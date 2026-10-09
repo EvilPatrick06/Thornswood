@@ -74,6 +74,7 @@ try {
     Put (Join-Path $tree 'launcher/art/scroll.png') 'png bytes'
     Put (Join-Path $tree 'launcher/app/ARCHITECTURE.md') 'notes'
     Put (Join-Path $tree 'records/client-build.json') '{"forkCommit":"abc"}'
+    Put (Join-Path $tree 'records/ui-gone.json') '{"daedric":{},"unused":[]}'
     Put (Join-Path $tree 'scripts/release/Build-Launcher.ps1') '# build'
 
     $h0 = Get-LauncherInputHash $tree
@@ -99,9 +100,13 @@ try {
     $h4 = Get-LauncherInputHash $tree
     Yes 'records\client-build.json counts, it is compiled in' ($h4 -ne $h3)
 
+    Put (Join-Path $tree 'records/ui-gone.json') '{"daedric":{},"unused":["bg.png"]}'
+    $hGone = Get-LauncherInputHash $tree
+    Yes 'records\ui-gone.json counts, it is compiled in' ($hGone -ne $h4)
+
     Put (Join-Path $tree 'scripts/release/Build-Launcher.ps1') '# build, changed'
     $h5 = Get-LauncherInputHash $tree
-    Yes 'Build-Launcher.ps1 counts' ($h5 -ne $h4)
+    Yes 'Build-Launcher.ps1 counts' ($h5 -ne $hGone)
 
     Put (Join-Path $tree 'game/plugins/thing.js') 'a plugin'
     Put (Join-Path $tree 'site/server.js') 'the site'

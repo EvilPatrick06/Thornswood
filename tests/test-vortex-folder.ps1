@@ -148,7 +148,13 @@ namespace Thornswood
         public static int IsolateCreations(ICollection<string> wanted, Action<string> say) { return 0; }
         public static int IsolateCreations(ICollection<string> wanted, ICollection<string> serverLight, Action<string> say) { return 0; }
     }
-    static class Keep { public static List<string> Held() { return new List<string>(); } }
+    static class Keep
+    {
+        public static List<string> Held() { return new List<string>(); }
+        // OwnGame.Foreign reads the hashed UI asset list Ship wrote, from Keep
+        // among other roots (#1318).
+        public static string Dir { get { return System.IO.Path.Combine(Paths.ProfileDir, "Keep"); } }
+    }
     static class Junction { public static bool IsLink(string p) { return false; } }
     static class Downgrade
     {
@@ -1010,6 +1016,8 @@ try {
             ForEach-Object { '    "{0}": {{ "bytes": 1, "sha1": "0", "depot": "1" }}' -f $_.Replace('\', '\') }
         [IO.File]::WriteAllText($skyrimList, "{`n  ""build"": ""1.6.1170"",`n  ""files"": {`n" + ($listed -join ",`n") + "`n  }`n}`n", $utf8)
         $cscArgs += "/resource:$skyrimList,skyrim-files.json"
+        $uiGoneList = Join-Path $Here 'records\ui-gone.json'
+        $cscArgs += "/resource:$uiGoneList,ui-gone.json"
     }
     foreach ($r in $refs) { $cscArgs += "/reference:$r" }
     foreach ($f in $real) { $cscArgs += (Resolve-Path -LiteralPath $f).Path }

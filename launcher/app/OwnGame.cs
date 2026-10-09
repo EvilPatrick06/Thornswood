@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.Win32.SafeHandles;
@@ -656,8 +658,20 @@ namespace Thornswood
         /// 14: Elysium Estate's old plugin, ElysiumEstateSSE.esp, is left out,
         ///    so a refresh cannot copy it back after a pack deletes it. See
         ///    Foreign, issue #690.
+        /// 15: another server's menu files under Data\Platform\UI (the 37
+        ///    Daedric Online files and the unused fork svgs plus bg.png) are
+        ///    left out, so a refresh cannot copy them back after a pack
+        ///    deletes them. Only index.html, build.js, thornswood-* files and
+        ///    hashed assets Ship wrote into the pack count as ours. See
+        ///    Foreign, issue #1318.
+        /// 16: an install that does not yet have the hashed UI asset list
+        ///    keeps those hashed front assets (chat fonts) on a refresh
+        ///    rather than dropping them. The Daedric set and unused fork
+        ///    assets in records\ui-gone.json stay out either way. Once a
+        ///    list exists, only names on it are ours. See Foreign, issue
+        ///    #1318.
         /// </summary>
-        const int Rules = 14;
+        const int Rules = 16;
 
         public static bool NeedsRefresh(Config cfg)
         {
@@ -738,6 +752,8 @@ namespace Thornswood
             ForgetGenerated();
 
             HashSet<string> deployed = Deployed(src);
+            uiHashedWalkRoot = src;
+            ResetUiHashedOurs();
             // Thornswood's own files by its records (#1232): the installer's
             // list, the packs' and Keep's, while they still say so.
             HashSet<string> ours = Ours(deployed);
@@ -870,6 +886,8 @@ namespace Thornswood
 
             Dictionary<string, Rec> old = ReadFiles();
             HashSet<string> deployed = Deployed(src);
+            uiHashedWalkRoot = src;
+            ResetUiHashedOurs();
             HashSet<string> owned = Owned(deployed);
             HashSet<string> ours = Ours(deployed);
             // Until every record of Thornswood's own files is here, nothing is
@@ -1866,17 +1884,217 @@ namespace Thornswood
                 return !leaf.StartsWith("thornswood-", StringComparison.OrdinalIgnoreCase);
             if (rel.StartsWith("Data\\Platform\\UI\\", StringComparison.OrdinalIgnoreCase))
             {
-                if (rel.StartsWith("Data\\Platform\\UI\\assets\\", StringComparison.OrdinalIgnoreCase)) return true;
+                // Same rule as Test-ShipOtherServer in Ship-Rules.ps1 (#1318):
+                // ours is index.html, build.js, thornswood-* files, and the
+                // hashed assets Ship wrote into the pack. Nested paths,
+                // another menu's Vite files, and any unnamed flat file are
+                // not ours, so a refresh cannot copy the Daedric set or the
+                // unused fork svgs back from the Steam copy after a pack
+                // deletes them. The list is read from the pack, never by
+                // parsing build.js, which might be somebody else's copy.
+                const string UiPrefix = "Data\\Platform\\UI\\";
+                if (rel.Length <= UiPrefix.Length) return true;
+                string rest = rel.Substring(UiPrefix.Length);
+                if (rest.IndexOf('\\') >= 0 || rest.IndexOf('/') >= 0) return true;
                 if (leaf.Equals("app.js", StringComparison.OrdinalIgnoreCase) || leaf.Equals("vite.svg", StringComparison.OrdinalIgnoreCase)) return true;
-                // Everything else flat under UI is ours: index.html, build.js,
-                // the thornswood-*.js overlays, and the front's own hashed
-                // fonts, icons and sounds beside build.js. Somebody else's menu
-                // is a Vite build, which is the assets folder and the two
-                // names above. The first version of this rule on 20 September
-                // whitelisted three names and would have left the front's 147
-                // asset files out of the next refresh.
+                if (leaf.Equals("index.html", StringComparison.OrdinalIgnoreCase) || leaf.Equals("build.js", StringComparison.OrdinalIgnoreCase)) return false;
+                if (leaf.StartsWith("thornswood-", StringComparison.OrdinalIgnoreCase)) return false;
+                // Before the no-list keep: the Daedric set and unused fork
+                // assets are never ours, by name or by sha256, from the
+                // same records\ui-gone.json Ship-Rules reads.
+                if (UiGoneLeaf(leaf)) return true;
+                if (UiGoneByHash(rel)) return true;
+                if (UiHashedAssetName(leaf))
+                {
+                    HashSet<string> ours = UiHashedOurs();
+                    // Packs from before #1318 have no list. Hashed front
+                    // assets (chat fonts and the rest) stay ours so a
+                    // refresh cannot drop them. Once a list exists, only
+                    // names on it are ours.
+                    if (ours.Count == 0) return false;
+                    return !ours.Contains(leaf);
+                }
+                return true;
             }
             return false;
+        }
+
+        const string UiAssetsRel = "Data\\Platform\\UI\\thornswood-ui-assets.txt";
+        static readonly Regex UiHashedName = new Regex("^[0-9a-f]{8,32}\\.(ttf|woff2?|eot|otf|svg|png|jpe?g|gif|wav|mp3|ogg|webp)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        static HashSet<string> uiHashedOurs;
+        static string uiHashedWalkRoot = null;
+        static string uiGoneRecordText;
+        static HashSet<string> uiGoneLeaves;
+        static HashSet<string> uiGoneHashes;
+
+        static string ReadUiGoneRecord()
+        {
+            if (!string.IsNullOrEmpty(uiGoneRecordText)) return uiGoneRecordText;
+            Stream stream;
+            try { stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("ui-gone.json"); }
+            catch (Exception ex)
+            {
+                throw new Exception("This launcher could not open records\\ui-gone.json (" + ex.Message.TrimEnd('.') +
+                    "), so a refresh cannot keep another server's menu files out. Update the launcher, or tell staff it said this.");
+            }
+            if (stream == null)
+                throw new Exception("This launcher was built without records\\ui-gone.json, so a refresh cannot keep another server's menu files out. Update the launcher, or tell staff it said this.");
+            try
+            {
+                using (StreamReader sr = new StreamReader(stream))
+                {
+                    string text = sr.ReadToEnd();
+                    if (string.IsNullOrEmpty(text))
+                        throw new Exception("This launcher's copy of records\\ui-gone.json is empty, so a refresh cannot keep another server's menu files out. Update the launcher, or tell staff it said this.");
+                    return text;
+                }
+            }
+            catch (Exception ex)
+            {
+                if (ex.Message != null && ex.Message.IndexOf("records\\ui-gone.json", StringComparison.Ordinal) >= 0) throw;
+                throw new Exception("This launcher could not read records\\ui-gone.json (" + ex.Message.TrimEnd('.') +
+                    "), so a refresh cannot keep another server's menu files out. Update the launcher, or tell staff it said this.");
+            }
+        }
+
+        static void EnsureUiGone()
+        {
+            if (uiGoneLeaves != null) return;
+            var leaves = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var hashes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            string text = ReadUiGoneRecord();
+            Match d = Regex.Match(text, "\"daedric\"\\s*:\\s*\\{([\\s\\S]*?)\\}");
+            Match u = Regex.Match(text, "\"unused\"\\s*:\\s*\\[([\\s\\S]*?)\\]");
+            if (!d.Success || !u.Success)
+                throw new Exception("This launcher's copy of records\\ui-gone.json is not the gone set, so a refresh cannot keep another server's menu files out. Update the launcher, or tell staff it said this.");
+            int daedric = 0;
+            foreach (Match m in Regex.Matches(d.Groups[1].Value, "\"([^\"]+)\"\\s*:\\s*\"([0-9a-fA-F]{64})\""))
+            {
+                leaves.Add(m.Groups[1].Value);
+                hashes.Add(m.Groups[2].Value.ToLowerInvariant());
+                daedric++;
+            }
+            int unused = 0;
+            foreach (Match m in Regex.Matches(u.Groups[1].Value, "\"([^\"]+)\""))
+            {
+                leaves.Add(m.Groups[1].Value);
+                unused++;
+            }
+            if (daedric == 0 || hashes.Count == 0 || unused == 0)
+                throw new Exception("This launcher's copy of records\\ui-gone.json names none of the gone set, so a refresh cannot keep another server's menu files out. Update the launcher, or tell staff it said this.");
+            uiGoneLeaves = leaves;
+            uiGoneHashes = hashes;
+        }
+
+        static bool UiGoneLeaf(string leaf)
+        {
+            if (string.IsNullOrEmpty(leaf)) return false;
+            EnsureUiGone();
+            return uiGoneLeaves.Contains(leaf);
+        }
+
+        static string UiFileSha256(string full, out bool unreadable)
+        {
+            unreadable = false;
+            if (string.IsNullOrEmpty(full) || !File.Exists(full)) return "";
+            SHA256 sha = SHA256.Create();
+            try
+            {
+                FileStream fs = new FileStream(full, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                try
+                {
+                    byte[] hash = sha.ComputeHash(fs);
+                    return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+                }
+                finally { fs.Dispose(); }
+            }
+            catch (Exception ex)
+            {
+                Swallow.Note("OwnGame.UiGone, hash " + full, ex);
+                unreadable = true;
+                return "";
+            }
+            finally { sha.Dispose(); }
+        }
+
+        static List<string> UiGoneHashRoots()
+        {
+            var roots = new List<string>();
+            if (!string.IsNullOrEmpty(Paths.Game)) roots.Add(Paths.Game);
+            try
+            {
+                if (!string.IsNullOrEmpty(Keep.Dir)) roots.Add(Keep.Dir);
+            }
+            catch (Exception ex) { Swallow.Note("OwnGame.UiGone, keep", ex); }
+            if (!string.IsNullOrEmpty(uiHashedWalkRoot)) roots.Add(uiHashedWalkRoot);
+            return roots;
+        }
+
+        static bool UiGoneByHash(string rel)
+        {
+            EnsureUiGone();
+            List<string> roots = UiGoneHashRoots();
+            for (int i = 0; i < roots.Count; i++)
+            {
+                bool unreadable;
+                string h = UiFileSha256(Path.Combine(roots[i], rel), out unreadable);
+                if (unreadable) return true;
+                if (h.Length > 0 && uiGoneHashes.Contains(h)) return true;
+            }
+            return false;
+        }
+
+        static bool UiHashedAssetName(string leaf)
+        {
+            return leaf != null && UiHashedName.IsMatch(leaf);
+        }
+
+        static void ResetUiHashedOurs()
+        {
+            uiHashedOurs = null;
+        }
+
+        static void LoadUiHashedList(HashSet<string> set, string path)
+        {
+            if (string.IsNullOrEmpty(path) || !File.Exists(path)) return;
+            foreach (string raw in File.ReadAllLines(path))
+            {
+                string n = (raw ?? "").Trim();
+                if (n.Length == 0 || n[0] == '#') continue;
+                if (n.IndexOfAny(new char[] { '/', '\\' }) >= 0) continue;
+                if (n.IndexOf("..", StringComparison.Ordinal) >= 0) continue;
+                if (UiHashedAssetName(n)) set.Add(n);
+            }
+        }
+
+        static void LoadUiHashedFromRoot(HashSet<string> set, string root)
+        {
+            if (string.IsNullOrEmpty(root)) return;
+            try { LoadUiHashedList(set, Path.Combine(root, UiAssetsRel)); }
+            catch (Exception ex) { Swallow.Note("OwnGame.UiHashedOurs, " + root, ex); }
+        }
+
+        /// <summary>
+        /// Hashed UI assets Ship wrote into the pack (#1318). Read from that
+        /// list, never by parsing build.js.
+        /// </summary>
+        static HashSet<string> UiHashedOurs()
+        {
+            if (uiHashedOurs != null) return uiHashedOurs;
+            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            try { LoadUiHashedFromRoot(set, Paths.Game); }
+            catch (Exception ex) { Swallow.Note("OwnGame.UiHashedOurs, game", ex); }
+            try { LoadUiHashedFromRoot(set, Keep.Dir); }
+            catch (Exception ex) { Swallow.Note("OwnGame.UiHashedOurs, keep", ex); }
+            LoadUiHashedFromRoot(set, uiHashedWalkRoot);
+            try
+            {
+                if (!string.IsNullOrEmpty(Paths.ProfileDir))
+                    LoadUiHashedList(set, Path.Combine(Paths.ProfileDir, "OwnGame", "ui-front-assets.txt"));
+            }
+            catch (Exception ex) { Swallow.Note("OwnGame.UiHashedOurs, profile", ex); }
+            uiHashedOurs = set;
+            return set;
         }
 
         static readonly string[] CopyTypes = {

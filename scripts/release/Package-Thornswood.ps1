@@ -397,6 +397,13 @@ try {
     Die ("Could not place game\required-data into $GameDir : " + $_.Exception.Message)
 }
 
+try {
+    $null = Save-ShipUiHashedAssets $GameDir
+    Say ("  front hashed assets named by build.js: {0}" -f @($script:ShipUiHashedWritten).Count) 'DarkGray'
+} catch {
+    Die $_.Exception.Message
+}
+
 # Listed from the long path. $GameDir is whatever was passed, and that is
 # the short 8.3 form when the folder sits under a short TEMP. FullName is
 # the long one, so cutting by $GameDir's length takes the wrong relative

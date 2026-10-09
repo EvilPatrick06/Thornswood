@@ -439,6 +439,17 @@ try {
     Die ("Could not place game\required-data into $GameDir : " + $_.Exception.Message)
 }
 
+# Hashed assets Data\Platform\UI\build.js names, parsed here, never kept by
+# hand (#1318). Zero names, a named file that is missing, or a path with a
+# slash all refuse the ship. The parsed names are written into the game
+# folder so the pack carries them and OwnGame.Foreign can read them.
+try {
+    $script:ShipUiHashedWritten = @(Save-ShipUiHashedAssets $GameDir)
+    Say ("  front hashed assets named by build.js: {0}" -f $script:ShipUiHashedWritten.Count) 'DarkGray'
+} catch {
+    Die $_.Exception.Message
+}
+
 $null = New-Item -ItemType Directory -Force -Path $DistDir
 
 . (Join-Path $Here '..\dev\Close-Launcher.ps1')
@@ -1015,6 +1026,17 @@ if ($changed.Count -or $removed.Count -or $profileChanged.Count) {
                 $sw = New-Object IO.StreamWriter ($e.Open())
                 foreach ($rel in $removed) { $sw.WriteLine(($rel -replace '\\', '/')) }
                 $sw.Flush(); $sw.Dispose()
+            }
+
+            # The hashed assets build.js named, for audit and for OwnGame
+            # (#1318). The same names are in the game file thornswood-ui-assets.txt.
+            $uiNames = @($script:ShipUiHashedWritten)
+            if ($uiNames.Count) {
+                $ue = $zip.CreateEntry('ui-assets.txt')
+                $uw = New-Object IO.StreamWriter ($ue.Open())
+                $uw.WriteLine('# hashed assets build.js named, #1318')
+                foreach ($n in $uiNames) { $uw.WriteLine($n) }
+                $uw.Flush(); $uw.Dispose()
             }
 
             # The load order rides in the last part. Anyone who stops halfway
@@ -2066,7 +2088,7 @@ if ($Dev) {
 $relSource = Get-ReleaseSource $RepoDir
 $relBaseline = if ($releaseBaseline) { [string]$releaseBaseline.id } else { '' }
 $relRecord = New-ReleaseRecord $Id $Channel (Val $doc 'launcherVersion') @($chunks | ForEach-Object { [string]$_.Id }) `
-    $relBaseline $relSource.Commit $relSource.Branch $relSource.Uncommitted
+    $relBaseline $relSource.Commit $relSource.Branch $relSource.Uncommitted @($script:ShipUiHashedWritten)
 Set-Prop $doc 'release' $relRecord
 Say ("  release {0}{1}" -f $Id, $(if ($relRecord.commit) { ', built from ' + $relRecord.commit.Substring(0, 12) } else { ', not from a git checkout' })) 'Green'
 # ==== end thornswood release record ====

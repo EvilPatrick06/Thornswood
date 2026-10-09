@@ -281,6 +281,24 @@ $lifted = [ordered]@{
     'OwnGame.UnwantedCreation' = Get-CsMember $og 'static bool UnwantedCreation(string rel)'
     'OwnGame.ClientFiles'      = (Get-CsMember $og 'public static readonly string[] ClientFiles =') + ';'
     'OwnGame.ClientFile'       = Get-CsMember $og 'public static bool ClientFile(string rel)'
+    'OwnGame.UiAssetsRel'      = Get-CsLine $og '(?m)^\s*const string UiAssetsRel = [^\r\n]*;'
+    'OwnGame.UiHashedName'     = Get-CsLine $og '(?m)^\s*static readonly Regex UiHashedName = [^\r\n]*;'
+    'OwnGame.uiHashedOursField' = Get-CsLine $og '(?m)^\s*static HashSet<string> uiHashedOurs;'
+    'OwnGame.uiHashedWalkRoot' = Get-CsLine $og '(?m)^\s*static string uiHashedWalkRoot = [^\r\n]*;'
+    'OwnGame.uiGoneRecordText' = Get-CsLine $og '(?m)^\s*static string uiGoneRecordText;'
+    'OwnGame.uiGoneLeaves'     = Get-CsLine $og '(?m)^\s*static HashSet<string> uiGoneLeaves;'
+    'OwnGame.uiGoneHashes'     = Get-CsLine $og '(?m)^\s*static HashSet<string> uiGoneHashes;'
+    'OwnGame.ReadUiGoneRecord' = Get-CsMember $og 'static string ReadUiGoneRecord()'
+    'OwnGame.EnsureUiGone'     = Get-CsMember $og 'static void EnsureUiGone()'
+    'OwnGame.UiGoneLeaf'       = Get-CsMember $og 'static bool UiGoneLeaf(string leaf)'
+    'OwnGame.UiFileSha256'     = Get-CsMember $og 'static string UiFileSha256(string full, out bool unreadable)'
+    'OwnGame.UiGoneHashRoots'  = Get-CsMember $og 'static List<string> UiGoneHashRoots()'
+    'OwnGame.UiGoneByHash'     = Get-CsMember $og 'static bool UiGoneByHash(string rel)'
+    'OwnGame.UiHashedAssetName' = Get-CsMember $og 'static bool UiHashedAssetName(string leaf)'
+    'OwnGame.ResetUiHashedOurs' = Get-CsMember $og 'static void ResetUiHashedOurs()'
+    'OwnGame.LoadUiHashedList' = Get-CsMember $og 'static void LoadUiHashedList(HashSet<string> set, string path)'
+    'OwnGame.LoadUiHashedFromRoot' = Get-CsMember $og 'static void LoadUiHashedFromRoot(HashSet<string> set, string root)'
+    'OwnGame.UiHashedOurs'     = Get-CsMember $og 'static HashSet<string> UiHashedOurs()'
     'OwnGame.Foreign'          = Get-CsMember $og 'public static bool Foreign(string rel)'
     'Checks.OffSuffix'         = Get-CsLine $ck '(?m)^\s*public const string OffSuffix = "[^"\r\n]*";'
     'Keep.Platform'            = Get-CsLine $keepCs '(?m)^\s*const string Platform = [^\r\n]*;'
@@ -300,6 +318,8 @@ $cs = @"
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
+using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 namespace $ns
 {
@@ -328,8 +348,32 @@ namespace $ns
         $($lifted['OwnGame.UnwantedCreation'])
         $($lifted['OwnGame.ClientFiles'])
         $($lifted['OwnGame.ClientFile'])
+        $($lifted['OwnGame.UiAssetsRel'])
+        $($lifted['OwnGame.UiHashedName'])
+        $($lifted['OwnGame.uiHashedOursField'])
+        $($lifted['OwnGame.uiHashedWalkRoot'])
+        $($lifted['OwnGame.uiGoneRecordText'])
+        $($lifted['OwnGame.uiGoneLeaves'])
+        $($lifted['OwnGame.uiGoneHashes'])
+        $($lifted['OwnGame.ReadUiGoneRecord'])
+        $($lifted['OwnGame.EnsureUiGone'])
+        $($lifted['OwnGame.UiGoneLeaf'])
+        $($lifted['OwnGame.UiFileSha256'])
+        $($lifted['OwnGame.UiGoneHashRoots'])
+        $($lifted['OwnGame.UiGoneByHash'])
+        $($lifted['OwnGame.UiHashedAssetName'])
+        $($lifted['OwnGame.ResetUiHashedOurs'])
+        $($lifted['OwnGame.LoadUiHashedList'])
+        $($lifted['OwnGame.LoadUiHashedFromRoot'])
+        $($lifted['OwnGame.UiHashedOurs'])
         $($lifted['OwnGame.Foreign'])
         public static string SkipOf(string rel) { return Skip(rel); }
+        public static void ResetUiHashedOursForTest() { ResetUiHashedOurs(); }
+        public static void SetUiGoneRecordForTest(string text) {
+            uiGoneRecordText = text;
+            uiGoneLeaves = null;
+            uiGoneHashes = null;
+        }
     }
     public static class Keep
     {
@@ -353,6 +397,11 @@ $OwnGameT = [type]($ns + '.OwnGame')
 $KeepT    = [type]($ns + '.Keep')
 $PathsT   = [type]($ns + '.Paths')
 
+# Foreign on a UI path loads the gone record. The lifted type has no
+# embedded copy, so the override must be in place before those paths.
+$goneText = [IO.File]::ReadAllText((Join-Path $Here 'records\ui-gone.json'))
+$OwnGameT::SetUiGoneRecordForTest($goneText)
+
 Yes 'OwnGame.Foreign calls the dresser not ours' ($OwnGameT::Foreign($rel))
 Yes 'so a refresh leaves it out of the game folder' ($null -ne $OwnGameT::SkipOf($rel))
 Yes ('and still takes our {0} plugin(s)' -f $ours.Count) (@($ours | Where-Object { $null -ne $OwnGameT::SkipOf('Data\Platform\Plugins\' + $_) }).Count -eq 0)
@@ -364,6 +413,11 @@ $twins = @($rel, 'Data\Platform\Plugins\somebody-else.js', 'Data\Interface\map.s
            # #690: Elysium Estate's old plugin is left out, the collection's is not.
            'Data\ElysiumEstateSSE.esp', 'Data\ElysiumEstate.esp',
            'Data\Platform\UI\assets\app-1.js', 'Data\Platform\UI\thornswood-chat.js',
+           # #1318: another server's menu and unused fork assets are left out;
+           # the two keeps still ship.
+           'Data\Platform\UI\menu_theme.mp3', 'Data\Platform\UI\bg.png',
+           'Data\Platform\UI\thornswood-menu.jpg', 'Data\Platform\UI\thornswood-theme.mp3',
+           'Data\Platform\UI\logo.png',
            'Data\Platform\PluginsNoLoad\auth-data-no-load.js',
            # #960: SkyUI 5.2's loose scripts are left out, MCM Recorder's are not.
            'Data\Scripts\ski_main.pex', 'Data\Scripts\SKI_WidgetManager.pex',
@@ -372,6 +426,153 @@ $twins += @($ours | ForEach-Object { 'Data\Platform\Plugins\' + $_ })
 $apart = @($twins | Where-Object { [bool]$OwnGameT::Foreign($_) -ne [bool](Test-ShipOtherServer $_) })
 Yes ('OwnGame.Foreign and Test-ShipOtherServer agree on all {0} paths asked, the dresser among them' -f $twins.Count) ($apart.Count -eq 0)
 foreach ($a in $apart) { Write-Host "      they disagree on $a" }
+
+# OwnGame reads the pack list. A listed hashed name is ours. An install
+# with no list yet must not drop hashed front assets on a refresh. The
+# Daedric set and unused fork assets stay out either way, from the same
+# records\ui-gone.json Ship-Rules loaded.
+$uiOwn = Join-Path ([IO.Path]::GetTempPath()) ('ts-ui-own-' + [Diagnostics.Process]::GetCurrentProcess().Id)
+try {
+    $uiGame = Join-Path $uiOwn 'Game'
+    $uiProf = Join-Path $uiOwn 'Profile'
+    New-Item -ItemType Directory -Force -Path (Join-Path $uiGame 'Data\Platform\UI') | Out-Null
+    New-Item -ItemType Directory -Force -Path $uiProf | Out-Null
+    $listed = 'cafebabeface0123.png'
+    $otherHashed = 'deadbeefdeadbeef.png'
+    $fontRel = 'Data\Platform\UI\' + $listed
+    $otherRel = 'Data\Platform\UI\' + $otherHashed
+    $daedricJpg = @($ShipDaedricMenu.Keys | Where-Object { $_ -like '*.jpg' } | Select-Object -First 1)[0]
+    $daedricTtf = @($ShipDaedricMenu.Keys | Where-Object { $_ -like '*.ttf' } | Select-Object -First 1)[0]
+    $unusedSvg  = @($ShipUnusedFrontAssets | Where-Object { $_ -like '*.svg' } | Select-Object -First 1)[0]
+    $savedGame = $PathsT::Game
+    $savedProf = $PathsT::ProfileDir
+    $PathsT::Game = $null
+    $PathsT::ProfileDir = $null
+    $OwnGameT::ResetUiHashedOursForTest()
+    Yes 'OwnGame: with no ui-assets list yet, a hashed front asset is ours so a refresh cannot drop it' (-not $OwnGameT::Foreign($fontRel))
+    Yes '  and a non-hash bare name like logo.png is still not ours' ($OwnGameT::Foreign('Data\Platform\UI\logo.png'))
+    Yes '  and a Daedric jpg is not ours, even with no list' ($OwnGameT::Foreign('Data\Platform\UI\' + $daedricJpg))
+    Yes '  and a Daedric ttf is not ours, even with no list' ($OwnGameT::Foreign('Data\Platform\UI\' + $daedricTtf))
+    Yes '  and an unused fork svg is not ours, even with no list' ($OwnGameT::Foreign('Data\Platform\UI\' + $unusedSvg))
+
+    $PathsT::Game = $uiGame
+    $PathsT::ProfileDir = $uiProf
+    $renamedRel = 'Data\Platform\UI\abcdef0123456789.jpg'
+    $renamedFull = Join-Path $uiGame $renamedRel
+    [IO.File]::WriteAllText($renamedFull, 'daedric-renamed-copy')
+    $renamedSha = Get-ShipFileSha256 $renamedFull
+    $injected = $goneText.Replace('"daedric": {', ('"daedric": { "zz-test.jpg": "' + $renamedSha + '",'))
+    $OwnGameT::SetUiGoneRecordForTest($injected)
+    $OwnGameT::ResetUiHashedOursForTest()
+    Yes '  and a renamed Daedric file is caught by hash, even with no list' ($OwnGameT::Foreign($renamedRel))
+
+    # Unreadable hashed file, still no list. The old fail-open treated a
+    # hashed name as ours when the list was missing, so this case would
+    # pass that code. With a list, a hashed name not on it is already
+    # not ours even without the unreadable check.
+    $OwnGameT::SetUiGoneRecordForTest($goneText)
+    $lockedRel = 'Data\Platform\UI\fedcba9876543210.jpg'
+    $lockedFull = Join-Path $uiGame $lockedRel
+    [IO.File]::WriteAllText($lockedFull, 'hashed-but-unreadable')
+    $lock = [IO.File]::Open($lockedFull, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None)
+    try {
+        $OwnGameT::ResetUiHashedOursForTest()
+        Yes '  and an unreadable hashed UI file is not ours, even with no list' ($OwnGameT::Foreign($lockedRel))
+    } finally { $lock.Dispose() }
+
+    $listPath = Join-Path $uiGame 'Data\Platform\UI\thornswood-ui-assets.txt'
+    [IO.File]::WriteAllLines($listPath, @('# hashed assets build.js named, #1318', $listed))
+    $OwnGameT::ResetUiHashedOursForTest()
+    Yes 'OwnGame counts a listed hashed name as ours' (-not $OwnGameT::Foreign($fontRel))
+    Yes '  and a hashed name the list does not carry is not ours' ($OwnGameT::Foreign($otherRel))
+    Yes '  and a Daedric jpg is still not ours when a ui-assets list is present' ($OwnGameT::Foreign('Data\Platform\UI\' + $daedricJpg))
+
+    $lock = [IO.File]::Open($lockedFull, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None)
+    try {
+        $OwnGameT::ResetUiHashedOursForTest()
+        Yes '  and an unreadable hashed UI file is not ours' ($OwnGameT::Foreign($lockedRel))
+    } finally { $lock.Dispose() }
+
+    $OwnGameT::SetUiGoneRecordForTest($null)
+    $missingThrew = $false
+    $missingSaid = ''
+    try { [void]$OwnGameT::Foreign($fontRel) } catch { $missingThrew = $true; $missingSaid = $_.Exception.Message }
+    Yes 'OwnGame refuses when the gone record is missing' ($missingThrew -and ($missingSaid -match 'ui-gone\.json'))
+
+    $OwnGameT::SetUiGoneRecordForTest('{ "not": "the gone set" }')
+    $corruptThrew = $false
+    $corruptSaid = ''
+    try { [void]$OwnGameT::Foreign($fontRel) } catch { $corruptThrew = $true; $corruptSaid = $_.Exception.Message }
+    Yes '  and refuses when the gone record is corrupt' ($corruptThrew -and ($corruptSaid -match 'ui-gone\.json'))
+
+    # Empty embedded record. SetUiGoneRecordForTest('') is IsNullOrEmpty, so
+    # ReadUiGoneRecord falls through to the missing-resource path. A second
+    # compile of the lifted OwnGame with a 0-byte ui-gone.json is the empty
+    # ReadToEnd branch.
+    $emptyNs = $ns + 'Empty'
+    $csEmpty = $cs.Replace("namespace $ns", "namespace $emptyNs")
+    $emptyDir = Join-Path $uiOwn 'empty-gone'
+    New-Item -ItemType Directory -Force -Path $emptyDir | Out-Null
+    $emptyRes = Join-Path $emptyDir 'ui-gone.json'
+    [IO.File]::WriteAllBytes($emptyRes, [byte[]]@())
+    $csFile = Join-Path $emptyDir 'lifted.cs'
+    $driverFile = Join-Path $emptyDir 'driver.cs'
+    $emptyExe = Join-Path $emptyDir 'empty-gone.exe'
+    [IO.File]::WriteAllText($csFile, $csEmpty)
+    [IO.File]::WriteAllText($driverFile, @"
+using System;
+namespace $emptyNs {
+    static class EmptyGoneProgram {
+        static int Main() {
+            try {
+                Console.Write(OwnGame.Foreign("Data\\Platform\\UI\\cafebabeface0123.png"));
+                return 2;
+            } catch (Exception ex) {
+                Console.Write(ex.Message ?? "");
+                return 0;
+            }
+        }
+    }
+}
+"@)
+    $csc = $null
+    if ($env:WINDIR) {
+        $csc = @(
+            (Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'),
+            (Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe')
+        ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+    }
+    Yes 'the .NET Framework csc the launcher builds with is on this machine' ([bool]$csc)
+    $emptyBuilt = $false
+    if ($csc) {
+        $fw = Split-Path -Parent $csc
+        $cscArgs = @(
+            '/noconfig', '/nologo', '/target:exe', '/warn:0',
+            "/out:$emptyExe",
+            "/resource:$emptyRes,ui-gone.json",
+            "/reference:$(Join-Path $fw 'System.dll')",
+            "/reference:$(Join-Path $fw 'System.Core.dll')",
+            $csFile,
+            $driverFile
+        )
+        $cscOut = & $csc @cscArgs 2>&1
+        $emptyBuilt = ($LASTEXITCODE -eq 0) -and (Test-Path -LiteralPath $emptyExe)
+        if (-not $emptyBuilt) { Write-Host ('      ' + ($cscOut | Out-String).Trim()) }
+    }
+    $emptySaid = ''
+    if ($emptyBuilt) {
+        $emptySaid = & $emptyExe 2>&1 | Out-String
+    }
+    Yes 'OwnGame refuses when the embedded gone record is empty' (
+        $emptySaid -match 'is empty' -and $emptySaid -match 'ui-gone\.json')
+
+    $OwnGameT::SetUiGoneRecordForTest($goneText)
+    $PathsT::Game = $savedGame
+    $PathsT::ProfileDir = $savedProf
+    $OwnGameT::ResetUiHashedOursForTest()
+} finally {
+    Remove-Item -LiteralPath $uiOwn -Recurse -Force -ErrorAction SilentlyContinue
+}
 
 $rulesNum = [regex]::Match($og, '(?m)^\s*const int Rules = (\d+);')
 $rulesDoc = [regex]::Match($og, '(?m)^\s*/// (\d+): the retired dresser, thornswood-chargen\.js')

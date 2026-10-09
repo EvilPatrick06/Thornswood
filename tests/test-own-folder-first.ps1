@@ -980,6 +980,7 @@ $listed = @('SkyrimSE.exe', 'bink2w64.dll', 'Data\Skyrim.esm', 'Data\Skyrim - Te
     ForEach-Object { '    "{0}": {{ "bytes": 1, "sha1": "0", "depot": "1" }}' -f $_.Replace('\', '\\') }
 Put $skyrimList ("{`n  ""build"": ""1.6.1170"",`n  ""files"": {`n" + ($listed -join ",`n") + "`n  }`n}`n")
 $cscArgs += ('/resource:' + $skyrimList + ',skyrim-files.json')
+$cscArgs += ('/resource:' + (Join-Path $Repo 'records\ui-gone.json') + ',ui-gone.json')
 $cscArgs += $cs
 $cscArgs += $driverCs
 $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'

@@ -42,7 +42,7 @@ function Read([string]$name) {
 
 # ---- Build-Launcher.ps1 --------------------------------------------------------
 $b = Read 'Build-Launcher.ps1'
-foreach ($n in 'logo.png', 'launcher-header.jpg', 'launcher-header.mp4', 'Thornswood.ini', 'client-build.json') {
+foreach ($n in 'logo.png', 'launcher-header.jpg', 'launcher-header.mp4', 'Thornswood.ini', 'client-build.json', 'ui-gone.json') {
     Yes "Build-Launcher stops when $n is not found" ($b -match ('Die "' + [regex]::Escape($n) + ' is not at'))
 }
 Yes '  and no longer only warns about any of them' ($b -notmatch "is missing, the launcher will run without its emblem' 'Yellow'" -and $b -notmatch "client-build\.json is missing; the launcher will not be able")
@@ -74,7 +74,7 @@ Yes 'Ship''s untracked-file gate looks past tools' ($s -match "\`$moreRoots = @\
 if (Get-Command git -ErrorAction SilentlyContinue) {
     $tracked = @(& git -C $repo ls-files 2>$null)
     foreach ($f in 'launcher/logo.png', 'launcher/launcher-header.jpg', 'launcher/launcher-header.mp4', 'launcher/Thornswood.ini',
-                   'records/client-build.json', 'installer/Setup-Thornswood.ps1', 'installer/Install.bat', 'installer/Setup.bat', 'installer/READ ME FIRST.txt',
+                   'records/client-build.json', 'records/ui-gone.json', 'installer/Setup-Thornswood.ps1', 'installer/Install.bat', 'installer/Setup.bat', 'installer/READ ME FIRST.txt',
                    'game/ui/index.html', 'site/public/banner.webm', 'site/public/banner.mp4', 'site/public/banner.jpg',
                    'game/menu/logo.nif', 'game/menu/logo01ae.nif', 'game/menu/Mainmenuwallpaper.dds', 'scripts/release/Sync-Client.ps1', 'installer/setup/Bootstrap.cs') {
         Yes "$f is tracked, so its absence is a wrong path" ($tracked -contains $f)

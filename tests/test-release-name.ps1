@@ -179,7 +179,7 @@ try {
     $fake = Join-Path $Scratch 'repo'
     New-Item -ItemType Directory -Force -Path $fake | Out-Null
     Copy-Item -LiteralPath (Join-Path $repo 'scripts') -Destination $fake -Recurse -Force
-    foreach ($f in 'layout.json', 'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt', 'records\generated.json') {
+    foreach ($f in 'layout.json', 'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt', 'records\generated.json', 'records\ui-gone.json') {
         $from = Join-Path $repo $f
         if (Test-Path -LiteralPath $from) {
             New-Item -ItemType Directory -Force -Path (Split-Path -Parent (Join-Path $fake $f)) | Out-Null
@@ -205,7 +205,7 @@ try {
     foreach ($dd in 'Game\Data', 'Profile\OwnGame', 'appdata', 'dist') { New-Item -ItemType Directory -Force -Path (Join-Path $inst $dd) | Out-Null }
     New-Item -ItemType Directory -Force -Path (Join-Path $site 'feed'), (Join-Path $site 'feed-dev'), $rel | Out-Null
     [IO.File]::WriteAllLines((Join-Path $inst 'Profile\OwnGame\files.txt'), @('F|V|1024|638000000000000000|Data\collection.esp'))
-    Put (Join-Path $inst 'Game\Data\Platform\UI\ours.esp') 'the plugin, changed'
+    Put (Join-Path $inst 'Game\Data\Platform\UI\thornswood-ours.esp') 'the plugin, changed'
     # Every pack carries the reference plugin list in the game server's order,
     # read from its manifest on the resources port. A stand-in server on this
     # machine answers for it, and config.json points there.
@@ -219,6 +219,8 @@ try {
     # The covered bodies a publish needs since d2519bb, as a build leaves them.
     . (Join-Path $repo 'tests\fixtures\generated-bodies.ps1')
     New-GeneratedBodies $inst $fake
+    . (Join-Path $repo 'tests\fixtures\ui-front.ps1')
+    Install-UiFrontFixture (Join-Path $inst 'Game')
     $node = Get-Command node -ErrorAction SilentlyContinue
     Yes 'node is on PATH, for the stand-in game server' ($null -ne $node)
     if ($null -eq $node) { Done }
@@ -246,12 +248,12 @@ try {
     }
     $null = $script:gameServer.StandardOutput.ReadToEndAsync()
     Put (Join-Path $inst 'config.json') ('{"ServerAddress":"127.0.0.1","ServerPort":' + ($port - 1) + '}')
-    Put (Join-Path $inst 'Game\Data\Platform\UI\ours.bsa') ('x' * 4096)
+    Put (Join-Path $inst 'Game\Data\Platform\UI\thornswood-ours.bsa') ('x' * 4096)
     # What the last release published, on the stand-in store: the plugin as it
     # was, so this build has something to send. The feed names no baseline
     # record yet, so the store's copy is what it is diffed against.
     Put (Join-Path $site 'feed\version.json') '{"launcherVersion":"1.1.102","packs":[],"news":[]}'
-    Put (Join-Path $site 'feed\published.json') '{"Data\\Platform\\UI\\ours.esp":"5:0000000000000000000000000000000000000000000000000000000000000000"}'
+    Put (Join-Path $site 'feed\published.json') '{"Data\\Platform\\UI\\thornswood-ours.esp":"5:0000000000000000000000000000000000000000000000000000000000000000"}'
     $Shell = (Get-Process -Id $PID).Path
     function Publish([string[]]$extra) {
         $oldA = $env:LOCALAPPDATA; $oldE = $ErrorActionPreference
@@ -335,7 +337,7 @@ try {
 
     # d. A second real release straight after the first (#1057): its own id,
     #    never the first's, so a launcher that took the first still takes it.
-    Put (Join-Path $inst 'Game\Data\Platform\UI\ours.esp') 'the plugin, changed for a second release'
+    Put (Join-Path $inst 'Game\Data\Platform\UI\thornswood-ours.esp') 'the plugin, changed for a second release'
     $r = Publish @('-Notes', "'Test release`n- a second one'")
     YesR ("a second release goes out under an id of its own ({0} after {1}, exit {2})" -f $r.Published, $id, $r.Code) (
         $r.Code -eq 0 -and $r.Published -match '^\d{8}-\d{6}$' -and $r.Published -ne $id) $r
@@ -344,13 +346,13 @@ try {
         @($ids | Select-Object -Unique).Count -eq $ids.Count)
     $applied = @($id)
     Yes '  and a launcher that applied the first has the second still to take' (@($ids | Where-Object { $applied -notcontains $_ }) -contains $r.Published)
-    Put (Join-Path $inst 'Game\Data\Platform\UI\ours.esp') 'the plugin, changed for a release under a taken name'
+    Put (Join-Path $inst 'Game\Data\Platform\UI\thornswood-ours.esp') 'the plugin, changed for a release under a taken name'
     $r2 = Publish @('-Notes', "'Test release`n- a clash'", '-Id', $r.Published)
     YesR ("  an -Id the feed already has is refused (exit {0})" -f $r2.Code) ($r2.Code -ne 0 -and $r2.Out -match 'already has a release or pack named') $r2
 
     # b. What Ship -DryRun passes: -NoUpload -NoPush. Nothing is sent, so
     #    nothing may be named as sent.
-    Put (Join-Path $inst 'Game\Data\Platform\UI\ours.esp') 'the plugin, changed again'
+    Put (Join-Path $inst 'Game\Data\Platform\UI\thornswood-ours.esp') 'the plugin, changed again'
     $siteBefore = [IO.File]::ReadAllText((Join-Path $site 'feed\version.json'))
     # A fixed id, so the checks below can name it.
     $r = Publish @('-Notes', "'Test release`n- two lines'", '-Id', '20990101-0001', '-NoUpload', '-NoPush', '-NoClose', '-KeepPacks', '0')
@@ -365,7 +367,7 @@ try {
     Yes '  the feed it wrote here still names its release, with no baseline, as it sent none' ($null -ne $lrec -and $lrec.id -eq '20990101-0001' -and $lrec.baseline -eq '')
 
     # c. A feed send that fails: the store's version.json cannot be replaced.
-    Put (Join-Path $inst 'Game\Data\Platform\UI\ours.esp') 'the plugin, changed a third time'
+    Put (Join-Path $inst 'Game\Data\Platform\UI\thornswood-ours.esp') 'the plugin, changed a third time'
     [void](Receive-FeedStore 'main' $rel -SiteDir $site)
     New-Item -ItemType Directory -Force -Path (Join-Path $site 'feed\version.json.part\in-the-way') | Out-Null
     $siteBefore = [IO.File]::ReadAllText((Join-Path $site 'feed\version.json'))

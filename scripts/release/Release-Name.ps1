@@ -138,7 +138,8 @@ function Get-ReleaseSource([string]$RepoDir) {
 # The "release" object Publish-Update writes into version.json. The tag is
 # named only when there is a commit for it to go on.
 function New-ReleaseRecord([string]$Id, [string]$Channel, [string]$LauncherVersion, [string[]]$Packs,
-                           [string]$Baseline, [string]$Commit, [string]$Branch, [int]$Uncommitted) {
+                           [string]$Baseline, [string]$Commit, [string]$Branch, [int]$Uncommitted,
+                           [string[]]$UiAssets = @()) {
     $ch = if ($Channel -eq 'dev') { 'dev' } else { 'main' }
     $tag = if ($Commit) { Get-ReleaseTagName $ch $Id } else { '' }
     return [pscustomobject][ordered]@{
@@ -151,6 +152,7 @@ function New-ReleaseRecord([string]$Id, [string]$Channel, [string]$LauncherVersi
         branch          = [string]$Branch
         uncommitted     = $Uncommitted
         tag             = $tag
+        uiAssets        = @(@($UiAssets) | Where-Object { $_ } | ForEach-Object { [string]$_ })
     }
 }
 
