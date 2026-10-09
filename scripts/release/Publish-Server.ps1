@@ -92,8 +92,10 @@ param(
     # sends nothing but the installer, and writes no news.
     [switch]$PutBack,
     # How long the new server has to answer on the box before the previous one
-    # goes back.
-    [int]$Wait = 60,
+    # goes back. Left off, the shared ceiling in ServerReadyWait.ps1, derived
+    # from measured Live and Dev starts (#1938). A start that never answers
+    # still rolls back.
+    [int]$Wait,
     # The build record the binary is held to (#1214). The repository's own,
     # which the committed check below holds to the commit.
     [string]$Record = '',
@@ -173,7 +175,7 @@ foreach ($t in 'ssh', 'scp') {
 # with uncommitted changes, or untracked, refuses it here, naming each, before
 # anything is built or the box is asked anything. There is no switch past it.
 . (Join-Path $Here '..\deploy\Artifact.ps1')
-$committedOnly = @('scripts/deploy/Install-ThornswoodServer.ps1', 'scripts/deploy/ServerSettings.ps1', 'scripts/deploy/ServerBuild.ps1', 'scripts/vps/Roll-Log.ps1')
+$committedOnly = @('scripts/deploy/Install-ThornswoodServer.ps1', 'scripts/deploy/ServerSettings.ps1', 'scripts/deploy/ServerBuild.ps1', 'scripts/deploy/ServerReadyWait.ps1', 'scripts/vps/Roll-Log.ps1')
 if (-not $PutBack) { $committedOnly += 'game/gamemode.js', 'records/most-online.json', 'records/server-build.json' }
 try { Assert-ThornswoodCommitted -RepoDir (Join-Path $Here '..\..') -Paths $committedOnly -What 'this publish' }
 catch { Die $_.Exception.Message }
@@ -198,6 +200,14 @@ if (-not (Test-Path -LiteralPath $settingsLib)) { Die "not found: $settingsLib" 
 $buildLib = Join-Path $Here '..\deploy\ServerBuild.ps1'
 if (-not (Test-Path -LiteralPath $buildLib)) { Die "not found: $buildLib" }
 . $buildLib
+# How long a start may take to answer on both ports (#1938). The installer
+# loads it from beside itself on the box, so it goes up with the others.
+$waitLib = Join-Path $Here '..\deploy\ServerReadyWait.ps1'
+if (-not (Test-Path -LiteralPath $waitLib)) { Die "not found: $waitLib" }
+. $waitLib
+if (-not $PSBoundParameters.ContainsKey('Wait')) {
+    $Wait = Get-ThornswoodServerReadyWait
+}
 
 # What the installer said, printed as it comes, and its last line read: it
 # ends with INSTALL OK, INSTALL REFUSED, INSTALL ROLLED BACK or INSTALL FAILED.
@@ -225,6 +235,8 @@ if ($PutBack) {
     Invoke-ThornswoodNative { & scp @ssh $settingsLib "${target}:C:/ServerSettings.ps1" }
     if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
     Invoke-ThornswoodNative { & scp @ssh $buildLib "${target}:C:/ServerBuild.ps1" }
+    if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
+    Invoke-ThornswoodNative { & scp @ssh $waitLib "${target}:C:/ServerReadyWait.ps1" }
     if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
     Invoke-Installer "-Root '$VpsRoot' -TaskName '$TaskName' -StartNow -PutBack -Wait $Wait"
     Say 'the previous server is back and answering up there' 'Green'
@@ -465,6 +477,8 @@ if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. The server up the
 Invoke-ThornswoodNative { & scp @ssh $settingsLib "${target}:C:/ServerSettings.ps1" }
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. The server up there was not touched." }
 Invoke-ThornswoodNative { & scp @ssh $buildLib "${target}:C:/ServerBuild.ps1" }
+if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. The server up there was not touched." }
+Invoke-ThornswoodNative { & scp @ssh $waitLib "${target}:C:/ServerReadyWait.ps1" }
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. The server up there was not touched." }
 Say 'copied' 'Green'
 

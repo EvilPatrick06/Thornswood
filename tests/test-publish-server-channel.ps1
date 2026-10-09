@@ -220,6 +220,7 @@ try {
     Yes '  and not what the build folder holds that is no part of a release' ($ents -notcontains 'gamemode.js.progression-20260921' -and $ents -notcontains 'data/manifest.json')
     Yes '  and ServerBuild.ps1 went up beside the installer, which holds them again with it' (@($r.Calls | Where-Object { $_ -match '^scp .*ServerBuild\.ps1 .*C:/ServerBuild\.ps1' }).Count -eq 1)
     Yes '  and ServerSettings.ps1 went up beside the installer (#1222)' (@($r.Calls | Where-Object { $_ -match '^scp .*ServerSettings\.ps1 .*C:/ServerSettings\.ps1' }).Count -eq 1)
+    Yes '  and ServerReadyWait.ps1 went up beside the installer (#1938)' (@($r.Calls | Where-Object { $_ -match '^scp .*ServerReadyWait\.ps1 .*C:/ServerReadyWait\.ps1' }).Count -eq 1)
     $local = Get-Content -LiteralPath $settings -Raw | ConvertFrom-Json
     Yes ("  and the build's own settings are the live ones still (port {0}, name {1})" -f $local.port, $local.name) ([int]$local.port -eq 7777 -and $local.name -eq 'Thornswood' -and [int]$local.thornswoodVoicePort -eq 7778)
     # The gamemode and the number of seats are the build's, written the same on
