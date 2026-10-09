@@ -438,6 +438,21 @@ jobs:
           if ($failed.Count) { Write-Host ("{0} harness(es) failed: {1}" -f $failed.Count, ($failed -join ', ')); exit 1 }
           Write-Host ('all {0} passed' -f $six.Count)
 
+      - name: Run the signer check
+        shell: pwsh
+        run: |
+          # Issue #2046. tests\test-signer-check.ps1 sat 1 of 34 red every
+          # night from 5 Oct while this build stayed green, because it ran
+          # only at night. It compiles Signature.cs and points Refusal and
+          # MicrosoftRefusal at real files, about two seconds. The harness
+          # restarts itself in Windows PowerShell 5.1, the .NET Framework
+          # the launcher runs on.
+          & pwsh -NoProfile -File tests\test-signer-check.ps1
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::error file=tests/test-signer-check.ps1::the signer check failed, the FAIL lines above say what'
+            exit 1
+          }
+
       - name: Check NPC population policy
         shell: pwsh
         run: |
