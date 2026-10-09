@@ -656,8 +656,14 @@ namespace Thornswood
         /// 14: Elysium Estate's old plugin, ElysiumEstateSSE.esp, is left out,
         ///    so a refresh cannot copy it back after a pack deletes it. See
         ///    Foreign, issue #690.
+        /// 15: another server's menu files under Data\Platform\UI (the 37
+        ///    Daedric Online files and the unused fork svgs plus bg.png) are
+        ///    left out, so a refresh cannot copy them back after a pack
+        ///    deletes them. Only index.html, build.js, thornswood-* files and
+        ///    hashed assets Ship wrote into the pack count as ours. See
+        ///    Foreign, issue #1318.
         /// </summary>
-        const int Rules = 14;
+        const int Rules = 15;
 
         public static bool NeedsRefresh(Config cfg)
         {
@@ -738,6 +744,8 @@ namespace Thornswood
             ForgetGenerated();
 
             HashSet<string> deployed = Deployed(src);
+            uiHashedWalkRoot = src;
+            ResetUiHashedOurs();
             // Thornswood's own files by its records (#1232): the installer's
             // list, the packs' and Keep's, while they still say so.
             HashSet<string> ours = Ours(deployed);
@@ -870,6 +878,8 @@ namespace Thornswood
 
             Dictionary<string, Rec> old = ReadFiles();
             HashSet<string> deployed = Deployed(src);
+            uiHashedWalkRoot = src;
+            ResetUiHashedOurs();
             HashSet<string> owned = Owned(deployed);
             HashSet<string> ours = Ours(deployed);
             // Until every record of Thornswood's own files is here, nothing is
@@ -1866,17 +1876,83 @@ namespace Thornswood
                 return !leaf.StartsWith("thornswood-", StringComparison.OrdinalIgnoreCase);
             if (rel.StartsWith("Data\\Platform\\UI\\", StringComparison.OrdinalIgnoreCase))
             {
-                if (rel.StartsWith("Data\\Platform\\UI\\assets\\", StringComparison.OrdinalIgnoreCase)) return true;
+                // Same rule as Test-ShipOtherServer in Ship-Rules.ps1 (#1318):
+                // ours is index.html, build.js, thornswood-* files, and the
+                // hashed assets Ship wrote into the pack. Nested paths,
+                // another menu's Vite files, and any unnamed flat file are
+                // not ours, so a refresh cannot copy the Daedric set or the
+                // unused fork svgs back from the Steam copy after a pack
+                // deletes them. The list is read from the pack, never by
+                // parsing build.js, which might be somebody else's copy.
+                const string UiPrefix = "Data\\Platform\\UI\\";
+                if (rel.Length <= UiPrefix.Length) return true;
+                string rest = rel.Substring(UiPrefix.Length);
+                if (rest.IndexOf('\\') >= 0 || rest.IndexOf('/') >= 0) return true;
                 if (leaf.Equals("app.js", StringComparison.OrdinalIgnoreCase) || leaf.Equals("vite.svg", StringComparison.OrdinalIgnoreCase)) return true;
-                // Everything else flat under UI is ours: index.html, build.js,
-                // the thornswood-*.js overlays, and the front's own hashed
-                // fonts, icons and sounds beside build.js. Somebody else's menu
-                // is a Vite build, which is the assets folder and the two
-                // names above. The first version of this rule on 20 September
-                // whitelisted three names and would have left the front's 147
-                // asset files out of the next refresh.
+                if (leaf.Equals("index.html", StringComparison.OrdinalIgnoreCase) || leaf.Equals("build.js", StringComparison.OrdinalIgnoreCase)) return false;
+                if (leaf.StartsWith("thornswood-", StringComparison.OrdinalIgnoreCase)) return false;
+                if (UiHashedAssetName(leaf) && UiHashedOurs().Contains(leaf)) return false;
+                return true;
             }
             return false;
+        }
+
+        const string UiAssetsRel = "Data\\Platform\\UI\\thornswood-ui-assets.txt";
+        static readonly Regex UiHashedName = new Regex("^[0-9a-f]{8,32}\\.(ttf|woff2?|eot|otf|svg|png|jpe?g|gif|wav|mp3|ogg|webp)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        static HashSet<string> uiHashedOurs;
+        static string uiHashedWalkRoot;
+
+        static bool UiHashedAssetName(string leaf)
+        {
+            return leaf != null && UiHashedName.IsMatch(leaf);
+        }
+
+        static void ResetUiHashedOurs()
+        {
+            uiHashedOurs = null;
+        }
+
+        static void LoadUiHashedList(HashSet<string> set, string path)
+        {
+            if (string.IsNullOrEmpty(path) || !File.Exists(path)) return;
+            foreach (string raw in File.ReadAllLines(path))
+            {
+                string n = (raw ?? "").Trim();
+                if (n.Length == 0 || n[0] == '#') continue;
+                if (n.IndexOfAny(new char[] { '/', '\\' }) >= 0) continue;
+                if (n.IndexOf("..", StringComparison.Ordinal) >= 0) continue;
+                if (UiHashedAssetName(n)) set.Add(n);
+            }
+        }
+
+        static void LoadUiHashedFromRoot(HashSet<string> set, string root)
+        {
+            if (string.IsNullOrEmpty(root)) return;
+            try { LoadUiHashedList(set, Path.Combine(root, UiAssetsRel)); }
+            catch (Exception ex) { Swallow.Note("OwnGame.UiHashedOurs, " + root, ex); }
+        }
+
+        /// <summary>
+        /// Hashed UI assets Ship wrote into the pack (#1318). Read from that
+        /// list, never by parsing build.js.
+        /// </summary>
+        static HashSet<string> UiHashedOurs()
+        {
+            if (uiHashedOurs != null) return uiHashedOurs;
+            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            try { LoadUiHashedFromRoot(set, Paths.Game); }
+            catch (Exception ex) { Swallow.Note("OwnGame.UiHashedOurs, game", ex); }
+            try { LoadUiHashedFromRoot(set, Keep.Dir); }
+            catch (Exception ex) { Swallow.Note("OwnGame.UiHashedOurs, keep", ex); }
+            LoadUiHashedFromRoot(set, uiHashedWalkRoot);
+            try
+            {
+                if (!string.IsNullOrEmpty(Paths.ProfileDir))
+                    LoadUiHashedList(set, Path.Combine(Paths.ProfileDir, "OwnGame", "ui-front-assets.txt"));
+            }
+            catch (Exception ex) { Swallow.Note("OwnGame.UiHashedOurs, profile", ex); }
+            uiHashedOurs = set;
+            return set;
         }
 
         static readonly string[] CopyTypes = {

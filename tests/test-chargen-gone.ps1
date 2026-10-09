@@ -281,6 +281,15 @@ $lifted = [ordered]@{
     'OwnGame.UnwantedCreation' = Get-CsMember $og 'static bool UnwantedCreation(string rel)'
     'OwnGame.ClientFiles'      = (Get-CsMember $og 'public static readonly string[] ClientFiles =') + ';'
     'OwnGame.ClientFile'       = Get-CsMember $og 'public static bool ClientFile(string rel)'
+    'OwnGame.UiAssetsRel'      = Get-CsLine $og '(?m)^\s*const string UiAssetsRel = [^\r\n]*;'
+    'OwnGame.UiHashedName'     = Get-CsLine $og '(?m)^\s*static readonly Regex UiHashedName = [^\r\n]*;'
+    'OwnGame.uiHashedOurs'     = Get-CsLine $og '(?m)^\s*static HashSet<string> uiHashedOurs;'
+    'OwnGame.uiHashedWalkRoot' = Get-CsLine $og '(?m)^\s*static string uiHashedWalkRoot;'
+    'OwnGame.UiHashedAssetName' = Get-CsMember $og 'static bool UiHashedAssetName(string leaf)'
+    'OwnGame.ResetUiHashedOurs' = Get-CsMember $og 'static void ResetUiHashedOurs()'
+    'OwnGame.LoadUiHashedList' = Get-CsMember $og 'static void LoadUiHashedList(HashSet<string> set, string path)'
+    'OwnGame.LoadUiHashedFromRoot' = Get-CsMember $og 'static void LoadUiHashedFromRoot(HashSet<string> set, string root)'
+    'OwnGame.UiHashedOurs'     = Get-CsMember $og 'static HashSet<string> UiHashedOurs()'
     'OwnGame.Foreign'          = Get-CsMember $og 'public static bool Foreign(string rel)'
     'Checks.OffSuffix'         = Get-CsLine $ck '(?m)^\s*public const string OffSuffix = "[^"\r\n]*";'
     'Keep.Platform'            = Get-CsLine $keepCs '(?m)^\s*const string Platform = [^\r\n]*;'
@@ -328,6 +337,15 @@ namespace $ns
         $($lifted['OwnGame.UnwantedCreation'])
         $($lifted['OwnGame.ClientFiles'])
         $($lifted['OwnGame.ClientFile'])
+        $($lifted['OwnGame.UiAssetsRel'])
+        $($lifted['OwnGame.UiHashedName'])
+        $($lifted['OwnGame.uiHashedOurs'])
+        $($lifted['OwnGame.uiHashedWalkRoot'])
+        $($lifted['OwnGame.UiHashedAssetName'])
+        $($lifted['OwnGame.ResetUiHashedOurs'])
+        $($lifted['OwnGame.LoadUiHashedList'])
+        $($lifted['OwnGame.LoadUiHashedFromRoot'])
+        $($lifted['OwnGame.UiHashedOurs'])
         $($lifted['OwnGame.Foreign'])
         public static string SkipOf(string rel) { return Skip(rel); }
     }
@@ -364,6 +382,10 @@ $twins = @($rel, 'Data\Platform\Plugins\somebody-else.js', 'Data\Interface\map.s
            # #690: Elysium Estate's old plugin is left out, the collection's is not.
            'Data\ElysiumEstateSSE.esp', 'Data\ElysiumEstate.esp',
            'Data\Platform\UI\assets\app-1.js', 'Data\Platform\UI\thornswood-chat.js',
+           # #1318: another server's menu and unused fork assets are left out;
+           # the two keeps still ship.
+           'Data\Platform\UI\menu_theme.mp3', 'Data\Platform\UI\bg.png',
+           'Data\Platform\UI\thornswood-menu.jpg', 'Data\Platform\UI\thornswood-theme.mp3',
            'Data\Platform\PluginsNoLoad\auth-data-no-load.js',
            # #960: SkyUI 5.2's loose scripts are left out, MCM Recorder's are not.
            'Data\Scripts\ski_main.pex', 'Data\Scripts\SKI_WidgetManager.pex',

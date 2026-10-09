@@ -197,8 +197,7 @@ fork wherever the fork has a copy.
 | `Data\Platform\Fonts\DIN-Pro-bold.spritefont` | Byte for byte the fork's `client-deps` copy: a sprite font whose name says DIN Pro Bold. | None found. DIN Pro is FSI FontShop's typeface, whose own files point at FontFont's end user licence (below), and upstream names no licence for this file. |
 | `Data\Platform\Modules\skyrimPlatform.ts` | skyrim-platform's TypeScript declarations, an older copy (136,561 bytes) than the fork builds (136,768). | GPL-3.0 |
 | `Data\Platform\UI\build.js` | A development build of `skymp5-front`, dated 13 September 04:33 in the game folder. It was not built here, and nobody recorded the commit it came from. It bundles npm packages under their own licences, among them React 16.13.1 and 17.0.2, MIT by the `@license` comments inside it. | GPL-3.0 |
-| The 68 files beside build.js that it names by hash | Its fonts, sounds and pictures. 26 are byte for byte files in the fork's `skymp5-front\src`. | As build.js, except the fonts below. |
-| 42 more files beside build.js that it does not name | Byte for byte pictures from the fork's `skymp5-front\src` (41 dated 14 September, `bg.png` dated 13 September). They are dead weight. | GPL-3.0 |
+| The files beside build.js that it names by hash | Its fonts, sounds and pictures. 26 are byte for byte files in the fork's `skymp5-front\src`. Ship parses the names from build.js at pack time (#1318); it does not keep a count by hand. | As build.js, except the fonts below. |
 
 The fonts in that front build, from their own name tables. All six are byte for
 byte the files in upstream's `skymp5-front\src\fonts`:
@@ -318,15 +317,19 @@ This file did not read either mod's permissions.
 
 These are neither Thornswood's nor traceable to SkyMP. They ship because they
 sit in the game folder and the rules in Ship-Rules.ps1 count them as ours.
-Under `Data\Platform\UI` every flat file counts as ours (the UI rule in
-Test-ShipOtherServer), and no rule looks at `Fonts` or `Images`. The installer
-built on 23 September carries every one of them.
+Under `Data\Platform\UI` only `index.html`, `build.js`, `thornswood-*` files
+and the hashed assets build.js names count as ours (#1318). No rule looks at
+`Fonts` or `Images`. The installer built on 23 September carried the files
+below that still have no licence this file can name.
 
-- `Data\Platform\UI`: 37 files, 16.2 MB, dated 14 September 14:51 to 14:56.
-  Three are EB Garamond fonts, whose own name table says SIL Open Font License.
-  The rest are 11 .jpg, 22 .png and `menu_theme.mp3`. Neither build.js nor any
-  Thornswood file names them, and none is in the fork. They look like another
-  server's menu.
+- `Data\Platform\UI`: 37 files from Daedric Online's menu (11 .jpg, 22 .png,
+  3 EB Garamond fonts whose name table says SIL Open Font License, and
+  `menu_theme.mp3`), 16.2 MB, dated 14 September 14:51 to 14:56. Neither
+  build.js nor any Thornswood file names them, and none is in the fork.
+  Removed and deleted from every install by every pack (#1318). They never
+  ship again. A renamed copy still counts, by sha256. The 41 unused
+  skymp5-front svgs and `bg.png` beside them (the old "42 more files" row)
+  are gone the same way.
 - `Data\Platform\Fonts\ChainLink.spritefont`, `Futura.spritefont`,
   `NoticeIcon.spritefont` and `VoiceIcon.spritefont`, dated 14 September
   14:44. skyrim-platform loads every .spritefont in that folder
@@ -553,7 +556,9 @@ branch any more.
   from npm and Google Fonts did.
 - build.js has no recorded source commit.
 - The Futura PT, DIN Pro and Bankir-Retro fonts, and the files under "Shipped
-  today with no licence this file can name", ship with no licence found.
+  today with no licence this file can name" that still ship (`Fonts` sprite
+  fonts and `Images`), ship with no licence found. The 37 Daedric Online
+  menu files do not: they are removed and deleted from installs (#1318).
 
 ## Microsoft WebView2 SDK licence
 

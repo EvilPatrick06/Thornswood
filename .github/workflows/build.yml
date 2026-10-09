@@ -268,6 +268,8 @@ jobs:
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
                  'test-third-party.js',
+                 'test-ship-rules.ps1',
+                 'test-chargen-gone.ps1',
                  'test-hand-install-retired.ps1',
                  'test-downgrade-steam-window.ps1', 'test-address-library.ps1', 'test-vortex-folder.ps1',
                  'test-new-box-runbook.ps1', 'test-remote-header.ps1',

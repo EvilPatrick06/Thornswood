@@ -41,6 +41,8 @@
       Ensure-ShipRequiredData      place those files into Data\ before a pack or installer scan
       Get-ShipSymbolDir            where this machine keeps launcher/setup .pdb per version (#462)
       Save-ShipSymbols             copy .pdb from a build folder into Get-ShipSymbolDir
+      Get-ShipUiHashedAssets       hashed asset names parsed from Data\Platform\UI\build.js
+      Save-ShipUiHashedAssets      parse, refuse a bad front, write thornswood-ui-assets.txt
 
   Paths are relative to the game folder, with backslashes.
 #>
@@ -283,6 +285,249 @@ $ShipOldSkyUIScripts = @(
     'Data\Scripts\ski_widgetmanager.pex'
 )
 
+# ANOTHER SERVER'S MENU UNDER Data\Platform\UI, issue #1318.
+#
+# 37 files from Daedric Online's menu (11 jpg, 22 png, 3 EB Garamond ttf,
+# menu_theme.mp3) sat on the shipping machine and went out in every installer
+# and pack with no licence. Nothing in this repository names them: build.js
+# names none, and nothing else under Data\Platform does. Djinn, 9 Oct: remove
+# them for good. They never ship, and every pack deletes them from installs.
+# Matched by sha256 as well as by name, so a renamed copy still counts.
+#
+# The 41 unused skymp5-front svgs and bg.png beside them (the old "42 more
+# files" row in THIRD-PARTY.md) are dead weight too: build.js names none of
+# them. They stop shipping and every pack deletes them from installs as well.
+#
+# WHAT IS OURS UNDER UI. Only index.html, build.js, thornswood-* files, and
+# the hashed assets build.js actually names. That last list is parsed from
+# build.js at ship time, never kept by hand. OwnGame.Foreign reads the list
+# Ship wrote into the pack rather than parsing build.js itself.
+$ShipUiAssetsRel = 'Data\Platform\UI\thornswood-ui-assets.txt'
+$ShipUiHashedPattern = '^[0-9a-f]{8,32}\.(ttf|woff2?|eot|otf|svg|png|jpe?g|gif|wav|mp3|ogg|webp)$'
+$ShipDaedricMenu = [ordered]@{
+    '0d38fd98ca293be5d0c8270fef9dedef.jpg' = 'db23cb612c7f5d8f00b8a6858028363604630c6c7c20ee80aa1e37ab8b1a47de'
+    '4ea8bf5739be06e0e5fd161f6adf5850.jpg' = '9d45803fd5fecc6c14a40858c556ee5f968835132bb78f87578ae7aab4e96d8d'
+    '543e3fee1044af120d75105ac3090557.jpg' = 'e001643d7f536072979a3bc67401986dcbda83d03339e859fb782a5862769e82'
+    '81ee50861a303d1214780abc71e65f36.jpg' = '0b527774e24ebeb7ed3de3ef50d09bea7f7a1b8d639fb6f18faa84a769d274b1'
+    '882dbfc52ca85fc4c1486db71e04d6fa.jpg' = '9b9eb591a53fade9cb073a0a7238f84fb9053cac5a127712a58c2b1371214b90'
+    '9edb4981b4e1caf812b103f6b18fe36b.jpg' = '18d66277cc8461873974097a78903de69626c418dda1cf150ea4f8e20a6b6240'
+    '9f0ea8f110dda78dbd424958dba41499.jpg' = 'c647b33bde2288793eab104dd3752da369ec7b6c9dc608b059616b30ede66e5d'
+    'b0b5cadd68447e59256eca2044991ec3.jpg' = 'c7314f95cc9250753e0e2c6490509f127ffe63f563d7b03d8de959807050ebd8'
+    'c2553ded19b6fb3ac56596fe739d612b.jpg' = 'ec612213dd938977b28044687392a5be48c8cda33f895179bee1233557ab5966'
+    'd17e16ae17f0fe4dd33cf43287b68abb.jpg' = 'bf53662fa447171fe9b8dd3f1c0d858efabb96c694949c9af9f1962daf58b92f'
+    'e51c5bdb8dcc1edee4cbb35900069a03.jpg' = '00a0e140bef06fe7d2b66b0e4038df2c47b5483e93ca83649fee6c54887e3752'
+    '03cc9ca1acc21fa6f1c6ad5101cb255b.png' = 'd0bf7e48a1dc87b87bf964ff12c54d373b15d5ce68fa2c110d8f1d382a9aff49'
+    '0dfec5cc5038b6094389cef8a50a200e.png' = 'f93ebd4a38b4cee40875a611586d4e0bc6f684a63fe61bb6924a54ec7521dcf4'
+    '299434de78bbe21ea23041b1be92c39c.png' = '91bc44651e620258cb4b260d2ee7d718489c7508cb3dd234e2969c369632e1c8'
+    '3004f7ad71899c0c42f508d4a4d9df7b.png' = '24bc277750c76a9da9ae038f243910b3eb03712529f77e1218930affdfddb0f0'
+    '3b1d9dfd8b928e7bb7893bb6a2439afd.png' = '48d86b3fd3e28ec7b2fb28eecb8710efa39374ffa95dffdcbb6dab1757e7e435'
+    '531ab2fd197a8b7acf53b5594b5e3223.png' = '7810d7763757cb4b27b35113e101cf925c11a1dec8fbc0cc8cb5a3a5f4c9e9cd'
+    '55dfe7f22c8cab4da857e10ea3820725.png' = '1da66efd2a41475496a1f77a40326e184717ea3f396db934498e8f775d1b4dda'
+    '5b5bd6bfddd68f3d5fb254fff3ecefef.png' = '3aacd4c089e7f1d036fb2ee0f98a237f4a367392c73819fdd49bf4905695ff15'
+    '664fcb4f7edc8048f19d08b72f6c7c6d.png' = '566cfbbfb305b3c264a3cab42c8a7a547a9eeaafc7ccc417d98a0c41e7cbb44d'
+    '68f6bf41b5670b32dae78a7e644964e7.png' = '3027e506327e23f583dd9657e3cd23fbc3878384c76cb123e54876e052f1ab86'
+    '8ec57d93ee70da82e4128e716bddba0c.png' = '3ae73232f1013f3e612281c44c1d11e503ec644c4b8bff2a8a4392def4cfbe6f'
+    '98fcc009b62a2e309130443063d085bf.png' = 'b5ed1d771d1a1029413f1b1c9ab8d7877e0c380b095a6ca6ac4b5fe685df88f2'
+    'a1d63d44016df48a54babe9b0329da61.png' = '0ac842420b623b9a95abfeb3658b9779256dd5df8f390c69c14fcba0265e35e1'
+    'a793e924a98f7a40a7113d3e1d481c9c.png' = '8dcaca85e00028ba5a6306e6cdf9d4106ecb7279a6005f29c28314a1bcda7798'
+    'b5016b511dd0fb0aaecd2255c5e15379.png' = '624d1cec7aed10aa4b28d7161ef603bf813a00b4730950adc61c9b13cead1b51'
+    'b8d955f710cb2ae0d86a37cc8563066f.png' = 'adda08dd375ebc21b5be6fc88f22634935a60457dea49046b6b24300d1a6e525'
+    'c26ab06b79e8861ebaff50361d502013.png' = '6058166128889ca66c8b872f8d874ace0c81a4b17352ab39aeb220f76b853192'
+    'c608839467d2011b9dc04e5a9ffd8782.png' = '7cfb96be3427eb70ac225fa573ff738adf5f0022f1d5da51b24f39d911d4f596'
+    'dd0aadf615113abf5856ed58cd528087.png' = '7466023e1baa4e37f8d628d3086068e966e55319636f79fadf1805e3f08729ad'
+    'e0ca10b6276b6f88d5dcf37c0de4cddf.png' = '8647239617c0a9aad2d11213e2723e7a55a0a7f15dc7ad250e9bee0e77c098af'
+    'e737d42dda1e949d34fc0514a0db3b5d.png' = 'e79311c0af2a03423b0216a272096f6fd97c786838a0a28a032c6b3bafc05225'
+    'f314576d391b3aca3bb958d74b09f4c8.png' = 'd6e5e584d56c6325db8b41d6b14f96e20ecd2ea046052f15c8df3203d148c126'
+    '02732f42edb584062268.ttf' = '934aa932b4bc1a75d883f7c3d4d5bbc8278e5e7fcc96d5440bbffd61050cf958'
+    '0418ecf95d39d9473390.ttf' = 'b536adfa0f5746cfbd148d8a1a669540366edef2c85c4b49450798a037bd928c'
+    'ef857eb378108590f849.ttf' = '9d2ca86044b885d085059c7e3bed21d6e31456a81a47761e7ade8cd390ebe71d'
+    'menu_theme.mp3' = 'eda338afc99c53926ecd3a1479127689928ff734b96f6a24bd53649b587bd3f4'
+}
+$ShipDaedricMenuHashes = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+foreach ($h in $ShipDaedricMenu.Values) { [void]$ShipDaedricMenuHashes.Add($h) }
+$ShipUnusedFrontAssets = @(
+    '012ba60b5cafa40f9e478f978761f33d.svg'
+    '05bc1c771a7f9d9fa958eab5889558f7.svg'
+    '06a298c40e1d6dc99a81d63276ee6161.svg'
+    '07863f7f6cd3e41d2d4dd98555709017.svg'
+    '0acb800c49cbe871dacdb686546aa5de.svg'
+    '1f08438ecd0badfb463bbfa1b6a00b70.svg'
+    '29359f1c6135098e82121dce53128a35.svg'
+    '293db3d76ab19fe8228fec890f8054c0.svg'
+    '2d45d5f75c74bbf47f231dd420bb50e4.svg'
+    '34d7c23d97684ec11c66319566850bee.svg'
+    '4240b22a3e4ea3d863083d8cc66dc9d2.svg'
+    '434474aac1ca25361cc7f9fadc87043a.svg'
+    '45255c99ec0c0f37fbadb45928198869.svg'
+    '46e7c235111fa294ae294e52361b1a64.svg'
+    '5183d83cbcb7262bc8ce4325c6b83ab1.svg'
+    '51d5d9ae7e81b615957cd01b3775d915.svg'
+    '5c2874217cce8f12078a4c478c7760a8.svg'
+    '615881216ef2ce0dd5609a3cd7f32a26.svg'
+    '70828fb0d81d34baf7216b141e84512a.svg'
+    '7368c872f5c628c86f6a52fbd83e5e36.svg'
+    '76cbeb799fc98908a589dfcf1b0df4c6.svg'
+    '79a2d684ce0ce231b4fc4ae00462abbd.svg'
+    '8725285acc017513ed15441d664312d7.svg'
+    '95ef521334d6e74aca76d7ef28fd11a7.svg'
+    '9c26de6addf1f2d8b12b6002ae854b95.svg'
+    '9daf4db75b4c8a2bb5a817f052e4d7a9.svg'
+    'a13807eed63afde04cb7be12e93604c6.svg'
+    'a72e8754c0389c9050a7ff03a97c8913.svg'
+    'ad1f817dd17374e2bd7486b3a5ac47a8.svg'
+    'b2422b6faed4209b53b16946877b5d52.svg'
+    'b504fd8bc5ee0f86635573d4a74b9778.svg'
+    'ba7f86afe59d769feb36fbaa88a5faca.svg'
+    'c3f0ce7307ae5d17c8a0a6faedb739fe.svg'
+    'c5ce282718fc847f993170a705c22125.svg'
+    'c607cf803e8ca2a885e1bd6141999c6d.svg'
+    'c97f9a61534aa6adb5ce52e0a909f328.svg'
+    'cb339e63ba0a96c297fad9db03e15565.svg'
+    'cf57e7f8f09ad647e4cd6be3c8b70ebe.svg'
+    'd016f173d0d647e6cbe4c46ee74abb05.svg'
+    'ef92c2ecafd152e547c2f9296ce6956a.svg'
+    'fb344395b65fad4dc9b2b4dbecaaf9ae.svg'
+    'bg.png'
+)
+$ShipUiGoneLeaves = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+foreach ($n in $ShipDaedricMenu.Keys) { [void]$ShipUiGoneLeaves.Add($n) }
+foreach ($n in $ShipUnusedFrontAssets) { [void]$ShipUiGoneLeaves.Add($n) }
+
+function Get-ShipFileSha256([string]$full) {
+    if (-not $full -or -not (Test-Path -LiteralPath $full -PathType Leaf)) { return '' }
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+        $fs = New-Object IO.FileStream($full, [IO.FileMode]::Open, [IO.FileAccess]::Read, ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+        try { return ([BitConverter]::ToString($sha.ComputeHash($fs))).Replace('-', '').ToLowerInvariant() }
+        finally { $fs.Dispose() }
+    }
+    finally { $sha.Dispose() }
+}
+
+# Quoted strings in build.js that name a file with an asset extension. Bare
+# hashed names are kept. Anything with a slash, '..', or a rooted/drive path
+# refuses the ship, naming the entry. Other quoted strings are ignored.
+function Read-ShipUiHashedAssetsFromText([string]$text) {
+    $names = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    $assetExt = '\.(?:ttf|woff2?|eot|otf|svg|png|jpe?g|gif|wav|mp3|ogg|webp)(?:\?[^"]*)?$'
+    foreach ($m in [regex]::Matches($text, '"((?:[^"\\]|\\.)*)"')) {
+        $s = $m.Groups[1].Value.Replace('\/', '/').Replace('\\', '\')
+        if ($s -notmatch $assetExt) { continue }
+        $q = $s.IndexOf('?')
+        if ($q -ge 0) { $s = $s.Substring(0, $q) }
+        $rooted = $s.StartsWith('/') -or $s.StartsWith('\') -or ($s.Length -ge 2 -and $s[1] -eq [char]':')
+        $dots = $s -match '(^|[\\/])\.\.($|[\\/])'
+        if ($rooted -or $dots -or $s.Contains('/') -or $s.Contains('\')) {
+            throw ("build.js names '{0}', which is not a bare hashed asset (slash, '..', or a rooted path). Nothing was packed." -f $s)
+        }
+        if ($s -notmatch $ShipUiHashedPattern) { continue }
+        [void]$names.Add($s)
+    }
+    return $names
+}
+
+$script:ShipUiHashedCacheKey = ''
+$script:ShipUiHashedCache = $null
+$script:ShipUiHashedGameDir = $null
+$script:ShipUiHashedWritten = @()
+
+function Get-ShipUiBuildJsPath {
+    $game = $script:ShipUiHashedGameDir
+    if (-not $game) {
+        $game = Get-Variable -Name GameDir -ValueOnly -ErrorAction SilentlyContinue
+    }
+    if (-not $game) { return '' }
+    return [IO.Path]::Combine([string]$game, 'Data\Platform\UI\build.js')
+}
+
+# The hashed asset names build.js names, parsed at ship time. Empty when there
+# is no GameDir or no build.js, so a unit test that only asks a path still
+# runs. A bad path in build.js throws, which is how a ship is refused.
+function Get-ShipUiHashedAssets {
+    $build = Get-ShipUiBuildJsPath
+    if (-not $build -or -not (Test-Path -LiteralPath $build -PathType Leaf)) {
+        return @()
+    }
+    $item = Get-Item -LiteralPath $build
+    $key = '{0}|{1}|{2}' -f $item.FullName, $item.Length, $item.LastWriteTimeUtc.Ticks
+    if ($script:ShipUiHashedCacheKey -eq $key -and $null -ne $script:ShipUiHashedCache) {
+        return $script:ShipUiHashedCache
+    }
+    $set = Read-ShipUiHashedAssetsFromText ([IO.File]::ReadAllText($build))
+    $script:ShipUiHashedCache = @($set)
+    $script:ShipUiHashedCacheKey = $key
+    return $script:ShipUiHashedCache
+}
+
+function Test-ShipUiHashedAssetName([string]$leaf) {
+    return [bool]($leaf -and ($leaf -match $ShipUiHashedPattern))
+}
+
+# Ours under Data\Platform\UI: index.html, build.js, thornswood-* files, and
+# hashed assets build.js named. Everything else flat or nested is not ours.
+function Test-ShipUiOurs([string]$rel, [string]$leaf) {
+    if ($leaf -ieq 'index.html' -or $leaf -ieq 'build.js') { return $true }
+    if ($leaf -like 'thornswood-*') { return $true }
+    if (Test-ShipUiHashedAssetName $leaf) {
+        foreach ($n in @(Get-ShipUiHashedAssets)) { if ($n -ieq $leaf) { return $true } }
+    }
+    return $false
+}
+
+function Test-ShipUiGoneByHash([string]$rel) {
+    $game = Get-Variable -Name GameDir -ValueOnly -ErrorAction SilentlyContinue
+    if (-not $game) { return $false }
+    $full = [IO.Path]::Combine([string]$game, $rel)
+    $have = Get-ShipFileSha256 $full
+    if (-not $have) { return $false }
+    return $ShipDaedricMenuHashes.Contains($have)
+}
+
+# Ship-time guard: parse build.js, refuse on zero names, refuse if a named
+# file is missing, refuse a bad path (Read-ShipUiHashedAssetsFromText throws).
+# Writes the parsed names into Data\Platform\UI\thornswood-ui-assets.txt so
+# the pack carries them and OwnGame.Foreign can read them.
+function Save-ShipUiHashedAssets([string]$GameFolder) {
+    if (-not $GameFolder) { throw 'Save-ShipUiHashedAssets needs the game folder.' }
+    $savedParse = $script:ShipUiHashedGameDir
+    $script:ShipUiHashedGameDir = $GameFolder
+    $savedGame = Get-Variable -Name GameDir -ValueOnly -ErrorAction SilentlyContinue
+    $GameDir = $GameFolder
+    try {
+        $build = Join-Path $GameFolder 'Data\Platform\UI\build.js'
+        if (-not (Test-Path -LiteralPath $build -PathType Leaf)) {
+            throw 'Data\Platform\UI\build.js is missing, so the front''s hashed assets cannot be derived. Nothing was packed.'
+        }
+        $script:ShipUiHashedCacheKey = ''
+        $script:ShipUiHashedCache = $null
+        $names = @(Get-ShipUiHashedAssets)
+        if ($names.Count -eq 0) {
+            throw 'build.js named no hashed assets, so the parse is wrong or the front is empty. Nothing was packed.'
+        }
+        $ui = Join-Path $GameFolder 'Data\Platform\UI'
+        foreach ($n in $names) {
+            $at = Join-Path $ui $n
+            if (-not (Test-Path -LiteralPath $at -PathType Leaf)) {
+                throw ("build.js names '{0}', which is not in Data\Platform\UI. Nothing was packed." -f $n)
+            }
+        }
+        $sorted = @($names | Sort-Object { $_.ToLowerInvariant() })
+        $lines = New-Object 'System.Collections.Generic.List[string]'
+        [void]$lines.Add('# Hashed assets Data\Platform\UI\build.js named. Written by Ship at pack time (#1318).')
+        [void]$lines.Add('# One bare file name per line. OwnGame.Foreign reads this rather than parsing build.js.')
+        foreach ($n in $sorted) { [void]$lines.Add($n) }
+        $out = Join-Path $GameFolder $ShipUiAssetsRel
+        [IO.File]::WriteAllLines($out, $lines)
+        $script:ShipUiHashedWritten = $sorted
+        return $sorted
+    }
+    finally {
+        $script:ShipUiHashedGameDir = $savedParse
+        if ($null -ne $savedGame) { $GameDir = $savedGame }
+        else { Remove-Variable -Name GameDir -ErrorAction SilentlyContinue }
+    }
+}
+
 function Test-ShipOtherServer([string]$rel) {
     # The client runtime, before anything else is asked: ours when it is the
     # recorded build, and not ours when it is anything else or is not there.
@@ -333,18 +578,23 @@ function Test-ShipOtherServer([string]$rel) {
         if ($leaf -like 'thornswood-*.js') { return $false }
         return $true
     }
-    # Under UI, ours is flat: index.html, build.js, our thornswood-*.js
-    # overlays, and the front's own hashed fonts, icons and sounds beside
-    # build.js (a .ttf, .svg, .png, .wav or .mp3 named by its hash, and
-    # menu_theme.mp3). Somebody else's menu is a Vite build, which has an
-    # assets folder, an app.js and a vite.svg. The first version of this rule
-    # on 20 September whitelisted three names and called the front's own 147
-    # asset files foreign, which the dev Ship of 13:02 duly left out of the
-    # pack; a fresh installer would have shipped a front with no fonts.
+    # Under UI, ours is only index.html, build.js, thornswood-* files, and
+    # the hashed assets build.js names (parsed at ship time, #1318). Nested
+    # paths, another menu's Vite files, the Daedric set, the unused fork
+    # svgs and bg.png, and any unnamed flat file are not ours. A renamed
+    # copy of the Daedric set still counts, by sha256. The first version of
+    # this rule on 20 September whitelisted three names and called the
+    # front's own hashed files foreign; the 13:02 dev Ship left them out.
+    # The next version treated every flat file as ours, which is how the 37
+    # slipped through.
     if ($rel -like 'Data\Platform\UI\*') {
-        if ($rel -like 'Data\Platform\UI\assets\*') { return $true }
+        $rest = $rel.Substring('Data\Platform\UI\'.Length)
+        if ($rest.Contains('\') -or $rest.Contains('/')) { return $true }
         if ($leaf -ieq 'app.js' -or $leaf -ieq 'vite.svg') { return $true }
-        return $false
+        if ($ShipUiGoneLeaves.Contains($leaf)) { return $true }
+        if (Test-ShipUiGoneByHash $rel) { return $true }
+        if (Test-ShipUiOurs $rel $leaf) { return $false }
+        return $true
     }
     return $false
 }
@@ -1322,8 +1572,36 @@ $ShipDeleteAlways = @(
 # error box. The collection's SkyUI keeps its scripts inside SkyUI_SE.bsa, so
 # nothing it installs is lost. See $ShipOldSkyUIScripts above.
 $ShipDeleteAlways += $ShipOldSkyUIScripts
+# The Daedric menu set and the unused fork svgs plus bg.png, issue #1318:
+# leaving them out of new packs does nothing for the machines that already
+# have them. Every pack deletes these names. Get-ShipDeleteAlways also adds
+# a renamed copy whose bytes still match a Daedric sha256.
+$ShipUiGonePaths = @($ShipDaedricMenu.Keys | ForEach-Object { 'Data\Platform\UI\' + $_ })
+$ShipUiGonePaths += @($ShipUnusedFrontAssets | ForEach-Object { 'Data\Platform\UI\' + $_ })
+$ShipDeleteAlways += $ShipUiGonePaths
 
-function Get-ShipDeleteAlways { return $ShipDeleteAlways }
+function Get-ShipDeleteAlways {
+    $list = New-Object 'System.Collections.Generic.List[string]'
+    foreach ($p in $ShipDeleteAlways) { $list.Add($p) }
+    $game = Get-Variable -Name GameDir -ValueOnly -ErrorAction SilentlyContinue
+    if ($game) {
+        $ui = [IO.Path]::Combine([string]$game, 'Data\Platform\UI')
+        if (Test-Path -LiteralPath $ui -PathType Container) {
+            $have = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+            foreach ($p in $list) { [void]$have.Add($p) }
+            foreach ($f in @(Get-ChildItem -LiteralPath $ui -File)) {
+                $rel = 'Data\Platform\UI\' + $f.Name
+                if ($have.Contains($rel)) { continue }
+                $h = Get-ShipFileSha256 $f.FullName
+                if ($h -and $ShipDaedricMenuHashes.Contains($h)) {
+                    $list.Add($rel)
+                    [void]$have.Add($rel)
+                }
+            }
+        }
+    }
+    return @($list)
+}
 
 # FILES THAT TRAVEL WITH A PAGE, issue #883.
 #

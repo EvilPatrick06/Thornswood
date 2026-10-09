@@ -307,7 +307,7 @@ try {
     foreach ($dd in 'Game\Data', 'Profile\OwnGame', 'Launcher', 'dist') { New-Item -ItemType Directory -Force -Path (Join-Path $inst $dd) | Out-Null }
     New-Item -ItemType Directory -Force -Path (Join-Path $pSite 'feed'), (Join-Path $pSite 'feed-dev'), $rel | Out-Null
     [IO.File]::WriteAllLines((Join-Path $inst 'Profile\OwnGame\files.txt'), @('F|V|1024|638000000000000000|Data\collection.esp'))
-    Put (Join-Path $inst 'Game\Data\Platform\UI\ours.esp') 'the plugin, changed'
+    Put (Join-Path $inst 'Game\Data\Platform\UI\thornswood-ours.esp') 'the plugin, changed'
     Put (Join-Path $inst 'Profile\OwnGame\plugins.txt') "*ours.esp`r`n"
     $pluginHeader = [byte[]]::new(24)
     [Text.Encoding]::ASCII.GetBytes('TES4').CopyTo($pluginHeader, 0)
@@ -317,6 +317,8 @@ try {
     Put (Join-Path $inst 'Profile\OwnGame\loadorder.txt') "ours.esp`r`n"
     . (Join-Path $repo 'tests\fixtures\generated-bodies.ps1')
     New-GeneratedBodies $inst $fake
+    . (Join-Path $repo 'tests\fixtures\ui-front.ps1')
+    Install-UiFrontFixture (Join-Path $inst 'Game')
     $node = Get-Command node -ErrorAction SilentlyContinue
     Yes 'node is on PATH, for the stand-in game server' ($null -ne $node)
     if ($null -eq $node) { Done }
@@ -337,14 +339,14 @@ try {
     if (-not $port) { Done }
     $null = $script:gameServer.StandardOutput.ReadToEndAsync()
     Put (Join-Path $inst 'config.json') ('{"ServerAddress":"127.0.0.1","ServerPort":' + ($port - 1) + '}')
-    Put (Join-Path $inst 'Game\Data\Platform\UI\ours.bsa') ('x' * 4096)
+    Put (Join-Path $inst 'Game\Data\Platform\UI\thornswood-ours.bsa') ('x' * 4096)
     # Main has shipped the build; the dev feed has one release on it, the
     # plugin as it was, and its notes go stale below.
     $pMain = [pscustomobject][ordered]@{ launcherVersion = '1.2.0'; packs = @(); news = @()
                                          release = [pscustomobject][ordered]@{ id = '20261005-235125'; channel = 'main'; commit = $head; uncommitted = 0 } }
     Put (Join-Path $pSite 'feed\version.json') ($pMain | ConvertTo-Json -Depth 6)
     Put (Join-Path $pSite 'feed-dev\version.json') '{"launcherVersion":"1.2.0","packs":[],"news":[],"mainVersion":"1.1.106"}'
-    Put (Join-Path $pSite 'feed-dev\published.json') '{"Data\\Platform\\UI\\ours.esp":"5:0000000000000000000000000000000000000000000000000000000000000000"}'
+    Put (Join-Path $pSite 'feed-dev\published.json') '{"Data\\Platform\\UI\\thornswood-ours.esp":"5:0000000000000000000000000000000000000000000000000000000000000000"}'
     function Publish([string[]]$extra) {
         $pu = Join-Path $fake 'scripts\release\Publish-Update.ps1'
         $argText = (@('-Channel', 'dev', '-Root', (Q $inst), '-ReleaseDir', (Q $rel), '-DistRoot', (Q (Join-Path $inst 'dist')), '-SiteDir', (Q $pSite),
