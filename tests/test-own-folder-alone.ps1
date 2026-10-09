@@ -489,6 +489,7 @@ namespace Thornswood
             T = args[0];
             try
             {
+                UiGoneCompiledIn();
                 OneGap();
                 SteamMovesOn();
                 FirstFromNewer();
@@ -505,6 +506,30 @@ namespace Thornswood
             }
             Console.WriteLine("driver: " + pass + " passed, " + fail + " failed");
             return fail > 0 ? 1 : 0;
+        }
+
+        // records\ui-gone.json is compiled in. OwnGame.Foreign reads that
+        // copy, not a test override. 37 Daedric names and hashes, 42 unused.
+        static void UiGoneCompiledIn()
+        {
+            Yes("a Daedric jpg from the compiled-in gone record is not ours",
+                OwnGame.Foreign("Data\\Platform\\UI\\0d38fd98ca293be5d0c8270fef9dedef.jpg"));
+            var flags = BindingFlags.NonPublic | BindingFlags.Static;
+            var leaves = typeof(OwnGame).GetField("uiGoneLeaves", flags).GetValue(null) as HashSet<string>;
+            var hashes = typeof(OwnGame).GetField("uiGoneHashes", flags).GetValue(null) as HashSet<string>;
+            int daedric = 0, unused = 0;
+            if (leaves != null)
+            {
+                foreach (string n in leaves)
+                {
+                    string x = (n ?? "").ToLowerInvariant();
+                    if (x.EndsWith(".svg") || x == "bg.png") unused++;
+                    else daedric++;
+                }
+            }
+            Yes("the compiled-in gone record has 37 Daedric names", daedric == 37);
+            Yes("  and 37 Daedric hashes", hashes != null && hashes.Count == 37);
+            Yes("  and 42 unused names", unused == 42);
         }
 
         // One plugin the published collection does not ship must not read as

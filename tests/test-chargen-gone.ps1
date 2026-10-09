@@ -291,7 +291,7 @@ $lifted = [ordered]@{
     'OwnGame.ReadUiGoneRecord' = Get-CsMember $og 'static string ReadUiGoneRecord()'
     'OwnGame.EnsureUiGone'     = Get-CsMember $og 'static void EnsureUiGone()'
     'OwnGame.UiGoneLeaf'       = Get-CsMember $og 'static bool UiGoneLeaf(string leaf)'
-    'OwnGame.UiFileSha256'     = Get-CsMember $og 'static string UiFileSha256(string full)'
+    'OwnGame.UiFileSha256'     = Get-CsMember $og 'static string UiFileSha256(string full, out bool unreadable)'
     'OwnGame.UiGoneHashRoots'  = Get-CsMember $og 'static List<string> UiGoneHashRoots()'
     'OwnGame.UiGoneByHash'     = Get-CsMember $og 'static bool UiGoneByHash(string rel)'
     'OwnGame.UiHashedAssetName' = Get-CsMember $og 'static bool UiHashedAssetName(string leaf)'
@@ -397,6 +397,11 @@ $OwnGameT = [type]($ns + '.OwnGame')
 $KeepT    = [type]($ns + '.Keep')
 $PathsT   = [type]($ns + '.Paths')
 
+# Foreign on a UI path loads the gone record. The lifted type has no
+# embedded copy, so the override must be in place before those paths.
+$goneText = [IO.File]::ReadAllText((Join-Path $Here 'records\ui-gone.json'))
+$OwnGameT::SetUiGoneRecordForTest($goneText)
+
 Yes 'OwnGame.Foreign calls the dresser not ours' ($OwnGameT::Foreign($rel))
 Yes 'so a refresh leaves it out of the game folder' ($null -ne $OwnGameT::SkipOf($rel))
 Yes ('and still takes our {0} plugin(s)' -f $ours.Count) (@($ours | Where-Object { $null -ne $OwnGameT::SkipOf('Data\Platform\Plugins\' + $_) }).Count -eq 0)
@@ -432,8 +437,6 @@ try {
     $uiProf = Join-Path $uiOwn 'Profile'
     New-Item -ItemType Directory -Force -Path (Join-Path $uiGame 'Data\Platform\UI') | Out-Null
     New-Item -ItemType Directory -Force -Path $uiProf | Out-Null
-    $goneText = [IO.File]::ReadAllText((Join-Path $Here 'records\ui-gone.json'))
-    $OwnGameT::SetUiGoneRecordForTest($goneText)
     $listed = 'cafebabeface0123.png'
     $otherHashed = 'deadbeefdeadbeef.png'
     $fontRel = 'Data\Platform\UI\' + $listed
@@ -469,6 +472,30 @@ try {
     $OwnGameT::ResetUiHashedOursForTest()
     Yes 'OwnGame counts a listed hashed name as ours' (-not $OwnGameT::Foreign($fontRel))
     Yes '  and a hashed name the list does not carry is not ours' ($OwnGameT::Foreign($otherRel))
+    Yes '  and a Daedric jpg is still not ours when a ui-assets list is present' ($OwnGameT::Foreign('Data\Platform\UI\' + $daedricJpg))
+
+    $lockedRel = 'Data\Platform\UI\fedcba9876543210.jpg'
+    $lockedFull = Join-Path $uiGame $lockedRel
+    [IO.File]::WriteAllText($lockedFull, 'hashed-but-unreadable')
+    $lock = [IO.File]::Open($lockedFull, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None)
+    try {
+        $OwnGameT::ResetUiHashedOursForTest()
+        Yes '  and an unreadable hashed UI file is not ours' ($OwnGameT::Foreign($lockedRel))
+    } finally { $lock.Dispose() }
+
+    $OwnGameT::SetUiGoneRecordForTest($null)
+    $missingThrew = $false
+    $missingSaid = ''
+    try { [void]$OwnGameT::Foreign($fontRel) } catch { $missingThrew = $true; $missingSaid = $_.Exception.Message }
+    Yes 'OwnGame refuses when the gone record is missing' ($missingThrew -and ($missingSaid -match 'ui-gone\.json'))
+
+    $OwnGameT::SetUiGoneRecordForTest('{ "not": "the gone set" }')
+    $corruptThrew = $false
+    $corruptSaid = ''
+    try { [void]$OwnGameT::Foreign($fontRel) } catch { $corruptThrew = $true; $corruptSaid = $_.Exception.Message }
+    Yes '  and refuses when the gone record is corrupt' ($corruptThrew -and ($corruptSaid -match 'ui-gone\.json'))
+
+    $OwnGameT::SetUiGoneRecordForTest($goneText)
     $PathsT::Game = $savedGame
     $PathsT::ProfileDir = $savedProf
     $OwnGameT::ResetUiHashedOursForTest()

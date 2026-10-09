@@ -427,6 +427,11 @@ jobs:
                  'test-discord-callback-hang.js',
                  'test-member-role-wording.js',
                  'test-page-changed.js',
+                 'test-missing-files-stop.ps1',
+                 'test-ship-launcher-drift.ps1',
+                 'test-client-by-hash.ps1',
+                 'test-build-vs-install.ps1',
+                 'test-ship-dry-run.ps1',
                  'test-gate-list.ps1'
           $failed = @()
           foreach ($n in $six) {

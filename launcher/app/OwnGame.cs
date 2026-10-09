@@ -1930,17 +1930,31 @@ namespace Thornswood
         static string ReadUiGoneRecord()
         {
             if (!string.IsNullOrEmpty(uiGoneRecordText)) return uiGoneRecordText;
+            Stream stream;
+            try { stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("ui-gone.json"); }
+            catch (Exception ex)
+            {
+                throw new Exception("This launcher could not open records\\ui-gone.json (" + ex.Message.TrimEnd('.') +
+                    "), so a refresh cannot keep another server's menu files out. Update the launcher, or tell staff it said this.");
+            }
+            if (stream == null)
+                throw new Exception("This launcher was built without records\\ui-gone.json, so a refresh cannot keep another server's menu files out. Update the launcher, or tell staff it said this.");
             try
             {
-                using (Stream s = Assembly.GetExecutingAssembly().GetManifestResourceStream("ui-gone.json"))
+                using (StreamReader sr = new StreamReader(stream))
                 {
-                    if (s != null)
-                        using (StreamReader sr = new StreamReader(s))
-                            return sr.ReadToEnd();
+                    string text = sr.ReadToEnd();
+                    if (string.IsNullOrEmpty(text))
+                        throw new Exception("This launcher's copy of records\\ui-gone.json is empty, so a refresh cannot keep another server's menu files out. Update the launcher, or tell staff it said this.");
+                    return text;
                 }
             }
-            catch (Exception ex) { Swallow.Note("OwnGame.UiGone, embedded", ex); }
-            return "";
+            catch (Exception ex)
+            {
+                if (ex.Message != null && ex.Message.IndexOf("records\\ui-gone.json", StringComparison.Ordinal) >= 0) throw;
+                throw new Exception("This launcher could not read records\\ui-gone.json (" + ex.Message.TrimEnd('.') +
+                    "), so a refresh cannot keep another server's menu files out. Update the launcher, or tell staff it said this.");
+            }
         }
 
         static void EnsureUiGone()
@@ -1949,24 +1963,25 @@ namespace Thornswood
             var leaves = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var hashes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             string text = ReadUiGoneRecord();
-            if (!string.IsNullOrEmpty(text))
+            Match d = Regex.Match(text, "\"daedric\"\\s*:\\s*\\{([\\s\\S]*?)\\}");
+            Match u = Regex.Match(text, "\"unused\"\\s*:\\s*\\[([\\s\\S]*?)\\]");
+            if (!d.Success || !u.Success)
+                throw new Exception("This launcher's copy of records\\ui-gone.json is not the gone set, so a refresh cannot keep another server's menu files out. Update the launcher, or tell staff it said this.");
+            int daedric = 0;
+            foreach (Match m in Regex.Matches(d.Groups[1].Value, "\"([^\"]+)\"\\s*:\\s*\"([0-9a-fA-F]{64})\""))
             {
-                Match d = Regex.Match(text, "\"daedric\"\\s*:\\s*\\{([\\s\\S]*?)\\}");
-                if (d.Success)
-                {
-                    foreach (Match m in Regex.Matches(d.Groups[1].Value, "\"([^\"]+)\"\\s*:\\s*\"([0-9a-fA-F]{64})\""))
-                    {
-                        leaves.Add(m.Groups[1].Value);
-                        hashes.Add(m.Groups[2].Value.ToLowerInvariant());
-                    }
-                }
-                Match u = Regex.Match(text, "\"unused\"\\s*:\\s*\\[([\\s\\S]*?)\\]");
-                if (u.Success)
-                {
-                    foreach (Match m in Regex.Matches(u.Groups[1].Value, "\"([^\"]+)\""))
-                        leaves.Add(m.Groups[1].Value);
-                }
+                leaves.Add(m.Groups[1].Value);
+                hashes.Add(m.Groups[2].Value.ToLowerInvariant());
+                daedric++;
             }
+            int unused = 0;
+            foreach (Match m in Regex.Matches(u.Groups[1].Value, "\"([^\"]+)\""))
+            {
+                leaves.Add(m.Groups[1].Value);
+                unused++;
+            }
+            if (daedric == 0 || hashes.Count == 0 || unused == 0)
+                throw new Exception("This launcher's copy of records\\ui-gone.json names none of the gone set, so a refresh cannot keep another server's menu files out. Update the launcher, or tell staff it said this.");
             uiGoneLeaves = leaves;
             uiGoneHashes = hashes;
         }
@@ -1978,8 +1993,9 @@ namespace Thornswood
             return uiGoneLeaves.Contains(leaf);
         }
 
-        static string UiFileSha256(string full)
+        static string UiFileSha256(string full, out bool unreadable)
         {
+            unreadable = false;
             if (string.IsNullOrEmpty(full) || !File.Exists(full)) return "";
             SHA256 sha = SHA256.Create();
             try
@@ -1992,7 +2008,12 @@ namespace Thornswood
                 }
                 finally { fs.Dispose(); }
             }
-            catch (Exception ex) { Swallow.Note("OwnGame.UiGone, hash " + full, ex); return ""; }
+            catch (Exception ex)
+            {
+                Swallow.Note("OwnGame.UiGone, hash " + full, ex);
+                unreadable = true;
+                return "";
+            }
             finally { sha.Dispose(); }
         }
 
@@ -2012,11 +2033,12 @@ namespace Thornswood
         static bool UiGoneByHash(string rel)
         {
             EnsureUiGone();
-            if (uiGoneHashes.Count == 0) return false;
             List<string> roots = UiGoneHashRoots();
             for (int i = 0; i < roots.Count; i++)
             {
-                string h = UiFileSha256(Path.Combine(roots[i], rel));
+                bool unreadable;
+                string h = UiFileSha256(Path.Combine(roots[i], rel), out unreadable);
+                if (unreadable) return true;
                 if (h.Length > 0 && uiGoneHashes.Contains(h)) return true;
             }
             return false;
