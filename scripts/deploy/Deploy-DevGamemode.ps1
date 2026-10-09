@@ -189,8 +189,10 @@ param(
   [string]$Why = 'a gamemode update',
   [switch]$Now,
   # How long the new dev server has to answer on its game port and its
-  # resources port before the old files go back.
-  [int]$Wait = 60,
+  # resources port before the old files go back. Left off, the shared
+  # ceiling in ServerReadyWait.ps1, derived from measured Live and Dev
+  # starts (#1938). A start that never answers still rolls back.
+  [int]$Wait,
   # Put the files the last run replaced back in, and send nothing. See the
   # header.
   [switch]$PutBack,
@@ -213,6 +215,9 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 . (Join-Path $Here 'Swap.ps1')
+if (-not $PSBoundParameters.ContainsKey('Wait')) {
+  $Wait = Get-ThornswoodServerReadyWait
+}
 if ($PutBack -and $LoadOrder) { throw '-PutBack puts the last files back and sends nothing, so it does not take -LoadOrder.' }
 if (-not $PutBack) {
   if (-not $Note.Trim()) {

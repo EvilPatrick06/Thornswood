@@ -120,9 +120,11 @@ param(
   # Deploy-Gamemode -Vortex built the list from.
   [string]$Data    = 'C:\Program Files (x86)\Steam\steamapps\common\Skyrim Special Edition\Data',
   # How long the new server has to answer on its game port and its resources
-  # port before the old files go back. Waiting longer costs nothing when it
-  # comes up, because the check returns the moment both answer.
-  [int]$Wait       = 60,
+  # port before the old files go back. Left off, the shared ceiling in
+  # ServerReadyWait.ps1, derived from measured Live and Dev starts (#1938).
+  # Waiting longer costs nothing when it comes up, because the check returns
+  # the moment both answer. A start that never answers still rolls back.
+  [int]$Wait,
   # Put the files the last deploy replaced back in, and nothing else. Needs no
   # build on this machine. See the header.
   [switch]$PutBack,
@@ -177,6 +179,9 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 . (Join-Path $Here 'Swap.ps1')
+if (-not $PSBoundParameters.ContainsKey('Wait')) {
+  $Wait = Get-ThornswoodServerReadyWait
+}
 . (Join-Path $Here 'Artifact.ps1')
 . (Join-Path $Here 'ServerSettings.ps1')
 . (Join-Path $Here 'ServerBuild.ps1')
