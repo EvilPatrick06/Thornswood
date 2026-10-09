@@ -404,17 +404,27 @@ function Get-ShipFileSha256([string]$full) {
     finally { $sha.Dispose() }
 }
 
-# Quoted strings in build.js that name a file with an asset extension. Bare
-# hashed names are kept. Anything with a slash, '..', or a rooted/drive path
-# refuses the ship, naming the entry. Other quoted strings are ignored.
+# Webpack file-loader (and asset modules) emit the publicPath concatenated
+# with the output file name:
+#   module.exports = __webpack_require__.p + "hash.ext";
+#   e.exports=n.p+"hash.ext";
+# A webpack *dev* eval build wraps that in a string, so the quotes are
+# escaped:
+#   eval("module.exports = __webpack_require__.p + \"hash.ext\";")
+# Quoted source module ids ("./src/img/foo.svg") are webpack keys, not
+# concatenations, and are ignored. A concatenation whose URL is not a bare
+# name (slash, '..', drive, or rooted) refuses the ship, naming the entry.
+# A bare name that is not a hashed asset is ignored, not counted as ours.
 function Read-ShipUiHashedAssetsFromText([string]$text) {
     $names = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
-    $assetExt = '\.(?:ttf|woff2?|eot|otf|svg|png|jpe?g|gif|wav|mp3|ogg|webp)(?:\?[^"]*)?$'
-    foreach ($m in [regex]::Matches($text, '"((?:[^"\\]|\\.)*)"')) {
-        $s = $m.Groups[1].Value.Replace('\/', '/').Replace('\\', '\')
-        if ($s -notmatch $assetExt) { continue }
+    $concatRe = '(?:__webpack_require__|n)\.p\s*\+\s*(?:\\"([^"]*)\\"|\"([^"]*)\")'
+    foreach ($m in [regex]::Matches($text, $concatRe)) {
+        $s = $m.Groups[1].Value
+        if ([string]::IsNullOrEmpty($s)) { $s = $m.Groups[2].Value }
+        $s = $s.Replace('\/', '/').Replace('\\', '\')
         $q = $s.IndexOf('?')
         if ($q -ge 0) { $s = $s.Substring(0, $q) }
+        if ([string]::IsNullOrEmpty($s)) { continue }
         $rooted = $s.StartsWith('/') -or $s.StartsWith('\') -or ($s.Length -ge 2 -and $s[1] -eq [char]':')
         $dots = $s -match '(^|[\\/])\.\.($|[\\/])'
         if ($rooted -or $dots -or $s.Contains('/') -or $s.Contains('\')) {

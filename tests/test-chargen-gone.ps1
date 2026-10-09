@@ -348,6 +348,7 @@ namespace $ns
         $($lifted['OwnGame.UiHashedOurs'])
         $($lifted['OwnGame.Foreign'])
         public static string SkipOf(string rel) { return Skip(rel); }
+        public static void ResetUiHashedOursForTest() { ResetUiHashedOurs(); }
     }
     public static class Keep
     {
@@ -386,6 +387,7 @@ $twins = @($rel, 'Data\Platform\Plugins\somebody-else.js', 'Data\Interface\map.s
            # the two keeps still ship.
            'Data\Platform\UI\menu_theme.mp3', 'Data\Platform\UI\bg.png',
            'Data\Platform\UI\thornswood-menu.jpg', 'Data\Platform\UI\thornswood-theme.mp3',
+           'Data\Platform\UI\logo.png',
            'Data\Platform\PluginsNoLoad\auth-data-no-load.js',
            # #960: SkyUI 5.2's loose scripts are left out, MCM Recorder's are not.
            'Data\Scripts\ski_main.pex', 'Data\Scripts\SKI_WidgetManager.pex',
@@ -394,6 +396,40 @@ $twins += @($ours | ForEach-Object { 'Data\Platform\Plugins\' + $_ })
 $apart = @($twins | Where-Object { [bool]$OwnGameT::Foreign($_) -ne [bool](Test-ShipOtherServer $_) })
 Yes ('OwnGame.Foreign and Test-ShipOtherServer agree on all {0} paths asked, the dresser among them' -f $twins.Count) ($apart.Count -eq 0)
 foreach ($a in $apart) { Write-Host "      they disagree on $a" }
+
+# OwnGame reads the pack list. A listed hashed name is ours. An install
+# with no list yet must not drop hashed front assets on a refresh.
+$uiOwn = Join-Path ([IO.Path]::GetTempPath()) ('ts-ui-own-' + [Diagnostics.Process]::GetCurrentProcess().Id)
+try {
+    $uiGame = Join-Path $uiOwn 'Game'
+    $uiProf = Join-Path $uiOwn 'Profile'
+    New-Item -ItemType Directory -Force -Path (Join-Path $uiGame 'Data\Platform\UI') | Out-Null
+    New-Item -ItemType Directory -Force -Path $uiProf | Out-Null
+    $listed = 'cafebabeface0123.png'
+    $otherHashed = 'deadbeefdeadbeef.png'
+    $fontRel = 'Data\Platform\UI\' + $listed
+    $otherRel = 'Data\Platform\UI\' + $otherHashed
+    $savedGame = $PathsT::Game
+    $savedProf = $PathsT::ProfileDir
+    $PathsT::Game = $null
+    $PathsT::ProfileDir = $null
+    $OwnGameT::ResetUiHashedOursForTest()
+    Yes 'OwnGame: with no ui-assets list yet, a hashed front asset is ours so a refresh cannot drop it' (-not $OwnGameT::Foreign($fontRel))
+    Yes '  and a non-hash bare name like logo.png is still not ours' ($OwnGameT::Foreign('Data\Platform\UI\logo.png'))
+
+    $PathsT::Game = $uiGame
+    $PathsT::ProfileDir = $uiProf
+    $listPath = Join-Path $uiGame 'Data\Platform\UI\thornswood-ui-assets.txt'
+    [IO.File]::WriteAllLines($listPath, @('# hashed assets build.js named, #1318', $listed))
+    $OwnGameT::ResetUiHashedOursForTest()
+    Yes 'OwnGame counts a listed hashed name as ours' (-not $OwnGameT::Foreign($fontRel))
+    Yes '  and a hashed name the list does not carry is not ours' ($OwnGameT::Foreign($otherRel))
+    $PathsT::Game = $savedGame
+    $PathsT::ProfileDir = $savedProf
+    $OwnGameT::ResetUiHashedOursForTest()
+} finally {
+    Remove-Item -LiteralPath $uiOwn -Recurse -Force -ErrorAction SilentlyContinue
+}
 
 $rulesNum = [regex]::Match($og, '(?m)^\s*const int Rules = (\d+);')
 $rulesDoc = [regex]::Match($og, '(?m)^\s*/// (\d+): the retired dresser, thornswood-chargen\.js')

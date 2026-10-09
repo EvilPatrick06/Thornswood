@@ -206,21 +206,64 @@ Yes '  nor its vite.svg' (Test-ShipOtherServer 'Data\Platform\UI\vite.svg')
 
 # ---- Data\Platform\UI: only what build.js names, #1318 --------------------------
 #
-# A real webpack excerpt, using two fonts THIRD-PARTY.md records as files
-# build.js names. No hand-kept count of 68.
+# Font names come from the real shipped build.js fixture, not a hand-kept pair.
+. (Join-Path $Here 'tests\fixtures\ui-front.ps1')
+function Get-UiNameSet($items) {
+    $s = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    foreach ($x in @($items)) {
+        $n = ([string]$x).Trim()
+        if ($n.Length -eq 0 -or $n[0] -eq '#') { continue }
+        [void]$s.Add($n)
+    }
+    return $s
+}
+function Test-UiNameSetsEqual($a, $b) {
+    $sa = Get-UiNameSet $a
+    $sb = Get-UiNameSet $b
+    if ($sa.Count -ne $sb.Count) { return $false }
+    foreach ($x in $sa) { if (-not $sb.Contains($x)) { return $false } }
+    return $true
+}
+function Test-UiParseRefuses([string]$js, [string]$named) {
+    $threw = $false
+    $namedIt = $false
+    try { $null = Read-ShipUiHashedAssetsFromText $js }
+    catch {
+        $threw = $true
+        $namedIt = $_.Exception.Message -match [regex]::Escape($named)
+    }
+    return ($threw -and $namedIt)
+}
+
+$uiFixtureJs = Get-UiFrontFixtureBuildJs
+Yes 'the real shipped build.js is committed as a test fixture' (Test-Path -LiteralPath $uiFixtureJs)
+$uiExpected = Get-UiFrontFixtureExpectedNames
+$uiRealParsed = $null
+$uiRealThrew = $false
+try { $uiRealParsed = Read-ShipUiHashedAssetsFromText ([IO.File]::ReadAllText($uiFixtureJs)) }
+catch { $uiRealThrew = $true; Write-Host ('      ' + $_.Exception.Message) }
+Yes 'the real shipped build.js parses without throwing' (-not $uiRealThrew -and $null -ne $uiRealParsed)
+Yes '  and the parsed names are exactly the emitted hashed set from that file' (
+    -not $uiRealThrew -and (Test-UiNameSetsEqual $uiRealParsed $uiExpected))
+$uiFonts = @(Get-UiFrontFixtureFontNames)
+$uiFontA = [string]$uiFonts[0]
+$uiFontB = [string]$uiFonts[1]
+Yes '  and that set names the Futura PT Cond Book font the fixture emits' ($uiExpected.Contains($uiFontA))
+Yes '  and names the Futura PT Cond Medium font' ($uiExpected.Contains($uiFontB))
+
 $uiWork = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-ui-front-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $uiDir = Join-Path $uiWork 'Data\Platform\UI'
 New-Item -ItemType Directory -Force -Path $uiDir | Out-Null
-# Webpack file-loader form: __webpack_require__.p + "hash.ext"
-$uiExcerpt = @'
+# Webpack file-loader form: __webpack_require__.p + "hash.ext" / n.p+"hash.ext"
+$uiExcerpt = @"
 !function(e){var t={};function n(r){if(t[r])return t[r].exports;var o=t[r]={i:r,l:!1,exports:{}};return e[r].call(o.exports,o,o.exports,n),o.l=!0,o.exports}n.p="";n(0)}([
-function(e,t,n){e.exports=n.p+"6f802bf60c545304b09e.ttf";},
-function(e,t,n){e.exports=n.p+"00e4a2200c3e5ae71d67.ttf";}
+function(e,t,n){e.exports=n.p+"$uiFontA";},
+function(e,t,n){e.exports=n.p+"$uiFontB";}
 ]);
-'@
+"@
 [IO.File]::WriteAllText((Join-Path $uiDir 'build.js'), $uiExcerpt)
-[IO.File]::WriteAllText((Join-Path $uiDir '6f802bf60c545304b09e.ttf'), 'font-a')
-[IO.File]::WriteAllText((Join-Path $uiDir '00e4a2200c3e5ae71d67.ttf'), 'font-b')
+[IO.File]::WriteAllText((Join-Path $uiDir $uiFontA), 'font-a')
+[IO.File]::WriteAllText((Join-Path $uiDir $uiFontB), 'font-b')
 [IO.File]::WriteAllText((Join-Path $uiDir 'index.html'), '<html></html>')
 [IO.File]::WriteAllText((Join-Path $uiDir 'thornswood-bridge.js'), 'overlay')
 [IO.File]::WriteAllText((Join-Path $uiDir 'thornswood-menu.jpg'), 'menu')
@@ -229,25 +272,27 @@ $GameDir = $uiWork
 $script:ShipUiHashedCacheKey = ''
 $script:ShipUiHashedCache = $null
 $parsed = @(Get-ShipUiHashedAssets)
-Yes 'a real build.js excerpt parses hashed names (not a hand-kept count)' ($parsed.Count -gt 0)
-Yes '  and names the Futura PT Cond Book font THIRD-PARTY.md records' ($parsed -icontains '6f802bf60c545304b09e.ttf')
-Yes '  and names the Futura PT Cond Medium font' ($parsed -icontains '00e4a2200c3e5ae71d67.ttf')
+Yes 'a webpack excerpt parses hashed names derived from the real file' (
+    $parsed.Count -gt 0 -and ($parsed -icontains $uiFontA) -and ($parsed -icontains $uiFontB))
 
 foreach ($rel in @(
     'Data\Platform\UI\index.html',
     'Data\Platform\UI\build.js',
     'Data\Platform\UI\thornswood-bridge.js',
-    'Data\Platform\UI\6f802bf60c545304b09e.ttf',
-    'Data\Platform\UI\00e4a2200c3e5ae71d67.ttf',
+    ('Data\Platform\UI\' + $uiFontA),
+    ('Data\Platform\UI\' + $uiFontB),
     'Data\Platform\UI\thornswood-menu.jpg',
     'Data\Platform\UI\thornswood-theme.mp3'
 )) {
     Yes "$rel is the front's own and ships" (-not (Test-ShipOtherServer $rel) -and -not (Test-ShipMachine $rel) -and -not (Test-ShipRuntime $rel))
 }
 Yes 'an unnamed flat UI file does not ship' (Test-ShipOtherServer 'Data\Platform\UI\0123456789abcdef0123456789abcdef.png')
+Yes 'a non-hash bare name like logo.png is not counted as ours' (
+    -not ((Read-ShipUiHashedAssetsFromText 'e.exports=n.p+"logo.png";') -icontains 'logo.png') -and
+    (Test-ShipOtherServer 'Data\Platform\UI\logo.png'))
 
 # A renamed hashed asset in build.js is picked up with no list edit.
-$renamedExcerpt = $uiExcerpt.Replace('00e4a2200c3e5ae71d67.ttf', 'cafebabeface0123.png')
+$renamedExcerpt = $uiExcerpt.Replace($uiFontB, 'cafebabeface0123.png')
 [IO.File]::WriteAllText((Join-Path $uiDir 'build.js'), $renamedExcerpt)
 [IO.File]::WriteAllText((Join-Path $uiDir 'cafebabeface0123.png'), 'renamed-asset')
 $script:ShipUiHashedCacheKey = ''
@@ -278,10 +323,6 @@ foreach ($n in $ShipUnusedFrontAssets) {
 $daedricName = @($ShipDaedricMenu.Keys)[0]
 $daedricHash = $ShipDaedricMenu[$daedricName]
 $renamedGone = Join-Path $uiDir 'not-the-original-name.jpg'
-# 37 bytes of a known hash: write the real bytes only when we have them is
-# not possible here, so hash the file we write and put that hash in the set
-# for this check, then restore. Safer: write bytes, compute hash, add to the
-# set, ask Test-ShipOtherServer, then remove.
 [IO.File]::WriteAllText($renamedGone, 'daedric-renamed-copy')
 $renamedSha = Get-ShipFileSha256 $renamedGone
 [void]$ShipDaedricMenuHashes.Add($renamedSha)
@@ -291,41 +332,74 @@ Yes '  and every pack deletes that renamed copy too' ($goneAlways -contains 'Dat
 [void]$ShipDaedricMenuHashes.Remove($renamedSha)
 Remove-Item -LiteralPath $renamedGone -Force
 
-# Guards: zero names, a missing named file, a path with '..'.
+# Guards: zero names, a missing named file, emitted non-bare URLs.
 $zeroJs = Join-Path $uiDir 'build.js'
 $savedJs = [IO.File]::ReadAllText($zeroJs)
-[IO.File]::WriteAllText($zeroJs, 'function(){ return "no assets here"; }')
+[IO.File]::WriteAllText($zeroJs, 'var k="./src/img/button_middle.svg"; function(){ return "no assets here"; }')
 $script:ShipUiHashedCacheKey = ''
 $script:ShipUiHashedCache = $null
+$srcIgnored = @(Read-ShipUiHashedAssetsFromText ([IO.File]::ReadAllText($zeroJs)))
+Yes 'source module ids with slashes are ignored, not a refuse' ($srcIgnored.Count -eq 0)
 $zeroThrew = $false
 try { $null = Save-ShipUiHashedAssets $uiWork } catch { $zeroThrew = $_.Exception.Message -match 'named no hashed assets' }
 Yes 'zero names parsed refuses to ship' $zeroThrew
 
-[IO.File]::WriteAllText($zeroJs, $uiExcerpt.Replace('00e4a2200c3e5ae71d67.ttf', 'abcdef0123456789.ttf'))
+[IO.File]::WriteAllText($zeroJs, $uiExcerpt.Replace($uiFontB, 'abcdef0123456789.ttf'))
 $script:ShipUiHashedCacheKey = ''
 $script:ShipUiHashedCache = $null
 $missThrew = $false
 try { $null = Save-ShipUiHashedAssets $uiWork } catch { $missThrew = ($_.Exception.Message -like '*abcdef0123456789.ttf*' -and $_.Exception.Message -like '*not in Data\Platform\UI*') }
 Yes 'build.js naming a missing file refuses to ship' $missThrew
 
-$dotThrew = $false; $dotNamed = $false
-[IO.File]::WriteAllText($zeroJs, 'e.exports=n.p+"../x.png";')
-$script:ShipUiHashedCacheKey = ''
-$script:ShipUiHashedCache = $null
-try { $null = Read-ShipUiHashedAssetsFromText ([IO.File]::ReadAllText($zeroJs)) }
-catch {
-    $dotThrew = $true
-    $dotNamed = $_.Exception.Message -match [regex]::Escape('../x.png')
-}
-Yes "build.js naming '../x.png' refuses, naming the entry" ($dotThrew -and $dotNamed)
+Yes "an emitted 'img/x.png' refuses, naming the entry" (Test-UiParseRefuses 'e.exports=n.p+"img/x.png";' 'img/x.png')
+Yes "an emitted 'C:\x.png' refuses, naming the entry" (Test-UiParseRefuses 'e.exports=n.p+"C:\x.png";' 'C:\x.png')
+Yes "an emitted '/x.png' refuses, naming the entry" (Test-UiParseRefuses 'e.exports=n.p+"/x.png";' '/x.png')
+Yes "an emitted '../x.png' refuses, naming the entry" (Test-UiParseRefuses 'e.exports=n.p+"../x.png";' '../x.png')
 
 [IO.File]::WriteAllText($zeroJs, $savedJs)
 $script:ShipUiHashedCacheKey = ''
 $script:ShipUiHashedCache = $null
 $savedNames = @(Save-ShipUiHashedAssets $uiWork)
+$gameList = Get-Content -LiteralPath (Join-Path $uiWork $ShipUiAssetsRel)
 Yes 'Ship writes the parsed names into thornswood-ui-assets.txt' (
     (Test-Path -LiteralPath (Join-Path $uiWork $ShipUiAssetsRel)) -and
-    $savedNames.Count -eq $parsed.Count)
+    (Test-UiNameSetsEqual $savedNames $parsed) -and
+    (Test-UiNameSetsEqual $gameList $parsed))
+
+# Pack ui-assets.txt and the release record must carry the same names by
+# content, not just a count. Publish-Update writes the zip entry from
+# $script:ShipUiHashedWritten; New-ReleaseRecord takes the same list.
+$packUiLines = New-Object 'System.Collections.Generic.List[string]'
+[void]$packUiLines.Add('# hashed assets build.js named, #1318')
+foreach ($n in @($script:ShipUiHashedWritten)) { [void]$packUiLines.Add($n) }
+. (Join-Path $Here 'scripts\release\Release-Name.ps1')
+$uiRelease = New-ReleaseRecord 't' 'dev' '0' @('t') 't' '' '' 0 @($script:ShipUiHashedWritten)
+Yes 'pack ui-assets.txt names match the parse of build.js by content' (Test-UiNameSetsEqual $packUiLines $parsed)
+Yes 'the release record uiAssets match the parse of build.js by content' (Test-UiNameSetsEqual $uiRelease.uiAssets $parsed)
+
+# Same content check against the real shipped file, not the two-font excerpt.
+$uiRealWork = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-ui-real-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+$uiRealDir = Join-Path $uiRealWork 'Data\Platform\UI'
+New-Item -ItemType Directory -Force -Path $uiRealDir | Out-Null
+Copy-Item -LiteralPath $uiFixtureJs -Destination (Join-Path $uiRealDir 'build.js')
+[IO.File]::WriteAllText((Join-Path $uiRealDir 'index.html'), '<html></html>')
+foreach ($n in $uiExpected) {
+    [IO.File]::WriteAllText((Join-Path $uiRealDir $n), 'asset')
+}
+$script:ShipUiHashedCacheKey = ''
+$script:ShipUiHashedCache = $null
+$realSaved = @(Save-ShipUiHashedAssets $uiRealWork)
+$realGameList = Get-Content -LiteralPath (Join-Path $uiRealWork $ShipUiAssetsRel)
+$realPack = New-Object 'System.Collections.Generic.List[string]'
+[void]$realPack.Add('# hashed assets build.js named, #1318')
+foreach ($n in @($script:ShipUiHashedWritten)) { [void]$realPack.Add($n) }
+$realRelease = New-ReleaseRecord 't' 'dev' '0' @('t') 't' '' '' 0 @($script:ShipUiHashedWritten)
+Yes 'the ship record of the real build.js matches that parse by content' (Test-UiNameSetsEqual $realSaved $uiRealParsed)
+Yes '  and so does pack ui-assets.txt' (Test-UiNameSetsEqual $realPack $uiRealParsed)
+Yes '  and so does the release record uiAssets' (Test-UiNameSetsEqual $realRelease.uiAssets $uiRealParsed)
+Yes '  and so does the game file thornswood-ui-assets.txt' (Test-UiNameSetsEqual $realGameList $uiRealParsed)
+Remove-Item -LiteralPath $uiRealWork -Recurse -Force -ErrorAction SilentlyContinue
+
 Remove-Item -LiteralPath $uiWork -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Variable -Name GameDir -ErrorAction SilentlyContinue
 $script:ShipUiHashedCacheKey = ''

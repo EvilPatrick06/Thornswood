@@ -662,8 +662,12 @@ namespace Thornswood
         ///    deletes them. Only index.html, build.js, thornswood-* files and
         ///    hashed assets Ship wrote into the pack count as ours. See
         ///    Foreign, issue #1318.
+        /// 16: an install that does not yet have the hashed UI asset list
+        ///    keeps those hashed front assets (chat fonts) on a refresh
+        ///    rather than dropping them. Once a list exists, only names on
+        ///    it are ours. See Foreign, issue #1318.
         /// </summary>
-        const int Rules = 15;
+        const int Rules = 16;
 
         public static bool NeedsRefresh(Config cfg)
         {
@@ -1891,7 +1895,16 @@ namespace Thornswood
                 if (leaf.Equals("app.js", StringComparison.OrdinalIgnoreCase) || leaf.Equals("vite.svg", StringComparison.OrdinalIgnoreCase)) return true;
                 if (leaf.Equals("index.html", StringComparison.OrdinalIgnoreCase) || leaf.Equals("build.js", StringComparison.OrdinalIgnoreCase)) return false;
                 if (leaf.StartsWith("thornswood-", StringComparison.OrdinalIgnoreCase)) return false;
-                if (UiHashedAssetName(leaf) && UiHashedOurs().Contains(leaf)) return false;
+                if (UiHashedAssetName(leaf))
+                {
+                    HashSet<string> ours = UiHashedOurs();
+                    // Packs from before #1318 have no list. Hashed front
+                    // assets (chat fonts and the rest) stay ours so a
+                    // refresh cannot drop them. Once a list exists, only
+                    // names on it are ours.
+                    if (ours.Count == 0) return false;
+                    return !ours.Contains(leaf);
+                }
                 return true;
             }
             return false;
