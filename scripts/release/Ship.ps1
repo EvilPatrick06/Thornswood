@@ -449,7 +449,7 @@ function Get-LauncherDrift([string]$repoDir, [string]$tag) {
             & git -C $repoDir rev-parse --verify --quiet "refs/tags/$tag" *> $null
             if ($LASTEXITCODE -ne 0) { return @() }
         }
-        $paths = @(& git -C $repoDir diff --name-only "refs/tags/$tag" HEAD -- launcher records/client-build.json ':(exclude,glob)**/*.md' 2>$null |
+        $paths = @(& git -C $repoDir diff --name-only "refs/tags/$tag" HEAD -- launcher records/client-build.json records/ui-gone.json ':(exclude,glob)**/*.md' 2>$null |
                    Where-Object { $_ })
         if ($LASTEXITCODE -ne 0) { return @() }
         return $paths
@@ -493,9 +493,9 @@ function Set-ReleaseLauncherSignature([string]$exe, [string]$signer, [string]$ex
 
 # WHAT THE LAUNCHER IS COMPILED FROM, as one sha256, issue #921. Every file
 # under launcher\ but the Markdown (the code, ui.xaml, the art, the video, the
-# WebView2 loader, the manifest), records\client-build.json, which is compiled
-# in, and Build-Launcher.ps1, which writes the version resource and picks what
-# goes in. Read off the working tree, not git, so a dev Ship of uncommitted
+# WebView2 loader, the manifest), records\client-build.json and
+# records\ui-gone.json, which are compiled in, and Build-Launcher.ps1, which
+# writes the version resource and picks what goes in. Read off the working tree, not git, so a dev Ship of uncommitted
 # work counts it. Paths with / and sorted ordinally, so the same tree gives the
 # same answer on any machine; a line ending changed by git's autocrlf gives a
 # different one, which costs a rebuild and nothing worse.
@@ -509,7 +509,7 @@ function Get-LauncherInputHash([string]$repoDir) {
             $lines.Add($rel + "`t" + (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash.ToLowerInvariant())
         }
     }
-    foreach ($rel in 'records/client-build.json', 'scripts/release/Build-Launcher.ps1') {
+    foreach ($rel in 'records/client-build.json', 'records/ui-gone.json', 'scripts/release/Build-Launcher.ps1') {
         $p = Join-Path $repoDir $rel
         $h = 'missing'
         if (Test-Path -LiteralPath $p) { $h = (Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash.ToLowerInvariant() }

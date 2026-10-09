@@ -354,6 +354,15 @@ if (Test-Path -LiteralPath $skyrimRecord) {
     Die "skyrim-files.json is not at $skyrimRecord. It is in the repository, so the path is wrong; the launcher could not tell Skyrim's own files from mods put into the Steam copy by hand."
 }
 
+# The Daedric menu set and unused fork assets (#1318). OwnGame.Foreign and
+# Ship-Rules.ps1 both read this one file, so the two cannot drift.
+$uiGoneRecord = Join-Path $Here '..\..\records\ui-gone.json'
+if (Test-Path -LiteralPath $uiGoneRecord) {
+    $cscArgs += "/resource:$((Resolve-Path $uiGoneRecord).Path),ui-gone.json"
+} else {
+    Die "ui-gone.json is not at $uiGoneRecord. It is in the repository, so the path is wrong; the launcher could not keep another server's menu files out of a refresh."
+}
+
 foreach ($r in $refs) { $cscArgs += "/reference:$r" }
 foreach ($f in $cs)   { $cscArgs += $f.FullName }
 if ($infoApp) { $cscArgs += $infoApp }

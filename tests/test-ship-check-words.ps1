@@ -53,12 +53,13 @@ $play = Join-Path $T 'Play'
 $dist = Join-Path $T 'dist'
 $plant = 'HARNESS1081 the player must not ship'
 try {
-    New-Item -ItemType Directory -Force -Path (Join-Path $tree 'scripts\release'), (Join-Path $tree 'scripts\dev'), $play, $dist | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $tree 'scripts\release'), (Join-Path $tree 'scripts\dev'), (Join-Path $tree 'records'), $play, $dist | Out-Null
     foreach ($n in 'Ship.ps1', 'Ship-Rules.ps1', 'Assert-PublishSigned.ps1', 'Feed-Store.ps1', 'Release-Name.ps1', 'Note-Rules.ps1', 'Where.ps1') {
         Copy-Item -LiteralPath (Join-Path $Repo ('scripts\release\' + $n)) -Destination (Join-Path $tree ('scripts\release\' + $n)) -Force
     }
     Copy-Item -LiteralPath $wordsReal -Destination (Join-Path $tree 'scripts\dev\Check-Words.ps1') -Force
     Copy-Item -LiteralPath (Join-Path $Repo 'layout.json') -Destination (Join-Path $tree 'layout.json') -Force
+    Copy-Item -LiteralPath (Join-Path $Repo 'records\ui-gone.json') -Destination (Join-Path $tree 'records\ui-gone.json') -Force
     [IO.File]::WriteAllText((Join-Path $tree 'README.md'), ($plant + "`r`n"))
 
     $ps = (Get-Process -Id $PID).Path
