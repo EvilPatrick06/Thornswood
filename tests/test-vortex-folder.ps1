@@ -148,7 +148,13 @@ namespace Thornswood
         public static int IsolateCreations(ICollection<string> wanted, Action<string> say) { return 0; }
         public static int IsolateCreations(ICollection<string> wanted, ICollection<string> serverLight, Action<string> say) { return 0; }
     }
-    static class Keep { public static List<string> Held() { return new List<string>(); } }
+    static class Keep
+    {
+        public static List<string> Held() { return new List<string>(); }
+        // OwnGame.Foreign reads the hashed UI asset list Ship wrote, from Keep
+        // among other roots (#1318).
+        public static string Dir { get { return System.IO.Path.Combine(Paths.ProfileDir, "Keep"); } }
+    }
     static class Junction { public static bool IsLink(string p) { return false; } }
     static class Downgrade
     {

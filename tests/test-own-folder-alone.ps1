@@ -122,7 +122,13 @@ namespace Thornswood
         public static string VortexProfileDir(string name) { return null; }
         public static bool GameRunning() { return false; }
     }
-    static class Keep { public static List<string> Held() { return new List<string>(); } }
+    static class Keep
+    {
+        public static List<string> Held() { return new List<string>(); }
+        // OwnGame.Foreign reads the hashed UI asset list Ship wrote, from Keep
+        // among other roots (#1318).
+        public static string Dir { get { return System.IO.Path.Combine(Paths.ProfileDir, "Keep"); } }
+    }
     // An install that never synced to a release record (Sync.cs): every record
     // of Thornswood's own files is its packs', Keep's and the installer's.
     static class Updater
