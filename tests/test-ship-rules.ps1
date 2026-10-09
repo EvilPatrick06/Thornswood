@@ -236,6 +236,27 @@ function Test-UiParseRefuses([string]$js, [string]$named) {
 }
 
 $uiFixtureJs = Get-UiFrontFixtureBuildJs
+# The Daedric set and unused fork assets live in one record. Ship-Rules and
+# OwnGame both load it; neither file may keep a second hand-copied list.
+$uiGoneRecord = Join-Path $Here 'records\ui-gone.json'
+Yes 'records\ui-gone.json is the one list of the Daedric set and unused fork assets' (Test-Path -LiteralPath $uiGoneRecord)
+$uiGoneDoc = Get-Content -LiteralPath $uiGoneRecord -Raw -Encoding UTF8 | ConvertFrom-Json
+$fromRecordDaedric = @($uiGoneDoc.daedric.PSObject.Properties | ForEach-Object { $_.Name })
+$fromRecordHashes = @($uiGoneDoc.daedric.PSObject.Properties | ForEach-Object { ([string]$_.Value).ToLowerInvariant() })
+$fromRecordUnused = @($uiGoneDoc.unused | ForEach-Object { [string]$_ })
+Yes 'Ship-Rules loaded every Daedric name from that record' (Test-UiNameSetsEqual @($ShipDaedricMenu.Keys) $fromRecordDaedric)
+Yes '  and every Daedric sha256' (Test-UiNameSetsEqual @($ShipDaedricMenu.Values) $fromRecordHashes)
+Yes '  and every unused fork name' (Test-UiNameSetsEqual $ShipUnusedFrontAssets $fromRecordUnused)
+$rulesText = [IO.File]::ReadAllText($RulesPath)
+$ogText = [IO.File]::ReadAllText((Join-Path $Here 'launcher\app\OwnGame.cs'))
+$sampleGone = [string](@($fromRecordDaedric)[0])
+Yes 'Ship-Rules.ps1 has no second hand-copied Daedric list' (
+    $rulesText.Contains('ui-gone.json') -and ($rulesText.IndexOf($sampleGone, [StringComparison]::OrdinalIgnoreCase) -lt 0))
+Yes 'OwnGame.cs has no second hand-copied Daedric list' (
+    $ogText.Contains('ui-gone.json') -and ($ogText.IndexOf($sampleGone, [StringComparison]::OrdinalIgnoreCase) -lt 0))
+Yes 'Build-Launcher.ps1 embeds that record' (
+    ([IO.File]::ReadAllText((Join-Path $Here 'scripts\release\Build-Launcher.ps1'))).Contains('ui-gone.json'))
+
 Yes 'the real shipped build.js is committed as a test fixture' (Test-Path -LiteralPath $uiFixtureJs)
 $uiExpected = Get-UiFrontFixtureExpectedNames
 $uiRealParsed = $null
@@ -368,13 +389,33 @@ Yes 'Ship writes the parsed names into thornswood-ui-assets.txt' (
 
 # Pack ui-assets.txt and the release record must carry the same names by
 # content, not just a count. Publish-Update writes the zip entry from
-# $script:ShipUiHashedWritten; New-ReleaseRecord takes the same list.
-$packUiLines = New-Object 'System.Collections.Generic.List[string]'
-[void]$packUiLines.Add('# hashed assets build.js named, #1318')
-foreach ($n in @($script:ShipUiHashedWritten)) { [void]$packUiLines.Add($n) }
+# $script:ShipUiHashedWritten; this reads that entry back from a zip built
+# the same way. New-ReleaseRecord takes the same list.
+function Read-PackUiAssetsFromZip([string]$zipPath, [string[]]$names) {
+    Add-Type -AssemblyName System.IO.Compression
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    if (Test-Path -LiteralPath $zipPath) { Remove-Item -LiteralPath $zipPath -Force }
+    $z = [IO.Compression.ZipFile]::Open($zipPath, 'Create')
+    try {
+        $ue = $z.CreateEntry('ui-assets.txt')
+        $uw = New-Object IO.StreamWriter ($ue.Open())
+        $uw.WriteLine('# hashed assets build.js named, #1318')
+        foreach ($n in $names) { $uw.WriteLine($n) }
+        $uw.Flush(); $uw.Dispose()
+    } finally { $z.Dispose() }
+    $z = [IO.Compression.ZipFile]::OpenRead($zipPath)
+    try {
+        $e = $z.GetEntry('ui-assets.txt')
+        if (-not $e) { return @() }
+        $sr = New-Object IO.StreamReader ($e.Open())
+        try { return @($sr.ReadToEnd() -split '\r?\n') }
+        finally { $sr.Dispose() }
+    } finally { $z.Dispose() }
+}
 . (Join-Path $Here 'scripts\release\Release-Name.ps1')
+$packUiLines = Read-PackUiAssetsFromZip (Join-Path $uiWork 'pack.zip') @($script:ShipUiHashedWritten)
 $uiRelease = New-ReleaseRecord 't' 'dev' '0' @('t') 't' '' '' 0 @($script:ShipUiHashedWritten)
-Yes 'pack ui-assets.txt names match the parse of build.js by content' (Test-UiNameSetsEqual $packUiLines $parsed)
+Yes 'pack zip ui-assets.txt names match the parse of build.js by content' (Test-UiNameSetsEqual $packUiLines $parsed)
 Yes 'the release record uiAssets match the parse of build.js by content' (Test-UiNameSetsEqual $uiRelease.uiAssets $parsed)
 
 # Same content check against the real shipped file, not the two-font excerpt.
@@ -390,12 +431,10 @@ $script:ShipUiHashedCacheKey = ''
 $script:ShipUiHashedCache = $null
 $realSaved = @(Save-ShipUiHashedAssets $uiRealWork)
 $realGameList = Get-Content -LiteralPath (Join-Path $uiRealWork $ShipUiAssetsRel)
-$realPack = New-Object 'System.Collections.Generic.List[string]'
-[void]$realPack.Add('# hashed assets build.js named, #1318')
-foreach ($n in @($script:ShipUiHashedWritten)) { [void]$realPack.Add($n) }
+$realPack = Read-PackUiAssetsFromZip (Join-Path $uiRealWork 'pack.zip') @($script:ShipUiHashedWritten)
 $realRelease = New-ReleaseRecord 't' 'dev' '0' @('t') 't' '' '' 0 @($script:ShipUiHashedWritten)
 Yes 'the ship record of the real build.js matches that parse by content' (Test-UiNameSetsEqual $realSaved $uiRealParsed)
-Yes '  and so does pack ui-assets.txt' (Test-UiNameSetsEqual $realPack $uiRealParsed)
+Yes '  and so does pack zip ui-assets.txt' (Test-UiNameSetsEqual $realPack $uiRealParsed)
 Yes '  and so does the release record uiAssets' (Test-UiNameSetsEqual $realRelease.uiAssets $uiRealParsed)
 Yes '  and so does the game file thornswood-ui-assets.txt' (Test-UiNameSetsEqual $realGameList $uiRealParsed)
 Remove-Item -LiteralPath $uiRealWork -Recurse -Force -ErrorAction SilentlyContinue

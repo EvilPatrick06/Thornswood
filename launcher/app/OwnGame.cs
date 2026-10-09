@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.Win32.SafeHandles;
@@ -664,8 +666,10 @@ namespace Thornswood
         ///    Foreign, issue #1318.
         /// 16: an install that does not yet have the hashed UI asset list
         ///    keeps those hashed front assets (chat fonts) on a refresh
-        ///    rather than dropping them. Once a list exists, only names on
-        ///    it are ours. See Foreign, issue #1318.
+        ///    rather than dropping them. The Daedric set and unused fork
+        ///    assets in records\ui-gone.json stay out either way. Once a
+        ///    list exists, only names on it are ours. See Foreign, issue
+        ///    #1318.
         /// </summary>
         const int Rules = 16;
 
@@ -1895,6 +1899,11 @@ namespace Thornswood
                 if (leaf.Equals("app.js", StringComparison.OrdinalIgnoreCase) || leaf.Equals("vite.svg", StringComparison.OrdinalIgnoreCase)) return true;
                 if (leaf.Equals("index.html", StringComparison.OrdinalIgnoreCase) || leaf.Equals("build.js", StringComparison.OrdinalIgnoreCase)) return false;
                 if (leaf.StartsWith("thornswood-", StringComparison.OrdinalIgnoreCase)) return false;
+                // Before the no-list keep: the Daedric set and unused fork
+                // assets are never ours, by name or by sha256, from the
+                // same records\ui-gone.json Ship-Rules reads.
+                if (UiGoneLeaf(leaf)) return true;
+                if (UiGoneByHash(rel)) return true;
                 if (UiHashedAssetName(leaf))
                 {
                     HashSet<string> ours = UiHashedOurs();
@@ -1914,6 +1923,104 @@ namespace Thornswood
         static readonly Regex UiHashedName = new Regex("^[0-9a-f]{8,32}\\.(ttf|woff2?|eot|otf|svg|png|jpe?g|gif|wav|mp3|ogg|webp)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         static HashSet<string> uiHashedOurs;
         static string uiHashedWalkRoot = null;
+        static string uiGoneRecordText;
+        static HashSet<string> uiGoneLeaves;
+        static HashSet<string> uiGoneHashes;
+
+        static string ReadUiGoneRecord()
+        {
+            if (!string.IsNullOrEmpty(uiGoneRecordText)) return uiGoneRecordText;
+            try
+            {
+                using (Stream s = Assembly.GetExecutingAssembly().GetManifestResourceStream("ui-gone.json"))
+                {
+                    if (s != null)
+                        using (StreamReader sr = new StreamReader(s))
+                            return sr.ReadToEnd();
+                }
+            }
+            catch (Exception ex) { Swallow.Note("OwnGame.UiGone, embedded", ex); }
+            return "";
+        }
+
+        static void EnsureUiGone()
+        {
+            if (uiGoneLeaves != null) return;
+            var leaves = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var hashes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            string text = ReadUiGoneRecord();
+            if (!string.IsNullOrEmpty(text))
+            {
+                Match d = Regex.Match(text, "\"daedric\"\\s*:\\s*\\{([\\s\\S]*?)\\}");
+                if (d.Success)
+                {
+                    foreach (Match m in Regex.Matches(d.Groups[1].Value, "\"([^\"]+)\"\\s*:\\s*\"([0-9a-fA-F]{64})\""))
+                    {
+                        leaves.Add(m.Groups[1].Value);
+                        hashes.Add(m.Groups[2].Value.ToLowerInvariant());
+                    }
+                }
+                Match u = Regex.Match(text, "\"unused\"\\s*:\\s*\\[([\\s\\S]*?)\\]");
+                if (u.Success)
+                {
+                    foreach (Match m in Regex.Matches(u.Groups[1].Value, "\"([^\"]+)\""))
+                        leaves.Add(m.Groups[1].Value);
+                }
+            }
+            uiGoneLeaves = leaves;
+            uiGoneHashes = hashes;
+        }
+
+        static bool UiGoneLeaf(string leaf)
+        {
+            if (string.IsNullOrEmpty(leaf)) return false;
+            EnsureUiGone();
+            return uiGoneLeaves.Contains(leaf);
+        }
+
+        static string UiFileSha256(string full)
+        {
+            if (string.IsNullOrEmpty(full) || !File.Exists(full)) return "";
+            SHA256 sha = SHA256.Create();
+            try
+            {
+                FileStream fs = new FileStream(full, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                try
+                {
+                    byte[] hash = sha.ComputeHash(fs);
+                    return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+                }
+                finally { fs.Dispose(); }
+            }
+            catch (Exception ex) { Swallow.Note("OwnGame.UiGone, hash " + full, ex); return ""; }
+            finally { sha.Dispose(); }
+        }
+
+        static List<string> UiGoneHashRoots()
+        {
+            var roots = new List<string>();
+            if (!string.IsNullOrEmpty(Paths.Game)) roots.Add(Paths.Game);
+            try
+            {
+                if (!string.IsNullOrEmpty(Keep.Dir)) roots.Add(Keep.Dir);
+            }
+            catch (Exception ex) { Swallow.Note("OwnGame.UiGone, keep", ex); }
+            if (!string.IsNullOrEmpty(uiHashedWalkRoot)) roots.Add(uiHashedWalkRoot);
+            return roots;
+        }
+
+        static bool UiGoneByHash(string rel)
+        {
+            EnsureUiGone();
+            if (uiGoneHashes.Count == 0) return false;
+            List<string> roots = UiGoneHashRoots();
+            for (int i = 0; i < roots.Count; i++)
+            {
+                string h = UiFileSha256(Path.Combine(roots[i], rel));
+                if (h.Length > 0 && uiGoneHashes.Contains(h)) return true;
+            }
+            return false;
+        }
 
         static bool UiHashedAssetName(string leaf)
         {

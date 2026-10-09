@@ -1016,6 +1016,8 @@ try {
             ForEach-Object { '    "{0}": {{ "bytes": 1, "sha1": "0", "depot": "1" }}' -f $_.Replace('\', '\') }
         [IO.File]::WriteAllText($skyrimList, "{`n  ""build"": ""1.6.1170"",`n  ""files"": {`n" + ($listed -join ",`n") + "`n  }`n}`n", $utf8)
         $cscArgs += "/resource:$skyrimList,skyrim-files.json"
+        $uiGoneList = Join-Path $Here 'records\ui-gone.json'
+        if (Test-Path -LiteralPath $uiGoneList) { $cscArgs += "/resource:$uiGoneList,ui-gone.json" }
     }
     foreach ($r in $refs) { $cscArgs += "/reference:$r" }
     foreach ($f in $real) { $cscArgs += (Resolve-Path -LiteralPath $f).Path }

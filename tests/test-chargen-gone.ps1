@@ -285,6 +285,15 @@ $lifted = [ordered]@{
     'OwnGame.UiHashedName'     = Get-CsLine $og '(?m)^\s*static readonly Regex UiHashedName = [^\r\n]*;'
     'OwnGame.uiHashedOursField' = Get-CsLine $og '(?m)^\s*static HashSet<string> uiHashedOurs;'
     'OwnGame.uiHashedWalkRoot' = Get-CsLine $og '(?m)^\s*static string uiHashedWalkRoot = [^\r\n]*;'
+    'OwnGame.uiGoneRecordText' = Get-CsLine $og '(?m)^\s*static string uiGoneRecordText;'
+    'OwnGame.uiGoneLeaves'     = Get-CsLine $og '(?m)^\s*static HashSet<string> uiGoneLeaves;'
+    'OwnGame.uiGoneHashes'     = Get-CsLine $og '(?m)^\s*static HashSet<string> uiGoneHashes;'
+    'OwnGame.ReadUiGoneRecord' = Get-CsMember $og 'static string ReadUiGoneRecord()'
+    'OwnGame.EnsureUiGone'     = Get-CsMember $og 'static void EnsureUiGone()'
+    'OwnGame.UiGoneLeaf'       = Get-CsMember $og 'static bool UiGoneLeaf(string leaf)'
+    'OwnGame.UiFileSha256'     = Get-CsMember $og 'static string UiFileSha256(string full)'
+    'OwnGame.UiGoneHashRoots'  = Get-CsMember $og 'static List<string> UiGoneHashRoots()'
+    'OwnGame.UiGoneByHash'     = Get-CsMember $og 'static bool UiGoneByHash(string rel)'
     'OwnGame.UiHashedAssetName' = Get-CsMember $og 'static bool UiHashedAssetName(string leaf)'
     'OwnGame.ResetUiHashedOurs' = Get-CsMember $og 'static void ResetUiHashedOurs()'
     'OwnGame.LoadUiHashedList' = Get-CsMember $og 'static void LoadUiHashedList(HashSet<string> set, string path)'
@@ -309,6 +318,8 @@ $cs = @"
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
+using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 namespace $ns
 {
@@ -341,6 +352,15 @@ namespace $ns
         $($lifted['OwnGame.UiHashedName'])
         $($lifted['OwnGame.uiHashedOursField'])
         $($lifted['OwnGame.uiHashedWalkRoot'])
+        $($lifted['OwnGame.uiGoneRecordText'])
+        $($lifted['OwnGame.uiGoneLeaves'])
+        $($lifted['OwnGame.uiGoneHashes'])
+        $($lifted['OwnGame.ReadUiGoneRecord'])
+        $($lifted['OwnGame.EnsureUiGone'])
+        $($lifted['OwnGame.UiGoneLeaf'])
+        $($lifted['OwnGame.UiFileSha256'])
+        $($lifted['OwnGame.UiGoneHashRoots'])
+        $($lifted['OwnGame.UiGoneByHash'])
         $($lifted['OwnGame.UiHashedAssetName'])
         $($lifted['OwnGame.ResetUiHashedOurs'])
         $($lifted['OwnGame.LoadUiHashedList'])
@@ -349,6 +369,11 @@ namespace $ns
         $($lifted['OwnGame.Foreign'])
         public static string SkipOf(string rel) { return Skip(rel); }
         public static void ResetUiHashedOursForTest() { ResetUiHashedOurs(); }
+        public static void SetUiGoneRecordForTest(string text) {
+            uiGoneRecordText = text;
+            uiGoneLeaves = null;
+            uiGoneHashes = null;
+        }
     }
     public static class Keep
     {
@@ -398,17 +423,24 @@ Yes ('OwnGame.Foreign and Test-ShipOtherServer agree on all {0} paths asked, the
 foreach ($a in $apart) { Write-Host "      they disagree on $a" }
 
 # OwnGame reads the pack list. A listed hashed name is ours. An install
-# with no list yet must not drop hashed front assets on a refresh.
+# with no list yet must not drop hashed front assets on a refresh. The
+# Daedric set and unused fork assets stay out either way, from the same
+# records\ui-gone.json Ship-Rules loaded.
 $uiOwn = Join-Path ([IO.Path]::GetTempPath()) ('ts-ui-own-' + [Diagnostics.Process]::GetCurrentProcess().Id)
 try {
     $uiGame = Join-Path $uiOwn 'Game'
     $uiProf = Join-Path $uiOwn 'Profile'
     New-Item -ItemType Directory -Force -Path (Join-Path $uiGame 'Data\Platform\UI') | Out-Null
     New-Item -ItemType Directory -Force -Path $uiProf | Out-Null
+    $goneText = [IO.File]::ReadAllText((Join-Path $Here 'records\ui-gone.json'))
+    $OwnGameT::SetUiGoneRecordForTest($goneText)
     $listed = 'cafebabeface0123.png'
     $otherHashed = 'deadbeefdeadbeef.png'
     $fontRel = 'Data\Platform\UI\' + $listed
     $otherRel = 'Data\Platform\UI\' + $otherHashed
+    $daedricJpg = @($ShipDaedricMenu.Keys | Where-Object { $_ -like '*.jpg' } | Select-Object -First 1)[0]
+    $daedricTtf = @($ShipDaedricMenu.Keys | Where-Object { $_ -like '*.ttf' } | Select-Object -First 1)[0]
+    $unusedSvg  = @($ShipUnusedFrontAssets | Where-Object { $_ -like '*.svg' } | Select-Object -First 1)[0]
     $savedGame = $PathsT::Game
     $savedProf = $PathsT::ProfileDir
     $PathsT::Game = $null
@@ -416,9 +448,22 @@ try {
     $OwnGameT::ResetUiHashedOursForTest()
     Yes 'OwnGame: with no ui-assets list yet, a hashed front asset is ours so a refresh cannot drop it' (-not $OwnGameT::Foreign($fontRel))
     Yes '  and a non-hash bare name like logo.png is still not ours' ($OwnGameT::Foreign('Data\Platform\UI\logo.png'))
+    Yes '  and a Daedric jpg is not ours, even with no list' ($OwnGameT::Foreign('Data\Platform\UI\' + $daedricJpg))
+    Yes '  and a Daedric ttf is not ours, even with no list' ($OwnGameT::Foreign('Data\Platform\UI\' + $daedricTtf))
+    Yes '  and an unused fork svg is not ours, even with no list' ($OwnGameT::Foreign('Data\Platform\UI\' + $unusedSvg))
 
     $PathsT::Game = $uiGame
     $PathsT::ProfileDir = $uiProf
+    $renamedRel = 'Data\Platform\UI\abcdef0123456789.jpg'
+    $renamedFull = Join-Path $uiGame $renamedRel
+    [IO.File]::WriteAllText($renamedFull, 'daedric-renamed-copy')
+    $renamedSha = Get-ShipFileSha256 $renamedFull
+    $injected = $goneText.Replace('"daedric": {', ('"daedric": { "zz-test.jpg": "' + $renamedSha + '",'))
+    $OwnGameT::SetUiGoneRecordForTest($injected)
+    $OwnGameT::ResetUiHashedOursForTest()
+    Yes '  and a renamed Daedric file is caught by hash, even with no list' ($OwnGameT::Foreign($renamedRel))
+
+    $OwnGameT::SetUiGoneRecordForTest($goneText)
     $listPath = Join-Path $uiGame 'Data\Platform\UI\thornswood-ui-assets.txt'
     [IO.File]::WriteAllLines($listPath, @('# hashed assets build.js named, #1318', $listed))
     $OwnGameT::ResetUiHashedOursForTest()

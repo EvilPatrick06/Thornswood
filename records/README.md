@@ -27,6 +27,13 @@ read it (issue #440, phase 8):
   compiled fallback (Downgrade.cs, Config.cs) and Setup-Thornswood.ps1,
   because a pin move is one release. `tests\test-skyrim-pin.ps1` fails while
   they disagree.
+- `ui-gone.json`: the 37 Daedric Online menu files (name and sha256) and the
+  42 unused skymp5-front svgs plus bg.png that must never ship and that every
+  pack deletes (issue #1318). `Ship-Rules.ps1` loads it; Build-Launcher puts
+  it inside the launcher; OwnGame.Foreign reads that copy so a refresh cannot
+  copy those files back. No script writes this one: it is changed by hand, in
+  a pull request. `tests\test-ship-rules.ps1` fails while Ship-Rules and
+  OwnGame disagree with it.
 - `skyrim-files.json`: every file of the pinned build, 46 on 1.6.1170, with
   its bytes, SHA-1 and depot, read out of Steam's own manifests of the three
   depots `skyrim-pin.json` names by `scripts\release\New-SkyrimFilesRecord.ps1`
