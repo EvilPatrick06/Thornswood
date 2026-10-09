@@ -77,7 +77,7 @@ $T = Join-Path ([IO.Path]::GetTempPath()) ('ts-1804-' + [Guid]::NewGuid().ToStri
 New-Item -ItemType Directory -Force -Path $T | Out-Null
 # The installer and what it loads from beside it, as Publish-Server sends them.
 $box = Join-Path $T 'box'
-foreach ($f in 'Install-ThornswoodServer.ps1', 'ServerSettings.ps1', 'ServerBuild.ps1') {
+foreach ($f in 'Install-ThornswoodServer.ps1', 'ServerSettings.ps1', 'ServerBuild.ps1', 'ServerReadyWait.ps1') {
     Put (Join-Path $box $f) ([IO.File]::ReadAllText((Join-Path $repo "scripts\deploy\$f")))
 }
 $installer = Join-Path $box 'Install-ThornswoodServer.ps1'

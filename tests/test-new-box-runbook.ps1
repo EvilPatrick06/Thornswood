@@ -380,7 +380,8 @@ function Scps([string]$pageText) {
 }
 $beside = Beside (Join-Path $scriptsDir 'deploy\Install-ThornswoodServer.ps1')
 Yes ('the installer loads {0} from beside itself, read off its syntax tree' -f ($beside -join ', ')) (
-    $beside -contains 'ServerSettings.ps1' -and $beside -contains 'ServerBuild.ps1')
+    $beside -contains 'ServerSettings.ps1' -and $beside -contains 'ServerBuild.ps1' -and
+    $beside -contains 'ServerReadyWait.ps1')
 function Short-Of($scps) {
     $miss = @()
     foreach ($sc in $scps) {
@@ -393,7 +394,10 @@ function Short-Of($scps) {
 # scp cannot pass the real pages by finding nothing.
 $wasStep6 = "   ``````powershell`n   scp .\scripts\deploy\Install-ThornswoodServer.ps1 .\scripts\deploy\ServerSettings.ps1 .\scripts\vps\Roll-Log.ps1 Administrator@<new address>:C:/`n   ``````"
 $caughtScp = Short-Of (Scps $wasStep6)
-Yes 'the check catches step 6 as it was, which left ServerBuild.ps1 behind' ($caughtScp.Count -eq 1 -and $caughtScp[0] -match '^ServerBuild\.ps1 ')
+$caughtNames = @($caughtScp | ForEach-Object { ($_ -split ' ')[0] })
+Yes 'the check catches step 6 as it was, which left ServerBuild.ps1 behind' (
+    $caughtNames -contains 'ServerBuild.ps1' -and $caughtNames -contains 'ServerReadyWait.ps1' -and
+    $caughtScp.Count -eq 2)
 $carries = 0; $short = @()
 foreach ($page in $pages.Keys) {
     $sc = Scps $pages[$page]

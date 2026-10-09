@@ -32,7 +32,8 @@
        the stage to the root, and the world, the roster, the runtime data and
        the logs are carried across (below).
     3. It is started, and has -Wait seconds to answer on its game port and its
-       resources port. If it does not, it is stopped, what was carried goes
+       resources port (left off, the shared ceiling in ServerReadyWait.ps1,
+       #1938). If it does not, it is stopped, what was carried goes
        back, the new folder is renamed <root>.failed-<stamp>, the previous one
        comes back as the root and is started again: INSTALL ROLLED BACK, exit 1.
 
@@ -81,7 +82,10 @@ param(
     # Put the newest <root>.prev-<stamp> back as the root, checked the same way.
     [switch]$PutBack,
     # How long a started server has to answer before the previous one goes back.
-    [int]$Wait = 60,
+    # Left off, the shared ceiling in ServerReadyWait.ps1, derived from
+    # measured Live and Dev starts (#1938). A start that never answers still
+    # rolls back.
+    [int]$Wait,
     # thornswoodRequirePass for the server this installs: on holds a session
     # until its join pass arrives, off lets it act meanwhile. Set over the
     # running server's, or into a first install's; left off, the running
@@ -157,6 +161,17 @@ if (-not (Test-Path -LiteralPath $buildLib)) {
     Finish 'INSTALL REFUSED' 1
 }
 . $buildLib
+# How long a start may take to answer on both ports (#1938): beside this
+# script too, sent with it. Without it there is no ceiling, so nothing runs.
+$waitLib = Join-Path $here 'ServerReadyWait.ps1'
+if (-not (Test-Path -LiteralPath $waitLib)) {
+    Say "ServerReadyWait.ps1 is not beside this installer, so how long a start may take to answer has no source. Nothing was changed." 'Red'
+    Finish 'INSTALL REFUSED' 1
+}
+. $waitLib
+if (-not $PSBoundParameters.ContainsKey('Wait')) {
+    $Wait = Get-ThornswoodServerReadyWait
+}
 $script:running = $null
 
 # The game port a root's settings name, and the resources port that follows
@@ -225,8 +240,9 @@ function StopServer([string]$dir) {
     }
 }
 
-# Both of its ports, from the box itself, for up to -Wait seconds. UDP alone is
-# not enough: the resources port is what the launcher and the client fetch
+# Both of its ports, from the box itself, for up to -Wait seconds (the shared
+# ceiling unless this run passed -Wait, ServerReadyWait.ps1, #1938). UDP alone
+# is not enough: the resources port is what the launcher and the client fetch
 # from, and it only opens once the native server has been built without throwing.
 function Answers([string]$dir) {
     $port = GamePortOf $dir
