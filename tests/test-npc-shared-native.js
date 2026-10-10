@@ -233,7 +233,14 @@ api.updateNpcMovement = (id,pos,rot,speed) => {
   timed('movement','updateNpcMovement',[id,pos,rot,speed]);
   nativeSpeeds.set(id,speed);
   // Check native positions, rather than treating a speed argument as proof.
-  if(!moved.has(id) && previous && Math.hypot(...pos.map((v,i) => v-previous[i])) > 0.000001) {
+  // The engine holds a position as three 32-bit floats (NiPoint3), which past
+  // 131072 units from the origin are 1/64 of a unit apart, so a shorter step
+  // is stored as no step. The runtime keeps its own position in doubles and
+  // steps on from that, so the engine catches up on the next step (#2032: the
+  // Castle Volkihar skeletons 2013cc0 and 2013cc2, at x -173213, were asked
+  // for 0.011 units on the first tick after the reload).
+  const engineCanMove = previous && pos.some((v,i) => Math.fround(v) !== Math.fround(previous[i]));
+  if(!moved.has(id) && engineCanMove) {
     const actual = server.get(id,'locationalData').pos;
     assert.ok(Math.hypot(...actual.map((v,i) => v-previous[i])) > 0.000001,
       'Native position must advance for '+id.toString(16));
