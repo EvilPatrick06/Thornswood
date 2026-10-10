@@ -211,6 +211,8 @@ let bare = null;
 let startedBefore = 0;
 let log = '';
 let bareLog = '';
+// The second service's folder, made in ready() and removed at the end (#1992).
+let bareDir = null;
 async function ready() {
   await new Promise((ok) => site.listen(0, '127.0.0.1', ok));
   PORT = await freePort('0.0.0.0');
@@ -228,7 +230,7 @@ async function ready() {
   srv.stderr.on('data', (d) => { log += d; });
   await listening(srv, PORT);
   // A second copy in its own folder, with no site to ask (#1315).
-  const bareDir = fs.mkdtempSync(path.join(os.tmpdir(), 'voiceauth-bare-'));
+  bareDir = fs.mkdtempSync(path.join(os.tmpdir(), 'voiceauth-bare-'));
   for (const n of ['voice-server.js', 'headlines.js']) fs.copyFileSync(path.join(__dirname, n), path.join(bareDir, n));
   BARE = await freePort('0.0.0.0');
   bare = spawn(process.execPath, ['voice-server.js'], {
@@ -244,6 +246,7 @@ async function ready() {
 }
 
 (async () => {
+  try {
   const h = await ready();
   console.log('service up: build ' + h.build + ', auth ' + h.auth);
   check('/health says auth on, with THORNSWOOD_VOICE_AUTH set to off', h.auth, 'on');
@@ -367,8 +370,31 @@ async function ready() {
   // the child's pipes are still closing trips a libuv assertion on Windows,
   // which looks like a failure and is not one.
   process.exitCode = fail ? 1 : 0;
-  srv.kill();
-  bare.kill();
+  } finally {
+    await cleanUp();
+  }
+})().catch((e) => { console.error(e); process.exitCode = 1; });
+
+/*
+  Stops both services and waits for them to exit, then removes both scratch
+  folders, so a run leaves %TEMP% as it found it (#1992). A service still
+  running holds its folder open on Windows, hence the wait and the retries.
+*/
+async function cleanUp() {
+  const stopped = (c) => new Promise((r) => {
+    if (!c || c.exitCode !== null || c.signalCode !== null) return r();
+    c.once('exit', () => r());
+    c.kill();
+    setTimeout(r, 5000).unref();
+  });
+  await Promise.all([stopped(srv), stopped(bare)]);
   site.close();
+  for (const d of [dir, bareDir]) {
+    if (!d) continue;
+    try { fs.rmSync(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }
+    catch (e) { console.error('could not remove ' + d + ': ' + e.message); process.exitCode = 1; }
+  }
+  // Let the loop drain before exiting: process.exit while the children's
+  // pipes are still closing trips a libuv assertion on Windows.
   setTimeout(() => {}, 150);
-})().catch((e) => { console.error(e); if (srv) srv.kill(); if (bare) bare.kill(); site.close(); process.exitCode = 1; });
+}
