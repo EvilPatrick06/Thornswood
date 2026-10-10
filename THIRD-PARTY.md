@@ -96,18 +96,17 @@ none, the launcher downloads Microsoft's own bootstrapper from Microsoft's link
 
 The six files recorded in `records\client-build.json` correspond to
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
-commit `720a5f7c` (in full, `720a5f7cad1f5f669fb7d0a12e2ff33685eeaf0e`). That
+commit `9e5d630d` (in full, `9e5d630d355b2fa00d6811b85875d091d8599ded`). That
 is upstream skyrim-multiplayer/skymp at `2849e676` with Thornswood's changes on
 top. Check-Secrets.ps1 stops a release whose copy of any of the six is not the
 recorded sha256 (client-not-recorded-build), and Sync-Client.ps1 puts in the
 recorded build.
 
-The six files retain the published e6534129 bytes: their client, platform
-and serialization sources are unchanged. This is reuse of source-equivalent
-artifacts, not a claim that they were recompiled. The server addon was built
-with the new private economy writer and shared inventory validator, together
-with the merged appearance-publication change. Exact build and regression
-evidence is in `records\merchant-runtime-provenance.md`.
+The six client files were rebuilt locally. The native server and its
+JavaScript bundle were built from the same merged source, including the
+atomic quest inventory and state transaction. The generated client and
+server records give each file's hash and source commit. The older reuse
+described in `records\merchant-runtime-provenance.md` is historical.
 
 | File | Built from, in the fork | Licence |
 |---|---|---|
@@ -436,7 +435,7 @@ with.
 
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`, is AGPL-3.0. That record and the client record
-  name `720a5f7cad1f5f669fb7d0a12e2ff33685eeaf0e` on the public fork. The
+  name `9e5d630d355b2fa00d6811b85875d091d8599ded` on the public fork. The
   server module and the six client files were built from that commit, which
   adds the 5 October security fixes (the RPC route, request bodies, metrics,
   the login line, the settings files), the server's equipment write for a new
@@ -445,10 +444,12 @@ with.
   light plugins on the server and in the save the client loads, numbered
   teleports so an old one is never carried out after a newer one, and the
   server reading its source map while it starts; the server module's SHA256 is
-  `8d95ae59af3cac1d617e13709a8b0683de01e110b8910843b6722d3083ebffc5`, built
-  2026-10-06T02:32:14Z. Both servers run it: the dev server since
-  5 October 9:56 PM MT and the main server since 5 October 11:47 PM MT, with
-  release 1.2.0.
+  `df01589df3f9f3a7991736b9a64c4345e50f8d9cc43a5d5ee857ad51bad80bca`, built
+  2026-10-10T19:19:24Z. This is the recorded next release, not a deployment
+  claim. Main remains on `720a5f7cad1f5f669fb7d0a12e2ff33685eeaf0e`.
+  Dev also remains on that earlier engine until the next authorized Ship.
+  The new build adds atomic quest inventory/state writes, connection refusal
+  handling, strict save reading and the merged font and settings changes.
   Section 13 of the AGPL asks that everybody who connects to a modified server
   over a network be offered its source. The next section is that offer.
   `scam_native.node` is also the one file that carries antigo, under the
@@ -475,9 +476,13 @@ certifi is the Certifi project (Mozilla CA bundle as an MPL-2.0 package).
 
 ## Where the source is
 
-For the six client files and for the game server module running on the VPS, the
+For the six recorded client files and the recorded game server module, the
 Corresponding Source is the fork at the commit each record names. The six
 client files and the game server module, at the one commit both records name:
+
+https://github.com/EvilPatrick06/skymp/tree/9e5d630d355b2fa00d6811b85875d091d8599ded
+
+For the earlier engine still deployed on Main and Dev:
 
 https://github.com/EvilPatrick06/skymp/tree/720a5f7cad1f5f669fb7d0a12e2ff33685eeaf0e
 

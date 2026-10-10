@@ -334,6 +334,16 @@ if (lifted && ORES) {
       // Each person's quests are kept on the character (#1621).
       load: function (a) { return kept[a] ? JSON.parse(kept[a]) : undefined; },
       save: function (a, rec) { kept[a] = JSON.stringify(rec); },
+      identity: function (a) {return 'actor:'+a;},
+      commit: function (a, expected, next, changes) {
+        const pack=Object.assign({},inv);
+        for (const change of changes) {
+          const key=a+'|'+change.item,count=(pack[key]||0)+change.count;
+          if(count<0)return {ok:false};
+          pack[key]=count;
+        }
+        Object.assign(inv,pack);kept[a]=JSON.stringify(next);return {ok:true};
+      },
       addItem: function (a, item, n) { inv[a + '|' + item] = (inv[a + '|' + item] || 0) + n; return true; },
       takeItem: function (a, item, n) {
         if ((inv[a + '|' + item] || 0) < n) { return false; }
@@ -414,6 +424,19 @@ if (ORES && qBlock2) {
   const ctx = { console: console, Map: Map, Set: Set, Math: Math, Number: Number, String: String,
     Buffer: Buffer, JSON: JSON, Object: Object, Array: Array, RegExp: RegExp, Error: Error,
     Date: { now: function () { return clock.now; } },
+    MERCHANT_TRADING: {createQuestTransactions: function () {
+      return {available: function () {return true;}, identity: function (a) {return 'actor:'+a;}, shutdown: function () {},
+        commit: function (a, expected, next, changes) {
+          const pack=Object.assign({},inv);
+          for (const change of changes) {
+            const key=a+'|'+change.item,count=(pack[key]||0)+change.count;
+            if(count<0)return {ok:false};
+            pack[key]=count;
+          }
+          Object.assign(inv,pack);props[a+'|thornswoodQuests']=JSON.stringify(next);return {ok:true};
+        }
+      };
+    }},
     mp: {
       makeProperty: function (name) { made[name] = true; },
       get: function (id, key) {
@@ -447,6 +470,7 @@ if (ORES && qBlock2) {
     wearTool: function () { return null; }
   };
   ctx.globalThis = ctx;
+  ctx.__thornswoodMerchantTrade = {questReady: function () {return true;}};
   ctx.__thornswoodCharacter = { rankOf: function (a, key) { return ranks[a + ':' + key] || ''; } };
   vm.createContext(ctx);
   vm.runInContext(qBlock2, ctx);
