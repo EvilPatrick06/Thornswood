@@ -1,12 +1,16 @@
 param([string]$Scratch)
 $ErrorActionPreference='Stop'
 $repo=Split-Path -Parent $PSScriptRoot
-if(-not $Scratch){$Scratch=Join-Path ([IO.Path]::GetTempPath()) ('thornswood-collection-state-'+[guid]::NewGuid().ToString('N'))}
+# A folder this run makes is removed in the finally below (#1992); one the
+# caller passed in is the caller's to keep.
+$ownScratch=-not $Scratch
+if($ownScratch){$Scratch=Join-Path ([IO.Path]::GetTempPath()) ('thornswood-collection-state-'+[guid]::NewGuid().ToString('N'))}
+$oldAppData=$env:APPDATA
+try {
 New-Item -ItemType Directory -Path $Scratch -Force | Out-Null
 & python (Join-Path $PSScriptRoot 'fixtures\vortex-collection-state.py') $Scratch
 if($LASTEXITCODE){throw 'Collection fixture generation failed'}
 . (Join-Path $repo 'scripts\mods\LoadOrder.ps1')
-$oldAppData=$env:APPDATA
 $cases=@{
  'compressed'=2; 'updated'=3; 'downgraded'=1; 'deleted'=0; 'revision-deleted'=0; 'other-slug'=0;
  'mixed'=2; 'latest-not-installed'=2; 'obsolete'=2; 'authoring'=2; 'authoring-version'=2; 'authoring-numeric-version'=2;
@@ -35,7 +39,6 @@ $ids=@{
 }
 function Newest($case){ if($newest.ContainsKey($case)){$newest[$case]}else{$cases[$case]} }
 $count=0
-try {
  # Exercise the publishing entry point first: the old raw-byte reader must fail.
  foreach($case in @('compressed')+@($cases.Keys | Where-Object {$_ -ne 'compressed'} | Sort-Object)){
   $env:APPDATA=Join-Path $Scratch ('collection-'+$case)
@@ -65,4 +68,7 @@ try {
   $count++;Write-Host ('PASS reader '+$case)
  }
  Write-Host ($count.ToString()+' collection cases and C# 5 compilation passed')
-}finally{$env:APPDATA=$oldAppData}
+}finally{
+ $env:APPDATA=$oldAppData
+ if($ownScratch -and (Test-Path -LiteralPath $Scratch)){Remove-Item -LiteralPath $Scratch -Recurse -Force}
+}
