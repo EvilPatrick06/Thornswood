@@ -20,7 +20,18 @@ function fixture(){
 const plain=x=>JSON.parse(JSON.stringify(x));
 const state={pos:[10,20,30],cellOrWorld:60,isHuman:false};
 const f=fixture();assert.deepEqual(f.excluded,[2]);
-assert.deepEqual(plain(f.policy.configure(1,state)),{home:[10,20,30],cell:60,leash:100});
+assert.deepEqual(plain(f.policy.configure(1,state)),{home:[10,20,30],cell:60,leash:100,swims:false,ambush:false});
+// Row 11 (#2067): 1 a race that swims and cannot walk, kept below the depth it
+// was placed at; 2 an ambush placement.
+{
+  const g=fixture();
+  g.data.keep[0].push(3);
+  const flagged=context.createNpcPopulation(g.api,g.data,['Skyrim.esm']);
+  assert.deepEqual(plain(flagged.configure(1,state)),{home:[10,20,30],cell:60,leash:100,swims:true,ambush:true,top:30});
+  g.data.keep[0][11]=2;
+  const ambush=context.createNpcPopulation(g.api,g.data,['Skyrim.esm']);
+  assert.deepEqual(plain(ambush.configure(1,state)),{home:[10,20,30],cell:60,leash:100,swims:false,ambush:true});
+}
 assert.equal(f.props.get('1:spawnDelay'),2700);assert.equal(f.policy.returnMinutes(1),45);
 assert.equal(f.policy.configure(2,state),null);assert.equal(f.policy.configure(3,state),null);
 assert.equal(f.policy.configure(0xff000010,{...state,isHuman:true}),null);

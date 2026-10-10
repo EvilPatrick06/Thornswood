@@ -155,6 +155,41 @@ class PopulationTests(unittest.TestCase):
         self.assertIs(result["keep"], keep, (base, location, result))
         return result
 
+    def test_a_race_that_swims_and_cannot_walk_is_marked_to_keep_to_water(self):
+        # RACE DATA flags: 0x40 swims, 0x100 walks (#2067).
+        fish = desc(0x2f0)
+        self.catalogue.tables[b"RACE"][fish] = {"edid": "SlaughterfishRace", "keywords": [], "raceFlags": 0x40}
+        self.catalogue.races["SlaughterfishRace"] = fish
+        self.catalogue.base("fish", "EncSlaughterfish", "SlaughterfishRace")
+        self.assertTrue(self.classify("fish", "wild", True)["swims"])
+        self.catalogue.tables[b"RACE"][self.catalogue.races["WolfRace"]]["raceFlags"] = 0x40 | 0x100
+        self.assertFalse(self.classify("wolf", "wild", True, 0x1001)["swims"], "A wolf that can swim still walks")
+
+    def test_ambush_bases_are_marked(self):
+        base = self.catalogue.base("ambush", "LvlDraugrAmbushMelee1HMale", "NordRace", ["BanditFaction"])
+        self.catalogue.tables[b"NPC_"][base]["name"] = "Draugr"
+        self.assertTrue(self.classify("ambush", "dungeon", True)["ambush"])
+        self.assertFalse(self.classify("bandit", "dungeon", True, 0x1001)["ambush"])
+
+    def test_test_worlds_and_test_interiors_are_cut_but_real_cells_named_test_are_not(self):
+        cells = self.catalogue.tables[b"CELL"]
+        # A worldspace the game keeps for testing (CWTestHold).
+        self.catalogue.tables[b"WRLD"][self.catalogue.world]["edid"] = "CWTestHold"
+        result = self.classify("wolf", "wild", False)
+        self.assertEqual(result["reason"], "Test or holding cell, never in the world as placed")
+        self.catalogue.tables[b"WRLD"][self.catalogue.world]["edid"] = "Tamriel"
+        # Tamriel has real exterior cells named Test... (TestReach): kept.
+        cells[self.catalogue.cells["wild"]]["edid"] = "TestReach"
+        self.classify("wolf", "wild", True, 0x1001)
+        # An interior that holds actors until a script moves them: cut.
+        cells[self.catalogue.cells["cave"]]["edid"] = "WerewolfPreload"
+        result = self.classify("wolf", "cave", False, 0x1002)
+        self.assertEqual(result["reason"], "Test or holding cell, never in the world as placed")
+        # A bank called Holdings is not a holding cell.
+        cells[self.catalogue.cells["cave"]]["edid"] = "RiftenRethanHoldingsBank"
+        self.assertNotEqual(self.classify("bandit", "cave", True, 0x1003)["reason"],
+                            "Test or holding cell, never in the world as placed")
+
     def test_guards_and_courts_are_cut_from_city_and_open_world_town(self):
         for habitat in ("city", "town"):
             for base in ("guard", "court"):
