@@ -157,7 +157,7 @@ function Read-CollectionPluginsRecord([string]$Path) {
     if ($names -notcontains $need) { throw "$Path has no $need, so the record is corrupt. Nothing was sent." }
   }
   if (-not $doc.collection) { throw "$Path names no collection. Nothing was sent." }
-  if ($doc.revision -notmatch '^\d+$' -or [int]$doc.revision -le 0) { throw "$Path revision is not a positive number. Nothing was sent." }
+  if ([string]$doc.revision -notmatch '^\d+$' -or [int]$doc.revision -le 0) { throw "$Path revision is not a positive number. Nothing was sent." }
   if ([string]$doc.collectionJsonSha256 -notmatch '^[0-9a-fA-F]{64}$') { throw "$Path collectionJsonSha256 is not a SHA256. Nothing was sent." }
   if ($null -eq $doc.plugins) { throw "$Path has no plugins object. Nothing was sent." }
   $plugins = @{}
@@ -170,7 +170,7 @@ function Read-CollectionPluginsRecord([string]$Path) {
     foreach ($need in 'bytes', 'sha256') {
       if ($rowNames -notcontains $need) { throw "$Path plugin '$n' has no $need. Nothing was sent." }
     }
-    if ($row.bytes -notmatch '^\d+$' -or [int64]$row.bytes -le 0) { throw "$Path plugin '$n' bytes is not a positive count. Nothing was sent." }
+    if ([string]$row.bytes -notmatch '^\d+$' -or [int64]$row.bytes -le 0) { throw "$Path plugin '$n' bytes is not a positive count. Nothing was sent." }
     if ([string]$row.sha256 -notmatch '^[0-9a-fA-F]{64}$') { throw "$Path plugin '$n' sha256 is not a SHA256. Nothing was sent." }
     $plugins[$n] = [pscustomobject]@{
       Name          = $n
@@ -229,19 +229,17 @@ function Test-CollectionPluginFile($Record, [string]$Name, [string]$Path) {
 }
 
 function Get-CollectionPluginProblems($Record, $Rows) {
-  $lines = New-Object System.Collections.Generic.List[string]
   $col = $Record.Collection
   $rev = $Record.Revision
-  foreach ($r in @($Rows)) {
+  foreach ($r in $Rows) {
+    if ($null -eq $r) { continue }
     if ($r.InCollection -and -not $r.Ok) {
       $gotSha = $r.GotSha
       if (-not $gotSha) { $gotSha = 'missing' }
-      $line = ('{0} from {1}: sha256 {2} ({3:N0} bytes), the collection''s ({4} rev {5}) is {6} ({7:N0} bytes)' -f `
-        $r.Name, $r.Path, $gotSha, $r.GotBytes, $col, $rev, $r.WantSha, $r.WantBytes)
-      [void]$lines.Add($line)
+      '{0} from {1}: sha256 {2} ({3:N0} bytes), the collection''s ({4} rev {5}) is {6} ({7:N0} bytes)' -f `
+        $r.Name, $r.Path, $gotSha, $r.GotBytes, $col, $rev, $r.WantSha, $r.WantBytes
     }
   }
-  return $lines.ToArray()
 }
 
 function Get-CollectionPinnedMap($Record) {
@@ -370,11 +368,14 @@ function Get-CollectionPluginDeployPlan($Record, [string[]]$PluginNames, [hashta
       }
     }
   }
+  # .ToArray() rather than @(...): PowerShell throws "Argument types do
+  # not match" when @() is wrapped round a List[object] of pscustomobjects
+  # (same binder as Build-SpellTable.ps1).
   return [pscustomobject]@{
-    Problems = @($problems)
-    Send     = @($send)
-    Changed  = @($changed)
-    Outside  = @($outside)
+    Problems = $problems.ToArray()
+    Send     = $send.ToArray()
+    Changed  = $changed.ToArray()
+    Outside  = $outside.ToArray()
   }
 }
 
