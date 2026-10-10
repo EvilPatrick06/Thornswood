@@ -96,7 +96,10 @@ it is not sold. You bring it back and it is taken. Walk away before
 the turn-in and it goes back into that container. The cooldown does
 not start. You do not keep a second one.
 
-The place is a cell. A kill outside it does not count. A retrieval
+An interior place is its cell. Exterior places use the exact source objects
+and bounded ground specified in [Custom quest places](quest-locations.md);
+a runtime worldspace alone never names a whole quest area. A kill outside
+the named place does not count. A retrieval
 from anywhere else is not the item. A dragon is not on this list.
 A richer deed waits longer. Another scene can be added the same
 way: a retrieval, or a kill the server can check, a set amount of
@@ -151,7 +154,8 @@ the turn-in. The open quests, what each has drawn or killed, and the
 cooldowns are kept on the character, so a restart of the server keeps
 them. When a character's quests cannot be read, nothing is written
 over them and their quest steps are refused until it is put right.
-The one place each other scarce row opens, and the sack, shelf,
-chest, urn, strongbox, ruin, cell, and hold a scene row names, are
-not written on this page. They are not bound, so those places stay
-shut. A dragon is not a bounty. Papyrus quests do not run.
+The remaining scarce places and scene objects have been selected in
+[Custom quest places](quest-locations.md), with exact source references,
+counts, cooldowns and the distinction between existing sources and markers
+still to be placed. Those interactions are not bound yet, so their offers
+stay shut. A dragon is not a bounty. Papyrus quests do not run.

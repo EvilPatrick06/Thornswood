@@ -138,6 +138,7 @@ function boot(into) {
         }
         // The native boundary publishes a single complete character snapshot.
         forms[a] = {inv:pack,props:Object.assign({},current.props,{[PROP]:JSON.parse(JSON.stringify(next))})};
+        if(ctx.__afterCommit)ctx.__afterCommit();
         return {ok:true};
       }
     };
@@ -431,6 +432,15 @@ unread({ v: 2, open: {}, cool: {} }, 'a record of another shape');
   yes('a current quest swing owns its cleanup lease',valid());
   w.svc.shutdown();done();
   yes('shutdown revokes mining cleanup and work credit',!valid() && credits===0 && have(35,EBONY.ore)===0);
+}
+{
+  ranks['37:miner']='master';w=restart();w.svc.offer(37,'ebony');
+  let credits=0,wear=0;
+  w.ctx.creditWork=function(){credits++;};w.ctx.wearTool=function(){wear++;};
+  w.ctx.__afterCommit=function(){w.svc.shutdown();};
+  w.svc.mineRare(37,here[0],EBONY);
+  yes('publication followed by shutdown cannot credit work to the next controller',
+      have(37,EBONY.ore)===1 && credits===0 && wear===0);
 }
 {
   ranks['33:miner']='master';w=restart();
