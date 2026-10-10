@@ -461,6 +461,20 @@ jobs:
             exit 1
           }
 
+      - name: Run the generated-files build harness
+        shell: pwsh
+        run: |
+          # Issue #1982. tests\test-build-generated.ps1 failed cases C to K
+          # because case B overwrote the path to Build-Generated.ps1. It ran
+          # nowhere on push, so nothing caught it. It compiles stand-ins for
+          # Pandora and BodySlide with the .NET Framework csc and builds into
+          # a temp folder; it touches no real game folder.
+          & pwsh -NoProfile -File tests\test-build-generated.ps1
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::error file=tests/test-build-generated.ps1::the generated-files build harness failed, the FAIL lines above say what'
+            exit 1
+          }
+
       - name: Check NPC population policy
         shell: pwsh
         run: |
