@@ -306,8 +306,17 @@ console.log('');
 // the gamemode nothing a tick: every timer makes the same engine reads with
 // the 6,000 in the world as with none. A timer that starts walking the world
 // fails here, by name.
-yes('the whole of the gamemode\'s timers stay under 3% of one core with ' + PEOPLE + ' people and ' +
-    NPCS + ' NPCs (' + total.toFixed(2) + '%)', total < 3);
+// Issue #1983: the share of a core above is wall time on a shared machine, so it
+// is printed, not checked (it read 3.74% on main and passed on a branch with no
+// change, on One on 5 Oct, while other builds ran). What is checked is the work
+// a tick does: engine reads and sets a second. Measured on One, 10 Oct 2026,
+// origin/main 2d9a64e, 6,000 NPCs: PEOPLE=5 234/s, PEOPLE=20 887/s,
+// PEOPLE=50 2193/s (about 43.5 a person plus 16). The bound is 45 a person
+// plus 20, so one more read a person on the voice feed's 200 ms pass fails it.
+const workSec = totalReads + totalSets, workBound = 45 * PEOPLE + 20;
+console.log('  (share of a core is wall time, shown only: ' + total.toFixed(2) + '%)');
+yes('the whole of the gamemode\'s timers make at most ' + workBound + ' engine reads and sets a second with ' +
+    PEOPLE + ' people and ' + NPCS + ' NPCs (' + Math.round(workSec) + ')', workSec <= workBound);
 if (NPCS) {
   const moved = [];
   table.forEach(function (t) {
@@ -332,17 +341,29 @@ if (NPCS) {
   function perCall(name, fn, n) {
     const f = sandbox.mp[name];
     if (typeof f !== 'function') { return -1; }
+    for (const k in reads) { delete reads[k]; }
+    counting = true;
     const t0 = process.hrtime.bigint();
     for (let i = 0; i < n; i++) { try { fn(f, i); } catch (e) { } }
-    return Number(process.hrtime.bigint() - t0) / 1e6 / n;
+    const ms = Number(process.hrtime.bigint() - t0) / 1e6 / n;
+    counting = false;
+    let work = 0; for (const k in reads) { work += reads[k]; }
+    perCallWork[name] = work / n;
+    return ms;
   }
+  const perCallWork = {};
   const deathMs = perCall('onDeath', function (f, i) { f(npcIds[i % npcIds.length], 0); }, 2000);
   const pressMs = perCall('onActivate', function (f, i) { f(npcIds[i % npcIds.length], ids[i % ids.length]); }, 2000);
   console.log('  an NPC dying costs ' + deathMs.toFixed(3) + ' ms, a press on one ' + pressMs.toFixed(3) + ' ms');
-  yes('an NPC\'s death costs the gamemode under half a millisecond (' + deathMs.toFixed(3) + ')',
-      deathMs >= 0 && deathMs < 0.5);
-  yes('a press on an NPC costs under half a millisecond (' + pressMs.toFixed(3) + ')',
-      pressMs >= 0 && pressMs < 0.5);
+  // Issue #1983: the milliseconds above are wall time, shown only. Checked is
+  // the work per call: engine reads and sets. Measured on One, 10 Oct 2026,
+  // origin/main 2d9a64e: 4 a death, 1 a press. The bound is that plus one.
+  const deathWork = perCallWork.onDeath, pressWork = perCallWork.onActivate;
+  console.log('  engine reads and sets: ' + deathWork + ' a death, ' + pressWork + ' a press');
+  yes('an NPC\'s death makes at most 5 engine reads and sets (' + deathWork + ')',
+      deathMs >= 0 && deathWork <= 5);
+  yes('a press on an NPC makes at most 2 engine reads and sets (' + pressWork + ')',
+      pressMs >= 0 && pressWork <= 2);
 }
 
 // ------------------------------------------------------------ one timer's pass
