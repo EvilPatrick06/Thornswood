@@ -37,7 +37,10 @@
     .\Deploy-Server.ps1 -Mode restart    counts down and empties the room
     .\Deploy-Server.ps1 -Now             no warning at all
     .\Deploy-Server.ps1 -PutBack         the files the last deploy replaced go
-                                         back in, checked the same way
+                                         back in, checked the same way. A
+                                         .prev whose collection plugins are
+                                         not the record refuses; the fix is
+                                         a deploy, not a put-back (#2019)
     .\Deploy-Server.ps1 -RequirePass on  the same deploy, and the live join
                                          pass hold set on (off lets a session
                                          act until its pass arrives)
@@ -167,7 +170,10 @@ param(
   [long[]]$Playtesters = @(),
   # The committed gamemode alone, with no server build on this machine
   # (#1089). See GAMEMODE ONLY in the header.
-  [switch]$GamemodeOnly
+  [switch]$GamemodeOnly,
+  # The collection plugin record (#2019). No -Skip: the way past a bad
+  # plugin is to fix the plugin.
+  [string]$CollectionRecord = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -185,6 +191,19 @@ if (-not $PSBoundParameters.ContainsKey('Wait')) {
 . (Join-Path $Here 'Artifact.ps1')
 . (Join-Path $Here 'ServerSettings.ps1')
 . (Join-Path $Here 'ServerBuild.ps1')
+. (Join-Path $Here 'CollectionPlugins.ps1')
+. (Join-Path $Here '..\mods\LoadOrder.ps1')
+if (-not $CollectionRecord) { $CollectionRecord = Join-Path $Here '..\..\records\collection-plugins.json' }
+$CollectionRec = Read-CollectionPluginsRecord $CollectionRecord
+$Pinned = Get-CollectionPinnedMap $CollectionRec
+$PinRefuse = -not [bool]$GamemodeOnly
+$revWhy = @(Confirm-CollectionPluginsDeploy $CollectionRec '')
+if ($revWhy.Count) {
+  Write-Host ''
+  Write-Host '  the collection plugin record does not match this machine:' -ForegroundColor Red
+  foreach ($w in $revWhy) { Write-Host ('    ' + $w) -ForegroundColor Red }
+  throw 'the collection plugin record does not match this machine. Nothing was sent and the server was not touched.'
+}
 
 function Remote($script) {
   # Send-Script.ps1 (issue #1070): a long script goes as a file of its own
@@ -399,7 +418,7 @@ function Invoke-PutBack {
   $eap = $ErrorActionPreference
   $ErrorActionPreference = 'Continue'
   try {
-    $backOut = @(Remote ((SwapVars $Root $Task '.stage-none' '.undone-none' $Wait ([ordered]@{})) + $putBackPick + $swapBlock) |
+    $backOut = @(Remote ((SwapVars $Root $Task '.stage-none' '.undone-none' $Wait ([ordered]@{}) $null $Pinned $true) + $putBackPick + $swapBlock) |
                  ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })
   } finally { $ErrorActionPreference = $eap }
   if (-not (Show-SwapResult $backOut "$rootWin\.undone-<stamp>")) { exit 1 }
@@ -734,64 +753,70 @@ if (Test-Path -LiteralPath $ep) { 'ESP ' + (Get-Item -LiteralPath $ep).Length } 
   # the server, so none of it could reach anybody's game either. The gamemode was
   # live and calling for records that were not in the file any client had.
   #
-  # So the size is asked for as well as the name. Size and not a hash because this
-  # is one remote call over ssh for the whole folder either way, and a hash of 60
-  # plugins is 28MB of reading on a box that is also running the server; a plugin
-  # whose contents changed and whose size did not is a case this can live with,
-  # and a deploy that reads every plugin twice is not.
-  $thereRaw = @(Remote ("Get-ChildItem -LiteralPath '" + $remotePlugins.Replace('/','\') +
-                        "' -File | ForEach-Object { `$_.Name + '|' + `$_.Length }"))
-  $thereSize = @{}
-  foreach ($row in $thereRaw) {
-    $bits = "$row".Trim() -split '\|'
-    if ($bits.Count -eq 2 -and $bits[0] -match '\.es[pml]$') { $thereSize[$bits[0]] = [int64]$bits[1] }
-  }
-  $there = @($thereSize.Keys)
-
-  # OUR OWN PLUGIN COMES FROM THE REPO, NOT FROM A GAME FOLDER.
-  #
-  # $Data is the Steam copy, which is right for the other 59: Vortex deploys them
-  # there and that is where they live. Thornswood-Content.esp is not one of those.
-  # It is built by scripts in this repo and installed into a game folder by
-  # Install-ThornswoodContent.ps1, whose default target is C:\Thornswood\Game and
-  # not the Steam copy at all.
-  #
-  # So on 21 September there were four copies of it on this machine at three
-  # different sizes, and a deploy sent whichever one the Steam folder happened to
-  # hold: 151,288 bytes, which was that morning's, while the repo was on 141,234
-  # with the deed, the key and the mold in it. Chasing that around by hand is how
-  # an evening goes missing, so the question is settled here instead. The repo is
-  # where this plugin is made and the repo is what goes up.
+  # Collection plugins are held to records\collection-plugins.json by SHA256
+  # (#2019). Size was the rule until 5 Oct, when a 3,288 byte 3BBB.esp left
+  # One and became the server's copy. Size cannot catch a same-size wrong
+  # file, and that is the hole. Masters are not hashed. Outside plugins still
+  # use name and size for sending, and are listed, and never block.
   $ours = Join-Path $Here '..\..\game\content\Thornswood-Content.esp'
-
-  $sendPlugins = @()
-  $changed = @()
+  $pinNames = @($CollectionRec.Plugins.Keys)
+  $q = { param($s) "'" + ([string]$s).Replace("'", "''") + "'" }
+  $pinLit = @($pinNames | ForEach-Object { & $q $_ }) -join ', '
+  $thereRaw = @(Remote (
+    '$dir = ' + (& $q ($remotePlugins.Replace('/','\'))) + "`r`n" +
+    '$pin = @(' + $pinLit + ')' + "`r`n" +
+    @'
+$pinOf = @{}
+foreach ($n in $pin) { $pinOf[$n] = $true }
+Get-ChildItem -LiteralPath $dir -File -EA SilentlyContinue | ForEach-Object {
+  if ($_.Name -notmatch '\.es[pml]$') { return }
+  $sha = ''
+  foreach ($k in @($pinOf.Keys)) {
+    if ([string]::Equals($k, $_.Name, [StringComparison]::OrdinalIgnoreCase)) {
+      $sha = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+      break
+    }
+  }
+  $_.Name + '|' + $_.Length + '|' + $sha
+}
+'@
+  ))
+  $localOf = @{}
   foreach ($n in $pluginNames) {
     $local = Join-Path $Data $n
     if ($n -eq 'Thornswood-Content.esp' -and (Test-Path -LiteralPath $ours)) { $local = $ours }
-    if ($there -notcontains $n) {
-      if (Test-Path -LiteralPath $local) { $sendPlugins += $local }
-      else { throw "the load order names $n, the VPS does not have it, and it is not at $local either" }
-      continue
+    $localOf[$n] = $local
+  }
+  $plan = Get-CollectionPluginDeployPlan $CollectionRec $pluginNames $localOf $thereRaw
+  $lines = @(Get-CollectionPluginProblems $CollectionRec $plan.Problems)
+  if ($lines.Count) {
+    Write-Host ''
+    Write-Host '  collection plugins are not the record:' -ForegroundColor Red
+    foreach ($w in $lines) { Write-Host ('    ' + $w) -ForegroundColor Red }
+    throw ('collection plugins are not the record; the lines above say which. Nothing was sent and the server was not touched.')
+  }
+  foreach ($n in $pluginNames) {
+    $local = $localOf[$n]
+    $there = $false
+    foreach ($row in $thereRaw) {
+      $bits = "$row".Trim() -split '\|'
+      if ($bits.Count -ge 1 -and [string]::Equals($bits[0], $n, [StringComparison]::OrdinalIgnoreCase)) { $there = $true; break }
     }
-    # It is there. Is it the same one? A plugin this machine does not have is left
-    # alone: the VPS's copy is then the only copy and overwriting it with nothing
-    # is the one outcome worse than it being stale.
-    if (-not (Test-Path -LiteralPath $local)) { continue }
-    $localLen = (Get-Item -LiteralPath $local).Length
-    if ($localLen -ne $thereSize[$n]) {
-      $sendPlugins += $local
-      $changed += ('{0}  {1:N0} -> {2:N0} bytes' -f $n, $thereSize[$n], $localLen)
+    if (-not $there -and -not (Test-Path -LiteralPath $local)) {
+      throw "the load order names $n, the VPS does not have it, and it is not at $local either"
     }
   }
+  $sendPlugins = @($plan.Send)
+  $changed = @($plan.Changed)
   Write-Host ''
   Write-Host ('  load order: {0} plugins, paths rewritten to {1}' -f $pluginNames.Count, $remotePlugins) -ForegroundColor DarkGray
+  Write-CollectionOutsideBlock $CollectionRec $plan.Outside
   if ($sendPlugins.Count) {
     Write-Host ('  {0} plugin(s) will go up before the restart:' -f $sendPlugins.Count) -ForegroundColor Yellow
     foreach ($p in $sendPlugins) { Write-Host ('    ' + (Split-Path $p -Leaf)) -ForegroundColor Yellow }
     foreach ($c in $changed) { Write-Host ('    changed: ' + $c) -ForegroundColor Yellow }
   } else {
-    Write-Host '  every plugin the load order names is on the VPS at the same size' -ForegroundColor DarkGray
+    Write-Host '  every collection plugin the load order names matches the record, and every outside plugin is the same size' -ForegroundColor DarkGray
   }
 }
 
@@ -878,11 +903,11 @@ if ($GamemodeOnly) {
   # swap (#1089, ServerSettings.ps1's $settingsKeepBlock).
   $liveKeys = @()
   $carryScript = [IO.File]::ReadAllText((Join-Path $Here 'ServerSettings.ps1')) + "`r`n" + $ThornswoodRecordSumText + "`r`n" +
-                 (SwapVars $Root $Task $stageName $prevName $Wait $hashes $liveKeys) + ('$WantRecord = ''' + $recordSum + '''' + "`r`n") + $settingsKeepBlock
+                 (SwapVars $Root $Task $stageName $prevName $Wait $hashes $liveKeys $Pinned $PinRefuse) + ('$WantRecord = ''' + $recordSum + '''' + "`r`n") + $settingsKeepBlock
 } else {
   $liveKeys = @($ThornswoodGamemodeKeys + @($asked.Keys))
   $carryScript = [IO.File]::ReadAllText((Join-Path $Here 'ServerSettings.ps1')) + "`r`n" +
-                 (SwapVars $Root $Task $stageName $prevName $Wait $hashes $liveKeys) + (Get-ThornswoodAskedLine $asked) + $settingsCarryBlock
+                 (SwapVars $Root $Task $stageName $prevName $Wait $hashes $liveKeys $Pinned $PinRefuse) + (Get-ThornswoodAskedLine $asked) + $settingsCarryBlock
 }
 $carryOut = @(Remote $carryScript | ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })
 $carried = @($carryOut | Where-Object { $_ -match '^CARRIED [0-9a-f]{64}$' })
@@ -894,7 +919,7 @@ if (-not $carried.Count) {
 }
 $hashes['server-settings.json'] = $carried[0].Substring(8)
 
-$checkOut = @(Remote ((SwapVars $Root $Task $stageName $prevName $Wait $hashes $liveKeys) + $checkBlock) |
+$checkOut = @(Remote ((SwapVars $Root $Task $stageName $prevName $Wait $hashes $liveKeys $Pinned $PinRefuse) + $checkBlock) |
               ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })
 if ($checkOut -notcontains 'STAGE OK') {
   Write-Host ''
@@ -915,7 +940,7 @@ Write-Host 'Stopping, swapping in and starting...'
 $eap = $ErrorActionPreference
 $ErrorActionPreference = 'Continue'
 try {
-  $swapOut = @(Remote ((SwapVars $Root $Task $stageName $prevName $Wait $hashes $liveKeys) + $swapBlock) |
+  $swapOut = @(Remote ((SwapVars $Root $Task $stageName $prevName $Wait $hashes $liveKeys $Pinned $PinRefuse) + $swapBlock) |
                ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })
 } finally { $ErrorActionPreference = $eap }
 

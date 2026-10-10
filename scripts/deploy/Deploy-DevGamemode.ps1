@@ -203,7 +203,10 @@ param(
   # parameter named only (#1929). With none set, PowerShell numbered them in
   # the order above, so a bare note bound to -Vps: on 5 Oct the refusal's own
   # example became the VPS address and the script refused again.
-  [Parameter(Position = 0)][string]$Note = ''
+  [Parameter(Position = 0)][string]$Note = '',
+  # The collection plugin record (#2019). No -Skip: the way past a bad
+  # plugin is to fix the plugin.
+  [string]$CollectionRecord = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -215,6 +218,19 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 . (Join-Path $Here 'Swap.ps1')
+. (Join-Path $Here 'CollectionPlugins.ps1')
+. (Join-Path $Here '..\mods\LoadOrder.ps1')
+if (-not $CollectionRecord) { $CollectionRecord = Join-Path $Here '..\..\records\collection-plugins.json' }
+$CollectionRec = Read-CollectionPluginsRecord $CollectionRecord
+$Pinned = Get-CollectionPinnedMap $CollectionRec
+$PinRefuse = [bool]$LoadOrder
+$revWhy = @(Confirm-CollectionPluginsDeploy $CollectionRec '')
+if ($revWhy.Count) {
+  Write-Host ''
+  Write-Host '  the collection plugin record does not match this machine:' -ForegroundColor Red
+  foreach ($w in $revWhy) { Write-Host ('    ' + $w) -ForegroundColor Red }
+  throw 'the collection plugin record does not match this machine. Nothing was sent and the server was not touched.'
+}
 if (-not $PSBoundParameters.ContainsKey('Wait')) {
   $Wait = Get-ThornswoodServerReadyWait
 }
@@ -332,20 +348,36 @@ if ($LoadOrder) {
   $pluginNames = @($built.loadOrder | ForEach-Object { [IO.Path]::GetFileName($_) })
   $ours = Join-Path $Here '..\..\game\content\Thornswood-Content.esp'
 
-  # Name and size, the same question Deploy-Server.ps1 asks of the live box and
-  # for the same reason: a plugin already there by name may not be the same
-  # plugin any more. Size and not a hash, because a hash of 57 plugins is tens
-  # of megabytes of reading on a box that is also running two servers.
-  $thereRaw = @(Remote ("Get-ChildItem -LiteralPath '" + $remotePlugins.Replace('/','\') +
-                        "' -File | ForEach-Object { `$_.Name + '|' + `$_.Length }"))
+  # Collection plugins are held to records\collection-plugins.json by SHA256
+  # (#2019), the same question Deploy-Server.ps1 asks of the live box. Size
+  # was the rule until a same-size wrong 3BBB.esp went up from One.
+  $pinNames = @($CollectionRec.Plugins.Keys)
+  $q = { param($s) "'" + ([string]$s).Replace("'", "''") + "'" }
+  $pinLit = @($pinNames | ForEach-Object { & $q $_ }) -join ', '
+  $thereRaw = @(Remote (
+    '$dir = ' + (& $q ($remotePlugins.Replace('/','\'))) + "`r`n" +
+    '$pin = @(' + $pinLit + ')' + "`r`n" +
+    @'
+$pinOf = @{}
+foreach ($n in $pin) { $pinOf[$n] = $true }
+Get-ChildItem -LiteralPath $dir -File -EA SilentlyContinue | ForEach-Object {
+  if ($_.Name -notmatch '\.es[pml]$') { return }
+  $sha = ''
+  foreach ($k in @($pinOf.Keys)) {
+    if ([string]::Equals($k, $_.Name, [StringComparison]::OrdinalIgnoreCase)) {
+      $sha = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+      break
+    }
+  }
+  $_.Name + '|' + $_.Length + '|' + $sha
+}
+'@
+  ))
   $thereSize = @{}
   foreach ($row in $thereRaw) {
     $bits = "$row".Trim() -split '\|'
-    if ($bits.Count -eq 2 -and $bits[0] -match '\.es[pml]$') { $thereSize[$bits[0]] = [int64]$bits[1] }
+    if ($bits.Count -ge 2 -and $bits[0] -match '\.es[pml]$') { $thereSize[$bits[0]] = [int64]$bits[1] }
   }
-  # An unreadable folder and an empty one look the same from here, and the
-  # difference is 57 plugins going up over a slow link for no reason, or an scp
-  # into a path that does not exist. Neither should happen quietly.
   if ($thereSize.Count -eq 0) {
     Write-Host ''
     Write-Host ("  Nothing readable at $remotePlugins on the dev box.") -ForegroundColor Red
@@ -353,33 +385,38 @@ if ($LoadOrder) {
     throw "could not read the dev server's plugin folder, so there is no way to tell what it already has"
   }
 
+  $localOf = @{}
   foreach ($n in $pluginNames) {
     $local = Join-Path $Data $n
     if ($n -eq 'Thornswood-Content.esp' -and (Test-Path -LiteralPath $ours)) { $local = $ours }
-    if (-not $thereSize.ContainsKey($n)) {
-      if (Test-Path -LiteralPath $local) { $sendPlugins += $local }
-      else { throw "the load order names $n, the dev server does not have it, and it is not at $local either" }
-      continue
-    }
-    # There already. A plugin this machine does not have is left alone: the
-    # box's copy is then the only copy, and overwriting it with nothing is the
-    # one outcome worse than it being stale.
-    if (-not (Test-Path -LiteralPath $local)) { continue }
-    $localLen = (Get-Item -LiteralPath $local).Length
-    if ($localLen -ne $thereSize[$n]) {
-      $sendPlugins += $local
-      $changed += ('{0}  {1:N0} -> {2:N0} bytes' -f $n, $thereSize[$n], $localLen)
+    $localOf[$n] = $local
+  }
+  $plan = Get-CollectionPluginDeployPlan $CollectionRec $pluginNames $localOf $thereRaw
+  $lines = @(Get-CollectionPluginProblems $CollectionRec $plan.Problems)
+  if ($lines.Count) {
+    Write-Host ''
+    Write-Host '  collection plugins are not the record:' -ForegroundColor Red
+    foreach ($w in $lines) { Write-Host ('    ' + $w) -ForegroundColor Red }
+    throw ('collection plugins are not the record; the lines above say which. Nothing was sent and the server was not touched.')
+  }
+  foreach ($n in $pluginNames) {
+    $local = $localOf[$n]
+    if (-not $thereSize.ContainsKey($n) -and -not (Test-Path -LiteralPath $local)) {
+      throw "the load order names $n, the dev server does not have it, and it is not at $local either"
     }
   }
+  $sendPlugins = @($plan.Send)
+  $changed = @($plan.Changed)
 
   Write-Host ''
   Write-Host ('  load order: {0} plugins, paths rewritten to {1}' -f $pluginNames.Count, $remotePlugins) -ForegroundColor DarkGray
+  Write-CollectionOutsideBlock $CollectionRec $plan.Outside
   if ($sendPlugins.Count) {
     Write-Host ('  {0} plugin(s) will go up before the restart:' -f $sendPlugins.Count) -ForegroundColor Yellow
     foreach ($p in $sendPlugins) { Write-Host ('    ' + (Split-Path $p -Leaf)) -ForegroundColor Yellow }
     foreach ($c in $changed) { Write-Host ('    changed: ' + $c) -ForegroundColor Yellow }
   } else {
-    Write-Host '  every plugin the load order names is on the dev server at the same size' -ForegroundColor DarkGray
+    Write-Host '  every collection plugin the load order names matches the record, and every outside plugin is the same size' -ForegroundColor DarkGray
   }
 
   # The list goes up as a file of its own. Putting 57 paths inside the settings
@@ -962,7 +999,7 @@ if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$want
   if (-not $sum.Count) { throw "the staged settings could not be read back on the dev box. The dev server has not been touched." }
   $hashes['server-settings.json'] = $sum[0].ToLowerInvariant()
 
-  $checkOut = @(Remote ((SwapVars $Root $Task $stageName $prevName $Wait $hashes) + $checkBlock) |
+  $checkOut = @(Remote ((SwapVars $Root $Task $stageName $prevName $Wait $hashes $null $Pinned $PinRefuse) + $checkBlock) |
                 ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })
   if ($checkOut -notcontains 'STAGE OK') {
     Write-Host ''
@@ -995,7 +1032,7 @@ if (-not $PutBack) { $readBackKeys = $DevSettingsKeys }
 $eap = $ErrorActionPreference
 $ErrorActionPreference = 'Continue'
 try {
-  $swapOut = @(Remote ((SwapVars $Root $Task $stageName $prevName $Wait $hashes $readBackKeys) + $pick + $swapBlock) |
+  $swapOut = @(Remote ((SwapVars $Root $Task $stageName $prevName $Wait $hashes $readBackKeys $Pinned $(if ($PutBack) { $true } else { $PinRefuse })) + $pick + $swapBlock) |
                ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })
 } finally { $ErrorActionPreference = $eap }
 $swapped = Show-SwapResult $swapOut "$rootWin\.prev-<stamp>"

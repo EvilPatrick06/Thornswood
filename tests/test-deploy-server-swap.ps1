@@ -94,6 +94,15 @@ $serverBuildPath = Join-Path $Here 'scripts\deploy\ServerBuild.ps1'
 Yes 'Swap.ps1 puts ServerBuild.ps1 in front of the stage check' (
     $lib.Substring($b).Contains('$checkBlock = [IO.File]::ReadAllText((Join-Path $PSScriptRoot ''ServerBuild.ps1'')) + "`r`n" + $checkBlock'))
 $checkBlock = [IO.File]::ReadAllText($serverBuildPath) + "`r`n" + $checkBlock
+# Collection plugin pin (#2019): Swap.ps1 puts CollectionPlugins.ps1's
+# far-side text in front of the check, the same way it puts ServerBuild.
+$collectionPluginsPath = Join-Path $Here 'scripts\deploy\CollectionPlugins.ps1'
+. $collectionPluginsPath
+Yes 'Swap.ps1 puts CollectionPinnedText in front of the stage check and the put-back pick' (
+    $lib.Contains('$checkBlock = $CollectionPinnedText + "`r`n" + $checkBlock') -and
+    $lib.Contains('$putBackPick = $CollectionPinnedText + "`r`n" + $putBackPick'))
+$checkBlock = $CollectionPinnedText + "`r`n" + $checkBlock
+$putBackPick = $CollectionPinnedText + "`r`n" + $putBackPick
 Yes 'Deploy-Server.ps1 loads Swap.ps1' ($src -match "\. \(Join-Path \`$Here 'Swap\.ps1'\)")
 # Which settings Deploy-Server takes from the build and which stay the live
 # server's (#1222), and the carry it runs on the box: ServerSettings.ps1.
@@ -108,7 +117,7 @@ Yes 'ServerSettings.ps1 has the carry block and the live keys, in plain ASCII' (
 Yes 'Deploy-Server.ps1 loads it, sends it with the carry, and checks and swaps with the live keys' (
     $src -match "\. \(Join-Path \`$Here 'ServerSettings\.ps1'\)" -and $src.Contains('$settingsCarryBlock') -and
     $src.Contains('$liveKeys = @($ThornswoodGamemodeKeys + @($asked.Keys))') -and
-    ([regex]::Matches($src, '\$hashes \$liveKeys\) \+ \$(checkBlock|swapBlock)')).Count -eq 2)
+    ([regex]::Matches($src, '\$hashes \$liveKeys \$Pinned \$PinRefuse\) \+ \$(checkBlock|swapBlock)')).Count -eq 2)
 
 # ---- -GamemodeOnly, read (#1089) ---------------------------------------------
 # A machine other than One puts a gamemode live with no server build: the
@@ -303,7 +312,7 @@ function MakeStage {
 
 # The far side, as Deploy-Server sends it: SwapVars, then the block. The two
 # task cmdlets are replaced in between, and nothing else is.
-function RunFar([string]$block, [string]$stageName, [string]$prevName, [int]$wait, $want, [string[]]$keys = $null) {
+function RunFar([string]$block, [string]$stageName, [string]$prevName, [int]$wait, $want, [string[]]$keys = $null, $pinned = $null, [bool]$pinRefuse = $true) {
     $mock = @"
 function Get-ScheduledTask { [CmdletBinding()] param([string]`$TaskName) }
 function Set-ScheduledTask { [CmdletBinding()] param([Parameter(ValueFromPipeline = `$true)]`$InputObject) }
@@ -313,7 +322,7 @@ function Start-ScheduledTask { [CmdletBinding()] param([string]`$TaskName)
 }
 
 "@
-    $body = (SwapVars $root 'Thornswood Test Swap' $stageName $prevName $wait $want $keys) + $mock + $block
+    $body = (SwapVars $root 'Thornswood Test Swap' $stageName $prevName $wait $want $keys $pinned $pinRefuse) + $mock + $block
     $f = Join-Path $work ('far-' + [Guid]::NewGuid().ToString('N') + '.ps1')
     [IO.File]::WriteAllText($f, $body, (New-Object Text.UTF8Encoding($true)))
     $eap = $ErrorActionPreference
@@ -719,6 +728,17 @@ try {
     Put (Join-Path $gmRepo 'game\gamemode.js') '// gamemode only, one'
     Put (Join-Path $gmRepo 'game\content\Thornswood-Content.esp') 'our plugin, two, longer'
     Put (Join-Path $gmRepo 'records\server-build.json') $gmRecordLf
+    # Empty collection record so -GamemodeOnly can fail closed on a missing
+    # file without pinning any plugin the existing cases send (#2019).
+    Put (Join-Path $gmRepo 'records\collection-plugins.json') (@'
+{
+  "collection": "7essxf",
+  "revision": 2,
+  "collectionJsonSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "generatedBy": "scripts/release/New-CollectionPluginsRecord.ps1",
+  "plugins": {}
+}
+'@)
     $gmPrelude = @"
 function Get-ScheduledTask { [CmdletBinding()] param([string]`$TaskName) }
 function Set-ScheduledTask { [CmdletBinding()] param([Parameter(ValueFromPipeline = `$true)]`$InputObject) }
@@ -926,10 +946,107 @@ function Start-ScheduledTask { [CmdletBinding()] param([string]`$TaskName)
             [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $root 'server-settings.json'))) -eq [Convert]::ToBase64String($ownSettings) -and
             (WaitUp $P) -and ((Owner $Q) -eq $otherPid))
         if ($script:fail -gt $failed) { Show }
+
+        # ---- 14. -GamemodeOnly warns on a box already holding a bad plugin
+        $goodPin = ('A' * 32)
+        $badPin = ('X' * 32)
+        $goodPinSha = Sha $goodPin
+        $badPinSha = Sha $badPin
+        $pinRec = @{
+            collection = '7essxf'; revision = 2
+            collectionJsonSha256 = '0000000000000000000000000000000000000000000000000000000000000000'
+            generatedBy = 'scripts/release/New-CollectionPluginsRecord.ps1'
+            plugins = @{
+                '3BBB.esp' = @{
+                    bytes = 32; sha256 = $goodPinSha; mod = 30174; fileId = 600100
+                    archiveMd5 = '0' * 32; archiveSha256 = '1' * 64
+                    archivePath = 'optionA/3BBB.esp'; via = 'fomod'
+                }
+            }
+        }
+        Put (Join-Path $gmRepo 'records\collection-plugins.json') ($pinRec | ConvertTo-Json -Depth 6)
+        GmCommit
+        Put (Join-Path $root 'plugins\3BBB.esp') $badPin
+        $lo = [IO.File]::ReadAllText((Join-Path $root 'server-settings.json')) | ConvertFrom-Json
+        $lo.loadOrder = @($lo.loadOrder) + @((($root -replace '\\', '/') + '/plugins/3BBB.esp'))
+        Put (Join-Path $root 'server-settings.json') ($lo | ConvertTo-Json -Depth 8)
+        $scpBefore = $global:TsGm.Scp.Count
+        $r = GmDeploy
+        $said = $r.Said
+        $failed = $script:fail
+        $pluginScp = @($global:TsGm.Scp | Select-Object -Skip $scpBefore | Where-Object { $_ -match 'plugins[/\\]' })
+        $warnPath = Join-Path $root 'plugins\3BBB.esp'
+        Yes '14  -GamemodeOnly WARNING names the plugin, expected SHA256, actual SHA256 and source path' (
+            $said -match 'WARNING:' -and $said -match '3BBB\.esp' -and
+            $said -match $goodPinSha -and $said -match $badPinSha -and
+            ($said -match [regex]::Escape($warnPath) -or $said -match [regex]::Escape(($warnPath -replace '\\', '/'))))
+        Yes '14  and the deploy finishes with exit code 0' $r.Ok
+        Yes '14  and no plugin files are copied on a -GamemodeOnly run' ($pluginScp.Count -eq 0)
+        Yes '14  and the box still holds the mismatched 3BBB.esp' ((Text (Join-Path $root 'plugins\3BBB.esp')) -eq $badPin)
+        if ($script:fail -gt $failed) { Show }
     } finally {
         Remove-Item -Path function:global:ssh, function:global:scp, function:global:TsGmMap -ErrorAction SilentlyContinue
         Remove-Variable -Name TsGm -Scope Global -ErrorAction SilentlyContinue
     }
+
+    # ---- 13, 15, 16, 19: box-side collection pin (#2019) --------------------
+    $goodPin = ('A' * 32)
+    $badPin = ('X' * 32)
+    $goodPinSha = Sha $goodPin
+    $badPinSha = Sha $badPin
+    $pinMap = [ordered]@{ '3BBB.esp' = $goodPinSha }
+    $pinText = SwapVars $root 'Thornswood Test Swap' '.stage-pin' '.prev-pin' 4 ([ordered]@{}) $null $pinMap $true
+    Yes '13  SwapVars sends $Pinned as quoted literals from the record' (
+        $pinText -match [regex]::Escape("`$Pinned['3BBB.esp'] = '$goodPinSha'"))
+    Yes '13  and the far-side pin text opens no record or manifest' (
+        $CollectionPinnedText -notmatch 'collection-plugins\.json' -and
+        $CollectionPinnedText -notmatch 'server-build\.json' -and
+        $CollectionPinnedText -notmatch 'ConvertFrom-Json')
+
+    Put (Join-Path $root 'plugins\3BBB.esp') $badPin
+    $failed = $script:fail
+    $live = [IO.File]::ReadAllText((Join-Path $root 'server-settings.json')) | ConvertFrom-Json
+    if (@($live.loadOrder | ForEach-Object { [IO.Path]::GetFileName($_) }) -notcontains '3BBB.esp') {
+        $live.loadOrder = @($live.loadOrder) + @((($root -replace '\\', '/') + '/plugins/3BBB.esp'))
+        Put (Join-Path $root 'server-settings.json') ($live | ConvertTo-Json -Depth 8)
+    }
+    $before13 = Tree $root
+    $running13 = Owner $P
+    $w = MakeStage -Name '.stage-2019-13' -Order @('Skyrim.esm', $bob, '3BBB.esp')
+    $out = RunFar $checkBlock '.stage-2019-13' '.prev-2019-13' 4 $w $null $pinMap $true
+    Yes '13  a staged or on-disk collection plugin with the wrong hash is STAGE REFUSED' (
+        ($out -contains 'STAGE REFUSED') -and ($out -notcontains 'STAGE OK') -and
+        (($out -join "`n") -match '3BBB\.esp') -and (($out -join "`n") -match $badPinSha) -and (($out -join "`n") -match $goodPinSha))
+    Yes '13  and the live files are unchanged and the server is still answering' (
+        (Tree $root) -eq $before13 -and (Owner $P) -eq $running13 -and (WaitUp $P))
+    if ($script:fail -gt $failed) { Show }
+
+    # 15 / 19: -PutBack with a bad .prev refuses, even when PinRefuse is false.
+    Get-ChildItem -LiteralPath $root -Directory -Force | Where-Object { $_.Name -like '.prev-*' } |
+        ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force }
+    $prevBad = Join-Path $root '.prev-2099-2019-bad'
+    Put (Join-Path $prevBad 'gamemode.js') '// putback pin'
+    Put (Join-Path $prevBad 'plugins\3BBB.esp') $badPin
+    $before15 = Tree $root
+    $running15 = Owner $P
+    $failed = $script:fail
+    $out = RunFar ($putBackPick + $swapBlock) '.stage-none' '.undone-none' 4 ([ordered]@{}) $null $pinMap $true
+    Yes '15  -PutBack with a bad .prev is SWAP REFUSED, naming the plugin' (
+        ($out -contains 'SWAP REFUSED') -and ($out -notcontains 'SWAP OK') -and
+        (($out -join "`n") -match '3BBB\.esp') -and (($out -join "`n") -match $badPinSha))
+    Yes '15  and the tree is byte-identical and the server was never stopped' (
+        (Tree $root) -eq $before15 -and (Owner $P) -eq $running15 -and
+        -not (@($out | Where-Object { $_ -like 'stopped pid *' }).Count))
+    if ($script:fail -gt $failed) { Show }
+
+    $out = RunFar ($putBackPick + $swapBlock) '.stage-none' '.undone-none' 4 ([ordered]@{}) $null $pinMap $false
+    Yes '19  -GamemodeOnly combined with -PutBack against a mismatched .prev still REFUSES (warn path does not bypass PutBack)' (
+        ($out -contains 'SWAP REFUSED') -and ($out -notcontains 'SWAP OK') -and
+        (($out -join "`n") -match 'REFUSED:') -and (($out -join "`n") -match '3BBB\.esp'))
+    Yes '19  and the tree is still byte-identical, nothing stopped' (
+        (Tree $root) -eq $before15 -and (Owner $P) -eq $running15)
+    if ($script:fail -gt $failed) { Show }
+    Remove-Item -LiteralPath $prevBad -Recurse -Force -EA SilentlyContinue
 
     # ---- nothing to put back --------------------------------------------------
     $empty = Join-Path $work 'no-prev-root'

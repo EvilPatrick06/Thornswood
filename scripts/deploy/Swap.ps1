@@ -130,6 +130,16 @@ foreach ($p in $order) {
   $staged = ((Split-Path -Parent $at) -eq $plugins) -and (Test-Path -LiteralPath (Join-Path $stageDir ('plugins\' + $leaf)))
   if (-not $staged -and -not (Test-Path -LiteralPath $at)) { $bad += ('the load order names a plugin that is not on disk: ' + $p) }
 }
+# Collection plugins held to the repo record (#2019). $Pinned came from this
+# machine as quoted literals. A full deploy refuses; -GamemodeOnly warns and
+# the stage still checks out, because a bad plugin already on the box is not
+# a reason to hold a gamemode. -PutBack never uses this path.
+if (${function:Test-PinnedPlugins}) {
+  foreach ($row in @(Test-PinnedPlugins $order $stageDir $plugins $Pinned)) {
+    if ($row.Kind -eq 'refuse') { $bad += $row.Line }
+    else { 'WARNING: ' + $row.Line }
+  }
+}
 # The gamemode parses on the box too, not only where it was written. Issue
 # #446: a gamemode that does not parse stops the server at start, and this is
 # the last point at which that costs nothing.
@@ -399,10 +409,12 @@ exit 1
 # change: the swap then reads the settings back before it starts anything, and
 # ServerSettings.ps1's $settingsCarryBlock uses them (Deploy-Server.ps1). Left
 # out, $ReleaseKeys is $null and there is no read-back.
-function SwapVars([string]$farRoot, [string]$taskName, [string]$stageName, [string]$prevName, [int]$waitSeconds, $sums, [string[]]$releaseKeys = $null) {
+function SwapVars([string]$farRoot, [string]$taskName, [string]$stageName, [string]$prevName, [int]$waitSeconds, $sums, [string[]]$releaseKeys = $null, $pinned = $null, [bool]$pinRefuse = $true) {
   $q = { param($s) "'" + ([string]$s).Replace("'", "''") + "'" }
   $keysLine = '$ReleaseKeys = $null'
   if ($null -ne $releaseKeys) { $keysLine = '$ReleaseKeys = @(' + ((@($releaseKeys) | ForEach-Object { & $q $_ }) -join ', ') + ')' }
+  $refuseLine = '$PinRefuse = $true'
+  if (-not $pinRefuse) { $refuseLine = '$PinRefuse = $false' }
   $lines = @(
     ('$Root  = ' + (& $q $farRoot.Replace('/', '\'))),
     ('$Task  = ' + (& $q $taskName)),
@@ -411,9 +423,16 @@ function SwapVars([string]$farRoot, [string]$taskName, [string]$stageName, [stri
     ('$Wait  = ' + $waitSeconds),
     '$KeepStage = $false',
     $keysLine,
-    '$Want  = [ordered]@{}'
+    $refuseLine,
+    '$Want  = [ordered]@{}',
+    '$Pinned = @{}'
   )
   foreach ($k in @($sums.Keys)) { $lines += ('$Want[' + (& $q $k) + '] = ' + (& $q $sums[$k])) }
+  # $Pinned is name -> sha256 from the repo record on this machine. Quoted
+  # literals only: the box never reads a record or a manifest (#2019).
+  if ($null -ne $pinned) {
+    foreach ($k in @($pinned.Keys)) { $lines += ('$Pinned[' + (& $q $k) + '] = ' + (& $q $pinned[$k])) }
+  }
   return (($lines -join "`r`n") + "`r`n")
 }
 # ==== end deploy-server remote blocks ====
@@ -423,6 +442,10 @@ function SwapVars([string]$farRoot, [string]$taskName, [string]$stageName, [stri
 # file beside this one: tests\test-deploy-server-swap.ps1 runs the blocks out
 # of the markers and puts the same text in front itself.
 $checkBlock = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'ServerBuild.ps1')) + "`r`n" + $checkBlock
+# Collection plugin pin check (#2019). Same shape as ServerBuild: the far-side
+# function is text in front of the block. The box never opens the record.
+. (Join-Path $PSScriptRoot 'CollectionPlugins.ps1')
+$checkBlock = $CollectionPinnedText + "`r`n" + $checkBlock
 
 # ==== put-back pick ====
 #
@@ -457,10 +480,42 @@ if (-not $Want.Count) {
   'SWAP REFUSED'
   exit 1
 }
+# Collection plugins in this .prev are held to $Pinned from the repo record
+# (#2019). A mismatch refuses and stops nothing. Outside plugin files are
+# listed and do not block. $PinRefuse is ignored: a -GamemodeOnly warn must
+# never bypass a put-back. Service put-backs (docs, voice, bot) send no
+# $Pinned; an unset table is empty and nothing here refuses.
+if (-not (Test-Path variable:Pinned) -or $null -eq $Pinned) { $Pinned = @{} }
+$pinBad = @()
+foreach ($rel in @($Want.Keys)) {
+  if ($rel -notlike 'plugins/*' -and $rel -notlike 'plugins\*') { continue }
+  $leaf = [IO.Path]::GetFileName($rel)
+  $wantSha = $null
+  foreach ($k in @($Pinned.Keys)) {
+    if ([string]::Equals([string]$k, $leaf, [StringComparison]::OrdinalIgnoreCase)) { $wantSha = [string]$Pinned[$k]; break }
+  }
+  $at = Join-Path $last[0].FullName ($rel -replace '/', '\')
+  if (-not $wantSha) {
+    'outside the collection, not held to it: ' + $rel
+    continue
+  }
+  if (-not (Test-Path -LiteralPath $at)) { continue }
+  $got = (Get-FileHash -LiteralPath $at -Algorithm SHA256).Hash.ToLowerInvariant()
+  $len = (Get-Item -LiteralPath $at).Length
+  if ($got -ne $wantSha.ToLowerInvariant()) {
+    $pinBad += ('REFUSED: ' + $last[0].Name + '\' + ($rel -replace '/', '\') + ' is sha256 ' + $got + ' (' + ('{0:N0}' -f $len) + ' bytes), the collection''s is ' + $wantSha.ToLowerInvariant())
+  }
+}
+if ($pinBad.Count) {
+  foreach ($x in $pinBad) { $x }
+  'SWAP REFUSED'
+  exit 1
+}
 'putting back what ' + $last[0].FullName + ' kept: ' + (@($Want.Keys) -join ', ')
 
 '@
 # ==== end put-back pick ====
+$putBackPick = $CollectionPinnedText + "`r`n" + $putBackPick
 
 # ==== service swap blocks ====
 #

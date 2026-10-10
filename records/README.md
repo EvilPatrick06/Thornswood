@@ -34,6 +34,16 @@ read it (issue #440, phase 8):
   copy those files back. No script writes this one: it is changed by hand, in
   a pull request. `tests\test-ship-rules.ps1` fails while Ship-Rules and
   OwnGame disagree with it.
+- `collection-plugins.json`: every `.esp` / `.esm` / `.esl` a collection
+  revision installs, with its bytes and SHA-256, hashed from that revision's
+  pinned archives (issue #2019). `scripts\release\New-CollectionPluginsRecord.ps1`
+  writes it. Deploy-Server, Deploy-DevGamemode `-LoadOrder`, Export-ServerPayload
+  and `-PutBack` refuse a collection plugin that is not this hash. `-GamemodeOnly`
+  warns and goes on. `tests\test-2019-collection-plugins.ps1` holds the
+  generator and the deploying-machine cases; the box-side cases live in
+  `tests\test-deploy-server-swap.ps1`. Run the generator in the same pull
+  request as a collection revision move; never edit the record by hand. A
+  machine without the Nexus archives cannot write it.
 - `skyrim-files.json`: every file of the pinned build, 46 on 1.6.1170, with
   its bytes, SHA-1 and depot, read out of Steam's own manifests of the three
   depots `skyrim-pin.json` names by `scripts\release\New-SkyrimFilesRecord.ps1`

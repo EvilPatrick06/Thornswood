@@ -44,13 +44,17 @@ param(
     [ValidateSet('main', 'dev')][string]$Channel = 'main',
     # The build record the binary is held to and that goes into the payload as
     # server-build.json, so the installer on the box holds it too (#1214).
-    [string]$Record = (Join-Path $PSScriptRoot '..\..\records\server-build.json')
+    [string]$Record = (Join-Path $PSScriptRoot '..\..\records\server-build.json'),
+    # The collection plugin record (#2019). No -Skip: the way past a bad
+    # plugin is to fix the plugin.
+    [string]$CollectionRecord = (Join-Path $PSScriptRoot '..\..\records\collection-plugins.json')
 )
 
 $ErrorActionPreference = 'Stop'
 if (-not (Test-Path -LiteralPath $Dist)) { throw "server dist not found: $Dist" }
 . (Join-Path $PSScriptRoot '..\deploy\ServerSettings.ps1')
 . (Join-Path $PSScriptRoot '..\deploy\ServerBuild.ps1')
+. (Join-Path $PSScriptRoot '..\deploy\CollectionPlugins.ps1')
 
 # ---- settings no server should get, and the dev ones for live ----------------
 # Until #1114 a dev Publish-Server rewrote the build's own settings to port
@@ -103,6 +107,26 @@ if (-not (Test-Path -LiteralPath (Join-Path $Dist 'gamemode.js'))) {
 }
 if (-not (Test-Path -LiteralPath (Join-Path $Dist 'thornswood-build.json'))) {
     Write-Host "no thornswood-build.json in $Dist, so the server will not be able to say which gamemode it runs" -ForegroundColor Yellow
+}
+
+# Collection plugins held to the record before anything is copied (#2019).
+# A same-size wrong file must not enter the payload folder or the zip.
+$colRec = Read-CollectionPluginsRecord $CollectionRecord
+$settingsEarly = Join-Path $Dist 'server-settings.json'
+$earlySettings = Get-Content -LiteralPath $settingsEarly -Raw | ConvertFrom-Json
+if (-not $earlySettings.loadOrder) { throw 'server-settings.json has no loadOrder' }
+$earlyChecks = New-Object System.Collections.Generic.List[object]
+foreach ($p in $earlySettings.loadOrder) {
+    $src = $p -replace '/', '\'
+    $name = Split-Path $src -Leaf
+    if (-not (Test-Path -LiteralPath $src)) { continue }
+    [void]$earlyChecks.Add((Test-CollectionPluginFile $colRec $name $src))
+}
+$earlyBad = @(Get-CollectionPluginProblems $colRec $earlyChecks)
+if ($earlyBad.Count) {
+    Write-Host "collection plugins named by the load order are not the record:" -ForegroundColor Red
+    foreach ($w in $earlyBad) { Write-Host ('  ' + $w) -ForegroundColor Red }
+    throw 'collection plugins are not the record; the lines above say which. Nothing was packed.'
 }
 
 if (Test-Path -LiteralPath $OutDir) { Remove-Item -LiteralPath $OutDir -Recurse -Force }

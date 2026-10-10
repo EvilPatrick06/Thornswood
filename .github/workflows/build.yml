@@ -77,7 +77,7 @@ jobs:
     name: Launcher builds
     runs-on: [self-hosted, Windows, thornswood-vps]
     # About two minutes on the VPS. Past this it is stuck, not slow.
-    timeout-minutes: 10
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -447,6 +447,39 @@ jobs:
           }
           if ($failed.Count) { Write-Host ("{0} harness(es) failed: {1}" -f $failed.Count, ($failed -join ', ')); exit 1 }
           Write-Host ('all {0} passed' -f $six.Count)
+
+      - name: Run the collection plugin harness
+        shell: pwsh
+        run: |
+          # Issue #2019. Generator, local deploy checks, revision tie, and the
+          # real-record gate. Box-side cases run in test-deploy-server-swap.ps1.
+          & pwsh -NoProfile -File tests\test-2019-collection-plugins.ps1
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::error file=tests/test-2019-collection-plugins.ps1::the collection plugin harness failed, the FAIL lines above say what'
+            exit 1
+          }
+
+      - name: Run the deploy-server swap harness
+        shell: pwsh
+        run: |
+          # Issue #2019 added the box-side pin cases (13, 14, 15, 19) to this
+          # harness. It already ran Swap.ps1's blocks against a scratch root.
+          & pwsh -NoProfile -File tests\test-deploy-server-swap.ps1
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::error file=tests/test-deploy-server-swap.ps1::the deploy-server swap harness failed, the FAIL lines above say what'
+            exit 1
+          }
+
+      - name: Run the deploy-swaps harness
+        shell: pwsh
+        run: |
+          # Issue #2019: $Pinned wiring and a collection record in the scratch
+          # repo so Deploy-Server and Deploy-DevGamemode fail closed.
+          & pwsh -NoProfile -File tests\test-deploy-swaps.ps1
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::error file=tests/test-deploy-swaps.ps1::the deploy-swaps harness failed, the FAIL lines above say what'
+            exit 1
+          }
 
       - name: Run the signer check
         shell: pwsh

@@ -87,6 +87,14 @@ foreach ($n in 'Deploy-DevGamemode.ps1', 'Deploy-Docs.ps1', 'Install-Voice.ps1',
     $t = [IO.File]::ReadAllText((Join-Path $scripts ('deploy\' + $n)))
     Yes "$n loads Swap.ps1 and takes -PutBack" ($t.Contains(". (Join-Path `$Here 'Swap.ps1')") -and $t -match '\[switch\]\$PutBack')
 }
+$ds = [IO.File]::ReadAllText((Join-Path $scripts 'deploy\Deploy-Server.ps1'))
+$dg = [IO.File]::ReadAllText((Join-Path $scripts 'deploy\Deploy-DevGamemode.ps1'))
+$sw = [IO.File]::ReadAllText((Join-Path $scripts 'deploy\Swap.ps1'))
+Yes 'Deploy-Server and Deploy-DevGamemode pass $Pinned through SwapVars (#2019)' (
+    $ds -match 'SwapVars \$Root \$Task \$stageName \$prevName \$Wait \$hashes \$liveKeys \$Pinned \$PinRefuse' -and
+    $dg -match '\$Pinned')
+Yes 'Swap.ps1 put-back pick refuses a mismatched collection plugin even when $PinRefuse is false' (
+    $sw -match '\$PinRefuse is ignored' -or $sw -match 'never bypass a put-back')
 
 $node = Get-Command node -CommandType Application -EA SilentlyContinue | Select-Object -First 1
 $python = Get-Command python -CommandType Application -EA SilentlyContinue | Select-Object -First 1
@@ -419,6 +427,15 @@ function Show { foreach ($l in $script:lastSaid) { Write-Host ('        ' + $l) 
 
 # ---- the scratch repository ---------------------------------------------------
 Copy-Item -LiteralPath $scripts -Destination (Join-Path $repo 'scripts') -Recurse
+Put (Join-Path $repo 'records\collection-plugins.json') @'
+{
+  "collection": "7essxf",
+  "revision": 2,
+  "collectionJsonSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "generatedBy": "scripts/release/New-CollectionPluginsRecord.ps1",
+  "plugins": {}
+}
+'@
 # Where.ps1 reads the layout from the repository's root; the artifacts go
 # under the out folder it names, inside the scratch repository.
 Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $scripts) 'layout.json') -Destination (Join-Path $repo 'layout.json')
