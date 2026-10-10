@@ -31,7 +31,8 @@
        SkyrimSE.exe in it: C:\Thornswood\Game unless -SkyrimDir says another.
        The first configure builds every vcpkg library and takes a long time.
        A fork whose path has an & in it is reached through a drive letter of
-       its own (subst) for configure and build, removed again at the end.
+       its own (subst) for configure and build, removed again at the end by
+       the last run on it; two builds at once each get their own (#1993).
     4. Builds everything, Release. After the first time only what changed is
        rebuilt, so a fork change that touches the client bundle is quick.
        It compiles as many projects at once as the memory free allows, two
@@ -101,56 +102,114 @@ function Get-SubstMap {
     }
     return $map
 }
+# Two builds at once (issue #1993). Measured on One on 5 Oct: two forks under
+# C:\ThornswoodTemps&Worktrees\worktrees shared one letter, because a run
+# reused whatever letter already stood for the parent, and the run that made
+# it removed it when it ended, so the other lost its paths mid-compile. Now:
+#  - a fork not yet configured gets a letter of its own, never one another run
+#    stands on, so two first builds never share one;
+#  - a fork configured through a letter must be built through that letter, so
+#    two such forks can still need the same one. Every run on a letter holds a
+#    file for it under %TEMP%\thornswood-engine-subst\<letter>, open with no
+#    sharing, and the letter is removed only by the last run to let go, and
+#    only if a build made it (a letter made by hand is left as it was).
+# Picking and making a letter, and letting go of one, are done under one
+# mutex, so two runs cannot pick the same free letter at the same moment.
+function Get-EngineSubstDir([string]$Letter) {
+    $d = Join-Path (Join-Path ([IO.Path]::GetTempPath()) 'thornswood-engine-subst') $Letter.ToUpper()
+    $null = [IO.Directory]::CreateDirectory($d)
+    return $d
+}
+function Enter-EngineSubstLock {
+    $mx = New-Object Threading.Mutex($false, 'Local\ThornswoodEngineSubst')
+    try { $null = $mx.WaitOne() } catch [Threading.AbandonedMutexException] { }
+    return $mx
+}
+# A file under the letter's folder, held open for as long as this run uses it.
+function Add-EngineSubstHold([string]$Letter) {
+    $f = Join-Path (Get-EngineSubstDir $Letter) ('hold-' + $PID + '-' + [Guid]::NewGuid().ToString('N'))
+    return [IO.File]::Open($f, 'CreateNew', 'ReadWrite', 'None')
+}
+# How many other runs still hold the letter: a hold file that cannot be
+# deleted is open in a run that is still going; one that can was left by a
+# run that ended without letting go, and is cleared.
+function Get-EngineSubstHolders([string]$Letter) {
+    $n = 0
+    foreach ($h in @(Get-ChildItem -LiteralPath (Get-EngineSubstDir $Letter) -Filter 'hold-*' -File -ErrorAction SilentlyContinue)) {
+        try { [IO.File]::Delete($h.FullName) } catch { $n++ }
+    }
+    return $n
+}
 # @{ Fork = the fork's path to build from; Drive = 'J:' or ''; Made = whether
-# this run made the letter and so removes it; Why = why it could not }.
+# this run made the letter; Hold = this run's hold on it; Why = why it could not }.
 function Mount-EngineFork([string]$Fork) {
-    $r = @{ Fork = $Fork; Drive = ''; Made = $false; Why = '' }
+    $r = @{ Fork = $Fork; Drive = ''; Made = $false; Hold = $null; Why = '' }
     if (-not (Test-CmdSplitsPath $Fork)) { return $r }
     $parent = (Split-Path -Parent $Fork).TrimEnd('\')
     $leaf = Split-Path -Leaf $Fork
-    $subst = Get-SubstMap
-    $letter = ''
-    $cache = Join-Path $Fork 'build\CMakeCache.txt'
-    if (Test-Path -LiteralPath $cache) {
-        $m = [regex]::Match((Get-Content -LiteralPath $cache -Raw), '(?m)^CMAKE_CACHEFILE_DIR:INTERNAL=(([A-Za-z]):/[^\r\n]*)')
-        # Configured on the path itself (vcpkg was bootstrapped some other
-        # way): build it where it was configured.
-        if ($m.Success -and $m.Groups[1].Value.TrimEnd('/') -eq ($Fork.TrimEnd('\') + '\build').Replace('\', '/')) { return $r }
-        if ($m.Success) { $letter = $m.Groups[2].Value.ToUpper() }
-        if ($letter -and -not $subst.ContainsKey($letter) -and (Test-Path -LiteralPath ($letter + ':\'))) {
-            $r.Why = ('the build in ' + (Join-Path $Fork 'build') + ' was configured through ' + $letter + ':, which is now another drive. Free ' + $letter + ': or delete that build folder to configure it again.')
-            return $r
+    $mx = Enter-EngineSubstLock
+    try {
+        $subst = Get-SubstMap
+        $letter = ''
+        $cache = Join-Path $Fork 'build\CMakeCache.txt'
+        if (Test-Path -LiteralPath $cache) {
+            $m = [regex]::Match((Get-Content -LiteralPath $cache -Raw), '(?m)^CMAKE_CACHEFILE_DIR:INTERNAL=(([A-Za-z]):/[^\r\n]*)')
+            # Configured on the path itself (vcpkg was bootstrapped some other
+            # way): build it where it was configured.
+            if ($m.Success -and $m.Groups[1].Value.TrimEnd('/') -eq ($Fork.TrimEnd('\') + '\build').Replace('\', '/')) { return $r }
+            if ($m.Success) { $letter = $m.Groups[2].Value.ToUpper() }
+            if ($letter -and -not $subst.ContainsKey($letter) -and (Test-Path -LiteralPath ($letter + ':\'))) {
+                $r.Why = ('the build in ' + (Join-Path $Fork 'build') + ' was configured through ' + $letter + ':, which is now another drive. Free ' + $letter + ': or delete that build folder to configure it again.')
+                return $r
+            }
         }
-    } else {
-        foreach ($k in $subst.Keys) { if ($subst[$k] -eq $parent) { $letter = $k } }
-    }
-    if (-not $letter) {
-        $taken = @([IO.DriveInfo]::GetDrives() | ForEach-Object { $_.Name.Substring(0, 1).ToUpper() })
-        $letter = @('T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'S', 'R', 'Q', 'P', 'O', 'N', 'M', 'L', 'K', 'J', 'I', 'H') |
-                  Where-Object { $taken -notcontains $_ -and -not $subst.ContainsKey($_) } | Select-Object -First 1
-        if (-not $letter) { $r.Why = 'no drive letter is free to reach ' + $parent + ' through.'; return $r }
-    }
-    if ($subst.ContainsKey($letter)) {
-        if ($subst[$letter] -ne $parent) {
-            $r.Why = ($letter + ': already stands for ' + $subst[$letter] + ', and the build in ' + (Join-Path $Fork 'build') + ' was configured through it. Remove it (subst ' + $letter + ': /d) and run this again.')
-            return $r
+        if (-not $letter) {
+            # A letter of this run's own: not a drive, not a subst, and not one
+            # another run holds (its subst could be gone a moment before ours).
+            $taken = @([IO.DriveInfo]::GetDrives() | ForEach-Object { $_.Name.Substring(0, 1).ToUpper() })
+            $letter = @('T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'S', 'R', 'Q', 'P', 'O', 'N', 'M', 'L', 'K', 'J', 'I', 'H') |
+                      Where-Object { $taken -notcontains $_ -and -not $subst.ContainsKey($_) -and -not (Get-EngineSubstHolders $_) } | Select-Object -First 1
+            if (-not $letter) { $r.Why = 'no drive letter is free to reach ' + $parent + ' through.'; return $r }
         }
-    } else {
-        & (Join-Path $env:SystemRoot 'System32\subst.exe') ($letter + ':') $parent | Out-Null
-        if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath (Join-Path ($letter + ':\') $leaf))) {
-            $r.Why = 'subst could not make ' + $letter + ': stand for ' + $parent + '.'
-            return $r
+        if ($subst.ContainsKey($letter)) {
+            if ($subst[$letter] -ne $parent) {
+                $r.Why = ($letter + ': already stands for ' + $subst[$letter] + ', and the build in ' + (Join-Path $Fork 'build') + ' was configured through it. Remove it (subst ' + $letter + ': /d) and run this again.')
+                return $r
+            }
+        } else {
+            & (Join-Path $env:SystemRoot 'System32\subst.exe') ($letter + ':') $parent | Out-Null
+            if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath (Join-Path ($letter + ':\') $leaf))) {
+                $r.Why = 'subst could not make ' + $letter + ': stand for ' + $parent + '.'
+                return $r
+            }
+            $r.Made = $true
+            # Marks the letter as a build's, so the last run off it removes it.
+            [IO.File]::WriteAllText((Join-Path (Get-EngineSubstDir $letter) 'made'), $parent)
         }
-        $r.Made = $true
-    }
-    $r.Drive = $letter + ':'
-    $r.Fork = $letter + ':\' + $leaf
-    return $r
+        $r.Hold = Add-EngineSubstHold $letter
+        $r.Drive = $letter + ':'
+        $r.Fork = $letter + ':\' + $leaf
+        return $r
+    } finally { $mx.ReleaseMutex(); $mx.Dispose() }
 }
+# Lets go of the letter; removes it when no other run holds it and a build made it.
 function Dismount-EngineFork($Mount) {
-    if ($Mount -and $Mount.Made -and $Mount.Drive) { & (Join-Path $env:SystemRoot 'System32\subst.exe') $Mount.Drive /d | Out-Null }
+    if (-not $Mount -or -not $Mount.Drive) { return }
+    $letter = $Mount.Drive.Substring(0, 1)
+    $mx = Enter-EngineSubstLock
+    try {
+        if ($Mount.Hold) {
+            $f = $Mount.Hold.Name
+            $Mount.Hold.Dispose(); $Mount.Hold = $null
+            Remove-Item -LiteralPath $f -Force -ErrorAction SilentlyContinue
+        }
+        $made = Join-Path (Get-EngineSubstDir $letter) 'made'
+        if ((Test-Path -LiteralPath $made) -and -not (Get-EngineSubstHolders $letter)) {
+            & (Join-Path $env:SystemRoot 'System32\subst.exe') $Mount.Drive /d | Out-Null
+            Remove-Item -LiteralPath $made -Force -ErrorAction SilentlyContinue
+        }
+    } finally { $mx.ReleaseMutex(); $mx.Dispose() }
 }
-
 $repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $build = Join-Path $Fork 'build'
 $record = Join-Path $repo 'records\client-build.json'
