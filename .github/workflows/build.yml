@@ -314,6 +314,7 @@ jobs:
                  'test-1606-logout-fill.js',
                  'test-1734-rest-reconnect.js',
                  'test-1676-rest-gate.js',
+                 'test-1677-ale-curve.js',
                  'test-1733-injury-gate.js',
                  'test-1767-creation-tools.js',
                  'test-1588-tools-50.js',
