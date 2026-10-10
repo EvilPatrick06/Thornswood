@@ -96,7 +96,7 @@ none, the launcher downloads Microsoft's own bootstrapper from Microsoft's link
 
 The six files recorded in `records\client-build.json` correspond to
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
-commit `260c6c16` (in full, `260c6c162fdaf58dca419a3392598ffe6a2b8310`). That
+commit `e31a579a` (in full, `e31a579a7044ef094180f59a0d405607b95836e8`). That
 is upstream skyrim-multiplayer/skymp at `2849e676` with Thornswood's changes on
 top. Check-Secrets.ps1 stops a release whose copy of any of the six is not the
 recorded sha256 (client-not-recorded-build), and Sync-Client.ps1 puts in the
@@ -435,7 +435,7 @@ with.
 
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`, is AGPL-3.0. That record and the client record
-  name `260c6c162fdaf58dca419a3392598ffe6a2b8310` on the public fork. The
+  name `e31a579a7044ef094180f59a0d405607b95836e8` on the public fork. The
   server module and the six client files were built from that commit, which
   adds the 5 October security fixes (the RPC route, request bodies, metrics,
   the login line, the settings files), the server's equipment write for a new
@@ -444,8 +444,8 @@ with.
   light plugins on the server and in the save the client loads, numbered
   teleports so an old one is never carried out after a newer one, and the
   server reading its source map while it starts; the server module's SHA256 is
-  `df01589df3f9f3a7991736b9a64c4345e50f8d9cc43a5d5ee857ad51bad80bca`, built
-  2026-10-10T19:19:24Z. This is the recorded next release, not a deployment
+  `1457be424403205efa1ca454aff2db627dfa0991b87cc0f6fa9490095f258bbc`, built
+  2026-10-10T20:37:07Z. This is the recorded next release, not a deployment
   claim. Main remains on `0f54ad4541fff9bf75c8d8107fc767e47037a2d6`.
   Dev also remains on that earlier engine until the next authorized Ship.
   The new build adds atomic quest inventory/state writes, connection refusal
@@ -480,7 +480,7 @@ For the six recorded client files and the recorded game server module, the
 Corresponding Source is the fork at the commit each record names. The six
 client files and the game server module, at the one commit both records name:
 
-https://github.com/EvilPatrick06/skymp/tree/260c6c162fdaf58dca419a3392598ffe6a2b8310
+https://github.com/EvilPatrick06/skymp/tree/e31a579a7044ef094180f59a0d405607b95836e8
 
 For the earlier engine still deployed on Main and Dev:
 

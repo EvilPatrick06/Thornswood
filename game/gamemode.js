@@ -8454,10 +8454,10 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
   }
 
   /*
-    THE DULL CLOCK, AND A DROPPED PIECE PICKED UP AGAIN (#1384). See the
-    durability block. A container in a held building loses what its days
-    have taken before the engine sends what is in it, and a piece somebody
-    dropped gets the condition it went down with. It refuses nothing.
+    THE DULL CLOCK (#1384). See the durability block. A container in a held
+    building loses what its days have taken before the engine sends what is
+    in it. It refuses nothing. A dropped piece keeps its condition in the
+    engine now (MpActor::DropItem, #1719), so a pickup needs nothing here.
   */
   const wear = globalThis.__thornswoodDurability;
   if (wear && wear.pressed) {
@@ -51491,14 +51491,8 @@ mp.onTakeItem = guard('onTakeItem', function (sourceRefrId, actorId, baseId, cou
 mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
   log('drop:', auditPerson(actorId), 'dropped', Number(count) || 0, auditItem(baseId),
       'in', auditCell(actorId));
-  // A piece's condition is in its name and the ground keeps no name, so the
-  // durability block remembers it for the pickup (#1384).
-  var wear = globalThis.__thornswoodDurability;
-  if (wear && wear.dropped) {
-    try { wear.dropped(actorId, Number(baseId) || 0, count); } catch (e) {
-      log('durability: the drop threw:', e);
-    }
-  }
+  // The engine puts the piece's extra, its condition in the name included,
+  // on the dropped reference and gives it back on the pickup (#1719).
 });
 
 /*
@@ -51883,9 +51877,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
   TWO THINGS IN THE ENGINE MAKE A FRESH, PLAIN ENTRY, and a plain entry
   reads as 100%, so each of them would be a free repair:
-    a drop. MpActor::DropItem places the bare record, so the name is lost.
-          dropped() remembers the condition that went down and the pickup
-          puts it back on (pressed()).
+    a drop, until #1719. MpActor::DropItem now puts the dropped entry's
+          extra on the reference and the pickup adds it back, so a drop
+          keeps the condition and nothing here watches drops any more.
     a craft. CraftEvent::OnFireSuccess takes away plain entries and adds a
           plain one. A temper is refused (recipelessCraft), so it is not a
           way round this. Enchanting a piece that is not at 100% fails in
@@ -51967,18 +51961,6 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   // BOD2 slot 39, the shield. A shield blocks for its holder, so a blocked
   // hit reaches it, and it is armour, so every hit already does.
   var SHIELD_SLOT = 1 << 9;
-  /*
-    A dropped thing lies on the ground two minutes before the engine deletes
-    it (MpActor::DropItem, kDeletionTimeSeconds), so its condition is kept a
-    little longer than that and no longer.
-  */
-  var DROP_KEEP_MS = 3 * 60 * 1000;
-  // The pickup is added after onActivate returns. Same wait a fresh key is
-  // named after (KEY_NAME_DELAY).
-  var PICKUP_DELAY_MS = 250;
-  // MpForm::IsEspmForm: below this a reference was placed by a plugin, above
-  // it the server made it, which is what a drop makes.
-  var RUNTIME = 0xff000000;
   // Where a container's dull clock is written, on the reference itself.
   var CLOCK_PROPERTY = 'thornswoodDull';
   // The repair panel's view, the owner's only (game/ui/thornswood-repair.js).
@@ -52077,8 +52059,6 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     var kinds = {};
     var shields = {};
     var names = {};
-    // Pieces that went onto the ground and what they were at, oldest first.
-    var drops = [];
 
     /*
       What kind of piece a base is: 'weapon', 'armour', 'clothing', or ''
@@ -52536,96 +52516,12 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       return hit(Number(targetId) || 0, idFrom(aggressor), idFrom(source), !!blocked);
     }
 
-    function forgetOldDrops() {
-      var t = api.now();
-      while (drops.length && t - drops[0].at > DROP_KEEP_MS) { drops.shift(); }
-    }
-
-    function remember(cell, baseId, cond, n) {
-      if (cond === CONDITION.sound || !(n > 0)) { return; }
-      forgetOldDrops();
-      drops.push({ cell: cell, baseId: baseId, cond: cond, n: n, at: api.now() });
-    }
-
     /*
-      A PIECE IS GOING ONTO THE GROUND. Called before the engine takes it
-      out of the pack. When every stack of that base is at one condition,
-      that is what went down. When they differ, the pack is read again once
-      the drop is done, and the stack that got smaller is the one.
-    */
-    function dropped(actorId, baseId, count) {
-      if (!pieceKind(baseId)) { return; }
-      var entries = api.inventory(actorId) || [];
-      var stacks = entries.filter(function (e) { return e && e.baseId === baseId && Number(e.count) > 0; });
-      if (!stacks.length) { return; }
-      var cell = api.cellOf(actorId);
-      var n = Math.max(1, Number(count) || 1);
-      var first = conditionOf(stacks[0]);
-      var one = stacks.every(function (e) { return conditionOf(e) === first; });
-      if (one) { remember(cell, baseId, first, n); return; }
-      var before = stacks.map(function (e) { return { entry: copy(e), count: Number(e.count) || 0 }; });
-      api.later(function () {
-        var after = api.inventory(actorId) || [];
-        for (var i = 0; i < before.length; i++) {
-          var left = 0;
-          for (var j = 0; j < after.length; j++) {
-            if (sameStack(after[j], before[i].entry)) { left += Number(after[j].count) || 0; }
-          }
-          if (left < before[i].count) {
-            remember(cell, baseId, conditionOf(before[i].entry), before[i].count - left);
-            return;
-          }
-        }
-      }, 0);
-    }
-
-    function plainCount(entries, baseId) {
-      var n = 0;
-      for (var i = 0; i < entries.length; i++) {
-        var e = entries[i];
-        if (e && e.baseId === baseId && !e.name && !e.worn && !e.wornLeft) { n += Number(e.count) || 0; }
-      }
-      return n;
-    }
-
-    /*
-      SOMETHING WAS PRESSED. A container is the dull clock. A piece lying on
-      the ground that the server made, which is what a drop makes, is
-      matched to the drop that left it there, and once it is in the pack its
-      condition goes back on. Only as many as the pickup added: a plain
-      sword that was already in the pack is not touched.
+      SOMETHING WAS PRESSED. A container is the dull clock. A piece picked
+      up off the ground keeps its condition in the engine (#1719).
     */
     function pressed(actorId, refrId, baseDesc) {
       if (api.isContainer(baseDesc)) { return opened(refrId); }
-      if (!(Number(refrId) >= RUNTIME) || !drops.length) { return 0; }
-      var baseId = api.idOf(baseDesc);
-      if (!pieceKind(baseId)) { return 0; }
-      forgetOldDrops();
-      var cell = api.cellOf(refrId);
-      var at = -1;
-      for (var i = 0; i < drops.length; i++) {
-        if (drops[i].baseId === baseId && drops[i].cell === cell) { at = i; break; }
-      }
-      if (at < 0) { return 0; }
-      var rec = drops.splice(at, 1)[0];
-      var before = plainCount(api.inventory(actorId) || [], baseId);
-      api.later(function () {
-        var entries = api.inventory(actorId);
-        if (!entries) { return; }
-        var gained = plainCount(entries, baseId) - before;
-        var n = Math.min(rec.n, gained);
-        if (n <= 0) { return; }
-        for (var j = 0; j < entries.length; j++) {
-          var e = entries[j];
-          if (e && e.baseId === baseId && !e.name && !e.worn && !e.wornLeft && Number(e.count) > 0) {
-            if (api.setInventory(actorId, setUnits(entries, j, n, rec.cond))) {
-              api.log('durability:', actorId.toString(16), 'picked up', n, bareName(e),
-                      'and it is back at', rec.cond + '%');
-            }
-            return;
-          }
-        }
-      }, PICKUP_DELAY_MS);
       return 0;
     }
 
@@ -52634,7 +52530,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       BREAK_CHANCE: BREAK_CHANCE, WEAR_PER_HIT: WEAR_PER_HIT, KITS: kits,
       pieceKind: pieceKind, conditionOf: conditionOf, withCondition: withCondition,
       repairTo: repairTo, repairWithKit: repairWithKit, view: view, panel: panel,
-      opened: opened, hit: hit, onHit: onHit, dropped: dropped, pressed: pressed
+      opened: opened, hit: hit, onHit: onHit, pressed: pressed
     };
   }
 
