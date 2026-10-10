@@ -94,6 +94,10 @@ RECORDS[0x21a72] = { type: 'GMST', fields: [{ type: 'DATA', data: floatBytes(0.1
 RECORDS[RACE] = { type: 'RACE', fields: [{ type: 'DATA', data: floatBytes(3, 88, 128) }] };
 
 const mpFake = {
+  getNpcAIState: function(id) {
+    const a=world.actors.get(id);
+    return a ? {isHuman:a.pid>0,profileId:a.pid,lifeGeneration:a.life || 0} : null;
+  },
   get: function (id, prop) {
     if (id === 0 && prop === 'onlinePlayers') {
       return Array.from(world.actors.keys()).filter(function (k) { return world.actors.get(k).pid > 0; });
@@ -153,6 +157,7 @@ const mpFake = {
 const states = new Map();
 function makeBox() {
   const box = {
+    MERCHANT_TRADING: require('../game/merchant-trading'),
     console: { log: function () {} },
     mp: mpFake,
     guard: function (n, fn) { return fn; },
@@ -675,6 +680,24 @@ yes('the log says it once a cast', logged('Leyline Attunement') === 1);
   yes('and the day it spent is still spent', /^Font of Magic comes back in \d+ hours$/.test(K.use(RUN, states.get(RUN), 'fontofmagic').why));
 }
 
+// A queued bonus belongs to the character who caused the engine hit.
+for (const field of ['pid','life']) {
+  const by=actor(0xff000030);
+  states.set(by,filled(['might']));
+  heal(WOLF);
+  strike(by,WOLF,0.2,SWORD,{power:true});
+  world.actors.get(by)[field]=(world.actors.get(by)[field] || 0)+1;
+  settle();
+  yes('perk damage refuses attacker '+field+' replacement before flush',health(WOLF)===0.8);
+}
+{
+  const by=actor(0xff000031);
+  states.set(by,filled(['might']));
+  heal(WOLF); world.actors.get(WOLF).p.health=0.22;
+  strike(by,WOLF,0.2,SWORD,{power:true}); settle();
+  world.actors.get(by).life=1;
+  yes('perk fallback does not name a replacement character',K.killerOf(WOLF)===0);
+}
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

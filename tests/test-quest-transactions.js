@@ -1,6 +1,6 @@
 'use strict';
 const assert=require('node:assert/strict');
-const {createQuestTransactions}=require('../game/quest-transactions');
+const {createQuestTransactions,actorIdentity}=require('../game/quest-transactions');
 const clone=x=>JSON.parse(JSON.stringify(x));
 function fixture(options={}) {
   let inventory={entries:[{baseId:15,count:40},{baseId:100,count:4,name:'Keepsake',health:0.75}]};
@@ -66,4 +66,19 @@ for(const changes of [[{item:'missing',count:1}],[{item:'ore:Skyrim.esm',count:-
 assert.equal(f.calls(),0);assert.deepEqual(f.inventory(),original);
 const token=f.transfer.identity(10);f.profile(8);assert.notEqual(f.transfer.identity(10),token);
 f.transfer.shutdown();assert.equal(f.transfer.commit(10,f.record(),next,[]).ok,false);
+{
+  const mp={getNpcAIState:()=>({isHuman:true,profileId:7,lifeGeneration:0}),getDescFromId:()=> 'ff000010:Skyrim.esm'};
+  const token=actorIdentity(mp,10);
+  assert.deepEqual(JSON.parse(token),{desc:'ff000010:Skyrim.esm',profileId:7,life:0});
+  mp.getDescFromId=()=> 'ff000011:Skyrim.esm';
+  assert.notEqual(actorIdentity(mp,10),token,'descriptor replacement cannot retain ownership');
+  for(const ai of [null,{isHuman:false,profileId:7,lifeGeneration:0},
+    {isHuman:true,profileId:0,lifeGeneration:0},{isHuman:true,profileId:7,lifeGeneration:-1},
+    {isHuman:true,profileId:7,lifeGeneration:NaN},{isHuman:true,profileId:7,lifeGeneration:0.5}]) {
+    mp.getNpcAIState=()=>ai;
+    assert.equal(actorIdentity(mp,10),null,'unverifiable identity refuses delayed ownership');
+  }
+  mp.getNpcAIState=()=>{throw Error('actor unloaded');};
+  assert.equal(actorIdentity(mp,10),null);
+}
 console.log('PASS quest atomic inventory/state, metadata, save admission, publication errors, refusal and revocation');

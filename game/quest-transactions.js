@@ -6,6 +6,14 @@ function same(a,b) {
   var left=Object.keys(a).sort(),right=Object.keys(b).sort();
   return left.length===right.length && left.every(function(key,i){return key===right[i] && same(a[key],b[key]);});
 }
+function actorIdentity(mp,actor) {
+  try {
+    var ai=mp.getNpcAIState(actor),desc=mp.getDescFromId(actor);
+    if(!ai || ai.isHuman!==true || !Number.isInteger(ai.profileId) || ai.profileId<=0 ||
+        !Number.isSafeInteger(ai.lifeGeneration) || ai.lifeGeneration<0 || typeof desc!=='string' || !desc)return null;
+    return JSON.stringify({desc:desc,profileId:ai.profileId,life:ai.lifeGeneration});
+  } catch(error) { return null; }
+}
 function createQuestTransactions(deps) {
   var mp=deps.mp,active=true,property='thornswoodQuests';
   var log=deps.log || function(){};
@@ -16,11 +24,7 @@ function createQuestTransactions(deps) {
         'get','getIdFromDesc','getDescFromId','getNpcAIState'].every(function(key){return typeof mp[key]==='function';});
   }
   function identity(actor) {
-    if(!active)return null;
-    var ai=mp.getNpcAIState(actor),desc=mp.getDescFromId(actor);
-    if(!ai || !ai.isHuman || !Number.isInteger(ai.profileId) || ai.profileId<=0 ||
-        !Number.isSafeInteger(ai.lifeGeneration) || ai.lifeGeneration<0 || !desc)return null;
-    return JSON.stringify({desc:desc,profileId:ai.profileId,life:ai.lifeGeneration});
+    return active ? actorIdentity(mp,actor) : null;
   }
   function commit(actor,expectedRecord,nextRecord,changes) {
     if(!available())return {ok:false,why:'unavailable'};
@@ -82,4 +86,4 @@ function createQuestTransactions(deps) {
   }
   return {commit:commit,identity:identity,available:available,shutdown:function(){active=false;}};
 }
-module.exports={createQuestTransactions:createQuestTransactions};
+module.exports={createQuestTransactions:createQuestTransactions,actorIdentity:actorIdentity};

@@ -44786,8 +44786,10 @@ log('gamemode loaded:',
     if (kind === 'spell' && heldOf(target, t).spellbreaker) { breakSpell(target, by, idOfForm(source), t); }
 
     if (!by || by === target || !personOf(by)) { return; }
+    var identity = MERCHANT_TRADING.actorIdentity(mp, by);
+    if (!identity) { return; }
     var mine = heldOf(by, t);
-    var e = { before: -1, after: null, by: by, more: 0, overcharge: false, aim: false };
+    var e = { before: -1, after: null, by: by, identity: identity, more: 0, overcharge: false, aim: false };
     if (kind === 'melee' && power && !bash && mine.devastatingblow) { e.more = PERKS.devastatingblow.more; }
     if (kind === 'spell' && mine.overcharge) { e.overcharge = true; }
     if (kind === 'bow' && mine.lethalaim) { e.aim = true; }
@@ -44823,7 +44825,7 @@ log('gamemode loaded:',
     if (next <= 0) {
       next = 0;
       // The engine kills on this write with nobody named; mp.onDeath asks.
-      if (killer) { ST.blow[target] = { by: killer, at: now() }; }
+      if (killer) { ST.blow[target] = { by: killer.by, identity: killer.identity, at: now() }; }
     }
     var p = pct(target);
     if (!p) { return; }
@@ -44844,18 +44846,19 @@ log('gamemode loaded:',
       var change = 0, killer = 0;
       for (var i = 0; i < list.length; i++) {
         var e = list[i];
+        if (!e.identity || MERCHANT_TRADING.actorIdentity(mp, e.by) !== e.identity) { continue; }
         var took = e.before - e.after;
         if (!(e.after >= 0) || !(took > 0)) { continue; }
         if (e.more) {
           change -= took * e.more;
-          killer = e.by;
+          killer = e;
           fired(e.by, 'devastatingblow');
         }
         if (e.aim) {
           var extra = lethalExtra(target, took);
           if (extra > 0) {
             change -= extra;
-            killer = e.by;
+            killer = e;
             fired(e.by, 'lethalaim');
           }
         }
@@ -44864,7 +44867,7 @@ log('gamemode loaded:',
           if (n >= PERKS.overcharge.inEvery) {
             n = 0;
             change -= took * PERKS.overcharge.more;
-            killer = e.by;
+            killer = e;
             fired(e.by, 'overcharge');
             tell(e.by, 'Overcharge: that spell lands double.');
           }
@@ -44880,7 +44883,7 @@ log('gamemode loaded:',
     var b = has(ST.blow, target) ? ST.blow[target] : null;
     if (!b) { return 0; }
     delete ST.blow[target];
-    return (now() - b.at) < 2000 ? b.by : 0;
+    return (now() - b.at) < 2000 && b.identity && MERCHANT_TRADING.actorIdentity(mp, b.by) === b.identity ? b.by : 0;
   }
 
   // -------------------------------------------------------------- the tick --
@@ -45738,8 +45741,10 @@ log('gamemode loaded:',
     // A bulwark's own blocked hit is a block seen.
     if (blocked && has(ST.on, target) && ST.on[target].cover) { ST.block[target] = true; }
 
-    var e = { before: -1, after: null, by: by, more: 0, less: 0, stagger: false, used: [] };
-    var a = (by && has(ST.on, by)) ? ST.on[by] : null;
+    var identity = by ? MERCHANT_TRADING.actorIdentity(mp, by) : null;
+    if (by && personOf(by) && !identity) { return; }
+    var e = { before: -1, after: null, by: by, identity: identity, more: 0, less: 0, stagger: false, used: [] };
+    var a = (identity && has(ST.on, by)) ? ST.on[by] : null;
     if (a && !isSpell(source)) {
       if (power && a.wreck && a.wreck > t) {
         e.more = MANEUVERS.wreck.more; e.stagger = true;
@@ -45771,6 +45776,7 @@ log('gamemode loaded:',
      window is still open. */
   function rearm(e) {
     if (!e.by || !e.used.length) { return; }
+    if (!e.identity || MERCHANT_TRADING.actorIdentity(mp, e.by) !== e.identity) { return; }
     var rec = onOf(e.by, true);
     for (var i = 0; i < e.used.length; i++) {
       var u = e.used[i];
@@ -45785,7 +45791,7 @@ log('gamemode loaded:',
     if (next <= 0) {
       next = 0;
       // The engine kills on this write with nobody named; mp.onDeath asks.
-      if (killer) { ST.blow[target] = { by: killer, at: now() }; }
+      if (killer) { ST.blow[target] = { by: killer.by, identity: killer.identity, at: now() }; }
     }
     try {
       var p = mp.get(target, 'percentages');
@@ -45827,10 +45833,11 @@ log('gamemode loaded:',
       var change = 0, killer = 0, stagger = false;
       for (var i = 0; i < list.length; i++) {
         var e = list[i];
+        if (e.identity && MERCHANT_TRADING.actorIdentity(mp, e.by) !== e.identity) { continue; }
         var took = e.before - e.after;
         if (!(e.after >= 0) || !(took > 0)) { rearm(e); continue; }
         if (e.less) { change += took * e.less; }
-        if (e.more) { change -= took * e.more; killer = e.by; }
+        if (e.more) { change -= took * e.more; killer = e; }
         if (e.stagger) { stagger = true; }
       }
       if (h > 0 && change !== 0) { setHealth(target, h, change, killer); }
@@ -45843,7 +45850,7 @@ log('gamemode loaded:',
     var b = has(ST.blow, target) ? ST.blow[target] : null;
     if (!b) { return 0; }
     delete ST.blow[target];
-    return (now() - b.at) < 2000 ? b.by : 0;
+    return (now() - b.at) < 2000 && b.identity && MERCHANT_TRADING.actorIdentity(mp, b.by) === b.identity ? b.by : 0;
   }
 
   // -------------------------------------------------------------- the tick --
@@ -62578,6 +62585,14 @@ function same(a,b) {
   var left=Object.keys(a).sort(),right=Object.keys(b).sort();
   return left.length===right.length && left.every(function(key,i){return key===right[i] && same(a[key],b[key]);});
 }
+function actorIdentity(mp,actor) {
+  try {
+    var ai=mp.getNpcAIState(actor),desc=mp.getDescFromId(actor);
+    if(!ai || ai.isHuman!==true || !Number.isInteger(ai.profileId) || ai.profileId<=0 ||
+        !Number.isSafeInteger(ai.lifeGeneration) || ai.lifeGeneration<0 || typeof desc!=='string' || !desc)return null;
+    return JSON.stringify({desc:desc,profileId:ai.profileId,life:ai.lifeGeneration});
+  } catch(error) { return null; }
+}
 function createQuestTransactions(deps) {
   var mp=deps.mp,active=true,property='thornswoodQuests';
   var log=deps.log || function(){};
@@ -62588,11 +62603,7 @@ function createQuestTransactions(deps) {
         'get','getIdFromDesc','getDescFromId','getNpcAIState'].every(function(key){return typeof mp[key]==='function';});
   }
   function identity(actor) {
-    if(!active)return null;
-    var ai=mp.getNpcAIState(actor),desc=mp.getDescFromId(actor);
-    if(!ai || !ai.isHuman || !Number.isInteger(ai.profileId) || ai.profileId<=0 ||
-        !Number.isSafeInteger(ai.lifeGeneration) || ai.lifeGeneration<0 || !desc)return null;
-    return JSON.stringify({desc:desc,profileId:ai.profileId,life:ai.lifeGeneration});
+    return active ? actorIdentity(mp,actor) : null;
   }
   function commit(actor,expectedRecord,nextRecord,changes) {
     if(!available())return {ok:false,why:'unavailable'};
@@ -62654,7 +62665,7 @@ function createQuestTransactions(deps) {
   }
   return {commit:commit,identity:identity,available:available,shutdown:function(){active=false;}};
 }
-module.exports={createQuestTransactions:createQuestTransactions};
+module.exports={createQuestTransactions:createQuestTransactions,actorIdentity:actorIdentity};
 return module.exports;})();
 'use strict';
 
@@ -63247,6 +63258,7 @@ module.exports = {
   createMerchantTrading: createMerchantTrading,
   createNativeMerchantTransfer: createNativeMerchantTransfer,
   createQuestTransactions: QUEST_TRANSFER.createQuestTransactions,
+  actorIdentity: QUEST_TRANSFER.actorIdentity,
   installMerchantTrading: installMerchantTrading,
   bookHoldOf: bookHoldOf,
   guildSite: guildSite,
