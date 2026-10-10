@@ -22,10 +22,10 @@ http.createServer((req,res)=>{
     Object.assign(data.quests[1],{state:'open',drawn:1,gem:'Ruby',canTake:false,canReturn:false,canAbandon:true});
   }
   res.setHeader('Content-Type','text/html');
-  res.end('<!doctype html><html lang="en"><meta charset="utf-8"><title>Merchant panel fixture</title>'+ 
-    '<body style="margin:0;background:#302820"><div style="position:fixed;top:0;left:0;color:white;z-index:2147483500"><output id="commands"></output>'+ 
-    '<button onclick="window.rejectCommand=true">Reject commands</button><button onclick="window.thornswoodMerchant.setData(window.fixtureData)">Same session update</button>'+ 
-    '<button onclick="window.fixtureData.sessionId=\'fixture-2\';window.thornswoodMerchant.setData(window.fixtureData)">New activation</button></div>'+ 
-    '<script>window.skyrimPlatform={sendMessage:function(){}};window.thornswoodNet={say:function(line){document.getElementById("commands").textContent=line;return window.rejectCommand!==true;}};</script>'+ 
+  res.end('<!doctype html><html lang="en"><meta charset="utf-8"><title>Merchant panel fixture</title>'+
+    '<body style="margin:0;background:#302820"><div style="position:fixed;top:0;left:0;color:white;z-index:2147483500"><output id="commands"></output>'+
+    '<button onclick="window.rejectCommand=true">Reject commands</button><button onclick="window.thornswoodMerchant.setData(window.fixtureData)">Same session update</button>'+
+    '<button onclick="window.fixtureData.sessionId=\'fixture-2\';window.thornswoodMerchant.setData(window.fixtureData)">New activation</button></div>'+
+    '<script>window.skyrimPlatform={sendMessage:function(){}};window.thornswoodNet={say:function(line){document.getElementById("commands").textContent=line;return window.rejectCommand!==true;}};</script>'+
     '<script src="/merchant.js"></script><script>window.fixtureData='+JSON.stringify(data)+';window.thornswoodMerchant.setData(window.fixtureData);</script></body></html>');
 }).listen(0,'127.0.0.1',function(){console.log('Merchant fixture http://127.0.0.1:'+this.address().port);});
