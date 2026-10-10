@@ -31,12 +31,13 @@ function createQuestTransactions(deps) {
   function commit(actor,expectedRecord,nextRecord,changes) {
     if(!available())return {ok:false,why:'unavailable'};
     try {
+      var token=identity(actor);
+      if(!token)return {ok:false,why:'identity'};
       // Match the addon's JSON boundary, including omitted optional fields.
       nextRecord=JSON.parse(JSON.stringify(nextRecord));
       return deps.withInventoryMutation(actor,function(human,stillActive){
         if(!available() || !stillActive())return {ok:false,why:'unavailable'};
-        var token=identity(actor);
-        if(!token)return {ok:false,why:'identity'};
+        if(identity(actor)!==token)return {ok:false,why:'identity'};
         var owner=JSON.parse(token);
         if(owner.desc!==human.desc || owner.profileId!==human.profileId)return {ok:false,why:'identity'};
         var receipt=mp.getInventoryReceipt(actor);

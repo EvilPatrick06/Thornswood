@@ -5,17 +5,17 @@ const clone=x=>JSON.parse(JSON.stringify(x));
 function fixture(options={}) {
   let inventory={entries:[{baseId:15,count:40},{baseId:100,count:4,name:'Keepsake',health:0.75}]};
   let record={v:1,open:{wolf:{kills:1}},cool:{}},receipt='null',saved='null',profile=7,pending=false;
-  let calls=0,mode='',busy=false;
+  let calls=0,mode='',busy=false,runtime='10';
   const human=()=>({desc:'ff000010:Skyrim.esm',profileId:profile});
   const mp={
-    getActorRuntimeIdentity:()=> '10',
+    getActorRuntimeIdentity:()=>runtime,
     getNpcAIState:()=>({isHuman:true,profileId:profile,lifeGeneration:0}),
     getDescFromId:()=>human().desc,getIdFromDesc:d=>d==='f:Skyrim.esm'?15:d==='ore:Skyrim.esm'?100:0,
     get:(id,key)=>{if(mode==='readback' && calls)throw Error('readback unavailable');return clone(key==='inventory'?inventory:record);},
     getInventoryReceipt:()=>receipt,getSavedInventoryReceipt:()=>saved,
     compareAndSetInventoryAndProperty(id,expected,old,next,seq,owner,change) {
       calls++;assert.equal(owner,profile);assert.equal(change.expectedLifeGeneration,0);
-      assert.equal(change.expectedRuntimeIdentity,'10');
+      assert.equal(change.expectedRuntimeIdentity,runtime);
       if(mode==='before')throw new Error('before mutation');
       if(mode==='refuse')return false;
       assert.deepEqual(expected,inventory);assert.equal(old,receipt);assert.deepEqual(change.expected,record);
@@ -31,7 +31,7 @@ function fixture(options={}) {
     busy=true;try{return fn(human(),()=>true);}finally{busy=false;}
   }});
   return {mp,transfer,record:()=>clone(record),inventory:()=>clone(inventory),receipt:()=>receipt,
-    calls:()=>calls,mode:m=>mode=m,pending:b=>pending=b,profile:p=>profile=p,save:()=>saved=receipt};
+    calls:()=>calls,mode:m=>mode=m,pending:b=>pending=b,profile:p=>profile=p,runtime:r=>runtime=r,save:()=>saved=receipt};
 }
 const next={v:1,open:{},cool:{wolf:1000}};
 let f=fixture();
@@ -68,6 +68,13 @@ for(const changes of [[{item:'missing',count:1}],[{item:'ore:Skyrim.esm',count:-
 assert.equal(f.calls(),0);assert.deepEqual(f.inventory(),original);
 const token=f.transfer.identity(10);f.profile(8);assert.notEqual(f.transfer.identity(10),token);
 f.transfer.shutdown();assert.equal(f.transfer.commit(10,f.record(),next,[]).ok,false);
+{
+  const old=fixture(),before=old.inventory(),record=old.record();
+  const replacement={toJSON(){old.runtime('11');return next;}};
+  assert.equal(old.transfer.commit(10,record,replacement,[{item:'f:Skyrim.esm',count:25}]).ok,false,
+    'replacement serialization cannot adopt a newer native session');
+  assert.equal(old.calls(),0);assert.deepEqual(old.inventory(),before);assert.deepEqual(old.record(),record);
+}
 {
   let runtime='10';
   const mp={getActorRuntimeIdentity:()=>runtime,getNpcAIState:()=>({isHuman:true,profileId:7,lifeGeneration:0}),getDescFromId:()=> 'ff000010:Skyrim.esm'};
