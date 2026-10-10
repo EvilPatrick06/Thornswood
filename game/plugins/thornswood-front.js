@@ -1449,8 +1449,44 @@
     backToChoice({ id: me, name: myName(), ended: sentence });
   }
 
+  /*
+    THE ENGINE TURNED THE CONNECTION AWAY (#1893).
+
+    A refusal at the engine's own door (no free incoming connections, IP
+    recently connected, already connected, banned) never reaches the gamemode,
+    so nothing says { end } for it. The fork's networkingService.ts no longer
+    answers it with a new connection: it closes the client and leaves the
+    reason in storage.thornswoodConnectionDenied ({ error, at }). This shows
+    it at the character choice the way sessionEnded shows the server's
+    sentence, and nothing connects again until a character is picked
+    (relogAs). A hot reload does not show an old one again.
+  */
+  let deniedSeenAt = 0;
+  try { deniedSeenAt = Number((sp.storage.thornswoodConnectionDenied || {}).at) || 0; } catch (e) { deniedSeenAt = 0; }
+  function connectionDenied(reason) {
+    const me = PROFILE;
+    const sentence = 'The server turned the connection away' + (reason ? ': ' + reason : '.');
+    log('session: ' + sentence + ' The game goes to the character choice as profile', me + '; nothing connects again until a character is picked');
+    afkGone = true;
+    afkClose();
+    try { globalThis.__thornswoodInWorld = false; } catch (e) { }
+    try { sp.mpClientPlugin.destroyClient(); } catch (e) { log('session: could not close the connection to the game server:', e); }
+    try { sp.Game.quitToMainMenu(); } catch (e) { log('session: could not go to the main menu:', e); }
+    if (!chooseAtMenu || !(me > 0)) {
+      log('session: this game does not choose its character at the menu, so it stays at the main menu');
+      return;
+    }
+    backToChoice({ id: me, name: myName(), ended: sentence });
+  }
   sp.on('update', guard('idle check', () => {
     const now = Date.now();
+    let denied = null;
+    try { denied = sp.storage.thornswoodConnectionDenied || null; } catch (e) { denied = null; }
+    if (denied && (Number(denied.at) || 0) > deniedSeenAt) {
+      deniedSeenAt = Number(denied.at) || 0;
+      connectionDenied(String(denied.error || ''));
+      return;
+    }
     if (afkOutAsked) {
       const why = afkOutAsked;
       afkOutAsked = '';
