@@ -763,59 +763,18 @@ yes('the page and the block agree: worn gear loses 1% a hit',
 
 // ---------------------------------------------------------- a drop ---------
 
+// The engine keeps a dropped piece's extra through the pickup (#1719), so the
+// block no longer watches drops, and pressing a dropped piece writes nothing.
 const DROPPED = 0xff00a001;
 {
   const w = world();
-  w.packs[PERSON] = [{ baseId: IRON_SWORD, count: 1, name: 'Iron Sword (40%)' }];
-  w.api.dropped(PERSON, IRON_SWORD, 1);
-  w.packs[PERSON] = [];
+  yes('the durability block has no drop watcher any more', typeof w.api.dropped === 'undefined');
   w.cells[DROPPED] = 'WhiterunBreezehome';
-  w.packs[OTHER] = [{ baseId: IRON_SWORD, count: 1 }];
-  w.api.pressed(OTHER, DROPPED, 'iron-sword');
-  w.packs[OTHER] = [{ baseId: IRON_SWORD, count: 2 }];
-  w.flush();
-  yes('a piece dropped at 40% and picked up again is at 40%, not 100%',
-      w.count(OTHER, IRON_SWORD, 'Iron Sword (40%)') === 1 && w.count(OTHER, IRON_SWORD, '') === 1);
-}
-{
-  const w = world();
-  w.packs[PERSON] = [{ baseId: IRON_SWORD, count: 1, name: 'Iron Sword (40%)' },
-                     { baseId: IRON_SWORD, count: 1, name: 'Iron Sword (90%)' }];
-  w.api.dropped(PERSON, IRON_SWORD, 1);
-  w.packs[PERSON] = [{ baseId: IRON_SWORD, count: 1, name: 'Iron Sword (40%)' }];
-  w.flush();
-  w.api.pressed(PERSON, DROPPED, 'iron-sword');
-  w.packs[PERSON].push({ baseId: IRON_SWORD, count: 1 });
-  w.flush();
-  yes('of two conditions, the one that went down is the one that comes back',
-      w.count(PERSON, IRON_SWORD, 'Iron Sword (90%)') === 1 && w.count(PERSON, IRON_SWORD, '') === 0);
-}
-{
-  const w = world();
-  w.packs[PERSON] = [{ baseId: IRON_SWORD, count: 1, name: 'Iron Sword (40%)' }];
-  w.api.dropped(PERSON, IRON_SWORD, 1);
-  w.cells[DROPPED] = 'SomewhereElse';
-  w.packs[OTHER] = [];
-  w.api.pressed(OTHER, DROPPED, 'iron-sword');
-  w.packs[OTHER] = [{ baseId: IRON_SWORD, count: 1 }];
-  w.flush();
-  yes('a sword picked up in another place is not matched to it', w.count(OTHER, IRON_SWORD, '') === 1);
-  w.cells[DROPPED] = 'WhiterunBreezehome';
-  w.t += 4 * 60 * 1000;
-  w.api.pressed(OTHER, DROPPED, 'iron-sword');
-  w.packs[OTHER] = [{ baseId: IRON_SWORD, count: 2 }];
-  w.flush();
-  yes('and the drop is forgotten once the engine has cleared the ground', w.count(OTHER, IRON_SWORD, '') === 2);
-}
-{
-  const w = world();
-  w.packs[PERSON] = [{ baseId: IRON_SWORD, count: 1, name: 'Iron Sword (40%)' }];
-  w.api.dropped(PERSON, IRON_SWORD, 1);
-  w.packs[OTHER] = [{ baseId: IRON_SWORD, count: 1 }];
+  w.packs[OTHER] = [{ baseId: IRON_SWORD, count: 1, name: 'Iron Sword (40%)' }];
   w.api.pressed(OTHER, DROPPED, 'iron-sword');
   w.flush();
-  yes('a pickup that added nothing leaves a plain sword already in the pack alone',
-      w.count(OTHER, IRON_SWORD, '') === 1 && w.writes === 0);
+  yes('a pickup off the ground is left as the engine gave it',
+      w.count(OTHER, IRON_SWORD, 'Iron Sword (40%)') === 1 && w.writes === 0);
 }
 
 // ---------------------------------------------------------- the wiring ------
@@ -828,8 +787,8 @@ const recipeless = between(code, 'function recipelessCraft(actorId, craftedItemB
 yes('a press reaches the durability block, after the box is remembered',
     /wear\.pressed\(casterRefrId, refrId, baseDesc\)/.test(onActivate) &&
     onActivate.indexOf('touchedBox(casterRefrId, refrId)') < onActivate.indexOf('wear.pressed('));
-yes('a drop reaches it, and the drop watcher still returns nothing',
-    /wear\.dropped\(actorId, Number\(baseId\) \|\| 0, count\)/.test(onDrop) && !/\breturn\b/.test(onDrop));
+yes('a drop no longer reaches it, and the drop watcher still returns nothing',
+    onDrop !== '' && !/wear\.dropped\(/.test(onDrop) && !/\breturn\b/.test(onDrop));
 const onHitLines = gm.split('\n').filter(function (l) { return /^mp\['onPapyrusEvent:OnHit'\] = guard\('onPapyrusEvent:OnHit', function/.test(l); });
 yes('a hit reaches it through the one OnHit handler, under guard(), beside the warrior maneuvers, with the blocked flag',
     onHitLines.length === 1 &&
