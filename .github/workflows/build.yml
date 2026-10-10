@@ -287,7 +287,7 @@ jobs:
                  'test-1319-pass-switch.js',
                  'test-1319-pass-switch.ps1',
                  'test-1320-pass-one-session.js',
-                 'test-1373-scarce-scene.js',
+                 'test-1373-scarce-scene.js', 'test-quest-transactions.js',
                  'test-nobody-makes.js',
                  'test-1378-shared-gather.js',
                  'test-special-edition-only.js',
