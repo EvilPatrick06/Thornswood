@@ -394,6 +394,7 @@ jobs:
                  'test-1349-relay-shapes.js',
                  'test-1033-pulse-cost.js',
                  'test-1157-session-ends.js',
+                 'test-1994-load-refused.js',
                  'test-1894-door-sentence.js',
                  'test-1180-own-plugins.js',
                  'test-1885-manifest-order.js',
@@ -458,6 +459,20 @@ jobs:
           & pwsh -NoProfile -File tests\test-signer-check.ps1
           if ($LASTEXITCODE -ne 0) {
             Write-Host '::error file=tests/test-signer-check.ps1::the signer check failed, the FAIL lines above say what'
+            exit 1
+          }
+
+      - name: Run the generated-files build harness
+        shell: pwsh
+        run: |
+          # Issue #1982. tests\test-build-generated.ps1 failed cases C to K
+          # because case B overwrote the path to Build-Generated.ps1. It ran
+          # nowhere on push, so nothing caught it. It compiles stand-ins for
+          # Pandora and BodySlide with the .NET Framework csc and builds into
+          # a temp folder; it touches no real game folder.
+          & pwsh -NoProfile -File tests\test-build-generated.ps1
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::error file=tests/test-build-generated.ps1::the generated-files build harness failed, the FAIL lines above say what'
             exit 1
           }
 

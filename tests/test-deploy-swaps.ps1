@@ -47,6 +47,13 @@
   file, with no ssh or scp run at all. And only the newest two .prev folders
   are kept, not three.
 
+  And issue #1973: two copies run at once, by two sessions, must both pass.
+  Each run's scratch tasks and bot service carry a tag of its own (Thornswood
+  Test <tag> ..., ThornswoodTest<tag>Bot), so the check for a real task left
+  behind looks for, stops and removes only this run's; its ports are held by a
+  lock file for the whole run, so a second copy cannot pick the same ones; and
+  its folders are under a scratch folder of its own, as they were.
+
   Connects to nothing but 127.0.0.1.
 #>
 [CmdletBinding()]
@@ -99,6 +106,13 @@ $far     = Join-Path $work 'far'
 $repo    = Join-Path $work 'repo'
 $pidLog  = Join-Path $work 'pids.txt'
 $utf8    = New-Object Text.UTF8Encoding($false)
+# This run's own names for the scratch scheduled tasks and the bot service
+# (#1973, #1135): every other harness and every other copy of this one uses
+# names of its own, so the check for a real task left behind looks only for
+# this run's, and can never stop or remove another run's.
+$runTag      = [Guid]::NewGuid().ToString('N').Substring(0, 8)
+$TaskPrefix  = 'Thornswood Test ' + $runTag
+$BotService  = 'ThornswoodTest' + $runTag + 'Bot'
 foreach ($d in $farTemp, $tasks, $far) { $null = [IO.Directory]::CreateDirectory($d) }
 
 function Put([string]$path, [string]$text) {
@@ -131,8 +145,26 @@ function Free([int]$p) {
 }
 $rand = New-Object Random
 $script:taken = @()
+# A port is this run's only while it holds the lock file for it, open with no
+# sharing, under one folder every run on the machine uses. Two runs at once
+# each check a port is free and only later bind it, so without the lock both
+# could pick the same one (#1973). A run that dies lets go of its locks with
+# its handles, so a file left behind takes nothing.
+$portLocks = Join-Path ([IO.Path]::GetTempPath()) 'ts-port-locks'
+$null = [IO.Directory]::CreateDirectory($portLocks)
+$script:portHeld = New-Object Collections.Generic.List[IO.FileStream]
+function HoldPort([int]$p) {
+    try { $script:portHeld.Add([IO.File]::Open((Join-Path $portLocks ([string]$p)), 'OpenOrCreate', 'ReadWrite', 'None')); return $true }
+    catch { return $false }
+}
 function PickPort {
-    do { $p = $rand.Next(41000, 48000) } until ((Free $p) -and (Free ($p + 1)) -and $script:taken -notcontains $p -and $script:taken -notcontains ($p + 1))
+    do {
+        $p = $rand.Next(41000, 48000)
+        $ok = $false
+        if ((Free $p) -and (Free ($p + 1)) -and $script:taken -notcontains $p -and $script:taken -notcontains ($p + 1)) {
+            if (HoldPort $p) { if (HoldPort ($p + 1)) { $ok = $true } }
+        }
+    } until ($ok)
     $script:taken += $p, ($p + 1)
     return $p
 }
@@ -162,10 +194,10 @@ function NoRealTask {
     $folder = Join-Path $env:SystemRoot 'System32\Tasks'
     $readable = $false
     try { $null = [IO.Directory]::GetFiles($folder, 'x'); $readable = $true } catch { }
-    if ($readable -and -not (Test-Path -Path (Join-Path $folder 'Thornswood Test*'))) { return $true }
-    $svc = @(Get-Service -Name 'ThornswoodTest*' -ErrorAction SilentlyContinue)
+    if ($readable -and -not (Test-Path -Path (Join-Path $folder ($TaskPrefix + '*')))) { return $true }
+    $svc = @(Get-Service -Name ($BotService + '*') -ErrorAction SilentlyContinue)
     if ($svc.Count) { return $false }
-    $real = @(Get-ScheduledTask -TaskName 'Thornswood Test*' -ErrorAction SilentlyContinue)
+    $real = @(Get-ScheduledTask -TaskName ($TaskPrefix + '*') -ErrorAction SilentlyContinue)
     foreach ($r in $real) {
         Stop-ScheduledTask -TaskName $r.TaskName -ErrorAction SilentlyContinue
         Unregister-ScheduledTask -TaskName $r.TaskName -Confirm:$false -ErrorAction SilentlyContinue
@@ -503,7 +535,7 @@ try {
     $docsRoot = Join-Path $box 'Thornswood-Docs'
     $docsPort = PickPort
     Put (Join-Path $docsRoot 'port.txt') ([string]$docsPort)
-    $docs = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = $docsRoot; Task = 'Thornswood Test Docs'; Port = $docsPort; Wait = 10 }
+    $docs = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = $docsRoot; Task = ($TaskPrefix + ' Docs'); Port = $docsPort; Wait = 10 }
     $null = [IO.Directory]::CreateDirectory((Join-Path $work 'dist'))
     function Git-Scratch { $eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'; try { & git -C $repo @args 2>&1 | Out-Null } finally { $ErrorActionPreference = $eap } }
     $refusals = @(
@@ -511,22 +543,22 @@ try {
            Args = $docs.Clone() },
         @{ Name = 'Install-Voice.ps1'; File = 'voice/headlines.js'; How = 'changed'
            Args = @{ VpsHost = '127.0.0.1'; VpsUser = 'nobody'; Root = (Join-Path $box 'Thornswood-Voice'); Port = (PickPort); Site = ''; Bind = '0.0.0.0'
-                     ChatRange = 'off'; TurnUrl = ''; TaskName = 'Thornswood Test Voice'; NoPause = $true; Wait = 10 } },
+                     ChatRange = 'off'; TurnUrl = ''; TaskName = ($TaskPrefix + ' Voice'); NoPause = $true; Wait = 10 } },
         @{ Name = 'Install-Voice.ps1'; File = 'scripts/vps/Roll-Log.ps1'; How = 'changed'
            Args = @{ VpsHost = '127.0.0.1'; VpsUser = 'nobody'; Root = (Join-Path $box 'Thornswood-Voice'); Port = (PickPort); Site = ''; Bind = '0.0.0.0'
-                     ChatRange = 'off'; TurnUrl = ''; TaskName = 'Thornswood Test Voice'; NoPause = $true; Wait = 10 } },
+                     ChatRange = 'off'; TurnUrl = ''; TaskName = ($TaskPrefix + ' Voice'); NoPause = $true; Wait = 10 } },
         @{ Name = 'Install-Bot.ps1'; File = 'bot/card.py'; How = 'staged'
-           Args = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = (Join-Path $box 'Thornswood-Bot'); Service = 'ThornswoodTestBot'; CodeOnly = $true; NoPause = $true; Wait = 20 } },
+           Args = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = (Join-Path $box 'Thornswood-Bot'); Service = $BotService; CodeOnly = $true; NoPause = $true; Wait = 20 } },
         @{ Name = 'Deploy-DevGamemode.ps1'; File = 'game/gamemode.js'; How = 'changed'
-           Args = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = (Join-Path $box 'Thornswood-Server-Dev'); Task = 'Thornswood Test Dev Server'; Dist = (Join-Path $work 'dist'); Wait = 10; Now = $true
+           Args = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = (Join-Path $box 'Thornswood-Server-Dev'); Task = ($TaskPrefix + ' Dev Server'); Dist = (Join-Path $work 'dist'); Wait = 10; Now = $true
                      Note = "The gamemode deploy note test`n- This line is long enough for the shape check to pass." } },
         @{ Name = 'Deploy-Server.ps1'; File = 'game/content/Thornswood-Content.esp'; How = 'new'
-           Args = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = (Join-Path $box 'Thornswood-Server'); Task = 'Thornswood Test Live Server'; Dist = (Join-Path $work 'dist'); Wait = 10 } },
+           Args = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = (Join-Path $box 'Thornswood-Server'); Task = ($TaskPrefix + ' Live Server'); Dist = (Join-Path $work 'dist'); Wait = 10 } },
         @{ Name = 'release\Publish-Server.ps1'; File = 'game/gamemode.js'; How = 'changed'
-           Args = @{ Channel = 'dev'; VpsHost = '127.0.0.1'; VpsUser = 'nobody'; VpsRoot = (Join-Path $box 'Thornswood-Server-Dev'); TaskName = 'Thornswood Test Dev Server'
+           Args = @{ Channel = 'dev'; VpsHost = '127.0.0.1'; VpsUser = 'nobody'; VpsRoot = (Join-Path $box 'Thornswood-Server-Dev'); TaskName = ($TaskPrefix + ' Dev Server')
                      Dist = (Join-Path $work 'dist'); Zip = (Join-Path $work 'payload.zip'); SkipBuild = $true; NoPause = $true; Wait = 8 } },
         @{ Name = 'release\Publish-Server.ps1'; File = 'scripts/deploy/Install-ThornswoodServer.ps1'; How = 'changed'
-           Args = @{ Channel = 'dev'; VpsHost = '127.0.0.1'; VpsUser = 'nobody'; VpsRoot = (Join-Path $box 'Thornswood-Server-Dev'); TaskName = 'Thornswood Test Dev Server'
+           Args = @{ Channel = 'dev'; VpsHost = '127.0.0.1'; VpsUser = 'nobody'; VpsRoot = (Join-Path $box 'Thornswood-Server-Dev'); TaskName = ($TaskPrefix + ' Dev Server')
                      Dist = (Join-Path $work 'dist'); Zip = (Join-Path $work 'payload.zip'); SkipBuild = $true; NoPause = $true; Wait = 8; PutBack = $true } }
     )
     foreach ($c in $refusals) {
@@ -620,7 +652,7 @@ try {
     Yes '  and what was live is live again and answering' (((Live $docsRoot) -eq $live) -and (WaitFor { (Http $docsPort '/') -eq 'docs v2' }))
     if ($script:fail -gt $failed) { Show }
 
-    $r = Deploy 'Deploy-Docs.ps1' @{ Vps = '127.0.0.1'; User = 'nobody'; Root = $docsRoot; Task = 'Thornswood Test Docs'; Port = $docsPort; Wait = 10; PutBack = $true }
+    $r = Deploy 'Deploy-Docs.ps1' @{ Vps = '127.0.0.1'; User = 'nobody'; Root = $docsRoot; Task = ($TaskPrefix + ' Docs'); Port = $docsPort; Wait = 10; PutBack = $true }
     $failed = $script:fail
     Yes 'Deploy-Docs -PutBack puts the previous site back, and it answers' ($r.Ok -and (WaitFor { (Http $docsPort '/') -eq 'docs v1' }))
     $undone = @(Kept $docsRoot '.undone-*')
@@ -666,7 +698,7 @@ try {
     $voiceRoot = Join-Path $box 'Thornswood-Voice'
     $voicePort = PickPort
     $voice = @{ VpsHost = '127.0.0.1'; VpsUser = 'nobody'; Root = $voiceRoot; Port = $voicePort; Site = ''; Bind = '0.0.0.0'
-                ChatRange = 'off'; TurnUrl = ''; TaskName = 'Thornswood Test Voice'; NoPause = $true; Wait = 10 }
+                ChatRange = 'off'; TurnUrl = ''; TaskName = ($TaskPrefix + ' Voice'); NoPause = $true; Wait = 10 }
     function Build { $h = Http $voicePort '/health'; if ($h) { try { return [string]($h | ConvertFrom-Json).build } catch { } }; return '' }
 
     Voice 'voice-v1'
@@ -685,7 +717,7 @@ try {
 
     $live = Live $voiceRoot
     $pidBefore = Listener $voicePort
-    $taskBefore = TaskArg 'Thornswood Test Voice'
+    $taskBefore = TaskArg ($TaskPrefix + ' Voice')
     Put (Join-Path $repo 'voice\voice-server.js') 'function ( { not javascript'
     $r = Deploy 'Install-Voice.ps1' $voice.Clone()
     $failed = $script:fail
@@ -711,14 +743,14 @@ try {
     Yes 'Install-Voice: a build that does not start is SWAP ROLLED BACK, and the install fails' ((-not $r.Ok) -and $r.Said -match 'SWAP ROLLED BACK')
     Yes '  and says why from voice.log' ($r.Said -match 'this voice will not start')
     Yes '  and the old files are back and the old build answers again' (((Live $voiceRoot) -eq $live) -and (WaitFor { (Build) -eq 'voice-v2' }))
-    Yes '  and the task is back exactly as it was, chat range and all, not the one this install made' ((TaskArg 'Thornswood Test Voice') -eq $taskBefore -and $taskBefore -match 'THORNSWOOD_CHAT_RANGE=off&&')
+    Yes '  and the task is back exactly as it was, chat range and all, not the one this install made' ((TaskArg ($TaskPrefix + ' Voice')) -eq $taskBefore -and $taskBefore -match 'THORNSWOOD_CHAT_RANGE=off&&')
     if ($script:fail -gt $failed) { Show }
 
     $a = $voice.Clone(); $a['PutBack'] = $true
     $r = Deploy 'Install-Voice.ps1' $a
     $failed = $script:fail
     Yes 'Install-Voice -PutBack puts the previous build back, and it answers' ($r.Ok -and (WaitFor { (Build) -eq 'voice-v1' }))
-    Yes '  and leaves the task as it was' ((TaskArg 'Thornswood Test Voice') -eq $taskBefore)
+    Yes '  and leaves the task as it was' ((TaskArg ($TaskPrefix + ' Voice')) -eq $taskBefore)
     if ($script:fail -gt $failed) { Show }
 
     # ================================================================ the bot
@@ -736,14 +768,14 @@ try {
     $botLog = Join-Path $botRoot 'data\bot.log'
     $null = [IO.Directory]::CreateDirectory((Join-Path $botRoot 'data'))
     Put (Join-Path $botRoot 'run.ps1') ("Set-Location -LiteralPath '" + $bq + "'`r`nwhile (`$true) {`r`n  & cmd /c ""python """"" + $botRoot + "\bot.py"""" >> """"" + $botLog + """"" 2>&1""`r`n  Start-Sleep -Seconds 2`r`n}`r`n")
-    # The service ThornswoodTestBot, standing in for ThornswoodBot (#465).
-    Task 'ThornswoodTestBot' 'powershell.exe' ('-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $botRoot + '\run.ps1"') $botRoot
+    # The service $BotService (ThornswoodTest<run>Bot), standing in for ThornswoodBot (#465).
+    Task $BotService 'powershell.exe' ('-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $botRoot + '\run.ps1"') $botRoot
     function BotSays([string]$v) { return ((Get $botLog) -match [regex]::Escape($v + ' watching')) }
     # The site's data\for-bot, which Install-Bot waits for before it sends the
     # bot (#1102): a site that has not made it yet is refused below.
     $siteForBot = Join-Path $box 'Thornswood-Docs'
     $null = [IO.Directory]::CreateDirectory((Join-Path $siteForBot 'data\for-bot'))
-    $bot = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = $botRoot; DocsRoot = $siteForBot; Service = 'ThornswoodTestBot'; CodeOnly = $true; NoPause = $true; Wait = 20 }
+    $bot = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = $botRoot; DocsRoot = $siteForBot; Service = $BotService; CodeOnly = $true; NoPause = $true; Wait = 20 }
     Yes 'Install-Bot: the stand-in bot is up' (WaitFor { BotSays 'bot v1' })
 
     Bot 'bot v2'
@@ -818,7 +850,7 @@ try {
     # data\bot.log while it is taken away: a running bot opens its log for
     # appending and makes it again, and then the run finds one there.
     function Stop-TestBot {
-        $null = RunWrapped "Stop-Service -Name 'ThornswoodTestBot'`r`n"
+        $null = RunWrapped "Stop-Service -Name '$BotService'`r`n"
         foreach ($p in @(Get-CimInstance Win32_Process -EA SilentlyContinue | Where-Object { $_.CommandLine -and $_.CommandLine.Contains($botRoot) })) {
             if ($p.ProcessId -ne $PID) { Stop-Process -Id $p.ProcessId -Force -EA SilentlyContinue }
         }
@@ -831,7 +863,7 @@ try {
     Yes 'Install-Bot -CodeOnly: with the bot stopped and no bot.log anywhere, an empty one is made and the new code is swapped in' (
         $gone -and $r.Ok -and $r.Said -match 'SWAP OK' -and $r.Said -match 'made an empty .*data.bot\.log')
     Yes '  and the service was started, and the new bot says it is watching' (
-        $r.Said -match 'started the service ThornswoodTestBot' -and (WaitFor { BotSays 'bot v5' }))
+        $r.Said -match ('started the service ' + $BotService) -and (WaitFor { BotSays 'bot v5' }))
     Yes '  and data\bot.log is on the box afterwards, which is the path the docs name, and the run says True for it' (
         (Test-Path -LiteralPath $botLog) -and $r.Said -match ([regex]::Escape('Test-Path ' + $botLog) + '\s+True'))
     if ($script:fail -gt $failed) { Show }
@@ -876,12 +908,12 @@ try {
     Put (Join-Path $devRoot 'server-settings.json') (([ordered]@{ port = $devPort; name = 'Thornswood Dev'; dataDir = 'data'
         loadOrder = @($devFar + 'Skyrim.esm'); thornswoodServer = 'dev'; thornswoodRequirePass = $true }) | ConvertTo-Json)
     Put (Join-Path $devRoot 'data\keep.txt') 'the character book'
-    Task 'Thornswood Test Dev Server' $node.Source ('"' + $gameStub + '" "' + $devRoot + '"') $devRoot
+    Task ($TaskPrefix + ' Dev Server') $node.Source ('"' + $gameStub + '" "' + $devRoot + '"') $devRoot
     $gm = Join-Path $repo 'game\gamemode.js'
     $launcher = Join-Path $work 'launcher'
     $null = [IO.Directory]::CreateDirectory($launcher)
     $devNote = "The dev gamemode deploy test`n- This line is long enough for the shape check to pass."
-    $dev = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = $devRoot; Task = 'Thornswood Test Dev Server'
+    $dev = @{ Vps = '127.0.0.1'; User = 'nobody'; Root = $devRoot; Task = ($TaskPrefix + ' Dev Server')
               Dist = (Join-Path $work 'dist'); Wait = 10; Note = $devNote }
     function DevUp { return ((UdpOwner $devPort) -gt 0) -and ((Listener ($devPort + 1)) -gt 0) }
     Yes 'Deploy-DevGamemode: the stand-in dev server is up' (WaitFor { DevUp })
@@ -953,11 +985,11 @@ try {
     Put (Join-Path $liveRoot 'server-settings.json') $liveSettings
     Put (Join-Path $liveRoot '.prev-20260928-120000\gamemode.js') '// live before'
     Put (Join-Path $liveRoot '.prev-20260928-120000\server-settings.json') $liveSettings
-    Task 'Thornswood Test Live Server' $node.Source ('"' + $gameStub + '" "' + $liveRoot + '"') $liveRoot
+    Task ($TaskPrefix + ' Live Server') $node.Source ('"' + $gameStub + '" "' + $liveRoot + '"') $liveRoot
     function LiveUp { return ((UdpOwner $livePort) -gt 0) -and ((Listener ($livePort + 1)) -gt 0) }
     $null = WaitFor { LiveUp }
     $pidBefore = UdpOwner $livePort
-    $r = Deploy 'Deploy-Server.ps1' @{ Vps = '127.0.0.1'; User = 'nobody'; Root = $liveRoot; Task = 'Thornswood Test Live Server'
+    $r = Deploy 'Deploy-Server.ps1' @{ Vps = '127.0.0.1'; User = 'nobody'; Root = $liveRoot; Task = ($TaskPrefix + ' Live Server')
                                        Dist = (Join-Path $work 'dist'); Wait = 10; PutBack = $true }
     $failed = $script:fail
     Yes 'Deploy-Server -PutBack puts the newest .prev back, and the server answers as a new process' (
@@ -971,6 +1003,7 @@ catch {
 }
 finally {
     Yes 'no real scheduled task was left behind' (NoRealTask)
+    foreach ($h in $script:portHeld) { $h.Dispose() }
     # Only what this run started: the pids it wrote down, and only processes
     # that began after it did.
     if (Test-Path -LiteralPath $pidLog) {
