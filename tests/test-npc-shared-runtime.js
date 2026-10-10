@@ -72,7 +72,7 @@ function fixture(options = {}) {
   humanIds.forEach(id => states.set(id, actor(options.human && options.human[id])));
   let online = humanIds.slice();
   const originalIds = [...states.keys()], moved = new Set(), controlled = new Set();
-  const moves = [], attacks = [], attackAttempts = [], logs = [], controlEvents = [], snapshots = [];
+  const moves = [], attacks = [], attackAttempts = [], logs = [], controlEvents = [], snapshots = [], teleports = [];
   const meshes = options.meshes || new Map([[60, square()]]);
   const navLookedUp = new Set();
   const budgetViolations = [];
@@ -113,7 +113,10 @@ function fixture(options = {}) {
     },
     getFactionReactions() { return plain(options.reactions || []); },
     get(id, prop) {
-      if (id === 0 && prop === 'onlinePlayers') return online.slice();
+      if (id === 0 && prop === 'onlinePlayers') {
+        if (options.onlineFails && options.onlineFails()) throw new Error('observer list unreadable');
+        return online.slice();
+      }
       assert.ok(states.has(id), `unknown property actor ${id}`);
       const state = states.get(id);
       if (prop === 'locationalData') return {pos:state.pos.slice(), rot:state.rot.slice(),
@@ -123,7 +126,15 @@ function fixture(options = {}) {
       if (options.badProfile === id) throw new Error('one corrupt routine profile');
       return persisted.has(id + ':' + prop) ? plain(persisted.get(id + ':' + prop)) : null;
     },
-    set(id, prop, value) { persisted.set(id + ':' + prop, plain(value)); },
+    set(id, prop, value) {
+      persisted.set(id + ':' + prop, plain(value));
+      // The engine teleports an actor whose locationalData is written.
+      if (prop === 'locationalData') {
+        const state = states.get(id);
+        state.pos = value.pos.slice(); state.rot = value.rot.slice();
+        teleports.push({id, pos:value.pos.slice(), at:time});
+      }
+    },
     getIdFromDesc(desc) { return parseInt(desc.split(':')[0], 16); },
     getDescFromId(id) { return id.toString(16)+':Skyrim.esm'; },
     getNavmeshRecords(cell) {
@@ -170,10 +181,13 @@ function fixture(options = {}) {
         Math.hypot(...states.get(h).pos.map((v,i) => v-state.pos[i])) <= 4096);
       spend(nearby ? 'near' : 'background');
       const lift = options.lifts && options.lifts[id] || 0;
-      assert.ok(contains(mesh, pos, lift), 'Movement stays in a walkable triangle');
-      for (let fraction = 0; fraction <= 1; fraction += 0.1) {
-        assert.ok(contains(mesh, state.pos.map((v,i) => v+(pos[i]-v)*fraction), lift),
-          'Every movement segment must stay on the local surface');
+      // Ids in options.free are held to their own test's rule instead.
+      if (!(options.free && options.free.has(id))) {
+        assert.ok(contains(mesh, pos, lift), 'Movement stays in a walkable triangle');
+        for (let fraction = 0; fraction <= 1; fraction += 0.1) {
+          assert.ok(contains(mesh, state.pos.map((v,i) => v+(pos[i]-v)*fraction), lift),
+            'Every movement segment must stay on the local surface');
+        }
       }
       if (Math.hypot(...pos.map((v,i) => v-state.pos[i])) > 0.001) moved.add(id);
       moves.push({id, pos:pos.slice(), from:state.pos.slice(), at:time, speed});
@@ -231,7 +245,7 @@ function fixture(options = {}) {
     assert.deepEqual([...states.keys()], originalIds, 'The current cast is preserved');
   }
   function stop() { runtime.stop(); assert.equal(pending.size, 0, 'Stop cancels every timer'); }
-  return {api, states, ids, moved, controlled, moves, attacks,attackAttempts,logs,controlEvents,mappingCalls,snapshots,
+  return {api, states, ids, moved, controlled, moves, attacks,attackAttempts,logs,controlEvents,mappingCalls,snapshots,teleports,
     timers, policyEvents, loadedLookups:() => loadedLookups,
     addNpc(id, overrides = {}) {
       assert.ok(!states.has(id)); ids.push(id); states.set(id,actor(overrides));
@@ -759,6 +773,124 @@ test('A commanded actor survives five-second discovery under the real population
   assert.ok(!f.api.get(commanded,'isDisabled'),'The command stays visible');
   assert.ok(f.moves.some(move=>move.id===commanded && move.at>=5000),
     'The actor remains active after delayed rediscovery');
+  f.stop();
+});
+
+// #2067: an actor placed off walkable ground is set down on the nearest
+// walkable point out of everybody's sight; an ambush steps out when somebody
+// comes near; a race that swims and cannot walk keeps to water.
+const onSquare = p => p[0] >= -0.01 && p[0] <= 600.01 && p[1] >= -0.01 && p[1] <= 600.01;
+test('An actor off walkable ground is set down on the nearest walkable point when nobody is near', () => {
+  const f = fixture({count:1,npc:{1:{pos:[800,300,0]}},meshes:new Map([[60,square()]])});
+  f.advance(1500);
+  assert.equal(f.teleports.length,1,'Set down once');
+  const at = f.teleports[0].pos;
+  assert.ok(onSquare(at) && Math.hypot(at[0]-600,at[1]-300) < 2 && Math.abs(at[2]) < 0.01,
+    'On the walkable point nearest its placement: '+JSON.stringify(at));
+  f.advance(15000);
+  assert.ok(f.moved.has(1),'It moves like the rest of the cast afterwards');
+  assert.equal(f.status().held,0); assert.equal(f.status().unavailable,0); f.stop();
+});
+test('Nobody is set down while a person is within sight; it happens once they leave', () => {
+  const f = fixture({count:1,npc:{1:{pos:[800,300,0]}},humans:[50],human:{50:{pos:[3000,300,0]}},
+    meshes:new Map([[60,square()]])});
+  f.advance(10000);
+  assert.equal(f.teleports.length,0,'Not while somebody is within 4096 units');
+  assert.equal(f.status().held,1);
+  assert.ok(!f.moves.some(m => m.id === 1),'It waits where the game put it');
+  f.disconnect(50); f.advance(2000);
+  assert.equal(f.teleports.length,1,'Set down once nobody can see it'); f.stop();
+});
+test('An unreadable observer list sets nobody down that tick', () => {
+  let failing = true;
+  const f = fixture({count:1,npc:{1:{pos:[800,300,0]}},meshes:new Map([[60,square()]]),onlineFails:() => failing});
+  f.advance(5000);
+  assert.equal(f.teleports.length,0,'Not without knowing where everybody is');
+  failing = false; f.advance(2000);
+  assert.equal(f.teleports.length,1); f.stop();
+});
+test('Set down further than its leash, an actor takes the walkable point as its home and keeps moving', () => {
+  const f = fixture({count:1,npc:{1:{pos:[800,300,0]}},meshes:new Map([[60,square()]]),
+    population:homePolicy([800,300,0],60,100)});
+  f.advance(20000);
+  assert.equal(f.teleports.length,1);
+  const home = f.teleports[0].pos;
+  assert.ok(f.moves.some(m => m.id === 1 && m.speed > 0),'Not paused outside its leash');
+  checkLeash(f.moves,home,100); f.stop();
+});
+test('An ambush waits in its alcove, then steps out onto the floor when somebody comes near', () => {
+  const f = fixture({count:1,npc:{1:{pos:[640,300,0]}},humans:[50],human:{50:{pos:[2000,300,0]}},
+    meshes:new Map([[60,square()]]),free:new Set([1]),
+    population:() => ({home:[640,300,0],cell:60,leash:2000,ambush:true})});
+  f.advance(10000);
+  assert.ok(!f.moves.some(m => m.id === 1),'Still while nobody is within 1024 units');
+  assert.equal(f.teleports.length,0,'An ambush is never set down unseen');
+  assert.equal(f.status().held,1);
+  f.states.get(50).pos = [900,300,0];
+  f.advance(6000);
+  const mine = f.moves.filter(m => m.id === 1);
+  assert.ok(mine.length > 0,'It comes out');
+  const out = mine.findIndex(m => onSquare(m.pos));
+  assert.ok(out >= 0,'It reaches the floor');
+  // One straight line from the alcove to the floor point it steps onto.
+  const start = [640,300,0], end = mine[out].pos, line = end.map((v,j) => v-start[j]);
+  const length = Math.hypot(...line);
+  for (let i = 0; i <= out; i++) {
+    const p = mine[i].pos.map((v,j) => v-start[j]), along = p.reduce((n,v,j) => n+v*line[j],0)/length;
+    const off = Math.hypot(...p.map((v,j) => v-line[j]*along/length));
+    assert.ok(off < 0.01 && along >= -0.01 && along <= length+0.01,'Straight out of the alcove toward the floor');
+  }
+  assert.ok(mine.slice(out).every(m => onSquare(m.pos)),'On the floor from then on');
+  assert.equal(f.status().held,0); f.stop();
+});
+test('An ambush more than a step from any floor stays where the game put it', () => {
+  const f = fixture({count:1,npc:{1:{pos:[1000,300,0]}},humans:[50],human:{50:{pos:[900,300,0]}},
+    meshes:new Map([[60,square()]]),population:() => ({home:[1000,300,0],cell:60,leash:2000,ambush:true})});
+  f.advance(10000);
+  assert.ok(!f.moves.some(m => m.id === 1) && f.teleports.length === 0);
+  assert.ok(f.logs.some(l => /Ambush placement with no floor within a step/.test(l)));
+  assert.equal(f.status().unavailable,1); f.stop();
+});
+// Water on the left, land on the right, linked along x = 600.
+function shore(bedAt600 = 0) {
+  return geometry([[0,0,0],[600,0,bedAt600],[0,600,0],[600,600,bedAt600],[1200,0,bedAt600],[1200,600,bedAt600]],
+    [[0,1,2],[1,3,2],[1,4,3],[4,5,3]],[512,512,0,0]);
+}
+const fish = top => () => ({home:[300,300,top],cell:60,leash:5000,swims:true,top});
+test('A swimmer keeps to water, at its height over the bed and never above its depth', () => {
+  const f = fixture({count:1,npc:{1:{pos:[300,300,200],canSwim:true}},meshes:new Map([[60,shore()]]),
+    free:new Set([1]),population:fish(200)});
+  for (let i = 0; i < 4; i++) f.advance(15000);
+  const mine = f.moves.filter(m => m.id === 1);
+  assert.ok(mine.some(m => m.speed > 0),'It swims');
+  assert.ok(mine.every(m => m.pos[0] <= 600.01 && m.pos[2] <= 200.0001 && m.pos[2] >= 0),
+    'Over the water triangles, between the bed and its depth');
+  assert.equal(f.teleports.length,0); f.stop();
+});
+test('A swimmer over a rising bed stays below the depth it was placed at', () => {
+  const bed = x => x/600*150;
+  const f = fixture({count:1,npc:{1:{pos:[50,300,190],canSwim:true}},meshes:new Map([[60,shore(150)]]),
+    free:new Set([1]),population:fish(190)});
+  for (let i = 0; i < 8; i++) f.advance(15000);
+  const mine = f.moves.filter(m => m.id === 1);
+  assert.ok(mine.some(m => m.speed > 0));
+  assert.ok(mine.every(m => m.pos[2] <= 190.0001 && m.pos[2] >= bed(m.pos[0])-0.01 && m.pos[0] <= 600.01),
+    'Never above its depth, never under the bed, never over land');
+  f.stop();
+});
+test('A swimmer placed off the water is set down in the water, not on land', () => {
+  const f = fixture({count:1,npc:{1:{pos:[300,-150,120],canSwim:true}},meshes:new Map([[60,shore()]]),
+    free:new Set([1]),population:() => ({home:[300,-150,120],cell:60,leash:5000,swims:true,top:120})});
+  f.advance(1500);
+  assert.equal(f.teleports.length,1);
+  const at = f.teleports[0].pos;
+  assert.ok(at[0] <= 600 && at[1] >= 0 && Math.abs(at[2]-120) < 0.01,'Into the water at its depth: '+JSON.stringify(at));
+  f.stop();
+});
+test('A walker that can swim still treats a swimmer-only rule as not its own', () => {
+  const f = fixture({count:1,npc:{1:{pos:[900,300,0],canSwim:false}},meshes:new Map([[60,shore()]])});
+  f.advance(30000);
+  assert.ok(f.moves.filter(m => m.id === 1).every(m => m.pos[0] >= 599.99),'A walker that cannot swim stays on land');
   f.stop();
 });
 
