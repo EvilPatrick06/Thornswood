@@ -63311,13 +63311,13 @@ try {
 /*
   Scarce quests and scene quests, from the two tables on
   docs/systems/quests.md. Supply is not this block. Scene gold is created
-  with addItem. It is not taken from a trader purse.
+  in the quest's atomic inventory commit. It is not taken from a trader purse.
 
   The rare mine is bound: RARE_PLACES below is the one building each rare
-  seam is, and every vein of that seam anywhere else stays shut. The page
-  does not name the place the other scarce rows use, or the sack, shelf,
-  chest, urn, cell, or hold a scene row names. Those stay unbound. Which gem
-  a trader names, among the four on the miner page, is likewise not said.
+  seam is, and every vein of that seam anywhere else stays shut. The other
+  scarce sources and scene places are specified in quest-locations.md but
+  their interactions remain unbound. The miner offer requires an explicit
+  choice among the four gems on the miner page.
 */
 (function () {
   var HOUR = 60 * 60 * 1000;
