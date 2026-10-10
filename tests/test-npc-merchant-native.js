@@ -1,5 +1,15 @@
 'use strict';
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+// Run with no arguments (the nightly), check the gamemode sections this harness loads and SKIP the native part (#1881).
+if(!process.argv[2]||!process.argv[3]){
+  const src=require('node:fs').readFileSync(require('node:path').join(__dirname,'../game/gamemode.js'),'utf8');
+  for(const m of ["NPC MERCHANT PURSES","NPC POPULATION POLICY","NPC POPULATION DATA"]){
+    const b=src.indexOf('// '+m+' BEGIN'),e=src.indexOf('// '+m+' END');
+    if(b<0||e<=b){console.error('FAIL: gamemode.js section '+m+' missing');process.exit(1);}
+  }
+  console.log('SKIP: merchant native check needs <built addon .node path> <installed record .json path> (node tests/test-npc-merchant-native.js <addon> <installed.json>); gamemode sections present: NPC MERCHANT PURSES, NPC POPULATION POLICY, NPC POPULATION DATA');
+  process.exit(0);
+}
 const addon=require(path.resolve(process.argv[2]));
 const installed=JSON.parse(fs.readFileSync(process.argv[3],'utf8'));
 assert.equal(installed.loadOrder.length,102,'Use the verified installed plugin cast');
