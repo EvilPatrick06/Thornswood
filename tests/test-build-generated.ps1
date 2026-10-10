@@ -652,8 +652,8 @@ exit code $code"
     $bodies = $shipText.IndexOf("Head 'Covered bodies'")
     Yes 'B: Ship.ps1 has a Generated files step' ($at -gt 0)
     # The step runs to the launcher build, which comes after it since #1692.
-    $build = if ($at -gt 0) { $shipText.IndexOf('# ------------------------------------------------------------ build', $at) } else { -1 }
-    $step = if ($at -gt 0 -and $build -gt $at) { $shipText.Substring($at, $build - $at) } else { '' }
+    $buildAt = if ($at -gt 0) { $shipText.IndexOf('# ------------------------------------------------------------ build', $at) } else { -1 }
+    $step = if ($at -gt 0 -and $buildAt -gt $at) { $shipText.Substring($at, $buildAt - $at) } else { '' }
     Yes 'B: it reads the state of this install''s folder against records\generated.json' (
         $step -match "\. \(Join-Path \`$Here '\.\.\\mods\\Generated\.ps1'\)" -and $step -match "Get-GeneratedState \`$Root \(Join-Path \`$RepoDir 'records\\generated\.json'\)")
     Yes 'B: and stops, on both channels, with the sentence that says what to run, putting the version back' (
