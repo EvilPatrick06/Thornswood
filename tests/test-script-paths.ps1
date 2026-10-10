@@ -49,6 +49,7 @@ $notInGit = @{
     'out/dist'                      = 'the release output, under out, which git ignores (CONTRIBUTING, the fork and its build)'
     'records/signing/signing.json'  = 'a machine''s signing settings, ignored by git'
     'records/signing/client'        = 'Microsoft''s signing client, fetched from NuGet by Setup-ShipMachine.ps1 and ignored by git (#458)'
+    'records/collection-plugins.json' = 'hashed from Nexus archives on Nyx by New-CollectionPluginsRecord.ps1; this checkout has none until that run (issue #2019)'
     'local/backup-key.txt'          = 'the backup passphrase, a secret kept out of git'
     'local/thornswood-front.zip'    = 'the front build, made outside the repository and kept in local'
     'bot/announced.json'  = 'what Publish-Discord.ps1 has posted, written on the machine that ships'

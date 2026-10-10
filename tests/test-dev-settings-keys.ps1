@@ -84,7 +84,7 @@ Yes ('and nothing on the list is a key it never writes' + $(if ($notWritten.Coun
 Yes 'the swap is handed the list on a deploy and nothing on a put-back' (
     ($text -match '(?m)^\s*\$readBackKeys = \$null\s*$') -and
     ($text -match '(?m)^\s*if \(-not \$PutBack\) \{ \$readBackKeys = \$DevSettingsKeys \}\s*$') -and
-    ($text -match 'SwapVars \$Root \$Task \$stageName \$prevName \$Wait \$hashes \$readBackKeys\)'))
+    ($text -match 'SwapVars \$Root \$Task \$stageName \$prevName \$Wait \$hashes \$readBackKeys \$Pinned'))
 
 # ---- 2. the read-back itself, over two folders ---------------------------------
 $swapPath = Join-Path $Repo (Join-Path 'scripts' (Join-Path 'deploy' 'Swap.ps1'))

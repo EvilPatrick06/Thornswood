@@ -220,17 +220,6 @@ if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 . (Join-Path $Here 'Swap.ps1')
 . (Join-Path $Here 'CollectionPlugins.ps1')
 . (Join-Path $Here '..\mods\LoadOrder.ps1')
-if (-not $CollectionRecord) { $CollectionRecord = Join-Path $Here '..\..\records\collection-plugins.json' }
-$CollectionRec = Read-CollectionPluginsRecord $CollectionRecord
-$Pinned = Get-CollectionPinnedMap $CollectionRec
-$PinRefuse = [bool]$LoadOrder
-$revWhy = @(Confirm-CollectionPluginsDeploy $CollectionRec '')
-if ($revWhy.Count) {
-  Write-Host ''
-  Write-Host '  the collection plugin record does not match this machine:' -ForegroundColor Red
-  foreach ($w in $revWhy) { Write-Host ('    ' + $w) -ForegroundColor Red }
-  throw 'the collection plugin record does not match this machine. Nothing was sent and the server was not touched.'
-}
 if (-not $PSBoundParameters.ContainsKey('Wait')) {
   $Wait = Get-ThornswoodServerReadyWait
 }
@@ -260,6 +249,19 @@ if (-not $PutBack) {
     exit 1
   }
   Write-Host "  $Note" -ForegroundColor DarkGray
+}
+# After the switch and note refusals, so a missing note or -PutBack
+# -LoadOrder still names that and does not die on a missing record first.
+if (-not $CollectionRecord) { $CollectionRecord = Join-Path $Here '..\..\records\collection-plugins.json' }
+$CollectionRec = Read-CollectionPluginsRecord $CollectionRecord
+$Pinned = Get-CollectionPinnedMap $CollectionRec
+$PinRefuse = [bool]$LoadOrder
+$revWhy = @(Confirm-CollectionPluginsDeploy $CollectionRec '')
+if ($revWhy.Count) {
+  Write-Host ''
+  Write-Host '  the collection plugin record does not match this machine:' -ForegroundColor Red
+  foreach ($w in $revWhy) { Write-Host ('    ' + $w) -ForegroundColor Red }
+  throw 'the collection plugin record does not match this machine. Nothing was sent and the server was not touched.'
 }
 $Gamemode = Join-Path $Here '..\..\game\gamemode.js'
 if (-not (Test-Path -LiteralPath $Gamemode)) { throw "There is no gamemode at $Gamemode" }

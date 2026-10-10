@@ -178,6 +178,16 @@ try {
         $files[$rel] = [ordered]@{ sha256 = (Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash.ToLowerInvariant(); bytes = (Get-Item -LiteralPath $p).Length; commit = $commit }
     }
     Put $record ([ordered]@{ binary = 'scam_native.node'; sha256 = $files['scam_native.node'].sha256; source = [ordered]@{ commit = $commit }; files = $files } | ConvertTo-Json -Depth 5)
+    $colRec = Join-Path $T 'collection-plugins.json'
+    Put $colRec (@'
+{
+  "collection": "7essxf",
+  "revision": 2,
+  "collectionJsonSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "generatedBy": "scripts/release/New-CollectionPluginsRecord.ps1",
+  "plugins": {}
+}
+'@)
     foreach ($n in 'Skyrim.esm', 'A.esp', 'B.esp') { Put (Join-Path $plug $n) ('plugin ' + $n) }
     function Order([string[]]$names) {
         $s = [ordered]@{ name = 'Thornswood'; port = 7777; thornswoodVoicePort = 7778; maxPlayers = 14
@@ -189,7 +199,7 @@ try {
         if (Test-Path -LiteralPath $zip) { Remove-Item -LiteralPath $zip -Force }
         $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
         try {
-            $o = (& $shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $export -Dist $dist -Zip $zip -OutDir (Join-Path $T 'out\_payload') -Record $record 2>&1 | Out-String)
+            $o = (& $shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $export -Dist $dist -Zip $zip -OutDir (Join-Path $T 'out\_payload') -Record $record -CollectionRecord $colRec 2>&1 | Out-String)
             $code = $LASTEXITCODE
         } finally { $ErrorActionPreference = $old }
         return [pscustomobject]@{ Code = $code; Out = ($o -replace '\r?\n\s+\|\s+', ' '); Zip = (Test-Path -LiteralPath $zip) }
