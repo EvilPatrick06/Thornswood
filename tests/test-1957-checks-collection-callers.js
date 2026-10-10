@@ -11,8 +11,13 @@
 // them, and a launcher check that nothing runs looks, to the next person who
 // reads it, like a check the launcher makes. Patrick, 5 Oct: remove them.
 //
+// #1981: RemoveForeign, the old name kept as a wrapper of IsolateForeign,
+// had no caller either. It is gone, and every method in Checks.cs whose name
+// ends in Foreign is held to the same rule as the collection readers.
+//
 // What it checks:
-//   1. each method in Checks.cs whose name starts with Collection is reached
+//   1. each method in Checks.cs whose name starts with Collection, or ends
+//      with Foreign (#1981), is reached
 //      from code that runs: a call from another file in launcher\app, or from
 //      a method in Checks.cs that is not a collection reader, or from a
 //      collection reader that is itself reached. A reader called only by
@@ -105,9 +110,10 @@ function methods(text) {
 const checksText = code(fs.readFileSync(CHECKS, 'utf8'));
 const checksMethods = methods(checksText);
 const declared = new Set(checksMethods.map(x => x.name));
-const readers = [...declared].filter(x => /^Collection/.test(x));
+const readers = [...declared].filter(x => /^Collection/.test(x) || /Foreign$/.test(x));
 yes('Checks.cs declares collection readers to check (' + readers.join(', ') + ')', readers.length > 0);
 yes('and still reads the installed revision the Play page and the update bar use (CollectionRevision)', declared.has('CollectionRevision'));
+// #1981: the foreign-plugin check Verify runs is still there, and is checked below.('and still sets aside foreign plugins (IsolateForeign)', declared.has('IsolateForeign'));
 
 // Who calls each reader. A call inside Checks.cs belongs to the method whose
 // body holds it; a call from another file runs.
