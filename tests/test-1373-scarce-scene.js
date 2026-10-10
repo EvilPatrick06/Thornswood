@@ -88,6 +88,20 @@ function world(ranks) {
     goldDesc: 'f:Skyrim.esm',
     load: function (actor) { return kept.has(actor) ? JSON.parse(kept.get(actor)) : undefined; },
     save: function (actor, rec) { kept.set(actor, JSON.stringify(rec)); },
+    identity: function (actor) {return 'actor:'+actor;},
+    commit: function (actor, expected, next, changes) {
+      assert.deepEqual(kept.has(actor)?JSON.parse(kept.get(actor)):null,expected);
+      const pack=new Map(inv);
+      for (const change of changes) {
+        const key=actor+'|'+change.item,count=(pack.get(key)||0)+change.count;
+        if(count<0)return {ok:false};
+        pack.set(key,count);
+      }
+      for (const [key,count] of pack) inv.set(key,count);
+      kept.set(actor,JSON.stringify(next));
+      changes.filter(change=>change.count>0).forEach(change=>adds.push({actor,item:change.item,count:change.count}));
+      return {ok:true};
+    },
     addItem: function (actor, item, count) {
       const key = actor + '|' + item;
       inv.set(key, (inv.get(key) || 0) + count);

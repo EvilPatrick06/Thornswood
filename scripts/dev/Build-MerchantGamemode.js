@@ -7,11 +7,13 @@ const root = path.join(__dirname, '../..');
 const modePath = path.join(root, 'game/gamemode.js');
 const moduleSource = fs.readFileSync(path.join(root, 'game/merchant-trading.js'), 'utf8').replace(/\r\n/g, '\n');
 const settlementSource = fs.readFileSync(path.join(root, 'game/merchant-settlement.js'), 'utf8').replace(/\r\n/g, '\n');
+const questSource = fs.readFileSync(path.join(root, 'game/quest-transactions.js'), 'utf8').replace(/\r\n/g, '\n');
 const sites = JSON.parse(fs.readFileSync(path.join(root, 'game/data/guild-sites.json'), 'utf8')).sites;
 const traders = JSON.parse(fs.readFileSync(path.join(root, 'game/data/merchant-traders.json'), 'utf8'));
 const block = '// MERCHANT TRADING BUNDLE BEGIN\nconst MERCHANT_TRADING = (function () {\n' +
   'const module = { exports: {} };\nconst MERCHANT_GUILD_SITES = ' + JSON.stringify(sites) + ';\n' +
   'const MERCHANT_SETTLEMENT = (function () { const module = {exports:{}};\n' + settlementSource.trimEnd() + '\nreturn module.exports;})();\n' +
+  'const QUEST_TRANSACTIONS = (function () { const module = {exports:{}};\n' + questSource.trimEnd() + '\nreturn module.exports;})();\n' +
   moduleSource.trimEnd() + '\nconst install = module.exports.installMerchantTrading;\n' +
   'module.exports.installMerchantTrading = function (env) {\n' +
   '  return install(Object.assign({}, env, { catalog: ' + JSON.stringify(traders) + ' }));\n};\n' +

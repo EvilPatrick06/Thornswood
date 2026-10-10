@@ -1,8 +1,9 @@
 'use strict';
-// Opt-in native integration: addon path and the verified 48-plugin fixture.
+// Opt-in native integration: addon path and the verified installed plugin order.
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),vm=require('node:vm');
 const {createNativeMerchantTransfer,installMerchantTrading}=require('../game/merchant-trading');
 const {createSettlement,takeEntries}=require('../game/merchant-settlement');
+const {createQuestTransactions}=require('../game/quest-transactions');
 const addon=require(path.resolve(process.argv[2]));
 const installed=JSON.parse(fs.readFileSync(process.argv[3],'utf8'));
 const root=fs.mkdtempSync(path.join(os.tmpdir(),'tw-native-settlement-'));
@@ -115,6 +116,25 @@ vm.runInContext(source.slice(source.indexOf('// NPC MERCHANT PURSES BEGIN'),sour
   assert.equal(mp.get(largeHuman,'inventory').entries.filter(x=>x.baseId===15).reduce((sum,x)=>sum+x.count,0),55);
   assert.equal(purses.read(merchantId).purse,207);
   assert.equal(mp.getSavedInventoryReceipt(largeHuman),mp.getInventoryReceipt(largeHuman));
+  // Run the production quest caller through the merchant controller's actual
+  // admission lease and the native save worker, rather than a fake CAS.
+  mp.makeProperty('thornswoodQuests',{isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
+  const quests=createQuestTransactions({mp,withInventoryMutation:panel.withQuestInventoryMutation});
+  assert.equal(quests.available(),true);
+  const questBefore=mp.get(human,'inventory'),questGold=questBefore.entries.filter(x=>x.baseId===15).reduce((n,x)=>n+x.count,0);
+  const questRecord={v:1,open:{},cool:{wolf:123456}};
+  assert.equal(quests.commit(human,null,questRecord,[{item:'f:Skyrim.esm',count:25}]).ok,true);
+  assert.deepEqual(mp.get(human,'thornswoodQuests'),questRecord);
+  assert.equal(mp.get(human,'inventory').entries.filter(x=>x.baseId===15).reduce((n,x)=>n+x.count,0),questGold+25);
+  assert.deepEqual(mp.get(human,'inventory').entries.filter(x=>x.baseId!==15),questBefore.entries.filter(x=>x.baseId!==15));
+  const questReceipt=mp.getInventoryReceipt(human);
+  assert.equal(quests.commit(human,questRecord,questRecord,[]).ok,false,'the shared lease refuses an unsaved quest receipt');
+  for(let i=0;i<600 && mp.getSavedInventoryReceipt(human)!==questReceipt;i++){mp.tick();await new Promise(resolve=>setTimeout(resolve,10));}
+  assert.equal(mp.getSavedInventoryReceipt(human),questReceipt);
+  assert.equal(quests.commit(human,null,questRecord,[{item:'f:Skyrim.esm',count:25}]).ok,false,'a stale quest record cannot pay twice');
+  assert.equal(mp.getInventoryReceipt(human),questReceipt);
+  assert.equal(panel.questReady(human),true,'saved quest receipts are accepted by merchant admission');
+  quests.shutdown();
   panel.shutdown();purses.shutdown();
   const alias=path.join(served,'private-alias');
   fs.symlinkSync(settings.privDir,alias,process.platform==='win32'?'junction':'dir');
@@ -124,7 +144,7 @@ vm.runInContext(source.slice(source.indexOf('// NPC MERCHANT PURSES BEGIN'),sour
   assert.deepEqual(fs.readFileSync(ledger),before,'a served alias must refuse writes without changing the private ledger');
   const exposed=new addon.ScampServer(JSON.stringify({...settings,privDir:path.join(served,'private')}));exposed._setSelf(exposed);
   assert.throws(()=>exposed.writePrivateEconomyLedger('merchant','exposed'),/outside|alias/,'configured dataDir must not hide the actual HTTP root');
-  console.log('PASS real addon durable ledger, profile-bound CAS, exact saved debit/credit, reload, metadata and conservation');
+  console.log('PASS real addon durable ledger, profile-bound CAS, exact saved debit/credit, reload, metadata, quest atomicity and conservation');
   process.chdir(os.tmpdir());
   // Native save storage can still hold handles: retain this isolated evidence
   // directory for inspection rather than deleting files under its worker.
