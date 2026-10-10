@@ -28,6 +28,12 @@ PREDATORS = {'wolf', 'bear', 'sabre-cat'}
 ENEMY_FACTIONS = re.compile(r'bandit|forsworn|warlock|necromancer|vampire|draugr|skeleton|'
                             r'falmer|hagraven|werewolf|dwarven|dragon|giant|riekling|'
                             r'hostile|daedra|thalmor', re.I)
+# The game's test worldspaces and interiors, and the interiors it keeps actors
+# in until a script moves them (CWTestHold, WerewolfPreload, DLC2HoldingCellBard;
+# #2067). Only worldspaces and interiors: Tamriel, Blackreach, the Soul Cairn and
+# Solstheim have real exterior cells named Test..., and a bank is a Holdings.
+TEST_WORLDS = re.compile(r'test', re.I)
+TEST_INTERIORS = re.compile(r'test|preload|holdingcell', re.I)
 HABITATS = [('sewer', 'LocTypeSewer'), ('bandit-camp', 'LocTypeBanditCamp'),
             ('giant-camp', 'LocTypeGiantCamp'), ('farm', 'LocTypeFarm'),
             ('cave', 'LocTypeCave'), ('dungeon', 'LocTypeDungeon'),
@@ -147,8 +153,16 @@ def classify(context, ref, actor):
     trait = context.npc.get(context.through(base, C.USE_TRAITS), {})
     race = context.race_edid.get(trait.get('race'), '')
     species = species_of(race)
+    # Swims and not Walks (RACE DATA flags 0x40 and 0x100, libespm's kSwims and
+    # kWalks): the race moves only in water, so the runtime keeps it there (#2067).
+    race_flags = context.t[b'RACE'].get(trait.get('race'), {}).get('raceFlags', 0)
+    swims = bool(race_flags & 0x40) and not race_flags & 0x100
+    # Bethesda names the actors that wait in a sarcophagus, an alcove or a pipe
+    # until somebody comes near ...Ambush... (LvlDraugrAmbushMelee1HMale).
+    base_edid = (context.npc.get(base) or context.lvln.get(base) or {}).get('edid', '')
     result = {'role': 'cut', 'reason': 'Ambient filler', 'habitat': habitat,
-              'location': location, 'species': species, 'keep': False}
+              'location': location, 'species': species, 'keep': False,
+              'swims': swims, 'ambush': 'ambush' in base_edid.lower()}
     def decide(role, keep, reason):
         result.update(role=role, keep=keep, reason=reason)
         return result
@@ -158,6 +172,10 @@ def classify(context, ref, actor):
         return decide('cut', False, 'Deleted or initially switched off')
     if actor.get('startsDead'):
         return decide('cut', False, 'Authored corpse, not a living encounter')
+    cell = context.cells.get(actor.get('cell'), {})
+    world = context.t[b'WRLD'].get(actor.get('world'), {}).get('edid', '')
+    if TEST_WORLDS.search(world) or (cell.get('interior') and TEST_INTERIORS.search(cell.get('edid', ''))):
+        return decide('cut', False, 'Test or holding cell, never in the world as placed')
     if base not in context.npc:
         return decide('cut', False, 'No valid NPC base')
     facts = context.factions_of(base)
@@ -256,7 +274,7 @@ def read_details(plugin, tables):
                 continue
             flags, fid = struct.unpack_from('<II', buf, at+8)
             identity = plugin.desc(fid)
-            if identity and tag in {b'NPC_', b'ACHR', b'CELL', b'ECZN', b'REFR'}:
+            if identity and tag in {b'NPC_', b'ACHR', b'CELL', b'ECZN', b'REFR', b'RACE'}:
                 if tag == b'ECZN':
                     # ECZN is not read by the cast pass: replace a losing row
                     # even when the winner is an empty deletion.
@@ -280,6 +298,10 @@ def read_details(plugin, tables):
                         row['base'] = plugin.desc(C.u32(body))
                     elif tag == b'CELL' and st == b'XEZN' and len(body) >= 4:
                         row['encounter'] = plugin.desc(C.u32(body))
+                    elif tag == b'RACE' and st == b'DATA' and len(body) >= 36:
+                        # Flags follow 14 bytes of skill boosts, 2 unknown and
+                        # four heights and weights (xEdit TES5 RACE DATA).
+                        row['raceFlags'] = C.u32(body, 32)
                     elif tag == b'ECZN' and st == b'DATA' and len(body) >= 12:
                         row['location'] = plugin.desc(C.u32(body, 4))
                         row['minimum'], row['maximum'] = body[9], body[11]
@@ -396,7 +418,10 @@ def write_runtime(payload):
         'cut': [r['ref'] for r in payload['npcs'] if not r['keep'] and r['ref'] != '14:Skyrim.esm'],
         'keep': [[r['ref'], r['base'], r['world'] or r['cell'], r['pos'], r['leash'],
                   r['returnMinutes'], r['role'], r['habitat'], r['tier'], r.get('cap'),
-                  r.get('populationBucket')] for r in payload['npcs'] if r['keep']]}
+                  r.get('populationBucket'),
+                  # 1: swims and cannot walk; 2: an ambush placement (#2067).
+                  (1 if r.get('swims') else 0) | (2 if r.get('ambush') else 0)]
+                 for r in payload['npcs'] if r['keep']]}
     target = HERE.parent.parent / 'game/gamemode.js'
     source = target.read_text(encoding='utf-8')
     begin = source.index('// NPC POPULATION DATA BEGIN')
