@@ -1547,8 +1547,6 @@ ref,name,base,hold,locationName,location,habitat,role,species,tier,cap,returnMin
 1f4ba:Dragonborn.esm,Ash Spawn,322bc:Dragonborn.esm,Solstheim,Fort Frostmoth,14293:Dragonborn.esm,dungeon,enemy,dlc2ashspawn,3,16,60,1536,142f8:Dragonborn.esm,,-157.52490234375,4380.87158203125,-208.55198669433594
 1f4c3:Dragonborn.esm,Ash Spawn,1c06d:Dragonborn.esm,Solstheim,Fort Frostmoth,14293:Dragonborn.esm,dungeon,enemy,dlc2ashspawn,3,16,60,1536,ef34:Dragonborn.esm,800:Dragonborn.esm,52192.1171875,21894.345703125,2081.541015625
 1f4ca:Dragonborn.esm,Ash Spawn,1c06d:Dragonborn.esm,Solstheim,Fort Frostmoth,14293:Dragonborn.esm,dungeon,enemy,dlc2ashspawn,3,16,60,1536,ef33:Dragonborn.esm,800:Dragonborn.esm,54007.0,24175.052734375,2567.19921875
-1f99a:Dragonborn.esm,Dragon,1ef73:Dragonborn.esm,Whiterun,open ground in CWTestHold,1b4c6:Skyrim.esm,wilderness,enemy,dragon,,4,45,1536,1b4c6:Skyrim.esm,1b44a:Skyrim.esm,3055.6083984375,1691.0921630859375,224.0
-1f99c:Dragonborn.esm,Horse,68d6d:Skyrim.esm,Whiterun,TestCWHoldStart,1b513:Skyrim.esm,wilderness,animal,horse,,6,20,1536,1b513:Skyrim.esm,1b44a:Skyrim.esm,1670.65966796875,1575.9306640625,144.41622924804688
 1f9c2:Dragonborn.esm,Majni,1dc67:Dragonborn.esm,Solstheim,Frostmoon Crag,142cb:Dragonborn.esm,dungeon,trader,nord,2,,360,1536,ee2e:Dragonborn.esm,800:Dragonborn.esm,41464.1875,57293.57421875,6843.16162109375
 1f9ea:Dragonborn.esm,Frostbite Spider,41fb5:Skyrim.esm,Solstheim,Raven Rock Mine,1429a:Dragonborn.esm,dungeon,animal,spider,4,20,90,1536,142fc:Dragonborn.esm,,6867.60400390625,-1635.07275390625,-400.1605224609375
 1fa0d:Dragonborn.esm,Frostbite Spider,41fb5:Skyrim.esm,Solstheim,Raven Rock Mine,1429a:Dragonborn.esm,dungeon,animal,spider,4,20,90,1536,142fc:Dragonborn.esm,,9839.89453125,-2589.678955078125,460.23065185546875
@@ -3046,7 +3044,6 @@ ref,name,base,hold,locationName,location,habitat,role,species,tier,cap,returnMin
 78472:Skyrim.esm,Bandit,3df53:Skyrim.esm,the Pale,Raldbthar,90576:Skyrim.esm,dungeon,enemy,imperial,2,12,45,1536,15257:Skyrim.esm,,5684.60107421875,-1660.083251953125,459.0
 7847c:Skyrim.esm,Dwarven Spider Worker,10ee4d:Skyrim.esm,the Pale,Raldbthar,90576:Skyrim.esm,dungeon,animal,spider,2,12,45,1536,15257:Skyrim.esm,,13721.1181640625,-6027.5498046875,767.1838989257812
 78485:Skyrim.esm,Bandit,1e79e:Skyrim.esm,the Pale,Raldbthar,90576:Skyrim.esm,dungeon,enemy,imperial,2,12,45,1536,15257:Skyrim.esm,,6152.197265625,-1779.31982421875,459.0
-7871c:Skyrim.esm,Werewolf,7871b:Skyrim.esm,Hjaalmarch,WerewolfPreload,1929e:Skyrim.esm,dungeon,animal,wolf,1,8,30,1536,78715:Skyrim.esm,,1775.346923828125,1921.7894287109375,195.0235595703125
 78af7:Skyrim.esm,Bandit Chief,78c13:Skyrim.esm,Hjaalmarch,Robber's Gorge,1929b:Skyrim.esm,bandit-camp,enemy,imperial,,7,45,2048,d74:Skyrim.esm,3c:Skyrim.esm,-79065.2265625,45424.59765625,-11752.5810546875
 78af8:Skyrim.esm,Bandit,78c14:Skyrim.esm,Hjaalmarch,Robber's Gorge,1929b:Skyrim.esm,bandit-camp,enemy,imperial,,7,45,2048,944c:Skyrim.esm,3c:Skyrim.esm,-80440.6953125,46139.62109375,-11939.83203125
 78b01:Skyrim.esm,Bandit,78c14:Skyrim.esm,Hjaalmarch,Robber's Gorge,1929b:Skyrim.esm,bandit-camp,enemy,imperial,,7,45,2048,d74:Skyrim.esm,3c:Skyrim.esm,-79957.9453125,46477.3671875,-11647.1142578125

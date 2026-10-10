@@ -330,7 +330,7 @@ function finishPreparation(stage) {
     advance(1000);
     const state = status();
     if(state.loadingComplete && state.preparing === 0 && state.pendingMeshes === 0 &&
-        state.active+state.unavailable === state.loaded) break;
+        state.active+state.unavailable+(state.held || 0) === state.loaded) break;
   }
   const state = status();
   console.log(JSON.stringify({stage,elapsedMs:time-start,status:state,peakRssMiB:peakRss/1048576,worst}));
@@ -340,7 +340,22 @@ function finishPreparation(stage) {
   assert.equal(state.pendingMeshes,0,'Navigation preparation must finish within five simulated minutes');
   assert.equal(controlled.size,expectedLoaded,'Every existing native NPC remains server owned, including stationary actors');
   assert.equal(observedNativeIds.size,expectedLoaded,'Native discovery and preloading must identify exactly the same cast');
-  assert.equal(state.active+state.unavailable,expectedLoaded,'Every identity is active or stationary');
+  const reasons = new Map();
+  for(const line of lines) {
+    const m = /activity unavailable: (.*)$/.exec(line);
+    if(m) reasons.set(m[1],(reasons.get(m[1]) || 0)+1);
+  }
+  console.log(JSON.stringify({stage,stationaryReasons:Object.fromEntries(reasons)}));
+  // Placed off walkable ground (#2067): set down out of sight, which with
+  // nobody connected is at once, or for an ambush, waiting until somebody is
+  // near. So with nobody connected only catalogued ambushes may still wait.
+  const waiting = runtime.getHeldIds ? runtime.getHeldIds() : [];
+  assert.equal(state.active+state.unavailable+(state.held || 0),expectedLoaded,
+    'Every identity is active, stationary or waiting off walkable ground');
+  if(populationMode) {
+    const ambushes = new Set(populationData.keep.filter(row => (row[11] || 0) & 2).map(row => server.getIdFromDesc(row[0])));
+    for(const id of waiting) assert.ok(ambushes.has(id),'Only an ambush waits with nobody near: '+id.toString(16));
+  } else assert.equal(waiting.length,0,'With nobody connected nobody else waits off walkable ground');
   for(const id of loaded) {
     assert.ok(controlled.has(id),'No loaded NPC may return to client hosting');
     const nativeState = server.getNpcAIState(id);
@@ -365,10 +380,11 @@ function proveActivity(stage) {
   moved.clear();
   acceptedAttackers.clear();
   attackAttempts.clear();
-  const stationaryPositions = new Map([...unavailable].map(id =>
+  const waiting = new Set(runtime.getHeldIds ? runtime.getHeldIds() : []);
+  const stationaryPositions = new Map([...unavailable,...waiting].map(id =>
     [id,server.get(id,'locationalData').pos.slice()]));
   const eligible = [...controlled].filter(id => {
-    if(unavailable.has(id)) return false;
+    if(unavailable.has(id) || waiting.has(id)) return false;
     const state = server.getNpcAIState(id);
     return !state.isDead && !state.isDisabled && !state.immobile;
   });
@@ -380,7 +396,7 @@ function proveActivity(stage) {
   const windowMoved = new Set(moved), windowAttackers = new Set(acceptedAttackers);
   const terminalPositions = new Map();
   for(const id of controlled) {
-    if(unavailable.has(id)) continue;
+    if(unavailable.has(id) || waiting.has(id)) continue;
     const state = server.getNpcAIState(id);
     if(state.isDead || state.isDisabled || state.immobile) {
       terminalPositions.set(id,state.pos.slice());
