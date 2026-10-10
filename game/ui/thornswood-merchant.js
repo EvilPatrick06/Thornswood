@@ -12,6 +12,8 @@
   var data = null;
   var shown = false;
   var root = null;
+  var gemChoices = {};
+  var dismissed = null;
 
   function tell(what) {
     try { window.skyrimPlatform.sendMessage('thornswood-front', 'merchant:' + what); }
@@ -20,8 +22,7 @@
   function net(line) {
     try {
       if (window.thornswoodNet && window.thornswoodNet.say) {
-        window.thornswoodNet.say(line);
-        return true;
+        return window.thornswoodNet.say(line) === true;
       }
     } catch (e) { }
     return false;
@@ -46,6 +47,10 @@
     '#' + ID + ' .line{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px;',
     '  border:1px solid rgba(198,170,109,.30);background:rgba(0,0,0,.20);margin-bottom:8px}',
     '#' + ID + ' .nm{flex:1;min-width:140px}',
+    '#' + ID + ' h3{font-size:20px;font-weight:normal;color:#f6e9c8;margin:16px 0 10px}',
+    '#' + ID + ' .quest-copy{flex:1;min-width:240px}',
+    '#' + ID + ' .quest-copy p{margin:4px 0;font-size:14px;line-height:1.5}',
+    '#' + ID + ' select{font:inherit;color:#f6e9c8;background:#17140f;border:1px solid #ac9564;padding:6px;max-width:100%}',
     '#' + ID + ' button{font-family:inherit;cursor:pointer;border:1px solid rgba(198,170,109,.55);',
     '  background:rgba(0,0,0,.25);color:#e9d19b;padding:5px 10px;font-size:15px;line-height:20px;',
     '  letter-spacing:.14em;text-transform:uppercase}',
@@ -61,7 +66,7 @@
     document.head.appendChild(style);
     root = document.createElement('div');
     root.id = ID;
-    root.innerHTML = '<div class="panel"><h2 id="' + ID + '-title">Trader</h2>' +
+    root.innerHTML = '<div class="panel" role="dialog" aria-modal="true" aria-labelledby="' + ID + '-title"><h2 id="' + ID + '-title">Trader</h2>' +
       '<div class="body" id="' + ID + '-body"></div>' +
       '<div class="foot"><span id="' + ID + '-purse"></span><span style="flex:1"></span>' +
       '<button id="' + ID + '-close">Step back</button></div></div>';
@@ -82,7 +87,36 @@
       (data.trader || 'Trader') + (data.place ? ' at ' + data.place : '');
     root.querySelector('#' + ID + '-purse').textContent = 'Purse ' + (data.purse == null ? '' : data.purse);
     var body = '';
-    if (data.note) body += '<p class="note">' + esc(data.note) + '</p>';
+    if (data.note) body += '<p class="note" role="status">' + esc(data.note) + '</p>';
+    var quests = data.quests || [];
+    if (quests.length) body += '<h3>Work from the guild</h3>';
+    for (var q = 0; q < quests.length; q++) {
+      var quest = quests[q];
+      var location = typeof quest.locations === 'string' ? quest.locations : Object.keys(quest.locations || {}).map(function(gem){
+        return gem + ': ' + quest.locations[gem];
+      }).join('; ');
+      if (quest.gem && quest.locations && typeof quest.locations === 'object') location = quest.locations[quest.gem] || location;
+      var status = quest.state === 'open' ? ('Drawn ' + quest.drawn + ' of ' + quest.holds + (quest.gem ? ', ' + quest.gem : '')) :
+        quest.state === 'cooldown' ? ('Returns in ' + quest.waitMinutes + ' minutes') : quest.state === 'locked' ? ('Requires ' + quest.who) : 'Available';
+      body += '<div class="line"><div class="quest-copy"><strong>' + esc(quest.name) + '</strong>' +
+        '<p>' + esc(location) + '</p><p>Draw up to ' + esc(quest.holds) + ', return ' + esc(quest.ask) +
+        ' to finish, and keep the rest. Returns after ' + esc(quest.hours) + ' hours.</p><p>' + esc(status) + '</p></div>';
+      if (quest.state === 'open') {
+        body += '<button data-quest="' + esc(quest.id) + '" data-action="return"' + (quest.canReturn ? '' : ' disabled') + '>Turn in work</button>' +
+          '<button data-quest="' + esc(quest.id) + '" data-action="abandon"' + (quest.canAbandon ? '' : ' disabled') + '>Give back and leave</button>';
+      } else {
+        var gems = quest.gems || [], chosen = gemChoices[quest.id] || '';
+        if (gems.length) {
+          body += '<select data-gem="' + esc(quest.id) + '" aria-label="Gem for ' + esc(quest.name) + '"' + (quest.canTake ? '' : ' disabled') + '><option value="">Choose a gem</option>';
+          for (var g = 0; g < gems.length; g++) body += '<option value="' + esc(gems[g]) + '"' + (chosen === gems[g] ? ' selected' : '') + '>' + esc(gems[g]) + '</option>';
+          body += '</select>';
+        }
+        body += '<button data-quest="' + esc(quest.id) + '" data-action="take" data-ready="' + (quest.canTake ? 'yes' : 'no') + '"' +
+          (quest.canTake && (!gems.length || chosen) ? '' : ' disabled') + '>Take work</button>';
+      }
+      body += '</div>';
+    }
+    if (quests.length) body += '<h3>Trade</h3>';
     var rows = data.offers || [];
     if (!rows.length) body += '<p class="note">No submitted price.</p>';
     for (var i = 0; i < rows.length; i++) {
@@ -109,16 +143,34 @@
     for (var b = 0; b < buttons.length; b++) {
       buttons[b].onclick = function (ev) {
         var el = ev.currentTarget;
+        var questId = el.getAttribute('data-quest');
+        if (questId) {
+          // Availability comes from the server view. Chat transport has no
+          // per-command acknowledgement, so it cannot own a pending button.
+          net('/merchant quest ' + el.getAttribute('data-action') + ' ' + questId +
+            (gemChoices[questId] ? ' ' + gemChoices[questId] : ''));
+          return;
+        }
         var verb = el.getAttribute('data-verb');
         var name = el.getAttribute('data-name');
         if (verb === 'supply') net('/merchant supply ' + name);
         else net('/merchant ' + verb + ' 1 ' + name);
       };
     }
+    var selects = host.querySelectorAll('select[data-gem]');
+    for (var c = 0; c < selects.length; c++) {
+      selects[c].onchange = function(ev) {
+        var el = ev.currentTarget, id = el.getAttribute('data-gem');
+        gemChoices[id] = el.value;
+        var take = host.querySelector('button[data-quest="' + id + '"][data-action="take"]');
+        if (take) take.disabled = take.getAttribute('data-ready') !== 'yes' || !el.value;
+      };
+    }
     tell('opened');
   }
-  function open() { draw(); }
+  function open() { dismissed=null; draw(); }
   function close() {
+    if (data && data.open !== false) dismissed=data.sessionId || 'legacy';
     if (root) root.className = '';
     if (shown) tell('closed');
     shown = false;
@@ -126,7 +178,7 @@
   function setData(next) {
     data = next || null;
     if (!data || data.open === false) close();
-    else draw();
+    else if (dismissed !== (data.sessionId || 'legacy')) draw();
   }
   window.thornswoodMerchant = { open: open, close: close, setData: setData, isOpen: function () { return shown; } };
   tell('ready');
