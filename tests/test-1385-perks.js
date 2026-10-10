@@ -48,7 +48,9 @@ if (!(progression && perks && onDeath && onHit)) {
 const clock = { t: 1700000000000 };
 const DAY = 24 * 60 * 60 * 1000;
 const world = { actors: new Map(), props: new Map(), calls: [], timers: [], logs: [], told: [], failProp: false };
-function desc(id) { return id.toString(16) + ':run'; }
+// An actor may carry its own descriptor, the way another character loaded at
+// the same ID has one (#2069).
+function desc(id) { const a = world.actors.get(id); return (a && a.desc) || id.toString(16) + ':run'; }
 function actor(id, o) {
   world.actors.set(id, Object.assign({ pid: id > 0xff000000 && id < 0xff001000 ? id - 0xff000000 : -1, dead: false,
     p: { health: 1, magicka: 1, stamina: 1 }, max: { Health: 200, Magicka: 100, Stamina: 100 },
@@ -361,6 +363,54 @@ strike(MIGHT, WOLF, 0.2, SWORD, { power: true });
 settle();
 yes('the quarter again can kill, and mp.onDeath is told whose blow it was',
   world.actors.get(WOLF).dead === true && K.killerOf(WOLF) === MIGHT && K.killerOf(WOLF) === 0);
+
+// ------------------------------------------- a replaced target (#2069) --
+// A queued Might bonus belongs to the body it was queued on. A new life or
+// another descriptor at the same ID before the flush is left alone.
+// The native life of whoever is at an ID (#2069). A replacement is a new
+// life, or another descriptor at the same ID.
+if (!mpFake.getNpcAIState) {
+  mpFake.getNpcAIState = function (id) {
+    const a = world.actors.get(id);
+    return a ? { isHuman: a.pid > 0, profileId: a.pid, lifeGeneration: a.life || 0 } : null;
+  };
+}
+function replaced(id, how) {
+  const a = world.actors.get(id);
+  if (how === 'life') { a.life = (a.life || 0) + 1; } else { a.desc = 'other' + id.toString(16) + ':run'; }
+  // Its health is what the engine left at the ID, as in the issue: the
+  // queued effect is all that could still move it.
+}
+function restored(id) { const a = world.actors.get(id); delete a.desc; }
+{
+  const by = actor(0xff000060);
+  states.set(by, filled(['might']));
+  const PERSON = actor(0xff000061);
+  for (const [name, target] of [['person', PERSON], ['creature', WOLF]]) {
+    for (const how of ['life', 'desc']) {
+      heal(target);
+      strike(by, target, 0.2, SWORD, { power: true });
+      replaced(target, how);
+      settle();
+      yes('T1 a Might bonus queued on a ' + name + ' does not land on a replacement (' + how + ')', health(target) === 0.8);
+      restored(target);
+    }
+    heal(target);
+    strike(by, target, 0.2, SWORD, { power: true });
+    settle();
+    yes('T2 on the same ' + name + ' it still lands: 0.2 becomes 0.25', health(target) === 0.75);
+    heal(target); world.actors.get(target).p.health = 0.22;
+    strike(by, target, 0.2, SWORD, { power: true });
+    settle();
+    replaced(target, 'life');
+    yes('T3 the fallback killer of a ' + name + ' is not named for a replacement life', K.killerOf(target) === 0);
+    heal(target); world.actors.get(target).p.health = 0.22;
+    strike(by, target, 0.2, SWORD, { power: true });
+    settle();
+    yes('T3 and is named for the life it killed', world.actors.get(target).dead === true && K.killerOf(target) === by);
+    heal(target);
+  }
+}
 heal(WOLF);
 
 // ------------------------------------------------------------ Lethal Aim --

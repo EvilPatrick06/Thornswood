@@ -44794,6 +44794,7 @@ log('gamemode loaded:',
     if (kind === 'spell' && mine.overcharge) { e.overcharge = true; }
     if (kind === 'bow' && mine.lethalaim) { e.aim = true; }
     if (!e.more && !e.overcharge && !e.aim) { return; }
+    e.target = targetLife(target);
     var p = pct(target);
     e.before = p ? p.health : -1;
     if (!(e.before > 0)) { return; }
@@ -44804,6 +44805,24 @@ log('gamemode loaded:',
       setTimeout((typeof guard === 'function') ? guard('perkHits', flush) : flush, 0);
     }
   }
+
+  /*
+    WHOSE BODY A QUEUED BLOW IS FOR (#2069). Queues are keyed by the target's
+    actor ID, and a new life or another character can be loaded at that ID
+    before the flush. The descriptor and native life are taken when the blow
+    is queued and asked again before the target is read or written, and a
+    blow whose target was replaced is let go. The attacker's side is #2070's.
+  */
+  function targetLife(target) {
+    var desc = null, life = null;
+    try { desc = mp.getDescFromId(target) || null; } catch (err) { desc = null; }
+    try {
+      var ai = (typeof mp.getNpcAIState === 'function') ? mp.getNpcAIState(target) : null;
+      if (ai && Number.isSafeInteger(ai.lifeGeneration)) { life = ai.lifeGeneration; }
+    } catch (err2) { life = null; }
+    return JSON.stringify([desc, life]);
+  }
+  function sameTarget(target, life) { return life !== undefined && targetLife(target) === life; }
 
   function breakSpell(target, by, spellId, t) {
     var info = spellOf(spellId);
@@ -44827,6 +44846,7 @@ log('gamemode loaded:',
       // The engine kills on this write with nobody named; mp.onDeath asks.
       if (killer) { ST.blow[target] = { by: killer.by, identity: killer.identity, at: now() }; }
     }
+    if (has(ST.blow, target) && next <= 0) { ST.blow[target].target = targetLife(target); }
     var p = pct(target);
     if (!p) { return; }
     setPct(target, next, p.magicka, p.stamina);
@@ -44839,7 +44859,8 @@ log('gamemode loaded:',
     for (var k in all) {
       if (!has(all, k)) { continue; }
       var target = Number(k);
-      var list = all[k];
+      var list = all[k].filter(function (q) { return sameTarget(target, q.target); });
+      if (!list.length) { continue; }
       var p = pct(target);
       var h = p ? p.health : -1;
       if (list.length && list[list.length - 1].after === null) { list[list.length - 1].after = h; }
@@ -44882,6 +44903,7 @@ log('gamemode loaded:',
   function killerOf(target) {
     var b = has(ST.blow, target) ? ST.blow[target] : null;
     if (!b) { return 0; }
+    if (!sameTarget(target, b.target)) { delete ST.blow[target]; return 0; }
     delete ST.blow[target];
     return (now() - b.at) < 2000 && b.identity && MERCHANT_TRADING.actorIdentity(mp, b.by) === b.identity ? b.by : 0;
   }
@@ -45761,6 +45783,7 @@ log('gamemode loaded:',
     // add, 30% back (the question to Patrick on #1398).
     e.less = shielded(target, t) + lined;
     if (!e.more && !e.less && !e.stagger) { return; }
+    e.target = targetLife(target);
     e.before = share(target, 'health');
     if (!(e.before > 0)) { rearm(e); return; }
     if (!pending[target]) { pending[target] = []; }
@@ -45770,6 +45793,24 @@ log('gamemode loaded:',
       setTimeout(guard('maneuverHits', flush), 0);
     }
   }
+
+  /*
+    WHOSE BODY A QUEUED BLOW IS FOR (#2069). Queues are keyed by the target's
+    actor ID, and a new life or another character can be loaded at that ID
+    before the flush. The descriptor and native life are taken when the blow
+    is queued and asked again before the target is read or written, and a
+    blow whose target was replaced is let go. The attacker's side is #2070's.
+  */
+  function targetLife(target) {
+    var desc = null, life = null;
+    try { desc = mp.getDescFromId(target) || null; } catch (err) { desc = null; }
+    try {
+      var ai = (typeof mp.getNpcAIState === 'function') ? mp.getNpcAIState(target) : null;
+      if (ai && Number.isSafeInteger(ai.lifeGeneration)) { life = ai.lifeGeneration; }
+    } catch (err2) { life = null; }
+    return JSON.stringify([desc, life]);
+  }
+  function sameTarget(target, life) { return life !== undefined && targetLife(target) === life; }
 
   /* A blow that took nothing gives back what it would have spent, while its
      window is still open. */
@@ -45792,6 +45833,7 @@ log('gamemode loaded:',
       // The engine kills on this write with nobody named; mp.onDeath asks.
       if (killer) { ST.blow[target] = { by: killer.by, identity: killer.identity, at: now() }; }
     }
+    if (has(ST.blow, target) && next <= 0) { ST.blow[target].target = targetLife(target); }
     try {
       var p = mp.get(target, 'percentages');
       mp.set(target, 'percentages', { health: next, magicka: Number(p.magicka), stamina: Number(p.stamina) });
@@ -45826,7 +45868,9 @@ log('gamemode loaded:',
     for (var k in all) {
       if (!has(all, k)) { continue; }
       var target = Number(k);
-      var list = all[k];
+      // A blow for a replaced target lands on nobody: what it spent comes back.
+      var list = all[k].filter(function (q) { if (sameTarget(target, q.target)) { return true; } rearm(q); return false; });
+      if (!list.length) { continue; }
       var h = share(target, 'health');
       if (list.length && list[list.length - 1].after === null) { list[list.length - 1].after = h; }
       var change = 0, killer = 0, stagger = false;
@@ -45850,6 +45894,7 @@ log('gamemode loaded:',
   function killerOf(target) {
     var b = has(ST.blow, target) ? ST.blow[target] : null;
     if (!b) { return 0; }
+    if (!sameTarget(target, b.target)) { delete ST.blow[target]; return 0; }
     delete ST.blow[target];
     return (now() - b.at) < 2000 && b.identity && MERCHANT_TRADING.actorIdentity(mp, b.by) === b.identity ? b.by : 0;
   }
