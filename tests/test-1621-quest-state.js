@@ -63,7 +63,7 @@ function form(id) {
   return forms[id];
 }
 function have(id, item) { return (forms[id] && forms[id].inv[item]) || 0; }
-const fault = { read: null, write: false, noAdd: [] };
+const fault = { read: null, write: false, noAdd: [], throwAdd: [] };
 const said = [];
 function lastSaid() { return said.length ? said[said.length - 1] : ''; }
 
@@ -110,6 +110,7 @@ function boot(into) {
     getDescFromId: function () { return ''; }
   };
   ctx.addItem = function (a, item, n) {
+    if (fault.throwAdd.indexOf(item) >= 0) throw new Error('native inventory write failed');
     if (fault.noAdd.indexOf(item) >= 0) { return false; }
     const f = form(a);
     f.inv[item] = (f.inv[item] || 0) + n;
@@ -121,10 +122,30 @@ function boot(into) {
     f.inv[item] -= n;
     return true;
   };
+  ctx.MERCHANT_TRADING = {createQuestTransactions: function () {
+    return {identity: function (a) { return ctx.__identityToken || 'actor:' + a; }, shutdown: function () {},available:function(){return true;},
+      commit: function (a, expected, next, changes) {
+        if (fault.write) throw new Error('the write was refused');
+        const current = form(a);
+        if (JSON.stringify(current.props[PROP] || null) !== JSON.stringify(expected)) return {ok:false};
+        const pack = JSON.parse(JSON.stringify(current.inv));
+        for (const change of changes) {
+          if (fault.throwAdd.indexOf(change.item) >= 0 && change.count > 0) throw new Error('native inventory write failed');
+          if (fault.noAdd.indexOf(change.item) >= 0 && change.count > 0) return {ok:false};
+          const count = (pack[change.item] || 0) + change.count;
+          if (count < 0) return {ok:false};
+          pack[change.item] = count;
+        }
+        // The native boundary publishes a single complete character snapshot.
+        forms[a] = {inv:pack,props:Object.assign({},current.props,{[PROP]:JSON.parse(JSON.stringify(next))})};
+        return {ok:true};
+      }
+    };
+  }};
+  ctx.__thornswoodMerchantTrade={nativeReady:function(){return true;},questReady:function(){return true;}};
   ctx.globalThis = ctx;
   ctx.__thornswoodCharacter = { rankOf: function (a, key) { return ranks[a + ':' + key] || ''; } };
   ctx.__thornswoodDungeonLoot = { GOLD_DESC: 'f:Skyrim.esm' };
-  ctx.__thornswoodQuests = undefined;
   if (!into) { vm.createContext(ctx); }
   vm.runInContext(block, ctx);
   return { svc: ctx.__thornswoodQuests, ctx: ctx, logged: logged };
@@ -288,7 +309,7 @@ unread({ v: 2, open: {}, cool: {} }, 'a record of another shape');
   fault.write = true;
   w.svc.mineRare(8, here[0], EBONY);
   fault.write = false;
-  yes('a draw that cannot be written hands over no ore', /could not be written/.test(lastSaid()) && have(8, EBONY.ore) === 0 &&
+  yes('a draw that cannot be written hands over no ore', /could not be committed/.test(lastSaid()) && have(8, EBONY.ore) === 0 &&
       forms[8].props[PROP].open.ebony.drawn === 0);
   for (let i = 0; i < 4; i++) { w.svc.mineRare(8, here[0], EBONY); }
   fault.write = true;
@@ -306,7 +327,7 @@ unread({ v: 2, open: {}, cool: {} }, 'a record of another shape');
   w.svc.mineRare(8, here[0], EBONY);
   fault.noAdd = [];
   yes('ore the load order cannot hand over is not counted as drawn',
-      /nothing in this load order/.test(lastSaid()) && forms[8].props[PROP].open.ebony.drawn === 4 && have(8, EBONY.ore) === 4);
+      /could not be committed/.test(lastSaid()) && forms[8].props[PROP].open.ebony.drawn === 4 && have(8, EBONY.ore) === 4);
   w.svc.walkAway(8, 'ebony');
 }
 {
@@ -327,8 +348,8 @@ unread({ v: 2, open: {}, cool: {} }, 'a record of another shape');
   fault.noAdd = ['f:Skyrim.esm'];
   const t = w.svc.turnIn(9, 'wolf');
   fault.noAdd = [];
-  yes('gold that cannot be handed over opens the quest again, with no cooldown',
-      t.why === 'gold' && forms[9].props[PROP].open.wolf.kills === 1 && !forms[9].props[PROP].cool.wolf);
+  yes('gold that cannot be handed over leaves the quest open, with no cooldown',
+      t.why === 'unwritten' && forms[9].props[PROP].open.wolf.kills === 1 && !forms[9].props[PROP].cool.wolf);
   fault.write = true;
   const t2 = w.svc.turnIn(9, 'wolf');
   fault.write = false;
@@ -336,8 +357,43 @@ unread({ v: 2, open: {}, cool: {} }, 'a record of another shape');
   yes('and written, it pays the 25 once', w.svc.turnIn(9, 'wolf').ok === true && have(9, 'f:Skyrim.esm') === 25);
 }
 
+// A native inventory setter can throw instead of returning false. The
+// quest and its payment must remain one state, including after restart.
+{
+  w = restart();
+  w.svc.bindPlace('wolf', { cell: 'pad-1' });
+  w.svc.offer(30, 'wolf');
+  forms[30].props[PROP].open.wolf.kills = 1;
+  fault.throwAdd = ['f:Skyrim.esm'];
+  try { w.svc.turnIn(30, 'wolf'); } catch (error) { /* observe saved state below */ }
+  fault.throwAdd = [];
+  w = restart();
+  const saved = forms[30].props[PROP];
+  yes('a thrown inventory write cannot save the cooldown without its scene reward',
+      !!saved.open.wolf && !saved.cool.wolf && have(30, 'f:Skyrim.esm') === 0);
+}
+
 // ------------------------------------------------------- a hot reload ----
 {
+  ranks['31:miner']='master';w=restart();w.svc.offer(31,'ebony');
+  let finish;
+  w.ctx.swing=function(a,anim,done){finish=done;};
+  const old=w.svc;
+  old.mineRare(31,here[0],EBONY);
+  boot(w.ctx);
+  finish();
+  yes('a mining callback from the old controller cannot draw after reload',have(31,EBONY.ore)===0);
+}
+{
+  ranks['32:miner']='master';w=restart();w.svc.offer(32,'ebony');
+  let finish;
+  w.ctx.swing=function(a,anim,done){finish=done;};
+  w.ctx.__identityToken='original';w.svc.mineRare(32,here[0],EBONY);
+  w.ctx.__identityToken='replacement';finish();
+  yes('a delayed mining callback cannot draw for a replacement identity',have(32,EBONY.ore)===0);
+}
+{
+  w=restart();
   const ctx = w.ctx;
   const again = boot(ctx);
   yes('a hot reload starts the service again over the property the first load made',
@@ -347,6 +403,13 @@ unread({ v: 2, open: {}, cool: {} }, 'a record of another shape');
 }
 
 // ------------------------------------------------------- the pages -------
+{
+  ranks['33:miner']='master';w=restart();
+  yes('the trader describes the four authored mine quests',typeof w.svc.describe==='function' &&
+      w.svc.describe(33).length===4);
+  yes('unbound scarce locations cannot be taken from the trader panel',typeof w.svc.act==='function' &&
+      w.svc.act(33,'take','pearl').why==='unbound');
+}
 function whereThis(md) {
   const at = md.indexOf('## Where this is');
   return at < 0 ? '' : md.slice(at).replace(/\s+/g, ' ');

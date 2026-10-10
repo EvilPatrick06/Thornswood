@@ -62492,6 +62492,8 @@ function createSettlement(deps) {
       var expected = inventory(transfer.inventory(offer.humanId));
       if (!equal(expected, offer.expected)) return {accepted:false,done:false,reason:'Your inventory changed. Choose the trade again.'};
       var receipt = transfer.receipt(offer.humanId), sequence = sequenceOf(receipt, human) + 1;
+      if (transfer.saved(offer.humanId) !== receipt)
+        return {accepted:false,done:false,reason:'Your previous inventory change is waiting on the save.'};
       if (!Number.isSafeInteger(sequence + 1)) throw new Error('Inventory receipt sequence is exhausted.');
       var pending = {version:2,id:world + ':' + state.reference + ':' + (state.revision || 0),world:world,
         reference:state.reference,base:state.base,human:human,kind:offer.kind,phase:'debit',
@@ -62535,11 +62537,114 @@ function createSettlement(deps) {
       return changed;
     } finally { busy = false; }
   }
-  return {begin:begin,tick:tick,available:available,pruneSupplyHistory:pruneSupplyHistory,shutdown:function () { active=false; }};
+  function withInventoryMutation(actorId,change) {
+    if(!available() || busy)return {ok:false,why:'unavailable'};
+    busy=true;
+    try {
+      var human=transfer.identity(actorId);
+      if(!human || !admitted(human,''))return {ok:false,why:'waiting'};
+      if(transfer.saved(actorId)!==transfer.receipt(actorId))return {ok:false,why:'waiting'};
+      if(!active)return {ok:false,why:'unavailable'};
+      return change(human,function(){return active;});
+    } finally {busy=false;}
+  }
+  function canInventoryMutation(actorId) {
+    if(!available() || busy)return false;
+    var human=transfer.identity(actorId);
+    return !!human && admitted(human,'') && transfer.saved(actorId)===transfer.receipt(actorId);
+  }
+  return {begin:begin,tick:tick,available:available,pruneSupplyHistory:pruneSupplyHistory,
+    withInventoryMutation:withInventoryMutation,canInventoryMutation:canInventoryMutation,shutdown:function () { active=false; }};
 }
 
 module.exports = {createSettlement:createSettlement,inventory:inventory,takeEntries:takeEntries,
   addEntries:addEntries,metadataKey:metadataKey,MAX_PENDING:MAX_PENDING};
+return module.exports;})();
+const QUEST_TRANSACTIONS = (function () { const module = {exports:{}};
+'use strict';
+var inventoryTools=typeof MERCHANT_SETTLEMENT!=='undefined'?MERCHANT_SETTLEMENT:require('./merchant-settlement');
+function same(a,b) {
+  if(a===b)return true;
+  if(!a || !b || typeof a!=='object' || typeof b!=='object' || Array.isArray(a)!==Array.isArray(b))return false;
+  var left=Object.keys(a).sort(),right=Object.keys(b).sort();
+  return left.length===right.length && left.every(function(key,i){return key===right[i] && same(a[key],b[key]);});
+}
+function createQuestTransactions(deps) {
+  var mp=deps.mp,active=true,property='thornswoodQuests';
+  var log=deps.log || function(){};
+  function available() {
+    return active && typeof deps.withInventoryMutation==='function' && !!mp &&
+      ['compareAndSetInventoryAndProperty','getInventoryReceipt','getSavedInventoryReceipt',
+        'get','getIdFromDesc','getDescFromId','getNpcAIState'].every(function(key){return typeof mp[key]==='function';});
+  }
+  function identity(actor) {
+    if(!active)return null;
+    var ai=mp.getNpcAIState(actor),desc=mp.getDescFromId(actor);
+    if(!ai || !ai.isHuman || !Number.isInteger(ai.profileId) || ai.profileId<=0 ||
+        !Number.isSafeInteger(ai.lifeGeneration) || ai.lifeGeneration<0 || !desc)return null;
+    return JSON.stringify({desc:desc,profileId:ai.profileId,life:ai.lifeGeneration});
+  }
+  function commit(actor,expectedRecord,nextRecord,changes) {
+    if(!available())return {ok:false,why:'unavailable'};
+    try {
+      // Match the addon's JSON boundary, including omitted optional fields.
+      nextRecord=JSON.parse(JSON.stringify(nextRecord));
+      return deps.withInventoryMutation(actor,function(human,stillActive){
+        if(!available() || !stillActive())return {ok:false,why:'unavailable'};
+        var token=identity(actor);
+        if(!token)return {ok:false,why:'identity'};
+        var owner=JSON.parse(token);
+        if(owner.desc!==human.desc || owner.profileId!==human.profileId)return {ok:false,why:'identity'};
+        var receipt=mp.getInventoryReceipt(actor);
+        if(mp.getSavedInventoryReceipt(actor)!==receipt)return {ok:false,why:'waiting'};
+        var oldReceipt=JSON.parse(receipt),sequence=1;
+        if(oldReceipt!==null) {
+          if(!oldReceipt || Object.keys(oldReceipt).length!==3 || oldReceipt.actor!==human.desc ||
+              oldReceipt.profile!==human.profileId || !Number.isSafeInteger(oldReceipt.sequence) || oldReceipt.sequence<1)
+            throw new Error('Quest inventory receipt cannot be verified.');
+          sequence=oldReceipt.sequence+1;
+        }
+        if(!Number.isSafeInteger(sequence))throw new Error('Quest inventory receipt sequence is exhausted.');
+        var before=inventoryTools.inventory(mp.get(actor,'inventory')),next=before;
+        changes.forEach(function(change){
+          if(!Number.isSafeInteger(change.count) || change.count===0)throw new Error('Invalid quest goods.');
+          var baseId=mp.getIdFromDesc(change.item);
+          if(!Number.isInteger(baseId) || baseId<=0 || baseId>0xffffffff)throw new Error('Quest goods are unavailable.');
+          next=change.count<0?inventoryTools.takeEntries(next,baseId,-change.count).inventory:
+            inventoryTools.addEntries(next,[{baseId:baseId,count:change.count}]);
+        });
+        var nextReceipt=JSON.stringify({actor:human.desc,profile:human.profileId,sequence:sequence});
+        if(!stillActive() || !available() || identity(actor)!==token)return {ok:false,why:'identity'};
+        try {
+          var changed=mp.compareAndSetInventoryAndProperty(actor,before,receipt,next,sequence,human.profileId,
+            {name:property,expected:expectedRecord===undefined?null:expectedRecord,replacement:nextRecord});
+          return {ok:changed===true,why:changed===true?'':'changed'};
+        } catch(error) {
+          // Publication can fail after the atomic live edit. Read back that
+          // identity and receipt; never compensate, replay, or infer a save.
+          try {
+            if(identity(actor)===token) {
+              var live=mp.getInventoryReceipt(actor),record=mp.get(actor,property);
+              if(live===nextReceipt && same(record,nextRecord))return {ok:true};
+              if(live===receipt && same(record==null?null:record,expectedRecord==null?null:expectedRecord)) {
+                log('quest transaction refused: '+String(error));
+                return {ok:false,why:'unwritten'};
+              }
+            }
+          } catch(readError) {log('quest transaction readback failed: '+String(readError));}
+          active=false;
+          log('quest transaction outcome is unknown; service revoked: '+String(error));
+          return {ok:false,why:'unavailable'};
+        }
+      });
+    } catch(error) {
+      log('quest transaction unavailable: '+String(error));
+      return {ok:false,why:'unwritten'};
+    }
+  }
+  return {commit:commit,identity:identity,available:available,shutdown:function(){active=false;}};
+}
+module.exports={createQuestTransactions:createQuestTransactions};
 return module.exports;})();
 'use strict';
 
@@ -62590,6 +62695,7 @@ function guildSite(bookHold) {
 }
 
 var SETTLEMENT = typeof MERCHANT_SETTLEMENT !== 'undefined' ? MERCHANT_SETTLEMENT : require('./merchant-settlement');
+var QUEST_TRANSFER = typeof QUEST_TRANSACTIONS !== 'undefined' ? QUEST_TRANSACTIONS : require('./quest-transactions');
 
 function createNativeMerchantTransfer(mp) {
   return {
@@ -62690,6 +62796,17 @@ function createMerchantTrading(deps) {
     return Number(profileId) > 0 && Number(profileId) === Number(human.profileId);
   }
 
+  function sessionIdentity(human) {
+    if (!human || !human.isHuman || !Number.isSafeInteger(human.profileId) || human.profileId<=0 ||
+        typeof human.desc!=='string' || !human.desc || !Number.isSafeInteger(human.lifeGeneration) || human.lifeGeneration<0) return null;
+    return JSON.stringify([human.desc,human.profileId,human.lifeGeneration]);
+  }
+
+  function questView(actorId) {
+    var quests=typeof deps.quests==='function' && deps.quests();
+    return quests ? quests.describe(actorId) : [];
+  }
+
   function supplyKey(human, itemName) {
     return JSON.stringify([human.desc, human.profileId, itemName.toLowerCase()]);
   }
@@ -62730,7 +62847,7 @@ function createMerchantTrading(deps) {
       var ready = !!owns && !state.pending && state.purse >= pay && (!last || at - last >= SUPPLY_WAIT);
       supply.push({ name: offers[k].name, pay: pay, count: SUPPLY_COUNT, ready: ready });
     }
-    return {
+    var view = {
       open: true,
       transfer: settlement.available(),
       trader: place.name || 'Trader',
@@ -62739,21 +62856,32 @@ function createMerchantTrading(deps) {
       purse: state.purse,
       offers: offers,
       supply: supply,
+      quests: questView(actorId),
       note: note || (settlement.available()
         ? ''
         : 'Buying and selling wait on the native transfer. Nothing has moved.')
     };
+    var session=sessions.get(profileId);
+    if (session && session.actorId===actorId) session.quests=JSON.stringify(view.quests);
+    return view;
   }
 
   function recover() {
     if (!active) return [];
     var changed = settlement.tick(), views = [];
     sessions.forEach(function (session, profileId) {
-      if (changed.indexOf(session.merchantId) < 0) return;
-      var human = transfer.identity(session.actorId);
-      if (!human || human.profileId !== profileId) {sessions.delete(profileId); return;}
+      var reached=inReach(session.actorId,session.merchantId);
+      if (!reached.ok || !authed(profileId,reached.human) || sessionIdentity(reached.human)!==session.identity) {
+        sessions.delete(profileId); views.push({actorId:session.actorId,view:{open:false}}); return;
+      }
+      var quests=JSON.stringify(questView(session.actorId));
+      if (changed.indexOf(session.merchantId) < 0 && quests===session.quests) return;
       var state = purses.read(session.merchantId), place = state && placeOf(state.reference);
-      if (state && place) views.push({actorId:session.actorId,view:viewFor(session.merchantId,state,place,session.actorId,profileId)});
+      if (state && place) {
+        var view=viewFor(session.merchantId,state,place,session.actorId,profileId);
+        session.quests=JSON.stringify(view.quests);
+        views.push({actorId:session.actorId,view:view});
+      }
     });
     return views;
   }
@@ -62802,6 +62930,8 @@ function createMerchantTrading(deps) {
       var reached = inReach(actorId, merchantId);
       if (!reached.ok) return fail(reached.reason, { open: false });
       if (!authed(profileId, reached.human)) return fail('That request is not yours.');
+      var identity=sessionIdentity(reached.human);
+      if (!identity) return fail('This character is unavailable.', {open:false});
       var state = purses.prepare(merchantId);
       if (!state) return fail('That is not a guild trader.');
       var place = placeOf(state.reference);
@@ -62810,8 +62940,8 @@ function createMerchantTrading(deps) {
       }
       var prior = sessions.get(profileId);
       var repeat = prior && prior.merchantId === merchantId && (now() - prior.at) < 3000;
-      sessions.set(profileId, { merchantId: merchantId, actorId:actorId, at: now() });
       var opened = viewFor(merchantId, state, place, actorId, profileId);
+      sessions.set(profileId, { merchantId: merchantId, actorId:actorId, identity:identity, quests:JSON.stringify(opened.quests), at: now() });
       return {
         text: repeat ? '' : (opened.transfer
           ? ('Trading with ' + opened.trader + ' in ' + opened.place + '. Purse ' + opened.purse + '.')
@@ -62822,12 +62952,35 @@ function createMerchantTrading(deps) {
 
     merchantId = sessionMerchant(profileId);
     if (!merchantId) return fail('Press E on a guild trader.');
+    if (sessions.get(profileId).actorId !== actorId) {
+      sessions.delete(profileId);
+      return fail('Press E on a guild trader with this character.', {open:false});
+    }
     var again = inReach(actorId, merchantId);
     if (!again.ok) {
       sessions.delete(profileId);
       return fail(again.reason, { open: false });
     }
     if (!authed(profileId, again.human)) return fail('That request is not yours.');
+    if (sessionIdentity(again.human)!==sessions.get(profileId).identity) {
+      sessions.delete(profileId);
+      return fail('Press E on a guild trader with this character.', {open:false});
+    }
+    if (verb === 'quest') {
+      var quests = typeof deps.quests==='function' && deps.quests();
+      if (!quests) return fail('Quest work is unavailable.');
+      if (parts.length<4 || parts.length>5) return fail('Choose the work in the trader panel.');
+      var result=quests.act(actorId,String(parts[2]),String(parts[3]),parts[4],merchantId);
+      var reasons={class:'This work takes a different class.',rank:'This work takes a higher rank.',
+        cooldown:'This work is still resting.',open:'You already hold this work.',gem:'Choose a gem first.',
+        short:'You have not drawn enough to turn this work in.',none:'You do not hold this work.',
+        unbound:'This work has no appointed place yet.',unwritten:'The work could not be committed just now.',
+        unavailable:'Quest work is unavailable.'};
+      var text=result.ok ? (parts[2]==='take'?'You take the work.':parts[2]==='return'?'The work is turned in.':'You give back what you drew and leave the work.') :
+        reasons[result.why] || 'The work could not be changed.';
+      var questState=purses.prepare(merchantId),questPlace=questState && placeOf(questState.reference);
+      return fail(text,questState && questPlace ? viewFor(merchantId,questState,questPlace,actorId,profileId,text) : {open:false});
+    }
     if (verb === 'buy' || verb === 'sell' || verb === 'supply') {
       return trade(actorId, profileId, merchantId, verb, parts.slice(2));
     }
@@ -62939,6 +63092,8 @@ function createMerchantTrading(deps) {
     activate: activate,
     recover: recover,
     nativeReady: function () { return settlement.available(); },
+    withQuestInventoryMutation: function(actorId,change) {return settlement.withInventoryMutation(actorId,change);},
+    questReady: function(actorId) {return settlement.canInventoryMutation(actorId);},
     shutdown: function () { active=false; sessions.clear(); settlement.shutdown(); },
     REACH: REACH,
     SUPPLY_COUNT: SUPPLY_COUNT,
@@ -62999,6 +63154,8 @@ function installMerchantTrading(env) {
         return {
           pos: pos,
           cell: cell,
+          desc: mp.getDescFromId(id),
+          lifeGeneration: ai && ai.lifeGeneration,
           profileId: ai && ai.profileId || 0,
           isHuman: !!(ai && ai.isHuman)
         };
@@ -63015,6 +63172,7 @@ function installMerchantTrading(env) {
       }
     },
     places: doc.byRef || {},
+    quests: function () { return g.__thornswoodQuests; },
     resolve: function (name) {
       var fn = g.__thornswoodResolveItem;
       if (typeof fn !== 'function') return null;
@@ -63070,6 +63228,7 @@ function installMerchantTrading(env) {
 module.exports = {
   createMerchantTrading: createMerchantTrading,
   createNativeMerchantTransfer: createNativeMerchantTransfer,
+  createQuestTransactions: QUEST_TRANSFER.createQuestTransactions,
   installMerchantTrading: installMerchantTrading,
   bookHoldOf: bookHoldOf,
   guildSite: guildSite,
@@ -63217,6 +63376,7 @@ try {
 
   function createCustomQuests(deps) {
     deps = deps || {};
+    var active = true;
     var GOLD_DESC = deps.goldDesc;
     var places = {};
     var rankOf = deps.rankOf || function () { return ''; };
@@ -63232,20 +63392,19 @@ try {
       Nothing else holds it, so what the server enforces is what a restart
       reads.
 
-      Each step reads the record and writes it before it hands anything over:
-      a draw is counted before the ore is in the pack, and a turn-in or a walk
-      away takes the goods before the record lets go of them. A step that
-      cannot be written changes nothing, and goods it had already moved go
-      back where they were.
+      Inventory steps commit the complete next pack and quest record together.
+      No intermediate save can close a quest without its reward, or count a
+      draw without its goods. There is no compensating add, take or reopen.
     */
-    if (typeof deps.load !== 'function' || typeof deps.save !== 'function') {
+    if (typeof deps.load !== 'function' || typeof deps.save !== 'function' ||
+        typeof deps.commit !== 'function' || typeof deps.identity !== 'function') {
       throw new Error('the custom quests have nowhere on the character to keep them');
     }
     var note = deps.log || function () {
       console.log('[quests] ' + Array.prototype.join.call(arguments, ' '));
     };
     var UNREAD = 'Your quests could not be read just now, so nothing changed. Tell staff with /helpme.';
-    var UNWRITTEN = 'Your quests could not be written just now, so nothing changed. Tell staff with /helpme.';
+    var UNWRITTEN = 'Quest work could not be committed just now. Tell staff with /helpme.';
     var traders = new Set();
     try {
       var data = (typeof NPC_POPULATION_DATA !== 'undefined') ? NPC_POPULATION_DATA : null;
@@ -63271,12 +63430,13 @@ try {
       cooldown and forget what was drawn.
     */
     function questsOf(actor) {
+      if (!active) return null;
       var raw;
       try { raw = deps.load(actor); } catch (e) {
         note('could not read the quests of', actor + ':', e);
         return null;
       }
-      var out = { open: {}, cool: {} };
+      var out = { open: {}, cool: {}, expected: raw === undefined ? null : raw };
       if (raw === undefined || raw === null) return out;
       if (typeof raw !== 'object' || raw.v !== 1) {
         note('the quests on', actor, 'are not a quest record, so nothing is written over them');
@@ -63301,9 +63461,12 @@ try {
       });
       return out;
     }
-    function keep(actor, b) {
+    function keep(actor, b, changes) {
       try {
-        deps.save(actor, { v: 1, open: b.open, cool: b.cool });
+        if (!active) return false;
+        var next = { v: 1, open: b.open, cool: b.cool };
+        if (changes) return deps.commit(actor, b.expected, next, changes).ok === true;
+        deps.save(actor, next);
         return true;
       } catch (e) {
         note('could not write the quests of', actor + ', so nothing changed:', e);
@@ -63387,22 +63550,14 @@ try {
     function giveRare(actor, refrId, seam) {
       var b = questsOf(actor);
       var shut = rareShut(actor, refrId, seam, b);
-      if (shut) return shut;
+      if (shut) return { ok: false, text: shut };
       var id = RARE[seam.name];
       var row = byId[id];
       var open = b.open[id];
-      var was = open.itemDesc;
       open.drawn += 1;
       open.itemDesc = seam.ore;
-      if (!keep(actor, b)) return UNWRITTEN;
-      if (!deps.addItem(actor, seam.ore, 1)) {
-        open.drawn -= 1;
-        open.itemDesc = was;
-        keep(actor, b);
-        return 'The seam gives up ' + seam.name + ' and there is nothing in this load order to put in your hands.';
-      }
-      if (open.drawn >= row.holds) return 'That is all this place will give you.';
-      return '';
+      if (!keep(actor, b, [{item: seam.ore, count: 1}])) return { ok: false, text: UNWRITTEN };
+      return { ok: true, text: open.drawn >= row.holds ? 'That is all this place will give you.' : '' };
     }
     function mineRare(actor, refrId, seam) {
       var classGateFn = deps.classGate || classGate;
@@ -63423,12 +63578,17 @@ try {
       if (tool) return tool;
       var shut = rareShut(actor, refrId, seam, questsOf(actor));
       if (shut) return shut;
+      if (deps.ready && !deps.ready(actor)) return 'Quest work is waiting on a saved inventory change.';
       if (miningFn(actor)) { stopMiningFn(actor); return 'You put the pick down.'; }
       if (swingingFn(actor)) return '';
       var pick = toolIdFn(actor, 'miner');
+      var original = deps.identity(actor);
+      if (!original) return UNREAD;
       swingFn(actor, anim, function () {
-        var line = giveRare(actor, refrId, seam);
-        if (line) { notifyFn(actor, line); sayFn(actor, line); }
+        if (!active || deps.identity(actor) !== original) return;
+        var result = giveRare(actor, refrId, seam);
+        if (result.text) { notifyFn(actor, result.text); sayFn(actor, result.text); }
+        if (!result.ok) return;
         try { creditFn(actor, 'mine'); } catch (e) {}
         try { wearFn(actor, 'miner'); } catch (e) {}
       }, { tool: pick });
@@ -63439,14 +63599,9 @@ try {
       if (!b) return { ok: false, why: 'unread' };
       var open = b.open[id];
       if (!open) return { ok: false, why: 'none' };
-      if (open.drawn > 0) {
-        if (!deps.takeItem(actor, open.itemDesc, open.drawn)) return { ok: false, why: 'goods' };
-      }
+      var changes = open.drawn > 0 ? [{item: open.itemDesc, count: -open.drawn}] : [];
       delete b.open[id];
-      if (!keep(actor, b)) {
-        if (open.drawn > 0) deps.addItem(actor, open.itemDesc, open.drawn);
-        return { ok: false, why: 'unwritten' };
-      }
+      if (!keep(actor, b, changes)) return { ok: false, why: 'unwritten' };
       return { ok: true };
     }
     function turnIn(actor, id, traderRef) {
@@ -63456,29 +63611,10 @@ try {
       var open = row && b.open[id];
       if (!row || !open) return { ok: false, why: 'none' };
       if (!row.scarce && row.kind !== 'retrieval' && row.kind !== 'kill') return { ok: false, why: 'unknown' };
-      /*
-        Finished is the quest closed and its cooldown stamped, in one write.
-        Goods are taken before that write and gold is handed over after it,
-        so a write that fails gives the goods back, and gold that cannot be
-        handed over opens the quest again.
-      */
-      function finish() {
-        delete b.open[id];
-        b.cool[id] = deps.now() + row.hours * HOUR;
-        return keep(actor, b);
-      }
-      function reopen() {
-        b.open[id] = open;
-        delete b.cool[id];
-        keep(actor, b);
-      }
+      var changes = [];
       if (row.scarce) {
         if (open.drawn < row.ask) return { ok: false, why: 'short' };
-        if (!deps.takeItem(actor, open.itemDesc, row.ask)) return { ok: false, why: 'goods' };
-        if (!finish()) {
-          deps.addItem(actor, open.itemDesc, row.ask);
-          return { ok: false, why: 'unwritten' };
-        }
+        changes.push({item: open.itemDesc, count: -row.ask});
       } else if (row.kind === 'retrieval') {
         if (open.drawn < 1) return { ok: false, why: 'short' };
         var place = places[id] || {};
@@ -63486,24 +63622,14 @@ try {
           var hold = deps.traderHold ? deps.traderHold(traderRef) : '';
           if (!place.handoffHold || hold !== place.handoffHold) return { ok: false, why: 'hold' };
         }
-        if (!deps.takeItem(actor, open.itemDesc, 1)) return { ok: false, why: 'goods' };
-        if (!finish()) {
-          deps.addItem(actor, open.itemDesc, 1);
-          return { ok: false, why: 'unwritten' };
-        }
-        if (!deps.addItem(actor, GOLD_DESC, row.gold)) {
-          deps.addItem(actor, open.itemDesc, 1);
-          reopen();
-          return { ok: false, why: 'gold' };
-        }
+        changes.push({item: open.itemDesc, count: -1}, {item: GOLD_DESC, count: row.gold});
       } else {
         if (open.kills < row.count) return { ok: false, why: 'short' };
-        if (!finish()) return { ok: false, why: 'unwritten' };
-        if (!deps.addItem(actor, GOLD_DESC, row.gold)) {
-          reopen();
-          return { ok: false, why: 'gold' };
-        }
+        changes.push({item: GOLD_DESC, count: row.gold});
       }
+      delete b.open[id];
+      b.cool[id] = deps.now() + row.hours * HOUR;
+      if (!keep(actor, b, changes)) return { ok: false, why: 'unwritten' };
       return { ok: true, gold: row.scarce ? 0 : row.gold };
     }
     function noteKill(killer, victim) {
@@ -63544,13 +63670,7 @@ try {
         if (place.cell && cell !== place.cell) return;
         open.drawn = 1;
         open.itemDesc = place.item;
-        if (!keep(actor, held)) { said = UNWRITTEN; return; }
-        if (!deps.addItem(actor, place.item, 1)) {
-          open.drawn = 0;
-          open.itemDesc = null;
-          keep(actor, held);
-          return;
-        }
+        if (!keep(actor, held, [{item: place.item, count: 1}])) { said = UNWRITTEN; return; }
         said = 'You take it.';
       });
       return said;
@@ -63562,9 +63682,42 @@ try {
     function isTrader(refrId) {
       return traders.has(descOf(refrId));
     }
+    var mineNames = {
+      ebony: 'Raven Rock Mine', stalhrim: 'Kolbjorn Barrow', heartstone: 'Coldcinder Cave',
+      gem: {Ruby: 'White Ridge Sanctum', Sapphire: 'Highpoint Tower', Emerald: 'Kolbjorn Barrow', Amethyst: 'Highpoint Tower'}
+    };
+    function bound(row) {
+      var place = places[row.id];
+      return !!place && !!(row.gems ? place.cells && row.gems.every(function(gem){return !!place.cells[gem];}) : place.cell);
+    }
+    function describe(actor) {
+      var held = questsOf(actor);
+      if (!held) return [];
+      var ready = active && (!deps.ready || deps.ready(actor));
+      return SCARCE.filter(bound).map(function(row){
+        var open = held.open[row.id], gate = qualify(actor,row), until = held.cool[row.id] || 0;
+        var state = open ? 'open' : until > deps.now() ? 'cooldown' : gate.ok ? 'available' : 'locked';
+        var location = mineNames[row.id] || '';
+        return {id:row.id,name:row.name,who:row.who,ask:row.ask,holds:row.holds,hours:row.hours,
+          state:state,drawn:open ? open.drawn : 0,gem:open && open.gem || '',
+          gems:row.gems ? row.gems.slice() : [],locations:location,
+          waitMinutes:until ? Math.max(0,Math.ceil((until-deps.now())/60000)) : 0,
+          canTake:ready && state==='available',canReturn:ready && !!open && open.drawn>=row.ask,
+          canAbandon:ready && !!open};
+      });
+    }
+    function act(actor, verb, id, gem, traderRef) {
+      var row = byId[id];
+      if (!row || !row.scarce || !bound(row)) return {ok:false,why:'unbound'};
+      if (!active || deps.ready && !deps.ready(actor)) return {ok:false,why:'unavailable'};
+      if (verb === 'take') return offer(actor,id,{gem:gem});
+      if (verb === 'return') return turnIn(actor,id,traderRef);
+      if (verb === 'abandon') return walkAway(actor,id);
+      return {ok:false,why:'unknown'};
+    }
     function speak(actor, refrId) {
       if (!isTrader(refrId)) return null;
-      return null;
+      return describe(actor);
     }
     function onActivate(actor, refrId) {
       var held = questsOf(actor);
@@ -63581,7 +63734,8 @@ try {
       lineup: lineup, offer: offer, bindPlace: bindPlace, walkAway: walkAway,
       turnIn: turnIn, noteKill: noteKill, noteContainer: noteContainer,
       mineRare: mineRare, isRareSeam: function (seam) { return !!RARE[seam && seam.name]; },
-      onActivate: onActivate, speak: speak
+      onActivate: onActivate, speak: speak, describe: describe, act: act,
+      shutdown: function () { active = false; }
     };
   }
 
@@ -63599,6 +63753,15 @@ try {
           updateOwner: '', updateNeighbor: ''
         });
       } catch (e) { /* made by an earlier load. harmless. */ }
+      if (globalThis.__thornswoodQuests && typeof globalThis.__thornswoodQuests.shutdown === 'function') globalThis.__thornswoodQuests.shutdown();
+      if (globalThis.__thornswoodQuestTransactions) globalThis.__thornswoodQuestTransactions.shutdown();
+      var questTransactions = MERCHANT_TRADING.createQuestTransactions({mp: mp, log: log,
+        withInventoryMutation: function (actor, change) {
+          var merchants = globalThis.__thornswoodMerchantTrade;
+          return merchants ? merchants.withQuestInventoryMutation(actor, change) : {ok: false, why: 'unavailable'};
+        }
+      });
+      globalThis.__thornswoodQuestTransactions = questTransactions;
       globalThis.__thornswoodQuests = createCustomQuests({
         now: function () { return Date.now(); },
         goldDesc: globalThis.__thornswoodDungeonLoot && globalThis.__thornswoodDungeonLoot.GOLD_DESC,
@@ -63609,8 +63772,12 @@ try {
           a.unshift('custom quests:');
           log.apply(null, a);
         },
-        addItem: addItem,
-        takeItem: takeItem,
+        commit: questTransactions.commit,
+        identity: questTransactions.identity,
+        ready: function (actor) {
+          var merchants = globalThis.__thornswoodMerchantTrade;
+          return questTransactions.available() && !!merchants && merchants.questReady(actor);
+        },
         rankOf: function (actor, key) {
           var c = globalThis.__thornswoodCharacter;
           if (!c || !c.rankOf) return '';

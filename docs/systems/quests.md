@@ -130,7 +130,15 @@ finite purse, with a six-hour cooldown after completion. The server
 checks the character, reach, submitted price, goods and purse before
 accepting it. Goods and payment persist through reconnects and restarts.
 
-Scarce and scene offers are not connected to the trader panel yet.
+The trader panel implements the four miner offers: ebony, a chosen gem,
+stalhrim, and heart stone. It shows their places, draw limits, required
+returns, progress, rank gates and personal cooldowns. Choose a gem before
+taking its work. Turn in the required goods to finish, or give back the
+whole draw to leave without a cooldown. These inventory steps require the
+native transaction that saves the quest, inventory and receipt together.
+An unfinished merchant transfer or unsaved inventory receipt holds them
+until its exact save acknowledgement; no reward is inferred from a timer.
+The other scarce and scene offers are not connected to the panel yet.
 Scene gold is created when the quest is finished. It is not taken
 from a trader's purse. Walking
 away puts the goods back and does not start the cooldown. The rank on

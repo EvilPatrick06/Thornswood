@@ -67,7 +67,32 @@ function fixture() {
 }
 
 let f=fixture(), s=f.make();
+// A quest or another inventory transaction can have a live receipt that has
+// not reached storage. Reserving against it would strand a trade on restart.
+const questReceipt=JSON.stringify({actor:'ff000010:Skyrim.esm',profile:7,sequence:1});
+f.transfer.cas(10,copy(f.inv),'null',copy(f.inv),1,7);
 let result=s.begin(f.offer());
+assert.equal(result.accepted,false,'an unsaved preceding transaction blocks admission');
+assert.equal(f.states.get(1).pending,undefined,'no ledger intent depends on an unsaved receipt');
+assert.equal(f.live(),questReceipt);
+f.save();
+result=s.begin(f.offer());assert.equal(result.accepted,true,'exact saved acknowledgement permits the next trade');
+assert.deepEqual(f.calls,[1,2]);
+
+f=fixture();s=f.make();
+let guarded=false;
+assert.equal(s.withInventoryMutation(10,(human,alive)=>{
+  guarded=true;assert.equal(human.profileId,7);assert.equal(alive(),true);
+  assert.equal(s.begin(f.offer()).accepted,false,'a quest mutation owns the synchronous admission lease');
+  s.shutdown();assert.equal(alive(),false,'reload revokes the held lease');
+  return {ok:false};
+}).ok,false);
+assert.equal(guarded,true);assert.deepEqual(f.calls,[]);
+f=fixture();s=f.make();s.begin(f.offer());guarded=false;
+assert.equal(s.withInventoryMutation(10,()=>{guarded=true;}).ok,false);
+assert.equal(guarded,false,'an unresolved merchant reservation prevents quest inventory work');
+f=fixture();s=f.make();
+result=s.begin(f.offer());
 assert.equal(result.done,false);
 assert.equal(f.inv.entries[1].count,7,'debit removes only the outgoing goods');
 assert.equal(f.inv.entries[0].count,40,'incoming payment is quarantined before saved debit');

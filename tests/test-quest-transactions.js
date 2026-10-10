@@ -1,0 +1,66 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {createQuestTransactions}=require('../game/quest-transactions');
+const clone=x=>JSON.parse(JSON.stringify(x));
+function fixture() {
+  let inventory={entries:[{baseId:15,count:40},{baseId:100,count:4,name:'Keepsake',health:0.75}]};
+  let record={v:1,open:{wolf:{kills:1}},cool:{}},receipt='null',saved='null',profile=7,pending=false;
+  let calls=0,mode='',busy=false;
+  const human=()=>({desc:'ff000010:Skyrim.esm',profileId:profile});
+  const mp={
+    getNpcAIState:()=>({isHuman:true,profileId:profile,lifeGeneration:0}),
+    getDescFromId:()=>human().desc,getIdFromDesc:d=>d==='f:Skyrim.esm'?15:d==='ore:Skyrim.esm'?100:0,
+    get:(id,key)=>clone(key==='inventory'?inventory:record),
+    getInventoryReceipt:()=>receipt,getSavedInventoryReceipt:()=>saved,
+    compareAndSetInventoryAndProperty(id,expected,old,next,seq,owner,change) {
+      calls++;assert.equal(owner,profile);
+      if(mode==='before')throw new Error('before mutation');
+      if(mode==='refuse')return false;
+      assert.deepEqual(expected,inventory);assert.equal(old,receipt);assert.deepEqual(change.expected,record);
+      inventory=clone(next);record=clone(change.replacement);
+      receipt=JSON.stringify({actor:human().desc,profile,sequence:seq});
+      if(mode==='unknown'){record={other:true};throw new Error('unknown outcome');}
+      if(mode==='after')throw new Error('notification failed');
+      return true;
+    }
+  };
+  const transfer=createQuestTransactions({mp,withInventoryMutation:(id,fn)=>{
+    if(busy || pending || receipt!==saved)return {ok:false,why:'waiting'};
+    busy=true;try{return fn(human(),()=>true);}finally{busy=false;}
+  }});
+  return {mp,transfer,record:()=>clone(record),inventory:()=>clone(inventory),receipt:()=>receipt,
+    calls:()=>calls,mode:m=>mode=m,pending:b=>pending=b,profile:p=>profile=p,save:()=>saved=receipt};
+}
+const next={v:1,open:{},cool:{wolf:1000}};
+let f=fixture();
+assert.equal(f.transfer.commit(10,f.record(),next,[{item:'f:Skyrim.esm',count:25}]).ok,true);
+assert.deepEqual(f.record(),next);assert.equal(f.inventory().entries[0].count,65);
+assert.equal(f.inventory().entries[1].name,'Keepsake');assert.equal(f.calls(),1);
+assert.equal(f.transfer.commit(10,next,next,[]).ok,false,'an unsaved preceding commit stays fenced');
+f.save();
+assert.equal(f.transfer.commit(10,next,next,[{item:'ore:Skyrim.esm',count:-2}]).ok,true);
+assert.equal(f.inventory().entries.find(x=>x.baseId===100).count,2);
+assert.equal(f.inventory().entries.find(x=>x.baseId===100).health,0.75);
+for(const mode of ['before','refuse']) {
+  f=fixture();const before=f.inventory(),record=f.record();f.mode(mode);
+  assert.equal(f.transfer.commit(10,record,next,[{item:'f:Skyrim.esm',count:25}]).ok,false);
+  assert.deepEqual(f.inventory(),before);assert.deepEqual(f.record(),record);assert.equal(f.receipt(),'null');
+}
+f=fixture();f.mode('after');
+assert.equal(f.transfer.commit(10,f.record(),next,[{item:'f:Skyrim.esm',count:25}]).ok,true,'live receipt establishes a committed write despite notification error');
+assert.equal(f.calls(),1);assert.equal(f.inventory().entries[0].count,65);
+f=fixture();f.mode('after');
+assert.equal(f.transfer.commit(10,f.record(),{...next,open:{ebony:{drawn:1,gem:undefined}}},[]).ok,true,
+  'native JSON readback establishes a commit when optional fields were omitted');
+f=fixture();f.mode('unknown');
+assert.equal(f.transfer.commit(10,f.record(),next,[]).ok,false);assert.equal(f.transfer.available(),false);
+f.mode('');assert.equal(f.transfer.commit(10,f.record(),next,[]).ok,false);assert.equal(f.calls(),1);
+f=fixture();f.pending(true);
+assert.equal(f.transfer.commit(10,f.record(),next,[]).ok,false);assert.equal(f.calls(),0);
+f=fixture();const original=f.inventory();
+for(const changes of [[{item:'missing',count:1}],[{item:'ore:Skyrim.esm',count:-5}],[{item:'f:Skyrim.esm',count:0.5}]])
+  assert.equal(f.transfer.commit(10,f.record(),next,changes).ok,false);
+assert.equal(f.calls(),0);assert.deepEqual(f.inventory(),original);
+const token=f.transfer.identity(10);f.profile(8);assert.notEqual(f.transfer.identity(10),token);
+f.transfer.shutdown();assert.equal(f.transfer.commit(10,f.record(),next,[]).ok,false);
+console.log('PASS quest atomic inventory/state, metadata, save admission, publication errors, refusal and revocation');

@@ -33,7 +33,7 @@ function worldOf(native) {
   const live=new Map(),saved=new Map();
   return {
     actors, inv, records,
-    actor(id) { return actors[id] || null; },
+    actor(id) { return actors[id] ? {desc:id.toString(16)+':Skyrim.esm',lifeGeneration:0,...actors[id]} : null; },
     carry(id, baseId) { return (inv[id] && inv[id][baseId]) || 0; },
     save() { for (const [id,receipt] of live) saved.set(id,receipt); },
     transfer: {
@@ -109,6 +109,50 @@ assert.equal(opened.view.open, true);
 assert.equal(opened.view.purse, 250);
 assert.equal(opened.view.transfer, true);
 assert.equal(opened.view.offers[0].stock, 0);
+const questCalls=[];
+box.deps.quests=()=>({describe:()=>[{id:'ebony',name:'The ebony'}],
+  act:(...args)=>{questCalls.push(args);return {ok:true};}});
+assert.equal(open(box.api).view.quests[0].id,'ebony');
+assert.equal(box.api.command({actorId:10,profileId:9,parts:['/merchant','quest','take','ebony']}).view,null);
+assert.equal(questCalls.length,0,'forged quest profile cannot reach the controller');
+box.world.actors[11]={...box.world.actors[10]};
+box.api.command({actorId:11,profileId:7,parts:['/merchant','quest','take','ebony']});
+assert.equal(questCalls.length,0,'a replacement actor cannot reuse the old session');
+open(box.api);
+box.api.command({actorId:10,profileId:7,parts:['/merchant','quest','take','gem','Ruby']});
+assert.deepEqual(questCalls.pop(),[10,'take','gem','Ruby',1]);
+box.world.actors[10].lifeGeneration=1;
+box.api.command({actorId:10,profileId:7,parts:['/merchant','quest','take','ebony']});
+assert.equal(questCalls.length,0,'an earlier life cannot reuse a merchant session');
+open(box.api);
+box.world.actors[10].desc='new:Skyrim.esm';
+box.api.command({actorId:10,profileId:7,parts:['/merchant','quest','take','ebony']});
+assert.equal(questCalls.length,0,'a changed descriptor cannot reuse a merchant session');
+open(box.api);
+box.world.actors[10].pos=[900,0,0];
+box.api.command({actorId:10,profileId:7,parts:['/merchant','quest','take','ebony']});
+assert.equal(questCalls.length,0,'out-of-reach quest action cannot reach the controller');
+box.world.actors[10].pos=[0,0,0];open(box.api);
+
+const cooldownPanel=service({on:true},250);
+let cooling=true;
+cooldownPanel.deps.quests=()=>({describe:()=>[{id:'ebony',state:cooling?'cooldown':'available',canTake:!cooling}]});
+open(cooldownPanel.api);
+assert.equal(cooldownPanel.api.recover().length,0,'unchanged quest data does not republish');
+cooling=false;
+const refreshedWork=cooldownPanel.api.recover();
+assert.equal(refreshedWork.length,1,'cooldown expiry updates an open panel without a trade');
+assert.equal(refreshedWork[0].view.quests[0].canTake,true);
+assert.equal(cooldownPanel.api.recover().length,0,'a refreshed quest is not sent repeatedly');
+let takenWork=false;
+cooldownPanel.deps.quests=()=>({describe:()=>[{id:'ebony',state:takenWork?'open':'available'}],
+  act:()=>{takenWork=true;return {ok:true};}});
+open(cooldownPanel.api);
+const takenView=cooldownPanel.api.command({actorId:10,profileId:7,parts:['/merchant','quest','take','ebony']}).view;
+assert.equal(takenView.note,'You take the work.');
+assert.equal(cooldownPanel.api.recover().length,0,'unchanged recovery retains the action feedback without replacing the view');
+cooldownPanel.world.actors[10].lifeGeneration=1;
+assert.deepEqual(cooldownPanel.api.recover()[0].view,{open:false},'recovery closes an obsolete character session');
 
 let sold = box.api.command({ actorId: 10, profileId: 7, parts: ['/merchant', 'sell', '2', 'Iron', 'Ingot'] });
 assert.match(sold.text, /Sold 2/);
