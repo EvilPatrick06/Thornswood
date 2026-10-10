@@ -94,6 +94,11 @@ RECORDS[0x21a72] = { type: 'GMST', fields: [{ type: 'DATA', data: floatBytes(0.1
 RECORDS[RACE] = { type: 'RACE', fields: [{ type: 'DATA', data: floatBytes(3, 88, 128) }] };
 
 const mpFake = {
+  getActorRuntimeIdentity: function(id) {
+    const a=world.actors.get(id);
+    if (!a) throw new Error('no actor');
+    return String(1+(a.runtime || 0));
+  },
   getNpcAIState: function(id) {
     const a=world.actors.get(id);
     return a ? {isHuman:a.pid>0,profileId:a.pid,lifeGeneration:a.life || 0} : null;
@@ -681,8 +686,8 @@ yes('the log says it once a cast', logged('Leyline Attunement') === 1);
 }
 
 // A queued bonus belongs to the character who caused the engine hit.
-for (const field of ['pid','life']) {
-  const by=actor(0xff000030);
+for (const field of ['pid','life','runtime']) {
+  const by=actor(0xff000040+['pid','life','runtime'].indexOf(field));
   states.set(by,filled(['might']));
   heal(WOLF);
   strike(by,WOLF,0.2,SWORD,{power:true});
@@ -690,13 +695,13 @@ for (const field of ['pid','life']) {
   settle();
   yes('perk damage refuses attacker '+field+' replacement before flush',health(WOLF)===0.8);
 }
-{
-  const by=actor(0xff000031);
+for (const field of ['life','runtime']) {
+  const by=actor(0xff000044+['life','runtime'].indexOf(field));
   states.set(by,filled(['might']));
   heal(WOLF); world.actors.get(WOLF).p.health=0.22;
   strike(by,WOLF,0.2,SWORD,{power:true}); settle();
-  world.actors.get(by).life=1;
-  yes('perk fallback does not name a replacement character',K.killerOf(WOLF)===0);
+  world.actors.get(by)[field]=1;
+  yes('perk fallback does not name a replacement character after '+field,K.killerOf(WOLF)===0);
 }
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');

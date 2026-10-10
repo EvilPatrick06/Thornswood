@@ -372,6 +372,11 @@ RECORDS[ZERO_RACE] = { type: 'RACE', fields: [{ type: 'DATA', data: raceData(0) 
 RECORDS[ZERO_BASE] = { type: 'NPC_', fields: [{ type: 'ACBS', data: acbs(0) }] };
 const effectsMaps = new Map();
 const mpFake = {
+  getActorRuntimeIdentity: function(id) {
+    const a=world.actors.get(id);
+    if (!a) throw new Error('no actor');
+    return String(1+(a.runtime || 0));
+  },
   getNpcAIState: function(id) {
     const a=world.actors.get(id);
     return a ? {isHuman:a.pid>0,profileId:a.pid,lifeGeneration:a.life || 0} : null;
@@ -1063,7 +1068,7 @@ const keysCs = fs.readFileSync(path.join(root, 'launcher', 'app', 'Keys.cs'), 'u
   yes('and clears its wait, as the page says', /Rush \(15 stamina, ready\)/.test(M2.use(RUSHER, '')));
 }
 
-for (const field of ['pid', 'life', 'unreadable']) {
+for (const field of ['pid', 'life', 'runtime', 'unreadable']) {
   later(200000);
   const defender = actor(0xff000050);
   const by = actor(0xff000051);
@@ -1080,22 +1085,33 @@ for (const field of ['pid', 'life', 'unreadable']) {
   yes('Wall remains on the defender when attacker identity is ' + field, health(defender) === 0.6);
 }
 
-for (const field of ['pid','life']) {
-  const by=actor(field==='pid'?0xff000030:0xff000032);
+for (const field of ['pid','life','runtime']) {
+  const by=actor(0xff000040+['pid','life','runtime'].indexOf(field));
   states.set(by,warrior('berserker','master'));
-  M.use(by,'wreck'); heal(WOLF);
+  yes('Wreck is armed before the '+field+' damage regression',/^Wreck/.test(M.use(by,'wreck')));heal(WOLF);
   strike(by,WOLF,0.2,{power:true});
   world.actors.get(by)[field]=(world.actors.get(by)[field] || 0)+1;
   settle();
   yes('maneuver damage refuses attacker '+field+' replacement before flush',health(WOLF)===0.8);
 }
-{
-  const by=actor(0xff000031);
+for (const field of ['life','runtime']) {
+  const by=actor(0xff000044+['life','runtime'].indexOf(field));
   states.set(by,warrior('berserker','master'));
-  M.use(by,'wreck'); heal(WOLF); world.actors.get(WOLF).p.health=0.22;
+  yes('Wreck is armed before the '+field+' fallback regression',/^Wreck/.test(M.use(by,'wreck')));
+  heal(WOLF);world.actors.get(WOLF).p.health=0.22;
   strike(by,WOLF,0.2,{power:true}); settle();
-  world.actors.get(by).life=1;
-  yes('maneuver fallback does not name a replacement character',M.killerOf(WOLF)===0);
+  world.actors.get(by)[field]=1;
+  yes('maneuver fallback does not name a replacement character after '+field,M.killerOf(WOLF)===0);
+}
+{
+  const by=actor(0xff000033);
+  states.set(by,warrior('berserker','master'));
+  yes('Heavy is armed before the runtime rearm regression',/^Heavy/.test(M.use(by,'heavy')));heal(WOLF);
+  strike(by,WOLF,0,{power:true});
+  world.actors.get(by).runtime=1;
+  settle();
+  strike(by,WOLF,0.2,{power:true});settle();
+  yes('a discarded old-session hit cannot rearm Heavy for the new session',health(WOLF)===0.8);
 }
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');

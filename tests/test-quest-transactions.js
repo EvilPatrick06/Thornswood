@@ -8,12 +8,14 @@ function fixture(options={}) {
   let calls=0,mode='',busy=false;
   const human=()=>({desc:'ff000010:Skyrim.esm',profileId:profile});
   const mp={
+    getActorRuntimeIdentity:()=> '10',
     getNpcAIState:()=>({isHuman:true,profileId:profile,lifeGeneration:0}),
     getDescFromId:()=>human().desc,getIdFromDesc:d=>d==='f:Skyrim.esm'?15:d==='ore:Skyrim.esm'?100:0,
     get:(id,key)=>{if(mode==='readback' && calls)throw Error('readback unavailable');return clone(key==='inventory'?inventory:record);},
     getInventoryReceipt:()=>receipt,getSavedInventoryReceipt:()=>saved,
     compareAndSetInventoryAndProperty(id,expected,old,next,seq,owner,change) {
       calls++;assert.equal(owner,profile);assert.equal(change.expectedLifeGeneration,0);
+      assert.equal(change.expectedRuntimeIdentity,'10');
       if(mode==='before')throw new Error('before mutation');
       if(mode==='refuse')return false;
       assert.deepEqual(expected,inventory);assert.equal(old,receipt);assert.deepEqual(change.expected,record);
@@ -67,9 +69,19 @@ assert.equal(f.calls(),0);assert.deepEqual(f.inventory(),original);
 const token=f.transfer.identity(10);f.profile(8);assert.notEqual(f.transfer.identity(10),token);
 f.transfer.shutdown();assert.equal(f.transfer.commit(10,f.record(),next,[]).ok,false);
 {
-  const mp={getNpcAIState:()=>({isHuman:true,profileId:7,lifeGeneration:0}),getDescFromId:()=> 'ff000010:Skyrim.esm'};
+  let runtime='10';
+  const mp={getActorRuntimeIdentity:()=>runtime,getNpcAIState:()=>({isHuman:true,profileId:7,lifeGeneration:0}),getDescFromId:()=> 'ff000010:Skyrim.esm'};
   const token=actorIdentity(mp,10);
-  assert.deepEqual(JSON.parse(token),{desc:'ff000010:Skyrim.esm',profileId:7,life:0});
+  assert.deepEqual(JSON.parse(token),{desc:'ff000010:Skyrim.esm',profileId:7,life:0,runtime:'10'});
+  runtime='11';
+  assert.notEqual(actorIdentity(mp,10),token,'same human life/ownership changes cannot retain the token');
+  for(const invalid of [undefined,null,0,1,'','0','01','-1','1.5',' 1','1\n','18446744073709551616']) {
+    runtime=invalid;
+    assert.equal(actorIdentity(mp,10),null,'unverifiable native revision refuses delayed ownership');
+  }
+  runtime='18446744073709551615';
+  assert.notEqual(actorIdentity(mp,10),null,'uint64 revisions are not truncated by JS numbers');
+  runtime='10';
   mp.getDescFromId=()=> 'ff000011:Skyrim.esm';
   assert.notEqual(actorIdentity(mp,10),token,'descriptor replacement cannot retain ownership');
   for(const ai of [null,{isHuman:false,profileId:7,lifeGeneration:0},

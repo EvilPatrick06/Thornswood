@@ -3,7 +3,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),vm=require('node:vm');
 const {createNativeMerchantTransfer,installMerchantTrading}=require('../game/merchant-trading');
 const {createSettlement,takeEntries}=require('../game/merchant-settlement');
-const {createQuestTransactions}=require('../game/quest-transactions');
+const {createQuestTransactions,actorIdentity}=require('../game/quest-transactions');
 const addon=require(path.resolve(process.argv[2]));
 const installed=JSON.parse(fs.readFileSync(process.argv[3],'utf8'));
 const root=fs.mkdtempSync(path.join(os.tmpdir(),'tw-native-settlement-'));
@@ -134,6 +134,22 @@ vm.runInContext(source.slice(source.indexOf('// NPC MERCHANT PURSES BEGIN'),sour
   assert.equal(quests.commit(human,null,questRecord,[{item:'f:Skyrim.esm',count:25}]).ok,false,'a stale quest record cannot pay twice');
   assert.equal(mp.getInventoryReceipt(human),questReceipt);
   assert.equal(panel.questReady(human),true,'saved quest receipts are accepted by merchant admission');
+  const initialToken=actorIdentity(mp,human),initialLife=mp.getNpcAIState(human).lifeGeneration;
+  mp.set(human,'isDead',true);
+  assert.notEqual(actorIdentity(mp,human),initialToken,'real human death must revoke the canonical caller token');
+  mp.set(human,'isDead',false);
+  assert.notEqual(actorIdentity(mp,human),initialToken,'real human respawn cannot restore the old caller token');
+  assert.equal(mp.getNpcAIState(human).lifeGeneration,initialLife,'the persisted NPC counter is not the human session fence');
+  const inventoryBeforeReentry=mp.get(human,'inventory');
+  const reentrantExpected={toJSON() {
+    mp.set(human,'isDead',true);mp.set(human,'isDead',false);
+    return questRecord;
+  }};
+  assert.equal(quests.commit(human,reentrantExpected,questRecord,[{item:'f:Skyrim.esm',count:25}]).ok,false,
+    'native CAS must reject a human lifecycle change during argument serialization');
+  assert.deepEqual(mp.get(human,'inventory'),inventoryBeforeReentry);
+  assert.equal(mp.getInventoryReceipt(human),questReceipt);
+  assert.deepEqual(mp.get(human,'thornswoodQuests'),questRecord);
   quests.shutdown();
   panel.shutdown();purses.shutdown();
   const alias=path.join(served,'private-alias');

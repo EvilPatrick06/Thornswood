@@ -62671,10 +62671,12 @@ function same(a,b) {
 }
 function actorIdentity(mp,actor) {
   try {
-    var ai=mp.getNpcAIState(actor),desc=mp.getDescFromId(actor);
+    var ai=mp.getNpcAIState(actor),desc=mp.getDescFromId(actor),runtime=mp.getActorRuntimeIdentity(actor);
     if(!ai || ai.isHuman!==true || !Number.isInteger(ai.profileId) || ai.profileId<=0 ||
-        !Number.isSafeInteger(ai.lifeGeneration) || ai.lifeGeneration<0 || typeof desc!=='string' || !desc)return null;
-    return JSON.stringify({desc:desc,profileId:ai.profileId,life:ai.lifeGeneration});
+        !Number.isSafeInteger(ai.lifeGeneration) || ai.lifeGeneration<0 || typeof desc!=='string' || !desc ||
+        typeof runtime!=='string' || !runtime || runtime.length>20 || runtime[0]==='0' || /[^0-9]/.test(runtime) ||
+        (runtime.length===20 && runtime>'18446744073709551615'))return null;
+    return JSON.stringify({desc:desc,profileId:ai.profileId,life:ai.lifeGeneration,runtime:runtime});
   } catch(error) { return null; }
 }
 function createQuestTransactions(deps) {
@@ -62684,7 +62686,7 @@ function createQuestTransactions(deps) {
   function available() {
     return active && typeof deps.withInventoryMutation==='function' && !!mp &&
       ['compareAndSetInventoryAndProperty','getInventoryReceipt','getSavedInventoryReceipt',
-        'get','getIdFromDesc','getDescFromId','getNpcAIState'].every(function(key){return typeof mp[key]==='function';});
+        'get','getIdFromDesc','getDescFromId','getNpcAIState','getActorRuntimeIdentity'].every(function(key){return typeof mp[key]==='function';});
   }
   function identity(actor) {
     return active ? actorIdentity(mp,actor) : null;
@@ -62722,7 +62724,8 @@ function createQuestTransactions(deps) {
         if(!stillActive() || !available() || identity(actor)!==token)return {ok:false,why:'identity'};
         try {
           var changed=mp.compareAndSetInventoryAndProperty(actor,before,receipt,next,sequence,human.profileId,
-            {name:property,expected:expectedRecord===undefined?null:expectedRecord,replacement:nextRecord,expectedLifeGeneration:owner.life});
+            {name:property,expected:expectedRecord===undefined?null:expectedRecord,replacement:nextRecord,
+              expectedLifeGeneration:owner.life,expectedRuntimeIdentity:owner.runtime});
           return {ok:changed===true,why:changed===true?'':'changed'};
         } catch(error) {
           // Publication can fail after the atomic live edit. Read back that
