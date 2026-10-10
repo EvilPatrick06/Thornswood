@@ -45742,7 +45742,6 @@ log('gamemode loaded:',
     if (blocked && has(ST.on, target) && ST.on[target].cover) { ST.block[target] = true; }
 
     var identity = by ? MERCHANT_TRADING.actorIdentity(mp, by) : null;
-    if (by && personOf(by) && !identity) { return; }
     var e = { before: -1, after: null, by: by, identity: identity, more: 0, less: 0, stagger: false, used: [] };
     var a = (identity && has(ST.on, by)) ? ST.on[by] : null;
     if (a && !isSpell(source)) {
@@ -45833,10 +45832,12 @@ log('gamemode loaded:',
       var change = 0, killer = 0, stagger = false;
       for (var i = 0; i < list.length; i++) {
         var e = list[i];
-        if (e.identity && MERCHANT_TRADING.actorIdentity(mp, e.by) !== e.identity) { continue; }
         var took = e.before - e.after;
         if (!(e.after >= 0) || !(took > 0)) { rearm(e); continue; }
         if (e.less) { change += took * e.less; }
+        // The reduction belongs to the defender, regardless of who now owns
+        // the attacker's ID. Only the attacker's effects need this identity.
+        if (!e.identity || MERCHANT_TRADING.actorIdentity(mp, e.by) !== e.identity) { continue; }
         if (e.more) { change -= took * e.more; killer = e; }
         if (e.stagger) { stagger = true; }
       }

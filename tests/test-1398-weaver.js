@@ -234,6 +234,7 @@ const mpB = {
 const states = new Map();
 const party = { leader: 1, members: [] };
 const boxB = {
+  MERCHANT_TRADING: require('../game/quest-transactions'),
   console: { log: function () { } },
   Buffer: Buffer,
   mp: mpB,

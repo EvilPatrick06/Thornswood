@@ -1063,6 +1063,23 @@ const keysCs = fs.readFileSync(path.join(root, 'launcher', 'app', 'Keys.cs'), 'u
   yes('and clears its wait, as the page says', /Rush \(15 stamina, ready\)/.test(M2.use(RUSHER, '')));
 }
 
+for (const field of ['pid', 'life', 'unreadable']) {
+  later(200000);
+  const defender = actor(0xff000050);
+  const by = actor(0xff000051);
+  states.set(defender, warrior('bulwark', 'master'));
+  M.use(defender, 'wall');
+  const readIdentity = mpFake.getNpcAIState;
+  if (field === 'unreadable') {
+    mpFake.getNpcAIState = function (id) { return id === by ? null : readIdentity(id); };
+  }
+  strike(by, defender, 0.5, {});
+  if (field !== 'unreadable') { world.actors.get(by)[field] = (world.actors.get(by)[field] || 0) + 1; }
+  settle();
+  mpFake.getNpcAIState = readIdentity;
+  yes('Wall remains on the defender when attacker identity is ' + field, health(defender) === 0.6);
+}
+
 for (const field of ['pid','life']) {
   const by=actor(field==='pid'?0xff000030:0xff000032);
   states.set(by,warrior('berserker','master'));
