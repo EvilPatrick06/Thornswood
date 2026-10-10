@@ -348,7 +348,9 @@ function creditBox(bonus) {
 // ------------------------------------------------- the maneuvers, pure part --
 const clock = { t: 1000000 };
 const world = { actors: new Map(), calls: [], staggers: [], writes: [], timers: [] };
-function desc(id) { return id.toString(16) + ':run'; }
+// An actor may carry its own descriptor, the way another character loaded at
+// the same ID has one (#2069).
+function desc(id) { const a = world.actors.get(id); return (a && a.desc) || id.toString(16) + ':run'; }
 function actor(id, o) {
   world.actors.set(id, Object.assign({ pid: id > 0xff000000 && id < 0xff001000 ? id - 0xff000000 : -1, dead: false,
     p: { health: 1, magicka: 1, stamina: 1 }, max: 100, pos: [0, 0, 0], cell: 'cell:Skyrim.esm', anim: null,
@@ -656,6 +658,89 @@ strike(BER, WOLF, 0.2, { power: true });
 settle();
 yes('a Wreck half again that takes health to nothing kills', world.actors.get(WOLF).dead === true && health(WOLF) === 0);
 yes('and mp.onDeath is told whose blow it was', M.killerOf(WOLF) === BER && M.killerOf(WOLF) === 0);
+
+// ------------------------------------------- a replaced target (#2069) --
+// A queued Wreck, a Wall's reduction and a stagger belong to the body they
+// were queued on. A new life or another descriptor at the same ID before the
+// flush is left alone, and the Wreck it spent comes back.
+// The native life of whoever is at an ID (#2069). A replacement is a new
+// life, or another descriptor at the same ID.
+if (!mpFake.getNpcAIState) {
+  mpFake.getNpcAIState = function (id) {
+    const a = world.actors.get(id);
+    return a ? { isHuman: a.pid > 0, profileId: a.pid, lifeGeneration: a.life || 0 } : null;
+  };
+}
+function replaced(id, how) {
+  const a = world.actors.get(id);
+  if (how === 'life') { a.life = (a.life || 0) + 1; } else { a.desc = 'other' + id.toString(16) + ':run'; }
+  // Its health is what the engine left at the ID, as in the issue: the
+  // queued effect is all that could still move it.
+}
+function restored(id) { const a = world.actors.get(id); delete a.desc; }
+{
+  const PERSON = actor(0xff000062, { pos: [9000, 100, 0] });
+  for (const [name, target] of [['person', PERSON], ['creature', WOLF]]) {
+    for (const how of ['life', 'desc']) {
+      later(200000);
+      const by = actor(0xff000063, { pos: [9000, 0, 0] });
+      states.set(by, warrior('berserker', 'master'));
+      world.actors.get(by).p.stamina = 1; M.use(by, 'wreck'); heal(target);
+      const staggers = world.staggers.length;
+      strike(by, target, 0.2, { power: true });
+      replaced(target, how);
+      settle();
+      yes('T1 a Wreck queued on a ' + name + ' does not land on a replacement (' + how + ')',
+          health(target) === 0.8 && world.staggers.length === staggers);
+      restored(target);
+      heal(target);
+      strike(by, target, 0.2, { power: true });
+      settle();
+      yes('T1 and the Wreck it spent comes back for the next power attack in its window', health(target) === 0.7);
+    }
+    later(200000);
+    const by = actor(0xff000064, { pos: [9000, 0, 0] });
+    states.set(by, warrior('berserker', 'master'));
+    world.actors.get(by).p.stamina = 1; M.use(by, 'wreck'); heal(target);
+    strike(by, target, 0.2, { power: true });
+    settle();
+    yes('T2 on the same ' + name + ' it still lands: 0.2 becomes 0.3', health(target) === 0.7);
+    later(200000);
+    world.actors.get(by).p.stamina = 1; M.use(by, 'wreck'); heal(target); world.actors.get(target).p.health = 0.22;
+    strike(by, target, 0.2, { power: true });
+    settle();
+    replaced(target, 'life');
+    yes('T3 the fallback killer of a ' + name + ' is not named for a replacement life', M.killerOf(target) === 0);
+    later(200000);
+    world.actors.get(by).p.stamina = 1; M.use(by, 'wreck'); heal(target); world.actors.get(target).p.health = 0.22;
+    strike(by, target, 0.2, { power: true });
+    settle();
+    yes('T3 and is named for the life it killed', world.actors.get(target).dead === true && M.killerOf(target) === by);
+    heal(target);
+  }
+  // A Wall's reduction is the defender's, and stays with the defender's life.
+  for (const how of ['life', 'desc']) {
+    later(200000);
+    const wall = actor(0xff000065, { pos: [9000, 0, 0] });
+    states.set(wall, warrior('bulwark', 'master'));
+    world.actors.get(wall).p.stamina = 1;
+    M.use(wall, 'wall');
+    strike(WOLF, wall, 0.5, {});
+    replaced(wall, how);
+    settle();
+    yes('T4 a Wall reduction queued for a defender is not given to a replacement (' + how + ')', health(wall) === 0.5);
+    restored(wall);
+    heal(wall);
+  }
+  later(200000);
+  const wall = actor(0xff000066, { pos: [9000, 0, 0] });
+  states.set(wall, warrior('bulwark', 'master'));
+  world.actors.get(wall).p.stamina = 1;
+  M.use(wall, 'wall');
+  strike(WOLF, wall, 0.5, {});
+  settle();
+  yes('T5 on the same defender the Wall still takes 20% off: 0.5 becomes 0.4', health(wall) === 0.6);
+}
 heal(WOLF);
 
 // Wall.
