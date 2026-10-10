@@ -109,7 +109,8 @@ finally { Remove-Item -LiteralPath $fake -Recurse -Force -ErrorAction SilentlyCo
 # stands in for vcpkg's bootstrap.
 $ast = [System.Management.Automation.Language.Parser]::ParseInput($text, [ref]$null, [ref]$null)
 $lift = @()
-foreach ($fn in 'Test-CmdSplitsPath', 'Get-SubstMap', 'Mount-EngineFork', 'Dismount-EngineFork') {
+$liftNames = 'Test-CmdSplitsPath', 'Get-SubstMap', 'Get-EngineSubstDir', 'Enter-EngineSubstLock', 'Add-EngineSubstHold', 'Get-EngineSubstHolders', 'Mount-EngineFork', 'Dismount-EngineFork'
+foreach ($fn in $liftNames) {
     $d = $ast.Find({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $fn }, $true)
     Yes "it has $fn" ($null -ne $d)
     if ($d) { $lift += $d.Extent.Text }
@@ -129,7 +130,7 @@ function Read-CmdBat([string]$Bat) {
     return (& $cmdExe /d /c ($Bat + ' 2>&1') 2>&1 | ForEach-Object { "$_" } | Out-String)
 }
 
-if ($lift.Count -eq 4) {
+if ($lift.Count -eq $liftNames.Count) {
     . ([scriptblock]::Create($lift -join "`n"))
     $amp = Join-Path ([IO.Path]::GetTempPath()) ('ts-engine-' + [Guid]::NewGuid().ToString('N').Substring(0, 8) + '\wt&x')
     $forkA = Join-Path $amp 'fork'
@@ -151,12 +152,15 @@ if ($lift.Count -eq 4) {
         Yes '  standing for the fork''s parent, not the fork, so its build folder is not J://build' ((Get-SubstMap)[$m.Drive.Substring(0, 1)] -eq $amp)
         $through = Read-CmdBat (Join-Path $m.Fork 'bootstrap.bat')
         Yes '  and the same bootstrap, given that path, runs' ($through -match ('bootstrapped from ' + [regex]::Escape($m.Fork + '\')))
+        # A second run while it stands gets a letter of its own (#1993): it
+        # used to reuse this one, and the first run's end took it away.
         $again = Mount-EngineFork $forkA
-        Yes '  a second run while it stands reuses it and leaves it for the first to remove' ($again.Drive -eq $m.Drive -and -not $again.Made)
-        Dismount-EngineFork $again
-        Yes '  which does not remove it' (Test-Path -LiteralPath ($m.Drive + '\'))
+        $mounts += $again
+        Yes ('  a second run while it stands gets a letter of its own (' + $again.Drive + ')') ($again.Drive -match '^[A-Z]:$' -and $again.Drive -ne $m.Drive -and $again.Made)
         Dismount-EngineFork $m
-        Yes '  and the run that made it removes it at the end' (-not (Get-SubstMap).ContainsKey($m.Drive.Substring(0, 1)) -and -not (Test-Path -LiteralPath ($m.Drive + '\')))
+        Yes '  and the first run''s end removes only its own letter' (-not (Test-Path -LiteralPath ($m.Drive + '\')) -and (Test-Path -LiteralPath (Join-Path $again.Fork 'CMakeLists.txt')))
+        Dismount-EngineFork $again
+        Yes '  and the run that made each removes it at the end' (-not (Get-SubstMap).ContainsKey($m.Drive.Substring(0, 1)) -and -not (Get-SubstMap).ContainsKey($again.Drive.Substring(0, 1)) -and -not (Test-Path -LiteralPath ($again.Drive + '\')))
 
         # A build configured through a letter is built through the same one.
         $cacheDir = Join-Path $forkA 'build'
@@ -169,7 +173,15 @@ if ($lift.Count -eq 4) {
             $c = Mount-EngineFork $forkA
             $mounts += $c
             Yes ('a fork configured through ' + $pick + ': is built through ' + $pick + ': again (' + $c.Drive + ')') ($c.Drive -eq ($pick + ':') -and $c.Made -and (Test-Path -LiteralPath (Join-Path $c.Fork 'CMakeLists.txt')))
+            # Two runs on the same configured letter: the one that made it
+            # ending first leaves it for the other, and the last one off removes it.
+            $c2 = Mount-EngineFork $forkA
+            $mounts += $c2
+            Yes '  a second run on that configured letter shares it' ($c2.Drive -eq $c.Drive -and -not $c2.Made -and $c2.Hold)
             Dismount-EngineFork $c
+            Yes '  and the run that made it ending first leaves it while the other still holds it' (Test-Path -LiteralPath (Join-Path $c2.Fork 'CMakeLists.txt'))
+            Dismount-EngineFork $c2
+            Yes '  and the last run off it removes it' (-not (Get-SubstMap).ContainsKey($pick) -and -not (Test-Path -LiteralPath ($pick + ':\')))
         } else { Write-Host 'SKIP  no drive letter free for the configured-through-a-letter case' }
         [IO.File]::WriteAllText($cacheFile, ('CMAKE_CACHEFILE_DIR:INTERNAL=' + $cacheDir.Replace('\', '/') + "`r`n"))
         $d = Mount-EngineFork $forkA
