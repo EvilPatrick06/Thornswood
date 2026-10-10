@@ -193,6 +193,17 @@ if (-not $PSBoundParameters.ContainsKey('Wait')) {
 . (Join-Path $Here 'ServerBuild.ps1')
 . (Join-Path $Here 'CollectionPlugins.ps1')
 . (Join-Path $Here '..\mods\LoadOrder.ps1')
+if (-not $CollectionRecord) { $CollectionRecord = Join-Path $Here '..\..\records\collection-plugins.json' }
+$CollectionRec = Read-CollectionPluginsRecord $CollectionRecord
+$Pinned = Get-CollectionPinnedMap $CollectionRec
+$PinRefuse = -not [bool]$GamemodeOnly
+$revWhy = @(Confirm-CollectionPluginsDeploy $CollectionRec '')
+if ($revWhy.Count) {
+  Write-Host ''
+  Write-Host '  the collection plugin record does not match this machine:' -ForegroundColor Red
+  foreach ($w in $revWhy) { Write-Host ('    ' + $w) -ForegroundColor Red }
+  throw 'the collection plugin record does not match this machine. Nothing was sent and the server was not touched.'
+}
 
 function Remote($script) {
   # Send-Script.ps1 (issue #1070): a long script goes as a file of its own
@@ -439,19 +450,6 @@ if ($GamemodeOnly -and $asked.Count) {
   Write-Host '  -GamemodeOnly sets no setting: the live server keeps its own, and no key may move.' -ForegroundColor Red
   Write-Host '  -RequirePass, -Devs and -Playtesters go with a full deploy, from a machine with the server build.' -ForegroundColor Yellow
   throw '-GamemodeOnly was given -RequirePass, -Devs or -Playtesters. Nothing was sent and the server was not touched.'
-}
-# After the switch refusals, so a -PutBack with -RequirePass still names
-# that pairing and does not die on a missing record first (#1223, #2019).
-if (-not $CollectionRecord) { $CollectionRecord = Join-Path $Here '..\..\records\collection-plugins.json' }
-$CollectionRec = Read-CollectionPluginsRecord $CollectionRecord
-$Pinned = Get-CollectionPinnedMap $CollectionRec
-$PinRefuse = -not [bool]$GamemodeOnly
-$revWhy = @(Confirm-CollectionPluginsDeploy $CollectionRec '')
-if ($revWhy.Count) {
-  Write-Host ''
-  Write-Host '  the collection plugin record does not match this machine:' -ForegroundColor Red
-  foreach ($w in $revWhy) { Write-Host ('    ' + $w) -ForegroundColor Red }
-  throw 'the collection plugin record does not match this machine. Nothing was sent and the server was not touched.'
 }
 if ($PutBack) { Invoke-PutBack }
 

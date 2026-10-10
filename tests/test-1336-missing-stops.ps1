@@ -178,17 +178,21 @@ try {
         $files[$rel] = [ordered]@{ sha256 = (Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash.ToLowerInvariant(); bytes = (Get-Item -LiteralPath $p).Length; commit = $commit }
     }
     Put $record ([ordered]@{ binary = 'scam_native.node'; sha256 = $files['scam_native.node'].sha256; source = [ordered]@{ commit = $commit }; files = $files } | ConvertTo-Json -Depth 5)
-    $colRec = Join-Path $T 'collection-plugins.json'
-    Put $colRec (@'
-{
-  "collection": "7essxf",
-  "revision": 2,
-  "collectionJsonSha256": "0000000000000000000000000000000000000000000000000000000000000000",
-  "generatedBy": "scripts/release/New-CollectionPluginsRecord.ps1",
-  "plugins": {}
-}
-'@)
     foreach ($n in 'Skyrim.esm', 'A.esp', 'B.esp') { Put (Join-Path $plug $n) ('plugin ' + $n) }
+    . (Join-Path $repo 'scripts\deploy\CollectionPlugins.ps1')
+    $colRows = @{}
+    foreach ($n in 'Skyrim.esm', 'A.esp', 'B.esp') {
+        $p = Join-Path $plug $n
+        $colRows[$n] = [pscustomobject]@{
+            Bytes = [int64](Get-Item -LiteralPath $p).Length
+            Sha256 = (Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash.ToLowerInvariant()
+            Mod = 0; FileId = 0
+            ArchiveMd5 = ('0' * 32); ArchiveSha256 = ('1' * 64)
+            ArchivePath = $n; Via = 'copy'
+        }
+    }
+    $colRec = Join-Path $T 'collection-plugins.json'
+    Write-CollectionPluginsRecord $colRec (New-CollectionPluginsRecordObject '7essxf' 2 ('00' * 32) $colRows)
     function Order([string[]]$names) {
         $s = [ordered]@{ name = 'Thornswood'; port = 7777; thornswoodVoicePort = 7778; maxPlayers = 14
             loadOrder = @($names | ForEach-Object { (Join-Path $plug $_).Replace('\', '/') })

@@ -222,6 +222,9 @@ Yes 'the carry, the check and the swap are all handed those keys' (
 $W = Join-Path ([IO.Path]::GetTempPath()) ('ts-1223-ds-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $bin = Join-Path $W 'bin'
 $calls = Join-Path $W 'calls.log'
+. (Join-Path $deploy 'CollectionPlugins.ps1')
+$colRec = Join-Path $W 'collection-plugins.json'
+Write-CollectionPluginsRecord $colRec (New-CollectionPluginsRecordObject '7essxf' 2 ('00' * 32) @{})
 foreach ($n in 'ssh', 'scp') {
     Put (Join-Path $bin ($n + '.ps1')) ("[IO.File]::AppendAllText(`$env:TS_1223_CALLS, ('$n ' + (`$args -join ' ') + [Environment]::NewLine))`r`nexit 1`r`n")
 }
@@ -235,7 +238,7 @@ try {
         $eap = $ErrorActionPreference
         $ErrorActionPreference = 'Continue'
         try {
-            $o = (& $shell -NoProfile -NonInteractive -File $dsPath -Vps 127.0.0.1 -User test -PutBack -Now $case[0] $case[1] 2>&1 | Out-String)
+            $o = (& $shell -NoProfile -NonInteractive -File $dsPath -Vps 127.0.0.1 -User test -PutBack -Now $case[0] $case[1] -CollectionRecord $colRec 2>&1 | Out-String)
             $code = $LASTEXITCODE
         } finally { $ErrorActionPreference = $eap }
         $failed = $script:fail
