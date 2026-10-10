@@ -368,8 +368,8 @@ if (!mpFake.getNpcAIState) {
 function replaced(id, how) {
   const a = world.actors.get(id);
   if (how === 'life') { a.life = (a.life || 0) + 1; } else { a.desc = 'other' + id.toString(16) + ':run'; }
-  // The new body comes in whole.
-  a.p = { health: 1, magicka: 1, stamina: 1 }; a.dead = false;
+  // Its health is what the engine left at the ID, as in the issue: the
+  // queued effect is all that could still move it.
 }
 function restored(id) { const a = world.actors.get(id); delete a.desc; }
 {
@@ -382,7 +382,7 @@ function restored(id) { const a = world.actors.get(id); delete a.desc; }
       strike(by, target, 0.2, SWORD, { power: true });
       replaced(target, how);
       settle();
-      yes('T1 a Might bonus queued on a ' + name + ' does not land on a replacement (' + how + ')', health(target) === 1);
+      yes('T1 a Might bonus queued on a ' + name + ' does not land on a replacement (' + how + ')', health(target) === 0.8);
       restored(target);
     }
     heal(target);

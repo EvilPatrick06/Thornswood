@@ -674,8 +674,8 @@ if (!mpFake.getNpcAIState) {
 function replaced(id, how) {
   const a = world.actors.get(id);
   if (how === 'life') { a.life = (a.life || 0) + 1; } else { a.desc = 'other' + id.toString(16) + ':run'; }
-  // The new body comes in whole.
-  a.p = { health: 1, magicka: 1, stamina: 1 }; a.dead = false;
+  // Its health is what the engine left at the ID, as in the issue: the
+  // queued effect is all that could still move it.
 }
 function restored(id) { const a = world.actors.get(id); delete a.desc; }
 {
@@ -691,7 +691,7 @@ function restored(id) { const a = world.actors.get(id); delete a.desc; }
       replaced(target, how);
       settle();
       yes('T1 a Wreck queued on a ' + name + ' does not land on a replacement (' + how + ')',
-          health(target) === 1 && world.staggers.length === staggers);
+          health(target) === 0.8 && world.staggers.length === staggers);
       restored(target);
       heal(target);
       strike(by, target, 0.2, { power: true });
@@ -728,7 +728,7 @@ function restored(id) { const a = world.actors.get(id); delete a.desc; }
     strike(WOLF, wall, 0.5, {});
     replaced(wall, how);
     settle();
-    yes('T4 a Wall reduction queued for a defender is not given to a replacement (' + how + ')', health(wall) === 1);
+    yes('T4 a Wall reduction queued for a defender is not given to a replacement (' + how + ')', health(wall) === 0.5);
     restored(wall);
     heal(wall);
   }
