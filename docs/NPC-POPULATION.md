@@ -3,7 +3,7 @@
 Generated from the winning records in the 48-plugin dev load order.
 This is the authored policy prepared for the next dev release; release proof is recorded separately.
 
-14,668 placements inspected; 5,075 retained; 9,593 excluded.
+14,668 placements inspected; 5,072 retained; 9,596 excluded.
 
 Named pets and named enemies are excluded even when their source record lacks the Unique flag.
 Merchant traders and exterior transport services remain available.
@@ -18,9 +18,9 @@ listed interval; the deadline persists through restart. A corpse yields one shar
 | Eastmarch | 512 |
 | Falkreath | 432 |
 | Haafingar | 339 |
-| Hjaalmarch | 393 |
+| Hjaalmarch | 392 |
 | Solstheim | 462 |
-| Whiterun | 545 |
+| Whiterun | 543 |
 | Winterhold | 504 |
 | no hold | 360 |
 | the Pale | 381 |
@@ -283,7 +283,7 @@ and six of each other animal species per tile. Cave and dungeon caps are shared 
 | Robber's Gorge | Hjaalmarch | bandit-camp |  | 9 | 45 |
 | Shadowgreen Cavern | Haafingar | dungeon | 1 | 8 | 30 |
 | Shimmermist Cave | Whiterun | cave | 2 | 12 | 45 |
-| WerewolfPreload | Hjaalmarch | dungeon | 1 | 5 | 30 |
+| The Icerunner | Hjaalmarch | dungeon | 1 | 4 | 30 |
 | Brinehammer | the Pale | dungeon | 1 | 7 | 30 |
 | Pride of Tel Vos | Winterhold | dungeon | 1 | 4 | 30 |
 | Winter War | Winterhold | bandit-camp |  | 4 | 45 |
@@ -328,8 +328,6 @@ and six of each other animal species per tile. Cave and dungeon caps are shared 
 | WhiterunPLainsDistrict03 | Whiterun | city |  | 7 | 20, 360 |
 | DLC2BujoldsRetreatExterior01 | Solstheim | wilderness |  | 6 | 45, 360 |
 | Oakwood | Falkreath | city |  | 8 | 20, 360 |
-| open ground in CWTestHold | Whiterun | wilderness |  | 1 | 45 |
-| TestCWHoldStart | Whiterun | wilderness |  | 1 | 20 |
 | Movarth's Lair | Hjaalmarch | dungeon | 1 | 8 | 30 |
 | Ansilvund | Eastmarch | dungeon | 1 | 8 | 30 |
 | Warmaiden's | Whiterun | dungeon | 1 | 2 | 360 |
