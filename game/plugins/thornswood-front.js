@@ -794,6 +794,9 @@
     // First, so nothing that throws further down can leave it held.
     T.claimFocus('select', choiceUp());
 
+    // The game refused to build the save for the pick (#1994): the choice comes back.
+    if (loadRefused()) { return; }
+
     // Which window the keys are going to, and the two words that hold the
     // client's wait open. Both are needed for as long as the choice is up and
     // neither can be left to the page alone: see menuWatch.
@@ -1405,6 +1408,38 @@
     menuPhase = 0; menuAt = Date.now(); menuAsked = 0; menuLoaded = false;
     menuBeatAt = 0; menuReloads = 0; menuGaveUp = false; menuChosenId = 0;
     relogAt = 0;
+  }
+
+  /*
+    THE GAME REFUSED TO BUILD THE PICK'S SAVE (#1994).
+
+    A character picked at the menu is loaded from a save SkyrimPlatform builds
+    on the spot. When it cannot build it (a form it cannot name, such as a
+    face part from a plugin past the end of this game's lists, or a starting
+    pack it cannot write), skymp5-client's LoadGameService logs the reason,
+    hands it here in __thornswoodLoadRefused and loads nothing. Until 10 Oct
+    upstream's catch loaded the character again with no appearance at all, and
+    they arrived with the menu template's face, race and gear, which is what
+    Patrick saw on dev on 5 Oct and nothing said why.
+
+    The game is still at the main menu, so nothing is quit: the connection
+    closes (destroyClient, so the client has nothing to connect again) and the
+    choice comes back with a sentence over the slots, the way it does when the
+    server ends a session. A pick connects again (relogAs). On tick, because
+    the main menu has no update.
+  */
+  const LOAD_REFUSED_WORDS = 'That character could not be loaded: this game could not build their save, so nothing was loaded. ' +
+                             'The reason is in the logs this game sends when it closes. Tell staff the time and which character it was.';
+  function loadRefused() {
+    let why = '';
+    try { why = String(globalThis.__thornswoodLoadRefused || ''); } catch (e) { why = ''; }
+    if (!why) { return false; }
+    try { globalThis.__thornswoodLoadRefused = ''; } catch (e) { }
+    const me = menuChosenId || PROFILE;
+    log('menu: the game refused to build the save for profile', me + ', so nothing loads and the choice comes back:', why);
+    try { sp.mpClientPlugin.destroyClient(); } catch (e) { log('menu: could not close the connection to the game server:', e); }
+    backToChoice({ id: me, name: '', ended: LOAD_REFUSED_WORDS });
+    return true;
   }
 
   /*
