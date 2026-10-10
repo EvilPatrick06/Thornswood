@@ -41,6 +41,21 @@ outside the prepared region pauses activity. The NPC remains loaded and owned by
 the server. A reliable stopped snapshot prevents continued walking extrapolation.
 Dead, disabled, and immobile NPCs also pause safely.
 
+An NPC the game placed off walkable ground (a goat on a ledge, a horker on a
+rock, a deer just past a mesh edge) is set down on the walkable point nearest
+its placement, searched out to 8,192 units, the way the game moves an actor
+onto its navmesh. It happens only while nobody is within 4,096 units, and only
+in a tick that read where everybody is. When that point is past its home
+radius, the point becomes its home. An ambush (a base named ...Ambush..., such
+as a draugr in a burial alcove) waits where it was placed until somebody comes
+within 1,024 units, then walks straight out onto the floor beside it; one more
+than 256 units from any floor (a pipe or a ceiling the game empties by script)
+stays put. A race that swims and cannot walk (the slaughterfish) moves only over
+water triangles, at its height above the bed and never higher than the depth it
+was placed at. The searches run a few tiles at a time on their own tick. The
+catalogue leaves out the game's test worldspaces and its test and holding
+interiors. Issue #2067 has the measurements.
+
 Movement also respects the authored home radius, including local routes on slopes
 and inside small home ranges. Dynamic encounters and farm births must pass habitat
 and shared density checks before their creation is reported as successful.

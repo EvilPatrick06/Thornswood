@@ -22,6 +22,13 @@ try {
   });
   trade.push(10, { open: true });
   assert.equal(props[0].value.open, true);
+  const broken = service.installMerchantTrading({
+    mp: {getIdFromDesc(){return 20;},makeProperty(){},set(){throw Error('publication unavailable');}},
+    g:{},purses:{prepare(){return null;}},log(){}
+  });
+  assert.throws(()=>broken.push(10,{open:true}),/publication unavailable/);
+  assert.match(broken.command({actorId:10,profileId:7,parts:['/merchant','1']}).text,/unavailable/,
+    'a failed publisher revokes the controller before it can accept more work');
   // Run the actual activation dispatch with a stubbed trade service.
   const activation = source.slice(source.indexOf('    const merchants =', source.indexOf('E ON A GUILD TRADER')), source.indexOf('    const milked =', source.indexOf('E ON A GUILD TRADER')));
   const pushed = [];
