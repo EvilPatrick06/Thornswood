@@ -517,8 +517,29 @@ yes('only the roster is sent newest-only',
               MB(most(late)) + ' over the last, one position message ' + MB(posBytes));
   yes('and stops growing rather than climbing with every tick',
       posBytes > 0 && most(late) - most(early) < posBytes + 64 * 1024);
-  yes('and the memory the service holds stops growing with it',
-      last.held - from.held < 1024 * 1024);
+  /* The memory check waits for the thing it is about (#1991): sends to the
+     stuck socket being refused, thirty of them (the six seconds above in
+     ticks), while the backlog behind it stays drained down to one message.
+     It used to compare two probes six seconds apart, and on a loaded
+     machine a collector or a slow tick landing on either end made that red.
+     Now a span with a spike in it is let go and the next thirty refused
+     sends are measured from scratch, inside a generous bound. The code
+     before #275 grew 3 to 4 MB over every such span, so it never passes. */
+  const REFUSED = 30;
+  let base = null, grewBy = null;
+  const flat = await until('the memory flat over ' + REFUSED + ' refused sends', async () => {
+    const h = await health();
+    const now = probes[probes.length - 1];
+    if (!base) { base = { dropped: h.droppedPositions, probe: now }; return false; }
+    if (h.droppedPositions - base.dropped < REFUSED) return false;
+    const drained = probes.filter((p) => p.at >= base.probe.at).every((p) => p.queue <= posBytes + 64 * 1024);
+    grewBy = now.held - base.probe.held;
+    if (drained && grewBy < 1024 * 1024) return true;
+    base = { dropped: h.droppedPositions, probe: now };
+    return false;
+  }, 8 * BOUND_MS);
+  console.log('      held grew ' + (grewBy === null ? 'n/a' : MB(grewBy)) + ' over the last ' + REFUSED + ' refused sends');
+  yes('and the memory the service holds stops growing with it', flat);
   yes('a stuck socket is not closed for positions alone, they are dropped instead',
       hStuck.peers === 2);
   /* Polled rather than read once: when the kernel does not take a 145 KB
