@@ -9,6 +9,7 @@ function same(a,b) {
 function createQuestTransactions(deps) {
   var mp=deps.mp,active=true,property='thornswoodQuests';
   var log=deps.log || function(){};
+  function report(message,error) {try{log(message+String(error));}catch(ignored){}}
   function available() {
     return active && typeof deps.withInventoryMutation==='function' && !!mp &&
       ['compareAndSetInventoryAndProperty','getInventoryReceipt','getSavedInventoryReceipt',
@@ -54,7 +55,7 @@ function createQuestTransactions(deps) {
         if(!stillActive() || !available() || identity(actor)!==token)return {ok:false,why:'identity'};
         try {
           var changed=mp.compareAndSetInventoryAndProperty(actor,before,receipt,next,sequence,human.profileId,
-            {name:property,expected:expectedRecord===undefined?null:expectedRecord,replacement:nextRecord});
+            {name:property,expected:expectedRecord===undefined?null:expectedRecord,replacement:nextRecord,expectedLifeGeneration:owner.life});
           return {ok:changed===true,why:changed===true?'':'changed'};
         } catch(error) {
           // Publication can fail after the atomic live edit. Read back that
@@ -64,18 +65,18 @@ function createQuestTransactions(deps) {
               var live=mp.getInventoryReceipt(actor),record=mp.get(actor,property);
               if(live===nextReceipt && same(record,nextRecord))return {ok:true};
               if(live===receipt && same(record==null?null:record,expectedRecord==null?null:expectedRecord)) {
-                log('quest transaction refused: '+String(error));
+                report('quest transaction refused: ',error);
                 return {ok:false,why:'unwritten'};
               }
             }
-          } catch(readError) {log('quest transaction readback failed: '+String(readError));}
+          } catch(readError) { /* An unreadable outcome is revoked below before diagnostics. */ }
           active=false;
-          log('quest transaction outcome is unknown; service revoked: '+String(error));
-          return {ok:false,why:'unavailable'};
+          report('quest transaction outcome is unknown; service revoked: ',error);
+          return {ok:false,why:'unavailable',uncertain:true};
         }
       });
     } catch(error) {
-      log('quest transaction unavailable: '+String(error));
+      report('quest transaction unavailable: ',error);
       return {ok:false,why:'unwritten'};
     }
   }

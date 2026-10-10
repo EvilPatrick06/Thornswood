@@ -2971,6 +2971,7 @@ function swing(actorId, anim, lands, opts) {
   // One timer per person, not one per strike: a miner working a seam sets this
   // again every swing, and the last one is the one that clears.
   SWING_CLEAR[actorId] = setTimeout(function () {
+    if (o.alive && !o.alive()) return;
     delete SWING_CLEAR[actorId];
     delete SWING_IN_AIR[actorId];
     /*
@@ -62326,9 +62327,9 @@ function createSettlement(deps) {
   }
   function records() { return purses.pendingRecords(); }
   function humanKey(human) { return human && human.desc && human.profileId > 0 ? human.desc + ':' + human.profileId : ''; }
-  function admitted(human, reference) {
+  function admitted(human, reference, reserveCapacity) {
     var pending = records(), key = humanKey(human);
-    if (!key || pending.length >= MAX_PENDING) return false;
+    if (!key || reserveCapacity!==false && pending.length >= MAX_PENDING) return false;
     return pending.every(function (record) {
       var other = record.state.pending.human;
       return humanKey(other) && humanKey(other) !== key && record.reference !== reference;
@@ -62540,18 +62541,22 @@ function createSettlement(deps) {
   function withInventoryMutation(actorId,change) {
     if(!available() || busy)return {ok:false,why:'unavailable'};
     busy=true;
+    var leased=true;
     try {
       var human=transfer.identity(actorId);
-      if(!human || !admitted(human,''))return {ok:false,why:'waiting'};
+      if(!human || !admitted(human,'',false))return {ok:false,why:'waiting'};
       if(transfer.saved(actorId)!==transfer.receipt(actorId))return {ok:false,why:'waiting'};
       if(!active)return {ok:false,why:'unavailable'};
-      return change(human,function(){return active;});
-    } finally {busy=false;}
+      var result=change(human,function(){return active && leased;});
+      // Unknown receipts revoke all writers until a reload reads durable state.
+      if(result && result.uncertain)active=false;
+      return result;
+    } finally {leased=false;busy=false;}
   }
   function canInventoryMutation(actorId) {
     if(!available() || busy)return false;
     var human=transfer.identity(actorId);
-    return !!human && admitted(human,'') && transfer.saved(actorId)===transfer.receipt(actorId);
+    return !!human && admitted(human,'',false) && transfer.saved(actorId)===transfer.receipt(actorId);
   }
   return {begin:begin,tick:tick,available:available,pruneSupplyHistory:pruneSupplyHistory,
     withInventoryMutation:withInventoryMutation,canInventoryMutation:canInventoryMutation,shutdown:function () { active=false; }};
@@ -62572,6 +62577,7 @@ function same(a,b) {
 function createQuestTransactions(deps) {
   var mp=deps.mp,active=true,property='thornswoodQuests';
   var log=deps.log || function(){};
+  function report(message,error) {try{log(message+String(error));}catch(ignored){}}
   function available() {
     return active && typeof deps.withInventoryMutation==='function' && !!mp &&
       ['compareAndSetInventoryAndProperty','getInventoryReceipt','getSavedInventoryReceipt',
@@ -62617,7 +62623,7 @@ function createQuestTransactions(deps) {
         if(!stillActive() || !available() || identity(actor)!==token)return {ok:false,why:'identity'};
         try {
           var changed=mp.compareAndSetInventoryAndProperty(actor,before,receipt,next,sequence,human.profileId,
-            {name:property,expected:expectedRecord===undefined?null:expectedRecord,replacement:nextRecord});
+            {name:property,expected:expectedRecord===undefined?null:expectedRecord,replacement:nextRecord,expectedLifeGeneration:owner.life});
           return {ok:changed===true,why:changed===true?'':'changed'};
         } catch(error) {
           // Publication can fail after the atomic live edit. Read back that
@@ -62627,18 +62633,18 @@ function createQuestTransactions(deps) {
               var live=mp.getInventoryReceipt(actor),record=mp.get(actor,property);
               if(live===nextReceipt && same(record,nextRecord))return {ok:true};
               if(live===receipt && same(record==null?null:record,expectedRecord==null?null:expectedRecord)) {
-                log('quest transaction refused: '+String(error));
+                report('quest transaction refused: ',error);
                 return {ok:false,why:'unwritten'};
               }
             }
-          } catch(readError) {log('quest transaction readback failed: '+String(readError));}
+          } catch(readError) { /* An unreadable outcome is revoked below before diagnostics. */ }
           active=false;
-          log('quest transaction outcome is unknown; service revoked: '+String(error));
-          return {ok:false,why:'unavailable'};
+          report('quest transaction outcome is unknown; service revoked: ',error);
+          return {ok:false,why:'unavailable',uncertain:true};
         }
       });
     } catch(error) {
-      log('quest transaction unavailable: '+String(error));
+      report('quest transaction unavailable: ',error);
       return {ok:false,why:'unwritten'};
     }
   }
@@ -62728,6 +62734,7 @@ function createMerchantTrading(deps) {
   var now = deps.now || function () { return Date.now(); };
   var reach = deps.reach == null ? REACH : deps.reach;
   var sessions = new Map();
+  var sessionSerial = 0;
   var settlement = SETTLEMENT.createSettlement({purses:purses,transfer:transfer,world:deps.namespace || purses.namespace,log:deps.log,now:now});
   var active = true;
 
@@ -62862,7 +62869,7 @@ function createMerchantTrading(deps) {
         : 'Buying and selling wait on the native transfer. Nothing has moved.')
     };
     var session=sessions.get(profileId);
-    if (session && session.actorId===actorId) session.quests=JSON.stringify(view.quests);
+    if (session && session.actorId===actorId) view.sessionId=session.id;
     return view;
   }
 
@@ -62879,7 +62886,6 @@ function createMerchantTrading(deps) {
       var state = purses.read(session.merchantId), place = state && placeOf(state.reference);
       if (state && place) {
         var view=viewFor(session.merchantId,state,place,session.actorId,profileId);
-        session.quests=JSON.stringify(view.quests);
         views.push({actorId:session.actorId,view:view});
       }
     });
@@ -62941,7 +62947,8 @@ function createMerchantTrading(deps) {
       var prior = sessions.get(profileId);
       var repeat = prior && prior.merchantId === merchantId && (now() - prior.at) < 3000;
       var opened = viewFor(merchantId, state, place, actorId, profileId);
-      sessions.set(profileId, { merchantId: merchantId, actorId:actorId, identity:identity, quests:JSON.stringify(opened.quests), at: now() });
+      opened.sessionId=identity+':'+now()+':'+(++sessionSerial);
+      sessions.set(profileId, { id:opened.sessionId, merchantId: merchantId, actorId:actorId, identity:identity, quests:JSON.stringify(opened.quests), at: now() });
       return {
         text: repeat ? '' : (opened.transfer
           ? ('Trading with ' + opened.trader + ' in ' + opened.place + '. Purse ' + opened.purse + '.')
@@ -63088,6 +63095,11 @@ function createMerchantTrading(deps) {
   }
 
   return {
+    acknowledgeView: function(actorId,view) {
+      sessions.forEach(function(session){
+        if(session.actorId===actorId && session.id===view.sessionId)session.quests=JSON.stringify(view.quests);
+      });
+    },
     command: command,
     activate: activate,
     recover: recover,
@@ -63208,7 +63220,9 @@ function installMerchantTrading(env) {
   trading.push = function (actorId, view) {
     var payload = JSON.parse(JSON.stringify(view || { open: false }));
     payload.at = Date.now();
-    try { mp.set(actorId, property, payload); } catch (e) { log('merchant panel: ' + e); }
+    try { mp.set(actorId, property, payload); }
+    catch (e) { trading.shutdown(); log('merchant panel publication failed; controller revoked: ' + e); throw e; }
+    trading.acknowledgeView(actorId,payload);
   };
   var timers=env.timers || (typeof setTimeout === 'function' && typeof clearTimeout === 'function' ? {setTimeout:setTimeout,clearTimeout:clearTimeout} : null);
   var alive=true, timer=null;
@@ -63430,7 +63444,7 @@ try {
       cooldown and forget what was drawn.
     */
     function questsOf(actor) {
-      if (!active) return null;
+      if (!active || deps.available && !deps.available()) return null;
       var raw;
       try { raw = deps.load(actor); } catch (e) {
         note('could not read the quests of', actor + ':', e);
@@ -63463,7 +63477,7 @@ try {
     }
     function keep(actor, b, changes) {
       try {
-        if (!active) return false;
+        if (!active || deps.available && !deps.available()) return false;
         var next = { v: 1, open: b.open, cool: b.cool };
         if (changes) return deps.commit(actor, b.expected, next, changes).ok === true;
         deps.save(actor, next);
@@ -63588,10 +63602,10 @@ try {
         if (!active || deps.identity(actor) !== original) return;
         var result = giveRare(actor, refrId, seam);
         if (result.text) { notifyFn(actor, result.text); sayFn(actor, result.text); }
-        if (!result.ok) return;
+        if (!result.ok || !active || deps.available && !deps.available() || deps.identity(actor) !== original) return;
         try { creditFn(actor, 'mine'); } catch (e) {}
         try { wearFn(actor, 'miner'); } catch (e) {}
-      }, { tool: pick });
+      }, { tool: pick, alive: function(){return active && (!deps.available || deps.available()) && deps.identity(actor) === original;} });
       return '';
     }
     function walkAway(actor, id) {
@@ -63774,6 +63788,7 @@ try {
         },
         commit: questTransactions.commit,
         identity: questTransactions.identity,
+        available: questTransactions.available,
         ready: function (actor) {
           var merchants = globalThis.__thornswoodMerchantTrade;
           return questTransactions.available() && !!merchants && merchants.questReady(actor);

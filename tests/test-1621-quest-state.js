@@ -123,7 +123,7 @@ function boot(into) {
     return true;
   };
   ctx.MERCHANT_TRADING = {createQuestTransactions: function () {
-    return {identity: function (a) { return ctx.__identityToken || 'actor:' + a; }, shutdown: function () {},available:function(){return true;},
+    return {identity: function (a) { return ctx.__identityToken || 'actor:' + a; }, shutdown: function () {},available:function(){return !ctx.__revoked;},
       commit: function (a, expected, next, changes) {
         if (fault.write) throw new Error('the write was refused');
         const current = form(a);
@@ -403,6 +403,35 @@ unread({ v: 2, open: {}, cool: {} }, 'a record of another shape');
 }
 
 // ------------------------------------------------------- the pages -------
+{
+  const timers=[],writes=[];
+  const start=gm.indexOf('function swing(actorId, anim, lands, opts) {');
+  const finish=gm.indexOf('\n}\n/*',start)+2;
+  const ctx={mp:{set:(...args)=>writes.push(args)},setTimeout:(fn,ms)=>{timers.push({fn,ms});return timers.length;},
+    clearTimeout(){},guard:(label,fn)=>fn,SWING_PROPERTY:'swing',SWING_STOP:'stop',SWING_FREE:'free',
+    SWING_MS:2500,SWING_LAND_MS:900,SWING_QUIET:{},SWING_IN_AIR:{},SWING_CLEAR:{},log(){}};
+  vm.createContext(ctx);vm.runInContext(gm.slice(start,finish),ctx);
+  let alive=true;ctx.swing(36,'mine',null,{alive:()=>alive});alive=false;
+  const count=writes.length;timers.forEach(t=>t.fn());
+  yes('the real swing cleanup cannot write after its owner is revoked',writes.length===count);
+}
+{
+  w=restart();w.svc.bindPlace('wolf',{cell:'pad-1'});w.svc.offer(34,'wolf');
+  names[41]='Wolf';veinCell[41]='pad-1';
+  const saved=JSON.stringify(forms[34]);w.ctx.__revoked=true;
+  w.svc.noteKill(34,41);w.svc.offer(34,'ebony');
+  yes('transaction revocation blocks every quest-state writer',JSON.stringify(forms[34])===saved);
+}
+{
+  ranks['35:miner']='master';w=restart();w.svc.offer(35,'ebony');
+  let done,valid,credits=0;
+  w.ctx.swing=function(a,anim,finish,opts){done=finish;valid=opts.alive;};
+  w.ctx.creditWork=function(){credits++;};
+  w.svc.mineRare(35,here[0],EBONY);
+  yes('a current quest swing owns its cleanup lease',valid());
+  w.svc.shutdown();done();
+  yes('shutdown revokes mining cleanup and work credit',!valid() && credits===0 && have(35,EBONY.ore)===0);
+}
 {
   ranks['33:miner']='master';w=restart();
   yes('the trader describes the four authored mine quests',typeof w.svc.describe==='function' &&

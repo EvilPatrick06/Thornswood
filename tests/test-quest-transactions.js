@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict');
 const {createQuestTransactions}=require('../game/quest-transactions');
 const clone=x=>JSON.parse(JSON.stringify(x));
-function fixture() {
+function fixture(options={}) {
   let inventory={entries:[{baseId:15,count:40},{baseId:100,count:4,name:'Keepsake',health:0.75}]};
   let record={v:1,open:{wolf:{kills:1}},cool:{}},receipt='null',saved='null',profile=7,pending=false;
   let calls=0,mode='',busy=false;
@@ -10,21 +10,21 @@ function fixture() {
   const mp={
     getNpcAIState:()=>({isHuman:true,profileId:profile,lifeGeneration:0}),
     getDescFromId:()=>human().desc,getIdFromDesc:d=>d==='f:Skyrim.esm'?15:d==='ore:Skyrim.esm'?100:0,
-    get:(id,key)=>clone(key==='inventory'?inventory:record),
+    get:(id,key)=>{if(mode==='readback' && calls)throw Error('readback unavailable');return clone(key==='inventory'?inventory:record);},
     getInventoryReceipt:()=>receipt,getSavedInventoryReceipt:()=>saved,
     compareAndSetInventoryAndProperty(id,expected,old,next,seq,owner,change) {
-      calls++;assert.equal(owner,profile);
+      calls++;assert.equal(owner,profile);assert.equal(change.expectedLifeGeneration,0);
       if(mode==='before')throw new Error('before mutation');
       if(mode==='refuse')return false;
       assert.deepEqual(expected,inventory);assert.equal(old,receipt);assert.deepEqual(change.expected,record);
       inventory=clone(next);record=clone(change.replacement);
       receipt=JSON.stringify({actor:human().desc,profile,sequence:seq});
-      if(mode==='unknown'){record={other:true};throw new Error('unknown outcome');}
+      if(mode==='unknown' || mode==='readback'){record={other:true};throw new Error('unknown outcome');}
       if(mode==='after')throw new Error('notification failed');
       return true;
     }
   };
-  const transfer=createQuestTransactions({mp,withInventoryMutation:(id,fn)=>{
+  const transfer=createQuestTransactions({mp,log:options.log,withInventoryMutation:(id,fn)=>{
     if(busy || pending || receipt!==saved)return {ok:false,why:'waiting'};
     busy=true;try{return fn(human(),()=>true);}finally{busy=false;}
   }});
@@ -55,6 +55,9 @@ assert.equal(f.transfer.commit(10,f.record(),{...next,open:{ebony:{drawn:1,gem:u
 f=fixture();f.mode('unknown');
 assert.equal(f.transfer.commit(10,f.record(),next,[]).ok,false);assert.equal(f.transfer.available(),false);
 f.mode('');assert.equal(f.transfer.commit(10,f.record(),next,[]).ok,false);assert.equal(f.calls(),1);
+f=fixture({log:()=>{throw Error('logger failed');}});f.mode('readback');
+assert.equal(f.transfer.commit(10,f.record(),next,[]).uncertain,true);
+assert.equal(f.transfer.available(),false,'revocation must precede fallible diagnostics');
 f=fixture();f.pending(true);
 assert.equal(f.transfer.commit(10,f.record(),next,[]).ok,false);assert.equal(f.calls(),0);
 f=fixture();const original=f.inventory();

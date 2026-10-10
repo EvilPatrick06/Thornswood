@@ -80,6 +80,7 @@ function createMerchantTrading(deps) {
   var now = deps.now || function () { return Date.now(); };
   var reach = deps.reach == null ? REACH : deps.reach;
   var sessions = new Map();
+  var sessionSerial = 0;
   var settlement = SETTLEMENT.createSettlement({purses:purses,transfer:transfer,world:deps.namespace || purses.namespace,log:deps.log,now:now});
   var active = true;
 
@@ -214,7 +215,7 @@ function createMerchantTrading(deps) {
         : 'Buying and selling wait on the native transfer. Nothing has moved.')
     };
     var session=sessions.get(profileId);
-    if (session && session.actorId===actorId) session.quests=JSON.stringify(view.quests);
+    if (session && session.actorId===actorId) view.sessionId=session.id;
     return view;
   }
 
@@ -231,7 +232,6 @@ function createMerchantTrading(deps) {
       var state = purses.read(session.merchantId), place = state && placeOf(state.reference);
       if (state && place) {
         var view=viewFor(session.merchantId,state,place,session.actorId,profileId);
-        session.quests=JSON.stringify(view.quests);
         views.push({actorId:session.actorId,view:view});
       }
     });
@@ -293,7 +293,8 @@ function createMerchantTrading(deps) {
       var prior = sessions.get(profileId);
       var repeat = prior && prior.merchantId === merchantId && (now() - prior.at) < 3000;
       var opened = viewFor(merchantId, state, place, actorId, profileId);
-      sessions.set(profileId, { merchantId: merchantId, actorId:actorId, identity:identity, quests:JSON.stringify(opened.quests), at: now() });
+      opened.sessionId=identity+':'+now()+':'+(++sessionSerial);
+      sessions.set(profileId, { id:opened.sessionId, merchantId: merchantId, actorId:actorId, identity:identity, quests:JSON.stringify(opened.quests), at: now() });
       return {
         text: repeat ? '' : (opened.transfer
           ? ('Trading with ' + opened.trader + ' in ' + opened.place + '. Purse ' + opened.purse + '.')
@@ -440,6 +441,11 @@ function createMerchantTrading(deps) {
   }
 
   return {
+    acknowledgeView: function(actorId,view) {
+      sessions.forEach(function(session){
+        if(session.actorId===actorId && session.id===view.sessionId)session.quests=JSON.stringify(view.quests);
+      });
+    },
     command: command,
     activate: activate,
     recover: recover,
@@ -560,7 +566,9 @@ function installMerchantTrading(env) {
   trading.push = function (actorId, view) {
     var payload = JSON.parse(JSON.stringify(view || { open: false }));
     payload.at = Date.now();
-    try { mp.set(actorId, property, payload); } catch (e) { log('merchant panel: ' + e); }
+    try { mp.set(actorId, property, payload); }
+    catch (e) { trading.shutdown(); log('merchant panel publication failed; controller revoked: ' + e); throw e; }
+    trading.acknowledgeView(actorId,payload);
   };
   var timers=env.timers || (typeof setTimeout === 'function' && typeof clearTimeout === 'function' ? {setTimeout:setTimeout,clearTimeout:clearTimeout} : null);
   var alive=true, timer=null;

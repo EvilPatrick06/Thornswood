@@ -13,6 +13,7 @@
   var shown = false;
   var root = null;
   var gemChoices = {};
+  var dismissed = null;
 
   function tell(what) {
     try { window.skyrimPlatform.sendMessage('thornswood-front', 'merchant:' + what); }
@@ -21,8 +22,7 @@
   function net(line) {
     try {
       if (window.thornswoodNet && window.thornswoodNet.say) {
-        window.thornswoodNet.say(line);
-        return true;
+        return window.thornswoodNet.say(line) === true;
       }
     } catch (e) { }
     return false;
@@ -145,10 +145,10 @@
         var el = ev.currentTarget;
         var questId = el.getAttribute('data-quest');
         if (questId) {
-          el.disabled = true;
-          var sent = net('/merchant quest ' + el.getAttribute('data-action') + ' ' + questId +
+          // Availability comes from the server view. Chat transport has no
+          // per-command acknowledgement, so it cannot own a pending button.
+          net('/merchant quest ' + el.getAttribute('data-action') + ' ' + questId +
             (gemChoices[questId] ? ' ' + gemChoices[questId] : ''));
-          if (!sent) el.disabled = false;
           return;
         }
         var verb = el.getAttribute('data-verb');
@@ -168,8 +168,9 @@
     }
     tell('opened');
   }
-  function open() { draw(); }
+  function open() { dismissed=null; draw(); }
   function close() {
+    if (data && data.open !== false) dismissed=data.sessionId || 'legacy';
     if (root) root.className = '';
     if (shown) tell('closed');
     shown = false;
@@ -177,7 +178,7 @@
   function setData(next) {
     data = next || null;
     if (!data || data.open === false) close();
-    else draw();
+    else if (dismissed !== (data.sessionId || 'legacy')) draw();
   }
   window.thornswoodMerchant = { open: open, close: close, setData: setData, isOpen: function () { return shown; } };
   tell('ready');

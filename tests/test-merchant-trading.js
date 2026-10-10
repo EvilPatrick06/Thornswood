@@ -143,6 +143,8 @@ cooling=false;
 const refreshedWork=cooldownPanel.api.recover();
 assert.equal(refreshedWork.length,1,'cooldown expiry updates an open panel without a trade');
 assert.equal(refreshedWork[0].view.quests[0].canTake,true);
+assert.equal(cooldownPanel.api.recover().length,1,'an unacknowledged publication is not cached as delivered');
+cooldownPanel.api.acknowledgeView(10,refreshedWork[0].view);
 assert.equal(cooldownPanel.api.recover().length,0,'a refreshed quest is not sent repeatedly');
 let takenWork=false;
 cooldownPanel.deps.quests=()=>({describe:()=>[{id:'ebony',state:takenWork?'open':'available'}],
@@ -150,6 +152,7 @@ cooldownPanel.deps.quests=()=>({describe:()=>[{id:'ebony',state:takenWork?'open'
 open(cooldownPanel.api);
 const takenView=cooldownPanel.api.command({actorId:10,profileId:7,parts:['/merchant','quest','take','ebony']}).view;
 assert.equal(takenView.note,'You take the work.');
+cooldownPanel.api.acknowledgeView(10,takenView);
 assert.equal(cooldownPanel.api.recover().length,0,'unchanged recovery retains the action feedback without replacing the view');
 cooldownPanel.world.actors[10].lifeGeneration=1;
 assert.deepEqual(cooldownPanel.api.recover()[0].view,{open:false},'recovery closes an obsolete character session');

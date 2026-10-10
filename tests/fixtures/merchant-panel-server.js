@@ -1,7 +1,7 @@
 'use strict';
 // Local browser fixture for the actual CEF trader panel. No game/server writes.
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path');
-const base={open:true,transfer:true,trader:'Guild trader',place:'Whiterun',purse:250,
+const base={open:true,sessionId:'fixture-1',transfer:true,trader:'Guild trader',place:'Whiterun',purse:250,
   offers:[{name:'Iron Ingot',buy:3,sell:5,stock:4}],supply:[],quests:[
     {id:'ebony',name:'The ebony',who:'Miner, master',ask:4,holds:12,hours:24,state:'available',drawn:0,
       gems:[],locations:'Raven Rock Mine',canTake:true,canReturn:false,canAbandon:false},
@@ -23,7 +23,9 @@ http.createServer((req,res)=>{
   }
   res.setHeader('Content-Type','text/html');
   res.end('<!doctype html><html lang="en"><meta charset="utf-8"><title>Merchant panel fixture</title>'+ 
-    '<body style="margin:0;background:#302820"><output id="commands" style="position:fixed;top:0;left:0;color:white;z-index:2147483500"></output>'+ 
-    '<script>window.skyrimPlatform={sendMessage:function(){}};window.thornswoodNet={say:function(line){document.getElementById("commands").textContent=line;}};</script>'+ 
-    '<script src="/merchant.js"></script><script>window.thornswoodMerchant.setData('+JSON.stringify(data)+');</script></body></html>');
+    '<body style="margin:0;background:#302820"><div style="position:fixed;top:0;left:0;color:white;z-index:2147483500"><output id="commands"></output>'+ 
+    '<button onclick="window.rejectCommand=true">Reject commands</button><button onclick="window.thornswoodMerchant.setData(window.fixtureData)">Same session update</button>'+ 
+    '<button onclick="window.fixtureData.sessionId=\'fixture-2\';window.thornswoodMerchant.setData(window.fixtureData)">New activation</button></div>'+ 
+    '<script>window.skyrimPlatform={sendMessage:function(){}};window.thornswoodNet={say:function(line){document.getElementById("commands").textContent=line;return window.rejectCommand!==true;}};</script>'+ 
+    '<script src="/merchant.js"></script><script>window.fixtureData='+JSON.stringify(data)+';window.thornswoodMerchant.setData(window.fixtureData);</script></body></html>');
 }).listen(0,'127.0.0.1',function(){console.log('Merchant fixture http://127.0.0.1:'+this.address().port);});

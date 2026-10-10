@@ -81,9 +81,9 @@ function createSettlement(deps) {
   }
   function records() { return purses.pendingRecords(); }
   function humanKey(human) { return human && human.desc && human.profileId > 0 ? human.desc + ':' + human.profileId : ''; }
-  function admitted(human, reference) {
+  function admitted(human, reference, reserveCapacity) {
     var pending = records(), key = humanKey(human);
-    if (!key || pending.length >= MAX_PENDING) return false;
+    if (!key || reserveCapacity!==false && pending.length >= MAX_PENDING) return false;
     return pending.every(function (record) {
       var other = record.state.pending.human;
       return humanKey(other) && humanKey(other) !== key && record.reference !== reference;
@@ -295,18 +295,22 @@ function createSettlement(deps) {
   function withInventoryMutation(actorId,change) {
     if(!available() || busy)return {ok:false,why:'unavailable'};
     busy=true;
+    var leased=true;
     try {
       var human=transfer.identity(actorId);
-      if(!human || !admitted(human,''))return {ok:false,why:'waiting'};
+      if(!human || !admitted(human,'',false))return {ok:false,why:'waiting'};
       if(transfer.saved(actorId)!==transfer.receipt(actorId))return {ok:false,why:'waiting'};
       if(!active)return {ok:false,why:'unavailable'};
-      return change(human,function(){return active;});
-    } finally {busy=false;}
+      var result=change(human,function(){return active && leased;});
+      // Unknown receipts revoke all writers until a reload reads durable state.
+      if(result && result.uncertain)active=false;
+      return result;
+    } finally {leased=false;busy=false;}
   }
   function canInventoryMutation(actorId) {
     if(!available() || busy)return false;
     var human=transfer.identity(actorId);
-    return !!human && admitted(human,'') && transfer.saved(actorId)===transfer.receipt(actorId);
+    return !!human && admitted(human,'',false) && transfer.saved(actorId)===transfer.receipt(actorId);
   }
   return {begin:begin,tick:tick,available:available,pruneSupplyHistory:pruneSupplyHistory,
     withInventoryMutation:withInventoryMutation,canInventoryMutation:canInventoryMutation,shutdown:function () { active=false; }};
