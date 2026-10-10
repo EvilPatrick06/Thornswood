@@ -53400,7 +53400,11 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       night: !!v.night,
       roof: !!v.roof,
       high: Number(v.high) || 0,
-      fire: (typeof v.fire === 'number') ? v.fire : -1
+      fire: (typeof v.fire === 'number') ? v.fire : -1,
+      // The ales lately and when the last went down (#1677). consumed() reads
+      // them through settle(), so without them every ale was the first.
+      ale: Number(v.ale) || 0,
+      aleAt: (typeof v.aleAt === 'number') ? v.aleAt : null
     };
   }
 
