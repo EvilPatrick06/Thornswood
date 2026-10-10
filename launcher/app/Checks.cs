@@ -636,10 +636,6 @@ namespace Thornswood
             catch (Exception ex) { Swallow.Note("Checks.NoteIsolated", ex); }
         }
 
-        /// <summary>Old name. Kept so nothing that still calls it deletes
-        /// anything, because it never did anything else after this change.</summary>
-        public static int RemoveForeign(Action<string> say) { return IsolateForeign(say); }
-
         /// <summary>
         /// Creation Club plugins the game will load without being asked, and
         /// that <paramref name="wanted"/>, the reference list, does not name.
