@@ -54,20 +54,33 @@
   var newAt = 0;
   var newFrom = -1;
   var NEW_WAIT_MS = 3000;
+  // The press is still in the chat's queue, waiting for the socket (#2135).
+  // The 3 s wait is for an answer to a line that has gone, so it starts when
+  // the line leaves, not when it was queued: until #2135 it ran out while the
+  // line was still queued, the next press queued another, and the welcome
+  // sent the server one journal per 3 s somebody had been waiting.
+  var newQueued = false;
 
   function tell(what) {
     try { window.skyrimPlatform.sendMessage('thornswood-front', 'journal:' + what); }
     catch (e) { }
   }
 
+  /* 'sent', 'queued' (the chat holds it until it joins), or '' (it went
+     nowhere). say answers true only for a line on the socket. */
   function net(line) {
     try {
-      if (window.thornswoodNet && window.thornswoodNet.say) {
-        window.thornswoodNet.say(line);
-        return true;
+      var n = window.thornswoodNet;
+      if (n && n.say) {
+        var before = queued();
+        if (n.say(line) === true) { return 'sent'; }
+        return queued() > before ? 'queued' : '';
       }
     } catch (e) { }
-    return false;
+    return '';
+  }
+  function queued() {
+    try { return Number(window.thornswoodNet.state().queued) || 0; } catch (e) { return 0; }
   }
 
   /*
@@ -326,10 +339,19 @@
           */
           openGroup = '';
           var now = Date.now();
+          if (newQueued) {
+            if (queued() > 0) { return; }
+            // It has left since the last press: wait for its answer from now.
+            newQueued = false;
+            newAt = now;
+            return;
+          }
           if (newAt && now - newAt < NEW_WAIT_MS) { return; }
           newAt = now;
           newFrom = books().length;
-          if (!net('/journal new Journal')) { newAt = 0; }
+          var went = net('/journal new Journal');
+          if (went === 'queued') { newQueued = true; }
+          else if (!went) { newAt = 0; }
           return;
         }
         if (this.getAttribute('data-shared') !== null) {
@@ -856,7 +878,7 @@
     setData: function (d) {
       data = d || null;
       // The new journal has arrived, so New answers the next press again.
-      if (newAt && books().length !== newFrom) { newAt = 0; newFrom = -1; }
+      if ((newAt || newQueued) && books().length !== newFrom) { newAt = 0; newFrom = -1; newQueued = false; }
       /*
         Redrawn on every push, and that is a real cost: typing into a page and
         having a friend log in would otherwise rebuild the textarea under the
