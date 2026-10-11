@@ -79,9 +79,30 @@ const FOR_BOT = path.join(DATA, 'for-bot');
 // request log carrying addresses would quietly make that untrue, so this
 // holds what the site says about itself and the method and path of anything
 // that failed, and never who asked.
-function makeLog(dir, name, maxBytes, keep) {
+//
+// WHEN ROLLING FAILS (#2189). Until 11 October a failed roll was swallowed
+// and the line was appended anyway, so one rotated file held open (an editor,
+// a tail, a backup) or a folder that lost delete rights let site.log grow
+// past its four megabytes for as long as the site ran, with nothing said.
+// Now: the failure is said ONCE on the console and in the log itself, naming
+// the file, the error and what usually causes it. The roll is retried every
+// retryMs (a minute), not on every line. And the active file has an
+// EMERGENCY CEILING of twice maxBytes (8 MB for site.log): past it one line
+// says so and the file stops growing, lines carry on to the console only,
+// until a roll succeeds, which is said once too. Disk space for this folder
+// as a whole is #2178's storage alerts, not this.
+function makeLog(dir, name, maxBytes, keep, opts) {
   const file = path.join(dir, name);
+  const retryMs = (opts && typeof opts.retryMs === 'number') ? opts.retryMs : 60000;
+  const ceiling = maxBytes * 2;
   let broken = false;
+  let rollError = null;      // the last roll's error, null when the last roll worked
+  let rollFailures = 0;      // failed rolls since the last good one
+  let nextRoll = 0;          // no retry before this (ms)
+  let held = false;          // the ceiling line has been written
+  function say(line) {
+    try { process.stdout.write('[thornswood-docs] ' + line + '\n'); } catch (e) { }
+  }
 
   function two(n) { return n < 10 ? '0' + n : String(n); }
   function stamp() {
@@ -103,16 +124,50 @@ function makeLog(dir, name, maxBytes, keep) {
         if (fs.existsSync(from)) { fs.renameSync(from, file + '.' + (i + 1)); }
       }
       if (fs.existsSync(file)) { fs.renameSync(file, file + '.1'); }
+      rollError = null;
       return true;
-    } catch (e) { return false; }
+    } catch (e) { rollError = e; return false; }
   }
 
   function write(line) {
     if (broken) { return false; }
     try {
-      let big = false;
-      try { big = fs.statSync(file).size >= maxBytes; } catch (e) { big = false; }
-      if (big) { roll(); }
+      let size = 0;
+      try { size = fs.statSync(file).size; } catch (e) { size = 0; }
+      if (size >= maxBytes && Date.now() >= nextRoll) {
+        if (roll()) {
+          if (rollFailures) {
+            const was = rollFailures;
+            rollFailures = 0; held = false;
+            say('rolled ' + file + ' again after ' + was + ' failed tr' + (was === 1 ? 'y' : 'ies'));
+            fs.appendFileSync(file, stamp() + '  log rolled again after ' + was + ' failed tr' + (was === 1 ? 'y' : 'ies') + '\n');
+          }
+          size = 0;
+        } else {
+          rollFailures++;
+          nextRoll = Date.now() + retryMs;
+          if (rollFailures === 1) {
+            const why = 'could not roll ' + file + ' (' + ((rollError && (rollError.code || rollError.message)) || 'unknown') +
+              ': ' + ((rollError && rollError.message) || '') + '). Usually ' + name + '.1 to .' + keep +
+              ' is held open by an editor, a tail or a backup, or the folder lost delete rights. ' +
+              'Retrying every ' + Math.round(retryMs / 1000) + ' s; past ' + ceiling + ' bytes ' + name +
+              ' stops growing and lines go to the console only.';
+            say(why);
+            fs.appendFileSync(file, stamp() + '  ERROR ' + why + '\n');
+            size += why.length;
+          }
+        }
+      }
+      if (size >= ceiling) {
+        if (!held) {
+          held = true;
+          const stop = name + ' reached its emergency ceiling of ' + ceiling + ' bytes with rolling still failing; ' +
+            'lines go to the console only until a roll works';
+          say(stop);
+          fs.appendFileSync(file, stamp() + '  ERROR ' + stop + '\n');
+        }
+        return false;
+      }
       fs.appendFileSync(file, stamp() + '  ' + line + '\n');
       return true;
     } catch (e) {
@@ -127,7 +182,11 @@ function makeLog(dir, name, maxBytes, keep) {
     }
   }
 
-  return { file: file, write: write, roll: roll, broken: function () { return broken; } };
+  return {
+    file: file, write: write, roll: roll, ceiling: ceiling,
+    broken: function () { return broken; },
+    rolling: function () { return { failures: rollFailures, held: held, error: rollError ? (rollError.code || rollError.message) : null }; }
+  };
 }
 
 // Four megabytes is a few days of a closed playtest and opens in anything.
