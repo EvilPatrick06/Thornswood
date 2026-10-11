@@ -264,6 +264,12 @@ jobs:
           # Issue #1589: a line here with no comma after it ends the list, and
           # every name below it only prints itself. test-gate-list.ps1 parses
           # this step and fails on any harness named outside the list.
+          # Djinn, 11 Oct 2026: Main is the full badge at every size. #1581
+          # put the site favicon's crest into the small frames of app.ico,
+          # so shortcuts and the taskbar showed the tab icon.
+          # tests\test-launcher-icons.js fails if any frame of
+          # launcher\app.ico matches a frame of site\public\favicon.ico, or
+          # if app.ico and app-dev.ico share a frame.
           $six = 'test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
@@ -438,6 +444,7 @@ jobs:
                  'test-client-by-hash.ps1',
                  'test-build-vs-install.ps1',
                  'test-ship-dry-run.ps1',
+                 'test-launcher-icons.js',
                  'test-gate-list.ps1'
           $failed = @()
           foreach ($n in $six) {
