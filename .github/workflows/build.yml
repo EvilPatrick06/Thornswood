@@ -77,7 +77,7 @@ jobs:
     name: Launcher builds
     runs-on: [self-hosted, Windows, thornswood-vps]
     # About two minutes on the VPS. Past this it is stuck, not slow.
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -581,6 +581,42 @@ jobs:
           & $py -m ruff check --isolated --no-cache --select E9,F63,F7,F82 --output-format github @files
           if ($LASTEXITCODE -ne 0) { exit 1 }
           Write-Host ("{0} Python file(s) name only what exists" -f $files.Count)
+
+      - name: Lint (warnings only)
+        # Issue #1343. Reports ruff, eslint and PSScriptAnalyzer findings and
+        # never fails the build. PSScriptAnalyzer took about 253 s over the
+        # repository on Ship PC One on 10 Oct (1276 findings), so 8 minutes.
+        continue-on-error: true
+        timeout-minutes: 8
+        shell: pwsh
+        run: |
+          # ruff: the venv the step above made from the hash-pinned
+          # .github\ruff-requirements.txt, so nothing new is installed.
+          $py = Join-Path $env:RUNNER_TEMP 'ruff-venv\Scripts\python.exe'
+          if (Test-Path -LiteralPath $py) {
+            & $py -m ruff check --no-cache --config .github\lint\ruff.toml --exit-zero --output-format github @(git ls-files '*.py')
+          } else { Write-Host '::warning::no ruff venv, ruff lint skipped' }
+
+          # eslint: pinned by version only (no lockfile, no hash).
+          $npm = Join-Path $env:RUNNER_TEMP 'lint-npm'
+          npm install --prefix $npm --no-save --no-audit --no-fund --silent eslint@9.39.5
+          $eslint = Join-Path $npm 'node_modules\.bin\eslint.cmd'
+          if (Test-Path -LiteralPath $eslint) {
+            & $eslint -c .github\lint\eslint.config.mjs .
+          } else { Write-Host '::warning::could not install eslint 9.39.5, eslint lint skipped' }
+
+          # PSScriptAnalyzer: pinned by version only, from the PowerShell Gallery.
+          $psm = Join-Path $env:RUNNER_TEMP 'lint-psm'
+          New-Item -ItemType Directory -Force -Path $psm | Out-Null
+          Save-Module -Name PSScriptAnalyzer -RequiredVersion 1.24.0 -Path $psm -Repository PSGallery -Force
+          Import-Module (Join-Path $psm 'PSScriptAnalyzer\1.24.0\PSScriptAnalyzer.psd1')
+          $found = @(Invoke-ScriptAnalyzer -Path . -Recurse -Settings .github\lint\PSScriptAnalyzerSettings.psd1)
+          foreach ($d in $found) {
+            $lvl = if ($d.Severity -eq 'Error') { 'error' } else { 'warning' }
+            Write-Host ("::{0} file={1},line={2}::{3}: {4}" -f $lvl, $d.ScriptPath, $d.Line, $d.RuleName, $d.Message)
+          }
+          Write-Host ("PSScriptAnalyzer: {0} finding(s)" -f $found.Count)
+          exit 0
 
       - name: Count the silent catches in the launcher
         shell: pwsh
