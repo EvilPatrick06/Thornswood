@@ -77,6 +77,11 @@ namespace Thornswood
         static bool updateAnswered;
         static bool checkFailed;
         static DateTime playStartedAt;
+        // When the last session's game closed, for PlayPressedBy (#2215).
+        static DateTime gameClosedAt;
+        // The last key that went down on this window, for PlayPressedBy.
+        static Key lastKeyDown = Key.None;
+        static DateTime lastKeyDownAt;
 
         // An update published while the game runs. The check that runs every
         // thirty seconds during play notices it; four and a half minutes after it is first
@@ -1068,6 +1073,34 @@ namespace Thornswood
         {
             try { File.AppendAllText(Paths.LogFile, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  " + m + Environment.NewLine); }
             catch { /* the log is the only place this line could have gone */ }
+        }
+
+        /// <summary>
+        /// One line saying what pressed Play (#2215): the mouse (and whether its
+        /// left button is still down), the keyboard (and the last key down on
+        /// this window, and how long ago), or neither, which is UI Automation or
+        /// a program; whether the window was the active one; and how long after
+        /// the last game closed.
+        /// </summary>
+        static string PlayPressedBy()
+        {
+            try
+            {
+                InputDevice dev = InputManager.Current.MostRecentInputDevice;
+                string by;
+                if (dev is MouseDevice)
+                    by = "the mouse (left button " + (Mouse.LeftButton == MouseButtonState.Pressed ? "still down" : "up") + ")";
+                else if (dev is KeyboardDevice)
+                    by = "the keyboard (last key " + lastKeyDown + ", " +
+                         (lastKeyDownAt == DateTime.MinValue ? "never" : (int)(DateTime.Now - lastKeyDownAt).TotalMilliseconds + " ms ago") +
+                         (Keyboard.Modifiers != ModifierKeys.None ? ", " + Keyboard.Modifiers + " held" : "") + ")";
+                else
+                    by = dev == null ? "no input device (UI Automation or a program)" : dev.GetType().Name;
+                string when = gameClosedAt == DateTime.MinValue ? "no game closed yet this run"
+                    : (DateTime.Now - gameClosedAt).TotalSeconds.ToString("0.0") + " s after the last game closed";
+                return "Play pressed by " + by + ", window " + (win != null && win.IsActive ? "active" : "not active") + ", " + when + ".";
+            }
+            catch (Exception ex) { return "Play pressed (what pressed it could not be read: " + ex.Message + ")."; }
         }
 
         // ------------------------------------------------------------- pages
@@ -2190,8 +2223,22 @@ namespace Thornswood
 
             btnCopy.Visibility = Visibility.Collapsed;
 
+            // For PlayPressedBy: the last key that went down on this window.
+            win.PreviewKeyDown += delegate (object s, KeyEventArgs e)
+            {
+                lastKeyDown = e.Key == Key.System ? e.SystemKey : e.Key;
+                lastKeyDownAt = DateTime.Now;
+            };
             btnPlay.Click += delegate
             {
+                // What pressed it, into the log (#2215). Since 20 September the
+                // game has started again within three seconds of closing 17
+                // times on One, the person saying they quit with the mouse
+                // through Steam's overlay, and only this button reaches
+                // StartPlay from outside. Nothing said which input pressed it,
+                // so the cause could not be measured; this line is that
+                // measurement.
+                LogOnly(PlayPressedBy());
                 // Play means Play. Until 20 September this opened a bar of two
                 // character slots and the slot's own button started the game;
                 // the person picks at the game's main menu now.
@@ -2616,6 +2663,7 @@ namespace Thornswood
                 BuildStatRow();
                 btnPlay.Content = "PLAY";
                 btnQuitGame.Visibility = Visibility.Collapsed;
+                gameClosedAt = DateTime.Now;
                 Log("Game closed after " + (int)(DateTime.Now - playStartedAt).TotalMinutes + " minutes. Your Windows Skyrim folders are back to normal.");
                 {
                     // Where the crash log is, and the snapshot beside it on
