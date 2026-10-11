@@ -92,6 +92,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Script.ps1')
+. (Join-Path $Here '..\vps\Lock-Folder.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 
@@ -124,7 +125,7 @@ $cfg64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($caddyfile))
 Remote @"
 `$ErrorActionPreference = 'Stop'
 `$dir = '$caddyWin'
-if (-not (Test-Path `$dir)) { New-Item -ItemType Directory -Path `$dir -Force | Out-Null }
+$(Get-ThornswoodLockedFolderScript $caddyWin)
 
 if (-not (Test-Path (Join-Path `$dir 'caddy.exe'))) {
   'downloading caddy $CaddyVersion'

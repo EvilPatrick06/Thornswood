@@ -45,6 +45,8 @@
 #>
 
 . (Join-Path $PSScriptRoot 'ServerReadyWait.ps1')
+# Restore-SwapRecord sends its lock for the deploy store (Lock-Folder.ps1).
+. (Join-Path $PSScriptRoot '..\vps\Lock-Folder.ps1')
 
 # ==== deploy-server remote blocks ====
 #
@@ -746,6 +748,7 @@ function Restore-SwapRecord([string]$Target, [string[]]$SshArgs, [string]$Root, 
 `$beside = $(& $q $w.Beside)
 `$cur = Join-Path $(& $q ($storeWin + '\current')) $(& $q ($part + '.json'))
 `$when = [DateTime]::UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", [Globalization.CultureInfo]::InvariantCulture)
+$(Get-ThornswoodLockedFolderScript $storeWin)
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent `$cur) | Out-Null
 if ('$came' -eq 'True' -and (Test-Path -LiteralPath `$beside)) {
   Copy-Item -LiteralPath `$beside -Destination `$cur -Force
