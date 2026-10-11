@@ -105,6 +105,17 @@ stages kept in the actor property `thornswoodChargen` (`gamemode.js:3668`):
 An old `arriving` state is folded into `done` (`gamemode.js:4668-4671`).
 `"thornswoodChargen": false` in `server-settings.json` switches the hall off.
 
+A saved character the server cannot read at start (its base form or race not
+in the load order, or an appearance that will not parse) is kept on disk as
+it was, and its id is never given to a new form (fork PR 33, #1269). The
+profile then has no character, so spawn makes it a new one and calls
+`created()`, where `tellKeptCharacter` asks the engine
+(`mp.getUnreadableChangeForms(profileId)`) which of the profile's records were
+kept, writes them on the new character in `thornswoodKeptCharacters`, and
+says one line to the person once: the earlier character was kept, ask staff
+with `/helpme`. It runs whether the hall is on or off. An engine build without
+the binding is said once in the gamemode log, and nobody is told.
+
 Body shape is height and weight only (#993, "BODY SHAPE" in `gamemode.js`).
 `mp.onUpdateAppearanceAttempt` holds the weight in a sent appearance to 0 to
 100 and drops any field the engine does not know. `thornswoodBodyReset` in
@@ -352,7 +363,7 @@ These read `gamemode.js`, most by running one block against a stubbed `mp`.
 | Area | Tests |
 |---|---|
 | Logging and identity | `test-thornswood-log.js`, `test-gamemode-id.js`, `test-build-stamp.ps1` |
-| Chargen and arrival | `test-arrivals.js`, `test-arrival-line.js`, `test-creation-close.js`, `test-creation-lines.js`, `test-creation-quiet.js`, `test-dressed-at-creation.js`, `test-new-character.js`, `test-stuck-in-the-hall.js` |
+| Chargen and arrival | `test-arrivals.js`, `test-arrival-line.js`, `test-creation-close.js`, `test-creation-lines.js`, `test-creation-quiet.js`, `test-dressed-at-creation.js`, `test-new-character.js`, `test-stuck-in-the-hall.js`, `test-1269-kept-character.js` |
 | Gathering and mining | `test-deposit.js`, `test-chopping-gate.js`, `test-cooldown-sweep.js`, `test-mine-buildings.js`, `test-farming.js`, `test-eggs.js` |
 | Crafting and rules | `test-rulebook.js`, `test-nobody-makes.js`, `test-race-gate.js`, `test-race-table.js`, `test-recipeless-craft.js`, `test-bard-instruments.js`, `test-staff-spells.js`, `test-spell-tomes.js`, `test-enchanter-staff-spells.js`, `test-classes-page.js` |
 | Property and economy | `test-deed-title.js`, `test-locks.js`, `test-key-chain.js`, `test-mold-key.js`, `test-cut-key.js`, `test-offices.js`, `test-coffers.js`, `test-boards.js`, `test-unpin.js`, `test-spoils.js`, `test-one-mint.js` |
