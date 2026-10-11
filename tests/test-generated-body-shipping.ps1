@@ -1,5 +1,7 @@
 # Generated covered body outputs must override collection defaults in updates
 # and installers. A nearby ungenerated mod asset remains collection-owned.
+# Scripts this runs whole go to a stand-in box, so the freshness guard lets them be (#2118).
+$env:THORNSWOOD_HARNESS = '1'
 $ErrorActionPreference='Stop'
 $repo=Split-Path -Parent $PSScriptRoot
 . (Join-Path $repo 'scripts\release\Ship-Rules.ps1')

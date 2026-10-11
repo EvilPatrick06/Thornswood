@@ -37,6 +37,8 @@
   Nothing here connects to anything but 127.0.0.1, and everything it writes is
   in its own temp folder.
 #>
+# Scripts this runs whole go to a stand-in box, so the freshness guard lets them be (#2118).
+$env:THORNSWOOD_HARNESS = '1'
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot

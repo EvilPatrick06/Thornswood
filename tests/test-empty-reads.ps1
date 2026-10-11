@@ -18,6 +18,8 @@
   Scratch folders and scratch copies only; the VPS is a stub that answers
   NOHOOK, and nothing reaches the network.
 #>
+# Scripts this runs whole go to a stand-in box, so the freshness guard lets them be (#2118).
+$env:THORNSWOOD_HARNESS = '1'
 $ErrorActionPreference = 'Stop'
 $Repo = Split-Path -Parent $PSScriptRoot
 $Shell = (Get-Process -Id $PID).Path
