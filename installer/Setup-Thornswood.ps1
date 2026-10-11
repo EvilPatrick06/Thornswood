@@ -220,14 +220,14 @@ function Get-SteamRoot {
         }
     }
     $c += "${env:ProgramFiles(x86)}\Steam", "$env:ProgramFiles\Steam"
-    $c | Where-Object { $_ -and (Test-Path (Join-Path $_ 'steam.exe')) } | Select-Object -First 1
+    $c | Where-Object { $_ -and (Test-Path -LiteralPath (Join-Path $_ 'steam.exe')) } | Select-Object -First 1
 }
 function Get-Libraries($steam) {
     $r = @($steam)
     $vdf = Join-Path $steam 'steamapps\libraryfolders.vdf'
-    if (Test-Path $vdf) {
+    if (Test-Path -LiteralPath $vdf) {
         foreach ($l in Get-Content -LiteralPath $vdf) {
-            if ($l -match '^\s*"path"\s+"(.+)"') { $p = $Matches[1] -replace '\\\\', '\'; if (Test-Path $p) { $r += $p } }
+            if ($l -match '^\s*"path"\s+"(.+)"') { $p = $Matches[1] -replace '\\\\', '\'; if (Test-Path -LiteralPath $p) { $r += $p } }
         }
     }
     $r | Select-Object -Unique
@@ -243,11 +243,11 @@ $libs = @(if ($steamRoot) { Get-Libraries $steamRoot })
 if (-not $SteamGamePath) {
     foreach ($l in $libs) {
         $g = Join-Path $l 'steamapps\common\Skyrim Special Edition'
-        if (Test-Path (Join-Path $g 'SkyrimSE.exe')) { $SteamGamePath = $g; break }
+        if (Test-Path -LiteralPath (Join-Path $g 'SkyrimSE.exe')) { $SteamGamePath = $g; break }
     }
 }
 if (-not $SteamGamePath) { Die 'Skyrim Special Edition was not found in any Steam library. Install it first.' }
-$SteamGamePath = (Resolve-Path $SteamGamePath).Path
+$SteamGamePath = (Resolve-Path -LiteralPath $SteamGamePath).Path
 Say "  $SteamGamePath" 'Green'
 
 # ---- which shape of install this is --------------------------------------
@@ -469,7 +469,7 @@ function Invoke-DepotRepair($reason) {
     function Resolve-Depot($id) {
         foreach ($c in @((Join-Path $content "app_$AppId\depot_$id"), (Join-Path $content "$AppId\$id"),
                          (Join-Path $content "depot_$id"), (Join-Path $content $id))) {
-            if (Test-Path $c) { return $c }
+            if (Test-Path -LiteralPath $c) { return $c }
         }
         $null
     }
@@ -543,7 +543,7 @@ if (Test-Path $vanillaList) {
         $out = @()
         foreach ($prop in $doc.PSObject.Properties) {
             $f = Join-Path $GameDir $prop.Name
-            if (-not (Test-Path $f)) { continue }
+            if (-not (Test-Path -LiteralPath $f)) { continue }
             if ((Get-Sha256 $f) -ne ([string]$prop.Value).ToLower()) { $out += $prop.Name }
         }
         return $out
