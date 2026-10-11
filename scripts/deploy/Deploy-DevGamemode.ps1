@@ -854,7 +854,7 @@ if (`$orderPath -and (Test-Path `$orderPath)) {
 `$order2 = @(`$(if (`$wantOrder) { `$newOrder } else { @(`$s.loadOrder) }))
 $fullIndexDef
 `$loadsLight = `$false
-try { `$loadsLight = ((Get-Content -LiteralPath '$boxRecord' -Raw | ConvertFrom-Json).lightPlugins -eq `$true) } catch { }
+try { `$loadsLight = ((Get-Content -LiteralPath '$boxRecord' -Raw -ErrorAction Stop | ConvertFrom-Json).lightPlugins -eq `$true) } catch { }
 `$lightOf = @{ $lightTable }
 `$unread = @()
 `$isLight = `$null

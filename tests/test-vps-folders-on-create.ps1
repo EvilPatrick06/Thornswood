@@ -132,11 +132,11 @@ Remove-Item `$zip, `$rec -Force
     $a = Join-Path $c 'a'; $b = Join-Path $c 'b'
     foreach ($p in $a, (Join-Path $b 'Thornswood-Maint'), (Join-Path $b 'Thornswood-Dumps'), (Join-Path $c 'only2')) { $null = New-Item -ItemType Directory -Force -Path $p; Grant $p $runner 'Deny' }
     Lock-ThornswoodFolder -Path $a
-    Lock-ThornswoodFolder -Path (Join-Path $c 'only2') -Only
-    $null = & $ps51 -NoProfile -ExecutionPolicy Bypass -File $lockBox -Parent $b -AllowGamingPc -SiteSid none -BotSid none
+    Lock-ThornswoodFolder -Path (Join-Path $c 'only2') -Only -Writers @('S-1-5-19', $runner)
+    $null = & $ps51 -NoProfile -ExecutionPolicy Bypass -File $lockBox -Parent $b -AllowGamingPc -SiteSid none -BotSid none -DumpWriterSids ('S-1-5-19,' + $runner)
     function Rules([string]$p) { return ((All $p | ForEach-Object { $_.IdentityReference.Value + '|' + $_.AccessControlType + '|' + [int]$_.FileSystemRights + '|' + [int]$_.InheritanceFlags + '|' + $_.IsInherited }) | Sort-Object) -join ';' }
     Yes 'the helper leaves exactly the rules Lock-VpsFolders.ps1 leaves on a service folder (the runner''s deny kept)' (((Rules $a) -eq (Rules (Join-Path $b 'Thornswood-Maint'))) -and (Rules $a).Contains($runner))
-    Yes 'and -Only exactly the rules it leaves on Dumps' ((Rules (Join-Path $c 'only2')) -eq (Rules (Join-Path $b 'Thornswood-Dumps')))
+    Yes 'and -Only -Writers exactly the rules it leaves on Dumps, the writers'' write included' ((Rules (Join-Path $c 'only2')) -eq (Rules (Join-Path $b 'Thornswood-Dumps')))
 } finally {
     & icacls $tmp /reset /T /C /Q 2>&1 | Out-Null
     Remove-Item -LiteralPath $tmp -Recurse -Force -EA SilentlyContinue

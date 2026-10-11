@@ -571,6 +571,67 @@ function pageMarkdown(name) {
   try { return forMode(fs.readFileSync(file, 'utf8'), cfg.open); } catch (e) { return null; }
 }
 
+// The credits page says which engine each server runs. That is a fact of the
+// box, not of the repo, so a hand edit went stale with every deploy (the
+// source-offer test caught 3a32e961 that way). Deploy-Server.ps1 writes
+// data/deployed-build.json after a server deploy (scripts/deploy/
+// DeployedBuild.ps1), and the feeds this site serves carry the client commit.
+// fillCreditsCommits puts both into the page at serve time. The markdown keeps
+// its hand text, which is what goes out when either source is missing.
+// ==== thornswood credits fill ====
+function fillCreditsCommits(md, deployed, feeds) {
+  const FULL = /^[0-9a-f]{40}$/;
+  const SOME = /^[0-9a-f]{7,40}$/;
+  const tree = 'https://github.com/EvilPatrick06/skymp/tree/';
+  const link = function (c) { return '[`' + c.slice(0, 8) + '`](' + tree + c + ')'; };
+  const pick = function (ch) {
+    const e = deployed && typeof deployed === 'object' ? deployed[ch] : null;
+    const c = e && typeof e === 'object' ? String(e.commit || '') : '';
+    return FULL.test(c) ? c : null;
+  };
+  let out = String(md);
+  const live = pick('live');
+  const dev = pick('dev');
+  if (live && dev) {
+    const rec = /built from one commit,\s+\[`[0-9a-f]{7,40}`\]\(https:\/\/github\.com\/EvilPatrick06\/skymp\/tree\/([0-9a-f]{40})\)/.exec(out);
+    const recorded = rec ? rec[1] : '';
+    let said;
+    if (live === dev) {
+      said = live === recorded ? 'Both servers run it, ' + link(live) + '.'
+                               : 'The recorded build has not been deployed yet. Both servers run ' + link(live) + '.';
+    } else {
+      said = (live !== recorded && dev !== recorded ? 'The recorded build has not been deployed yet. ' : '') +
+             'The test server runs ' + link(dev) + ' and the main server runs ' + link(live) + '.';
+    }
+    // The hand sentence runs from "then to the main server." to "the earlier
+    // engine ...", whatever it says about which server runs what (#2098).
+    out = out.replace(/(then to the main server\.\s+)((?:(?!\n\s*\n)[\s\S])*?)\[`[0-9a-f]{7,40}`\]\([^)\s]*\),\s+the earlier engine[^.]*\./,
+                      function (m, lead) { return lead + said; });
+  }
+  for (const row of [['Public', 'feed/version.json', 'public'], ['Dev', 'feed-dev/version.json', 'dev']]) {
+    const c = feeds && typeof feeds === 'object' ? String(feeds[row[2]] || '') : '';
+    if (!SOME.test(c)) continue;
+    const re = new RegExp('(^|\\n)(\\|\\s*' + row[0] + '\\s*\\|\\s*`' + row[1].replace(/[./]/g, '\\$&') +
+                          '`\\s*\\|\\s*)\\[`[0-9a-f]{7,40}`\\]\\([^)\\s]*\\)');
+    out = out.replace(re, function (m, a, b) { return a + b + link(c); });
+  }
+  return out;
+}
+// ==== end thornswood credits fill ====
+const DEPLOYED_BUILD = path.join(DATA, 'deployed-build.json');
+function readJsonQuiet(file) {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')); } catch (e) { return null; }
+}
+function creditsFacts() {
+  const feeds = {};
+  for (const pair of [['public', 'feed'], ['dev', 'feed-dev']]) {
+    const v = readJsonQuiet(path.join(ROOT, pair[1], 'version.json'));
+    const c = v && v.clientRuntime && v.clientRuntime.forkCommit;
+    if (typeof c === 'string') feeds[pair[0]] = c;
+  }
+  return { deployed: readJsonQuiet(DEPLOYED_BUILD), feeds: feeds };
+}
+
 // Public discovery uses the configured project domain, never a request's Host.
 const PUBLIC_ORIGIN = 'https://thornswood.net';
 function singlePageHeading(body, title) {
@@ -4076,7 +4137,11 @@ async function handle(req, res) {
       // A written page goes out with its words in it. After the invite link
       // above, so nothing anybody typed is mistaken for DISCORD_URL.
       if (MD_PAGES.indexOf(route) >= 0) {
-        const md = pageMarkdown(route.slice(1));
+        let md = pageMarkdown(route.slice(1));
+        if (md !== null && route === '/credits') {
+          const facts = creditsFacts();
+          md = fillCreditsCommits(md, facts.deployed, facts.feeds);
+        }
         if (md === null) return send(res, 404, notFoundPage(), TYPES['.html']);
         html = fillPage(html, singlePageHeading(pageHtml(md), blurb[0]));
       } else if (route !== '/') {

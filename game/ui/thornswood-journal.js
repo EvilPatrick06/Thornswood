@@ -48,6 +48,12 @@
   // Who was in front of you when J opened, { id, name }, or null. The plugin
   // hands it over from the look prompt (#1630); see setFacing.
   var facing = null;
+  // ONE CLICK, ONE JOURNAL (#2037). When New was pressed, and how many journals
+  // there were then. Further presses are ignored until the server's view shows
+  // the new one (setData) or NEW_WAIT_MS passes with no answer.
+  var newAt = 0;
+  var newFrom = -1;
+  var NEW_WAIT_MS = 3000;
 
   function tell(what) {
     try { window.skyrimPlatform.sendMessage('thornswood-front', 'journal:' + what); }
@@ -319,7 +325,11 @@
             anybody.
           */
           openGroup = '';
-          net('/journal new Journal');
+          var now = Date.now();
+          if (newAt && now - newAt < NEW_WAIT_MS) { return; }
+          newAt = now;
+          newFrom = books().length;
+          if (!net('/journal new Journal')) { newAt = 0; }
           return;
         }
         if (this.getAttribute('data-shared') !== null) {
@@ -845,6 +855,8 @@
     },
     setData: function (d) {
       data = d || null;
+      // The new journal has arrived, so New answers the next press again.
+      if (newAt && books().length !== newFrom) { newAt = 0; newFrom = -1; }
       /*
         Redrawn on every push, and that is a real cost: typing into a page and
         having a friend log in would otherwise rebuild the textarea under the

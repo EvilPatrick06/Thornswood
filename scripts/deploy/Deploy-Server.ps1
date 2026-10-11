@@ -185,6 +185,7 @@ if (-not $PSBoundParameters.ContainsKey('Wait')) {
 . (Join-Path $Here 'Artifact.ps1')
 . (Join-Path $Here 'ServerSettings.ps1')
 . (Join-Path $Here 'ServerBuild.ps1')
+. (Join-Path $Here 'DeployedBuild.ps1')
 
 function Remote($script) {
   # Send-Script.ps1 (issue #1070): a long script goes as a file of its own
@@ -405,6 +406,7 @@ function Invoke-PutBack {
   if (-not (Show-SwapResult $backOut "$rootWin\.undone-<stamp>")) { exit 1 }
   # The record that came back with the files is what the box says it runs.
   Restore-SwapRecord "$User@$Vps" $ssh $Root $backOut "$Root/data/thornswood-deploy.json" 'gamemode'
+  $null = Save-ThornswoodDeployedBuild "$User@$Vps" $ssh $Root
   Write-Host ''
   Write-Host '  PASS. The previous files are back and the server is answering.' -ForegroundColor Green
   exit 0
@@ -940,6 +942,9 @@ if ($swapOut -notcontains 'SWAP OK') {
 # http://<box>:3000/thornswood-deploy.json says which commit is live.
 Save-SwapPreviousRecord "$User@$Vps" $ssh $Root $prevName "$Root/data/thornswood-deploy.json"
 $null = Set-ThornswoodArtifactCurrent -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh -Root $Root -Beside "$Root/data/thornswood-deploy.json"
+# And what engine it runs, from the box's own server-build.json, where the site
+# reads it for the credits page (DeployedBuild.ps1). Never fails the deploy.
+$null = Save-ThornswoodDeployedBuild "$User@$Vps" $ssh $Root
 
 # And from here, the shape Publish-Server.ps1 uses. The box answering itself
 # on 127.0.0.1 is not the same as it answering the rest of the world; this is

@@ -264,6 +264,12 @@ jobs:
           # Issue #1589: a line here with no comma after it ends the list, and
           # every name below it only prints itself. test-gate-list.ps1 parses
           # this step and fails on any harness named outside the list.
+          # Djinn, 11 Oct 2026: Main is the full badge at every size. #1581
+          # put the site favicon's crest into the small frames of app.ico,
+          # so shortcuts and the taskbar showed the tab icon.
+          # tests\test-launcher-icons.js fails if any frame of
+          # launcher\app.ico matches a frame of site\public\favicon.ico, or
+          # if app.ico and app-dev.ico share a frame.
           $six = 'test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
@@ -274,7 +280,7 @@ jobs:
                  'test-downgrade-steam-window.ps1', 'test-address-library.ps1', 'test-vortex-folder.ps1',
                  'test-new-box-runbook.ps1', 'test-remote-header.ps1',
                  'test-vps-defaults.ps1', 'test-runner-lock.ps1', 'test-deploy-artifact.ps1', 'test-deploy-records.js',
-                 'test-own-folder-alone.ps1', 'test-own-folder-first.ps1', 'test-own-folder-again.ps1', 'test-setup-game-files.ps1', 'test-npc-runtime.js',
+                 'test-own-folder-alone.ps1', 'test-own-folder-first.ps1', 'test-own-folder-again.ps1', 'test-setup-game-files.ps1', 'test-check-build.ps1', 'test-client-build-record.ps1', 'test-npc-runtime.js',
                  'test-mold-key.js', 'test-putback-flora.js', 'test-staff-spells.js', 'test-join-pass-trust.js',
                  'test-npc-shared-runtime.js', 'test-npc-navigation-equivalence.js', 'test-npc-population-runtime.js',
                  'test-shared-resource-stock.js', 'test-resource-stock-integration.js',
@@ -407,6 +413,7 @@ jobs:
                  'test-site-auth.js',
                  'test-site-route-gaps.js',
                  'test-docs-pwfile.ps1',
+                 'test-site-credits-fill.js', 'test-deployed-build.ps1',
                  'test-site-headers.js',
                  'test-site-render.js', 'test-site-discovery.js',
                  'test-home-status.js', 'test-seats.js', 'test-age-gate.js', 'test-download-hash.js',
@@ -439,6 +446,7 @@ jobs:
                  'test-client-by-hash.ps1',
                  'test-build-vs-install.ps1',
                  'test-ship-dry-run.ps1',
+                 'test-launcher-icons.js',
                  'test-gate-list.ps1'
           $failed = @()
           foreach ($n in $six) {

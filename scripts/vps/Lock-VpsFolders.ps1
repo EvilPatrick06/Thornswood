@@ -29,7 +29,10 @@
   C:\Thornswood-Deploys, C:\Thornswood-Caddy and C:\Thornswood-Maint lose
   Users the same way, keeping their rules by name (the bot's on Watch, the
   site's on Deploys\current), and C:\Thornswood-Dumps is SYSTEM's and
-  Administrators' only, since nothing known reads it. Watch is refused while
+  Administrators' to read, with LOCAL SERVICE and every local thornswood-runner*
+  account allowed to make and write files in it and read nothing: Windows Error
+  Reporting writes node.exe's crash dumps there (LocalDumps), as the account
+  the crashing node ran as (Patrick, 11 October). Watch is refused while
   the bot runs with no rule on it by name (run Install-Bot.ps1 first), and
   Deploys while the site has none on current (run Deploy-Docs.ps1 first).
     the folder takes nothing from C:\ any more; SYSTEM, Administrators and the
@@ -72,7 +75,10 @@ param(
     [switch]$AllowGamingPc,
     # The bot's account as a SID; worked out from NT SERVICE\ThornswoodBot when
     # empty. 'none' says there is no bot on this box to keep reading the watchdog.
-    [string]$BotSid = ''
+    [string]$BotSid = '',
+    # Who may write crash dumps into Dumps, as SIDs, comma separated; LOCAL
+    # SERVICE and each local thornswood-runner* account when empty. 'none' for nobody.
+    [string]$DumpWriterSids = ''
 )
 $ErrorActionPreference = 'Stop'
 function Say([string]$m) { Write-Output $m }
@@ -97,8 +103,9 @@ $nameRule = '^(Thornswood-(Server|Server-Dev|Voice|Voice-Dev)(\.(prev|undone|fai
 #   Caddy    caddy.exe runs as SYSTEM ('Thornswood Web', Setup-Domain.ps1);
 #            nothing else reads it.
 #   Maint    update.ps1 and dev-instance.ps1 run as SYSTEM; nothing else.
-#   Dumps    nothing in scripts\ makes or reads it, so what is in it is not
-#            known: SYSTEM's and Administrators' only, like the backups.
+#   Dumps    WER LocalDumps writes node.exe's crash dumps there as the crashing
+#            account: SYSTEM's and Administrators' like the backups, plus write
+#            (no read) for LOCAL SERVICE and the thornswood-runner* accounts.
 $svcRule = '^Thornswood-(Watch|Deploys|Caddy|Maint|Dumps)$'
 
 # The site's account, from its task, when it is one of its own.
@@ -116,6 +123,12 @@ if (-not $BotSid) {
         try { $BotSid = (New-Object Security.Principal.NTAccount('NT SERVICE\ThornswoodBot')).Translate([Security.Principal.SecurityIdentifier]).Value } catch { }
     }
 }
+if (-not $DumpWriterSids) {
+    $w = @('S-1-5-19')
+    try { $w += @(Get-CimInstance Win32_UserAccount -Filter 'LocalAccount=True' -ErrorAction Stop | Where-Object { $_.Name -like 'thornswood-runner*' } | ForEach-Object { $_.SID }) } catch { }
+    $DumpWriterSids = $w -join ','
+}
+$dumpWriters = @(if ($DumpWriterSids -ne 'none') { $DumpWriterSids -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ } })
 if ($SiteSid -ne 'none') { Say ('the site runs as ' + $SiteSid + ', so each folder must have its rule before Users comes off') }
 
 function Explicit([string]$path) {
@@ -133,7 +146,7 @@ function Show([string]$path) {
 }
 # $only: SYSTEM, Administrators and this account and nothing else by name
 # (private); otherwise every rule by name stays but the broad ones.
-function Lock([string]$path, [bool]$only) {
+function Lock([string]$path, [bool]$only, [string[]]$writers = @()) {
     $acl = Get-Acl -LiteralPath $path
     $acl.SetAccessRuleProtection($true, $false)
     foreach ($r in @($acl.GetAccessRules($true, $false, [Security.Principal.SecurityIdentifier]))) {
@@ -143,6 +156,10 @@ function Lock([string]$path, [bool]$only) {
     foreach ($s in $keepers) {
         $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(
             (New-Object Security.Principal.SecurityIdentifier($s)), 'FullControl', $tree, 'None', 'Allow')))
+    }
+    foreach ($s in @($writers | Where-Object { $_ -and $keepers -notcontains $_ })) {
+        $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(
+            (New-Object Security.Principal.SecurityIdentifier($s)), 'Write, Synchronize', $tree, 'None', 'Allow')))
     }
     # Writes back only the access rules. Set-Acl can also try to write the audit
     # part, which needs a privilege the build runner's account does not have
@@ -186,11 +203,12 @@ foreach ($f in $folders) {
             $refused++; continue
         }
     }
-    $parts = @(@{ P = $path; Only = ($isBackup -or $f.Name -eq 'Thornswood-Dumps') })
+    $isDumps = $f.Name -eq 'Thornswood-Dumps'
+    $parts = @(@{ P = $path; Only = ($isBackup -or $isDumps); W = $(if ($isDumps) { $dumpWriters } else { @() }) })
     if (-not $isVoice -and -not $isBackup -and -not $isSvc) {
         foreach ($sub in 'data', 'private') {
             $p = Join-Path $path $sub
-            if (Test-Path -LiteralPath $p) { $parts += @{ P = $p; Only = ($sub -eq 'private') } }
+            if (Test-Path -LiteralPath $p) { $parts += @{ P = $p; Only = ($sub -eq 'private'); W = @() } }
         }
     }
     foreach ($x in $parts) {
@@ -198,10 +216,11 @@ foreach ($f in $folders) {
         $inherits = -not (Get-Acl -LiteralPath $x.P).AreAccessRulesProtected
         if ($WhatIf) {
             Say ('WOULD LOCK ' + $x.P + ': ' + $(if ($inherits) { 'stop taking rules from above, ' } else { '' }) + $going.Count + ' rule(s) by name would go' +
-                 $(if ($x.Only) { ', SYSTEM and Administrators only' } else { '' }))
+                 $(if ($x.Only) { ', SYSTEM and Administrators only' } else { '' }) +
+                 $(if (@($x.W).Count) { ', write (no read) for ' + (@($x.W) -join ', ') } else { '' }))
             continue
         }
-        try { Lock $x.P $x.Only; Say ('locked ' + $x.P) }
+        try { Lock $x.P $x.Only @($x.W); Say ('locked ' + $x.P) }
         catch { Say ('COULD NOT LOCK ' + $x.P + ': ' + $_.Exception.Message); $refused++ }
     }
     if (-not $isVoice -and -not $isBackup -and -not $isSvc) {
