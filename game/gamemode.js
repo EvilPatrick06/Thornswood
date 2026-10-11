@@ -27728,6 +27728,117 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId, effects) {
 }
 
 /*
+  THE SOUL GEM HAS A RANK (#1648). docs/systems/enchantments.md: "The strength
+  of the enchantment is the soul gem, not a second ladder." Petty from novice,
+  Lesser at advanced, Common at expert, Greater, Grand and Black at master, in
+  the half that owns the enchantment: Bladebinder for a weapon, Wardweaver for
+  armour and clothing. "A greater gem in a novice's pack does not make a
+  novice enchantment stronger. The bench refuses it. A petty gem is legal at
+  every rank."
+
+  WHAT THE ENGINE HANDS OVER. Since the fork commit for #1648 (skymp PR #51)
+  mp.onCraft gets the craft's inputs as a seventh argument,
+  [{ baseId, count }, ...], the same entries the engine takes on a success.
+  The sixth stays the effects slot #1389 reserves and is null. Returning
+  false runs nothing in the engine, so the gem and the piece both stay in the
+  pack and the client is sent its inventory back. An engine older than that
+  passes no seventh argument and this is never asked.
+
+  WHICH GEM, read off the record's editor id, because that is the same for the
+  empty and the filled gem of one size (SoulGemGreater, SoulGemGreaterFilled)
+  and for every mod's gem built the vanilla way. Azura's Star holds grand
+  souls and the Black Star black ones. A filled gem's size is what is judged:
+  the soul inside a partly filled gem is runtime data the craft message does
+  not carry.
+
+  WHOSE RANK. The piece is the other input: a WEAP is Bladebinder's, anything
+  else Wardweaver's. When the piece cannot be read, the person's own enchanter
+  half is asked. P.canWork answers the way it does at a forge: your own half
+  at your rank, your sister half and a taught half at novice only.
+
+  A PETTY GEM IS NEVER ASKED, and neither is somebody who is not an enchanter:
+  whether they may work the bench at all is recipelessCraft's question, and it
+  has the sentence for it. Answers the refusal to say, or ''.
+*/
+var SOUL_GEM_RANK = { petty: 'novice', lesser: 'advanced', common: 'expert', greater: 'master', grand: 'master', black: 'master' };
+
+function soulGemRefusal(actorId, inputs) {
+  if (!Array.isArray(inputs)) { return ''; }
+  function recordOf(baseId) {
+    try {
+      var res = mp.lookupEspmRecordById(Number(baseId) || 0);
+      return (res && res.record) ? res.record : null;
+    } catch (e) {
+      return null;
+    }
+  }
+  function sizeOf(rec) {
+    if (!rec) { return null; }
+    var type = rec.type ? String(rec.type) : '';
+    var ed = String(rec.editorId || '').toLowerCase();
+    if (type && type !== 'SLGM') { return null; }
+    if (ed.indexOf('azurasstar') !== -1) { return 'grand'; }
+    if (ed.indexOf('blackstar') !== -1) { return 'black'; }
+    if (ed.indexOf('soulgem') === -1 && type !== 'SLGM') { return null; }
+    var sizes = ['petty', 'lesser', 'common', 'greater', 'grand', 'black'];
+    for (var i = 0; i < sizes.length; i++) {
+      if (ed.indexOf(sizes[i]) !== -1) { return sizes[i]; }
+    }
+    return null;
+  }
+
+  var gem = null;
+  var pieceType = '';
+  for (var i = 0; i < inputs.length; i++) {
+    var entry = inputs[i] || {};
+    var rec = recordOf(entry.baseId);
+    var size = sizeOf(rec);
+    if (size) {
+      if (!gem || RANK_LADDER.indexOf(SOUL_GEM_RANK[size]) > RANK_LADDER.indexOf(SOUL_GEM_RANK[gem])) { gem = size; }
+    } else if (rec && rec.type) {
+      pieceType = String(rec.type);
+    }
+  }
+  if (!gem) { return ''; }
+  var need = SOUL_GEM_RANK[gem];
+  if (need === 'novice') { return ''; }
+
+  var C = globalThis.__thornswoodCharacter;
+  var P = globalThis.__thornswoodProgression;
+  if (!C || !C.stateOf || !P || !P.canWork) {
+    log('the character or progression block is not loaded, so the soul gem gate is open');
+    return '';
+  }
+  var s = null;
+  try { s = C.stateOf(actorId); } catch (e) { s = null; }
+  if (!s) { return ''; }
+
+  var halves = [];
+  try { halves = (P.halvesOf && P.halvesOf('enchanter')) || []; } catch (e) { halves = []; }
+  var half = pieceType === 'WEAP' ? 'bladebinder' : (pieceType ? 'wardweaver' : '');
+  if (!half && s.prof === 'enchanter' && s.half) { half = s.half; }
+  if (!half || halves.indexOf(half) === -1) {
+    // Not an enchanter half this build knows: nothing to measure against.
+    if (s.prof !== 'enchanter') { return ''; }
+    half = s.half || '';
+  }
+  if (!half) { return ''; }
+  // Somebody who holds no enchanter half at all is recipelessCraft's to refuse.
+  var holds = s.prof === 'enchanter' || halves.some(function (h) { return !!P.rankOf(s, h); });
+  if (!holds) { return ''; }
+
+  var ok = false;
+  try { ok = !!P.canWork(s, half, need); } catch (e) { ok = false; }
+  if (ok) { return ''; }
+
+  var halfName = (C.nameOf && C.nameOf(half)) || (half.charAt(0).toUpperCase() + half.slice(1));
+  var have = P.rankOf(s, half);
+  return 'A ' + gem + ' soul gem is ' + rankWord(need) + ' ' + halfName + '\'s work' +
+         (have ? ' and you are ' + rankWord(have) + ' ' + halfName : '') +
+         '. A petty gem works at any rank. The gem and the piece stay in your pack.';
+}
+
+/*
   The recipe that makes a key, and how long to wait before naming what it made.
 
   ThornswoodRecipeKey is added to Thornswood-Content.esp by
@@ -27792,6 +27903,22 @@ mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recip
     Everything below this line assumes a recipe id that names a record.
   */
   if (!recipeId) {
+    /*
+      THE SOUL GEM FIRST (#1648): the engine's seventh argument is the inputs,
+      read through arguments so the signature every test cuts by stays as it
+      is. An engine that passes none is not asked.
+    */
+    var inputs = arguments[6];
+    if (Array.isArray(inputs) && typeof soulGemRefusal === 'function') {
+      var gemNo = soulGemRefusal(actorId, inputs);
+      if (gemNo) {
+        notify(actorId, gemNo);
+        say(actorId, gemNo);
+        log(actorId.toString(16), 'was refused an enchantment at bench', (workbenchId || 0).toString(16),
+            'carrying', JSON.stringify(inputs) + ':', gemNo);
+        return false;
+      }
+    }
     return recipelessCraft(actorId, craftedItemBaseId, workbenchId, effects);
   }
 
