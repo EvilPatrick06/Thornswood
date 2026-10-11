@@ -153,11 +153,17 @@ not quietly change our build. The fork also stops unless the build folder is
 `<fork>\build` (`CMakeLists.txt:46-56`), and asks for CMake 3.19 or newer
 (`:74`).
 
-NOT CHECKED: that this line configures cleanly at the current pin, and with
-which CMake version. That needs Windows, Visual Studio and a Skyrim folder,
-and the reading above had none of them. `Build-Engine.ps1` runs this line;
-whoever runs it next puts `cmake --version` and the configure's last line
-here.
+Checked on 10 October (issue #1357) on Ship PC One, at pin e31a579a, with
+CMake 4.4.3 (`cmake --version`) and Visual Studio 17 2022 Build Tools: the
+line numbers above still hold at that commit, and the `CMakeCache.txt` of a
+configure of this line at e31a579a the same day holds every setting as passed
+(generator `Visual Studio 17 2022`, platform `x64`, triplet
+`x64-windows-sp`, `OFFLINE_MODE`, `BUILD_CLIENT` and
+`BUILD_SKYRIM_PLATFORM` ON, `SKYRIM_DIR` the game folder) and a generated
+solution. No flag is wrong, missing or dead. `SKYRIM_DIR` is declared with
+`option()`, so the cache stores it as `BOOL` holding the path; that is the
+fork's own quirk and works. The cached toolchain path is the substituted
+drive letter (`T:/skymp/...`) described above.
 
 Never move a configured build folder: CMake writes absolute paths into it,
 which is why the move to `engine\skymp` needed this configure again.
