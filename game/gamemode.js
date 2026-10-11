@@ -38016,11 +38016,10 @@ log('gamemode loaded:',
     THE Z AND THE FACING ARE THE SAME KIND OF UNVERIFIED. BOARD_REACH is 400,
     so a height that is out by more than that leaves a board nobody can reach
     while standing under it, and that is the first thing verification should
-    check. The facing is carried and nothing reads it: a board here is a PLACE,
-    a cell and a point, with no record and no placed reference, so there is
-    nothing yet to point in a direction. It is kept because it is the number
-    that will be needed the day there is, and because losing it means asking
-    Djinn for it twice.
+    check. The server has no use for the facing: a board here is a PLACE, a
+    cell and a point. Each client does: it puts the message board object down
+    at every board and turns it to this facing, from the cell, point and
+    facing boardsView sends (#1597).
   */
   var BOARD_CELL = '3c:Skyrim.esm';   // Tamriel
   var BOARD_SITES = {
@@ -38358,12 +38357,29 @@ log('gamemode loaded:',
   */
   var boardReads = {};
 
+  /*
+    WHERE EACH BOARD IS, FOR THE OBJECT (#1597). Every client puts the message
+    board object down at every board, so each row also carries the board's
+    cell or worldspace and point. A board keeps its own facing; one a steward
+    walked has none, and keeps its town's from BOARD_SITES, the facing its
+    object had before (0 where neither has one).
+  */
   function boardsView(profileId) {
     var list = [];
     for (var i = 0; i < LEDGER_HOLDS.length; i++) {
       var h = LEDGER_HOLDS[i];
       if (!Object.prototype.hasOwnProperty.call(boards, h)) { continue; }
-      list.push({ hold: h, where: (boards[h] && boards[h].where) || h });
+      var bh = boards[h];
+      var row = { hold: h, where: (bh && bh.where) || h };
+      if (bh && typeof bh.cell === 'string' && bh.pos && bh.pos.length === 3) {
+        var site = Object.prototype.hasOwnProperty.call(BOARD_SITES, h) ? BOARD_SITES[h] : null;
+        var face = Number(bh.facing);
+        if (!isFinite(face)) { face = site ? Number(site.facing) : 0; }
+        row.cell = bh.cell;
+        row.x = bh.pos[0]; row.y = bh.pos[1]; row.z = bh.pos[2];
+        row.face = isFinite(face) ? face : 0;
+      }
+      list.push(row);
     }
     var hold = Object.prototype.hasOwnProperty.call(boardReads, profileId) ? boardReads[profileId] : '';
     if (!hold || !Object.prototype.hasOwnProperty.call(boards, hold)) {

@@ -260,6 +260,10 @@ jobs:
           # Issue #1163: the Discord sign-in callback gives up inside ten
           # seconds when the token exchange or the profile lookup stalls,
           # never answers, or drops halfway, and the page says to try again.
+          # Issue #1597: every notice board gets its object, in the cell or
+          # worldspace the server has it in, from the list the server sends;
+          # tests\test-1597-board-objects.js runs the plugin's board code on a
+          # pretend game. Under a second.
           # $six is a historical name: the gate list grew well past six (#1368).
           # Issue #1589: a line here with no comma after it ends the list, and
           # every name below it only prints itself. test-gate-list.ps1 parses
@@ -303,6 +307,7 @@ jobs:
                  'test-1378-shared-gather.js',
                  'test-special-edition-only.js',
                  'test-1374-letters.js',
+                 'test-1597-board-objects.js',
                  'test-1380-rare-mines.js',
                  'test-1621-quest-state.js',
                  'test-unpin.js', 'test-coffers.js',
