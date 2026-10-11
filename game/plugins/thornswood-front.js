@@ -37,6 +37,12 @@
   // Ours is the address in Thornswood.ini's ServerAddress line when there is
   // one, so a server move is an ini edit, and the fixed address below when
   // there is not.
+  //
+  // This is the one copy (issue #485). The other plugins in game/plugins hold
+  // no check of their own: this file publishes it below as
+  // globalThis.Thornswood.whoseGame, only once it has said ours, and each of
+  // them asks it on the first tick and stays idle when it is not there.
+  // tests/test-whose-game-gate.js holds that together.
   if (!thornswoodGame()) { return; }
   function thornswoodGame() {
     const ours = ['192.135.112.23'];
@@ -53,7 +59,7 @@
       ip = String((JSON.parse(raw) || {})['server-ip'] || '').trim();
     } catch (e) { return true; }
     if (ip && ours.indexOf(ip) < 0) {
-      try { skyrimPlatform.printConsole('[thornswood] the client points at ' + ip + ', not this server. Plugin idle.'); } catch (e) { }
+      try { skyrimPlatform.printConsole('[thornswood] the client points at ' + ip + ', not this server. Every Thornswood plugin idle.'); } catch (e) { }
       return false;
     }
     // The client can point at us and this still not be our session: another
@@ -66,9 +72,9 @@
       let when = Number(first);           // unix milliseconds from the launcher
       if (!isFinite(when) || when < 1e12) { when = Date.parse(first); }
       if (isFinite(when) && Math.abs(Date.now() - when) < 24 * 3600 * 1000) { return true; }
-      try { skyrimPlatform.printConsole('[thornswood] the launcher\'s session note is stale, so this is another server\'s session. Plugin idle.'); } catch (e) { }
+      try { skyrimPlatform.printConsole('[thornswood] the launcher\'s session note is stale, so this is another server\'s session. Every Thornswood plugin idle.'); } catch (e) { }
     } catch (e) {
-      try { skyrimPlatform.printConsole('[thornswood] the launcher left no session note, so this is another server\'s session. Plugin idle.'); } catch (e2) { }
+      try { skyrimPlatform.printConsole('[thornswood] the launcher left no session note, so this is another server\'s session. Every Thornswood plugin idle.'); } catch (e2) { }
     }
     return false;
   }
@@ -76,6 +82,9 @@
   const sp = skyrimPlatform;
 
   const T = (globalThis.Thornswood = globalThis.Thornswood || {});
+  // The whose-game check, for the other plugins (see above). Published before
+  // the line under it, so a second load of this file hands over a current copy.
+  T.whoseGame = thornswoodGame;
   if (T.front) return;      // already loaded, do not load the page twice
   T.front = true;
 

@@ -133,10 +133,8 @@ foreach ($b in $readsJson) { Write-Host "  $b" -ForegroundColor Red }
 $baked = @(
     'launcher/app/Config.cs',
     'config.example.json',
-    'game/plugins/thornswood-emotes.js',
-    'game/plugins/thornswood-front.js',
-    'game/plugins/thornswood-mark.js',
-    'game/plugins/thornswood-voice.js'
+    # The whose-game gate's one copy (#485); the other plugins read it from front.
+    'game/plugins/thornswood-front.js'
 )
 # Prose that names the box for a person reading it.
 $prose = @('site/data/board.json')
