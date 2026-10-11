@@ -41,7 +41,7 @@ What is NOT covered today, which is what this issue is about:
 | Artifact | Format | Signature | Algorithm | Verified by |
 | --- | --- | --- | --- | --- |
 | Launcher `Thornswood.exe` | PE | Authenticode, embedded (today) | RSA certificate from Artifact Signing, SHA256 file digest, RFC 3161 SHA256 timestamp | Ship gate; installed launcher before swap (`Signature.cs`) |
-| Installer / setup-stub | PE | Authenticode, embedded (today) | same | Ship gate; Windows SmartScreen; players |
+| Installer / setup-stub | PE | Authenticode, embedded (today) | same | Ship gate; Windows SmartScreen for the people installing |
 | Client runtime, packs, baseline, optional packs | zip | Covered by the signed release manifest (below), by sha256 | SHA256 entries in a signed manifest | Launcher (phase C), Ship gate |
 | Feed `version.json` | JSON | Covered by the signed release manifest: the manifest names the feed's own sha256 for that release | same | Launcher (phase C), `Check-ShipReady` |
 | Build records `client-build.json`, `server-build.json` | JSON | Covered by the signed release manifest | same | Ship gate, box deploy |
