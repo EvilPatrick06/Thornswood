@@ -165,3 +165,27 @@ function Get-ThornswoodRecordSum([byte[]]$Bytes) {
 }
 '@
 . ([scriptblock]::Create($ThornswoodRecordSumText))
+
+<#
+  Whether a gamemode may go onto a server that runs the build whose record
+  sums to $BoxSum, given the record its commit holds ($RecordSum, from
+  records\server-build.json at that commit). $null when it may; otherwise the
+  sentence that says why not. A gamemode is written for the engine its commit
+  records: #1719 took drop handling out of the gamemode because engine 9fd1f69b
+  keeps the extra, so that gamemode on the earlier engine loses it. Deploy-Server
+  -GamemodeOnly makes the same comparison for live (#1089); Deploy-DevGamemode
+  uses this for dev (#2076).
+#>
+function Get-ThornswoodBoxBuildProblem([string]$BoxSum, [string]$BoxCommit, [string]$RecordSum, [string]$RecordCommit, [string]$Server, [string]$PutThere) {
+  $ours = $RecordCommit
+  if ($ours.Length -gt 8) { $ours = $ours.Substring(0, 8) }
+  if (-not $BoxSum) { return ('the ' + $Server + ' did not say which server build it runs') }
+  if ($BoxSum -eq 'none') { return ('the ' + $Server + ' has no server-build.json, so nothing says which server build it runs. ' + $PutThere + ' puts one there.') }
+  if ($BoxSum -ne $RecordSum) {
+    $theirs = 'an unreadable one'
+    if ($BoxCommit) { $theirs = 'commit ' + $BoxCommit.Substring(0, [Math]::Min(8, $BoxCommit.Length)) }
+    return ('the ' + $Server + ' runs another server build (' + $theirs + ') than the one records\server-build.json holds at this commit (commit ' +
+            $ours + '). This gamemode is written for that build: put it on first (' + $PutThere + '), then send the gamemode.')
+  }
+  return $null
+}

@@ -420,6 +420,7 @@ jobs:
                  'test-server-stage-directories.ps1',
                  'test-dev-settings-keys.ps1',
                  'test-dev-gamemode-notes.ps1',
+                 'test-2076-dev-build-check.ps1',
                  'test-1929-dev-gamemode-note.ps1',
                  'test-1938-server-ready-wait.ps1',
                  'test-1955-ship-stack-note.ps1',
