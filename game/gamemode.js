@@ -62814,6 +62814,131 @@ function createQuestTransactions(deps) {
 }
 module.exports={createQuestTransactions:createQuestTransactions,actorIdentity:actorIdentity,targetIdentity:targetIdentity};
 return module.exports;})();
+const KILL_CONTRACTS = (function () { const module = {exports:{}};
+'use strict';
+var identityTools=typeof QUEST_TRANSACTIONS!=='undefined'?QUEST_TRANSACTIONS:require('./quest-transactions');
+var SPEC=[
+  {id:'wolf',hold:'Whiterun',place:'White River Watch',count:1,world:'151f9',refs:{'86a88':'e1672'}},
+  {id:'sabre',hold:'Eastmarch',place:'Lost Knife Hideout',count:1,world:'1a337',refs:{'1ce7b':'59397'}},
+  {id:'camp',hold:'Whiterun',place:'Halted Stream Camp',count:3,world:'3c',bounds:[14000,18000,16000,22000],
+    refs:{'50533':'b623b','50549':'b6fcd','5054a':'1e79f','5054e':'b623b'}},
+  {id:'bear',hold:'the Rift',place:'Pinepeak Cavern',count:1,world:'15230',refs:{'19f3e':'1e7a4'}},
+  {id:'barrow',hold:'Falkreath',place:'Bleak Falls Temple',count:1,world:'371de',
+    refs:{'1d219':'1e7ad','380b3':'4a59a','380b5':'567c8','380b7':'bf7b3','380b8':'a6850'}},
+  {id:'giant',hold:'Whiterun',place:'Bleakwind Basin',count:1,world:'3c',bounds:[-500,2500,-1000,3000],
+    refs:{'33f9f':'3053f','33fa3':'3053f'}}
+];
+function own(o,key){return Object.prototype.hasOwnProperty.call(o,key);}
+function object(o){return !!o && typeof o==='object' && !Array.isArray(o);}
+function copy(o){return JSON.parse(JSON.stringify(o));}
+function generation(n){return Number.isSafeInteger(n) && n>=0;}
+function point(p){return Array.isArray(p) && p.length===3 && p.every(Number.isFinite);}
+function createKillContracts(deps) {
+  var mp=deps.mp, sources={},byId={},rows=[];
+  if(!deps.population || !Array.isArray(deps.population.keep))throw new Error('Kill source catalogue is unavailable.');
+  SPEC.forEach(function(spec){
+    var row={id:spec.id,hold:spec.hold,place:spec.place,count:spec.count,world:spec.world+':Skyrim.esm',
+      bounds:spec.bounds,refs:[]};
+    Object.keys(spec.refs).forEach(function(local){
+      var ref=local+':Skyrim.esm',base=spec.refs[local]+':Skyrim.esm';
+      var matches=deps.population.keep.filter(function(r){return r[0]===ref;});
+      var kept=matches[0];
+      if(matches.length!==1 || kept[1]!==base || kept[2]!==row.world || !point(kept[3]) ||
+          !Number.isFinite(kept[4]) || kept[4]<=0)throw new Error('Kill source disagrees with the kept cast: '+ref);
+      sources[ref]={row:row,base:base,pos:kept[3].slice(),leash:kept[4]};row.refs.push(ref);
+    });
+    byId[row.id]=row;rows.push(row);
+  });
+  function history(b) {
+    var raw=own(b,'killHistory')?b.killHistory:b.expected?b.expected.killHistory:undefined;
+    if(raw===undefined)return {};
+    if(!object(raw) || Object.keys(raw).some(function(ref){return !own(sources,ref) || !generation(raw[ref]);}))return null;
+    return copy(raw);
+  }
+  function uncertain(b) {
+    var raw=own(b,'killUncertain')?b.killUncertain:b.expected?b.expected.killUncertain:undefined;
+    if(raw===undefined)return {};
+    if(!object(raw) || Object.keys(raw).some(function(id){return !own(byId,id) || raw[id]!==true;}))return null;
+    return copy(raw);
+  }
+  function validEntry(row,entry,retained) {
+    if(!object(entry) || !generation(entry.kills) || entry.kills>row.count)return false;
+    var credited=entry.credited;
+    if(credited===undefined && entry.kills===0)return true;
+    if(!Array.isArray(credited) || credited.length!==entry.kills)return false;
+    var seen={};
+    return credited.every(function(body){
+      if(!object(body) || row.refs.indexOf(body.ref)<0 || !generation(body.life) ||
+          !retained || !own(retained,body.ref) || retained[body.ref]<body.life)return false;
+      var key=JSON.stringify([body.ref,body.life]);
+      if(own(seen,key))return false;seen[key]=true;return true;
+    });
+  }
+  function snapshot(id) {
+    try {
+      var ref=mp.getDescFromId(id),source=sources[ref];
+      if(!source)return null;
+      var ai=mp.getNpcAIState(id),token=identityTools.targetIdentity(mp,id);
+      if(!ai || ai.isHuman!==false || ai.isServerControlled!==true || ai.isDisabled===true ||
+          !generation(ai.lifeGeneration) || !point(ai.pos) || typeof token!=='string' ||
+          mp.get(id,'baseDesc')!==source.base || mp.get(id,'worldOrCellDesc')!==source.row.world)return null;
+      var body=JSON.parse(token);
+      if(body.desc!==ref || body.life!==ai.lifeGeneration || body.body!==ai.runtimeLifeIdentity)return null;
+      var distance=ai.pos.reduce(function(n,v,i){return n+Math.pow(v-source.pos[i],2);},0);
+      var box=source.row.bounds;
+      if(distance>source.leash*source.leash || box && (ai.pos[0]<box[0] || ai.pos[0]>box[1] || ai.pos[1]<box[2] || ai.pos[1]>box[3]))return null;
+      return {ref:ref,life:ai.lifeGeneration,dead:ai.isDead===true,row:source.row};
+    } catch(error){return null;}
+  }
+  function bodies(row) {
+    try {
+      var result=row.refs.map(function(ref){return snapshot(mp.getIdFromDesc(ref));});
+      return result.every(Boolean)?result:null;
+    } catch(error){return null;}
+  }
+  function take(b,id) {
+    var row=own(byId,id)?byId[id]:null,retained=history(b),doubt=uncertain(b);
+    if(!row)return {ok:false,why:'unknown'};
+    if(own(b.open,id))return {ok:false,why:'open'};
+    if(!retained || !doubt)return {ok:false,why:'recovery'};
+    var current=bodies(row);
+    if(!current)return {ok:false,why:'unavailable'};
+    current.forEach(function(body){
+      if(doubt[id] || body.dead)retained[body.ref]=Math.max(own(retained,body.ref)?retained[body.ref]:-1,body.life);
+    });
+    delete doubt[id];
+    b.killHistory=retained;b.killUncertain=doubt;b.open[id]={drawn:0,kills:0,credited:[]};
+    return {ok:true};
+  }
+  function credit(b,killer,victim) {
+    var owner=deps.identity(killer);
+    if(typeof owner!=='string' || !owner)return {ok:false,why:'identity'};
+    var body=snapshot(victim),retained=history(b),doubt=uncertain(b);
+    if(!body || !body.dead)return {ok:false,why:'target'};
+    var entry=b.open[body.row.id];
+    if(!retained || !doubt || doubt[body.row.id] || !validEntry(body.row,entry,retained))return {ok:false,why:'recovery'};
+    if(entry.kills>=body.row.count || own(retained,body.ref) && retained[body.ref]>=body.life)return {ok:false,why:'duplicate'};
+    if(deps.identity(killer)!==owner)return {ok:false,why:'identity'};
+    entry=copy(entry);entry.kills++;entry.credited=(entry.credited || []).concat([{ref:body.ref,life:body.life}]);
+    retained[body.ref]=body.life;b.killHistory=retained;b.open[body.row.id]=entry;
+    return {ok:true};
+  }
+  function ready(b,id) {
+    var row=own(byId,id)?byId[id]:null,retained=history(b),doubt=uncertain(b),entry=b.open[id];
+    return !!row && !!retained && !!doubt && !doubt[id] && validEntry(row,entry,retained) && entry.kills===row.count;
+  }
+  function abandon(b,id) {
+    var row=own(byId,id)?byId[id]:null,doubt=uncertain(b);
+    if(!row || !own(b.open,id))return {ok:false,why:'none'};
+    if(!doubt)return {ok:false,why:'recovery'};
+    if(!validEntry(row,b.open[id],history(b)))doubt[id]=true;
+    b.killUncertain=doubt;delete b.open[id];return {ok:true};
+  }
+  return {rows:rows,available:function(id){return own(byId,id) && !!bodies(byId[id]);},
+    take:take,credit:credit,ready:ready,abandon:abandon};
+}
+module.exports={createKillContracts:createKillContracts};
+return module.exports;})();
 'use strict';
 
 var GOLD_BASE = 15;
@@ -62971,9 +63096,9 @@ function createMerchantTrading(deps) {
     return JSON.stringify([human.desc,human.profileId,human.lifeGeneration]);
   }
 
-  function questView(actorId) {
+  function questView(actorId,merchantId) {
     var quests=typeof deps.quests==='function' && deps.quests();
-    return quests ? quests.describe(actorId) : [];
+    return quests ? quests.describe(actorId,merchantId) : [];
   }
 
   function supplyKey(human, itemName) {
@@ -63025,7 +63150,7 @@ function createMerchantTrading(deps) {
       purse: state.purse,
       offers: offers,
       supply: supply,
-      quests: questView(actorId),
+      quests: questView(actorId,merchantId),
       note: note || (settlement.available()
         ? ''
         : 'Buying and selling wait on the native transfer. Nothing has moved.')
@@ -63043,7 +63168,7 @@ function createMerchantTrading(deps) {
       if (!reached.ok || !authed(profileId,reached.human) || sessionIdentity(reached.human)!==session.identity) {
         sessions.delete(profileId); views.push({actorId:session.actorId,view:{open:false}}); return;
       }
-      var quests=JSON.stringify(questView(session.actorId));
+      var quests=JSON.stringify(questView(session.actorId,session.merchantId));
       if (changed.indexOf(session.merchantId) < 0 && quests===session.quests) return;
       var state = purses.read(session.merchantId), place = state && placeOf(state.reference);
       if (state && place) {
@@ -63268,6 +63393,10 @@ function createMerchantTrading(deps) {
     nativeReady: function () { return settlement.available(); },
     withQuestInventoryMutation: function(actorId,change) {return settlement.withInventoryMutation(actorId,change);},
     questReady: function(actorId) {return settlement.canInventoryMutation(actorId);},
+    questHold: function(merchantId) {
+      var state=active && purses.read(merchantId),place=state && placeOf(state.reference);
+      return place && place.hold || '';
+    },
     shutdown: function () { active=false; sessions.clear(); settlement.shutdown(); },
     REACH: REACH,
     SUPPLY_COUNT: SUPPLY_COUNT,
@@ -63420,6 +63549,7 @@ const install = module.exports.installMerchantTrading;
 module.exports.installMerchantTrading = function (env) {
   return install(Object.assign({}, env, { catalog: {"version":1,"count":249,"byRef":{"1000a:Populated Cities Towns Villages Legendary.esp":{"name":"Merchant","hold":"Whiterun","bookHold":"whiterun","locationName":"Rorikstead","cell":"9597:Skyrim.esm","world":"3c:Skyrim.esm","pos":[-83681.125,7565.1875,-4220.984375]},"1021:Solitude Arena.esp":{"name":"Chef of the Restaurant","hold":"Haafingar","bookHold":"solitude","locationName":"SolitudeTemple","cell":"37ee4:Skyrim.esm","world":"37edf:Skyrim.esm","pos":[-59069.3203125,112568.546875,-7363.8359375]},"109aa9:Arena - Markarth Side.esp":{"name":"Nix Silverspoon","hold":"Hjaalmarch","bookHold":"morthal","locationName":"Markarth Side","cell":"1096b5:Arena - Markarth Side.esp","world":null,"pos":[480,-48,0]},"127bb6:Arena - Markarth Side.esp":{"name":"Vixi","hold":"Hjaalmarch","bookHold":"morthal","locationName":"Markarth Side","cell":"103e1d:Arena - Markarth Side.esp","world":null,"pos":[752,24,0]},"13482:Skyrim.esm":{"name":"Alvor","hold":"Whiterun","bookHold":"whiterun","locationName":"Riverwood","cell":"133c8:Skyrim.esm","world":null,"pos":[-515.1854248046875,-153.69107055664062,240]},"13487:Skyrim.esm":{"name":"Lucan Valerius","hold":"Whiterun","bookHold":"whiterun","locationName":"Riverwood","cell":"133c9:Skyrim.esm","world":null,"pos":[32.38584518432617,-123.53012084960938,0]},"13488:Skyrim.esm":{"name":"Camilla Valerius","hold":"Whiterun","bookHold":"whiterun","locationName":"Riverwood","cell":"133c9:Skyrim.esm","world":null,"pos":[18.921188354492188,-251.0354461669922,0]},"135227:WindhelmSSE.esp":{"name":"Audmund","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"13502e:WindhelmSSE.esp","world":null,"pos":[1543.1429443359375,-5162.24609375,67.30768585205078]},"136edc:Arena - Markarth Side.esp":{"name":"Lilja","hold":"Hjaalmarch","bookHold":"morthal","locationName":"Markarth Side","cell":"f9b2a:Arena - Markarth Side.esp","world":null,"pos":[704,176,0]},"13bffc:Arena - Markarth Side.esp":{"name":"Gunnr","hold":"Hjaalmarch","bookHold":"morthal","locationName":"Markarth Side","cell":"f9a47:Arena - Markarth Side.esp","world":null,"pos":[48,-8,0]},"13c008:Arena - Markarth Side.esp":{"name":"Hild","hold":"Hjaalmarch","bookHold":"morthal","locationName":"Markarth Side","cell":"f9a47:Arena - Markarth Side.esp","world":null,"pos":[-56,0,0]},"149aca:WindhelmSSE.esp":{"name":"Hellte","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"12fba4:WindhelmSSE.esp","world":null,"pos":[-2132.254638671875,1259.0950927734375,-40.11399459838867]},"15cfcd:WindhelmSSE.esp":{"name":"Tormund Tall-Tale","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"15cc6f:WindhelmSSE.esp","world":null,"pos":[1860.81494140625,-5032.67626953125,64.00001525878906]},"160715:Riften Expansion.esp":{"name":"Bjoruld","hold":"the Rift","bookHold":"riften","locationName":"Riften","cell":"cc616:Riften Expansion.esp","world":null,"pos":[-91.23159790039062,74.497802734375,64]},"16acf:Skyrim.esm":{"name":"Stormcloak Quartermaster","hold":"Haafingar","bookHold":"solitude","locationName":"Sons of Skyrim Military Camp","cell":"9305:Skyrim.esm","world":"3c:Skyrim.esm","pos":[-91802.8828125,88395.84375,-12499.0546875]},"16d752:WindhelmSSE.esp":{"name":"Brurid","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"12f61e:WindhelmSSE.esp","world":null,"pos":[-1729.3756103515625,4209.54931640625,-62.92679214477539]},"172ca7:WindhelmSSE.esp":{"name":"Delmon","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"10665b:WindhelmSSE.esp","world":null,"pos":[-1117.6427001953125,-1085.0047607421875,-128.00009155273438]},"177da:Dragonborn.esm":{"name":"Neloth","hold":"Solstheim","bookHold":"ravenrock","locationName":"Tel Mithryn","cell":"17787:Dragonborn.esm","world":null,"pos":[102.66351318359375,1159.6314697265625,-8.091889381408691]},"177db:Dragonborn.esm":{"name":"Talvas Fathryon","hold":"Solstheim","bookHold":"ravenrock","locationName":"Tel Mithryn","cell":"17787:Dragonborn.esm","world":null,"pos":[200.34228515625,1152.60107421875,-5.302620887756348]},"177dc:Dragonborn.esm":{"name":"Elynea Mothren","hold":"Solstheim","bookHold":"ravenrock","locationName":"Tel Mithryn","cell":"1772a:Dragonborn.esm","world":null,"pos":[298.970947265625,-276.8332214355469,0]},"179c40:Riften Expansion.esp":{"name":"Sethesi","hold":"the Rift","bookHold":"riften","locationName":"Riften","cell":"cc616:Riften Expansion.esp","world":null,"pos":[-283.3656005859375,-21.51885986328125,63.00001525878906]},"1828f:Dragonborn.esm":{"name":"Glover Mallory","hold":"Solstheim","bookHold":"ravenrock","locationName":"Raven Rock","cell":"17ec4:Dragonborn.esm","world":null,"pos":[-663.4784545898438,-301.1336669921875,0]},"18291:Dragonborn.esm":{"name":"Geldis Sadri","hold":"Solstheim","bookHold":"ravenrock","locationName":"Raven Rock","cell":"17ec0:Dragonborn.esm","world":null,"pos":[-39.04017639160156,-178.24331665039062,0]},"18293:Dragonborn.esm":{"name":"Fethis Alor","hold":"Solstheim","bookHold":"ravenrock","locationName":"Raven Rock","cell":"17ebf:Dragonborn.esm","world":null,"pos":[-149.79263305664062,-146.8022918701172,0]},"182a0:Dragonborn.esm":{"name":"Garyn Ienth","hold":"Solstheim","bookHold":"ravenrock","locationName":"Raven Rock","cell":"18277:Dragonborn.esm","world":null,"pos":[-64.05123138427734,194.41407775878906,0]},"182a2:Dragonborn.esm":{"name":"Milore Ienth","hold":"Solstheim","bookHold":"ravenrock","locationName":"Raven Rock","cell":"18277:Dragonborn.esm","world":null,"pos":[-3.5353641510009766,232.098876953125,0]},"18fac:Dragonborn.esm":{"name":"Morwen","hold":"Solstheim","bookHold":"ravenrock","locationName":"Skaal Village","cell":"18f46:Dragonborn.esm","world":null,"pos":[-322.0987854003906,781.871826171875,1.4615297317504883]},"18fb8:Dragonborn.esm":{"name":"Baldor Iron-Shaper","hold":"Solstheim","bookHold":"ravenrock","locationName":"Skaal Village","cell":"18f49:Dragonborn.esm","world":null,"pos":[-173.83023071289062,544.9551391601562,-7.358676433563232]},"18fc0:Dragonborn.esm":{"name":"Edla","hold":"Solstheim","bookHold":"ravenrock","locationName":"Skaal Village","cell":"18f4a:Dragonborn.esm","world":null,"pos":[-472.4573669433594,846.078857421875,40.82240295410156]},"1939ba:aaaGraniteHill.esp":{"name":"Lova","hold":"Falkreath","bookHold":"falkreath","locationName":"Granite Hill","cell":"626a:aaaGraniteHill.esp","world":null,"pos":[-1024,0,512]},"1981e:Skyrim.esm":{"name":"Solaf","hold":"Falkreath","bookHold":"falkreath","locationName":"Falkreath","cell":"13a76:Skyrim.esm","world":null,"pos":[-1219.1793212890625,-180.9888458251953,-0.1077728271484375]},"198a0:Skyrim.esm":{"name":"Corpulus Vinius","hold":"Haafingar","bookHold":"solitude","locationName":"Solitude","cell":"16a0e:Skyrim.esm","world":null,"pos":[-204.85626220703125,-453.2304382324219,0]},"198ac:Skyrim.esm":{"name":"Taarie","hold":"Haafingar","bookHold":"solitude","locationName":"Solitude","cell":"16a0f:Skyrim.esm","world":null,"pos":[21.030447006225586,-535.8790283203125,0]},"198ad:Skyrim.esm":{"name":"Endarie","hold":"Haafingar","bookHold":"solitude","locationName":"Solitude","cell":"16a0f:Skyrim.esm","world":null,"pos":[-35.81916809082031,-431.54315185546875,0.00006103515625]},"198af:Skyrim.esm":{"name":"Jala","hold":"Haafingar","bookHold":"solitude","locationName":"Solitude","cell":"16a05:Skyrim.esm","world":null,"pos":[432,-960,0]},"198b1:Skyrim.esm":{"name":"Fihada","hold":"Haafingar","bookHold":"solitude","locationName":"Solitude","cell":"169fe:Skyrim.esm","world":null,"pos":[-247.2842254638672,-1140.2867431640625,0.0000152587890625]},"198b3:Skyrim.esm":{"name":"Evette San","hold":"Haafingar","bookHold":"solitude","locationName":"Solitude","cell":"16a08:Skyrim.esm","world":null,"pos":[560,-688,0]},"198b6:Skyrim.esm":{"name":"Vittoria Vici","hold":"Haafingar","bookHold":"solitude","locationName":"Solitude","cell":"16a07:Skyrim.esm","world":null,"pos":[-7.1953125,-384.15625,4.4306640625]},"198c5:Skyrim.esm":{"name":"Sybille Stentor","hold":"Haafingar","bookHold":"solitude","locationName":"Solitude","cell":"16a04:Skyrim.esm","world":null,"pos":[-1115.4222412109375,1085.11181640625,576.4193725585938]},"198c9:Skyrim.esm":{"name":"Sayma","hold":"Haafingar","bookHold":"solitude","locationName":"Solitude","cell":"16a10:Skyrim.esm","world":null,"pos":[-159.3194580078125,-975.5235595703125,0.0001068115234375]},"198d2:Skyrim.esm":{"name":"Angeline Morrard","hold":"Haafingar","bookHold":"solitude","locationName":"Solitude","cell":"16a11:Skyrim.esm","world":null,"pos":[21.52102279663086,-248.43890380859375,0]},"198d3:Skyrim.esm":{"name":"Vivienne Onis","hold":"Haafingar","bookHold":"solitude","locationName":"Solitude","cell":"16a11:Skyrim.esm","world":null,"pos":[-20.143760681152344,-158.26580810546875,0.000003814697265625]},"198d4:Skyrim.esm":{"name":"Addvar","hold":"Haafingar","bookHold":"solitude","locationName":"Solitude","cell":"16a0d:Skyrim.esm","world":null,"pos":[463.8466491699219,-1004.7083740234375,0.000003814697265625]},"198d5:Skyrim.esm":{"name":"Geimund","hold":"Haafingar","bookHold":"solitude","locationName":"Solitude","cell":"70469:Skyrim.esm","world":null,"pos":[475.1209716796875,-1299.91552734375,-0.000003814697265625]},"198d8:Skyrim.esm":{"name":"Beirand","hold":"Haafingar","bookHold":"solitude","locationName":"Solitude","cell":"16a10:Skyrim.esm","world":null,"pos":[-277.358154296875,-1007.031494140625,0.000003814697265625]},"198ea:Skyrim.esm":{"name":"Lisbet","hold":"the Reach","bookHold":"markarth","locationName":"Markarth","cell":"16dff:Skyrim.esm","world":null,"pos":[439.7211608886719,2819.8076171875,0]},"198eb:Skyrim.esm":{"name":"Imedhnain","hold":"the Reach","bookHold":"markarth","locationName":"Markarth","cell":"16dff:Skyrim.esm","world":null,"pos":[-351.8253479003906,2705.2294921875,2.836996078491211]},"198ec:Skyrim.esm":{"name":"Kleppr","hold":"the Reach","bookHold":"markarth","locationName":"Markarth","cell":"16dfe:Skyrim.esm","world":null,"pos":[-6791.62548828125,-1032.6207275390625,144]},"198ed:Skyrim.esm":{"name":"Frabbi","hold":"the Reach","bookHold":"markarth","locationName":"Markarth","cell":"16dfe:Skyrim.esm","world":null,"pos":[-6858.62548828125,-1032.6207275390625,144]},"198f2:Skyrim.esm":{"name":"Kerah","hold":"the Reach","bookHold":"markarth","locationName":"Markarth","cell":"16dfd:Skyrim.esm","world":null,"pos":[1899.5155029296875,339.3449401855469,0]},"198f7:Skyrim.esm":{"name":"Bothela","hold":"the Reach","bookHold":"markarth","locationName":"Markarth","cell":"16df6:Skyrim.esm","world":null,"pos":[-166.40286254882812,1063.5419921875,-112]},"198f8:Skyrim.esm":{"name":"Muiri","hold":"the Reach","bookHold":"markarth","locationName":"Markarth","cell":"16df6:Skyrim.esm","world":null,"pos":[173.17724609375,870.2454833984375,-112]},"19906:Skyrim.esm":{"name":"Ghorza gra-Bagol","hold":"the Reach","bookHold":"markarth","locationName":"Markarth","cell":"16df2:Skyrim.esm","world":null,"pos":[519.8775634765625,2151.841064453125,6911.1318359375]},"19907:Skyrim.esm":{"name":"Tacitus Sallustius","hold":"the Reach","bookHold":"markarth","locationName":"Markarth","cell":"16df2:Skyrim.esm","world":null,"pos":[434.6217346191406,1860.99658203125,6896]},"19908:Skyrim.esm":{"name":"Calcelmo","hold":"the Reach","bookHold":"markarth","locationName":"Markarth","cell":"16df2:Skyrim.esm","world":null,"pos":[-5168.5185546875,-167.9541778564453,6635.326171875]},"19909:Skyrim.esm":{"name":"Aicantar","hold":"the Reach","bookHold":"markarth","locationName":"Markarth","cell":"36a72:Skyrim.esm","world":null,"pos":[198,3298,0]},"1990a:Skyrim.esm":{"name":"Anton Virane","hold":"the Reach","bookHold":"markarth","locationName":"Markarth","cell":"16df2:Skyrim.esm","world":null,"pos":[-4416,1952,6896]},"19929:Skyrim.esm":{"name":"Murbul","hold":"the Reach","bookHold":"markarth","locationName":"Dushnikh Yal","cell":"198e2:Skyrim.esm","world":null,"pos":[857.6615600585938,-490.8791198730469,0]},"1992b:Skyrim.esm":{"name":"Gharol","hold":"the Reach","bookHold":"markarth","locationName":"Dushnikh Yal","cell":"198e2:Skyrim.esm","world":null,"pos":[514.876708984375,-36.48973846435547,0]},"199cf:Skyrim.esm":{"name":"Eydis","hold":"the Reach","bookHold":"markarth","locationName":"Old Hroldan","cell":"16776:Skyrim.esm","world":null,"pos":[847.8201293945312,-27.208759307861328,0]},"199d0:Skyrim.esm":{"name":"Skuli","hold":"the Reach","bookHold":"markarth","locationName":"Old Hroldan","cell":"138be:Skyrim.esm","world":null,"pos":[1309.1551513671875,-696.7742919921875,0.00005227327346801758]},"19dc8:Skyrim.esm":{"name":"Keerava","hold":"the Rift","bookHold":"riften","locationName":"Riften","cell":"16bdf:Skyrim.esm","world":null,"pos":[657.87158203125,-214.71763610839844,64]},"19dc9:Skyrim.esm":{"name":"Talen-Jei","hold":"the Rift","bookHold":"riften","locationName":"Riften","cell":"16bdf:Skyrim.esm","world":null,"pos":[693.4588623046875,-15.719537734985352,64]},"19dce:Skyrim.esm":{"name":"Indaryn","hold":"the Rift","bookHold":"riften","locationName":"Riften","cell":"16bdc:Skyrim.esm","world":null,"pos":[2215.047119140625,-4296.64794921875,319]},"19dcf:Skyrim.esm":{"name":"Drifa","hold":"the Rift","bookHold":"riften","locationName":"Riften","cell":"16bd9:Skyrim.esm","world":null,"pos":[-147.76100158691406,10.519561767578125,64]},"19dd0:Skyrim.esm":{"name":"Bersi Honey-Hand","hold":"the Rift","bookHold":"riften","locationName":"Riften","cell":"16bd9:Skyrim.esm","world":null,"pos":[-42.64916229248047,-54.30506896972656,64]},"19ddc:Skyrim.esm":{"name":"Brand-Shei","hold":"the Rift","bookHold":"riften","locationName":"Riften","cell":"16bd4:Skyrim.esm","world":null,"pos":[-283.684814453125,-194.00802612304688,64]},"19ddd:Skyrim.esm":{"name":"Ungrien","hold":"the Rift","bookHold":"riften","locationName":"Riften","cell":"16bd4:Skyrim.esm","world":null,"pos":[27.647171020507812,404.66082763671875,63]},"19df0:Skyrim.esm":{"name":"Wylandriah","hold":"the Rift","bookHold":"riften","locationName":"Riften","cell":"16bd2:Skyrim.esm","world":null,"pos":[-1226.40966796875,1024.047119140625,128]},"19df1:Skyrim.esm":{"name":"Balimund","hold":"the Rift","bookHold":"riften","locationName":"Riften","cell":"53081:Skyrim.esm","world":null,"pos":[-181.75938415527344,-184.0110321044922,64]},"19df3:Skyrim.esm":{"name":"Asbjorn Fire-Tamer","hold":"the Rift","bookHold":"riften","locationName":"Riften","cell":"53081:Skyrim.esm","world":null,"pos":[-73.3221664428711,-195.400634765625,64]},"19df9:Skyrim.esm":{"name":"Vekel the Man","hold":"the Rift","bookHold":"riften","locationName":"Riften","cell":"16bcf:Skyrim.esm","world":null,"pos":[187.49066162109375,2476.4599609375,-123.60869598388672]},"19dfa:Skyrim.esm":{"name":"Dirge","hold":"the Rift","bookHold":"riften","locationName":"Riften","cell":"16bcf:Skyrim.esm","world":null,"pos":[17.521156311035156,2593.78076171875,-124.43700408935547]},"19dfb:Skyrim.esm":{"name":"Elgrim","hold":"the Rift","bookHold":"riften","locationName":"Riften","cell":"16bce:Skyrim.esm","world":null,"pos":[0,784,112]},"19dfc:Skyrim.esm":{"name":"Hafjorg","hold":"the Rift","bookHold":"riften","locationName":"Riften","cell":"16bce:Skyrim.esm","world":null,"pos":[-96,784,112]},"19e02:Skyrim.esm":{"name":"Wilhelm","hold":"the Rift","bookHold":"riften","locationName":"Ivarstead","cell":"13a5c:Skyrim.esm","world":null,"pos":[1451.5177001953125,191.83848571777344,0.00008392333984375]},"19e03:Skyrim.esm":{"name":"Lynly Star-Sung","hold":"the Rift","bookHold":"riften","locationName":"Ivarstead","cell":"13a5c:Skyrim.esm","world":null,"pos":[1548.2703857421875,192.79067993164062,0.00006103515625]},"19e09:Skyrim.esm":{"name":"Filnjar","hold":"the Rift","bookHold":"riften","locationName":"Shor's Stone","cell":"13856:Skyrim.esm","world":null,"pos":[1189.831298828125,-59.188446044921875,240]},"19e14:Skyrim.esm":{"name":"Marise Aravel","hold":"the Rift","bookHold":"riften","locationName":"Riften","cell":"9ccde:Skyrim.esm","world":null,"pos":[2084.01806640625,2835.379638671875,176]},"19e19:Skyrim.esm":{"name":"Atub","hold":"the Rift","bookHold":"riften","locationName":"Largashbur","cell":"1525c:Skyrim.esm","world":null,"pos":[787.3623046875,-587.6644897460938,0]},"1a51b:Dragonborn.esm":{"name":"Elmus","hold":"Solstheim","bookHold":"ravenrock","locationName":"DLC2BujoldsRetreatExterior01","cell":"ee04:Dragonborn.esm","world":"800:Dragonborn.esm","pos":[80597.8203125,58660.40234375,658.997314453125]},"1a51d:Dragonborn.esm":{"name":"Halbarn Iron-Fur","hold":"Solstheim","bookHold":"ravenrock","locationName":"Thirsk Mead Hall","cell":"16feb:Dragonborn.esm","world":null,"pos":[3506.53564453125,1025.052001953125,6634.30126953125]},"1a66d:Skyrim.esm":{"name":"Arcadia","hold":"Whiterun","bookHold":"whiterun","locationName":"Whiterun","cell":"165b6:Skyrim.esm","world":null,"pos":[-520,-248,64]},"1a66e:Skyrim.esm":{"name":"Hulda","hold":"Whiterun","bookHold":"whiterun","locationName":"Whiterun","cell":"1605e:Skyrim.esm","world":null,"pos":[336,-416,64]},"1a672:Skyrim.esm":{"name":"Belethor","hold":"Whiterun","bookHold":"whiterun","locationName":"Whiterun","cell":"165b3:Skyrim.esm","world":null,"pos":[119.512451171875,-23.152530670166016,69.51840209960938]},"1a675:Skyrim.esm":{"name":"Carlotta Valentia","hold":"Whiterun","bookHold":"whiterun","locationName":"Whiterun","cell":"165b1:Skyrim.esm","world":null,"pos":[50.630889892578125,-218.3187713623047,33.24507141113281]},"1a67c:Skyrim.esm":{"name":"Adrianne Avenicci","hold":"Whiterun","bookHold":"whiterun","locationName":"Warmaiden's","cell":"1db4e:Skyrim.esm","world":null,"pos":[-16,128,64]},"1a680:Skyrim.esm":{"name":"Anoriath","hold":"Whiterun","bookHold":"whiterun","locationName":"The Drunken Huntsman","cell":"165b7:Skyrim.esm","world":null,"pos":[-496,-1264,66.92522430419922]},"1a681:Skyrim.esm":{"name":"Elrindir","hold":"Whiterun","bookHold":"whiterun","locationName":"Whiterun","cell":"165b7:Skyrim.esm","world":null,"pos":[-16.498863220214844,-1200.2633056640625,80]},"1a683:Skyrim.esm":{"name":"Eorlund Gray-Mane","hold":"Whiterun","bookHold":"whiterun","locationName":"Whiterun","cell":"165b2:Skyrim.esm","world":null,"pos":[-738.41455078125,-310.5943298339844,320]},"1a684:Skyrim.esm":{"name":"Fralia Gray-Mane","hold":"Whiterun","bookHold":"whiterun","locationName":"Whiterun","cell":"165b2:Skyrim.esm","world":null,"pos":[-800,-320,320]},"1a69a:Skyrim.esm":{"name":"Ysolda","hold":"Whiterun","bookHold":"whiterun","locationName":"Whiterun","cell":"165ac:Skyrim.esm","world":null,"pos":[269.8266906738281,-79.94212341308594,69.47135925292969]},"1a6a5:Skyrim.esm":{"name":"Ahlam","hold":"Whiterun","bookHold":"whiterun","locationName":"Whiterun","cell":"165b7:Skyrim.esm","world":null,"pos":[-308.28973388671875,-587.3578491210938,320.06121826171875]},"1a6a8:Skyrim.esm":{"name":"Mralki","hold":"Whiterun","bookHold":"whiterun","locationName":"Rorikstead","cell":"13870:Skyrim.esm","world":null,"pos":[807.19677734375,-163.96075439453125,0.5329780578613281]},"1a6b5:Skyrim.esm":{"name":"Frida","hold":"the Pale","bookHold":"dawnstar","locationName":"Dawnstar","cell":"13a86:Skyrim.esm","world":null,"pos":[1088.7137451171875,-91.87908172607422,2.565845489501953]},"1a6be:Skyrim.esm":{"name":"Rustleif","hold":"the Pale","bookHold":"dawnstar","locationName":"Dawnstar","cell":"13a83:Skyrim.esm","world":null,"pos":[909.4266357421875,18.256004333496094,272]},"1a6bf:Skyrim.esm":{"name":"Seren","hold":"the Pale","bookHold":"dawnstar","locationName":"Dawnstar","cell":"13a83:Skyrim.esm","world":null,"pos":[822.4622192382812,18.16551971435547,272]},"1a6c3:Skyrim.esm":{"name":"Madena","hold":"the Pale","bookHold":"dawnstar","locationName":"Dawnstar","cell":"13a80:Skyrim.esm","world":null,"pos":[-776.2161865234375,1119.9918212890625,0]},"1aa35:The Great City of Solitude.esp":{"name":"Jytte","hold":"Haafingar","bookHold":"solitude","locationName":"Solitude","cell":"e1e6:The Great City of Solitude.esp","world":null,"pos":[404.8375549316406,-1556.0911865234375,0.00006103515625]},"1aa5e:Skyrim.esm":{"name":"Falion","hold":"Hjaalmarch","bookHold":"morthal","locationName":"Morthal","cell":"138d0:Skyrim.esm","world":null,"pos":[693.3634643554688,28.15774154663086,272.34967041015625]},"1aa61:Skyrim.esm":{"name":"Lami","hold":"Hjaalmarch","bookHold":"morthal","locationName":"Morthal","cell":"138cf:Skyrim.esm","world":null,"pos":[860.4638671875,-160.4937744140625,272]},"1aa62:Skyrim.esm":{"name":"Jonna","hold":"Hjaalmarch","bookHold":"morthal","locationName":"Morthal","cell":"138ce:Skyrim.esm","world":null,"pos":[794.4549560546875,-143.3380584716797,10.95335578918457]},"1b085:Skyrim.esm":{"name":"Iddra","hold":"Eastmarch","bookHold":"windhelm","locationName":"Kynesgrove","cell":"13907:Skyrim.esm","world":null,"pos":[2404.942138671875,-135.187744140625,0.5329742431640625]},"1b086:Skyrim.esm":{"name":"Kjeld","hold":"Eastmarch","bookHold":"windhelm","locationName":"Kynesgrove","cell":"13907:Skyrim.esm","world":null,"pos":[2328.049560546875,-199.382568359375,0.000019073486328125]},"1b08b:Skyrim.esm":{"name":"Dravynea the Stoneweaver","hold":"Eastmarch","bookHold":"windhelm","locationName":"Kynesgrove","cell":"13907:Skyrim.esm","world":null,"pos":[1712.6890869140625,-738.410400390625,0.00000762939453125]},"1b097:Skyrim.esm":{"name":"Bolar","hold":"Eastmarch","bookHold":"windhelm","locationName":"Narzulbur","cell":"15238:Skyrim.esm","world":null,"pos":[-223.99969482421875,-351.9990234375,-16.000003814697266]},"1b099:Skyrim.esm":{"name":"Dushnamub","hold":"Eastmarch","bookHold":"windhelm","locationName":"Narzulbur","cell":"15238:Skyrim.esm","world":null,"pos":[5.2290472984313965,-297.620849609375,-16.000003814697266]},"1b115:Skyrim.esm":{"name":"Nurelion","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"1678c:Skyrim.esm","world":null,"pos":[1587.1324462890625,-4987.16552734375,72.77753448486328]},"1b116:Skyrim.esm":{"name":"Quintus Navale","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"1678c:Skyrim.esm","world":null,"pos":[1483.6988525390625,-4987.85107421875,72.77753448486328]},"1b118:Skyrim.esm":{"name":"Elda Early-Dawn","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"16789:Skyrim.esm","world":null,"pos":[128,-3856,320]},"1b11a:Skyrim.esm":{"name":"Nils","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"16789:Skyrim.esm","world":null,"pos":[-432,-3872,320]},"1b11c:Skyrim.esm":{"name":"Niranye","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"16788:Skyrim.esm","world":null,"pos":[-960.8294067382812,-3247.095947265625,0]},"1b123:Skyrim.esm":{"name":"Revyn Sadri","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"16782:Skyrim.esm","world":null,"pos":[-1072.8953857421875,-1134.9822998046875,-128]},"1b124:Skyrim.esm":{"name":"Aval Atheron","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"16781:Skyrim.esm","world":null,"pos":[-2954.65576171875,356.79949951171875,-448]},"1b128:Skyrim.esm":{"name":"Ambarys Rendar","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"1677f:Skyrim.esm","world":null,"pos":[2834.9716796875,-2092.90380859375,-512]},"1b129:Skyrim.esm":{"name":"Malthyr Elenil","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"1677f:Skyrim.esm","world":null,"pos":[2893.5712890625,-1941.44189453125,-0.00001239776611328125]},"1b12e:Skyrim.esm":{"name":"Hillevi Cruel-Sea","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"1677d:Skyrim.esm","world":null,"pos":[-2452.187744140625,-3370.1787109375,1216]},"1b132:Skyrim.esm":{"name":"Wuunferth the Unliving","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"1677c:Skyrim.esm","world":null,"pos":[-2832,-2752,64]},"1b135:Skyrim.esm":{"name":"Oengul War-Anvil","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"7d033:Skyrim.esm","world":null,"pos":[1312.3782958984375,-5028.5703125,58.14128494262695]},"1b136:Skyrim.esm":{"name":"Hermir Strong-Heart","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"7d033:Skyrim.esm","world":null,"pos":[1378.881591796875,-5025.79541015625,65.86392211914062]},"1b145:Skyrim.esm":{"name":"Ulundil","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"16774:Skyrim.esm","world":null,"pos":[-112,-128,64]},"1c18c:Skyrim.esm":{"name":"Birna","hold":"Winterhold","bookHold":"winterhold","locationName":"Winterhold","cell":"13813:Skyrim.esm","world":null,"pos":[-1035.252197265625,-131.28944396972656,10.275467872619629]},"1c18d:Skyrim.esm":{"name":"Dagur","hold":"Winterhold","bookHold":"winterhold","locationName":"Winterhold","cell":"13814:Skyrim.esm","world":null,"pos":[1470.461181640625,17.313034057617188,0.00006103515625]},"1c18e:Skyrim.esm":{"name":"Haran","hold":"Winterhold","bookHold":"winterhold","locationName":"Winterhold","cell":"13814:Skyrim.esm","world":null,"pos":[1986.1158447265625,-209.83944702148438,0.000034332275390625]},"1c1a1:Skyrim.esm":{"name":"Tolfdir","hold":"Winterhold","bookHold":"winterhold","locationName":"Winterhold College","cell":"cab91:Skyrim.esm","world":null,"pos":[-377.09039306640625,-397.4307861328125,-383.99993896484375]},"1c1a5:Skyrim.esm":{"name":"Faralda","hold":"Winterhold","bookHold":"winterhold","locationName":"Winterhold College","cell":"1380f:Skyrim.esm","world":null,"pos":[403.2132568359375,-356.6697998046875,-384]},"1c1a6:Skyrim.esm":{"name":"Drevis Neloren","hold":"Winterhold","bookHold":"winterhold","locationName":"Winterhold College","cell":"1380f:Skyrim.esm","world":null,"pos":[375.5077209472656,379.20013427734375,-384]},"1c1a7:Skyrim.esm":{"name":"Phinis Gestor","hold":"Winterhold","bookHold":"winterhold","locationName":"Winterhold College","cell":"1380f:Skyrim.esm","world":null,"pos":[-376.52850341796875,394.60040283203125,-384]},"1c1a8:Skyrim.esm":{"name":"Colette Marence","hold":"Winterhold","bookHold":"winterhold","locationName":"Winterhold College","cell":"1380f:Skyrim.esm","world":null,"pos":[-600.1836547851562,109.60194396972656,28.567283630371094]},"1c1aa:Skyrim.esm":{"name":"Enthir","hold":"Winterhold","bookHold":"winterhold","locationName":"Winterhold College","cell":"cab91:Skyrim.esm","world":null,"pos":[413.85235595703125,348.97003173828125,0.00002288818359375]},"1c1b4:Skyrim.esm":{"name":"Urag gro-Shub","hold":"Winterhold","bookHold":"winterhold","locationName":"Winterhold College","cell":"13810:Skyrim.esm","world":null,"pos":[-201,404,0]},"1d4bc:Skyrim.esm":{"name":"Babette","hold":"Falkreath","bookHold":"falkreath","locationName":"Dark Brotherhood Sanctuary","cell":"ad5a1:Skyrim.esm","world":null,"pos":[-513.0843505859375,-1120.0906982421875,-940.701171875]},"1d503:The Great City of Solitude.esp":{"name":"Tilda","hold":"Haafingar","bookHold":"solitude","locationName":"Solitude","cell":"1d235:The Great City of Solitude.esp","world":null,"pos":[-255.72314453125,-2849.1650390625,1.0403954982757568]},"1e7d6:Skyrim.esm":{"name":"Nelacar","hold":"Winterhold","bookHold":"winterhold","locationName":"Winterhold","cell":"13814:Skyrim.esm","world":null,"pos":[1944.821533203125,696.4560546875,0.00000762939453125]},"1e9f92:Riften Expansion.esp":{"name":"Rhanul","hold":"the Rift","bookHold":"riften","locationName":"Riften","cell":"1e9e2b:Riften Expansion.esp","world":null,"pos":[-418,935,112]},"1e9f93:Riften Expansion.esp":{"name":"Hirmond","hold":"the Rift","bookHold":"riften","locationName":"Riften","cell":"1e9e2b:Riften Expansion.esp","world":null,"pos":[246,881,112]},"1eec1:Dragonborn.esm":{"name":"Dremora Merchant","hold":"Solstheim","bookHold":"ravenrock","locationName":"Solstheim","cell":"1ee98:Dragonborn.esm","world":null,"pos":[275.79705810546875,-308.63568115234375,0]},"1f9c2:Dragonborn.esm":{"name":"Majni","hold":"Solstheim","bookHold":"ravenrock","locationName":"Frostmoon Crag","cell":"ee2e:Dragonborn.esm","world":"800:Dragonborn.esm","pos":[41464.1875,57293.57421875,6843.16162109375]},"2005a:Skyrim.esm":{"name":"Hadring","hold":"the Pale","bookHold":"dawnstar","locationName":"Nightgate Inn","cell":"13a5d:Skyrim.esm","world":null,"pos":[840.364990234375,-185.7938995361328,0.000006198883056640625]},"207af8:WindhelmSSE.esp":{"name":"Manheim","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"12fcff:WindhelmSSE.esp","world":null,"pos":[-1759.7481689453125,4241.83349609375,-63.019248962402344]},"21612:aaaGraniteHill.esp":{"name":"Sigrid","hold":"Falkreath","bookHold":"falkreath","locationName":"Granite Hill","cell":"d9ac:aaaGraniteHill.esp","world":null,"pos":[299.77630615234375,-101,240.81759643554688]},"21ea6:Skyrim.esm":{"name":"Madesi","hold":"the Rift","bookHold":"riften","locationName":"Riften","cell":"42247:Skyrim.esm","world":"16bb4:Skyrim.esm","pos":[173925.78125,-97031.46875,11104.0068359375]},"2214de:WindhelmSSE.esp":{"name":"Vanadis","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"2210d9:WindhelmSSE.esp","world":null,"pos":[-786.0707397460938,-3689.43603515625,320.1373596191406]},"24004:JKs Skyrim.esp":{"name":"Jauffre","hold":"the Rift","bookHold":"riften","locationName":"Ivarstead","cell":"3519:JKs Skyrim.esp","world":null,"pos":[1805.77734375,1944.7269287109375,104.44857025146484]},"25906:FishingInSkyrim.esp":{"name":"Rybek Kupiecski","hold":"Haafingar","bookHold":"solitude","locationName":"open ground in Tamriel","cell":"92df:Skyrim.esm","world":"3c:Skyrim.esm","pos":[-73486.28125,91281.8125,-13911.423828125]},"284ad:Skyrim.esm":{"name":"Hogni Red-Arm","hold":"the Reach","bookHold":"markarth","locationName":"Markarth","cell":"16dfe:Skyrim.esm","world":null,"pos":[-4019.7138671875,-1594.49951171875,178.4000701904297]},"2b82e:aaaGraniteHill.esp":{"name":"Roar","hold":"Falkreath","bookHold":"falkreath","locationName":"Granite Hill","cell":"d9ac:aaaGraniteHill.esp","world":null,"pos":[512,80,0]},"2ba8d:Skyrim.esm":{"name":"Sabjorn","hold":"Whiterun","bookHold":"whiterun","locationName":"Honningbrew Meadery","cell":"15207:Skyrim.esm","world":null,"pos":[-1371.0843505859375,-767.385498046875,0]},"2c1ea:Dragonborn.esm":{"name":"Revus Sarvani","hold":"Solstheim","bookHold":"ravenrock","locationName":"open ground in DLC2SolstheimWorld","cell":"142ec:Dragonborn.esm","world":"800:Dragonborn.esm","pos":[68977.9375,29583.716796875,1154.5489501953125]},"31861:Dragonborn.esm":{"name":"Falas Selvayn","hold":"Solstheim","bookHold":"ravenrock","locationName":"Ramshackle Trading Post","cell":"142ec:Dragonborn.esm","world":"800:Dragonborn.esm","pos":[57780.578125,44226.12890625,4147.0263671875]},"31efc3:Riften Expansion.esp":{"name":"Wulfdis Thread-Weaver","hold":"the Rift","bookHold":"riften","locationName":"Riften","cell":"cc3f6:Riften Expansion.esp","world":null,"pos":[-273.2473449707031,-81.94912719726562,63.99998474121094]},"33a2:JKs Skyrim.esp":{"name":"Balgus","hold":"the Pale","bookHold":"dawnstar","locationName":"Dawnstar","cell":"32b8:JKs Skyrim.esp","world":null,"pos":[1486.3250732421875,1923.6727294921875,228.70834350585938]},"33b45:OarsRest.esp":{"name":"Yorgan","hold":"Falkreath","bookHold":"falkreath","locationName":"POIPineForest30","cell":"9b5a:Skyrim.esm","world":"3c:Skyrim.esm","pos":[-42563.39453125,-49189.28515625,695.0947265625]},"3a198:Skyrim.esm":{"name":"Valga Vinicia","hold":"Falkreath","bookHold":"falkreath","locationName":"Falkreath","cell":"3a184:Skyrim.esm","world":null,"pos":[-348.84991455078125,-99.87165832519531,0]},"3a19b:Skyrim.esm":{"name":"Zaria","hold":"Falkreath","bookHold":"falkreath","locationName":"Falkreath","cell":"3a183:Skyrim.esm","world":null,"pos":[-630.467041015625,23.01331329345703,0.5730171203613281]},"3a19f:Skyrim.esm":{"name":"Lod","hold":"Falkreath","bookHold":"falkreath","locationName":"Falkreath","cell":"13a73:Skyrim.esm","world":null,"pos":[1587.974609375,132.00314331054688,240]},"3a22:JKs Skyrim.esp":{"name":"Anka","hold":"the Pale","bookHold":"dawnstar","locationName":"Dawnstar","cell":"32b8:JKs Skyrim.esp","world":null,"pos":[1204.6116943359375,1890.033203125,228.7083740234375]},"3abab:aaaGraniteHill.esp":{"name":"Tulia","hold":"Falkreath","bookHold":"falkreath","locationName":"Granite Hill","cell":"83c1:aaaGraniteHill.esp","world":null,"pos":[304,-80,240]},"3abac:aaaGraniteHill.esp":{"name":"Tolvier","hold":"Falkreath","bookHold":"falkreath","locationName":"Granite Hill","cell":"8a43:aaaGraniteHill.esp","world":null,"pos":[12,48,240]},"3abad:aaaGraniteHill.esp":{"name":"Aisha","hold":"Falkreath","bookHold":"falkreath","locationName":"Granite Hill","cell":"8a43:aaaGraniteHill.esp","world":null,"pos":[111,48,240]},"3fcce:aaaGraniteHill.esp":{"name":"Jennifer","hold":"Falkreath","bookHold":"falkreath","locationName":"Granite Hill","cell":"30934:aaaGraniteHill.esp","world":null,"pos":[-128,-64,0]},"4031:HearthFires.esm":{"name":"Sofie","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"16789:Skyrim.esm","world":null,"pos":[717.160888671875,-3938.998046875,63.9999885559082]},"418a:JKs Skyrim.esp":{"name":"Cedric","hold":"Whiterun","bookHold":"whiterun","locationName":"Rorikstead","cell":"3f78:JKs Skyrim.esp","world":null,"pos":[2187.60546875,2131.94580078125,318.93792724609375]},"41dae:AnotherOakwood.esp":{"name":"Clebus Calvisius","hold":"Falkreath","bookHold":"falkreath","locationName":"Oakwood","cell":"41cd2:AnotherOakwood.esp","world":null,"pos":[178.9574737548828,27.29453468322754,203.7107391357422]},"44dd7:aaaGraniteHill.esp":{"name":"John","hold":"Falkreath","bookHold":"falkreath","locationName":"Granite Hill","cell":"30934:aaaGraniteHill.esp","world":null,"pos":[135.27828979492188,50.352813720703125,0]},"4d53e:WindhelmSSE.esp":{"name":"Wilhelm","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"4d3bb:WindhelmSSE.esp","world":null,"pos":[-160.23260498046875,-40.78663635253906,82.36285400390625]},"4d593:WindhelmSSE.esp":{"name":"Hildevi","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"4d45c:WindhelmSSE.esp","world":null,"pos":[11.721552848815918,-273.284912109375,79.99999237060547]},"4d594:WindhelmSSE.esp":{"name":"Old Hjolf","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"4d45c:WindhelmSSE.esp","world":null,"pos":[69.58196258544922,-214.12110900878906,80]},"4e0b3:Skyrim.esm":{"name":"Grelka","hold":"the Rift","bookHold":"riften","locationName":"Riften","cell":"16bd4:Skyrim.esm","world":null,"pos":[126.46509552001953,396.2760009765625,64]},"52e7f:WindhelmSSE.esp":{"name":"Snowberry","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"4dd75:WindhelmSSE.esp","world":null,"pos":[2713.712158203125,-2258.458740234375,12.908853530883789]},"52e81:WindhelmSSE.esp":{"name":"Olfand the World-Weary","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"4dd75:WindhelmSSE.esp","world":null,"pos":[2860.194580078125,-2166.623046875,0.0000457763671875]},"542f:OarsRest.esp":{"name":"Wulf Heavy-Hammer","hold":"Falkreath","bookHold":"falkreath","locationName":"POITundra08","cell":"9b3a:Skyrim.esm","world":"3c:Skyrim.esm","pos":[-45910.41796875,-45833.15625,1026.8037109375]},"55a63:Skyrim.esm":{"name":"Moth gro-Bagol","hold":"the Reach","bookHold":"markarth","locationName":"Markarth","cell":"16df2:Skyrim.esm","world":null,"pos":[270.2900390625,2007.3707275390625,6898.6240234375]},"5b685:Skyrim.esm":{"name":"Sharamph","hold":"the Reach","bookHold":"markarth","locationName":"Mor Khazgur","cell":"5b5dd:Skyrim.esm","world":null,"pos":[960.632080078125,-688.0978393554688,9.661914825439453]},"5b687:Skyrim.esm":{"name":"Shuftharz","hold":"the Reach","bookHold":"markarth","locationName":"Mor Khazgur","cell":"5b5dd:Skyrim.esm","world":null,"pos":[-451.7367248535156,-549.9678955078125,9.661856651306152]},"5cbf8:SkyrimSewers.esp":{"name":"Peddler","hold":"Haafingar","bookHold":"solitude","locationName":"Solitude Sewers","cell":"1d98:SkyrimSewers.esp","world":null,"pos":[-1287.0487060546875,1583.4478759765625,0.8705368041992188]},"5cc07:SkyrimSewers.esp":{"name":"Peddler","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm Sewers","cell":"2ba8d:SkyrimSewers.esp","world":null,"pos":[1570.5234375,2626.384521484375,2064]},"5d16:aaaGraniteHill.esp":{"name":"Privious","hold":"Falkreath","bookHold":"falkreath","locationName":"Granite Hill","cell":"5c98:aaaGraniteHill.esp","world":null,"pos":[143.61802673339844,83.21532440185547,0.8153076171875]},"5d1b8:SkyrimSewers.esp":{"name":"Peddler","hold":"Whiterun","bookHold":"whiterun","locationName":"Whiterun Sewers","cell":"3b21f:SkyrimSewers.esp","world":null,"pos":[-1188.6650390625,1978.4561767578125,2082.087890625]},"5f3a5c:aaaGraniteHill.esp":{"name":"Rhoda","hold":"Falkreath","bookHold":"falkreath","locationName":"Granite Hill","cell":"8a43:aaaGraniteHill.esp","world":null,"pos":[-306.13446044921875,42.180171966552734,1.545440673828125]},"5f3a63:aaaGraniteHill.esp":{"name":"Valdr","hold":"Falkreath","bookHold":"falkreath","locationName":"Granite Hill","cell":"8a43:aaaGraniteHill.esp","world":null,"pos":[-254.3852081298828,130.6094970703125,2.1885986328125]},"60752:SkyrimSewers.esp":{"name":"Peddler","hold":"the Reach","bookHold":"markarth","locationName":"Markarth Sewers","cell":"4bbac:SkyrimSewers.esp","world":null,"pos":[544.8438720703125,2444.133544921875,3105.0751953125]},"6311:JKs Skyrim.esp":{"name":"Regner Winterfist","hold":"Whiterun","bookHold":"whiterun","locationName":"open ground in Tamriel","cell":"9598:Skyrim.esm","world":"3c:Skyrim.esm","pos":[-86579.859375,7467.91064453125,-3534.5068359375]},"684a1:North Keep.esp":{"name":"Scalbo Pripata","hold":"Falkreath","bookHold":"falkreath","locationName":"Pripata Residence","cell":"3a985:North Keep.esp","world":null,"pos":[783.98974609375,-983.8707275390625,19.51117706298828]},"68b0:aaaGraniteHill.esp":{"name":"Helana","hold":"Falkreath","bookHold":"falkreath","locationName":"Granite Hill","cell":"626a:aaaGraniteHill.esp","world":null,"pos":[-2091.60302734375,-73.32713317871094,512]},"6c730:WindhelmSSE.esp":{"name":"Mathendis","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"4d912:WindhelmSSE.esp","world":null,"pos":[-888.7623291015625,-1561.365966796875,-128]},"6d8e8:North Keep.esp":{"name":"Glabo Sarata","hold":"Falkreath","bookHold":"falkreath","locationName":"North Colovian Company","cell":"3a987:North Keep.esp","world":null,"pos":[140.36898803710938,-1226.2745361328125,18.026222229003906]},"6d8e9:North Keep.esp":{"name":"Murmea Sarata","hold":"Falkreath","bookHold":"falkreath","locationName":"North Colovian Company","cell":"3a987:North Keep.esp","world":null,"pos":[-124.81770324707031,-1206.080078125,19.58515167236328]},"72c89:North Keep.esp":{"name":"Psyshre","hold":"Falkreath","bookHold":"falkreath","locationName":"The Estates' Edge","cell":"3a988:North Keep.esp","world":null,"pos":[224.81382751464844,-550.4144287109375,15.826522827148438]},"74340:Skyrim.esm":{"name":"Ri'saad","hold":"the Reach","bookHold":"markarth","locationName":"open ground in Tamriel","cell":"d74:Skyrim.esm","world":"3c:Skyrim.esm","pos":[-161168.09375,6435.263671875,-5202.662109375]},"74345:Skyrim.esm":{"name":"Ma'dran","hold":"Eastmarch","bookHold":"windhelm","locationName":"open ground in Tamriel","cell":"d74:Skyrim.esm","world":"3c:Skyrim.esm","pos":[134817.828125,24027.203125,-12973.521484375]},"7434a:Skyrim.esm":{"name":"Ahkari","hold":"the Pale","bookHold":"dawnstar","locationName":"open ground in Tamriel","cell":"d74:Skyrim.esm","world":"3c:Skyrim.esm","pos":[26529.052734375,101839.90625,-13265.4384765625]},"7e5b:aaaGraniteHill.esp":{"name":"Laila","hold":"Falkreath","bookHold":"falkreath","locationName":"Granite Hill","cell":"626a:aaaGraniteHill.esp","world":null,"pos":[-1247.61279296875,52.23408126831055,512.5894775390625]},"80c5e:WindhelmSSE.esp":{"name":"Sten Stone-Fish","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"b4db:Skyrim.esm","world":"3c:Skyrim.esm","pos":[135174.609375,29159.23828125,-12563.2421875]},"80c73:WindhelmSSE.esp":{"name":"Pelena","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"b4dc:Skyrim.esm","world":"3c:Skyrim.esm","pos":[135072.609375,30676.673828125,-12575.265625]},"80c74:WindhelmSSE.esp":{"name":"Llathise","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"b4dc:Skyrim.esm","world":"3c:Skyrim.esm","pos":[134852.125,30024.439453125,-12552.486328125]},"8472:aaaGraniteHill.esp":{"name":"Alex","hold":"Falkreath","bookHold":"falkreath","locationName":"Granite Hill","cell":"83c1:aaaGraniteHill.esp","world":null,"pos":[528,32,0]},"8751:OarsRest.esp":{"name":"Freya","hold":"Falkreath","bookHold":"falkreath","locationName":"Oars Rest","cell":"3cfa:OarsRest.esp","world":null,"pos":[431.0910339355469,89.59657287597656,0.8616886138916016]},"8755:OarsRest.esp":{"name":"Wilbur","hold":"Falkreath","bookHold":"falkreath","locationName":"Oars Rest","cell":"59eb:OarsRest.esp","world":null,"pos":[-117.34032440185547,-127.0096206665039,240]},"8759:OarsRest.esp":{"name":"Neith","hold":"Falkreath","bookHold":"falkreath","locationName":"open ground in Tamriel","cell":"9b39:Skyrim.esm","world":"3c:Skyrim.esm","pos":[-42624.8203125,-46833.32421875,809.0692138671875]},"8c5a:The Great City of Solitude.esp":{"name":"Aksel Trodirson","hold":"Haafingar","bookHold":"solitude","locationName":"Solitude","cell":"8afc:The Great City of Solitude.esp","world":null,"pos":[419.2315673828125,-1468.463623046875,0.00006103515625]},"9226:OarsRest.esp":{"name":"Candice","hold":"Falkreath","bookHold":"falkreath","locationName":"Oars Rest","cell":"6554:OarsRest.esp","world":null,"pos":[354.7676086425781,160.29946899414062,240.29757690429688]},"922b:OarsRest.esp":{"name":"Rogan","hold":"Falkreath","bookHold":"falkreath","locationName":"Oars Rest","cell":"6554:OarsRest.esp","world":null,"pos":[544.6723022460938,-63.587066650390625,240.3957977294922]},"9ea8:Populated Cities Towns Villages Legendary.esp":{"name":"Merchant","hold":"Whiterun","bookHold":"whiterun","locationName":"WhiterunPlainsDistrict01","cell":"1a278:Skyrim.esm","world":"1a26f:Skyrim.esm","pos":[21886.19140625,-9056.4189453125,-3632.357421875]},"9eae:Populated Cities Towns Villages Legendary.esp":{"name":"Servant","hold":"Whiterun","bookHold":"whiterun","locationName":"Whiterun","cell":"1605e:Skyrim.esm","world":null,"pos":[-708.0775146484375,-525.8494262695312,68.00003051757812]},"a3d26:Arena - Markarth Side.esp":{"name":"Brandi","hold":"Hjaalmarch","bookHold":"morthal","locationName":"Markarth Side","cell":"103e1d:Arena - Markarth Side.esp","world":null,"pos":[728,280,0]},"a453:Populated Cities Towns Villages Legendary.esp":{"name":"Merchant","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"1677f:Skyrim.esm","world":null,"pos":[3133.747802734375,-1971.810546875,-256]},"a4910:WindhelmSSE.esp":{"name":"Tinos Drothan","hold":"Eastmarch","bookHold":"windhelm","locationName":"WindhelmOrigin","cell":"3837e:Skyrim.esm","world":"1691d:Skyrim.esm","pos":[137790.1875,38238.38671875,-12642.90234375]},"a4982:WindhelmSSE.esp":{"name":"Ingjar","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"4d674:WindhelmSSE.esp","world":null,"pos":[672.62451171875,-1772.472412109375,64]},"a547:AnotherOakwood.esp":{"name":"Dragolf","hold":"Falkreath","bookHold":"falkreath","locationName":"Oakwood","cell":"4c37:AnotherOakwood.esp","world":null,"pos":[49.04106903076172,33.375762939453125,0.5]},"a553:AnotherOakwood.esp":{"name":"Idir","hold":"Falkreath","bookHold":"falkreath","locationName":"Oakwood","cell":"4c3b:AnotherOakwood.esp","world":null,"pos":[213.50990295410156,-91.9915771484375,0]},"aadd:AnotherOakwood.esp":{"name":"Birgo","hold":"Falkreath","bookHold":"falkreath","locationName":"Oakwood","cell":"4c38:AnotherOakwood.esp","world":null,"pos":[-143.28396606445312,27.720430374145508,239.99996948242188]},"ab16:AnotherOakwood.esp":{"name":"Mirad","hold":"Falkreath","bookHold":"falkreath","locationName":"Oakwood","cell":"4c3d:AnotherOakwood.esp","world":null,"pos":[-381.50689697265625,32.36038589477539,331.6473388671875]},"b4a3:Populated Cities Towns Villages Legendary.esp":{"name":"Merchant","hold":"Winterhold","bookHold":"winterhold","locationName":"Winterhold","cell":"13814:Skyrim.esm","world":null,"pos":[2143.7470703125,154.48138427734375,0.000091552734375]},"b818c:Arena - Markarth Side.esp":{"name":"Azira","hold":"Hjaalmarch","bookHold":"morthal","locationName":"Markarth Side","cell":"5c591:Arena - Markarth Side.esp","world":null,"pos":[-247.96986389160156,157.0489501953125,264.53125]},"b818d:Arena - Markarth Side.esp":{"name":"Jaeger","hold":"Hjaalmarch","bookHold":"morthal","locationName":"Markarth Side","cell":"5c591:Arena - Markarth Side.esp","world":null,"pos":[-237.17320251464844,-167.08517456054688,261.5469055175781]},"b882a:Skyrim.esm":{"name":"Tonilia","hold":"the Rift","bookHold":"riften","locationName":"Riften","cell":"16bcf:Skyrim.esm","world":null,"pos":[-673.4930419921875,1759.600830078125,-88.48727416992188]},"bd300:Arena - Markarth Side.esp":{"name":"Olivia","hold":"Hjaalmarch","bookHold":"morthal","locationName":"Markarth Side","cell":"5c591:Arena - Markarth Side.esp","world":null,"pos":[464,-40,266.36419677734375]},"c7261:JK's Whiterun's Outskirts.esp":{"name":"Ingrid","hold":"Whiterun","bookHold":"whiterun","locationName":"Whiterun","cell":"479d5:JK's Whiterun's Outskirts.esp","world":null,"pos":[2790.174072265625,1811.1986083984375,64.775146484375]},"c7264:JK's Whiterun's Outskirts.esp":{"name":"Carol","hold":"Whiterun","bookHold":"whiterun","locationName":"Whiterun","cell":"479d5:JK's Whiterun's Outskirts.esp","world":null,"pos":[2808.031982421875,1385.5802001953125,65.775146484375]},"c7596:Arena - Markarth Side.esp":{"name":"Varimo","hold":"Hjaalmarch","bookHold":"morthal","locationName":"Markarth Side","cell":"801b3:Arena - Markarth Side.esp","world":null,"pos":[-136,-776,0.46243101358413696]},"d15b0:Skyrim.esm":{"name":"Ulfberth War-Bear","hold":"Whiterun","bookHold":"whiterun","locationName":"Warmaiden's","cell":"1db4e:Skyrim.esm","world":null,"pos":[20.610565185546875,469.6237487792969,318.54693603515625]},"d587:The Great City of Solitude.esp":{"name":"Dra'kaleeja","hold":"Haafingar","bookHold":"solitude","locationName":"Solitude","cell":"afdb:The Great City of Solitude.esp","world":null,"pos":[113.09288787841797,-3917.9052734375,-0.000030517578125]},"d6ad9:Skyrim.esm":{"name":"Aquillius Aeresius","hold":"Haafingar","bookHold":"solitude","locationName":"Solitude","cell":"16a07:Skyrim.esm","world":null,"pos":[-39.04411315917969,-443.0608825683594,0.423614501953125]},"d7505:Skyrim.esm":{"name":"Saadia","hold":"Whiterun","bookHold":"whiterun","locationName":"Whiterun","cell":"1605e:Skyrim.esm","world":null,"pos":[-122.04067993164062,-55.382999420166016,64]},"e1c1:JKs Skyrim.esp":{"name":"Ginda Ildram","hold":"Eastmarch","bookHold":"windhelm","locationName":"open ground in WindhelmWorld","cell":"3837c:Skyrim.esm","world":"1691d:Skyrim.esm","pos":[139274.046875,39913.8359375,-12470.2861328125]},"e24:JKs Skyrim.esp":{"name":"Avros","hold":"Hjaalmarch","bookHold":"morthal","locationName":"Morthal","cell":"93be:Skyrim.esm","world":"3c:Skyrim.esm","pos":[-37173.703125,64145.35546875,-13940.6337890625]},"e2d7:Populated Cities Towns Villages Legendary.esp":{"name":"Merchant","hold":"Haafingar","bookHold":"solitude","locationName":"SolitudeRow","cell":"37ef0:Skyrim.esm","world":"37edf:Skyrim.esm","pos":[-54936.2578125,105507.8828125,-8703.9990234375]},"e2d9:Populated Cities Towns Villages Legendary.esp":{"name":"Merchant","hold":"Haafingar","bookHold":"solitude","locationName":"SolitudeRow","cell":"37ef0:Skyrim.esm","world":"37edf:Skyrim.esm","pos":[-53827.421875,102994.1640625,-9060.505859375]},"e897:Populated Cities Towns Villages Legendary.esp":{"name":"Merchant","hold":"the Rift","bookHold":"riften","locationName":"RiftenCitySouth","cell":"42245:Skyrim.esm","world":"16bb4:Skyrim.esm","pos":[172992.59375,-98687.3984375,11136]},"e898:Populated Cities Towns Villages Legendary.esp":{"name":"Merchant","hold":"the Rift","bookHold":"riften","locationName":"RiftenCitySouth","cell":"42245:Skyrim.esm","world":"16bb4:Skyrim.esm","pos":[174456.171875,-99202.390625,11140.8818359375]},"e899:Populated Cities Towns Villages Legendary.esp":{"name":"Merchant","hold":"the Rift","bookHold":"riften","locationName":"RiftenOrigin","cell":"42247:Skyrim.esm","world":"16bb4:Skyrim.esm","pos":[175629.4375,-97007.171875,11136]},"eee3:Populated Cities Towns Villages Legendary.esp":{"name":"Merchant","hold":"the Reach","bookHold":"markarth","locationName":"MarkarthKeep","cell":"20eea:Skyrim.esm","world":"16d71:Skyrim.esm","pos":[-176757.40625,5431.83642578125,-2764.000244140625]},"eee8:Populated Cities Towns Villages Legendary.esp":{"name":"Merchant","hold":"the Reach","bookHold":"markarth","locationName":"Markarth","cell":"20ee7:Skyrim.esm","world":"16d71:Skyrim.esm","pos":[-173781.921875,5562.46484375,-3375.50830078125]},"eee9:Populated Cities Towns Villages Legendary.esp":{"name":"Merchant","hold":"the Reach","bookHold":"markarth","locationName":"Markarth","cell":"20ee7:Skyrim.esm","world":"16d71:Skyrim.esm","pos":[-173292.375,4222.763671875,-3618.896240234375]},"fe498:Skyrim.esm":{"name":"Imperial Quartermaster","hold":"Haafingar","bookHold":"solitude","locationName":"CWGuardTemplates","cell":"1fa4c:Skyrim.esm","world":null,"pos":[4271.35302734375,-2862.42236328125,-29.796730041503906]},"fe4aa:Skyrim.esm":{"name":"Imperial Quartermaster","hold":"Eastmarch","bookHold":"windhelm","locationName":"Imperial Military Camp","cell":"ba7e:Skyrim.esm","world":"3c:Skyrim.esm","pos":[173996.109375,-20537.89453125,-1990.7332763671875]},"fe4bc:Skyrim.esm":{"name":"Imperial Quartermaster","hold":"Winterhold","bookHold":"winterhold","locationName":"Imperial Military Camp","cell":"8eee:Skyrim.esm","world":"3c:Skyrim.esm","pos":[52109.0390625,96449.1875,-6913.79248046875]},"fe4c1:Skyrim.esm":{"name":"Imperial Quartermaster","hold":"the Rift","bookHold":"riften","locationName":"Imperial Military Camp","cell":"9859:Skyrim.esm","world":"3c:Skyrim.esm","pos":[81654.4765625,-87402.796875,10990.30859375]},"fe4c2:Skyrim.esm":{"name":"Imperial Quartermaster","hold":"the Pale","bookHold":"dawnstar","locationName":"Imperial Military Camp","cell":"928c:Skyrim.esm","world":"3c:Skyrim.esm","pos":[-3348.718505859375,101647.984375,-11282.109375]},"fe4cb:Skyrim.esm":{"name":"Stormcloak Quartermaster","hold":"Eastmarch","bookHold":"windhelm","locationName":"CWGuardTemplates","cell":"1fa4c:Skyrim.esm","world":null,"pos":[3052.09619140625,-2710.93017578125,-30.927734375]},"fe4e4:Skyrim.esm":{"name":"Stormcloak Quartermaster","hold":"Hjaalmarch","bookHold":"morthal","locationName":"Sons of Skyrim Military Camp","cell":"9312:Skyrim.esm","world":"3c:Skyrim.esm","pos":[-10768.4443359375,83661.2421875,-12778.0556640625]},"fe4e7:Skyrim.esm":{"name":"Stormcloak Quartermaster","hold":"the Reach","bookHold":"markarth","locationName":"Sons of Skyrim Military Camp","cell":"9435:Skyrim.esm","world":"3c:Skyrim.esm","pos":[-120746.53125,50514.7890625,-8515.9091796875]},"fe4f0:Skyrim.esm":{"name":"Stormcloak Quartermaster","hold":"Falkreath","bookHold":"falkreath","locationName":"Sons of Skyrim Military Camp","cell":"9806:Skyrim.esm","world":"3c:Skyrim.esm","pos":[38552.79296875,-74665.203125,13317.9541015625]},"ffe0:Populated Cities Towns Villages Legendary.esp":{"name":"Merchant","hold":"the Pale","bookHold":"dawnstar","locationName":"Dawnstar","cell":"8eb6:Skyrim.esm","world":"3c:Skyrim.esm","pos":[28668.31640625,105343.28125,-13927.4951171875]},"ffec:Populated Cities Towns Villages Legendary.esp":{"name":"Merchant","hold":"Falkreath","bookHold":"falkreath","locationName":"Falkreath","cell":"9c80:Skyrim.esm","world":"3c:Skyrim.esm","pos":[-29330.89453125,-87964.515625,-3034.863525390625]},"fff0:Populated Cities Towns Villages Legendary.esp":{"name":"Hunter","hold":"the Rift","bookHold":"riften","locationName":"Ivarstead","cell":"97a0:Skyrim.esm","world":"3c:Skyrim.esm","pos":[75663.2109375,-62574.6875,10544]},"fff2:Populated Cities Towns Villages Legendary.esp":{"name":"Pilgrim","hold":"the Rift","bookHold":"riften","locationName":"Ivarstead","cell":"97a0:Skyrim.esm","world":"3c:Skyrim.esm","pos":[75624.7578125,-63265.63671875,10549.6572265625]},"fffe:Populated Cities Towns Villages Legendary.esp":{"name":"Merchant","hold":"Hjaalmarch","bookHold":"morthal","locationName":"Morthal","cell":"93be:Skyrim.esm","world":"3c:Skyrim.esm","pos":[-39029.87109375,65359.16796875,-13942.884765625]}}} }));
 };
+module.exports.createKillContracts = KILL_CONTRACTS.createKillContracts;
 return module.exports;
 })();
 // MERCHANT TRADING BUNDLE END
@@ -63558,6 +63688,7 @@ try {
     var GOLD_DESC = deps.goldDesc;
     var places = {};
     var rankOf = deps.rankOf || function () { return ''; };
+    var kills = deps.killContracts;
     /*
       WHAT EACH PERSON HOLDS IS ON THE CHARACTER (#1621), not in a map here.
       A map in this process was emptied by every restart: a scarce quest open
@@ -63627,6 +63758,10 @@ try {
       var open = (raw.open && typeof raw.open === 'object') ? raw.open : {};
       Object.keys(open).forEach(function (id) {
         var o = open[id];
+        if (own(byId,id) && byId[id].kind==='kill') {
+          out.open[id]=JSON.parse(JSON.stringify(o));
+          return;
+        }
         if (!own(byId, id) || !o || typeof o !== 'object') return;
         out.open[id] = {
           drawn: whole(o.drawn),
@@ -63664,7 +63799,9 @@ try {
     function keep(actor, b, changes) {
       try {
         if (!active || deps.available && !deps.available()) return false;
-        var next = recordEdits(b.expected || {v:1,open:{},cool:{}}, b.before, {open: b.open, cool: b.cool});
+        var after={open:b.open,cool:b.cool};
+        ['killHistory','killUncertain'].forEach(function(key){if(own(b,key))after[key]=b[key];});
+        var next = recordEdits(b.expected || {v:1,open:{},cool:{}}, b.before, after);
         next.v = 1;
         if (changes) return deps.commit(actor, b.expected, next, changes).ok === true;
         deps.save(actor, next);
@@ -63714,10 +63851,16 @@ try {
       if (!row) return { ok: false, why: 'unknown' };
       var b = questsOf(actor);
       if (!b) return { ok: false, why: 'unread' };
-      if (b.open[id]) return { ok: false, why: 'open' };
+      if (own(b.open,id)) return { ok: false, why: 'open' };
       if ((b.cool[id] || 0) > deps.now()) return { ok: false, why: 'cooldown' };
       var gate = qualify(actor, row);
       if (!gate.ok) return { ok: false, why: gate.why };
+      if (row.kind==='kill') {
+        if(!kills)return {ok:false,why:'unbound'};
+        var accepted=kills.take(b,id);
+        if(!accepted.ok)return accepted;
+        return keep(actor,b,[]) ? {ok:true} : {ok:false,why:'unwritten'};
+      }
       if (row.gems) {
         var gem = opts && opts.gem;
         if (row.gems.indexOf(gem) < 0) return { ok: false, why: 'gem' };
@@ -63798,6 +63941,12 @@ try {
     function walkAway(actor, id) {
       var b = questsOf(actor);
       if (!b) return { ok: false, why: 'unread' };
+      if (own(byId,id) && byId[id].kind==='kill') {
+        if(!kills)return {ok:false,why:'unbound'};
+        var left=kills.abandon(b,id);
+        if(!left.ok)return left;
+        return keep(actor,b,[]) ? {ok:true} : {ok:false,why:'unwritten'};
+      }
       var open = b.open[id];
       if (!open) return { ok: false, why: 'none' };
       var changes = open.drawn > 0 ? [{item: open.itemDesc, count: -open.drawn}] : [];
@@ -63825,7 +63974,10 @@ try {
         }
         changes.push({item: open.itemDesc, count: -1}, {item: GOLD_DESC, count: row.gold});
       } else {
-        if (open.kills < row.count) return { ok: false, why: 'short' };
+        var source=kills && kills.rows.find(function(r){return r.id===id;});
+        if(!source)return {ok:false,why:'unbound'};
+        if(!deps.traderHold || deps.traderHold(traderRef)!==source.hold)return {ok:false,why:'hold'};
+        if(!kills.ready(b,id)) return { ok: false, why: 'short' };
         changes.push({item: GOLD_DESC, count: row.gold});
       }
       delete b.open[id];
@@ -63836,27 +63988,10 @@ try {
     function noteKill(killer, victim) {
       var b = questsOf(killer);
       if (!b) return { ok: false, why: 'unread' };
-      var watching = false;
-      Object.keys(b.open).forEach(function (id) {
-        if (byId[id] && byId[id].kind === 'kill') watching = true;
-      });
-      if (!watching) return { ok: false, why: 'none' };
-      var name = deps.creatureName ? deps.creatureName(victim) : '';
-      if (/dragon/i.test(name)) return { ok: false, why: 'dragon' };
-      var cell = deps.cellOf ? deps.cellOf(victim) : '';
-      var counted = false;
-      SCENE.forEach(function (row) {
-        if (row.kind !== 'kill') return;
-        var open = b.open[row.id];
-        if (!open || open.kills >= row.count) return;
-        var place = places[row.id] || {};
-        if (!place.cell || cell !== place.cell) return;
-        if (!creatureOk(row.match, name)) return;
-        open.kills += 1;
-        counted = true;
-      });
-      if (counted && !keep(killer, b)) return { ok: false, why: 'unwritten' };
-      return { ok: true };
+      if(!kills)return {ok:false,why:'unbound'};
+      var credited=kills.credit(b,killer,victim);
+      if(!credited.ok)return credited;
+      return keep(killer,b,[]) ? {ok:true} : {ok:false,why:'unwritten'};
     }
     function noteContainer(actor, ref, cell) {
       var held = questsOf(actor);
@@ -63891,11 +64026,11 @@ try {
       var place = places[row.id];
       return !!place && !!(row.gems ? place.cells && row.gems.every(function(gem){return !!place.cells[gem];}) : place.cell);
     }
-    function describe(actor) {
+    function describe(actor,traderRef) {
       var held = questsOf(actor);
       if (!held) return [];
       var ready = active && (!deps.ready || deps.ready(actor));
-      return SCARCE.filter(bound).map(function(row){
+      var offers=SCARCE.filter(bound).map(function(row){
         var open = held.open[row.id], gate = qualify(actor,row), until = held.cool[row.id] || 0;
         var state = open ? 'open' : until > deps.now() ? 'cooldown' : gate.ok ? 'available' : 'locked';
         var location = mineNames[row.id] || '';
@@ -63906,11 +64041,27 @@ try {
           canTake:ready && state==='available',canReturn:ready && !!open && open.drawn>=row.ask,
           canAbandon:ready && !!open};
       });
+      var hold=deps.traderHold && deps.traderHold(traderRef);
+      if(kills)kills.rows.forEach(function(source){
+        if(source.hold!==hold)return;
+        var row=byId[source.id],hasOpen=own(held.open,row.id),open=held.open[row.id],until=held.cool[row.id] || 0;
+        var available=kills.available(row.id),done=hasOpen && kills.ready(held,row.id);
+        var count=open && Number.isSafeInteger(open.kills)?open.kills:0;
+        offers.push({id:row.id,name:row.name,kind:'kill',check:row.check,gold:row.gold,count:row.count,
+          hours:row.hours,locations:source.place,kills:count,state:hasOpen?'open':until>deps.now()?'cooldown':available?'available':'unavailable',
+          waitMinutes:until?Math.max(0,Math.ceil((until-deps.now())/60000)):0,
+          canTake:ready && !hasOpen && !until && available,canReturn:ready && done,canAbandon:ready && hasOpen});
+      });
+      return offers;
     }
     function act(actor, verb, id, gem, traderRef) {
       var row = byId[id];
-      if (!row || !row.scarce || !bound(row)) return {ok:false,why:'unbound'};
+      if (!row || !(row.scarce && bound(row)) && !(row.kind==='kill' && kills)) return {ok:false,why:'unbound'};
       if (!active || deps.ready && !deps.ready(actor)) return {ok:false,why:'unavailable'};
+      if(row.kind==='kill') {
+        var source=kills.rows.find(function(r){return r.id===id;});
+        if(!source || !deps.traderHold || deps.traderHold(traderRef)!==source.hold)return {ok:false,why:'hold'};
+      }
       if (verb === 'take') return offer(actor,id,{gem:gem});
       if (verb === 'return') return turnIn(actor,id,traderRef);
       if (verb === 'abandon') return walkAway(actor,id);
@@ -63918,7 +64069,7 @@ try {
     }
     function speak(actor, refrId) {
       if (!isTrader(refrId)) return null;
-      return describe(actor);
+      return describe(actor,refrId);
     }
     function onActivate(actor, refrId) {
       var held = questsOf(actor);
@@ -63975,6 +64126,7 @@ try {
         },
         commit: questTransactions.commit,
         identity: questTransactions.identity,
+        killContracts: MERCHANT_TRADING.createKillContracts({mp:mp,population:NPC_POPULATION_DATA,identity:questTransactions.identity}),
         available: questTransactions.available,
         ready: function (actor) {
           var merchants = globalThis.__thornswoodMerchantTrade;
@@ -64007,7 +64159,10 @@ try {
             return (loc && loc.cellOrWorldDesc) || '';
           } catch (e) { return ''; }
         },
-        traderHold: function () { return ''; }
+        traderHold: function (ref) {
+          var merchants=globalThis.__thornswoodMerchantTrade;
+          return merchants ? merchants.questHold(ref) : '';
+        }
       });
       Object.keys(RARE_PLACES).forEach(function (id) {
         globalThis.__thornswoodQuests.bindPlace(id, RARE_PLACES[id]);

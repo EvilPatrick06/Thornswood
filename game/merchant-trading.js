@@ -155,9 +155,9 @@ function createMerchantTrading(deps) {
     return JSON.stringify([human.desc,human.profileId,human.lifeGeneration]);
   }
 
-  function questView(actorId) {
+  function questView(actorId,merchantId) {
     var quests=typeof deps.quests==='function' && deps.quests();
-    return quests ? quests.describe(actorId) : [];
+    return quests ? quests.describe(actorId,merchantId) : [];
   }
 
   function supplyKey(human, itemName) {
@@ -209,7 +209,7 @@ function createMerchantTrading(deps) {
       purse: state.purse,
       offers: offers,
       supply: supply,
-      quests: questView(actorId),
+      quests: questView(actorId,merchantId),
       note: note || (settlement.available()
         ? ''
         : 'Buying and selling wait on the native transfer. Nothing has moved.')
@@ -227,7 +227,7 @@ function createMerchantTrading(deps) {
       if (!reached.ok || !authed(profileId,reached.human) || sessionIdentity(reached.human)!==session.identity) {
         sessions.delete(profileId); views.push({actorId:session.actorId,view:{open:false}}); return;
       }
-      var quests=JSON.stringify(questView(session.actorId));
+      var quests=JSON.stringify(questView(session.actorId,session.merchantId));
       if (changed.indexOf(session.merchantId) < 0 && quests===session.quests) return;
       var state = purses.read(session.merchantId), place = state && placeOf(state.reference);
       if (state && place) {
@@ -452,6 +452,10 @@ function createMerchantTrading(deps) {
     nativeReady: function () { return settlement.available(); },
     withQuestInventoryMutation: function(actorId,change) {return settlement.withInventoryMutation(actorId,change);},
     questReady: function(actorId) {return settlement.canInventoryMutation(actorId);},
+    questHold: function(merchantId) {
+      var state=active && purses.read(merchantId),place=state && placeOf(state.reference);
+      return place && place.hold || '';
+    },
     shutdown: function () { active=false; sessions.clear(); settlement.shutdown(); },
     REACH: REACH,
     SUPPLY_COUNT: SUPPLY_COUNT,
