@@ -38,6 +38,13 @@ Yes 'Install-Bot installs into py-libs with pip --target, and sends the code and
     $install.Contains('foreach ($f in ''bot.py'', ''card.py'', ''dev-channel.txt'', ''requirements.txt'', ''live-smoke-discord-export.json'')') -and
     -not $install.Contains('joins.json'''))
 Yes 'the swap is told to put py-libs back with the code' ($install.Contains('$Dirs = @(''''py-libs'''')') -and $swap.Contains('$moveRels'))
+# pip --target on Python 3.12.4 and later leaves its files with the rules of
+# the folder tempfile.mkdtemp made (SYSTEM, Administrators, owner) and none of
+# the bot folder's, so the bot's account could not read them (11 Oct).
+Yes 'Install-Bot puts py-libs under the folder''s rules and refuses before stopping the bot when its account cannot read a file' (
+    $install.Contains('& icacls ''$rootWin\$stageName\py-libs'' /reset /T /Q') -and
+    $install.Contains('''NT SERVICE\$Service''') -and
+    $install.Contains('if ("$libs" -match ''PY-LIBS NOT'') { Die'))
 
 # The python the bot runs on: python on the PATH, the one Bot-Service.ps1
 # hands the service and Install-Bot.ps1 installs for all users (3.12 on the
@@ -109,6 +116,14 @@ function PipTarget([string]$wheel, [string]$dest, [string]$req) {
 }
 PipTarget $w1 (Join-Path $rootBot 'py-libs') (Join-Path $work 'req-old.txt')
 PipTarget $w2 (Join-Path $stage 'py-libs') (Join-Path $stage 'requirements.txt')
+
+# The cause and the reset Install-Bot runs, on the stage pip just filled.
+$libFiles = @(Get-ChildItem -LiteralPath (Join-Path $stage 'py-libs') -File -Recurse)
+function Unruled($files) { @($files | Where-Object { -not @((Get-Acl -LiteralPath $_.FullName).Access | Where-Object { $_.IsInherited }).Count }) }
+$newPy = "$(& $py -c 'import sys; print(sys.version_info >= (3, 12, 4))')".Trim() -eq 'True'
+if ($newPy) { Yes 'pip --target on Python 3.12.4 or later leaves its files outside the folder''s rules' ((Unruled $libFiles).Count -gt 0) }
+& icacls (Join-Path $stage 'py-libs') /reset /T /Q | Out-Null
+Yes 'icacls /reset /T puts every py-libs file under the folder''s own rules' ($libFiles.Count -gt 0 -and (Unruled $libFiles).Count -eq 0)
 
 $botLines = @(
     'import thornslib, sys'
