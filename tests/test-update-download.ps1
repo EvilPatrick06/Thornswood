@@ -358,6 +358,7 @@ namespace Thornswood
             Yes("self-update: a launcher failing the signer check is refused", e != null && e.Message.Contains("Nothing has been replaced"));
             Yes("self-update: nothing is put at Thornswood.exe.new", !File.Exists(exe + ".new"));
             Yes("self-update: no swap script is written", Directory.GetFiles(Path.GetTempPath(), "thornswood-update-*.cmd").Length == 0);
+            Yes("self-update: the refused download is not left in TEMP", Parts() == 0);
 
             Clear(); Net.Body = body; v.launcherSha256 = wrong;
             e = Try(() => Updater.SelfUpdate(cfg, v, Log));
