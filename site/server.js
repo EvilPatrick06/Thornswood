@@ -32,10 +32,16 @@ const path   = require('path');
 const crypto = require('crypto');
 
 const PORT   = Number(process.env.THORNSWOOD_DOCS_PORT || 3001);
-/* Once Caddy is in front, this should answer only to Caddy. Otherwise port
-   3001 stays open as a plain HTTP way past the certificate, which makes the
-   certificate decorative. Set THORNSWOOD_DOCS_LOCAL=1 then. */
-const BIND   = process.env.THORNSWOOD_DOCS_LOCAL === '1' ? '127.0.0.1' : '0.0.0.0';
+/* LOOPBACK UNLESS ASKED (#2185). Caddy holds 443 and hands everything on from
+   127.0.0.1, so this answers only there. Listening on every address put port
+   3001 open as a plain HTTP way past the certificate, cookies and passwords
+   included, on any box where THORNSWOOD_DOCS_LOCAL had not been set, and the
+   unsafe answer was the default. Now a plain listener on every address takes
+   THORNSWOOD_DOCS_EXPOSE=1, for a box with no proxy in front, and says so
+   loudly at every start. THORNSWOOD_DOCS_LOCAL=1 still means loopback and
+   wins over EXPOSE. */
+const EXPOSED = process.env.THORNSWOOD_DOCS_EXPOSE === '1' && process.env.THORNSWOOD_DOCS_LOCAL !== '1';
+const BIND   = EXPOSED ? '0.0.0.0' : '127.0.0.1';
 const ROOT   = __dirname;
 const DATA   = path.join(ROOT, 'data');
 const PUBLIC = path.join(ROOT, 'public');
@@ -6277,6 +6283,11 @@ http.createServer((req, res) => {
   }
 }).listen(PORT, BIND, () => {
   console.log('[thornswood-docs] listening on ' + BIND + ':' + PORT);
+  if (EXPOSED) {
+    console.log('[thornswood-docs] WARNING: plain HTTP on every address (THORNSWOOD_DOCS_EXPOSE=1). ' +
+                'Sign-ins, cookies and uploads reach ' + PORT + ' unencrypted from anywhere the firewall lets in. ' +
+                'Put Caddy in front and unset it (#2185).');
+  }
   console.log('[thornswood-docs] writing this to ' + siteLog.file +
               ', rolled at 4 MB, five kept');
   console.log('[thornswood-docs] documents in ' + DATA);
