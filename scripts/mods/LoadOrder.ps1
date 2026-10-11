@@ -110,8 +110,8 @@ function Import-VortexStateReader {
     if ('Thornswood.VortexProfileState' -as [type]) { return }
     $source = Join-Path $PSScriptRoot '..\..\launcher\app\VortexProfileState.cs'
     if ($PSVersionTable.PSVersion.Major -le 5) {
-        Add-Type -Path $source -ReferencedAssemblies System.dll,System.Core.dll,System.Xml.dll,System.Runtime.Serialization.dll
-    } else { Add-Type -Path $source }
+        Add-Type -LiteralPath $source -ReferencedAssemblies System.dll,System.Core.dll,System.Xml.dll,System.Runtime.Serialization.dll
+    } else { Add-Type -LiteralPath $source }
 }
 <#
   The legacy fallback: the revision out of the old folder name, or 0. Kept for
@@ -227,8 +227,11 @@ $script:CollectionJsonFrom = ''
   and not the collection.
 #>
 function Get-CollectionExportArchive([string]$Folder) {
-    $none = New-Object object[] 0
-    if (-not $Folder -or -not (Test-Path -LiteralPath $Folder -PathType Container)) { return , $none }
+    # The archives go out one by one, so every caller's @(...) is the list and
+    # its Count the number of archives. It used to return the list as one
+    # object, so @(...) held one item even with no archive at all: Count was
+    # never 0, and a caller's foreach got the whole list as one "archive".
+    if (-not $Folder -or -not (Test-Path -LiteralPath $Folder -PathType Container)) { return }
     $found = New-Object Collections.Generic.List[object]
     $places = @((Join-Path $Folder 'export'), $Folder)
     for ($i = 0; $i -lt $places.Count; $i++) {
@@ -241,9 +244,9 @@ function Get-CollectionExportArchive([string]$Folder) {
             [void]$found.Add([pscustomobject]@{ File = $f; Place = $i; Named = $named })
         }
     }
-    if ($found.Count -eq 0) { return , $none }
+    if ($found.Count -eq 0) { return }
     $sorted = @($found | Sort-Object Place, Named, @{ Expression = { $_.File.LastWriteTimeUtc }; Descending = $true })
-    return , [object[]]@($sorted | ForEach-Object { $_.File })
+    foreach ($x in $sorted) { $x.File }
 }
 
 <#
