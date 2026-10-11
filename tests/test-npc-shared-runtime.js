@@ -894,5 +894,31 @@ test('A walker that can swim still treats a swimmer-only rule as not its own', (
   f.stop();
 });
 
+// #2072: two ways an NPC used to stop for good mid walk, measured in the
+// population harness (47954 and 45b7e).
+test('A wall face in the navmesh is never a step: an NPC beside one keeps walking', () => {
+  // The floor shares its x = 0 edge with a triangle standing upright on it,
+  // all three corners at x = 0, so it has no ground seen from above.
+  const wall = geometry([[0,0,0],[300,0,0],[0,300,0],[0,150,200]], [[0,1,2],[0,2,3]]);
+  const f = fixture({count:1,npc:{1:{pos:[60,60,0]}},meshes:new Map([[60,wall]])});
+  for (let i = 0; i < 4; i++) f.advance(15000);
+  assert.ok(!f.logs.some(l => /activity unavailable/.test(l)),'Never stopped: '+f.logs.filter(l => /unavailable/.test(l)).join(' | '));
+  assert.ok(f.moves.filter(m => m.id === 1 && m.speed > 0).length > 3,'It keeps walking on the floor');
+  f.stop();
+});
+test('A raised NPC near the edge of its leash only steps where it would stand inside the leash', () => {
+  // Small triangles; the NPC stands 60 above the floor. Its only neighbour's
+  // center is 75 across from home, inside an 80 leash on the floor and 96
+  // away where the NPC would stand.
+  const grid = geometry([[0,0,0],[100,0,0],[0,100,0],[100,100,0],[200,0,0],[200,100,0]],
+    [[1,3,2],[1,4,3],[4,5,3]]);
+  const home = [200/3,200/3,0];
+  const f = fixture({count:1,npc:{1:{pos:[200/3,200/3,60]}},lifts:{1:60},meshes:new Map([[60,grid]]),
+    population:homePolicy(home,60,80)});
+  for (let i = 0; i < 4; i++) f.advance(15000);
+  assert.ok(!f.logs.some(l => /activity unavailable/.test(l)),'Never stopped: '+f.logs.filter(l => /unavailable/.test(l)).join(' | '));
+  checkLeash(f.moves,home,80); f.stop();
+});
+
 console.log(JSON.stringify({passed,failed}));
 process.exitCode = failed ? 1 : 0;
