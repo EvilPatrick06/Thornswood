@@ -87,6 +87,43 @@ function Write-ThornswoodJsonFile([string]$Path, $Table) {
   [IO.File]::WriteAllText($Path, ($Table | ConvertTo-Json -Depth 10), (New-Object Text.UTF8Encoding($false)))
 }
 
+# bot.env.json, locked to SYSTEM, Administrators and whoever runs this, plus
+# read for the service's own account NT SERVICE\<Service>, the one program
+# meant to open it. Until issue #2158 the settings step in Install-Bot.ps1
+# took every rule off and put back only the first three, so the swap started
+# a service that could not read its own settings, the rollback hit the same
+# denied read, and a full run left the bot stopped. The service's rule is
+# given here, in the same write that takes the others off.
+# The SID is worked out the way Get-ThornswoodServiceSid in Bot-Service.ps1
+# does it (tests\test-bot-env-acl.ps1 checks they agree), because this file
+# goes up without Bot-Service.ps1 and the account may not exist yet.
+function Get-ThornswoodBotEnvServiceSid([string]$Service) {
+  $sha = [Security.Cryptography.SHA1]::Create()
+  try { $h = $sha.ComputeHash([Text.Encoding]::Unicode.GetBytes($Service.ToUpperInvariant())) }
+  finally { $sha.Dispose() }
+  $parts = @()
+  for ($i = 0; $i -lt 20; $i += 4) { $parts += [BitConverter]::ToUInt32($h, $i) }
+  return ('S-1-5-80-' + ($parts -join '-'))
+}
+
+function Protect-ThornswoodBotEnv([string]$Path, [string]$Service = 'ThornswoodBot') {
+  $acl = Get-Acl -LiteralPath $Path
+  $acl.SetAccessRuleProtection($true, $false)
+  foreach ($r in @($acl.Access)) { [void]$acl.RemoveAccessRule($r) }
+  $admins = @('S-1-5-18', 'S-1-5-32-544', [Security.Principal.WindowsIdentity]::GetCurrent().User.Value)
+  foreach ($s in $admins) {
+    $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(
+      (New-Object Security.Principal.SecurityIdentifier($s)), 'FullControl', 'Allow')))
+  }
+  $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(
+    (New-Object Security.Principal.SecurityIdentifier((Get-ThornswoodBotEnvServiceSid $Service))), 'Read', 'Allow')))
+  # Only the access rules are written back, as Set-ThornswoodAclAccess does,
+  # so an account without SeSecurityPrivilege can run it (issue #1120).
+  $item = Get-Item -LiteralPath $Path -Force
+  if ($PSVersionTable.PSEdition -eq 'Core') { [IO.FileSystemAclExtensions]::SetAccessControl([IO.FileInfo]$item, [Security.AccessControl.FileSecurity]$acl) }
+  else { $item.SetAccessControl($acl) }
+}
+
 function Write-ThornswoodBotToken {
   param(
     [string]$Token,
