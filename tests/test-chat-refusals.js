@@ -221,6 +221,24 @@ if (loaded && pollTimer) {
   yes('and says what /deed says', JSON.stringify(a.said) === JSON.stringify(b.said));
 }
 
+// -------------- refused before arrival, not held (refuse-before-arrival) ---
+// Somebody on no list with no character in the world used to be told "That
+// will run as soon as you arrive" for /give, and refused 90 seconds later.
+if (loaded && pollTimer) {
+  const GHOST = 7;   // a profile with no character online
+  settings = Object.assign({ thornswoodAdmins: [PID] }, HOLD_OFF);
+  ['/give gold 5', '/spawn troll', '/tp whiterun', '/where', '/kick 5', '/spawnat 5 troll', '/ban 5'].forEach(function (line) {
+    const r = send(line, GHOST);
+    yes(line + ' from somebody on no list, not in the world yet, is refused at once: ' + one(r),
+        r.said.length >= 1 && r.said.every(function (s) { return !/as soon as you arrive/.test(s); }) &&
+        r.said.some(function (s) { return /not yours|refuses everybody|not on|playtester/i.test(s); }) &&
+        r.placed.length === 0);
+  });
+  settings = Object.assign({ thornswoodPlaytesters: [GHOST + 1] }, HOLD_OFF);
+  const r = send('/give gold 5', GHOST + 1);
+  yes('a listed tester not in the world yet is still held for arrival: ' + one(r),
+      r.said.length === 1 && /as soon as you arrive/.test(r.said[0]));
+}
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
