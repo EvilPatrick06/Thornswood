@@ -1102,7 +1102,10 @@ if ($preSig -and $preSig.Status -ne 'NotSigned' -and $preSig.SignerCertificate) 
     }
     if ($signtoolStrip) {
         Say '  stub was signed; stripping so OneFile attach can be signed afterwards' 'DarkGray'
-        & $signtoolStrip remove /s $exe 2>&1 | Out-Null
+        # Its exit code decides: under Stop, 5.1 threw on signtool's stderr
+        # before the Die below could say what failed.
+        $was = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+        try { & $signtoolStrip remove /s $exe 2>&1 | Out-Null } finally { $ErrorActionPreference = $was }
         if ($LASTEXITCODE -ne 0) {
             Die 'could not strip the stub signature before attaching the payload'
         }

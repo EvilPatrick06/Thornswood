@@ -159,6 +159,10 @@ function Remote($script) {
 # gh with its output kept apart from its errors, and a failure that says which
 # call it was. Named so it never shadows gh itself.
 function Invoke-Gh {
+  # The exit code decides, not stderr: under Stop, Windows PowerShell 5.1 threw
+  # on any line gh wrote there (a notice, a warning) even through 2>$null, and
+  # a failure came out as NativeCommandError instead of the message below.
+  $ErrorActionPreference = 'Continue'
   $out = & gh @args 2>$null
   if ($LASTEXITCODE -ne 0) { throw ('gh ' + ($args -join ' ') + ' failed') }
   return $out
