@@ -410,9 +410,10 @@ yes('and one for no report as "refusing profile N: no load order report"',
     GM.indexOf("'[thornswood] refusing profile ' + pid + ': no load order report in '") >= 0);
 yes('and watching only as "WOULD REFUSE profile N:"',
     GM.indexOf("'[thornswood] WOULD REFUSE profile ' + profileId + ': load order differs at '") >= 0);
-const SHELL = fs.readFileSync(path.join(REPO_DIR, 'launcher', 'app', 'Shell.cs'), 'utf8');
-yes('Shell.cs still starts a session in launcher.log with the line this cuts at',
-    SHELL.indexOf('Log("' + eval(grabLine('SESSION_START_MARK').replace(/^const SESSION_START_MARK = /, '')) + '" + Updater.Version') >= 0);
+// Play(), which writes it, moved from Shell.cs to ShellPlay.cs in #2093 (#500).
+const SHELL_PLAY = fs.readFileSync(path.join(REPO_DIR, 'launcher', 'app', 'ShellPlay.cs'), 'utf8');
+yes('ShellPlay.cs still starts a session in launcher.log with the line this cuts at',
+    SHELL_PLAY.indexOf('Log("' + eval(grabLine('SESSION_START_MARK').replace(/^const SESSION_START_MARK = /, '')) + '" + Updater.Version') >= 0);
 const CLIENT = path.join(REPO_DIR, 'engine', 'skymp', 'skymp5-client', 'src', 'services', 'services', 'loadOrderVerificationService.ts');
 if (fs.existsSync(CLIENT)) {
   const LOV = fs.readFileSync(CLIENT, 'utf8');

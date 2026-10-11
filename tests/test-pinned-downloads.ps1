@@ -75,6 +75,10 @@ function HereStrings($ast) {
 # A remote block exactly as the script would send it: the here-string is
 # evaluated as written, with the script's own variables set to the values
 # given. Backticks and dollar signs come out the way they would on the wire.
+# Setup-Domain.ps1 dot-sources scripts\vps\Lock-Folder.ps1 and its caddy block
+# calls Get-ThornswoodLockedFolderScript (#2105), so it is loaded here the same
+# way. Loading it locks nothing; only the text it returns is read.
+. (Join-Path $RepoPath 'scripts\vps\Lock-Folder.ps1')
 function Expand([string]$hereString, [hashtable]$vars) {
     $sb = [scriptblock]::Create($hereString)
     return (& {
@@ -346,15 +350,20 @@ function Start-Process {
     $pinErr = Join-Path $work 'python-pin-err.txt'
     $pref = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
-    $said = @(& powershell.exe -NoProfile -File $runner 2>$pinErr)
+    # -ExecutionPolicy Bypass, as the other harnesses that run a script under
+    # Windows PowerShell do: where its policy is Restricted the runner never
+    # loads, and that non-zero exit is not the checksum refusing anything.
+    $said = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $runner 2>$pinErr)
     $ErrorActionPreference = $pref
+    $pinSaid = if (Test-Path -LiteralPath $pinErr) { Get-Content -LiteralPath $pinErr -Raw } else { '' }
     Yes 'a python installer that does not match the checksum exits non-zero' ($LASTEXITCODE -ne 0)
+    Yes '  and it is the checksum that refused it' ("$pinSaid" -match 'does not match the checksum recorded for it')
     Yes '  and the installer is never started' (-not (Test-Path -LiteralPath $started))
     Yes '  and the download is not left behind' (-not (Test-Path -LiteralPath $landed))
 
     Remove-Item -LiteralPath $started -Force -ErrorAction SilentlyContinue
     Write-PythonRunner $fakeSha
-    $said = @(& powershell.exe -NoProfile -File $runner)
+    $said = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $runner)
     Yes 'a python installer that matches exits 0 and is run' (
         $LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $started))
     Yes '  and it says the checksum matched' (($said -join ' ') -match 'checksum matched')
