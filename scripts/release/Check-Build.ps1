@@ -192,8 +192,13 @@ foreach ($m in $mods) {
     continue
   }
 
-  $crc = [Thornswood.Crc32]::OfFile($path)
-  if ($crc -ne [int]$m.crc32) {
+  # The server writes zlib's CRC-32 as a signed int32, so half of all files
+  # carry a negative number. Another tool may write the same 32 bits unsigned,
+  # and [int] of anything over 2147483647 throws. Both are read as the low 32
+  # bits, so the two spellings of one checksum are the same file.
+  $crc  = [int64][Thornswood.Crc32]::OfFile($path) -band 0xFFFFFFFFL
+  $want = [int64]$m.crc32 -band 0xFFFFFFFFL
+  if ($crc -ne $want) {
     $wrong += [pscustomobject]@{ Name = $name; Why = 'same size, different contents' }
     continue
   }
