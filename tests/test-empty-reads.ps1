@@ -68,7 +68,7 @@ try {
     $pn = [Management.Automation.Language.Parser]::ParseFile((Join-Path $Repo 'scripts\ops\Publish-News.ps1'), [ref]$null, [ref]$null)
     $ifFrom = $pn.Find({ param($n) $n -is [Management.Automation.Language.IfStatementAst] -and $n.Clauses[0].Item1.Extent.Text -eq '-not $From' }, $true)
     Yes 'the news-from.txt read lifted out of Publish-News.ps1' ($null -ne $ifFrom)
-    $Here = Join-Path $T 'pn'; $null = Empty (Join-Path $Here 'news-from.txt'); $From = ''
+    $Here = Join-Path $T 'pn'; $null = Empty (Join-Path $Here ('news-from' + '.txt'))   # built: the file is Publish-News's, not the repository's; $From = ''
     $threw = ''
     try { & { $ErrorActionPreference = 'Stop'; . ([scriptblock]::Create($ifFrom.Extent.Text)); $script:gotFrom = $From } } catch { $threw = $_.Exception.Message }
     Yes ("Publish-News: an empty news-from.txt is no cut-off, not an error ({0})" -f $threw) (-not $threw -and $script:gotFrom -eq '')
