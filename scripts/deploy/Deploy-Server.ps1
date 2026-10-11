@@ -186,6 +186,7 @@ if (-not $PSBoundParameters.ContainsKey('Wait')) {
 . (Join-Path $Here 'ServerSettings.ps1')
 . (Join-Path $Here 'ServerBuild.ps1')
 . (Join-Path $Here 'DeployedBuild.ps1')
+. (Join-Path $Here '..\release\Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
 function Remote($script) {
   # Send-Script.ps1 (issue #1070): a long script goes as a file of its own
@@ -511,7 +512,8 @@ if (-not $GamemodeOnly) {
   # it. The same test Export-ServerPayload.ps1 makes for a live payload, and an
   # npcSettings "default" key, which refuses every NPC. Before the stamp is
   # written, the box is asked anything or the artifact is sent.
-  $buildSettings = Get-Content -LiteralPath (Join-Path $Dist 'server-settings.json') -Raw | ConvertFrom-Json
+  $buildSettingsPath = Join-Path $Dist 'server-settings.json'
+  $buildSettings = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $buildSettingsPath -Raw) $buildSettingsPath
   $notLive = @(Get-ThornswoodServerSettingsProblems $buildSettings 'main')
   if ($notLive.Count) {
     Write-Host ''
@@ -542,7 +544,7 @@ if (-not (Test-ThornswoodBuildStamp -Path $stampPath -Gamemode $built)) {
       (Get-FileHash -LiteralPath $src).Hash -eq (Get-FileHash -LiteralPath $built).Hash) { $stampFrom = $src }
   $null = Save-ThornswoodBuildStamp -Gamemode $stampFrom -Channel main -RepoDir (Split-Path -Parent (Split-Path -Parent $Here)) -Path $stampPath -Artifact $artifact
 }
-'{0,-22} {1}' -f 'thornswood-build.json', (Format-ThornswoodBuildStamp (Get-Content -LiteralPath $stampPath -Raw | ConvertFrom-Json)) | Write-Host
+'{0,-22} {1}' -f 'thornswood-build.json', (Format-ThornswoodBuildStamp (ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $stampPath -Raw) $stampPath)) | Write-Host
 
 # ---------------------------------------------------------- which build is this
 #
@@ -566,7 +568,7 @@ $recordPath = Join-Path $Here '..\..\records\server-build.json'
 if (-not (Test-Path -LiteralPath $recordPath)) {
   throw 'there is no records\server-build.json, so nothing says which build these server files are. Nothing was sent and the server was not touched.'
 }
-$rec = Get-Content -LiteralPath $recordPath -Raw | ConvertFrom-Json
+$rec = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $recordPath -Raw) $recordPath
 $serverFiles = @()
 if ($GamemodeOnly) {
   # No server file goes, so there is none here to hold to the record. The
@@ -714,7 +716,7 @@ if (Test-Path -LiteralPath $ep) { 'ESP ' + (Get-Item -LiteralPath $ep).Length } 
   # list names that is not there yet, before the restart, so a plugin added to the
   # build cannot leave the server unable to start.
   $settingsSrc = Join-Path $Dist 'server-settings.json'
-  $settings = Get-Content -LiteralPath $settingsSrc -Raw | ConvertFrom-Json
+  $settings = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $settingsSrc -Raw) $settingsSrc
   if (-not $settings.loadOrder) { throw 'server-settings.json has no loadOrder' }
   $pluginNames = @($settings.loadOrder | ForEach-Object { [IO.Path]::GetFileName($_) })
   $remotePlugins = ($Root -replace '\\', '/') + '/plugins'
