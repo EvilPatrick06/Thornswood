@@ -298,7 +298,20 @@ Head 'Configure'
 # MSB1009. A configure over that cache carries on from it.
 $cache = Join-Path $build 'CMakeCache.txt'
 $solution = Join-Path $build 'ALL_BUILD.vcxproj'
-if (Test-Path -LiteralPath $solution) { Ok "already configured: $build" }
+# A build already configured is generated again over its own cache every run
+# (#2157). The fork's CMakeLists collect their sources with GLOB_RECURSE, and
+# a glob is read at configure time, so a fork change that adds a .cpp (fork
+# #54's PageHeldKeys.cpp, 11 Oct) was in no project and the link failed with
+# LNK2019 until somebody configured by hand. Given only the build folder,
+# cmake takes the source, the generator and every setting from the cache, so
+# nothing is rebuilt in vcpkg; it took 16 s on One.
+if ((Test-Path -LiteralPath $solution) -and $Check) { Ok "already configured: $build; this run would generate it again over its cache, so a source file the fork added is built" }
+elseif (Test-Path -LiteralPath $solution) {
+    Say '  already configured; generating again over its cache, so a source file the fork added since is in the build'
+    $code = Run $cmake $build
+    if ($code -ne 0) { Die "cmake exited with $code generating $build again over its cache. The first error above is usually the real one." }
+    Ok "generated again: $build"
+}
 elseif ($Check -and (Test-Path -LiteralPath $cache)) { Miss "$build was configured part way (no ALL_BUILD.vcxproj); this run would configure it again from where it stopped" }
 elseif ($Check) { Miss "$build is not configured; this run would configure it (the first time builds every vcpkg library, which is slow)" }
 else {
