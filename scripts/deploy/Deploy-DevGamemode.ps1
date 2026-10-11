@@ -215,6 +215,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 . (Join-Path $Here 'Swap.ps1')
+. (Join-Path $Here '..\release\Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 if (-not $PSBoundParameters.ContainsKey('Wait')) {
   $Wait = Get-ThornswoodServerReadyWait
 }
@@ -291,7 +292,7 @@ Write-Host '  gamemode.js parses'
 $devRecordPath = Join-Path $Here '..\..\records\server-build.json'
 if (-not (Test-Path -LiteralPath $devRecordPath)) { throw 'there is no records\server-build.json, so nothing says which server build this gamemode is written for. Nothing was sent.' }
 $devRecordSum = Get-ThornswoodRecordSum ([IO.File]::ReadAllBytes($devRecordPath))
-$devRecordCommit = [string]((Get-Content -LiteralPath $devRecordPath -Raw | ConvertFrom-Json).source.commit)
+$devRecordCommit = [string]((ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $devRecordPath -Raw) $devRecordPath).source.commit)
 $devBoxSaid = @(Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script ($ThornswoodRecordSumText + "`r`n" + @"
 `$rp = '$($Root.Replace('/', '\').Replace("'", "''"))\server-build.json'
 if (Test-Path -LiteralPath `$rp) {
@@ -358,7 +359,7 @@ if ($LoadOrder) {
   if (-not (Test-Path -LiteralPath $settingsSrc)) {
     throw "-LoadOrder needs the built server's settings at $settingsSrc. Run Deploy-Gamemode.ps1 -Vortex first."
   }
-  $built = Get-Content -LiteralPath $settingsSrc -Raw | ConvertFrom-Json
+  $built = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $settingsSrc -Raw) $settingsSrc
   if (-not $built.loadOrder) { throw "$settingsSrc has no loadOrder" }
   $pluginNames = @($built.loadOrder | ForEach-Object { [IO.Path]::GetFileName($_) })
   $ours = Join-Path $Here '..\..\game\content\Thornswood-Content.esp'
