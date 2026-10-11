@@ -4656,6 +4656,24 @@ namespace Thornswood
             btnServerDev.Visibility = Visibility.Visible;
             btnServerMain.IsEnabled = true;
             btnServerDev.IsEnabled = true;
+            // The open panel covers the chip, so its first row is where the chip
+            // was: that row is the server this install is on, the other below.
+            // Until 11 Oct the rows kept the XAML order, Main then Dev, and a dev
+            // install opened onto Main (Patrick: "it doesnt have the current
+            // server you are on as the one on top").
+            var rows = btnServerMain.Parent as Panel;
+            if (rows != null && rows == btnServerDev.Parent)
+            {
+                Button first = cfg.IsDev ? btnServerDev : btnServerMain;
+                Button second = cfg.IsDev ? btnServerMain : btnServerDev;
+                if (rows.Children.IndexOf(first) != 0)
+                {
+                    rows.Children.Remove(first);
+                    rows.Children.Insert(0, first);
+                }
+                first.Margin = new Thickness(0, 0, 0, 2);
+                second.Margin = new Thickness(0);
+            }
             PaintServerChip();
         }
 
