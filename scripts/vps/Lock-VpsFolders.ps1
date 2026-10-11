@@ -41,6 +41,10 @@
       the bot's on moderation.log, stay where they are.
   Install-ThornswoodServer.ps1 does the same at every server install from now
   on, and vps-dev-instance.ps1 for the dev folders it makes.
+  The service folders are locked as they are made, by the same rules, through
+  Lock-Folder.ps1: Watch-Services.ps1 and Watch-Load.ps1 for Watch,
+  Setup-Domain.ps1 for Caddy, Artifact.ps1 and Swap.ps1 for Deploys. Nothing in
+  the repository makes Maint or Dumps, so those two are this script's alone.
 
   WHAT IT REFUSES.
     - anywhere with SkyrimSE.exe on it, which is the gaming PC, not the VPS
