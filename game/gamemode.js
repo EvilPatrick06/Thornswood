@@ -63563,8 +63563,8 @@ try {
       A map in this process was emptied by every restart: a scarce quest open
       at the time was gone while what it had drawn stayed in the pack, so
       twelve ebony out of Raven Rock Mine were kept with nothing left to put
-      them back, and every cooldown came back at once. deps.load and deps.save
-      read and write one record on the character, { v, open, cool }. The server
+      them back, and every cooldown came back at once. deps.load and deps.commit
+      read one record on the character, { v, open, cool }. The server
       keeps it in the character's change form beside the pack and saves that
       form whole, so no save holds the goods without the quest that drew them.
       Nothing else holds it, so what the server enforces is what a restart
@@ -63574,7 +63574,7 @@ try {
       No intermediate save can close a quest without its reward, or count a
       draw without its goods. There is no compensating add, take or reopen.
     */
-    if (typeof deps.load !== 'function' || typeof deps.save !== 'function' ||
+    if (typeof deps.load !== 'function' ||
         typeof deps.commit !== 'function' || typeof deps.identity !== 'function') {
       throw new Error('the custom quests have nowhere on the character to keep them');
     }
@@ -63610,12 +63610,17 @@ try {
     */
     function questsOf(actor) {
       if (!active || deps.available && !deps.available()) return null;
-      var raw;
-      try { raw = deps.load(actor); } catch (e) {
+      var raw,owner;
+      try {
+        owner=deps.identity(actor);
+        if(!owner)return null;
+        raw=deps.load(actor);
+        if(deps.identity(actor)!==owner)return null;
+      } catch (e) {
         note('could not read the quests of', actor + ':', e);
         return null;
       }
-      var out = { open: {}, cool: {}, expected: raw === undefined ? null : raw,
+      var out = { open: {}, cool: {}, owner:owner, expected: raw === undefined ? null : raw,
         before: {open: {}, cool: {}} };
       if (raw === undefined || raw === null) return out;
       if (typeof raw !== 'object' || Array.isArray(raw) || raw.v !== 1 ||
@@ -63663,12 +63668,11 @@ try {
     }
     function keep(actor, b, changes) {
       try {
-        if (!active || deps.available && !deps.available()) return false;
+        if (!active || deps.available && !deps.available() || deps.identity(actor)!==b.owner) return false;
         var next = recordEdits(b.expected || {v:1,open:{},cool:{}}, b.before, {open: b.open, cool: b.cool});
         next.v = 1;
-        if (changes) return deps.commit(actor, b.expected, next, changes).ok === true;
-        deps.save(actor, next);
-        return true;
+        if(deps.identity(actor)!==b.owner)return false;
+        return deps.commit(actor, b.expected, next, changes || []).ok === true;
       } catch (e) {
         note('could not write the quests of', actor + ', so nothing changed:', e);
         return false;
@@ -63967,7 +63971,6 @@ try {
         now: function () { return Date.now(); },
         goldDesc: globalThis.__thornswoodDungeonLoot && globalThis.__thornswoodDungeonLoot.GOLD_DESC,
         load: function (actor) { return mp.get(actor, QUEST_PROPERTY); },
-        save: function (actor, rec) { mp.set(actor, QUEST_PROPERTY, rec); },
         log: function () {
           var a = Array.prototype.slice.call(arguments);
           a.unshift('custom quests:');
