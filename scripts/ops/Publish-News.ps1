@@ -80,7 +80,8 @@ if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 
 if (-not $From) {
   $cut = Join-Path $Here 'news-from.txt'
-  if (Test-Path -LiteralPath $cut) { $From = (Get-Content $cut -Raw).Trim() }
+  # "$()": an empty file reads as $null (even through [string](...)), and a method on $null throws.
+  if (Test-Path -LiteralPath $cut) { $From = ("$(Get-Content $cut -Raw)").Trim() }
 }
 
 # The live feed only. This repository's own version.json was a copy left from

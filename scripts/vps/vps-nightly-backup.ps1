@@ -91,7 +91,9 @@ function Note($m) {
 $pass = $null
 if (-not $Plain) {
   if (-not (Test-Path -LiteralPath $KeyFile)) { throw 'No backup passphrase file. No archive was created.' }
-  $pass = (Get-Content -LiteralPath $KeyFile -Raw).Trim()
+  # "$()": an empty file reads as $null (even through [string](...)), and a method on $null throws. Without it the
+  # line below, which says the file is empty, was never reached.
+  $pass = ("$(Get-Content -LiteralPath $KeyFile -Raw)").Trim()
   if (-not $pass) { throw 'The backup passphrase file is empty. No archive was created.' }
 }
 
