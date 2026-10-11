@@ -1,4 +1,4 @@
-﻿# Signed releases and artifact provenance (issue #2163)
+# Signed releases and artifact provenance (issue #2163)
 
 Status: DESIGN AND PILOT. Nothing in the live release path changes with this
 document. release.yml, Ship, Publish-Installer, the feed and every checksum
@@ -131,10 +131,10 @@ the sha256 and keeps the sha256 check.
 ## 6. Tags, drafts, replacement and failed signatures
 
 - Tag movement. release.yml builds whatever the tag points at, and a tag can
-  be moved and re-run (`workflow_dispatch`). The manifest records the commit
-  sha, not just the tag name; Ship compares the draft's recorded commit with
-  `git rev-parse <tag>` and refuses if the tag moved after the draft was
-  built. Proposed, not built: a protected tag rule for `v*`.
+  be moved and re-run (`workflow_dispatch`). Making the tag resolve to the
+  intended commit is #2202 (Wyrd lane), not this design. What this design
+  adds is only that the manifest records the commit sha the draft was built
+  from, so whatever check #2202 settles on has a signed value to compare.
 - Draft promotion. The draft's `SHA256SUMS` describes the UNSIGNED runner
   exe; signing on One changes the bytes. Ship already checks the download
   against `SHA256SUMS` before signing; the manifest then records both the
