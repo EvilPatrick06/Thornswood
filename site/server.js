@@ -1125,15 +1125,36 @@ const INBOX_KEEP = 2000;
 const reportSalt = crypto.randomBytes(32);
 const reportSeen = new Map();
 
-function clientAddr(req) {
-  const sock = String((req.socket && req.socket.remoteAddress) || '');
+// THE ONE TRUSTED-PROXY BOUNDARY (#2187). requestAddr is the address a request
+// came from, and both the report limit below and the sign-in log use it, so
+// there is one rule rather than two. The socket is the truth. X-Forwarded-For
+// is believed only when the socket is a proxy we run: loopback, which is
+// Caddy, or an address listed in THORNSWOOD_TRUSTED_PROXIES (comma separated,
+// for a proxy on another box; empty by default). Even then only the LAST hop
+// is taken, the one that proxy wrote: anything before it is whatever the
+// sender typed. A direct caller's header is ignored entirely. Until 11
+// October the sign-in log took the FIRST hop from anybody, so any caller could
+// write any address into signins.json.
+const TRUSTED_PROXIES = new Set(String(process.env.THORNSWOOD_TRUSTED_PROXIES || '')
+  .split(',').map((s) => s.trim().toLowerCase().replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/, ''))
+  .filter(Boolean));
+
+function requestAddr(req) {
+  const plain = (a) => String(a || '').trim().toLowerCase()
+    .replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/, '');
+  const sock = plain(req.socket && req.socket.remoteAddress);
   let addr = sock;
-  if (/^(127\.|::1$|::ffff:127\.)/i.test(sock)) {
-    const hops = String(req.headers['x-forwarded-for'] || '').split(',')
+  if (/^(127\.|::1$)/.test(sock) || TRUSTED_PROXIES.has(sock)) {
+    const hops = String((req.headers && req.headers['x-forwarded-for']) || '').split(',')
       .map((s) => s.trim()).filter(Boolean);
-    if (hops.length) addr = hops[hops.length - 1];
+    const last = hops.length ? plain(hops[hops.length - 1]) : '';
+    if (last && net.isIP(last)) addr = last;
   }
-  addr = addr.toLowerCase().replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/, '');
+  return addr;
+}
+
+function clientAddr(req) {
+  let addr = requestAddr(req);
   if (net.isIPv6(addr)) {
     const halves = addr.split('%')[0].split('::');
     const head = halves[0] ? halves[0].split(':') : [];
@@ -2598,8 +2619,7 @@ function noteSignIn(req, me, st, back) {
       admin: !!st.admin,
       outcome: outcome,
       roles: Array.isArray(st.roles) ? st.roles.slice(0, 12) : [],
-      ip: String((req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
-                 (req.socket && req.socket.remoteAddress) || '')
+      ip: requestAddr(req)
     });
     putJson(ATTEMPTS, freshSignIns(rows, Date.now()));
   } catch (e) { }
