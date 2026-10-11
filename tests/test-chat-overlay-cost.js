@@ -48,6 +48,7 @@ const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in test
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const pluginPass = require('./fixtures/plugin-pass'); // front's whose-game check and the first tick, as the game does (#485)
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -592,9 +593,10 @@ const PTT = 'Data/Platform/voice-ptt.txt';
 const PTT_PROFILE = '../Profile/voice-ptt.txt';
 
 const PLUGIN = read('game/plugins/thornswood-voice.js');
-const oursMatch = /const ours = \['([^']+)'\];/.exec(PLUGIN);
+// The address is in front's whose-game check, the one copy (#485).
+const oursMatch = /const ours = \['([^']+)'\];/.exec(read('game/plugins/thornswood-front.js'));
 const OURS = oursMatch ? oursMatch[1] : '';
-yes('the plugin names the address it calls ours', !!OURS);
+yes('front\'s whose-game check names the address it calls ours', !!OURS);
 
 /*
   The real plugin, a fake Skyrim Platform, a fake file system and a clock
@@ -664,7 +666,7 @@ function plugin(opts) {
   };
   if (opts.ready) { sandbox.Thornswood = { ready: true }; }
   vm.createContext(sandbox);
-  vm.runInContext(PLUGIN, sandbox, { filename: 'thornswood-voice.js' });
+  pluginPass.load(sandbox, PLUGIN, { filename: 'thornswood-voice.js' });
 
   function frame(ms) {
     clock += ms;

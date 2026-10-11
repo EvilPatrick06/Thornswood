@@ -1,52 +1,21 @@
-(function () {
-'use strict';
-
 // ------------------------------------------------------------ whose game ----
-// Skyrim Platform loads every plugin in Data/Platform/Plugins, whichever server
-// skymp5-client is about to join. Somebody who also plays another server starts
-// it from this same Skyrim, so on 2026-09-16 Thornswood's voice indicator sat
-// on top of that server's menu. Whichever launcher ran last wrote
-// skymp5-client-settings.txt, and its server-ip says whose game this is. Not
-// ours: this file does nothing at all. Unreadable: carry on, as before.
-//
-// Ours is the address in Thornswood.ini's ServerAddress line when there is
-// one, so a server move is an ini edit, and the fixed address below when
-// there is not.
-if (!thornswoodGame()) { return; }
-function thornswoodGame() {
-  const ours = ['192.135.112.23'];
-  let ip = '';
-  try {
-    const fs = require('fs');
-    try {
-      const m = fs.readFileSync('Data/SKSE/Plugins/Thornswood.ini', 'utf8')
-        .match(/^\s*ServerAddress\s*=\s*([^\s;]+)/m);
-      if (m) { ours.push(m[1]); }
-    } catch (e) { }
-    let raw = fs.readFileSync('Data/Platform/Plugins/skymp5-client-settings.txt', 'utf8');
-    if (raw.charCodeAt(0) === 0xFEFF) { raw = raw.slice(1); }
-    ip = String((JSON.parse(raw) || {})['server-ip'] || '').trim();
-  } catch (e) { return true; }
-  if (ip && ours.indexOf(ip) < 0) {
-    try { skyrimPlatform.printConsole('[thornswood] the client points at ' + ip + ', not this server. Plugin idle.'); } catch (e) { }
-    return false;
-  }
-  // The client can point at us and this still not be our session: another
-  // server's launcher that never rewrites the client settings leaves our
-  // address in them. So the launcher leaves a note when it starts the game
-  // and takes it away when the game closes. No fresh note, not our session.
-  try {
-    const note = String(require('fs').readFileSync('Data/Platform/thornswood-session.txt', 'utf8')).trim();
-    const first = note.split(/\s+/)[0];
-    let when = Number(first);         // unix milliseconds from the launcher
-    if (!isFinite(when) || when < 1e12) { when = Date.parse(first); }
-    if (isFinite(when) && Math.abs(Date.now() - when) < 24 * 3600 * 1000) { return true; }
-    try { skyrimPlatform.printConsole('[thornswood] the launcher\'s session note is stale, so this is another server\'s session. Plugin idle.'); } catch (e) { }
-  } catch (e) {
-    try { skyrimPlatform.printConsole('[thornswood] the launcher left no session note, so this is another server\'s session. Plugin idle.'); } catch (e2) { }
-  }
-  return false;
-}
+// thornswood-front.js owns the whose-game check (issue #485): the client
+// settings must point at this server and the launcher's session note must be
+// fresh, or every Thornswood plugin stays idle. Front publishes the check as
+// globalThis.Thornswood.whoseGame, and only when it says ours. This plugin
+// runs nothing until the first tick: Skyrim Platform runs every file in
+// Data/Platform/Plugins in one pass and sends that tick after the pass
+// (TickImpl in the fork's skyrim-platform SkyrimPlatform.cpp), so by then
+// front has published the check or did not load, whichever order the files
+// came in. Nothing published means idle; so does the check saying not ours.
+(function (start) {
+  skyrimPlatform.once('tick', function () {
+    const T = globalThis.Thornswood;
+    if (!T || typeof T.whoseGame !== 'function' || !T.whoseGame()) { return; }
+    start();
+  });
+})(function () {
+'use strict';
 
 // ---------------------------------------------------------------------------
 // Thornswood proximity voice, game side.
@@ -819,4 +788,4 @@ sp.on('browserMessage', guard('browserMessage', (event) => {
 
 log('loaded. browser:', typeof sp.browser);
 
-})();
+});
