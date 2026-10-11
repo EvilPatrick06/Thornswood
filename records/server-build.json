@@ -1,9 +1,9 @@
 {
   "_note": "What the server in this release is, and the source it was built from: every file the fork builds into it, by hash, and the one fork commit (scripts\\deploy\\ServerBuild.ps1 says which files). sha256 is the binary's. Export-ServerPayload, Publish-Server, Deploy-Server and the installer refuse any server file that is not this. Regenerate with scripts\\release\\New-ServerBuildRecord.ps1 after every rebuild.",
   "binary": "scam_native.node",
-  "sha256": "1457be424403205efa1ca454aff2db627dfa0991b87cc0f6fa9490095f258bbc",
-  "bytes": 5770752,
-  "builtUtc": "2026-10-10T20:37:07Z",
+  "sha256": "a4c5d9c7bfa6badf93d43e3587f08eb9973d289b4711ab727f784a77361a8c21",
+  "bytes": 5771264,
+  "builtUtc": "2026-10-11T01:40:26Z",
   "source": {
     "repo": "https://github.com/EvilPatrick06/skymp.git",
     "branch": "thornswood/engine-changes",
@@ -23,8 +23,8 @@
       "commit": "9fd1f69b6c3893e47511fd3f49ce914737d5d633"
     },
     "dist_back/skymp5-server.js.map": {
-      "sha256": "aae45a1fc7a5af9b49e436ac036528107ea489c91edbcea3bdf9cd21724db441",
-      "bytes": 10313497,
+      "sha256": "9818706daf4d0f806303c32817f23d4f293429ac47c1ac8853eded9873bc4731",
+      "bytes": 10310003,
       "commit": "9fd1f69b6c3893e47511fd3f49ce914737d5d633"
     },
     "launch_server.bat": {
@@ -33,18 +33,18 @@
       "commit": "9fd1f69b6c3893e47511fd3f49ce914737d5d633"
     },
     "package.json": {
-      "sha256": "833ab3aab289dd2b465be832bcb7b094549e545c5e23854faa45a916487d0d25",
-      "bytes": 1498,
+      "sha256": "d9436e66c5d55b8b7776c4f99224852a51635e15bb69f47deb090a329b90b353",
+      "bytes": 1455,
       "commit": "9fd1f69b6c3893e47511fd3f49ce914737d5d633"
     },
     "scam_native.node": {
-      "sha256": "1457be424403205efa1ca454aff2db627dfa0991b87cc0f6fa9490095f258bbc",
-      "bytes": 5770752,
+      "sha256": "a4c5d9c7bfa6badf93d43e3587f08eb9973d289b4711ab727f784a77361a8c21",
+      "bytes": 5771264,
       "commit": "9fd1f69b6c3893e47511fd3f49ce914737d5d633"
     },
     "yarn.lock": {
-      "sha256": "cc52ea2d25119d8b0ba5e7f567209cec9e65d13fab084799337f1315c21087ee",
-      "bytes": 93274,
+      "sha256": "33190adb3c4971a443a5de32880ddb808597b3e97656ad4ea607ee6af9a608d4",
+      "bytes": 91310,
       "commit": "9fd1f69b6c3893e47511fd3f49ce914737d5d633"
     }
   },
