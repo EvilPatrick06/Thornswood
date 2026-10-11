@@ -258,11 +258,14 @@ if (-not (Test-Path -LiteralPath $Gamemode)) { throw "There is no gamemode at $G
 # of people it holds (records\most-online.json) and, with -LoadOrder, our
 # plugin (#1121). There used to be a -Gamemode to send a file from anywhere;
 # that was a way round the commit, so it is gone.
-# -PutBack builds and sends nothing.
+# -PutBack builds and sends nothing. records\server-build.json is read below as
+# the record of the server build this commit's gamemode is written for
+# (#2076), so it is held to the commit too: an uncommitted record would be
+# compared with the box in place of the one the commit holds (#2132).
 . (Join-Path $Here 'Artifact.ps1')
 $artifact = $null
 if (-not $PutBack) {
-$alsoSends = @('records/most-online.json')
+$alsoSends = @('records/most-online.json', 'records/server-build.json')
 if ($LoadOrder) { $alsoSends += 'game/content/Thornswood-Content.esp' }
 $artifact = New-ThornswoodArtifact -Component gamemode -RepoDir (Join-Path $Here '..\..') -Paths 'game/gamemode.js' -AlsoSends $alsoSends
 Write-Host ('  artifact ' + (Format-ThornswoodArtifact $artifact))
