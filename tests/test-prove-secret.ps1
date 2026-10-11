@@ -148,6 +148,13 @@ Start-Sleep -Seconds 2
     try { Prove { throw 'must not run' } -value (New-Object Security.SecureString) | Out-Null } catch { $refused = $_ }
     Yes 'an empty value is refused before anything starts' ($null -ne $refused -and [IO.File]::ReadAllText($calls) -eq $before)
 
+    # ---- 4b. a watcher that reads no command lines proves nothing (#1263):
+    # NOT FOUND over none is not a NOT FOUND.
+    $blind = Join-Path $work 'blind.cmd'
+    [IO.File]::WriteAllText($blind, "@echo off`r`necho WATCHER READY`r`nmore >nul`r`necho WATCHER NOT FOUND`r`necho WATCHER READ 0`r`n", (New-Object Text.ASCIIEncoding))
+    $r = Prove { 'ran' } -sshCommand @($blind)
+    Yes 'a watcher that read nothing: no NOT FOUND, exit code 2' ($r.Out -notmatch '(?m)^NOT FOUND' -and $r.Out -match 'read no command lines' -and $r.Code -eq 2)
+
     # ---- 5. a watcher that never starts: the run is not run, exit code 2
     $global:wasRun = $false
     $r = Prove { $global:wasRun = $true } -sshCommand @($deadSsh)
