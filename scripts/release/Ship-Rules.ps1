@@ -457,7 +457,13 @@ function Save-ShipUiHashedAssets([string]$GameFolder) {
         [void]$lines.Add('# One bare file name per line. OwnGame.Foreign reads this rather than parsing build.js.')
         foreach ($n in $sorted) { [void]$lines.Add($n) }
         $out = Join-Path $GameFolder $ShipUiAssetsRel
-        [IO.File]::WriteAllLines($out, $lines)
+        # Written only when the names moved, so a Ship that finds the same front
+        # leaves the file and its time alone: an old size and time baseline then
+        # still reads it as unchanged (#2088).
+        $text = ($lines -join [Environment]::NewLine) + [Environment]::NewLine
+        if (-not (Test-Path -LiteralPath $out -PathType Leaf) -or [IO.File]::ReadAllText($out) -ne $text) {
+            [IO.File]::WriteAllText($out, $text)
+        }
         $script:ShipUiHashedWritten = $sorted
         return $sorted
     }
