@@ -177,7 +177,7 @@ param(
   [string]$Npcs = '',
   # Where Deploy-Gamemode.ps1 leaves the built server. Its server-settings.json
   # is the one authority on what the load order is and in what order.
-  [string]$Dist = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') ServerDist),
+  [string]$Dist = '',
   # Where the other plugins live on this machine. Ours is taken from the repo
   # instead; see the header.
   [string]$Data = 'C:\Thornswood\Game\Data',
@@ -215,6 +215,8 @@ $ErrorActionPreference = 'Stop'
 $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+# Resolved here, not as the parameter's default: 5.1 leaves $PSScriptRoot empty in an advanced script's defaults (#2229).
+if (-not $Dist) { $Dist = & (Join-Path $Here '..\release\Where.ps1') ServerDist }
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Script.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
