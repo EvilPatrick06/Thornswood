@@ -121,7 +121,7 @@ try {
     Yes 'j4: both together is the stand-in' (Test-FreshHarnessStandIn 'harness.invalid')
     $env:THORNSWOOD_VPS = 'harness.invalid'
     Yes 'j5: so is THORNSWOOD_VPS=harness.invalid for a script that takes no -Vps' (Test-FreshHarnessStandIn '')
-    Yes 'j6: but an explicit real -Vps wins over it' (-not (Test-FreshHarnessStandIn '192.135.112.23'))
+    Yes 'j6: but an explicit real -Vps wins over it' (-not (Test-FreshHarnessStandIn ([string](Get-Content (Join-Path $PSScriptRoot '..\scripts\vps\vps.json') -Raw | ConvertFrom-Json).address)))
     $plainDir = Join-Path ([IO.Path]::GetTempPath()) ('fresh-plain-' + [guid]::NewGuid().ToString('N').Substring(0, 6))
     New-Item -ItemType Directory $plainDir | Out-Null
     $m = ''; try { Assert-FreshCheckout -RepoDir $plainDir -What 'x' -Target 'harness.invalid' *> $null } catch { $m = $_.Exception.Message }
