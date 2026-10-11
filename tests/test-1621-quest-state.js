@@ -18,10 +18,11 @@ const path = require('path');
 const vm = require('vm');
 const population = require('../game/data/npc-population.json');
 const compactPopulation={keep:population.npcs.filter(r=>r.keep).map(r=>
-  [r.ref,r.base,r.world||r.cell,r.pos,r.leash,r.returnMinutes,r.role])};
+  [r.ref,r.base,r.world||r.cell,r.pos,r.leash,r.returnMinutes,r.role,r.habitat,r.tier,r.cap,r.populationBucket,0,r.species])};
 const npcStates={}, npcIds={};
 compactPopulation.keep.forEach((r,i)=>{
   const id=i+5000;npcIds[r[0]]=id;npcStates[id]={ref:r[0],base:r[1],world:r[2],pos:r[3].slice(),
+    race:r[12]==='sabre-cat'?'SabreCatRace':r[12]+'Race',
     profileId:-1,isHuman:false,isDead:false,isServerControlled:true,lifeGeneration:0,runtimeLifeIdentity:'100'};
 });
 for(const [id,ref] of [[31,'50533'],[32,'50549'],[33,'5054a'],[41,'86a88']]) {
@@ -138,6 +139,7 @@ function boot(into) {
     return true;
   };
   ctx.NPC_POPULATION_DATA=compactPopulation;
+  ctx.raceEdidOf=id=>npcStates[id].race;
   ctx.MERCHANT_TRADING = {createKillContracts: require('../game/kill-contracts').createKillContracts,
     createQuestTransactions: function () {
     return {identity: function (a) {

@@ -16,6 +16,14 @@ function object(o){return !!o && typeof o==='object' && !Array.isArray(o);}
 function copy(o){return JSON.parse(JSON.stringify(o));}
 function generation(n){return Number.isSafeInteger(n) && n>=0;}
 function point(p){return Array.isArray(p) && p.length===3 && p.every(Number.isFinite);}
+function speciesOf(race) {
+  if(typeof race!=='string')return '';
+  var lower=race.toLowerCase();
+  if(lower.indexOf('sabre')>=0)return 'sabre-cat';
+  return lower.replace(/race$/,'');
+}
+var SPECIES={wolf:'wolf',sabre:'sabre-cat',bear:'bear',barrow:'draugr',giant:'giant'};
+var BANDITS={'50533':'imperial','50549':'imperial','5054a':'breton','5054e':'imperial'};
 function createKillContracts(deps) {
   var mp=deps.mp, sources={},byId={},rows=[];
   if(!deps.population || !Array.isArray(deps.population.keep))throw new Error('Kill source catalogue is unavailable.');
@@ -26,9 +34,12 @@ function createKillContracts(deps) {
       var ref=local+':Skyrim.esm',base=spec.refs[local]+':Skyrim.esm';
       var matches=deps.population.keep.filter(function(r){return r[0]===ref;});
       var kept=matches[0];
+      var species=spec.id==='camp'?BANDITS[local]:SPECIES[spec.id];
       if(matches.length!==1 || kept[1]!==base || kept[2]!==row.world || !point(kept[3]) ||
-          !Number.isFinite(kept[4]) || kept[4]<=0)throw new Error('Kill source disagrees with the kept cast: '+ref);
-      sources[ref]={row:row,base:base,pos:kept[3].slice(),leash:kept[4]};row.refs.push(ref);
+          !Number.isFinite(kept[4]) || kept[4]<=0 || kept[12]!==species ||
+          spec.id==='camp' && kept[6]!=='enemy')throw new Error('Kill source disagrees with the kept cast: '+ref);
+      sources[ref]={row:row,base:base,species:species,role:spec.id==='camp'?'bandit':species,
+        pos:kept[3].slice(),leash:kept[4]};row.refs.push(ref);
     });
     byId[row.id]=row;rows.push(row);
   });
@@ -64,7 +75,8 @@ function createKillContracts(deps) {
       var ai=mp.getNpcAIState(id),token=identityTools.targetIdentity(mp,id);
       if(!ai || ai.isHuman!==false || ai.isServerControlled!==true || ai.isDisabled===true ||
           !generation(ai.lifeGeneration) || !point(ai.pos) || typeof token!=='string' ||
-          mp.get(id,'baseDesc')!==source.base || mp.get(id,'worldOrCellDesc')!==source.row.world)return null;
+          mp.get(id,'baseDesc')!==source.base || mp.get(id,'worldOrCellDesc')!==source.row.world ||
+          typeof deps.raceOf!=='function' || speciesOf(deps.raceOf(id))!==source.species)return null;
       var body=JSON.parse(token);
       if(body.desc!==ref || body.life!==ai.lifeGeneration || body.body!==ai.runtimeLifeIdentity)return null;
       var distance=ai.pos.reduce(function(n,v,i){return n+Math.pow(v-source.pos[i],2);},0);

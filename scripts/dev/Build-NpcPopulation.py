@@ -420,7 +420,7 @@ def write_runtime(payload):
                   r['returnMinutes'], r['role'], r['habitat'], r['tier'], r.get('cap'),
                   r.get('populationBucket'),
                   # 1: swims and cannot walk; 2: an ambush placement (#2067).
-                  (1 if r.get('swims') else 0) | (2 if r.get('ambush') else 0)]
+                  (1 if r.get('swims') else 0) | (2 if r.get('ambush') else 0), r['species']]
                  for r in payload['npcs'] if r['keep']]}
     target = HERE.parent.parent / 'game/gamemode.js'
     source = target.read_text(encoding='utf-8')
