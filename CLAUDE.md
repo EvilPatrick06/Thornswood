@@ -131,6 +131,9 @@ worktrees in the shared clone and read a session-start snapshot as the truth.
   branch. Before deleting a worktree or branch you did not make, check no
   running process names its folder and its pull request merged over an hour
   ago; lanes may be mid-run in it.
+- Never `git stash` in the shared clone (#992: 244 orphaned stashes were
+  found there, archived as `refs/stash-archive/*`). Park work on a branch
+  in your own worktree instead; a stash there is invisible to every other lane.
 - Leave nothing stale (Patrick, 5 Oct: "we need rules ... not to leave stale
   worktrees, branches, or PRs local or on GitHub it's messy work"). The
   moment a pull request of yours merges or is closed, its worktree, local
