@@ -600,9 +600,13 @@ jobs:
           # eslint: pinned by version only (no lockfile, no hash).
           $npm = Join-Path $env:RUNNER_TEMP 'lint-npm'
           npm install --prefix $npm --no-save --no-audit --no-fund --silent eslint@9.39.5
-          $eslint = Join-Path $npm 'node_modules\.bin\eslint.cmd'
+          # node runs eslint.js itself, not npm's eslint.cmd shim: cmd.exe reads
+          # the shim, whose 'SET dp0=%~dp0' and '%*' are unquoted, so an '&' in
+          # its folder or an argument (C:\ThornswoodTemps&Worktrees) cut the
+          # command short and eslint never ran (#1343).
+          $eslint = Join-Path $npm 'node_modules\eslint\bin\eslint.js'
           if (Test-Path -LiteralPath $eslint) {
-            & $eslint -c .github\lint\eslint.config.mjs .
+            & node $eslint -c (Join-Path $PWD '.github\lint\eslint.config.mjs') .
           } else { Write-Host '::warning::could not install eslint 9.39.5, eslint lint skipped' }
 
           # PSScriptAnalyzer: pinned by version only, from the PowerShell Gallery.
