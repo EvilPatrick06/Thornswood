@@ -151,8 +151,10 @@ function createMerchantTrading(deps) {
 
   function sessionIdentity(human) {
     if (!human || !human.isHuman || !Number.isSafeInteger(human.profileId) || human.profileId<=0 ||
-        typeof human.desc!=='string' || !human.desc || !Number.isSafeInteger(human.lifeGeneration) || human.lifeGeneration<0) return null;
-    return JSON.stringify([human.desc,human.profileId,human.lifeGeneration]);
+        typeof human.desc!=='string' || !human.desc || !Number.isSafeInteger(human.lifeGeneration) || human.lifeGeneration<0 ||
+        typeof human.runtimeIdentity!=='string' || !/^[1-9][0-9]{0,19}$/.test(human.runtimeIdentity) ||
+        human.runtimeIdentity.length===20 && human.runtimeIdentity>'18446744073709551615') return null;
+    return JSON.stringify([human.desc,human.profileId,human.lifeGeneration,human.runtimeIdentity]);
   }
 
   function questView(actorId,merchantId) {
@@ -518,6 +520,7 @@ function installMerchantTrading(env) {
           cell: cell,
           desc: mp.getDescFromId(id),
           lifeGeneration: ai && ai.lifeGeneration,
+          runtimeIdentity: mp.getActorRuntimeIdentity(id),
           profileId: ai && ai.profileId || 0,
           isHuman: !!(ai && ai.isHuman)
         };

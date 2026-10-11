@@ -446,6 +446,7 @@ unread({v:1,open:{},cool:null}, 'a null cooldown map');
   let alive=true;ctx.swing(36,'mine',null,{alive:()=>alive});alive=false;
   const count=writes.length;timers.forEach(t=>t.fn());
   yes('the real swing cleanup cannot write after its owner is revoked',writes.length===count);
+  yes('revoked swing cleanup retires its local busy state',!ctx.SWING_IN_AIR[36] && !ctx.SWING_CLEAR[36]);
 }
 {
   w=restart();w.svc.bindPlace('wolf',{cell:'pad-1'});w.svc.offer(34,'wolf');
@@ -585,6 +586,39 @@ yes('the miner page says the same', /kept on the character/.test(mWhere) &&
   yes('retrieval activation cannot adopt a new actor session',have(83,'satchel-item')===0 && forms[83].props[PROP].open.satchel.drawn===0);
 }
 
+{
+  ranks['84:miner']='master';w=restart();w.svc.offer(84,'ebony');let finish;
+  w.ctx.swing=(a,anim,done)=>{finish=done;};w.svc.mineRare(84,here[0],EBONY);
+  w.svc.offer(84,'stalhrim');finish();
+  yes('a landing swing cannot adopt a newer quest record',have(84,EBONY.ore)===0);
+}
+{
+  ranks['85:miner']='master';w=restart();w.svc.offer(85,'ebony');
+  const saved=JSON.stringify(forms[85]);
+  w.ctx.__identityToken='old';w.ctx.__thornswoodMerchantTrade.questReady=()=>{w.ctx.__identityToken='new';return true;};
+  w.svc.act(85,'abandon','ebony');
+  yes('trader readiness cannot adopt a replacement character session',JSON.stringify(forms[85])===saved);
+}
+{
+  ranks['86:miner']='master';w=restart();w.svc.offer(86,'ebony');let wear=0;
+  w.ctx.creditWork=()=>{w.ctx.__identityToken='new';};w.ctx.wearTool=()=>wear++;
+  w.svc.mineRare(86,here[0],EBONY);
+  yes('work credit cannot pass tool wear into a replacement session',have(86,EBONY.ore)===1 && wear===0);
+}
+{
+  ranks['87:miner']='master';forms[87]={inv:{},props:{[PROP]:{v:1,open:{wolf:{kills:{toString:null,valueOf:null}}},
+    cool:{futureQuest:{toString:null,valueOf:null}}}}};w=restart();let result;
+  try{result=w.svc.offer(87,'ebony');}catch(error){}
+  yes('unrelated malformed legacy fields cannot throw during a miner offer',result && result.ok===true);
+}
+{
+  ranks['88:miner']='master';w=restart();w.svc.offer(88,'ebony');
+  w.ctx.__identityToken='old';w.ctx.classGate=()=>{w.ctx.__identityToken='new';return null;};
+  w.ctx.isVein=()=>true;w.ctx.ORES_BY_BASE={test:EBONY};w.ctx.ORE_ONE_PLACE=['Ebony Ore'];
+  const start=gm.indexOf('function mineOre(actorId, refrId, baseDesc) {'),end=gm.indexOf('\n}\n',start)+2;
+  vm.runInContext(gm.slice(start,end),w.ctx);w.ctx.mineOre(88,here[0],'test');
+  yes('the outer mining caller cannot replace the session before rare-work capture',have(88,EBONY.ore)===0);
+}
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

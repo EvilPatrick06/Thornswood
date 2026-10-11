@@ -33,7 +33,7 @@ function worldOf(native) {
   const live=new Map(),saved=new Map();
   return {
     actors, inv, records,
-    actor(id) { return actors[id] ? {desc:id.toString(16)+':Skyrim.esm',lifeGeneration:0,...actors[id]} : null; },
+    actor(id) { return actors[id] ? {desc:id.toString(16)+':Skyrim.esm',lifeGeneration:0,runtimeIdentity:'100',...actors[id]} : null; },
     carry(id, baseId) { return (inv[id] && inv[id][baseId]) || 0; },
     save() { for (const [id,receipt] of live) saved.set(id,receipt); },
     transfer: {
@@ -127,6 +127,10 @@ assert.deepEqual(questCalls.pop(),[10,'take','gem','Ruby',1]);
 box.world.actors[10].lifeGeneration=1;
 box.api.command({actorId:10,profileId:7,parts:['/merchant','quest','take','ebony']});
 assert.equal(questCalls.length,0,'an earlier life cannot reuse a merchant session');
+open(box.api);
+box.world.actors[10].runtimeIdentity='101';
+box.api.command({actorId:10,profileId:7,parts:['/merchant','quest','take','ebony']});
+assert.equal(questCalls.length,0,'a new native session cannot reuse an old merchant panel');
 open(box.api);
 box.world.actors[10].desc='new:Skyrim.esm';
 box.api.command({actorId:10,profileId:7,parts:['/merchant','quest','take','ebony']});
