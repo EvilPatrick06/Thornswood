@@ -62927,6 +62927,10 @@ function createKillContracts(deps) {
     var row=own(byId,id)?byId[id]:null,retained=history(b),doubt=uncertain(b),entry=b.open[id];
     return !!row && !!retained && !!doubt && !doubt[id] && validEntry(row,entry,retained) && entry.kills===row.count;
   }
+  function verified(b,id) {
+    var row=own(byId,id)?byId[id]:null,retained=history(b),doubt=uncertain(b);
+    return !!row && !!retained && !!doubt && (!own(b.open,id) || !doubt[id] && validEntry(row,b.open[id],retained));
+  }
   function abandon(b,id) {
     var row=own(byId,id)?byId[id]:null,doubt=uncertain(b);
     if(!row || !own(b.open,id))return {ok:false,why:'none'};
@@ -62935,7 +62939,7 @@ function createKillContracts(deps) {
     b.killUncertain=doubt;delete b.open[id];return {ok:true};
   }
   return {rows:rows,available:function(id){return own(byId,id) && !!bodies(byId[id]);},
-    take:take,credit:credit,ready:ready,abandon:abandon};
+    take:take,credit:credit,ready:ready,verified:verified,abandon:abandon};
 }
 module.exports={createKillContracts:createKillContracts};
 return module.exports;})();
@@ -64054,7 +64058,8 @@ try {
         offers.push({id:row.id,name:row.name,kind:'kill',check:row.check,gold:row.gold,count:row.count,
           hours:row.hours,locations:source.place,kills:count,state:hasOpen?'open':until>deps.now()?'cooldown':available?'available':'unavailable',
           waitMinutes:until?Math.max(0,Math.ceil((until-deps.now())/60000)):0,
-          canTake:ready && !hasOpen && !until && available,canReturn:ready && done,canAbandon:ready && hasOpen});
+          recovery:!kills.verified(held,row.id),
+          canTake:ready && !hasOpen && !until && available && kills.verified(held,row.id),canReturn:ready && done,canAbandon:ready && hasOpen});
       });
       return offers;
     }

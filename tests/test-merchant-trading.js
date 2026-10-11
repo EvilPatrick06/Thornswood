@@ -109,10 +109,13 @@ assert.equal(opened.view.open, true);
 assert.equal(opened.view.purse, 250);
 assert.equal(opened.view.transfer, true);
 assert.equal(opened.view.offers[0].stock, 0);
-const questCalls=[];
-box.deps.quests=()=>({describe:()=>[{id:'ebony',name:'The ebony'}],
+const questCalls=[],described=[];
+box.deps.quests=()=>({describe:(...args)=>{described.push(args);return [{id:'ebony',name:'The ebony'}];},
   act:(...args)=>{questCalls.push(args);return {ok:true};}});
 assert.equal(open(box.api).view.quests[0].id,'ebony');
+assert.deepEqual(described.pop(),[10,1],'quest view receives the authenticated merchant');
+assert.equal(box.api.questHold(1),'Whiterun');
+assert.equal(box.api.questHold(900),'','unknown merchant has no offering hold');
 assert.equal(box.api.command({actorId:10,profileId:9,parts:['/merchant','quest','take','ebony']}).view,null);
 assert.equal(questCalls.length,0,'forged quest profile cannot reach the controller');
 box.world.actors[11]={...box.world.actors[10]};

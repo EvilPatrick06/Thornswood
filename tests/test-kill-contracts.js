@@ -86,4 +86,15 @@ for(const id of ['constructor','toString','__proto__']) {
   assert.equal(w.svc.abandon(b,id).ok,false);
   assert.deepEqual(b,before);
 }
+{
+  w=world();const b={open:{wolf:{kills:0,credited:[]}},expected:{killHistory:{'86a88:Skyrim.esm':-1}}};
+  assert.ok(w.svc.abandon(b,'wolf').ok,'explicit abandonment remains available with malformed retained history');
+  assert.equal(b.expected.killHistory['86a88:Skyrim.esm'],-1,'abandonment never erases malformed history');
+  assert.equal(w.svc.take(b,'wolf').ok,false,'invalid history blocks new work pending recovery');
+}
+{
+  w=world();const b=held();w.svc.take(b,'wolf');w.svc.abandon(b,'wolf');w.svc.take(b,'wolf');
+  const id=w.ids.get('86a88:Skyrim.esm');w.states.get(id).isDead=true;
+  assert.ok(w.svc.credit(b,1,id).ok,'an uncredited living body can count after valid zero-progress abandonment');
+}
 console.log('PASS six authored kill contracts, exact sources, lifecycle credit, replay protection and legacy recovery');

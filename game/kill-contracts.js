@@ -110,6 +110,10 @@ function createKillContracts(deps) {
     var row=own(byId,id)?byId[id]:null,retained=history(b),doubt=uncertain(b),entry=b.open[id];
     return !!row && !!retained && !!doubt && !doubt[id] && validEntry(row,entry,retained) && entry.kills===row.count;
   }
+  function verified(b,id) {
+    var row=own(byId,id)?byId[id]:null,retained=history(b),doubt=uncertain(b);
+    return !!row && !!retained && !!doubt && (!own(b.open,id) || !doubt[id] && validEntry(row,b.open[id],retained));
+  }
   function abandon(b,id) {
     var row=own(byId,id)?byId[id]:null,doubt=uncertain(b);
     if(!row || !own(b.open,id))return {ok:false,why:'none'};
@@ -118,6 +122,6 @@ function createKillContracts(deps) {
     b.killUncertain=doubt;delete b.open[id];return {ok:true};
   }
   return {rows:rows,available:function(id){return own(byId,id) && !!bodies(byId[id]);},
-    take:take,credit:credit,ready:ready,abandon:abandon};
+    take:take,credit:credit,ready:ready,verified:verified,abandon:abandon};
 }
 module.exports={createKillContracts:createKillContracts};
