@@ -928,7 +928,7 @@ try {
         'sample.py'               = 'print("a module nobody sent")'
         'sample-maka.png'         = 'a picture nobody sent'
         'assets\sample-mixed.png' = 'a picture in a folder the install sends into'
-        'tools\redraw.py'         = 'a folder nobody sent, with a tool in it'
+        'scratch\redraw.py'       = 'a folder nobody sent, with a tool in it'
     }
     # And what is the bot's own, which every run leaves as it was. bot.env.json
     # is on the box already; run.ps1 is the stand-in service's loop, the old
@@ -969,7 +969,7 @@ try {
     # A folder nothing sent goes aside whole, so it is named as the folder.
     $named = ([regex]::Match($r.Said, 'moved aside 4 thing\(s\) .* into ' + [regex]::Escape($newest) + ': (.*)')).Groups[1].Value
     Yes '  and the run names each one, the stray folder as one, and where they went' (
-        $named -and -not (Compare-Object @($named.Trim() -split ', ') @('assets/sample-mixed.png', 'sample-maka.png', 'sample.py', 'tools')))
+        $named -and -not (Compare-Object @($named.Trim() -split ', ') @('assets/sample-mixed.png', 'sample-maka.png', 'sample.py', 'scratch')))
     Yes '  and what is the bot''s own is as it was: data, webhooks, py-libs, service, bot.env.json, the record, the old loop''s file, an old log' (
         (Sums) -eq $ownBefore)
     Yes '  and the card artwork the run sent is still in assets, and the record beside the code' (

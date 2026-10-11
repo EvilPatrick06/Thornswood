@@ -166,18 +166,48 @@ function show(html) {
 
 /* Hard eighteen-and-over door on /downloads and /join only. Remembered in
    localStorage, with a cookie fallback. Confirming is a statement kept as a
-   record, not verification of age. The rest of the site stays open. */
+   record, not verification of age. The rest of the site stays open.
+
+   BOTH COPIES EXPIRE, AND BOTH CARRY THE POLICY (#2192). Until 11 October the
+   localStorage copy was a bare "1" that never expired, so clearing cookies
+   left the gate open for ever, against the one year privacy.md promises.
+   Now localStorage holds {"v": AGE_POLICY, "until": <ms>}, one year out, the
+   same as the cookie, and the cookie's value is AGE_POLICY. Raising
+   AGE_POLICY (when the gate's wording changes what somebody agreed to) makes
+   every earlier answer ask again. A stored value that is not that shape, is
+   for another policy, has passed its day, or claims a day more than a year
+   and a bit away (a clock set back, or a value typed in) is dropped and the
+   gate asks. MIGRATION: the old bare "1" is honoured only while the old
+   cookie still is, since the cookie is the copy that had a year on it; then
+   it is restamped in the new shape. Without the cookie it is dropped. */
 var AGE_KEY = 'tw-age-18';
 var AGE_PATHS = { '/downloads': 1, '/join': 1 };
+var AGE_POLICY = 1;
+var AGE_DAYS = 365;
+var AGE_DAY_MS = 86400000;
+function ageCookie() {
+  return new RegExp('(?:^|;\\s*)tw-age-18=' + AGE_POLICY + '(?:;|$)').test(document.cookie || '');
+}
+function ageStore(until) {
+  try { localStorage.setItem(AGE_KEY, JSON.stringify({ v: AGE_POLICY, until: until })); } catch (e) {}
+}
 function ageOk() {
-  try { if (localStorage.getItem(AGE_KEY) === '1') return true; } catch (e) {}
-  return /(?:^|;\s*)tw-age-18=1(?:;|$)/.test(document.cookie || '');
+  var now = Date.now(), raw = null;
+  try { raw = localStorage.getItem(AGE_KEY); } catch (e) {}
+  if (raw !== null) {
+    var rec = null;
+    try { rec = JSON.parse(raw); } catch (e) {}
+    if (rec && typeof rec === 'object' && rec.v === AGE_POLICY && typeof rec.until === 'number' &&
+        rec.until > now && rec.until <= now + (AGE_DAYS + 2) * AGE_DAY_MS) return true;
+    if (raw === '1' && ageCookie()) { ageStore(now + AGE_DAYS * AGE_DAY_MS); return true; }
+    try { localStorage.removeItem(AGE_KEY); } catch (e) {}
+  }
+  return ageCookie();
 }
 function ageRemember() {
-  try { localStorage.setItem(AGE_KEY, '1'); } catch (e) {}
-  var exp = new Date();
-  exp.setFullYear(exp.getFullYear() + 1);
-  document.cookie = 'tw-age-18=1; path=/; expires=' + exp.toUTCString() + '; SameSite=Lax' +
+  ageStore(Date.now() + AGE_DAYS * AGE_DAY_MS);
+  var exp = new Date(Date.now() + AGE_DAYS * AGE_DAY_MS);
+  document.cookie = 'tw-age-18=' + AGE_POLICY + '; path=/; expires=' + exp.toUTCString() + '; SameSite=Lax' +
     (location.protocol === 'https:' ? '; Secure' : '');
 }
 function showAgeGate() {
