@@ -15,7 +15,8 @@
       FOUND      that many processes on the VPS had it in their command line
 
   and a count of the process command lines it read. Exit code 0 for NOT FOUND,
-  1 for FOUND, 2 when the watcher could not say.
+  1 for FOUND, 2 when the watcher could not say. A NOT FOUND over no command
+  lines at all proves nothing, so it is not one (#1263): that is a 2 as well.
 
   WHY THIS EXISTS. #1068's person check was a hand-run Get-CimInstance on the
   VPS during the call. That is one snapshot of a remote powershell that lives
@@ -160,7 +161,11 @@ try {
         $said = @($lines | ForEach-Object { $_.Trim() } | Where-Object { $_ -like 'WATCHER *' })
         $read = @($said | Where-Object { $_ -like 'WATCHER READ *' } | ForEach-Object { $_.Substring(13) }) | Select-Object -First 1
         $found = @($said | Where-Object { $_ -like 'WATCHER FOUND *' } | ForEach-Object { $_.Substring(14) }) | Select-Object -First 1
-        if ($said -contains 'WATCHER NOT FOUND') {
+        $readCount = 0
+        if (-not [int]::TryParse([string]$read, [ref]$readCount)) { $readCount = 0 }
+        if ($said -contains 'WATCHER NOT FOUND' -and $readCount -le 0) {
+            Write-Host "The watcher read no command lines on $VpsHost, so nothing is proved." -ForegroundColor Red
+        } elseif ($said -contains 'WATCHER NOT FOUND') {
             Write-Host "NOT FOUND  no command line on $VpsHost held the value during the run ($read process command lines read)" -ForegroundColor Green
             $verdict = 0
         } elseif ($found) {
