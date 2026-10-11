@@ -235,6 +235,8 @@
   bodies' collection revision, and only on Patrick's word. A body mesh the
   check cannot read refuses on both channels, with or without it (#1956).
 
+.PARAMETER AllowStaleCheckout
+    Go ahead from a checkout that is not exactly origin/main and clean, with a loud warning (#2118). Without it the script refuses a stale or dirty checkout before it sends anything.
 .EXAMPLE
   .\scripts\release\Ship.ps1 -Channel dev "The map marker points at the right door now"
 
@@ -306,8 +308,15 @@ param(
     ,[switch]$RebuildLauncher
     # A main release with a nude body in the game folder (issue #405).
     ,[switch]$AllowUncoveredBodies
+    # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
+    ,[switch]$AllowStaleCheckout
 )
 . (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
+
+# A stale or dirty checkout sends old or unlanded code; refuse it (#2118).
+# -AnyBranch: the Git section below already holds a main release to main
+# (or a hotfix/ branch), and a dev release may ship any pushed branch.
+if (-not $DryRun) { . (Join-Path $PSScriptRoot '..\deploy\Fresh-Checkout.ps1'); Assert-FreshCheckout -RepoDir (Join-Path $PSScriptRoot '..\..') -What 'Ship' -AnyBranch -AllowStale:$AllowStaleCheckout }
 
 
 # The launcher, Thornswood.exe in the launcher folder.

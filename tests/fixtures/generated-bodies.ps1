@@ -18,6 +18,8 @@
   repository the publisher runs from, because the record holds the hash of its
   records\generated.json.
 #>
+# Scripts this runs whole go to a stand-in box, so the freshness guard lets them be (#2118).
+$env:THORNSWOOD_HARNESS = '1'
 function New-GeneratedBodies([string]$Root, [string]$Repo) {
     $game = Join-Path $Root 'Game'
     $bodies = & {
