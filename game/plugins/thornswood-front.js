@@ -7647,90 +7647,169 @@
   /*
     THE MESSAGE BOARD OBJECT. Thornswood-Content.esp already has the
     activator (local id 0x593B, ThornswoodMessageBoard). The four copies it
-    places start disabled, and they are not the nine spots. Each client puts
-    one enabled copy at each spot. A form is asked for in the frame it is
-    used, because a kept form wrapper dies. What is kept is the reference id.
-    A steward move updates that spot, and the object is moved with it.
+    places start disabled. Each client puts one enabled copy wherever the
+    server says a board is (#1597). The server's boards, each with its cell
+    or worldspace, come in the social view, and the board page hands them
+    here as 'board:spots'.
+
+    WHY THE CELL. placeAtMe puts the copy in the cell you are in, and
+    setPosition moves it inside that same cell or worldspace. This used to be
+    nine points in Tamriel with no cell, put down the moment the page was
+    ready: somebody who came in indoors had all nine put inside that room,
+    and a board anywhere else (Raven Rock's in The Retching Netch, one a
+    steward walked indoors or to Solstheim) never had an object. So a board
+    is put down only while you are in its cell, or its worldspace outdoors.
+
+    A form is asked for in the frame it is used, because a kept form wrapper
+    dies. What is kept is the reference id and where it was put. A steward
+    move comes as a new list: the copy is moved when the board stays in the
+    same cell or worldspace, and taken away when it does not, to be put down
+    in the new one when you are there.
     A click is the use key on that object, while you are standing at it.
   */
   const BOARD_REACH = 400;
   const BOARD_LOCAL = 0x593B;
   const BOARD_FILE = 'Thornswood-Content.esp';
-  const BOARD_SEEDS = [
-    { hold: 'solitude', x: -64867, y: 104407.2, z: -8405.9, face: 9.9 },
-    { hold: 'whiterun', x: 23139.4, y: -7891.7, z: -3494.4, face: 188.4 },
-    { hold: 'riften', x: 174559.5, y: -94337, z: 11130.2, face: 38 },
-    { hold: 'windhelm', x: 134265.1, y: 35842.3, z: -12397.5, face: 85.8 },
-    { hold: 'markarth', x: -173494.7, y: 5049.1, z: -3447.6, face: 72 },
-    { hold: 'falkreath', x: -30342.2, y: -87022.7, z: -3119.1, face: 56.6 },
-    { hold: 'morthal', x: -38766.1, y: 64411.9, z: -13920.9, face: 251.2 },
-    { hold: 'dawnstar', x: 32216.4, y: 102314, z: -13263, face: 110 },
-    { hold: 'winterhold', x: 109969.6, y: 100594.4, z: -9033, face: 241.4 }
-  ];
-  const boardRefIds = {};
+  let boardSpots = [];       // { hold, cell, x, y, z, face }, the server's
+  const boardRefs = {};      // hold -> { id, cell, x, y, z, face }, what was put down
+  const boardPlaceIds = {};  // '17ec0:Dragonborn.esm' -> that cell's runtime id
   const boardFailSaid = {};
   let boardNear = null;
   let boardWatchAt = 0;
   let boardPlaceAt = 0;
 
-  function boardLive(id) {
-    if (!id) { return false; }
+  function boardQuiet(p) {
+    if (p && typeof p.then === 'function') { p.then(function () { }, function () { }); }
+  }
+
+  function boardRef(id) {
+    if (!id) { return null; }
     try {
       const ref = sp.ObjectReference.from(sp.Game.getFormEx(id >>> 0));
-      return !!(ref && (ref.getFormID() >>> 0) === (id >>> 0));
-    } catch (e) { return false; }
+      return ref && (ref.getFormID() >>> 0) === (id >>> 0) ? ref : null;
+    } catch (e) { return null; }
   }
+
+  function boardLive(id) { return !!boardRef(id); }
 
   function boardObjectHere(ref) {
     if (!ref) { return false; }
     let id = 0;
     try { id = ref.getFormID() >>> 0; } catch (e) { return false; }
-    for (const hold in boardRefIds) {
-      if ((boardRefIds[hold] >>> 0) === id) { return true; }
+    for (const hold in boardRefs) {
+      if ((boardRefs[hold].id >>> 0) === id) { return true; }
     }
     return false;
   }
 
-  function boardMoveRef(hold, x, y, z, face) {
-    const id = boardRefIds[hold];
-    if (!boardLive(id)) { return; }
+  /*
+    The server's descriptor of a cell or worldspace, 'local id:file' the way
+    worldOrCellDesc writes it, as the id this game gave that record. Asked by
+    file and local id because a runtime id carries the plugin's place in the
+    load order. Kept once found; not found yet is asked again next time.
+  */
+  function boardPlaceId(desc) {
+    if (Object.prototype.hasOwnProperty.call(boardPlaceIds, desc)) { return boardPlaceIds[desc]; }
+    const at = String(desc).indexOf(':');
+    if (at <= 0) { return 0; }
+    const local = parseInt(String(desc).slice(0, at), 16);
+    const file = String(desc).slice(at + 1);
+    if (!isFinite(local) || !file) { return 0; }
+    let id = 0;
     try {
-      const ref = sp.ObjectReference.from(sp.Game.getFormEx(id >>> 0));
-      if (!ref) { return; }
-      const moved = ref.setPosition(x, y, z);
-      if (moved && typeof moved.then === 'function') { moved.then(function () { }, function () { }); }
-      if (face != null) {
-        const turned = ref.setAngle(0, 0, face);
-        if (turned && typeof turned.then === 'function') { turned.then(function () { }, function () { }); }
+      const form = sp.Game.getFormFromFile(local, file);
+      id = form ? (form.getFormID() >>> 0) : 0;
+    } catch (e) { id = 0; }
+    if (id) { boardPlaceIds[desc] = id; }
+    return id;
+  }
+
+  /* The worldspace you are in, or your cell indoors, as the server matches a board. */
+  function boardPlaceHere(pc) {
+    try {
+      const ws = pc.getWorldSpace();
+      if (ws) { return ws.getFormID() >>> 0; }
+      const cell = pc.getParentCell();
+      return cell ? (cell.getFormID() >>> 0) : 0;
+    } catch (e) { return 0; }
+  }
+
+  function boardTakeAway(hold, why) {
+    const had = boardRefs[hold];
+    delete boardRefs[hold];
+    const ref = had ? boardRef(had.id) : null;
+    if (!ref) { return; }
+    try {
+      boardQuiet(ref.disable(false));
+      boardQuiet(ref.delete());
+      say('took the notice board in ' + hold + ' away: ' + why);
+    } catch (e) {
+      say('could not take the notice board in ' + hold + ' away: ' + e);
+    }
+  }
+
+  /* The list the page hands on: every board the server has, with its cell. */
+  function boardsSet(list) {
+    const next = [];
+    const byHold = {};
+    for (let i = 0; i < (Array.isArray(list) ? list.length : 0); i++) {
+      const s = list[i];
+      if (!s || typeof s.hold !== 'string' || typeof s.cell !== 'string' || !s.cell) { continue; }
+      const x = Number(s.x), y = Number(s.y), z = Number(s.z), face = Number(s.face);
+      if (!isFinite(x) || !isFinite(y) || !isFinite(z)) { continue; }
+      const spot = { hold: s.hold, cell: s.cell, x: x, y: y, z: z, face: isFinite(face) ? face : 0 };
+      next.push(spot);
+      byHold[spot.hold] = spot;
+    }
+    boardSpots = next;
+    for (const hold in boardRefs) {
+      if (!Object.prototype.hasOwnProperty.call(boardRefs, hold)) { continue; }
+      const had = boardRefs[hold];
+      const spot = byHold[hold];
+      if (!spot) { boardTakeAway(hold, 'the server has no board there now'); continue; }
+      if (spot.cell !== had.cell) { boardTakeAway(hold, 'the board is in ' + spot.cell + ' now'); continue; }
+      if (spot.x === had.x && spot.y === had.y && spot.z === had.z && spot.face === had.face) { continue; }
+      const ref = boardRef(had.id);
+      if (!ref) { continue; }
+      try {
+        boardQuiet(ref.setPosition(spot.x, spot.y, spot.z));
+        boardQuiet(ref.setAngle(0, 0, spot.face));
+        had.x = spot.x; had.y = spot.y; had.z = spot.z; had.face = spot.face;
+        say('moved the notice board in ' + hold + ' to where the server has it');
+      } catch (e) {
+        say('could not move the notice board in ' + hold + ': ' + e);
       }
-    } catch (e) { }
+    }
+    boardPlaceAt = 0;
   }
 
   function ensureBoards() {
     const now = Date.now();
     if (now - boardPlaceAt < 2000) { return; }
     boardPlaceAt = now;
-    if (!T.ready) { return; }
+    if (!T.ready || !boardSpots.length) { return; }
     let base = null;
     let pc = null;
     try { base = sp.Game.getFormFromFile(BOARD_LOCAL, BOARD_FILE); } catch (e) { base = null; }
     try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
     if (!base || !pc) { return; }
-    for (let i = 0; i < BOARD_SEEDS.length; i++) {
-      const spot = BOARD_SEEDS[i];
-      if (boardLive(boardRefIds[spot.hold])) { continue; }
+    const here = boardPlaceHere(pc);
+    if (!here) { return; }
+    for (let i = 0; i < boardSpots.length; i++) {
+      const spot = boardSpots[i];
+      const had = boardRefs[spot.hold];
+      if (had && had.cell === spot.cell && boardLive(had.id)) { continue; }
+      if (boardPlaceId(spot.cell) !== here) { continue; }
       let ref = null;
       try { ref = pc.placeAtMe(base, 1, false, false); } catch (e) { ref = null; }
       if (!ref) { continue; }
       try {
-        const moved = ref.setPosition(spot.x, spot.y, spot.z);
-        if (moved && typeof moved.then === 'function') { moved.then(function () { }, function () { }); }
-        const turned = ref.setAngle(0, 0, spot.face || 0);
-        if (turned && typeof turned.then === 'function') { turned.then(function () { }, function () { }); }
-        const on = ref.enable(false);
-        if (on && typeof on.then === 'function') { on.then(function () { }, function () { }); }
-        boardRefIds[spot.hold] = ref.getFormID() >>> 0;
-        say('put the notice board down in ' + spot.hold);
+        boardQuiet(ref.setPosition(spot.x, spot.y, spot.z));
+        boardQuiet(ref.setAngle(0, 0, spot.face));
+        boardQuiet(ref.enable(false));
+        boardRefs[spot.hold] = { id: ref.getFormID() >>> 0, cell: spot.cell,
+                                 x: spot.x, y: spot.y, z: spot.z, face: spot.face };
+        say('put the notice board down in ' + spot.hold + ' (' + spot.cell + ')');
       } catch (e) {
         if (!boardFailSaid[spot.hold]) {
           boardFailSaid[spot.hold] = true;
@@ -7745,13 +7824,20 @@
     return Math.sqrt(dx * dx + dy * dy + dz * dz);
   }
 
-  function boardAimSpot(px, py, pz) {
+  /*
+    The board you are aiming at: the one the server says you are near, which
+    it matched by cell, or else the nearest within 1500 of the boards in the
+    cell or worldspace you are in.
+  */
+  function boardAimSpot(pc, px, py, pz) {
     if (boardNear && boardDist(px, py, pz, boardNear) <= 1500) { return boardNear; }
+    const here = boardPlaceHere(pc);
     let best = null;
     let bestD = 1500;
-    for (let i = 0; i < BOARD_SEEDS.length; i++) {
-      const d = boardDist(px, py, pz, BOARD_SEEDS[i]);
-      if (d <= bestD) { bestD = d; best = BOARD_SEEDS[i]; }
+    for (let i = 0; i < boardSpots.length; i++) {
+      if (!here || boardPlaceId(boardSpots[i].cell) !== here) { continue; }
+      const d = boardDist(px, py, pz, boardSpots[i]);
+      if (d <= bestD) { bestD = d; best = boardSpots[i]; }
     }
     return best;
   }
@@ -7938,7 +8024,7 @@
     try {
       px = pc.getPositionX(); py = pc.getPositionY(); pz = pc.getPositionZ();
     } catch (err) { return false; }
-    const spot = boardAimSpot(px, py, pz);
+    const spot = boardAimSpot(pc, px, py, pz);
     if (!spot) { return false; }
     const dist = boardDist(px, py, pz, spot);
     if (dist > BOARD_REACH) { return false; }
@@ -7980,7 +8066,7 @@
     if (!pc) { return; }
     let dist = 99999;
     try {
-      const spot = boardAimSpot(pc.getPositionX(), pc.getPositionY(), pc.getPositionZ());
+      const spot = boardAimSpot(pc, pc.getPositionX(), pc.getPositionY(), pc.getPositionZ());
       if (spot) { dist = boardDist(pc.getPositionX(), pc.getPositionY(), pc.getPositionZ(), spot); }
     } catch (e) { dist = 99999; }
     if (dist > BOARD_REACH) {
@@ -8996,16 +9082,18 @@
       }
       if (!isFinite(bx) || !isFinite(by) || !isFinite(bz)) { boardNear = null; return; }
       boardNear = { hold: hold, x: bx, y: by, z: bz };
-      if (hold) {
-        for (let i = 0; i < BOARD_SEEDS.length; i++) {
-          if (BOARD_SEEDS[i].hold !== hold) { continue; }
-          BOARD_SEEDS[i].x = bx;
-          BOARD_SEEDS[i].y = by;
-          BOARD_SEEDS[i].z = bz;
-          boardMoveRef(hold, bx, by, bz, BOARD_SEEDS[i].face);
-          break;
-        }
-      }
+      return;
+    }
+    /*
+      Every board the server has, with its cell or worldspace (#1597). The
+      board page sends it when the list changes, a steward move included;
+      boardsSet puts the objects where it says.
+    */
+    if (what.indexOf('board:spots ') === 0) {
+      let list = null;
+      try { list = JSON.parse(what.slice('board:spots '.length)); } catch (e) { list = null; }
+      if (!Array.isArray(list)) { log('board: the page sent a list of boards that does not read'); return; }
+      boardsSet(list);
       return;
     }
     if (what === 'maneuvers:opened') { T.claimFocus('maneuvers', true); return; }
