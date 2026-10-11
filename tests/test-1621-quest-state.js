@@ -210,8 +210,8 @@ yes('a second short of 24 hours, after another restart, it still holds', w.svc.o
 clock.now += 1;
 yes('and at 24 hours the trader can open it again', w.svc.offer(2, 'ebony').ok === true);
 w.svc.walkAway(2, 'ebony');
-yes('a cooldown that has run out is left off the record',
-    !forms[2].props[PROP].cool.ebony);
+yes('an expired cooldown is retained as history without blocking the next offer',
+    forms[2].props[PROP].cool.ebony <= clock.now);
 
 // ------------------------------------------------ the gem they named -----
 yes('a ruby quest', w.svc.offer(3, 'gem', { gem: 'Ruby' }).ok === true);
@@ -265,9 +265,9 @@ w = restart();
 yes('a record is rebuilt field by field: a count that is not whole reads as none',
     w.svc.offer(5, 'ebony').why === 'open' && w.svc.walkAway(5, 'ebony').ok === true);
 function owns(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
-yes('a quest the tables do not have, and a cooldown that ran out, are left off',
-    !owns(forms[5].props[PROP].open, 'nothere') && !owns(forms[5].props[PROP].open, 'constructor') &&
-    !owns(forms[5].props[PROP].cool, 'nothere') && !owns(forms[5].props[PROP].cool, 'gem') &&
+yes('unknown quest fields and expired cooldowns remain saved outside the working view',
+    owns(forms[5].props[PROP].open, 'nothere') && owns(forms[5].props[PROP].open, 'constructor') &&
+    owns(forms[5].props[PROP].cool, 'nothere') && owns(forms[5].props[PROP].cool, 'gem') &&
     forms[5].props[PROP].cool.stalhrim === clock.now + HOUR);
 
 // --------------------------------------- a record that cannot be read ----
@@ -288,6 +288,8 @@ function unread(value, what) {
 }
 unread('a string', 'a value that is not a record');
 unread({ v: 2, open: {}, cool: {} }, 'a record of another shape');
+unread({v:1,open:[],cool:{}}, 'an array where the open quest map belongs');
+unread({v:1,open:{},cool:'unreadable'}, 'an unreadable cooldown map');
 {
   forms[7] = { inv: {}, props: {} };
   forms[7].props[PROP] = { v: 1, open: {}, cool: { ebony: clock.now + HOUR } };
@@ -501,6 +503,14 @@ yes('the miner page says the same', /kept on the character/.test(mWhere) &&
   preserved('return');
   w=restart();w.svc.offer(50,'stalhrim');w.svc.walkAway(50,'stalhrim');
   preserved('abandon after restart');
+}
+{
+  forms[51]={inv:{},props:{[PROP]:{v:1,open:{ebony:{drawn:0,kills:0,itemDesc:null,
+    extension:{source:'future-format'}}},cool:{}}}};
+  ranks['51:miner']='master';w=restart();w.svc.mineRare(51,here[0],EBONY);
+  yes('a draw changes its known counter while retaining extra fields on the same quest',
+    forms[51].props[PROP].open.ebony.drawn===1 && have(51,EBONY.ore)===1 &&
+    forms[51].props[PROP].open.ebony.extension.source==='future-format');
 }
 
 console.log('');

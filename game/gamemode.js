@@ -63599,9 +63599,10 @@ try {
       return (n > 0 && Math.floor(n) === n) ? n : 0;
     }
     /*
-      One person's quests off the character, rebuilt field by field rather
-      than trusted whole: a quest the tables no longer have, a count that is
-      not a whole number and a cooldown that has run out are left off. Nothing
+      One person's working quest view, read field by field rather than
+      trusted whole. Unknown entries and expired cooldowns stay outside that
+      view, but remain in the saved record. An unrelated action must preserve
+      them and any malformed fields awaiting explicit recovery. Nothing
       there yet is nothing open and nothing waiting. A read that throws, or a
       value that is there and is not this record, is null: every step refuses
       and nothing is written over it, because writing would hand back every
@@ -63614,9 +63615,12 @@ try {
         note('could not read the quests of', actor + ':', e);
         return null;
       }
-      var out = { open: {}, cool: {}, expected: raw === undefined ? null : raw };
+      var out = { open: {}, cool: {}, expected: raw === undefined ? null : raw,
+        before: {open: {}, cool: {}} };
       if (raw === undefined || raw === null) return out;
-      if (typeof raw !== 'object' || raw.v !== 1) {
+      if (typeof raw !== 'object' || Array.isArray(raw) || raw.v !== 1 ||
+          ['open','cool'].some(function(key){return own(raw,key) && raw[key] !== null &&
+            (typeof raw[key] !== 'object' || Array.isArray(raw[key]));})) {
         note('the quests on', actor, 'are not a quest record, so nothing is written over them');
         return null;
       }
@@ -63637,12 +63641,31 @@ try {
         var until = Number(cool[id]) || 0;
         if (own(byId, id) && until > t) out.cool[id] = until;
       });
+      out.before = JSON.parse(JSON.stringify({open: out.open, cool: out.cool}));
       return out;
+    }
+    // Apply only edits made to the working view, never its read normalization.
+    // This keeps newer quest fields and unrelated damaged records verbatim.
+    function recordEdits(raw, before, after) {
+      var next = JSON.parse(JSON.stringify(raw || {}));
+      Object.keys(before).forEach(function(key){
+        if (!own(after,key)) delete next[key];
+      });
+      Object.keys(after).forEach(function(key){
+        if (JSON.stringify(before[key]) === JSON.stringify(after[key])) return;
+        var left=before[key], right=after[key], original=next[key];
+        if (left && right && typeof left==='object' && typeof right==='object' &&
+            !Array.isArray(left) && !Array.isArray(right)) {
+          next[key]=recordEdits(original && typeof original==='object' && !Array.isArray(original) ? original : {},left,right);
+        } else next[key]=right;
+      });
+      return next;
     }
     function keep(actor, b, changes) {
       try {
         if (!active || deps.available && !deps.available()) return false;
-        var next = { v: 1, open: b.open, cool: b.cool };
+        var next = recordEdits(b.expected || {v:1,open:{},cool:{}}, b.before, {open: b.open, cool: b.cool});
+        next.v = 1;
         if (changes) return deps.commit(actor, b.expected, next, changes).ok === true;
         deps.save(actor, next);
         return true;
