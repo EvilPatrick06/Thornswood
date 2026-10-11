@@ -56,7 +56,7 @@ function HereOf([string]$name) {
 }
 $lib = HereOf 'lockLib'
 $all = HereOf 'lockAll'
-Yes 'the locks are one block the install and -Lock both send' ([bool]$lib -and [bool]$all -and $text.Contains('$lockAll = $lockLib + $watcherLib + @'''))
+Yes 'the locks are one block the install and -Lock both send' ([bool]$lib -and [bool]$all -and $text.Contains('$lockAll = $lockLib + $watcherLib + "`n`$liveFilter = '''))
 
 # ---- the names -Number gives ------------------------------------------------------
 Yes '-Number is a parameter, 1 to 99' ($text -match '\[ValidateRange\(1, 99\)\]\[int\]\$Number = 1')
@@ -85,7 +85,7 @@ Yes '  every runner keeps the one label build.yml asks for' ($text -notmatch '\$
 $lockAt = $text.IndexOf('Lock-RunnerRoot `$root `$acct')
 $cfgAt = $text.IndexOf('& .\config.cmd --unattended')
 Yes 'the install locks its own folder before config.cmd writes the credentials into it' ($lockAt -gt 0 -and $cfgAt -gt $lockAt)
-Yes '  and sends the locks with the install' ($text.Contains('-Script ($lockLib + $watcherLib + "`n" + @"'))
+Yes '  and sends the locks with the install' ($text.Contains('$out = Send-WithSecret $token ($lockLib + $watcherLib + "`n" + @"'))
 $installAt = $text.IndexOf('# ----------------------------------------------------------------- install --')
 $lockMode = $text.IndexOf('if ($Lock) {')
 Yes '-Lock is its own mode, before the install' ($lockMode -gt 0 -and $installAt -gt $lockMode)
