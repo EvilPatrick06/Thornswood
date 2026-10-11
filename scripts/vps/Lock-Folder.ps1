@@ -13,7 +13,10 @@
     takes nothing from above; SYSTEM, Administrators and the account running
     it have Full Control; every rule by name stays; Users, Everyone,
     Authenticated Users and CREATOR OWNER go. -Only also takes off every rule
-    by name but those three (private, the backups, Dumps).
+    by name but those three (private, the backups, Dumps). -Writers then lets
+    each SID named make and write files in it, and read nothing (Dumps:
+    LOCAL SERVICE and the build runners write node.exe's crash dumps there,
+    Patrick's decision on 11 October).
   Only a folder this makes is locked. One that is already there is left to
   Lock-VpsFolders.ps1, which knows what the bot and the site must keep first.
 
@@ -23,7 +26,7 @@
 #>
 
 function Lock-ThornswoodFolder {
-    param([Parameter(Mandatory = $true)][string]$Path, [switch]$Only)
+    param([Parameter(Mandatory = $true)][string]$Path, [switch]$Only, [string[]]$Writers = @())
     $broad = @('S-1-1-0', 'S-1-5-11', 'S-1-5-32-545', 'S-1-3-0')
     $tree = [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
     $keepers = @('S-1-5-18', 'S-1-5-32-544', [Security.Principal.WindowsIdentity]::GetCurrent().User.Value)
@@ -36,6 +39,10 @@ function Lock-ThornswoodFolder {
     foreach ($s in $keepers) {
         $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(
             (New-Object Security.Principal.SecurityIdentifier($s)), 'FullControl', $tree, 'None', 'Allow')))
+    }
+    foreach ($s in @($Writers | Where-Object { $_ -and $keepers -notcontains $_ })) {
+        $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(
+            (New-Object Security.Principal.SecurityIdentifier($s)), 'Write, Synchronize', $tree, 'None', 'Allow')))
     }
     # Only the access rules are written back, never the audit part (#1120).
     $item = Get-Item -LiteralPath $Path -Force
