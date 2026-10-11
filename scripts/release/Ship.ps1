@@ -235,6 +235,8 @@
   bodies' collection revision, and only on Patrick's word. A body mesh the
   check cannot read refuses on both channels, with or without it (#1956).
 
+.PARAMETER AllowStaleCheckout
+    Go ahead from a checkout that is not exactly origin/main and clean, with a loud warning (#2118). Without it the script refuses a stale or dirty checkout before it sends anything.
 .EXAMPLE
   .\scripts\release\Ship.ps1 -Channel dev "The map marker points at the right door now"
 
