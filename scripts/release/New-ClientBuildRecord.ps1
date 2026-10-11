@@ -83,6 +83,9 @@ if ($otherMarkers -gt 0) { throw "the bundle carries $otherMarkers marker(s) fro
 # with an empty branch, or "HEAD", and no base (issue #546). These fall back
 # to what the clone itself can say.
 function Get-ForkBranch([string]$clone, [string]$now) {
+  # git says "fatal" on stderr for a ref it does not know. Under Stop that is a
+  # thrown error in Windows PowerShell, so the answer is read off its output.
+  $ErrorActionPreference = 'Continue'
   if ($now -and $now -ne 'HEAD') { return $now }
   $remote = @(& git -C $clone branch -r --contains HEAD 2>$null | ForEach-Object { "$_".Trim() } | Where-Object { $_ -and $_ -notmatch '->' })
   if ($remote -contains 'origin/thornswood/engine-changes') { return 'thornswood/engine-changes' }
@@ -97,6 +100,7 @@ function Get-ForkBranch([string]$clone, [string]$now) {
   return $now
 }
 function Get-UpstreamBase([string]$clone, [string]$now, [string]$recorded) {
+  $ErrorActionPreference = 'Continue'
   if ($now) { return $now }
   if ($recorded) {
     & git -C $clone merge-base --is-ancestor $recorded HEAD 2>$null | Out-Null
@@ -108,8 +112,16 @@ function Get-UpstreamBase([string]$clone, [string]$now, [string]$recorded) {
 # The commit, and whether the clone is clean and the build is not older than
 # the source it claims to be built from.
 $commit = ''; $branch = ''; $base = ''; $dirty = $false; $stale = @()
+# A record with no commit says nothing about where the build came from, so a
+# -Clone git cannot read is refused rather than written down as blank.
+$ErrorActionPreference = 'Continue'
+$commit = ((& git -C $Clone rev-parse --short=8 HEAD 2>$null) -join '').Trim()
+if ($LASTEXITCODE -ne 0 -or -not $commit) { $ErrorActionPreference = 'Stop'; throw "not a git clone, or it has no commit: $Clone" }
+# Every git call below may write "fatal" to stderr for something the clone
+# does not have (no upstream remote, an old recorded base). Under Stop, Windows
+# PowerShell throws on that, and the catch used to skip the base, the dirty
+# check and the stale check without a word.
 try {
-  $commit = (& git -C $Clone rev-parse --short=8 HEAD 2>$null).Trim()
   $branch = Get-ForkBranch $Clone ((& git -C $Clone branch --show-current 2>$null) -join '').Trim()
   $recordedBase = ''
   try { $recordedBase = [string]((Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\records\client-build.json') -Raw | ConvertFrom-Json).upstreamBase) } catch { }
@@ -120,6 +132,7 @@ try {
     if ($src.LastWriteTimeUtc -gt $newest) { $stale += $src.FullName.Substring($Clone.Length + 1) }
   }
 } catch { }
+$ErrorActionPreference = 'Stop'
 
 $record = [ordered]@{
   recordedUtc          = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
