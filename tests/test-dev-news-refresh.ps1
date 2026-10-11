@@ -275,7 +275,7 @@ try {
     $fake = Join-Path $Scratch 'repo'
     New-Item -ItemType Directory -Force -Path $fake | Out-Null
     Copy-Item -LiteralPath (Join-Path $repo 'scripts') -Destination $fake -Recurse -Force
-    foreach ($f in 'layout.json', 'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt', 'records\generated.json', 'records\ui-gone.json') {
+    foreach ($f in 'layout.json', 'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt', 'records\generated.json', 'records\ui-gone.json', 'records\client-build.json') {
         $from = Join-Path $repo $f
         if (Test-Path -LiteralPath $from) {
             New-Item -ItemType Directory -Force -Path (Split-Path -Parent (Join-Path $fake $f)) | Out-Null
@@ -345,7 +345,12 @@ try {
     $pMain = [pscustomobject][ordered]@{ launcherVersion = '1.2.0'; packs = @(); news = @()
                                          release = [pscustomobject][ordered]@{ id = '20261005-235125'; channel = 'main'; commit = $head; uncommitted = 0 } }
     Put (Join-Path $pSite 'feed\version.json') ($pMain | ConvertTo-Json -Depth 6)
-    Put (Join-Path $pSite 'feed-dev\version.json') '{"launcherVersion":"1.2.0","packs":[],"news":[],"mainVersion":"1.1.106"}'
+    # The stand-in UI front carries a SkyMP file (build.js), so the pack's source
+    # notice reads records\client-build.json (#1318), copied above. The dev feed
+    # already has that client runtime, as a real dev feed does, so this run does
+    # not stage the six runtime files the stand-in game folder never had.
+    $pFork = [string](((Get-Content -LiteralPath (Join-Path $fake 'records\client-build.json') -Raw) -replace '^\uFEFF', '') | ConvertFrom-Json).forkCommit
+    Put (Join-Path $pSite 'feed-dev\version.json') ('{"launcherVersion":"1.2.0","packs":[],"news":[],"mainVersion":"1.1.106","clientRuntime":{"forkCommit":"' + $pFork + '","url":"https://example.invalid/client-runtime-' + $pFork + '.zip","notice":1}}')
     Put (Join-Path $pSite 'feed-dev\published.json') '{"Data\\Platform\\UI\\thornswood-ours.esp":"5:0000000000000000000000000000000000000000000000000000000000000000"}'
     function Publish([string[]]$extra) {
         $pu = Join-Path $fake 'scripts\release\Publish-Update.ps1'
