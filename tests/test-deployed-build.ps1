@@ -27,6 +27,33 @@ function Invoke-ThornswoodArtifactRemote([string]$Target, [string[]]$SshArgs, [s
 
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('ts-deployed-build-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
 $node = $null
+function Wait-OwnLine($proc, $err, [string]$mark, [int]$port, [string]$what) {
+    $deadline = [DateTime]::UtcNow.AddSeconds(20)
+    $seen = New-Object 'System.Collections.Generic.List[string]'
+    while ($true) {
+        $left = [int][Math]::Max(0, ($deadline - [DateTime]::UtcNow).TotalMilliseconds)
+        $read = $proc.StandardOutput.ReadLineAsync()
+        if (-not $read.Wait($left)) { return ('{0} did not say it was listening on port {1} within 20 seconds' -f $what, $port) }
+        $got = $read.Result
+        if ($null -eq $got) {
+            [void]$proc.WaitForExit(5000)
+            $said = ''
+            if ($err.Wait(5000)) { $said = ([string]$err.Result).Trim() }
+            $code = '?'
+            if ($proc.HasExited) { $code = $proc.ExitCode }
+            if ($said -match 'EADDRINUSE') {
+                return ('something else already holds port {0}, so {1} stopped (exit {2}) before it was listening' -f $port, $what, $code)
+            }
+            return ('{0} stopped (exit {1}) before it was listening: {2} {3}' -f $what, $code, ($seen -join ' '), $said)
+        }
+        $seen.Add($got)
+        if ($got.StartsWith($mark + ' listening on ') -and $got.EndsWith(':' + $port)) {
+            # Drained from here on, so a chatty child never blocks on a full pipe.
+            $null = $proc.StandardOutput.ReadToEndAsync()
+            return ''
+        }
+    }
+}
 try {
   $live = Join-Path $tmp 'Thornswood-Server'
   $dev  = Join-Path $tmp 'Thornswood-Server-Dev'
@@ -115,11 +142,11 @@ try {
   $psi.EnvironmentVariables['THORNSWOOD_DOCS_LOCAL'] = '1'
   $psi.EnvironmentVariables['THORNSWOOD_CHAT_DIR'] = (Join-Path $docs 'chat')
   $node = [Diagnostics.Process]::Start($psi)
+  $err = $node.StandardError.ReadToEndAsync()
+  $said = Wait-OwnLine $node $err '[thornswood-docs]' $port 'the site'
+  Yes 'the site says it is listening on its port' ($said -eq '')
   $body = $null
-  for ($i = 0; $i -lt 50 -and $null -eq $body; $i++) {
-    Start-Sleep -Milliseconds 200
-    try { $body = (Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:$port/credits" -TimeoutSec 5).Content } catch { }
-  }
+  if ($said -eq '') { try { $body = (Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:$port/credits" -TimeoutSec 10).Content } catch { } }
   Yes 'after the stubbed deploy, /credits names the deployed commit' ($body -and $body.Contains('aaaaaaaa') -and $body.Contains('tree/' + $A))
   Yes 'and the stale hand sentence is gone, with credits.md untouched' ($body -and -not $body.Contains('the earlier engine') -and
     ([IO.File]::ReadAllText((Join-Path $docs 'data\site\credits.md')) -eq [IO.File]::ReadAllText((Join-Path $app 'data\site\credits.md'))))

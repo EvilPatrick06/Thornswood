@@ -603,8 +603,10 @@ function fillCreditsCommits(md, deployed, feeds) {
       said = (live !== recorded && dev !== recorded ? 'The recorded build has not been deployed yet. ' : '') +
              'The test server runs ' + link(dev) + ' and the main server runs ' + link(live) + '.';
     }
-    out = out.replace(/The recorded build has not been deployed yet\.\s+Both servers still run\s+\[`[0-9a-f]{7,40}`\]\([^)\s]*\),\s+the earlier engine[^.]*\./,
-                      function () { return said; });
+    // The hand sentence runs from "then to the main server." to "the earlier
+    // engine ...", whatever it says about which server runs what (#2098).
+    out = out.replace(/(then to the main server\.\s+)((?:(?!\n\s*\n)[\s\S])*?)\[`[0-9a-f]{7,40}`\]\([^)\s]*\),\s+the earlier engine[^.]*\./,
+                      function (m, lead) { return lead + said; });
   }
   for (const row of [['Public', 'feed/version.json', 'public'], ['Dev', 'feed-dev/version.json', 'dev']]) {
     const c = feeds && typeof feeds === 'object' ? String(feeds[row[2]] || '') : '';

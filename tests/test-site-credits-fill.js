@@ -35,7 +35,7 @@ function yes(what, cond) {
 
 const A = 'a'.repeat(40), B = 'b'.repeat(40);
 const recorded = (/built from one commit,\s+\[`[0-9a-f]{7,40}`\]\(https:\/\/github\.com\/EvilPatrick06\/skymp\/tree\/([0-9a-f]{40})\)/.exec(CREDITS) || [])[1];
-const HAND = /Both servers still run\s+\[`3a32e961`\]/;
+const HAND = /still runs\s+\[`3a32e961`\]/;
 
 // ---- part one: the pure fill -------------------------------------------------
 const cut = /\/\/ ==== thornswood credits fill ====([\s\S]*?)\/\/ ==== end thornswood credits fill ====/.exec(SRC);
