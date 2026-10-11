@@ -71,7 +71,10 @@ function Get-SourceNoticeEntries([string]$ClientRecord, [string[]]$Carried, [str
     foreach ($x in @($Carried)) { if ($x -and $SourceNoticeFiles.Contains($x)) { $any = $true; break } }
     if (-not $any) { return @() }
     if (-not (Test-Path -LiteralPath $ClientRecord)) { throw "$ClientRecord is missing" }
-    $c = (Get-Content -LiteralPath $ClientRecord -Raw).TrimStart([char]0xFEFF) | ConvertFrom-Json
+    # An empty record reads as $null; say so, rather than a method call on $null.
+    $raw = "$(Get-Content -LiteralPath $ClientRecord -Raw)"
+    if (-not $raw.Trim([char]0xFEFF, ' ', [char]9, [char]13, [char]10)) { throw "$ClientRecord is empty" }
+    $c = $raw.TrimStart([char]0xFEFF) | ConvertFrom-Json
     $fork = ([string]$c.fork).TrimEnd('/')
     if (-not $fork -or -not $c.forkCommit) { throw 'client-build.json names no fork or no commit' }
     $recorded = @($c.files.PSObject.Properties.Name)

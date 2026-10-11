@@ -83,7 +83,9 @@ $layoutPath = Join-Path $repo 'layout.json'
 if (-not (Test-Path -LiteralPath $layoutPath)) {
     throw "layout.json is not at $layoutPath. It is in the repository, so the path is wrong."
 }
-$layout = Get-Content -LiteralPath $layoutPath -Raw -Encoding UTF8 | ConvertFrom-Json
+$layoutText = "$(Get-Content -LiteralPath $layoutPath -Raw -Encoding UTF8)"
+if (-not $layoutText.Trim([char]0xFEFF, ' ', [char]9, [char]13, [char]10)) { throw "layout.json at $layoutPath is empty." }
+try { $layout = $layoutText.TrimStart([char]0xFEFF) | ConvertFrom-Json } catch { throw ("layout.json at $layoutPath is not valid JSON: " + $_.Exception.Message) }
 
 function Join-Under([string]$root, [string]$rel) {
     if (-not $rel) { return $root }

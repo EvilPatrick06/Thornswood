@@ -58,6 +58,7 @@ param(
     [int]$Jobs = 0,
     [switch]$NoPause
 )
+. (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
 $ErrorActionPreference = 'Stop'
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
@@ -253,8 +254,14 @@ if (-not (Test-Path -LiteralPath (Join-Path $Fork 'CMakeLists.txt'))) {
         if ((Run git -C $repo submodule update --init engine/skymp) -ne 0) { Die 'git could not fetch engine\skymp. Is this a clone of the repository, and can this account read EvilPatrick06/skymp?' }
     }
 }
+# Read with Continue: a fork that is not there yet (-Check says this run would
+# fetch it) makes git say "fatal" on stderr, and under Stop Windows
+# PowerShell 5.1 ended -Check there, even through 2>$null. The exit code decides.
+$ErrorActionPreference = 'Continue'
 $pinned = ((& git -C $repo ls-tree HEAD engine/skymp 2>$null) -split '\s+')[2]
 $at = (& git -C $Fork rev-parse HEAD 2>$null | Select-Object -First 1)
+if ($LASTEXITCODE -ne 0) { $at = $null }
+$ErrorActionPreference = 'Stop'
 if ($at) {
     Say ("  pinned   {0}" -f $pinned)
     Say ("  at       {0}" -f $at)
@@ -334,7 +341,7 @@ Ok 'built'
 
 # ---- 5. the recorded client -------------------------------------------------
 Head 'Is this the recorded client?'
-$rec = Get-Content -LiteralPath $record -Raw | ConvertFrom-Json
+$rec = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $record -Raw) $record
 $dist = Join-Path $build 'dist\client'
 $differ = 0
 foreach ($rel in @($rec.files.PSObject.Properties.Name)) {

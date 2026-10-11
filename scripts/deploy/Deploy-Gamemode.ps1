@@ -138,6 +138,7 @@ param(
     # nobody reads.
     [switch]$IgnoreRevision
 )
+. (Join-Path $PSScriptRoot '..\release\Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
 # Same rule as Find-Root in Publish-Update.ps1 / Repair-Manifest.ps1. -Data,
 # -Plugins and -Vortex still win; this only fills the defaults when they were
@@ -509,7 +510,7 @@ $priorPath = Join-Path $Dist 'server-settings.json'
 $prior = @()
 if (-not $NewOrder -and -not $FullLoadOrder -and -not $MinimalLoadOrder -and (Test-Path -LiteralPath $priorPath)) {
     try {
-        $prior = @((Get-Content -LiteralPath $priorPath -Raw | ConvertFrom-Json).loadOrder |
+        $prior = @((ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $priorPath -Raw) $priorPath).loadOrder |
                    ForEach-Object { [IO.Path]::GetFileName(([string]$_).Replace('/', '\')) } |
                    Where-Object { $_ })
     } catch { $prior = @() }
@@ -597,7 +598,7 @@ $paths = @($keep | ForEach-Object { (Join-Path $Data $_) -replace '\\', '/' })
 # ---- rewrite server-settings.json -----------------------------------------
 $settingsPath = Join-Path $Dist 'server-settings.json'
 $s = if (Test-Path -LiteralPath $settingsPath) {
-        Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+        ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $settingsPath -Raw) $settingsPath
      } else { [pscustomobject]@{} }
 
 $s | Add-Member -NotePropertyName loadOrder   -NotePropertyValue $paths      -Force

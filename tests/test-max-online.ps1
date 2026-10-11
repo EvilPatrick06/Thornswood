@@ -41,6 +41,8 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 $Here = Split-Path -Parent $Here
 if (-not $RepoDir) { $RepoDir = $Here }
 # The counting function Deploy-DevGamemode sends up with the block (#2011).
+# The sections lifted below call ConvertFrom-ThornswoodJson, which their script dot-sources.
+. (Join-Path $RepoDir 'scripts\release\Read-JsonFile.ps1')
 . (Join-Path $RepoDir 'scripts\deploy\ServerOrder.ps1')
 $script:fullIndexDef = 'function Get-ThornswoodFullIndex {' + "`n" + (Get-Command Get-ThornswoodFullIndex).Definition + "`n}"
 

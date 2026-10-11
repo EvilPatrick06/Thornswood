@@ -84,6 +84,7 @@ param(
   # and no announced.json check. Issue #594.
   [switch]$GamemodeDeploy
 )
+. (Join-Path $PSScriptRoot '..\release\Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
 $ErrorActionPreference = 'Stop'
 
@@ -263,7 +264,7 @@ if ($Note) {
 
   # A byte order mark is not JSON and ConvertFrom-Json stops on the first
   # character, which is the trap that has bitten every other reader of this file.
-  $v = ((Get-Content $vf -Raw) -replace '^\uFEFF', '') | ConvertFrom-Json
+  $v = ConvertFrom-ThornswoodJson (Get-Content $vf -Raw) $vf
   $n = @(PropList $v 'news')[0]
   if (-not $n) { if (-not $Quiet) { Write-Host '  nothing to post' }; return }
 

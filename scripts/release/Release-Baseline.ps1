@@ -54,6 +54,7 @@
   https, which needs no ssh. tests\test-release-baseline.ps1 drives it.
 #>
 
+. (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 function Get-BaselineHex([byte[]]$bytes) {
     return ([BitConverter]::ToString($bytes)).Replace('-', '').ToLowerInvariant()
 }
@@ -133,7 +134,7 @@ function Read-BaselineFile([string]$path) {
     $map = @{}
     $text = ([IO.File]::ReadAllText($path)) -replace '^\uFEFF', ''
     if (-not $text.Trim()) { return $map }
-    $o = $text | ConvertFrom-Json
+    $o = ConvertFrom-ThornswoodJson $text $path
     if ($null -ne $o) { foreach ($p in $o.PSObject.Properties) { $map[$p.Name] = [string]$p.Value } }
     return $map
 }
@@ -441,7 +442,7 @@ function Get-BaselineFromPacks($doc, [string]$WorkDir, [string]$SiteDir, [string
 # scratch files under $WorkDir; Save-State writes the store copy once the
 # release is out.
 function Resolve-ReleaseBaseline([string]$VersionFile, [string]$StateFile, [string]$WorkDir, [string]$SiteDir, [string]$SiteUrl = 'https://thornswood.net', [scriptblock]$Say) {
-    $doc = (([IO.File]::ReadAllText($VersionFile)) -replace '^\uFEFF', '') | ConvertFrom-Json
+    $doc = ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($VersionFile)) $VersionFile
     $ptr = Get-FeedBaselinePointer $doc
     $have = Get-BaselineFileSha $StateFile
     $lines = @()

@@ -78,13 +78,13 @@ $found = Remote @"
 `$ErrorActionPreference = 'Continue'
 `$roots = @()
 foreach (`$d in (Get-ChildItem 'C:\' -Directory -EA SilentlyContinue)) {
-  if (Test-Path (Join-Path `$d.FullName 'server-settings.json')) { `$roots += `$d.FullName }
+  if (Test-Path -LiteralPath (Join-Path `$d.FullName 'server-settings.json')) { `$roots += `$d.FullName }
 }
 if (-not `$roots) {
   # Second pass: one level deeper, for a server inside a folder of its own.
   foreach (`$d in (Get-ChildItem 'C:\' -Directory -EA SilentlyContinue)) {
-    foreach (`$s in (Get-ChildItem `$d.FullName -Directory -EA SilentlyContinue)) {
-      if (Test-Path (Join-Path `$s.FullName 'server-settings.json')) { `$roots += `$s.FullName }
+    foreach (`$s in (Get-ChildItem -LiteralPath `$d.FullName -Directory -EA SilentlyContinue)) {
+      if (Test-Path -LiteralPath (Join-Path `$s.FullName 'server-settings.json')) { `$roots += `$s.FullName }
     }
   }
 }
@@ -122,10 +122,10 @@ Say ("  reading {0} ({1}), against the build at {2}" -f $root, $(if ($Dev) { 'de
 Head "Reading the manifests under $root"
 $out = Remote @"
 `$ErrorActionPreference = 'Continue'
-`$root = '$root'
+`$root = '$($root.Replace("'", "''"))'
 `$dataDir = 'data'
 try {
-  `$cfg = Get-Content (Join-Path `$root 'server-settings.json') -Raw | ConvertFrom-Json
+  `$cfg = Get-Content -LiteralPath (Join-Path `$root 'server-settings.json') -Raw | ConvertFrom-Json
   if (`$cfg.dataDir) { `$dataDir = [string]`$cfg.dataDir }
 } catch { }
 `$data = Join-Path `$root `$dataDir
@@ -135,9 +135,9 @@ try {
 # where the client asks for it. Reading both and concatenating made the server
 # look like it wanted 122 plugins when it wants 61.
 `$seen = `$false
-foreach (`$f in (Get-ChildItem `$data -Recurse -Filter 'manifest.json' -File -EA SilentlyContinue)) {
+foreach (`$f in (Get-ChildItem -LiteralPath `$data -Recurse -Filter 'manifest.json' -File -EA SilentlyContinue)) {
   try {
-    `$m = Get-Content `$f.FullName -Raw | ConvertFrom-Json
+    `$m = Get-Content -LiteralPath `$f.FullName -Raw | ConvertFrom-Json
     `$n = @(`$m.loadOrder).Count
     `$k = @(`$m.mods).Count
     'FILE ' + `$f.FullName
