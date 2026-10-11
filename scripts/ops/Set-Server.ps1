@@ -79,7 +79,10 @@ if (-not (Test-Path -LiteralPath $cfgPath)) { Die "not found: $cfgPath" }
 
 $raw = [IO.File]::ReadAllBytes($cfgPath)
 $skip = if ($raw.Length -ge 3 -and $raw[0] -eq 0xEF -and $raw[1] -eq 0xBB -and $raw[2] -eq 0xBF) { 3 } else { 0 }
-$cfg = [Text.Encoding]::UTF8.GetString($raw, $skip, $raw.Length - $skip) | ConvertFrom-Json
+# Named when empty or not JSON, rather than a parse error or a null document.
+$cfgText = [Text.Encoding]::UTF8.GetString($raw, $skip, $raw.Length - $skip)
+if (-not $cfgText.Trim()) { Die "$cfgPath is empty. Nothing has been changed." }
+try { $cfg = $cfgText | ConvertFrom-Json } catch { Die ("$cfgPath is not valid JSON: " + $_.Exception.Message) }
 
 Say ("  was  {0}:{1}" -f $cfg.ServerAddress, $cfg.ServerPort) 'DarkGray'
 $cfg.ServerAddress = $Address
@@ -97,7 +100,9 @@ if ($receive) {
 $VersionFile = Join-Path $ReleaseDir 'version.json'
 if (-not (Test-Path -LiteralPath $VersionFile)) { Die "not found: $VersionFile" }
 
-$doc = Get-Content -LiteralPath $VersionFile -Raw | ConvertFrom-Json
+$docText = "$(Get-Content -LiteralPath $VersionFile -Raw)"
+if (-not $docText.Trim([char]0xFEFF, ' ', [char]9, [char]13, [char]10)) { Die "$VersionFile is empty. Only this machine was changed." }
+try { $doc = $docText.TrimStart([char]0xFEFF) | ConvertFrom-Json } catch { Die ("$VersionFile is not valid JSON: " + $_.Exception.Message + " Only this machine was changed.") }
 $wasA = if ($doc.PSObject.Properties.Name -contains 'serverAddress') { [string]$doc.serverAddress } else { '' }
 $wasP = if ($doc.PSObject.Properties.Name -contains 'serverPort') { [string]$doc.serverPort } else { '' }
 Say ("  was  {0}:{1}" -f $wasA, $wasP) 'DarkGray'

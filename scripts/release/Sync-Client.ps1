@@ -80,7 +80,10 @@ function Sha256([string]$p) { (Get-FileHash -LiteralPath $p -Algorithm SHA256).H
 if (-not (Test-Path -LiteralPath $Record)) { Stop-Here "no record at $Record. Run .\scripts\release\New-ClientBuildRecord.ps1 after building the client." }
 if (-not (Test-Path -LiteralPath $Game))   { Stop-Here "game folder not found: $Game" }
 
-$rec = Get-Content -LiteralPath $Record -Raw | ConvertFrom-Json
+# Named when empty or not JSON, rather than a parse error or a null record.
+$recText = "$(Get-Content -LiteralPath $Record -Raw)"
+if (-not $recText.Trim([char]0xFEFF, ' ', [char]9, [char]13, [char]10)) { Stop-Here "$Record is empty. Run .\scripts\release\New-ClientBuildRecord.ps1 after building the client." }
+try { $rec = $recText | ConvertFrom-Json } catch { Stop-Here ("$Record is not valid JSON: " + $_.Exception.Message) }
 $files = @($rec.files.PSObject.Properties.Name)
 if (-not $files.Count) { Stop-Here 'the record names no files' }
 

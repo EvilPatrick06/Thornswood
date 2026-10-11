@@ -126,6 +126,7 @@ param(
   [string]$Site = 'https://thornswood.net',
   [string]$Root = ''
 )
+. (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
@@ -305,7 +306,7 @@ function Find-ClientRuntime($Feeds, [string]$Commit) {
 
 # How many of the record's files a folder holds as recorded.
 function Get-ClientMatch([string]$Record, [string]$Folder) {
-  $rec = Get-Content -LiteralPath $Record -Raw | ConvertFrom-Json
+  $rec = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $Record -Raw) $Record
   $n = 0
   if (-not $Folder -or -not (Test-Path -LiteralPath $Folder)) { return 0 }
   foreach ($p in $rec.files.PSObject.Properties) {
@@ -328,7 +329,7 @@ function Install-ClientRuntime([string]$Zip, [string]$Sha256, [long]$Bytes, [str
   if (Test-Path -LiteralPath $Stage) { Remove-Item -LiteralPath $Stage -Recurse -Force }
   Add-Type -AssemblyName System.IO.Compression.FileSystem
   [IO.Compression.ZipFile]::ExtractToDirectory($Zip, $Stage)
-  $rec = Get-Content -LiteralPath $Record -Raw | ConvertFrom-Json
+  $rec = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $Record -Raw) $Record
   $plan = @()
   try {
     foreach ($p in $rec.files.PSObject.Properties) {

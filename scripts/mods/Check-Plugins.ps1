@@ -6,12 +6,12 @@ $ref = $null
 foreach ($d in [IO.DriveInfo]::GetDrives()) {
   if ($d.DriveType -ne 'Fixed' -or -not $d.IsReady) { continue }
   $t = Join-Path $d.RootDirectory.FullName (Join-Path 'Thornswood' (Join-Path 'Profile' (Join-Path 'Default' 'plugins.txt')))
-  if (Test-Path $t) { $ref = $t; break }
+  if (Test-Path -LiteralPath $t) { $ref = $t; break }
 }
 
 function Enabled($p) {
-  if (-not (Test-Path $p)) { return @() }
-  @(Get-Content $p | Where-Object { $_.StartsWith('*') } | ForEach-Object { $_.Substring(1).Trim() })
+  if (-not $p -or -not (Test-Path -LiteralPath $p)) { return @() }
+  @(Get-Content -LiteralPath $p | Where-Object { $_.StartsWith('*') } | ForEach-Object { $_.Substring(1).Trim() })
 }
 
 $have = Enabled $live
