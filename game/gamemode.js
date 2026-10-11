@@ -63619,8 +63619,8 @@ try {
         before: {open: {}, cool: {}} };
       if (raw === undefined || raw === null) return out;
       if (typeof raw !== 'object' || Array.isArray(raw) || raw.v !== 1 ||
-          ['open','cool'].some(function(key){return own(raw,key) && raw[key] !== null &&
-            (typeof raw[key] !== 'object' || Array.isArray(raw[key]));})) {
+          ['open','cool'].some(function(key){return own(raw,key) &&
+            (!raw[key] || typeof raw[key] !== 'object' || Array.isArray(raw[key]));})) {
         note('the quests on', actor, 'are not a quest record, so nothing is written over them');
         return null;
       }

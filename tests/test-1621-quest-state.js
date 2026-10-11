@@ -290,6 +290,8 @@ unread('a string', 'a value that is not a record');
 unread({ v: 2, open: {}, cool: {} }, 'a record of another shape');
 unread({v:1,open:[],cool:{}}, 'an array where the open quest map belongs');
 unread({v:1,open:{},cool:'unreadable'}, 'an unreadable cooldown map');
+unread({v:1,open:null,cool:{}}, 'a null open quest map');
+unread({v:1,open:{},cool:null}, 'a null cooldown map');
 {
   forms[7] = { inv: {}, props: {} };
   forms[7].props[PROP] = { v: 1, open: {}, cool: { ebony: clock.now + HOUR } };
