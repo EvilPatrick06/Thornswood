@@ -64,9 +64,11 @@ nothing.
 - The durability block (#1384), which belongs to Anvil.
 - mp.onCraft, where Anvil's 9ce36701 (#1648) lands.
 
-## Found along the way, not changed
+## Fixed along the way
 
-- A /spawn or /give from somebody whose character is not in the world yet is
-  held with "That will run as soon as you arrive", even when they are on no
-  list. It is refused when it does run, so nothing is given, but the first
-  reply promises something that will not happen.
+- A gated word (/give, /spawn, /tp, /goto, /where and the staff words) from
+  somebody on no list whose character was not in the world yet was held with
+  "That will run as soon as you arrive" and refused 90 seconds later.
+  dispatch() now hands it to handle() at once, so the refusal comes first.
+  A listed tester is still held as before. test-chat-refusals failed 7 of 35
+  before the change and passes all 35 after.
