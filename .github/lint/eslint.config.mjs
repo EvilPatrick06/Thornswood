@@ -1,0 +1,27 @@
+// eslint config for the build check's step "Lint (warnings only)", issue #1343.
+// Every rule is "warn", so eslint never exits 1 over a finding. No imports,
+// because eslint is installed into the run's temp folder and a plugin import
+// from here would not resolve. Bug patterns only, no style rules.
+export default [
+  { ignores: ['engine/**', '**/node_modules/**', '**/*.min.js', 'launcher/**/bin/**', 'launcher/**/obj/**'] },
+  {
+    files: ['**/*.js', '**/*.cjs', '**/*.mjs'],
+    languageOptions: { ecmaVersion: 'latest', sourceType: 'script' },
+    linterOptions: { reportUnusedDisableDirectives: 'off' },
+    rules: {
+      'no-unused-vars': ['warn', { args: 'none', caughtErrors: 'none' }],
+      'no-unreachable': 'warn',
+      'no-dupe-keys': 'warn',
+      'no-duplicate-case': 'warn',
+      'no-self-assign': 'warn',
+      'no-self-compare': 'warn',
+      'no-cond-assign': 'warn',
+      'no-constant-condition': ['warn', { checkLoops: false }],
+      'no-redeclare': 'warn',
+      'no-unsafe-finally': 'warn',
+      'use-isnan': 'warn',
+      'valid-typeof': 'warn',
+    },
+  },
+  { files: ['**/*.mjs'], languageOptions: { sourceType: 'module' } },
+];
