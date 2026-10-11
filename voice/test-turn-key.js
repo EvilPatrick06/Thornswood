@@ -45,12 +45,13 @@ const STUN_ONLY = '{"iceServers":[{"urls":"stun:stun.l.google.com:19302"}]}';
 // local chat (voice/test-local-chat.js), and the five from backed on
 // with the backpressure work (voice/test-backpressure.js), and closedSilent
 // with the keepalive's other half (voice/test-keepalive.js), each separately
-// from the relay key.
+// from the relay key. chatRetention came with the chat prune's own report
+// (voice/test-chat-retention.js, #2191).
 // deploy is the artifact record Install-Voice.ps1 leaves beside the service (#459).
 const HEALTH_FIELDS = ['ok', 'build', 'deploy', 'auth', 'uptimeSeconds', 'startedAt', 'bind', 'turn',
                        'chatRange', 'peers', 'tracked', 'queuedCommands',
                        'backed', 'largestQueueBytes', 'droppedPositions', 'skippedRosters',
-                       'closedBacklogged', 'closedSilent'];
+                       'closedBacklogged', 'closedSilent', 'chatRetention'];
 // The two lines every start wrote, with nothing configured, on the port that
 // start was given. Loopback with nothing configured since #1304.
 const startLog = (port) => '[voice] listening on 127.0.0.1:' + port + ' (loopback only, so something must be proxying to it)\n' +
