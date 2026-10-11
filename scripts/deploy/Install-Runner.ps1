@@ -1,4 +1,4 @@
-﻿<#
+<#
   Install-Runner.ps1
 
   Puts a GitHub Actions runner on the VPS, so the build check runs on every
@@ -12,6 +12,33 @@
       .\scripts\deploy\Install-Runner.ps1 -Lock        lock every runner on the box again,
                                                     touching no runner and no job, and
                                                     take off the old priority watchers
+      .\scripts\deploy\Install-Runner.ps1 -OffBox      a pull request runner on THIS machine,
+                                                    not the VPS (#1306), run elevated
+
+  OFF THE BOX (-OffBox, issue #1306). build.yml sends a pull request to the
+  label thornswood-pr, which no runner on the VPS carries, so code nobody has
+  merged never runs beside the live server. -OffBox puts that runner on the
+  machine this is run on (One, or a spare PC), in an elevated PowerShell, with
+  no ssh at all: the same scripts the VPS gets run here instead. Its defaults
+  are C:\Thornswood-RunnerPR, the account thornswood-pr, the runner name
+  thornswood-pr-<computer> and the label thornswood-pr (-Number n puts the
+  number on the end of each, the same as on the box). What changes from the box:
+    - The account is shut out of every C:\Thornswood* folder, not only
+      C:\Thornswood-*: on a developer machine the worktrees, the play build and
+      the vault are C:\ThornswoodTemps&Worktrees, C:\Thornswood and
+      C:\Thornswood Vault, and none has the hyphen. -AlsoDeny adds any other
+      folder (another drive, say) to that list.
+    - Defender keeps scanning the runner's folder unless -DefenderSkip is given.
+      On the VPS the speed was worth it; on a machine people work on, a pull
+      request's code is exactly what the scanner is for.
+  Kept as on the box: an account in Users and nothing else with a password
+  nobody sees, the runner's own folder locked to SYSTEM, Administrators and that
+  account with nothing taken from C:\, the pinned runner zip, the service at
+  normal priority, and the old priority tasks taken off. -Status, -Remove and
+  -Lock take -OffBox too. -DryRunTo <file> writes the scripts it would run to
+  that file and runs none of them, with a stand-in for every gh call, so
+  tests\test-runner-offbox.ps1 can read them without touching an ACL, a
+  service, an account or GitHub.
 
   WHY. Every run of .github\workflows\build.yml has failed in seconds since
   02:10 on 25 September, because GitHub's own runners are blocked on billing.
@@ -112,6 +139,15 @@ param(
   [switch]$Status,
   [switch]$Remove,
   [switch]$Lock,
+  # A pull request runner on this machine rather than the VPS (#1306).
+  [switch]$OffBox,
+  # Folders the runner's account is shut out of as well as C:\Thornswood*.
+  [string[]]$AlsoDeny = @(),
+  # -OffBox only: let Defender skip the runner's folder as it does on the VPS.
+  [switch]$DefenderSkip,
+  # Write the scripts it would run to this file and run none of them; every gh
+  # call gets a stand-in answer. For tests\test-runner-offbox.ps1.
+  [string]$DryRunTo = '',
   [switch]$NoPause
 )
 
@@ -121,8 +157,10 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Script.ps1')
 . (Join-Path $Here '..\vps\Send-Secret.ps1')
-if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
-if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
+if (-not $OffBox) {
+  if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
+  if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
+}
 
 # The nth runner's names, the header's SEVERAL OF THEM. A name given on the
 # command line wins. 'thornswood-runner99' is 19 characters, inside the 20 a
@@ -132,6 +170,23 @@ if ($Number -gt 1) {
   if (-not $PSBoundParameters.ContainsKey('Account'))    { $Account = 'thornswood-runner' + $Number }
   if (-not $PSBoundParameters.ContainsKey('RunnerName')) { $RunnerName = 'thornswood-vps-' + $Number }
 }
+# Off the box (the header's OFF THE BOX). Its own names, so it can never be
+# mistaken for, or replace, a runner on the VPS. thornswood-pr99 is 15
+# characters, inside the 20 a local account may have.
+$liveFilter = 'Thornswood-*'
+if ($OffBox) {
+  $n = $(if ($Number -gt 1) { '' + $Number } else { '' })
+  if (-not $PSBoundParameters.ContainsKey('Root'))       { $Root = 'C:\Thornswood-RunnerPR' + $n }
+  if (-not $PSBoundParameters.ContainsKey('Account'))    { $Account = 'thornswood-pr' + $n }
+  if (-not $PSBoundParameters.ContainsKey('RunnerName')) { $RunnerName = 'thornswood-pr-' + $env:COMPUTERNAME.ToLower() + $(if ($n) { '-' + $n } else { '' }) }
+  if (-not $PSBoundParameters.ContainsKey('Label'))      { $Label = 'thornswood-pr' }
+  $liveFilter = 'Thornswood*'
+  if ($Label -match 'thornswood-vps') { Write-Host 'STOP. -OffBox never takes the VPS label: build.yml would send it main and release builds.' -ForegroundColor Red; exit 1 }
+}
+# The list the scripts below are given, as PowerShell source.
+$alsoDenyList = '@(' + ((@($AlsoDeny | Where-Object { $_ }) | ForEach-Object { "'" + $_.Replace("'", "''") + "'" }) -join ', ') + ')'
+$defenderOn = $(if ($OffBox -and -not $DefenderSkip) { '$false' } else { '$true' })
+$where = $(if ($OffBox) { 'this machine' } else { 'the VPS' })
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
@@ -140,7 +195,14 @@ function Done() { Write-Host ''; if (-not $NoPause) { [void](Read-Host 'Enter to
 
 $target = "$VpsUser@$VpsHost"
 $ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
-foreach ($t in 'ssh', 'scp', 'gh') {
+$tools = @('ssh', 'scp', 'gh')
+if ($OffBox) { $tools = @('gh') }
+if ($DryRunTo) { $tools = @() }
+if ($OffBox -and -not $DryRunTo) {
+  $me = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+  if (-not $me.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { Die '-OffBox makes an account, a service and folder rules on this machine, so it needs PowerShell run as administrator.' }
+}
+foreach ($t in $tools) {
   if (-not (Get-Command $t -ErrorAction SilentlyContinue)) {
     if ($t -ne 'gh') { Die "$t is not on PATH. Windows ships it: Settings, Apps, Optional features, OpenSSH Client." }
     Die 'gh is not on PATH. Install GitHub CLI from https://cli.github.com and run gh auth login.'
@@ -151,10 +213,36 @@ foreach ($t in 'ssh', 'scp', 'gh') {
 # 8,191 characters once encoded, so it goes as a file and is deleted after,
 # the same way Setup-Domain.ps1 does it. The registration token is never in
 # the file: it goes on ssh's standard input (Send-Secret.ps1, issue #451).
+# -OffBox runs the same scripts here, in a Windows PowerShell of their own (they
+# end with exit, which would close this one), from a file removed after. A
+# secret goes on that PowerShell's standard input, never in the file or on its
+# command line, the same promise Send-Secret.ps1 keeps over ssh. -DryRunTo
+# writes them down instead and runs nothing.
+function Invoke-Here([string]$script, $secret = $null) {
+  if ($DryRunTo) {
+    Add-Content -LiteralPath $DryRunTo -Value ("# ==== a script it would run" + $(if ($null -ne $secret) { ', with a secret on standard input' } else { '' }) + " ====`r`n" + $script) -Encoding UTF8
+    $global:LASTEXITCODE = 0
+    return @('DRY RUN, nothing ran', 'service Running')
+  }
+  $pre = $(if ($null -ne $secret) { '$ThornswoodSecret = [Console]::In.ReadToEnd().Trim()' + "`r`n" } else { '' })
+  $file = Join-Path $env:TEMP ('ts-runner-' + [Guid]::NewGuid().ToString('N') + '.ps1')
+  [IO.File]::WriteAllText($file, $pre + $script, (New-Object Text.UTF8Encoding $true))
+  $ErrorActionPreference = 'Continue'
+  try {
+    if ($null -ne $secret) { $out = @([string]$secret | & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $file 2>&1 | ForEach-Object { "$_" }) }
+    else { $out = @(& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $file 2>&1 | ForEach-Object { "$_" }) }
+  } finally { Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue }
+  return $out
+}
 function Remote($script) {
+  if ($OffBox -or $DryRunTo) { return Invoke-Here $script }
   # Send-Script.ps1 (issue #1070): a long script goes as a file of its own
   # name, removed after, and the far side's exit code comes back.
   return Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script $script
+}
+function Send-WithSecret($secret, [string]$script) {
+  if ($OffBox -or $DryRunTo) { return Invoke-Here $script $secret }
+  return Invoke-ThornswoodSecretRemote -Target $target -SshArgs $ssh -Secret $secret -Script $script
 }
 # gh with its output kept apart from its errors, and a failure that says which
 # call it was. Named so it never shadows gh itself.
@@ -163,6 +251,12 @@ function Invoke-Gh {
   # on any line gh wrote there (a notice, a warning) even through 2>$null, and
   # a failure came out as NativeCommandError instead of the message below.
   $ErrorActionPreference = 'Continue'
+  if ($DryRunTo) {
+    # Stand-ins, so a dry run asks GitHub nothing.
+    $a = $args -join ' '
+    if ($a -match 'registration-token|remove-token') { return 'DRY-RUN-TOKEN-NOT-REAL' }
+    return ('{"runners":[{"name":"' + $RunnerName + '","status":"online (dry run)","busy":false,"labels":[{"name":"' + $Label + '"}]}]}')
+  }
   $out = & gh @args 2>$null
   if ($LASTEXITCODE -ne 0) { throw ('gh ' + ($args -join ' ') + ' failed') }
   return $out
@@ -204,14 +298,18 @@ function Lock-RunnerRoot([string]$root, [string]$acct) {
 # Users, Everyone or Authenticated Users in, and no deny for it. An account
 # may be given as *<SID>, the way icacls takes one. $parent is C:\ except in
 # tests\test-runner-lock.ps1, which runs both of these on scratch folders.
-function Close-RunnerAccount([string]$acct, [string]$own, [string]$parent = 'C:\') {
+# $filter is 'Thornswood-*' on the VPS and 'Thornswood*' off it (-OffBox), where
+# the worktrees and the play build have no hyphen. $also is -AlsoDeny.
+function Close-RunnerAccount([string]$acct, [string]$own, [string]$parent = 'C:\', [string]$filter = 'Thornswood-*', [string[]]$also = @()) {
   $ErrorActionPreference = 'Continue'
   $sid = ''
   if ($acct.StartsWith('*')) { $sid = $acct.Substring(1) }
   else { try { $sid = (New-Object Security.Principal.NTAccount($acct)).Translate([Security.Principal.SecurityIdentifier]).Value } catch { } }
   if (-not $sid) { throw ('there is no account called ' + $acct + ' on this box') }
   $had = 0; $shut = 0; $wasOpen = @()
-  foreach ($d in @(Get-ChildItem -LiteralPath $parent -Directory -Filter 'Thornswood-*' -EA SilentlyContinue)) {
+  $dirs = @(@(Get-ChildItem -LiteralPath $parent -Directory -Filter $filter -EA SilentlyContinue) +
+            @($also | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Container) } | ForEach-Object { Get-Item -LiteralPath $_ }))
+  foreach ($d in $dirs) {
     if ($d.FullName -eq $own) { continue }
     $rules = $null
     try { $rules = @((Get-Acl -LiteralPath $d.FullName).GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])) } catch { }
@@ -252,7 +350,7 @@ function Remove-RunnerWatchers([string]$prefix = 'Thornswood Runner') {
 # Every runner service on the box, by what Windows says it is: its folder is
 # the one its RunnerService.exe is in, its account the one it runs as. Then
 # the old priority watchers, which belong to no one runner.
-$lockAll = $lockLib + $watcherLib + @'
+$lockAll = $lockLib + $watcherLib + "`n`$liveFilter = '" + $liveFilter + "'`n`$alsoDeny = " + $alsoDenyList + "`n" + @'
 
 $ErrorActionPreference = 'Continue'
 $bad = 0
@@ -267,7 +365,7 @@ foreach ($svc in $services) {
   if (-not $acct -or $acct -match '^(LocalSystem|LocalService|NetworkService)$') { $svc.Name + ' runs as ' + $svc.StartName + ', not an account of its own, so it was left alone'; $bad++; continue }
   try {
     Lock-RunnerRoot $root $acct
-    Close-RunnerAccount $acct $root
+    Close-RunnerAccount $acct $root 'C:\' $liveFilter $alsoDeny
   } catch { 'NOT LOCKED: ' + $svc.Name + ': ' + $_.Exception.Message; $bad++ }
 }
 if ($bad) { exit 1 }
@@ -312,7 +410,7 @@ if ($Remove) {
   try { $tok = (Invoke-Gh api -X POST "repos/$Repo/actions/runners/remove-token" --jq .token | Out-String).Trim() } catch { Say '  could not get a removal token; the box is cleaned and GitHub is left to forget it' 'Yellow' }
   # The removal token goes on ssh's standard input and reaches config.cmd in
   # its environment, never on a command line (Send-Secret.ps1, issue #451).
-  Invoke-ThornswoodSecretRemote -Target $target -SshArgs $ssh -Secret ([string]$tok) -Script ($watcherLib + "`n" + @"
+  Send-WithSecret ([string]$tok) ($watcherLib + "`n" + @"
 `$ErrorActionPreference = 'Continue'
 `$t = `$ThornswoodSecret; `$ThornswoodSecret = `$null
 if ((Test-Path '$Root\config.cmd') -and `$t) {
@@ -325,8 +423,8 @@ if ((Test-Path '$Root\config.cmd') -and `$t) {
 Stop-Service -Name '$service' -Force -EA SilentlyContinue
 & sc.exe delete '$service' 2>&1 | Out-Null
 Remove-RunnerWatchers
-foreach (`$d in (Get-ChildItem 'C:\' -Directory -Filter 'Thornswood-*' -EA SilentlyContinue)) {
-  & icacls.exe `$d.FullName /remove:d '$Account' /T /C /Q 2>&1 | Out-Null
+foreach (`$d in @(@(Get-ChildItem 'C:\' -Directory -Filter '$liveFilter' -EA SilentlyContinue | ForEach-Object { `$_.FullName }) + $alsoDenyList)) {
+  if (Test-Path -LiteralPath `$d) { & icacls.exe `$d /remove:d '$Account' /T /C /Q 2>&1 | Out-Null }
 }
 Remove-LocalUser -Name '$Account' -EA SilentlyContinue
 Remove-Item -LiteralPath '$Root' -Recurse -Force -EA SilentlyContinue
@@ -358,7 +456,7 @@ $zipName = "actions-runner-win-x64-$version.zip"
 $zipUrl = "https://github.com/actions/runner/releases/download/v$version/$zipName"
 Say "  actions/runner $version (pinned), SHA-256 $sha" 'Green'
 
-Head 'What the build check needs, on the VPS'
+Head "What the build check needs, on $where"
 $need = Remote @"
 `$env:PATH = [Environment]::GetEnvironmentVariable('PATH','Machine')
 foreach (`$c in 'pwsh','node','python','git') {
@@ -376,7 +474,7 @@ if ($missing.Count) {
   if ($missing -contains 'pwsh' -or $missing -contains 'node' -or $missing -contains 'git') { $how += ".\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeGit'   (PowerShell 7, Node, Git, for all users; from this machine, it runs on the VPS)" }
   if ($missing -contains 'python') { $how += '.\scripts\deploy\Install-Bot.ps1   (Python for all users; the bot needs it anyway)' }
   if ($missing -contains 'csc' -or $missing -contains 'wpf') { $how += 'the box needs Windows Server with the Desktop Experience and .NET Framework 4.8; that is not a script' }
-  Die ("The VPS is missing " + ($missing -join ', ') + ". Nothing was installed. Put them there with:" + [Environment]::NewLine + '    ' + ($how -join ([Environment]::NewLine + '    ')))
+  Die ("$where is missing " + ($missing -join ', ') + ". Nothing was installed. Put them there with:" + [Environment]::NewLine + '    ' + ($how -join ([Environment]::NewLine + '    ')))
 }
 
 Head 'Registration token'
@@ -384,12 +482,12 @@ $token = (Invoke-Gh api -X POST "repos/$Repo/actions/runners/registration-token"
 if (-not $token) { Die "GitHub gave no registration token. gh has to be signed in as somebody who administers $Repo." }
 Say '  got one, good for an hour, not shown' 'Green'
 
-Head 'Installing it on the VPS'
+Head "Installing it on $where"
 # The token goes on ssh's standard input (Send-Secret.ps1, issue #451): on no
 # command line and in no file on either machine. Until then it was written
 # into this script, which is long enough to go up as a file, so it sat in
 # C:\Windows\Temp on the VPS while the install ran.
-$out = Invoke-ThornswoodSecretRemote -Target $target -SshArgs $ssh -Secret $token -Script ($lockLib + $watcherLib + "`n" + @"
+$out = Send-WithSecret $token ($lockLib + $watcherLib + "`n" + @"
 `$ErrorActionPreference = 'Stop'
 `$regToken = `$ThornswoodSecret; `$ThornswoodSecret = `$null
 if (-not `$regToken) { throw 'NOTHING ARRIVED on standard input, so there is no registration token. Nothing was installed.' }
@@ -422,11 +520,12 @@ if (Get-LocalUser -Name `$acct -EA SilentlyContinue) {
   'account ' + `$acct + ' made'
 }
 
-# Every live Thornswood folder is closed to it: read and write both.
-foreach (`$d in (Get-ChildItem 'C:\' -Directory -Filter 'Thornswood-*' -EA SilentlyContinue)) {
-  if (`$d.FullName -eq `$root) { continue }
-  & icacls.exe `$d.FullName /deny (`$acct + ':(OI)(CI)F') /C /Q 2>&1 | Out-Null
-  'closed to it: ' + `$d.FullName
+# Every live Thornswood folder is closed to it: read and write both. Off the
+# box that is every C:\Thornswood* folder, and -AlsoDeny's besides.
+foreach (`$d in @(@(Get-ChildItem 'C:\' -Directory -Filter '$liveFilter' -EA SilentlyContinue | ForEach-Object { `$_.FullName }) + $alsoDenyList)) {
+  if (`$d -eq `$root -or -not (Test-Path -LiteralPath `$d)) { continue }
+  & icacls.exe `$d /deny (`$acct + ':(OI)(CI)F') /C /Q 2>&1 | Out-Null
+  'closed to it: ' + `$d
 }
 
 # A runner already here is taken off first, so a second run replaces it.
@@ -465,7 +564,10 @@ if (-not (Test-Path (Join-Path `$root 'bin\Runner.Listener.exe')) -or -not (Test
 # check, which was most of its five minutes. The runner's own folder only;
 # every live C:\Thornswood-* folder stays scanned. The repository is
 # private, so what runs here is the team's own code.
-try { Add-MpPreference -ExclusionPath `$root -EA Stop; 'Defender skips ' + `$root } catch { 'Defender exclusion not set: ' + `$_.Exception.Message }
+# Off the box (-OffBox) it keeps scanning unless -DefenderSkip says otherwise.
+if ($defenderOn) {
+  try { Add-MpPreference -ExclusionPath `$root -EA Stop; 'Defender skips ' + `$root } catch { 'Defender exclusion not set: ' + `$_.Exception.Message }
+} else { 'Defender still scans ' + `$root + ' (off the box; -DefenderSkip to change that)' }
 
 # Its own folder is the one place it may write.
 & icacls.exe `$root /grant (`$acct + ':(OI)(CI)M') /T /C /Q 2>&1 | Out-Null
