@@ -8,7 +8,9 @@
   against scratch folders under %TEMP% with the real Get-Acl and Set-Acl, read
   back. Watch, Deploys, Caddy and Maint keep their rules by name (the bot's on
   Watch, the site's on Deploys\current, a runner's deny); Dumps is SYSTEM's and
-  Administrators' only. Watch is refused while the bot has no rule on it, and
+  Administrators', with write and no read for LOCAL SERVICE and the runners
+  (WER's node.exe crash dumps), every other rule by name gone, a runner's deny
+  too. Watch is refused while the bot has no rule on it, and
   Deploys while the site has none on current, and each is then left as it was.
   tests\test-server-acl.ps1 covers the server, voice and backup folders.
 #>
@@ -45,7 +47,7 @@ function Grant([string]$p, [string]$sid, [string]$rights, [string]$inh, [string]
     Set-Acl -LiteralPath $p -AclObject $acl
 }
 function Box([string]$c, [string]$botSid, [string[]]$more) {
-    $a = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $lockBox, '-Parent', $c, '-SiteSid', $site, '-BotSid', $botSid, '-AllowGamingPc') + $more
+    $a = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $lockBox, '-Parent', $c, '-SiteSid', $site, '-BotSid', $botSid, '-AllowGamingPc', '-DumpWriterSids', ($site + ',' + $runner)) + $more
     $eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     try { $o = @(& $ps51 @a 2>&1 | ForEach-Object { "$_" }) } finally { $ErrorActionPreference = $eap }
     $script:code = $LASTEXITCODE
@@ -76,11 +78,13 @@ try {
     Grant (Join-Path $c 'Thornswood-Deploys\current') $site 'Read' 'ObjectInherit' 'NoPropagateInherit'
     Grant (Join-Path $c 'Thornswood-Deploys') $runner 'FullControl' 'ContainerInherit, ObjectInherit' 'None' 'Deny'
     Grant (Join-Path $c 'Thornswood-Dumps') $site 'Read' 'ContainerInherit, ObjectInherit' 'None'
+    Grant (Join-Path $c 'Thornswood-Dumps') $runner 'FullControl' 'ContainerInherit, ObjectInherit' 'None' 'Deny'
     $names = 'Thornswood-Watch', 'Thornswood-Deploys', 'Thornswood-Caddy', 'Thornswood-Maint', 'Thornswood-Dumps'
     Yes 'the scratch folders start the way C:\ leaves them, Users reaching caddy.exe' ((Broad (Join-Path $c 'Thornswood-Caddy\caddy.exe')) -gt 0)
     $before = @{}; foreach ($n in $names) { $before[$n] = (Get-Acl -LiteralPath (Join-Path $c $n)).Sddl }
     $o = Box $c $bot @('-WhatIf')
     foreach ($n in $names) { Yes "-WhatIf says it would lock $n" ($o -match ('WOULD LOCK ' + [regex]::Escape((Join-Path $c $n)) + ':')) }
+    Yes '-WhatIf names the Dumps writers' ($o -match ('WOULD LOCK ' + [regex]::Escape((Join-Path $c 'Thornswood-Dumps')) + ':.*write \(no read\) for ' + [regex]::Escape($site + ', ' + $runner)))
     Yes '-WhatIf changes nothing' (@($names | Where-Object { (Get-Acl -LiteralPath (Join-Path $c $_)).Sddl -ne $before[$_] }).Count -eq 0 -and $o -match 'WHATIF: nothing was changed')
     $o = Box $c $bot @()
     Yes ('it locks all five and refuses none (exit ' + $script:code + ')') ($script:code -eq 0 -and $o -match 'LOCKED 5 folder\(s\), 0 refused')
@@ -101,7 +105,16 @@ try {
     Yes 'nobody but SYSTEM, Administrators and the bot reaches Caddy or Maint' (
         @(@((Get-Acl -LiteralPath (Join-Path $c 'Thornswood-Caddy\caddy.exe')).Access) + @((Get-Acl -LiteralPath (Join-Path $c 'Thornswood-Maint\update.ps1')).Access) | Where-Object { $keep -notcontains (Sid $_) }).Count -eq 0)
     $x = @((Get-Acl -LiteralPath (Join-Path $c 'Thornswood-Dumps\crash.dmp')).Access | ForEach-Object { Sid $_ } | Sort-Object -Unique)
-    Yes ('Dumps is SYSTEM''s and Administrators'' alone, a rule by name gone too (' + ($x -join ', ') + ')') (@($x | Where-Object { $keep -notcontains $_ }).Count -eq 0)
+    Yes ('Dumps holds only SYSTEM, Administrators and the two writers, the site''s read gone (' + ($x -join ', ') + ')') (@($x | Where-Object { $keep -notcontains $_ -and @($site, $runner) -notcontains $_ }).Count -eq 0)
+    $WriteBits = [Security.AccessControl.FileSystemRights]'Write'; $Rd = [Security.AccessControl.FileSystemRights]'ReadData'
+    foreach ($w in $site, $runner) {
+        foreach ($p in 'Thornswood-Dumps', 'Thornswood-Dumps\crash.dmp') {
+            $r = @(Named (Join-Path $c $p) $w)
+            Yes "  $w may make and write files in $p, and reads nothing there" (
+                $r.Count -ge 1 -and @($r | Where-Object { "$($_.AccessControlType)" -eq 'Deny' }).Count -eq 0 -and
+                @($r | Where-Object { ($_.FileSystemRights -band $WriteBits) -eq $WriteBits }).Count -ge 1 -and @($r | Where-Object { ($_.FileSystemRights -band $Rd) -ne 0 }).Count -eq 0)
+        }
+    }
     Yes 'each is read back' ($o -match ([regex]::Escape((Join-Path $c 'Thornswood-Caddy')) + ': takes nothing from above, no Users rule'))
     Yes 'a folder that is not ours is never touched' ((Broad (Join-Path $c 'Thornswood-Docs\x.txt')) -gt 0)
     $s1 = @{}; foreach ($n in $names) { $s1[$n] = (Get-Acl -LiteralPath (Join-Path $c $n)).Sddl }
