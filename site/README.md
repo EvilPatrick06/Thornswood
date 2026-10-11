@@ -48,6 +48,18 @@ a page on another name under thornswood.net does. A GET changes nothing
 another page can choose. `tests\test-1367-cross-site.js` sends every kind of
 write the hub makes from another site and from this one.
 
+## The site log
+
+`site.log` sits beside `server.js` and rolls at 4 MB, keeping `site.log.1` to
+`.5`. If a roll fails (usually a rotated file held open by an editor, a tail
+or a backup, or the folder losing delete rights), the site says so once, on
+the console and in the log, with the file and the error, and tries again
+every minute rather than on every line. The active file has an emergency
+ceiling of 8 MB (twice the roll size): past it one line says so and the file
+stops growing, with lines going to the console only, until a roll works,
+which is said once too. `tests\test-2189-log-rotation.js` covers it. Disk
+space for the folder as a whole is a storage alert (#2178), not this.
+
 ## On your machine
 
 It needs node and nothing else. Run it from a copy of this folder rather than
