@@ -40,7 +40,9 @@ yes('the site still keys the role half off that exact name',
     /banned: \['Banned'\]/.test(src));
 
 // ------------------------------------------------------- the file half
-const from = src.indexOf('  const bans = jsonFile(BANS, {});');
+// The read goes through bansNow() since #2186, which fails closed on a
+// broken file (tests/test-bans-broken.js runs that against the real site).
+const from = src.indexOf('  const readB = bansNow();\n  if (readB.broken) {');
 const to = src.indexOf('  /* The hand written admin list is an override', from);
 const block = (from >= 0 && to > from) ? src.slice(from, to) : '';
 yes('the ban file is read inside standing()', !!block);
@@ -52,16 +54,18 @@ if (block) {
     lookup worked. The stub stands in for jsonFile, which on the real thing
     returns the fallback for a missing or unreadable file.
   */
-  function decide(bansTable, discordId) {
+  function decide(bansTable, discordId, broken) {
     const out = { id: String(discordId), banned: false, play: false, admin: false };
     const jsonFile = function () { return bansTable; };
+    const bansNow = function () { return { table: bansTable, broken: broken || '' }; };
+    const BANS_BROKEN_WHY = 'broken';
     const BANS = 'bans.json';
     let returned = false;
     (function () {
       // the block ends in `return out;` inside the real function
-      const run = new Function('out', 'jsonFile', 'BANS', 'discordId', 'Object',
+      const run = new Function('out', 'jsonFile', 'BANS', 'discordId', 'Object', 'bansNow', 'BANS_BROKEN_WHY',
         block + '\nreturn null;');
-      const r = run(out, jsonFile, BANS, discordId, Object);
+      const r = run(out, jsonFile, BANS, discordId, Object, bansNow, BANS_BROKEN_WHY);
       returned = (r !== null) || out.banned;
     })();
     return { out: out, returned: returned };
@@ -94,6 +98,8 @@ if (block) {
       /String\(discordId\)/.test(block));
 
   yes('an empty file bans nobody', decide({}, '123456789012345678').out.banned === false);
+  yes('a broken file bans everybody, and says why (#2186)', decide({}, '1', 'will not parse').out.banned === true &&
+      decide({}, '1', 'will not parse').out.bansBroken === true);
 
   /*
     A missing file is the one that matters most: jsonFile answers its fallback,
@@ -122,7 +128,7 @@ if (block) {
   */
   const fn = src.slice(src.indexOf('async function standing(discordId)'),
                        src.indexOf('/* The ticket the launcher keeps.'));
-  const banIdx = fn.indexOf('jsonFile(BANS');
+  const banIdx = fn.indexOf('bansNow()');
   const adminIdx = fn.indexOf('cfg.admins.indexOf');
   const noBotIdx = fn.indexOf('No bot configured yet');
   yes('the file is read before the hand written admin list',
