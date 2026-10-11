@@ -54,6 +54,13 @@
   lock file for the whole run, so a second copy cannot pick the same ones; and
   its folders are under a scratch folder of its own, as they were.
 
+  And issue #2113: Deploy-DevGamemode sends a gamemode only onto the server
+  build its commit records (#2076), so the scratch commit holds this
+  repository's records\server-build.json and the stand-in dev box holds the
+  same record, as a full dev publish leaves it. Without them every dev case
+  was refused at that check and none reached the swap. A dev box that holds
+  another build's record is refused before anything is sent.
+
   Connects to nothing but 127.0.0.1.
 #>
 [CmdletBinding()]
@@ -422,6 +429,14 @@ Copy-Item -LiteralPath $scripts -Destination (Join-Path $repo 'scripts') -Recurs
 # Where.ps1 reads the layout from the repository's root; the artifacts go
 # under the out folder it names, inside the scratch repository.
 Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $scripts) 'layout.json') -Destination (Join-Path $repo 'layout.json')
+# Every commit holds records\server-build.json, the server build its gamemode
+# is written for, and Deploy-DevGamemode sends a gamemode only onto a dev
+# server that runs that build (#2076). This repository's record, so the
+# scratch commit holds one as a real one does; the stand-in dev box gets the
+# same record below, as Publish-Server -Channel dev leaves it (#2113).
+$serverRecord = Join-Path (Split-Path -Parent $scripts) 'records\server-build.json'
+$null = [IO.Directory]::CreateDirectory((Join-Path $repo 'records'))
+Copy-Item -LiteralPath $serverRecord -Destination (Join-Path $repo 'records\server-build.json')
 Put (Join-Path $repo 'scripts\vps\vps.json') '{ "address": "127.0.0.1" }'
 # The artifacts are built under out\, which is ignored, as it is in the repository.
 Put (Join-Path $repo '.gitignore') "out/`n"
@@ -782,8 +797,10 @@ try {
     $live = Live $botRoot
     $a = $bot.Clone(); $a['DocsRoot'] = (Join-Path $box 'No-Site-Yet')
     $r = Deploy 'Install-Bot.ps1' $a
+    $failed = $script:fail
     Yes 'Install-Bot: a site with no data\for-bot yet stops it, naming Deploy-Docs, with the bot untouched' (
         (-not $r.Ok) -and $r.Said -match 'Run \.\\scripts\\deploy\\Deploy-Docs\.ps1 first' -and ((Live $botRoot) -eq $live))
+    if ($script:fail -gt $failed) { Show }
 
     Bot 'bot v2'
     $r = Deploy 'Install-Bot.ps1' $bot.Clone()
@@ -908,6 +925,9 @@ try {
     Put (Join-Path $devRoot 'server-settings.json') (([ordered]@{ port = $devPort; name = 'Thornswood Dev'; dataDir = 'data'
         loadOrder = @($devFar + 'Skyrim.esm'); thornswoodServer = 'dev'; thornswoodRequirePass = $true }) | ConvertTo-Json)
     Put (Join-Path $devRoot 'data\keep.txt') 'the character book'
+    # The record of the server build it runs, which a full dev publish leaves
+    # beside the server files: the build this commit records (#2076, #2113).
+    Copy-Item -LiteralPath $serverRecord -Destination (Join-Path $devRoot 'server-build.json')
     Task ($TaskPrefix + ' Dev Server') $node.Source ('"' + $gameStub + '" "' + $devRoot + '"') $devRoot
     $gm = Join-Path $repo 'game\gamemode.js'
     $launcher = Join-Path $work 'launcher'
@@ -918,12 +938,29 @@ try {
     function DevUp { return ((UdpOwner $devPort) -gt 0) -and ((Listener ($devPort + 1)) -gt 0) }
     Yes 'Deploy-DevGamemode: the stand-in dev server is up' (WaitFor { DevUp })
 
+    # A dev server that runs another server build than the commit records is
+    # refused before the artifact is sent (#2076): no scp, nothing stopped.
+    $recText = [IO.File]::ReadAllText($serverRecord)
+    $recCommit = [string]($recText | ConvertFrom-Json).source.commit
+    Put (Join-Path $devRoot 'server-build.json') $recText.Replace($recCommit, ('f' * 40))
     Put $gm '// dev v2'
+    $live = Live $devRoot
+    $pidBefore = UdpOwner $devPort
+    $scpBefore = $global:TsScpCount
+    $r = Deploy 'Deploy-DevGamemode.ps1' $dev.Clone()
+    $failed = $script:fail
+    Yes 'Deploy-DevGamemode: a dev server on another server build is refused before anything is sent' (
+        (-not $r.Ok) -and $recCommit -and $r.Said -match 'runs another server build \(commit ffffffff\)' -and $global:TsScpCount -eq $scpBefore)
+    Yes '  and the dev server is untouched, the same process answering' (((Live $devRoot) -eq $live) -and ((UdpOwner $devPort) -eq $pidBefore))
+    if ($script:fail -gt $failed) { Show }
+    Copy-Item -LiteralPath $serverRecord -Destination (Join-Path $devRoot 'server-build.json') -Force
+
     $pidBefore = UdpOwner $devPort
     $r = Deploy 'Deploy-DevGamemode.ps1' $dev.Clone()
     $failed = $script:fail
     Yes 'Deploy-DevGamemode: a good gamemode is SWAP OK and the dev server answers as a new process' (
-        $r.Ok -and $r.Said -match 'SWAP OK' -and (Get (Join-Path $devRoot 'gamemode.js')) -eq '// dev v2' -and
+        $r.Ok -and $r.Said -match 'runs the build this commit records' -and $r.Said -match 'SWAP OK' -and
+        (Get (Join-Path $devRoot 'gamemode.js')) -eq '// dev v2' -and
         (WaitFor { DevUp }) -and ((UdpOwner $devPort) -ne $pidBefore))
     Yes '  and its stamp went in beside it, and the settings were edited in the stage, not in place' (
         (Test-Path -LiteralPath (Join-Path $devRoot 'thornswood-build.json')) -and
