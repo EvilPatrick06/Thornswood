@@ -105,7 +105,7 @@
 #>
 [CmdletBinding()]
 param(
-  [string]$Dist    = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') ServerDist),
+  [string]$Dist    = '',
   [string]$Vps     = '',
   [string]$User    = '',
   [string]$Root    = 'C:/Thornswood-Server',
@@ -179,6 +179,8 @@ $ErrorActionPreference = 'Stop'
 $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+# Resolved here, not as the parameter's default: 5.1 leaves $PSScriptRoot empty in an advanced script's defaults (#2229).
+if (-not $Dist) { $Dist = & (Join-Path $Here '..\release\Where.ps1') ServerDist }
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Script.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
