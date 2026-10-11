@@ -40,6 +40,39 @@
   tests\test-runner-offbox.ps1 can read them without touching an ACL, a
   service, an account or GitHub.
 
+  WHAT A PULL REQUEST JOB MAY REACH (-OffBox only). Two guards, put on by the
+  install and by -OffBox -Lock, taken off by -OffBox -Remove, shown by -Status
+  and written out by -DryRunTo like everything else:
+    - THE NETWORK. Outbound block rules in Windows Firewall, in a group of
+      their own ('Thornswood PR runner <account>'), that match only programs
+      running as the runner's account (-LocalUser, the account's SID) and
+      cover every address except GitHub's (the web, api, git and actions
+      lists of https://api.github.com/meta, fetched when it runs), loopback,
+      and whatever -AllowHost names resolve to then. Windows Firewall puts a
+      block rule above any allow rule, so "block everything, allow GitHub"
+      cannot be two rules: the block rules ARE the complement of GitHub's
+      ranges. What that does not do: it has no idea of host names (a rule is
+      addresses; the actions list is broad Azure space shared with others);
+      the lists change, so -OffBox -Lock fetches them again and puts the
+      rules back (a new GitHub range is blocked until then, which fails
+      closed); DNS questions go out through the DNS Client service, not the
+      account, so a job can still ask a name server (a DNS tunnel is possible);
+      a job that asks a service running as another account to fetch for it
+      (BITS, say) is not this account's traffic. build.yml installs the pinned
+      ruff from PyPI, which is not GitHub: that step fails closed unless
+      -AllowHost pypi.org,files.pythonhosted.org is given (their addresses at
+      that moment; a CDN moves them).
+    - WHAT IT MAY READ outside C:\Thornswood*. A deny for the account on the
+      root of every other fixed or removable drive, on every profile in
+      C:\Users but its own and Default (Public included), and on
+      C:\ProgramData\ssh and C:\ProgramData\Docker. Each deny sits on that one
+      folder and is inherited below it; -Remove takes exactly those off. What
+      that does not do: a child with inheritance switched off keeps its own
+      rules; Windows, Program Files and the rest of ProgramData stay readable,
+      as every account's are, because the tools a build needs live there;
+      and the runner and its jobs are one account, so a job can read the
+      runner's own .credentials (GitHub's design, the same on the VPS).
+
   WHY. Every run of .github\workflows\build.yml has failed in seconds since
   02:10 on 25 September, because GitHub's own runners are blocked on billing.
   Decided by Patrick on 25 September (issue #437): a runner on the VPS rather
@@ -143,6 +176,9 @@ param(
   [switch]$OffBox,
   # Folders the runner's account is shut out of as well as C:\Thornswood*.
   [string[]]$AlsoDeny = @(),
+  # -OffBox only: host names a pull request job may reach besides GitHub,
+  # resolved to addresses when it runs (WHAT A PULL REQUEST JOB MAY REACH).
+  [string[]]$AllowHost = @(),
   # -OffBox only: let Defender skip the runner's folder as it does on the VPS.
   [switch]$DefenderSkip,
   # Write the scripts it would run to this file and run none of them; every gh
@@ -187,6 +223,7 @@ if ($OffBox) {
 $alsoDenyList = '@(' + ((@($AlsoDeny | Where-Object { $_ }) | ForEach-Object { "'" + $_.Replace("'", "''") + "'" }) -join ', ') + ')'
 $defenderOn = $(if ($OffBox -and -not $DefenderSkip) { '$false' } else { '$true' })
 $where = $(if ($OffBox) { 'this machine' } else { 'the VPS' })
+$guardGroup = 'Thornswood PR runner ' + $Account
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
@@ -255,6 +292,7 @@ function Invoke-Gh {
     # Stand-ins, so a dry run asks GitHub nothing.
     $a = $args -join ' '
     if ($a -match 'registration-token|remove-token') { return 'DRY-RUN-TOKEN-NOT-REAL' }
+    if ($a -match '^api meta') { return '{"web":["140.82.112.0/20","2a0a:a440::/29"],"api":["192.30.252.0/22"],"git":["140.82.112.0/20"],"actions":["4.148.0.0/16"]}' }
     return ('{"runners":[{"name":"' + $RunnerName + '","status":"online (dry run)","busy":false,"labels":[{"name":"' + $Label + '"}]}]}')
   }
   $out = & gh @args 2>$null
@@ -347,6 +385,134 @@ function Remove-RunnerWatchers([string]$prefix = 'Thornswood Runner') {
 }
 '@
 
+# ------------------------------------------------- the off-box guards --
+# The header's WHAT A PULL REQUEST JOB MAY REACH. $rangeLib runs here, on the
+# machine that runs this script, and turns the address lists GitHub publishes
+# into the ranges to block; tests\test-runner-offbox.ps1 lifts it out and
+# checks its arithmetic. $guardLib runs where the runner is.
+$rangeLib = @'
+function ConvertTo-RunnerRange([string]$cidr) {
+  $parts = $cidr.Trim().Split('/')
+  $ip = [Net.IPAddress]::Parse($parts[0])
+  $bytes = $ip.GetAddressBytes()
+  $bits = $bytes.Length * 8
+  $len = $(if ($parts.Count -gt 1) { [int]$parts[1] } else { $bits })
+  if ($len -lt 0 -or $len -gt $bits) { throw ('not an address range: ' + $cidr) }
+  $n = [bigint]0
+  foreach ($b in $bytes) { $n = $n * 256 + $b }
+  $size = [bigint]::Pow(2, $bits - $len)
+  $lo = $n - ($n % $size)
+  New-Object PSObject -Property @{ V = $(if ($bits -eq 32) { 4 } else { 6 }); Lo = $lo; Hi = $lo + $size - 1 }
+}
+function ConvertFrom-RunnerNumber([bigint]$n, [int]$v) {
+  $count = $(if ($v -eq 4) { 4 } else { 16 })
+  $bytes = New-Object byte[] $count
+  for ($i = $count - 1; $i -ge 0; $i--) { $bytes[$i] = [byte][int]($n % 256); $n = [bigint]::Divide($n, 256) }
+  ([Net.IPAddress]$bytes).ToString()
+}
+# Every address, IPv4 and IPv6, that is in none of $allow, as Windows Firewall
+# ranges (a-b, or a lone address).
+function Get-RunnerBlockRanges([string[]]$allow) {
+  $out = New-Object Collections.Generic.List[string]
+  $all = @($allow | Where-Object { $_ } | ForEach-Object { ConvertTo-RunnerRange $_ })
+  foreach ($v in 4, 6) {
+    $top = [bigint]::Pow(2, $(if ($v -eq 4) { 32 } else { 128 })) - 1
+    $next = [bigint]0
+    foreach ($r in @($all | Where-Object { $_.V -eq $v } | Sort-Object -Property Lo)) {
+      if ($r.Lo -gt $next) {
+        $a = ConvertFrom-RunnerNumber $next $v; $b = ConvertFrom-RunnerNumber ($r.Lo - 1) $v
+        $out.Add($(if ($a -eq $b) { $a } else { $a + '-' + $b }))
+      }
+      if ($r.Hi + 1 -gt $next) { $next = $r.Hi + 1 }
+    }
+    if ($next -le $top) { $out.Add((ConvertFrom-RunnerNumber $next $v) + '-' + (ConvertFrom-RunnerNumber $top $v)) }
+  }
+  $out.ToArray()
+}
+'@
+$guardLib = @'
+# Outbound block rules for the account alone, replacing any it had.
+function Set-RunnerFirewall([string]$acct, [string]$group, [string[]]$blocks, [int]$per = 500) {
+  $sid = $(if ($acct.StartsWith('*')) { $acct.Substring(1) } else { (New-Object Security.Principal.NTAccount($acct)).Translate([Security.Principal.SecurityIdentifier]).Value })
+  if (-not @($blocks).Count) { throw 'there is no address list to block, so the firewall was left as it was' }
+  @(Get-NetFirewallRule -Group $group -EA SilentlyContinue) | ForEach-Object { Remove-NetFirewallRule -Name $_.Name }
+  $why = 'Install-Runner.ps1 -OffBox (#1306): a pull request job reaches GitHub and nothing else. -OffBox -Remove takes it off.'
+  $n = 0
+  for ($i = 0; $i -lt $blocks.Count; $i += $per) {
+    $n++
+    $chunk = @($blocks[$i..([Math]::Min($i + $per, $blocks.Count) - 1)])
+    New-NetFirewallRule -DisplayName ($group + ' ' + $n) -Group $group -Direction Outbound -Action Block -Profile Any -LocalUser ('D:(A;;CC;;;' + $sid + ')') -RemoteAddress $chunk -Description $why -EA Stop | Out-Null
+  }
+  'firewall: ' + $acct + ' may reach GitHub and this machine only, ' + $blocks.Count + ' blocked range(s) in ' + $n + ' outbound rule(s), group ' + $group
+}
+function Remove-RunnerFirewall([string]$group) {
+  $r = @(Get-NetFirewallRule -Group $group -EA SilentlyContinue)
+  if (-not $r.Count) { 'firewall: no rule in ' + $group; return }
+  $r | ForEach-Object { Remove-NetFirewallRule -Name $_.Name }
+  'firewall: took off ' + $r.Count + ' rule(s) in ' + $group
+}
+function Get-RunnerFirewall([string]$group) {
+  $r = @(Get-NetFirewallRule -Group $group -EA SilentlyContinue)
+  if ($r.Count) { 'firewall  ' + $r.Count + ' outbound block rule(s), ' + @($r | Where-Object { "$($_.Enabled)" -eq 'True' }).Count + ' on (group ' + $group + ')' } else { 'firewall  NO RULES: a pull request job may reach anywhere. -OffBox -Lock puts them on' }
+}
+# The folders outside C:\Thornswood* it is shut out of. $users, $programData
+# and $drives are C:\Users, C:\ProgramData and the other drives except in
+# tests\test-runner-offbox.ps1, which gives scratch folders.
+function Get-RunnerReadDenies([string]$acct, [string]$users = 'C:\Users', [string]$programData = $env:ProgramData, $drives = $null) {
+  if ($null -eq $drives) {
+    $sys = '' + $env:SystemDrive
+    $drives = @(Get-CimInstance Win32_LogicalDisk -EA SilentlyContinue | Where-Object { ($_.DriveType -eq 2 -or $_.DriveType -eq 3) -and $_.DeviceID -ne $sys } | ForEach-Object { $_.DeviceID + '\' })
+  }
+  $name = $acct.Split('\')[-1]
+  $keep = @('Default', 'Default User', 'All Users')
+  $out = @($drives | Where-Object { $_ })
+  $out += @(Get-ChildItem -LiteralPath $users -Directory -Force -EA SilentlyContinue |
+            Where-Object { -not ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -and $keep -notcontains $_.Name -and $_.Name -ne $name -and $_.Name -notlike ($name + '.*') } |
+            ForEach-Object { $_.FullName })
+  foreach ($p in 'ssh', 'Docker') { $out += (Join-Path $programData $p) }
+  @($out | Where-Object { Test-Path -LiteralPath $_ -PathType Container })
+}
+function Close-RunnerReads([string]$acct, [string[]]$paths) {
+  $ErrorActionPreference = 'Continue'
+  foreach ($p in $paths) {
+    $null = & icacls.exe $p /deny ($acct + ':(OI)(CI)F') /C /Q 2>&1
+    if ($LASTEXITCODE -eq 0) { 'shut out of: ' + $p } else { 'COULD NOT shut ' + $acct + ' out of ' + $p }
+  }
+}
+function Open-RunnerReads([string]$acct, [string[]]$paths) {
+  $ErrorActionPreference = 'Continue'
+  foreach ($p in $paths) { $null = & icacls.exe $p /remove:d $acct /C /Q 2>&1 }
+  'deny taken off ' + @($paths).Count + ' folder(s) outside C:\Thornswood*'
+}
+'@
+. ([scriptblock]::Create($rangeLib))
+# Where the runner is: the guards, as source. $mode is apply, remove or status.
+function Get-GuardScript([string]$mode, [string[]]$blocks = @()) {
+  $list = '@(' + ((@($blocks) | ForEach-Object { "'" + $_ + "'" }) -join ', ') + ')'
+  $head = $guardLib + "`n`$grdAcct = '" + $Account.Replace("'", "''") + "'`n`$grdGroup = '" + $guardGroup.Replace("'", "''") + "'`n"
+  if ($mode -eq 'status') { return $head + 'Get-RunnerFirewall $grdGroup' }
+  if ($mode -eq 'remove') { return $head + "Remove-RunnerFirewall `$grdGroup`nOpen-RunnerReads `$grdAcct (Get-RunnerReadDenies `$grdAcct)`n" }
+  return $head + "`$grdBlocks = " + $list + "`nSet-RunnerFirewall `$grdAcct `$grdGroup `$grdBlocks`nClose-RunnerReads `$grdAcct (Get-RunnerReadDenies `$grdAcct)`n"
+}
+# GitHub's published lists, loopback and -AllowHost, as the ranges to block.
+function Get-GuardBlocks {
+  $meta = (Invoke-Gh api meta | Out-String) | ConvertFrom-Json
+  $allow = @('127.0.0.0/8', '::1/128')
+  foreach ($k in 'web', 'api', 'git', 'actions') {
+    $got = @($meta.$k | Where-Object { $_ })
+    if (-not $got.Count) { throw ('api.github.com/meta has no ' + $k + ' list, so no firewall rule was made') }
+    $allow += $got
+  }
+  foreach ($h in @($AllowHost | Where-Object { $_ })) {
+    if ($DryRunTo) { $allow += '203.0.113.7/32'; continue }
+    $ips = @([Net.Dns]::GetHostAddresses($h) | ForEach-Object { $_.IPAddressToString })
+    if (-not $ips.Count) { throw ('-AllowHost ' + $h + ' resolves to nothing') }
+    $allow += $ips
+    Say ('  -AllowHost ' + $h + ': ' + ($ips -join ', ') + ' (as of now)') 'Yellow'
+  }
+  Get-RunnerBlockRanges $allow
+}
+
 # Every runner service on the box, by what Windows says it is: its folder is
 # the one its RunnerService.exe is in, its account the one it runs as. Then
 # the old priority watchers, which belong to no one runner.
@@ -392,6 +558,7 @@ if (Test-Path '$Root') {
 if (`$old.Count) { 'priority  OLD WATCHER TASK still here: ' + ((`$old | ForEach-Object { `$_.TaskName }) -join ', ') + '. -Lock takes it off' }
 else { 'priority  no watcher task; the service starts the runner at normal' }
 "@) | ForEach-Object { Say "  $_" }
+  if ($OffBox) { Remote (Get-GuardScript 'status') | ForEach-Object { Say "  $_" } }
   Head 'On GitHub'
   try {
     $r = (Invoke-Gh api "repos/$Repo/actions/runners" | Out-String) | ConvertFrom-Json
@@ -426,6 +593,7 @@ Remove-RunnerWatchers
 foreach (`$d in @(@(Get-ChildItem 'C:\' -Directory -Filter '$liveFilter' -EA SilentlyContinue | ForEach-Object { `$_.FullName }) + $alsoDenyList)) {
   if (Test-Path -LiteralPath `$d) { & icacls.exe `$d /remove:d '$Account' /T /C /Q 2>&1 | Out-Null }
 }
+$(if ($OffBox) { Get-GuardScript 'remove' } else { '' })
 Remove-LocalUser -Name '$Account' -EA SilentlyContinue
 Remove-Item -LiteralPath '$Root' -Recurse -Force -EA SilentlyContinue
 if (Test-Path '$Root') { 'the folder is still there, something holds a file in it' } else { 'runner, account and folder removed' }
@@ -440,6 +608,16 @@ if ($Lock) {
   $code = $LASTEXITCODE
   $said | ForEach-Object { Say "  $_" }
   if ($code -ne 0) { Die "the lock did not finish for every runner (exit $code); the lines above say which." }
+  if ($OffBox) {
+    # The header's WHAT A PULL REQUEST JOB MAY REACH: GitHub's lists fetched
+    # again, so a range GitHub added since is let through.
+    Head 'What a pull request job may reach and read'
+    try { $blocks = @(Get-GuardBlocks) } catch { Die ('no firewall rule was changed: ' + $_.Exception.Message) }
+    $said = @(Remote (Get-GuardScript 'apply' $blocks))
+    $code = $LASTEXITCODE
+    $said | ForEach-Object { Say "  $_" }
+    if ($code -ne 0 -or ($said -join ' ') -match 'COULD NOT') { Die "the guards did not all go on (exit $code); the lines above say which." }
+  }
   Done
 }
 
@@ -481,6 +659,13 @@ Head 'Registration token'
 $token = (Invoke-Gh api -X POST "repos/$Repo/actions/runners/registration-token" --jq .token | Out-String).Trim()
 if (-not $token) { Die "GitHub gave no registration token. gh has to be signed in as somebody who administers $Repo." }
 Say '  got one, good for an hour, not shown' 'Green'
+
+$guard = ''
+if ($OffBox) {
+  Head 'What a pull request job may reach'
+  try { $guard = Get-GuardScript 'apply' @(Get-GuardBlocks) } catch { Die ('nothing was installed: ' + $_.Exception.Message) }
+  Say '  GitHub''s address lists fetched; every other address is blocked for the account' 'Green'
+}
 
 Head "Installing it on $where"
 # The token goes on ssh's standard input (Send-Secret.ps1, issue #451): on no
@@ -527,6 +712,9 @@ foreach (`$d in @(@(Get-ChildItem 'C:\' -Directory -Filter '$liveFilter' -EA Sil
   & icacls.exe `$d /deny (`$acct + ':(OI)(CI)F') /C /Q 2>&1 | Out-Null
   'closed to it: ' + `$d
 }
+# Off the box: the network and the reads (WHAT A PULL REQUEST JOB MAY REACH),
+# before the runner can take a job.
+$guard
 
 # A runner already here is taken off first, so a second run replaces it.
 `$svc = '$service'
@@ -603,6 +791,7 @@ foreach (`$p in (Get-Process Runner.Listener -EA SilentlyContinue)) { 'listener 
 "@)
 $out | ForEach-Object { Say "  $_" }
 $token = $null
+if ($OffBox -and "$out" -match 'COULD NOT shut') { Die 'The runner is installed, but a folder outside C:\Thornswood* could not be closed to it (the lines above). .\scripts\deploy\Install-Runner.ps1 -OffBox -Lock tries again.' }
 if ("$out" -notmatch 'service Running') { Die 'The runner service is not running. The lines above say where it stopped; .\scripts\deploy\Install-Runner.ps1 -Status shows what is there.' }
 
 Head 'GitHub'

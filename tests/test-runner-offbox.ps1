@@ -9,7 +9,9 @@
   real ACL work is Close-RunnerAccount, lifted out of the script and run on
   scratch folders under TEMP for ANONYMOUS LOGON (*S-1-5-7), the same way
   tests\test-runner-lock.ps1 does. No account, service, Defender setting,
-  C:\ folder or runner registration is touched.
+  C:\ folder or runner registration is touched. The firewall guards run
+  against stand-ins for the NetSecurity cmdlets, so no real rule is read or
+  made; the read guards deny ANONYMOUS LOGON on scratch folders only.
 #>
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -105,6 +107,83 @@ try {
     foreach ($n in 'Thornswood-Server', 'ThornswoodTemps') { New-Item -ItemType Directory -Path (Join-Path $parent2 $n) | Out-Null }
     $null = Close-RunnerAccount '*S-1-5-7' (Join-Path $parent2 'none') $parent2
     Yes 'the VPS default filter is unchanged: Thornswood-* only' ((Denied (Join-Path $parent2 'Thornswood-Server')) -and -not (Denied (Join-Path $parent2 'ThornswoodTemps')))
+
+    # ---- the guards in the dry run (WHAT A PULL REQUEST JOB MAY REACH) -----
+    $r = Dry @('-OffBox')
+    $t = $r.Text
+    Yes '-OffBox install puts outbound block rules on for the account alone' ($t -match [regex]::Escape('Set-RunnerFirewall $grdAcct $grdGroup $grdBlocks') -and $t -match '-Direction Outbound -Action Block' -and $t -match [regex]::Escape("-LocalUser ('D:(A;;CC;;;'"))
+    Yes '  in a group named for the account' ($t -match [regex]::Escape("`$grdGroup = 'Thornswood PR runner thornswood-pr'"))
+    Yes '  blocking everything outside GitHub''s published lists (stand-in meta)' ($t -match [regex]::Escape("'0.0.0.0-4.147.255.255'") -and $t -match [regex]::Escape("'4.149.0.0-126.255.255.255'") -and $t -match [regex]::Escape("'128.0.0.0-140.82.111.255'"))
+    Yes '  loopback and GitHub''s ranges are not in the block list' ($t -notmatch "'127\.0\.0\.0-" -and $t -notmatch [regex]::Escape("'140.82.112.0") -and $t -notmatch [regex]::Escape("'192.30.252.0"))
+    Yes '  IPv6 too: everything but ::1 and GitHub''s 2a0a:a440::/29' ($t -match [regex]::Escape("'::'") -and $t -match [regex]::Escape("'::2-2a0a:a43f:ffff:ffff:ffff:ffff:ffff:ffff'") -and $t -match [regex]::Escape("'2a0a:a448::-ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff'"))
+    Yes '  and shuts it out of other drives, profiles and ProgramData secrets' ($t -match [regex]::Escape('Close-RunnerReads $grdAcct (Get-RunnerReadDenies $grdAcct)'))
+    $iG = $t.IndexOf('Set-RunnerFirewall $grdAcct'); $iC = $t.IndexOf('.\config.cmd --unattended')
+    Yes '  both before config.cmd can start the runner' ($iG -gt 0 -and $iC -gt $iG)
+    Yes '  GitHub''s lists came from a stand-in: gh never called' (-not (Test-Path -LiteralPath $ghCalled))
+    $r = Dry @('-OffBox', '-AllowHost', 'pypi.org')
+    Yes '-AllowHost lets its address through (stand-in 203.0.113.7)' ($r.Text -match [regex]::Escape("-203.0.113.6'") -and $r.Text -match [regex]::Escape("'203.0.113.8-"))
+    $r = Dry @('-OffBox', '-Lock')
+    Yes "-OffBox -Lock fetches the lists again and puts the guards back (exit $($r.Code))" ($r.Code -eq 0 -and $r.Text -match [regex]::Escape('Set-RunnerFirewall $grdAcct $grdGroup $grdBlocks') -and $r.Text -match [regex]::Escape('Close-RunnerReads'))
+    $r = Dry @('-OffBox', '-Remove')
+    Yes '-OffBox -Remove takes the firewall rules and the read denies off' ($r.Text -match [regex]::Escape('Remove-RunnerFirewall $grdGroup') -and $r.Text -match [regex]::Escape('Open-RunnerReads $grdAcct (Get-RunnerReadDenies $grdAcct)'))
+    $r = Dry @('-OffBox', '-Status')
+    Yes '-OffBox -Status says what the firewall has' ($r.Text -match [regex]::Escape('Get-RunnerFirewall $grdGroup'))
+    $r = Dry @('-OffBox', '-Number', '2')
+    Yes '-Number 2 gets a firewall group of its own' ($r.Text -match [regex]::Escape("`$grdGroup = 'Thornswood PR runner thornswood-pr2'"))
+    foreach ($m in @(@(), @('-Remove'), @('-Lock'), @('-Status'))) {
+        $r = Dry $m
+        Yes ("the VPS (no -OffBox) $($m -join ' ') gets no firewall rule and no read deny") ($r.Code -eq 0 -and $r.Text -notmatch 'RunnerFirewall|RunnerReads')
+    }
+
+    # ---- the range arithmetic ----------------------------------------------
+    $rl = [regex]::Match($src, "(?s)\`$rangeLib = @'\r?\n(.*?)\r?\n'@").Groups[1].Value
+    Yes 'the range library is where it was' ($rl -match 'function Get-RunnerBlockRanges')
+    . ([scriptblock]::Create($rl))
+    $b = @(Get-RunnerBlockRanges @('10.0.0.0/8'))
+    Yes 'one IPv4 range: the rest of IPv4, and all of IPv6' (($b -join ',') -eq '0.0.0.0-9.255.255.255,11.0.0.0-255.255.255.255,::-ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff')
+    $b = @(Get-RunnerBlockRanges @('10.0.0.0/8', '10.1.0.0/16', '11.0.0.0/8', '13.0.0.5', '0.0.0.0/32', '::/0'))
+    Yes 'overlapping and touching ranges merge; a lone address stays lone' (($b -join ',') -eq '0.0.0.1-9.255.255.255,12.0.0.0-13.0.0.4,13.0.0.6-255.255.255.255')
+    $b = @(Get-RunnerBlockRanges @('10.0.0.1/8'))
+    Yes 'host bits in a CIDR are ignored' ($b[0] -eq '0.0.0.0-9.255.255.255')
+    Yes 'nothing to allow blocks everything' ((@(Get-RunnerBlockRanges @()) -join ',') -eq '0.0.0.0-255.255.255.255,::-ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff')
+
+    # ---- the guards themselves, on stand-ins and scratch folders -----------
+    $gl = [regex]::Match($src, "(?s)\`$guardLib = @'\r?\n(.*?)\r?\n'@").Groups[1].Value
+    Yes 'the guard library is where it was' ($gl -match 'function Set-RunnerFirewall')
+    $script:fw = New-Object Collections.ArrayList
+    $script:gone = New-Object Collections.ArrayList
+    # Stand-ins: functions win over the cmdlets, so no real rule is read or made.
+    function New-NetFirewallRule { param($DisplayName, $Group, $Direction, $Action, $Profile, $LocalUser, $RemoteAddress, $Description, $ErrorAction) [void]$script:fw.Add(@{ Name = $DisplayName; Group = $Group; Direction = $Direction; Action = $Action; LocalUser = $LocalUser; Remote = @($RemoteAddress) }) }
+    function Get-NetFirewallRule { param($Group, $ErrorAction) @($script:fw | Where-Object { $_.Group -eq $Group } | ForEach-Object { New-Object PSObject -Property @{ Name = $_.Name; Enabled = 'True' } }) }
+    function Remove-NetFirewallRule { param($Name) [void]$script:gone.Add($Name); $keep = @($script:fw | Where-Object { $_.Name -ne $Name }); $script:fw.Clear(); foreach ($k in $keep) { [void]$script:fw.Add($k) } }
+    . ([scriptblock]::Create($gl))
+    $many = @(1..1203 | ForEach-Object { '10.0.' + [int][Math]::Floor($_ / 256) + '.' + ($_ % 256) })
+    $said = Set-RunnerFirewall '*S-1-5-7' 'TS test group' $many
+    Yes 'Set-RunnerFirewall: 1,203 ranges in three rules of 500' ($script:fw.Count -eq 3 -and $script:fw[2].Remote.Count -eq 203 -and $said -match '3 outbound rule')
+    Yes '  every rule outbound, block, for that account''s SID only' (@($script:fw | Where-Object { $_.Direction -eq 'Outbound' -and $_.Action -eq 'Block' -and $_.LocalUser -eq 'D:(A;;CC;;;S-1-5-7)' -and $_.Group -eq 'TS test group' }).Count -eq 3)
+    $null = Set-RunnerFirewall '*S-1-5-7' 'TS test group' @('1.2.3.4')
+    Yes '  run again it replaces its rules, never piles them up' ($script:fw.Count -eq 1 -and $script:gone.Count -eq 3)
+    Yes '  status counts them' ((Get-RunnerFirewall 'TS test group') -match '1 outbound block rule')
+    $threw = $false; try { $null = Set-RunnerFirewall '*S-1-5-7' 'TS test group' @() } catch { $threw = $true }
+    Yes '  an empty list changes nothing and says so' ($threw -and $script:fw.Count -eq 1)
+    $null = Remove-RunnerFirewall 'TS test group'
+    Yes 'Remove-RunnerFirewall takes the group off' ($script:fw.Count -eq 0 -and (Get-RunnerFirewall 'TS test group') -match 'NO RULES')
+
+    $u = Join-Path $work 'Users'; $pd = Join-Path $work 'ProgramData'; $dv = Join-Path $work 'D-root'
+    foreach ($n in 'alice', 'Public', 'Default', 'thornswood-pr', 'thornswood-pr.ONE') { New-Item -ItemType Directory -Path (Join-Path $u $n) | Out-Null }
+    foreach ($n in 'ssh', 'Docker', 'chocolatey') { New-Item -ItemType Directory -Path (Join-Path $pd $n) | Out-Null }
+    New-Item -ItemType Directory -Path $dv | Out-Null
+    $deny = @(Get-RunnerReadDenies 'thornswood-pr' $u $pd @($dv, (Join-Path $work 'no-drive')))
+    $want = @($dv, (Join-Path $u 'alice'), (Join-Path $u 'Public'), (Join-Path $pd 'ssh'), (Join-Path $pd 'Docker'))
+    Yes 'the read list: other drives, other profiles and Public, ProgramData ssh and Docker' ((@($deny | Sort-Object) -join '|') -eq (@($want | Sort-Object) -join '|'))
+    Yes '  not its own profile, not Default, not the rest of ProgramData' (-not ($deny -match 'thornswood-pr|Default|chocolatey'))
+    $said = @(Close-RunnerReads '*S-1-5-7' $deny)
+    Yes 'Close-RunnerReads denies the account each one' (@($deny | Where-Object { Denied $_ }).Count -eq $deny.Count -and -not ($said -match 'COULD NOT'))
+    Yes '  and nothing else' (-not (Denied (Join-Path $u 'thornswood-pr')) -and -not (Denied (Join-Path $pd 'chocolatey')))
+    $kid = Join-Path $u 'alice\Documents'; New-Item -ItemType Directory -Path $kid | Out-Null
+    Yes '  the deny reaches what is inside' (Denied $kid)
+    $null = Open-RunnerReads '*S-1-5-7' $deny
+    Yes 'Open-RunnerReads takes every one off again' (@($deny | Where-Object { Denied $_ }).Count -eq 0 -and -not (Denied $kid))
 } finally {
     $env:PATH = $oldPath
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
