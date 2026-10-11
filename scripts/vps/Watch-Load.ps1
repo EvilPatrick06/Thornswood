@@ -61,6 +61,10 @@ function Die($m) {
   exit 1
 }
 
+# What the box answers is kept in $said, never $out: PowerShell names are not
+# case sensitive, so $out is the [string]$Out parameter, and assigning the
+# answer to it joined every line into one (so ^FAILED never matched) and, with
+# no switches, replaced the logs folder with that text (issue #2061).
 function Remote($script) {
   # Send-Script.ps1 (issue #1070): a long script goes as a file of its own
   # name, removed after, and the far side's exit code comes back.
@@ -73,13 +77,13 @@ Write-Host '  THORNSWOOD  -  what the server uses, over a week' -ForegroundColor
 # ------------------------------------------------------------------ off ---
 if ($Remove) {
   Head 'Taking it off'
-  $out = Remote @"
+  $said = Remote @"
 `$ErrorActionPreference = 'Continue'
 `$null = & schtasks /delete /tn '$Task' /f 2>&1
 if (`$LASTEXITCODE -eq 0) { 'the task is gone' } else { 'there was no task called $Task' }
 'the record is still at $Root\load.csv'
 "@
-  foreach ($l in $out) { Say "  $l" }
+  foreach ($l in $said) { Say "  $l" }
   Write-Host ''
   if (-not $NoPause) { [void](Read-Host 'Enter to close') }
   exit 0
@@ -104,7 +108,7 @@ if ($Install) {
   # quote and backslash exactly as it is in the repo.
   $b64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($collector))
 
-  $out = Remote @"
+  $said = Remote @"
 `$ErrorActionPreference = 'Continue'
 $(Get-ThornswoodLockedFolderScript $Root)
 [IO.File]::WriteAllBytes('$Root\load.ps1', [Convert]::FromBase64String('$b64'))
@@ -125,13 +129,25 @@ if (Test-Path '$Root\load.csv') {
   `$all | Select-Object -Last 1 | ForEach-Object { '  ' + `$_ }
 } else { 'FAILED    the first run wrote no load.csv yet' }
 if (Test-Path '$Root\load.log') { Get-Content '$Root\load.log' -Tail 5 | ForEach-Object { 'load.log  ' + `$_ } }
+if (Get-ScheduledTask -TaskName '$Task' -EA SilentlyContinue) { 'task      $Task is registered' } else { 'FAILED    there is no task called $Task after making it' }
 "@
 
-  foreach ($l in $out) {
+  # Issue #2061: the box went without this record because nothing said an
+  # install had not taken. Every FAILED line, or no sign the task was made and
+  # registered, is now a non-zero exit, so a run that did not take cannot look
+  # like one that did.
+  $failed = $false
+  foreach ($l in $said) {
     $c = 'Gray'
-    if ("$l" -match '^FAILED') { $c = 'Red' }
+    if ("$l" -match '^FAILED') { $c = 'Red'; $failed = $true }
     if ("$l" -match '^(wrote|made)') { $c = 'Green' }
     Say "  $l" $c
+  }
+  $text = (@($said) | ForEach-Object { "$_" }) -join "`n"
+  if ($text -notmatch '(?m)^made\s') { $failed = $true; Say '  the server never said it made the task' 'Red' }
+  if ($text -notmatch '(?m)^task\s+.* is registered') { $failed = $true; Say '  the server never said the task is registered' 'Red' }
+  if ($failed) {
+    Die "The collector did not take on the box. Read the lines above, then run -Install again. Nothing else on the box was changed."
   }
 
   Head 'From now on'
@@ -144,7 +160,7 @@ if (Test-Path '$Root\load.log') { Get-Content '$Root\load.log' -Tail 5 | ForEach
 
 # -------------------------------------------------------------- report ---
 Head 'The collector'
-$out = Remote @"
+$said = Remote @"
 `$ErrorActionPreference = 'Continue'
 `$t = Get-ScheduledTask -TaskName '$Task' -EA SilentlyContinue
 if (`$t) {
@@ -156,7 +172,7 @@ if (Test-Path '$Root\load.csv') {
 } else { 'record    none yet' }
 if (Test-Path '$Root\load.log') { Get-Content '$Root\load.log' -Tail 5 | ForEach-Object { 'load.log  ' + `$_ } }
 "@
-foreach ($l in $out) {
+foreach ($l in $said) {
   $c = 'Gray'
   if ("$l" -match 'NOT installed|none yet') { $c = 'Red' }
   Say "  $l" $c
