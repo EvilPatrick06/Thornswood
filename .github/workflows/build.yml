@@ -420,7 +420,7 @@ jobs:
                  'test-table-install.js',
                  'test-secrets-fail-closed.js',
                  'test-our-key-menus.js', 'test-slash-key.js', 'test-social-keys.js',
-                 'test-2037-journal-new.js', 'test-2135-journal-press.js', 'test-social.js',
+                 'test-2037-journal-new.js', 'test-2135-journal-press.js', 'test-social.js', 'test-2157-reconfigure.ps1',
                  'test-site-auth.js',
                  'test-site-route-gaps.js',
                  'test-docs-pwfile.ps1',
