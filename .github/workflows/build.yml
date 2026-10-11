@@ -426,7 +426,7 @@ jobs:
                  'test-site-route-gaps.js', 'test-2215-play-pressed-by.ps1',
                  'test-docs-pwfile.ps1',
                  'test-site-credits-fill.js', 'test-deployed-build.ps1',
-                 'test-site-headers.js',
+                 'test-site-headers.js', 'test-generated-source-chain.ps1',
                  'test-site-render.js', 'test-site-discovery.js',
                  'test-home-status.js', 'test-seats.js', 'test-age-gate.js', 'test-download-hash.js',
                  'test-download-button.js', 'test-gallery-ux.js', 'test-gallery.js', 'test-site-local.js',
