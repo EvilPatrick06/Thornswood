@@ -425,6 +425,12 @@ Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $scripts) 'layout.json') -
 Put (Join-Path $repo 'scripts\vps\vps.json') '{ "address": "127.0.0.1" }'
 # The artifacts are built under out\, which is ignored, as it is in the repository.
 Put (Join-Path $repo '.gitignore') "out/`n"
+# Deploy-DevGamemode sends a gamemode only onto the server build its commit
+# records (#2076): records\server-build.json here, and the same record as the
+# stand-in dev server's server-build.json below, as Publish-Server leaves it.
+$serverRecord = Join-Path (Split-Path -Parent $scripts) 'records\server-build.json'
+$null = [IO.Directory]::CreateDirectory((Join-Path $repo 'records'))
+Copy-Item -LiteralPath $serverRecord -Destination (Join-Path $repo 'records\server-build.json')
 
 $siteJs = @'
 const http = require('http'), fs = require('fs'), path = require('path');
@@ -908,6 +914,8 @@ try {
     Put (Join-Path $devRoot 'server-settings.json') (([ordered]@{ port = $devPort; name = 'Thornswood Dev'; dataDir = 'data'
         loadOrder = @($devFar + 'Skyrim.esm'); thornswoodServer = 'dev'; thornswoodRequirePass = $true }) | ConvertTo-Json)
     Put (Join-Path $devRoot 'data\keep.txt') 'the character book'
+    # The build this commit records is the build the dev server runs (#2076).
+    Copy-Item -LiteralPath $serverRecord -Destination (Join-Path $devRoot 'server-build.json')
     Task ($TaskPrefix + ' Dev Server') $node.Source ('"' + $gameStub + '" "' + $devRoot + '"') $devRoot
     $gm = Join-Path $repo 'game\gamemode.js'
     $launcher = Join-Path $work 'launcher'
