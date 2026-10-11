@@ -103,7 +103,7 @@ const mpFake = {
   },
   getNpcAIState: function(id) {
     const a=world.actors.get(id);
-    return a ? {isHuman:a.pid>0,profileId:a.pid,lifeGeneration:a.life || 0} : null;
+    return a ? {isHuman:a.pid>0,profileId:a.pid,lifeGeneration:a.life || 0,runtimeLifeIdentity:String(1+(a.body || 0))} : null;
   },
   get: function (id, prop) {
     if (id === 0 && prop === 'onlinePlayers') {
@@ -377,7 +377,9 @@ if (!mpFake.getNpcAIState) {
 }
 function replaced(id, how) {
   const a = world.actors.get(id);
-  if (how === 'life') { a.life = (a.life || 0) + 1; } else { a.desc = 'other' + id.toString(16) + ':run'; }
+  if (how === 'life') { a.life = (a.life || 0) + 1; }
+  else if (how === 'body') { a.body = (a.body || 0) + 1; }
+  else { a.desc = 'other' + id.toString(16) + ':run'; }
   // Its health is what the engine left at the ID, as in the issue: the
   // queued effect is all that could still move it.
 }
@@ -387,7 +389,7 @@ function restored(id) { const a = world.actors.get(id); delete a.desc; }
   states.set(by, filled(['might']));
   const PERSON = actor(0xff000061);
   for (const [name, target] of [['person', PERSON], ['creature', WOLF]]) {
-    for (const how of ['life', 'desc']) {
+    for (const how of ['life', 'desc', 'body']) {
       heal(target);
       strike(by, target, 0.2, SWORD, { power: true });
       replaced(target, how);
@@ -399,11 +401,13 @@ function restored(id) { const a = world.actors.get(id); delete a.desc; }
     strike(by, target, 0.2, SWORD, { power: true });
     settle();
     yes('T2 on the same ' + name + ' it still lands: 0.2 becomes 0.25', health(target) === 0.75);
-    heal(target); world.actors.get(target).p.health = 0.22;
-    strike(by, target, 0.2, SWORD, { power: true });
-    settle();
-    replaced(target, 'life');
-    yes('T3 the fallback killer of a ' + name + ' is not named for a replacement life', K.killerOf(target) === 0);
+    for (const how of ['life','body']) {
+      heal(target); world.actors.get(target).p.health = 0.22;
+      strike(by, target, 0.2, SWORD, { power: true });
+      settle();
+      replaced(target, how);
+      yes('T3 the fallback killer of a ' + name + ' is not named for a replacement '+how, K.killerOf(target) === 0);
+    }
     heal(target); world.actors.get(target).p.health = 0.22;
     strike(by, target, 0.2, SWORD, { power: true });
     settle();

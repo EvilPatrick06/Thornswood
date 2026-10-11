@@ -1,6 +1,6 @@
 'use strict';
 const assert=require('node:assert/strict');
-const {createQuestTransactions,actorIdentity}=require('../game/quest-transactions');
+const {createQuestTransactions,actorIdentity,targetIdentity}=require('../game/quest-transactions');
 const clone=x=>JSON.parse(JSON.stringify(x));
 function fixture(options={}) {
   let inventory={entries:[{baseId:15,count:40},{baseId:100,count:4,name:'Keepsake',health:0.75}]};
@@ -101,3 +101,15 @@ f.transfer.shutdown();assert.equal(f.transfer.commit(10,f.record(),next,[]).ok,f
   assert.equal(actorIdentity(mp,10),null);
 }
 console.log('PASS quest atomic inventory/state, metadata, save admission, publication errors, refusal and revocation');
+{
+  let body='100',dead=false;
+  const ai={isHuman:false,profileId:-1,lifeGeneration:0};
+  const mp={getNpcAIState:()=>({...ai,isDead:dead,runtimeLifeIdentity:body}),getDescFromId:()=> '86a88:Skyrim.esm'};
+  const alive=targetIdentity(mp,10);assert.notEqual(alive,null);
+  dead=true;assert.equal(targetIdentity(mp,10),alive,'a real killing blow still belongs to the same body');
+  body='101';assert.notEqual(targetIdentity(mp,10),alive,'ownership or revival revokes an old body');
+  ai.profileId=42;assert.notEqual(targetIdentity(mp,10),alive,'target profile replacement is fenced too');
+  for(const invalid of [undefined,null,0,'','0','01','1\n','18446744073709551616']) {
+    body=invalid;assert.equal(targetIdentity(mp,10),null,'missing or malformed body revisions fail closed');
+  }
+}

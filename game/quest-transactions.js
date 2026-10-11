@@ -6,13 +6,24 @@ function same(a,b) {
   var left=Object.keys(a).sort(),right=Object.keys(b).sort();
   return left.length===right.length && left.every(function(key,i){return key===right[i] && same(a[key],b[key]);});
 }
+function nativeRevision(value) {
+  return typeof value==='string' && value.length>0 && value.length<=20 && value[0]!=='0' &&
+    !/[^0-9]/.test(value) && (value.length<20 || value<='18446744073709551615');
+}
+function targetIdentity(mp,actor) {
+  try {
+    var ai=mp.getNpcAIState(actor),desc=mp.getDescFromId(actor);
+    if(!ai || !Number.isInteger(ai.profileId) || !Number.isSafeInteger(ai.lifeGeneration) ||
+        ai.lifeGeneration<0 || typeof desc!=='string' || !desc || !nativeRevision(ai.runtimeLifeIdentity))return null;
+    return JSON.stringify({desc:desc,profileId:ai.profileId,life:ai.lifeGeneration,body:ai.runtimeLifeIdentity});
+  } catch(error) { return null; }
+}
 function actorIdentity(mp,actor) {
   try {
     var ai=mp.getNpcAIState(actor),desc=mp.getDescFromId(actor),runtime=mp.getActorRuntimeIdentity(actor);
     if(!ai || ai.isHuman!==true || !Number.isInteger(ai.profileId) || ai.profileId<=0 ||
         !Number.isSafeInteger(ai.lifeGeneration) || ai.lifeGeneration<0 || typeof desc!=='string' || !desc ||
-        typeof runtime!=='string' || !runtime || runtime.length>20 || runtime[0]==='0' || /[^0-9]/.test(runtime) ||
-        (runtime.length===20 && runtime>'18446744073709551615'))return null;
+        !nativeRevision(runtime))return null;
     return JSON.stringify({desc:desc,profileId:ai.profileId,life:ai.lifeGeneration,runtime:runtime});
   } catch(error) { return null; }
 }
@@ -90,4 +101,4 @@ function createQuestTransactions(deps) {
   }
   return {commit:commit,identity:identity,available:available,shutdown:function(){active=false;}};
 }
-module.exports={createQuestTransactions:createQuestTransactions,actorIdentity:actorIdentity};
+module.exports={createQuestTransactions:createQuestTransactions,actorIdentity:actorIdentity,targetIdentity:targetIdentity};

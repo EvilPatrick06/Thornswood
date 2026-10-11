@@ -381,7 +381,7 @@ const mpFake = {
   },
   getNpcAIState: function(id) {
     const a=world.actors.get(id);
-    return a ? {isHuman:a.pid>0,profileId:a.pid,lifeGeneration:a.life || 0} : null;
+    return a ? {isHuman:a.pid>0,profileId:a.pid,lifeGeneration:a.life || 0,runtimeLifeIdentity:String(1+(a.body || 0))} : null;
   },
   get: function (id, prop) {
     if (id === 0 && prop === 'onlinePlayers') {
@@ -683,7 +683,9 @@ if (!mpFake.getNpcAIState) {
 }
 function replaced(id, how) {
   const a = world.actors.get(id);
-  if (how === 'life') { a.life = (a.life || 0) + 1; } else { a.desc = 'other' + id.toString(16) + ':run'; }
+  if (how === 'life') { a.life = (a.life || 0) + 1; }
+  else if (how === 'body') { a.body = (a.body || 0) + 1; }
+  else { a.desc = 'other' + id.toString(16) + ':run'; }
   // Its health is what the engine left at the ID, as in the issue: the
   // queued effect is all that could still move it.
 }
@@ -691,7 +693,7 @@ function restored(id) { const a = world.actors.get(id); delete a.desc; }
 {
   const PERSON = actor(0xff000062, { pos: [9000, 100, 0] });
   for (const [name, target] of [['person', PERSON], ['creature', WOLF]]) {
-    for (const how of ['life', 'desc']) {
+    for (const how of ['life', 'desc', 'body']) {
       later(200000);
       const by = actor(0xff000063, { pos: [9000, 0, 0] });
       states.set(by, warrior('berserker', 'master'));
@@ -715,12 +717,14 @@ function restored(id) { const a = world.actors.get(id); delete a.desc; }
     strike(by, target, 0.2, { power: true });
     settle();
     yes('T2 on the same ' + name + ' it still lands: 0.2 becomes 0.3', health(target) === 0.7);
-    later(200000);
-    world.actors.get(by).p.stamina = 1; M.use(by, 'wreck'); heal(target); world.actors.get(target).p.health = 0.22;
-    strike(by, target, 0.2, { power: true });
-    settle();
-    replaced(target, 'life');
-    yes('T3 the fallback killer of a ' + name + ' is not named for a replacement life', M.killerOf(target) === 0);
+    for (const how of ['life','body']) {
+      later(200000);
+      world.actors.get(by).p.stamina = 1; M.use(by, 'wreck'); heal(target); world.actors.get(target).p.health = 0.22;
+      strike(by, target, 0.2, { power: true });
+      settle();
+      replaced(target, how);
+      yes('T3 the fallback killer of a ' + name + ' is not named for a replacement '+how, M.killerOf(target) === 0);
+    }
     later(200000);
     world.actors.get(by).p.stamina = 1; M.use(by, 'wreck'); heal(target); world.actors.get(target).p.health = 0.22;
     strike(by, target, 0.2, { power: true });
@@ -729,7 +733,7 @@ function restored(id) { const a = world.actors.get(id); delete a.desc; }
     heal(target);
   }
   // A Wall's reduction is the defender's, and stays with the defender's life.
-  for (const how of ['life', 'desc']) {
+  for (const how of ['life', 'desc', 'body']) {
     later(200000);
     const wall = actor(0xff000065, { pos: [9000, 0, 0] });
     states.set(wall, warrior('bulwark', 'master'));

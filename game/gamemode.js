@@ -44814,15 +44814,9 @@ log('gamemode loaded:',
     blow whose target was replaced is let go. The attacker's side is #2070's.
   */
   function targetLife(target) {
-    var desc = null, life = null;
-    try { desc = mp.getDescFromId(target) || null; } catch (err) { desc = null; }
-    try {
-      var ai = (typeof mp.getNpcAIState === 'function') ? mp.getNpcAIState(target) : null;
-      if (ai && Number.isSafeInteger(ai.lifeGeneration)) { life = ai.lifeGeneration; }
-    } catch (err2) { life = null; }
-    return JSON.stringify([desc, life]);
+    return MERCHANT_TRADING.targetIdentity(mp, target);
   }
-  function sameTarget(target, life) { return life !== undefined && targetLife(target) === life; }
+  function sameTarget(target, life) { return typeof life === 'string' && targetLife(target) === life; }
 
   function breakSpell(target, by, spellId, t) {
     var info = spellOf(spellId);
@@ -45802,15 +45796,9 @@ log('gamemode loaded:',
     blow whose target was replaced is let go. The attacker's side is #2070's.
   */
   function targetLife(target) {
-    var desc = null, life = null;
-    try { desc = mp.getDescFromId(target) || null; } catch (err) { desc = null; }
-    try {
-      var ai = (typeof mp.getNpcAIState === 'function') ? mp.getNpcAIState(target) : null;
-      if (ai && Number.isSafeInteger(ai.lifeGeneration)) { life = ai.lifeGeneration; }
-    } catch (err2) { life = null; }
-    return JSON.stringify([desc, life]);
+    return MERCHANT_TRADING.targetIdentity(mp, target);
   }
-  function sameTarget(target, life) { return life !== undefined && targetLife(target) === life; }
+  function sameTarget(target, life) { return typeof life === 'string' && targetLife(target) === life; }
 
   /* A blow that took nothing gives back what it would have spent, while its
      window is still open. */
@@ -62714,13 +62702,24 @@ function same(a,b) {
   var left=Object.keys(a).sort(),right=Object.keys(b).sort();
   return left.length===right.length && left.every(function(key,i){return key===right[i] && same(a[key],b[key]);});
 }
+function nativeRevision(value) {
+  return typeof value==='string' && value.length>0 && value.length<=20 && value[0]!=='0' &&
+    !/[^0-9]/.test(value) && (value.length<20 || value<='18446744073709551615');
+}
+function targetIdentity(mp,actor) {
+  try {
+    var ai=mp.getNpcAIState(actor),desc=mp.getDescFromId(actor);
+    if(!ai || !Number.isInteger(ai.profileId) || !Number.isSafeInteger(ai.lifeGeneration) ||
+        ai.lifeGeneration<0 || typeof desc!=='string' || !desc || !nativeRevision(ai.runtimeLifeIdentity))return null;
+    return JSON.stringify({desc:desc,profileId:ai.profileId,life:ai.lifeGeneration,body:ai.runtimeLifeIdentity});
+  } catch(error) { return null; }
+}
 function actorIdentity(mp,actor) {
   try {
     var ai=mp.getNpcAIState(actor),desc=mp.getDescFromId(actor),runtime=mp.getActorRuntimeIdentity(actor);
     if(!ai || ai.isHuman!==true || !Number.isInteger(ai.profileId) || ai.profileId<=0 ||
         !Number.isSafeInteger(ai.lifeGeneration) || ai.lifeGeneration<0 || typeof desc!=='string' || !desc ||
-        typeof runtime!=='string' || !runtime || runtime.length>20 || runtime[0]==='0' || /[^0-9]/.test(runtime) ||
-        (runtime.length===20 && runtime>'18446744073709551615'))return null;
+        !nativeRevision(runtime))return null;
     return JSON.stringify({desc:desc,profileId:ai.profileId,life:ai.lifeGeneration,runtime:runtime});
   } catch(error) { return null; }
 }
@@ -62798,7 +62797,7 @@ function createQuestTransactions(deps) {
   }
   return {commit:commit,identity:identity,available:available,shutdown:function(){active=false;}};
 }
-module.exports={createQuestTransactions:createQuestTransactions,actorIdentity:actorIdentity};
+module.exports={createQuestTransactions:createQuestTransactions,actorIdentity:actorIdentity,targetIdentity:targetIdentity};
 return module.exports;})();
 'use strict';
 
@@ -63392,6 +63391,7 @@ module.exports = {
   createNativeMerchantTransfer: createNativeMerchantTransfer,
   createQuestTransactions: QUEST_TRANSFER.createQuestTransactions,
   actorIdentity: QUEST_TRANSFER.actorIdentity,
+  targetIdentity: QUEST_TRANSFER.targetIdentity,
   installMerchantTrading: installMerchantTrading,
   bookHoldOf: bookHoldOf,
   guildSite: guildSite,
