@@ -12,6 +12,8 @@
 # record sums, and the script is read for where it asks: before the artifact
 # leaves this machine, and not on -PutBack, which sends no gamemode.
 # Read only. Nothing connects to anything.
+# Scripts this runs whole go to a stand-in box, so the freshness guard lets them be (#2118).
+$env:THORNSWOOD_HARNESS = '1'
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 . (Join-Path $repo 'scripts\deploy\ServerBuild.ps1')

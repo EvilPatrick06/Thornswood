@@ -114,7 +114,7 @@ try {
 $keepH = $env:THORNSWOOD_HARNESS; $keepV = $env:THORNSWOOD_VPS
 try {
     $env:THORNSWOOD_HARNESS = ''; $env:THORNSWOOD_VPS = ''
-    Yes 'j1: the marker is a reserved .invalid name, which never resolves' ($script:FreshHarnessHost -eq 'harness.invalid')
+    Yes 'j1: the stand-in boxes are harness.invalid and loopback only' ((@($script:FreshHarnessHosts) -join ',') -eq 'harness.invalid,127.0.0.1,::1,localhost')
     Yes 'j2: harness.invalid without THORNSWOOD_HARNESS=1 is not the stand-in' (-not (Test-FreshHarnessStandIn 'harness.invalid'))
     $env:THORNSWOOD_HARNESS = '1'
     Yes 'j3: THORNSWOOD_HARNESS=1 with no box named is not the stand-in' (-not (Test-FreshHarnessStandIn ''))
@@ -140,10 +140,14 @@ try {
     }
     $hosts = @($hosts | Where-Object { $_ } | Sort-Object -Unique)
     $env:THORNSWOOD_VPS = ''
-    $hit = @($hosts | Where-Object { $_ -ne 'harness.invalid' -and (Test-FreshHarnessStandIn $_) })
+    $hit = @($hosts | Where-Object { $script:FreshHarnessHosts -notcontains $_ -and (Test-FreshHarnessStandIn $_) })
     Yes "j8: none of the $($hosts.Count) hosts the scripts name, live and dev box included, is the stand-in" ($hit.Count -eq 0 -and $hosts -contains [string]$vj.address)
-    Yes 'j9: and no script names harness.invalid as a real box' (-not ($scan | Where-Object { $_ -match 'harness\.invalid' -and $_ -notmatch 'FreshHarnessHost' }))
-    Yes 'j10: the live/dev address is not .invalid' (-not ([string]$vj.address).EndsWith('.invalid'))
+    Yes 'j9: vps.json, the live and dev box, is not a stand-in box' ($script:FreshHarnessHosts -notcontains ([string]$vj.address).ToLowerInvariant())
+    Yes 'j10: and is not loopback or .invalid' (-not ([string]$vj.address).EndsWith('.invalid') -and -not ([string]$vj.address).StartsWith('127.'))
+    $env:THORNSWOOD_VPS = ''
+    Yes 'j11: a loopback box with the flag is the stand-in' (Test-FreshHarnessStandIn '127.0.0.1')
+    $env:THORNSWOOD_HARNESS = ''
+    Yes 'j12: and without the flag it is not' (-not (Test-FreshHarnessStandIn '127.0.0.1'))
 } finally { $env:THORNSWOOD_HARNESS = $keepH; $env:THORNSWOOD_VPS = $keepV }
 # Every script that sends to the VPS or ships calls it, near the top, and
 # offers the loud override.

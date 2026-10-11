@@ -25,22 +25,23 @@
 # so every git call here runs under Continue for itself only.
 #
 # THE HARNESS STAND-IN, and nothing else, is let through without a check:
-# the tests run these scripts whole against stand-in ssh and scp, from a
-# checkout that is a pull request's head and so never origin/main. A run
-# counts as the stand-in only when BOTH are true: THORNSWOOD_HARNESS is 1,
-# and the box it would send to is exactly harness.invalid (the -Vps it was
-# handed, or THORNSWOOD_VPS when it takes none). .invalid is reserved by
-# RFC 2606 and can never resolve, so no real box can be that name, and
-# tests\test-fresh-checkout.ps1 fails if the live or dev host ever is.
-$script:FreshHarnessHost = 'harness.invalid'
+# the tests run these scripts whole against stand-in ssh and scp and a
+# pretend box on this machine, from a checkout that is a pull request's head
+# and so never origin/main. A run counts as the stand-in only when BOTH are
+# true: THORNSWOOD_HARNESS is 1, AND the box it would send to (the -Vps it
+# was handed, or THORNSWOOD_VPS when it takes none) is one that can never be
+# a real server: harness.invalid (.invalid is reserved by RFC 2606 and never
+# resolves) or this machine's own loopback, 127.0.0.1, ::1 or localhost,
+# which the harnesses' pretend boxes listen on. tests\test-fresh-checkout.ps1
+# fails if the live or dev host, or any host a script names, is ever one.
+$script:FreshHarnessHosts = @('harness.invalid', '127.0.0.1', '::1', 'localhost')
 
 function Test-FreshHarnessStandIn {
     param([string]$Target)
     if ($env:THORNSWOOD_HARNESS -ne '1') { return $false }
     $t = if ($Target) { $Target } else { [string]$env:THORNSWOOD_VPS }
-    return ($t.Trim().ToLowerInvariant() -eq $script:FreshHarnessHost)
+    return ($script:FreshHarnessHosts -contains $t.Trim().ToLowerInvariant())
 }
-
 # Not a git clone at all (a copy of the scripts on some other box): refused
 # too, since there is nothing to say what it was built from, unless
 # -AllowStale.
@@ -110,7 +111,7 @@ function Assert-FreshCheckout {
         [switch]$AllowStale,
         [string]$Target = ''
     )
-    if (Test-FreshHarnessStandIn $Target) { Write-Host '  freshness: the harness stand-in (harness.invalid), not checked' -ForegroundColor DarkGray; return }
+    if (Test-FreshHarnessStandIn $Target) { Write-Host '  freshness: the harness stand-in box, not checked' -ForegroundColor DarkGray; return }
     $headNow = Invoke-FreshGit $RepoDir @('rev-parse', 'HEAD')
     $key = if ($headNow.Code -eq 0 -and $headNow.Out.Count) { $headNow.Out[0].Trim() + '|' + [bool]$AnyBranch } else { '' }
     if ($key -and $env:THORNSWOOD_FRESH_CHECKED -eq $key) { return }
