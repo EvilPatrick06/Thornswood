@@ -42,8 +42,9 @@ That commit starts from
 is the difference between the two.
 
 The server's engine goes to our test server first, then to the main server.
-The recorded build has not been deployed yet. Both servers still run
-[`0f54ad45`](https://github.com/EvilPatrick06/skymp/tree/0f54ad4541fff9bf75c8d8107fc767e47037a2d6),
+The test server runs the recorded build since 10 October. The main server
+still runs
+[`0f54ad45`](https://github.com/EvilPatrick06/skymp/tree/0f54ad45),
 the earlier engine from release 1.2.0 on 5 October.
 
 The six client files are built from the commit named by the feed a person
