@@ -120,6 +120,8 @@ $far     = Join-Path $work 'far'          # the scripts the stand-in ssh runs
 $pidLog  = Join-Path $work 'pids.txt'
 $root    = Join-Path $box 'Thornswood-Server'
 $utf8    = New-Object Text.UTF8Encoding($false)
+$runTag  = [Guid]::NewGuid().ToString('N').Substring(0, 8)
+$TaskPrefix = 'Thornswood Test ' + $runTag   # every task this run makes, and only those
 foreach ($d in $box, $tasks, $far) { $null = [IO.Directory]::CreateDirectory($d) }
 
 function Put([string]$path, [string]$text) {
@@ -133,8 +135,11 @@ function Get([string]$path) {
     try { $r = New-Object IO.StreamReader($fs); return $r.ReadToEnd() } finally { $fs.Dispose() }
 }
 # A real task by the name the stand-ins use means a stand-in did not take.
-# Taken off again at once, and a failure, because nothing here may leave one.
-function NoRealTask {
+# Only this run's own tasks carry $TaskPrefix, so only those are taken off
+# again; any other 'Thornswood Test*' task (another run's, or a real one) is
+# left exactly where it is and reported, because it is not ours to remove.
+# The same per-run tag test-deploy-swaps.ps1 uses since #1973 (c8f51230).
+function NoRealTask([string]$own = $TaskPrefix) {
     # The task folder on disk, when this account can read it, because asking
     # the scheduler takes seconds and this is asked after every far call.
     $folder = Join-Path $env:SystemRoot 'System32\Tasks'
@@ -143,11 +148,36 @@ function NoRealTask {
     if ($readable -and -not (Test-Path -Path (Join-Path $folder 'Thornswood Test*'))) { return $true }
     $real = @(Get-ScheduledTask -TaskName 'Thornswood Test*' -ErrorAction SilentlyContinue)
     foreach ($r in $real) {
-        Stop-ScheduledTask -TaskName $r.TaskName -ErrorAction SilentlyContinue
-        Unregister-ScheduledTask -TaskName $r.TaskName -Confirm:$false -ErrorAction SilentlyContinue
+        if ($r.TaskName.StartsWith($own + ' ', [StringComparison]::Ordinal)) {
+            Stop-ScheduledTask -TaskName $r.TaskName -ErrorAction SilentlyContinue
+            Unregister-ScheduledTask -TaskName $r.TaskName -Confirm:$false -ErrorAction SilentlyContinue
+        } else {
+            Write-Host ("      a task this run did not make is left alone: '" + $r.TaskName + "'")
+        }
     }
     return ($real.Count -eq 0)
 }
+# A decoy 'Thornswood Test <x>' task that is not this run's survives NoRealTask
+# and is reported, while one this run made is taken off. Real tasks, made and
+# removed here only, under names nothing else uses.
+$decoy = 'Thornswood Test Decoy ' + [Guid]::NewGuid().ToString('N').Substring(0, 8)
+$mine  = $TaskPrefix + ' Scene'
+$act   = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument '/c exit 0'
+try {
+    $null = Register-ScheduledTask -TaskName $decoy -Action $act -ErrorAction Stop
+    $null = Register-ScheduledTask -TaskName $mine  -Action $act -ErrorAction Stop
+    $clean = NoRealTask
+    Yes 'a task this run did not make is reported' (-not $clean)
+    Yes 'and left where it was' ($null -ne (Get-ScheduledTask -TaskName $decoy -ErrorAction SilentlyContinue))
+    Yes 'while a task this run made is removed' ($null -eq (Get-ScheduledTask -TaskName $mine -ErrorAction SilentlyContinue))
+} catch {
+    Yes ('the decoy scene could register its tasks: ' + $_.Exception.Message) $false
+} finally {
+    foreach ($n in $decoy, $mine) { Unregister-ScheduledTask -TaskName $n -Confirm:$false -ErrorAction SilentlyContinue }
+}
+Yes 'and the scene left no task of its own behind' (
+    $null -eq (Get-ScheduledTask -TaskName $decoy -ErrorAction SilentlyContinue) -and
+    $null -eq (Get-ScheduledTask -TaskName $mine -ErrorAction SilentlyContinue))
 function Sha([string]$path) { return (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() }
 # Every file and folder under a root and its hash, logs left out: a server
 # that ran appends to them, and they are carried across on purpose.
@@ -343,7 +373,7 @@ function Show { foreach ($l in $script:lastOut) { Write-Host ('        ' + $l) }
 
 # The installer, the way Publish-Server has the box run it.
 function Install([string]$zip, [string[]]$more) {
-    $a = "-Zip '" + $zip.Replace("'", "''") + "' -Root '" + $root.Replace("'", "''") + "' -TaskName 'Thornswood Test Server' -StartNow -AllowGamingPc -Wait 8 " + ($more -join ' ')
+    $a = "-Zip '" + $zip.Replace("'", "''") + "' -Root '" + $root.Replace("'", "''") + "' -TaskName '$TaskPrefix Server' -StartNow -AllowGamingPc -Wait 8 " + ($more -join ' ')
     return (RunWrapped ("& '" + $installer.Replace("'", "''") + "' " + $a + "`r`nexit `$LASTEXITCODE`r`n"))
 }
 
@@ -564,7 +594,7 @@ try {
     Put (Join-Path $root 'world\w2.txt') 'a character made since'
     $running = Owner $P
     $out = RunWrapped ("& '" + $installer.Replace("'", "''") + "' -Root '" + $root.Replace("'", "''") +
-                       "' -TaskName 'Thornswood Test Server' -StartNow -AllowGamingPc -Wait 8 -PutBack`r`nexit `$LASTEXITCODE`r`n")
+                       "' -TaskName '$TaskPrefix Server' -StartNow -AllowGamingPc -Wait 8 -PutBack`r`nexit `$LASTEXITCODE`r`n")
     $failed = $script:fail
     Yes '-PutBack is INSTALL OK' ($out -contains 'INSTALL OK')
     Yes '  and the old gamemode is live again, answering as a new process' (
@@ -622,7 +652,7 @@ try {
     Put (Join-Path $root 'server-settings.json') ($now | ConvertTo-Json -Depth 8)
     $now = SettingsOf $root
     $out = RunWrapped ("& '" + $installer.Replace("'", "''") + "' -Root '" + $root.Replace("'", "''") +
-                       "' -TaskName 'Thornswood Test Server' -StartNow -AllowGamingPc -Wait 8 -PutBack`r`nexit `$LASTEXITCODE`r`n")
+                       "' -TaskName '$TaskPrefix Server' -StartNow -AllowGamingPc -Wait 8 -PutBack`r`nexit `$LASTEXITCODE`r`n")
     $failed = $script:fail
     $back = SettingsOf $root
     Yes '-PutBack after it is INSTALL OK, and the older release is back' (
@@ -805,7 +835,7 @@ try {
         # default binary.
         $recordFile = Join-Path $work 'server-build.json'
         Put $recordFile (RecordText 'binary v2')
-        function Publish([string]$zip, [string[]]$more, [string]$channel = 'dev', [string]$vpsRoot = $devRoot, [string]$task = 'Thornswood Test Dev', [int]$port = $D) {
+        function Publish([string]$zip, [string[]]$more, [string]$channel = 'dev', [string]$vpsRoot = $devRoot, [string]$task = ($TaskPrefix + ' Dev'), [int]$port = $D) {
             $a = @{ Channel = $channel; VpsRoot = $vpsRoot; TaskName = $task; VpsHost = '127.0.0.1'; VpsUser = 'nobody'
                     Dist = $dist; Zip = $zip; SkipBuild = $true; NoPause = $true; Wait = 8; Record = $recordFile; NoNews = $true; NoPush = $true
                     GamePort = $port; ResourcesPort = ($port + 1) }
@@ -910,7 +940,7 @@ try {
     Yes ("a game port from the system for the live Publish-Server runs, {0}, and {1} above it, both free" -f $L, ($L + 1)) ($L -gt 0)
     if ($L -gt 0 -and $D -gt 0) {
         $liveRoot = Join-Path $box 'Live\Thornswood-Server'
-        $code = Publish (Payload -Port $L -ForRoot $liveRoot -Gamemode '// live v1') @() 'main' $liveRoot 'Thornswood Test Live' $L
+        $code = Publish (Payload -Port $L -ForRoot $liveRoot -Gamemode '// live v1') @() 'main' $liveRoot ($TaskPrefix + ' Live') $L
         $failed = $script:fail
         Yes 'Publish-Server -Channel main puts a first live server up and exits 0' ($code -eq 0 -and (WaitUp $L))
         if ($script:fail -gt $failed) { Show }
@@ -923,7 +953,7 @@ try {
         Put (Join-Path $liveRoot 'server-settings.json') ($liveOwn | ConvertTo-Json -Depth 8)
         $liveOwn = SettingsOf $liveRoot
         $code = Publish (Payload -Port $L -ForRoot $liveRoot -Gamemode '// live v2' -Settings @{ name = 'Thornswood Test'
-                         npcSettings = @{ default = @{ spawnInInterior = $true } }; thornswoodRequirePass = $false }) @() 'main' $liveRoot 'Thornswood Test Live' $L
+                         npcSettings = @{ default = @{ spawnInInterior = $true } }; thornswoodRequirePass = $false }) @() 'main' $liveRoot ($TaskPrefix + ' Live') $L
         $failed = $script:fail
         $liveAfter = SettingsOf $liveRoot
         Yes 'a live publish over it exits 0 and the new gamemode answers' (

@@ -77,7 +77,7 @@ jobs:
     name: Launcher builds
     runs-on: [self-hosted, Windows, thornswood-vps]
     # About two minutes on the VPS. Past this it is stuck, not slow.
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -264,6 +264,12 @@ jobs:
           # Issue #1589: a line here with no comma after it ends the list, and
           # every name below it only prints itself. test-gate-list.ps1 parses
           # this step and fails on any harness named outside the list.
+          # Djinn, 11 Oct 2026: Main is the full badge at every size. #1581
+          # put the site favicon's crest into the small frames of app.ico,
+          # so shortcuts and the taskbar showed the tab icon.
+          # tests\test-launcher-icons.js fails if any frame of
+          # launcher\app.ico matches a frame of site\public\favicon.ico, or
+          # if app.ico and app-dev.ico share a frame.
           $six = 'test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
@@ -274,7 +280,7 @@ jobs:
                  'test-downgrade-steam-window.ps1', 'test-address-library.ps1', 'test-vortex-folder.ps1',
                  'test-new-box-runbook.ps1', 'test-remote-header.ps1',
                  'test-vps-defaults.ps1', 'test-runner-lock.ps1', 'test-deploy-artifact.ps1', 'test-deploy-records.js',
-                 'test-own-folder-alone.ps1', 'test-own-folder-first.ps1', 'test-own-folder-again.ps1', 'test-npc-runtime.js',
+                 'test-own-folder-alone.ps1', 'test-own-folder-first.ps1', 'test-own-folder-again.ps1', 'test-setup-game-files.ps1', 'test-check-build.ps1', 'test-client-build-record.ps1', 'test-npc-runtime.js',
                  'test-mold-key.js', 'test-putback-flora.js', 'test-staff-spells.js', 'test-join-pass-trust.js',
                  'test-npc-shared-runtime.js', 'test-npc-navigation-equivalence.js', 'test-npc-population-runtime.js',
                  'test-shared-resource-stock.js', 'test-resource-stock-integration.js',
@@ -307,6 +313,7 @@ jobs:
                  'test-python-defaults.js',
                  'test-1388-apprentice.js',
                  'test-launcher-help.js', 'test-classes-page.js',
+                 'test-tester-checklist.js',
                  'test-1389-lists.js',
                  'test-1590-hunter-lists.js',
                  'test-1390-embassy.js',
@@ -404,6 +411,7 @@ jobs:
                  'test-secrets-fail-closed.js',
                  'test-our-key-menus.js', 'test-slash-key.js', 'test-social-keys.js',
                  'test-site-auth.js',
+                 'test-site-route-gaps.js',
                  'test-site-headers.js',
                  'test-site-render.js', 'test-site-discovery.js',
                  'test-home-status.js', 'test-seats.js', 'test-age-gate.js', 'test-download-hash.js',
@@ -412,6 +420,7 @@ jobs:
                  'test-join-outage.js', 'test-join-pass-site.js', 'test-open-switch.js', 'test-component-readmes.js',
                  'test-site-front-resilience.js', 'test-site-upload-guard.js',
                  'test-report-limits.js', 'test-site-hangs.js',
+                 'test-site-oauth-gaps.js', 'test-site-escaping.js', 'test-swap-helpers.ps1',
                  'test-backup-restore.ps1', 'test-backup-streaming.ps1',
                  'test-content-release.ps1',
                  'test-cooldown-sweep.js', 'test-voice-moved-clients.js',
@@ -419,6 +428,7 @@ jobs:
                  'test-server-stage-directories.ps1',
                  'test-dev-settings-keys.ps1',
                  'test-dev-gamemode-notes.ps1',
+                 'test-2076-dev-build-check.ps1',
                  'test-1929-dev-gamemode-note.ps1',
                  'test-1938-server-ready-wait.ps1',
                  'test-1955-ship-stack-note.ps1',
@@ -434,6 +444,7 @@ jobs:
                  'test-client-by-hash.ps1',
                  'test-build-vs-install.ps1',
                  'test-ship-dry-run.ps1',
+                 'test-launcher-icons.js',
                  'test-gate-list.ps1'
           $failed = @()
           foreach ($n in $six) {
@@ -579,6 +590,46 @@ jobs:
           & $py -m ruff check --isolated --no-cache --select E9,F63,F7,F82 --output-format github @files
           if ($LASTEXITCODE -ne 0) { exit 1 }
           Write-Host ("{0} Python file(s) name only what exists" -f $files.Count)
+
+      - name: Lint (warnings only)
+        # Issue #1343. Reports ruff, eslint and PSScriptAnalyzer findings and
+        # never fails the build. PSScriptAnalyzer took about 253 s over the
+        # repository on Ship PC One on 10 Oct (1276 findings), so 8 minutes.
+        continue-on-error: true
+        timeout-minutes: 8
+        shell: pwsh
+        run: |
+          # ruff: the venv the step above made from the hash-pinned
+          # .github\ruff-requirements.txt, so nothing new is installed.
+          $py = Join-Path $env:RUNNER_TEMP 'ruff-venv\Scripts\python.exe'
+          if (Test-Path -LiteralPath $py) {
+            & $py -m ruff check --no-cache --config .github\lint\ruff.toml --exit-zero --output-format github @(git ls-files '*.py')
+          } else { Write-Host '::warning::no ruff venv, ruff lint skipped' }
+
+          # eslint: pinned by version only (no lockfile, no hash).
+          $npm = Join-Path $env:RUNNER_TEMP 'lint-npm'
+          npm install --prefix $npm --no-save --no-audit --no-fund --silent eslint@9.39.5
+          # node runs eslint.js itself, not npm's eslint.cmd shim: cmd.exe reads
+          # the shim, whose 'SET dp0=%~dp0' and '%*' are unquoted, so an '&' in
+          # its folder or an argument (C:\ThornswoodTemps&Worktrees) cut the
+          # command short and eslint never ran (#1343).
+          $eslint = Join-Path $npm 'node_modules\eslint\bin\eslint.js'
+          if (Test-Path -LiteralPath $eslint) {
+            & node $eslint -c (Join-Path $PWD '.github\lint\eslint.config.mjs') .
+          } else { Write-Host '::warning::could not install eslint 9.39.5, eslint lint skipped' }
+
+          # PSScriptAnalyzer: pinned by version only, from the PowerShell Gallery.
+          $psm = Join-Path $env:RUNNER_TEMP 'lint-psm'
+          New-Item -ItemType Directory -Force -Path $psm | Out-Null
+          Save-Module -Name PSScriptAnalyzer -RequiredVersion 1.24.0 -Path $psm -Repository PSGallery -Force
+          Import-Module (Join-Path $psm 'PSScriptAnalyzer\1.24.0\PSScriptAnalyzer.psd1')
+          $found = @(Invoke-ScriptAnalyzer -Path . -Recurse -Settings .github\lint\PSScriptAnalyzerSettings.psd1)
+          foreach ($d in $found) {
+            $lvl = if ($d.Severity -eq 'Error') { 'error' } else { 'warning' }
+            Write-Host ("::{0} file={1},line={2}::{3}: {4}" -f $lvl, $d.ScriptPath, $d.Line, $d.RuleName, $d.Message)
+          }
+          Write-Host ("PSScriptAnalyzer: {0} finding(s)" -f $found.Count)
+          exit 0
 
       - name: Count the silent catches in the launcher
         shell: pwsh

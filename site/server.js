@@ -3952,7 +3952,9 @@ async function handle(req, res) {
     attemptsSpent.set(attempt, now);
     const spent = attemptCookie(req, attempt, '', 0);
     res.setHeader('Set-Cookie', spent);
-    if (!/^\/[A-Za-z0-9/_-]*$/.test(back)) back = '/';
+    // Two slashes is another host to a browser (//2130706433), so back has to
+    // start with exactly one.
+    if (!/^\/(?!\/)[A-Za-z0-9/_-]*$/.test(back)) back = '/';
     if (!code) return send(res, 302, '', 'text/plain', { Location: '/?discord=cancelled' });
 
     let me;
