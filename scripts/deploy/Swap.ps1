@@ -22,8 +22,10 @@
        machine, the settings parsed, the program parsed (node --check, or
        Python's own parser). A refusal clears the stage and stops nothing.
     3. Only then the stop, one rename per file (what it replaces goes into
-       <root>\.prev-<stamp>), and the same for a directory named in $Dirs,
-       the start, and a check that it answers.
+       <root>\.prev-<stamp>), and the same for a directory named in $Dirs;
+       for a caller that names what else at its root is its own ($Owns, the
+       bot, issue #1184), whatever is there that it did not send goes into
+       .prev the same way; then the start, and a check that it answers.
     4. If a rename fails, or it does not answer, the old files go back, the
        old one is started again, and the run says SWAP ROLLED BACK and exits 1.
 
@@ -595,8 +597,46 @@ foreach ($rel in @($moveRels)) {
   $placed += $rel
 }
 
+# WHAT THIS DEPLOY DID NOT SEND, issue #1184. A caller that owns the whole of
+# its root says so with $Owns: the names at the top of the root that are its
+# own besides what it sends (its settings, its records, the folders it
+# keeps), as wildcards. Everything else at the top of the root, and every
+# file in a folder this deploy sends into, goes aside into $prevDir while it
+# is stopped, so what starts is the root as the deploy describes it and
+# nothing more. It goes the way a replaced file goes: a rollback puts it back,
+# -PutBack puts it back with the code it came out beside (a file an older
+# deploy sent and this one no longer does is that older code's), and it
+# leaves the box with that .prev folder. The swap's own folders are never
+# looked at. With no $Owns nothing is, which is the site and the voice
+# service.
+$strays = @()
+if ($moved -and (Test-Path variable:Owns) -and @($Owns | Where-Object { $_ }).Count) {
+  $sentRels = @($moveRels)
+  $ownNames = @('.stage-*', '.prev-*', '.undone-*') + @($Owns | Where-Object { $_ })
+  function Strays([string]$dir, [string]$under) {
+    foreach ($e in @(Get-ChildItem -LiteralPath $dir -Force -EA SilentlyContinue)) {
+      $rel = $under + $e.Name
+      if (-not $under -and @($ownNames | Where-Object { $e.Name -like $_ }).Count) { continue }
+      if ($sentRels -contains $rel) { continue }
+      if ($e.PSIsContainer -and @($sentRels | Where-Object { $_.StartsWith($rel + '/', [StringComparison]::OrdinalIgnoreCase) }).Count) {
+        Strays $e.FullName ($rel + '/')
+        continue
+      }
+      $rel
+    }
+  }
+  foreach ($rel in @(Strays $Root '')) {
+    $r = $rel -replace '/', '\'
+    if (-not (Shift (Join-Path $Root $r) (Join-Path $prevDir $r))) { 'could not move ' + $rel + ', which this deploy did not send, aside'; $moved = $false; break }
+    $aside += $rel
+    $moveRels += $rel
+    $strays += $rel
+  }
+}
+
 if ($moved) {
   'swapped in ' + $placed.Count + ' file(s), the ones they replaced are in ' + $prevDir
+  if ($strays.Count) { 'moved aside ' + $strays.Count + ' thing(s) at ' + $Root + ' that this deploy did not send and that are not its own, into ' + $prevDir + ': ' + ($strays -join ', ') }
   StartIt
   'started, giving it ' + $Wait + ' seconds to answer'
   if (Healthy) {
