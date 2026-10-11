@@ -564,6 +564,25 @@ yes('the miner page says the same', /kept on the character/.test(mWhere) &&
     result.why==='unwritten' && !form(81).props[PROP]);
 }
 
+{
+  ranks['82:miner']='master';w=restart();w.ctx.__identityToken='old';w.svc.offer(82,'ebony');
+  w.ctx.__thornswoodCharacter.rankOf=function(){w.ctx.__identityToken='new';return 'master';};
+  w.svc.mineRare(82,here[0],EBONY);
+  yes('mining qualification cannot adopt a new actor session',have(82,EBONY.ore)===0 && forms[82].props[PROP].open.ebony.drawn===0);
+}
+{
+  w=restart();w.ctx.__identityToken='old';w.svc.offer(83,'satchel');
+  w.svc.bindPlace('satchel',{ref:9800,cell:'satchel-cell',item:'satchel-item'});
+  const get=w.ctx.mp.get;
+  w.ctx.mp.get=function(id,key){
+    if(id===9800 && key==='locationalData'){w.ctx.__identityToken='new';return {cellOrWorldDesc:'satchel-cell'};}
+    return get(id,key);
+  };
+  w.ctx.mp.getDescFromId=function(){return 'satchel-ref';};
+  w.svc.onActivate(83,9800);
+  yes('retrieval activation cannot adopt a new actor session',have(83,'satchel-item')===0 && forms[83].props[PROP].open.satchel.drawn===0);
+}
+
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
