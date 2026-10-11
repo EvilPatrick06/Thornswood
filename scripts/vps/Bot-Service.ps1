@@ -122,6 +122,54 @@ function Stop-ThornswoodBotStrays([string]$Root) {
   }
 }
 
+# The old loop's two files, beside the code. Remove-ThornswoodBotLoop takes
+# them off with the scheduled task that ran them; until a full run has done
+# that, they may still be what runs the bot.
+function Get-ThornswoodBotLoopFiles { return @('run.ps1', 'roll-log.ps1') }
+
+# The bot's records from before #1104, when it wrote them beside the code.
+# Move-ThornswoodBotRecords moves them into data on a full run.
+function Get-ThornswoodBotRecordNames {
+  return @('heartbeat.json', 'joins.json', 'open-tickets.json', 'commands-synced.json', 'heartbeat.json.tmp', 'joins.json.tmp')
+}
+
+# A log of the bot's, by its name: bot.log, its rolls bot.log.1 and on, and a
+# bot.log.<anything> somebody renamed by hand to keep it. A log is never
+# removed; a full run moves one beside the code into data with the records.
+function Test-ThornswoodBotLogName([string]$Name) { return ($Name -eq 'bot.log' -or $Name -like 'bot.log.*') }
+
+# WHAT THE BOT'S FOLDER HOLDS BESIDES ITS CODE (issue #1184).
+#
+# The code is what Install-Bot sends, and the swap is told that list. These
+# are the rest of the names at the top of the folder that are the bot's own,
+# as wildcards, and the swap leaves them where they are. Everything else at
+# the top of the folder, and every file in a folder the install sends into
+# (assets), was not put there by the install, so the swap moves it aside with
+# what the new code replaces ($Owns in Swap.ps1's service swap block).
+#
+# Seen on the VPS on 29 Sep: backfill.py, redraw.py, sample.py,
+# sample-maka.png, sample-mixed.png and a log renamed by hand sat beside
+# bot.py, copied there by hand and never taken off, because the install sent a
+# fixed list and had no rule for anything else in the folder. Python puts the
+# folder bot.py is in first on the bot's import path, so a sample.py there is
+# one import away from being run by the bot.
+#
+#   bot.env.json             the settings and the token (Write-BotToken.ps1)
+#   thornswood-deploy.json   the record of what runs here (Artifact.ps1)
+#   data                     the records and the log, the one folder the
+#                            bot's account writes (#1104)
+#   service                  the program the service runs, and host.json
+#   webhooks                 the news and dev webhooks, read over ssh
+#   py-libs                  the libraries; a full run stages and swaps them,
+#                            -CodeOnly leaves them as they are
+#   the old loop's files     until a full run takes the loop off (#465)
+#   the records and logs     from before #1104, until a full run moves them
+#     beside the code        into data
+function Get-ThornswoodBotOwned {
+  return @('bot.env.json', 'thornswood-deploy.json', 'data', 'service', 'webhooks', 'py-libs', 'bot.log', 'bot.log.*') +
+         @(Get-ThornswoodBotLoopFiles) + @(Get-ThornswoodBotRecordNames)
+}
+
 # The old loop, taken off once: its scheduled task, whatever it was running,
 # and its two files. The service replaces all of it.
 function Remove-ThornswoodBotLoop([string]$Root, [string]$Task) {
@@ -133,7 +181,7 @@ function Remove-ThornswoodBotLoop([string]$Root, [string]$Task) {
     else { 'removed the old scheduled task ' + $Task + ', which ran the bot as SYSTEM' }
   }
   Stop-ThornswoodBotStrays $Root
-  foreach ($f in 'run.ps1', 'roll-log.ps1') {
+  foreach ($f in @(Get-ThornswoodBotLoopFiles)) {
     $p = Join-Path $Root $f
     if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Force -EA SilentlyContinue; 'removed ' + $p }
   }
@@ -200,8 +248,8 @@ function Repair-ThornswoodBotData([string]$Root, [string]$Name = 'ThornswoodBot'
 function Move-ThornswoodBotRecords([string]$Root) {
   $data = Join-Path $Root 'data'
   if (-not (Test-Path -LiteralPath $data)) { $null = New-Item -ItemType Directory -Force -Path $data; 'made ' + $data }
-  $names = @('heartbeat.json', 'joins.json', 'open-tickets.json', 'commands-synced.json', 'heartbeat.json.tmp', 'joins.json.tmp')
-  $logs = @(Get-ChildItem -LiteralPath $Root -File -Force -EA SilentlyContinue | Where-Object { $_.Name -match '^bot\.log(\.\d+)?$' } | ForEach-Object { $_.Name })
+  $names = @(Get-ThornswoodBotRecordNames)
+  $logs = @(Get-ChildItem -LiteralPath $Root -File -Force -EA SilentlyContinue | Where-Object { Test-ThornswoodBotLogName $_.Name } | ForEach-Object { $_.Name })
   foreach ($n in @($names + $logs)) {
     $from = Join-Path $Root $n
     if (-not (Test-Path -LiteralPath $from)) { continue }

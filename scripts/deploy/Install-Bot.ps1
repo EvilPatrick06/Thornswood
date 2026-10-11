@@ -35,7 +35,13 @@
        service starts it at boot, starts python again when it exits, and
        rolls bot.log by size while it runs. The first full run takes the old
        scheduled task and its run.ps1 loop off the box.
-    7. Asks the box, once the swap has answered, what is really at the bot's
+    7. Leaves the bot's folder holding what it sends and what is the bot's
+       own (its settings, its records and log in data, the service, the
+       webhooks, the libraries), and nothing else: the swap moves anything
+       else there, a file somebody copied in by hand, aside into .prev with
+       what the new code replaced, and says each name (issue #1184,
+       Get-ThornswoodBotOwned in scripts\vps\Bot-Service.ps1).
+    8. Asks the box, once the swap has answered, what is really at the bot's
        folder there: one Test-Path line per file it sent, by full path, with
        data\bot.log among them. A file that is not there turns the run red,
        so a swap that said SWAP OK while something is missing from the
@@ -330,7 +336,9 @@ if (`$p) { 'FOUND ' + (& `$p.Source --version 2>&1) } else { 'MISSING' }
   checks the stage (each file by its hash, bot.py and card.py through Python's
   own parser). Nothing is stopped if that fails. The swap then stops the
   service by name, renames the files in (what they replace goes to
-  $Root\.prev-<stamp>, the newest two kept), starts it by name, and waits
+  $Root\.prev-<stamp>, the newest two kept, and so does anything in the
+  folder this run did not send that is not the bot's own, issue #1184),
+  starts it by name, and waits
   for this start to say it is watching its server. If it does not, the old
   files go back and the service is started again on them. -PutBack puts the
   newest .prev folder back the same way.
@@ -609,7 +617,14 @@ function Invoke-BotSwap([bool]$noServiceOk) {
   $svcLib = Join-Path $Here '..\vps\Bot-Service.ps1'
   if (-not (Test-Path -LiteralPath $svcLib)) { Die "missing: $svcLib" }
   $vars = (ServiceSwapVars $Root $stageName $prevName $Wait $hashes @()) + ('$NoServiceOk = $' + $noServiceOk + "`r`n") + ('$Dirs = @(''py-libs'')' + "`r`n")
-  $out = @(Remote ($vars + (Get-Content -LiteralPath $svcLib -Raw) + "`n" + $botHooks + $pick + $serviceSwapBlock) |
+  # The bot's folder holds what this run sends and what is the bot's own
+  # (Get-ThornswoodBotOwned, issue #1184), so the swap moves anything else
+  # there aside with what the new code replaces. After Bot-Service.ps1, which
+  # defines the list. -PutBack sends nothing to hold the folder to, so it
+  # looks at nothing.
+  $owns = ''
+  if (-not $PutBack) { $owns = '$Owns = @(Get-ThornswoodBotOwned)' + "`r`n" }
+  $out = @(Remote ($vars + (Get-Content -LiteralPath $svcLib -Raw) + "`n" + $owns + $botHooks + $pick + $serviceSwapBlock) |
            ForEach-Object { Say "  $_"; "$_".Trim() })
   if (-not (Show-SwapResult $out "$rootWin\.prev-<stamp>")) { Die 'the bot was not swapped in. The lines above say what is running.' }
   return $out
