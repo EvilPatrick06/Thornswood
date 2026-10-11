@@ -37,7 +37,7 @@
 
   THE JAVASCRIPT HALF IS ALWAYS BUILT AGAIN (#1214). Since fork #30 (#1236)
   the fork's CMake reruns the yarn install and build-ts when a .ts file under
-  skymp5-server\ts, package.json, yarn.lock or tsconfig.json is newer than the
+  skymp5-server\ts, package.json, yarn.lock or the TypeScript settings are newer than the
   bundle, so a package bump reaches the bundle on any full build. A bundle
   copied in from another build with a newer date would still be taken as
   current, so the bundle and its map are still removed before the build, and
