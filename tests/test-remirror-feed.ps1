@@ -25,6 +25,8 @@
   VPS; it is pointed at an address that answers nothing, and -Check is the
   switch that makes an unreachable site a line on screen rather than a stop.
 #>
+# Scripts this runs whole go to a stand-in box, so the freshness guard lets them be (#2118).
+$env:THORNSWOOD_HARNESS = '1'
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 

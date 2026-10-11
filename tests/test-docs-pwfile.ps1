@@ -1,4 +1,4 @@
-﻿<#
+<#
   test-docs-pwfile.ps1
 
   Deploy-Docs.ps1 -Password reads the site password from a locked-down file on
@@ -15,6 +15,8 @@
 #>
 [CmdletBinding()]
 param()
+# Scripts this runs whole go to a stand-in box, so the freshness guard lets them be (#2118).
+$env:THORNSWOOD_HARNESS = '1'
 
 $ErrorActionPreference = 'Stop'
 $Repo = Split-Path -Parent $PSScriptRoot

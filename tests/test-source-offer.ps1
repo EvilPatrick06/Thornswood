@@ -53,6 +53,8 @@
 #>
 [CmdletBinding()]
 param([string]$Fork)
+# Scripts this runs whole go to a stand-in box, so the freshness guard lets them be (#2118).
+$env:THORNSWOOD_HARNESS = '1'
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot

@@ -75,9 +75,14 @@ param(
     # A folder standing in for the site's root on the VPS (C:\Thornswood-Docs),
     # passed to Remirror-Site-Feed.ps1 and Feed-Store.ps1 so nothing connects
     # to the VPS. Tests only.
-    ,[string]$SiteDir
+    ,[string]$SiteDir,
+    # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
+    [switch]$AllowStaleCheckout
 )
 . (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
+
+# A stale or dirty checkout sends old or unlanded code; refuse it (#2118).
+. (Join-Path $PSScriptRoot '..\deploy\Fresh-Checkout.ps1'); Assert-FreshCheckout -RepoDir (Join-Path $PSScriptRoot '..\..') -What 'Publish-Update' -AllowStale:$AllowStaleCheckout
 
 
 # The launcher, Thornswood.exe in the launcher folder.

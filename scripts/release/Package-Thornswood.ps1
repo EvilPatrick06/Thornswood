@@ -58,8 +58,13 @@ param(
     # The setup program to build the installer around, instead of the one
     # the last Build-Launcher left in out\. A main Ship passes the one CI
     # built for the tag it ships (issue #932); nothing else needs it.
-    [string]$Stub = ''
+    [string]$Stub = '',
+    # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
+    [switch]$AllowStaleCheckout
 )
+
+# A stale or dirty checkout sends old or unlanded code; refuse it (#2118).
+. (Join-Path $PSScriptRoot '..\deploy\Fresh-Checkout.ps1'); Assert-FreshCheckout -RepoDir (Join-Path $PSScriptRoot '..\..') -What 'Package-Thornswood' -AllowStale:$AllowStaleCheckout
 
 
 # The launcher, Thornswood.exe in the launcher folder.
