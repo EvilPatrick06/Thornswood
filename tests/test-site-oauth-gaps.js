@@ -147,6 +147,20 @@ async function signIn(back, code, port) {
   return ask('/auth/discord/callback?code=' + code + '&state=' + encodeURIComponent(state), { Cookie: cookie });
 }
 
+// Waits for the site's own "[thornswood-docs] listening on ...:port" line
+// rather than polling the port (#1727).
+function listening(srv, port) {
+  return new Promise((ok, bad) => {
+    let out = '';
+    const end = (e) => { clearTimeout(late); srv.stdout.removeListener('data', said); srv.removeListener('close', gone); if (e) { bad(e); } else { ok(); } };
+    const said = (d) => { out += d; const m = /\[thornswood-docs\] listening on \S+:(\d+)/.exec(out); if (m && Number(m[1]) === port) { end(); } };
+    const gone = (c) => end(new Error('site stopped ' + c + ' before it was listening:\n' + out));
+    const late = setTimeout(() => end(new Error('site did not say it was listening on ' + port + ':\n' + out)), 15000);
+    srv.stdout.on('data', said);
+    srv.on('close', gone);
+  });
+}
+
 (async () => {
   PORT = await freePort();
   const srv = spawn(process.execPath, ['-r', path.join(dir, 'stub.js'), 'server.js'], {
@@ -156,14 +170,7 @@ async function signIn(back, code, port) {
   srv.stdout.on('data', (d) => { out += d; });
   srv.stderr.on('data', (d) => { out += d; });
   try {
-    await new Promise((ok, bad) => {
-      const t = setInterval(() => {
-        const m = /\[thornswood-docs\] listening on \S+:(\d+)/.exec(out);
-        if (m && Number(m[1]) === PORT) { clearInterval(t); clearTimeout(late); ok(); }
-      }, 50);
-      const late = setTimeout(() => { clearInterval(t); bad(new Error('site did not start:\n' + out)); }, 15000);
-      srv.on('close', (c) => { clearInterval(t); clearTimeout(late); bad(new Error('site stopped ' + c + ':\n' + out)); });
-    });
+    await listening(srv, PORT);
 
     console.log('WHERE THE BROWSER IS SENT BACK');
     let r = await signIn('/link', 'ok');
