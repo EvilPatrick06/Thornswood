@@ -35,7 +35,7 @@ $vps = Join-Path $scratch 'vps'
 $null = New-Item -ItemType Directory -Path $vps -Force
 
 try {
-    foreach ($n in @('Watch-Load.ps1', 'vps-load.ps1', 'Read-Load.ps1')) {
+    foreach ($n in @('Watch-Load.ps1', 'vps-load.ps1', 'Read-Load.ps1', 'Lock-Folder.ps1')) {
         Copy-Item -LiteralPath (Join-Path $Repo "scripts\vps\$n") -Destination $vps
     }
     Set-Content -LiteralPath (Join-Path $vps 'Vps.ps1') -Encoding ASCII -Value @'
