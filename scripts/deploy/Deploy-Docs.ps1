@@ -438,15 +438,16 @@ Write-Host 'Opening the port and setting up the task...'
 $setup = @(Remote @"
 `$ErrorActionPreference = 'Continue'
 
-# Once Setup-Domain has run, the site answers on loopback only and Caddy holds
-# 80 and 443. Opening 3001 again would put a plain HTTP way straight past the
-# certificate, so a redeploy after that must not do it, and tears the rule back
-# down if a previous run left one.
+# The site answers on loopback only unless THORNSWOOD_DOCS_EXPOSE=1 (#2185),
+# and Caddy holds 80 and 443. Opening 3001 would put a plain HTTP way straight
+# past the certificate, so the rule is opened only for a box that asked for a
+# plain listener on purpose, and torn down otherwise if a previous run left one.
 `$local = [Environment]::GetEnvironmentVariable('THORNSWOOD_DOCS_LOCAL','Machine')
-if (`$local -eq '1') {
+`$expose = [Environment]::GetEnvironmentVariable('THORNSWOOD_DOCS_EXPOSE','Machine')
+if (`$local -eq '1' -or `$expose -ne '1') {
   Get-NetFirewallRule -DisplayName '$Task' -EA SilentlyContinue |
     Remove-NetFirewallRule -EA SilentlyContinue
-  'behind the certificate, $Port left shut'
+  'loopback only, $Port left shut'
 }
 elseif (-not (Get-NetFirewallRule -DisplayName '$Task' -EA SilentlyContinue)) {
   New-NetFirewallRule -DisplayName '$Task' -Direction Inbound -Protocol TCP ``
@@ -743,6 +744,12 @@ function Answer {
   $by = ''
   if ($l.Count) { $by = ', pid ' + $l[0].OwningProcess }
   'the site answers on ' + $Port + $by
+  # Where it listens (#2185): loopback only, unless the box asked for a plain
+  # listener with THORNSWOOD_DOCS_EXPOSE=1. Said, not fatal: the site is up.
+  $open = @($l | Where-Object { $_.LocalAddress -notmatch '^(127\.|::1$)' } | ForEach-Object { $_.LocalAddress } | Sort-Object -Unique)
+  if ($open.Count -and [Environment]::GetEnvironmentVariable('THORNSWOOD_DOCS_EXPOSE','Machine') -ne '1') {
+    'EXPOSED: the site listens on ' + ($open -join ', ') + ' port ' + $Port + ', not loopback only. Plain HTTP past the certificate (#2185).'
+  } elseif ($l.Count) { 'listening on ' + ((@($l | ForEach-Object { $_.LocalAddress } | Sort-Object -Unique)) -join ', ') }
 }
 # Run by hand, to see why: a task swallows what node prints.
 function Why {
