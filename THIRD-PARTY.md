@@ -96,7 +96,7 @@ none, the launcher downloads Microsoft's own bootstrapper from Microsoft's link
 
 The six files recorded in `records\client-build.json` correspond to
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
-commit `7feb5dc4` (in full, `7feb5dc4cbcef4e040fcd49fa852c33351f8886d`). That
+commit `566bf468` (in full, `566bf4680c669bd12209210586a91b3b713f14b0`). That
 is upstream skyrim-multiplayer/skymp at `2849e676` with Thornswood's changes on
 top. Check-Secrets.ps1 stops a release whose copy of any of the six is not the
 recorded sha256 (client-not-recorded-build), and Sync-Client.ps1 puts in the
@@ -435,7 +435,7 @@ with.
 
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`, is AGPL-3.0. That record and the client record
-  name `7feb5dc4cbcef4e040fcd49fa852c33351f8886d` on the public fork. The
+  name `566bf4680c669bd12209210586a91b3b713f14b0` on the public fork. The
   server module and the six client files were built from that commit, which
   adds the 5 October security fixes (the RPC route, request bodies, metrics,
   the login line, the settings files), the server's equipment write for a new
@@ -444,10 +444,11 @@ with.
   light plugins on the server and in the save the client loads, numbered
   teleports so an old one is never carried out after a newer one, and the
   server reading its source map while it starts; the server module's SHA256 is
-  `a4c5d9c7bfa6badf93d43e3587f08eb9973d289b4711ab727f784a77361a8c21`, built
-  2026-10-11T01:40:26Z. This is the recorded next release, not a deployment
+  `58fa22bc318636e7d24cffc32136987c87f56db13d6c77e9dbb69bef6bb4ccc1`, built
+  2026-10-11T19:39:29Z. This is the recorded next release, not a deployment
   claim. Main remains on `3a32e9615d4eae43cc6995cdf2c09c528bc80da6`.
-  The dev server runs this build since 10 October 2026, 8:02 PM MT
+  The dev server runs the build before this one (fork `7feb5dc4`, without
+  onCraft's craft inputs, #1648) since 10 October 2026, 8:02 PM MT
   (Publish-Server -Channel dev); the dev feed's client files stay on
   `3a32e961` until the next dev Ship.
   The new build adds atomic quest inventory/state writes, connection refusal
@@ -482,7 +483,7 @@ For the six recorded client files and the recorded game server module, the
 Corresponding Source is the fork at the commit each record names. The six
 client files and the game server module, at the one commit both records name:
 
-https://github.com/EvilPatrick06/skymp/tree/7feb5dc4cbcef4e040fcd49fa852c33351f8886d
+https://github.com/EvilPatrick06/skymp/tree/566bf4680c669bd12209210586a91b3b713f14b0
 
 For the earlier engine still deployed on Main and Dev:
 
