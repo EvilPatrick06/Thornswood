@@ -72,8 +72,8 @@ $acctDefault = [regex]::Match($text, "\[string\]\`$Account\s*=\s*'([^']*)'").Gro
 Yes "  its name fits the 20 characters a local account may have (found '$acctDefault')" ($acctDefault.Length -ge 1 -and $acctDefault.Length -le 20)
 Yes '  its password is letters and digits, which cmd.exe passes to config.cmd untouched' ($text -notmatch 'GeneratePassword' -and $text.Contains('Pick (`$up + `$lo + `$dg) 37'))
 Yes 'the service runs as that account' ($text -match '--windowslogonaccount')
-Yes 'every live Thornswood folder is denied to it' ($text.Contains('icacls.exe `$d.FullName /deny'))
-Yes '  except its own' ($text -match 'if \(`\$d\.FullName -eq `\$root\) \{ continue \}')
+Yes 'every live Thornswood folder is denied to it' ($text.Contains('icacls.exe `$d /deny'))
+Yes '  except its own' ($text -match 'if \(`\$d -eq `\$root -or -not \(Test-Path -LiteralPath `\$d\)\) \{ continue \}')
 
 # ---- the download ------------------------------------------------------------------
 Yes 'the runner zip is checked against the SHA-256 in the release notes' ($text -match 'BEGIN SHA win-x64' -and $text -match 'Get-FileHash -LiteralPath `\$zip -Algorithm SHA256')

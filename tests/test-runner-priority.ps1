@@ -110,10 +110,10 @@ Yes ("  under the name the installs gave them, 'Thornswood Runner' ($prefixDefau
 $cfgAt = $text.IndexOf('& .\config.cmd --unattended')
 $installAt = $text.IndexOf('# ----------------------------------------------------------------- install --')
 $callAt = if ($installAt -ge 0) { $text.IndexOf('Remove-RunnerWatchers', $installAt) } else { -1 }
-Yes 'the install sends it' ($text.Contains('-Script ($lockLib + $watcherLib + "`n" + @"'))
+Yes 'the install sends it' ($text.Contains('$out = Send-WithSecret $token ($lockLib + $watcherLib + "`n" + @"'))
 Yes '  and runs it once config.cmd has made the service' ($cfgAt -gt 0 -and $callAt -gt $cfgAt)
 $all = HereOf 'lockAll'
-Yes '-Lock, and the end of every install, run it too' ($text.Contains('$lockAll = $lockLib + $watcherLib + @''') -and $all -match 'Remove-RunnerWatchers')
+Yes '-Lock, and the end of every install, run it too' ($text.Contains('$lockAll = $lockLib + $watcherLib + "`n`$liveFilter = ''') -and $all -match 'Remove-RunnerWatchers')
 Yes '  and count one it could not take off as a failure' ($all -match "-like 'COULD NOT\*'" -and $all -match '\$bad\+\+')
 $removeAt = $text.IndexOf('if ($Remove) {')
 $lockAt = $text.IndexOf('if ($Lock) {')
