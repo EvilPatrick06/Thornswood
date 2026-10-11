@@ -24,7 +24,14 @@
   .failed folders the installers keep beside the servers, and
   C:\Thornswood-Backup (issue #1173), which holds the backup passphrase and
   every backup, and so every secret on the box: that one is SYSTEM's and
-  Administrators' only, like private, and nothing else reads it.
+  Administrators' only, like private, and nothing else reads it. And the
+  service folders (issues #1183 and #1691): C:\Thornswood-Watch,
+  C:\Thornswood-Deploys, C:\Thornswood-Caddy and C:\Thornswood-Maint lose
+  Users the same way, keeping their rules by name (the bot's on Watch, the
+  site's on Deploys\current), and C:\Thornswood-Dumps is SYSTEM's and
+  Administrators' only, since nothing known reads it. Watch is refused while
+  the bot runs with no rule on it by name (run Install-Bot.ps1 first), and
+  Deploys while the site has none on current (run Deploy-Docs.ps1 first).
     the folder takes nothing from C:\ any more; SYSTEM, Administrators and the
       account running this have Full Control; every rule set on it by name
       stays (the site's, a deny for the build runner); Users, Everyone,
@@ -47,7 +54,7 @@
   -WhatIf says what it would change and changes nothing. Every folder is read
   back afterwards: its rules, one line each, and whether Users still reaches it.
 
-  tests\test-server-acl.ps1 runs it against scratch folders.
+  tests\test-server-acl.ps1 and tests\test-vps-service-folders.ps1 run it against scratch folders.
 #>
 param(
     [switch]$WhatIf,
@@ -58,7 +65,10 @@ param(
     [string]$SiteSid = '',
     # The tests run on a machine with the game, as an account that is not an
     # elevated Administrator, against scratch folders. Nothing else passes it.
-    [switch]$AllowGamingPc
+    [switch]$AllowGamingPc,
+    # The bot's account as a SID; worked out from NT SERVICE\ThornswoodBot when
+    # empty. 'none' says there is no bot on this box to keep reading the watchdog.
+    [string]$BotSid = ''
 )
 $ErrorActionPreference = 'Stop'
 function Say([string]$m) { Write-Output $m }
@@ -72,7 +82,20 @@ if (-not $AllowGamingPc) {
 $broad = @('S-1-1-0', 'S-1-5-11', 'S-1-5-32-545', 'S-1-3-0')
 $tree = [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
 $keepers = @('S-1-5-18', 'S-1-5-32-544', [Security.Principal.WindowsIdentity]::GetCurrent().User.Value)
-$nameRule = '^(Thornswood-(Server|Server-Dev|Voice|Voice-Dev)(\.(prev|undone|failed)-\d{8}-\d{6})?|Thornswood-Backup)$'
+$nameRule = '^(Thornswood-(Server|Server-Dev|Voice|Voice-Dev)(\.(prev|undone|failed)-\d{8}-\d{6})?|Thornswood-Backup|Thornswood-(Watch|Deploys|Caddy|Maint|Dumps))$'
+# The service folders (#1183, #1691). Each keeps its rules by name, and Users goes:
+#   Watch    watch.ps1 and load.ps1 run as SYSTEM; the bot reads alerts and
+#            writes alerts-sent-bot.txt by the rules Install-Bot.ps1 gives it
+#            (Grant-ThornswoodBotAccess), so the bot must have one first.
+#   Deploys  the deploy store, written as Administrator over scp (Artifact.ps1);
+#            the site reads current\ by the rule Deploy-Docs.ps1 gives it, so
+#            the site must have one there first.
+#   Caddy    caddy.exe runs as SYSTEM ('Thornswood Web', Setup-Domain.ps1);
+#            nothing else reads it.
+#   Maint    update.ps1 and dev-instance.ps1 run as SYSTEM; nothing else.
+#   Dumps    nothing in scripts\ makes or reads it, so what is in it is not
+#            known: SYSTEM's and Administrators' only, like the backups.
+$svcRule = '^Thornswood-(Watch|Deploys|Caddy|Maint|Dumps)$'
 
 # The site's account, from its task, when it is one of its own.
 if (-not $SiteSid) {
@@ -82,6 +105,12 @@ if (-not $SiteSid) {
         $s = (New-Object Security.Principal.NTAccount([string]$t.Principal.UserId)).Translate([Security.Principal.SecurityIdentifier]).Value
         if ($s -ne 'S-1-5-18') { $SiteSid = $s }
     } catch { }
+}
+if (-not $BotSid) {
+    $BotSid = 'none'
+    if (Get-Service -Name 'ThornswoodBot' -ErrorAction SilentlyContinue) {
+        try { $BotSid = (New-Object Security.Principal.NTAccount('NT SERVICE\ThornswoodBot')).Translate([Security.Principal.SecurityIdentifier]).Value } catch { }
+    }
 }
 if ($SiteSid -ne 'none') { Say ('the site runs as ' + $SiteSid + ', so each folder must have its rule before Users comes off') }
 
@@ -123,7 +152,7 @@ function Lock([string]$path, [bool]$only) {
 
 $folders = @(Get-ChildItem -LiteralPath $Parent -Directory -Force -ErrorAction SilentlyContinue |
              Where-Object { $_.Name -match $nameRule } | Sort-Object Name)
-if (-not $folders.Count) { Say ('nothing to lock: no Thornswood server or voice folder in ' + $Parent) }
+if (-not $folders.Count) { Say ('nothing to lock: no Thornswood server, voice or service folder in ' + $Parent) }
 $refused = 0; $done = 0
 foreach ($f in $folders) {
     $path = $f.FullName
@@ -132,16 +161,29 @@ foreach ($f in $folders) {
     # What the site reads here, and so must reach by its own rule.
     $isVoice = $f.Name -match '^Thornswood-Voice'
     $isBackup = $f.Name -eq 'Thornswood-Backup'
+    $isSvc = $f.Name -match $svcRule
+    if ($isSvc) {
+        $need = $null
+        if ($f.Name -eq 'Thornswood-Deploys' -and $SiteSid -ne 'none') { $need = @{ P = (Join-Path $path 'current'); S = $SiteSid; Who = 'the site''s'; Run = '.\scripts\deploy\Deploy-Docs.ps1' } }
+        if ($f.Name -eq 'Thornswood-Watch' -and $BotSid -ne 'none') { $need = @{ P = $path; S = $BotSid; Who = 'the bot''s'; Run = '.\scripts\deploy\Install-Bot.ps1' } }
+        if ($need -and (Test-Path -LiteralPath $need.P)) {
+            $has = @(Explicit $need.P | Where-Object { $_.IdentityReference.Value -eq $need.S -and $_.AccessControlType -eq 'Allow' })
+            if (-not $has.Count) {
+                Say ('REFUSED ' + $path + ': ' + $need.Who + ' account has no rule on ' + $need.P + ' by name, so taking Users off would stop it reading it. Run ' + $need.Run + ' first, then this again. Left as it is.')
+                $refused++; continue
+            }
+        }
+    }
     $siteNeeds = if ($isVoice) { Join-Path $path 'chat' } else { $path }
-    if ($SiteSid -ne 'none' -and -not $isBackup -and $f.Name -notmatch '\.(prev|undone|failed)-' -and (Test-Path -LiteralPath $siteNeeds)) {
+    if ($SiteSid -ne 'none' -and -not $isBackup -and -not $isSvc -and $f.Name -notmatch '\.(prev|undone|failed)-' -and (Test-Path -LiteralPath $siteNeeds)) {
         $has = @(Explicit $siteNeeds | Where-Object { $_.IdentityReference.Value -eq $SiteSid -and $_.AccessControlType -eq 'Allow' })
         if (-not $has.Count) {
             Say ('REFUSED ' + $path + ': the site''s account has no rule on ' + $siteNeeds + ' by name, so taking Users off would stop the site reading it. Run .\scripts\deploy\Deploy-Docs.ps1 first, then this again. Left as it is.')
             $refused++; continue
         }
     }
-    $parts = @(@{ P = $path; Only = $isBackup })
-    if (-not $isVoice -and -not $isBackup) {
+    $parts = @(@{ P = $path; Only = ($isBackup -or $f.Name -eq 'Thornswood-Dumps') })
+    if (-not $isVoice -and -not $isBackup -and -not $isSvc) {
         foreach ($sub in 'data', 'private') {
             $p = Join-Path $path $sub
             if (Test-Path -LiteralPath $p) { $parts += @{ P = $p; Only = ($sub -eq 'private') } }
@@ -158,7 +200,7 @@ foreach ($f in $folders) {
         try { Lock $x.P $x.Only; Say ('locked ' + $x.P) }
         catch { Say ('COULD NOT LOCK ' + $x.P + ': ' + $_.Exception.Message); $refused++ }
     }
-    if (-not $isVoice -and -not $isBackup) {
+    if (-not $isVoice -and -not $isBackup -and -not $isSvc) {
         $mod = Join-Path $path 'private\moderation.log'
         if ((Test-Path -LiteralPath $mod) -and (Get-Service -Name 'ThornswoodBot' -ErrorAction SilentlyContinue)) {
             $botSid = ''
