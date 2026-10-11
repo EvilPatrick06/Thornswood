@@ -33,7 +33,7 @@ function worldOf(native) {
   const live=new Map(),saved=new Map();
   return {
     actors, inv, records,
-    actor(id) { return actors[id] ? {desc:id.toString(16)+':Skyrim.esm',lifeGeneration:0,...actors[id]} : null; },
+    actor(id) { return actors[id] ? {desc:id.toString(16)+':Skyrim.esm',lifeGeneration:0,runtimeIdentity:'100',...actors[id]} : null; },
     carry(id, baseId) { return (inv[id] && inv[id][baseId]) || 0; },
     save() { for (const [id,receipt] of live) saved.set(id,receipt); },
     transfer: {

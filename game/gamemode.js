@@ -2970,10 +2970,11 @@ function swing(actorId, anim, lands, opts) {
   }
   // One timer per person, not one per strike: a miner working a seam sets this
   // again every swing, and the last one is the one that clears.
-  SWING_CLEAR[actorId] = setTimeout(function () {
-    if (o.alive && !o.alive()) return;
+  const cleanupTimer = setTimeout(function () {
+    if (SWING_CLEAR[actorId] !== cleanupTimer) return;
     delete SWING_CLEAR[actorId];
     delete SWING_IN_AIR[actorId];
+    if (o.alive && !o.alive()) return;
     /*
       A spent swing rather than null. The script above throws it away on
       either, but this property has only ever held an object and a property
@@ -2983,6 +2984,7 @@ function swing(actorId, anim, lands, opts) {
     */
     try { mp.set(actorId, SWING_PROPERTY, { anim: '', at: 0 }); } catch (e) { }
   }, SWING_MS + 1000);
+  SWING_CLEAR[actorId] = cleanupTimer;
   if (lands) { setTimeout(guard('swingLands', lands), SWING_LAND_MS); }
 }
 /*
@@ -3312,6 +3314,14 @@ function mineOre(actorId, refrId, baseDesc) {
   if (!isVein(baseDesc)) return null;
   const seam = ORES_BY_BASE[baseDesc];
 
+  // Rare work owns its identity and record before class/tool callbacks run.
+  const rareQuests = globalThis.__thornswoodQuests;
+  const onePlace = ORE_ONE_PLACE.indexOf(seam.name) !== -1;
+  if (onePlace || (rareQuests && rareQuests.isRareSeam && rareQuests.isRareSeam(seam))) {
+    if (rareQuests && rareQuests.mineRare) { return rareQuests.mineRare(actorId, refrId, seam); }
+    return 'This place is shut.';
+  }
+
   // The class first, and before the cooldown, the same ordering mineSalt and
   // harvest() settled on and for the same reason: somebody who is not a miner
   // is never going to work this seam, and 'it needs 14 more seconds' tells
@@ -3325,13 +3335,6 @@ function mineOre(actorId, refrId, baseDesc) {
   // do something about today.
   const tool = toolGate(actorId, 'miner');
   if (tool) return tool;
-
-  const rareQuests = globalThis.__thornswoodQuests;
-  const onePlace = ORE_ONE_PLACE.indexOf(seam.name) !== -1;
-  if (onePlace || (rareQuests && rareQuests.isRareSeam && rareQuests.isRareSeam(seam))) {
-    if (rareQuests && rareQuests.mineRare) { return rareQuests.mineRare(actorId, refrId, seam); }
-    return 'This place is shut.';
-  }
 
   const step = rankStep(actorId, 'miner');
   const pair = (seam.yield && seam.yield[step]) || [0, 0];
@@ -62967,8 +62970,10 @@ function createMerchantTrading(deps) {
 
   function sessionIdentity(human) {
     if (!human || !human.isHuman || !Number.isSafeInteger(human.profileId) || human.profileId<=0 ||
-        typeof human.desc!=='string' || !human.desc || !Number.isSafeInteger(human.lifeGeneration) || human.lifeGeneration<0) return null;
-    return JSON.stringify([human.desc,human.profileId,human.lifeGeneration]);
+        typeof human.desc!=='string' || !human.desc || !Number.isSafeInteger(human.lifeGeneration) || human.lifeGeneration<0 ||
+        typeof human.runtimeIdentity!=='string' || !/^[1-9][0-9]{0,19}$/.test(human.runtimeIdentity) ||
+        human.runtimeIdentity.length===20 && human.runtimeIdentity>'18446744073709551615') return null;
+    return JSON.stringify([human.desc,human.profileId,human.lifeGeneration,human.runtimeIdentity]);
   }
 
   function questView(actorId) {
@@ -63330,6 +63335,7 @@ function installMerchantTrading(env) {
           cell: cell,
           desc: mp.getDescFromId(id),
           lifeGeneration: ai && ai.lifeGeneration,
+          runtimeIdentity: mp.getActorRuntimeIdentity(id),
           profileId: ai && ai.profileId || 0,
           isHuman: !!(ai && ai.isHuman)
         };
@@ -63595,7 +63601,7 @@ try {
 
     function own(o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); }
     function whole(n) {
-      n = Number(n);
+      n = typeof n==='number' || typeof n==='string' ? Number(n) : 0;
       return (n > 0 && Math.floor(n) === n) ? n : 0;
     }
     /*
@@ -63643,8 +63649,9 @@ try {
       var cool = (raw.cool && typeof raw.cool === 'object') ? raw.cool : {};
       var t = deps.now();
       Object.keys(cool).forEach(function (id) {
-        var until = Number(cool[id]) || 0;
-        if (own(byId, id) && until > t) out.cool[id] = until;
+        if (!own(byId,id)) return;
+        var until = whole(cool[id]);
+        if (until > t) out.cool[id] = until;
       });
       out.before = JSON.parse(JSON.stringify({open: out.open, cool: out.cool}));
       return out;
@@ -63713,10 +63720,10 @@ try {
         })
       };
     }
-    function offer(actor, id, opts) {
+    function offer(actor, id, opts, held) {
       var row = byId[id];
       if (!row) return { ok: false, why: 'unknown' };
-      var b = questsOf(actor);
+      var b = held || questsOf(actor);
       if (!b) return { ok: false, why: 'unread' };
       if (b.open[id]) return { ok: false, why: 'open' };
       if ((b.cool[id] || 0) > deps.now()) return { ok: false, why: 'cooldown' };
@@ -63752,8 +63759,8 @@ try {
       if (open.drawn >= row.holds) return 'This place has nothing left until you turn the work in.';
       return null;
     }
-    function giveRare(actor, refrId, seam) {
-      var b = questsOf(actor);
+    function giveRare(actor, refrId, seam, held) {
+      var b = held || questsOf(actor);
       var shut = rareShut(actor, refrId, seam, b);
       if (shut) return { ok: false, text: shut };
       var id = RARE[seam.name];
@@ -63765,7 +63772,7 @@ try {
       return { ok: true, text: open.drawn >= row.holds ? 'That is all this place will give you.' : '' };
     }
     function mineRare(actor, refrId, seam) {
-      var original=deps.identity(actor);
+      var held=questsOf(actor),original=held && held.owner;
       if(!original)return UNREAD;
       var classGateFn = deps.classGate || classGate;
       var toolGateFn = deps.toolGate || toolGate;
@@ -63783,7 +63790,7 @@ try {
       if (refused) return refused;
       var tool = toolGateFn(actor, 'miner');
       if (tool) return tool;
-      var shut = rareShut(actor, refrId, seam, questsOf(actor));
+      var shut = rareShut(actor, refrId, seam, held);
       if (shut) return shut;
       if(deps.identity(actor)!==original)return UNREAD;
       if (deps.ready && !deps.ready(actor)) return 'Quest work is waiting on a saved inventory change.';
@@ -63793,16 +63800,17 @@ try {
       if(deps.identity(actor)!==original)return UNREAD;
       swingFn(actor, anim, function () {
         if (!active || deps.identity(actor) !== original) return;
-        var result = giveRare(actor, refrId, seam);
+        var result = giveRare(actor, refrId, seam, held);
         if (result.text) { notifyFn(actor, result.text); sayFn(actor, result.text); }
         if (!result.ok || !active || deps.available && !deps.available() || deps.identity(actor) !== original) return;
         try { creditFn(actor, 'mine'); } catch (e) {}
+        if (!active || deps.available && !deps.available() || deps.identity(actor)!==original) return;
         try { wearFn(actor, 'miner'); } catch (e) {}
       }, { tool: pick, alive: function(){return active && (!deps.available || deps.available()) && deps.identity(actor) === original;} });
       return '';
     }
-    function walkAway(actor, id) {
-      var b = questsOf(actor);
+    function walkAway(actor, id, held) {
+      var b = held || questsOf(actor);
       if (!b) return { ok: false, why: 'unread' };
       var open = b.open[id];
       if (!open) return { ok: false, why: 'none' };
@@ -63811,9 +63819,9 @@ try {
       if (!keep(actor, b, changes)) return { ok: false, why: 'unwritten' };
       return { ok: true };
     }
-    function turnIn(actor, id, traderRef) {
+    function turnIn(actor, id, traderRef, held) {
       var row = byId[id];
-      var b = row ? questsOf(actor) : null;
+      var b = row ? held || questsOf(actor) : null;
       if (row && !b) return { ok: false, why: 'unread' };
       var open = row && b.open[id];
       if (!row || !open) return { ok: false, why: 'none' };
@@ -63916,10 +63924,13 @@ try {
     function act(actor, verb, id, gem, traderRef) {
       var row = byId[id];
       if (!row || !row.scarce || !bound(row)) return {ok:false,why:'unbound'};
+      var held=questsOf(actor);
+      if(!held)return {ok:false,why:'unread'};
       if (!active || deps.ready && !deps.ready(actor)) return {ok:false,why:'unavailable'};
-      if (verb === 'take') return offer(actor,id,{gem:gem});
-      if (verb === 'return') return turnIn(actor,id,traderRef);
-      if (verb === 'abandon') return walkAway(actor,id);
+      if(deps.identity(actor)!==held.owner)return {ok:false,why:'identity'};
+      if (verb === 'take') return offer(actor,id,{gem:gem},held);
+      if (verb === 'return') return turnIn(actor,id,traderRef,held);
+      if (verb === 'abandon') return walkAway(actor,id,held);
       return {ok:false,why:'unknown'};
     }
     function speak(actor, refrId) {
