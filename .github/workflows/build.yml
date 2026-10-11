@@ -428,7 +428,7 @@ jobs:
                  'test-site-credits-fill.js', 'test-deployed-build.ps1',
                  'test-site-headers.js', 'test-generated-source-chain.ps1',
                  'test-site-render.js', 'test-site-discovery.js',
-                 'test-home-status.js', 'test-seats.js', 'test-age-gate.js', 'test-download-hash.js',
+                 'test-home-status.js', 'test-seats.js', 'test-age-gate.js', 'test-download-hash.js', 'test-2233-inuse-image.ps1',
                  'test-download-button.js', 'test-gallery-ux.js', 'test-gallery.js', 'test-site-local.js',
                  'test-session-cards.js', 'test-staff-bans.js', 'test-hub-staff-gallery.js', 'test-known-issues.js',
                  'test-join-outage.js', 'test-join-pass-site.js', 'test-open-switch.js', 'test-component-readmes.js',
