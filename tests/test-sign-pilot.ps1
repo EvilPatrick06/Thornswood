@@ -1,4 +1,4 @@
-﻿# tests\test-sign-pilot.ps1
+# tests\test-sign-pilot.ps1
 # Issue #2163. The verify half of scripts\release\Test-SignPilot.ps1, offline:
 # no Azure sign in and no signing. An unsigned test exe, a stale SHA256SUMS
 # and a missing folder must each be refused (exit 1), never accepted with a
@@ -42,7 +42,7 @@ try {
     T ($r.Code -eq 1 -and $r.Text -match 'FAIL\s+SHA256SUMS matches') 'a checksum that does not match is refused'
 
     $rec = Get-Content (Join-Path $repo 'records\signing\pilot-2163.json') -Raw | ConvertFrom-Json
-    T ($rec.signedSha256 -match '^[0-9a-f]{64}$' -and $rec.signer -match 'Gavin Knotts') 'the pilot record names a signed hash and the release signer'
+    T ($rec.signedSha256 -match '^[0-9a-f]{64}$' -and $rec.signerMatchesExpectedSigner -eq $true -and -not $rec.PSObject.Properties['signer']) 'the pilot record names a signed hash and the release signer'
     T (-not ((Get-Content (Join-Path $repo 'records\signing\pilot-2163.json') -Raw) -match '(?i)password|secret|token|BEGIN ')) 'the pilot record holds no secret'
 } finally { Remove-Item -LiteralPath $scratch -Recurse -Force -EA SilentlyContinue }
 

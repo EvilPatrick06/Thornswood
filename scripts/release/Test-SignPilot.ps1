@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
   Signs and verifies a throwaway TEST artifact only, to pilot the signed release design (issue #2163). Never touches a release, the feed or release.yml.
 
@@ -13,7 +13,7 @@
   what came out and writes, into -Out:
     pilot.exe        the signed test exe
     SHA256SUMS       its sha256, the same shape release.yml writes
-    provenance.json  source commit, engine pin, machine, both hashes, signer,
+    provenance.json  source commit, engine pin, machine, both hashes, signer check,
                      timestamp, the root and durable identity it chained to
 
   -Verify reads such a folder and checks, without signing anything and
@@ -86,7 +86,9 @@ if ($Sign) {
         signedSha256   = $signed
         digest         = 'SHA256 file digest, RFC 3161 SHA256 timestamp'
         timestampUrl   = 'http://timestamp.acs.microsoft.com'
-        signer         = $sig.SignerCertificate.Subject
+        # Not the Subject: the name on the certificate lives in Updater.cs and nowhere else git holds.
+        signerMatchesExpectedSigner = ($sig.SignerCertificate.Subject.IndexOf($ExpectedSigner, [StringComparison]::OrdinalIgnoreCase) -ge 0)
+        signerIssuer   = $sig.SignerCertificate.Issuer
         signerExpires  = $sig.SignerCertificate.NotAfter.ToUniversalTime().ToString('o')
         timestamper    = if ($sig.TimeStamperCertificate) { $sig.TimeStamperCertificate.Subject } else { '' }
     } | ConvertTo-Json | Set-Content -LiteralPath $prov -Encoding utf8
