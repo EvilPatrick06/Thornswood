@@ -1,4 +1,4 @@
-﻿<#
+<#
   test-deployed-build.ps1
 
   After a successful server deploy, Deploy-Server.ps1 writes what the box
@@ -10,6 +10,8 @@
   docs root and checks /credits names the deployed commit with no hand edit.
   Windows PowerShell 5.1 and PowerShell 7. Every temp folder is removed.
 #>
+# Scripts this runs whole go to a stand-in box, so the freshness guard lets them be (#2118).
+$env:THORNSWOOD_HARNESS = '1'
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 $Repo = Split-Path -Parent $Here
