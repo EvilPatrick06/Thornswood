@@ -172,6 +172,33 @@ namespace Thornswood
         static extern bool GetFileInformationByHandle(SafeFileHandle h, out Info info);
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
         static extern bool CreateHardLink(string newName, string existing, IntPtr security);
+        [StructLayout(LayoutKind.Sequential)]
+        struct Basic
+        {
+            public long Creation, Access, Write, Change;
+            public uint Attributes;
+        }
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern bool GetFileInformationByHandleEx(SafeFileHandle h, int infoClass, out Basic info, uint size);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern bool SetFileInformationByHandle(SafeFileHandle h, int infoClass, ref Basic info, uint size);
+
+        // Sets a file's change time back by the given ticks (#1707). NTFS takes
+        // the change time from the system clock, which moves in steps of about
+        // 15.6 ms; a write in the same step as the last stamp leaves the change
+        // time as it was. Setting it back first makes any later write move it.
+        static bool ChangeTimeBack(string path, long ticks)
+        {
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite | FileShare.Delete))
+            {
+                Basic b;
+                uint n = (uint)Marshal.SizeOf(typeof(Basic));
+                if (!GetFileInformationByHandleEx(fs.SafeFileHandle, 0, out b, n)) return false;
+                b.Creation = 0; b.Access = 0; b.Write = 0; b.Attributes = 0;
+                b.Change -= ticks;
+                return SetFileInformationByHandle(fs.SafeFileHandle, 0, ref b, n);
+            }
+        }
 
         static string Id(string path)
         {
@@ -700,6 +727,14 @@ namespace Thornswood
             // the way a manual mod or another launcher's downgrade puts one in.
             string other = Path.Combine(s.Dir, "other.bsa");
             Archive(other, "MODDED-MESH");
+            // The record and a copy made in the same clock step carry the same
+            // change time, so the copy would read as no change (#1707). The
+            // archive's change time goes back 10 s and the check puts that on
+            // record (same bytes, so it is only re-stamped); the copy then
+            // moves the change time past it in every run.
+            Yes("(the shared archive's change time set back 10 s, and re-stamped by the check)",
+                ChangeTimeBack(Path.Combine(own, Mesh), 10L * 10000000L) && OwnGame.CheckShared(OwnGame.Source(s.Cfg), null) == null &&
+                StampNow(Path.Combine(own, Mesh)).EndsWith(":" + OnRecord(Mesh).Split('|')[3]));
             string recorded = OnRecord(Mesh), before = StampNow(Path.Combine(own, Mesh));
             File.Copy(other, Path.Combine(s.Game, Mesh), true);
             long clock = DateTime.UtcNow.ToFileTimeUtc();
