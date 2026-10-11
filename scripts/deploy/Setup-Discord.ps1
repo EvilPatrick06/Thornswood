@@ -130,11 +130,21 @@ if ($code -ne 0) {
 
 $hook = Join-Path $Here '..\..\bot\news-webhook.txt'
 Write-Host ''
-if (Test-Path -LiteralPath $hook) {
+# An empty bot\news-webhook.txt reads back as $null, and .Trim() on that threw
+# before anything was said. Wrapped in a string it is '', which is refused here:
+# ConvertTo-SecureString cannot take an empty string, so Discord-Hook.ps1's own
+# address check never gets the chance.
+$hookText = ''
+if (Test-Path -LiteralPath $hook) { $hookText = "$(Get-Content -LiteralPath $hook -Raw)".Trim() }
+if ((Test-Path -LiteralPath $hook) -and -not $hookText) {
+  Write-Host '  bot\news-webhook.txt is empty, so nothing was sent to the VPS and releases will not' -ForegroundColor Yellow
+  Write-Host '  post themselves into #news yet. Run this again once #news exists.' -ForegroundColor Yellow
+} elseif ($hookText) {
   # Onto the VPS, where every machine that ships reads it (Discord-Hook.ps1); the
   # copy here is removed once the VPS has it.
   # Handed over as a SecureString (issue #1069), read from the file here.
-  & (Join-Path $Here '..\ops\Discord-Hook.ps1') -Name news -Save -Url (ConvertTo-SecureString ((Get-Content -LiteralPath $hook -Raw).Trim()) -AsPlainText -Force)
+  & (Join-Path $Here '..\ops\Discord-Hook.ps1') -Name news -Save -Url (ConvertTo-SecureString $hookText -AsPlainText -Force)
+  $hookText = $null
   if ($LASTEXITCODE -eq 0) {
     Write-Host '  Release notes will post themselves into #news from now on.' -ForegroundColor Green
   } else {
