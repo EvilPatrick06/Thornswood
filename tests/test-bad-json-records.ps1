@@ -98,6 +98,58 @@ try {
     [IO.File]::Copy((Join-Path $Repo 'records\ui-gone.json'), (Join-Path $sr 'records\ui-gone.json'), $true)
     $r = Child @($load)
     Yes '  and the real one still loads' ($r.Out -match 'LOADED')
+
+    # ---- the shared helper, scripts\release\Read-JsonFile.ps1 -----------------------
+    . (Join-Path $Repo 'scripts\release\Read-JsonFile.ps1')
+    $src = 'C:\somewhere\x.json'
+    function Says([scriptblock]$b) { try { & $b; return '' } catch { return $_.Exception.Message } }
+    Yes 'ConvertFrom-ThornswoodJson: an object comes back' ((ConvertFrom-ThornswoodJson '{"a":1}' $src).a -eq 1)
+    $arr = ConvertFrom-ThornswoodJson '[{"a":1}]' $src
+    $raw1 = '[{"a":1}]' | ConvertFrom-Json
+    Yes '  a one-item array comes back as ConvertFrom-Json gives it on this PowerShell' (($arr -is [array]) -eq ($raw1 -is [array]) -and @($arr)[0].a -eq 1)
+    Yes '  a byte order mark is dropped' ((ConvertFrom-ThornswoodJson ([string][char]0xFEFF + '{"a":2}') $src).a -eq 2)
+    Yes '  $null is "<path> is empty"' ((Says { ConvertFrom-ThornswoodJson $null $src }) -eq "$src is empty")
+    Yes '  white space is "<path> is empty"' ((Says { ConvertFrom-ThornswoodJson " `r`n " $src }) -eq "$src is empty")
+    Yes '  cut off is "<path> is not valid JSON: ..."' ((Says { ConvertFrom-ThornswoodJson '{"a":' $src }) -like "$src is not valid JSON: *")
+    Yes '  and a throw inside try still falls back' ($(try { $null = ConvertFrom-ThornswoodJson 'nope' $src; 'went on' } catch { 'fell back' }) -eq 'fell back')
+
+    # ---- per script, through the helper ---------------------------------------------
+    $f = Join-Path $T 'bad.json'
+    . (Join-Path $Repo 'scripts\release\Release-Baseline.ps1')
+    W $f '{"a":'
+    Yes 'Release-Baseline Read-BaselineFile: a cut-off baseline is named' ((Says { Read-BaselineFile $f }) -like "$f is not valid JSON: *")
+    W $f ''
+    Yes '  and an empty one is still an empty baseline, as before' ((Read-BaselineFile $f).Count -eq 0)
+
+    . (Join-Path $Repo 'scripts\release\Feed-Store.ps1')
+    $site = Join-Path $T 'site'
+    foreach ($k in $bad.Keys) {
+        W (Join-Path $site 'feed\version.json') $bad[$k]
+        $m = Says { Read-SiteFeed 'main' $site }
+        Yes ("Feed-Store Read-SiteFeed: a site version.json that is {0} is named" -f $k) ($m.StartsWith((Join-Path $site 'feed\version.json') + ' ' + $expect[$k]))
+    }
+
+    . (Join-Path $Repo 'scripts\mods\LoadOrder.ps1')
+    $lr = Join-Path $T 'lo-root'
+    W (Join-Path $lr 'config.json') '{"ServerAddress": "x", '
+    Yes 'LoadOrder Get-LoadOrderManifestUrl: a cut-off config.json is named' ((Says { Get-LoadOrderManifestUrl $lr }) -like ((Join-Path $lr 'config.json') + ' is not valid JSON: *'))
+
+    $al = Join-Path $T 'al'; W (Join-Path $al 'plugins.txt') ''; [void][IO.Directory]::CreateDirectory((Join-Path $al 'Data'))
+    W (Join-Path $al 'server-settings.json') ''
+    $r = Child @((Join-Path $Repo 'scripts\mods\Align-LoadOrder.ps1'), '-Data', (Join-Path $al 'Data'), '-Plugins', (Join-Path $al 'plugins.txt'), '-Settings', (Join-Path $al 'server-settings.json'))
+    Yes 'Align-LoadOrder: an empty server-settings.json is named' (Named $r (Join-Path $al 'server-settings.json') 'empty')
+
+    $sm = [Management.Automation.Language.Parser]::ParseFile((Join-Path $Repo 'scripts\release\Setup-ShipMachine.ps1'), [ref]$null, [ref]$null)
+    $gcm = $sm.Find({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Get-ClientMatch' }, $true)
+    . ([scriptblock]::Create($gcm.Extent.Text))
+    W $f 'not json at all'
+    Yes 'Setup-ShipMachine Get-ClientMatch: a client record that is not JSON is named' ((Says { Get-ClientMatch $f $T }) -like "$f is not valid JSON: *")
+
+    $sf = [Management.Automation.Language.Parser]::ParseFile((Join-Path $Repo 'scripts\release\Scrub-Feed.ps1'), [ref]$null, [ref]$null)
+    $rl = $sf.Find({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Read-Ledger' }, $true)
+    . ([scriptblock]::Create($rl.Extent.Text))
+    $LedgerFile = $f; W $f '{"ab":'
+    Yes 'Scrub-Feed Read-Ledger: a cut-off ledger is named' ((Says { Read-Ledger }) -like "$f is not valid JSON: *")
 }
 finally { Remove-Item -LiteralPath $T -Recurse -Force -ErrorAction SilentlyContinue }
 Write-Host ''

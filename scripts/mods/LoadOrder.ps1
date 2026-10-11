@@ -24,6 +24,7 @@
   LoadOrder.LightOrder and LoadOrder.Reorder do in the launcher.
 #>
 
+. (Join-Path $PSScriptRoot '..\release\Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 $script:LoadOrderMasters = 'Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm'
 
 <#
@@ -722,7 +723,7 @@ function Get-LoadOrderManifestUrl([string]$Root) {
     if (-not (Test-Path -LiteralPath $cfgPath)) { throw "no config.json at $cfgPath" }
     $raw = [IO.File]::ReadAllBytes($cfgPath)
     $skip = if ($raw.Length -ge 3 -and $raw[0] -eq 0xEF -and $raw[1] -eq 0xBB -and $raw[2] -eq 0xBF) { 3 } else { 0 }
-    $cfg = [Text.Encoding]::UTF8.GetString($raw, $skip, $raw.Length - $skip) | ConvertFrom-Json
+    $cfg = ConvertFrom-ThornswoodJson ([Text.Encoding]::UTF8.GetString($raw, $skip, $raw.Length - $skip)) $cfgPath
     $addr = ''
     $portText = ''
     if ($cfg.PSObject.Properties.Name -contains 'ServerAddress') { $addr = [string]$cfg.ServerAddress }

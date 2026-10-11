@@ -307,6 +307,7 @@ param(
     # A main release with a nude body in the game folder (issue #405).
     ,[switch]$AllowUncoveredBodies
 )
+. (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
 
 # The launcher, Thornswood.exe in the launcher folder.
@@ -961,7 +962,7 @@ elseif ($Dev) {
         }
         $f = Join-Path (Get-FeedStoreDir $ch) 'version.json'
         if (-not (Test-Path -LiteralPath $f)) { return '' }
-        return [string]((Get-Content -LiteralPath $f -Raw | ConvertFrom-Json).launcherVersion)
+        return [string]((ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $f -Raw) $f).launcherVersion)
     }
     function Read-EverPublished([string]$ch) {
         try { return @(Get-FeedStoreLaunchers $ch) }
@@ -1489,7 +1490,7 @@ function Measure-Installer {
         $when = (Get-Item $z).LastWriteTime
         $vf = Join-Path $ReleaseDir 'version.json'
         if (Test-Path $vf) {
-            $doc = Get-Content $vf -Raw | ConvertFrom-Json
+            $doc = ConvertFrom-ThornswoodJson (Get-Content $vf -Raw) $vf
             if ($doc.PSObject.Properties['packs'] -and $doc.packs) {
                 $seen = @{}
                 foreach ($p in @($doc.packs)) {

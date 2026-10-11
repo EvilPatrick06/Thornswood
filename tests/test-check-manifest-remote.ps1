@@ -44,6 +44,8 @@ try {
     foreach ($d in 'scripts\mods', 'scripts\vps', 'launcher\app') { [void][IO.Directory]::CreateDirectory((Join-Path $Fake $d)) }
     [IO.File]::Copy((Join-Path $Repo 'scripts\mods\Check-Manifest.ps1'), (Join-Path $Fake 'scripts\mods\Check-Manifest.ps1'))
     [IO.File]::Copy((Join-Path $Repo 'scripts\mods\LoadOrder.ps1'), (Join-Path $Fake 'scripts\mods\LoadOrder.ps1'))
+[void][IO.Directory]::CreateDirectory((Join-Path $Fake 'scripts\release'))
+[IO.File]::Copy((Join-Path $Repo 'scripts\release\Read-JsonFile.ps1'), (Join-Path $Fake 'scripts\release\Read-JsonFile.ps1'))
     W (Join-Path $Fake 'scripts\vps\Vps.ps1') "function Get-ThornswoodVpsUser { 'stub-user' }`nfunction Get-ThornswoodVpsAddress { '192.0.2.1' }`n"
     $q = { param($s) $s.Replace("'", "''") }
     W (Join-Path $Fake 'scripts\vps\Send-Script.ps1') @"

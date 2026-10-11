@@ -29,6 +29,7 @@ param(
     # outside its scratch folder is written.
     [string[]]$AlsoFix = @('C:\Thornswood\Profile\LocalAppData\Plugins.txt')
 )
+. (Join-Path $PSScriptRoot '..\release\Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
 $ErrorActionPreference = 'Stop'
 foreach ($p in @($Data, $Plugins, $Settings)) {
@@ -62,7 +63,7 @@ foreach ($p in $wanted) {
     $gameList += $p
 }
 
-$server = @((Get-Content -LiteralPath $Settings -Raw | ConvertFrom-Json).loadOrder |
+$server = @((ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $Settings -Raw) $Settings).loadOrder |
             ForEach-Object { [IO.Path]::GetFileName($_) })
 
 Write-Host ''

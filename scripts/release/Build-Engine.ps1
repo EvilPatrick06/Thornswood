@@ -58,6 +58,7 @@ param(
     [int]$Jobs = 0,
     [switch]$NoPause
 )
+. (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
 $ErrorActionPreference = 'Stop'
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
@@ -340,7 +341,7 @@ Ok 'built'
 
 # ---- 5. the recorded client -------------------------------------------------
 Head 'Is this the recorded client?'
-$rec = Get-Content -LiteralPath $record -Raw | ConvertFrom-Json
+$rec = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $record -Raw) $record
 $dist = Join-Path $build 'dist\client'
 $differ = 0
 foreach ($rel in @($rec.files.PSObject.Properties.Name)) {

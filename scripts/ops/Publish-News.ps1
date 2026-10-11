@@ -45,6 +45,7 @@ param(
   [string]$OutFile,
   [switch]$Quiet
 )
+. (Join-Path $PSScriptRoot '..\release\Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
 $ErrorActionPreference = 'Stop'
 
@@ -94,7 +95,7 @@ if (-not (Test-Path -LiteralPath $vf)) {
 
 # A byte order mark is not JSON. ConvertFrom-Json stops on the first character
 # and says something unhelpful about an unexpected token.
-$v = ((Get-Content $vf -Raw) -replace '^\uFEFF', '') | ConvertFrom-Json
+$v = ConvertFrom-ThornswoodJson (Get-Content $vf -Raw) $vf
 $all = @()
 if ($v.news) { $all = @($v.news) }
 
