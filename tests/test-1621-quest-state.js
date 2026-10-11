@@ -515,6 +515,26 @@ yes('the miner page says the same', /kept on the character/.test(mWhere) &&
     forms[51].props[PROP].open.ebony.extension.source==='future-format');
 }
 
+{
+  ranks['80:miner']='master';w=restart();w.svc.offer(80,'ebony');
+  let entered=false;
+  w.ctx.__thornswoodCharacter.rankOf=function(){
+    if(!entered){entered=true;w.svc.mineRare(80,here[0],EBONY);}
+    return 'master';
+  };
+  const result=w.svc.offer(80,'stalhrim');
+  yes('a metadata offer refuses a snapshot superseded by a nested inventory commit',
+    result.why==='unwritten' && forms[80].props[PROP].open.ebony.drawn===1 &&
+    !forms[80].props[PROP].open.stalhrim && have(80,EBONY.ore)===1);
+}
+{
+  ranks['81:miner']='master';w=restart();w.ctx.__identityToken='old-session';
+  w.ctx.__thornswoodCharacter.rankOf=function(){w.ctx.__identityToken='new-session';return 'master';};
+  const result=w.svc.offer(81,'ebony');
+  yes('a metadata offer cannot cross its actor session during qualification',
+    result.why==='unwritten' && !form(81).props[PROP]);
+}
+
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
