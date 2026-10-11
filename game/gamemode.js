@@ -61643,6 +61643,13 @@ function npcSurfaceOf(points, pos) {
   return a[2]+u*(b[2]-a[2])+v*(c[2]-a[2]);
 }
 function npcSurface(node, pos) { return npcSurfaceOf(node.points,pos); }
+// A triangle seen edge on from above (a wall face in the navmesh) has no
+// ground to stand on: npcSurfaceOf gives it no height, so nothing may route
+// onto it (#2072).
+function npcHasGround(points) {
+  const [a,b,c] = points;
+  return Math.abs((b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]))>=0.01;
+}
 // A race that swims and cannot walk (s.swims, from the catalogue, #2067) moves
 // on water triangles only: the beds of rivers, lakes and the sea.
 function npcWalkable(flags, s) {
@@ -61819,7 +61826,7 @@ function createNpcNavigation(api, now, report, ready) {
       if(external && (!ext || ext.type!==0)) continue;
       const targetMesh=external ? bank.meshes.get(ext.mesh) : mesh;
       const other=targetMesh && npcTriangleAt(targetMesh,external ? ext.index : edge);
-      if(!other || other===n || other.flags&(8|32)) continue;
+      if(!other || other===n || other.flags&(8|32) || !npcHasGround(other.points)) continue;
       const p=n.points[e],q=n.points[(e+1)%3];
       const oe=other.points.findIndex((v,j)=>
         (distance(v,p)<0.1 && distance(other.points[(j+1)%3],q)<0.1) ||
@@ -62089,6 +62096,13 @@ function startSharedNpcServerRuntime(api, timers, now, report, population) {
     } catch(e) {report('NPC identity refresh failed: '+e);}
     schedule(discover,5000);
   }
+  // Where an actor stands over a navmesh point: its lift above the floor, and
+  // a swimmer no higher than its depth. Home checks use this point, the one a
+  // step sends, not the floor under it (#2072).
+  function standAt(a,p) {
+    const z=p[2]+a.lift;
+    return [p[0],p[1],a.state && a.state.swims ? Math.min(z,a.state.swimTop) : z];
+  }
   function withinHome(a,pos,cell=a.cell) {
     return !a.policy || cell===a.policy.cell && distance(a.policy.home,pos)<=a.policy.leash;
   }
@@ -62128,7 +62142,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population) {
       }
       for(const link of n.links) {
         if(!previous.has(link.node) && a.bank.meshes.has(link.node.mesh) && walkable(link.node,a.state) &&
-            withinHome(a,link.middle) && withinHome(a,link.node.center)) {
+            withinHome(a,standAt(a,link.middle)) && withinHome(a,standAt(a,link.node.center))) {
           previous.set(link.node,{from:n,middle:link.middle});queue.push(link.node);
         }
       }
@@ -62137,7 +62151,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population) {
   }
   function ambient(a) {
     const links=a.node.links.filter(l=>a.bank.meshes.has(l.node.mesh) && walkable(l.node,a.state) &&
-      withinHome(a,l.middle) && withinHome(a,l.node.center));
+      withinHome(a,standAt(a,l.middle)) && withinHome(a,standAt(a,l.node.center)));
     a.sequence++;
     if(links.length) {
       const link=links[(a.sequence+a.id)%links.length];
@@ -62271,7 +62285,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population) {
         a.mode=flee ? 'flee' : 'combat';a.target=target;
         if(flee) {
           const links=a.node.links.filter(l=>a.bank.meshes.has(l.node.mesh) && walkable(l.node,s) &&
-            withinHome(a,l.middle) && withinHome(a,l.node.center)).sort((x,y)=>
+            withinHome(a,standAt(a,l.middle)) && withinHome(a,standAt(a,l.node.center))).sort((x,y)=>
             distance(y.node.center,targetState.pos)-distance(x.node.center,targetState.pos));
           if(links.length) a.path=[links[0].middle.map((v,j)=>v+(j===2?a.lift:0)),
             links[0].node.center.map((v,j)=>v+(j===2?a.lift:0))];
@@ -62308,7 +62322,8 @@ function startSharedNpcServerRuntime(api, timers, now, report, population) {
       (s.swims || Math.abs(pos[2]-npcSurface(n,pos)-a.lift)<2));
     // A swimmer keeps its height over the bed, never above its depth.
     if(node && s.swims) pos[2]=Math.min(npcSurface(node,pos)+a.lift,s.swimTop);
-    if(!node || !withinHome(a,pos) || (node!==a.node && !a.node.links.some(l=>l.node===node))) {
+    if(!withinHome(a,pos)) throw new Error('Movement would leave the home leash');
+    if(!node || (node!==a.node && !a.node.links.some(l=>l.node===node))) {
       throw new Error('Movement crossed an unverified navigation edge');
     }
     const delta=pos.map((v,j)=>v-a.pos[j]);
