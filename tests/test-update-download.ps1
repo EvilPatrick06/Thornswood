@@ -205,7 +205,7 @@ namespace Thornswood
 
     static partial class Updater
     {
-        public const string ExpectedSigner = "Gavin Knotts";
+        public const string ExpectedSigner = "Test Signer"; // a stand-in: the real name lives only in Updater.cs (#1052)
         class Cached { public string Url, Etag, LastModified; public VersionDoc Doc; }
 
         static WebClient Client(Config cfg, bool octet, string url) { return new FakeClient(); }
