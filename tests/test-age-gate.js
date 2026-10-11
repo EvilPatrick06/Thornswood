@@ -32,9 +32,9 @@ yes('gate paths are only /downloads and /join',
 yes('router calls the gate before page bodies',
     /if \(AGE_PATHS\[here\] && !ageOk\(\)\)/.test(home) &&
     /showAgeGate\(\)/.test(home));
-yes('remember uses localStorage and a cookie',
-    /localStorage\.setItem\(AGE_KEY, '1'\)/.test(home) &&
-    /tw-age-18=1; path=\//.test(home));
+yes('remember uses localStorage and a cookie, both with a day and a policy (#2192)',
+    /localStorage\.setItem\(AGE_KEY, JSON\.stringify\(\{ v: AGE_POLICY, until: until \}\)\)/.test(home) &&
+    /'tw-age-18=' \+ AGE_POLICY \+ '; path=\/; expires='/.test(home));
 yes('copy is a statement and a record, not verification',
     /Confirming here is you stating that you are eighteen or older/.test(home) &&
     /kept as a record of what you said, not as verification of your age/.test(home) &&

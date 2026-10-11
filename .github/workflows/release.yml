@@ -49,6 +49,10 @@ on:
       tag:
         description: The v<version> tag to build and draft a release for
         required: true
+      expected_sha:
+        description: The commit the tag must be (optional; without it the tag's commit must be on main)
+        required: false
+        default: ''
 # The draft release is created with the repository token, which needs write.
 permissions:
   contents: write
@@ -64,12 +68,43 @@ jobs:
     # The build is about two minutes; past this it is stuck, not slow.
     timeout-minutes: 20
     steps:
-      - name: Check out the tag, clean
+      # THE TAG IS CHECKED BEFORE IT IS BUILT (#2202). A manual run used to
+      # hand its free-form tag input straight to checkout and draft the
+      # release against the run's own SHA, so a branch, a bare SHA or a tag
+      # off main could be built and labelled as a release. Now the workflow's
+      # own commit is checked out with every tag and main, and
+      # scripts/release/Resolve-ReleaseTag.ps1 says which commit the tag is:
+      # a real v<version> tag, and either the expected SHA (a tag push's own
+      # GITHUB_SHA, or the manual run's expected_sha) or a commit on main.
+      # Anything else stops the run before anything is built. The input
+      # reaches the script through env, never pasted into the script text.
+      - name: Check out the workflow's commit, with every tag and main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
           clean: true
           submodules: false
+          fetch-depth: 0
+
+      - name: Confirm the tag is the commit meant, then check it out
+        id: tag
+        shell: pwsh
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+          INPUT_SHA: ${{ github.event.inputs.expected_sha }}
+        run: |
+          . .\scripts\release\Resolve-ReleaseTag.ps1
+          if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch') { $tag = $env:INPUT_TAG; $expected = $env:INPUT_SHA }
+          else { $tag = $env:GITHUB_REF_NAME; $expected = $env:GITHUB_SHA }
+          try { $commit = Resolve-ThornswoodReleaseTag -Tag $tag -RepoDir . -ExpectedSha $expected -MainRef origin/main }
+          catch { Write-Host ('::error::' + $_.Exception.Message); exit 1 }
+          git checkout --force --detach $commit
+          if ($LASTEXITCODE -ne 0) { Write-Host "::error::could not check out $commit"; exit 1 }
+          git clean -ffdx
+          $head = "$(git rev-parse HEAD)".Trim()
+          if ($head -ne $commit) { Write-Host "::error::checked out $head, not $commit"; exit 1 }
+          Write-Host ("tag {0} is commit {1}" -f $tag, $commit)
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("tag=" + $tag)
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("commit=" + $commit)
 
       - name: Build the launcher into RUNNER_TEMP
         shell: pwsh
@@ -107,9 +142,13 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-          INPUT_TAG: ${{ github.event.inputs.tag }}
+          RELEASE_TAG: ${{ steps.tag.outputs.tag }}
+          RELEASE_COMMIT: ${{ steps.tag.outputs.commit }}
         run: |
-          $tag = if ($env:INPUT_TAG) { $env:INPUT_TAG } else { $env:GITHUB_REF_NAME }
+          # The tag and commit the check above settled, so the draft names the
+          # commit that was built, not whatever ref started the run (#2202).
+          $tag = $env:RELEASE_TAG
+          if (-not $tag -or $env:RELEASE_COMMIT -notmatch '^[0-9a-f]{40}$') { Write-Host '::error::the tag check gave no tag and commit'; exit 1 }
           $out = Join-Path $env:RUNNER_TEMP 'release'
           $exe = Join-Path $out 'Thornswood.exe'
           $stub = Join-Path $out 'setup-stub.exe'
@@ -136,7 +175,7 @@ jobs:
           if (-not $release) {
             $payload = @{
               tag_name = $tag
-              target_commitish = $env:GITHUB_SHA
+              target_commitish = $env:RELEASE_COMMIT
               name = "Launcher $tag"
               body = $notes
               draft = $true
