@@ -12,6 +12,7 @@
     .\Publish-Discord.ps1 -Dev
     .\Publish-Discord.ps1 -DryRun
     .\Publish-Discord.ps1 -Dev -Note "..." -GamemodeDeploy
+    .\Publish-Discord.ps1 -Dev -Record      say the current dev release WAS announced, post nothing
 
   -DryRun prints what it would post and sends nothing.
 
@@ -25,13 +26,23 @@
   whatever was newest in the feed and had no idea it had posted it before, so
   running it twice, or running it days after a release to see what it does,
   announced that release again to everybody. It now writes the version and
-  the title it posted into discord\announced.json and refuses to say the same
-  thing twice. -Force is how a post that really does need repeating is made,
-  and it is the only way.
+  the title it posted into announced.json and refuses to say the same thing
+  twice. -Force is how a post that really does need repeating is made, and it
+  is the only way.
 
-  That file is one line per channel and it is NOT in git: the two builds
-  announce different versions and each shipping machine has its own history,
-  so a tracked copy would be a merge conflict on every release.
+  WHERE THAT RECORD LIVES (#2167). Until 11 October it was bot\announced.json
+  in the checkout that ran this, so a post made from a worktree Ship was
+  unknown to every other checkout, and the record went when the worktree did.
+  It is now announced.json in the channel's VPS store beside the feed
+  (C:\Thornswood-Docs\feed\announced.json and feed-dev\announced.json, not
+  served by the site), read and written through Feed-Store.ps1 like the feed
+  itself: received into %LOCALAPPDATA%\Thornswood\feed\announced-<channel>,
+  and sent back only if nobody else changed it meanwhile. When the store
+  cannot be read, nothing is posted (the record cannot say it was not posted
+  already); -Force posts anyway. While the store has no record yet, an old
+  bot\announced.json in this checkout is still read, never written.
+  -Record writes the current release into the store as announced and posts
+  nothing: for a post that went out from a checkout whose record was lost.
 
   Called by Ship.ps1 at the end of every release, so it is usually not run on
   its own. If bot\news-webhook.txt is not there it does nothing and
@@ -82,7 +93,9 @@ param(
   [string]$Note = '',
   # A gamemode-only dev deploy: footer "dev server", no "Dev build:" prefix,
   # and no announced.json check. Issue #594.
-  [switch]$GamemodeDeploy
+  [switch]$GamemodeDeploy,
+  # Write the current release into the shared record as announced, post nothing.
+  [switch]$Record
 )
 . (Join-Path $PSScriptRoot '..\release\Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
@@ -316,20 +329,55 @@ if ($title.Length -gt 250) { $title = $title.Substring(0, 247) + '...' }
 # reshipped under the same number with a different note, and that note is
 # worth saying. The pair is what gets remembered. Gamemode deploys are not
 # releases and are never deduped here.
+if ($Record -and $GamemodeDeploy) { Write-Host '  -Record is for releases; a gamemode deploy is never remembered. Nothing done.' -ForegroundColor Yellow; return }
 if (-not $GamemodeDeploy) {
-  $stateFile = Join-Path $Here '..\..\bot\announced.json'
+  # The shared record, in the channel's VPS store (#2167). See the note above.
+  . (Join-Path $Here '..\release\Feed-Store.ps1')
   $stateKey = if ($Dev) { 'dev' } else { 'main' }
+  $stateDir = Join-Path (Split-Path -Parent (Get-FeedStoreDir $stateKey)) ('announced-' + $stateKey)
+  $stateFile = Join-Path $stateDir 'announced.json'
   $said = @{}
-  if (Test-Path -LiteralPath $stateFile) {
+  $stateRead = $false
+  try {
+    $got = Receive-FeedStore $stateKey -Dir $stateDir -Files @('announced.json')
+    $stateRead = $true
+  } catch {
+    if (-not $Force) {
+      Write-Host ('  COULD NOT READ what was already announced from the VPS store, so nothing was posted: ' + $_.Exception.Message) -ForegroundColor Red
+      Write-Host '  -Force posts anyway' -ForegroundColor DarkGray
+      $global:ThornswoodDiscordResult = 'failed'
+      return
+    }
+    if (-not $Quiet) { Write-Host '  could not read the shared record, -Force given, going ahead' -ForegroundColor Yellow }
+  }
+  $from = $stateFile
+  if ($stateRead -and -not $got['announced.json']) {
+    # Nothing in the store yet: an old per-checkout record still counts, read only.
+    $legacy = Join-Path $Here '..\..\bot\announced.json'
+    $from = if (Test-Path -LiteralPath $legacy) { $legacy } else { '' }
+  }
+  if ($from -and (Test-Path -LiteralPath $from)) {
     # A file that will not parse is treated as no file at all. It is a note to
     # ourselves about what was posted, and refusing to ship over a corrupted
     # note would be the tail wagging the dog.
     try {
-      $raw = ((Get-Content $stateFile -Raw) -replace '^\uFEFF', '') | ConvertFrom-Json
+      $raw = ([IO.File]::ReadAllText($from) -replace '^\uFEFF', '') | ConvertFrom-Json
       foreach ($p in $raw.PSObject.Properties) { $said[$p.Name] = $p.Value }
     } catch {
       if (-not $Quiet) { Write-Host '  announced.json will not parse, treating it as empty' -ForegroundColor DarkGray }
     }
+  }
+  # Writes this release into the record and sends it to the store. Returns ''
+  # or why it could not.
+  function Save-ThornswoodAnnounced {
+    if (-not $stateRead) { return 'the shared record was never read' }
+    try {
+      $said[$stateKey] = @{ stamp = $stamp; version = (Prop $v 'launcherVersion')
+                            title = $title; at = (Get-Date).ToUniversalTime().ToString('s') + 'Z' }
+      [IO.File]::WriteAllText($stateFile, ($said | ConvertTo-Json -Depth 5), (New-Object Text.UTF8Encoding($false)))
+      $null = Send-FeedStore $stateKey -Dir $stateDir -Files @('announced.json')
+      return ''
+    } catch { return $_.Exception.Message }
   }
   $stamp = (Prop $v 'launcherVersion') + '|' + $title
   if ($said.ContainsKey($stateKey) -and (Prop $said[$stateKey] 'stamp') -eq $stamp -and -not $Force) {
@@ -340,6 +388,13 @@ if (-not $GamemodeDeploy) {
       Write-Host '  -Force says it again anyway' -ForegroundColor DarkGray
     }
     $global:ThornswoodDiscordResult = 'already'
+    return
+  }
+  if ($Record) {
+    if ($DryRun) { Write-Host ('  -DryRun: would record ' + (Prop $v 'launcherVersion') + ' as announced, nothing posted') -ForegroundColor Yellow; return }
+    $why = Save-ThornswoodAnnounced
+    if ($why) { Write-Host "  could not record it: $why" -ForegroundColor Red; $global:ThornswoodDiscordResult = 'failed' }
+    else { Write-Host ('  recorded ' + (Prop $v 'launcherVersion') + ' as announced in the shared record, nothing posted'); $global:ThornswoodDiscordResult = 'recorded' }
     return
   }
 }
@@ -405,12 +460,10 @@ try {
   # run would read it and refuse. Gamemode deploys are not releases and are
   # not remembered here.
   if (-not $GamemodeDeploy) {
-    try {
-      $said[$stateKey] = @{ stamp = $stamp; version = (Prop $v 'launcherVersion')
-                            title = $title; at = (Get-Date).ToUniversalTime().ToString('s') + 'Z' }
-      ($said | ConvertTo-Json -Depth 5) | Set-Content -LiteralPath $stateFile -Encoding UTF8
-    } catch {
-      if (-not $Quiet) { Write-Host "  posted, but could not write announced.json: $_" -ForegroundColor Yellow }
+    $why = Save-ThornswoodAnnounced
+    if ($why) {
+      Write-Host "  posted, but could not write the shared announced record: $why" -ForegroundColor Yellow
+      Write-Host ('  record it with: .\scripts\ops\Publish-Discord.ps1' + $(if ($Dev) { ' -Dev' } else { '' }) + ' -Record') -ForegroundColor Yellow
     }
   }
 } catch {
