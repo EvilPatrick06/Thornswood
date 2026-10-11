@@ -49297,6 +49297,8 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
     body has newlines in it, and the chat socket is line based. Everything
     after the first :: is the page.
   */
+  var journalFullSaid = {};
+  var FULL_SAY_MS = 10000;
   function journalCommand(soc, actorId, profileId, parts) {
     var verb = String(parts[1] || '').toLowerCase();
     var s = soc.stateOf(actorId);
@@ -49312,6 +49314,14 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
 
     if (verb === 'new') {
       var made = soc.newJournal(actorId, parts.slice(2).join(' '));
+      // A repeated press says nothing, and the full refusal is said once a
+      // FULL_SAY_MS per character rather than once per press (#2037).
+      if (made.again) { return ''; }
+      if (made.full) {
+        var fullAt = journalFullSaid[actorId] || 0;
+        if (Date.now() - fullAt < FULL_SAY_MS) { return ''; }
+        journalFullSaid[actorId] = Date.now();
+      }
       return made.why || ('Started ' + made.journal.title + '.');
     }
 
@@ -57439,10 +57449,17 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     one directional: sharing a page with somebody puts it in their list of
     things shared with them, and it stays yours.
   */
+  var NEW_JOURNAL_GAP_MS = 2000;
   function newJournal(actorId, title) {
     var s = stateOf(actorId);
     if (s.journals.length >= SOCIAL.mostJournals) {
-      return { why: 'You are carrying as many journals as you can.' };
+      return { why: 'You are carrying as many journals as you can.', full: true };
+    }
+    // ONE PRESS, ONE JOURNAL (#2037). A second New inside NEW_JOURNAL_GAP_MS of
+    // the last journal made is the same press arriving again, and makes nothing.
+    var last = s.journals.length ? s.journals[s.journals.length - 1] : null;
+    if (last && Date.now() - (Number(last.at) || 0) < NEW_JOURNAL_GAP_MS) {
+      return { why: '', again: true };
     }
     var j = {
       id: 'j' + Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(36),
