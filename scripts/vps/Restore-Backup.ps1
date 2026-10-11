@@ -86,7 +86,9 @@ if ($src.ToLower().EndsWith('.enc')) {
   if (-not $KeyFile -or -not (Test-Path -LiteralPath $KeyFile)) {
     Die 'No passphrase file. Pass -KeyFile pointing at your copy of the one Install-Backup.ps1 made.'
   }
-  $pass = (Get-Content -LiteralPath $KeyFile -Raw).Trim()
+  # "$()": an empty file reads as $null (even through [string](...)), and a method on $null throws. Without it the
+  # line below, which names the empty file, was never reached.
+  $pass = ("$(Get-Content -LiteralPath $KeyFile -Raw)").Trim()
   if (-not $pass) { Die "The passphrase file at $KeyFile is empty." }
 
   $inputFile = $null; $outputFile = $null; $kdf = $null; $hmac = $null

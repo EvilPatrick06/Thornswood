@@ -88,7 +88,8 @@ $hook = ''; $from = ''
 $line = @($r.Out | Where-Object { $_ -like 'HOOK *' } | Select-Object -First 1)
 if ($r.Code -eq 0 -and $line.Count -and $line[0].Substring(5).Trim() -match $shape) { $hook = $line[0].Substring(5).Trim(); $from = 'the VPS' }
 elseif (Test-Path -LiteralPath $local) {
-    $t = (Get-Content -LiteralPath $local -Raw).Trim()
+    # "$()": an empty file reads as $null (even through [string](...)), and a method on $null throws.
+    $t = ("$(Get-Content -LiteralPath $local -Raw)").Trim()
     if ($t -match $shape) { $hook = $t; $from = "the copy on this machine, $local" }
 }
 
