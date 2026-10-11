@@ -311,7 +311,10 @@ $ShipUiGoneRecord = Join-Path $PSScriptRoot '..\..\records\ui-gone.json'
 if (-not (Test-Path -LiteralPath $ShipUiGoneRecord -PathType Leaf)) {
     throw 'records\ui-gone.json is missing, so the Daedric menu set and unused fork assets cannot be kept out.'
 }
-$script:ShipUiGoneDoc = Get-Content -LiteralPath $ShipUiGoneRecord -Raw -Encoding UTF8 | ConvertFrom-Json
+$ShipUiGoneText = "$(Get-Content -LiteralPath $ShipUiGoneRecord -Raw -Encoding UTF8)"
+if (-not $ShipUiGoneText.Trim([char]0xFEFF, ' ', [char]9, [char]13, [char]10)) { throw 'records\ui-gone.json is empty, so the Daedric menu set and unused fork assets cannot be kept out.' }
+try { $script:ShipUiGoneDoc = $ShipUiGoneText.TrimStart([char]0xFEFF) | ConvertFrom-Json }
+catch { throw ('records\ui-gone.json is not valid JSON, so the Daedric menu set and unused fork assets cannot be kept out: ' + $_.Exception.Message) }
 $ShipDaedricMenu = [ordered]@{}
 foreach ($p in @($script:ShipUiGoneDoc.daedric.PSObject.Properties)) {
     $ShipDaedricMenu[$p.Name] = ([string]$p.Value).ToLowerInvariant()
