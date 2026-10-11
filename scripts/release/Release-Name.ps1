@@ -104,6 +104,11 @@ function Get-ReleaseTagName([string]$Channel, [string]$Id) {
 # whole output is read, never cut short with Select-Object -First: Windows
 # PowerShell stops the process when the pipeline ends early and reports exit -1.
 function Invoke-ReleaseGit([string]$RepoDir, [string[]]$GitArgs) {
+    # The exit code decides, not stderr. Under Windows PowerShell 5.1 with Stop,
+    # a "fatal" git writes for a ref it does not know ends the caller even
+    # through 2>$null: Ship's origin/main check stopped there instead of reading
+    # Code. Continue here is this function's own and goes when it returns.
+    $ErrorActionPreference = 'Continue'
     $out = @(& git -C $RepoDir @GitArgs 2>$null)
     $rc = $LASTEXITCODE
     $first = if ($out.Count) { ([string]$out[0]).Trim() } else { '' }

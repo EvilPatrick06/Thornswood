@@ -1370,8 +1370,11 @@ function Assert-ShipGeneratedBodyFiles([string]$GameDir, [string]$ProfileDir) {
     }
 }
 
-# Whether a loose file waits for the collection, at this revision.
+# Whether a loose file waits for the collection, at this revision. Either slash:
+# the held list is written with backslashes, and a path with forward ones (a zip
+# entry, a git path) used to read as not held, so it would not ship at all.
 function Test-ShipHeld([string]$rel, [int]$Revision = $ShipCollectionRevision) {
+    $rel = $rel.Replace('/', '\')
     foreach ($h in $ShipHeldForCollection) {
         $p = [string]$h.Path
         $hit = if ($p.EndsWith('\')) { $rel.StartsWith($p, 'OrdinalIgnoreCase') } else { $rel -ieq $p }

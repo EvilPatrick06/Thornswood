@@ -65,6 +65,13 @@ Yes 'the held folder''s name alone, with no file under it, is not held' (-not (T
 Yes 'a sibling folder that starts with the same letters is not held' (-not (Test-ShipHeld (([string]$folder.Path).TrimEnd('\') + 'x\a.nif') 0))
 Yes 'a held file is held by its exact path, any case' ((Test-ShipHeld ([string]$file.Path) 0) -and (Test-ShipHeld ([string]$file.Path).ToLowerInvariant() 0))
 Yes '  and a file beside it is not' (-not (Test-ShipHeld ([string]$file.Path + '.bak') 0))
+$fwd = $inFolder.Replace('\', '/')
+Yes "a forward-slash path under a held folder is held below its revision ($fwd)" (Test-ShipHeld $fwd ($hr - 1))
+Yes '  and not at it' (-not (Test-ShipHeld $fwd $hr))
+Yes '  mixed slashes and any case too' (Test-ShipHeld ($inFolder.Substring(0, 5) + $fwd.Substring(5).ToUpperInvariant()) ($hr - 1))
+Yes 'a held file with forward slashes is held by its exact path' (Test-ShipHeld ([string]$file.Path).Replace('\', '/') 0)
+Yes '  and a forward-slash sibling folder is still not held' (-not (Test-ShipHeld ((([string]$folder.Path).TrimEnd('\') + 'x/a.nif').Replace('\', '/')) 0))
+Yes 'a forward-slash held path still ships below its revision (not "not ours")' (-not (Test-ShipNotOurs $fwd ($hr - 1)))
 $was = $ShipCollectionRevision
 $ShipCollectionRevision = 0
 Yes 'with no revision passed it uses $ShipCollectionRevision (0: held)' (Test-ShipHeld $inFolder)
