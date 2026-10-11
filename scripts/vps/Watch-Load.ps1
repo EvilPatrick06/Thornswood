@@ -47,6 +47,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here 'Vps.ps1')
 . (Join-Path $Here 'Send-Script.ps1')
+. (Join-Path $Here 'Lock-Folder.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 if (-not $Out) { $Out = Join-Path (Split-Path -Parent (Split-Path -Parent $Here)) 'logs' }
@@ -105,7 +106,7 @@ if ($Install) {
 
   $out = Remote @"
 `$ErrorActionPreference = 'Continue'
-if (-not (Test-Path '$Root')) { `$null = New-Item -ItemType Directory -Path '$Root' -Force }
+$(Get-ThornswoodLockedFolderScript $Root)
 [IO.File]::WriteAllBytes('$Root\load.ps1', [Convert]::FromBase64String('$b64'))
 'wrote     $Root\load.ps1  ' + (Get-Item '$Root\load.ps1').Length + ' bytes'
 
