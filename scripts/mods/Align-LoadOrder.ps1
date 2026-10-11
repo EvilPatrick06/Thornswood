@@ -23,8 +23,13 @@ param(
     [string]$Data     = 'C:\Thornswood\Game\Data',
     [string]$Plugins  = 'C:\Thornswood\Profile\Default\plugins.txt',
     [string]$Settings = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') ServerSettings),
-    [switch]$Fix
+    [switch]$Fix,
+    # Other plugin lists -Fix also edits, beside the two names next to -Plugins.
+    # The launcher's LocalAppData copy by default; a test passes @() so nothing
+    # outside its scratch folder is written.
+    [string[]]$AlsoFix = @('C:\Thornswood\Profile\LocalAppData\Plugins.txt')
 )
+. (Join-Path $PSScriptRoot '..\release\Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
 $ErrorActionPreference = 'Stop'
 foreach ($p in @($Data, $Plugins, $Settings)) {
@@ -58,7 +63,7 @@ foreach ($p in $wanted) {
     $gameList += $p
 }
 
-$server = @((Get-Content -LiteralPath $Settings -Raw | ConvertFrom-Json).loadOrder |
+$server = @((ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $Settings -Raw) $Settings).loadOrder |
             ForEach-Object { [IO.Path]::GetFileName($_) })
 
 Write-Host ''
@@ -69,6 +74,10 @@ Write-Host ("server lists    : {0} plugins" -f $server.Count) -ForegroundColor C
 $extra = @()
 $si = 0
 for ($gi = 0; $gi -lt $gameList.Count; $gi++) {
+    # A server entry the game will not index is reported as missing below; it
+    # is stepped over here, or every plugin after it would read as extra and
+    # -Fix would switch them all off.
+    while ($si -lt $server.Count -and $gameList -notcontains $server[$si]) { $si++ }
     if ($si -lt $server.Count -and $gameList[$gi] -ieq $server[$si]) { $si++; continue }
     $extra += $gameList[$gi]
 }
@@ -126,7 +135,7 @@ if ($extra.Count) {
 
     $targets = @('plugins.txt','Plugins.txt' | ForEach-Object {
         Join-Path (Split-Path $Plugins -Parent) $_
-    }) + @('C:\Thornswood\Profile\LocalAppData\Plugins.txt')
+    }) + @($AlsoFix | Where-Object { $_ })
     $seen = @{}
     foreach ($t in ($targets | Select-Object -Unique)) {
         if (-not (Test-Path -LiteralPath $t)) { continue }

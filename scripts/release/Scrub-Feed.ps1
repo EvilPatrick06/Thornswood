@@ -130,6 +130,7 @@ function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; Write-Host ''; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
 
+. (Join-Path $Here 'Read-JsonFile.ps1')
 . (Join-Path $Here 'Feed-Store.ps1')
 . (Join-Path $Here 'Release-Baseline.ps1')
 . (Join-Path $Here 'Ship-Rules.ps1')
@@ -336,7 +337,7 @@ function New-ScrubbedPack([string]$old, [string]$dest) {
 function Read-Ledger {
     $o = @{}
     if (-not (Test-Path -LiteralPath $LedgerFile)) { return $o }
-    $j = (([IO.File]::ReadAllText($LedgerFile)) -replace '^\uFEFF', '') | ConvertFrom-Json
+    $j = ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($LedgerFile)) $LedgerFile
     if ($null -ne $j) { foreach ($p in $j.PSObject.Properties) { $o[$p.Name] = [string]$p.Value } }
     return $o
 }
@@ -380,7 +381,7 @@ catch { Die ("Could not receive the $Channel feed from the VPS, so nothing was c
 $VersionFile = Join-Path $ReleaseDir 'version.json'
 $StateFile = Join-Path $ReleaseDir 'published.json'
 if (-not (Test-Path -LiteralPath $VersionFile)) { Die "The VPS has no version.json for the $Channel channel." }
-$doc = (([IO.File]::ReadAllText($VersionFile)) -replace '^\uFEFF', '') | ConvertFrom-Json
+$doc = ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($VersionFile)) $VersionFile
 $packs = @()
 if ($doc.PSObject.Properties['packs'] -and $doc.packs) { $packs = @($doc.packs) }
 Say ("  {0} pack(s) on the feed" -f $packs.Count) 'DarkGray'
@@ -649,7 +650,7 @@ else {
             }
             foreach ($m in [regex]::Matches([IO.File]::ReadAllText($pth), '[0-9a-f]{64}')) { [void]$named.Add($m.Value) }
         }
-        $d2 = (([IO.File]::ReadAllText((Join-Path $look 'version.json'))) -replace '^\uFEFF', '') | ConvertFrom-Json
+        $d2 = ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText((Join-Path $look 'version.json'))) (Join-Path $look 'version.json')
         $rp = @(); try { $b2 = Get-FeedBaselinePointer $d2; if ($null -ne $b2) { $rp += $b2 } } catch { }
         $rp += @(Get-FeedReleases $d2)
         foreach ($r in $rp) {

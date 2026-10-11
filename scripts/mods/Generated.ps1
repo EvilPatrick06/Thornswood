@@ -183,14 +183,45 @@ function Get-GeneratedBuildList([string]$Path) {
 function Get-GeneratedLoosePandoraFiles([string]$Root) {
     $made = Join-Path $Root 'Profile\OwnGame\made.txt'
     $source = ''
+    $steam = ''
     if (Test-Path -LiteralPath $made) {
         foreach ($line in [IO.File]::ReadAllLines($made)) {
-            $m = [regex]::Match($line, '^source=(.+)$')
-            if ($m.Success) { $source = $m.Groups[1].Value.Trim() }
+            $m = [regex]::Match($line.TrimStart([char]0xFEFF), '^(source|game)=(.+)$')
+            if (-not $m.Success) { continue }
+            if ($m.Groups[1].Value -eq 'source') { $source = $m.Groups[2].Value.Trim() } else { $steam = $m.Groups[2].Value.Trim() }
         }
     }
     if (-not $source) { throw "$made names no source, so the files of Pandora's mod cannot be read." }
+    # The source may itself be a Thornswood folder rather than the one Vortex
+    # deploys into: the dev release folder and the main install on One both
+    # record source=C:\Thornswood-DevBuild\Game. A Thornswood folder never holds
+    # Vortex's record (OwnGame leaves it out, and Build-Generated refuses a folder
+    # that has it), so on 11 Oct, once the dev install's refresh had taken it
+    # out, every Ship from those folders stopped here; and later that day that
+    # folder was deleted altogether. Follow each Thornswood folder's own record
+    # back to the folder that has Vortex's, a few steps at most so a loop of
+    # records cannot spin, and when the chain ends without it, take the game
+    # folder the record names (game=, the Steam copy Vortex deploys into).
     $manifest = Join-Path $source 'Data\vortex.deployment.json'
+    $seen = @($source)
+    for ($hop = 0; $hop -lt 4 -and -not (Test-Path -LiteralPath $manifest); $hop++) {
+        $back = Join-Path (Split-Path -Parent $source) 'Profile\OwnGame\made.txt'
+        $next = ''
+        if (Test-Path -LiteralPath $back) {
+            foreach ($line in [IO.File]::ReadAllLines($back)) {
+                $m = [regex]::Match($line.TrimStart([char]0xFEFF), '^source=(.+)$')
+                if ($m.Success) { $next = $m.Groups[1].Value.Trim() }
+            }
+        }
+        if (-not $next -or $seen -contains $next) { break }
+        $seen += $next
+        $source = $next
+        $manifest = Join-Path $source 'Data\vortex.deployment.json'
+    }
+    if (-not (Test-Path -LiteralPath $manifest) -and $steam) {
+        $atSteam = Join-Path $steam 'Data\vortex.deployment.json'
+        if (Test-Path -LiteralPath $atSteam) { $manifest = $atSteam }
+    }
     if (-not (Test-Path -LiteralPath $manifest)) { throw "Vortex's record ($manifest) cannot be read, so the files of Pandora's mod cannot be read." }
     $doc = ([IO.File]::ReadAllText($manifest) -replace '^\uFEFF', '') | ConvertFrom-Json
     $mine = @($doc.files | Where-Object { ([string]$_.relPath) -ieq 'Pandora Behaviour Engine+.exe' })

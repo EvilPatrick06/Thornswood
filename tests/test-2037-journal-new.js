@@ -7,9 +7,11 @@
 //   A. the panel (game/ui/thornswood-journal.js) sends /journal new once and
 //      ignores more presses until the server's view shows the new journal, or
 //      3 seconds pass with no answer;
-//   B. the server (journalCommand/newJournal in game/gamemode.js) makes nothing
-//      for a second New within 2 seconds of the last journal, and says the
-//      full refusal at most once every 10 seconds per character.
+//   B. the server (journalCommand/newJournal in game/gamemode.js) runs a
+//      command offered again under its id once, and says the full refusal at
+//      most once every 10 seconds per character. It had a 2 s window too,
+//      for "the same press arriving again"; #2135 measured that nothing
+//      repeats a press (tests/test-2135-journal-press.js) and took it out.
 // A runs the real panel under a stand-in page (as test-1630-journal-gui.js
 // does). B loads the whole gamemode under a stand-in mp (as
 // test-spawn-reply.js does) with a hand-turned clock.
@@ -241,16 +243,20 @@ if (loaded && pollTimer) {
     return -1;
   };
   let started = 0, full = 0;
-  for (let n = 0; n < 20; n++) {
-    const r = send('/journal new Journal');
-    started += r.said.filter(function (x) { return /^Started /.test(x); }).length;
+  // One press whose acknowledgement went missing, so the voice service
+  // offers it again under the same id: one journal however often it comes.
+  for (let n = 0; n < 3; n++) {
+    queue.push({ id: 'test:offered-again', profileId: PID, name: 'Patrick', text: '/journal new Journal' });
+    said.length = 0;
+    pollTimer.fn();
+    started += said.filter(function (x) { return /^Started /.test(x.text); }).length;
     clock += 50;
   }
-  yes('B1: twenty presses inside a second make one journal: started ' + started + ', held ' + journals(),
+  yes('B1: one press offered three times makes one journal: started ' + started + ', held ' + journals(),
       started === 1 && journals() === 1);
 
-  for (let n = 0; n < 15; n++) { clock += 2500; send('/journal new Journal'); }
-  yes('B2: presses far enough apart still make one each, up to the 12 carried: ' + journals(), journals() === 12);
+  for (let n = 0; n < 11; n++) { clock += 50; send('/journal new Journal'); }
+  yes('B2: separate presses make one each, however close, up to the 12 carried: ' + journals(), journals() === 12);
   for (let n = 0; n < 30; n++) {
     clock += 300;
     const r = send('/journal new Journal');

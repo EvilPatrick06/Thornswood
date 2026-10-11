@@ -58,6 +58,7 @@ param(
     [int]$Jobs = 0,
     [switch]$NoPause
 )
+. (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
 $ErrorActionPreference = 'Stop'
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
@@ -253,8 +254,14 @@ if (-not (Test-Path -LiteralPath (Join-Path $Fork 'CMakeLists.txt'))) {
         if ((Run git -C $repo submodule update --init engine/skymp) -ne 0) { Die 'git could not fetch engine\skymp. Is this a clone of the repository, and can this account read EvilPatrick06/skymp?' }
     }
 }
+# Read with Continue: a fork that is not there yet (-Check says this run would
+# fetch it) makes git say "fatal" on stderr, and under Stop Windows
+# PowerShell 5.1 ended -Check there, even through 2>$null. The exit code decides.
+$ErrorActionPreference = 'Continue'
 $pinned = ((& git -C $repo ls-tree HEAD engine/skymp 2>$null) -split '\s+')[2]
 $at = (& git -C $Fork rev-parse HEAD 2>$null | Select-Object -First 1)
+if ($LASTEXITCODE -ne 0) { $at = $null }
+$ErrorActionPreference = 'Stop'
 if ($at) {
     Say ("  pinned   {0}" -f $pinned)
     Say ("  at       {0}" -f $at)
@@ -291,7 +298,20 @@ Head 'Configure'
 # MSB1009. A configure over that cache carries on from it.
 $cache = Join-Path $build 'CMakeCache.txt'
 $solution = Join-Path $build 'ALL_BUILD.vcxproj'
-if (Test-Path -LiteralPath $solution) { Ok "already configured: $build" }
+# A build already configured is generated again over its own cache every run
+# (#2157). The fork's CMakeLists collect their sources with GLOB_RECURSE, and
+# a glob is read at configure time, so a fork change that adds a .cpp (fork
+# #54's PageHeldKeys.cpp, 11 Oct) was in no project and the link failed with
+# LNK2019 until somebody configured by hand. Given only the build folder,
+# cmake takes the source, the generator and every setting from the cache, so
+# nothing is rebuilt in vcpkg; it took 16 s on One.
+if ((Test-Path -LiteralPath $solution) -and $Check) { Ok "already configured: $build; this run would generate it again over its cache, so a source file the fork added is built" }
+elseif (Test-Path -LiteralPath $solution) {
+    Say '  already configured; generating again over its cache, so a source file the fork added since is in the build'
+    $code = Run $cmake $build
+    if ($code -ne 0) { Die "cmake exited with $code generating $build again over its cache. The first error above is usually the real one." }
+    Ok "generated again: $build"
+}
 elseif ($Check -and (Test-Path -LiteralPath $cache)) { Miss "$build was configured part way (no ALL_BUILD.vcxproj); this run would configure it again from where it stopped" }
 elseif ($Check) { Miss "$build is not configured; this run would configure it (the first time builds every vcpkg library, which is slow)" }
 else {
@@ -334,7 +354,7 @@ Ok 'built'
 
 # ---- 5. the recorded client -------------------------------------------------
 Head 'Is this the recorded client?'
-$rec = Get-Content -LiteralPath $record -Raw | ConvertFrom-Json
+$rec = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $record -Raw) $record
 $dist = Join-Path $build 'dist\client'
 $differ = 0
 foreach ($rel in @($rec.files.PSObject.Properties.Name)) {

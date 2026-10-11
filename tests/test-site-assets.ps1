@@ -26,6 +26,8 @@
     Publish-Update.ps1: its site upload block and its move-the-urls block, run
       on their own between their markers, and that site is the default.
 #>
+# Scripts this runs whole go to a stand-in box, so the freshness guard lets them be (#2118).
+$env:THORNSWOOD_HARNESS = '1'
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 

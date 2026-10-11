@@ -128,7 +128,8 @@ function world(opts) {
   opts = opts || {};
   const w = {
     t: opts.t || 1000000,
-    packs: {}, worn: {}, held: {}, clocks: {}, states: {}, cells: {},
+    packs: {}, worn: {}, records: {}, recordWrites: 0, refuseRecord: false,
+    held: {}, clocks: {}, states: {}, cells: {},
     rolls: (opts.rolls || []).slice(), said: [], logs: [], queue: [], writes: 0, refuseWrite: false,
     shown: []
   };
@@ -148,7 +149,27 @@ function world(opts) {
     },
     worn: function (id) {
       if (w.worn[id]) { return w.worn[id]; }
+      if (w.records[id]) {
+        return JSON.parse(JSON.stringify(w.records[id].inv.entries)).filter(function (e) { return e.worn || e.wornLeft; });
+      }
       return (w.packs[id] || []).filter(function (e) { return e.worn || e.wornLeft; });
+    },
+    // The equipment record, and the engine's names-only write of it (#1651).
+    record: function (id) { return w.records[id] ? JSON.parse(JSON.stringify(w.records[id])) : null; },
+    setRecord: function (id, rec) {
+      if (w.refuseRecord) { return false; }
+      const was = w.records[id].inv.entries;
+      const now = rec.inv.entries;
+      // What EquipmentBinding::Set takes from an owned actor: nothing but names.
+      const onlyNames = was.length === now.length && was.every(function (e, i) {
+        const a = Object.assign({}, e), b = Object.assign({}, now[i]);
+        delete a.name; delete b.name;
+        return JSON.stringify(a) === JSON.stringify(b);
+      });
+      if (!onlyNames) { throw new Error('the record write changed more than names'); }
+      w.recordWrites++;
+      w.records[id] = JSON.parse(JSON.stringify(rec));
+      return true;
     },
     recordOf: function (id) { return RECORDS[id] || null; },
     nameOf: function (id) { return NAMES[id] || ''; },
@@ -723,8 +744,8 @@ yes('the page and the block agree: worn gear loses 1% a hit',
 {
   const w = world();
   w.packs[PERSON] = [{ baseId: STEEL_ARMOR, count: 1, name: 'Steel Armor (84%)', worn: true }];
-  // The client still names it as it was when it reached the pack: its
-  // namesEqual drops the "(...)" and never takes a new number in.
+  // A record with an older number on the name: written before #1651, or a
+  // report of an equip that crossed a rename on the way.
   w.worn[PERSON] = [{ baseId: STEEL_ARMOR, count: 1, worn: true, name: 'Steel Armor (90%)' }];
   w.api.hit(PERSON, NPC, 0);
   yes('the equipment the client sends, with the old number on the name, is still matched to the piece',
@@ -841,6 +862,117 @@ yes('/repair is a word the server answers for the key and the panel, and nobody 
 yes('the cut list still holds the temper rows, so an event can bring one back',
     /Tempering rows, the grindstone and the armour table, are in this file/.test(
       fs.readFileSync(path.join(REPO_DIR, 'docs', 'systems', 'cut-items.md'), 'utf8')));
+
+// ------------------------------------------- the record follows (#1651) --
+//
+// The owner's game dresses them at login by matching each worn entry of the
+// equipment record to the pack by name, exactly, since #1651. So a rename in
+// the pack renames the record's entry in the same step, and a record written
+// before #1651 is put right as its owner logs in.
+
+function recordOf(entries) { return { inv: { entries: entries }, numChanges: 3 }; }
+function recName(w, id, i) { return w.records[id].inv.entries[i].name; }
+{
+  const w = world();
+  w.packs[PERSON] = [{ baseId: STEEL_ARMOR, count: 1 }, { baseId: IRON_SWORD, count: 1, name: 'Iron Sword (50%)' },
+                     { baseId: ROBES, count: 1, name: 'Adept Robes (60%)' }];
+  w.records[PERSON] = recordOf([{ baseId: STEEL_ARMOR, count: 1, worn: true, name: 'Steel Armor' },
+                                { baseId: IRON_SWORD, count: 1, worn: true, name: 'Iron Sword (50%)' },
+                                { baseId: ROBES, count: 1, name: 'Adept Robes (60%)' }]);
+  w.api.hit(PERSON, NPC, IRON_SWORD, true);
+  yes('a hit renames the worn pieces in the record in the same step as the pack',
+      w.count(PERSON, STEEL_ARMOR, 'Steel Armor (99%)') === 1 && recName(w, PERSON, 0) === 'Steel Armor (99%)' &&
+      w.count(PERSON, IRON_SWORD, 'Iron Sword (49%)') === 1 && recName(w, PERSON, 1) === 'Iron Sword (49%)');
+  yes('in one write of the record, changing nothing but names, and its counter left alone',
+      w.recordWrites === 1 && w.records[PERSON].numChanges === 3 && w.records[PERSON].inv.entries[0].worn === true);
+  yes('what is carried and not worn is left as the record had it', recName(w, PERSON, 2) === 'Adept Robes (60%)');
+  w.api.hit(PERSON, NPC, 0);
+  yes("the next hit finds the piece by the record's new name and renames it again",
+      w.count(PERSON, STEEL_ARMOR, 'Steel Armor (98%)') === 1 && recName(w, PERSON, 0) === 'Steel Armor (98%)');
+}
+{
+  // Two swords of one base, one worn. The pack keeps them as one stack until
+  // a hit splits them; the record names the worn one.
+  const w = world();
+  w.packs[PERSON] = [{ baseId: IRON_SWORD, count: 2, name: 'Iron Sword (85%)' }];
+  w.records[PERSON] = recordOf([{ baseId: IRON_SWORD, count: 1, worn: true, name: 'Iron Sword (85%)' },
+                                { baseId: IRON_SWORD, count: 1, name: 'Iron Sword (85%)' }]);
+  w.packs[OTHER] = [];
+  w.api.hit(OTHER, PERSON, IRON_SWORD);
+  w.api.hit(OTHER, PERSON, IRON_SWORD);
+  yes("of two swords of one base, the record's worn one is the one worn down, hit after hit",
+      w.count(PERSON, IRON_SWORD, 'Iron Sword (83%)') === 1 && w.count(PERSON, IRON_SWORD, 'Iron Sword (85%)') === 1 &&
+      recName(w, PERSON, 0) === 'Iron Sword (83%)' && recName(w, PERSON, 1) === 'Iron Sword (85%)');
+}
+{
+  const w = world();
+  w.packs[PERSON] = [{ baseId: IRON_SWORD, count: 1, name: 'Iron Sword (40%)' }, { baseId: WEAPON_KIT, count: 1 }];
+  w.records[PERSON] = recordOf([{ baseId: IRON_SWORD, count: 1, worn: true, name: 'Iron Sword (40%)' }]);
+  const r = w.api.repairWithKit(PERSON, row(IRON_SWORD, 40, 'Iron Sword'));
+  yes('a repair of a worn piece to 100% renames it plain in the record too',
+      r.ok && w.count(PERSON, IRON_SWORD, '') === 1 && recName(w, PERSON, 0) === undefined && w.recordWrites === 1);
+}
+{
+  const w = world();
+  w.packs[PERSON] = [{ baseId: IRON_SWORD, count: 1, name: 'Iron Sword (40%)' }, { baseId: WEAPON_KIT, count: 1 }];
+  w.records[PERSON] = recordOf([{ baseId: STEEL_ARMOR, count: 1, worn: true }]);
+  w.api.repairWithKit(PERSON, row(IRON_SWORD, 40, 'Iron Sword'));
+  yes('a repair of a piece nobody wears writes nothing to the record', w.recordWrites === 0);
+}
+{
+  const w = world();
+  w.packs[PERSON] = [{ baseId: STEEL_ARMOR, count: 1, name: 'Steel Armor (80%)' }];
+  w.records[PERSON] = recordOf([{ baseId: STEEL_ARMOR, count: 1, worn: true, name: 'Steel Armor (80%)' }]);
+  w.refuseRecord = true;
+  w.api.hit(PERSON, NPC, 0);
+  yes('when the engine refuses the record (an engine before #1651), the hit still wears the pack',
+      w.count(PERSON, STEEL_ARMOR, 'Steel Armor (79%)') === 1 && recName(w, PERSON, 0) === 'Steel Armor (80%)');
+}
+
+// A record written before #1651, at login.
+{
+  const w = world();
+  w.packs[PERSON] = [{ baseId: IRON_SWORD, count: 1, name: 'Iron Sword (40%)' },
+                     { baseId: IRON_SWORD, count: 1, name: 'Iron Sword (85%)' },
+                     { baseId: STEEL_ARMOR, count: 1, name: 'Steel Armor (70%)' },
+                     { baseId: GOLD_RING, count: 1 }];
+  w.records[PERSON] = recordOf([{ baseId: IRON_SWORD, count: 1, worn: true, name: 'Iron Sword (90%)' },
+                                { baseId: STEEL_ARMOR, count: 1, worn: true, name: 'Steel Armor (70%)' },
+                                { baseId: GOLD_RING, count: 1, worn: true, name: 'Gold Ring' },
+                                { baseId: IRON_SWORD, count: 1, name: 'Iron Sword (60%)' }]);
+  const n = w.api.loading(PERSON);
+  yes("at login a worn piece the record names at an old condition takes the pack's name",
+      n === 1 && recName(w, PERSON, 0) === 'Iron Sword (85%)');
+  yes("of an 85% and a 40% sword, the record's 90% is the 85% one, the nearest", recName(w, PERSON, 0) === 'Iron Sword (85%)');
+  yes('a worn piece the record already names right, a ring, and what is not worn are left alone',
+      recName(w, PERSON, 1) === 'Steel Armor (70%)' && recName(w, PERSON, 2) === 'Gold Ring' &&
+      recName(w, PERSON, 3) === 'Iron Sword (60%)');
+  yes('in one write, said in the log', w.recordWrites === 1 && w.logs.some(function (l) { return /equipment record/.test(l); }));
+  w.recordWrites = 0;
+  yes('and the next login finds nothing to put right', w.api.loading(PERSON) === 0 && w.recordWrites === 0);
+}
+{
+  const w = world();
+  w.packs[PERSON] = [{ baseId: IRON_SWORD, count: 1 }];
+  w.records[PERSON] = recordOf([{ baseId: IRON_SWORD, count: 1, worn: true, name: 'Iron Sword' }]);
+  yes('a plain piece the record names by its own name is right as it is', w.api.loading(PERSON) === 0 && w.recordWrites === 0);
+  w.records[PERSON] = recordOf([{ baseId: IRON_SWORD, count: 1, worn: true, name: 'Iron Sword (90%)' }]);
+  w.api.loading(PERSON);
+  yes('a record naming a piece since mended to 100% loses the number', recName(w, PERSON, 0) === undefined);
+}
+{
+  // Two worn swords, one in each hand, both named at old numbers; the pack
+  // has two stacks. Each stack answers for one of them.
+  const w = world();
+  w.packs[PERSON] = [{ baseId: IRON_SWORD, count: 1, name: 'Iron Sword (30%)' },
+                     { baseId: IRON_SWORD, count: 1, name: 'Iron Sword (70%)' }];
+  w.records[PERSON] = recordOf([{ baseId: IRON_SWORD, count: 1, worn: true, name: 'Iron Sword (75%)' },
+                                { baseId: IRON_SWORD, count: 1, wornLeft: true, name: 'Iron Sword (35%)' }]);
+  w.api.loading(PERSON);
+  yes('two worn pieces of one base each take a stack of their own, the nearest',
+      recName(w, PERSON, 0) === 'Iron Sword (70%)' && recName(w, PERSON, 1) === 'Iron Sword (30%)');
+}
+yes("the engine's hook before a character is handed over is the block's", /g\.__thornswoodSpawn\.loading = function/.test(block));
 
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');

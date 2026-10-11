@@ -33,6 +33,8 @@
 #>
 [CmdletBinding()]
 param([string]$RepoDir)
+# Scripts this runs whole go to a stand-in box, so the freshness guard lets them be (#2118).
+$env:THORNSWOOD_HARNESS = '1'
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
@@ -41,6 +43,8 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 $Here = Split-Path -Parent $Here
 if (-not $RepoDir) { $RepoDir = $Here }
 # The counting function Deploy-DevGamemode sends up with the block (#2011).
+# The section lifted below calls ConvertFrom-ThornswoodJson, which Deploy-Gamemode dot-sources.
+. (Join-Path $RepoDir 'scripts\release\Read-JsonFile.ps1')
 . (Join-Path $RepoDir 'scripts\deploy\ServerOrder.ps1')
 $script:fullIndexDef = 'function Get-ThornswoodFullIndex {' + "`n" + (Get-Command Get-ThornswoodFullIndex).Definition + "`n}"
 

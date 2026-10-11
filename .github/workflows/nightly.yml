@@ -137,6 +137,24 @@ jobs:
           if ($bad) { exit 1 }
           Write-Host 'every bot file parses'
 
+      - name: Install the eslint the lint harness copies
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          # tests\test-eslint-amp-path.ps1 (#1343, #2092) runs build.yml's
+          # eslint lines offline: its npm stand-in copies eslint 9.39.5 out of
+          # %TEMP%\herald-lint, and with nothing there it says SKIP and exits
+          # 2. No runner had that folder, so it failed the first night it was
+          # in the tree (#1273). This is the same pinned install build.yml's
+          # lint step makes, into the folder the harness reads by default.
+          $cache = Join-Path $env:TEMP 'herald-lint'
+          npm install --prefix $cache --no-save --no-audit --no-fund --silent eslint@9.39.5
+          if (-not (Test-Path -LiteralPath (Join-Path $cache 'node_modules\eslint\bin\eslint.js'))) {
+            Write-Host '::error file=tests/test-eslint-amp-path.ps1::could not install eslint 9.39.5, so the lint harness has nothing to copy'
+            exit 1
+          }
+          Write-Host ('eslint 9.39.5 is in ' + $cache)
+
       - name: Run the test harnesses
         if: ${{ !cancelled() }}
         shell: pwsh

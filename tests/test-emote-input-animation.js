@@ -1,5 +1,6 @@
 'use strict';
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const pluginPass=require('./fixtures/plugin-pass'); // front's whose-game check and the first tick, as the game does (#485)
 const source=fs.readFileSync(path.join(__dirname,'../game/plugins/thornswood-emotes.js'),'utf8');
 const serverAddress=JSON.parse(fs.readFileSync(path.join(__dirname,'../scripts/vps/vps.json'),'utf8')).address;
 function fixture() {
@@ -26,7 +27,7 @@ function fixture() {
       if(ack)hooks.forEach(h=>h.leave(ctx));
     });}}};
   const ctx={skyrimPlatform:sp,Thornswood:T,require:()=>io,Date:Clock,JSON,Math,Number};
-  vm.createContext(ctx);vm.runInContext(source,ctx);
+  vm.createContext(ctx);pluginPass.load(ctx,source,{filename:'thornswood-emotes.js'});
   function emit(name,event){inUpdate=name==='update'||name==='buttonEvent';if(name==='update'&&waiting&&delay>0&&!--delay){drawn=false;waiting=false;}for(const fn of handlers[name]||[])fn(event);if(name==='update')while(nativeTasks.length)nativeTasks.shift()();inUpdate=false;}
   return {sent,pins,labels,emit,reject(){accepted=false;},
     focus(){focused=true;},delaySheathe(){delay=5;},interruptSheatheOnReset(){resetInterrupts=true;delay=5;},noAcknowledgement(){ack=false;},elapse(ms){time+=ms;},
