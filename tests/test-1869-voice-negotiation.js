@@ -630,14 +630,35 @@ async function partOne() {
   E.pause();
   const before = got.length;
 
-  const feeding = setInterval(feed, 200);
+  // Backed (#2144) is only "a write the kernel has not taken yet": one tick of
+  // 1500 rows is past the socket's high-water mark the moment it is written,
+  // so health says backed until the kernel takes it, even while the reader's
+  // kernel buffers still have room. Seen once is not enough. On the build
+  // runner the feed stopped on such a moment, the kernel then took the tick,
+  // drain cleared backed, and the joins were measured on a socket that was not
+  // backed. So the feed stops only once backed has held for a whole second
+  // with nothing being fed, which is a socket whose kernel buffers are full.
+  // voice/test-backpressure.js waits the same way (two probes in a row).
+  const t0 = Date.now();
+  const timeline = [];
+  let feeding = setInterval(feed, 200);
   let backed = false;
-  for (let i = 0; i < 150 && !backed; i++) {
+  while (!backed && Date.now() - t0 < 30000) {
     await sleep(200);
-    backed = (await health()).backed >= 1;
+    if ((await health()).backed < 1) continue;
+    timeline.push('backed at ' + (Date.now() - t0) + ' ms');
+    clearInterval(feeding);
+    backed = true;
+    for (let k = 0; k < 5 && backed; k++) {
+      await sleep(200);
+      const hh = await health();
+      if (hh.backed < 1) { backed = false; timeline.push('drained at ' + (Date.now() - t0) + ' ms (queue was a tick in flight)'); }
+    }
+    if (!backed) feeding = setInterval(feed, 200);
   }
-  yes('a socket that does not read is backed up, so what follows is measured on one', backed);
   clearInterval(feeding);
+  console.log('      the feed: ' + timeline.join(', ') + (backed ? ', held for 1 s with nothing fed' : ', never held'));
+  yes('a socket that does not read is backed up, so what follows is measured on one', backed);
   if (!backed) { return; }
   const skipped0 = (await health()).skippedRosters;
 
