@@ -43,6 +43,10 @@
   Nothing here connects to anything, and everything it writes is in its own
   temp folder.
 #>
+# Scripts this runs whole go to a stand-in box, so the freshness guard lets them be (#2118).
+$env:THORNSWOOD_HARNESS = '1'
+# Publish-Update takes no -Vps; its box here is this machine's stand-in.
+$env:THORNSWOOD_VPS = '127.0.0.1'
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
@@ -179,7 +183,7 @@ try {
     $fake = Join-Path $Scratch 'repo'
     New-Item -ItemType Directory -Force -Path $fake | Out-Null
     Copy-Item -LiteralPath (Join-Path $repo 'scripts') -Destination $fake -Recurse -Force
-    foreach ($f in 'layout.json', 'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt', 'records\generated.json', 'records\ui-gone.json') {
+    foreach ($f in 'layout.json', 'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt', 'records\generated.json', 'records\ui-gone.json', 'records\client-build.json') {
         $from = Join-Path $repo $f
         if (Test-Path -LiteralPath $from) {
             New-Item -ItemType Directory -Force -Path (Split-Path -Parent (Join-Path $fake $f)) | Out-Null
@@ -252,7 +256,12 @@ try {
     # What the last release published, on the stand-in store: the plugin as it
     # was, so this build has something to send. The feed names no baseline
     # record yet, so the store's copy is what it is diffed against.
-    Put (Join-Path $site 'feed\version.json') '{"launcherVersion":"1.1.102","packs":[],"news":[]}'
+    # The stand-in UI front carries a SkyMP file (build.js), so the pack's source
+    # notice reads records\client-build.json (#1318), copied above. The feed
+    # already has that client runtime, as a real feed does, so this run does
+    # not stage the six runtime files the stand-in game folder never had.
+    $pFork = [string](((Get-Content -LiteralPath (Join-Path $fake 'records\client-build.json') -Raw) -replace '^\uFEFF', '') | ConvertFrom-Json).forkCommit
+    Put (Join-Path $site 'feed\version.json') ('{"launcherVersion":"1.1.102","packs":[],"news":[],"clientRuntime":{"forkCommit":"' + $pFork + '","url":"https://example.invalid/client-runtime-' + $pFork + '.zip","notice":1}}')
     Put (Join-Path $site 'feed\published.json') '{"Data\\Platform\\UI\\thornswood-ours.esp":"5:0000000000000000000000000000000000000000000000000000000000000000"}'
     $Shell = (Get-Process -Id $PID).Path
     function Publish([string[]]$extra) {

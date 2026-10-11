@@ -32,10 +32,16 @@ const path   = require('path');
 const crypto = require('crypto');
 
 const PORT   = Number(process.env.THORNSWOOD_DOCS_PORT || 3001);
-/* Once Caddy is in front, this should answer only to Caddy. Otherwise port
-   3001 stays open as a plain HTTP way past the certificate, which makes the
-   certificate decorative. Set THORNSWOOD_DOCS_LOCAL=1 then. */
-const BIND   = process.env.THORNSWOOD_DOCS_LOCAL === '1' ? '127.0.0.1' : '0.0.0.0';
+/* LOOPBACK UNLESS ASKED (#2185). Caddy holds 443 and hands everything on from
+   127.0.0.1, so this answers only there. Listening on every address put port
+   3001 open as a plain HTTP way past the certificate, cookies and passwords
+   included, on any box where THORNSWOOD_DOCS_LOCAL had not been set, and the
+   unsafe answer was the default. Now a plain listener on every address takes
+   THORNSWOOD_DOCS_EXPOSE=1, for a box with no proxy in front, and says so
+   loudly at every start. THORNSWOOD_DOCS_LOCAL=1 still means loopback and
+   wins over EXPOSE. */
+const EXPOSED = process.env.THORNSWOOD_DOCS_EXPOSE === '1' && process.env.THORNSWOOD_DOCS_LOCAL !== '1';
+const BIND   = EXPOSED ? '0.0.0.0' : '127.0.0.1';
 const ROOT   = __dirname;
 const DATA   = path.join(ROOT, 'data');
 const PUBLIC = path.join(ROOT, 'public');
@@ -571,6 +577,67 @@ function pageMarkdown(name) {
   try { return forMode(fs.readFileSync(file, 'utf8'), cfg.open); } catch (e) { return null; }
 }
 
+// The credits page says which engine each server runs. That is a fact of the
+// box, not of the repo, so a hand edit went stale with every deploy (the
+// source-offer test caught 3a32e961 that way). Deploy-Server.ps1 writes
+// data/deployed-build.json after a server deploy (scripts/deploy/
+// DeployedBuild.ps1), and the feeds this site serves carry the client commit.
+// fillCreditsCommits puts both into the page at serve time. The markdown keeps
+// its hand text, which is what goes out when either source is missing.
+// ==== thornswood credits fill ====
+function fillCreditsCommits(md, deployed, feeds) {
+  const FULL = /^[0-9a-f]{40}$/;
+  const SOME = /^[0-9a-f]{7,40}$/;
+  const tree = 'https://github.com/EvilPatrick06/skymp/tree/';
+  const link = function (c) { return '[`' + c.slice(0, 8) + '`](' + tree + c + ')'; };
+  const pick = function (ch) {
+    const e = deployed && typeof deployed === 'object' ? deployed[ch] : null;
+    const c = e && typeof e === 'object' ? String(e.commit || '') : '';
+    return FULL.test(c) ? c : null;
+  };
+  let out = String(md);
+  const live = pick('live');
+  const dev = pick('dev');
+  if (live && dev) {
+    const rec = /built from one commit,\s+\[`[0-9a-f]{7,40}`\]\(https:\/\/github\.com\/EvilPatrick06\/skymp\/tree\/([0-9a-f]{40})\)/.exec(out);
+    const recorded = rec ? rec[1] : '';
+    let said;
+    if (live === dev) {
+      said = live === recorded ? 'Both servers run it, ' + link(live) + '.'
+                               : 'The recorded build has not been deployed yet. Both servers run ' + link(live) + '.';
+    } else {
+      said = (live !== recorded && dev !== recorded ? 'The recorded build has not been deployed yet. ' : '') +
+             'The test server runs ' + link(dev) + ' and the main server runs ' + link(live) + '.';
+    }
+    // The hand sentence runs from "then to the main server." to "the earlier
+    // engine ...", whatever it says about which server runs what (#2098).
+    out = out.replace(/(then to the main server\.\s+)((?:(?!\n\s*\n)[\s\S])*?)\[`[0-9a-f]{7,40}`\]\([^)\s]*\),\s+the earlier engine[^.]*\./,
+                      function (m, lead) { return lead + said; });
+  }
+  for (const row of [['Public', 'feed/version.json', 'public'], ['Dev', 'feed-dev/version.json', 'dev']]) {
+    const c = feeds && typeof feeds === 'object' ? String(feeds[row[2]] || '') : '';
+    if (!SOME.test(c)) continue;
+    const re = new RegExp('(^|\\n)(\\|\\s*' + row[0] + '\\s*\\|\\s*`' + row[1].replace(/[./]/g, '\\$&') +
+                          '`\\s*\\|\\s*)\\[`[0-9a-f]{7,40}`\\]\\([^)\\s]*\\)');
+    out = out.replace(re, function (m, a, b) { return a + b + link(c); });
+  }
+  return out;
+}
+// ==== end thornswood credits fill ====
+const DEPLOYED_BUILD = path.join(DATA, 'deployed-build.json');
+function readJsonQuiet(file) {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')); } catch (e) { return null; }
+}
+function creditsFacts() {
+  const feeds = {};
+  for (const pair of [['public', 'feed'], ['dev', 'feed-dev']]) {
+    const v = readJsonQuiet(path.join(ROOT, pair[1], 'version.json'));
+    const c = v && v.clientRuntime && v.clientRuntime.forkCommit;
+    if (typeof c === 'string') feeds[pair[0]] = c;
+  }
+  return { deployed: readJsonQuiet(DEPLOYED_BUILD), feeds: feeds };
+}
+
 // Public discovery uses the configured project domain, never a request's Host.
 const PUBLIC_ORIGIN = 'https://thornswood.net';
 function singlePageHeading(body, title) {
@@ -1058,15 +1125,36 @@ const INBOX_KEEP = 2000;
 const reportSalt = crypto.randomBytes(32);
 const reportSeen = new Map();
 
-function clientAddr(req) {
-  const sock = String((req.socket && req.socket.remoteAddress) || '');
+// THE ONE TRUSTED-PROXY BOUNDARY (#2187). requestAddr is the address a request
+// came from, and both the report limit below and the sign-in log use it, so
+// there is one rule rather than two. The socket is the truth. X-Forwarded-For
+// is believed only when the socket is a proxy we run: loopback, which is
+// Caddy, or an address listed in THORNSWOOD_TRUSTED_PROXIES (comma separated,
+// for a proxy on another box; empty by default). Even then only the LAST hop
+// is taken, the one that proxy wrote: anything before it is whatever the
+// sender typed. A direct caller's header is ignored entirely. Until 11
+// October the sign-in log took the FIRST hop from anybody, so any caller could
+// write any address into signins.json.
+const TRUSTED_PROXIES = new Set(String(process.env.THORNSWOOD_TRUSTED_PROXIES || '')
+  .split(',').map((s) => s.trim().toLowerCase().replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/, ''))
+  .filter(Boolean));
+
+function requestAddr(req) {
+  const plain = (a) => String(a || '').trim().toLowerCase()
+    .replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/, '');
+  const sock = plain(req.socket && req.socket.remoteAddress);
   let addr = sock;
-  if (/^(127\.|::1$|::ffff:127\.)/i.test(sock)) {
-    const hops = String(req.headers['x-forwarded-for'] || '').split(',')
+  if (/^(127\.|::1$)/.test(sock) || TRUSTED_PROXIES.has(sock)) {
+    const hops = String((req.headers && req.headers['x-forwarded-for']) || '').split(',')
       .map((s) => s.trim()).filter(Boolean);
-    if (hops.length) addr = hops[hops.length - 1];
+    const last = hops.length ? plain(hops[hops.length - 1]) : '';
+    if (last && net.isIP(last)) addr = last;
   }
-  addr = addr.toLowerCase().replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/, '');
+  return addr;
+}
+
+function clientAddr(req) {
+  let addr = requestAddr(req);
   if (net.isIPv6(addr)) {
     const halves = addr.split('%')[0].split('::');
     const head = halves[0] ? halves[0].split(':') : [];
@@ -2531,8 +2619,7 @@ function noteSignIn(req, me, st, back) {
       admin: !!st.admin,
       outcome: outcome,
       roles: Array.isArray(st.roles) ? st.roles.slice(0, 12) : [],
-      ip: String((req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
-                 (req.socket && req.socket.remoteAddress) || '')
+      ip: requestAddr(req)
     });
     putJson(ATTEMPTS, freshSignIns(rows, Date.now()));
   } catch (e) { }
@@ -3952,7 +4039,9 @@ async function handle(req, res) {
     attemptsSpent.set(attempt, now);
     const spent = attemptCookie(req, attempt, '', 0);
     res.setHeader('Set-Cookie', spent);
-    if (!/^\/[A-Za-z0-9/_-]*$/.test(back)) back = '/';
+    // Two slashes is another host to a browser (//2130706433), so back has to
+    // start with exactly one.
+    if (!/^\/(?!\/)[A-Za-z0-9/_-]*$/.test(back)) back = '/';
     if (!code) return send(res, 302, '', 'text/plain', { Location: '/?discord=cancelled' });
 
     let me;
@@ -4074,7 +4163,11 @@ async function handle(req, res) {
       // A written page goes out with its words in it. After the invite link
       // above, so nothing anybody typed is mistaken for DISCORD_URL.
       if (MD_PAGES.indexOf(route) >= 0) {
-        const md = pageMarkdown(route.slice(1));
+        let md = pageMarkdown(route.slice(1));
+        if (md !== null && route === '/credits') {
+          const facts = creditsFacts();
+          md = fillCreditsCommits(md, facts.deployed, facts.feeds);
+        }
         if (md === null) return send(res, 404, notFoundPage(), TYPES['.html']);
         html = fillPage(html, singlePageHeading(pageHtml(md), blurb[0]));
       } else if (route !== '/') {
@@ -6210,6 +6303,11 @@ http.createServer((req, res) => {
   }
 }).listen(PORT, BIND, () => {
   console.log('[thornswood-docs] listening on ' + BIND + ':' + PORT);
+  if (EXPOSED) {
+    console.log('[thornswood-docs] WARNING: plain HTTP on every address (THORNSWOOD_DOCS_EXPOSE=1). ' +
+                'Sign-ins, cookies and uploads reach ' + PORT + ' unencrypted from anywhere the firewall lets in. ' +
+                'Put Caddy in front and unset it (#2185).');
+  }
   console.log('[thornswood-docs] writing this to ' + siteLog.file +
               ', rolled at 4 MB, five kept');
   console.log('[thornswood-docs] documents in ' + DATA);

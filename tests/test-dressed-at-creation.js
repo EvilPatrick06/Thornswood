@@ -114,12 +114,12 @@ function world(ownedIds) {
   const g = { __thornswoodSpoils: { purse: purse } };
   const firstSeen = new Map();
   const make = new Function('mp', 'log', 'idOf', 'SHIFT', 'HALL', 'CHARGEN_PROPERTY', 'CHARGEN_ENABLED',
-    'firstSeen', 'sendToHall', 'tellOnce', 'globalThis',
+    'firstSeen', 'sendToHall', 'tellOnce', 'tellKeptCharacter', 'globalThis',
     PIECES.faceMark + '\n' + PIECES.chargenOf + '\n' + PIECES.setChargen + '\n' +
     PIECES.giveShift + '\n' + PIECES.dressNewCharacter + '\n' + PIECES.beginAppearance + '\n' +
     'return ' + created + ';');
   const createdFn = make(mp, log, d => ids[d] || 0, CHARGEN.shift, HALL, PROP, true,
-    firstSeen, () => false, () => {}, g);
+    firstSeen, () => false, () => {}, () => false, g);
   return { mp, writes, lines, created: createdFn };
 }
 

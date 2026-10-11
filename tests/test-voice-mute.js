@@ -30,6 +30,7 @@ const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in test
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const pluginPass = require('./fixtures/plugin-pass'); // front's whose-game check and the first tick, as the game does (#485)
 // The box's address from the one place that holds it (#459), which is what the
 // plugin's own list is kept equal to by Set-Vps.ps1.
 const OUR_ADDRESS = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'scripts', 'vps', 'vps.json'), 'utf8')).address;
@@ -292,8 +293,9 @@ function mutedSent(sent) {
 // ----------------------------------------------------------- the plugin
 /*
   The real plugin, with a fake Skyrim Platform and a fake file system. It
-  checks whose game this is before it does anything, so the fake client
-  settings point at our server and the launcher's session note is fresh.
+  runs only once front's whose-game check says ours (#485), which
+  fixtures/plugin-pass.js runs for real, so the fake client settings point
+  at our server and the launcher's session note is fresh.
 */
 function plugin() {
   const files = {};
@@ -321,7 +323,7 @@ function plugin() {
     Math: Math, Array: Array, Object: Object, RegExp: RegExp, isFinite: isFinite
   };
   vm.createContext(sandbox);
-  vm.runInContext(read('game/plugins/thornswood-voice.js'), sandbox);
+  pluginPass.load(sandbox, read('game/plugins/thornswood-voice.js'), { filename: 'thornswood-voice.js' });
   function page() {
     const args = [].slice.call(arguments);
     (handlers.browserMessage || []).forEach(function (fn) { fn({ arguments: args }); });

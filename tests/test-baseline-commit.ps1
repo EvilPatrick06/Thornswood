@@ -25,6 +25,8 @@
 
   Read only apart from its own temp folder.
 #>
+# Scripts this runs whole go to a stand-in box, so the freshness guard lets them be (#2118).
+$env:THORNSWOOD_HARNESS = '1'
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $src = Get-Content -Raw (Join-Path $PSScriptRoot '..\scripts\release\Publish-Update.ps1')

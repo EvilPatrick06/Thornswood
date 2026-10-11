@@ -43,6 +43,8 @@
   Run under whichever PowerShell runs this file, so running it under both
   checks both. Nothing here connects to the VPS.
 #>
+# Scripts this runs whole go to a stand-in box, so the freshness guard lets them be (#2118).
+$env:THORNSWOOD_HARNESS = '1'
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot

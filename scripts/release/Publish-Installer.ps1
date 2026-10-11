@@ -48,8 +48,13 @@ param(
   # The payload is inside the exe, so there is one file to publish and the
   # downloads page has one button. Package-Thornswood -OneFile passes this
   # through. Without it the pair is published the old way.
-  [switch]$OneFile
+  [switch]$OneFile,
+    # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
+    [switch]$AllowStaleCheckout
 )
+
+# A stale or dirty checkout sends old or unlanded code; refuse it (#2118).
+. (Join-Path $PSScriptRoot '..\deploy\Fresh-Checkout.ps1'); Assert-FreshCheckout -RepoDir (Join-Path $PSScriptRoot '..\..') -What 'Publish-Installer' -Target $Vps -AllowStale:$AllowStaleCheckout
 
 $ErrorActionPreference = 'Stop'
 $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')

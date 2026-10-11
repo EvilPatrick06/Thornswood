@@ -47,6 +47,8 @@
 #>
 [CmdletBinding()]
 param()
+# Scripts this runs whole go to a stand-in box, so the freshness guard lets them be (#2118).
+$env:THORNSWOOD_HARNESS = '1'
 
 $ErrorActionPreference = 'Stop'
 if ($PSVersionTable.PSEdition -eq 'Core') {
@@ -153,8 +155,8 @@ $clientRel = @($cb.files.PSObject.Properties.Name)[0]
 # ---- the scratch feed and three releases --------------------------------------
 #
 # What the installer put down, before any release named a record.
-$installer = @{ 'Data\Platform\UI\a.esp' = 'a0'; 'Data\Platform\UI\b.bsa' = 'b0 from the installer'; 'Data\Platform\Plugins\thornswood-ui.js' = 'ui0 from the installer'
-                'Data\Platform\UI\keep.txt' = 'kept the whole time'; $clientRel = 'client 0' }
+$installer = @{ 'Data\Platform\UI\thornswood-a.esp' = 'a0'; 'Data\Platform\UI\thornswood-b.bsa' = 'b0 from the installer'; 'Data\Platform\Plugins\thornswood-ui.js' = 'ui0 from the installer'
+                'Data\Platform\UI\thornswood-keep.txt' = 'kept the whole time'; $clientRel = 'client 0' }
 $launcherSha = 'c' * 64
 $runtimeSha = 'd' * 64
 Write-Feed ([pscustomobject][ordered]@{
@@ -207,12 +209,12 @@ function Publish-Scratch([string]$Id, [hashtable]$changes, [string[]]$deletes, [
 }
 
 $R1 = '20260901-1000-dev'; $R2 = '20260902-1100-dev'; $R3 = '20260903-1200-dev'
-Publish-Scratch $R1 @{ 'Data\Platform\UI\a.esp' = 'a1'; 'Data\Platform\UI\new1.esp' = 'new one' } @() "*a.esp`r`n*new1.esp`r`n" ('1' * 64)
+Publish-Scratch $R1 @{ 'Data\Platform\UI\thornswood-a.esp' = 'a1'; 'Data\Platform\UI\thornswood-new1.esp' = 'new one' } @() "*thornswood-a.esp`r`n*thornswood-new1.esp`r`n" ('1' * 64)
 $d1 = Read-Feed
 Yes 'the first release that names a record starts the list, with only itself' (@($d1.releases).Count -eq 1 -and [string]$d1.releases[0].id -eq $R1 -and [string]$d1.releases[0].lastPack -eq $R1)
-Publish-Scratch $R2 @{ 'Data\Platform\UI\a.esp' = 'a2'; 'Data\Platform\UI\b.bsa' = 'b2, the first change to the installer''s file'; 'Data\Platform\UI\new2.esp' = 'new two'
-                       'Data\Platform\Plugins\thornswood-ui.js' = 'ui2'; $clientRel = 'client 2' } @('Data\Platform\UI\new1.esp') "*a.esp`r`n*new2.esp`r`n" ('2' * 64)
-Publish-Scratch $R3 @{ 'Data\Platform\UI\a.esp' = 'a3'; 'Data\Platform\UI\new2.esp' = 'new two, again'; 'Data\Platform\UI\new3.esp' = 'new three' } @() "*a.esp`r`n*new2.esp`r`n" ('3' * 64)
+Publish-Scratch $R2 @{ 'Data\Platform\UI\thornswood-a.esp' = 'a2'; 'Data\Platform\UI\thornswood-b.bsa' = 'b2, the first change to the installer''s file'; 'Data\Platform\UI\thornswood-new2.esp' = 'new two'
+                       'Data\Platform\Plugins\thornswood-ui.js' = 'ui2'; $clientRel = 'client 2' } @('Data\Platform\UI\thornswood-new1.esp') "*thornswood-a.esp`r`n*thornswood-new2.esp`r`n" ('2' * 64)
+Publish-Scratch $R3 @{ 'Data\Platform\UI\thornswood-a.esp' = 'a3'; 'Data\Platform\UI\thornswood-new2.esp' = 'new two, again'; 'Data\Platform\UI\thornswood-new3.esp' = 'new three' } @() "*thornswood-a.esp`r`n*thornswood-new2.esp`r`n" ('3' * 64)
 $d3 = Read-Feed
 Yes 'three releases later the list is newest first, each with the pack it ended on' (
     (@($d3.releases | ForEach-Object { [string]$_.id }) -join ',') -eq "$R3,$R2,$R1" -and
@@ -430,7 +432,7 @@ Yes '  the store''s releases.txt has a line for the rollback, not the Ship it le
     @($relTxt | Where-Object { ($_ -split "`t")[0] -eq $R3 }).Count -eq 0)
 $wantB = $records[$R2]
 Yes 'the launcher that had everything lands on exactly the second release''s files' ((Update-Install $A) -eq 1 -and (Test-Lands $A $wantB))
-Yes '  its plugin list is the one the second release shipped' ((Plugins-Of $A) -eq "*a.esp`r`n*new2.esp`r`n")
+Yes '  its plugin list is the one the second release shipped' ((Plugins-Of $A) -eq "*thornswood-a.esp`r`n*thornswood-new2.esp`r`n")
 Yes '  and the client runtime is the one its launcher expects' ((Client-Of $A) -eq (Entry 'client 2'))
 Yes 'the one offline since the first takes the rest and the rollback, and lands on the same files' ((Update-Install $B) -eq 3 -and (Test-Lands $B $wantB))
 $C = New-Install 'fresh' @{} @($R1, $R2, $R3)
@@ -441,7 +443,7 @@ Yes 'no launcher is offered: the version did not move' (-not [bool]$mNewer.Invok
 
 # All the way back to the first: the installer's own files are in no pack, but
 # since #1050 each release put them on the site by sha256 beside the record.
-$installerOnly = @('Data\Platform\UI\b.bsa', 'Data\Platform\Plugins\thornswood-ui.js')
+$installerOnly = @('Data\Platform\UI\thornswood-b.bsa', 'Data\Platform\Plugins\thornswood-ui.js')
 $held = Join-Path $T 'held-installer-only'
 New-Item -ItemType Directory -Force -Path $held | Out-Null
 foreach ($k in $installerOnly) {
@@ -452,7 +454,7 @@ foreach ($k in $installerOnly) {
 $before = Feed-Sha
 $r = Rollback @('-To', $R1, '-Id', '20260904-1100-dev')
 Yes 'going back without the installer-only file on the site is refused, naming it, and nothing is sent' (
-    $r.Code -eq 1 -and $r.Out -match [regex]::Escape('Data\Platform\UI\b.bsa') -and $r.Out -match 'FilesFrom' -and (Feed-Sha) -eq $before)
+    $r.Code -eq 1 -and $r.Out -match [regex]::Escape('Data\Platform\UI\thornswood-b.bsa') -and $r.Out -match 'FilesFrom' -and (Feed-Sha) -eq $before)
 # Put the bytes back beside the record. -FilesFrom remains the fallback when
 # they are not there; with them on the site, no -FilesFrom is needed (#1051).
 foreach ($f in @(Get-ChildItem -LiteralPath $held -File)) {
@@ -464,7 +466,7 @@ $d = Read-Feed
 Yes 'going back to a file only the installer ever had works from its sha256 on the site, with no -FilesFrom' (
     $r.Code -eq 0 -and [string]$d.baseline.id -eq $RA -and [string]$d.releases[0].to -eq $R1 -and (Test-Kept $d))
 Yes '  the launcher lands on the first release''s files, the installer''s back and the later ones gone' ((Update-Install $A) -eq 1 -and (Test-Lands $A $records[$R1]))
-Yes '  with the first release''s plugin list' ((Plugins-Of $A) -eq "*a.esp`r`n*new1.esp`r`n")
+Yes '  with the first release''s plugin list' ((Plugins-Of $A) -eq "*thornswood-a.esp`r`n*thornswood-new1.esp`r`n")
 Yes '  and the client runtime still the launcher''s, not the first release''s' ((Client-Of $A) -eq (Entry 'client 2'))
 Yes '  the offline one lands there as well' ((Update-Install $B) -eq 1 -and (Test-Lands $B $records[$R1]))
 
@@ -490,7 +492,7 @@ foreach ($k in @($records[$R3].Keys)) { if ([string]$fwd[$k] -ne [string]$record
 foreach ($k in @($fwd.Keys)) { if (-not $k.StartsWith(':gone:') -and -not $k.StartsWith(':golden:') -and $k -ne ':record:files' -and -not $records[$R3].ContainsKey($k)) { $same = $false } }
 Yes '  the record it names is the third release''s, with the launcher''s own source, what it takes out, and :record:files' (
     (Get-BaselineFileSha (Join-Path $feedDir 'published.json')) -eq [string]$d.baseline.sha256 -and $same -and
-    [string]$fwd[':gone:Data\Platform\UI\new1.esp'] -eq 'removed' -and [string]$fwd[$RecordFilesKey] -eq '1')
+    [string]$fwd[':gone:Data\Platform\UI\thornswood-new1.esp'] -eq 'removed' -and [string]$fwd[$RecordFilesKey] -eq '1')
 Yes 'the list names every step, newest first' ((@($d.releases | ForEach-Object { [string]$_.id }) -join ',') -eq "$RF,$RA,$RB,$R3,$R2,$R1")
 $r = Rollback @('-Back', '1', '-DryRun', '-Id', '20260904-1400-dev')
 Yes '-Back 1 from there is the release before it in the list' ($r.Code -eq 0 -and $r.Out -match ("going to " + [regex]::Escape($RA)))

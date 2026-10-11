@@ -45,6 +45,7 @@ param(
   [string]$OutFile,
   [switch]$Quiet
 )
+. (Join-Path $PSScriptRoot '..\release\Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
 $ErrorActionPreference = 'Stop'
 
@@ -80,7 +81,8 @@ if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 
 if (-not $From) {
   $cut = Join-Path $Here 'news-from.txt'
-  if (Test-Path -LiteralPath $cut) { $From = (Get-Content $cut -Raw).Trim() }
+  # "$()": an empty file reads as $null (even through [string](...)), and a method on $null throws.
+  if (Test-Path -LiteralPath $cut) { $From = ("$(Get-Content $cut -Raw)").Trim() }
 }
 
 # The live feed only. This repository's own version.json was a copy left from
@@ -93,7 +95,7 @@ if (-not (Test-Path -LiteralPath $vf)) {
 
 # A byte order mark is not JSON. ConvertFrom-Json stops on the first character
 # and says something unhelpful about an unexpected token.
-$v = ((Get-Content $vf -Raw) -replace '^\uFEFF', '') | ConvertFrom-Json
+$v = ConvertFrom-ThornswoodJson (Get-Content $vf -Raw) $vf
 $all = @()
 if ($v.news) { $all = @($v.news) }
 

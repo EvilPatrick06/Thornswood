@@ -37,6 +37,8 @@
 #>
 [CmdletBinding()]
 param()
+# Scripts this runs whole go to a stand-in box, so the freshness guard lets them be (#2118).
+$env:THORNSWOOD_HARNESS = '1'
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
@@ -216,7 +218,7 @@ Yes 'ClientRuntime.cs takes out only the recorded paths it wants (Find by name)'
     ($cr -match 'ZipArchiveEntry en = Find\(ar, rel\);' -and $cr -match 'string rel = want\[i\];')
 $up2 = Get-Content -LiteralPath (Join-Path $Repo 'launcher\app\Updater.cs') -Raw
 Yes 'Updater.cs skips a pack entry that is not game\, profile\ or delete.txt' `
-    ($up2 -match '(?s)rel\.Equals\("delete\.txt", StringComparison\.OrdinalIgnoreCase\)\)\s*continue;\s*else\s*continue;')
+    ($up2 -match '(?s)rel\.Equals\("delete\.txt", StringComparison\.OrdinalIgnoreCase\)\)\s*continue;\s*else if \(rel\.Equals\("ui-assets\.txt", StringComparison\.OrdinalIgnoreCase\)\)\s*\{.*?\bcontinue;\s*\}\s*else\s*continue;\s*// The fence is')
 
 # ---- THIRD-PARTY.md says so, and not what stopped being true ----------------
 $tp = Get-Content -LiteralPath (Join-Path $Repo 'THIRD-PARTY.md') -Raw

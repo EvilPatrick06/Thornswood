@@ -75,8 +75,14 @@ param(
     # A folder standing in for the site's root on the VPS (C:\Thornswood-Docs),
     # passed to Remirror-Site-Feed.ps1 and Feed-Store.ps1 so nothing connects
     # to the VPS. Tests only.
-    ,[string]$SiteDir
+    ,[string]$SiteDir,
+    # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
+    [switch]$AllowStaleCheckout
 )
+. (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
+
+# A stale or dirty checkout sends old or unlanded code; refuse it (#2118).
+. (Join-Path $PSScriptRoot '..\deploy\Fresh-Checkout.ps1'); Assert-FreshCheckout -RepoDir (Join-Path $PSScriptRoot '..\..') -What 'Publish-Update' -AllowStale:$AllowStaleCheckout
 
 
 # The launcher, Thornswood.exe in the launcher folder.
@@ -957,7 +963,7 @@ if (-not $changed.Count -and -not $realRemoved -and -not $profileChanged.Count -
 }
 
 # The feed as received, for the ids it already uses (#1057).
-$feedNow = if (Test-Path -LiteralPath $VersionFile) { (([IO.File]::ReadAllText($VersionFile)) -replace '^\uFEFF', '') | ConvertFrom-Json } else { $null }
+$feedNow = if (Test-Path -LiteralPath $VersionFile) { ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($VersionFile)) $VersionFile } else { $null }
 if (-not $Id) {
     # An unfinished release is finished, not replaced. See the block beside
     # Save-State for why the id matters more than the timestamp.
@@ -1124,7 +1130,7 @@ if ($Launcher) {
 }
 
 # ------------------------------------------------------------ upload
-$doc = Get-Content $VersionFile -Raw | ConvertFrom-Json
+$doc = ConvertFrom-ThornswoodJson (Get-Content $VersionFile -Raw) $VersionFile
 
 # ConvertFrom-Json gives back an object with only the keys the file had, and
 # assigning to a key that was never there throws. Anything new has to be added.
@@ -1172,7 +1178,7 @@ $clientRel = $null
 try {
     $cbPath = Join-Path $PSScriptRoot '..\..\records\client-build.json'
     if (Test-Path -LiteralPath $cbPath) {
-        $cb = Get-Content -LiteralPath $cbPath -Raw | ConvertFrom-Json
+        $cb = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $cbPath -Raw) $cbPath
         $cbCommit = [string]$cb.forkCommit
         $have = $null
         if ($doc.PSObject.Properties['clientRuntime']) { $have = $doc.clientRuntime }
@@ -1546,7 +1552,7 @@ if (-not $NoPush) {
         Say '  the feed changed on the VPS since this run read it; received again, and this release goes on top' 'Yellow'
         try { [void](Receive-FeedStore $Channel $ReleaseDir @('version.json') -SiteDir $SiteDir) }
         catch { Die ("Could not receive the $Channel feed again, so nothing was written: " + $_.Exception.Message) }
-        $doc = Get-Content $VersionFile -Raw | ConvertFrom-Json
+        $doc = ConvertFrom-ThornswoodJson (Get-Content $VersionFile -Raw) $VersionFile
     }
 }
 # ==== end thornswood feed recheck ====

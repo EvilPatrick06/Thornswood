@@ -35,23 +35,26 @@
   nothing else is asked for, because the client runtime is a separate build
   with its own record (records\client-build.json, Sync-Client.ps1).
 
-  THE JAVASCRIPT HALF IS ALWAYS BUILT AGAIN (#1214). The fork's CMake runs
-  build-ts only when a .ts file under skymp5-server\ts is newer than the
-  bundle. It does not look at yarn.lock, package.json or the TypeScript settings, so a
-  package bump never reached the bundle, and a bundle copied in from another
-  build with a newer date was taken as current. So the bundle and its map are
-  removed before the build, and the build has to write them from what is
-  checked out. esbuild writes the same bytes for the same sources, so this
+  THE JAVASCRIPT HALF IS ALWAYS BUILT AGAIN (#1214). Since fork #30 (#1236)
+  the fork's CMake reruns the yarn install and build-ts when a .ts file under
+  skymp5-server\ts, package.json, yarn.lock or the TypeScript settings are newer than the
+  bundle, so a package bump reaches the bundle on any full build. A bundle
+  copied in from another build with a newer date would still be taken as
+  current, so the bundle and its map are still removed before the build, and
+  the build has to write them from what is checked out. esbuild writes the same bytes for the same sources, so this
   costs about ten seconds and changes nothing when nothing changed.
   New-ServerBuildRecord.ps1 then ties every file to the clone before it
   records any of them.
 
   WHAT IT DOES NOT DO
 
-  It does not configure. The build folder already carries a CMakeCache from a
-  previous configure and reconfiguring is a different job with different
-  arguments. If the cache is missing this says so and stops rather than
-  guessing at a configure line.
+  It does not configure a new build folder. The build folder already carries a
+  CMakeCache from a previous configure, and a first configure is a different
+  job with different arguments. If the cache is missing this says so and stops
+  rather than guessing at a configure line. A folder that is configured is
+  generated again over its own cache (cmake <build folder>, every setting kept)
+  before the compile, so a source file the fork added since is in the build
+  (#2157).
 
   It does not deploy, it does not talk to the VPS, and it does not touch the
   game folder. It installs the server's packages, compiles and, unless told
@@ -163,6 +166,22 @@ if (-not (Test-Path -LiteralPath $msbuild)) {
     Die "MSBuild is not at $msbuild even though vswhere pointed at $vsPath."
 }
 Ok ("MSBuild from " + $vsPath)
+
+# Generated again over its cache (#2157): the fork's CMakeLists glob their
+# sources at configure time, so a .cpp the fork added since the last configure
+# is in no project and the link fails. Given only the build folder, cmake
+# keeps the source, the generator and every setting the cache holds.
+$cmake = (Get-Command cmake -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
+if (-not $cmake) {
+    $c = Join-Path $vsPath 'Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe'
+    if (Test-Path -LiteralPath $c) { $cmake = $c }
+}
+if (-not $cmake) { Die 'cmake is not on PATH and not in Visual Studio. The "Desktop development with C++" workload installs it.' }
+$ErrorActionPreference = 'Continue'
+try { & $cmake $BuildDir 2>&1 | ForEach-Object { Say ('  ' + $_) 'DarkGray' }; $code = $LASTEXITCODE }
+finally { $ErrorActionPreference = 'Stop' }
+if ($code -ne 0) { Die "cmake exited with $code generating $BuildDir again over its cache. The lines above say why." }
+Ok ('generated again over its cache, ' + $cmake)
 if (-not (Get-Command yarn -ErrorAction SilentlyContinue)) {
     Die 'yarn is not on PATH, and the JavaScript half of the server is built with it. Run  corepack enable  in an administrator PowerShell once Node is in.'
 }

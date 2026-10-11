@@ -117,8 +117,14 @@ param(
     # installer (#1804, see the header). Left off, the running server keeps
     # its own, and one with neither true nor false is refused. Live goes on
     # only when Patrick says Main.
-    [ValidateSet('', 'on', 'off')][string]$RequirePass = ''
+    [ValidateSet('', 'on', 'off')][string]$RequirePass = '',
+    # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
+    [switch]$AllowStaleCheckout
 )
+. (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
+
+# A stale or dirty checkout sends old or unlanded code; refuse it (#2118).
+. (Join-Path $PSScriptRoot '..\deploy\Fresh-Checkout.ps1'); Assert-FreshCheckout -RepoDir (Join-Path $PSScriptRoot '..\..') -What 'Publish-Server' -Target $VpsHost -AllowStale:$AllowStaleCheckout
 if (-not $Record) { $Record = Join-Path $PSScriptRoot '..\..\records\server-build.json' }
 
 # The two that the channel decides, unless they were given outright. An
@@ -327,7 +333,7 @@ if (Test-Path -LiteralPath $settingsPath) {
     # #1222), so they are the record's number or the publish does not go.
     if ($mostOnline.Value -le 0) { Die ("$($mostOnline.From) gave no number ($($mostOnline.Why)), and a publish sets how many the server holds from it. Nothing was sent.") }
     try {
-        $capJson = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+        $capJson = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $settingsPath -Raw) $settingsPath
         $capWas = [string]$capJson.thornswoodMostOnline + '/' + [string]$capJson.maxPlayers
         Set-MaxPlayers $capJson $mostOnline
         if (([string]$capJson.thornswoodMostOnline + '/' + [string]$capJson.maxPlayers) -ne $capWas) {
@@ -341,7 +347,7 @@ if (Test-Path -LiteralPath $settingsPath) {
     Head 'Where new characters start'
     $hallPlugin = 'Skyrim Unbound.esp'
     $hallLocal = 0x19BAD4                     # SkyrimUnboundRoom01
-    $gate = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+    $gate = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $settingsPath -Raw) $settingsPath
 
     # The index a form id is computed from is the plugin's place among the
     # full plugins, which is every entry until the engine the record names
@@ -698,7 +704,7 @@ if (-not $NoNews -and $up) {
     } else {
         Head 'News'
         try {
-            $doc = Get-Content -LiteralPath $VersionFile -Raw | ConvertFrom-Json
+            $doc = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $VersionFile -Raw) $VersionFile
 
             # What actually moved, worked out here rather than taken from the
             # note, so an entry says something even when the note is empty.
@@ -716,7 +722,7 @@ if (-not $NoNews -and $up) {
             # people read are about what they will notice. The gamemode copy is
             # said above where it happens; the count is said here, on screen.
             try {
-                $ss = Get-Content -LiteralPath (Join-Path $Dist 'server-settings.json') -Raw | ConvertFrom-Json
+                $ss = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath (Join-Path $Dist 'server-settings.json') -Raw) (Join-Path $Dist 'server-settings.json')
                 if ($ss.loadOrder) { Say ('  load order: {0} plugins server side' -f @($ss.loadOrder).Count) 'DarkGray' }
             } catch { }
 

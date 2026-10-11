@@ -46,6 +46,7 @@ param(
     # server-build.json, so the installer on the box holds it too (#1214).
     [string]$Record = (Join-Path $PSScriptRoot '..\..\records\server-build.json')
 )
+. (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
 $ErrorActionPreference = 'Stop'
 if (-not (Test-Path -LiteralPath $Dist)) { throw "server dist not found: $Dist" }
@@ -61,7 +62,7 @@ if (-not (Test-Path -LiteralPath $Dist)) { throw "server dist not found: $Dist" 
 # here, before anything is copied or zipped. So does an npcSettings "default"
 # key on either channel, which refuses every NPC (#1222): the installer keeps
 # the running server's own npcSettings, but a first install has none to keep.
-$liveWhy = @(Get-ThornswoodServerSettingsProblems (Get-Content -LiteralPath (Join-Path $Dist 'server-settings.json') -Raw | ConvertFrom-Json) $Channel)
+$liveWhy = @(Get-ThornswoodServerSettingsProblems (ConvertFrom-ThornswoodJson (Get-Content -LiteralPath (Join-Path $Dist 'server-settings.json') -Raw) (Join-Path $Dist 'server-settings.json')) $Channel)
 if ($liveWhy.Count) {
     $whose = if ($Channel -eq 'main') { "is not the live server's" } else { 'is not fit for any server' }
     throw ("server-settings.json in $Dist $($whose): " + ($liveWhy -join '; ') +
@@ -131,7 +132,7 @@ if ($left.Count) { Write-Host ('  left in the build, not part of a server releas
 
 # ---- the plugins its load order names --------------------------------------
 $settingsPath = Join-Path $Dist 'server-settings.json'
-$s = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+$s = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $settingsPath -Raw) $settingsPath
 if (-not $s.loadOrder) { throw 'server-settings.json has no loadOrder' }
 
 $vpsPlugins = ($VpsRoot -replace '\\', '/') + '/plugins'

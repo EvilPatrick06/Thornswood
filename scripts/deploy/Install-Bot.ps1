@@ -35,7 +35,13 @@
        service starts it at boot, starts python again when it exits, and
        rolls bot.log by size while it runs. The first full run takes the old
        scheduled task and its run.ps1 loop off the box.
-    7. Asks the box, once the swap has answered, what is really at the bot's
+    7. Leaves the bot's folder holding what it sends and what is the bot's
+       own (its settings, its records and log in data, the service, the
+       webhooks, the libraries), and nothing else: the swap moves anything
+       else there, a file somebody copied in by hand, aside into .prev with
+       what the new code replaced, and says each name (issue #1184,
+       Get-ThornswoodBotOwned in scripts\vps\Bot-Service.ps1).
+    8. Asks the box, once the swap has answered, what is really at the bot's
        folder there: one Test-Path line per file it sent, by full path, with
        data\bot.log among them. A file that is not there turns the run red,
        so a swap that said SWAP OK while something is missing from the
@@ -330,7 +336,9 @@ if (`$p) { 'FOUND ' + (& `$p.Source --version 2>&1) } else { 'MISSING' }
   checks the stage (each file by its hash, bot.py and card.py through Python's
   own parser). Nothing is stopped if that fails. The swap then stops the
   service by name, renames the files in (what they replace goes to
-  $Root\.prev-<stamp>, the newest two kept), starts it by name, and waits
+  $Root\.prev-<stamp>, the newest two kept, and so does anything in the
+  folder this run did not send that is not the bot's own, issue #1184),
+  starts it by name, and waits
   for this start to say it is watching its server. If it does not, the old
   files go back and the service is started again on them. -PutBack puts the
   newest .prev folder back the same way.
@@ -609,7 +617,14 @@ function Invoke-BotSwap([bool]$noServiceOk) {
   $svcLib = Join-Path $Here '..\vps\Bot-Service.ps1'
   if (-not (Test-Path -LiteralPath $svcLib)) { Die "missing: $svcLib" }
   $vars = (ServiceSwapVars $Root $stageName $prevName $Wait $hashes @()) + ('$NoServiceOk = $' + $noServiceOk + "`r`n") + ('$Dirs = @(''py-libs'')' + "`r`n")
-  $out = @(Remote ($vars + (Get-Content -LiteralPath $svcLib -Raw) + "`n" + $botHooks + $pick + $serviceSwapBlock) |
+  # The bot's folder holds what this run sends and what is the bot's own
+  # (Get-ThornswoodBotOwned, issue #1184), so the swap moves anything else
+  # there aside with what the new code replaces. After Bot-Service.ps1, which
+  # defines the list. -PutBack sends nothing to hold the folder to, so it
+  # looks at nothing.
+  $owns = ''
+  if (-not $PutBack) { $owns = '$Owns = @(Get-ThornswoodBotOwned)' + "`r`n" }
+  $out = @(Remote ($vars + (Get-Content -LiteralPath $svcLib -Raw) + "`n" + $owns + $botHooks + $pick + $serviceSwapBlock) |
            ForEach-Object { Say "  $_"; "$_".Trim() })
   if (-not (Show-SwapResult $out "$rootWin\.prev-<stamp>")) { Die 'the bot was not swapped in. The lines above say what is running.' }
   return $out
@@ -789,12 +804,29 @@ Set-Location '$rootWin'
 New-Item -ItemType Directory -Force -Path '$rootWin\$stageName\py-libs' | Out-Null
 & python -m pip install --quiet --disable-pip-version-check --upgrade --target '$rootWin\$stageName\py-libs' -r '$rootWin\$stageName\requirements.txt' 2>&1 | Out-Null
 if (`$LASTEXITCODE -eq 0) { 'discord.py, pillow and certifi ready, in py-libs, at the versions in requirements.txt' } else { 'PIP FAILED with ' + `$LASTEXITCODE }
+# pip --target builds in a folder made by Python's tempfile.mkdtemp, which on
+# Windows (Python 3.12.4 and later) holds only SYSTEM, Administrators and its
+# owner, with no inheritance, and then renames the files into py-libs. A
+# rename keeps them that way, so the bot's own account could not read its
+# libraries: on 11 Oct the first full install since py-libs came in (#1543)
+# stopped on PermissionError for typing_extensions.py and rolled back. Put
+# every file under the stage's own rules, the bot folder's, and refuse
+# before the bot is stopped if its account still cannot read one.
+& icacls '$rootWin\$stageName\py-libs' /reset /T /Q 2>&1 | Out-Null
+if (`$LASTEXITCODE -ne 0) { 'PY-LIBS NOT RESET: icacls exited ' + `$LASTEXITCODE }
+`$rx = [Security.AccessControl.FileSystemRights]::ReadAndExecute
+`$shut = @(Get-ChildItem -LiteralPath '$rootWin\$stageName\py-libs' -File -Recurse | Where-Object {
+  -not @((Get-Acl -LiteralPath `$_.FullName).Access | Where-Object {
+    `$_.IdentityReference.Value -eq 'NT SERVICE\$Service' -and `$_.AccessControlType -eq 'Allow' -and (`$_.FileSystemRights -band `$rx) -eq `$rx })
+})
+if (`$shut.Count) { 'PY-LIBS NOT READABLE by NT SERVICE\${Service}: ' + `$shut.Count + ' file(s), first ' + `$shut[0].Name }
 `$env:PYTHONPATH = '$rootWin\$stageName\py-libs'
 `$ca = (& python -c "import certifi; print(certifi.where())" 2>&1 | Select-Object -Last 1)
 if (`$ca -and (Test-Path `$ca)) { 'root certificates at ' + `$ca } else { 'COULD NOT FIND certifi, TLS will fail' }
 "@)
 $libs | ForEach-Object { Say "  $_" }
 if ("$libs" -match 'PIP FAILED') { Die 'the libraries did not install into py-libs, so the bot was not stopped or changed.' }
+if ("$libs" -match 'PY-LIBS NOT') { Die "the bot's account could not read py-libs, so the bot was not stopped or changed." }
 
 # --------------------------------------------------------------- token ---
 $token = ''
@@ -882,25 +914,13 @@ try {
   }
 } catch { }
 [IO.File]::WriteAllText(`$f, (`$env2 | ConvertTo-Json -Depth 4), (New-Object Text.UTF8Encoding(`$false)))
-# Locked down, but not so far that the thing meant to read it cannot. The bot
-# runs as NT SERVICE\ThornswoodBot now, and Bot-Service.ps1 grants that
-# account read on this file below, after this rewrites the rules, every full
-# run. SYSTEM stays for the nightly backup, which runs as SYSTEM and copies
-# this folder. A file its reader cannot open is how the bot once started with
-# no token and exited immediately.
-try {
-  `$acl = Get-Acl `$f
-  `$acl.SetAccessRuleProtection(`$true, `$false)
-  foreach (`$r in @(`$acl.Access)) { [void]`$acl.RemoveAccessRule(`$r) }
-  foreach (`$sid in @('S-1-5-18', 'S-1-5-32-544')) {   # SYSTEM, Administrators
-    `$who = (New-Object Security.Principal.SecurityIdentifier(`$sid)).Translate([Security.Principal.NTAccount])
-    `$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(
-      `$who, 'FullControl', 'Allow')))
-  }
-  `$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(
-    [Security.Principal.WindowsIdentity]::GetCurrent().Name, 'FullControl', 'Allow')))
-  Set-Acl `$f `$acl
-} catch { 'could not tighten bot.env.json: ' + `$_.Exception.Message }
+# Locked down, but not so far that the thing meant to read it cannot: SYSTEM,
+# Administrators and this account, plus read for NT SERVICE\ThornswoodBot,
+# given in the same write (Protect-ThornswoodBotEnv in Write-BotToken.ps1,
+# issue #2158). SYSTEM stays for the nightly backup. A file its reader cannot
+# open is how the swap once failed and left the bot stopped.
+try { Protect-ThornswoodBotEnv -Path `$f -Service '$Service' }
+catch { 'could not tighten bot.env.json: ' + `$_.Exception.Message }
 'panel channel: #' + (`$env2['TICKET_CHANNEL'] -replace ',', ' or #')
 'closed tickets: #' + (`$env2['TICKET_LOG'] -replace ',', ' or #') + '  (staff only)'
 'join cards:    #' + `$env2['JOIN_CHANNEL']

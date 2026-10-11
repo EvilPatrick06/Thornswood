@@ -180,10 +180,10 @@ const psFiles = fs.readdirSync(path.join(REPO_DIR, 'tests')).filter((n) => /^tes
 const psText = {};
 for (const f of psFiles) { psText[f] = read(path.join(REPO_DIR, f)).replace(/^\uFEFF/, ''); }
 const psSites = psFiles.filter((f) => /THORNSWOOD_DOCS_PORT/.test(psText[f]));
-const FIVE = ['tests/test-feed-store.ps1', 'tests/test-record-sync.ps1', 'tests/test-release-baseline.ps1',
+const FIVE = ['tests/test-deployed-build.ps1', 'tests/test-feed-store.ps1', 'tests/test-record-sync.ps1', 'tests/test-release-baseline.ps1',
   'tests/test-scrub-feed.ps1', 'tests/test-site-assets.ps1'];
 console.log('\nthe PowerShell harnesses that start the site (' + psSites.length + '):');
-yes('they are the five #1755 found', psSites.length === FIVE.length && FIVE.every((f) => psSites.indexOf(f) >= 0));
+yes('they are the five #1755 found, and test-deployed-build.ps1', psSites.length === FIVE.length && FIVE.every((f) => psSites.indexOf(f) >= 0));
 // The function, from its line to the brace that closes it at the margin.
 function psLift(src) {
   const m = /^function Wait-OwnLine\([\s\S]*?\n\}\n/m.exec(src);
@@ -199,7 +199,7 @@ for (const f of psSites) {
   yes(f + ' neither polls the port nor drains the site\'s output before its line',
       !/function Up\(/.test(rest) && !/for \(\$i = 0; \$i -lt 100/.test(rest) && rest.indexOf('StandardOutput.ReadToEndAsync()') < 0);
 }
-yes('the five carry the same Wait-OwnLine', psSites.every((f) => psWaits[f] && psWaits[f] === psWaits[psSites[0]]));
+yes('they all carry the same Wait-OwnLine', psSites.every((f) => psWaits[f] && psWaits[f] === psWaits[psSites[0]]));
 {
   const sa = psText['tests/test-site-assets.ps1'] || '';
   yes('test-site-assets.ps1: the GitHub stand-in says its own line, and is waited on',

@@ -311,7 +311,10 @@ $ShipUiGoneRecord = Join-Path $PSScriptRoot '..\..\records\ui-gone.json'
 if (-not (Test-Path -LiteralPath $ShipUiGoneRecord -PathType Leaf)) {
     throw 'records\ui-gone.json is missing, so the Daedric menu set and unused fork assets cannot be kept out.'
 }
-$script:ShipUiGoneDoc = Get-Content -LiteralPath $ShipUiGoneRecord -Raw -Encoding UTF8 | ConvertFrom-Json
+$ShipUiGoneText = "$(Get-Content -LiteralPath $ShipUiGoneRecord -Raw -Encoding UTF8)"
+if (-not $ShipUiGoneText.Trim([char]0xFEFF, ' ', [char]9, [char]13, [char]10)) { throw 'records\ui-gone.json is empty, so the Daedric menu set and unused fork assets cannot be kept out.' }
+try { $script:ShipUiGoneDoc = $ShipUiGoneText.TrimStart([char]0xFEFF) | ConvertFrom-Json }
+catch { throw ('records\ui-gone.json is not valid JSON, so the Daedric menu set and unused fork assets cannot be kept out: ' + $_.Exception.Message) }
 $ShipDaedricMenu = [ordered]@{}
 foreach ($p in @($script:ShipUiGoneDoc.daedric.PSObject.Properties)) {
     $ShipDaedricMenu[$p.Name] = ([string]$p.Value).ToLowerInvariant()
@@ -417,7 +420,9 @@ function Test-ShipUiOurs([string]$rel, [string]$leaf) {
 function Test-ShipUiGoneByHash([string]$rel) {
     $game = Get-Variable -Name GameDir -ValueOnly -ErrorAction SilentlyContinue
     if (-not $game) { return $false }
-    $full = Join-Path ([string]$game) $rel
+    # [IO.Path]::Combine, not Join-Path: Join-Path throws on a drive this
+    # machine has not got (the test's X:\Game\ fakes on the nightly runner).
+    $full = [IO.Path]::Combine([string]$game, $rel)
     $have = Get-ShipFileSha256 $full
     if (-not $have) { return $false }
     return $ShipDaedricMenuHashes.Contains($have)
@@ -457,7 +462,13 @@ function Save-ShipUiHashedAssets([string]$GameFolder) {
         [void]$lines.Add('# One bare file name per line. OwnGame.Foreign reads this rather than parsing build.js.')
         foreach ($n in $sorted) { [void]$lines.Add($n) }
         $out = Join-Path $GameFolder $ShipUiAssetsRel
-        [IO.File]::WriteAllLines($out, $lines)
+        # Written only when the names moved, so a Ship that finds the same front
+        # leaves the file and its time alone: an old size and time baseline then
+        # still reads it as unchanged (#2088).
+        $text = ($lines -join [Environment]::NewLine) + [Environment]::NewLine
+        if (-not (Test-Path -LiteralPath $out -PathType Leaf) -or [IO.File]::ReadAllText($out) -ne $text) {
+            [IO.File]::WriteAllText($out, $text)
+        }
         $script:ShipUiHashedWritten = $sorted
         return $sorted
     }
@@ -1362,8 +1373,11 @@ function Assert-ShipGeneratedBodyFiles([string]$GameDir, [string]$ProfileDir) {
     }
 }
 
-# Whether a loose file waits for the collection, at this revision.
+# Whether a loose file waits for the collection, at this revision. Either slash:
+# the held list is written with backslashes, and a path with forward ones (a zip
+# entry, a git path) used to read as not held, so it would not ship at all.
 function Test-ShipHeld([string]$rel, [int]$Revision = $ShipCollectionRevision) {
+    $rel = $rel.Replace('/', '\')
     foreach ($h in $ShipHeldForCollection) {
         $p = [string]$h.Path
         $hit = if ($p.EndsWith('\')) { $rel.StartsWith($p, 'OrdinalIgnoreCase') } else { $rel -ieq $p }

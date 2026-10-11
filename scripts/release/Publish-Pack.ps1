@@ -47,8 +47,13 @@ param(
     [switch]$NoPause,
     # A folder standing in for the site's feed root, passed to
     # Remirror-Site-Feed.ps1 so nothing connects to the VPS. Tests only.
-    [string]$SiteDir
+    [string]$SiteDir,
+    # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
+    [switch]$AllowStaleCheckout
 )
+
+# A stale or dirty checkout sends old or unlanded code; refuse it (#2118).
+if (-not $DryRun) { . (Join-Path $PSScriptRoot '..\deploy\Fresh-Checkout.ps1'); Assert-FreshCheckout -RepoDir (Join-Path $PSScriptRoot '..\..') -What 'Publish-Pack' -AllowStale:$AllowStaleCheckout }
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot

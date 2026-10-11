@@ -18,6 +18,8 @@
   Package-Thornswood.ps1.
 #>
 param([string]$Repo)
+# Scripts this runs whole go to a stand-in box, so the freshness guard lets them be (#2118).
+$env:THORNSWOOD_HARNESS = '1'
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'

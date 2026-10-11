@@ -96,7 +96,7 @@ none, the launcher downloads Microsoft's own bootstrapper from Microsoft's link
 
 The six files recorded in `records\client-build.json` correspond to
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
-commit `7feb5dc4` (in full, `7feb5dc4cbcef4e040fcd49fa852c33351f8886d`). That
+commit `92848550` (in full, `928485503333b18c2325fc13cbf781d254b19af0`). That
 is upstream skyrim-multiplayer/skymp at `2849e676` with Thornswood's changes on
 top. Check-Secrets.ps1 stops a release whose copy of any of the six is not the
 recorded sha256 (client-not-recorded-build), and Sync-Client.ps1 puts in the
@@ -435,7 +435,7 @@ with.
 
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`, is AGPL-3.0. That record and the client record
-  name `7feb5dc4cbcef4e040fcd49fa852c33351f8886d` on the public fork. The
+  name `928485503333b18c2325fc13cbf781d254b19af0` on the public fork. The
   server module and the six client files were built from that commit, which
   adds the 5 October security fixes (the RPC route, request bodies, metrics,
   the login line, the settings files), the server's equipment write for a new
@@ -443,13 +443,17 @@ with.
   id, and the build fixes, and on top of those upstream's fixes of 5 October,
   light plugins on the server and in the save the client loads, numbered
   teleports so an old one is never carried out after a newer one, and the
-  server reading its source map while it starts; the server module's SHA256 is
-  `1457be424403205efa1ca454aff2db627dfa0991b87cc0f6fa9490095f258bbc`, built
-  2026-10-10T20:37:07Z. This is the recorded next release, not a deployment
+  server reading its source map while it starts. Since the build before it
+  (`7feb5dc4`) it also hands the gamemode what a craft used, so a soul gem
+  above a rank can be refused, lets the gamemode ask which saved characters
+  could not be read, sends a piece's new condition and name to whoever holds
+  it at once, and stops a key let go after a panel closes from repeating into
+  the page. The server module's SHA256 is
+  `1ce9da49b07913d40420cf7ae8880c2e927b1129571bf74cac86f127235ef0bb`, built
+  2026-10-11T20:18:57Z. This is the recorded next release, not a deployment
   claim. Main remains on `3a32e9615d4eae43cc6995cdf2c09c528bc80da6`.
-  Dev also remains on that earlier engine until the next authorized Ship.
-  The new build adds atomic quest inventory/state writes, connection refusal
-  handling, strict save reading and the merged font and settings changes.
+  It goes to the dev server (Publish-Server -Channel dev) and to the dev
+  feed's client files (a dev Ship) first.
   Section 13 of the AGPL asks that everybody who connects to a modified server
   over a network be offered its source. The next section is that offer.
   `scam_native.node` is also the one file that carries antigo, under the
@@ -480,9 +484,9 @@ For the six recorded client files and the recorded game server module, the
 Corresponding Source is the fork at the commit each record names. The six
 client files and the game server module, at the one commit both records name:
 
-https://github.com/EvilPatrick06/skymp/tree/7feb5dc4cbcef4e040fcd49fa852c33351f8886d
+https://github.com/EvilPatrick06/skymp/tree/928485503333b18c2325fc13cbf781d254b19af0
 
-For the earlier engine still deployed on Main and Dev:
+For the earlier engine still deployed on Main:
 
 https://github.com/EvilPatrick06/skymp/tree/3a32e9615d4eae43cc6995cdf2c09c528bc80da6
 

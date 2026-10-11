@@ -110,6 +110,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here 'Vps.ps1')
 . (Join-Path $Here 'Send-Script.ps1')
+. (Join-Path $Here 'Lock-Folder.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ErrorActionPreference = 'Stop'
@@ -808,7 +809,7 @@ if ($SetWebhook) {
 `$ErrorActionPreference = 'Continue'
 `$u = ('' + [Console]::In.ReadLine()).Trim()
 if (-not `$u) { 'FAILED    nothing arrived on standard input'; exit 1 }
-if (-not (Test-Path '$Root')) { `$null = New-Item -ItemType Directory -Path '$Root' -Force }
+$(Get-ThornswoodLockedFolderScript $Root)
 `$f = '$Root\alerts-webhook.txt'
 [IO.File]::WriteAllText(`$f, `$u + "``r``n", (New-Object Text.UTF8Encoding(`$false)))
 `$null = & icacls `$f /inheritance:r /grant:r '*S-1-5-18:F' '*S-1-5-32-544:F' 2>&1
@@ -846,7 +847,7 @@ if ($Install) {
 
   $out = Remote @"
 `$ErrorActionPreference = 'Continue'
-if (-not (Test-Path '$Root')) { `$null = New-Item -ItemType Directory -Path '$Root' -Force }
+$(Get-ThornswoodLockedFolderScript $Root)
 [IO.File]::WriteAllBytes('$Root\watch.ps1', [Convert]::FromBase64String('$b64'))
 'wrote     $Root\watch.ps1  ' + (Get-Item '$Root\watch.ps1').Length + ' bytes'
 

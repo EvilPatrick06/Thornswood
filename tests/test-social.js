@@ -371,6 +371,8 @@ if (social && trade) {
     const made = w.soc.newJournal(A, 'The Road North');
     yes('a journal can be started', !!made.journal && made.journal.title === 'The Road North');
     const jid = made.journal.id;
+    // A second New straight after is a second journal (#2135): nothing is
+    // taken as the first press arriving again, because nothing repeats one.
     const second = w.soc.newJournal(A, 'Recipes');
     yes('and more than one, which is what was asked for',
         !!second.journal && w.soc.stateOf(A).journals.length === 2);
@@ -691,10 +693,19 @@ if (social && trade) {
 
 // Mount/open events keep focus claims and use the normal command route.
 {
-  const start=FRONT.indexOf("    if (what === 'social:unavailable')"), end=FRONT.indexOf("    /*",start);
+  // From the unavailable notice to the end of the ready block, by what they
+  // say. It used to end at the first comment after the start, and #2142 put
+  // the board:spots comment above the ready block, so the lifted handler
+  // lost every *:ready line and D5 failed on main (#2159).
+  const FR=FRONT.split(String.fromCharCode(13)).join('');
+  const start=FR.indexOf("    if (what === 'social:unavailable')");
+  const ready=FR.indexOf("    if (what === 'party:ready' || what === 'journal:ready' || what === 'trade:ready'", start);
+  const end=FR.indexOf("\n    }\n", ready) + 7;
+  yes('D5: the lifted handler holds the unavailable notice, the opened events and the ready block',
+    start>=0 && ready>start && end>ready && /party:opened/.test(FR.slice(start,ready)) && /setKey/.test(FR.slice(ready,end)));
   const lines=[],focus=[],notes=[],pageJs=[];
   // PARTY_NAME: the P panel is told its key when it is ready (#1919).
-  const event=new Function('what','T','tellServer','log','note','PARTY_NAME',FRONT.slice(start,end));
+  const event=new Function('what','T','tellServer','log','note','PARTY_NAME',FR.slice(start,end));
   for(const what of ['party:ready','journal:ready','party:opened','journal:opened']) {
     event(what,{claimFocus(name,value){focus.push([name,value]);},js(code){pageJs.push(code);}},line=>lines.push(line),()=>{},text=>notes.push(text),'P');
   }

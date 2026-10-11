@@ -62,6 +62,7 @@
   The tests use it.
 #>
 
+. (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 function Get-FeedStorePrefix([string]$Channel) {
     if ($Channel -eq 'dev') { return 'feed-dev' }
     if ($Channel -eq 'main' -or -not $Channel) { return 'feed' }
@@ -505,7 +506,7 @@ function Read-SiteFeed([string]$Channel, [string]$SiteDir, [string]$SiteUrl = 'h
     if ($sd) {
         $f = Join-Path (Join-Path $sd $prefix) 'version.json'
         if (-not (Test-Path -LiteralPath $f)) { return $null }
-        return (([IO.File]::ReadAllText($f) -replace '^\uFEFF', '') | ConvertFrom-Json)
+        return (ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($f)) $f)
     }
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
     $wc = New-Object Net.WebClient
