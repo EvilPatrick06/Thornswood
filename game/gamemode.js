@@ -63765,6 +63765,8 @@ try {
       return { ok: true, text: open.drawn >= row.holds ? 'That is all this place will give you.' : '' };
     }
     function mineRare(actor, refrId, seam) {
+      var original=deps.identity(actor);
+      if(!original)return UNREAD;
       var classGateFn = deps.classGate || classGate;
       var toolGateFn = deps.toolGate || toolGate;
       var miningFn = deps.mining || mining;
@@ -63783,12 +63785,12 @@ try {
       if (tool) return tool;
       var shut = rareShut(actor, refrId, seam, questsOf(actor));
       if (shut) return shut;
+      if(deps.identity(actor)!==original)return UNREAD;
       if (deps.ready && !deps.ready(actor)) return 'Quest work is waiting on a saved inventory change.';
       if (miningFn(actor)) { stopMiningFn(actor); return 'You put the pick down.'; }
       if (swingingFn(actor)) return '';
       var pick = toolIdFn(actor, 'miner');
-      var original = deps.identity(actor);
-      if (!original) return UNREAD;
+      if(deps.identity(actor)!==original)return UNREAD;
       swingFn(actor, anim, function () {
         if (!active || deps.identity(actor) !== original) return;
         var result = giveRare(actor, refrId, seam);
@@ -63862,8 +63864,8 @@ try {
       if (counted && !keep(killer, b)) return { ok: false, why: 'unwritten' };
       return { ok: true };
     }
-    function noteContainer(actor, ref, cell) {
-      var held = questsOf(actor);
+    function noteContainer(actor, ref, cell, held) {
+      held = held || questsOf(actor);
       if (!held) return null;
       var said = null;
       SCENE.forEach(function (row) {
@@ -63933,7 +63935,7 @@ try {
       });
       if (!retrieval) return null;
       var cell = deps.cellOf ? (deps.cellOf(refrId) || '') : '';
-      return noteContainer(actor, refrId, cell);
+      return noteContainer(actor, refrId, cell, held);
     }
     return {
       lineup: lineup, offer: offer, bindPlace: bindPlace, walkAway: walkAway,
