@@ -32,6 +32,7 @@ const REPO_DIR = require('path').join(__dirname, '..');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const pluginPass = require('./fixtures/plugin-pass'); // front's whose-game check and the first tick, as the game does (#485)
 const CR = String.fromCharCode(13);
 function read(p) {
   return fs.readFileSync(path.isAbsolute(p) ? p : path.join(REPO_DIR, p), 'utf8').split(CR).join('');
@@ -247,7 +248,7 @@ function pluginRig(ini, w) {
   };
   const box = { skyrimPlatform: sp, Thornswood: T, require: () => io, Date: Date, JSON: JSON, Math: Math, Number: Number };
   vm.createContext(box);
-  vm.runInContext(plugin, box);
+  pluginPass.load(box, plugin, { filename: 'thornswood-emotes.js' });
   return { T: T, emit(name, ev) { (handlers[name] || []).forEach(function (fn) { fn(ev); }); } };
 }
 

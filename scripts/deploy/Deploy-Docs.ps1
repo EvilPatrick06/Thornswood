@@ -68,6 +68,9 @@ param(
   # value stays in the shell's history file and in the command line of the
   # process running this.
   [switch]$Password,
+  # Where -Password reads the site password on the box (#2116), so nobody
+  # types it. Missing: the hidden prompt, as before. See DocsPasswordFile.ps1.
+  [string]$PasswordFile = '',
   # Flattens EVERY document on the VPS with the repo copy, including the ones
   # people have been typing into on the site. It is for a first install and for
   # nothing else. It now takes a backup and says what it stood on.
@@ -109,6 +112,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Script.ps1')
 . (Join-Path $Here '..\vps\Send-Secret.ps1')
+. (Join-Path $Here 'DocsPasswordFile.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 . (Join-Path $Here 'Swap.ps1')
@@ -120,10 +124,28 @@ if ($PutBack -and ($Password -or $SeedDocs -or $Boards -or $Site -or $Docs -or $
 }
 
 # Asked before anything is sent, so a deploy never stops halfway for it.
+# The box's locked-down password file comes first (#2116): nobody types the
+# password or keeps a copy. The probe sends nothing secret and prints one
+# line. Only a missing file falls back to the hidden prompt; a file that is
+# there but readable by anybody else, or empty, stops here.
 $newPassword = ''
+$pwFromBox = $false
 if ($Password) {
-  $newPassword = Read-ThornswoodSecret '  New site password (it is not shown)'
-  if (-not $newPassword) { throw 'No password was given, so nothing was sent.' }
+  if (-not $PasswordFile) { $PasswordFile = Get-ThornswoodDocsPasswordFile }
+  $probe = @(Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script (Get-ThornswoodDocsPasswordProbe $PasswordFile) |
+    Where-Object { $_ -is [string] -and $_ -like 'PWFILE *' })
+  $pwState = if ($probe.Count) { [string]$probe[-1] } else { 'PWFILE (no answer)' }
+  if ($pwState -eq 'PWFILE OK') {
+    $pwFromBox = $true
+    Write-Host "  The site password comes from $PasswordFile on the box. Nothing to type."
+  } elseif ($pwState -eq 'PWFILE MISSING') {
+    Write-Host "  No $PasswordFile on the box, so it is asked for here."
+    $newPassword = Read-ThornswoodSecret '  New site password (it is not shown)'
+    if (-not $newPassword) { throw 'No password was given, so nothing was sent.' }
+  } else {
+    throw ("The password file on the box is not one to use ($pwState). Nothing was sent. " +
+           "It has to be $PasswordFile, owned by and open only to BUILTIN\Administrators and the deploy account, with inheritance off.")
+  }
 }
 
 # -Docs names have to be documents this repo actually has, or a typo would
@@ -376,10 +398,9 @@ if ($Password) {
   # so it is on no command line on either machine and in no file. Until then
   # it was base64'd into this script, which put it on the command line of ssh
   # here and of powershell on the VPS for the length of the call.
-  Invoke-ThornswoodSecretRemote -Target "$User@$Vps" -SshArgs $ssh -Secret $newPassword -Script @"
-`$ErrorActionPreference = 'Stop'
-`$pw = `$ThornswoodSecret; `$ThornswoodSecret = `$null
-if (-not `$pw) { 'NOTHING ARRIVED on standard input. Nothing written, the password is unchanged.'; return }
+  # The value comes either from the box's own file (#2116), read there, or on
+  # ssh's standard input from the prompt. What writes it is the same.
+  $setTail = @"
 `$f = '$rootWin\config.json'
 `$cfg = [ordered]@{}
 if (Test-Path -LiteralPath `$f) {
@@ -394,7 +415,18 @@ if (Test-Path -LiteralPath `$f) {
 `$cfg['password'] = `$pw
 [IO.File]::WriteAllText(`$f, (ConvertTo-Json -InputObject `$cfg -Depth 6), (New-Object Text.UTF8Encoding(`$false)))
 'set, ' + (`$cfg.Count - 1) + ' other setting(s) kept'
-"@ | ForEach-Object { "  $_" }
+"@
+  if ($pwFromBox) {
+    Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script ((Get-ThornswoodDocsPasswordSetHead $PasswordFile) + $setTail) |
+      Where-Object { $_ -is [string] } | ForEach-Object { "  $_" }
+  } else {
+    $setHead = @"
+`$ErrorActionPreference = 'Stop'
+`$pw = `$ThornswoodSecret; `$ThornswoodSecret = `$null
+if (-not `$pw) { 'NOTHING ARRIVED on standard input. Nothing written, the password is unchanged.'; return }
+"@
+    Invoke-ThornswoodSecretRemote -Target "$User@$Vps" -SshArgs $ssh -Secret $newPassword -Script ($setHead + "`n" + $setTail) | ForEach-Object { "  $_" }
+  }
   $newPassword = $null
 }
 

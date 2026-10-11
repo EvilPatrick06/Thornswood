@@ -50,6 +50,7 @@ param(
   [string]$Pin,
   [string]$Out
 )
+. (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 $ErrorActionPreference = 'Stop'
 if (-not $Pin) { $Pin = Join-Path $PSScriptRoot '..\..\records\skyrim-pin.json' }
 if (-not $Out) { $Out = Join-Path $PSScriptRoot '..\..\records\skyrim-files.json' }
@@ -63,7 +64,7 @@ if (-not $Steam -or -not (Test-Path -LiteralPath $Steam)) { Die 'Could not find 
 $Steam = [IO.Path]::GetFullPath($Steam.Replace('/', '\'))
 
 if (-not (Test-Path -LiteralPath $Pin)) { Die "The pin is not at $Pin." }
-$pinDoc = Get-Content -LiteralPath $Pin -Raw | ConvertFrom-Json
+$pinDoc = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $Pin -Raw) $Pin
 if (-not $pinDoc.build -or -not $pinDoc.appId -or @($pinDoc.depots).Count -eq 0) { Die "$Pin has no build, appId or depots." }
 
 # Steam's own section kinds in a manifest file.

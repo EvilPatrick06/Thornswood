@@ -215,6 +215,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 . (Join-Path $Here 'Swap.ps1')
+. (Join-Path $Here '..\release\Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 if (-not $PSBoundParameters.ContainsKey('Wait')) {
   $Wait = Get-ThornswoodServerReadyWait
 }
@@ -258,11 +259,14 @@ if (-not (Test-Path -LiteralPath $Gamemode)) { throw "There is no gamemode at $G
 # of people it holds (records\most-online.json) and, with -LoadOrder, our
 # plugin (#1121). There used to be a -Gamemode to send a file from anywhere;
 # that was a way round the commit, so it is gone.
-# -PutBack builds and sends nothing.
+# -PutBack builds and sends nothing. records\server-build.json is read below as
+# the record of the server build this commit's gamemode is written for
+# (#2076), so it is held to the commit too: an uncommitted record would be
+# compared with the box in place of the one the commit holds (#2132).
 . (Join-Path $Here 'Artifact.ps1')
 $artifact = $null
 if (-not $PutBack) {
-$alsoSends = @('records/most-online.json')
+$alsoSends = @('records/most-online.json', 'records/server-build.json')
 if ($LoadOrder) { $alsoSends += 'game/content/Thornswood-Content.esp' }
 $artifact = New-ThornswoodArtifact -Component gamemode -RepoDir (Join-Path $Here '..\..') -Paths 'game/gamemode.js' -AlsoSends $alsoSends
 Write-Host ('  artifact ' + (Format-ThornswoodArtifact $artifact))
@@ -288,7 +292,7 @@ Write-Host '  gamemode.js parses'
 $devRecordPath = Join-Path $Here '..\..\records\server-build.json'
 if (-not (Test-Path -LiteralPath $devRecordPath)) { throw 'there is no records\server-build.json, so nothing says which server build this gamemode is written for. Nothing was sent.' }
 $devRecordSum = Get-ThornswoodRecordSum ([IO.File]::ReadAllBytes($devRecordPath))
-$devRecordCommit = [string]((Get-Content -LiteralPath $devRecordPath -Raw | ConvertFrom-Json).source.commit)
+$devRecordCommit = [string]((ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $devRecordPath -Raw) $devRecordPath).source.commit)
 $devBoxSaid = @(Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script ($ThornswoodRecordSumText + "`r`n" + @"
 `$rp = '$($Root.Replace('/', '\').Replace("'", "''"))\server-build.json'
 if (Test-Path -LiteralPath `$rp) {
@@ -355,7 +359,7 @@ if ($LoadOrder) {
   if (-not (Test-Path -LiteralPath $settingsSrc)) {
     throw "-LoadOrder needs the built server's settings at $settingsSrc. Run Deploy-Gamemode.ps1 -Vortex first."
   }
-  $built = Get-Content -LiteralPath $settingsSrc -Raw | ConvertFrom-Json
+  $built = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $settingsSrc -Raw) $settingsSrc
   if (-not $built.loadOrder) { throw "$settingsSrc has no loadOrder" }
   $pluginNames = @($built.loadOrder | ForEach-Object { [IO.Path]::GetFileName($_) })
   $ours = Join-Path $Here '..\..\game\content\Thornswood-Content.esp'

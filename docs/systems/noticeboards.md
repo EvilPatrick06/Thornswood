@@ -6,7 +6,9 @@ standing there: J has every one, under Boards.
 
 ## Where a board is
 
-The object is the message board. One stands at each of the nine spots.
+The object is the message board. One stands at every board, wherever
+the server has it: indoors or out, in Skyrim or on Solstheim. It is
+put down when you are in that board's cell, or its worldspace outdoors.
 You are at it when you are within 400 of that board. Click the board.
 
 A steward moves it. Standing where it should be, they press its town
@@ -147,8 +149,10 @@ poster. A steward sees Take down on every haul. There is no command
 for any of it. See [Free Skyrim Trading Company](trading-company.md).
 
 Ten boards are seeded, and each one is that hold's drop box. Raven
-Rock's is at The Retching Netch, where Geldis Sadri stands. It has no
-message board object of its own: stand by the counter. Pressing E on
+Rock's is at The Retching Netch, where Geldis Sadri stands, and its
+message board object goes down on that spot. Nobody has yet checked
+in the game that it stands clear of him; a steward can walk it to a
+better one (#1597). Pressing E on
 a person or an NPC near a board answers them, not the board. Solitude's
 spot was corrected from a walked coordinate and still wants somebody
 to stand on it. There is no guild membership discount.

@@ -1,0 +1,139 @@
+'use strict';
+/*
+  test-site-credits-fill.js
+
+  The credits page names the engine each server runs and the client commit
+  each feed serves. Those were hand edits that went stale with every deploy
+  (3a32e961, caught by tests\test-source-offer.ps1). site/server.js now fills
+  them at serve time from data/deployed-build.json (written by
+  scripts/deploy/DeployedBuild.ps1 after a server deploy) and from the
+  feed/feed-dev version.json it serves, and keeps the hand text when either
+  is missing or unreadable.
+
+  Part one runs fillCreditsCommits, cut out of server.js by its markers, on
+  the real credits.md. Part two starts a copy of server.js in a temp folder
+  and asks it for /credits: hand text with no file, the new commit after the
+  file changes (no restart, no edit to credits.md), and hand text again when
+  the file is garbage. Offline; every temp folder is removed.
+*/
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const net = require('net');
+const http = require('http');
+const { spawn } = require('child_process');
+
+const REPO = path.join(__dirname, '..');
+const APP = path.join(REPO, 'site');
+const SRC = fs.readFileSync(path.join(APP, 'server.js'), 'utf8');
+const CREDITS = fs.readFileSync(path.join(APP, 'data', 'site', 'credits.md'), 'utf8');
+
+let pass = 0, fail = 0;
+function yes(what, cond) {
+  if (cond) { pass++; console.log('PASS  ' + what); } else { fail++; console.log('FAIL  ' + what); }
+}
+
+const A = 'a'.repeat(40), B = 'b'.repeat(40);
+const recorded = (/built from one commit,\s+\[`[0-9a-f]{7,40}`\]\(https:\/\/github\.com\/EvilPatrick06\/skymp\/tree\/([0-9a-f]{40})\)/.exec(CREDITS) || [])[1];
+const HAND = /still runs\s+\[`3a32e961`\]/;
+
+// ---- part one: the pure fill -------------------------------------------------
+const cut = /\/\/ ==== thornswood credits fill ====([\s\S]*?)\/\/ ==== end thornswood credits fill ====/.exec(SRC);
+yes('server.js has the credits fill between its markers', !!cut);
+const fill = cut ? new Function(cut[1] + '\nreturn fillCreditsCommits;')() : function (m) { return m; };
+yes('credits.md still has the hand sentence the fill replaces', HAND.test(CREDITS) && /the earlier engine/.test(CREDITS));
+yes('credits.md names the recorded commit the fill compares with', /^[0-9a-f]{40}$/.test(recorded || ''));
+
+yes('no file: the page is the hand text, unchanged', fill(CREDITS, null, {}) === CREDITS);
+yes('a file with only live: unchanged', fill(CREDITS, { live: { commit: A } }, {}) === CREDITS);
+yes('a commit that is not 40 hex: unchanged', fill(CREDITS, { live: { commit: 'zz' + A.slice(2) }, dev: { commit: A } }, {}) === CREDITS);
+yes('garbage shapes do not throw and change nothing',
+  fill(CREDITS, 'nope', 7) === CREDITS && fill(CREDITS, { live: 3, dev: [] }, null) === CREDITS);
+
+let out = fill(CREDITS, { live: { commit: A }, dev: { commit: A } }, {});
+yes('both on a new commit: the page names it', out.indexOf('Both servers run [`aaaaaaaa`](https://github.com/EvilPatrick06/skymp/tree/' + A + ')') >= 0);
+yes('both on a new commit: the stale hand sentence is gone', !HAND.test(out) && out.indexOf('the earlier engine') < 0);
+yes('both on a new commit: it still says the record is not deployed', out.indexOf('The recorded build has not been deployed yet.') >= 0);
+
+out = fill(CREDITS, { live: { commit: recorded }, dev: { commit: recorded } }, {});
+yes('both on the recorded commit: it says both run it, not that it is undeployed',
+  out.indexOf('Both servers run it, [`' + recorded.slice(0, 8) + '`]') >= 0 && out.indexOf('has not been deployed yet') < 0);
+
+out = fill(CREDITS, { live: { commit: A }, dev: { commit: recorded } }, {});
+yes('dev ahead of live: it names each server',
+  out.indexOf('The test server runs [`' + recorded.slice(0, 8) + '`]') >= 0 && out.indexOf('the main server runs [`aaaaaaaa`]') >= 0 &&
+  out.indexOf('has not been deployed yet') < 0);
+
+out = fill(CREDITS, null, { public: B, dev: A });
+yes('the feeds: the Public row names the public feed commit', /\|\s*Public\s*\|\s*`feed\/version\.json`\s*\|\s*\[`bbbbbbbb`\]\(https:\/\/github\.com\/EvilPatrick06\/skymp\/tree\/b{40}\)/.test(out));
+yes('the feeds: the Dev row names the dev feed commit', /\|\s*Dev\s*\|\s*`feed-dev\/version\.json`\s*\|\s*\[`aaaaaaaa`\]/.test(out));
+yes('the feeds: the server sentence is left alone', HAND.test(out));
+out = fill(CREDITS, null, { public: 'not a commit' });
+yes('a feed commit that is not hex: the row keeps its hand text', out === CREDITS);
+out = fill(CREDITS, { live: { commit: '<img src=x onerror=alert(1)>' }, dev: { commit: A } }, { public: '"><script>' });
+yes('markup in either file never reaches the page', out === CREDITS);
+
+// ---- part two: the server, end to end ----------------------------------------
+function freePort() {
+  return new Promise(function (ok, no) {
+    const s = net.createServer(); s.on('error', no);
+    s.listen(0, '127.0.0.1', function () { const p = s.address().port; s.close(function () { ok(p); }); });
+  });
+}
+function get(port, route) {
+  return new Promise(function (ok) {
+    http.get({ host: '127.0.0.1', port: port, path: route, agent: false }, function (res) {
+      let b = ''; res.setEncoding('utf8'); res.on('data', function (d) { b += d; });
+      res.on('end', function () { ok({ status: res.statusCode, body: b }); });
+    }).on('error', function () { ok({ status: 0, body: '' }); });
+  });
+}
+function wait(ms) { return new Promise(function (ok) { setTimeout(ok, ms); }); }
+
+(async function () {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-credits-fill-'));
+  let child = null;
+  try {
+    fs.writeFileSync(path.join(dir, 'server.js'), SRC);
+    fs.mkdirSync(path.join(dir, 'public'));
+    fs.copyFileSync(path.join(APP, 'public', 'home.html'), path.join(dir, 'public', 'home.html'));
+    const marked = fs.readdirSync(path.join(APP, 'public')).filter(function (n) { return /^marked-.*\.js$/.test(n); });
+    for (const m of marked) fs.copyFileSync(path.join(APP, 'public', m), path.join(dir, 'public', m));
+    fs.mkdirSync(path.join(dir, 'data', 'site'), { recursive: true });
+    fs.copyFileSync(path.join(APP, 'data', 'site', 'credits.md'), path.join(dir, 'data', 'site', 'credits.md'));
+    const port = await freePort();
+    let log = '';
+    child = spawn(process.execPath, ['server.js'], {
+      cwd: dir,
+      env: Object.assign({}, process.env, { THORNSWOOD_DOCS_PORT: String(port), THORNSWOOD_DOCS_LOCAL: '1', THORNSWOOD_CHAT_DIR: path.join(dir, 'chat') })
+    });
+    child.stdout.on('data', function (d) { log += d; }); child.stderr.on('data', function (d) { log += d; });
+    for (let i = 0; i < 200 && log.indexOf('listening on ') < 0; i++) await wait(50);
+    yes('the copy starts', log.indexOf('listening on ') >= 0);
+
+    let r = await get(port, '/credits');
+    yes('no deployed-build.json: /credits is 200 with the hand text', r.status === 200 && r.body.indexOf('3a32e961') >= 0 && r.body.indexOf('the earlier engine') >= 0);
+
+    fs.writeFileSync(path.join(dir, 'data', 'deployed-build.json'), JSON.stringify({ live: { commit: A }, dev: { commit: A } }));
+    r = await get(port, '/credits');
+    yes('after the file changes, with no hand edit and no restart, /credits names the new commit',
+      r.status === 200 && r.body.indexOf('aaaaaaaa') >= 0 && r.body.indexOf('tree/' + A) >= 0 && r.body.indexOf('the earlier engine') < 0);
+
+    fs.mkdirSync(path.join(dir, 'feed'));
+    fs.writeFileSync(path.join(dir, 'feed', 'version.json'), JSON.stringify({ clientRuntime: { forkCommit: B } }));
+    r = await get(port, '/credits');
+    yes('the public feed it serves fills the Public row', r.body.indexOf('tree/' + B) >= 0);
+
+    fs.writeFileSync(path.join(dir, 'data', 'deployed-build.json'), '{ not json');
+    fs.rmSync(path.join(dir, 'feed'), { recursive: true, force: true });
+    r = await get(port, '/credits');
+    yes('an unreadable file: /credits falls back to the hand text', r.status === 200 && r.body.indexOf('3a32e961') >= 0 && r.body.indexOf('aaaaaaaa') < 0);
+    yes('credits.md on disk was never edited', fs.readFileSync(path.join(dir, 'data', 'site', 'credits.md'), 'utf8') === CREDITS);
+  } finally {
+    if (child) { try { child.kill(); } catch (e) {} await wait(300); }
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) {}
+  }
+  yes('the temp folder is gone', !fs.existsSync(dir));
+  console.log(pass + ' passed, ' + fail + ' failed');
+  process.exit(fail ? 1 : 0);
+})();

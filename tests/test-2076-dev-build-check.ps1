@@ -49,6 +49,14 @@ Yes 'Deploy-DevGamemode asks the dev box which build it runs' ($ask -gt 0)
 Yes 'after the -PutBack guard, so -PutBack, which sends no gamemode, is not asked' ($guard -gt 0 -and $ask -gt $guard)
 Yes 'before the artifact is sent, so a refusal sends nothing' ($send -gt $ask)
 Yes 'and a refusal stops the run' ($src.IndexOf("throw 'The dev server does not run the server build this gamemode is written for.", $ask) -gt $ask)
+# The record it compares is held to the commit like the files it sends (#2132):
+# read from the working tree, an uncommitted record would be compared with the
+# box in place of the one the gamemode's commit holds.
+$also = [regex]::Match($src, '(?m)^\$alsoSends = @\(([^)]*)\)')
+Yes 'records\server-build.json is in what Deploy-DevGamemode holds to the commit' ($also.Success -and $also.Groups[1].Value.Contains("'records/server-build.json'"))
+$built = $src.IndexOf('New-ThornswoodArtifact -Component gamemode')
+$read = $src.IndexOf('[IO.File]::ReadAllBytes($devRecordPath)')
+Yes '  and the commit check runs before the record is read' ($built -gt 0 -and $read -gt $built)
 
 Write-Host ''
 Write-Host ("$pass passed, $fail failed")

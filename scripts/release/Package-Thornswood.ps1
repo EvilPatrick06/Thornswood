@@ -702,8 +702,14 @@ function Get-SourceNotice([string]$ClientRecord, [string]$ServerRecord, [string]
     foreach ($p in @($ClientRecord, $ServerRecord)) {
         if (-not (Test-Path -LiteralPath $p)) { throw "$p is missing" }
     }
-    $c = (Get-Content -LiteralPath $ClientRecord -Raw).TrimStart([char]0xFEFF) | ConvertFrom-Json
-    $s = (Get-Content -LiteralPath $ServerRecord -Raw).TrimStart([char]0xFEFF) | ConvertFrom-Json
+    # An empty record reads as $null; say so, rather than a method call on $null.
+    $cRaw = "$(Get-Content -LiteralPath $ClientRecord -Raw)"
+    $sRaw = "$(Get-Content -LiteralPath $ServerRecord -Raw)"
+    foreach ($x in @(@($ClientRecord, $cRaw), @($ServerRecord, $sRaw))) {
+        if (-not $x[1].Trim([char]0xFEFF, ' ', [char]9, [char]13, [char]10)) { throw ($x[0] + ' is empty') }
+    }
+    $c = $cRaw.TrimStart([char]0xFEFF) | ConvertFrom-Json
+    $s = $sRaw.TrimStart([char]0xFEFF) | ConvertFrom-Json
     $fork  = ([string]$c.fork).TrimEnd('/')
     $sRepo = ([string]$s.source.repo) -replace '\.git$', ''
     if (-not $fork -or -not $c.forkCommit) { throw 'client-build.json names no fork or no commit' }
@@ -1102,7 +1108,10 @@ if ($preSig -and $preSig.Status -ne 'NotSigned' -and $preSig.SignerCertificate) 
     }
     if ($signtoolStrip) {
         Say '  stub was signed; stripping so OneFile attach can be signed afterwards' 'DarkGray'
-        & $signtoolStrip remove /s $exe 2>&1 | Out-Null
+        # Its exit code decides: under Stop, 5.1 threw on signtool's stderr
+        # before the Die below could say what failed.
+        $was = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+        try { & $signtoolStrip remove /s $exe 2>&1 | Out-Null } finally { $ErrorActionPreference = $was }
         if ($LASTEXITCODE -ne 0) {
             Die 'could not strip the stub signature before attaching the payload'
         }

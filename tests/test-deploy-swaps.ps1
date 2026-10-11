@@ -54,6 +54,13 @@
   lock file for the whole run, so a second copy cannot pick the same ones; and
   its folders are under a scratch folder of its own, as they were.
 
+  And issue #2113: Deploy-DevGamemode sends a gamemode only onto the server
+  build its commit records (#2076), so the scratch commit holds this
+  repository's records\server-build.json and the stand-in dev box holds the
+  same record, as a full dev publish leaves it. Without them every dev case
+  was refused at that check and none reached the swap. A dev box that holds
+  another build's record is refused before anything is sent.
+
   Connects to nothing but 127.0.0.1.
 #>
 [CmdletBinding()]
@@ -422,6 +429,14 @@ Copy-Item -LiteralPath $scripts -Destination (Join-Path $repo 'scripts') -Recurs
 # Where.ps1 reads the layout from the repository's root; the artifacts go
 # under the out folder it names, inside the scratch repository.
 Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $scripts) 'layout.json') -Destination (Join-Path $repo 'layout.json')
+# Every commit holds records\server-build.json, the server build its gamemode
+# is written for, and Deploy-DevGamemode sends a gamemode only onto a dev
+# server that runs that build (#2076). This repository's record, so the
+# scratch commit holds one as a real one does; the stand-in dev box gets the
+# same record below, as Publish-Server -Channel dev leaves it (#2113).
+$serverRecord = Join-Path (Split-Path -Parent $scripts) 'records\server-build.json'
+$null = [IO.Directory]::CreateDirectory((Join-Path $repo 'records'))
+Copy-Item -LiteralPath $serverRecord -Destination (Join-Path $repo 'records\server-build.json')
 Put (Join-Path $repo 'scripts\vps\vps.json') '{ "address": "127.0.0.1" }'
 # The artifacts are built under out\, which is ignored, as it is in the repository.
 Put (Join-Path $repo '.gitignore') "out/`n"
@@ -782,8 +797,10 @@ try {
     $live = Live $botRoot
     $a = $bot.Clone(); $a['DocsRoot'] = (Join-Path $box 'No-Site-Yet')
     $r = Deploy 'Install-Bot.ps1' $a
+    $failed = $script:fail
     Yes 'Install-Bot: a site with no data\for-bot yet stops it, naming Deploy-Docs, with the bot untouched' (
         (-not $r.Ok) -and $r.Said -match 'Run \.\\scripts\\deploy\\Deploy-Docs\.ps1 first' -and ((Live $botRoot) -eq $live))
+    if ($script:fail -gt $failed) { Show }
 
     Bot 'bot v2'
     $r = Deploy 'Install-Bot.ps1' $bot.Clone()
@@ -897,6 +914,93 @@ try {
     Remove-Item -LiteralPath $besideCode -Force -EA SilentlyContinue
     if ($script:fail -gt $failed) { Show }
 
+    # What the install did not send (#1184). The bot's folder on the VPS held
+    # sample.py, backfill.py, redraw.py, two sample pictures and an old log
+    # beside bot.py, copied there by hand and never taken off, because the
+    # install sent a fixed list and had no rule for the rest of the folder; and
+    # the folder bot.py is in is the first place Python looks for a module. A
+    # run now leaves it holding what it sends and what is the bot's own
+    # (Get-ThornswoodBotOwned in Bot-Service.ps1), and moves the rest aside
+    # into its .prev while the bot is stopped.
+    $strays = [ordered]@{
+        'sample.py'               = 'print("a module nobody sent")'
+        'sample-maka.png'         = 'a picture nobody sent'
+        'assets\sample-mixed.png' = 'a picture in a folder the install sends into'
+        'tools\redraw.py'         = 'a folder nobody sent, with a tool in it'
+    }
+    # And what is the bot's own, which every run leaves as it was. bot.env.json
+    # is on the box already; run.ps1 is the stand-in service's loop, the old
+    # loop's file until a full run. thornswood-deploy.json is the bot's own
+    # too, but every good run writes it again, so it is held to being there.
+    $own = [ordered]@{
+        'data\joins.json'           = '{ "next": 7 }'
+        'webhooks\news.txt'         = 'not a webhook'
+        'py-libs\keep\__init__.py'  = 'VERSION = 1'
+        'service\host.json'         = '{ "root": "here" }'
+        'bot.log.20260916-1535.old' = 'a log renamed by hand, which a full run moves into data'
+        'joins.json'                = '{ "from before 1104": true }'
+    }
+    function PutAll($set) { foreach ($k in $set.Keys) { Put (Join-Path $botRoot $k) $set[$k] } }
+    function Sums {
+        $h = [ordered]@{}
+        foreach ($k in @($own.Keys) + @('bot.env.json', 'run.ps1', 'assets\join-card.png')) {
+            $p = Join-Path $botRoot $k
+            $h[$k] = $(if (Test-Path -LiteralPath $p) { (Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash } else { 'not there' })
+        }
+        return (($h.Keys | ForEach-Object { $_ + '|' + $h[$_] }) -join "`n")
+    }
+    PutAll $strays
+    PutAll $own
+    $ownBefore = Sums
+    Bot 'bot v7'
+    $r = Deploy 'Install-Bot.ps1' $bot.Clone()
+    $failed = $script:fail
+    $prev = @(Kept $botRoot '.prev-*')
+    $newest = $prev[-1]
+    Yes 'Install-Bot -CodeOnly: with files in the bot''s folder that nothing sent, the new code is SWAP OK and the bot says it is watching' (
+        $r.Ok -and $r.Said -match 'SWAP OK' -and (WaitFor { BotSays 'bot v7' }))
+    Yes '  and the stray .py, the stray .png, the one in assets and the stray folder are gone from the bot''s folder' (
+        -not @($strays.Keys | Where-Object { Test-Path -LiteralPath (Join-Path $botRoot $_) }).Count)
+    Yes '  and each is in the .prev this run made, as it was, beside the code it replaced' (
+        -not @($strays.Keys | Where-Object { (Get (Join-Path $newest $_)) -ne $strays[$_] }).Count -and
+        (Get (Join-Path $newest 'bot.py')) -match 'bot v6')
+    # A folder nothing sent goes aside whole, so it is named as the folder.
+    $named = ([regex]::Match($r.Said, 'moved aside 4 thing\(s\) .* into ' + [regex]::Escape($newest) + ': (.*)')).Groups[1].Value
+    Yes '  and the run names each one, the stray folder as one, and where they went' (
+        $named -and -not (Compare-Object @($named.Trim() -split ', ') @('assets/sample-mixed.png', 'sample-maka.png', 'sample.py', 'tools')))
+    Yes '  and what is the bot''s own is as it was: data, webhooks, py-libs, service, bot.env.json, the record, the old loop''s file, an old log' (
+        (Sums) -eq $ownBefore)
+    Yes '  and the card artwork the run sent is still in assets, and the record beside the code' (
+        (Test-Path -LiteralPath (Join-Path $botRoot 'assets\join-card.png')) -and (Test-Path -LiteralPath (Join-Path $botRoot 'thornswood-deploy.json')))
+    Yes '  and the box holds every file the run sent' ($r.Said -match 'FILES ON THE BOX')
+    if ($script:fail -gt $failed) { Show }
+
+    # -PutBack is the box as it was before that run, so what that run moved
+    # aside comes back with the code it sat beside: a file an older install
+    # sent and a newer one no longer does is the older code's.
+    $a = $bot.Clone(); $a.Remove('CodeOnly'); $a['PutBack'] = $true
+    $r = Deploy 'Install-Bot.ps1' $a
+    $failed = $script:fail
+    Yes 'Install-Bot -PutBack after it: the previous code comes back, and what that run moved aside with it' (
+        $r.Ok -and $r.Said -match 'SWAP OK' -and (Get (Join-Path $botRoot 'bot.py')) -match 'bot v6' -and
+        -not @($strays.Keys | Where-Object { (Get (Join-Path $botRoot $_)) -ne $strays[$_] }).Count)
+    Yes '  and what is the bot''s own is still as it was' ((Sums) -eq $ownBefore)
+    if ($script:fail -gt $failed) { Show }
+
+    # A new bot that does not come up puts the folder back as it was, the
+    # files it moved aside included.
+    $live = Live $botRoot
+    Bot 'bot v8, will-not-start'
+    $r = Deploy 'Install-Bot.ps1' $bot.Clone()
+    $failed = $script:fail
+    Yes 'Install-Bot -CodeOnly: code that does not start, with strays in the folder, is SWAP ROLLED BACK' (
+        (-not $r.Ok) -and $r.Said -match 'moved aside 4 thing' -and $r.Said -match 'SWAP ROLLED BACK')
+    Yes '  and the folder is as it was, what it moved aside back in place, and the old bot says it is watching again' (
+        ((Live $botRoot) -eq $live) -and $r.Said -match 'answering again' -and
+        -not @($strays.Keys | Where-Object { (Get (Join-Path $botRoot $_)) -ne $strays[$_] }).Count)
+    Yes '  and what is the bot''s own is still as it was' ((Sums) -eq $ownBefore)
+    if ($script:fail -gt $failed) { Show }
+
     # ======================================================= the dev server
     $devRoot = Join-Path $box 'Thornswood-Server-Dev'
     $devPort = PickPort
@@ -908,6 +1012,9 @@ try {
     Put (Join-Path $devRoot 'server-settings.json') (([ordered]@{ port = $devPort; name = 'Thornswood Dev'; dataDir = 'data'
         loadOrder = @($devFar + 'Skyrim.esm'); thornswoodServer = 'dev'; thornswoodRequirePass = $true }) | ConvertTo-Json)
     Put (Join-Path $devRoot 'data\keep.txt') 'the character book'
+    # The record of the server build it runs, which a full dev publish leaves
+    # beside the server files: the build this commit records (#2076, #2113).
+    Copy-Item -LiteralPath $serverRecord -Destination (Join-Path $devRoot 'server-build.json')
     Task ($TaskPrefix + ' Dev Server') $node.Source ('"' + $gameStub + '" "' + $devRoot + '"') $devRoot
     $gm = Join-Path $repo 'game\gamemode.js'
     $launcher = Join-Path $work 'launcher'
@@ -918,12 +1025,29 @@ try {
     function DevUp { return ((UdpOwner $devPort) -gt 0) -and ((Listener ($devPort + 1)) -gt 0) }
     Yes 'Deploy-DevGamemode: the stand-in dev server is up' (WaitFor { DevUp })
 
+    # A dev server that runs another server build than the commit records is
+    # refused before the artifact is sent (#2076): no scp, nothing stopped.
+    $recText = [IO.File]::ReadAllText($serverRecord)
+    $recCommit = [string]($recText | ConvertFrom-Json).source.commit
+    Put (Join-Path $devRoot 'server-build.json') $recText.Replace($recCommit, ('f' * 40))
     Put $gm '// dev v2'
+    $live = Live $devRoot
+    $pidBefore = UdpOwner $devPort
+    $scpBefore = $global:TsScpCount
+    $r = Deploy 'Deploy-DevGamemode.ps1' $dev.Clone()
+    $failed = $script:fail
+    Yes 'Deploy-DevGamemode: a dev server on another server build is refused before anything is sent' (
+        (-not $r.Ok) -and $recCommit -and $r.Said -match 'runs another server build \(commit ffffffff\)' -and $global:TsScpCount -eq $scpBefore)
+    Yes '  and the dev server is untouched, the same process answering' (((Live $devRoot) -eq $live) -and ((UdpOwner $devPort) -eq $pidBefore))
+    if ($script:fail -gt $failed) { Show }
+    Copy-Item -LiteralPath $serverRecord -Destination (Join-Path $devRoot 'server-build.json') -Force
+
     $pidBefore = UdpOwner $devPort
     $r = Deploy 'Deploy-DevGamemode.ps1' $dev.Clone()
     $failed = $script:fail
     Yes 'Deploy-DevGamemode: a good gamemode is SWAP OK and the dev server answers as a new process' (
-        $r.Ok -and $r.Said -match 'SWAP OK' -and (Get (Join-Path $devRoot 'gamemode.js')) -eq '// dev v2' -and
+        $r.Ok -and $r.Said -match 'runs the build this commit records' -and $r.Said -match 'SWAP OK' -and
+        (Get (Join-Path $devRoot 'gamemode.js')) -eq '// dev v2' -and
         (WaitFor { DevUp }) -and ((UdpOwner $devPort) -ne $pidBefore))
     Yes '  and its stamp went in beside it, and the settings were edited in the stage, not in place' (
         (Test-Path -LiteralPath (Join-Path $devRoot 'thornswood-build.json')) -and

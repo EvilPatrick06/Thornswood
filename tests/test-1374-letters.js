@@ -251,6 +251,10 @@ if (missing.length === 0 && fees && seeding && PASSAGES) {
     yes('W3 a steward moves it to where they stand', /ravenrock's board is here now/.test(moved) &&
         reg.boards.ravenrock.cell === '800:Dragonborn.esm' && reg.boards.ravenrock.pos[0] === -1000 &&
         !!reg.boards.ravenrock.placed && reg.boards.ravenrock.where === 'Raven Rock');
+    // #1597: every client is told where the board is now, cell and all, and puts its object there.
+    const told = s.boardsView(STEW.pid).list.filter(function (t) { return t.hold === 'ravenrock'; })[0];
+    yes('W3 and the boards every client is sent say Solstheim and the new point, for the object',
+        !!told && told.cell === '800:Dragonborn.esm' && told.x === -1000 && told.y === 2000 && told.z === 50);
 
     s = boot(reg, w);
     yes('W4 a restart keeps the walked spot', s.boards.ravenrock.cell === '800:Dragonborn.esm' &&

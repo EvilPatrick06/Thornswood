@@ -260,6 +260,10 @@ jobs:
           # Issue #1163: the Discord sign-in callback gives up inside ten
           # seconds when the token exchange or the profile lookup stalls,
           # never answers, or drops halfway, and the page says to try again.
+          # Issue #1597: every notice board gets its object, in the cell or
+          # worldspace the server has it in, from the list the server sends;
+          # tests\test-1597-board-objects.js runs the plugin's board code on a
+          # pretend game. Under a second.
           # $six is a historical name: the gate list grew well past six (#1368).
           # Issue #1589: a line here with no comma after it ends the list, and
           # every name below it only prints itself. test-gate-list.ps1 parses
@@ -270,7 +274,12 @@ jobs:
           # tests\test-launcher-icons.js fails if any frame of
           # launcher\app.ico matches a frame of site\public\favicon.ico, or
           # if app.ico and app-dev.ico share a frame.
-          $six = 'test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
+          # Issue #485: the whose-game gate is one copy, in
+          # thornswood-front.js, and every other plugin reads it on the first
+          # tick and stays idle without it. tests\test-whose-game-gate.js
+          # runs each plugin in a sandbox and fails on a second copy or a
+          # reader that wakes without the check. Under a second.
+          $six ='test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
                  'test-third-party.js',
@@ -298,6 +307,7 @@ jobs:
                  'test-1378-shared-gather.js',
                  'test-special-edition-only.js',
                  'test-1374-letters.js',
+                 'test-1597-board-objects.js',
                  'test-1380-rare-mines.js',
                  'test-1621-quest-state.js',
                  'test-unpin.js', 'test-coffers.js',
@@ -411,8 +421,11 @@ jobs:
                  'test-table-install.js',
                  'test-secrets-fail-closed.js',
                  'test-our-key-menus.js', 'test-slash-key.js', 'test-social-keys.js',
+                 'test-2037-journal-new.js', 'test-2135-journal-press.js', 'test-social.js',
                  'test-site-auth.js',
                  'test-site-route-gaps.js',
+                 'test-docs-pwfile.ps1',
+                 'test-site-credits-fill.js', 'test-deployed-build.ps1',
                  'test-site-headers.js',
                  'test-site-render.js', 'test-site-discovery.js',
                  'test-home-status.js', 'test-seats.js', 'test-age-gate.js', 'test-download-hash.js',
@@ -446,6 +459,7 @@ jobs:
                  'test-build-vs-install.ps1',
                  'test-ship-dry-run.ps1',
                  'test-launcher-icons.js',
+                 'test-whose-game-gate.js',
                  'test-gate-list.ps1'
           $failed = @()
           foreach ($n in $six) {

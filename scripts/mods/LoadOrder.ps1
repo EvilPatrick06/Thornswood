@@ -24,6 +24,7 @@
   LoadOrder.LightOrder and LoadOrder.Reorder do in the launcher.
 #>
 
+. (Join-Path $PSScriptRoot '..\release\Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 $script:LoadOrderMasters = 'Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm'
 
 <#
@@ -110,8 +111,8 @@ function Import-VortexStateReader {
     if ('Thornswood.VortexProfileState' -as [type]) { return }
     $source = Join-Path $PSScriptRoot '..\..\launcher\app\VortexProfileState.cs'
     if ($PSVersionTable.PSVersion.Major -le 5) {
-        Add-Type -Path $source -ReferencedAssemblies System.dll,System.Core.dll,System.Xml.dll,System.Runtime.Serialization.dll
-    } else { Add-Type -Path $source }
+        Add-Type -LiteralPath $source -ReferencedAssemblies System.dll,System.Core.dll,System.Xml.dll,System.Runtime.Serialization.dll
+    } else { Add-Type -LiteralPath $source }
 }
 <#
   The legacy fallback: the revision out of the old folder name, or 0. Kept for
@@ -227,8 +228,11 @@ $script:CollectionJsonFrom = ''
   and not the collection.
 #>
 function Get-CollectionExportArchive([string]$Folder) {
-    $none = New-Object object[] 0
-    if (-not $Folder -or -not (Test-Path -LiteralPath $Folder -PathType Container)) { return , $none }
+    # The archives go out one by one, so every caller's @(...) is the list and
+    # its Count the number of archives. It used to return the list as one
+    # object, so @(...) held one item even with no archive at all: Count was
+    # never 0, and a caller's foreach got the whole list as one "archive".
+    if (-not $Folder -or -not (Test-Path -LiteralPath $Folder -PathType Container)) { return }
     $found = New-Object Collections.Generic.List[object]
     $places = @((Join-Path $Folder 'export'), $Folder)
     for ($i = 0; $i -lt $places.Count; $i++) {
@@ -241,9 +245,9 @@ function Get-CollectionExportArchive([string]$Folder) {
             [void]$found.Add([pscustomobject]@{ File = $f; Place = $i; Named = $named })
         }
     }
-    if ($found.Count -eq 0) { return , $none }
+    if ($found.Count -eq 0) { return }
     $sorted = @($found | Sort-Object Place, Named, @{ Expression = { $_.File.LastWriteTimeUtc }; Descending = $true })
-    return , [object[]]@($sorted | ForEach-Object { $_.File })
+    foreach ($x in $sorted) { $x.File }
 }
 
 <#
@@ -719,7 +723,7 @@ function Get-LoadOrderManifestUrl([string]$Root) {
     if (-not (Test-Path -LiteralPath $cfgPath)) { throw "no config.json at $cfgPath" }
     $raw = [IO.File]::ReadAllBytes($cfgPath)
     $skip = if ($raw.Length -ge 3 -and $raw[0] -eq 0xEF -and $raw[1] -eq 0xBB -and $raw[2] -eq 0xBF) { 3 } else { 0 }
-    $cfg = [Text.Encoding]::UTF8.GetString($raw, $skip, $raw.Length - $skip) | ConvertFrom-Json
+    $cfg = ConvertFrom-ThornswoodJson ([Text.Encoding]::UTF8.GetString($raw, $skip, $raw.Length - $skip)) $cfgPath
     $addr = ''
     $portText = ''
     if ($cfg.PSObject.Properties.Name -contains 'ServerAddress') { $addr = [string]$cfg.ServerAddress }

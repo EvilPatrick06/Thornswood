@@ -4,7 +4,8 @@
 
 Skyrim Platform JavaScript, the part of Thornswood that runs inside the game.
 Skyrim Platform runs every `.js` in the game folder's `Data\Platform\Plugins`
-in the game's own node, and reloads one the moment its file changes. Nothing
+in the game's own node, one after another in one pass, and runs them all
+again the moment a file in that folder changes. Nothing
 here is built or bundled: the file in the repo is the file that runs.
 `thornswood-front.js` is the one plugin that owns the game's browser: it loads
 the page from `game\ui` once, mounts the overlays into it and does most of
@@ -14,6 +15,18 @@ where to call, push to talk), and `thornswood-mark.js` writes down the spot
 you stand on for `Mark-Spot.ps1`. Every one of them
 idles unless the client settings point at our server and the launcher has left
 a fresh session note, `Data\Platform\thornswood-session.txt`.
+
+That check, the whose-game gate, is in `thornswood-front.js` alone (#485).
+Front runs it first and, only when it says ours, publishes it as
+`globalThis.Thornswood.whoseGame`. The other plugins run nothing when they
+load: each asks for the first tick, which Skyrim Platform sends after the
+whole pass, and there calls that check and runs only if it says ours. So the
+order the files load in does not matter, and when front did not load nothing
+is published and every plugin stays idle. A new plugin opens with the same
+reader as the other three; `tests\test-whose-game-gate.js` fails on one that
+does not, and on any copy of the check outside front.
+`tests\fixtures\plugin-pass.js` does the same pass for a harness that runs a
+plugin on its own.
 
 ## On your machine
 

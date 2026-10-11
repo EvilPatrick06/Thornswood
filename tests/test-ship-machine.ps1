@@ -47,6 +47,8 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 $Repo = Split-Path -Parent $Here
 $Release = Join-Path $Repo 'scripts\release'
 $Setup = Join-Path $Release 'Setup-ShipMachine.ps1'
+# The sections lifted below call ConvertFrom-ThornswoodJson, which their script dot-sources.
+. (Join-Path $Release 'Read-JsonFile.ps1')
 $Ready = Join-Path $Release 'Check-ShipReady.ps1'
 $Sync = Join-Path $Release 'Sync-Client.ps1'
 

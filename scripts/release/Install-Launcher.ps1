@@ -248,7 +248,9 @@ public static extern void SHChangeNotify(int eventId, uint flags, System.IntPtr 
 # build but exactly right on the one build where the icon changed.
 $stamp    = Join-Path $outDir '.iconstamp'
 $lastIcon = ''
-if (Test-Path $stamp) { $lastIcon = (Get-Content $stamp -Raw -ErrorAction SilentlyContinue).Trim() }
+# An empty stamp (a write cut short) reads back as $null, and .Trim() on that
+# stopped the install under StrictMode. Wrapping it in a string makes it ''.
+if (Test-Path $stamp) { $lastIcon = "$(Get-Content $stamp -Raw -ErrorAction SilentlyContinue)".Trim() }
 # AND NOT ON A THROWAWAY BUILD EITHER. Killing and restarting Explorer is
 # already described below as too rude to do on every build; doing it because a
 # compile check ran is ruder still, and a scratch build's icon is not on

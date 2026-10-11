@@ -234,7 +234,12 @@ foreach ($p in $Path) {
         }
     }
 
-    & $signtool @args 2>&1 | ForEach-Object { Say ("    " + $_) 'DarkGray' }
+    # The exit code decides, not stderr. signtool writes "SignTool Error" there,
+    # and under Stop Windows PowerShell 5.1 made that line a thrown error: the
+    # first file that failed ended the script, with no count and no read-back.
+    $was = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    try { & $signtool @args 2>&1 | ForEach-Object { Say ("    " + $_) 'DarkGray' } }
+    finally { $ErrorActionPreference = $was }
     if ($LASTEXITCODE -ne 0) {
         Say ("  signtool exited with " + $LASTEXITCODE + " on " + $name) 'Red'
         $failed++

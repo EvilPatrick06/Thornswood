@@ -54,7 +54,10 @@ function ReadJson($path) {
   $raw = [IO.File]::ReadAllBytes($path)
   $skip = 0
   if ($raw.Length -ge 3 -and $raw[0] -eq 0xEF -and $raw[1] -eq 0xBB -and $raw[2] -eq 0xBF) { $skip = 3 }
-  return ([Text.Encoding]::UTF8.GetString($raw, $skip, $raw.Length - $skip) | ConvertFrom-Json)
+  $text = [Text.Encoding]::UTF8.GetString($raw, $skip, $raw.Length - $skip)
+  # Named when empty or not JSON, rather than a parse error or a null document.
+  if (-not $text.Trim()) { Die "$path is empty. Nothing has been changed there." }
+  try { return ($text | ConvertFrom-Json) } catch { Die ("$path is not valid JSON: " + $_.Exception.Message) }
 }
 function WriteJson($path, $doc) {
   # No byte order mark. The launcher's reader stops on one and node refuses it.

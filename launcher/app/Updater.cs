@@ -1199,9 +1199,18 @@ namespace Thornswood
             // swap script will pick it up on the next start whatever happens
             // here, so a check that ran later would be checking a decision
             // already made.
-            CheckSigner(tmp, log);
-            File.Copy(tmp, neu, true);
-            try { File.Delete(tmp); } catch (Exception ex) { Swallow.Note("Updater.SelfUpdate, delete", ex); }
+            // The download is deleted whichever way this goes. A launcher the
+            // signer check refused used to stay in %TEMP%, one more copy on
+            // every check that offered it again.
+            try
+            {
+                CheckSigner(tmp, log);
+                File.Copy(tmp, neu, true);
+            }
+            finally
+            {
+                try { File.Delete(tmp); } catch (Exception ex) { Swallow.Note("Updater.SelfUpdate, delete", ex); }
+            }
 
             int me = System.Diagnostics.Process.GetCurrentProcess().Id;
             // Named for the launcher it waits on. The script stays up for a few

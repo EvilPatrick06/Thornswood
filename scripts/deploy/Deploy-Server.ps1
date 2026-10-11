@@ -185,6 +185,8 @@ if (-not $PSBoundParameters.ContainsKey('Wait')) {
 . (Join-Path $Here 'Artifact.ps1')
 . (Join-Path $Here 'ServerSettings.ps1')
 . (Join-Path $Here 'ServerBuild.ps1')
+. (Join-Path $Here 'DeployedBuild.ps1')
+. (Join-Path $Here '..\release\Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
 function Remote($script) {
   # Send-Script.ps1 (issue #1070): a long script goes as a file of its own
@@ -405,6 +407,7 @@ function Invoke-PutBack {
   if (-not (Show-SwapResult $backOut "$rootWin\.undone-<stamp>")) { exit 1 }
   # The record that came back with the files is what the box says it runs.
   Restore-SwapRecord "$User@$Vps" $ssh $Root $backOut "$Root/data/thornswood-deploy.json" 'gamemode'
+  $null = Save-ThornswoodDeployedBuild "$User@$Vps" $ssh $Root
   Write-Host ''
   Write-Host '  PASS. The previous files are back and the server is answering.' -ForegroundColor Green
   exit 0
@@ -509,7 +512,8 @@ if (-not $GamemodeOnly) {
   # it. The same test Export-ServerPayload.ps1 makes for a live payload, and an
   # npcSettings "default" key, which refuses every NPC. Before the stamp is
   # written, the box is asked anything or the artifact is sent.
-  $buildSettings = Get-Content -LiteralPath (Join-Path $Dist 'server-settings.json') -Raw | ConvertFrom-Json
+  $buildSettingsPath = Join-Path $Dist 'server-settings.json'
+  $buildSettings = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $buildSettingsPath -Raw) $buildSettingsPath
   $notLive = @(Get-ThornswoodServerSettingsProblems $buildSettings 'main')
   if ($notLive.Count) {
     Write-Host ''
@@ -540,7 +544,7 @@ if (-not (Test-ThornswoodBuildStamp -Path $stampPath -Gamemode $built)) {
       (Get-FileHash -LiteralPath $src).Hash -eq (Get-FileHash -LiteralPath $built).Hash) { $stampFrom = $src }
   $null = Save-ThornswoodBuildStamp -Gamemode $stampFrom -Channel main -RepoDir (Split-Path -Parent (Split-Path -Parent $Here)) -Path $stampPath -Artifact $artifact
 }
-'{0,-22} {1}' -f 'thornswood-build.json', (Format-ThornswoodBuildStamp (Get-Content -LiteralPath $stampPath -Raw | ConvertFrom-Json)) | Write-Host
+'{0,-22} {1}' -f 'thornswood-build.json', (Format-ThornswoodBuildStamp (ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $stampPath -Raw) $stampPath)) | Write-Host
 
 # ---------------------------------------------------------- which build is this
 #
@@ -564,7 +568,7 @@ $recordPath = Join-Path $Here '..\..\records\server-build.json'
 if (-not (Test-Path -LiteralPath $recordPath)) {
   throw 'there is no records\server-build.json, so nothing says which build these server files are. Nothing was sent and the server was not touched.'
 }
-$rec = Get-Content -LiteralPath $recordPath -Raw | ConvertFrom-Json
+$rec = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $recordPath -Raw) $recordPath
 $serverFiles = @()
 if ($GamemodeOnly) {
   # No server file goes, so there is none here to hold to the record. The
@@ -712,7 +716,7 @@ if (Test-Path -LiteralPath $ep) { 'ESP ' + (Get-Item -LiteralPath $ep).Length } 
   # list names that is not there yet, before the restart, so a plugin added to the
   # build cannot leave the server unable to start.
   $settingsSrc = Join-Path $Dist 'server-settings.json'
-  $settings = Get-Content -LiteralPath $settingsSrc -Raw | ConvertFrom-Json
+  $settings = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $settingsSrc -Raw) $settingsSrc
   if (-not $settings.loadOrder) { throw 'server-settings.json has no loadOrder' }
   $pluginNames = @($settings.loadOrder | ForEach-Object { [IO.Path]::GetFileName($_) })
   $remotePlugins = ($Root -replace '\\', '/') + '/plugins'
@@ -940,6 +944,9 @@ if ($swapOut -notcontains 'SWAP OK') {
 # http://<box>:3000/thornswood-deploy.json says which commit is live.
 Save-SwapPreviousRecord "$User@$Vps" $ssh $Root $prevName "$Root/data/thornswood-deploy.json"
 $null = Set-ThornswoodArtifactCurrent -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh -Root $Root -Beside "$Root/data/thornswood-deploy.json"
+# And what engine it runs, from the box's own server-build.json, where the site
+# reads it for the credits page (DeployedBuild.ps1). Never fails the deploy.
+$null = Save-ThornswoodDeployedBuild "$User@$Vps" $ssh $Root
 
 # And from here, the shape Publish-Server.ps1 uses. The box answering itself
 # on 127.0.0.1 is not the same as it answering the rest of the world; this is

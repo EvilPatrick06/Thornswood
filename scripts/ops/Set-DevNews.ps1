@@ -51,7 +51,8 @@ $channelFile = Join-Path $Here '..\..\bot\dev-channel.txt'
 
 $wantChannel = ''
 if (Test-Path -LiteralPath $channelFile) {
-  $wantChannel = (Get-Content -LiteralPath $channelFile -Raw).Trim()
+  # "$()": an empty file reads as $null (even through [string](...)), and a method on $null throws.
+  $wantChannel = ("$(Get-Content -LiteralPath $channelFile -Raw)").Trim()
 }
 
 Write-Host ''
