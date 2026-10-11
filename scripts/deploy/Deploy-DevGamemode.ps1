@@ -280,6 +280,34 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) { throw 'node is not 
 if ($LASTEXITCODE -ne 0) { throw 'gamemode.js does not parse. Nothing was sent.' }
 Write-Host '  gamemode.js parses'
 
+# THE ENGINE THIS GAMEMODE IS WRITTEN FOR (#2076). A gamemode goes onto the
+# server build its commit records, the comparison Deploy-Server -GamemodeOnly
+# makes for live (#1089). Asked before the artifact leaves this machine, so a
+# refusal sends nothing and stops nothing. -PutBack sends no gamemode.
+. (Join-Path $Here 'ServerBuild.ps1')
+$devRecordPath = Join-Path $Here '..\..\records\server-build.json'
+if (-not (Test-Path -LiteralPath $devRecordPath)) { throw 'there is no records\server-build.json, so nothing says which server build this gamemode is written for. Nothing was sent.' }
+$devRecordSum = Get-ThornswoodRecordSum ([IO.File]::ReadAllBytes($devRecordPath))
+$devRecordCommit = [string]((Get-Content -LiteralPath $devRecordPath -Raw | ConvertFrom-Json).source.commit)
+$devBoxSaid = @(Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script ($ThornswoodRecordSumText + "`r`n" + @"
+`$rp = '$($Root.Replace('/', '\').Replace("'", "''"))\server-build.json'
+if (Test-Path -LiteralPath `$rp) {
+  'RECORD ' + (Get-ThornswoodRecordSum ([IO.File]::ReadAllBytes(`$rp)))
+  try { 'RECORDCOMMIT ' + [string](([IO.File]::ReadAllText(`$rp) | ConvertFrom-Json).source.commit) } catch { }
+} else { 'RECORD none' }
+"@) | ForEach-Object { "$_".Trim() })
+$devBoxSum = ''; $devBoxCommit = ''
+foreach ($l in $devBoxSaid) {
+  if ($l -match '^RECORD ([0-9a-f]{64}|none)$') { $devBoxSum = $Matches[1] }
+  elseif ($l -match '^RECORDCOMMIT ([0-9a-f]*)$') { $devBoxCommit = $Matches[1] }
+}
+$devBuildProblem = Get-ThornswoodBoxBuildProblem $devBoxSum $devBoxCommit $devRecordSum $devRecordCommit 'dev server' 'scripts\release\Publish-Server.ps1 -Channel dev'
+if ($devBuildProblem) {
+  Write-Host ('  ' + $devBuildProblem) -ForegroundColor Red
+  throw 'The dev server does not run the server build this gamemode is written for. Nothing was sent and the dev server was not touched.'
+}
+Write-Host ('  the dev server runs the build this commit records, commit ' + $devRecordCommit.Substring(0, [Math]::Min(8, $devRecordCommit.Length)))
+
 Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
 }
 
