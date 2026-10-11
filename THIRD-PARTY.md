@@ -447,7 +447,9 @@ with.
   `a4c5d9c7bfa6badf93d43e3587f08eb9973d289b4711ab727f784a77361a8c21`, built
   2026-10-11T01:40:26Z. This is the recorded next release, not a deployment
   claim. Main remains on `3a32e9615d4eae43cc6995cdf2c09c528bc80da6`.
-  Dev also remains on that earlier engine until the next authorized Ship.
+  The dev server runs this build since 10 October 2026, 8:02 PM MT
+  (Publish-Server -Channel dev); the dev feed's client files stay on
+  `3a32e961` until the next dev Ship.
   The new build adds atomic quest inventory/state writes, connection refusal
   handling, strict save reading and the merged font and settings changes.
   Section 13 of the AGPL asks that everybody who connects to a modified server
