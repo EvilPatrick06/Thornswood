@@ -1,6 +1,6 @@
 # The PowerShell scripts
 
-Every `.ps1` under this folder, 179 of them, by area: `release` builds and
+Every `.ps1` under this folder, 180 of them, by area: `release` builds and
 ships, `deploy` puts things on the VPS, `vps` looks after the box, `ops` runs
 the world day to day, `mods` works on the collection and the plugins, `dev`
 is for whoever is changing this repository. `oneoff` holds finished one time
@@ -164,6 +164,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/Sign-Artifact.ps1](release/Sign-Artifact.ps1) | Signs a built binary, or says plainly that it is not signing and carries on. |
 | [release/Source-Notice.ps1](release/Source-Notice.ps1) | The note and licence texts that go inside every download on the update feed that carries SkyMP files. |
 | [release/Sync-Client.ps1](release/Sync-Client.ps1) | Puts the client runtime built from the fork into the game folder, and refuses any file that is not the recorded build. |
+| [release/Test-SignPilot.ps1](release/Test-SignPilot.ps1) | Signs and verifies a throwaway TEST artifact only, to pilot the signed release design (issue #2163). Never touches a release, the feed or release.yml. |
 | [release/Where.ps1](release/Where.ps1) | Says where the engine fork and the build output are, so every script asks one place instead of carrying its own copy of a path. |
 | [vps/Add-VpsKey.ps1](vps/Add-VpsKey.ps1) | Puts another person's public SSH key on the VPS, so they can run the scripts that talk to it from their own machine without ever holding the Administrator password. |
 | [vps/Backup-Server.ps1](vps/Backup-Server.ps1) | Pulls everything off the server that could not be rebuilt from the repo, and puts it in a dated zip on this machine: in local\backups in the repository (Where.ps1 Backups), or the folder -Out names. |
