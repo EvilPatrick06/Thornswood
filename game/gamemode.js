@@ -49426,9 +49426,8 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
 
     if (verb === 'new') {
       var made = soc.newJournal(actorId, parts.slice(2).join(' '));
-      // A repeated press says nothing, and the full refusal is said once a
-      // FULL_SAY_MS per character rather than once per press (#2037).
-      if (made.again) { return ''; }
+      // The full refusal is said once a FULL_SAY_MS per character rather than
+      // once per press (#2037).
       if (made.full) {
         var fullAt = journalFullSaid[actorId] || 0;
         if (Date.now() - fullAt < FULL_SAY_MS) { return ''; }
@@ -57728,18 +57727,17 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     one directional: sharing a page with somebody puts it in their list of
     things shared with them, and it stays yours.
   */
-  var NEW_JOURNAL_GAP_MS = 2000;
   function newJournal(actorId, title) {
     var s = stateOf(actorId);
     if (s.journals.length >= SOCIAL.mostJournals) {
       return { why: 'You are carrying as many journals as you can.', full: true };
     }
-    // ONE PRESS, ONE JOURNAL (#2037). A second New inside NEW_JOURNAL_GAP_MS of
-    // the last journal made is the same press arriving again, and makes nothing.
-    var last = s.journals.length ? s.journals[s.journals.length - 1] : null;
-    if (last && Date.now() - (Number(last.at) || 0) < NEW_JOURNAL_GAP_MS) {
-      return { why: '', again: true };
-    }
+    // Every /journal new that reaches this is a request of its own (#2135).
+    // The panel sends one per press and holds further presses until the
+    // journal shows (thornswood-journal.js, #2037), the chat sends a line
+    // once, and a command offered again under its id runs once (commandsRun).
+    // tests/test-2135-journal-press.js counts it. So there is no time window
+    // here: the 2 s one #2037 added guessed at a repeat nothing makes.
     var j = {
       id: 'j' + Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(36),
       title: String(title || 'Journal').slice(0, 60),
