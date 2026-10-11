@@ -270,7 +270,12 @@ jobs:
           # tests\test-launcher-icons.js fails if any frame of
           # launcher\app.ico matches a frame of site\public\favicon.ico, or
           # if app.ico and app-dev.ico share a frame.
-          $six = 'test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
+          # Issue #485: the whose-game gate is one copy, in
+          # thornswood-front.js, and every other plugin reads it on the first
+          # tick and stays idle without it. tests\test-whose-game-gate.js
+          # runs each plugin in a sandbox and fails on a second copy or a
+          # reader that wakes without the check. Under a second.
+          $six ='test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
                  'test-third-party.js',
@@ -447,6 +452,7 @@ jobs:
                  'test-build-vs-install.ps1',
                  'test-ship-dry-run.ps1',
                  'test-launcher-icons.js',
+                 'test-whose-game-gate.js',
                  'test-gate-list.ps1'
           $failed = @()
           foreach ($n in $six) {
