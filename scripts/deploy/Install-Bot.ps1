@@ -897,25 +897,13 @@ try {
   }
 } catch { }
 [IO.File]::WriteAllText(`$f, (`$env2 | ConvertTo-Json -Depth 4), (New-Object Text.UTF8Encoding(`$false)))
-# Locked down, but not so far that the thing meant to read it cannot. The bot
-# runs as NT SERVICE\ThornswoodBot now, and Bot-Service.ps1 grants that
-# account read on this file below, after this rewrites the rules, every full
-# run. SYSTEM stays for the nightly backup, which runs as SYSTEM and copies
-# this folder. A file its reader cannot open is how the bot once started with
-# no token and exited immediately.
-try {
-  `$acl = Get-Acl `$f
-  `$acl.SetAccessRuleProtection(`$true, `$false)
-  foreach (`$r in @(`$acl.Access)) { [void]`$acl.RemoveAccessRule(`$r) }
-  foreach (`$sid in @('S-1-5-18', 'S-1-5-32-544')) {   # SYSTEM, Administrators
-    `$who = (New-Object Security.Principal.SecurityIdentifier(`$sid)).Translate([Security.Principal.NTAccount])
-    `$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(
-      `$who, 'FullControl', 'Allow')))
-  }
-  `$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(
-    [Security.Principal.WindowsIdentity]::GetCurrent().Name, 'FullControl', 'Allow')))
-  Set-Acl `$f `$acl
-} catch { 'could not tighten bot.env.json: ' + `$_.Exception.Message }
+# Locked down, but not so far that the thing meant to read it cannot: SYSTEM,
+# Administrators and this account, plus read for NT SERVICE\ThornswoodBot,
+# given in the same write (Protect-ThornswoodBotEnv in Write-BotToken.ps1,
+# issue #2158). SYSTEM stays for the nightly backup. A file its reader cannot
+# open is how the swap once failed and left the bot stopped.
+try { Protect-ThornswoodBotEnv -Path `$f -Service '$Service' }
+catch { 'could not tighten bot.env.json: ' + `$_.Exception.Message }
 'panel channel: #' + (`$env2['TICKET_CHANNEL'] -replace ',', ' or #')
 'closed tickets: #' + (`$env2['TICKET_LOG'] -replace ',', ' or #') + '  (staff only)'
 'join cards:    #' + `$env2['JOIN_CHANNEL']
