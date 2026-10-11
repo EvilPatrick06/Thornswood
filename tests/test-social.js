@@ -371,6 +371,16 @@ if (social && trade) {
     const made = w.soc.newJournal(A, 'The Road North');
     yes('a journal can be started', !!made.journal && made.journal.title === 'The Road North');
     const jid = made.journal.id;
+    // Since #2037 (#2117) a second New inside NEW_JOURNAL_GAP_MS of the last
+    // journal is taken as the same press arriving again and makes nothing, so
+    // the second journal is started once that gap has passed.
+    const gm = /var NEW_JOURNAL_GAP_MS = (\d+);/.exec(src);
+    const gap = gm ? +gm[1] : NaN;
+    yes('newJournal names the gap a second New has to wait (' + gap + ' ms)', gap > 0);
+    const again = w.soc.newJournal(A, 'Recipes');
+    yes('a second New inside that gap makes nothing',
+        !again.journal && again.again === true && w.soc.stateOf(A).journals.length === 1);
+    w.clock.now += gap;
     const second = w.soc.newJournal(A, 'Recipes');
     yes('and more than one, which is what was asked for',
         !!second.journal && w.soc.stateOf(A).journals.length === 2);
