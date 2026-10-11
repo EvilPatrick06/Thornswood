@@ -4,7 +4,7 @@
       pwsh -NoProfile -File .\tests\test-play-stuck-game.ps1
 
   The Play path's guards that no harness ran: ClearStuckGame,
-  CloseGameWaiting, ClearLeftovers and EnsureServer in launcher\app\Shell.cs.
+  CloseGameWaiting, ClearLeftovers and EnsureServer in launcher\app\Shell.cs and ShellPlay.cs.
 
   Each method is lifted out of the real Shell.cs (the brace-matched body, the
   way test-play-progress.ps1 reads its wiring) and compiled with the .NET
@@ -55,7 +55,9 @@ function Body([string]$src, [string]$start) {
 $shellPath = Join-Path $AppDir 'Shell.cs'
 Yes 'Shell.cs is in the launcher source' (Test-Path -LiteralPath $shellPath)
 if (-not (Test-Path -LiteralPath $shellPath)) { Done }
-$shell = [IO.File]::ReadAllText($shellPath, [Text.Encoding]::UTF8)
+# Since #500 the Play session (Play, EnsureServer, ClearStuckGame,
+# CloseGameWaiting) is in ShellPlay.cs; ClearLeftovers stays in Shell.cs.
+$shell = [IO.File]::ReadAllText($shellPath, [Text.Encoding]::UTF8) + "`n" + [IO.File]::ReadAllText((Join-Path $AppDir 'ShellPlay.cs'), [Text.Encoding]::UTF8)
 
 $sigs = @('static bool ClearStuckGame(bool askIfVisible)', 'static string CloseGameWaiting(out int closed)',
           'static string ClearLeftovers()', 'static bool EnsureServer()')
@@ -232,7 +234,7 @@ finally { Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyCon
 
 # ---- 2. the order of Play's steps, read from the file ----------------------
 $play = Body $shell 'static void Play()'
-Yes 'Play() is in Shell.cs' ($play.Length -gt 0)
+Yes 'Play() is in ShellPlay.cs' ($play.Length -gt 0)
 $steps = @('if (updatePending)', 'if (collectionBarUp)', 'if (ownGameBusy)', 'File.Exists(Paths.Loader)',
            'ClearStuckGame(true)', 'Verify.Run(cfg)', 'EnsureServer()', 'Keep.Restore()', 'Hold.Take(', 'Swap.Apply()', 'Process.Start(psi)')
 $prev = -1; $prevName = 'the top'
