@@ -83,7 +83,8 @@ if (Test-Path -LiteralPath $cm) {
 # MSB1009 for want of ALL_BUILD.vcxproj. Configured is the solution.
 Yes 'it calls the build configured only when ALL_BUILD.vcxproj is there' (
     $text -match "\`$solution = Join-Path \`$build 'ALL_BUILD\.vcxproj'" -and
-    $text -match 'if \(Test-Path -LiteralPath \$solution\) \{ Ok "already configured' -and
+    $text -match 'if \(\(Test-Path -LiteralPath \$solution\) -and \$Check\) \{ Ok "already configured' -and
+    $text -match 'elseif \(Test-Path -LiteralPath \$solution\) \{' -and
     $text -notmatch 'if \(Test-Path -LiteralPath \$cache\) \{ Ok "already configured')
 
 # On a machine without the tools: it says what is missing and builds nothing.
