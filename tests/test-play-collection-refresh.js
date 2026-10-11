@@ -62,7 +62,7 @@ const chars = read('ShellChars.cs');
 const shell = read('Shell.cs');
 const due = body(own, 'static bool OwnGameRefreshIfDue()');
 const startPlay = body(chars, 'static void StartPlay()');
-const play = body(shell, 'static void Play()');
+const play = body(read('ShellPlay.cs'), 'static void Play()');
 const wire = body(own, 'static void WireOwnGame()');
 
 yes('OwnGameRefreshIfDue exists', due.length > 0);
