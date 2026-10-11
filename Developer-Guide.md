@@ -50,6 +50,7 @@ The outline nests, and the table of contents follows it. A part is a numbered se
     - [Fix the cause, no band-aids](#fix-the-cause-no-band-aids)
     - [Buttons, not chat commands](#buttons-not-chat-commands)
     - [Everything we need to do goes on the board](#everything-we-need-to-do-goes-on-the-board)
+    - [What is not a reason to skip an issue](#what-is-not-a-reason-to-skip-an-issue)
     - [Settled design, not up for a quiet rewrite](#settled-design-not-up-for-a-quiet-rewrite)
     - [How work moves](#how-work-moves)
       - [Main, hotfixes, and merging](#main-hotfixes-and-merging)
@@ -907,6 +908,29 @@ How to use it:
 - A pull request that finishes an issue says `Closes #N`, so merging closes
   it and the board moves it to Done. Say in the pull request, or in #staff-general,
   which issues moved.
+
+#### What is not a reason to skip an issue
+
+Decided by Patrick on 11 Oct, after a pick of ten issues to work left out the
+ones that needed him, needed the VPS, or named a later date. Choosing work
+from the board, none of these three puts an issue aside:
+
+- **It needs Patrick's decision.** Write the decision out in full, on the
+  issue and to him: what is wrong, what was measured, each option and what it
+  would do, and which one you recommend. Then he answers and the work goes
+  ahead. His words: "If it needs my decision just give me the decision in
+  full with my different options so we can get them done".
+- **It needs the VPS.** The key is on the shipping machine and the scripts in
+  `scripts\vps` and `scripts\deploy` reach the box, so VPS work is done by
+  whoever takes the issue, not handed to Patrick. When a tool or permission
+  layer refuses a command, say which one and ask Patrick for the rule. His
+  words: "You have VPS access so you can do those ones".
+- **It waits on a date.** Many dates written in issues were made up by an
+  agent that did not want to do the work then. Check whether something real
+  waits on that date, a release that is not out yet or a booked event, and if
+  nothing does, do the work now. His words: "A date that hasn't come yet
+  those might just be made up dates because agents were too lazy do those
+  issues now".
 
 #### Settled design, not up for a quiet rewrite
 
