@@ -184,6 +184,11 @@ function Select-Removed([string[]]$removed) {
 function Get-Shipped($files, $collection, $prefix, $optional) {
     $vortexFiles = $collection
     $optionalPrefixes = $optional
+    # $GameDir is the folder $prefix was made from, as it is in Package-Thornswood
+    # and in the pack's stand-in above. Without it Ship-Rules cannot find build.js,
+    # so the front's hashed assets under Data\Platform\UI read as somebody else's
+    # and this machine's installer column left them out while the pack kept them.
+    $GameDir = $prefix.TrimEnd('\')
     $ship = @(); $skipBytes = 0; $shipBytes = 0; $optionalBytes = 0; $optionalCount = 0; $machineCount = 0
     $collectionBytes = 0; $collectionCount = 0
     $clientShipped = 0
