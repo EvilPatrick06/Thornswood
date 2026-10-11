@@ -163,7 +163,7 @@ These cookies make the site and the age gate work. They are not advertising and 
 - **twa**. Signed Discord identity cookie for signed-in accounts, lasting up to 30 days. HttpOnly. Staff permissions are checked from roles, not granted by the cookie alone. Cleared on sign-out.
 - **twst_***. One-use security cookies for a Discord sign-in, lasting ten minutes and scoped to `/auth/discord`. HttpOnly. Cleared when sign-in returns.
 - **tw**. Fallback member-password cookie when Discord sign-in is not configured, lasting up to one year. HttpOnly. Ignored when Discord is configured; cleared on sign-out.
-- **tw-age-18**. Records that this browser stated eighteen or older. The cookie lasts one year. The localStorage copy has no automatic expiry. Not HttpOnly. Clearing site storage means the gate asks again. This is not verified age.
+- **tw-age-18**. Records that this browser stated eighteen or older. The cookie and the localStorage copy both last one year, and both ask again if the gate's wording changes what you agreed to. Not HttpOnly. Clearing site storage means the gate asks again. This is not verified age.
 
 Sign-in cookies use SameSite=Lax and Secure when served over HTTPS. See the
 [cookie policy](/cookies) for their purposes and how to clear them.
