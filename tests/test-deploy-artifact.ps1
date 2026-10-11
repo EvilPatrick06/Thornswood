@@ -319,19 +319,31 @@ try {
     New-Item -ItemType Directory -Force -Path (Join-Path $partRoot 'data') | Out-Null
     $global:tsScp = @()
     $global:tsSsh = 0
+    $global:tsFarTemp = (Join-Path $box 'Temp').Replace('\', '/') + '/'
+    New-Item -ItemType Directory -Force -Path $global:tsFarTemp | Out-Null
     function global:scp {
         $far = [string]$args[-1]; $local = [string]$args[-2]
         $path = $far.Substring($far.IndexOf(':', $far.IndexOf('@')) + 1)
+        # The box's C:/Windows/Temp is the stand-in box's own temp, never this
+        # machine's (a non-admin runner may not remove files there).
+        $path = $path.Replace('C:/Windows/Temp/', $global:tsFarTemp)
         $global:tsScp += $path
         Copy-Item -LiteralPath $local -Destination $path -Force
         $global:LASTEXITCODE = 0
     }
     function global:ssh {
         $global:tsSsh++
-        $cmd = [string]$args[-1]
-        $b64 = ($cmd -split ' ')[-1]
-        $text = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($b64))
-        & ([ScriptBlock]::Create($text))
+        $cmd = ([string]$args[-1]).Replace('C:/Windows/Temp/', $global:tsFarTemp)
+        # A script past Send-Script.ps1's limit (the store's lock from
+        # Lock-Folder.ps1 makes Send-ThornswoodArtifact's one) comes by scp and
+        # runs by -File, and is removed by -Command after.
+        if ($cmd -match ' -File (\S+)$') { & ([ScriptBlock]::Create([IO.File]::ReadAllText($Matches[1]))) }
+        elseif ($cmd -match ' -Command (.+)$') { & ([ScriptBlock]::Create($Matches[1])) }
+        else {
+            $b64 = ($cmd -split ' ')[-1]
+            $text = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($b64))
+            & ([ScriptBlock]::Create($text))
+        }
         $global:LASTEXITCODE = 0
     }
     try {

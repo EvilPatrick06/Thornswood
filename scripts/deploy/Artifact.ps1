@@ -64,6 +64,7 @@
 . (Join-Path $PSScriptRoot '..\vps\Vps.ps1')
 
 . (Join-Path $PSScriptRoot '..\vps\Send-Script.ps1')
+. (Join-Path $PSScriptRoot '..\vps\Lock-Folder.ps1')
 
 $script:ThornswoodDeployStore = 'C:/Thornswood-Deploys'
 
@@ -557,6 +558,7 @@ function Send-ThornswoodArtifact {
   $dir = $store + '/' + $Artifact.Component
   $zipWin = ($dir + '/' + $Artifact.Name).Replace('/', '\')
   $ask = @"
+$(Get-ThornswoodLockedFolderScript $store.Replace('/', '\'))
 New-Item -ItemType Directory -Force -Path '$($dir.Replace('/', '\'))', '$($store.Replace('/', '\'))\current' | Out-Null
 if (Test-Path -LiteralPath '$zipWin') { 'HAS ' + (Get-FileHash -LiteralPath '$zipWin' -Algorithm SHA256).Hash.ToLowerInvariant() } else { 'HAS none' }
 "@
