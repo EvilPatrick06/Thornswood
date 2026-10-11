@@ -793,6 +793,16 @@ if (Test-Path -LiteralPath $ep) { 'ESP ' + (Get-Item -LiteralPath $ep).Length } 
       $changed += ('{0}  {1:N0} -> {2:N0} bytes' -f $n, $thereSize[$n], $localLen)
     }
   }
+  # THE COLLECTION'S BYTES, NOT THIS MACHINE'S (#2019). A plugin goes up when
+  # its size differs from the box's, from whatever -Data holds. On 5 Oct that
+  # sent a 3BBB.esp from another installer choice to both servers and blocked
+  # Play for everybody on the collection. Every plugin about to go, except our
+  # own, has to be the one records\collection-plugins.json holds; a deploy
+  # that would send any other stops here, naming it, with nothing sent. With
+  # no record it stops too: nothing else can say those bytes are the
+  # collection's. Only the plugins about to go are read.
+  . (Join-Path $Here 'CollectionPlugins.ps1')
+  Assert-ThornswoodCollectionPlugins -RecordPath (Join-Path $Here '..\..\records\collection-plugins.json') -Files $sendPlugins -Exempt 'Thornswood-Content.esp' -What 'this deploy'
   Write-Host ''
   Write-Host ('  load order: {0} plugins, paths rewritten to {1}' -f $pluginNames.Count, $remotePlugins) -ForegroundColor DarkGray
   if ($sendPlugins.Count) {
