@@ -97,15 +97,23 @@ band-aids" is the rule for everybody. For a Claude it also means:
 
 Decided by Patrick on 4 Oct: never add a chat command for something people do in the world, only for staff and dev. `/stuck`, the lines that reach staff (`/helpme`, `/report`), the ways of saying a line (`/me`, `/do`, `/w`, `/s`, `/y`, `/ooc`) and `/roll` stay commands with no buttons, and help text names them; docs\SYSTEMS.md "Buttons, not commands" is the rule and what counts as a button.
 
-### Every reply ends with the commands, in order, and what each one is for
+### What the person must decide or run opens the reply, one whole item each
 
-Asked for by Patrick on 19 Sep, after four pushes went out and not one pull
-request was created, because the commands in the reply were missing a
-`git checkout` and nobody could tell from reading them.
+Changed by Patrick on 11 Oct, after a reply put "your decisions" and a block of
+commands at the end, lumped together and missing pieces: "stop doing that
+were you will have a my decision report and commands for me to run and 1. not
+do it at the end 2. not group it all together 3. Not give me all the commands
+and info I need". So a reply that needs something from the person starts with
+it, before the report of what was done. Each decision and each run is its own
+numbered item that stands alone: what it is, what was measured, the options
+and what each does with a recommendation, and every command that item needs,
+so nothing has to be pieced together from elsewhere in the reply.
 
-So a reply that leaves anything for a person to run ends with a block of the
-exact commands, in the order they are run, each with a line saying what it
-does and what it should print when it worked. No "then open a pull request",
+The commands themselves, asked for by Patrick on 19 Sep, after four pushes
+went out and not one pull request was created, because the commands in the
+reply were missing a `git checkout` and nobody could tell from reading them:
+inside its item, the exact commands, in the order they are run, each with a
+line saying what it does and what it should print when it worked. No "then open a pull request",
 no "deploy it": the literal line, copy and paste, from whatever directory the
 reply says to start in. If a command needs a different directory, the `cd` is
 one of the commands. If one of them is Patrick's rather than the person's
