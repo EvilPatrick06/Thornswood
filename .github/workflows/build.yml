@@ -1,4 +1,4 @@
-# Every pull request and every push to main gets the checks a release starts
+﻿# Every pull request and every push to main gets the checks a release starts
 # with: do all the PowerShell scripts parse, does every game script parse,
 # does the bot parse, do the test harnesses still pass, and does the launcher
 # compile with the .NET Framework 4 csc (C# 5). A red mark here means the
