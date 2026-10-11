@@ -417,7 +417,9 @@ function Test-ShipUiOurs([string]$rel, [string]$leaf) {
 function Test-ShipUiGoneByHash([string]$rel) {
     $game = Get-Variable -Name GameDir -ValueOnly -ErrorAction SilentlyContinue
     if (-not $game) { return $false }
-    $full = Join-Path ([string]$game) $rel
+    # [IO.Path]::Combine, not Join-Path: Join-Path throws on a drive this
+    # machine has not got (the test's X:\Game\ fakes on the nightly runner).
+    $full = [IO.Path]::Combine([string]$game, $rel)
     $have = Get-ShipFileSha256 $full
     if (-not $have) { return $false }
     return $ShipDaedricMenuHashes.Contains($have)
