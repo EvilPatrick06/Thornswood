@@ -412,6 +412,7 @@ jobs:
                  'test-our-key-menus.js', 'test-slash-key.js', 'test-social-keys.js',
                  'test-site-auth.js',
                  'test-site-route-gaps.js',
+                 'test-site-credits-fill.js', 'test-deployed-build.ps1',
                  'test-site-headers.js',
                  'test-site-render.js', 'test-site-discovery.js',
                  'test-home-status.js', 'test-seats.js', 'test-age-gate.js', 'test-download-hash.js',
