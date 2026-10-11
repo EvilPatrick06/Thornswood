@@ -18,6 +18,16 @@ it belongs to, before the session ends (Developer-Guide.md says where the board
 is and how its order works). Saying it in a reply is not recording it: a
 reply is gone when the window closes. Say in the reply which issues moved.
 
+## Picking issues to work
+
+Decided by Patrick on 11 Oct: needing his decision, needing the VPS, and
+waiting on a date are not reasons to leave an issue out of a pick.
+Developer-Guide.md "What is not a reason to skip an issue" is the rule. For a
+Claude: a decision goes to him written out in full in the same reply (what is
+wrong, what was measured, each option, a recommendation), not as a terse
+picker; and a date in an issue is checked against what really waits on it
+before it is trusted.
+
 ## What a Claude here does itself and what the person does
 
 Read anything. Run git status, diff, log, fetch, the read only scripts
