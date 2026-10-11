@@ -124,7 +124,7 @@ param(
 . (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
 # A stale or dirty checkout sends old or unlanded code; refuse it (#2118).
-. (Join-Path $PSScriptRoot '..\deploy\Fresh-Checkout.ps1'); Assert-FreshCheckout -RepoDir (Join-Path $PSScriptRoot '..\..') -What 'Publish-Server' -AllowStale:$AllowStaleCheckout
+. (Join-Path $PSScriptRoot '..\deploy\Fresh-Checkout.ps1'); Assert-FreshCheckout -RepoDir (Join-Path $PSScriptRoot '..\..') -What 'Publish-Server' -Target $VpsHost -AllowStale:$AllowStaleCheckout
 if (-not $Record) { $Record = Join-Path $PSScriptRoot '..\..\records\server-build.json' }
 
 # The two that the channel decides, unless they were given outright. An

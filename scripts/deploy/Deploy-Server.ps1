@@ -173,7 +173,7 @@ param(
 )
 
 # A stale or dirty checkout sends old or unlanded code; refuse it (#2118).
-. (Join-Path $PSScriptRoot '..\deploy\Fresh-Checkout.ps1'); Assert-FreshCheckout -RepoDir (Join-Path $PSScriptRoot '..\..') -What 'Deploy-Server' -AllowStale:$AllowStaleCheckout
+. (Join-Path $PSScriptRoot '..\deploy\Fresh-Checkout.ps1'); Assert-FreshCheckout -RepoDir (Join-Path $PSScriptRoot '..\..') -What 'Deploy-Server' -Target $Vps -AllowStale:$AllowStaleCheckout
 
 $ErrorActionPreference = 'Stop'
 $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')

@@ -109,6 +109,42 @@ try {
     Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
 }
 
+# ------------------------------------------- the harness stand-in only ---
+# Skipped only when THORNSWOOD_HARNESS is 1 AND the box is harness.invalid.
+$keepH = $env:THORNSWOOD_HARNESS; $keepV = $env:THORNSWOOD_VPS
+try {
+    $env:THORNSWOOD_HARNESS = ''; $env:THORNSWOOD_VPS = ''
+    Yes 'j1: the marker is a reserved .invalid name, which never resolves' ($script:FreshHarnessHost -eq 'harness.invalid')
+    Yes 'j2: harness.invalid without THORNSWOOD_HARNESS=1 is not the stand-in' (-not (Test-FreshHarnessStandIn 'harness.invalid'))
+    $env:THORNSWOOD_HARNESS = '1'
+    Yes 'j3: THORNSWOOD_HARNESS=1 with no box named is not the stand-in' (-not (Test-FreshHarnessStandIn ''))
+    Yes 'j4: both together is the stand-in' (Test-FreshHarnessStandIn 'harness.invalid')
+    $env:THORNSWOOD_VPS = 'harness.invalid'
+    Yes 'j5: so is THORNSWOOD_VPS=harness.invalid for a script that takes no -Vps' (Test-FreshHarnessStandIn '')
+    Yes 'j6: but an explicit real -Vps wins over it' (-not (Test-FreshHarnessStandIn '192.135.112.23'))
+    $plainDir = Join-Path ([IO.Path]::GetTempPath()) ('fresh-plain-' + [guid]::NewGuid().ToString('N').Substring(0, 6))
+    New-Item -ItemType Directory $plainDir | Out-Null
+    $m = ''; try { Assert-FreshCheckout -RepoDir $plainDir -What 'x' -Target 'harness.invalid' *> $null } catch { $m = $_.Exception.Message }
+    Yes 'j7: the stand-in goes through even from a folder that is no checkout' ($m -eq '')
+    Remove-Item -Recurse -Force $plainDir
+
+    # The live and dev boxes can never be the stand-in: every host vps.json,
+    # this machine's own file and the scripts name, with the flag on.
+    $vj = Get-Content -Raw (Join-Path $Repo 'scripts\vps\vps.json') | ConvertFrom-Json
+    $hosts = @([string]$vj.address)
+    $local = Join-Path (Join-Path ([string]$env:LOCALAPPDATA) 'Thornswood') 'vps.json'
+    if ($env:LOCALAPPDATA -and (Test-Path $local)) { try { $hosts += [string](Get-Content -Raw $local | ConvertFrom-Json).address } catch { } }
+    $scan = Get-ChildItem (Join-Path $Repo 'scripts') -Recurse -Include *.ps1, *.json | ForEach-Object { Get-Content -Raw -LiteralPath $_.FullName }
+    foreach ($s in $scan) {
+        foreach ($mm in [regex]::Matches([string]$s, '\b(?:\d{1,3}\.){3}\d{1,3}\b|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:net|com|org|io|gg|invalid)\b')) { $hosts += $mm.Value }
+    }
+    $hosts = @($hosts | Where-Object { $_ } | Sort-Object -Unique)
+    $env:THORNSWOOD_VPS = ''
+    $hit = @($hosts | Where-Object { $_ -ne 'harness.invalid' -and (Test-FreshHarnessStandIn $_) })
+    Yes "j8: none of the $($hosts.Count) hosts the scripts name, live and dev box included, is the stand-in" ($hit.Count -eq 0 -and $hosts -contains [string]$vj.address)
+    Yes 'j9: and no script names harness.invalid as a real box' (-not ($scan | Where-Object { $_ -match 'harness\.invalid' -and $_ -notmatch 'FreshHarnessHost' }))
+    Yes 'j10: the live/dev address is not .invalid' (-not ([string]$vj.address).EndsWith('.invalid'))
+} finally { $env:THORNSWOOD_HARNESS = $keepH; $env:THORNSWOOD_VPS = $keepV }
 # Every script that sends to the VPS or ships calls it, near the top, and
 # offers the loud override.
 $callers = @(
