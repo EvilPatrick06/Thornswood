@@ -763,6 +763,15 @@ by all of them and sits detached at `origin/main`, because lanes build from
 it: branch work goes in a worktree beside it, removed with its branch once
 the pull request merges.
 
+One rule binds the lanes and not a person (Patrick, 11 Oct): a lane only
+commits, pushes and merges. It never runs a Ship, a Deploy-*, Publish-* or
+Install-* script, a step on the live or dev server, or a Vortex step. For each
+change that needs a run, the lane writes one note in the vault's
+`wiki/claude-queue/` folder with the exact command, its risks, draft release
+notes, and a news post when people would notice; the README in that folder
+has the template. A Claude on the shipping machine runs those notes. A lane
+does not ask anybody to approve a deploy; the note is the hand-off.
+
 #### Words
 
 The people in the world are customers, clients, people, testers, partners.

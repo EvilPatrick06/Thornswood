@@ -28,6 +28,18 @@ wrong, what was measured, each option, a recommendation), not as a terse
 picker; and a date in an issue is checked against what really waits on it
 before it is trusted.
 
+## The runs the lanes leave
+
+Decided by Patrick on 11 Oct: the lanes only commit, push and merge, and a
+Claude runs every Ship, deploy, install, live server and Vortex step for them.
+Each lane writes one note per change in the vault's `wiki/claude-queue/`
+(Developer-Guide.md, the lanes paragraph). At the start of a session on the
+shipping machine, list that folder and run each note: dev ones when they are
+ready, a Main Ship or a live server run when Patrick says so. Afterwards put
+what ran, when, what it printed and the health check on the issue and in
+`wiki/status.md`, and delete the note. A note that cannot run keeps the
+reason written into it.
+
 ## What a Claude here does itself and what the person does
 
 Read anything. Run git status, diff, log, fetch, the read only scripts
