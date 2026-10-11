@@ -804,12 +804,29 @@ Set-Location '$rootWin'
 New-Item -ItemType Directory -Force -Path '$rootWin\$stageName\py-libs' | Out-Null
 & python -m pip install --quiet --disable-pip-version-check --upgrade --target '$rootWin\$stageName\py-libs' -r '$rootWin\$stageName\requirements.txt' 2>&1 | Out-Null
 if (`$LASTEXITCODE -eq 0) { 'discord.py, pillow and certifi ready, in py-libs, at the versions in requirements.txt' } else { 'PIP FAILED with ' + `$LASTEXITCODE }
+# pip --target builds in a folder made by Python's tempfile.mkdtemp, which on
+# Windows (Python 3.12.4 and later) holds only SYSTEM, Administrators and its
+# owner, with no inheritance, and then renames the files into py-libs. A
+# rename keeps them that way, so the bot's own account could not read its
+# libraries: on 11 Oct the first full install since py-libs came in (#1543)
+# stopped on PermissionError for typing_extensions.py and rolled back. Put
+# every file under the stage's own rules, the bot folder's, and refuse
+# before the bot is stopped if its account still cannot read one.
+& icacls '$rootWin\$stageName\py-libs' /reset /T /Q 2>&1 | Out-Null
+if (`$LASTEXITCODE -ne 0) { 'PY-LIBS NOT RESET: icacls exited ' + `$LASTEXITCODE }
+`$rx = [Security.AccessControl.FileSystemRights]::ReadAndExecute
+`$shut = @(Get-ChildItem -LiteralPath '$rootWin\$stageName\py-libs' -File -Recurse | Where-Object {
+  -not @((Get-Acl -LiteralPath `$_.FullName).Access | Where-Object {
+    `$_.IdentityReference.Value -eq 'NT SERVICE\$Service' -and `$_.AccessControlType -eq 'Allow' -and (`$_.FileSystemRights -band `$rx) -eq `$rx })
+})
+if (`$shut.Count) { 'PY-LIBS NOT READABLE by NT SERVICE\${Service}: ' + `$shut.Count + ' file(s), first ' + `$shut[0].Name }
 `$env:PYTHONPATH = '$rootWin\$stageName\py-libs'
 `$ca = (& python -c "import certifi; print(certifi.where())" 2>&1 | Select-Object -Last 1)
 if (`$ca -and (Test-Path `$ca)) { 'root certificates at ' + `$ca } else { 'COULD NOT FIND certifi, TLS will fail' }
 "@)
 $libs | ForEach-Object { Say "  $_" }
 if ("$libs" -match 'PIP FAILED') { Die 'the libraries did not install into py-libs, so the bot was not stopped or changed.' }
+if ("$libs" -match 'PY-LIBS NOT') { Die "the bot's account could not read py-libs, so the bot was not stopped or changed." }
 
 # --------------------------------------------------------------- token ---
 $token = ''
