@@ -1,7 +1,7 @@
-﻿<#
+<#
   DocsPasswordFile.ps1
 
-  Where Deploy-Docs.ps1 -Password gets the site's member password when nobody
+  Where the site's member password comes from for Deploy-Docs.ps1 -Password, when nobody
   types it (issue #2116): a file on the box, locked to the box's Administrators
   and the deploy account. The value is read on the box and goes straight into
   the site's config.json, so it never crosses the wire, never sits on a
