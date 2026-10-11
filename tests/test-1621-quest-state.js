@@ -588,6 +588,31 @@ yes('the miner page says the same', /kept on the character/.test(mWhere) &&
   vm.runInContext(gm.slice(start,end),w.ctx);w.ctx.mineOre(88,here[0],'test');
   yes('the outer mining caller cannot replace the session before rare-work capture',have(88,EBONY.ore)===0);
 }
+{
+  ranks['89:miner']='master';w=restart();w.svc.offer(89,'ebony');let stopped=0;
+  w.ctx.__identityToken='old';w.ctx.mining=()=>true;w.ctx.stopMining=()=>stopped++;
+  w.ctx.__thornswoodMerchantTrade.questReady=()=>{w.ctx.__identityToken='new';return true;};
+  w.svc.mineRare(89,here[0],EBONY);
+  yes('readiness cannot stop a replacement session mining spell',stopped===0);
+}
+{
+  const timers=[],writes=[];let runtime='100';
+  const start=gm.indexOf('function swing(actorId, anim, lands, opts) {');
+  const finish=gm.indexOf('\nconst SWING_QUIET',start);
+  const ctx={mp:{set:(...args)=>writes.push(args),getActorRuntimeIdentity:()=>runtime},
+    setTimeout:(fn,ms)=>{timers.push({fn,ms});return timers.length;},clearTimeout(){},
+    guard:(label,fn)=>fn,SWING_PROPERTY:'swing',SWING_STOP:'stop',SWING_FREE:'free',
+    SWING_MS:2500,SWING_LAND_MS:900,SWING_QUIET:{},SWING_IN_AIR:{},SWING_CLEAR:{},log(){}};
+  vm.createContext(ctx);vm.runInContext(gm.slice(start,finish),ctx);
+  ctx.swing(90,'old',null,{alive:()=>{ctx.swing(90,'new',null,{});return true;}});
+  timers[0].fn();
+  yes('a cleanup validation callback cannot erase a newer swing',writes.at(-1)[2].anim==='new');
+  ctx.swingEnd(91,1);const endTimer=timers.at(-1);
+  ctx.swing(91,'new',null,{});const count=writes.length;endTimer.fn();
+  yes('a mining-stop timer cannot erase a newer swing',writes.length===count);
+  ctx.swingEnd(92,1);const revoked=timers.at(-1);runtime='101';const before=writes.length;revoked.fn();
+  yes('a mining-stop timer cannot write into a replacement session',writes.length===before);
+}
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

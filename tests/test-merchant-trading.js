@@ -137,6 +137,16 @@ box.world.actors[10].pos=[900,0,0];
 box.api.command({actorId:10,profileId:7,parts:['/merchant','quest','take','ebony']});
 assert.equal(questCalls.length,0,'out-of-reach quest action cannot reach the controller');
 box.world.actors[10].pos=[0,0,0];open(box.api);
+{
+  const actor=box.world.actor;
+  box.world.actor=function(id) {
+    if(id===1)box.world.actors[10].runtimeIdentity='102';
+    return actor(id);
+  };
+  box.api.command({actorId:10,profileId:7,parts:['/merchant','quest','abandon','ebony']});
+  assert.equal(questCalls.length,0,'a merchant location callback cannot redirect an old panel into a replacement session');
+  box.world.actor=actor;
+}
 
 const cooldownPanel=service({on:true},250);
 let cooling=true;
