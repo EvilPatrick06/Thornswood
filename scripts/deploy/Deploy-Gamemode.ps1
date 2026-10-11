@@ -387,7 +387,7 @@ else {
     $cfgPath = Join-Path (Split-Path -Parent $Data) 'config.json'
     if (-not (Test-Path -LiteralPath $cfgPath)) { $cfgPath = Join-Path (Find-Root) 'config.json' }
     $colUrl = ''
-    try { $colUrl = [string](Get-Content -LiteralPath $cfgPath -Raw | ConvertFrom-Json).CollectionUrl } catch { }
+    try { $colUrl = [string](ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $cfgPath -Raw) $cfgPath).CollectionUrl } catch { }
     $cs = Get-CollectionState $colUrl
     if ($cs.Known) {
         if ($cs.Behind -and -not $IgnoreRevision) {
