@@ -56,7 +56,7 @@ the same public branch:
 | Channel | Feed | The six client files are built from |
 |---|---|---|
 | Public | `feed/version.json` | [`0f54ad45`](https://github.com/EvilPatrick06/skymp/tree/0f54ad45) |
-| Dev | `feed-dev/version.json` | [`0f54ad45`](https://github.com/EvilPatrick06/skymp/tree/0f54ad45) |
+| Dev | `feed-dev/version.json` | [`f1e18a4a`](https://github.com/EvilPatrick06/skymp/tree/f1e18a4a) |
 
 | File | Built from | Licence |
 |---|---|---|
