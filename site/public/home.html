@@ -121,8 +121,22 @@
     whole. If either file is replaced, take it from the render the launcher
     strip is cut from, not from the strip.
   -->
+  <!--
+    DECORATIVE (#2193). The painting says nothing the page does not say in
+    words, so the video is hidden from assistive technology (aria-hidden),
+    kept out of the tab order (tabindex -1), carries no controls, and has no
+    fallback text: a browser that cannot play it shows the poster, and a
+    screen reader has nothing to announce. disablepictureinpicture and
+    disableremoteplayback keep the browser from laying its own picture in
+    picture and cast buttons over it, which would be a media control with no
+    name. The only way to move it is the labelled button below
+    (#bannerMotion), which home.js shows, names and keeps in step, and which
+    stays in the tab order. Reduced motion is home.js too: no autoplay
+    attribute here, so nothing starts before it has asked.
+  -->
   <video class="art" muted loop playsinline preload="none"
-         poster="/banner.jpg" aria-hidden="true" tabindex="-1">
+         poster="/banner.jpg" aria-hidden="true" tabindex="-1"
+         disablepictureinpicture disableremoteplayback>
     <source src="/banner.mp4" type="video/mp4">
   </video>
   <div class="wrap">
