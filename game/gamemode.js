@@ -48702,6 +48702,10 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
   // this often per profile (#410).
   var unprovenSaid = {};
   var UNPROVEN_SAY_MS = 600000;
+  // The words handle() refuses to anybody on no list (isPlaytester covers dev,
+  // staff and admin too), before it ever asks for a character.
+  var GATED_WORDS = ['/give', '/spawn', '/tp', '/goto', '/where', '/kick', '/freeze',
+    '/unfreeze', '/bring', '/silence', '/unsilence', '/warn', '/spawnat', '/ban', '/unban', '/pk'];
 
   /* With thornswoodRequirePass on, no pass shown yet for this profile (#410). */
   function passHeld(profileId) {
@@ -48811,6 +48815,13 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
       return;
     }
     if (!profileId || runsNow(word, parts)) { handle(cmd); return; }
+
+    // REFUSED NOW, NOT AFTER ARRIVAL. A word only a listed tier may run, from
+    // somebody on no list, is refused by handle() before it needs a character.
+    // Holding it told them "That will run as soon as you arrive" and then
+    // refused it 90 seconds later, so the refusal goes first (codex sweep,
+    // docs/GAMEMODE-COVERAGE.md).
+    if (GATED_WORDS.indexOf(word) !== -1 && typeof isPlaytester === 'function' && !isPlaytester(profileId)) { handle(cmd); return; }
 
     var q = held[profileId];
     if (!q && actorOf(profileId)) { handle(cmd); return; }
