@@ -1,5 +1,5 @@
 ﻿<#
-  test-docs-password-file.ps1
+  test-docs-pwfile.ps1
 
   Deploy-Docs.ps1 -Password reads the site password from a locked-down file on
   the box (issue #2116), and falls back to the hidden prompt only when that file
