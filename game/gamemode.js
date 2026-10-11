@@ -52089,14 +52089,15 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   maneuvers block and hands it to onHit here.
 
   WHAT IS WORN IS MATCHED TO THE PACK BY THE NAME WITHOUT THE CONDITION.
-  What is worn is read off the equipment, which the client sends, and the
-  client never takes in a new condition on a piece it already holds:
-  skymp5-client's namesEqual (sync/inventory.ts in the fork) drops a
-  trailing "(...)" from both names before comparing, so "Iron Sword (85%)"
-  and "Iron Sword (84%)" are one entry to it and its diff applies nothing.
-  Its equipment keeps naming the piece as it was when it arrived, so a
-  match on the whole name finds the piece once and loses it after the
-  first hit. sameName compares the way the client does.
+  What is worn is read off the equipment record, which the client sends
+  when something goes on or comes off. Since #1651 the client takes a new
+  condition on a piece it holds: its namesEqual (sync/inventory.ts in the
+  fork) compares names exactly, and a piece the pack renames is renamed in
+  the game where it lies, so a worn piece stays worn. This block renames
+  the record's entry in the same step (THE EQUIPMENT RECORD FOLLOWS THE
+  PACK), but the record can still name an older condition for a moment: the
+  client's own report of an equip can cross a rename on the way. So sameName
+  leaves the condition out, and a hit still finds the piece.
 
   THE KITS. A kit is a MISC record and a recipe in Thornswood-Content.esp
   (scripts/mods/Add-ContentRecords.py). KITS says what each one mends,
@@ -52446,6 +52447,17 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       if (!api.setInventory(actorId, next)) {
         return no('The repair could not be written. Nothing was used. Try again in a moment.');
       }
+      // When one unit of a stack is mended and one of them is worn, the
+      // owner's game renames the worn one (renameInventoryItems takes worn
+      // pieces first), so the record renames the worn one too.
+      var mendedWorn = [];
+      try { mendedWorn = api.worn(actorId) || []; } catch (e) { mendedWorn = []; }
+      for (var mw = 0; mw < mendedWorn.length; mw++) {
+        if (packEntryFor(entries, mendedWorn[mw]) === p.i) {
+          renameInRecord(actorId, [{ worn: mendedWorn[mw], to: withCondition(p.entry, to).name }]);
+          break;
+        }
+      }
       api.log('durability:', actorId.toString(16), 'mended', p.name, 'from', p.cond + '%', 'to',
               to + '%', 'with', aWord(kit.name));
       return { ok: true, from: p.cond, to: to, kit: p.kind, baseId: p.entry.baseId,
@@ -52627,17 +52639,142 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       those, the one the pack has flagged worn in the same hand, else any
       flagged worn, else the first.
     */
-    function packEntryFor(entries, w) {
+    function packEntryFor(entries, w, left) {
       var at = -1, best = -1;
       var named = typeof w.name === 'string';
       for (var k = 0; k < entries.length; k++) {
         var e = entries[k];
         if (!e || e.baseId !== w.baseId || !(Number(e.count) > 0)) { continue; }
+        if (left && !(left[k] > 0)) { continue; }
         if (named && !sameName(e, w.name)) { continue; }
         var score = (!!e.worn === !!w.worn && !!e.wornLeft === !!w.wornLeft) ? 2 : ((e.worn || e.wornLeft) ? 1 : 0);
+        // The record's own name first, condition and all: the record follows
+        // the pack (#1651), so of two stacks of one base it names the right
+        // one, where the name without the condition names both.
+        if (named && (e.name || '') === w.name) { score += 4; }
         if (score > best) { at = k; best = score; }
       }
       return at;
+    }
+
+    /*
+      THE EQUIPMENT RECORD FOLLOWS THE PACK (#1651). The engine keeps two
+      lists for a person: the pack, which this block writes, and the
+      equipment record, which says what is worn and which their game writes
+      every time something goes on or comes off. The record names each piece
+      as their game named it then. Their game dresses them at login by
+      finding, for each worn entry in the record, the stack in the pack with
+      the same name and extras (applyPcInv in the fork's remoteServer.ts),
+      and since #1651 it compares names exactly. So when this block renames
+      a worn piece in the pack, it renames that piece's entry in the record
+      in the same step. The engine takes a write that changes nothing but
+      names for any actor and tells nobody (EquipmentBinding::Set in the
+      fork), because nothing worn changes. Only worn entries are renamed: the
+      rest of the record is their game's copy of the pack at the last equip,
+      and nothing reads it.
+
+      renames is a list of { worn: the record's entry as read, to: the new
+      name, or undefined for a plain one }. Answers how many were renamed.
+    */
+    function sameRecordEntry(a, b) {
+      if (!a || !b || a.baseId !== b.baseId || (Number(a.count) || 0) !== (Number(b.count) || 0)) {
+        return false;
+      }
+      for (var i = 0; i < EXTRA.length; i++) {
+        if (a[EXTRA[i]] !== b[EXTRA[i]]) { return false; }
+      }
+      return !!a.worn === !!b.worn && !!a.wornLeft === !!b.wornLeft;
+    }
+
+    function renameInRecord(actorId, renames) {
+      if (!renames.length || !api.record || !api.setRecord) { return 0; }
+      var rec = null;
+      try { rec = api.record(actorId); } catch (e) { rec = null; }
+      var list = rec && rec.inv && rec.inv.entries;
+      if (!list) { return 0; }
+      var used = {};
+      var changed = 0;
+      for (var r = 0; r < renames.length; r++) {
+        var at = -1;
+        for (var i = 0; i < list.length && at < 0; i++) {
+          var e = list[i];
+          if (!used[i] && e && (e.worn || e.wornLeft) && sameRecordEntry(e, renames[r].worn)) { at = i; }
+        }
+        if (at < 0) { continue; }
+        used[at] = true;
+        if ((list[at].name || '') === (renames[r].to || '')) { continue; }
+        if (renames[r].to) { list[at].name = renames[r].to; } else { delete list[at].name; }
+        changed++;
+      }
+      if (changed && !api.setRecord(actorId, rec)) { return 0; }
+      return changed;
+    }
+
+    /*
+      A RECORD WRITTEN BEFORE #1651, put right as its owner logs in. Until
+      #1651 nothing renamed the record, and the owner's game never took a new
+      condition, so a record can name a worn piece by a condition the pack
+      has since moved on from ("Iron Sword (90%)" worn, the pack holding
+      "Iron Sword (85%)"). The engine asks here just before it hands the
+      character to its owner's game (spawn.ts in the fork). Each worn piece
+      whose name matches no stack in the pack is renamed to the stack a hit
+      on it reaches, by packEntryFor. When two stacks of that base differ
+      only in condition and the pack does not say which is worn, the one
+      nearest the condition the record names is taken: a worn piece moves a
+      percent a hit from the number its record was written at. A stack
+      answers for as many worn entries as it has units, and entries that
+      already match claim theirs first.
+    */
+    function sameNameOrPlain(a, b, baseId) {
+      a = String(a || '');
+      b = String(b || '');
+      if (a === b) { return true; }
+      var plain = baseName(baseId);
+      return (!a && b === plain) || (!b && a === plain);
+    }
+
+    function loading(actorId) {
+      if (!api.record || !api.setRecord) { return 0; }
+      var rec = null;
+      try { rec = api.record(actorId); } catch (e) { rec = null; }
+      var list = rec && rec.inv && rec.inv.entries;
+      var entries = api.inventory(actorId);
+      if (!list || !entries) { return 0; }
+      var left = entries.map(function (e) { return Number(e && e.count) || 0; });
+      var stale = [];
+      for (var i = 0; i < list.length; i++) {
+        var w = list[i];
+        if (!w || !(w.worn || w.wornLeft) || !pieceKind(w.baseId)) { continue; }
+        var exact = -1;
+        for (var k = 0; k < entries.length && exact < 0; k++) {
+          var e = entries[k];
+          if (e && e.baseId === w.baseId && left[k] > 0 && sameNameOrPlain(e.name, w.name, w.baseId)) { exact = k; }
+        }
+        if (exact >= 0) { left[exact]--; } else { stale.push(w); }
+      }
+      var changed = 0;
+      for (var s = 0; s < stale.length; s++) {
+        var at = packEntryFor(entries, stale[s], left);
+        if (at < 0) { continue; }
+        var was = conditionOf(stale[s]);
+        for (var n = 0; n < entries.length; n++) {
+          var other = entries[n];
+          if (n === at || !other || other.baseId !== stale[s].baseId || !(left[n] > 0) ||
+              !sameName(other, stale[s].name || '') ||
+              !!other.worn !== !!entries[at].worn || !!other.wornLeft !== !!entries[at].wornLeft) { continue; }
+          if (Math.abs(conditionOf(other) - was) < Math.abs(conditionOf(entries[at]) - was)) { at = n; }
+        }
+        left[at]--;
+        var to = entries[at].name;
+        if (to) { stale[s].name = to; } else { delete stale[s].name; }
+        changed++;
+      }
+      if (changed && !api.setRecord(actorId, rec)) { return 0; }
+      if (changed) {
+        api.log('durability:', actorId.toString(16), 'named', changed,
+                'worn piece(s) in the equipment record as the pack has them');
+      }
+      return changed;
     }
 
     /*
@@ -52655,11 +52792,13 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       if (!entries) { return []; }
       var gone = [];
       var worse = 0;
+      var renames = [];
       for (var j = 0; j < due.length; j++) {
         var at = packEntryFor(entries, due[j]);
         if (at < 0) { continue; }
         var cond = conditionOf(entries[at]);
         if (cond > CONDITION.lowest) {
+          renames.push({ worn: due[j], to: withCondition(entries[at], cond - WEAR_PER_HIT).name });
           entries = setUnits(entries, at, 1, cond - WEAR_PER_HIT);
           worse++;
           continue;
@@ -52670,6 +52809,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       }
       if (!gone.length && !worse) { return []; }
       if (!api.setInventory(actorId, entries)) { return []; }
+      renameInRecord(actorId, renames);
       for (var n = 0; n < gone.length; n++) {
         api.say(actorId, 'Your ' + gone[n] + ' broke. It was at 0%, and a kit would have mended it.');
       }
@@ -52708,7 +52848,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       BREAK_CHANCE: BREAK_CHANCE, WEAR_PER_HIT: WEAR_PER_HIT, KITS: kits,
       pieceKind: pieceKind, conditionOf: conditionOf, withCondition: withCondition,
       repairTo: repairTo, repairWithKit: repairWithKit, view: view, panel: panel,
-      opened: opened, hit: hit, onHit: onHit, pressed: pressed
+      opened: opened, hit: hit, onHit: onHit, pressed: pressed, loading: loading
     };
   }
 
@@ -52813,6 +52953,20 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       } catch (e) { }
       return (entriesOf(id) || []).filter(function (e) { return e && (e.worn || e.wornLeft); });
     },
+    // The equipment record as the engine holds it, and a write of it that
+    // changes only names (#1651; EquipmentBinding::Set in the fork).
+    record: function (id) {
+      try {
+        var eq = mp.get(id, 'equipment');
+        return eq ? JSON.parse(JSON.stringify(eq)) : null;
+      } catch (e) { return null; }
+    },
+    setRecord: function (id, rec) {
+      try { mp.set(id, 'equipment', rec); return true; } catch (e) {
+        log('durability: could not rename in the equipment record of', Number(id).toString(16) + ':', e);
+        return false;
+      }
+    },
     recordOf: function (baseId) {
       var res = mp.lookupEspmRecordById(baseId);
       return (res && res.record) || null;
@@ -52859,6 +53013,19 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     say: say,
     log: log
   });
+
+  /*
+    The engine's last word before it hands a character that already exists
+    to its owner's game (spawn.ts in the fork, #1651): see A RECORD WRITTEN
+    BEFORE #1651. A failure here is logged with the actor and the login goes
+    on, since the record is then only as it was before.
+  */
+  g.__thornswoodSpawn = g.__thornswoodSpawn || {};
+  g.__thornswoodSpawn.loading = function (actorId) {
+    try { g.__thornswoodDurability.loading(actorId); } catch (e) {
+      log('durability: could not name the equipment record of', Number(actorId).toString(16), 'at login:', e);
+    }
+  };
 })();
 // ==== end thornswood durability ====
 
