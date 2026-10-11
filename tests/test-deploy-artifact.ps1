@@ -447,7 +447,7 @@ foreach ($w in $wiring) {
 # The other repository files each sends, beside its artifact, are checked too.
 $also = @(
     @{ File = 'scripts\deploy\Install-Voice.ps1';      Want = @('scripts/vps/Roll-Log.ps1') },
-    @{ File = 'scripts\deploy\Deploy-DevGamemode.ps1'; Want = @('records/most-online.json', 'game/content/Thornswood-Content.esp') },
+    @{ File = 'scripts\deploy\Deploy-DevGamemode.ps1'; Want = @('records/most-online.json', 'records/server-build.json', 'game/content/Thornswood-Content.esp') },
     @{ File = 'scripts\deploy\Deploy-Server.ps1';      Want = @('game/content/Thornswood-Content.esp', 'records/server-build.json') }
 )
 foreach ($w in $also) {
