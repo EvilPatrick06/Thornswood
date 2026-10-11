@@ -282,16 +282,6 @@ try {
             Copy-Item -LiteralPath $from -Destination (Join-Path $fake $f) -Force
         }
     }
-    # The pack carries Data\Platform\UI\build.js (the UI front fixture), a SkyMP file,
-    # so Source-Notice reads records\client-build.json for the fork and its commit.
-    # The stand-in record is the real one with its files cut to one built file, a
-    # stand-in TESModPlatform.pex the game folder gets below, so the client runtime
-    # step stages that one file and the ship rules find it is the recorded build.
-    $standInPex = [Text.Encoding]::ASCII.GetBytes('stand-in TESModPlatform.pex')
-    $standInPexSha = -join ([Security.Cryptography.SHA256]::Create().ComputeHash($standInPex) | ForEach-Object { $_.ToString('x2') })
-    $cbReal = (Get-Content -LiteralPath (Join-Path $repo 'records\client-build.json') -Raw).TrimStart([char]0xFEFF) | ConvertFrom-Json
-    $cbReal.files = [pscustomobject]@{ 'Data\Scripts\TESModPlatform.pex' = [pscustomobject]@{ sha256 = $standInPexSha; bytes = $standInPex.Length } }
-    Put (Join-Path $fake 'records\client-build.json') ($cbReal | ConvertTo-Json -Depth 5)
     $reqFrom = Join-Path $repo 'game\required-data'
     if (Test-Path -LiteralPath $reqFrom) {
         New-Item -ItemType Directory -Force -Path (Join-Path $fake 'game\required-data') | Out-Null
@@ -329,8 +319,6 @@ try {
     New-GeneratedBodies $inst $fake
     . (Join-Path $repo 'tests\fixtures\ui-front.ps1')
     Install-UiFrontFixture (Join-Path $inst 'Game')
-    New-Item -ItemType Directory -Force -Path (Join-Path $inst 'Game\Data\Scripts') | Out-Null
-    [IO.File]::WriteAllBytes((Join-Path $inst 'Game\Data\Scripts\TESModPlatform.pex'), $standInPex)
     $node = Get-Command node -ErrorAction SilentlyContinue
     Yes 'node is on PATH, for the stand-in game server' ($null -ne $node)
     if ($null -eq $node) { Done }
