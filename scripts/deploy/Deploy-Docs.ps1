@@ -102,8 +102,13 @@ param(
   # How long the new site has to answer before the old files go back.
   [int]$Wait = 30,
   # Put the app the last deploy replaced back in, and send nothing.
-  [switch]$PutBack
+  [switch]$PutBack,
+    # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
+    [switch]$AllowStaleCheckout
 )
+
+# A stale or dirty checkout sends old or unlanded code; refuse it (#2118).
+. (Join-Path $PSScriptRoot '..\deploy\Fresh-Checkout.ps1'); Assert-FreshCheckout -RepoDir (Join-Path $PSScriptRoot '..\..') -What 'Deploy-Docs' -Target $Vps -AllowStale:$AllowStaleCheckout
 
 $ErrorActionPreference = 'Stop'
 $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')

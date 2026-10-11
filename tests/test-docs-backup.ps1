@@ -13,6 +13,8 @@
 #   pwsh -File tests\test-docs-backup.ps1                 the repo's copy
 #   pwsh -File tests\test-docs-backup.ps1 -Path <file>    any other copy
 param([string]$Path)
+# Scripts this runs whole go to a stand-in box, so the freshness guard lets them be (#2118).
+$env:THORNSWOOD_HARNESS = '1'
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot
 if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
