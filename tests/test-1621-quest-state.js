@@ -475,6 +475,34 @@ yes('the miner page says the same', /kept on the character/.test(mWhere) &&
     /restart of the server keeps them/.test(mWhere) && !/kept in memory/.test(mWhere) &&
     !/restart of the server clears them/.test(mWhere));
 
+// A miner action owns its own quest fields. Other quest metadata can be
+// newer than this controller, or malformed and awaiting explicit recovery.
+{
+  const untouched = { killHistory: {'86a88:Skyrim.esm': 7}, future: {format: 2},
+    wolf: {kills: 'unreadable', credited: ['old-life'], extension: {hold: 'Whiterun'}},
+    unknown: {drawn: 3, itemDesc: 'retained:item'} };
+  forms[50] = {inv:{}, props:{[PROP]:{v:1, open:{wolf:untouched.wolf, futureQuest:untouched.unknown},
+    cool:{futureQuest:clock.now+HOUR},killHistory:untouched.killHistory,future:untouched.future}}};
+  ranks['50:miner']='master';w=restart();
+  function preserved(phase) {
+    const record=forms[50].props[PROP];
+    yes(phase+': opaque root quest state survives', JSON.stringify(record.killHistory)===JSON.stringify(untouched.killHistory) &&
+      JSON.stringify(record.future)===JSON.stringify(untouched.future));
+    yes(phase+': unrelated malformed kill state survives verbatim', JSON.stringify(record.open.wolf)===JSON.stringify(untouched.wolf));
+    yes(phase+': unknown quest and cooldown survive', JSON.stringify(record.open.futureQuest)===JSON.stringify(untouched.unknown) &&
+      record.cool.futureQuest===clock.now+HOUR);
+  }
+  yes('a valid miner offer still opens beside retained quest fields',w.svc.offer(50,'ebony').ok===true);
+  preserved('offer');
+  for(let i=0;i<4;i++)w.svc.mineRare(50,here[0],EBONY);
+  yes('mining still commits four goods beside retained fields',have(50,EBONY.ore)===4);
+  preserved('draw');
+  yes('the miner return still consumes its ask',w.svc.turnIn(50,'ebony').ok===true && have(50,EBONY.ore)===0);
+  preserved('return');
+  w=restart();w.svc.offer(50,'stalhrim');w.svc.walkAway(50,'stalhrim');
+  preserved('abandon after restart');
+}
+
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
