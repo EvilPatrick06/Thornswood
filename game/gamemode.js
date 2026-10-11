@@ -4433,11 +4433,107 @@ function arriveAt(actorId, townKey) {
   return true;
 }
 
+/*
+  A SAVED CHARACTER THE SERVER COULD NOT READ IS KEPT, AND ITS OWNER IS TOLD
+  ONCE, issue #1269.
+
+  On the dev server ff000005, profile 902356861's character, was skipped at
+  every start because its race could not be read, and the next new character
+  was given its id and saved over the file. The engine (fork PR 33) now keeps
+  such a record on disk as it was, never hands its id out again, and lists it
+  with its profile. The profile then has no character, so spawn makes it a new
+  one under a new id, and created() below is that moment.
+
+  Patrick, 5 October, on what the person gets: a new character under a new id,
+  and told once, on joining, that the old one was kept. This asks the engine
+  for the profile's kept records (getUnreadableChangeForms, added to the fork
+  for #1269), writes them on the new character, and says the line only when
+  that write reads back, the same order as tellOnce: written first, so it is
+  never said twice. created() runs once per new character, so this is once per
+  new character; the record on it also tells staff which old ids belong to it.
+  Before the chargen switch, because with the hall off this is still the new
+  character made because the old one could not be read.
+
+  The line does not name the race. The engine keeps a record for three causes
+  (a base form not in the load order, an appearance that will not parse, a
+  race not in the load order) and does not say which to the gamemode; the
+  server log names the cause, and the race id, at every start.
+
+  An engine without the binding is said once in the log, not passed over in
+  silence: such a server keeps nothing aside, so it has nobody to tell, and
+  the line says the telling waits on the engine build that has it.
+*/
+const KEPT_PROPERTY = 'thornswoodKeptCharacters';
+const KEPT_LINE =
+  'Your earlier character could not be loaded on this server, so this is a ' +
+  'new one. The earlier one has been kept as it was. ' +
+  'Ask staff with /helpme to have it looked at.';
+let keptUnaskableSaid = false;
+
+// Invisible to both: only the server and staff have any use for it.
+try {
+  mp.makeProperty(KEPT_PROPERTY, {
+    isVisibleByOwner: false, isVisibleByNeighbors: false,
+    updateOwner: '', updateNeighbor: ''
+  });
+} catch (e) { /* already made by a previous load. harmless. */ }
+
+function tellKeptCharacter(actorId) {
+  const who = actorId.toString(16);
+  if (typeof mp.getUnreadableChangeForms !== 'function') {
+    if (!keptUnaskableSaid) {
+      keptUnaskableSaid = true;
+      log('kept', 'this engine build has no getUnreadableChangeForms (#1269), so ' +
+          'nobody made a new character is told that an old one was kept');
+    }
+    return false;
+  }
+  let pid = 0;
+  try { pid = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { pid = 0; }
+  if (!pid) {
+    log('kept', who, 'has no profile, so there is nothing kept to ask about');
+    return false;
+  }
+  let kept;
+  try {
+    kept = mp.getUnreadableChangeForms(pid);
+  } catch (e) {
+    log('kept', who, 'could not ask which saved characters of profile', pid,
+        'were kept:', e);
+    return false;
+  }
+  if (!Array.isArray(kept) || !kept.length) { return false; }
+  const ids = kept.map(function (id) { return (Number(id) >>> 0).toString(16); });
+
+  let was = null;
+  try { was = mp.get(actorId, KEPT_PROPERTY); } catch (e) { was = null; }
+  if (was && was.told) { return false; }
+  try {
+    mp.set(actorId, KEPT_PROPERTY, { profileId: pid, kept: ids, told: Date.now() });
+  } catch (e) {
+    log('kept', who, 'profile', pid, 'has kept character(s)', ids.join(','),
+        'but the record could not be written, so nothing was said:', e);
+    return false;
+  }
+  let back = null;
+  try { back = mp.get(actorId, KEPT_PROPERTY); } catch (e) { back = null; }
+  if (!back || !back.told) {
+    log('kept', who, 'profile', pid, 'has kept character(s)', ids.join(','),
+        'but the record did not read back, so nothing was said');
+    return false;
+  }
+  log('kept', who, 'is a new character for profile', pid, 'whose saved character(s)',
+      ids.join(','), 'could not be read and were kept; told once');
+  say(actorId, KEPT_LINE);
+  return true;
+}
+
 /* What the character block, further down the file, needs from here. Through
  * the global rather than the scope, the same way it reaches the rules, so the
  * sections stay separable. */
 globalThis.__thornswoodChargen = {
   created: function (actorId) {
+    tellKeptCharacter(actorId);
     if (!CHARGEN_ENABLED || chargenOf(actorId)) { return; }
     firstSeen.set(actorId, Date.now());
     beginAppearance(actorId);
