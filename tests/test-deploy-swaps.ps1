@@ -897,6 +897,93 @@ try {
     Remove-Item -LiteralPath $besideCode -Force -EA SilentlyContinue
     if ($script:fail -gt $failed) { Show }
 
+    # What the install did not send (#1184). The bot's folder on the VPS held
+    # sample.py, backfill.py, redraw.py, two sample pictures and an old log
+    # beside bot.py, copied there by hand and never taken off, because the
+    # install sent a fixed list and had no rule for the rest of the folder; and
+    # the folder bot.py is in is the first place Python looks for a module. A
+    # run now leaves it holding what it sends and what is the bot's own
+    # (Get-ThornswoodBotOwned in Bot-Service.ps1), and moves the rest aside
+    # into its .prev while the bot is stopped.
+    $strays = [ordered]@{
+        'sample.py'               = 'print("a module nobody sent")'
+        'sample-maka.png'         = 'a picture nobody sent'
+        'assets\sample-mixed.png' = 'a picture in a folder the install sends into'
+        'tools\redraw.py'         = 'a folder nobody sent, with a tool in it'
+    }
+    # And what is the bot's own, which every run leaves as it was. bot.env.json
+    # is on the box already; run.ps1 is the stand-in service's loop, the old
+    # loop's file until a full run. thornswood-deploy.json is the bot's own
+    # too, but every good run writes it again, so it is held to being there.
+    $own = [ordered]@{
+        'data\joins.json'           = '{ "next": 7 }'
+        'webhooks\news.txt'         = 'not a webhook'
+        'py-libs\keep\__init__.py'  = 'VERSION = 1'
+        'service\host.json'         = '{ "root": "here" }'
+        'bot.log.20260916-1535.old' = 'a log renamed by hand, which a full run moves into data'
+        'joins.json'                = '{ "from before 1104": true }'
+    }
+    function PutAll($set) { foreach ($k in $set.Keys) { Put (Join-Path $botRoot $k) $set[$k] } }
+    function Sums {
+        $h = [ordered]@{}
+        foreach ($k in @($own.Keys) + @('bot.env.json', 'run.ps1', 'assets\join-card.png')) {
+            $p = Join-Path $botRoot $k
+            $h[$k] = $(if (Test-Path -LiteralPath $p) { (Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash } else { 'not there' })
+        }
+        return (($h.Keys | ForEach-Object { $_ + '|' + $h[$_] }) -join "`n")
+    }
+    PutAll $strays
+    PutAll $own
+    $ownBefore = Sums
+    Bot 'bot v7'
+    $r = Deploy 'Install-Bot.ps1' $bot.Clone()
+    $failed = $script:fail
+    $prev = @(Kept $botRoot '.prev-*')
+    $newest = $prev[-1]
+    Yes 'Install-Bot -CodeOnly: with files in the bot''s folder that nothing sent, the new code is SWAP OK and the bot says it is watching' (
+        $r.Ok -and $r.Said -match 'SWAP OK' -and (WaitFor { BotSays 'bot v7' }))
+    Yes '  and the stray .py, the stray .png, the one in assets and the stray folder are gone from the bot''s folder' (
+        -not @($strays.Keys | Where-Object { Test-Path -LiteralPath (Join-Path $botRoot $_) }).Count)
+    Yes '  and each is in the .prev this run made, as it was, beside the code it replaced' (
+        -not @($strays.Keys | Where-Object { (Get (Join-Path $newest $_)) -ne $strays[$_] }).Count -and
+        (Get (Join-Path $newest 'bot.py')) -match 'bot v6')
+    # A folder nothing sent goes aside whole, so it is named as the folder.
+    $named = ([regex]::Match($r.Said, 'moved aside 4 thing\(s\) .* into ' + [regex]::Escape($newest) + ': (.*)')).Groups[1].Value
+    Yes '  and the run names each one, the stray folder as one, and where they went' (
+        $named -and -not (Compare-Object @($named.Trim() -split ', ') @('assets/sample-mixed.png', 'sample-maka.png', 'sample.py', 'tools')))
+    Yes '  and what is the bot''s own is as it was: data, webhooks, py-libs, service, bot.env.json, the record, the old loop''s file, an old log' (
+        (Sums) -eq $ownBefore)
+    Yes '  and the card artwork the run sent is still in assets, and the record beside the code' (
+        (Test-Path -LiteralPath (Join-Path $botRoot 'assets\join-card.png')) -and (Test-Path -LiteralPath (Join-Path $botRoot 'thornswood-deploy.json')))
+    Yes '  and the box holds every file the run sent' ($r.Said -match 'FILES ON THE BOX')
+    if ($script:fail -gt $failed) { Show }
+
+    # -PutBack is the box as it was before that run, so what that run moved
+    # aside comes back with the code it sat beside: a file an older install
+    # sent and a newer one no longer does is the older code's.
+    $a = $bot.Clone(); $a.Remove('CodeOnly'); $a['PutBack'] = $true
+    $r = Deploy 'Install-Bot.ps1' $a
+    $failed = $script:fail
+    Yes 'Install-Bot -PutBack after it: the previous code comes back, and what that run moved aside with it' (
+        $r.Ok -and $r.Said -match 'SWAP OK' -and (Get (Join-Path $botRoot 'bot.py')) -match 'bot v6' -and
+        -not @($strays.Keys | Where-Object { (Get (Join-Path $botRoot $_)) -ne $strays[$_] }).Count)
+    Yes '  and what is the bot''s own is still as it was' ((Sums) -eq $ownBefore)
+    if ($script:fail -gt $failed) { Show }
+
+    # A new bot that does not come up puts the folder back as it was, the
+    # files it moved aside included.
+    $live = Live $botRoot
+    Bot 'bot v8, will-not-start'
+    $r = Deploy 'Install-Bot.ps1' $bot.Clone()
+    $failed = $script:fail
+    Yes 'Install-Bot -CodeOnly: code that does not start, with strays in the folder, is SWAP ROLLED BACK' (
+        (-not $r.Ok) -and $r.Said -match 'moved aside 4 thing' -and $r.Said -match 'SWAP ROLLED BACK')
+    Yes '  and the folder is as it was, what it moved aside back in place, and the old bot says it is watching again' (
+        ((Live $botRoot) -eq $live) -and $r.Said -match 'answering again' -and
+        -not @($strays.Keys | Where-Object { (Get (Join-Path $botRoot $_)) -ne $strays[$_] }).Count)
+    Yes '  and what is the bot''s own is still as it was' ((Sums) -eq $ownBefore)
+    if ($script:fail -gt $failed) { Show }
+
     # ======================================================= the dev server
     $devRoot = Join-Path $box 'Thornswood-Server-Dev'
     $devPort = PickPort
