@@ -203,8 +203,13 @@ param(
   # parameter named only (#1929). With none set, PowerShell numbered them in
   # the order above, so a bare note bound to -Vps: on 5 Oct the refusal's own
   # example became the VPS address and the script refused again.
-  [Parameter(Position = 0)][string]$Note = ''
+  [Parameter(Position = 0)][string]$Note = '',
+    # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
+    [switch]$AllowStaleCheckout
 )
+
+# A stale or dirty checkout sends old or unlanded code; refuse it (#2118).
+. (Join-Path $PSScriptRoot '..\deploy\Fresh-Checkout.ps1'); Assert-FreshCheckout -RepoDir (Join-Path $PSScriptRoot '..\..') -What 'Deploy-DevGamemode' -AnyBranch -AllowStale:$AllowStaleCheckout
 
 $ErrorActionPreference = 'Stop'
 $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')

@@ -117,9 +117,14 @@ param(
     # installer (#1804, see the header). Left off, the running server keeps
     # its own, and one with neither true nor false is refused. Live goes on
     # only when Patrick says Main.
-    [ValidateSet('', 'on', 'off')][string]$RequirePass = ''
+    [ValidateSet('', 'on', 'off')][string]$RequirePass = '',
+    # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
+    [switch]$AllowStaleCheckout
 )
 . (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
+
+# A stale or dirty checkout sends old or unlanded code; refuse it (#2118).
+. (Join-Path $PSScriptRoot '..\deploy\Fresh-Checkout.ps1'); Assert-FreshCheckout -RepoDir (Join-Path $PSScriptRoot '..\..') -What 'Publish-Server' -AllowStale:$AllowStaleCheckout
 if (-not $Record) { $Record = Join-Path $PSScriptRoot '..\..\records\server-build.json' }
 
 # The two that the channel decides, unless they were given outright. An

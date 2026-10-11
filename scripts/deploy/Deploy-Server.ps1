@@ -167,8 +167,13 @@ param(
   [long[]]$Playtesters = @(),
   # The committed gamemode alone, with no server build on this machine
   # (#1089). See GAMEMODE ONLY in the header.
-  [switch]$GamemodeOnly
+  [switch]$GamemodeOnly,
+    # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
+    [switch]$AllowStaleCheckout
 )
+
+# A stale or dirty checkout sends old or unlanded code; refuse it (#2118).
+. (Join-Path $PSScriptRoot '..\deploy\Fresh-Checkout.ps1'); Assert-FreshCheckout -RepoDir (Join-Path $PSScriptRoot '..\..') -What 'Deploy-Server' -AllowStale:$AllowStaleCheckout
 
 $ErrorActionPreference = 'Stop'
 $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
