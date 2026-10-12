@@ -1963,9 +1963,10 @@ async def ensure_hold_panel(guild):
 #                   we give the bot, tagged Dev or Main (/test-task, or
 #                   python bot.py --post-task).
 #   #test-findings  what #test-results was, renamed. Nothing else about it moves.
-#   #known-issues   one bot post per open GitHub issue labelled Dev Findings or
-#                   Main Findings, linking the issue, struck through and marked
-#                   Fixed when the issue is closed as completed.
+#   #known-issues   read only, one bot post per open GitHub issue labelled Dev
+#                   Findings or Main Findings: title and status only, no number
+#                   and no link. Fixed when closed as completed, Closed, not
+#                   fixed when closed otherwise, Open again when reopened.
 #
 # THE ONE-TIME SETUP. Getting the server from the old shape to that one is the
 # only channel change the bot makes, and Patrick's explicit exception to the
@@ -2036,6 +2037,29 @@ def _copy_overwrites(ch):
     for target, ow in dict(getattr(ch, 'overwrites', None) or {}).items():
         allow, deny = ow.pair()
         out[target] = discord.PermissionOverwrite.from_pair(allow, deny)
+    return out
+
+
+def known_overwrites(guild, like):
+    """
+    #known-issues' overwrites: #test-findings' copied, so the same people see
+    it, then made read only (Patrick, 11 Oct). Sending and threads are off for
+    @everyone and every copied role or member; the bot alone may send.
+    """
+    out = _copy_overwrites(like) if like is not None else {}
+    me = getattr(guild, 'me', None)
+    everyone = getattr(guild, 'default_role', None)
+    if everyone is not None and everyone not in out:
+        out[everyone] = discord.PermissionOverwrite()
+    for t, ow in out.items():
+        if t == me:
+            continue
+        ow.update(**dict((n, False) for n in ARCHIVE_LOCK))
+    if me is not None:
+        mine = out.get(me) or discord.PermissionOverwrite()
+        mine.update(view_channel=True, send_messages=True,
+                    read_message_history=True)
+        out[me] = mine
     return out
 
 
@@ -2172,11 +2196,14 @@ async def channel_setup(guild, apply=False, path=None):
             ('the %d permission overwrite(s) of #%s'
              % (len(getattr(like, 'overwrites', {}) or {}), FINDINGS_NAME))
             if like is not None else 'no overwrites of its own'))
+        said.append('%smake #%s read only: sending and threads off for '
+                    '@everyone and every copied overwrite, the bot keeps send'
+                    % (verb, KNOWN_NAME))
         if apply:
             await guild.create_text_channel(
                 KNOWN_NAME,
                 category=getattr(like, 'category', None),
-                overwrites=_copy_overwrites(like) if like is not None else {},
+                overwrites=known_overwrites(guild, like),
                 topic='Known issues the team is working on. Kept by the bot.',
                 reason=SETUP_REASON)
 
@@ -2285,7 +2312,11 @@ async def test_task_cmd(interaction: discord.Interaction, title: str,
 # known-issues.json in the data folder, written straight after each post, so a
 # restart never posts twice. A post made just before a crash, before its line
 # reached the file, is found again on the next start by reading the channel's
-# recent history for the bot's own posts, which carry the issue's address.
+# recent history for the bot's own posts, by title.
+#
+# The post is the issue's title and its status, and nothing else: testers
+# have no GitHub, so no number and no link. A post made just before a crash is
+# matched back to its issue by that title.
 #
 # Closed as completed (confirmed fixed): the post is struck through and says
 # Fixed. Closed any other way: it says Closed, not fixed. Reopened: it goes
@@ -2341,36 +2372,42 @@ def github_issue(number, get=None):
     return get('%s/repos/%s/issues/%d' % (GITHUB_API, KNOWN_REPO, int(number)))
 
 
-KNOWN_MARK = re.compile(r'/issues/(\d+)\b')
+# Title and status only (Patrick, 11 Oct): no issue number and no link,
+# because testers have no GitHub. The post is found again by its title.
+KNOWN_HEAD = re.compile(r'^(?:~~)?\*\*(.+?)\*\*')
+KNOWN_STATUS = {None: 'Open', 'completed': 'Fixed'}
+
+
+def known_title(issue):
+    return (str(issue.get('title') or '').strip() or 'untitled')[:200].replace('*', '')
 
 
 def known_text(issue, closed=None):
-    """The post for one issue. closed is None (open), 'completed' or another
-       state_reason."""
-    num = int(issue.get('number'))
-    title = str(issue.get('title') or '').strip() or 'untitled'
-    url = str(issue.get('html_url') or
-              'https://github.com/%s/issues/%d' % (KNOWN_REPO, num))
-    label = issue.get('_label') or next(
-        (str(l.get('name')) for l in issue.get('labels') or []
-         if isinstance(l, dict) and l.get('name') in KNOWN_LABELS), '')
-    head = '**#%d %s**' % (num, title[:200])
-    if closed == 'completed':
-        head = '~~%s~~ **Fixed**' % head
-    elif closed:
-        head = '~~%s~~ **Closed, not fixed**' % head
-    return '%s\n%s%s' % (head, (label + ' \u00b7 ') if label else '', url)
+    """The post for one issue: its title and its status, nothing else.
+       closed is None (open), 'completed' (Fixed) or another state_reason
+       (Closed, not fixed)."""
+    title = known_title(issue)
+    if closed is None:
+        return '**%s**\nStatus: Open' % title
+    return '~~**%s**~~\nStatus: %s' % (
+        title, 'Fixed' if closed == 'completed' else 'Closed, not fixed')
 
 
-async def known_issues_once(channel, state, get=None, save=None):
+async def known_issues_once(channel, state, get=None, save=None, me_id=None):
     """
     One pass. state is the dict kept in known-issues.json and is changed in
     place; the caller writes it. Returns the numbers posted, edited.
+
+    With me_id, an open issue the state has no post for is first looked for
+    among the bot's own posts in the channel, by title, so a crash between a
+    post and its save never doubles it.
     """
     loop = asyncio.get_running_loop()
     issues = await loop.run_in_executor(None, github_open_findings, get)
     rec = state.setdefault('issues', {})
     posted, edited = [], []
+    if me_id is not None and any(str(n) not in rec for n in issues):
+        await known_issues_recover(channel, state, me_id, issues)
 
     def mark():
         state['_dirty'] = True
@@ -2426,21 +2463,31 @@ async def known_issues_once(channel, state, get=None, save=None):
     return posted, edited
 
 
-async def known_issues_recover(channel, state, me_id, limit=300):
-    """Put back any of the bot's own posts the state file is missing, read off
-       the channel, so a crash between a post and its save never doubles it."""
+async def known_issues_recover(channel, state, me_id, issues, limit=300):
+    """Put back any of the bot's own posts the state file is missing, matched
+       to an open issue by its title, each post to one issue at most."""
     rec = state.setdefault('issues', {})
+    used = set(int(v.get('message_id', 0)) for v in rec.values())
+    want = {}
+    for num in sorted(issues):
+        if str(num) not in rec:
+            want.setdefault(known_title(issues[num]), []).append(num)
+    if not want:
+        return
     async for msg in channel.history(limit=limit):
-        if getattr(msg.author, 'id', None) != me_id:
+        if getattr(msg.author, 'id', None) != me_id or msg.id in used:
             continue
-        m = KNOWN_MARK.search(msg.content or '')
-        if not m or m.group(1) in rec:
+        content = msg.content or ''
+        m = KNOWN_HEAD.match(content)
+        if not m or not want.get(m.group(1)):
             continue
-        rec[m.group(1)] = {'message_id': msg.id, 'channel_id': channel.id,
-                           'closed': ('completed' if '**Fixed**' in msg.content
-                                      else 'not_planned'
-                                      if '**Closed, not fixed**' in msg.content
-                                      else None)}
+        num = want[m.group(1)].pop(0)
+        rec[str(num)] = {'message_id': msg.id, 'channel_id': channel.id,
+                         'closed': ('completed' if 'Status: Fixed' in content
+                                    else 'not_planned'
+                                    if 'Status: Closed, not fixed' in content
+                                    else None)}
+        used.add(msg.id)
         state['_dirty'] = True
 
 
@@ -2462,7 +2509,6 @@ async def watch_known_issues():
             'fixed by hand (posting from empty would double every post)'
             % KNOWN_STATE)
         return
-    recovered = False
     while not client.is_closed():
         try:
             ch = None
@@ -2471,11 +2517,8 @@ async def watch_known_issues():
                 if ch is not None:
                     break
             if ch is not None:
-                if not recovered:
-                    await known_issues_recover(ch, state, client.user.id)
-                    recovered = True
-                posted, edited = await known_issues_once(ch, state,
-                                                         save=_known_save)
+                posted, edited = await known_issues_once(
+                    ch, state, save=_known_save, me_id=client.user.id)
                 if state.get('_dirty'):
                     _known_save(state)
                 if posted or edited:

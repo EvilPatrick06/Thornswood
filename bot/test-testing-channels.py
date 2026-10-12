@@ -224,7 +224,8 @@ yes('  and says each of the three changes it would make',
     and 'would make a new forum #test-tasks in Testing' in text
     and 'would rename the old text #test-tasks to #test-tasks-archive' in text
     and 'would rename #test-results to #test-findings' in text
-    and 'would make #known-issues in Testing' in text)
+    and 'would make #known-issues in Testing' in text
+    and 'would make #known-issues read only' in text)
 
 said = run(bot.channel_setup(g, apply=True, path=state))
 text = '\n'.join(said)
@@ -261,9 +262,22 @@ yes('#test-results is renamed #test-findings, the same channel and overwrites',
     and pairs(results.overwrites)[play] == pairs(
         {play: OW(view_channel=True, send_messages=True)})[play])
 known = bot._channel_named(g, 'known-issues', ('text',))
-yes('#known-issues is made beside it with #test-findings\' overwrites',
+yes('#known-issues is made beside #test-findings, seen by the same people',
     known is not None and known.category is results.category
-    and pairs(known.overwrites) == pairs(results.overwrites))
+    and set(results.overwrites) <= set(known.overwrites)
+    and all(known.overwrites[t].view_channel == results.overwrites[t].view_channel
+            for t in results.overwrites))
+yes('  and read only: no sending or threads for @everyone or the copied '
+    'tester overwrite',
+    all(known.overwrites[t].send_messages is False
+        and known.overwrites[t].send_messages_in_threads is False
+        and known.overwrites[t].create_public_threads is False
+        for t in (g.default_role, play)))
+yes('  while the bot keeps send there',
+    known.overwrites[g.me].send_messages is True
+    and known.overwrites[g.me].view_channel is True)
+yes('  and #test-findings itself is untouched by that',
+    results.overwrites[play].send_messages is True)
 done = json.load(open(state))
 yes('the apply is recorded in the state file by server id',
     '1' in done.get('guilds', {}) and done['guilds']['1'].get('done'))
@@ -417,9 +431,12 @@ posted, edited = run(bot.known_issues_once(ch, st, gh,
 yes('one post per open labelled issue, never for a pull request or an '
     'unlabelled issue, and one only for an issue with both labels',
     posted == [10, 11] and len(ch.messages) == 2)
-yes('  each linking its issue',
-    all('/issues/%d' % n in ch.messages[st['issues'][str(n)]['message_id']].content
-        for n in (10, 11)))
+texts = [ch.messages[st['issues'][str(n)]['message_id']].content for n in (10, 11)]
+yes('  each is the title and its status, nothing else',
+    texts == ['**Ferry sinks**\nStatus: Open', '**Gold resets**\nStatus: Open'])
+yes('  with no issue number and no link',
+    not any('#10' in t or '#11' in t or 'http' in t or 'github' in t.lower()
+            for t in texts))
 yes('  saved straight after each post, not at the end', saves == [1, 2])
 yes('  GitHub was asked with one query per label (labels are ANDed there)',
     len([u for u in ASKED if 'labels=' in u]) == 2)
@@ -436,8 +453,7 @@ yes('after a restart, read back from known-issues.json, nothing is posted '
 
 # A crash between the post and its save: the file has 10 only.
 st3 = {'issues': {'10': st['issues']['10']}}
-run(bot.known_issues_recover(ch, st3, me.id))
-posted, _ = run(bot.known_issues_once(ch, st3, gh))
+posted, _ = run(bot.known_issues_once(ch, st3, gh, me_id=me.id))
 yes('a post that never reached the file is found again in the channel and '
     'not doubled', posted == [] and len(ch.messages) == 2
     and st3['issues']['11']['message_id'] == st['issues']['11']['message_id'])
@@ -448,10 +464,11 @@ posted, edited = run(bot.known_issues_once(ch, st, gh))
 m10 = ch.messages[st['issues']['10']['message_id']].content
 m11 = ch.messages[st['issues']['11']['message_id']].content
 yes('closed as completed: the post is struck through and says Fixed',
-    10 in edited and m10.startswith('~~') and '**Fixed**' in m10
+    10 in edited and m10 == '~~**Ferry sinks**~~\nStatus: Fixed'
     and st['issues']['10']['closed'] == 'completed')
 yes('closed as not planned: it says Closed, not fixed',
-    '**Closed, not fixed**' in m11 and st['issues']['11']['closed'] == 'not_planned')
+    m11 == '~~**Gold resets**~~\nStatus: Closed, not fixed'
+    and st['issues']['11']['closed'] == 'not_planned')
 n = len(ch.edits)
 posted, edited = run(bot.known_issues_once(ch, st, gh))
 yes('a closed post is not edited again on the next pass',
@@ -461,13 +478,26 @@ issue(10, 'Ferry sinks', ['Dev Findings'])
 posted, edited = run(bot.known_issues_once(ch, st, gh))
 yes('reopened on GitHub: the same post goes back to open, no new post',
     edited == [10] and posted == [] and len(ch.messages) == 2
-    and '**Fixed**' not in ch.messages[st['issues']['10']['message_id']].content)
+    and ch.messages[st['issues']['10']['message_id']].content
+    == '**Ferry sinks**\nStatus: Open')
 
 st4 = {}
-run(bot.known_issues_recover(ch, st4, me.id))
-yes('recovery reads a Fixed or Closed post back as closed',
+run(bot.known_issues_recover(ch, st4, me.id, {10: ISSUES[10], 11: ISSUES[11]}))
+yes('recovery matches posts back by title and reads a Closed one as closed',
     st4['issues']['11']['closed'] == 'not_planned'
-    and st4['issues']['10']['closed'] is None)
+    and st4['issues']['10']['closed'] is None
+    and st4['issues']['10']['message_id'] == st['issues']['10']['message_id'])
+
+# Two open issues with one title: each gets its own post, recovery or not.
+issue(20, 'Same name', ['Dev Findings'])
+issue(21, 'Same name', ['Main Findings'])
+before = len(ch.messages)
+posted, _ = run(bot.known_issues_once(ch, st, gh, me_id=me.id))
+posted2, _ = run(bot.known_issues_once(ch, {'issues': dict(
+    (k, v) for k, v in st['issues'].items() if k != '21')}, gh, me_id=me.id))
+yes('two issues with the same title get two posts, and a recovery never '
+    'hands one post to both',
+    posted == [20, 21] and len(ch.messages) == before + 2 and posted2 == [])
 
 saved_token = os.environ.pop('GITHUB_TOKEN', None)
 

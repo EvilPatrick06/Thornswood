@@ -128,16 +128,19 @@ name, Owner, Dev, Lead Gamemaster and Lead GM by default. A `bot.env.json`
 that still carries `LIVE_SMOKE_ADMIN_ROLES` is read for it. A thread already
 open under the same title is handed back rather than made twice.
 
-**Known issues.** One bot post in `#known-issues` per open issue in
-`EvilPatrick06/Thornswood` labelled Dev Findings or Main Findings, linking the
-issue. When the issue is closed as completed (confirmed fixed) the post is
-struck through and says Fixed; closed any other way it says Closed, not fixed;
+**Known issues.** `#known-issues` is read only: the setup copies
+`#test-findings`' overwrites and switches sending and threads off for
+@everyone and each of them, and only the bot posts. One post per open issue in
+`EvilPatrick06/Thornswood` labelled Dev Findings or Main Findings, the title
+and its status and nothing else: no issue number and no link, because testers
+have no GitHub. When the issue is closed as completed (confirmed fixed) the
+post is struck through and says Fixed; closed any other way it says Closed, not fixed;
 reopened, it goes back. The bot reads GitHub every five minutes
 (`KNOWN_ISSUES_EVERY`, never under a minute) with `GITHUB_TOKEN` from
 `bot.env.json`, a read only token for that repository's issues. No token, no
 posts, said once in the log. Issue number to message id is kept in
-`data\known-issues.json`, written straight after each post, and the bot's own
-recent posts in the channel are read on start, so neither a restart nor a crash
+`data\known-issues.json`, written straight after each post, and before a new
+post the bot's own recent posts in the channel are matched by title, so neither a restart nor a crash
 between a post and its save posts twice.
 
 **The one-time setup.** Moving a server from the old shape is the only channel
@@ -152,8 +155,8 @@ convert a text channel to a forum, so when it refuses, a new forum is made in
 the same category and position with the old channel's permission overwrites,
 and the old channel is renamed `#test-tasks-archive` with sending switched off
 for everyone but the bot. Nothing is deleted. It renames `#test-results` to
-`#test-findings`, and makes `#known-issues` beside it with the same
-overwrites. A finished apply is written to `data\channel-setup.json` and a
+`#test-findings`, and makes `#known-issues` beside it, seen by the same
+people and read only for all but the bot. A finished apply is written to `data\channel-setup.json` and a
 second run does nothing; an apply that stopped part way does only what is left.
 `test-testing-channels.py` holds all of this.
 
