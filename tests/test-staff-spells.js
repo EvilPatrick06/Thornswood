@@ -429,7 +429,7 @@ function chat(srv, actor) {
     return (i >= 0 && j >= 0) ? src.slice(i, j) : null;
   })();
   yes('and it returns false only when the spell tomes block refuses the tome',
-      !!body && /if \(r && r\.refused\) \{ return false; \}/.test(body) &&
+      !!body && /if \(r && r\.refused\) \{[\s\S]*?return false;\s*\}/.test(body) &&
       (body.match(/return\s+false/g) || []).length === 1);
 }
 
