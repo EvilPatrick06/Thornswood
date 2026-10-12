@@ -1,6 +1,6 @@
 # The PowerShell scripts
 
-Every `.ps1` under this folder, 188 of them, by area: `release` builds and
+Every `.ps1` under this folder, 189 of them, by area: `release` builds and
 ships, `deploy` puts things on the VPS, `vps` looks after the box, `ops` runs
 the world day to day, `mods` works on the collection and the plugins, `dev`
 is for whoever is changing this repository. `oneoff` holds finished one time
@@ -46,6 +46,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [deploy/Rotate-BotToken.ps1](deploy/Rotate-BotToken.ps1) | Puts a new Discord bot token into both places on the VPS that use it, in one go, and restarts both programs that read it. |
 | [deploy/Rotate-ServerPassword.ps1](deploy/Rotate-ServerPassword.ps1) | Changes the server password and hands the new one to the site, so the launcher can fetch it after checking Discord. |
 | [deploy/ServerBuild.ps1](deploy/ServerBuild.ps1) | Which server files come from the fork, and whether a folder, a zip or a stage holds the build records\server-build.json names. |
+| [deploy/ServerContent.ps1](deploy/ServerContent.ps1) | Which Thornswood-Content.esp a game server holds, read off the box, and whether a release may send clients a content plugin that server does not hold (#2308). |
 | [deploy/ServerOrder.ps1](deploy/ServerOrder.ps1) | The server's load order once the engine loads light plugins (#1715), and the full index a form id is computed from. |
 | [deploy/ServerReadyWait.ps1](deploy/ServerReadyWait.ps1) | How long a started game server has to answer on its ports before a deploy puts the old files back. |
 | [deploy/ServerSettings.ps1](deploy/ServerSettings.ps1) | Which settings a game server install takes from the release, and which it keeps from the server it replaces. |
