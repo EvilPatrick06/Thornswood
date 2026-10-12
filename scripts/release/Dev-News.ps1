@@ -319,9 +319,8 @@ function Update-DevFeedMarks {
         $min = Get-DevNewsVal $doc 'minLauncher'
         if (-not $min) { $min = Get-DevNewsVal $doc 'launcherVersion' }
         [void](Set-FeedNewsList $doc @($doc.news) 'dev' $min (Join-Path $Dir 'news-out') $SiteDir)
-        # No byte order mark: the launcher's reader stops on one, which takes
-        # out the update check for everybody (see Publish-Update.ps1).
-        [IO.File]::WriteAllText($file, ($doc | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))
+        # Compact, no byte order mark (Feed-Store.ps1, Write-FeedVersionFile).
+        Write-FeedVersionFile $file $doc
         $sent = Send-FeedStore 'dev' $Dir @('version.json') -SiteDir $SiteDir -To $To
         $r.Sent = (@($sent.Sent).Count -gt 0)
     }

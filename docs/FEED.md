@@ -469,9 +469,22 @@ the notes leave it only from the first Ship whose minLauncher reads the news
 file (1.2.4, `launcher\app\FeedNews.cs`): from then they are one asset named as
 `newsFile` and `news` is `[]` (`scripts\release\Feed-News.ps1`). Projected on
 the 12 Oct feeds as pwsh 7 writes them, that is about 6,600 bytes on main and
-5,850 on dev. Of what is left, `release.uiAssets` is about 2,800 bytes and the
-indentation ConvertTo-Json writes is most of the rest: what #1050 still has
-open for its few hundred bytes.
+5,850 on dev. Measured after main's 1.2.4 Ship (20261012-115531) and dev's
+20261012-142406-dev, both with `news: []` and a `newsFile` whose bytes hash to
+its name: main 7,789 bytes, dev 5,726.
+
+Two more things then left the file (#1050). The release record no longer
+carries `uiAssets`, the front's hashed file names (2,569 bytes, read by no
+launcher, script or page): they are `Data\Platform\UI\thornswood-ui-assets.txt`,
+a file of the release that its record already holds by sha256. And every
+writer writes version.json compact, with no indentation or line breaks,
+through one function, `Write-FeedVersionFile` in `Feed-Store.ps1`
+(`tests\test-1050-feed-compact.ps1`). Both are JSON every launcher ever
+published reads the same way. On the same two feeds that is 4,250 bytes on
+main and 2,187 on dev. Of main's, 2,277 is the release note in
+`baseline.notes`, which the update card of a launcher from 1.2.4 on reads; the
+rest, about 1,950 bytes, is the fields above, each one read by a launcher or a
+script.
 
 ## Checks on every download
 

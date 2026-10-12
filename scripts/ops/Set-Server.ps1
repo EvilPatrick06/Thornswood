@@ -111,7 +111,7 @@ foreach ($pair in @(@('serverAddress', $Address), @('serverPort', $Port))) {
     if ($doc.PSObject.Properties.Name -contains $pair[0]) { $doc.($pair[0]) = $pair[1] }
     else { $doc | Add-Member -NotePropertyName $pair[0] -NotePropertyValue $pair[1] }
 }
-[IO.File]::WriteAllText($VersionFile, ($doc | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))
+Write-FeedVersionFile $VersionFile $doc
 Say ("  now  {0}:{1}" -f $Address, $Port) 'Green'
 
 if ($NoPush) {

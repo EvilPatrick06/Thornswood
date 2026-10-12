@@ -58,6 +58,8 @@
       Get-FeedStoreLaunchers main|dev    launchers.txt, one version a line
       Get-FeedStoreReleases main|dev     releases.txt, one release a line
       Read-SiteFeed main|dev             the feed as the public reads it
+      Write-FeedVersionFile -Path -Doc   write version.json as every writer
+                                         must: compact, no byte order mark
       Remove-FeedStoreAssets main|dev -Shas -Expect
                                          delete assets no feed names any more,
                                          refusing if either feed moved (#1152)
@@ -364,6 +366,31 @@ function Write-FeedStoreRead([string]$Dir, [string]$Channel, [hashtable]$there) 
     foreach ($k in @($there.Keys | Sort-Object)) { $t[$k] = [string]$there[$k] }
     $o = [ordered]@{ channel = $Channel; at = (Get-Date).ToUniversalTime().ToString('s') + 'Z'; there = $t }
     [IO.File]::WriteAllText((Join-Path $Dir 'read.json'), ($o | ConvertTo-Json -Depth 4), (New-Object Text.UTF8Encoding($false)))
+}
+
+# Every script that writes a channel's version.json writes it through here, so
+# there is one shape for the file every launcher reads on every check (#1050).
+#
+# Compact: no indentation and no line breaks. ConvertTo-Json without -Compress
+# indents each level, which was about 960 of main's 7,789 bytes on 12 Oct and
+# meant nothing to the launcher, the site or any script, all of which parse
+# it. -Depth 8 is the deepest any writer used, so no nested list is ever cut
+# to its type name.
+#
+# No byte order mark: the launcher's reader stops on one and reports an
+# unexpected character, which takes out the update check for everybody at
+# once, including their route to a fix, and node refuses it too.
+#
+# tests\test-1050-feed-compact.ps1 holds every writer to this and parses what
+# it writes with the launcher's own VersionDoc.Parse.
+function ConvertTo-FeedJson($Doc) {
+    return ($Doc | ConvertTo-Json -Depth 8 -Compress)
+}
+
+function Write-FeedVersionFile([string]$Path, $Doc) {
+    if (-not $Path) { throw 'Write-FeedVersionFile needs the path of version.json.' }
+    if ($null -eq $Doc) { throw "Write-FeedVersionFile was given no feed for $Path; nothing was written." }
+    [IO.File]::WriteAllText($Path, (ConvertTo-FeedJson $Doc), (New-Object Text.UTF8Encoding($false)))
 }
 
 # Fetches the files into the working folder and writes down what they were.
