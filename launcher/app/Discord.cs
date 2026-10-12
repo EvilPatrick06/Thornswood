@@ -522,9 +522,16 @@ namespace Thornswood
         /// version is one the channel's feed still lets in: from its
         /// minLauncher up to the launcher it published. why is the site's own
         /// sentence when it said no, which is written for the person.
+        ///
+        /// key is the pass's own key (#1320): the site gives it over https
+        /// beside the pass, and the game's client proves the pass on its own
+        /// connection with it (a mac over the nonce the game server sends each
+        /// login), so the key itself never goes on the game's port. "" from a
+        /// site that does not send one yet.
         /// </summary>
-        public static string Pass(int profileId, out string why)
+        public static string Pass(int profileId, out string key, out string why)
         {
+            key = "";
             why = "";
             if (!Linked)
             {
@@ -545,7 +552,11 @@ namespace Thornswood
             string pass = Field(reply, "pass");
             if (code == 200 && Field(reply, "ok") == "true" &&
                 Regex.IsMatch(pass, "^jp1\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$"))
+            {
+                string k = Field(reply, "key");
+                if (Regex.IsMatch(k, "^[A-Za-z0-9_-]{16,128}$")) key = k;
                 return pass;
+            }
             why = Field(reply, "message");
             if (why.Length == 0) why = "thornswood.net answered " + code + " and gave no join pass.";
             return "";

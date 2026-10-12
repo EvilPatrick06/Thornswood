@@ -30468,10 +30468,69 @@ log('gamemode loaded:',
   function held(pid, now) { return requiring() && !shown(pid, now); }
   function trusts(pid, now) { return !requiring() || proven(pid, now); }
 
+  /*
+    THE LOGIN PROVES THE PASS ON ITS OWN CONNECTION (#1320), watched only.
+
+    The pass reaches this block over the relay's socket, which names a profile
+    and nothing else, so this block cannot tie a pass to the game connection
+    that holds the character. The fork's login (skymp5-server,
+    thornswoodLogin.ts) can: with mp.onThornswoodLogin set, it sends every
+    offline login a fresh nonce, and a client of that engine answers with the
+    pass and HMAC-SHA256 of "jlp1." + nonce under the pass's own key. The site
+    gives the launcher that key over https beside the pass (passLoginKey in
+    site/server.js: HMAC-SHA256 of "jpk1." and the pass's mac, keyed on
+    passKey), so it never travels on the game's port, and a pass and mac seen
+    on the wire prove nothing on another connection, whose nonce is another.
+
+    WATCHED ONLY, ON PURPOSE. A launcher and an engine that answer are not on
+    everybody's machine yet, and a client that does not know the challenge
+    never answers. So the login hands over the profile asked for, exactly as
+    before, and the proof, when one comes, is checked and logged: good, or
+    why not. Nothing is refused here. Waiting for a good proof, and handing
+    over the pass's profile rather than the one asked for, is the next step,
+    once main's launcher and engine carry all of it and these lines show a
+    good proof for every login; it is written out on #1320.
+
+    loginProof(e, now) is what that step will ask: { ok, p } or { why }.
+  */
+  function loginProof(e, now) {
+    var key = passKey(now);
+    if (!e || !e.proof) { return { why: 'no proof' }; }
+    var r = readPass(e.proof.pass, key, now, serverName());
+    if (!r.ok) { return { why: r.why, p: r.p }; }
+    var own = b64u(crypto.createHmac('sha256', key).update('jpk1.' + r.id).digest());
+    var want = Buffer.from(b64u(crypto.createHmac('sha256', own).update('jlp1.' + String(e.nonce)).digest()));
+    var got = Buffer.from(String(e.proof.mac || ''));
+    if (want.length !== got.length || !crypto.timingSafeEqual(want, got)) {
+      return { why: 'a mac that does not check out for this connection', p: r.p };
+    }
+    if (r.p !== Number(e.profileId)) {
+      return { ok: true, p: r.p, why: 'a pass for profile ' + r.p + ', logged in as ' + e.profileId };
+    }
+    return { ok: true, p: r.p };
+  }
+
+  function onLogin(e) {
+    var now = Date.now();
+    var asked = Number(e && e.profileId) || 0;
+    if (!e || !e.proof) {
+      console.log('[thornswood] login of profile ' + asked + ' on user ' + (e && e.userId) +
+                  ' challenged; handed over as asked (watching, #1320)');
+      return asked;
+    }
+    var v = loginProof(e, now);
+    console.log('[thornswood] login proof from profile ' + asked + ' on user ' + e.userId + ': ' +
+                (v.ok ? (v.why ? 'good, but ' + v.why : 'good') : v.why) + ' (watching, nothing refused)');
+    return -1;
+  }
+  // Set again on every load, so a hot reload's hook is this one. An engine
+  // older than the fork's login challenge never calls it.
+  mp.onThornswoodLogin = onLogin;
+
   g.__thornswoodJoinPass = { take: take, sweep: sweep, readPass: readPass,
                              grace: GRACE_MS, sentence: SENTENCE, waiting: WAITING,
                              shown: shown, proven: proven, held: held, trusts: trusts,
-                             requiring: requiring };
+                             requiring: requiring, loginProof: loginProof, onLogin: onLogin };
 
   /*
     The one question every other block asks, safe to call before this block
