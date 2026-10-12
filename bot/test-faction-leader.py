@@ -3,19 +3,17 @@ test-faction-leader.py
 
 Apply: Faction Leader replaced Apply: Trading Company.
 
-The real bot module is imported and the real TicketModal.on_submit and
-faction_seat_cmd are run. Only what touches Discord is replaced: the guild,
-its channels, threads and roles, the interaction, the push to the site, and
-the seat file, which is pointed at a temporary folder so this cannot touch
-the one beside the code.
+The real bot module is imported and the real TicketModal.on_submit is
+run. Only what touches Discord is replaced: the guild, its channels,
+threads and roles, the interaction, and the push to the site.
 
 Holds:
 
   the faction pick and Other on the form
-  a submit-time recheck of a seat filled after the form opened
+  a submit-time recheck that a tampered pick is flagged and Other is not
   the staff flag on both Faction Leader and Jarl
   typed Other text out of the pinging opening line and Asking for
-  /faction-seat is staff only, and records who and when
+  Faction Leader routing to Owner and UPPER_STAFF_ROLES only
 
 Read only. Never connects to anything.
 """
@@ -29,7 +27,8 @@ import tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 os.environ.setdefault('DISCORD_TOKEN', 'not-a-real-token')
-for _k in ('TICKET_CHANNEL', 'TICKET_LOG', 'STAFF_ROLES', 'TICKET_COOLDOWN'):
+for _k in ('TICKET_CHANNEL', 'TICKET_LOG', 'STAFF_ROLES', 'TICKET_COOLDOWN',
+           'UPPER_STAFF_ROLES'):
     os.environ.pop(_k, None)
 
 import discord  # noqa: E402
@@ -125,19 +124,22 @@ class Channel(Posts):
     async def create_thread(self, name=None, **k):
         await asyncio.sleep(0)
         t = Thread(9000 + len(self.made), name)
+        t.opened_as = k
         self.made.append(t)
         self.guild.threads[t.id] = t
         return t
 
 
 class Guild(object):
-    def __init__(self, gid, staff):
+    def __init__(self, gid, staff, owner=None):
         self.id = gid
         self.name = 'Thornswood'
         self.me = Person(1, 'Thornswood')
         self.me.bot = True
         self.threads = {}
-        self.roles = [Role('Moderator', [staff])]
+        self.roles = [Role('Moderator', [staff], rid=11)]
+        if owner is not None:
+            self.roles.append(Role('Owner', [owner], rid=10))
         self.text_channels = [Channel(bot.TICKETS[0], self)]
 
     def get_thread(self, tid):
@@ -193,18 +195,6 @@ def off(kw):
             and not am.everyone and not am.users and not am.roles)
 
 
-def seats():
-    try:
-        with open(bot.FACTION_SEATS, encoding='utf-8') as f:
-            return json.load(f)
-    except Exception:
-        return None
-
-
-def write_seats(d):
-    bot._seats_write(d)
-
-
 def fill_faction(modal, pick, other='', answers=None):
     if modal.faction_select is not None:
         modal.faction_select._values = [pick]
@@ -244,11 +234,15 @@ def ask_as(who, guild):
 
 TMP = tempfile.mkdtemp(prefix='thornswood-faction-')
 bot.OPEN_TICKETS = os.path.join(TMP, 'open-tickets.json')
-bot.FACTION_SEATS = os.path.join(TMP, 'faction-seats.json')
+STAFF_RULE = (
+    'No GM or staff member (Loremaster, Discord Moderator, or any other staff '
+    'role) may hold an in-game RP role with faction leadership, such as a Jarl '
+    'or a faction lead.')
 
 try:
-    mo = Person(103, 'Mo', [Role('Moderator')])
-    G = Guild(1, mo)
+    mo = Person(103, 'Mo', [Role('Moderator', rid=11)])
+    pat = Person(100, 'Pat', [Role('Owner', rid=10)])
+    G = Guild(1, mo, pat)
     CH = G.text_channels[0]
     ada = Person(101, 'Ada')
 
@@ -264,11 +258,18 @@ try:
 
     lab = dict((a, b) for a, b, _ in bot.KINDS)['faction']
     form = bot.TicketModal('faction', lab)
-    yes('the form has a required Select of the open seats plus Other',
+    yes('the form has a required Select of every named faction plus Other',
         form.faction_select is not None
         and [o.value for o in form.faction_select.options]
         == bot.faction_names() + [bot.FACTION_OTHER]
         and form.faction_select.required is True)
+    yes('the public panel carries Djinn\'s confirmed staff-rule sentence, and both texts fit Discord\'s 2000 character message',
+        STAFF_RULE == bot.STAFF_LEADERSHIP_RULE
+        and STAFF_RULE in bot.PANEL_ALPHA
+        and STAFF_RULE in bot.PANEL_OPEN
+        and STAFF_RULE in bot._PANEL_JOBS
+        and len(bot.PANEL_ALPHA) <= 2000
+        and len(bot.PANEL_OPEN) <= 2000)
     yes('and an optional Other box with a short length limit',
         form.faction_other is not None
         and form.faction_other.required is False
@@ -283,23 +284,19 @@ try:
     yes('Asking for does not name a faction',
         bot.ROLE_FOR['faction'] == 'Faction Lead of the faction named below')
 
-    # ------------------------------------------------- a filled seat drops out
-    write_seats({'Imperial Embassy': {
-        'filled': True, 'by': 'Mo', 'by_id': 103, 'at': '2026-10-12T00:00:00Z'}})
-    closed = bot.TicketModal('faction', lab)
-    yes('a filled seat is left out of the Select',
-        [o.value for o in closed.faction_select.options]
-        == [n for n in bot.faction_names() if n != 'Imperial Embassy']
-        + [bot.FACTION_OTHER])
-    os.remove(bot.FACTION_SEATS)
+    yes('a named pick still lists every faction, including one that will be filled later',
+        [o.value for o in form.faction_select.options]
+        == bot.faction_names() + [bot.FACTION_OTHER])
 
-    # ---------------------------------------------- an open pick, no flags
+    # ---------------------------------------------- a named pick, no flags
     sent, _m = send_faction(G, ada, 'The Companions',
                             answers=['A Nord', 'Lead them', 'Evenings'])
     T = CH.made[0]
     body = T.body()
-    yes('an open named seat opens a ticket',
-        len(CH.made) == 1 and sent.followup.said)
+    yes('a named pick opens a private, not-invitable thread',
+        len(CH.made) == 1 and sent.followup.said
+        and T.opened_as.get('type') == discord.ChannelType.private_thread
+        and T.opened_as.get('invitable') is False)
     yes('the pick is in the escaped answers, not in the opening line',
         'The Companions' in body
         and 'The Companions' not in T.head()
@@ -308,12 +305,15 @@ try:
         '**Asking for:** Faction Lead of the faction named below' in body
         and 'Asking for:** The Companions' not in body
         and 'Asking for:** Faction Lead of The Companions' not in body)
-    yes('submitting did not mark the seat filled',
-        seats() is None)
-    yes('and there is no CHECK THIS ONE on a clean open pick',
+    yes('and there is no CHECK THIS ONE on a clean named pick',
         'CHECK THIS ONE' not in body)
     yes('their words are posted with mentions off',
         len(T.sent) > 1 and all(off(kw) for _, kw in T.sent[1:]))
+    yes('Faction Leader pings and adds Owner, not Moderator',
+        any(r.mention in T.head() and r.name == 'Owner' for r in G.roles)
+        and not any(r.name == 'Moderator' and r.mention in T.head() for r in G.roles)
+        and pat in T.added
+        and mo not in T.added)
 
     # -------------------------------------- Other, and typed mentions
     ben = Person(102, 'Ben')
@@ -323,9 +323,9 @@ try:
     other_t = CH.made[1]
     other_body = other_t.body()
     other_head = other_t.head()
-    yes('Other is flagged and the ticket still opens',
-        '**CHECK THIS ONE.** The faction they picked is not an open named seat.'
-        in other_body
+    yes('Other is a normal option: the ticket opens with no CHECK THIS ONE for the pick',
+        'CHECK THIS ONE' not in other_body
+        and 'not on the list' not in other_body
         and len(CH.made) == 2)
     yes('the typed Other text is in the answers, escaped',
         'everyone' in other_body and PULL not in other_body)
@@ -334,9 +334,6 @@ try:
         and '@everyone' not in other_head and '@here' not in other_head)
     yes('Asking for is still the static line',
         '**Asking for:** Faction Lead of the faction named below' in other_body)
-    yes('Other did not mark a seat filled',
-        seats() is None)
-
     asking_line = ''
     for line in other_body.splitlines():
         if line.startswith('**Asking for:**'):
@@ -348,31 +345,17 @@ try:
         and 'everyone' not in asking_line)
 
     # ------------------------------------------ submit-time recheck
-    write_seats({})
-    stale = bot.TicketModal('faction', lab)
-    fill_faction(stale, 'Dark Brotherhood', answers=['A', 'B', 'C'])
-    write_seats({'Dark Brotherhood': {
-        'filled': True, 'by': 'Mo', 'by_id': 103, 'at': '2026-10-12T01:00:00Z'}})
-    before = seats()
-    i = Interaction(G, Person(104, 'Cal'))
-    bot._last_ticket.clear()
-    asyncio.run(stale.on_submit(i))
-    flagged = CH.made[2].body()
-    yes('a seat filled after the form opened is flagged, and the ticket opens',
-        '**CHECK THIS ONE.** The faction they picked is not an open named seat.'
-        in flagged
-        and len(CH.made) == 3)
-    yes('and submitting still did not write the seat file',
-        seats() == before
-        and seats()['Dark Brotherhood']['by'] == 'Mo')
-
     unknown = bot.TicketModal('faction', lab)
     fill_faction(unknown, 'Not A Faction', answers=['A', 'B', 'C'])
     bot._last_ticket.clear()
     asyncio.run(unknown.on_submit(Interaction(G, Person(105, 'Dee'))))
-    yes('an unknown pick is flagged the same way',
-        '**CHECK THIS ONE.** The faction they picked is not an open named seat.'
-        in CH.made[3].body())
+    yes('an unknown or tampered pick is flagged, and the ticket still opens',
+        '**CHECK THIS ONE.** The faction they picked is not on the list.'
+        in CH.made[-1].body()
+        and bot.faction_pick_is_known('The Companions')
+        and bot.faction_pick_is_known(bot.FACTION_OTHER)
+        and not bot.faction_pick_is_known('Not A Faction')
+        and not bot.faction_pick_is_known(''))
 
     # ----------------------------------------------- staff flag, both forms
     gm = Person(201, 'Gwen', [Role('Gamemaster')])
@@ -418,52 +401,35 @@ try:
     yes('somebody with no staff role on Jarl is not flagged',
         'Holds a staff role' not in CH.made[-1].body())
 
-    # ------------------------------------------------- /faction-seat
-    if os.path.exists(bot.FACTION_SEATS):
-        os.remove(bot.FACTION_SEATS)
+    # ------------------------------------------------- routing
+    fake = Person(401, 'Fay', [Role('Lead Something', rid=88)])
+    G.roles.append(Role('Lead Something', [fake], rid=88))
+    pulled = bot.ticket_pull_roles('faction', G)
+    yes('a role whose name starts with Lead is not pulled unless its ID is listed',
+        all(r.name != 'Lead Something' for r in pulled)
+        and all(r.name != 'Moderator' for r in pulled)
+        and any(r.name == 'Owner' for r in pulled)
+        and 'owner' in bot.UPPER_STAFF_NAMES
+        and bot.UPPER_STAFF_IDS == set())
 
-    outsider = Person(301, 'Pat', [Role('Playtester')])
-    out_ask = ask_as(outsider, G)
-    asyncio.run(bot.mark_faction_seat(out_ask, 'fill', 'Imperial Embassy'))
-    yes('/faction-seat refuses someone who is not staff, to them alone',
-        len(out_ask.response.said) == 1
-        and out_ask.response.said[0][1] is True
-        and 'Staff mark these' in out_ask.response.said[0][0])
-    yes('and writes nothing',
-        seats() is None)
+    keep_ids, keep_names = bot.UPPER_STAFF_IDS, set(bot.UPPER_STAFF_NAMES)
+    bot.UPPER_STAFF_IDS = {88}
+    bot.UPPER_STAFF_NAMES = {'owner'}
+    listed = bot.ticket_pull_roles('faction', G)
+    yes('an ID in UPPER_STAFF_ROLES is pulled, with Owner, still not Moderator',
+        any(r.id == 88 for r in listed)
+        and any(r.name == 'Owner' for r in listed)
+        and all(r.name != 'Moderator' for r in listed))
+    bot.UPPER_STAFF_IDS, bot.UPPER_STAFF_NAMES = keep_ids, keep_names
 
-    for who in (Person(302, 'Lee', [Role('Lead Gamemaster')]),
-                Person(303, 'Ty', [Role('Trial Gamemaster')])):
-        a = ask_as(who, G)
-        asyncio.run(bot.mark_faction_seat(a, 'fill', 'Imperial Embassy'))
-        yes('/faction-seat refuses %s, the same is_staff as /close'
-            % who.roles[0].name,
-            a.response.said and 'Staff mark these' in a.response.said[0][0]
-            and seats() is None)
-
-    staff_ask = ask_as(mo, G)
-    asyncio.run(bot.mark_faction_seat(staff_ask, 'fill', 'Imperial Embassy'))
-    rec = seats()
-    yes('staff can fill a seat, and the file records who and when',
-        staff_ask.response.said
-        and 'Filled the lead seat of Imperial Embassy.' in staff_ask.response.said[0][0]
-        and rec and rec['Imperial Embassy']['filled'] is True
-        and rec['Imperial Embassy']['by'] == 'Mo'
-        and rec['Imperial Embassy']['by_id'] == 103
-        and rec['Imperial Embassy']['at'])
-
-    free_ask = ask_as(mo, G)
-    asyncio.run(bot.mark_faction_seat(free_ask, 'free', 'Imperial Embassy'))
-    rec = seats()
-    yes('staff can free it again',
-        rec['Imperial Embassy']['filled'] is False
-        and rec['Imperial Embassy']['by_id'] == 103
-        and 'Freed the lead seat of Imperial Embassy.' in free_ask.response.said[0][0])
-
-    yes('_seats_write is the same atomic temp file then replace as joins',
-        'JOINS + \'.tmp\'' in open(os.path.join(HERE, 'bot.py'), encoding='utf-8').read()
-        and 'FACTION_SEATS + \'.tmp\'' in open(os.path.join(HERE, 'bot.py'), encoding='utf-8').read()
-        and 'os.replace(tmp, FACTION_SEATS)' in open(os.path.join(HERE, 'bot.py'), encoding='utf-8').read())
+    n = len(CH.made)
+    ivy = Person(106, 'Ivy')
+    send_jarl(G, ivy)
+    jarl_t = CH.made[-1]
+    yes('a Jarl ticket still pings and adds general staff, including Moderator',
+        len(CH.made) == n + 1
+        and any(r.name == 'Moderator' and r.mention in jarl_t.head() for r in G.roles)
+        and mo in jarl_t.added)
 
     # Site inbox still gets the kind as a free string.
     yes('the site copy is kind faction, with the answers in detail',
@@ -471,9 +437,10 @@ try:
 
     with open(os.path.join(os.path.dirname(HERE), '.gitignore'), encoding='utf-8') as f:
         ignored = f.read()
-    yes('the seat file and its tmp stay out of git',
-        'bot/faction-seats.json' in ignored
-        and 'bot/faction-seats.json.tmp' in ignored)
+    yes('there is no faction-seats file in gitignore, because seat tracking is out',
+        'faction-seats.json' not in ignored
+        and not hasattr(bot, 'FACTION_SEATS')
+        and not hasattr(bot, 'mark_faction_seat'))
 
 finally:
     shutil.rmtree(TMP, ignore_errors=True)

@@ -45,11 +45,6 @@ bot/open-tickets.json
 bot/joins.json
 bot/joins.json.tmp
 
-# Which faction lead seats are filled, written by the bot beside itself on
-# the VPS. Who marked it and when. A copy here would be some other run's.
-bot/faction-seats.json
-bot/faction-seats.json.tmp
-
 # The bot's heartbeat for the watchdog (#449), rewritten every minute by
 # whichever bot is running; a copy here is some other run's.
 bot/heartbeat.json

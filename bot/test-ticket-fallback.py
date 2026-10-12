@@ -39,7 +39,7 @@ sys.path.insert(0, HERE)
 os.environ.setdefault('DISCORD_TOKEN', 'not-a-real-token')
 # The defaults are what is being tested, so nothing in this shell may move them.
 for _k in ('TICKET_CHANNEL', 'TICKET_LOG', 'STAFF_ROLES', 'CREATOR_ROLES',
-           'TICKET_COOLDOWN'):
+           'TICKET_COOLDOWN', 'UPPER_STAFF_ROLES'):
     os.environ.pop(_k, None)
 
 import discord  # noqa: E402

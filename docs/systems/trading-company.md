@@ -96,7 +96,7 @@ the hauler is away. Decided by Patrick on 4 Oct (#1646).
 
 The Free Skyrim Trading Company is a faction. Its lead seat is one of
 the Faction Leader applications in Discord, the same shape as a Jarl.
-A faction has one leader. Staff cannot hold the seat.
+A faction has one leader.
 
 The people who are accepted run it as a business: they make, they
 sell, and they buy. What they wear on the road while a crate is in

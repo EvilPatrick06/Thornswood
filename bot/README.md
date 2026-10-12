@@ -39,7 +39,7 @@ Discord is a copy that goes stale, so the welcome post links to them instead.
 
 | Channel | Who reads | What it is |
 |---|---|---|
-| `#tickets-and-applications` | everybody | The bot's ticket panel: applying for any job, reporting somebody, cannot install or connect. Each ticket opens a private thread only the person and staff can read |
+| `#tickets-and-applications` | everybody | The bot's ticket panel: applying for any job, reporting somebody, cannot install or connect. Each ticket opens a private thread only the person and the roles pulled into that kind can read. Faction Leader tickets go to Owner and the roles in `UPPER_STAFF_ROLES` (Owner only when that list is empty), not to general staff |
 | `#tickets` | staff only | Every closed ticket, with a link back to it, and the whole of any ticket whose private thread would not open |
 
 `#tickets` has to stay staff only, because a report about somebody lands there
@@ -202,10 +202,12 @@ Lead Gamemaster and Trial Gamemaster are not in that list, so neither opens
 hold as well.
 
 Neither is staff to the bot either. Closing a ticket, with `/close` or the
-Close ticket button, marking a faction lead seat with `/faction-seat`, and
-skipping the one open ticket rule and the cooldown take one of the
-`STAFF_ROLES` roles in `bot.env.json` (Owner, Dev, Gamemaster, Moderator and
-Loremaster by default), matched by id or name, and nothing else. The Manage Threads that both of them carry on every channel used to
+Close ticket button, and skipping the one open ticket rule and the cooldown
+take one of the `STAFF_ROLES` roles in `bot.env.json` (Owner, Dev, Gamemaster,
+Moderator and Loremaster by default), matched by id or name, and nothing
+else. Faction Leader tickets are pulled to `UPPER_STAFF_ROLES` plus Owner
+instead; empty or unset is Owner only. A future Lead role is added there
+by its ID. The Manage Threads that both of them carry on every channel used to
 count as staff there, and it no longer does (#1342). `test-staff-gate.py`
 runs every staff and admin command and button as somebody who is not staff
 for it, and fails on any new one whose gate is not written down in it.

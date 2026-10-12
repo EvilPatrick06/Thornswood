@@ -81,6 +81,10 @@ param(
   # social media rather than staff, so it has no business reading a report
   # about somebody or another person's playtest application.
   [string]$CreatorRoles  = 'Content Creator',
+  # Pulled into Faction Leader tickets, with Owner always added. Empty
+  # means Owner only, never the general staff list. A future Lead role
+  # is added here by its Discord role ID, not by a name prefix.
+  [string]$UpperStaffRoles = '',
   # Every run used to mint a new shared key, which meant every run also
   # silently stopped tickets reaching the site inbox until Deploy-Docs was run
   # again. The key is kept unless you ask for a new one.
@@ -894,6 +898,7 @@ if ('$KeyMode' -eq 'new' -or -not `$env2['THORNSWOOD_KEY']) {
 `$env2['TICKET_LOG']      = '$TicketLog'
 `$env2['STAFF_ROLES']     = '$StaffRoles'
 `$env2['CREATOR_ROLES']   = '$CreatorRoles'
+`$env2['UPPER_STAFF_ROLES'] = '$UpperStaffRoles'
 # Piped, Python writes in the machine's ANSI codepage and PowerShell reads the
 # pipe as OEM. Anything outside plain ASCII, a role name or a channel name with
 # an accent in it, came out of that as a screenful of question marks. Both ends
@@ -927,6 +932,7 @@ catch { 'could not tighten bot.env.json: ' + `$_.Exception.Message }
 'join cards:    #' + `$env2['JOIN_CHANNEL']
 'staff:         ' + `$env2['STAFF_ROLES']
 'creator only:  ' + `$env2['CREATOR_ROLES']
+'upper staff:   ' + `$env2['UPPER_STAFF_ROLES']
 
 # The same key into the site's config, so it accepts the bot and nobody else.
 # Never over a config.json that is there and does not parse: it is not empty,

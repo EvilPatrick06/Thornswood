@@ -20,8 +20,8 @@ your race.
 
 Thalmor robes, Thalmor armour, and Justiciar weapons are not found in
 the world. They are not in a chest and not on a body. A person on the
-remnant roll may craft them. The roll is an application, Apply: Faction Leader, picking Thalmor
-Remnant, the same kind as a Jarl, not a button on K. The references are on
+remnant roll may craft them. The roll is an application, the same
+kind as a Jarl, not a button on K. The references are on
 [Cut items](cut-items.md), marked thalmor, so they can come back for
 an event.
 

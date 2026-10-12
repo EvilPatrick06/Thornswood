@@ -77,7 +77,6 @@ GATED = (STAFF, TASKS)
 
 COMMANDS = {
     'close': STAFF,
-    'faction-seat': STAFF,
     'test-task': TASKS,
 }
 
@@ -378,16 +377,14 @@ def world():
 
 def refusal_for(gate, guild, label=''):
     if gate == STAFF:
-        if 'faction-seat' in label:
-            return 'Staff mark these'
         return 'Staff close these'
     return 'post test tasks'
 
 
 POINTS = entry_points()
-yes('/close, /faction-seat, the Close ticket button and /test-task are what this runs',
+yes('/close, the Close ticket button and /test-task are what this runs',
     sorted(l for l, _, _ in POINTS) == sorted(
-        ['/close', '/faction-seat', '/test-task', 'the thornswood:close button']))
+        ['/close', '/test-task', 'the thornswood:close button']))
 
 for label, gate, run in POINTS:
     for roles in OUTSIDERS[gate]:

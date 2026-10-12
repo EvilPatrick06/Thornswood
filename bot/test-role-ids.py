@@ -23,7 +23,7 @@ sys.path.insert(0, HERE)
 
 # Force the documented defaults so this file does not inherit a VPS env.
 for _k in ('STAFF_ROLES', 'CREATOR_ROLES', 'MEMBER_ROLE', 'LIVE_SMOKE_ADMIN_ROLES',
-           'TEST_TASK_ROLES'):
+           'TEST_TASK_ROLES', 'UPPER_STAFF_ROLES'):
     os.environ.pop(_k, None)
 
 # bot.py refuses to load without one, and never uses it unless client.run is
@@ -79,6 +79,11 @@ yes('CREATOR defaults stay Content Creator (old harnesses)',
     bot.CREATOR_NAMES == {'content creator'}
     and bot.CREATOR_IDS == set()
     and bot.CREATOR == ['content creator'])
+yes('UPPER_STAFF_ROLES unset is Owner only, never the general staff list',
+    bot.UPPER_STAFF_NAMES == {'owner'}
+    and bot.UPPER_STAFF_IDS == set()
+    and 'gamemaster' not in bot.UPPER_STAFF_NAMES
+    and 'moderator' not in bot.UPPER_STAFF_NAMES)
 
 staff_role = Role(42, 'Owner')
 renamed = Role(42, 'WasOwner')

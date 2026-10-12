@@ -34,8 +34,7 @@ row.
 Some factions have a lead seat: Imperial Embassy, Thalmor Remnant,
 Dark Brotherhood, The Companions, and the Free Skyrim Trading
 Company. The names live in `bot/factions.json`. Applying is
-Apply: Faction Leader in Discord. A faction has one leader. Staff mark a
-seat filled or free with `/faction-seat`. Staff cannot hold a Jarl seat or a faction lead.
+Apply: Faction Leader in Discord. A faction has one leader. No GM or staff member (Loremaster, Discord Moderator, or any other staff role) may hold an in-game RP role with faction leadership, such as a Jarl or a faction lead.
 
 The Discord role Faction Owner is separate: it lets an account found
 a faction book in the game. It is not granted by this application,

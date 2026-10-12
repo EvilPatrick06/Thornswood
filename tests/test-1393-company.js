@@ -886,7 +886,8 @@ attempt('the wiring', function () {
   yes('W9 applying for the company is the Faction Leader ticket, not a Trading Company form',
       /\('faction',\s+'Apply: Faction Leader'/.test(bot) && /'faction': \[/.test(bot) &&
       !/\('company',\s+'Apply: Trading Company'/.test(bot) &&
-      !/'company':\s+'Trading Company'/.test(bot) && !/'company': \[/.test(bot));
+      !/'company':\s+'Trading Company'/.test(bot) && !/'company': \[/.test(bot) &&
+      bot.indexOf('No GM or staff member (Loremaster, Discord Moderator, or any other staff role) may hold an in-game RP role with faction leadership, such as a Jarl or a faction lead.') !== -1);
   const build = read('bot/Build-Discord.py');
   yes('W10 and Build-Discord.py makes that role, so there is one to give',
       !!def && build.indexOf("ROLES.append(('" + def[1] + "', ") !== -1);

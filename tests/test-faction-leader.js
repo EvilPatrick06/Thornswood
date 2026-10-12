@@ -3,11 +3,13 @@
 // Apply: Faction Leader replaced Apply: Trading Company on the Discord
 // ticket panel. The Free Skyrim Trading Company is one of the seats.
 //
-// Djinn, 11 Oct 2026: the form, the open-seat list, the staff flag, and
-// the seat command. This file holds the source to those decisions so a
+// Djinn, 11-12 Oct 2026: the form, the pick list, the staff flag, the
+// confirmed panel sentence, and Faction Leader routing to upper staff
+// by role ID. This file holds the source to those decisions so a
 // pull request that puts the company form back, drops factions.json from
-// Install-Bot, or grants a faction lead Discord role goes red here.
-// bot/test-faction-leader.py runs the form and the command.
+// Install-Bot, grants a faction lead Discord role, or matches Lead
+// roles by a name prefix goes red here.
+// bot/test-faction-leader.py runs the form and the routing.
 //
 // Read only.
 'use strict';
@@ -31,11 +33,13 @@ const names = JSON.parse(read('bot/factions.json'));
 const site = read('site/server.js');
 const page = read('docs/systems/trading-company.md');
 const factions = read('docs/systems/factions.md');
+const STAFF_RULE = 'No GM or staff member (Loremaster, Discord Moderator, or any other staff role) may hold an in-game RP role with faction leadership, such as a Jarl or a faction lead.';
 
 yes('F1 discord.py is pinned at 2.7.1, which has Select inside a modal since 2.6.0',
-    /^discord\.py==2\.7\.1$/m.test(req) &&
-    /discord\.ui\.Label\(/.test(bot) && /discord\.ui\.Select\(/.test(bot) &&
-    /required=True/.test(bot));
+    req.indexOf('discord.py==2.7.1') !== -1 &&
+    bot.indexOf('discord.ui.Label(') !== -1 &&
+    bot.indexOf('discord.ui.Select(') !== -1 &&
+    bot.indexOf('required=True') !== -1);
 
 yes('F2 factions.json is names only, in this order, and Other is not in it',
     Array.isArray(names) &&
@@ -78,31 +82,34 @@ yes('F7 is_staff still leaves Lead and Trial Gamemaster out, and the flag list i
     /LEADERSHIP_EXTRA = \('Lead Gamemaster', 'Trial Gamemaster'\)/.test(bot) &&
     /LEADERSHIP_KINDS = \('jarl', 'faction'\)/.test(bot) &&
     /def is_staff\(who\):/.test(bot) &&
-    /The one gate on \/close, \/faction-seat/.test(bot));
+    /The one gate on \/close, the Close ticket button/.test(bot));
 
-yes('F8 /faction-seat uses is_staff, writes atomically, and records who and when',
-    /name='faction-seat'/.test(bot) &&
-    /if not is_staff\(interaction\.user\):/.test(bot) &&
-    /os\.replace\(tmp, FACTION_SEATS\)/.test(bot) &&
-    /'by_id': interaction\.user\.id/.test(bot) &&
-    /%Y-%m-%dT%H:%M:%SZ/.test(bot));
+yes('F8 Faction Leader tickets go to UPPER_STAFF_ROLES plus Owner, never a Lead name prefix',
+    /UPPER_STAFF_ROLES/.test(bot) &&
+    /UPPER_STAFF_NAMES\.add\('owner'\)/.test(bot) &&
+    /def ticket_pull_roles\(/.test(bot) &&
+    /kind == 'faction'/.test(bot) &&
+    !/startswith\(['"]Lead/.test(bot) &&
+    bot.indexOf("name='faction-seat'") === -1 &&
+    install.indexOf('UPPER_STAFF_ROLES') !== -1);
 
-const submit = bot.slice(bot.indexOf('async def on_submit'), bot.indexOf('def _chunks'));
-yes('F9 submit re-checks the pick and never writes the seat file',
-    /faction_pick_is_open\(picked\)/.test(bot) &&
-    /Submitting never marks a seat filled/.test(bot) &&
-    submit.indexOf('_seats_write') === -1);
+yes('F9 submit re-checks a known name; Other is not flagged; there is no seat file',
+    /faction_pick_is_known\(picked\)/.test(bot) &&
+    /Other is a normal option/.test(bot) &&
+    bot.indexOf('FACTION_SEATS') === -1 &&
+    bot.indexOf('_seats_write') === -1);
 
 yes('F10 the pick and the Other text stay out of the pinging head and Asking for',
     /head = '%s opened this\. %s'/.test(bot) &&
     /'faction':\s+'Faction Lead of the faction named below'/.test(bot) &&
     /The pick and the Other box stay out of the opening line/.test(bot));
 
-yes('F11 the panel text names Faction Leader and does not say apply for the Trading Company',
-    /\*\*Apply: Faction Leader\*\*/.test(bot) &&
+yes('F11 the panel uses Djinn\'s confirmed staff-rule sentence and does not say apply for the Trading Company',
+    bot.indexOf(STAFF_RULE) !== -1 &&
+    /STAFF_LEADERSHIP_RULE/.test(bot) &&
     !/Applying for the Trading Company/.test(bot) &&
     !/Apply: Trading Company/.test(bot) &&
-    /Staff cannot hold a Jarl seat or a faction lead/.test(bot));
+    bot.indexOf('Staff cannot hold a Jarl seat or a faction lead.') === -1);
 
 yes('F12 the site inbox still stores any ticket kind as a free string',
     /ticket: String\(o\.kind \|\| ''\)\.slice\(0, 20\)/.test(site));
@@ -110,12 +117,13 @@ yes('F12 the site inbox still stores any ticket kind as a free string',
 yes('F13 the trading company page no longer says Apply: Trading Company',
     page.indexOf('Apply: Trading Company') === -1 &&
     /Apply:\s*\nFaction Leader|Apply: Faction Leader/.test(page) &&
-    /Trading Company/.test(page));
+    /Trading Company/.test(page) &&
+    page.indexOf('/faction-seat') === -1);
 
-yes('F14 the factions page names the lead seats and the staff rule',
+yes('F14 the factions page names the lead seats and the confirmed staff rule, with no seat command',
     /Apply: Faction Leader/.test(factions) &&
-    /\/faction-seat/.test(factions) &&
-    /Staff cannot hold a Jarl seat or a faction lead/.test(factions) &&
+    factions.indexOf(STAFF_RULE) !== -1 &&
+    factions.indexOf('/faction-seat') === -1 &&
     /does not make a new Discord role/.test(factions));
 
 console.log('');
