@@ -317,8 +317,10 @@ launcher:
     py -3.12 bot\test-testing-channels.py
 
 With the libraries from `bot\requirements.txt`. On an older Python, bot.py
-stops at once and says so, rather than failing somewhere deep in a test
-(#2276). `test-python-version.py` holds that.
+and every test stop at once and say so, rather than failing somewhere deep in
+a test (#2276). The check is `_pyguard.py`, imported first by bot.py and by
+every `test-*.py`, and Install-Bot.ps1 sends it with bot.py.
+`test-python-version.py` holds that.
 
 ## Putting a bot change on the VPS
 
