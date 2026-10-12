@@ -145,6 +145,9 @@ function boot(dir, eng) {
   const body = [
     'var claims = {};',
     'var stewards = [];',
+    // Nobody guards this board; a guard's take down (#502) is
+    // tests/test-502-guard-board.js.
+    'function isGuard() { return false; }',
     'var boxes = loadPart(\'boxes\', {});',
     'var funds = loadPart(\'funds\', {});',
     'var notices = loadPart(\'notices\', {});',

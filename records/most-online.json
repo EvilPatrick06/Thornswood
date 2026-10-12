@@ -1,6 +1,12 @@
 {
+  "dev": {
+    "people": 5,
+    "staffSeats": 0,
+    "voice": 5,
+    "note": "The dev server's own numbers, and dev voice's, which the dev feed shows as of 5 awake. Patrick, 12 Oct: cap the dev server at 5, in the game and in voice. All 5 are ordinary seats with none kept over them for staff, because only the staff roles get into dev at all, so staff seats there would only raise the cap past 5. Voice holds no more than the 5 seated, so a sixth person is told voice and chat are full and tries again by itself, and cannot take a place in the line at the game's menu, which is kept over voice, until somebody leaves. The numbers outside this object are main's."
+  },
   "people": 25,
   "staffSeats": 5,
-  "voice": 60,
-  "note": "The most people in the world at once, and the extra seats over it that only the Discord staff roles may take. Patrick, 28 Sep: 25 at once for the alpha, raised later; 29 Sep: 5 staff seats for now. Anyone past the number waits in line at the game's menu. voice is the most people the voice service takes at once, never fewer than people and staffSeats together, because everybody seated and everybody waiting in line holds a socket to it: 60 is the 30 seats and a line as long again, chosen on 11 Oct from voice\\load-voice.js, where the service on One took 100 people with a restart under five seconds and fell behind at 200 (#481). Change it here, then run the deploy for each server and Install-Voice.ps1. scripts\\deploy\\MaxOnline.ps1 says who reads it."
+  "voice": 30,
+  "note": "The most people in the world at once, and the extra seats over it that only the Discord staff roles may take. Patrick, 28 Sep: 25 at once for the alpha, raised later; 29 Sep: 5 staff seats for now. Anyone past the number waits in line at the game's menu. voice is the most people the voice service takes at once, never fewer than people and staffSeats together, because everybody seated and everybody waiting in line holds a socket to it: 30 is the 30 seats and no more: Patrick, 12 Oct, said the cap is 25 for now and voice 30, the 25 and the 5 staff seats, so somebody waiting in line at the menu has no voice until they are in (#481). It was 60 from 11 to 12 Oct. Change it here, then run the deploy for each server and Install-Voice.ps1. scripts\\deploy\\MaxOnline.ps1 says who reads it."
 }

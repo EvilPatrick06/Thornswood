@@ -25,9 +25,12 @@
               Windows accepts (200 in 213 ms that day). Two runs in a row
               before it counts, so one slow answer is not an outage.
     feed      https://thornswood.net/feed/version.json and feed-dev answer
-              200 with a feed in them (a launcherUrl and packs, 76 and 83
-              that day), and the launcher each one names answers its first
-              byte. Every launcher reads these to update, and a new install
+              200 with a feed in them (a launcherUrl and the release record
+              the launcher syncs from, baseline.id), and the launcher each one
+              names answers its first byte. Until 12 Oct this asked for packs
+              (76 and 83 on 28 Sep); since #1050 a feed carries no packs on
+              purpose, every launcher let in syncing file by file from the
+              record, so main's 1.2.4 feed with "packs": [] read as broken. Every launcher reads these to update, and a new install
               starts from them. The addresses are Updater.cs's own.
     cert      the certificate on thornswood.net has more than 14 days left.
               Let's Encrypt (issuer YE2), 13 December 2026 that day, 75.8
@@ -373,15 +376,20 @@ function Check-Feed($S, $feed) {
   }
   $j = $null
   try { $j = $a.Body | ConvertFrom-Json } catch { }
-  if (-not $j -or -not $j.launcherUrl -or @($j.packs).Count -eq 0) {
-    return (Wrong ($feed.Url + ' answered, but not with a feed: no launcherUrl or no packs in it'))
+  # A feed is a launcher to update to and the release record launchers sync
+  # from (baseline.id). Packs are not asked for: since #1050 a feed carries
+  # none, on purpose.
+  $record = ''
+  if ($j -and $j.PSObject.Properties['baseline'] -and $j.baseline -and $j.baseline.PSObject.Properties['id']) { $record = '' + $j.baseline.id }
+  if (-not $j -or -not $j.launcherUrl -or -not $record) {
+    return (Wrong ($feed.Url + ' answered, but not with a feed: no launcherUrl or no release record (baseline.id) in it'))
   }
   $l = Get-Http ('' + $j.launcherUrl) -FirstByte
   if ($l.Code -ne 200 -and $l.Code -ne 206) {
     $said = $(if ($l.Code -gt 0) { 'answered HTTP ' + $l.Code } else { $l.Error })
     return (Wrong ('the feed answers, but the launcher it names, ' + $j.launcherUrl + ', ' + $said))
   }
-  return (Ok ('answered, ' + @($j.packs).Count + ' packs, launcher ' + $j.launcherVersion + ' downloads'))
+  return (Ok ('answered, release ' + $record + ', launcher ' + $j.launcherVersion + ' downloads'))
 }
 
 function Check-Cert($S) {

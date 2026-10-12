@@ -472,12 +472,13 @@ $settingsPath = Join-Path $Dist 'server-settings.json'
   AND HOW MANY IT HOLDS AT ONCE, #481, whichever channel it goes to:
   thornswoodMostOnline for the gamemode and maxPlayers, with the staff seats
   on top, for the engine, from records\most-online.json by way of
-  MaxOnline.ps1. Into the DIST copy like the ports above, so what is packed
+  MaxOnline.ps1, the channel's own numbers (dev's are its dev object since
+  12 Oct). Into the DIST copy like the ports above, so what is packed
   carries the one number, and only written when it moved.
 #>
 if (Test-Path -LiteralPath $settingsPath) {
     . (Join-Path $PSScriptRoot '..\deploy\MaxOnline.ps1')
-    $mostOnline = Get-MostOnline
+    $mostOnline = Get-MostOnline -Channel $Channel
     # The two keys a publish puts over the running server's (ServerSettings.ps1,
     # #1222), so they are the record's number or the publish does not go.
     if ($mostOnline.Value -le 0) { Die ("$($mostOnline.From) gave no number ($($mostOnline.Why)), and a publish sets how many the server holds from it. Nothing was sent.") }

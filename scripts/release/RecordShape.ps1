@@ -8,7 +8,7 @@
 
       server-build        records\server-build.json      the server build every deploy is held to
       client-build        records\client-build.json      the client build Ship and the launcher are held to
-      most-online         records\most-online.json       the seat count the engine and gamemode take
+      most-online         records\most-online.json       the seat count the engine and gamemode take, main's and dev's
       collection-plugins  records\collection-plugins.json  the collection's plugin bytes (#2019)
       skyrim-pin          records\skyrim-pin.json        the Skyrim build a release is pinned to
       skyrim-files        records\skyrim-files.json      every file of that build (the launcher embeds it)
@@ -108,14 +108,25 @@ function Get-ThornswoodRecordProblems {
             $out += @(Get-ThornswoodFilesMapProblems (Get-ThornswoodRecordProp $Doc 'files') 'files')
         }
         'most-online' {
-            if (-not (Test-ThornswoodWhole (Get-ThornswoodRecordProp $Doc 'people') 1)) { $out += 'people is missing or not a whole number above zero' }
-            elseif ([int64](Get-ThornswoodRecordProp $Doc 'people') -gt 1000) { $out += 'people is over 1000, the engine''s limit' }
-            $s = Get-ThornswoodRecordProp $Doc 'staffSeats'
-            if ($null -ne $s -and -not (Test-ThornswoodWhole $s 0)) { $out += 'staffSeats is there and not a whole number' }
-            # The most the voice service takes at once (#481); MaxOnline.ps1
-            # holds it to no fewer than the seats.
-            $v = Get-ThornswoodRecordProp $Doc 'voice'
-            if ($null -ne $v -and -not (Test-ThornswoodWhole $v 1)) { $out += 'voice is there and not a whole number above zero' }
+            # Main's numbers are the record's own, and dev's, when it has its
+            # own (Patrick, 12 Oct), are the same three keys in a dev object.
+            $sets = @(@{ Pre = ''; O = $Doc })
+            $dev = Get-ThornswoodRecordProp $Doc 'dev'
+            if ($null -ne $dev) {
+                if ($dev -isnot [System.Management.Automation.PSCustomObject]) { $out += 'dev is there and not an object of people, staffSeats and voice' }
+                else { $sets += @{ Pre = 'dev.'; O = $dev } }
+            }
+            foreach ($set in $sets) {
+                $o = $set.O; $pre = $set.Pre
+                if (-not (Test-ThornswoodWhole (Get-ThornswoodRecordProp $o 'people') 1)) { $out += "${pre}people is missing or not a whole number above zero" }
+                elseif ([int64](Get-ThornswoodRecordProp $o 'people') -gt 1000) { $out += "${pre}people is over 1000, the engine's limit" }
+                $s = Get-ThornswoodRecordProp $o 'staffSeats'
+                if ($null -ne $s -and -not (Test-ThornswoodWhole $s 0)) { $out += "${pre}staffSeats is there and not a whole number" }
+                # The most the voice service takes at once (#481); MaxOnline.ps1
+                # holds it to no fewer than the seats.
+                $v = Get-ThornswoodRecordProp $o 'voice'
+                if ($null -ne $v -and -not (Test-ThornswoodWhole $v 1)) { $out += "${pre}voice is there and not a whole number above zero" }
+            }
         }
         'skyrim-pin' {
             # What Publish-Update writes into version.json and the launcher's
