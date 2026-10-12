@@ -165,7 +165,12 @@ try {
         New-Item -ItemType Directory -Path $copy -Force | Out-Null
         Copy-Item -LiteralPath $repoV -Destination (Join-Path $copy 'version.json')
         $src = Read-Page (Join-Path $copy 'version.json')
-        $srcTitles = @(@($src.news) | ForEach-Object { [string]$_.title })
+        # Wherever the feed keeps its notes: in "news", or since main's 1.2.4
+        # Ship (12 Oct) a file of their own named as "newsFile", with "news"
+        # empty (Feed-News.ps1, #1050). Reading "news" alone found no title
+        # and failed this from that Ship on.
+        . (Join-Path $Here 'scripts\release\Feed-News.ps1')
+        $srcTitles = @(@(Get-FeedNewsList $src $env:THORNSWOOD_TEST_SITE_DIR) | ForEach-Object { [string]$_.title })
 
         $out2 = Get-Page $copy (Join-Path $tmp 'copy-news.json')
         Yes 'Publish-News reads a copy of the live feed' ($null -ne $out2)
