@@ -329,11 +329,8 @@ jobs:
                  'test-1383-injury.js',
                  'test-chat-log.js',
                  'test-2260-burn-relog.js',
-<<<<<<< HEAD
                  'test-2259-forge-burn.js',
-=======
                  'test-2261-tome-refused.js',
->>>>>>> 7f27f890 (A refused spell tome goes back into the reader's pack on screen (Refs #2261))
                  'test-1383-treatments.js',
                  'test-1384-condition.js',
                  'test-1385-perks.js',
