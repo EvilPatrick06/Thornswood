@@ -30,9 +30,11 @@ What is NOT covered today, which is what this issue is about:
   sha256 the feed names, and the feed is protected only by https and by who
   can write `C:\Thornswood-Docs\feed` over ssh. Whoever can write the feed
   can change both a pack and its hash.
-- release.yml does not sign. The runner's exe is signed later on One, so the
-  draft release on GitHub holds unsigned bytes and a `SHA256SUMS` for them,
-  and the published file has a different hash from the draft's.
+- release.yml does not sign yet. The runner's exe is signed later on One, so
+  the draft release on GitHub holds unsigned bytes and a `SHA256SUMS` for
+  them, and the published file has a different hash from the draft's.
+  Decided (section 8): signing moves into release.yml on GitHub's runner,
+  through a federated Azure identity, which ends this gap.
 - Nothing ties source commit, engine pin, runner, records and artifact hashes
   together in one signed statement.
 
@@ -66,7 +68,8 @@ tag, release id, runner name, the hashes of `client-build.json` and
 | Thing | Owner | Custody |
 | --- | --- | --- |
 | Signing account ThornswoodSigning and profile ThornswoodRelease | Patrick (makes accounts and gives the Certificate Profile Signer role, Developer-Guide.md "Your own signing sign in", #1740) | In Azure. No private key leaves Microsoft's HSM; certificates last three days and are reissued |
-| Right to sign | Each person who ships, with their own account holding Certificate Profile Signer on ThornswoodRelease | Their own `az login` on the machine they ship from. Nothing is copied between machines; `signing.json` holds paths only |
+| Release signing in release.yml (decided, section 8) | Patrick sets up the Azure side (the federated credential and the Signer role on ThornswoodRelease); the owner of the release.yml move does the workflow | A federated (OIDC) identity in Azure that trusts only release.yml on `v*` tags of this repository. No secret, password or key is stored in GitHub or on any machine; GitHub mints a short token per run. Pull request jobs never get it |
+| Right to sign by hand | Each person who ships, with their own account holding Certificate Profile Signer on ThornswoodRelease | Their own `az login` on the machine they ship from, for local and fallback signing only once release.yml signs. Nothing is copied between machines; `signing.json` holds paths only |
 | Durable identity pinned by launchers | Launcher lane | `Signature.Identities` in `launcher\app\Signature.cs` |
 | `SHA256SUMS`, feed hashes, records | Release lane (Ship) | Git (records), GitHub draft releases, VPS feed store |
 
@@ -79,7 +82,9 @@ the OLD profile, and only then sign with the new one. Rotating a person's
 signing right is removing their role assignment.
 
 Recovery. Lost machine: nothing to recover, sign in on another machine and
-run `Setup-ShipMachine.ps1`. Lost or compromised Azure account of a signer:
+run `Setup-ShipMachine.ps1`. Compromised workflow or repository: Patrick
+deletes the federated credential (or removes its role), which stops release
+signing at once without touching anyone's own sign in. Lost or compromised Azure account of a signer:
 Patrick removes the role and resets the account; no key is exposed because
 none was held. Lost signing account or profile: a new profile means a new
 durable identity, and installed launchers refuse it, so recovery is the
@@ -93,15 +98,20 @@ before the revocation date stays valid, later ones fail WinVerifyTrust. To
 withdraw one bad release without revoking: point the feed back at the last
 good release (the feed store keeps `history\`), and once the manifest is
 enforced, list the bad manifest's sha256 in a `revoked` array the launcher
-refuses. Emergency stop of all signing: remove the signer role assignments.
+refuses. Emergency stop of all signing: remove the signer role assignments,
+the federated identity's included.
 
 ## 4. Verification points
 
-1. Sign time (`Sign-Artifact.ps1`): reads the signature back, must be Valid.
+1. Sign time (`Sign-Artifact.ps1`, in release.yml once signing moves there):
+   reads the signature back, must be Valid; a failure fails the job and no
+   draft gets the file.
 2. Publish (`Assert-PublishSigned.ps1`): Authenticode Valid, Subject has
    ExpectedSigner, `Signature.cs` passes. Unchanged.
-3. Ship download of the runner's draft: `SHA256SUMS` first (unchanged), then
-   in phase B the draft's manifest signature.
+3. Ship download of the runner's draft: `SHA256SUMS` first (kept), then the
+   Authenticode check of the already signed exe and stub, then in phase B the
+   draft's manifest signature. Once release.yml signs, `SHA256SUMS` describes
+   the signed files.
 4. Launcher self update: sha256 from the feed, then `Signature.cs` (today).
 5. Launcher pack and runtime download: sha256 from the feed (today), plus the
    manifest signature and listing (phase C).
@@ -135,12 +145,14 @@ the sha256 and keeps the sha256 check.
   intended commit is #2202 (Wyrd lane), not this design. What this design
   adds is only that the manifest records the commit sha the draft was built
   from, so whatever check #2202 settles on has a signed value to compare.
-- Draft promotion. The draft's `SHA256SUMS` describes the UNSIGNED runner
-  exe; signing on One changes the bytes. Ship already checks the download
-  against `SHA256SUMS` before signing; the manifest then records both the
-  draft sha256 (unsigned) and the published sha256 (signed), so the chain
-  "runner built X, One signed X into Y" is in one signed statement. Promoting
-  a draft is a person's act and stays that way.
+- Draft promotion. Today the draft's `SHA256SUMS` describes the UNSIGNED
+  runner exe, and signing on One changes the bytes. With signing in
+  release.yml (section 8) the runner builds and signs in one job, the draft
+  carries the signed exe and stub with a `SHA256SUMS` of the signed files,
+  and the manifest is signed in the same job, so the draft's hashes and the
+  published hashes are the same and "this runner built and signed Y from
+  this commit" is one signed statement. Promoting a draft is a person's act
+  and stays that way.
 - Replacement. release.yml deletes and re-uploads same-named assets in a
   draft. After promotion an asset must never be replaced in place: a new
   build is a new release id. The feed serves by sha256, so a replaced file
@@ -167,16 +179,24 @@ can land in the signature blob, which Authenticode does not hash, and still
 verify. A tamper test has to change bytes in the hashed region (the pilot
 uses the DOS stub text). Anyone writing tamper tests later should know that.
 
-Not yet done: signing and verifying from a second, clean machine. One is the
-machine that already ships. That run is queued in the vault
-(`claude-queue\2163-signed-releases.md`).
+Not yet done: signing and verifying away from One. With section 8 decision 2
+that proof is a signed draft from release.yml, not a second hand-run
+machine; the vault note (`claude-queue\2163-signed-releases.md`) says so.
 
 ## 8. Decisions (Patrick, 11 Oct 2026)
 
 1. Key custody for non-PE artifacts: undecided. The catalog signed by
    ThornswoodRelease (section 2) is the default design, marked PENDING until
    Patrick confirms it.
-2. Where release signing happens: on the VPS build machine.
+2. Where release signing happens: on GitHub's runner, in release.yml, through
+   Azure Artifact Signing with a federated (OIDC) identity limited to
+   release.yml on `v*` tags. Patrick's final call, relayed by Smeagle; it
+   replaces the earlier "VPS build machine" answer. The draft carries the
+   signed exe and stub and a `SHA256SUMS` of the signed files; the manifest
+   is signed in the same job; Ship stops signing the launcher on One. Pull
+   request jobs never get the identity. The Azure side is Patrick's; the
+   workflow and script change belongs to whoever owns that move, not this
+   document.
 3. Second durable identity: not for now. The recovery risk in section 3
    stays accepted.
 4. Signers holding Certificate Profile Signer on ThornswoodRelease: Patrick,
