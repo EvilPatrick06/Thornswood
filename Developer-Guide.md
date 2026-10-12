@@ -395,8 +395,9 @@ component to the install it has:
 & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\setup.exe" modify --installPath "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\BuildTools" --add Microsoft.Net.Component.4.8.1.TargetingPack --quiet --norestart
 ```
 
-Visual Studio 2022 itself, any edition, with the ".NET desktop development"
-workload, is just as good. Then, from `Thornswood-Repo`:
+Visual Studio 2022 or newer itself, any edition, with the ".NET desktop
+development" workload, is just as good (GitHub's runner builds it with Visual
+Studio 18). Then, from `Thornswood-Repo`:
 
 ```
 .\scripts\release\Find-MSBuild.ps1 -Report

@@ -679,7 +679,8 @@ jobs:
           # step above is the build that ships, and this holds the project
           # files to it: both ways, both exes, the same resources, references,
           # types, file details, icon and manifest. GitHub's image has Visual
-          # Studio 2022; the VPS runners have no MSBuild (12 Oct), so the
+          # Studio (windows-2025-vs2026, Visual Studio 18 Enterprise, on
+          # 12 Oct); the VPS runners have no MSBuild (12 Oct), so the
           # fallback job leaves this step out, and the nightly runs the same
           # harness there with the builds said SKIP.
           & pwsh -NoProfile -File tests\test-498-msbuild.ps1 -RequireMSBuild -Scratch (Join-Path $env:RUNNER_TEMP 'msbuild-498')
