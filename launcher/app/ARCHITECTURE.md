@@ -188,7 +188,7 @@ after the three are ticked.
 and written by Save, which encrypts the update token with Windows' DPAPI and
 locks the file to this Windows account. The server address, port, collection
 link, voice port and update repository in it are facts about the server, not
-settings: `ShellUpdate.cs:97 OnVersionDoc()` overwrites them from version.json on
+settings: `ShellUpdate.cs:100 OnVersionDoc()` overwrites them from version.json on
 every update check. So is the Skyrim build pin (the exe size the checks look
 for and the depots the Downgrade button asks Steam for), taken through
 `Downgrade.AdoptPin()` when the feed carries it; the numbers compiled into
@@ -215,15 +215,20 @@ release record"). Once every launcher the feed lets in syncs, the feed's
 `packs` is empty (docs\FEED.md, "When the packs can go"), and the update card
 shows the note the record's pointer carries (`baseline.notes`, read by
 `RecordRef.FromFeed` in Config.cs) rather than the last pack's.
+FeedNews.cs is the News tab's half (#1050): when the feed
+names its notes as a file of their own (`newsFile`, an asset under its sha256),
+`FillNews()` fetches it once, checks it, keeps it in `Profile\news.json`, and
+puts its notes after the ones the feed carries, on the update check's own
+thread in `ShellUpdate.cs CheckUpdatesBackground`.
 `Updater.cs:1177 SelfUpdate()` writes `Launcher\Thornswood.exe.new` and a
 script in the temp folder, `thornswood-update-<process id>.cmd`, that swaps it in once
 this process has gone and keeps the old one until the new one has started
 (see SelfSwap below). `Version` at the top of the file is the launcher's
 version, moved by `scripts\release\Bump-Version.ps1` before a Ship. In the launcher,
 `ShellUpdate.cs:28 CheckUpdatesBackground()` asks, `OnVersionDoc` decides,
-`ShellUpdate.cs:369 RunUpdate()` installs, and `ShellUpdate.cs:48 CheckFailed()` keeps
+`ShellUpdate.cs:372 RunUpdate()` installs, and `ShellUpdate.cs:51 CheckFailed()` keeps
 Play shut and asks again every thirty seconds when the source does not answer.
-Every document that was read also goes to `ShellUpdate.cs:77 ShowNotice()`, which
+Every document that was read also goes to `ShellUpdate.cs:80 ShowNotice()`, which
 asks FeedNotice what the bar above Play says and whether Play is held.
 
 **PlayProgress and PlayBar** (Progress.cs, painted by ShellProgress.cs).
