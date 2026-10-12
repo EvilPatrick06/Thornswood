@@ -105,79 +105,60 @@ The support voice channel sits in Help, because that is what it is for.
 
 ### Testing
 
-`test-results` (a forum), `#test-tasks` and **play-testing** (voice), visible
-to Playtesters and staff and to nobody else. `#test-tasks` also lets in the
-lead gamemaster role, because that role may open a Live smoke session and the
-rest of that gate does not include it. It is on that channel's own line in the
-builder's plan, so no other channel moved.
+`#test-findings` (a forum, `test-results` until 11 October), `#test-tasks` (a
+forum), `#known-issues` and **play-testing** (voice), visible to Playtesters
+and staff and to nobody else. `#test-tasks` also lets in the lead gamemaster
+role, which may post test tasks and is not otherwise in that gate. It is on
+that channel's own line in the builder's plan, so no other channel moved.
 
-`#test-tasks` replaces `#test-these`, which was deleted in the channel cleanup.
-It is a new channel rather than that one renamed, and `#test-these` is in the
-builder's retired list so a re-run does not bring it back.
+`#test-tasks` replaces `#test-these`, which was deleted in the channel cleanup,
+and `#test-these` is in the builder's retired list so a re-run does not bring
+it back. Until 11 October `#test-tasks` carried the Live smoke checklist
+(dated sessions with Pass, Fail, Skip and Fail-known rows, `/live-smoke`).
+Patrick's card of that day took all of it out.
 
-It carries the living Live smoke checklist. The rows are not written in
-Discord: they are the Live slice of the acceptance criteria in the vault,
-exported to `live-smoke-discord-export.json`, which is deployed beside
-`bot.py`. Staff open a dated session and the bot posts one message per row,
-each with Pass, Fail, Skip and Fail-known on it, in a thread off the opener:
+**Test tasks.** One thread per test task, from a title and a body, with the
+forum's Dev or Main tag on it:
 
-    /live-smoke start    settings version and live channel, opens a session
-    /live-smoke reset    closes the session open now and opens a fresh one
-    /live-smoke refresh  reads the export again and rewrites the checklist
-    /live-smoke report   counts the marks on the session thread it is run in
+    /test-task title body tag     in Discord: Owner, Dev and Lead Gamemaster
+    python bot.py --env-file C:\Thornswood-Bot\bot.env.json --post-task --title "..." --body-file task.txt --tag Dev
 
-Those four are **Owner, Dev and Lead Gamemaster**, which is wider than Owner
-and Dev and narrower than the staff roles: a Moderator alone does not open or
-reset a session. They are the `LIVE_SMOKE_ADMIN_ROLES` roles in `bot.env.json`
-(Owner, Dev, Lead Gamemaster and Lead GM by default), matched by id or name.
-Role ids are preferred, because an id survives a rename, so renaming a role
-changes nothing; a role given by its name has to be renamed in
-`LIVE_SMOKE_ADMIN_ROLES` too. Testers and staff mark their own rows. Agents do
-not.
+Who may post is `TEST_TASK_ROLES` in `bot.env.json`, by role id (preferred) or
+name, Owner, Dev, Lead Gamemaster and Lead GM by default. A `bot.env.json`
+that still carries `LIVE_SMOKE_ADMIN_ROLES` is read for it. A thread already
+open under the same title is handed back rather than made twice.
 
-A mark is an edit to the Discord message it was pressed on, and it is one line
-per person: the row grows a `Marks:` block with a line for each display name,
-and marking again corrects that person's line rather than adding a second one.
-Nothing writes a mark, a name or an account id to the site, to a database, to a
-file or to the bot's log, and nothing posts a named fail anywhere outside the
-session thread. Everybody who can read the thread can read the marks in it.
-Going further than that, keeping marks anywhere off Discord, needs the Privacy
-page changed first.
+**Known issues.** `#known-issues` is read only: the setup copies
+`#test-findings`' overwrites and switches sending and threads off for
+@everyone and each of them, and only the bot posts. One post per open issue in
+`EvilPatrick06/Thornswood` labelled Dev Findings or Main Findings, the title
+and its status and nothing else: no issue number and no link, because testers
+have no GitHub. When the issue is closed as completed (confirmed fixed) the
+post is struck through and says Fixed; closed any other way it says Closed, not fixed;
+reopened, it goes back. The bot reads GitHub every five minutes
+(`KNOWN_ISSUES_EVERY`, never under a minute) with `GITHUB_TOKEN` from
+`bot.env.json`, a read only token for that repository's issues. No token, no
+posts, said once in the log. Issue number to message id is kept in
+`data\known-issues.json`, written straight after each post, and before a new
+post the bot's own recent posts in the channel are matched by title, so neither a restart nor a crash
+between a post and its save posts twice.
 
-`/live-smoke report` is those marks read back, not a second record of them.
-Run in the session thread that is open, it counts every row the session posted
-and answers the one admin who ran it, as an ephemeral nobody else sees: the
-session name, the day the set was last changed, how many rows are marked and
-how many are not, which rows carry a Fail or a Fail-known and who gave it, and
-the rows nobody has marked at all. Pass and Skip are counted rather than named,
-because eleven names on a Pass are eleven names between a reader and the one
-Fail under it. It posts nothing in the thread, reads nothing but the messages
-Discord already holds, and names people by the display names those messages
-already carry. The standing checklist thread is refused one, because those rows
-carry no buttons and so no marks, and so is a session a reset has closed.
+**The one-time setup.** Moving a server from the old shape is the only channel
+change the bot makes, Patrick's explicit exception for these three changes. It
+runs only when asked, never on a start:
 
-What a session puts in the channel is the checklist rows and nothing wrapped
-around them, which is Djinn's layout call of 1 October. The opener is the
-session's name, the live channel, the Settings version and one line saying
-when the set last changed; the blocks of instructions that used to sit above
-and below the rows are gone. Ticket numbers are not posted either: testers do
-not have GitHub, so `tickets` in the export is for the staff map and the
-harness, and a row carries one only where the export sets
-`rules.discord_show_tickets` to true.
+    python bot.py --env-file C:\Thornswood-Bot\bot.env.json --setup-channels           (preview, changes nothing)
+    python bot.py --env-file C:\Thornswood-Bot\bot.env.json --setup-channels --apply   (does it, once)
 
-Between sessions the channel carries the standing checklist: one post with the
-heading and the day the set last changed, and under it, in a thread, one
-message for each row saying the whole of what a tester does. It is worded the
-way a session words it, because a list of row names tells somebody what the set
-covers and nothing about how to run any of it. Those rows carry no buttons: a
-mark belongs to a dated session.
-
-When the Live set moves, the export changes in the vault and the copy in `bot`
-changes with it in the same pull request. Then
-`.\scripts\deploy\Install-Bot.ps1 -CodeOnly` puts it on the VPS, and
-`/live-smoke refresh` rewrites that checklist, editing the rows that are there
-and taking down any the set has dropped. A session already open keeps the rows
-it was opened with; the next `start` uses the new set.
+It turns `#test-tasks` into a forum with the Dev and Main tags. Discord cannot
+convert a text channel to a forum, so when it refuses, a new forum is made in
+the same category and position with the old channel's permission overwrites,
+and the old channel is renamed `#test-tasks-archive` with sending switched off
+for everyone but the bot. Nothing is deleted. It renames `#test-results` to
+`#test-findings`, and makes `#known-issues` beside it, seen by the same
+people and read only for all but the bot. A finished apply is written to `data\channel-setup.json` and a
+second run does nothing; an apply that stopped part way does only what is left.
+`test-testing-channels.py` holds all of this.
 
 ### Staff
 
@@ -197,7 +178,7 @@ different servers stitched together.
 | Role | Colour | What it means |
 |---|---|---|
 | Owner | gold | Runs the place. You |
-| Lead Gamemaster | deep blue | Runs the gamemasters, and opens a Live smoke session |
+| Lead Gamemaster | deep blue | Runs the gamemasters, and posts test tasks |
 | Dev | violet | Builds and deploys it |
 | Gamemaster | blue | Runs things in world |
 | Loremaster | teal | Writes the world |
@@ -230,8 +211,8 @@ runs every staff and admin command and button as somebody who is not staff
 for it, and fails on any new one whose gate is not written down in it.
 
 Both close a ticket and nothing else: a thread off a `TICKET_CHANNEL`
-channel, where the panel opens them. In any other thread, a Live smoke
-session or a `#tales` post, they answer that they only work inside a ticket
+channel, where the panel opens them. In any other thread, a `#test-tasks`
+post or a `#tales` post, they answer that they only work inside a ticket
 and archive and write down nothing (#1776, `test-1776-close-tickets-only.py`).
 
 Staff roles are job titles on purpose. Thane, Steward, Warden and Housecarl are
@@ -306,8 +287,7 @@ them, the way [Setting up a machine](../Developer-Guide.md#setting-up-a-machine)
 installs them (#1401).
 
 What goes up with it: `bot.py`, `card.py`, the channel ids, the card artwork,
-`requirements.txt`, and `live-smoke-discord-export.json`, which `bot.py` reads
-from beside itself for the live smoke. A file the bot reads and this list does
+and `requirements.txt`. A file the bot reads and this list does
 not name is a file that is only ever on main, never on the box.
 
 Nothing else stays in the bot's folder (#1184). It holds what that list sends
@@ -343,7 +323,7 @@ run asks the box itself and prints one line per file, under the heading
 ```text
 asked of THORNSWOOD-VPS, where the bot runs from C:\Thornswood-Bot
 Test-Path C:\Thornswood-Bot\bot.py  True
-Test-Path C:\Thornswood-Bot\live-smoke-discord-export.json  True
+Test-Path C:\Thornswood-Bot\card.py  True
 Test-Path C:\Thornswood-Bot\data\bot.log  True
 ```
 

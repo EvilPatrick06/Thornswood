@@ -217,9 +217,9 @@ if ($thereBlock) {
     $run = [scriptblock]::Create("param(`$Root, `$Service, `$Must)`r`n" + $thereBlock)
     $there = Join-Path $tmp 'there'
     $null = New-Item -ItemType Directory -Force -Path (Join-Path $there 'assets')
-    foreach ($f in 'bot.py', 'card.py', 'live-smoke-discord-export.json') { [IO.File]::WriteAllText((Join-Path $there $f), 'x') }
+    foreach ($f in 'bot.py', 'card.py') { [IO.File]::WriteAllText((Join-Path $there $f), 'x') }
     [IO.File]::WriteAllText((Join-Path $there 'assets\join-card.png'), 'x')
-    $must = @('bot.py', 'card.py', 'live-smoke-discord-export.json', 'assets/join-card.png')
+    $must = @('bot.py', 'card.py', 'assets/join-card.png')
     $thereLog = Join-Path $there 'data\bot.log'
     $said = @(& $run $there 'ThornswoodBot' $must | ForEach-Object { "$_" })
     $all = ($said -join "`n")
@@ -228,17 +228,17 @@ if ($thereBlock) {
         $all -match ('asked of \S.*, where the bot runs from ' + [regex]::Escape($there)))
     Yes 'and it makes data\bot.log at that root and says Test-Path True for it' (
         (Test-Path -LiteralPath $thereLog) -and $all -match ([regex]::Escape('Test-Path ' + $thereLog) + '\s+True'))
-    Yes 'and every file the run sent is True by its full path under that root, the export included' (
-        @($said | Where-Object { $_ -match '\s+True$' }).Count -eq 5 -and
-        $all -match ([regex]::Escape('Test-Path ' + (Join-Path $there 'live-smoke-discord-export.json')) + '\s+True'))
+    Yes 'and every file the run sent is True by its full path under that root, card.py included' (
+        @($said | Where-Object { $_ -match '\s+True$' }).Count -eq 4 -and
+        $all -match ([regex]::Escape('Test-Path ' + (Join-Path $there 'card.py')) + '\s+True'))
     # The two that were reported missing after a green run.
-    Remove-Item -LiteralPath (Join-Path $there 'live-smoke-discord-export.json') -Force
+    Remove-Item -LiteralPath (Join-Path $there 'card.py') -Force
     Remove-Item -LiteralPath $thereLog -Force
     $said = @(& $run $there 'ThornswoodBot' $must | ForEach-Object { "$_" })
     $all = ($said -join "`n")
-    Yes 'an export that is not at the root is FILES MISSING, named by its full path on the box' (
+    Yes 'a sent file that is not at the root is FILES MISSING, named by its full path on the box' (
         $said -contains 'FILES MISSING' -and
-        $all -match ([regex]::Escape('Test-Path ' + (Join-Path $there 'live-smoke-discord-export.json')) + '\s+False'))
+        $all -match ([regex]::Escape('Test-Path ' + (Join-Path $there 'card.py')) + '\s+False'))
     Yes 'and data\bot.log is made again rather than reported missing' ((Test-Path -LiteralPath $thereLog) -and $all -notmatch 'bot\.log  False')
 }
 Yes 'and a run whose files are not on the box stops, in -CodeOnly and in a full run' (
