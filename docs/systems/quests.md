@@ -1,5 +1,13 @@
 # Custom quests
 
+Patrick expanded the requirements on 12 October 2026: six distinct merchant
+roles per hold, different quests by hold and role, work at all four ranks,
+coverage for every class and profession, and Master work for every half and
+magic school. [Six trades in each hold](merchant-expansion.md) records that
+contract and the implementation order. The tables below describe the older
+authored work; they are no longer a restriction against adding quests.
+The expanded roster and quest catalogue are not released yet.
+
 Quests this server runs. Papyrus quests do not run, so a vanilla
 quest journal does not open. The offer, the turn-in, and the unlock
 are the server's.
