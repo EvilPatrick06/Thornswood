@@ -125,8 +125,8 @@ somebody's own machine:
 
 | Maneuver | In the server | Not yet |
 | --- | --- | --- |
-| Set | The stamina and the wait | Halving what a block costs. The game works that out on the blocker's machine |
-| Plant | The stamina and the wait. A Break or a Wreck does not stagger you | Any other stagger |
+| Set | The stamina and the wait | Halving what a block costs. A block costs no stamina here yet, so there is nothing to halve: the server decides a block and takes health only, and nobody else's blow does damage on your own machine. Whether blocks should cost stamina is Patrick's to decide |
+| Plant | The stamina and the wait. A Break or a Wreck does not stagger you, and your own game refuses every other stagger while it runs | Nothing |
 | Cover | While you block and they stay within 3 metres, a fifth of what each hit took is given back | A hit that kills outright is not softened |
 | Wall | You, and your party within 3 metres of you, get a fifth of what each hit took back | A hit that kills outright is not softened |
 | Rush | +4 speed, through the same hand that puts your skill tree on your character | Nothing |

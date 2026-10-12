@@ -642,12 +642,26 @@ heal(STRANGER);
 world.actors.get(BUL).p.stamina = 1;
 world.actors.get(BER).p.stamina = 1;
 later(60000);
-yes('Plant starts and says which staggers it stops', /^Plant, for 8 seconds\. A Break or a Wreck does not stagger you\./.test(M.use(BUL, 'plant')));
+const plantWrites = world.writes.length;
+yes('Plant starts and says nothing staggers you', /^Plant, for 8 seconds\. Nothing staggers you\./.test(M.use(BUL, 'plant')));
+{
+  // The view the front reads says Plant is on, with its length (#1386).
+  const w = world.writes.slice(plantWrites).filter(function (x) { return x.id === BUL; });
+  const row = w.length ? (w[w.length - 1].view || []).filter(function (r) { return r.key === 'plant'; })[0] : null;
+  yes('starting Plant redraws the view with Plant on, for 8 seconds', !!row && row.on === true && row.seconds === 8);
+}
 M.use(BER, 'break');
 strike(BER, BUL, 0.1, {});
 settle();
 yes('a Break on a planted Bulwark sends no stagger', world.staggers.length === 2);
 heal(BUL);
+{
+  const before = world.writes.length;
+  later(8100);
+  const w = world.writes.slice(before).filter(function (x) { return x.id === BUL; });
+  const row = w.length ? (w[w.length - 1].view || []).filter(function (r) { return r.key === 'plant'; })[0] : null;
+  yes('when Plant ends the view is redrawn with it off', !!row && !row.on && row.seconds === 8);
+}
 
 // A Wreck blow that kills is still the berserker's kill.
 later(120000);
@@ -1004,7 +1018,7 @@ const keysCs = fs.readFileSync(path.join(root, 'launcher', 'app', 'Keys.cs'), 'u
   yes('the front\'s three maneuver functions are there', parts.every(Boolean));
   const env = { js: [], notes: [], busy: '', creating: false, claims: {} };
   const F = new Function('T', 'MANEUVER_NAME', 'claims', 'busyMenuOpen', 'note', 'say', 'env',
-    'var skillsCreating = false;\n' + parts.join('\n') +
+    'var skillsCreating = false;\nfunction plantSeen() { }\n' + parts.join('\n') +
     '\nreturn { fromView: maneuversFromView, key: function () { skillsCreating = env.creating; return maneuverKeyPressed(); }, rows: function () { return maneuverRows; } };'
     .replace('return {', 'var maneuverRows = [];\nreturn {'))(
     { js: function (src) { env.js.push(src); return true; } }, '9', env.claims,
@@ -1141,6 +1155,69 @@ const keysCs = fs.readFileSync(path.join(root, 'launcher', 'app', 'Keys.cs'), 'u
   yes('a restart two seconds in ends it: the new server puts no speed on any view it works out',
     !!M2 && M2.effects(RUSHER) === null);
   yes('and clears its wait, as the page says', /Rush \(15 stamina, ready\)/.test(M2.use(RUSHER, '')));
+}
+
+// ----------------------------------------- Plant on the person's own machine --
+/*
+  #1386. "You are not staggered for 8 seconds." The server refuses the
+  staggers it sends (above). Every other stagger is the game's, played on
+  the person's own machine as staggerStart on their own character, so the
+  front blanks that event in the sendAnimationEvent hook while the view says
+  Plant is on: the real maneuversFromView and the real Plant block, over a
+  pretend hook and clock. FRONT=<path> runs it on another copy of the plugin.
+*/
+{
+  const FR = process.env.FRONT ? fs.readFileSync(process.env.FRONT, 'utf8').replace(/\r/g, '') : front;
+  const fromView = slice(FR, '  function maneuversFromView(json) {', '\n  }\n');
+  const a = FR.indexOf('  let plantUntil = 0;');
+  const b = a < 0 ? -1 : FR.indexOf("  sp.on('update', guard('plant', () => {", a);
+  const c = b < 0 ? -1 : FR.indexOf('\n  }));\n', b);
+  yes('the front has a Plant block beside the maneuver rows', !!fromView && a >= 0 && b > a && c > b);
+  if (fromView && a >= 0 && b > a && c > b) {
+    const clock = { t: 1000000 };
+    const hooks = [], updates = [], said = [];
+    const sp = {
+      hooks: { sendAnimationEvent: { add: function (h, from, to, pattern) { hooks.push({ h: h, from: from, to: to, pattern: pattern }); } } },
+      on: function (ev, fn) { if (ev === 'update') { updates.push(fn); } }
+    };
+    const api = new Function('sp', 'guard', 'say', 'log', 'Date', 'maneuversToPage',
+      'let maneuverRows = [];\n' + fromView + '\n' + FR.slice(a, c + 7) +
+      '\nreturn { fromView: maneuversFromView };')(
+      sp, function (n, fn) { return fn; }, function (t) { said.push(String(t)); }, function (t) { said.push(String(t)); },
+      { now: function () { return clock.t; } }, function () { });
+    yes('Plant hooks staggerStart on your own character and nobody else\'s',
+      hooks.length === 1 && hooks[0].from === 0x14 && hooks[0].to === 0x14 && hooks[0].pattern === 'staggerStart');
+    const stagger = function () {
+      const ctx = { animEventName: 'staggerStart', selfId: 0x14 };
+      hooks[0].h.enter(ctx);
+      updates.forEach(function (f) { f(); });
+      return ctx.animEventName;
+    };
+    const view = function (on) {
+      const row = { key: 'plant', name: 'Plant', stamina: 20, cooldown: 60, ready: !on, seconds: 8 };
+      if (on) { row.on = true; }
+      api.fromView(JSON.stringify({ v: 1, panel: { maneuvers: [{ key: 'set', name: 'Set', stamina: 15, cooldown: 45, ready: true }, row] } }));
+    };
+    view(false);
+    yes('without Plant a stagger plays', stagger() === 'staggerStart');
+    view(true);
+    yes('with Plant on in the view a stagger is refused', stagger() === '');
+    yes('and the log says so', said.some(function (l) { return /plant: refused a stagger \(1 in this Plant\)/.test(l); }));
+    clock.t += 3000;
+    view(true);
+    clock.t += 3000;
+    yes('the same Plant seen again does not start it over', stagger() === '');
+    view(false);
+    yes('the server saying it is over lets staggers play again', stagger() === 'staggerStart' &&
+      said.some(function (l) { return /plant: over, 2 stagger\(s\) refused/.test(l); }));
+    view(true);
+    clock.t += 8001;
+    yes('if the end never arrives, Plant still ends at its own length', stagger() === 'staggerStart');
+    api.fromView(JSON.stringify({ v: 1, panel: { maneuvers: [] } }));
+    view(true);
+    api.fromView(JSON.stringify({ v: 1, panel: { maneuvers: [{ key: 'rush', name: 'Rush', stamina: 15, cooldown: 30, ready: true }] } }));
+    yes('a view with no Plant row in it ends Plant', stagger() === 'staggerStart');
+  }
 }
 
 console.log('');
