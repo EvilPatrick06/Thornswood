@@ -102,8 +102,8 @@ There are no NPC guards. A hold's guards are people in a guard role,
 an office the hold sets ([Offices](offices.md)); Patrick decided on
 11 October that guards are people and no NPC guard comes back (#502).
 A Thalmor marker is a reason to start a fight. No bounty is added for
-killing an NPC: there is no crime gold and no stolen tag the server
-tracks. Theft is the rule on the site: take
+anything, a killing, a blow, a theft, a pickpocket or a trespass: there is
+no crime gold and no stolen tag the server tracks. Theft is the rule on the site: take
 something, take a good thing, leave the rest.
 
 ## Where this is
@@ -118,14 +118,18 @@ controller, population catalogue, habitat limits and difficulty tiers are live.
 Guards, courts, priests, town fillers and named creatures are not placed.
 Stock controls and merchant quests are still being implemented and verified.
 
-No bounty for a kill (#502): the bounty was Skyrim's own crime system in
-each person's game, and nothing of ours added one. Once a game is loaded,
-the front plugin tells the twelve crime factions in which a kill or a blow
-costs gold (every hold's, Raven Rock's, the Orcs' and one Dark Brotherhood
-contract's) that killing or striking a member is not a crime against them.
-The list is read out of the load order by `scripts\dev\Build-CrimeTable.py`
-into `game\data\crime-factions.json`. Theft, pickpocketing and trespass
-still add a bounty in the game; that waits on Patrick's answer on #502.
+No bounty for anything (#502): Patrick, 12 October, "the whole bounty
+system should be removed in its entirety". The bounty was Skyrim's own
+crime system in each person's game, and nothing of ours added one. Once a
+game is loaded, the front plugin sets all six ignore flags (murder, assault,
+stealing, trespass, pickpocket, werewolf) on every faction that tracks
+crime, 83 of them, so a crime of any kind against a member, or against
+something the faction owns, is not a crime against it. The list is read out
+of the load order by `scripts\dev\Build-CrimeTable.py` into
+`game\data\crime-factions.json`, which also lists every script that adds a
+bounty or sends somebody to jail by itself (guard dialogue, quest stages)
+and why none of them can run here. Escaping jail has no flag; the game adds
+it only to somebody it jailed, and with no NPC guard it jails nobody.
 See [Shared NPC activity](../NPC-SERVER-ACTIVITY.md) for verification.
 The [population catalogue](../NPC-POPULATION.md) lists authored counts, locations,
 caps and return times. Its coordinate files and the server policy come from the
