@@ -7,7 +7,7 @@
   back a few steps to a recent safe spot out of a short trail the server
   keeps, else the nearest temple; once every 5 minutes for each character;
   refused while dead; in a fight a 15 second wait that being hit or moving
-  cancels; every use written where staff read it (private/moderation.log,
+  cancels; every use written where staff read it (for-bot/moderation.log,
   which the bot says in the staff channel); a line in the chat every time.
 
   It runs the REAL chat command block of game/gamemode.js (WORDS through the
@@ -183,6 +183,7 @@ function load() {
     readFileSync: function () { throw new Error('not here'); },
     existsSync: function () { return false; },
     appendFileSync: function (p, text) { w.records.push({ path: p, text: text }); },
+    mkdirSync: function (p) { (w.dirs = w.dirs || []).push(p); },
     writeFileSync: function () { }, unlinkSync: function () { }
   };
   class FakeDate extends Date {
@@ -350,8 +351,9 @@ console.log('\nback a few steps:');
       /again in 5 minutes/.test(got[0]));
 
   const r = records(w);
-  yes('one line in moderation.log, under privDir', w.records.length === 1 &&
-      w.records[0].path === path.join('private', 'moderation.log'));
+  // In for-bot beside private, which the bot reads by a rule on the folder (#2321).
+  yes('one line in moderation.log, in for-bot beside privDir, the folder made first', w.records.length === 1 &&
+      w.records[0].path === path.join('for-bot', 'moderation.log') && (w.dirs || []).indexOf('for-bot') >= 0);
   const row = r[0] || {};
   yes('it says /stuck, the server, the profile, the name, the character and the Discord account',
       row.did === 'stuck' && row.server === 'dev' && row.by === BJORN && row.who === BJORN &&
