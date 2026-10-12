@@ -43052,11 +43052,14 @@ log('gamemode loaded:',
     And restoration strain while it lasts (#1387): the rising cost and the
     20 seconds refused, from the college block, folded in for the same
     reason as the maneuvers and asked at write time for the same reason.
+    Withered too, last, because it is a share of what the rest add up to.
   */
   function withCollege(actorId, base) {
     var co = g.__thornswoodCollege;
     if (!co || !co.effects || !actorId) { return base; }
-    var add = co.effects(actorId);
+    // The map so far goes in: withered takes a fifth of the health and
+    // magicka it already holds (#1387).
+    var add = co.effects(actorId, undefined, base);
     if (!add) { return base; }
     var out = {};
     for (var k in base) {
@@ -44617,10 +44620,18 @@ log('gamemode loaded:',
 
     Somebody still being made is left to the creation hall, which sends
     theirs on its first pass after the settle (beginCreation).
+
+    Withered (#1387) is the one that is kept on the character rather than in
+    memory, because it lasts 30 real minutes: it is in the view while it runs,
+    and its end is armed here, in this process, before the view is worked out.
   */
   function arrival(actorId) {
     var chargen = g.__thornswoodChargen;
     if (chargen && chargen.isChoosing && chargen.isChoosing(actorId)) { return null; }
+    var college = g.__thornswoodCollege;
+    if (college && college.witheredAtLogin) {
+      try { college.witheredAtLogin(actorId); } catch (e) { clog('withered at arrival threw for', actorId.toString(16) + ':', e); }
+    }
     return writeState(actorId, stateOf(actorId));
   }
 
@@ -45805,11 +45816,28 @@ log('gamemode loaded:',
     return null;
   }
 
+  /*
+    WHERE EACH MOST IS READ FROM, as GetBaseActorValues.cpp in the fork reads
+    them (RACE.cpp and NPC_.cpp give the bytes): the race's starting value, a
+    float in RACE DATA, plus the base's offset, a short in NPC_ ACBS. A most
+    that comes to nothing is 100, except magicka, which may be 0 and is 100
+    only below it. Health and magicka for withered (#1387, the college block).
+  */
+  var ENGINE_MOST = {
+    health: { race: 36, npc: 20, floorAtZero: true },
+    magicka: { race: 40, npc: 4, floorAtZero: false },
+    stamina: { race: 44, npc: 6, floorAtZero: true }
+  };
+
   /** The engine's own most, the way GetBaseActorValues works it out for a
       person: their race and their base, which for a person is the NPC_ record
       every character is made from (0x7) and carries no template. 0 when the
       records cannot be read. */
-  function engineStamina(actorId) {
+  function engineStamina(actorId) { return engineMost(actorId, 'stamina'); }
+
+  function engineMost(actorId, which) {
+    var at = Object.prototype.hasOwnProperty.call(ENGINE_MOST, which) ? ENGINE_MOST[which] : null;
+    if (!at) { return 0; }
     var raceId = 0, baseId = 0;
     try {
       var r = mp.callPapyrusFunction('method', 'Actor', 'GetRace', selfOf(actorId), []);
@@ -45821,12 +45849,13 @@ log('gamemode loaded:',
     }
     var race = fieldOf(raceId, 'DATA');
     var npc = fieldOf(baseId, 'ACBS');
-    if (!race || race.length < 48 || !npc || npc.length < 8) {
+    if (!race || race.length < 48 || !npc || npc.length < 22) {
       mlog('no RACE DATA or NPC_ ACBS for', actorId.toString(16), '(race', raceId.toString(16) + ', base', baseId.toString(16) + ')');
       return 0;
     }
-    var most = race.readFloatLE(44) + npc.readInt16LE(6);
-    return most > 0 ? most : 100;
+    var most = race.readFloatLE(at.race) + npc.readInt16LE(at.npc);
+    if (at.floorAtZero) { return most > 0 ? most : 100; }
+    return most >= 0 ? most : 100;
   }
 
   /** The person's real most stamina: the engine's, plus what the map the
@@ -46326,7 +46355,7 @@ log('gamemode loaded:',
 
   g.__thornswoodManeuvers = {
     MANEUVERS: MANEUVERS, ORDER: ORDER, WOVEN: WOVEN, wovenArmour: wovenArmour,
-    held: held, takenOn: takenOn, whyNot: whyNot, mostStamina: mostStamina,
+    held: held, takenOn: takenOn, whyNot: whyNot, mostStamina: mostStamina, engineMost: engineMost,
     use: use, effects: effects, view: view, hit: hit, flush: flush, killerOf: killerOf, tick: tick,
     state: ST
   };
@@ -46760,9 +46789,19 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
   (RestorationMod, the value the game's own Fortify Restoration moves,
   'spells cost X% less') goes down by what the page asks, through the
   effects map the client already applies, and while refused it goes down far
-  enough that no magicka pays for a restoration spell. Withered is not here:
-  it needs a cooked meal (#1382) and a share of max health, and the map
-  carries amounts.
+  enough that no magicka pays for a restoration spell.
+
+  WITHERED (potions.md). Five potions in an hour, or ten restoration casts
+  in an hour, sets withered for 30 real minutes: max health and max magicka
+  are 80% of what they were. The map carries amounts, so the fifth taken off
+  is worked out here as an amount: the engine's own most (the maneuvers
+  block reads it off the race and the base, as the engine does) plus what the
+  map already adds or takes off. A fortify from gear or a potion running on
+  the character is not in it, because the server does not see those. The
+  moment it ends is kept on the character, so a relog or a restart does not
+  end it early. Waiting the 30 minutes clears it. The page's other clear, a
+  cooked meal and a bed, waits for the cooked meal (#1382), which the server
+  does not know yet.
 */
 (function () {
   'use strict';
@@ -47153,10 +47192,20 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
     return restoration[key];
   }
 
-  /** What the strain puts on the client's map now, or null. */
-  function effects(actorId, at) {
-    var rec = own(strain, actorId) ? strain[actorId] : null;
+  /** What the strain and withered put on the client's map now, or null.
+      before is the map so far, which withered takes its share of. */
+  function effects(actorId, at, before) {
     var t = at || now();
+    var strained = strainEffects(actorId, t);
+    var withered = witheredEffects(actorId, t, before);
+    if (!strained) { return withered; }
+    if (!withered) { return strained; }
+    for (var k in withered) { if (own(withered, k)) { strained[k] = withered[k]; } }
+    return strained;
+  }
+
+  function strainEffects(actorId, t) {
+    var rec = own(strain, actorId) ? strain[actorId] : null;
     if (!rec) { return null; }
     // A refusal that has run its 20 seconds ends the window with it.
     if (rec.until) {
@@ -47186,6 +47235,8 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
     var id = (spell && spell.desc) ? idOfDesc(spell.desc) : 0;
     if (!actorId || !id || !personOf(actorId) || !isRestoration(id)) { return null; }
     var t = at || now();
+    // Every restoration cast counts towards withered, refused or not.
+    witherCount(actorId, 'cast', t);
     var rec = own(strain, actorId) ? strain[actorId] : null;
     if (rec && rec.until > t) {
       clog(hex(actorId), 'cast', spell.desc, 'while restoration is refused; the cost did not stop it');
@@ -47213,6 +47264,127 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
 
   function guardOf(name, fn) { return (typeof guard === 'function') ? guard(name, fn) : fn; }
 
+  // ------------------------------------------------------------ withered --
+  var WITHERED = {
+    hour: 60,        // minutes the count looks back over
+    potions: 5,      // potions in that hour
+    casts: 10,       // restoration casts in that hour
+    minutes: 30,     // real minutes it lasts
+    share: 0.8       // of max health and max magicka, while it lasts
+  };
+  var WITHERED_PROPERTY = 'thornswoodWithered';
+  var witherTimers = {};   // actorId -> the timer that ends it, in this process
+
+  function witheredRead(actorId) {
+    var rec = null;
+    try { rec = mp.get(actorId, WITHERED_PROPERTY); } catch (e) { rec = null; }
+    if (!rec || typeof rec !== 'object') { rec = {}; }
+    return {
+      drank: Array.isArray(rec.drank) ? rec.drank.filter(isFinite) : [],
+      cast: Array.isArray(rec.cast) ? rec.cast.filter(isFinite) : [],
+      until: Number(rec.until) || 0
+    };
+  }
+
+  function witheredWrite(actorId, rec) {
+    try { mp.set(actorId, WITHERED_PROPERTY, rec); } catch (e) { clog('could not write withered for', hex(actorId) + ':', e); }
+  }
+
+  /** True while this person is withered. */
+  function isWithered(actorId, at) {
+    return witheredRead(actorId).until > (at || now());
+  }
+
+  /* The end of it, on its own clock, and the map written again when it comes. */
+  function armWithered(actorId, until) {
+    if (witherTimers[actorId] && witherTimers[actorId].until === until) { return; }
+    var mine = { until: until };
+    witherTimers[actorId] = mine;
+    setTimeout(guardOf('witheredEnds', function () {
+      if (witherTimers[actorId] !== mine) { return; }
+      delete witherTimers[actorId];
+      if (witheredRead(actorId).until > now()) { return; }
+      clog(hex(actorId), 'is no longer withered');
+      tell(actorId, 'The withering has passed. Your health and magicka are your own again.');
+      push(actorId);
+    }), Math.max(0, until - now()) + 50);
+  }
+
+  /*
+    One potion or one restoration cast, counted against the hour. The fifth
+    potion or the tenth cast inside an hour sets withered for 30 minutes from
+    that moment, and the counts start again from nothing.
+  */
+  function witherCount(actorId, kind, at) {
+    var t = at || now();
+    var rec = witheredRead(actorId);
+    var since = t - WITHERED.hour * 60000;
+    rec.drank = rec.drank.filter(function (x) { return x > since && x <= t; });
+    rec.cast = rec.cast.filter(function (x) { return x > since && x <= t; });
+    rec[kind].push(t);
+    var set = rec.drank.length >= WITHERED.potions || rec.cast.length >= WITHERED.casts;
+    if (set) {
+      rec.until = t + WITHERED.minutes * 60000;
+      rec.drank = [];
+      rec.cast = [];
+    }
+    witheredWrite(actorId, rec);
+    if (set) {
+      clog(hex(actorId), 'is withered for', WITHERED.minutes, 'minutes after', kind === 'drank' ? 'a fifth potion' : 'a tenth restoration cast', 'in an hour');
+      tell(actorId, 'You are withered: ' + (kind === 'drank' ? 'five potions' : 'ten restoration spells') +
+           ' in an hour. For ' + WITHERED.minutes + ' minutes your health and magicka are four fifths of what they were.');
+      armWithered(actorId, rec.until);
+      push(actorId);
+    }
+    return rec;
+  }
+
+  /*
+    A potion drunk, from the one onEatItem handler (the injury block's), which
+    the engine raises once it has checked the pack holds it. Only a person's,
+    and only a potion: the needs block's table says which, and a brewed one is
+    a form only the brewer's game has, above the runtime line, which the
+    needs block counts as a potion too. Food, drink, ale and a poison are not.
+  */
+  function drank(actorId, baseId, at) {
+    var id = Number(actorId) || 0;
+    var base = Number(baseId) || 0;
+    if (!id || !base || !personOf(id)) { return null; }
+    var N = g.__thornswoodNeeds;
+    var kind = (N && N.kindOf) ? N.kindOf(base) : '';
+    if (!kind && base >= 0xff000000) { kind = 'potion'; }
+    if (kind !== 'potion') { return null; }
+    return witherCount(id, 'drank', at);
+  }
+
+  /*
+    What withered takes off, as amounts on the map. before is the map the
+    other blocks have folded so far, which is what "what they were" means
+    here: the engine's most plus the tree, the needs and the rest.
+  */
+  function witheredEffects(actorId, at, before) {
+    if (!isWithered(actorId, at)) { return null; }
+    var M = g.__thornswoodManeuvers;
+    if (!M || !M.engineMost) { clog('withered: the maneuvers block is not loaded, so the most cannot be read'); return null; }
+    var out = {};
+    ['health', 'magicka'].forEach(function (av) {
+      var most = Number(M.engineMost(actorId, av)) || 0;
+      var had = most + ((before && typeof before[av] === 'number') ? before[av] : 0);
+      if (!(most > 0) || !(had > 0)) { return; }
+      out[av] = -Math.round(had * (1 - WITHERED.share) * 100) / 100;
+    });
+    return Object.keys(out).length ? out : null;
+  }
+
+  /*
+    At login: a withering that is still running gets its end armed in this
+    process, so a restart does not leave it on past its 30 minutes.
+  */
+  function witheredAtLogin(actorId) {
+    var rec = witheredRead(actorId);
+    if (rec.until > now()) { armWithered(actorId, rec.until); }
+  }
+
   // ------------------------------------------------------------ register --
   try {
     mp.makeProperty(TAKE_PROPERTY, {
@@ -47231,6 +47403,16 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
     // already made by a previous load; a changed script needs a restart,
     // which a deploy is.
   }
+  try {
+    // The server's own record of withered: nobody's client reads it.
+    mp.makeProperty(WITHERED_PROPERTY, {
+      isVisibleByOwner: false, isVisibleByNeighbors: false,
+      updateOwner: '', updateNeighbor: ''
+    });
+  } catch (e) {
+    // already made by a previous load; a changed script needs a restart,
+    // which a deploy is.
+  }
 
   g.__thornswoodCollege = {
     HALLS: HALLS, OUTSIDE_DOORS: OUTSIDE_DOORS, STRAIN: STRAIN, REANIMATE: REANIMATE,
@@ -47239,6 +47421,8 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
     spellKind: spellKind, offBook: offBook, cleanAtLogin: cleanAtLogin, equipped: equipped,
     reanimates: reanimates, hit: hit,
     isRestoration: isRestoration, cast: cast, effects: effects, strain: strain,
+    WITHERED: WITHERED, WITHERED_PROPERTY: WITHERED_PROPERTY, drank: drank, isWithered: isWithered,
+    witheredAtLogin: witheredAtLogin,
     takeScript: takeScript, laydownScript: laydownScript
   };
   clog('ready');
@@ -55636,7 +55820,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
   g.__thornswoodNeeds = {
     NEEDS: NEEDS, COST: COST, TEMP_COST: TEMP_COST, CRAFT_REST: CRAFT_REST,
-    bandOf: bandOf, tempBand: tempBand, consumed: consumed,
+    bandOf: bandOf, tempBand: tempBand, consumed: consumed, kindOf: foodKind,
     settle: settle, view: view, effects: effects,
     // The bars as a line of text, for /needs (#2267).
     textView: textView,
@@ -57283,6 +57467,11 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   */
   mp.onEatItem = guard('onEatItem', function (actorId, baseId) {
     try { tell(actorId, swallowed(actorId, Number(baseId) || 0)); } catch (e) { hlog('the drink threw:', e); }
+    // Withered (#1387), in the college block, on its own: five potions in an hour.
+    var college = g.__thornswoodCollege;
+    if (college && college.drank) {
+      try { college.drank(actorId, Number(baseId) || 0); } catch (e) { hlog('withered threw:', e); }
+    }
   });
 
   /*
