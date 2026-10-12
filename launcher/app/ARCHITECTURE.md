@@ -211,7 +211,10 @@ ones that differ are fetched from beside the record (resumed with a Range
 request, each checked against its sha256) into `Profile\Sync`, then put in
 place, the plugin list settled, what the record says is gone taken out, and
 the release written into `Profile\release.txt` (docs\FEED.md, "Syncing to the
-release record").
+release record"). Once every launcher the feed lets in syncs, the feed's
+`packs` is empty (docs\FEED.md, "When the packs can go"), and the update card
+shows the note the record's pointer carries (`baseline.notes`, read by
+`RecordRef.FromFeed` in Config.cs) rather than the last pack's.
 `Updater.cs:1177 SelfUpdate()` writes `Launcher\Thornswood.exe.new` and a
 script in the temp folder, `thornswood-update-<process id>.cmd`, that swaps it in once
 this process has gone and keeps the old one until the new one has started

@@ -376,7 +376,8 @@ function Get-Held([string]$prefix) {
 
 # ---- the feed ------------------------------------------------------------------
 Head "The $Channel feed"
-try { [void](Receive-FeedStore $Channel $ReleaseDir -SiteDir $SiteDir) }
+# With the store's list of releases, kept beside the feed since #1050.
+try { [void](Receive-FeedStore $Channel $ReleaseDir @('version.json', 'published.json', $FeedReleasesFile) -SiteDir $SiteDir) }
 catch { Die ("Could not receive the $Channel feed from the VPS, so nothing was changed: " + $_.Exception.Message) }
 $VersionFile = Join-Path $ReleaseDir 'version.json'
 $StateFile = Join-Path $ReleaseDir 'published.json'
@@ -463,7 +464,11 @@ $ptrs = New-Object System.Collections.Generic.List[object]
 $base = $null
 try { $base = Get-FeedBaselinePointer $doc } catch { Die $_.Exception.Message }
 if ($null -ne $base) { $ptrs.Add($base) }
-foreach ($r in @(Get-FeedReleases $doc)) { $ptrs.Add($r) }
+# The releases the store keeps (merged with any the feed still carries), the
+# same objects written back once their pointers are swapped below.
+$relList = @()
+try { $relList = @(Get-StoreReleases $ReleaseDir $doc) } catch { Die ("The store's list of releases could not be read, so nothing was changed: " + $_.Exception.Message) }
+foreach ($r in $relList) { $ptrs.Add($r) }
 $recSwap = @{}       # old sha256 to @{ Sha; Entries; Prefix; File; Map }
 $recordsKept = @{}   # sha256 of each record the feed names after this run, to its map
 foreach ($ptr in $ptrs) {
@@ -594,9 +599,13 @@ if ($packSwap.Count -or $recSwap.Count -or $stateSwap) {
         $ptr.url = Set-UrlSha ([string]$ptr.url) $recSwap[$rsha].Sha
         if ($ptr.PSObject.Properties['entries']) { $ptr.entries = $recSwap[$rsha].Entries }
     }
+    # The store's list goes back with the pointers it holds swapped, and the
+    # feed no longer carries one (#1050).
+    if ($relList.Count) { Save-StoreReleases $ReleaseDir $relList; Remove-FeedReleasesField $doc }
     [IO.File]::WriteAllText($VersionFile, ($doc | ConvertTo-Json -Depth 6), $utf8)
     if ($stateSwap) { Copy-Item -LiteralPath $stateSwap -Destination $StateFile -Force }
     $files = @('version.json')
+    if ($relList.Count) { $files += $FeedReleasesFile }
     if (Test-Path -LiteralPath $StateFile) { $files += 'published.json' }
     try { $sent = Send-FeedStore $Channel $ReleaseDir $files -SiteDir $SiteDir }
     catch { Die ("The $Channel feed was not sent: " + $_.Exception.Message + ' The new packs are on the site beside the old ones; run this again.') }
@@ -633,9 +642,11 @@ else {
     $named = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
     foreach ($ch in @('main', 'dev')) {
         $look = Join-Path $WorkDir ("look-$ch")
-        $read = Receive-FeedStore $ch $look -SiteDir $SiteDir
+        $read = Receive-FeedStore $ch $look @('version.json', 'published.json', $FeedReleasesFile) -SiteDir $SiteDir
         $expect[$ch] = [string]$read['version.json']
-        foreach ($f in @('version.json', 'published.json')) {
+        # releases.json (#1050) names each release's record by its sha256, as
+        # version.json used to, so it is read as text the same way.
+        foreach ($f in @('version.json', 'published.json', $FeedReleasesFile)) {
             $pth = Join-Path $look $f
             if (-not (Test-Path -LiteralPath $pth)) { continue }
             # published.json is often the baseline record itself. Its :gone:
@@ -652,7 +663,7 @@ else {
         }
         $d2 = ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText((Join-Path $look 'version.json'))) (Join-Path $look 'version.json')
         $rp = @(); try { $b2 = Get-FeedBaselinePointer $d2; if ($null -ne $b2) { $rp += $b2 } } catch { }
-        $rp += @(Get-FeedReleases $d2)
+        $rp += @(Get-StoreReleases $look $d2)
         foreach ($r in $rp) {
             $rsha = ([string]$r.sha256).ToLowerInvariant()
             $rf = Join-Path (Join-Path $WorkDir 'records') ($rsha + '.json')

@@ -189,12 +189,18 @@ namespace Thornswood
             p.id = "release " + r.id;
             p.url = r.url;
             p.sha256 = r.sha256;
-            p.notes = LastNotes(v);
+            p.notes = r.notes.Length > 0 ? r.notes : LastNotes(v);
             p.Record = r;
             p.Doc = v;
             return p;
         }
 
+        /// <summary>
+        /// The note of the last pack on the feed, for a feed whose record does
+        /// not carry its own (every one before #1050 took the packs off the
+        /// feed). Once the feed's "packs" is empty, there is none to find here
+        /// and the record's own note is the one shown.
+        /// </summary>
         static string LastNotes(VersionDoc v)
         {
             if (v == null || v.packs == null) return "";
