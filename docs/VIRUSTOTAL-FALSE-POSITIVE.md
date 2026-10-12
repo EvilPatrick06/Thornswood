@@ -27,7 +27,7 @@ hash reputation verdict rather than a signature for a known family:
 Windows reports the file as NotSigned. The version resource is filled in:
 Title and Product are Thornswood Setup, Company is Thornswood, with a
 copyright line, and Build-Launcher stamps FileVersion and ProductVersion from
-the launcher's own version (`installer\setup\Bootstrap.cs:35-39`). VirusTotal
+the launcher's own version (`installer\setup\Bootstrap.cs:Build-Launcher.ps1 stamps them at compile time`). VirusTotal
 also tagged the file `detect-debug-environment` and
 `packers: .NET executable`.
 
@@ -53,13 +53,13 @@ dropper does.
   are looking at before reporting it. Everything below still helps a signed
   build whose publisher has little reputation yet.
 - It is a small .NET executable that downloads a much bigger payload and runs
-  what is inside it (`installer\setup\Bootstrap.cs:693`, Download). That is
+  what is inside it (`installer\setup\Bootstrap.cs:Download`). That is
   the definition of a downloader. The one thing that makes ours different is
   that the payload is checked against the SHA-256 the site published before
   anything in it runs, and a file that does not match is deleted
   (`PayloadMatches` and `CheckPayload` in the same file).
 - It ends other programs. StopSkyrim enumerates processes and used to call
-  Kill on anything still alive (`installer\setup\Bootstrap.cs:930`). Killing
+  Kill on anything still alive (`installer\setup\Bootstrap.cs:StopSkyrim`). Killing
   a process with no consent is behaviour a model can see, so since this page
   was written it asks first: a Yes or No box naming what is still running,
   Kill only on Yes, and on No the install stops having changed nothing
