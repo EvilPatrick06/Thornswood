@@ -51,12 +51,14 @@ $tmp = Join-Path ([IO.Path]::GetTempPath()) ('tw-json [x] & ' + [Guid]::NewGuid(
 $null = New-Item -ItemType Directory -Path $tmp
 try {
     $bad = [ordered]@{ empty = ''; 'cut off' = '{ "loadOrder": [ "a.esp"'; 'not JSON' = 'loadOrder = a.esp' }
+    # server-build.json in Deploy-Server and Deploy-DevGamemode is read through
+    # Read-ThornswoodRecord now (#2180), which reads through this helper and
+    # then holds the shape; tests\test-record-shapes.ps1 and
+    # test-2180-record-readers.ps1 cover those two reads.
     $reads = @(
-        @{ File = 'scripts\deploy\Deploy-Server.ps1';      Var = 'recordPath';        Leaf = 'server-build.json' },
         @{ File = 'scripts\deploy\Deploy-Server.ps1';      Var = 'settingsSrc';       Leaf = 'server-settings.json' },
         @{ File = 'scripts\deploy\Deploy-Server.ps1';      Var = 'buildSettingsPath'; Leaf = 'server-settings.json' },
         @{ File = 'scripts\deploy\Deploy-Server.ps1';      Var = 'stampPath';         Leaf = 'thornswood-build.json' },
-        @{ File = 'scripts\deploy\Deploy-DevGamemode.ps1'; Var = 'devRecordPath';     Leaf = 'server-build.json' },
         @{ File = 'scripts\deploy\Deploy-DevGamemode.ps1'; Var = 'settingsSrc';       Leaf = 'server-settings.json' })
     foreach ($r in $reads) {
         $ast = Tree $r.File
