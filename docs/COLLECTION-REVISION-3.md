@@ -7,11 +7,13 @@ full plugin, so every full plugin after the five base masters moves down one
 position and the full plugin count goes from 48 to 49. During the alpha a
 world reset from that is acceptable.
 
-This page is the local side only. Nothing here has been published, deployed
-or checked on a server. Steps 3 to 7 need Patrick's Vortex upload and a dev
-deploy, and they wait for Smeagle to ask.
+Who does what (Patrick's rule, 11 October): Claude alone runs every Vortex
+app, Publish, Deploy and live step on this page, which is steps 1 to 7, from
+an up-to-date checkout of main. Lanes only commit, push and merge the repo
+side. Claude picks the run up from a claude-queue note. Dev goes first, and
+Main follows only when Patrick asks.
 
-## 1. Start from revision 2
+## 1. Start from revision 2 (Claude, in Vortex)
 
 Revision 2 (docs\COLLECTION-REVISION-2.md) stays as it is: its removals,
 exclusions, installer choices, Estate and Runtime versions, Content base and
@@ -19,7 +21,7 @@ generated files carry over unchanged. Leave **Skip plugin rules** off.
 
 Check: Vortex's **Thornswood** profile is on revision 2 with 115 packages.
 
-## 2. Add USSEP at the version for Skyrim 1.6.1170
+## 2. Add USSEP at the version for Skyrim 1.6.1170 (Claude, in Vortex)
 
 Install USSEP **4.3.8a** (20 March 2026), the last release that supports
 SSE 1.6.1130 and later. 4.3.9 (21 August 2026) and newer require SSE 1.7.99
@@ -91,12 +93,12 @@ Check: the collection is 7essxf revision 3 with 116 packages, USSEP pinned at
 | 49 | Playable Rieklings.esp | Keep. Was position 48. |
 <!-- order:end -->
 
-## 3. Publish revision 3 (Patrick, on Nexus)
+## 3. Publish revision 3 (Claude, in Vortex)
 
-Patrick uploads revision 3 from Vortex with the pinned file and the two rules
+Claude uploads revision 3 from Vortex with the pinned file and the two rules
 above. Nothing in this repository does that.
 
-## 4. Regenerate what is read from the installed game
+## 4. Regenerate what is read from the installed game (Claude)
 
 USSEP edits vanilla records and placements, and every full plugin's load
 order index moves by one. Each channel's own folder is refreshed from the new
@@ -105,20 +107,21 @@ data tables built from the installed plugins (game\data\npc-population.json,
 resource-locations.json, fires.json, waters.json and the NPC population block
 in game\gamemode.js) are rebuilt from it, with their tests, in one PR.
 
-## 5. Dev first
+## 5. Dev first (Claude)
 
 Deploy-DevGamemode.ps1 -LoadOrder -Dist, with the dist\server folder
 Deploy-Gamemode.ps1 wrote, sends Dev the 49-position list, with the world
 reset that the moved indexes need. Without -Dist it keeps Dev's own order
 (#2309). Ship -Channel dev from Dev's own folder.
 
-## 6. Check the clean install on Dev
+## 6. Check the clean install on Dev (Claude)
 
 Run scripts\mods\Check-CleanInstall.ps1 against Dev, pointing its Data and
 plugin list parameters at Dev's own folder, and compare Dev's manifest with
 the table above. tests\test-collection-revision-3.ps1 keeps this page true to
 revision 2's order with USSEP added.
 
-## 7. Main
+## 7. Main (Claude, only when Patrick asks)
 
 Main follows Dev only when Patrick asks, through revision 2's steps 12 to 14.
+Claude runs them.
