@@ -388,7 +388,12 @@ when `Signature.MicrosoftRefusal` says Microsoft signed it (#1330).
 **OwnGame** (OwnGame.cs, OwnGameShare.cs, OwnGameKinds.cs and OwnGameClean.cs, with
 ShellOwnGame.cs for its card and offer). `<Root>\Game` itself. `OwnGame.cs:718 Make()` builds it in
 `<Root>\Game.new` and moves it into place; `OwnGame.cs:844 Refresh()` brings it
-up to date with Vortex. Once made, the folder needs nothing from the Steam copy
+up to date with Vortex. A refresh walks every file Vortex deployed and every
+file on record, except when Vortex has not deployed since and only the rules
+moved: then it looks only at the paths the new rules are about
+(RulesScope and RuleTouches in OwnGame.cs, which every new rule
+number joins) and carries the rest of the record forward (#2210). Its log line
+says which it did and how long it took. Once made, the folder needs nothing from the Steam copy
 (#1218): a refresh takes only the files Vortex's record lists, the game's own
 files are the folder's own copies, and nothing writes into the Steam copy, so
 it can be on any build and modded freely. Skyrim's archives are shared with the
