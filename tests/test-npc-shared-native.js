@@ -36,13 +36,21 @@ const maxCallbackMs = 50, maxColdLoadMs = 100, maxRssBytes = 2 * 1024 ** 3;
 //   started inside it. Young collections took 3 to 7 ms on average there and
 //   up to 179 ms when their helper threads were not given a processor.
 // Its work is at most its wall time less the collections inside it, and at
-// most the CPU time its thread used. The thread clock moves in steps (15.6 ms
-// on Windows), so the CPU bound is the reading plus one step. Either bound
-// inside the limit means the work is. The CPU bound leaves out any wait in
-// the kernel, a page of a memory-mapped plugin as well as a processor; the
-// stalls measured that night came late in runs too, after both preparations
-// had read every record, and at the same sizes as the clock loop's.
-assert.equal(typeof process.threadCpuUsage,'function','Measure callback work in thread CPU time');
+// most the CPU time its thread used, read to the cycle by thread-clock.js.
+// Either bound inside the limit means the work is. The CPU bound leaves out
+// any wait in the kernel, a page of a memory-mapped plugin as well as a
+// processor; the stalls measured that night came late in runs too, after both
+// preparations had read every record, and at the same sizes as the clock loop's.
+// Until 12 Oct the CPU bound read Windows' thread times, which move in steps
+// of 15.6 ms, plus one step, and four of fifteen runs stopped on a meshTick
+// reading 63 to 78 ms. Read to the cycle in eight runs on One on 12 Oct, no
+// callback held to 50 ms used more than 35.1 ms of CPU (a meshTick 32.2), and
+// with the run alone on the machine no more than 24.4. CPU time is the
+// machine's as well as the work's, though: the same cold load used 20.3 ms
+// held to a performance core, 32.9 on an efficient core, 45.3 on a low power
+// one, and up to 96.4 with four runs side by side (1.5 GiB each). So run it
+// with nothing else heavy on the machine.
+const threadClock = require('./thread-clock.js').load();
 // Collections arrive as performance entries once the event loop turns, so a
 // callback over its limit in wall time is checked when advance next yields.
 // (v8.GCProfiler reads them synchronously, but with it on every run stopped
@@ -56,18 +64,6 @@ new (require('node:perf_hooks').PerformanceObserver)(list => {
   }
 }).observe({entryTypes:['gc']});
 const turn = () => new Promise(resolve => setTimeout(resolve,0)).then(() => new Promise(resolve => setImmediate(resolve)));
-const threadCpuMs = () => { const u = process.threadCpuUsage(); return (u.user+u.system)/1000; };
-const cpuClockStepMs = (() => {
-  let step = 0;
-  for(let i = 0; i < 3; i++) {
-    let at = threadCpuMs(), next;
-    while((next = threadCpuMs()) === at);
-    at = next;
-    while((next = threadCpuMs()) === at);
-    step = Math.max(step,next-at);
-  }
-  return step;
-})();
 assert.equal(installed.loadOrder.length, 102, 'Use the actual installed 102-plugin fixture');
 const server = new addon.ScampServer(JSON.stringify({port:0,maxPlayers:2,offlineMode:true,
   name:'npc-shared-native-check',dataDir:path.dirname(installed.loadOrder[0]),
@@ -175,7 +171,7 @@ const attackAttempts = new Map(), nativeStates = new Map();
 const nativeSpeeds = new Map(), stoppedActors = new Set();
 const savedBeforeRestart = new Map(), writeSequences = new Map();
 const validationFailures = [];
-const worst = {callback:0,callbackTask:'',callbackWork:0,callbackWorkTask:'',cpuClockStepMs,gcPause:0,wallOverLimit:0,
+const worst = {callback:0,callbackTask:'',callbackWork:0,callbackWorkTask:'',counterGHz:threadClock.counterGHz,gcPause:0,wallOverLimit:0,
   load:0,state:0,nav:0,geometry:0,movement:0,attack:0};
 const timers = {
   setTimeout(fn,delay) {
@@ -331,10 +327,10 @@ async function checkOverLimit() {
   for(const c of overLimit) {
     let gc = 0;
     for(const [begin,end] of collections) gc += Math.max(0,Math.min(end,c.end)-Math.max(begin,c.start));
-    const work = Math.min(c.duration-gc,c.cpu+cpuClockStepMs);
+    const work = Math.min(c.duration-gc,c.cpu);
     noteWork(c.name,work);
     assert.ok(work <= c.limit,'Scheduled callback exceeded '+c.limit+' ms: '+c.name+' '+c.duration.toFixed(2)+' ms, '+
-      gc.toFixed(1)+' ms of it collecting garbage, '+c.cpu.toFixed(1)+' ms on the CPU ('+c.kernel.toFixed(1)+' of it in the kernel)');
+      gc.toFixed(1)+' ms of it collecting garbage, '+c.cpu.toFixed(1)+' ms on the CPU');
   }
   overLimit.length = 0;
   collections.length = 0;
@@ -350,12 +346,11 @@ async function advance(ms) {
     current = {moves:0};
     const start = performance.now();
     callbackAt = start;
-    const cpuAt = threadCpuMs(), kernelAt = process.threadCpuUsage().system;
-    let duration=0, cpu=0, kernel=0;
+    const cpuAt = threadClock.ms();
+    let duration=0, cpu=0;
     try { task.fn(); }
     finally {
-      cpu = threadCpuMs()-cpuAt;
-      kernel = (process.threadCpuUsage().system-kernelAt)/1000;
+      cpu = threadClock.ms()-cpuAt;
       duration = performance.now()-start;
       callbackAt = 0;
       if(duration > worst.callback) { worst.callback = duration; worst.callbackTask = task.name; }
@@ -365,8 +360,8 @@ async function advance(ms) {
     const limit=task.name==='preload' ? maxColdLoadMs : maxCallbackMs;
     if(duration > limit) {
       worst.wallOverLimit++;
-      overLimit.push({name:task.name,start,end:start+duration,duration,cpu,kernel,limit});
-    } else noteWork(task.name,Math.min(duration,cpu+cpuClockStepMs));
+      overLimit.push({name:task.name,start,end:start+duration,duration,cpu,limit});
+    } else noteWork(task.name,Math.min(duration,cpu));
     if(++callbacks % 100 === 0) sampleRss();
     assert.ok(++calls < 200000,'Runtime must yield with finitely many scheduled callbacks');
     if(callbacks % 1000 === 0) await checkOverLimit();
