@@ -71,9 +71,9 @@ try {
     T ($x.Report -match 'loopback \| tcp 3001') 'loopback services every local account can reach are listed from the #2165 facts'
     T ($x.Report -match "not Windows' effective access") 'the report says rights come from reading ACLs'
 
-    # The real build.yml, whichever way it stands (decision of 11 Oct 2026:
-    # pull requests move to GitHub-hosted runners, Codex lane). Before the
-    # move the row is a risk; after it the same row is ok.
+    # The real build.yml, whichever way it stands (Patrick, 11 Oct 2026: hosted
+    # runners by default, VPS runners as a backup, Codex lane). Any pull request
+    # job left on the VPS, a fallback included, is a risk row to read, never a hard fail without -Strict.
     $x = Run (Facts) ''
     $bt = [IO.File]::ReadAllText((Join-Path $repo '.github\workflows\build.yml'))
     $prOnProd = ($bt -match '(?m)^  pull_request:') -and ($bt -match 'runs-on:\s*\[[^\]]*\bthornswood-vps\b')
@@ -84,7 +84,7 @@ try {
     }
     T ($x.Out -notmatch 'RISK  workflow (nightly|release|drop-claims)\.yml runs on') 'nightly, release and drop-claims stay on the VPS and are not risks (no pull request trigger)'
     $rec0 = Get-Content (Join-Path $repo 'records\runner-isolation.json') -Raw | ConvertFrom-Json
-    T ([string]$rec0.decision -match 'GitHub-hosted' -and [string]$rec0.decision -match '11 Oct 2026') 'the record carries the decision'
+    T ([string]$rec0.decision -match 'GitHub-hosted' -and [string]$rec0.decision -match '11 Oct 2026' -and [string]$rec0.decision -match 'outbound' -and [string]$rec0.decision -notmatch 'residual') 'the record carries the decision'
 
     $b = Facts; $ru = $b.runner.runners[0]
     $ru.groups = @('Users', 'Administrators')
