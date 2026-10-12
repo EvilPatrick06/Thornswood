@@ -307,6 +307,19 @@ accepted. Discord has no default-role setting. Then the person picks a hold.
 again, and the posts are rewritten in place. It deletes what the bot wrote last
 time rather than adding a second copy, so the rules never end up posted twice.
 
+## Running the bot's tests
+
+The bot and its tests need Python 3.10 or newer, and the bot runs on 3.12.
+On a Windows PC with more than one Python installed, plain `python` is
+whichever comes first on PATH (on One that is 3.9), so run them with the
+launcher:
+
+    py -3.12 bot\test-testing-channels.py
+
+With the libraries from `bot\requirements.txt`. On an older Python, bot.py
+stops at once and says so, rather than failing somewhere deep in a test
+(#2276). `test-python-version.py` holds that.
+
 ## Putting a bot change on the VPS
 
 From a checkout of main that has just been pulled, never from a copy of the
