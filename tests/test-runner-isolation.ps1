@@ -71,8 +71,20 @@ try {
     T ($x.Report -match 'loopback \| tcp 3001') 'loopback services every local account can reach are listed from the #2165 facts'
     T ($x.Report -match "not Windows' effective access") 'the report says rights come from reading ACLs'
 
+    # The real build.yml, whichever way it stands (decision of 11 Oct 2026:
+    # pull requests move to GitHub-hosted runners, Codex lane). Before the
+    # move the row is a risk; after it the same row is ok.
     $x = Run (Facts) ''
-    T ($x.Out -match 'RISK  workflow build\.yml runs on: expected not thornswood-vps for untrusted code, found triggers pull_request,push,workflow_dispatch; on thornswood-vps') 'the real build.yml: pull requests run on the production runners (recorded as a finding)'
+    $bt = [IO.File]::ReadAllText((Join-Path $repo '.github\workflows\build.yml'))
+    $prOnProd = ($bt -match '(?m)^  pull_request:') -and ($bt -match 'runs-on:\s*\[[^\]]*\bthornswood-vps\b')
+    if ($prOnProd) {
+        T ($x.Out -match 'RISK  workflow build\.yml runs on: expected not thornswood-vps for untrusted code') 'the real build.yml still runs pull requests on the production runners, and the check says so (until the Codex move)'
+    } else {
+        T ($x.Out -notmatch 'RISK  workflow build\.yml runs on' -and $x.Report -match '\| workflow \| build\.yml runs on \|[^\n]*\| ok \|') 'the real build.yml runs no pull request on the production runners, and the check says ok'
+    }
+    T ($x.Out -notmatch 'RISK  workflow (nightly|release|drop-claims)\.yml runs on') 'nightly, release and drop-claims stay on the VPS and are not risks (no pull request trigger)'
+    $rec0 = Get-Content (Join-Path $repo 'records\runner-isolation.json') -Raw | ConvertFrom-Json
+    T ([string]$rec0.decision -match 'GitHub-hosted' -and [string]$rec0.decision -match '11 Oct 2026') 'the record carries the decision'
 
     $b = Facts; $ru = $b.runner.runners[0]
     $ru.groups = @('Users', 'Administrators')
