@@ -64066,6 +64066,61 @@ function sequenceOf(receipt, human) {
   return doc.sequence;
 }
 
+function canonical(value) {
+  if(Array.isArray(value)) return value.map(canonical);
+  if(value && typeof value==='object') {
+    var out=Object.create(null);
+    Object.keys(value).sort().forEach(function(key) {out[key]=canonical(value[key]);});
+    return out;
+  }
+  return value;
+}
+function digest(value) {return require('crypto').createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');}
+function rows(snapshot) {return inventory(snapshot).entries.map(function(entry) {return {entry:entry,label:''};});}
+function stockRows(stock) {
+  var out=stock.map(function(row) {
+    if(typeof row.name!=='string' || !row.name) throw new Error('Merchant stock cannot be verified.');
+    var entry=row.entry===undefined ? {baseId:row.baseId,count:row.count} : row.entry;
+    if(!entry || entry.baseId!==row.baseId || entry.count!==row.count) throw new Error('Merchant stock cannot be verified.');
+    return {entry:copy(entry),label:row.name};
+  });
+  inventory({entries:out.map(function(row) {return row.entry;})});
+  return out;
+}
+function bag(items, labelled) {
+  var result=new Map();
+  items.forEach(function(row) {
+    var metadata=copy(row.entry);delete metadata.count;
+    var key=JSON.stringify([labelled?row.label:'',canonical(metadata)]),held=result.get(key);
+    if(held) held.count+=row.entry.count;
+    else result.set(key,{entry:row.entry,label:row.label,count:row.entry.count});
+  });
+  return result;
+}
+function difference(before, after, labelled) {
+  var old=bag(before,labelled), next=bag(after,labelled), result=[];
+  next.forEach(function(row,key) {
+    if(!old.has(key) || old.get(key).count<row.count) throw new Error('Merchant transfer does not conserve inventory.');
+  });
+  old.forEach(function(row,key) {
+    var count=row.count-(next.has(key)?next.get(key).count:0);
+    if(count) result.push({entry:Object.assign({},copy(row.entry),{count:count}),label:row.label});
+  });
+  return result;
+}
+function goodsDigest(items) {
+  return digest(Array.from(bag(items,false),function(pair) {return [pair[0],pair[1].count];}).sort(function(a,b) {return a[0]<b[0]?-1:a[0]>b[0]?1:0;}));
+}
+function goldCount(items) {
+  var total=0;
+  items.forEach(function(row) {
+    if(row.entry.baseId!==15) throw new Error('Merchant gold cannot be verified.');
+    total+=row.entry.count;
+  });
+  if(total>MAX_COUNT) throw new Error('Merchant gold cannot be verified.');
+  return total;
+}
+
 // Native receipt writes are atomic with the human inventory. Ledger writes are
 // synchronous durable replacements. Neither is inferred from elapsed time.
 function createSettlement(deps) {
@@ -64090,6 +64145,75 @@ function createSettlement(deps) {
     var parts=/^([0-9a-f]{1,6})(?::([^:\/\\\x00-\x1f\x7f]+\.(?:esm|esp|esl)))?$/i.exec(human.desc);
     return parts ? JSON.stringify([parseInt(parts[1],16),(parts[2] || '').toLowerCase(),human.profileId]) : '';
   }
+  function nativeRows(snapshot) {
+    var value=inventory(snapshot);
+    if(transfer.validate(value)!==true || !active) throw new Error('Native inventory cannot be verified.');
+    return rows(value);
+  }
+  function compact(pending) {
+    return pending.phase==='credit' && pending.expected===undefined && pending.debit===undefined &&
+      pending.previous && pending.previous.purse===undefined && pending.previous.stock===undefined;
+  }
+  function supplyTransition(pending,previous,next,fresh,moved) {
+    if(pending.kind!=='supply') {
+      if(!equal(canonical(previous.supply),canonical(next.supply))) throw new Error('Merchant supply cannot be verified.');
+      return;
+    }
+    var key=changedSupplyKey(previous,next), before=copy(previous.supply), after=copy(next.supply), owner;
+    if(!key) throw new Error('Merchant supply cannot be verified.');
+    delete before[key];delete after[key];
+    if(!equal(canonical(before),canonical(after))) throw new Error('Merchant supply cannot be verified.');
+    try {owner=JSON.parse(key);} catch(error) {owner=null;}
+    if(fresh || pending.terms!==undefined) {
+      if(!Array.isArray(owner) || owner.length!==3 || owner[0]!==pending.human.desc || owner[1]!==pending.human.profileId ||
+          typeof owner[2]!=='string' || !owner[2] || owner[2]!==owner[2].toLowerCase()) throw new Error('Merchant supply owner cannot be verified.');
+      if(moved) {
+        var labels=Array.from(new Set(moved.map(function(row) {return row.label;})));
+        if(labels.length!==1 || owner[2]!==labels[0].toLowerCase()) throw new Error('Merchant supply owner cannot be verified.');
+      }
+    } else if(Array.isArray(owner) && (owner.length!==3 || owner[0]!==pending.human.desc || owner[1]!==pending.human.profileId))
+      throw new Error('Merchant supply owner cannot be verified.');
+  }
+  function conservation(pending, fresh) {
+    bounded(pending,MAX_INTENT_BYTES);
+    var credit=nativeRows({entries:pending.credit}), next=merchantSnapshot(pending.next);
+    stockRows(next.stock);
+    if(pending.creditAttempt!==undefined) {
+      nativeRows(pending.creditAttempt.expected);nativeRows(pending.creditAttempt.replacement);
+      if(!equal(pending.creditAttempt.replacement,addEntries(pending.creditAttempt.expected,pending.credit)))
+        throw new Error('Merchant recovery inventory cannot be verified.');
+    }
+    var isCompact=compact(pending), previous=merchantSnapshot(pending.previous,isCompact);
+    supplyTransition(pending,previous,next,fresh);
+    if(isCompact) {
+      if(pending.kind==='buy') {
+        if(!credit.length || credit.some(function(row) {return row.entry.baseId===15;})) throw new Error('Merchant goods cannot be verified.');
+      } else goldCount(credit);
+      if(pending.terms!==undefined) {
+        var terms=pending.terms;
+        if(!terms || terms.version!==1 || terms.kind!==pending.kind || Object.keys(terms).length!==7 ||
+            !Number.isInteger(terms.gold) || terms.gold<0 || terms.gold>MAX_COUNT ||
+            ![terms.goods,terms.credit,terms.next,terms.previousSupply].every(function(hash) {return typeof hash==='string' && /^[0-9a-f]{64}$/.test(hash);}) ||
+            terms.credit!==goodsDigest(credit) || terms.next!==digest(next) || terms.previousSupply!==digest(previous.supply) ||
+            (pending.kind==='buy'?terms.goods!==goodsDigest(credit):terms.gold!==goldCount(credit)))
+          throw new Error('Merchant compact terms cannot be verified.');
+      }
+      return pending.terms;
+    }
+    var removed=difference(nativeRows(pending.expected),nativeRows(pending.debit),false);
+    var moved=pending.kind==='buy'?difference(stockRows(previous.stock),stockRows(next.stock),true):
+      difference(stockRows(next.stock),stockRows(previous.stock),true);
+    if(!moved.length || moved.some(function(row) {return row.entry.baseId===15;})) throw new Error('Merchant goods cannot be verified.');
+    var gold=pending.kind==='buy'?next.purse-previous.purse:previous.purse-next.purse;
+    if(gold<0 || gold>MAX_COUNT || (pending.kind==='buy'?
+      goldCount(removed)!==gold || goodsDigest(credit)!==goodsDigest(moved):
+      removed.some(function(row) {return row.entry.baseId===15;}) || goodsDigest(removed)!==goodsDigest(moved) || goldCount(credit)!==gold))
+      throw new Error('Merchant transfer does not conserve goods and gold.');
+    supplyTransition(pending,previous,next,fresh,moved);
+    var summary={version:1,kind:pending.kind,gold:gold,goods:goodsDigest(moved),credit:goodsDigest(credit),next:digest(next),previousSupply:digest(previous.supply)};
+    if(pending.terms!==undefined && !equal(canonical(pending.terms),canonical(summary))) throw new Error('Merchant terms cannot be verified.');
+    return summary;
+  }
   function records() {
     try {
       var all=purses.pendingRecords(), merchants=new Set(), references=new Set(), transactions=new Set(), humans=new Set(), receipts=new Set();
@@ -64100,12 +64224,15 @@ function createSettlement(deps) {
             record.reference!==state.reference || !valid(pending,state)) throw new Error('Pending merchant records cannot be verified.');
         var previous=merchantSnapshot(pending.previous,pending.phase==='credit'), next=merchantSnapshot(pending.next);
         if(!equal(merchantSnapshot(state),pending.phase==='debit'?previous:next)) throw new Error('Pending merchant records cannot be verified.');
+        conservation(pending,false);
         [[merchants,record.merchantId],[references,record.reference],[transactions,pending.id],[humans,humanKey(pending.human)],
           [receipts,pending.debitReceipt],[receipts,pending.finalReceipt]].forEach(function(pair) {
           if(pair[0].has(pair[1])) throw new Error('Pending merchant records cannot be verified.');
           pair[0].add(pair[1]);
         });
       });
+      var latest=purses.pendingRecords();
+      if(!active || !equal(all,latest)) throw new Error('Merchant settlement changed during validation.');
       return all;
     } catch(error) {active=false;throw error;}
   }
@@ -64171,6 +64298,7 @@ function createSettlement(deps) {
       records();
       var current = purses.read(id);
       if (!current || current.pending || !equal(current, state)) return null;
+      try {merchantSnapshot(current);} catch(error) {active=false;throw error;}
       var next = copy(current), changed = false, at = now();
       Object.keys(next.supply || {}).forEach(function (key) {
         var stamp = next.supply[key];
@@ -64197,13 +64325,10 @@ function createSettlement(deps) {
     }
     return !!save(id, state, next, pending.id);
   }
-  function reconcile(id) {
+  function reconcile(id, checked) {
     if (!available()) return false;
     var state = purses.read(id), pending = state && state.pending;
-    if (!valid(pending, state)) return false;
-    // Corrupt duplicate reservations must not independently credit one human.
-    var key = humanKey(pending.human);
-    if (records().filter(function (r) { return humanKey(r.state.pending.human) === key; }).length !== 1) return false;
+    if (!valid(pending, state) || !equal(state,checked)) return false;
     var humanId = identity(pending);
     if (!active || !humanId) return false;
     var live = transfer.receipt(humanId), saved = transfer.saved(humanId);
@@ -64296,6 +64421,7 @@ function createSettlement(deps) {
       [expected,pending.debit,addEntries(pending.debit,pending.credit)].forEach(function (snapshot) {
         if(transfer.validate(snapshot)!==true) throw new Error('Native inventory validation failed.');
       });
+      pending.terms=conservation(pending,true);
       var armed = Object.assign({}, copy(state), {pending:pending});
       if(!valid(pending,state)) {active=false;throw new Error('Pending merchant records cannot be verified.');}
       // Either recovery inventory can reach the native/JS inventory limit.
@@ -64307,7 +64433,10 @@ function createSettlement(deps) {
       if (!save(offer.merchantId, state, bounded(armed, MAX_INTENT_BYTES))) return {accepted:false,done:false,reason:'The offer changed.'};
       var done = false;
       if (active) {
-        try { done = reconcile(offer.merchantId); }
+        try {
+          var checked=records().find(function(record) {return record.merchantId===offer.merchantId;});
+          done=!!checked && reconcile(offer.merchantId,checked.state);
+        }
         catch (error) { report(offer.merchantId,error); if (!active) throw error; }
       }
       var after = active && purses.read(offer.merchantId);
@@ -64322,7 +64451,7 @@ function createSettlement(deps) {
       var all = records(), changed = [];
       for (var i = 0; i < Math.min(MAX_PENDING, all.length) && active; i++) {
         var record = all[(cursor + i) % all.length];
-        try { if(reconcile(record.merchantId)) {changed.push(record.merchantId);errors.delete(record.merchantId);} }
+        try { if(reconcile(record.merchantId,record.state)) {changed.push(record.merchantId);errors.delete(record.merchantId);} }
         catch (error) { report(record.merchantId,error); if (!active) throw error; }
       }
       cursor = all.length ? (cursor + MAX_PENDING) % all.length : 0;
@@ -64346,10 +64475,19 @@ function createSettlement(deps) {
   }
   function canInventoryMutation(actorId) {
     if(!available() || busy)return false;
-    var human=transfer.identity(actorId);
-    return !!human && admitted(human,'',false) && transfer.saved(actorId)===transfer.receipt(actorId);
+    busy=true;
+    try {
+      var human=transfer.identity(actorId);
+      return !!human && admitted(human,'',false) && transfer.saved(actorId)===transfer.receipt(actorId) && active;
+    } finally {busy=false;}
   }
-  return {begin:begin,tick:tick,available:available,pruneSupplyHistory:pruneSupplyHistory,
+  function canRetire() {
+    if(!available() || busy) return false;
+    busy=true;
+    try {return records().every(function(record) {return record.state.pending.terms!==undefined;});}
+    finally {busy=false;}
+  }
+  return {begin:begin,tick:tick,available:available,canRetire:canRetire,pruneSupplyHistory:pruneSupplyHistory,
     withInventoryMutation:withInventoryMutation,canInventoryMutation:canInventoryMutation,shutdown:function () { active=false; }};
 }
 

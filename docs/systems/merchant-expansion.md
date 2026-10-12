@@ -89,8 +89,22 @@ checks the original preceding receipt as well as the debit and final receipts.
 Legacy intents without a supply map compare as an empty map throughout recovery;
 invalid maps are rejected. Recovery applies only merchant snapshot fields,
 preserving unrelated saved state.
-This identity/state check does not yet prove conservation of every saved
-goods and gold transfer; that remains a separate retirement prerequisite.
+Full saved trade snapshots must conserve goods, gold, stock labels and item
+metadata using their original terms. Zero-price transfers remain valid. New
+intents retain fixed-size terms and inventory digests through compaction,
+including the original cooldown-history digest. Compact records validate
+their retained supply transition before recovery or retirement readiness,
+within the same initial and recovery size limits. Recovery attempts must add
+exactly the saved credit to their expected inventory. Supply keys bind to the
+human and the outer item label, separate from the native item's name.
+Legacy intents gain no new summary bytes. Full legacy snapshots are checked
+where available; genuine old compact credit keeps its bounded receipt-based
+recovery because its discarded original deltas cannot be reconstructed.
+The settlement canRetire readiness check refuses any remaining legacy pending
+intent without retained terms. This readiness check still needs integration
+with the explicit roster activation step before a cut; no population change
+is included here. Unresolved legacy transfers retain their records and block
+activation rather than being reset or reissued.
 Without an explicit history manifest, the current active roster remains the
 manifest. This support alone does not cut the current 249 traders. Before
 activating retirement, validate writer ownership, pending-intent uniqueness,
@@ -102,6 +116,7 @@ open quests must remain recoverable during catalogue changes.
 Local checks include `node tests/test-merchant-trading.js`,
 `node tests/test-merchant-settlement.js`,
 `node tests/test-merchant-pending-preflight.js`,
+`node tests/test-merchant-conservation.js`,
 `node tests/test-merchant-deployment.js` and
 `node scripts/dev/Build-MerchantGamemode.js --check`.
 No game playtests or operational steps are performed by Codex. Changes
