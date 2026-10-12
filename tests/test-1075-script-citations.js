@@ -39,9 +39,10 @@
 //        .py    a def or class, or a name given a value at the left margin
 //        .md, Caddyfile   no names: always their own words
 // and anything else is their own words, as for a script. Only the pages in
-// WIDE are held to that so far: the others still cite those files by line
-// (FEED.md, GAMEMODE.md, GLOSSARY.md, systems/commands.md and more) and
-// join WIDE as each is converted. Their .ps1 citations are checked already.
+// WIDE are held to that so far. #2416 converted FEED.md, GAMEMODE.md,
+// GLOSSARY.md, VIRUSTOTAL-FALSE-POSITIVE.md and systems/commands.md and added
+// them; any other page joins WIDE as it is converted. Every page's .ps1
+// citations are checked already.
 //
 // Read only.
 const fs = require('fs');
@@ -89,7 +90,8 @@ yes('there are scripts to read them against, ' + scripts.length + ' of them', sc
 // what follows it.
 const CITE = /^((?:[\w.-]+[\\/])*)([\w.-]+\.(?:ps1|cs|js|py|md)|Caddyfile):([\s\S]+)$/i;
 const LINES = /^\s*\d[\d\s,-]*$/;
-const WIDE = ['docs/SYSTEM.md'];
+const WIDE = ['docs/SYSTEM.md', 'docs/FEED.md', 'docs/GAMEMODE.md', 'docs/GLOSSARY.md',
+  'docs/VIRUSTOTAL-FALSE-POSITIVE.md', 'docs/systems/commands.md'];
 function isScript(file) { return /\.ps1$/i.test(file); }
 
 // Where a cited script is, or why it cannot be said.
