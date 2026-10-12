@@ -54015,11 +54015,13 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       WHAT THE TIME AWAY DOES, BY WHERE SOMEBODY LOGGED OUT (#1606, #2246).
 
       One row for each kind of rest they were in when they left, and up for
-      somebody who left on their feet. Each row is three things:
+      somebody who left on their feet. Each row is four things:
 
         drain  the share of the ordinary clock the whole time away costs
                hunger, thirst and rest. 1 is all of it, the same as being
                awake in the world; 0 would be nothing at all.
+        floor  the time away takes no meter below this. A meter already
+               under it is left where it was. 0 is no floor.
         rest   after a night away, rest is at least this. 0 gives nothing.
         food, drink  after a night away, added to hunger and to thirst, on
                what the time away left.
@@ -54046,15 +54048,15 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       straight back in would put 25 on hunger and thirst every time.
     */
     away: {
-      bed:        { drain: 1, rest: 100, food: 25, drink: 25 },
-      inn:        { drain: 1, rest: 100, food: 25, drink: 25 },
-      common:     { drain: 1, rest: 0, food: 0, drink: 0 },
-      commonfire: { drain: 1, rest: 0, food: 0, drink: 0 },
-      camp:       { drain: 1, rest: 0, food: 0, drink: 0 },
-      rough:      { drain: 1, rest: 0, food: 0, drink: 0 },
-      campfire:   { drain: 1, rest: 0, food: 0, drink: 0 },
-      sit:        { drain: 1, rest: 0, food: 0, drink: 0 },
-      up:         { drain: 1, rest: 0, food: 0, drink: 0 }
+      bed:        { drain: 1, floor: 0, rest: 100, food: 25, drink: 25 },
+      inn:        { drain: 1, floor: 0, rest: 100, food: 25, drink: 25 },
+      common:     { drain: 1, floor: 0, rest: 0, food: 0, drink: 0 },
+      commonfire: { drain: 1, floor: 0, rest: 0, food: 0, drink: 0 },
+      camp:       { drain: 1, floor: 0, rest: 0, food: 0, drink: 0 },
+      rough:      { drain: 1, floor: 0, rest: 0, food: 0, drink: 0 },
+      campfire:   { drain: 1, floor: 0, rest: 0, food: 0, drink: 0 },
+      sit:        { drain: 1, floor: 0, rest: 0, food: 0, drink: 0 },
+      up:         { drain: 1, floor: 0, rest: 0, food: 0, drink: 0 }
     },
     sleptFor: 24 * 60000,
 
@@ -54371,11 +54373,13 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       (#2246): NEEDS.away's drain, on an arrival only. 1, the whole clock,
       everywhere until Patrick says otherwise on #2246.
     */
-    var share = arriving ? Number(awayRow(n.resting).drain) : 1;
+    var gone = arriving ? awayRow(n.resting) : null;
+    var share = gone ? Number(gone.drain) : 1;
     if (!(share >= 0)) { share = 1; }
+    var floor = gone ? clamp(Number(gone.floor) || 0) : 0;
 
-    n.food = clamp(n.food - NEEDS.drain.food * hours * share);
-    n.drink = clamp(n.drink - NEEDS.drain.drink * hours * share);
+    n.food = awayDrain(n.food, NEEDS.drain.food * hours * share, floor);
+    n.drink = awayDrain(n.drink, NEEDS.drain.drink * hours * share, floor);
 
     var restRate = NEEDS.drain.rest;
     if (n.worked && (now - n.worked) < NEEDS.workFor) {
@@ -54392,7 +54396,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       arrived(), below, and the beds' first sight of them gets them up.
     */
     var gain = arriving ? 0 : restingGain(actorId, n);
-    n.rest = clamp(n.rest + (gain - restRate * share) * hours);
+    n.rest = gone ? awayDrain(n.rest, restRate * share * hours, floor)
+                  : clamp(n.rest + (gain - restRate * share) * hours);
 
     /*
       Temperature moves TOWARD where you are, rather than only falling.
@@ -55383,6 +55388,16 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     n.drink = clamp(n.drink + drink);
     n.resting = '';
     return n.rest >= 100 ? 'You slept well. You are rested.' : 'You slept, though not well.';
+  }
+
+  /*
+    A meter after the time away: down by what the clock took, and never under
+    the row's floor unless it was already there (#2246).
+  */
+  function awayDrain(v, took, floor) {
+    var after = clamp(v - took);
+    if (floor > 0 && v > floor && after < floor) { after = floor; }
+    return v <= floor ? clamp(v) : after;
   }
 
   /*

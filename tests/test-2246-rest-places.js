@@ -286,13 +286,13 @@ const N = needs.NEEDS;
   const kinds = Object.keys(N.recover).concat(['up']);
   const rows = kinds.filter(function (k) {
     const r = N.away[k];
-    return r && typeof r.drain === 'number' && typeof r.rest === 'number' &&
+    return r && typeof r.drain === 'number' && typeof r.floor === 'number' && typeof r.rest === 'number' &&
            typeof r.food === 'number' && typeof r.drink === 'number';
   });
   yes('N2 NEEDS.away has a row for every kind of rest and for somebody on their feet (' + rows.length + ' of ' + kinds.length + ')',
       rows.length === kinds.length);
-  yes('N3 today every row costs the whole clock while away',
-      kinds.every(function (k) { return N.away[k].drain === 1; }));
+  yes('N3 today every row costs the whole clock while away, with no floor',
+      kinds.every(function (k) { return N.away[k].drain === 1 && N.away[k].floor === 0; }));
   const fills = kinds.filter(function (k) { return N.away[k].rest || N.away[k].food || N.away[k].drink; });
   yes('N3 and only your own bed and a bed you are allowed in fill at a logout (' + fills.join(', ') + ')',
       fills.join(',') === 'inn,bed' || fills.join(',') === 'bed,inn');
@@ -341,11 +341,22 @@ function near(a, b) { return Math.abs(a - b) < 1e-9; }
   yes('H1 a drain of a half costs half the clock while away (' + half.n.food.toFixed(2) + ', ' + half.n.drink.toFixed(2) + ')',
       near(half.n.food, Math.min(100, Math.max(0, half.was.food - d.food * 0.5) + 10)) &&
       near(half.n.drink, Math.min(100, Math.max(0, half.was.drink - d.drink * 0.5) + 10)));
-  yes('H1 rest is at least the row\'s 95 after the night, and they are up', half.n.rest === 95 && half.n.resting === '');  N.away.common = { drain: 0, rest: 0, food: 0, drink: 0 };
+  yes('H1 rest is at least the row\'s 95 after the night, and they are up', half.n.rest === 95 && half.n.resting === '');
+  N.away.common = { drain: 0, floor: 0, rest: 0, food: 0, drink: 0 };
   const none = logout('common', 9 * HOUR);
   yes('H2 a drain of 0 leaves the meters as they were left, and gives nothing on top',
       near(none.n.food, none.was.food) && near(none.n.drink, none.was.drink) && near(none.n.rest, none.was.rest) &&
       none.n.resting === 'common');
+  // A floor: 9 hours away would empty all three; with a floor of 25 none
+  // goes under it, and a meter already under it at logout stays put. After
+  // 2 hours awake, rest is above it and hunger and thirst are under it.
+  N.away.common = { drain: 1, floor: 25, rest: 0, food: 0, drink: 0 };
+  const floored = logout('common', 9 * HOUR);
+  const expect = function (was) { return was > 25 ? 25 : was; };
+  yes('H5 a floor of 25: rest stops at 25, hunger and thirst already under it stay where they were (' +
+      ['food', 'drink', 'rest'].map(function (k) { return k + ' ' + floored.was[k].toFixed(1) + ' to ' + floored.n[k].toFixed(1); }).join(', ') + ')',
+      floored.was.rest > 25 && floored.was.food < 25 &&
+      ['food', 'drink', 'rest'].every(function (k) { return near(floored.n[k], expect(floored.was[k])); }));
   N.away.common = keep;
   const short = logout('bed', N.sleptFor - MIN);
   yes('H3 away less than the night is no night: the drain only, no fill', short.n.rest < 100 && short.n.resting === 'bed');
