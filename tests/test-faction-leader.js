@@ -26,7 +26,6 @@ function yes(what, cond) {
 }
 
 const bot = read('bot/bot.py');
-const req = read('bot/requirements.txt');
 const install = read('scripts/deploy/Install-Bot.ps1');
 const build = read('bot/Build-Discord.py');
 const names = JSON.parse(read('bot/factions.json'));
@@ -35,8 +34,38 @@ const page = read('docs/systems/trading-company.md');
 const factions = read('docs/systems/factions.md');
 const STAFF_RULE = 'No GM or staff member (Loremaster, Discord Moderator, or any other staff role) may hold an in-game RP role with faction leadership, such as a Jarl or a faction lead.';
 
+// The pin is a name==version line. PyPI and the hashed lockfile write
+// discord-py; requirements.in writes discord.py. Both are the same
+// package (PEP 503). The VPS runner is Windows: the file may arrive
+// with CRLF, a UTF-8 BOM, or UTF-16. Read bytes, decode, join
+// backslash continuations, then demand exactly version 2.7.1.
+function decodeText(buf) {
+  if (buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xfe) {
+    return buf.slice(2).toString('utf16le');
+  }
+  if (buf.length >= 2 && buf[0] === 0xfe && buf[1] === 0xff) {
+    return Buffer.from(buf.slice(2)).swap16().toString('utf16le');
+  }
+  var s = buf.toString('utf8');
+  return s.charCodeAt(0) === 0xfeff ? s.slice(1) : s;
+}
+function requirementPins(text) {
+  var joined = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\\\n/g, ' ');
+  var pins = {};
+  joined.split('\n').forEach(function (raw) {
+    var line = raw.trim();
+    if (!line || line.charAt(0) === '#') return;
+    var m = /^([A-Za-z0-9][A-Za-z0-9._-]*)==([A-Za-z0-9.+!-]+)\b/.exec(line);
+    if (!m) return;
+    pins[m[1].toLowerCase().replace(/[-_.]+/g, '-')] = m[2];
+  });
+  return pins;
+}
+var reqPins = requirementPins(decodeText(
+  fs.readFileSync(path.join(REPO, 'bot', 'requirements.txt'))));
+
 yes('F1 discord.py is pinned at 2.7.1, which has Select inside a modal since 2.6.0',
-    req.indexOf('discord.py==2.7.1') !== -1 &&
+    reqPins['discord-py'] === '2.7.1' &&
     bot.indexOf('discord.ui.Label(') !== -1 &&
     bot.indexOf('discord.ui.Select(') !== -1 &&
     bot.indexOf('required=True') !== -1);
