@@ -35754,9 +35754,12 @@ log('gamemode loaded:',
     turned, locked or not. Kept apart from property.json because none of it
     is property: a cell is the hold's, whoever claims the building it is in.
 
-    WHO NAMES A GUARD IS NOT DECIDED YET. It is written out for Patrick on
-    #502. Until it is, nothing writes a guard into the register, nobody is
-    one, and every check below answers no, so nothing in the world changes.
+    WHO NAMES A GUARD. Patrick, 12 October, on #502: guards are named by the
+    Jarl of that hold, and taking the Jarl office asks for a hold. So the
+    Jarl office carries its hold on the character (s.officeHold, beside
+    s.office), and a Jarl names and removes guards of that hold alone, with
+    Name guard and Remove on the Office page of K (guardCmd). Nothing else
+    writes a guard into the register.
 
     A CELL IS THE ONE LOCK THAT SHUTS PEOPLE IN. Every other lock here keeps
     people out and never shuts them in (shutFor, WAY_OUT); a cell door is a
@@ -35840,6 +35843,41 @@ log('gamemode loaded:',
   function guardHoldOf(profileId) {
     var pid = Number(profileId) || 0;
     return (pid && Object.prototype.hasOwnProperty.call(law.guards, pid)) ? law.guards[pid] : '';
+  }
+
+  /*
+    THE HOLD OF A JARL (#502). Patrick, 12 October: guards are named by the
+    Jarl of that hold, and taking the Jarl office asks for a hold. The hold is
+    on the character beside the office, s.officeHold, one of the ten holds
+    the ledgers and the jails use, and it is chosen once, when the office is
+    taken (jarlCmd). A Jarl seated before there was a hold has none until
+    they choose it on the Office page.
+
+    An admin counts as a Jarl for the stewards and the steward's powers, so
+    the first office can be placed (#397), but a hold comes only from a
+    seated office: a guard is named by somebody in the world, and an admin
+    who wants to name one takes the office of a hold like anybody.
+  */
+  var HOLD_TOWN = {
+    whiterun: 'Whiterun', solitude: 'Solitude', riften: 'Riften', markarth: 'Markarth',
+    windhelm: 'Windhelm', falkreath: 'Falkreath', morthal: 'Morthal', dawnstar: 'Dawnstar',
+    winterhold: 'Winterhold', ravenrock: 'Raven Rock'
+  };
+
+  /** The hold of the Jarl office in this character state, or ''. */
+  function officeHoldOf(s) {
+    var h = (s && s.office === 'jarl') ? String(s.officeHold || '') : '';
+    return Object.prototype.hasOwnProperty.call(HOLD_TOWN, h) ? h : '';
+  }
+
+  /** The hold this person is Jarl of, on the character in the world, or ''. */
+  function jarlHoldOf(profileId, actorId) {
+    if (!actorId || !isJarl(profileId, actorId)) { return ''; }
+    var c = g['__thornswoodCharacter'];
+    if (!c || typeof c.stateOf !== 'function') { return ''; }
+    var s = null;
+    try { s = c.stateOf(actorId); } catch (e) { s = null; }
+    return officeHoldOf(s);
   }
 
   /** The hold whose jail this door is in, or null. */
@@ -40195,6 +40233,7 @@ log('gamemode loaded:',
     }
     if (word === '/jarl') { return jarlCmd(parts, actorId, profileId, toProfile); }
     if (word === '/steward') { return stewardCmd(parts, actorId, profileId, toProfile); }
+    if (word === '/guard') { return guardCmd(parts, actorId, profileId, toProfile); }
     if (word === '/evict') { return evict(actorId, profileId, toProfile); }
     if (word === '/box') { return boxCmd(parts, actorId, profileId, toProfile); }
     if (word === '/rent') { return rentCmd(parts, actorId, profileId, toProfile); }
@@ -40259,14 +40298,118 @@ log('gamemode loaded:',
       toProfile(profileId, 'Your character is not ready yet.');
       return true;
     }
-    if (s.office === 'jarl') {
-      toProfile(profileId, 'This character already holds the Jarl office.');
+    /*
+      THE OFFICE IS OF ONE HOLD (#502). Patrick, 12 October: taking the Jarl
+      office asks for a hold. The page sends it with the hold pressed; a
+      Jarl seated before there was a hold sends it once to choose theirs.
+      Chosen once: a Jarl does not move to another hold by a button.
+    */
+    var had = officeHoldOf(s);
+    if (had) {
+      toProfile(profileId, 'This character already holds the Jarl office of ' + HOLD_TOWN[had] + '.');
       return true;
     }
+    var want = (parts && parts.length > 1) ? String(parts[1]).trim().toLowerCase() : '';
+    if (!want) {
+      toProfile(profileId, 'The Jarl office is of one hold. Press the hold on the Office page of K.');
+      return true;
+    }
+    if (!Object.prototype.hasOwnProperty.call(HOLD_TOWN, want)) {
+      toProfile(profileId, 'There is no hold called ' + want.slice(0, 30) + '.');
+      return true;
+    }
+    var was = s.office === 'jarl';
     s.office = 'jarl';
+    s.officeHold = want;
     c.writeState(actorId, s, true);
-    plog('seated jarl office on actor', actorId, 'profile', profileId);
-    toProfile(profileId, 'This character holds the Jarl office now.');
+    plog(was ? 'gave the jarl office on actor' : 'seated jarl office on actor', actorId, 'profile', profileId,
+         'the hold', want);
+    toProfile(profileId, 'This character holds the Jarl office of ' + HOLD_TOWN[want] + ' now. ' +
+                         'You name its guards on the Office page.');
+    return true;
+  }
+
+  /*
+    A Jarl names a guard of their own hold, or takes the office back (#502).
+
+        /guard                 who guards your hold
+        /guard 1893288986      name one
+        /guard -1893288986     take it back
+
+    Sent by the Office page of the K panel, never typed: Name guard beside a
+    person in the world, Remove beside a guard. Patrick, 12 October: guards
+    are named by the Jarl of that hold. So the hold is the Jarl's own
+    (jarlHoldOf), never one the line names, and a Jarl removes only their
+    own hold's guards. Somebody who guards another hold is that hold's: its
+    Jarl removes them first. Kept by profile in the law register, the way a
+    steward is, and the cells each guard's game has open follow at once.
+  */
+  function guardCmd(parts, actorId, profileId, toProfile) {
+    var hold = jarlHoldOf(profileId, actorId);
+    var arg = (parts && parts.length > 1) ? String(parts[1]).trim() : '';
+    if (!arg) {
+      var mine = [];
+      for (var k in law.guards) {
+        if (Object.prototype.hasOwnProperty.call(law.guards, k) && hold && law.guards[k] === hold) { mine.push(k); }
+      }
+      toProfile(profileId, hold
+        ? (mine.length ? 'Guards of ' + HOLD_TOWN[hold] + ': ' + mine.join(', ') + '.'
+                       : 'No guards of ' + HOLD_TOWN[hold] + '. Name one on the Office page of K.')
+        : 'The Jarl of a hold names its guards on the Office page of K.');
+      return true;
+    }
+    if (!isJarl(profileId, actorId)) {
+      toProfile(profileId, 'Only the Jarl of a hold names its guards.');
+      return true;
+    }
+    if (!hold) {
+      toProfile(profileId, 'Your Jarl office has no hold yet. Choose it on the Office page of K, ' +
+                           'then name its guards.');
+      return true;
+    }
+    var drop = arg.charAt(0) === '-';
+    var pid = Number(drop ? arg.slice(1) : arg) || 0;
+    if (!pid) {
+      toProfile(profileId, 'That is not a profile id.');
+      return true;
+    }
+    var them = onlineActorOf(pid);
+    var who = them ? personName(them) : 'Profile ' + pid;
+    var theirs = guardHoldOf(pid);
+    if (drop) {
+      if (theirs !== hold) {
+        toProfile(profileId, who + ' is not a guard of ' + HOLD_TOWN[hold] + '.');
+        return true;
+      }
+      delete law.guards[pid];
+      saveLaw();
+      pushAll();
+      plog('law: the Jarl of', hold, '(profile ' + profileId + ') took the guard\'s office back from', pid);
+      toProfile(profileId, who + ' is no longer a guard of ' + HOLD_TOWN[hold] + '.');
+      if (them) { toProfile(pid, 'You are no longer a guard of ' + HOLD_TOWN[hold] + '.'); }
+      officeRedraw(actorId, pid);
+      return true;
+    }
+    if (theirs === hold) {
+      toProfile(profileId, who + ' is already a guard of ' + HOLD_TOWN[hold] + '.');
+      return true;
+    }
+    if (theirs) {
+      toProfile(profileId, who + ' is a guard of ' + HOLD_TOWN[theirs] + '. A guard keeps one hold, ' +
+                           'and the Jarl of ' + HOLD_TOWN[theirs] + ' takes that office back first.');
+      return true;
+    }
+    law.guards[pid] = hold;
+    saveLaw();
+    pushAll();
+    plog('law: the Jarl of', hold, '(profile ' + profileId + ') named', pid, 'a guard of', hold);
+    toProfile(profileId, who + ' is a guard of ' + HOLD_TOWN[hold] + ' now.');
+    if (them) {
+      toProfile(pid, 'The Jarl of ' + HOLD_TOWN[hold] + ' names you a guard of the hold. The cells of ' +
+                     JAIL_NAME[hold] + ' are yours to lock, and you take down posts on ' + HOLD_TOWN[hold] +
+                     '\'s notice board.');
+    }
+    officeRedraw(actorId, pid);
     return true;
   }
 
@@ -40418,7 +40561,9 @@ log('gamemode loaded:',
     var holds = !!(s && s.office === 'jarl');
     var jarl = admin || (role && holds);                     // isJarl
     var steward = jarl || stewards.indexOf(pid) !== -1;      // isSteward
-    if (!admin && !role && !steward) { return null; }
+    var hold = jarl ? officeHoldOf(s) : '';                  // jarlHoldOf
+    var guarding = guardHoldOf(pid);
+    if (!admin && !role && !steward && !guarding) { return null; }
 
     // Who is in the world, by profile, named the way a guest is named.
     var names = {};
@@ -40438,11 +40583,19 @@ log('gamemode loaded:',
     }
 
     var view = { jarl: holds, may: (admin || role) && !holds, name: jarl, steward: steward,
-                 stewards: [], people: [], door: null, box: null, boards: [] };
+                 stewards: [], people: [], door: null, box: null, boards: [],
+                 // The guards (#502): the Jarl's hold, the ten to choose from
+                 // while the office has none, that hold's guards, the people
+                 // who could be named one, and the hold this person guards.
+                 hold: hold || null, holds: [], guards: [], guardPeople: [],
+                 guardOf: guarding ? { hold: guarding, where: HOLD_TOWN[guarding], jail: JAIL_NAME[guarding] } : null };
     for (var k = 0; k < stewards.length; k++) {
       view.stewards.push({ pid: stewards[k],
                            name: Object.prototype.hasOwnProperty.call(names, stewards[k]) ? names[stewards[k]] : '' });
     }
+    var byName = function (a, b) {
+      return a.name < b.name ? -1 : (a.name > b.name ? 1 : a.pid - b.pid);
+    };
     if (jarl) {
       // Anybody in the world who is not a steward already, by name. The id
       // goes with the name, because the id is what the button sends.
@@ -40450,10 +40603,30 @@ log('gamemode loaded:',
         if (order[j] === pid || stewards.indexOf(order[j]) !== -1) { continue; }
         view.people.push({ pid: order[j], name: names[order[j]] });
       }
-      view.people.sort(function (a, b) {
-        return a.name < b.name ? -1 : (a.name > b.name ? 1 : a.pid - b.pid);
-      });
+      view.people.sort(byName);
       view.people = view.people.slice(0, OFFICE_PEOPLE_MAX);
+    }
+    if ((view.may || (holds && !hold))) {
+      for (var t in HOLD_TOWN) {
+        if (Object.prototype.hasOwnProperty.call(HOLD_TOWN, t)) { view.holds.push({ hold: t, where: HOLD_TOWN[t] }); }
+      }
+    }
+    if (hold) {
+      view.where = HOLD_TOWN[hold];
+      for (var gk in law.guards) {
+        if (!Object.prototype.hasOwnProperty.call(law.guards, gk) || law.guards[gk] !== hold) { continue; }
+        var gp = Number(gk);
+        view.guards.push({ pid: gp, name: Object.prototype.hasOwnProperty.call(names, gp) ? names[gp] : '' });
+      }
+      view.guards.sort(byName);
+      // Anybody in the world who guards no hold, themselves included: a
+      // Jarl may stand a watch too.
+      for (var q = 0; q < order.length; q++) {
+        if (guardHoldOf(order[q])) { continue; }
+        view.guardPeople.push({ pid: order[q], name: names[order[q]] });
+      }
+      view.guardPeople.sort(byName);
+      view.guardPeople = view.guardPeople.slice(0, OFFICE_PEOPLE_MAX);
     }
     if (!steward) { return view; }
 
@@ -40494,7 +40667,7 @@ log('gamemode loaded:',
     coversGround: coversGround, groundHere: groundHere,
     DOOR_PROPERTY: DOOR_PROPERTY,
     claims: function () { return claims; },
-    isJarl: isJarl, isSteward: isSteward, officeView: officeView,
+    isJarl: isJarl, isSteward: isSteward, officeView: officeView, jarlHoldOf: jarlHoldOf, HOLD_TOWN: HOLD_TOWN,
     isGuard: isGuard, guardHoldOf: guardHoldOf, jailHoldOf: jailHoldOf, cellLocked: cellLocked,
     mayPassCell: mayPassCell, lockCell: lockCell,
     guards: function () { return Object.assign({}, law.guards); },
@@ -44724,7 +44897,7 @@ log('gamemode loaded:',
     if (word === '/plant' || word === '/claim' || word === '/plot' ||
         word === '/deed' || word === '/deeds' || word === '/lock' ||
         word === '/unlock' || word === '/mold' || word === '/moldhere' || word === '/key' ||
-        word === '/jarl' || word === '/steward' || word === '/evict' || word === '/box' ||
+        word === '/jarl' || word === '/steward' || word === '/guard' || word === '/evict' || word === '/box' ||
         word === '/rent' || word === '/sleephere' || word === '/notice' || word === '/job' ||
         word === '/board' || word === '/take' ||
         word === '/haul' ||
@@ -49535,6 +49708,9 @@ const WORDS = ['/ooc', '/o',
                // PLAYER_WORDS: Patrick, 4 October, no chat commands for
                // anything people do, and a Jarl and a steward are people.
                '/jarl', '/steward', '/evict', '/box', '/rent',
+               // A Jarl names a guard of their hold (#502): Name guard and
+               // Remove on the Office page send it, never typed.
+               '/guard',
                // The notice board (#1627). Sent by the board panel's buttons
                // and J's Boards tab, never typed, and so NOT in PLAYER_WORDS:
                // Patrick, 4 October, nothing people do is a chat command. A

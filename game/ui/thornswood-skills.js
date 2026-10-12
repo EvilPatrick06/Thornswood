@@ -165,14 +165,21 @@
 
     officePage: { jarl, may, name, steward: <bool>,
                   stewards: [ { pid, name } ], people: [ { pid, name } ],
+                  hold, where, holds: [ { hold, where } ], guards: [ { pid, name } ],
+                  guardPeople: [ { pid, name } ], guardOf: { hold, where, jail } | null,
                   door: { name, by, rent: { amount, every, owed } | null } | null,
                   box: { hold } | null, boards: [ { hold, where } ] }
       The offices (#1638), sent to a character that holds the Jarl office or
-      may take it, or is a steward, and to nobody else. jarl: this character
+      may take it, or is a steward, or guards a hold, and to nobody else. jarl: this character
       holds it; may: it may take it; name: it names stewards; steward: it
       evicts, sets rent, marks a box and moves a board. people are the ones
       in the world a Jarl could name, by name with the profile id the button
       sends. door and box are what the steward opened in the last minute.
+      hold and where are the Jarl office's hold (#502), and holds the ten to
+      press while the office has none: taking it sends /jarl <hold>. guards
+      are that hold's, guardPeople who could be named one (Name guard sends
+      /guard <pid>, Remove /guard -<pid>), and guardOf the hold this
+      character's account guards.
       Its buttons send the server's own lines through the chat line, the way
       the property page's Stop does: /jarl, /steward <pid>, /steward -<pid>,
       /evict, /rent <gold>, /rent -, /box <hold> and /board move <hold>. The
@@ -383,7 +390,7 @@
     },
     office: {
       title: 'Office',
-      lead: 'The office on this character. A Jarl names the stewards. A steward ends a claim and sets the rent at a door, makes a container a hold\'s box, and moves a hold\'s notice board.',
+      lead: 'The office on this character. A Jarl is Jarl of one hold, and names the stewards and that hold\'s guards. A steward ends a claim and sets the rent at a door, makes a container a hold\'s box, and moves a hold\'s notice board. A guard keeps the cells of their hold\'s jail.',
       rows: []
     },
     home: {
@@ -1512,8 +1519,10 @@
     }
     if (sec === 'office') {
       var ov = officePage();
-      if (ov && ov.jarl) return { t: 'Jarl', c: 'set' };
+      if (ov && ov.jarl) return { t: ov.where ? 'Jarl of ' + ov.where : 'Jarl, choose the hold', c: ov.where ? 'set' : 'need' };
       if (ov && ov.may) return { t: 'may take the office', c: 'need' };
+      if (ov && ov.steward) return { t: 'steward', c: 'set' };
+      if (ov && ov.guardOf) return { t: 'guard of ' + (ov.guardOf.where || ov.guardOf.hold), c: 'set' };
       return { t: 'steward', c: 'set' };
     }
     if (sec === 'staff') {
@@ -2022,17 +2031,74 @@
     if (!o) return;
     var wrap = el('div', 'cards');
 
-    // The office on this character.
-    var seat = el('div', 'card' + (o.jarl ? ' mine' : ''));
-    var head = el('div', 'name', o.jarl ? 'Jarl' : (o.may ? 'The Jarl office' : 'Steward'));
-    if (o.jarl) head.appendChild(el('span', 'tag', 'held'));
-    seat.appendChild(head);
-    seat.appendChild(el('div', 'desc', o.jarl
-      ? 'This character holds the Jarl office. Another character on the account stays as it is.'
-      : (o.may ? 'This character may take the Jarl office. It is on the character, not the account, so another character on the account stays as it is.'
-               : 'A Jarl named you a steward.')));
-    if (o.may) officeRow(seat, '', '', [officeButton('Take the office', '/jarl')]);
-    wrap.appendChild(seat);
+    // The office on this character. The Jarl office is of one hold (#502):
+    // taking it, or choosing the hold of one taken before there was a hold,
+    // is a hold pressed twice, because it is not put back.
+    var holds = Array.isArray(o.holds) ? o.holds : [];
+    if (o.jarl || o.may || o.steward) {
+      var seat = el('div', 'card' + (o.jarl ? ' mine' : ''));
+      var head = el('div', 'name', o.jarl ? (o.where ? 'Jarl of ' + String(o.where) : 'Jarl')
+                                          : (o.may ? 'The Jarl office' : 'Steward'));
+      if (o.jarl) head.appendChild(el('span', 'tag', 'held'));
+      seat.appendChild(head);
+      seat.appendChild(el('div', 'desc', o.jarl
+        ? (o.where ? 'This character holds the Jarl office of ' + String(o.where) + ', and names its guards. Another character on the account stays as it is.'
+                   : 'This character holds the Jarl office, of no hold yet. Press the hold it is Jarl of, twice. It is chosen once.')
+        : (o.may ? 'This character may take the Jarl office of one hold. Press the hold, twice: it is chosen once. The office is on the character, not the account, so another character on the account stays as it is.'
+                 : 'A Jarl named you a steward.')));
+      if (holds.length) {
+        var pick = officeRow(seat, '', '', []);
+        holds.forEach(function (h) {
+          var where = String(h.where || h.hold);
+          pick.appendChild(officeButton(where, '/jarl ' + String(h.hold), 'Press again to be Jarl of ' + where));
+        });
+      }
+      wrap.appendChild(seat);
+    }
+
+    // A guard's own office (#502).
+    if (o.guardOf) {
+      var gd = el('div', 'card mine');
+      var gh = el('div', 'name', 'Guard of ' + String(o.guardOf.where || o.guardOf.hold));
+      gh.appendChild(el('span', 'tag', 'held'));
+      gd.appendChild(gh);
+      gd.appendChild(el('div', 'desc', 'The Jarl of ' + String(o.guardOf.where || o.guardOf.hold) + ' named you a guard. ' +
+        'Every cell of ' + String(o.guardOf.jail || 'the jail') + ' opens for you, and the lock key at a cell door locks or unlocks it for everybody else. ' +
+        'At ' + String(o.guardOf.where || o.guardOf.hold) + '\'s notice board you can take down any post.'));
+      wrap.appendChild(gd);
+    }
+
+    // The guards of the Jarl's hold, and naming one (#502).
+    if (o.name) {
+      var gc = el('div', 'card');
+      gc.appendChild(el('div', 'name', o.where ? 'Guards of ' + String(o.where) : 'Guards'));
+      if (!o.hold) {
+        gc.appendChild(el('div', 'inn', 'A Jarl names the guards of their own hold. Take the office of a hold first.'));
+      } else {
+        var guards = Array.isArray(o.guards) ? o.guards : [];
+        if (!guards.length) gc.appendChild(el('div', 'inn', 'No guards yet.'));
+        guards.forEach(function (w) {
+          var gpid = Number(w.pid) || 0;
+          officeRow(gc, w.name ? String(w.name) : 'Profile ' + gpid, w.name ? 'profile ' + gpid : 'not in the world now',
+                    [officeButton('Remove', '/guard -' + gpid)]);
+        });
+        var gpeople = Array.isArray(o.guardPeople) ? o.guardPeople : [];
+        gc.appendChild(el('div', 'inn', gpeople.length
+          ? 'Name a guard from the people in the world now:'
+          : 'Nobody in the world now guards no hold, so there is nobody to name.'));
+        gpeople.forEach(function (p) {
+          var ppid = Number(p.pid) || 0;
+          officeRow(gc, String(p.name || 'somebody'), 'profile ' + ppid, [officeButton('Name guard', '/guard ' + ppid)]);
+        });
+      }
+      wrap.appendChild(gc);
+    }
+
+    // A guard who holds no other office has only the card above.
+    if (!o.jarl && !o.may && !o.steward) {
+      elBody.appendChild(wrap);
+      return;
+    }
 
     // The stewards, and naming one.
     var st = el('div', 'card');

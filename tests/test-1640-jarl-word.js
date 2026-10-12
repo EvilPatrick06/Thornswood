@@ -41,6 +41,9 @@ const charBlock = slice(gm, '// ==== thornswood character ====', '// ==== end th
 const propCommand = slice(propBlock, HEAD, '\n  }\n');
 const charCommand = slice(charBlock, HEAD, '\n  }\n');
 const jarlSrc = slice(propBlock, '  function jarlCmd(parts, actorId, profileId, toProfile) {', '\n  }\n');
+// The Jarl office is of one hold (#502): jarlCmd reads the hold through these.
+const holdSrc = slice(propBlock, '  var HOLD_TOWN = {', '};') + '\n' +
+                slice(propBlock, '  function officeHoldOf(s) {', '\n  }\n');
 yes('the property block\'s command is in the gamemode', propCommand !== null);
 yes('the character block\'s command is in the gamemode', charCommand !== null);
 yes('jarlCmd is in the property block', jarlSrc !== null);
@@ -70,12 +73,12 @@ function world(opts) {
     here: function () { return opts && opts.atDoor ? 'breezehome' : null; }
   };
   pbox.g = pbox;
-  ['deeds', 'setLock', 'mold', 'moldHere', 'cutKey', 'claim', 'stewardCmd', 'evict',
+  ['deeds', 'setLock', 'mold', 'moldHere', 'cutKey', 'claim', 'stewardCmd', 'guardCmd', 'evict',
    'boxCmd', 'rentCmd', 'sleepHere', 'post', 'board', 'take', 'jobs', 'dropJob',
    'unpin', 'postLetter', 'deliver', 'haulCmd'].forEach(function (n) {
     pbox[n] = function () { stubbed.push(n); return true; };
   });
-  vm.runInNewContext(propCommand + '\n' + jarlSrc + '\nthis.cmd = command;', pbox);
+  vm.runInNewContext(holdSrc + '\n' + propCommand + '\n' + jarlSrc + '\nthis.cmd = command;', pbox);
 
   const logs = [];
   const cbox = {
@@ -88,7 +91,8 @@ function world(opts) {
     states: states, writes: writes, stubbed: stubbed, logs: logs,
     send: function (word, actorId, profileId) {
       const told = [];
-      const r = cbox.cmd(word, [word], actorId, profileId, function (pid, m) { told.push(m); });
+      const parts = word.split(' ');
+      const r = cbox.cmd(parts[0], parts, actorId, profileId, function (pid, m) { told.push(m); });
       return { answered: r, told: told };
     }
   };
@@ -97,33 +101,36 @@ function world(opts) {
 if (propCommand && charCommand && jarlSrc) {
   {
     const w = world();
-    const r = w.send('/jarl', ACTOR, JARL);
+    const r = w.send('/jarl whiterun', ACTOR, JARL);
     yes('J1 /jarl sent to the character block is answered there, not left for the unknown command reply',
         r.answered === true);
     yes('J1 and a character on a Jarl-role account holds the office',
         w.states[ACTOR].office === 'jarl' && w.writes.length === 1 && w.writes[0] === ACTOR);
-    yes('J1 and is told so', r.told.length === 1 && r.told[0] === 'This character holds the Jarl office now.');
+    yes('J1 and is told so, with its hold (#502)', r.told.length === 1 &&
+        r.told[0] === 'This character holds the Jarl office of Whiterun now. You name its guards on the Office page.' &&
+        w.states[ACTOR].officeHold === 'whiterun');
     yes('J1 and no other property word ran', w.stubbed.length === 0);
   }
   {
     const w = world();
-    const r = w.send('/jarl', ACTOR, ADMIN);
+    const r = w.send('/jarl riften', ACTOR, ADMIN);
     yes('J2 an admin without the role seats the office too',
         r.answered === true && w.states[ACTOR].office === 'jarl');
   }
   {
     const w = world();
-    const r = w.send('/jarl', ACTOR, NOBODY);
+    const r = w.send('/jarl riften', ACTOR, NOBODY);
     yes('J3 an account with neither is refused and the character is untouched',
         r.answered === true && w.states[ACTOR].office === null && w.writes.length === 0);
     yes('J3 and is told who may', r.told[0] === 'Only someone with the Jarl role (or an admin) can take the office.');
   }
   {
     const w = world();
-    w.send('/jarl', ACTOR, JARL);
-    const again = w.send('/jarl', ACTOR, JARL);
-    yes('J4 sending it again does not write twice',
-        w.writes.length === 1 && again.told[0] === 'This character already holds the Jarl office.');
+    w.send('/jarl whiterun', ACTOR, JARL);
+    const again = w.send('/jarl riften', ACTOR, JARL);
+    yes('J4 sending it again does not write twice, nor move the hold',
+        w.writes.length === 1 && again.told[0] === 'This character already holds the Jarl office of Whiterun.' &&
+        w.states[ACTOR].officeHold === 'whiterun');
     yes('J4 and the other character on the account stays ordinary',
         w.states[OTHER].office === null);
   }
