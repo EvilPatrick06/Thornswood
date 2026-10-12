@@ -62301,15 +62301,31 @@ function createPrivateEconomyLedger(fs,path,settings,name,references,durableWrit
   }
   return {load,save,durable:typeof durableWriter==='function',namespace:String(settings.thornswoodServer || 'main').toLowerCase()+':'+(path.sep==='\\' ? realPath(file).toLowerCase() : realPath(file))};
 }
+function npcMerchantManifest(data) {
+  const kept=data.keep.filter(row=>row[6]==='trader');
+  const history=data.merchantHistory===undefined ? kept.map(row=>row.slice(0,2)) : data.merchantHistory;
+  if(!Array.isArray(history) || !history.length) throw new Error('Invalid merchant history manifest');
+  const entries=new Map();
+  for(const row of history) {
+    if(!Array.isArray(row) || row.length!==2 || row.some(value=>typeof value!=='string' || !value) || entries.has(row[0]))
+      throw new Error('Invalid merchant history manifest');
+    entries.set(row[0],{reference:row[0],base:row[1],active:false});
+  }
+  for(const row of kept) {
+    const identity=entries.get(row[0]);
+    if(!identity || identity.base!==row[1] || identity.active) throw new Error('Active merchant catalogue disagrees with history manifest');
+    identity.active=true;
+  }
+  return Array.from(entries.values());
+}
 function createNpcMerchantPurses(api,data,storage) {
   const property='thornswoodMerchant',catalogue=new Map(),verified=new Set();
   let initialized=0,active=true;
   api.makeProperty(property,{isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
-  for(const row of data.keep) {
-    if(row[6]!=='trader') continue;
-    const id=api.getIdFromDesc(row[0]);
+  for(const identity of npcMerchantManifest(data)) {
+    const id=api.getIdFromDesc(identity.reference);
     if(!Number.isInteger(id) || id<=0 || catalogue.has(id)) throw new Error('Invalid merchant catalogue identity');
-    catalogue.set(id,{reference:row[0],base:row[1]});
+    catalogue.set(id,identity);
   }
   if(!storage || !storage.load || !storage.save) throw new Error('A durable merchant ledger is required');
   let ledger=storage.load();
@@ -62333,6 +62349,8 @@ function createNpcMerchantPurses(api,data,storage) {
     if(!active) throw new Error('Merchant purse service is unavailable');
     const identity=catalogue.get(id);
     if(!identity) return null;
+    // Retired identities remain private ledger records, never live traders.
+    if(!identity.active) return null;
     const actor=api.getNpcAIState(id);
     if(!actor || actor.isHuman || actor.profileId>0) throw new Error('A human cannot receive an NPC merchant purse');
     if(api.get(id,'baseDesc')!==identity.base) throw new Error('Merchant base does not match its authored reference');
@@ -62364,11 +62382,14 @@ function createNpcMerchantPurses(api,data,storage) {
     if(!active) throw new Error('Merchant purse service is unavailable');
     const identity=catalogue.get(id);
     if(!identity) throw new Error('That is not a guild trader');
-    const actor=api.getNpcAIState(id);
-    if(!actor || actor.isHuman || actor.profileId>0) throw new Error('A human cannot receive an NPC merchant purse');
     if(!valid(nextState, identity)) throw new Error('Merchant state cannot be verified');
     const previous=ledger.entries[identity.reference];
     if(previous===null || previous===undefined) throw new Error('Merchant initialization record is missing');
+    if(identity.active) {
+      const actor=api.getNpcAIState(id);
+      if(!actor || actor.isHuman || actor.profileId>0) throw new Error('A human cannot receive an NPC merchant purse');
+      if(api.get(id,'baseDesc')!==identity.base) throw new Error('Merchant base does not match its authored reference');
+    } else if(!previous.pending) throw new Error('A retired merchant can only finish a saved transfer');
     const revision=previous.revision || 0;
     const expected=expectedRevision===undefined ? (nextState.revision || 0) : expectedRevision;
     if(!Number.isSafeInteger(expected) || expected<0) throw new Error('Invalid merchant revision');
@@ -62392,7 +62413,7 @@ function createNpcMerchantPurses(api,data,storage) {
     }
     if(!active) throw new Error('Merchant purse service is unavailable');
     ledger=next;
-    api.set(id, property, JSON.parse(JSON.stringify(committed)));
+    if(identity.active) api.set(id, property, JSON.parse(JSON.stringify(committed)));
     return JSON.parse(JSON.stringify(committed));
   }
   function compareAndCommit(id, expectedRevision, nextState) {
@@ -62412,7 +62433,8 @@ function createNpcMerchantPurses(api,data,storage) {
     }
     return pending;
   }
-  return {prepare,read,commit,compareAndCommit,pendingRecords,durable:storage.durable===true,namespace:storage.namespace,shutdown:()=>{active=false;},stats:()=>({catalogue:catalogue.size,verified:verified.size,initialized})};
+  const activeCount=Array.from(catalogue.values()).filter(identity=>identity.active).length;
+  return {prepare,read,commit,compareAndCommit,pendingRecords,durable:storage.durable===true,namespace:storage.namespace,shutdown:()=>{active=false;},stats:()=>({catalogue:activeCount,retired:catalogue.size-activeCount,verified:verified.size,initialized})};
 }
 // NPC MERCHANT PURSES END
 
@@ -64947,7 +64969,7 @@ try {
       throw new Error('Merchant catalogue does not match the installed load order');
     globalThis.__thornswoodNpcMerchants=createNpcMerchantPurses(mp,NPC_POPULATION_DATA,
       createPrivateMerchantLedger(require('fs'),require('path'),cfgNpc,
-        NPC_POPULATION_DATA.keep.filter(row=>row[6]==='trader').map(row=>row[0]),
+        npcMerchantManifest(NPC_POPULATION_DATA).map(identity=>identity.reference),
         typeof mp.writePrivateEconomyLedger==='function' ? mp.writePrivateEconomyLedger.bind(mp) : null));
     try {
       globalThis.__thornswoodMerchantTrade = MERCHANT_TRADING.installMerchantTrading({

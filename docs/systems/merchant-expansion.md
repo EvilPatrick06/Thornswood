@@ -60,6 +60,7 @@ adding many offers must not create an uncapped new daily gold faucet.
 | Part | Responsibility | Requires |
 | --- | --- | --- |
 | merchant-panel | Separate eligible pack sales and stocked shelf purchases | Existing settlement |
+| merchant-history | Separate historical purse identities from active interaction references | Existing private ledger and receipt recovery |
 | merchant-roster | Six identities per hold and safe retirement of others | Ledger migration checks |
 | merchant-tables | Explicit role item permissions on every server path | Roster |
 | merchant-quests | Hold/role/tier objectives, gates and economy limits | Tables and native quest transactions |
@@ -67,6 +68,14 @@ adding many offers must not create an uncapped new daily gold faucet.
 First reproduce and fix the item-offer UI with server fixtures and a local
 browser fixture. Then validate the roster and ledger migration before
 cutting identities. Add table checks to view and command paths together.
+The purse controller accepts an explicit `merchantHistory` manifest of
+reference/base pairs for retirement recovery. A retired identity cannot be
+prepared for interaction or receive a starting purse; its existing pending
+transfer can finish against the private ledger without loading its NPC.
+Without an explicit history manifest, the current active roster remains the
+manifest. This support alone does not cut the current 249 traders. Before
+activating retirement, validate writer ownership, pending-intent uniqueness,
+explicit first-world initialization and reachable legacy quest turn-ins.
 Implement quests in complete, source-bound slices with coverage checks for
 all trades, holds, tiers, classes, professions, halves and schools. Legacy
 open quests must remain recoverable during catalogue changes.
