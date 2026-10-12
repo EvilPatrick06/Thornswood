@@ -251,9 +251,9 @@ if (block) {
           anything outside Skyrim.esm with Game.getFormFromFile. The table is
           the same pair, so they are compared as pairs.
         */
-        const inPlugin = (listed[1].match(/\['([^']+)',\s*(0x[0-9a-f]+)\]/g) || [])
+        const inPlugin = (listed[1].match(/\['([^']+)',\s*(0x[0-9a-f]+)(?:,\s*'craft')?\]/g) || [])
           .map(function (t) {
-            const m = /\['([^']+)',\s*(0x[0-9a-f]+)\]/.exec(t);
+            const m = /\['([^']+)',\s*(0x[0-9a-f]+)/.exec(t);
             return m[1].toLowerCase() + ':' + parseInt(m[2], 16);
           }).sort();
         const inTable = fires.fires.map(function (f) {

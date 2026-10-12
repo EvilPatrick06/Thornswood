@@ -169,9 +169,85 @@ if ($src.ToLower().EndsWith('.enc')) {
   Say '  not encrypted, so there is nothing to check' 'Yellow'
 }
 
+# ------------------------------------------------------ the entry policy ----
+# Issue #2199. What a backup zip may hold, decided here and not left to how a
+# given .NET happens to extract. Every entry is checked before one byte is
+# written, and the first that breaks a rule refuses the whole backup with a
+# named reason:
+#
+#   kind       a plain file or a folder. A symlink, a device, a fifo or a
+#              Windows reparse point (by the entry's external attributes) is
+#              refused: the backup never makes one
+#   name       relative, made of ordinary path parts: no drive or colon (which
+#              is also a Windows alternate stream), no leading slash, no '.'
+#              or '..' part, no empty part (a doubled slash), no control or
+#              <>"|?* characters, no part ending in a dot or a space, no
+#              reserved device name (CON, NUL, COM1 ...)
+#   inside     the resolved path stays beneath the folder it unpacks into
+#   unique     no two entries land on one path once slashes and case are
+#              folded, and no file sits where a folder has to be
+#   size       at most 200000 entries, names at most 1024 characters, parts
+#              at most 255
+#
+# Returns one record per entry: Entry, Name (as in the zip), Rel, Dir.
+function Test-ThornswoodBackupEntries($Entries, [string]$Root) {
+  $rootFull = [IO.Path]::GetFullPath($Root).TrimEnd('\') + '\'
+  $list = @($Entries)
+  if ($list.Count -gt 200000) { throw ("oversized: " + $list.Count + " entries, more than 200000") }
+  $reserved = '^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\..*)?$'
+  $files = @{}; $dirs = @{}; $out = New-Object 'System.Collections.Generic.List[object]'
+  foreach ($en in $list) {
+    $name = [string]$en.FullName
+    $show = ($name -replace '[\x00-\x1f]', '?')
+    if ([string]::IsNullOrEmpty($name)) { throw 'bad name: an entry with no name' }
+    if ($name.Length -gt 1024) { throw ("oversized: an entry name of " + $name.Length + " characters") }
+    $attr = ([long]$en.ExternalAttributes) -band 0xFFFFFFFFL
+    $unix = ($attr -shr 16) -band 0xF000
+    if ($unix -ne 0 -and $unix -ne 0x8000 -and $unix -ne 0x4000) { throw ("unsupported entry type: '" + $show + "' is not a plain file or folder (mode 0x" + ('{0:X}' -f $unix) + ")") }
+    if (($attr -band 0x400) -ne 0) { throw ("unsupported entry type: '" + $show + "' is a reparse point") }
+    if (($attr -band 0x40) -ne 0) { throw ("unsupported entry type: '" + $show + "' is a device") }
+    $isDir = $name -match '[\\/]$'
+    if ($isDir -and [long]$en.Length -ne 0) { throw ("unsupported entry type: '" + $show + "' is a folder with bytes in it") }
+    if ([IO.Path]::IsPathRooted($name) -or $name -match '^[\\/]' -or $name.Contains(':')) { throw ("outside the folder: '" + $show + "' is a rooted or drive name") }
+    $body = $name.TrimEnd([char[]]@([char]'\', [char]'/'))
+    foreach ($part in ($body -split '[\\/]')) {
+      if ($part -eq '') { throw ("bad name: '" + $show + "' has an empty part") }
+      if ($part -eq '.' -or $part -eq '..') { throw ("outside the folder: '" + $show + "' has a '" + $part + "' part") }
+      if ($part.Length -gt 255) { throw ("oversized: a part of '" + $show + "' is " + $part.Length + " characters") }
+      if ($part -match '[\x00-\x1f<>"|?*]') { throw ("bad name: '" + $show + "' has a character Windows does not allow") }
+      if ($part -match '[ .]$') { throw ("bad name: '" + $show + "' has a part ending in a dot or a space") }
+      if ($part -match $reserved) { throw ("bad name: '" + $show + "' uses the reserved name " + $part) }
+    }
+    $rel = $body -replace '/', '\'
+    $full = [IO.Path]::GetFullPath((Join-Path $rootFull $rel))
+    if (-not $full.StartsWith($rootFull, [StringComparison]::OrdinalIgnoreCase)) { throw ("outside the folder: '" + $show + "' resolves outside it") }
+    $key = $rel.ToLowerInvariant()
+    if ($isDir) {
+      if ($files.ContainsKey($key)) { throw ("collision: '" + $show + "' is a folder where '" + $files[$key] + "' is a file") }
+      $dirs[$key] = $name
+    } else {
+      if ($files.ContainsKey($key)) { throw ("collision: '" + $show + "' and '" + $files[$key] + "' land on the same file") }
+      if ($dirs.ContainsKey($key)) { throw ("collision: '" + $show + "' is a file where '" + $dirs[$key] + "' is a folder") }
+      $files[$key] = $name
+    }
+    $out.Add([pscustomobject]@{ Entry = $en; Name = $name; Rel = $rel; Dir = $isDir })
+  }
+  # A file may not sit where another entry needs a folder.
+  foreach ($k in (@($files.Keys) + @($dirs.Keys))) {
+    $p = $k
+    while (($i = $p.LastIndexOf('\')) -gt 0) {
+      $p = $p.Substring(0, $i)
+      if ($files.ContainsKey($p)) { throw ("collision: '" + $files[$p] + "' is a file where a folder is needed") }
+    }
+  }
+  return ,$out
+}
+
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $zf = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
 $entries = @($zf.Entries)
+try { [void](Test-ThornswoodBackupEntries $entries (Join-Path $Work ('.policy-' + [Guid]::NewGuid().ToString('N')))) }
+catch { $zf.Dispose(); Die ("The backup breaks the entry policy (#2199): " + $_.Exception.Message + ". Nothing was written.") }
 # Either slash: which one ZipFile writes has depended on the .NET version.
 $worldCount = @($entries | Where-Object { $_.FullName -match '^game[/\\]world[/\\]' }).Count
 $privCount  = @($entries | Where-Object { $_.FullName -match '^game[/\\]private[/\\]' }).Count
@@ -266,34 +342,47 @@ function Clear-RestoreStage {
 }
 $script:stageOwned = $false
 try {
-  # Every entry is checked before anything is made: a name that would land
-  # outside the folder, or a rooted one, refuses the backup.
+  # Every entry is checked against the entry policy (#2199) before anything is
+  # made. Then each one is written by this script, to the path the policy
+  # resolved, never by ExtractToDirectory: the runtime's own extraction is not
+  # the policy, and has differed between .NET versions.
   $zf = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
   try {
     $probe = Join-Path $toParent ('.restore-probe-' + [Guid]::NewGuid().ToString('N'))
-    $probeRoot = [IO.Path]::GetFullPath($probe).TrimEnd('\') + '\'
+    $plan = Test-ThornswoodBackupEntries @($zf.Entries) $probe
     $want = @{}
-    foreach ($en in @($zf.Entries)) {
-      $name = $en.FullName
-      if ([string]::IsNullOrEmpty($name) -or [IO.Path]::IsPathRooted($name) -or $name -match '^[\\/]' -or $name -match '(^|[\\/])\.\.([\\/]|$)') {
-        throw ("the entry '" + $name + "' would land outside the folder it is unpacked into")
-      }
-      $full = [IO.Path]::GetFullPath((Join-Path $probe $name))
-      if (-not $full.StartsWith($probeRoot, [StringComparison]::OrdinalIgnoreCase)) {
-        throw ("the entry '" + $name + "' would land outside the folder it is unpacked into")
-      }
-      if ($name -notmatch '[\\/]$') { $want[($name -replace '/', '\')] = @{ Length = [long]$en.Length } }
+    foreach ($p in $plan) { if (-not $p.Dir) { $want[$p.Rel] = @{ Length = [long]$p.Entry.Length } } }
+
+    $cur = $toParent
+    $missing = @()
+    while ($cur -and -not (Test-Path -LiteralPath $cur)) { $missing = @($cur) + $missing; $cur = Split-Path -Parent $cur }
+    foreach ($d in $missing) { [void][IO.Directory]::CreateDirectory($d); $madeParents.Add($d) }
+    $stage = Join-Path $toParent ('.' + (Split-Path -Leaf $To) + '.restore-' + [Guid]::NewGuid().ToString('N'))
+    [void][IO.Directory]::CreateDirectory($stage)
+    $script:stageOwned = $true
+    $stageFull = [IO.Path]::GetFullPath($stage).TrimEnd('\') + '\'
+    $buf = New-Object byte[] 81920
+    foreach ($p in $plan) {
+      $dest = [IO.Path]::GetFullPath((Join-Path $stageFull $p.Rel))
+      if (-not $dest.StartsWith($stageFull, [StringComparison]::OrdinalIgnoreCase)) { throw ("outside the folder: '" + $p.Name + "' resolves outside it") }
+      if ($p.Dir) { [void][IO.Directory]::CreateDirectory($dest); continue }
+      [void][IO.Directory]::CreateDirectory((Split-Path -Parent $dest))
+      $limit = [long]$p.Entry.Length
+      $in = $p.Entry.Open()
+      try {
+        # CreateNew: a second write to one path is refused, never an overwrite.
+        $outF = New-Object IO.FileStream($dest, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+        try {
+          $total = 0L
+          while (($n = $in.Read($buf, 0, $buf.Length)) -gt 0) {
+            $total += $n
+            if ($total -gt $limit) { throw ("unpacked " + $p.Rel + " past the " + $limit + " bytes the zip says") }
+            $outF.Write($buf, 0, $n)
+          }
+        } finally { $outF.Dispose() }
+      } finally { $in.Dispose() }
     }
   } finally { $zf.Dispose() }
-
-  $cur = $toParent
-  $missing = @()
-  while ($cur -and -not (Test-Path -LiteralPath $cur)) { $missing = @($cur) + $missing; $cur = Split-Path -Parent $cur }
-  foreach ($d in $missing) { [void][IO.Directory]::CreateDirectory($d); $madeParents.Add($d) }
-  $stage = Join-Path $toParent ('.' + (Split-Path -Leaf $To) + '.restore-' + [Guid]::NewGuid().ToString('N'))
-  [void][IO.Directory]::CreateDirectory($stage)
-  $script:stageOwned = $true
-  [System.IO.Compression.ZipFile]::ExtractToDirectory($zipPath, $stage)
 
   # The staged tree is what will be published, so it is the one checked.
   $stageRoot = [IO.Path]::GetFullPath($stage).TrimEnd('\') + '\'

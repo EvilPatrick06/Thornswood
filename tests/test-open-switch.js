@@ -88,11 +88,12 @@ function standingWith(open, roleIds) {
     access: { admin: ['Owner', 'Dev'], play: S.playRoles(PLAY, open), banned: ['Banned'],
               dev: ['Owner', 'Dev'], jarl: ['Jarl'] }
   };
-  const make = new Function('cfg', 'jsonFile', 'BANS', 'memberOf', 'roleNames',
+  // standing() reads bans through bansNow() since #2186.
+  const make = new Function('cfg', 'jsonFile', 'BANS', 'memberOf', 'roleNames', 'bansNow', 'BANS_BROKEN_WHY',
                             stSrc + '\nreturn standing;');
   const standing = make(cfg, () => ({}), 'bans.json',
     async () => ({ ok: true, body: { roles: roleIds, user: { username: 'ann' } } }),
-    async () => ROLE_IDS);
+    async () => ROLE_IDS, () => ({ table: {}, broken: '' }), '');
   return standing('123');
 }
 

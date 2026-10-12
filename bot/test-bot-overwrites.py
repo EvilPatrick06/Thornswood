@@ -686,8 +686,8 @@ try:
         gets_in(resolve(g, boss, tasks)))
     yes('  written once, on that channel and no other',
         len(theirs) == 1 and theirs[0][1] is tasks)
-    yes('  and #test-results is not one of them, so pathfind is not widened '
-        'everywhere', not resolve(g, boss, by_name['test-results']).view_channel)
+    yes('  and #test-findings is not one of them, so pathfind is not widened '
+        'everywhere', not resolve(g, boss, by_name['test-findings']).view_channel)
     yes('  nor is any staff channel or the one made by hand, because the role '
         'is not in STAFF',
         not resolve(g, boss, by_name['staff-general']).view_channel

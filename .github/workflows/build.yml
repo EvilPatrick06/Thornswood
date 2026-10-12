@@ -13,7 +13,10 @@
 # The harnesses were all written to be run by hand and none of them had ever
 # run here: 236 checks across twelve files, sitting in the repo going stale.
 #
-# WHERE IT RUNS. On the VPS, since 25 September: GitHub's own runners were
+# WHERE IT RUNS NOW (#1306, 11 October): GitHub's hosted Windows runner by
+# default, the VPS only as a fallback; see the jobs below. The history:
+#
+# WHERE IT RAN. On the VPS, from 25 September: GitHub's own runners were
 # blocked on billing and every run failed in seconds, and Patrick chose a
 # runner on the box over paying for minutes (issue #437).
 # scripts\deploy\Install-Runner.ps1 puts it there, as its own local account that is
@@ -24,8 +27,12 @@
 # the queue reached an hour when the lanes opened pull requests in bursts.
 # Install-Runner.ps1 -Number <n> puts each one after the first beside it with
 # the same label, so a check goes to whichever is free.
-# Safe because the repository is private: nobody outside the team can open a
-# pull request that runs code on the box.
+# NOT PULL REQUESTS, since 11 October (#1306, Patrick's option C; #2161): a
+# pull request runs these same steps on GitHub's hosted Windows runner, in
+# build-pr.yml, which scripts\dev\Build-PrWorkflow.js generates from this
+# file. Only a push to main, already merged, and a manual run use the box.
+# Change a step here, then run  node scripts/dev/Build-PrWorkflow.js;
+# tests\test-1306-pr-workflow.js fails while the two differ.
 #
 # WHY THE ACTIONS ARE PINNED. Every action is named by a full length commit
 # SHA, with the tag it was on in a comment at the end of the line, the same as
@@ -61,10 +68,15 @@
 # once this is green and it has been said in #staff-general.
 name: Build check
 on:
-  pull_request:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      runner:
+        description: 'hosted (GitHub, the default) or vps (the box, the fallback)'
+        type: choice
+        options: [hosted, vps]
+        default: hosted
 permissions:
   contents: read
 # One run per branch at a time. A newer push cancels the run it replaces, so
@@ -73,13 +85,41 @@ concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  launcher:
-    name: Launcher builds
+  # WHERE IT RUNS, since 11 October (#1306, Patrick's final call on #2161):
+  # GitHub's hosted windows-latest is the default, in the job "launcher"
+  # at the end of this file. This job is the VPS FALLBACK. It runs only
+  # for a trusted event (this file has no pull_request trigger: a pull
+  # request builds in build-pr.yml, hosted only), and only when
+  #   - the repository variable BUILD_RUNNER is vps (hosted minutes ran out,
+  #     or GitHub is down: Settings, Variables, BUILD_RUNNER = vps), or
+  #   - a manual run asked for runner: vps, or
+  #   - the hosted job failed. A quota or billing stop fails it before any
+  #     step runs, and this picks the build up on the box. A real red fails
+  #     here too, so a broken main shows red twice; that is the price of not
+  #     telling a quota stop from a test failure.
+  # The steps are the hosted job's own, by the YAML anchor checks, so the two
+  # can never test different things.
+  launcher-vps:
+    name: Launcher builds (VPS fallback)
+    needs: launcher
+    if: ${{ always() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}
     runs-on: [self-hosted, Windows, thornswood-vps]
-    # About two minutes on the VPS. Past this it is stuck, not slow.
+    # About fifteen minutes on the VPS. Past this it is stuck, not slow.
     timeout-minutes: 20
-    steps:
+    steps: &checks
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # The hosted image ships whatever node and python it has this month;
+      # these are pinned so a check means the same thing as on the VPS, which
+      # has its own and skips them.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: runner.environment == 'github-hosted'
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        if: runner.environment == 'github-hosted'
+        with:
+          python-version: '3.12'
 
       - name: Scan the tree for secrets
         shell: pwsh
@@ -197,6 +237,21 @@ jobs:
             exit 1
           }
 
+      - name: Check the high-risk records
+        shell: pwsh
+        run: |
+          # Issue #2180. records\server-build.json, client-build.json,
+          # most-online.json and collection-plugins.json must each be a version
+          # this checkout knows, with every field its readers depend on
+          # (scripts\release\RecordShape.ps1). The deploys refuse a record that
+          # is not; this says so at merge instead. Reads four files, under a
+          # second. Fail closed, like the steps above.
+          .\scripts\release\Check-Records.ps1
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::error file=records/server-build.json::a high-risk record is at a version this checkout does not know, or is missing a field its readers need; the lines above say which'
+            exit 1
+          }
+
       - name: Run the harnesses that went red unseen
         shell: pwsh
         run: |
@@ -289,7 +344,7 @@ jobs:
                  'test-downgrade-steam-window.ps1', 'test-address-library.ps1', 'test-vortex-folder.ps1',
                  'test-new-box-runbook.ps1', 'test-remote-header.ps1',
                  'test-vps-defaults.ps1', 'test-runner-lock.ps1', 'test-runner-offbox.ps1', 'test-restore-staging.ps1', 'test-deploy-artifact.ps1', 'test-deploy-records.js',
-                 'test-own-folder-alone.ps1', 'test-own-folder-first.ps1', 'test-own-folder-again.ps1', 'test-setup-game-files.ps1', 'test-setup-robocopy.ps1', 'test-sign-pilot.ps1', 'test-discord-announced-shared.ps1', 'test-check-build.ps1', 'test-client-build-record.ps1', 'test-npc-runtime.js',
+                 'test-own-folder-alone.ps1', 'test-own-folder-first.ps1', 'test-own-folder-again.ps1', 'test-setup-game-files.ps1', 'test-setup-robocopy.ps1', 'test-sign-pilot.ps1', 'test-prod-parity.ps1', 'test-runner-isolation.ps1', 'test-discord-announced-shared.ps1', 'test-check-build.ps1', 'test-client-build-record.ps1', 'test-npc-runtime.js',
                  'test-mold-key.js', 'test-putback-flora.js', 'test-staff-spells.js', 'test-join-pass-trust.js',
                  'test-npc-shared-runtime.js', 'test-npc-navigation-equivalence.js', 'test-npc-population-runtime.js',
                  'test-shared-resource-stock.js', 'test-resource-stock-integration.js',
@@ -312,6 +367,11 @@ jobs:
                  'test-1621-quest-state.js',
                  'test-unpin.js', 'test-coffers.js',
                  'test-1383-injury.js',
+                 'test-chat-log.js',
+                 'test-2260-burn-relog.js',
+                 'test-2259-forge-burn.js',
+                 'test-1306-pr-workflow.js',
+                 'test-2261-tome-refused.js',
                  'test-1383-treatments.js',
                  'test-1384-condition.js',
                  'test-1385-perks.js',
@@ -338,7 +398,7 @@ jobs:
                  'test-1588-tools-50.js',
                  'test-1741-encoding.js',
                  'test-1634-apprentice-gui.js',
-                 'test-1637-door-gui.js',
+                 'test-1637-door-gui.js', 'test-2250-claim-door.js', 'test-2256-locked-for-everyone.js', 'test-2245-drawn-pick.js', 'test-item-names.js', 'test-2255-key-mold-models.js',
                  'test-1636-farm-gui.js',
                  'test-1394-fares.js',
                  'test-1635-ride-panel.js',
@@ -434,8 +494,8 @@ jobs:
                  'test-join-outage.js', 'test-join-pass-site.js', 'test-open-switch.js', 'test-component-readmes.js',
                  'test-site-front-resilience.js', 'test-site-upload-guard.js',
                  'test-report-limits.js', 'test-site-hangs.js',
-                 'test-site-oauth-gaps.js', 'test-site-escaping.js', 'test-2185-site-bind.js', 'test-2193-hero-video.js', 'test-2187-signin-addr.js', 'test-2192-age-expiry.js', 'test-2189-log-rotation.js', 'test-2188-board-revision.js', 'test-2235-dev-ship-guard.ps1', 'test-2243-installer-throw.ps1', 'test-swap-helpers.ps1',
-                 'test-backup-restore.ps1', 'test-backup-streaming.ps1',
+                 'test-site-oauth-gaps.js', 'test-site-escaping.js', 'test-2185-site-bind.js', 'test-2193-hero-video.js', 'test-2187-signin-addr.js', 'test-2192-age-expiry.js', 'test-2189-log-rotation.js', 'test-2188-board-revision.js', 'test-2235-dev-ship-guard.ps1', 'test-2243-installer-throw.ps1', 'test-2251-key-press-log.js', 'test-swap-helpers.ps1',
+                 'test-backup-restore.ps1', 'test-backup-streaming.ps1', 'test-fetch-verify-all.ps1', 'test-2199-zip-policy.ps1',
                  'test-content-release.ps1',
                  'test-cooldown-sweep.js', 'test-voice-moved-clients.js',
                  'test-release-parity.ps1', 'test-dev-version.ps1', 'test-ship-launcher-reuse.ps1',
@@ -460,7 +520,8 @@ jobs:
                  'test-ship-dry-run.ps1',
                  'test-launcher-icons.js',
                  'test-whose-game-gate.js',
-                 'test-gate-list.ps1'
+                 'test-gate-list.ps1',
+                 'test-storage-forecast.ps1'
           $failed = @()
           foreach ($n in $six) {
             $p = Join-Path 'tests' $n
@@ -697,3 +758,15 @@ jobs:
       # No pdb artifact (#1356 / #462): the pdb carries absolute build-machine
       # source paths. Packs and the installer already skip *.pdb. Keep the exe
       # above; leave the pdb on the runner only.
+
+  # The default: GitHub's hosted Windows runner (#1306). Skipped when
+  # BUILD_RUNNER is vps or a manual run asked for the box, and then the
+  # fallback above runs instead.
+  launcher:
+    name: Launcher builds
+    if: ${{ vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}
+    runs-on: windows-latest
+    # The hosted runner has two cores: the harness step alone took over
+    # eighteen minutes on it, so it gets an hour.
+    timeout-minutes: 60
+    steps: *checks

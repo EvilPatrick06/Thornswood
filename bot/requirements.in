@@ -1,0 +1,6 @@
+# What the bot names directly (issue #2190). bot\requirements.txt is generated
+# from this file with every library the bot pulls in, each pinned by hash; the
+# command is at the top of that file. Change a version here, then regenerate.
+discord.py==2.7.1
+pillow==12.3.0
+certifi==2026.7.22

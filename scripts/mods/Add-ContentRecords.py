@@ -264,6 +264,16 @@ DEED = 0x5015493
 # as the deed is: "Key to Breezehome", "Key mold for Honeyside".
 KEY = 0x5015494
 MOLD = 0x5015495
+
+# WHAT THEY LOOK LIKE (#2255). Both were cloned from the charcoal MISC and kept
+# its mesh, so a key and a mold were the same stick of charcoal in the pack and
+# on the ground: "the key item isn't a key and is the same block log item as the
+# mold". Both now wear vanilla meshes from Skyrim.esm, so still no new art ships:
+# the key the 191 KEYM records in Skyrim.esm use most, and the silver mold the
+# Thieves Guild quest uses (MISC TGTQ01SilverMold). The MODT that came with the
+# charcoal is texture data for the charcoal's mesh, so it goes with it.
+KEY_MODEL = 'Clutter\\Key01.nif'
+MOLD_MODEL = 'Clutter\\SilverMold01.nif'
 RECIPE_MOLD = 0x5015496
 RECIPE_KEY = 0x5015497
 
@@ -474,6 +484,24 @@ def clone(src, fid, editor_id, sets=None, after=None, drop=None):
             out.extend(after[t])
     out = [(t, zstr(editor_id)) if t == b'EDID' else (t, b) for t, b in out]
     return Rec(src.tag, src.flags, fid, src.extra, pack_subrecords(out))
+
+
+def set_model(rec, model):
+    """The record's MODL set to model and the old mesh's MODT/MODS dropped.
+    True when that changed anything, so a second run is not an edit."""
+    pairs = subrecords(rec.data)
+    want = zstr(model)
+    out = []
+    for t, b in pairs:
+        if t in (b'MODT', b'MODS'):
+            continue
+        out.append((t, want) if t == b'MODL' else (t, b))
+    if not any(t == b'MODL' for t, _ in pairs):
+        raise SystemExit('0x%07X has no MODL to set' % rec.fid)
+    if out == pairs:
+        return False
+    rec.data = pack_subrecords(out)
+    return True
 
 
 def set_inputs(rec, items):
@@ -742,10 +770,12 @@ def main():
         b'FULL': zstr('Key'),
         b'DATA': struct.pack('<If', 0, 0.0),
     })
+    set_model(key, KEY_MODEL)
     mold = clone(misc_src, MOLD, 'ThornswoodMiscKeyMold', sets={
         b'FULL': zstr('Key Mold'),
         b'DATA': struct.pack('<If', 25, 1.0),
     })
+    set_model(mold, MOLD_MODEL)
     # THE MOLD AND THE KEY ARE BOTH MADE BY A SMITH, WHICH IS WHAT MAKES THE
     # CHAIN START AT ALL.
     #
@@ -1014,6 +1044,10 @@ def main():
         edited.add(rec.fid)
     if block is not None and EXECUTION_BLOCK not in removing and drop_script(block):
         edited.add(block.fid)
+    # A key and a mold already in the plugin get their own meshes (#2255).
+    for name, model in (('ThornswoodMiscKey', KEY_MODEL), ('ThornswoodMiscKeyMold', MOLD_MODEL)):
+        if name in already and set_model(by_edid[name], model):
+            edited.add(by_edid[name].fid)
     if not built and not edited and not removing:
         print('')
         print('  Everything this adds is already in the plugin. Nothing was written.')
