@@ -109,6 +109,9 @@ function Put-Asset([string]$file) {
 }
 function Url([string]$sha) { return "https://thornswood.net/feed-dev/assets/$sha" }
 function Read-Feed { return (([IO.File]::ReadAllText((Join-Path $feedDir 'version.json'))) -replace '^﻿', '') | ConvertFrom-Json }
+# The list a rollback reads, the store's releases.json beside the feed since
+# #1050 (Release-Baseline.ps1), merged with any the feed still carries.
+function Read-Releases { return @(Get-StoreReleases $feedDir (Read-Feed)) }
 function Write-Feed($doc) { [IO.File]::WriteAllText((Join-Path $feedDir 'version.json'), ($doc | ConvertTo-Json -Depth 6), $utf8) }
 function Feed-Sha { return (Get-BaselineFileSha (Join-Path $feedDir 'version.json')) }
 # A pack the way Publish-Update builds one: delete.txt, game/<path>, and the
@@ -413,14 +416,15 @@ Yes 'a note the notes may not carry is refused before anything is sent' ($r.Code
 $RB = '20260904-1000-dev'
 $r = Rollback @('-Back', '1', '-Id', $RB); Show $r
 $d = Read-Feed
-Yes '-Back 1 puts the feed back to the second release' ($r.Code -eq 0 -and [string]$d.baseline.id -eq $RB -and [string]$d.releases[0].to -eq $R2)
+Yes '-Back 1 puts the feed back to the second release' ($r.Code -eq 0 -and [string]$d.baseline.id -eq $RB -and [string](Read-Releases)[0].to -eq $R2)
+Yes '  and the list it goes back from is the store''s now, not the feed''s (#1050)' (-not $d.PSObject.Properties['releases'] -and (Test-Path -LiteralPath (Join-Path $feedDir 'releases.json')))
 Yes '  as one more pack on the end of the feed, at its own sha256 on the site' (
     [string]@($d.packs)[-1].id -eq $RB -and [string]@($d.packs)[-1].url -eq (Url ([string]@($d.packs)[-1].sha256)) -and
     (Get-BaselineFileSha (Join-Path $feedDir ("assets\" + [string]@($d.packs)[-1].sha256))) -eq [string]@($d.packs)[-1].sha256)
 Yes '  the launcher, minLauncher and the client runtime on the feed do not move' (Test-Kept $d)
 Yes '  the store''s baseline is the record the feed now names' ((Get-BaselineFileSha (Join-Path $feedDir 'published.json')) -eq [string]$d.baseline.sha256)
 Yes '  the note says what happened and passes the note rules' ([string]$d.news[0].title -match '^The game files go back' -and @(Get-NoteProblems ([string]@($d.packs)[-1].notes)).Count -eq 0)
-$bad = @(Get-ReleaseDisagreements $d)
+$bad = @(Get-ReleaseDisagreements $d (Read-Releases))
 Yes '  "release" names the rollback: its id, the launcher the feed keeps, its one pack, its baseline, no commit and no tag' (
     [string]$d.release.id -eq $RB -and [string]$d.release.channel -eq 'dev' -and [string]$d.release.launcherVersion -eq '1.1.102.5' -and
     (@($d.release.packs | ForEach-Object { [string]$_ }) -join ',') -eq $RB -and [string]$d.release.baseline -eq $RB -and
@@ -464,7 +468,7 @@ $RA = '20260904-1200-dev'
 $r = Rollback @('-To', $R1, '-Id', $RA); Show $r
 $d = Read-Feed
 Yes 'going back to a file only the installer ever had works from its sha256 on the site, with no -FilesFrom' (
-    $r.Code -eq 0 -and [string]$d.baseline.id -eq $RA -and [string]$d.releases[0].to -eq $R1 -and (Test-Kept $d))
+    $r.Code -eq 0 -and [string]$d.baseline.id -eq $RA -and [string](Read-Releases)[0].to -eq $R1 -and (Test-Kept $d))
 Yes '  the launcher lands on the first release''s files, the installer''s back and the later ones gone' ((Update-Install $A) -eq 1 -and (Test-Lands $A $records[$R1]))
 Yes '  with the first release''s plugin list' ((Plugins-Of $A) -eq "*thornswood-a.esp`r`n*thornswood-new1.esp`r`n")
 Yes '  and the client runtime still the launcher''s, not the first release''s' ((Client-Of $A) -eq (Entry 'client 2'))
@@ -474,11 +478,11 @@ Yes '  the offline one lands there as well' ((Update-Install $B) -eq 1 -and (Tes
 $RF = '20260904-1300-dev'
 $r = Rollback @('-To', $R3, '-Id', $RF); Show $r
 $d = Read-Feed
-Yes '-To the third release puts the feed forward again' ($r.Code -eq 0 -and [string]$d.releases[0].to -eq $R3 -and (Test-Kept $d))
+Yes '-To the third release puts the feed forward again' ($r.Code -eq 0 -and [string](Read-Releases)[0].to -eq $R3 -and (Test-Kept $d))
 Yes '  and "release" names that rollback, with nothing disagreeing' (
     [string]$d.release.id -eq $RF -and [string]$d.release.launcherVersion -eq '1.1.102.5' -and
     (@($d.release.packs | ForEach-Object { [string]$_ }) -join ',') -eq $RF -and [string]$d.release.baseline -eq $RF -and
-    [string]$d.release.commit -eq '' -and [string]$d.release.tag -eq '' -and @(Get-ReleaseDisagreements $d).Count -eq 0)
+    [string]$d.release.commit -eq '' -and [string]$d.release.tag -eq '' -and @(Get-ReleaseDisagreements $d (Read-Releases)).Count -eq 0)
 Yes '  every launcher lands on the third release''s files' (
     (Update-Install $A) -eq 1 -and (Test-Lands $A $records[$R3]) -and (Update-Install $B) -eq 1 -and (Test-Lands $B $records[$R3]) -and
     (Update-Install $C) -eq 2 -and (Test-Lands $C $records[$R3]))
@@ -493,12 +497,13 @@ foreach ($k in @($fwd.Keys)) { if (-not $k.StartsWith(':gone:') -and -not $k.Sta
 Yes '  the record it names is the third release''s, with the launcher''s own source, what it takes out, and :record:files' (
     (Get-BaselineFileSha (Join-Path $feedDir 'published.json')) -eq [string]$d.baseline.sha256 -and $same -and
     [string]$fwd[':gone:Data\Platform\UI\thornswood-new1.esp'] -eq 'removed' -and [string]$fwd[$RecordFilesKey] -eq '1')
-Yes 'the list names every step, newest first' ((@($d.releases | ForEach-Object { [string]$_.id }) -join ',') -eq "$RF,$RA,$RB,$R3,$R2,$R1")
+Yes 'the list names every step, newest first' ((@(Read-Releases | ForEach-Object { [string]$_.id }) -join ',') -eq "$RF,$RA,$RB,$R3,$R2,$R1")
 $r = Rollback @('-Back', '1', '-DryRun', '-Id', '20260904-1400-dev')
 Yes '-Back 1 from there is the release before it in the list' ($r.Code -eq 0 -and $r.Out -match ("going to " + [regex]::Escape($RA)))
 
 # A feed that names no releases: nothing to go back to.
 $d.PSObject.Properties.Remove('releases'); Write-Feed $d
+Remove-Item -LiteralPath (Join-Path $feedDir 'releases.json') -Force -ErrorAction SilentlyContinue
 $before = Feed-Sha
 $r = Rollback @('-Back', '1')
 Yes 'a feed that names no releases is refused and left alone' ($r.Code -eq 1 -and (Feed-Sha) -eq $before)

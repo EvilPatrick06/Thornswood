@@ -2,17 +2,21 @@
   DeployedBuild.ps1
 
   What each server actually runs, where the site can read it. After a
-  successful server deploy (or put-back), Deploy-Server.ps1 calls
-  Save-ThornswoodDeployedBuild. On the box, that reads the server root's own
-  server-build.json (the record that went up with the files) and sets that
-  channel's entry in the docs app's data\deployed-build.json:
+  successful server deploy (or put-back), Deploy-Server.ps1 and
+  Publish-Server.ps1 call Save-ThornswoodDeployedBuild, on either channel. On
+  the box, that reads the server root's own server-build.json (the record
+  that went up with the files) and sets that channel's entry in the docs
+  app's data\deployed-build.json:
 
     { "live": { "commit": "<40 hex>", "binary": "...", "sha256": "...", "at": "<UTC>" },
       "dev":  { ... } }
 
-  site/server.js reads that file each time /credits is served and fills the
-  "Both servers still run" sentence from it. With no file, or one it cannot
-  read, the page keeps its hand-written text.
+  Until #2303 only Deploy-Server.ps1 called it, and an engine reaches the dev
+  server through Publish-Server.ps1 -Channel dev, so on 11 Oct the file held
+  live alone. site/server.js reads that file each time /credits is served and
+  says what it holds for each server, one or both. With no file, one it cannot
+  read, or neither server in it, the page keeps its hand-written text, which
+  names no commit.
 
   Writing it never fails a deploy: the server is already swapped in and
   answering by then, so a problem here is printed and the deploy goes on.

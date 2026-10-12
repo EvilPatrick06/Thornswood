@@ -72,6 +72,7 @@ $bare = @()
 $calls = 0
 $secretCalls = 0
 $helperCalls = 0
+$contentCalls = 0
 foreach ($f in $files) {
     $tokens = $null; $errors = $null
     $ast = [System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$tokens, [ref]$errors)
@@ -124,7 +125,25 @@ foreach ($f in $files) {
                         ($v -is [System.Management.Automation.Language.VariableExpressionAst] -and $strictVars.ContainsKey($v.VariablePath.UserPath.ToLowerInvariant()))) { $okS = $true }
                 }
             }
-            if (-not $okS -and $f.Name -notin @('Send-Script.ps1', 'Send-Secret.ps1', 'Artifact.ps1')) { $bare += ('{0}:{1} ({2})' -f (Rel $f.FullName), $c.Extent.StartLineNumber, $name) }
+            # ServerContent.ps1 (#2334) passes its caller's array through, the
+            # way Artifact.ps1 does; its callers are checked just below.
+            if (-not $okS -and $f.Name -notin @('Send-Script.ps1', 'Send-Secret.ps1', 'Artifact.ps1', 'ServerContent.ps1')) { $bare += ('{0}:{1} ({2})' -f (Rel $f.FullName), $c.Extent.StartLineNumber, $name) }
+            continue
+        }
+        if ($name -eq 'Read-ThornswoodServerContent') {
+            # Its own -SshArgs defaults to the strict array, so a caller that
+            # leaves it out is strict; one that passes it hands a strict array.
+            $contentCalls++
+            for ($i = 0; $i -lt $c.CommandElements.Count - 1; $i++) {
+                $e = $c.CommandElements[$i]
+                if ($e -is [System.Management.Automation.Language.CommandParameterAst] -and $e.ParameterName -eq 'SshArgs') {
+                    $v = $c.CommandElements[$i + 1]
+                    if (-not ($v.Extent.Text -match 'StrictHostKeyChecking=yes' -or
+                        ($v -is [System.Management.Automation.Language.VariableExpressionAst] -and $strictVars.ContainsKey($v.VariablePath.UserPath.ToLowerInvariant())))) {
+                        $bare += ('{0}:{1} ({2})' -f (Rel $f.FullName), $c.Extent.StartLineNumber, $name)
+                    }
+                }
+            }
             continue
         }
         if (@('ssh', 'scp', 'sftp', 'ssh.exe', 'scp.exe', 'sftp.exe') -notcontains $name.ToLowerInvariant()) { continue }
@@ -146,6 +165,8 @@ Yes ('every ssh, scp and sftp call carries StrictHostKeyChecking=yes' + $(if ($b
 Yes ("  and there are real calls to check ($calls found)") ($calls -ge 60)
 Yes ("  every Invoke-ThornswoodRemote caller hands it a strict array ($helperCalls found)") ($helperCalls -ge 20)
 Yes ("  every Invoke-ThornswoodSecretRemote caller hands it a strict array ($secretCalls found)") ($secretCalls -ge 8)
+$contentDefault = [IO.File]::ReadAllText((Join-Path $repo 'scripts\deploy\ServerContent.ps1')) -match "\[string\[\]\]\`$SshArgs = @\('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes'\)"
+Yes ("  Read-ThornswoodServerContent defaults to the strict array, and its callers ($contentCalls found) hand it one") ($contentDefault -and $contentCalls -ge 3)
 
 # ---- 2b: Send-Secret.ps1 keeps its own guard ----------------------------------------
 # Whatever a caller passes, the secret goes only over a host-key-checked

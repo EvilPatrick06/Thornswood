@@ -174,6 +174,27 @@ try { `$h = Invoke-RestMethod 'http://127.0.0.1:$Port/health' -TimeoutSec 5; `$t
     }
 }
 
+<#
+  HOW MANY PEOPLE IT TAKES AT ONCE (#481). records\most-online.json is the one
+  place the numbers live, the world's seats and voice's, read through
+  MaxOnline.ps1 the way the deploys read the seats, before anything is sent:
+  a voice number under the seats stops here with the box untouched. It goes
+  on the service's command line as THORNSWOOD_VOICE_MOST. With no voice
+  number in the record the service is started without one, which is no cap,
+  and this says so.
+#>
+. (Join-Path $Here 'MaxOnline.ps1')
+$mostSet = ''
+if (-not $PutBack -and -not $Remove -and -not $Restart) {
+    try { $mostGot = Get-MostOnline } catch { Die $_.Exception.Message }
+    if ($mostGot.Voice -gt 0) {
+        $mostSet = "set THORNSWOOD_VOICE_MOST=$([int]$mostGot.Voice)&& "
+        Say ("  most people at once: {0}, from {1}" -f $mostGot.Voice, $mostGot.From) 'DarkGray'
+    } else {
+        Say ("  {0} gives no voice number, so the service takes everybody who comes" -f $mostGot.From) 'Yellow'
+    }
+}
+
 # ---------------------------------------------------------------- files -----
 # The voice artifact built above goes to the box's store first, and only
 # after its tree matches the commit (Assert-ThornswoodSourceIntegrity, issue
@@ -327,7 +348,7 @@ if ('$Bind' -eq '127.0.0.1') {
 # without it.
 `$roll = Join-Path '$Root' 'roll-log.ps1'
 `$psExe = Join-Path `$env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-`$cmd = ('/c "set THORNSWOOD_SITE=$Site&& set THORNSWOOD_VOICE_PORT=$Port&& set THORNSWOOD_VOICE_BIND=$Bind&& set THORNSWOOD_VOICE_AUTH=on&& set THORNSWOOD_CHAT_RANGE=$ChatRange&& $turnSet"{2}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{3}" -Path "{1}" & "{0}" voice-server.js >> "{1}" 2>&1"' -f `$node.Source, `$log, `$psExe, `$roll)
+`$cmd = ('/c "set THORNSWOOD_SITE=$Site&& set THORNSWOOD_VOICE_PORT=$Port&& set THORNSWOOD_VOICE_BIND=$Bind&& set THORNSWOOD_VOICE_AUTH=on&& set THORNSWOOD_CHAT_RANGE=$ChatRange&& $mostSet$turnSet"{2}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{3}" -Path "{1}" & "{0}" voice-server.js >> "{1}" 2>&1"' -f `$node.Source, `$log, `$psExe, `$roll)
 
 # The task as it is now, for the way back: a new install that does not answer
 # gets its old files AND its old settings back.

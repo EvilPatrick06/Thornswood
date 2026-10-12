@@ -63,7 +63,7 @@ Yes 'and the history comment names Distribution redistributables under that numb
 # Refresh used to re-link every !MustCopy Vortex file with Links<=1, which undid
 # Fix's light-flag Separates on plugins (CBBE.esp). Relink is Distribution only.
 Yes 'Refresh re-link of Vortex copies is scoped to Data\Platform\Distribution' (
-    $og.Contains('Links(dest) <= 1') -and
+    $og.Contains("!must && origin == 'V' && names <= 1") -and
     $og.Contains('f.Rel.StartsWith("Data\\Platform\\Distribution\\"') -and
     $og.Contains('Only Distribution: a broader !MustCopy re-link also') -and
     $og.Contains('CBBE.esp'))

@@ -278,7 +278,10 @@ if ($Note) {
   # A byte order mark is not JSON and ConvertFrom-Json stops on the first
   # character, which is the trap that has bitten every other reader of this file.
   $v = ConvertFrom-ThornswoodJson (Get-Content $vf -Raw) $vf
-  $n = @(PropList $v 'news')[0]
+  # The newest note, wherever the feed keeps them: "news", or the news file it
+  # names once every launcher it lets in reads one (Feed-News.ps1, #1050).
+  . (Join-Path $PSScriptRoot '..\release\Feed-News.ps1')
+  $n = @(Get-FeedNewsList $v $env:THORNSWOOD_TEST_SITE_DIR)[0]
   if (-not $n) { if (-not $Quiet) { Write-Host '  nothing to post' }; return }
 
   $title = Prop $n 'title'

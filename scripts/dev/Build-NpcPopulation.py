@@ -488,7 +488,7 @@ def write_catalogues(payload):
     summary = payload['summary']
     lines = ['# NPC population catalogue', '',
         'Generated from the winning records in the 48-plugin dev load order.',
-        'This is the authored policy prepared for the next dev release; release proof is recorded separately.', '',
+        'This is the policy release 1.2.3 runs on dev and main; release proof is recorded separately.', '',
         f"{summary['catalogued']:,} placements inspected; {summary['retained']:,} retained; {summary['excluded']:,} excluded.", '',
         'Named pets and named enemies are excluded even when their source record lacks the Unique flag.',
         'Merchant traders and exterior transport services remain available.', '',

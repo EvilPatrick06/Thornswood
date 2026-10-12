@@ -143,6 +143,13 @@ Yes 'something is held for revision 2' (@($ShipHeldForCollection).Count -gt 0)
 foreach ($h in $ShipHeldForCollection) {
     $p = [string]$h.Path
     $rel = $(if ($p.EndsWith('\')) { $p + 'x.nif' } else { $p })
+    if ([string]$h.ContentModel) {
+        # No revision settles it: it ships while the committed plugin names it
+        # (#2298), at every revision. tests\test-2298-held-board.ps1 has the rest.
+        Yes ("{0} ships at every revision while the content plugin names it" -f $rel) (
+            -not (Test-ShipNotOurs $rel 0) -and -not (Test-ShipNotOurs $rel 2) -and -not (Test-ShipNotOurs $rel 99))
+        continue
+    }
     Yes ("{0} ships until revision {1}" -f $rel, $h.Revision) (-not (Test-ShipNotOurs $rel 0) -and -not (Test-ShipNotOurs $rel 1))
     Yes ('  and not from revision {0}: {1}' -f $h.Revision, $h.Mod) ((Test-ShipNotOurs $rel ([int]$h.Revision)) -and (Test-ShipNotOurs $rel 3))
 }

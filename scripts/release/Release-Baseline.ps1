@@ -153,20 +153,80 @@ function Get-FeedBaselinePointer($doc) {
     return $b
 }
 
-function New-FeedBaselinePointer([string]$Id, [string]$Sha, [string]$Url, [int]$Entries) {
-    return [pscustomobject][ordered]@{ id = $Id; sha256 = $Sha.ToLowerInvariant(); url = $Url; entries = $Entries }
+# $Notes is the release note, Ship's whole note, title first. A launcher that
+# syncs to the record shows it on its update card (Sync.cs RecordDue, #1050):
+# once the packs are off the feed, their notes field is gone with them, and
+# this is where the card reads it instead. Left out when there is none.
+function New-FeedBaselinePointer([string]$Id, [string]$Sha, [string]$Url, [int]$Entries, [string]$Notes = '') {
+    $o = [ordered]@{ id = $Id; sha256 = $Sha.ToLowerInvariant(); url = $Url; entries = $Entries }
+    if ($Notes -and $Notes.Trim()) { $o['notes'] = $Notes.Trim() }
+    return [pscustomobject]$o
+}
+
+# ---- when the packs can go (#1050) -------------------------------------------
+#
+# Every launcher from the first one built with launcher\app\Sync.cs (#1154,
+# merged 29 Sep as 854aeeed) syncs the install to the release record and never
+# replays a pack: Updater.Pending offers the record and Sync marks every pack on
+# the feed applied without fetching one. So the packs are on the feed only for
+# launchers older than that, and those are below minLauncher on both channels:
+# Play is held for them and the site refuses them a join pass (#937). What they
+# can still do is update, and that never needed a pack: with no pack waiting
+# they are offered the launcher, take it through the signed self-update, and
+# the new one syncs. The first launcher with Sync.cs on each channel, read off
+# the release tags (git tag -l 'release/*' with the launcher each names):
+#   main  1.1.103    release/main/20261001-180012, the first main release after 854aeeed
+#   dev   1.1.102.8  release/dev/20260929-1129-dev; 1.1.102.7 the release before it had none
+# From the first release whose channel's minLauncher is at or above that
+# number, and whose last record already said every file of its own was on the
+# site (so its :gone: list carries what the packs took out, started from them),
+# the feed carries "packs": [] and no release adds one. [] rather than leaving
+# the field out: an empty list is a shape every launcher ever published reads.
+$FeedFirstSyncLauncher = @{ main = '1.1.103'; dev = '1.1.102.8' }
+
+# Two dotted versions compared part by part, the way Updater.IsNewer reads
+# them: 1, 0 or -1. $null when either is not digits and dots.
+function Compare-FeedVersion([string]$a, [string]$b) {
+    if ([string]$a -notmatch '^\d+(\.\d+)*$' -or [string]$b -notmatch '^\d+(\.\d+)*$') { return $null }
+    $x = @($a.Split('.') | ForEach-Object { [int64]$_ })
+    $y = @($b.Split('.') | ForEach-Object { [int64]$_ })
+    for ($i = 0; $i -lt [Math]::Max($x.Count, $y.Count); $i++) {
+        $u = if ($i -lt $x.Count) { $x[$i] } else { [int64]0 }
+        $v = if ($i -lt $y.Count) { $y[$i] } else { [int64]0 }
+        if ($u -ne $v) { if ($u -gt $v) { return 1 } else { return -1 } }
+    }
+    return 0
+}
+
+# True when every launcher the channel lets into the game ($MinLauncher, the
+# feed's minLauncher once this edit is out) syncs to the record, so the feed
+# need carry no pack. False for a minimum that is not a version.
+function Test-FeedPacksGone([string]$Channel, [string]$MinLauncher) {
+    $first = if ($Channel -eq 'dev') { $FeedFirstSyncLauncher['dev'] } else { $FeedFirstSyncLauncher['main'] }
+    $c = Compare-FeedVersion ([string]$MinLauncher).Trim() $first
+    return ($null -ne $c -and $c -ge 0)
 }
 
 # ---- every release's record, so a channel can be put back (#442) -------------
 #
-# "releases" in the feed is the record each release published, newest first,
-# each with lastPack: the id of the last pack on the feed once that release was
-# out, which is the pack holding the plugin list it shipped. Publish-Update adds
-# one per release (the release list block); Rollback-Feed.ps1 reads them to put
-# the channel back to one of them. No launcher reads it, and a launcher ignores
-# a field it does not know. The newest $FeedReleasesKeep are kept: about 200
-# bytes each.
+# The record each release published, newest first, each with lastPack: the id
+# of the last pack on the feed once that release was out, which is the pack
+# holding the plugin list it shipped ('' once the packs are gone; the record's
+# own :golden: entries hold it then). Publish-Update adds one per release (the
+# release list block); Rollback-Feed.ps1 reads them to put the channel back to
+# one of them, and Scrub-Feed.ps1 rewrites the ones it scrubs. No launcher reads
+# it. The newest $FeedReleasesKeep are kept: about 200 bytes each.
+#
+# WHERE IT IS KEPT (#1050). Until 12 Oct it was "releases" in version.json,
+# about 8 KB of a feed every launcher reads every thirty seconds, for scripts
+# only. It is releases.json in the channel's store on the VPS now, beside
+# published.json, received and sent through Feed-Store.ps1 with the feed and
+# never served (site\server.js answers only version.json and assets). A feed
+# that still carries "releases" (one written before this, or by a Ship from a
+# branch without it) is read as well and merged by id, and the next write takes
+# it out of the feed.
 $FeedReleasesKeep = 30
+$FeedReleasesFile = 'releases.json'
 
 # The id of the last pack on the feed, or '' when it lists none.
 function Get-FeedLastPackId($doc) {
@@ -202,14 +262,71 @@ function New-FeedReleaseEntry($Pointer, [string]$LastPack, [string]$To) {
     return [pscustomobject]$o
 }
 
+# When a release id says it was made, as yyyyMMddHHmmss, for putting two lists
+# in one order: ids are yyyyMMdd-HHmmss since #1057 and yyyyMMdd-HHmm before,
+# -dev on dev. '' for an id of any other shape.
+function Get-FeedReleaseTimeKey([string]$Id) {
+    $m = [regex]::Match([string]$Id, '^(\d{8})-(\d{4})(\d{2})?(?:$|-)')
+    if (-not $m.Success) { return '' }
+    $s = if ($m.Groups[3].Success) { $m.Groups[3].Value } else { '00' }
+    return ($m.Groups[1].Value + $m.Groups[2].Value + $s)
+}
+
+# The list as the store keeps it, in the channel's working folder $Dir
+# (Feed-Store.ps1), merged with any "releases" the feed $doc still carries:
+# one entry per id, the store's copy first, newest first by the time in the id
+# (both lists are in that order already; a rollback's id is the time it ran).
+# Never throws on a missing file; a store file that is not a JSON list is
+# named, because reading it as empty would lose every release it holds.
+function Get-StoreReleases([string]$Dir, $doc) {
+    $mine = @()
+    $f = if ($Dir) { Join-Path $Dir $FeedReleasesFile } else { '' }
+    if ($f -and (Test-Path -LiteralPath $f -PathType Leaf)) {
+        $text = ([IO.File]::ReadAllText($f)).TrimStart([char]0xFEFF)
+        if ($text.Trim()) {
+            $o = ConvertFrom-ThornswoodJson $text $f
+            $mine = @(Get-FeedReleases ([pscustomobject]@{ releases = @($o) }))
+        }
+    }
+    $theirs = @(Get-FeedReleases $doc)
+    $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    $rows = New-Object System.Collections.Generic.List[object]
+    $at = 0
+    foreach ($r in @($mine) + @($theirs)) {
+        if (-not $seen.Add([string]$r.id)) { continue }
+        $rows.Add([pscustomobject]@{ Key = (Get-FeedReleaseTimeKey ([string]$r.id)); At = $at; R = $r })
+        $at++
+    }
+    return @($rows | Sort-Object @{ Expression = 'Key'; Descending = $true }, @{ Expression = 'At'; Descending = $false } | ForEach-Object { $_.R })
+}
+
+# Writes the list into the store's working folder, as a JSON list, with no
+# byte order mark, for Send-FeedStore to send beside version.json.
+function Save-StoreReleases([string]$Dir, $List) {
+    $f = Join-Path $Dir $FeedReleasesFile
+    $json = ConvertTo-Json -InputObject @($List) -Depth 4
+    if (-not @($List).Count) { $json = '[]' }
+    [IO.File]::WriteAllText($f, $json, (New-Object Text.UTF8Encoding($false)))
+}
+
+# Takes "releases" out of the feed once the store holds them.
+function Remove-FeedReleasesField($doc) {
+    if ($null -ne $doc -and $doc.PSObject.Properties['releases']) { $doc.PSObject.Properties.Remove('releases') }
+}
+
 # Puts this release's record at the front of the list and keeps the newest
 # $Keep. Called BEFORE the feed's "baseline" is replaced: a feed that names a
 # baseline and no list yet (the first release after #442) starts the list with
 # that baseline, whose release ended at $LastPackBefore, the last pack on the
 # feed before this release added its own. $To names the release a rollback put
-# the channel back to.
-function Add-FeedRelease($doc, $Pointer, [string]$LastPack, [string]$LastPackBefore, [string]$To, [int]$Keep = $FeedReleasesKeep) {
-    $list = @(Get-FeedReleases $doc)
+# the channel back to. With $Dir (the channel's store working folder) the list
+# is the store's, merged with what the feed still carries, it is written there
+# as releases.json and "releases" comes out of the feed; without it the list
+# stays in the feed, as it was until #1050.
+function Add-FeedRelease($doc, $Pointer, [string]$LastPack, [string]$LastPackBefore, [string]$To, [int]$Keep = $FeedReleasesKeep, [string]$Dir = '') {
+    # Wrapped whole: an if hands its output back one item at a time, so one
+    # release would come back as that object, not a list of one.
+    $list = @(if ($Dir) { Get-StoreReleases $Dir $doc } else { Get-FeedReleases $doc })
     if (-not $list.Count) {
         $old = $null
         try { $old = Get-FeedBaselinePointer $doc } catch { $old = $null }
@@ -217,7 +334,10 @@ function Add-FeedRelease($doc, $Pointer, [string]$LastPack, [string]$LastPackBef
     }
     $list = @(New-FeedReleaseEntry $Pointer $LastPack $To) + @($list | Where-Object { [string]$_.id -ne [string]$Pointer.id })
     if ($Keep -gt 0 -and $list.Count -gt $Keep) { $list = @($list[0..($Keep - 1)]) }
-    if ($doc.PSObject.Properties['releases']) { $doc.releases = $list }
+    if ($Dir) {
+        Save-StoreReleases $Dir $list
+        Remove-FeedReleasesField $doc
+    } elseif ($doc.PSObject.Properties['releases']) { $doc.releases = $list }
     else { $doc | Add-Member -NotePropertyName 'releases' -NotePropertyValue $list }
     return $list
 }

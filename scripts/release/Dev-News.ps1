@@ -38,6 +38,7 @@
 
 . (Join-Path $PSScriptRoot 'Feed-Store.ps1')
 . (Join-Path $PSScriptRoot 'Release-Name.ps1')
+. (Join-Path $PSScriptRoot 'Feed-News.ps1')
 
 # ConvertFrom-Json hands back an object with only the keys the file had:
 # reading one that is not there throws under strict mode, and assigning one
@@ -165,11 +166,16 @@ function Update-DevNewsChannels($doc, $news, $mainDoc, [string]$sourceRepo) {
 # moved comes back, note by note, so a caller can say so and send only when
 # something did. A note with no channel at all reads the same as '' (main),
 # which is how the launcher reads it, so giving it '' is not a change.
-function Set-DevFeedMarks($doc, $mainDoc, [string]$SourceRepo) {
+#
+# Every note, wherever the feed keeps them (Feed-News.ps1, #1050): "news", and
+# the news file once the dev feed's minLauncher reads it. $SiteDir and
+# $SiteUrl are where that file is read from. The marked list is left whole in
+# "news"; whoever sends the feed puts it back the way the channel keeps it
+# (Set-FeedNewsList), as Update-DevFeedMarks below and Publish-Update do.
+function Set-DevFeedMarks($doc, $mainDoc, [string]$SourceRepo, [string]$SiteDir, [string]$SiteUrl = 'https://thornswood.net') {
     if ($null -eq $doc) { throw 'There is no dev feed to mark.' }
     if ($null -eq $mainDoc) { throw "There is no main feed to mark the dev feed against, so the dev marks were left alone." }
-    $news = @()
-    if ($doc.PSObject.Properties['news'] -and $doc.news) { $news = @($doc.news) }
+    $news = @(Open-FeedNewsList $doc (Get-FeedStoreSiteDir $SiteDir) $SiteUrl)
     $before = @($news | ForEach-Object { Get-DevNewsVal $_ 'channel' })
     $wasMain = Get-DevNewsVal $doc 'mainVersion'
     $marked = Update-DevNewsChannels $doc $news $mainDoc $SourceRepo
@@ -233,8 +239,13 @@ function Update-DevFeedMarks {
     $mainDoc = Read-SiteFeed 'main' -SiteDir $SiteDir -SiteUrl $SiteUrl
     if ($null -eq $mainDoc) { throw 'The site has no main feed, so the dev marks were left alone.' }
     $doc = (([IO.File]::ReadAllText($file)) -replace '^\uFEFF', '') | ConvertFrom-Json
-    $r = Set-DevFeedMarks $doc $mainDoc $SourceRepo
+    $r = Set-DevFeedMarks $doc $mainDoc $SourceRepo $SiteDir $SiteUrl
     if ($r.Changed -and -not $NoSend) {
+        # The notes back the way the dev feed keeps them (#1050): in "news",
+        # or once its minLauncher reads it, a news file sent to the site first.
+        $min = Get-DevNewsVal $doc 'minLauncher'
+        if (-not $min) { $min = Get-DevNewsVal $doc 'launcherVersion' }
+        [void](Set-FeedNewsList $doc @($doc.news) 'dev' $min (Join-Path $Dir 'news-out') $SiteDir)
         # No byte order mark: the launcher's reader stops on one, which takes
         # out the update check for everybody (see Publish-Update.ps1).
         [IO.File]::WriteAllText($file, ($doc | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))

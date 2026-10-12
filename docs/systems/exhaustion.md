@@ -54,6 +54,12 @@ you, the way [Temperature and weather](temperature.md) measures it. A
 bed in a building somebody else holds, who has not let you sleep there,
 is no rest at all. See [Property](property.md).
 
+A bed in an inn or a temple nobody holds is a place of its own (#2246).
+Djinn asked on 26 Sep for an inn or a temple to give back the most and the
+wild the least. What it is worth is Patrick's to set on #2246, and until
+he does it is worth what it always was: 25 an hour, 45 with a fire in
+reach, and no logout fill.
+
 Someone playing in the same cell adds 25 on top of whatever place you
 are already in, while they play and for 5 minutes after. Playing is the
 lute, the flute or the drum on the [emote wheel](emotes.md), with that
@@ -109,13 +115,19 @@ rest counts again once you sit or lie down again (#1734). The time you
 were away gains no rest, whatever you logged out on: it only drains,
 and the logout fill above is the one thing a bed gives for it (#1764). Which beds
 give the fill and the 24 minutes are the suggested answers on #1606,
-built that way until Patrick says otherwise. Tea and skooma are not items the needs
-block knows.
+built that way until Patrick says otherwise. What the time away costs,
+and what a night gives back to rest, hunger and thirst, is one table in
+the server with a row for each place above and one for somebody on their
+feet (#2246). Today every row costs the whole clock and only your own bed
+and a bed you are allowed in give the fill, so it is the rule above. An
+inn or a temple is read off the room's own records: its location carries
+the game's inn or temple mark, and a house the game sells as a home never counts as one.
+Tea and skooma are not items the needs block knows.
 Sleeping on open ground, an hour on a seat with no roof over you and
 no fire in reach, starts a chill. See [Disease](disease.md).
 The craft gate is asked at every bench's own menu, brews, enchanting
-and tempering included, at a key cut at a forge, and at a kiln burned
-by pressing it, before anything is taken, and the line says your Rest
+and tempering included, the kiln's charcoal too, and at a key cut at a
+forge, before anything is taken, and the line says your Rest
 is under 15. The same check asks first whether you are too sick or too
 hurt to work (see [Injury](injury.md)), and when you are, that line is
 the one said. It has not been extended to mining or chopping, and this

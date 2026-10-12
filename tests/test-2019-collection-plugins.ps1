@@ -54,7 +54,10 @@ try {
     $edition = if ($PSVersionTable.PSEdition -eq 'Core') { 'powershell' } else { 'pwsh' }
     if (Get-Command $edition -ErrorAction SilentlyContinue) {
         $other = Join-Path $tmp 'other.json'
-        & $edition -NoProfile -Command "& '$($gen.Replace("'", "''"))' -Data '$($col.Replace("'", "''"))' -Out '$($other.Replace("'", "''"))' -Collection 7essxf -Revision 2" *> $null
+        # -ExecutionPolicy Bypass for this one child: on a machine whose
+        # Windows PowerShell policy is Restricted (One, 12 Oct) it refused
+        # to run the generator at all, so nothing was written to compare.
+        & $edition -NoProfile -ExecutionPolicy Bypass -Command "& '$($gen.Replace("'", "''"))' -Data '$($col.Replace("'", "''"))' -Out '$($other.Replace("'", "''"))' -Collection 7essxf -Revision 2" *> $null
         Yes "  and the other edition ($edition) writes it byte for byte" ((Test-Path -LiteralPath $other) -and [Convert]::ToBase64String($raw) -eq [Convert]::ToBase64String([IO.File]::ReadAllBytes($other)))
     }
     $only = Join-Path $tmp 'only.json'
@@ -113,9 +116,14 @@ foreach ($d in @(
     Yes '  once it knows what it would send, and before it says or sends anything' ($loop -gt 0 -and $ask -gt $loop -and $after -gt $ask)
 }
 $dd = [IO.File]::ReadAllText((Join-Path $repo 'scripts\deploy\Deploy-DevGamemode.ps1')).Replace("`r`n", "`n")
-$lo = $dd.IndexOf("if (`$LoadOrder) {`n  `$settingsSrc")
+# The top-level -LoadOrder block: an if at the start of a line that ends the
+# line (the one-line if above it only adds a file to the list). Its first line
+# inside has changed (#2334 opens it with the read of what the dev box holds),
+# so it is found by the if alone; a block that is gone is a FAIL, not a throw.
+$m = [regex]::Match($dd, '(?m)^if \(\$LoadOrder\) \{\n')
+$lo = if ($m.Success) { $m.Index } else { -1 }
 $ask = $dd.IndexOf('Assert-ThornswoodCollectionPlugins -RecordPath')
-$end = $dd.IndexOf("`n}`n", $lo)
+$end = if ($lo -ge 0) { $dd.IndexOf("`n}`n", $lo) } else { -1 }
 Yes 'Deploy-DevGamemode asks only under -LoadOrder, which is when it sends plugins' ($lo -gt 0 -and $ask -gt $lo -and $ask -lt $end)
 
 # ---- the committed record (collection 7essxf revision 2, from C:\Thornswood\Game\Data on 11 Oct)

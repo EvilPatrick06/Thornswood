@@ -437,6 +437,20 @@ test('A reciprocal shared edge with tiny surface noise cannot freeze reachable c
   assert.ok(!f.logs.some(line => line.includes('Movement crossed an unverified navigation edge')));
   f.stop();
 });
+test('An NPC standing on a shared edge beside its target attacks instead of waiting for a step it never takes', () => {
+  // #2032: 526e9 stood on the middle of the edge its triangle shares with
+  // its target's, and the target's position, the same point as 32-bit floats,
+  // fell 1.3e-5 outside its triangle. Here the target is 0.0057 units over
+  // the diagonal of the square: inside navigation's 0.01 arrival distance,
+  // outside triangle 0's edge tolerance, so the route is all behind the NPC.
+  const f = fixture({count:1,humans:[100],
+    npc:{1:{pos:[300,300,0],combatTarget:100}},
+    human:{100:{pos:[300.004,300.004,0]}}});
+  f.advance(15000);
+  assert.ok(f.attacks.length > 0,'An NPC that has arrived beside its target attacks it');
+  assert.ok(f.controlled.has(1));
+  f.stop();
+});
 test('An overlapping unlinked triangle cannot displace a verified movement neighbor', () => {
   const mesh = geometry([[0,0,0],[600,0,0],[0,600,0],[600,600,0]],
     [[0,1,2],[1,3,2],[1,3,2]],[],false);
@@ -611,6 +625,32 @@ for (const reciprocal of [true,false]) {
   });
 }
 
+// #2032: rereading every triangle's links at each finished mesh made one
+// background route search cost 20 to 47 ms while the cast was prepared.
+test('A triangle\'s links are read again only when a mesh they lead to arrives', () => {
+  const {records} = externalPair(true);
+  records.set(1000062,{cell:60,mesh:isolated(),mapping:new Map()});
+  const context = {Buffer,Math,Date,Number,Map,Set,JSON};
+  vm.createContext(context);
+  vm.runInContext(source.slice(begin,end),context);
+  let ids = [1000060];
+  const nav = context.createNpcNavigation({
+    getNavmeshRecords: () => ids.slice(),
+    lookupEspmRecordById(id) {
+      const record = records.get(id);
+      return {record:{fields:[{type:'NVNM',data:record.mesh.data}]},toGlobalRecordId:local => record.mapping.get(local) || 0};
+    }},() => 0,() => {},() => {});
+  const load = (list,pos) => { ids = list; nav.ensureBank(60,pos); while(nav.pending()) nav.work(); };
+  load([1000060],[100,100,0]);
+  const node = context.npcTriangleAt(nav.meshes.get(1000060),0);
+  assert.equal(nav.nodeLinks(node).length,0,'The mesh across its external edge has not arrived');
+  load([1000061],[5000,5000,0]);
+  const links = nav.nodeLinks(node);
+  assert.equal(links.length,1,'Once it arrives the link is read');
+  assert.equal(links[0].node.mesh,1000061);
+  load([1000062],[9000,9000,0]);
+  assert.ok(nav.nodeLinks(node) === links,'A mesh the triangle does not lead to leaves its links unread');
+});
 function largeMesh(corrupt) {
   const mesh = geometry([[0,0,0],[300,0,0],[0,300,0]],
     Array.from({length:2200},() => [0,1,2]),[],false);

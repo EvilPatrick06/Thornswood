@@ -6,12 +6,14 @@
 // menu (mp.onCraft). A key cut at a forge with the lock key and a kiln burned
 // by pressing it asked the rest gate alone (#1676), so somebody refused the
 // forge's own Key row for a broken arm cut the same key at the same forge.
+// The kiln's press is gone since #2337: its charcoal is made in its own menu.
 //
 // Now every way of making something asks one gate, unfitToMake, which asks
 // the injury and disease block and then the needs block. This drives the
 // REAL injury and disease block, the REAL needs block, the REAL gate and the
-// three roads as they stand in the gamemode (mp.onCraft, burnCharcoal, and
-// the property block's cutKey with forgeHere, atForge and touchedBench) over
+// two roads as they stand in the gamemode (mp.onCraft, at the forge and at
+// the kiln, and the property block's cutKey with forgeHere, atForge and
+// touchedBench) over
 // one fake mp and one clock, and holds the rest of the file to the one gate,
 // so a road added later cannot ask one gate and forget the other.
 //
@@ -53,7 +55,6 @@ const NEEDS_SRC = slice('// ==== thornswood needs: hunger, thirst and exhaustion
 const HURT_SRC = slice('// ==== thornswood injury and disease ====', '// ==== end thornswood injury and disease ====');
 const GATE_SRC = slice('function unfitToMake(actorId, workbenchId) {', '\n}\n');
 const CRAFT_SRC = slice("mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId, effects) {", '\n});\n');
-const KILN_SRC = slice('function burnCharcoal(actorId, refrId) {', '\n}\n');
 const KEY_SRC = slice('  function cutKey(actorId, profileId, toProfile, parts) {', '\n  }\n');
 const FORGE_HERE_SRC = slice('  function forgeHere(parts, actorId) {', '\n  }\n');
 const AT_FORGE_SRC = slice('  function atForge(actorId) {', '\n  }\n');
@@ -66,11 +67,11 @@ const WATERS = table('WATERS') || { items: {} };
 const FORGE = (/^  var FORGE = '([^']+)';/m.exec(gm) || [])[1];
 const MOLD_REACH = number('MOLD_REACH');
 const DOOR_MEMORY_MS = number('DOOR_MEMORY_MS');
-yes('the needs and injury blocks, the craft gate, the three roads and the forge pieces are in the gamemode',
-    !!NEEDS_SRC && !!HURT_SRC && !!GATE_SRC && !!CRAFT_SRC && !!KILN_SRC && !!KEY_SRC &&
+yes('the needs and injury blocks, the craft gate, the two roads and the forge pieces are in the gamemode',
+    !!NEEDS_SRC && !!HURT_SRC && !!GATE_SRC && !!CRAFT_SRC && !!KEY_SRC &&
     !!FORGE_HERE_SRC && !!AT_FORGE_SRC && !!TOUCHED_SRC && !!BENCH_BY_BASE && !!STATIONS && !!FORGE &&
     MOLD_REACH > 0 && DOOR_MEMORY_MS > 0);
-if (!NEEDS_SRC || !HURT_SRC || !GATE_SRC || !CRAFT_SRC || !KILN_SRC || !KEY_SRC ||
+if (!NEEDS_SRC || !HURT_SRC || !GATE_SRC || !CRAFT_SRC || !KEY_SRC ||
     !FORGE_HERE_SRC || !AT_FORGE_SRC || !TOUCHED_SRC || !BENCH_BY_BASE || !STATIONS || !FORGE) { done(); }
 
 function baseOf(keyword) {
@@ -79,7 +80,7 @@ function baseOf(keyword) {
 const FORGE_BASE = baseOf(FORGE);
 const POT_BASE = baseOf('a5cb3:Skyrim.esm');
 const KILN_BASE = STATIONS.charcoalKiln;
-yes('the forge, the cooking pot and the kiln are benches the table knows, the kiln by the station the press reaches',
+yes('the forge, the cooking pot and the kiln are benches the table knows, the kiln by the base the plugin places',
     !!FORGE_BASE && !!POT_BASE && !!KILN_BASE && !!BENCH_BY_BASE[KILN_BASE]);
 
 const ME = 0xff000001;
@@ -162,24 +163,6 @@ function menu(r, bench, recipeId) {
   return { out: out, said: said, made: out !== false && reached.length > 0, took: writes.length };
 }
 
-/* A kiln pressed twice: burnCharcoal as it stands. */
-function kiln(r) {
-  const took = [];
-  const gave = [];
-  const run = new Function('globalThis', 'halfGate', 'toolGate', 'cooldownLeft', 'KILN_ARMED', 'KILN_ARM_MS',
-    'rankStep', 'takeItem', 'addItem', 'ITEMS', 'stampCooldown', 'creditWork', 'wearTool', 'unfitToMake',
-    KILN_SRC + '\nreturn burnCharcoal;')(
-    r.G, function () { return null; }, function () { return null; }, function () { return 0; },
-    {}, 15000, function () { return 0; },
-    function (id, item, n) { took.push(n); return true; },
-    function (id, item, n) { gave.push(n); return true; },
-    { firewood: 'fw', charcoalT1: 'c1', charcoalT2: 'c2', charcoalT3: 'c3', charcoalT4: 'c4' },
-    function () { }, function () { return null; }, function () { return null; }, r.gate);
-  const first = run(ME, KILN_REF);
-  const second = run(ME, KILN_REF);
-  return { said: [first, second], made: gave.length > 0, took: took.length };
-}
-
 /*
   A key at a forge: cutKey with the real forgeHere, atForge and touchedBench.
   parts is what the lock key sends; pressed is a forge press the server saw
@@ -219,7 +202,7 @@ const ROADS = {
   'a key cut at the forge last pressed, with no id': function (r) {
     return key(r, ['/key'], { base: FORGE_BASE, ref: FORGE_REF });
   },
-  'a kiln burned by pressing it': function (r) { return kiln(r); }
+  'a craft at the kiln\'s own menu': function (r) { return menu(r, KILN_REF); }
 };
 function line(o) { return o.said.join(' | '); }
 
@@ -307,13 +290,12 @@ Object.keys(ROADS).forEach(function (name) {
   yes('W2 no other code asks either block\'s craftRefusal by another name (only the two definitions and the gate)',
       other === 4);
   const calls = code.match(/\bunfitToMake\(actorId, [a-zA-Z]+\);/g) || [];
-  yes('W3 the three roads ask the gate: a bench\'s menu with its bench, a kiln with the kiln, a key with the forge',
-      calls.length === 3 &&
-      /unfitToMake\(actorId, workbenchId\)/.test(CRAFT_SRC) && /unfitToMake\(actorId, refrId\)/.test(KILN_SRC) &&
+  yes('W3 the two roads ask the gate: a bench\'s menu with its bench, the kiln\'s included, and a key with the forge',
+      calls.length === 2 && !/function burnCharcoal\b/.test(code) &&
+      /unfitToMake\(actorId, workbenchId\)/.test(CRAFT_SRC) &&
       /unfitToMake\(actorId, forge\)/.test(KEY_SRC));
   yes('W4 each asks before anything is taken',
       CRAFT_SRC.indexOf('unfitToMake(') < CRAFT_SRC.indexOf('recipelessCraft(') &&
-      KILN_SRC.indexOf('unfitToMake(') < KILN_SRC.indexOf('takeItem(') &&
       KEY_SRC.indexOf('unfitToMake(') < KEY_SRC.indexOf('takeItem('));
   yes('W5 the press writes down which forge, so a key cut with no id still names the bench',
       /prop\.touchedBench\(casterRefrId, baseDesc, refrId\)/.test(code));

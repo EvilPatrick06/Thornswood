@@ -2,7 +2,7 @@
 
 ## What it is
 
-This folder holds two files. `Bootstrap.cs` is the source of the small program
+This folder holds three files. `Bootstrap.cs` is the source of the small program
 a new person runs first, `Thornswood-Setup.exe`. `Setup.manifest` is that
 program's application manifest (issue #463): sharp at any display scale and on
 every monitor (per-monitor DPI), never asking for administrator (asInvoker),
@@ -11,8 +11,10 @@ and named `Thornswood.Installer.Setup` at the launcher's version, which
 inside the screen at any scale with the launcher's `WindowFit.cs`, which the
 build compiles in beside it. `tests\test-app-manifest.ps1` reads the manifest
 back out of the built exe. It is not the launcher's source;
-that is `launcher\app`. It is a WPF window in C# 5, like the launcher, because the
-same .NET Framework 4 csc compiles both and understands nothing newer. It asks
+that is `launcher\app`. It is a WPF window in C# 5 for now, like the launcher, because the
+same .NET Framework 4 csc compiles both and understands nothing newer.
+`Setup.csproj` beside it builds the same program with MSBuild; when the
+launcher build switches to MSBuild (#498) both move to newer C#. It asks
 which drive to install to, reads the
 payload attached to its own end, or downloads it from the site
 (`https://thornswood.net/api/payload`), carrying on from where a dropped

@@ -175,7 +175,10 @@ Yes ('every mod Ship-Rules holds files for is added here ({0})' -f ($heldIds -jo
     $heldIds.Count -gt 0 -and @($heldIds | Where-Object { $addIds -notcontains $_ -and $_ -ne '154063' }).Count -eq 0)
 Yes 'the published additions include the two generator packages and the three mesh mods' (($addIds -join ',') -eq '109194,133232,175362,19532,32117')
 Yes 'Styles is explicitly excluded, so its legacy held files expire rather than becoming an addition' ($addIds -notcontains '154063' -and $doc -match 'Styles of Skyrim Mashups \(154063\) is excluded')
-Yes 'everything held waits for revision 2, this page''s' (@($ShipHeldForCollection | Where-Object { [int]$_.Revision -ne 2 }).Count -eq 0)
+Yes 'everything held for a revision waits for revision 2, this page''s' (@($ShipHeldForCollection | Where-Object { -not [string]$_.ContentModel -and [int]$_.Revision -ne 2 }).Count -eq 0)
+$byPlugin = @($ShipHeldForCollection | Where-Object { [string]$_.ContentModel })
+Yes '  and the one no revision carries, the board, waits for the content plugin instead (#2298)' (
+    $byPlugin.Count -eq 1 -and [string]$byPlugin[0].Path -eq 'Data\meshes\olivar-messageboard\missiveboardcotnd.nif')
 $heldRows = @($loose | Where-Object { $_ -match '\*\*Held\*\*' })
 Yes 'every held folder or file is named on a Held row of the loose files table' (@($ShipHeldForCollection | Where-Object {
     $leaf = ([string]$_.Path).TrimEnd('\') -replace '^Data\\meshes\\', ''

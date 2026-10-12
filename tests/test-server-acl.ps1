@@ -21,6 +21,10 @@
                     rules by name carried across onto the root and data, a
                     build runner's deny kept, private SYSTEM's and
                     Administrators' only, the bot's rule on moderation.log
+                    in private from before #2321 kept, for-bot SYSTEM's,
+                    Administrators' and the bot's to read, a staff log made
+                    in it afterwards readable by the bot and private still
+                    not (#2321),
                     kept, the folder it replaced locked too; and the installer
                     calls it after the world and roster are carried across and
                     before the server's task is started
@@ -100,10 +104,13 @@ try {
     Put (Join-Path $new 'private\door.json') '{ "key": "the door key" }'
     Put (Join-Path $new 'private\moderation.log') '{}'
     Grant (Join-Path $new 'private\moderation.log') $bot 'Read' 'None' 'None'
+    # The folder the installer makes for the gamemode's staff log (#2321), as
+    # it is before the lock: inheriting from the root, and so Users.
+    $null = New-Item -ItemType Directory -Force -Path (Join-Path $new 'for-bot')
     Yes 'the scratch root starts the way a stage does, with Users reaching private\door.json' ((Broad (Join-Path $new 'private\door.json')) -gt 0)
 
     $script:said = @()
-    Lock-ServerRoot $new $old
+    Lock-ServerRoot $new $old $bot
     if ($new) { Lock-ServerRoot $old '' }
     Yes 'it says it locked the root' (($script:said -join ' ') -match 'locked ' + [regex]::Escape($new) -and ($script:said -join ' ') -notmatch 'COULD NOT')
     foreach ($p in @($new, (Join-Path $new 'server-settings.json'), (Join-Path $new 'server.log'), (Join-Path $new 'data'), (Join-Path $new 'data\shipped.txt'),
@@ -129,9 +136,35 @@ try {
     Yes 'the bot''s read on private\moderation.log stays, and reaches nothing else there' (
         @(Named (Join-Path $new 'private\moderation.log') $bot).Count -eq 1 -and @(Named (Join-Path $new 'private\door.json') $bot).Count -eq 0)
     Yes 'the folder it replaced is locked too, keeping its own rules by name' ((Get-Acl -LiteralPath $old).AreAccessRulesProtected -and @(Named $old $site).Count -eq 1)
+
+    # for-bot (#2321): the bot reads the staff log by a rule on the folder.
+    $fb = Join-Path $new 'for-bot'
+    $facl = Get-Acl -LiteralPath $fb
+    $fwho = @($facl.Access | ForEach-Object { Sid $_ } | Sort-Object -Unique)
+    Yes ('for-bot takes nothing from the root, and is SYSTEM''s, Administrators'' and the bot''s alone (' + ($fwho -join ', ') + ')') (
+        $facl.AreAccessRulesProtected -and @($fwho | Where-Object { @('S-1-5-18', 'S-1-5-32-544', $me, $bot) -notcontains $_ }).Count -eq 0 -and (Broad $fb) -eq 0)
+    $x = @(Named $fb $bot)
+    Yes 'the bot''s account may read for-bot and everything in it, and no more' (
+        $x.Count -eq 1 -and "$($x[0].FileSystemRights)" -match '^Read' -and "$($x[0].FileSystemRights)" -notmatch 'Modify|Write|FullControl' -and "$($x[0].InheritanceFlags)" -match 'ContainerInherit' -and "$($x[0].InheritanceFlags)" -match 'ObjectInherit')
+    Yes 'and says so' (($script:said -join ' ') -match ('the bot''s account may read ' + [regex]::Escape($fb)))
+    # The gamemode's first staff action, after the install: it makes the file.
+    $later = Join-Path $fb 'moderation.log'
+    [IO.File]::AppendAllText($later, '{"did":"warn"}' + "`n")
+    $x = @(Named $later $bot)
+    Yes 'a staff log made in for-bot after the install is readable by the bot''s account, by the folder''s rule' (
+        $x.Count -eq 1 -and $x[0].IsInherited -and "$($x[0].FileSystemRights)" -match '^Read' -and (Broad $later) -eq 0)
+    Yes 'and private still is not: no rule of the bot''s on private or door.json' (
+        @(Named (Join-Path $new 'private') $bot).Count -eq 0 -and @(Named (Join-Path $new 'private\door.json') $bot).Count -eq 0)
+    Yes 'nor of the site''s on for-bot' (@(Named $fb $site).Count -eq 0 -and @(Named $later $site).Count -eq 0)
+
     $script:said = @()
-    Lock-ServerRoot $new $old
-    Yes 'locked again, nothing is doubled' (@(Named $new $site | Where-Object { -not $_.IsInherited }).Count -eq 1 -and @(Named $new 'S-1-5-18' | Where-Object { -not $_.IsInherited }).Count -eq 1)
+    Lock-ServerRoot $new $old $bot
+    Yes 'locked again, nothing is doubled' (@(Named $new $site | Where-Object { -not $_.IsInherited }).Count -eq 1 -and @(Named $new 'S-1-5-18' | Where-Object { -not $_.IsInherited }).Count -eq 1 -and @(Named $fb $bot | Where-Object { -not $_.IsInherited }).Count -eq 1)
+    # A box whose bot account could not be looked up: for-bot keeps the rule it
+    # had by name, as it moved across from the folder it replaced.
+    $script:said = @()
+    Lock-ServerRoot $new $old ''
+    Yes 'locked with no bot account to give, for-bot keeps the bot''s rule it already had' (@(Named $fb $bot | Where-Object { -not $_.IsInherited }).Count -eq 1)
 
     # Where the installer calls it.
     $text = Get-Content -LiteralPath $installer -Raw
@@ -142,6 +175,11 @@ try {
     Yes 'the installer locks the root after the world and the roster are carried across' ($carry -gt 0 -and $lock -gt $carry)
     Yes 'and before the server''s task is registered or started' ($lock -lt $task -and $lock -lt $start)
     Yes 'and locks what it replaced' ($text -match [regex]::Escape('if ($hadRoot -and (Test-Path -LiteralPath $aside)) { Lock-ServerRoot $aside '''' }'))
+    Yes 'the installer carries for-bot across whole, as it does private' ($text -match [regex]::Escape("foreach (`$name in 'world', 'private', 'for-bot')"))
+    $mk = $text.IndexOf('$forBotDir = Join-Path $Root ''for-bot''')
+    Yes 'and makes for-bot when the server has none, before it locks, and gives the lock the bot''s account' (
+        $mk -gt $carry -and $mk -lt $lock -and $text -match [regex]::Escape('Lock-ServerRoot $Root $(if ($hadRoot) { $aside } else { '''' }) $botSid') -and
+        $text -match [regex]::Escape("NTAccount('NT SERVICE\ThornswoodBot')"))
 
     # ================================================================ the box, now
     $c = Join-Path $box 'c'
@@ -151,6 +189,9 @@ try {
     Put (Join-Path $c 'Thornswood-Server\private\door.json') 'key'
     Put (Join-Path $c 'Thornswood-Server\data\online.json') '{}'
     Put (Join-Path $c 'Thornswood-Server-Dev\private\door.json') 'key'
+    # The staff log's folder with the bot's read on it, as Install-Bot gives it (#2321).
+    Put (Join-Path $c 'Thornswood-Server\for-bot\moderation.log') '{}'
+    Grant (Join-Path $c 'Thornswood-Server\for-bot') $bot 'Read' 'ContainerInherit, ObjectInherit' 'None'
     Put (Join-Path $c 'Thornswood-Voice\chat\1.jsonl') 'said'
     Put (Join-Path $c 'Thornswood-Voice\token-key.txt') 'key'
     # The backups and their passphrase (#1173), with a rule somebody gave the
@@ -164,7 +205,7 @@ try {
     # Thornswood-Server-Dev has no rule for the site: the site deploy has not
     # been run since it was made.
     function Box([string[]]$more) {
-        $a = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $lockBox, '-Parent', $c, '-SiteSid', $site, '-AllowGamingPc') + $more
+        $a = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $lockBox, '-Parent', $c, '-SiteSid', $site, '-BotSid', $bot, '-AllowGamingPc') + $more
         $eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
         try { $o = @(& $ps51 @a 2>&1 | ForEach-Object { "$_" }) } finally { $ErrorActionPreference = $eap }
         $script:code = $LASTEXITCODE
@@ -187,6 +228,10 @@ try {
     Yes 'the site keeps its read on server.log''s folder, data and the chat logs' (
         @(Named (Join-Path $c 'Thornswood-Server\x.txt') $site).Count -eq 1 -and @(Named (Join-Path $c 'Thornswood-Server\data\online.json') $site).Count -eq 1 -and
         @(Named (Join-Path $c 'Thornswood-Voice\chat\1.jsonl') $site).Count -eq 1)
+    $fbBox = Join-Path $c 'Thornswood-Server\for-bot'
+    Yes 'for-bot is locked: no Users rule reaches it or the staff log in it (#2321)' ((Broad $fbBox) -eq 0 -and (Broad (Join-Path $fbBox 'moderation.log')) -eq 0 -and (Get-Acl -LiteralPath $fbBox).AreAccessRulesProtected)
+    Yes '  and the bot keeps its read on it, and on the staff log' (@(Named $fbBox $bot | Where-Object { -not $_.IsInherited }).Count -eq 1 -and @(Named (Join-Path $fbBox 'moderation.log') $bot).Count -ge 1)
+    Yes '  and a server whose for-bot has the bot''s rule is not said to need Install-Bot' ($o -notmatch [regex]::Escape('no rule on ' + $fbBox) -and $o -notmatch [regex]::Escape((Join-Path $c 'Thornswood-Server') + ' has no for-bot'))
     Yes 'and never reaches private or token-key.txt' (@(Named (Join-Path $c 'Thornswood-Server\private\door.json') $site).Count -eq 0 -and @(Named (Join-Path $c 'Thornswood-Voice\token-key.txt') $site).Count -eq 0)
     Yes 'private is SYSTEM''s and Administrators'' alone' ((Get-Acl -LiteralPath (Join-Path $c 'Thornswood-Server\private')).AreAccessRulesProtected -and
         @((Get-Acl -LiteralPath (Join-Path $c 'Thornswood-Server\private')).Access | Where-Object { @('S-1-5-18', 'S-1-5-32-544', $me) -notcontains (Sid $_) }).Count -eq 0)

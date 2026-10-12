@@ -1,8 +1,10 @@
-# Shared NPC activity on dev
+# Shared NPC activity
 
 The server owns the retained winning placed identities and their movement,
 combat, health and return timers. The population policy runs before loading,
-including later saved-form loads. Main does not start this controller.
+including later saved-form loads. Main and dev both start this controller:
+`game/gamemode.js` starts it when `thornswoodServer` is main or dev (or unset,
+which reads as main), since 6e4488e4 on 3 October.
 
 The 48-plugin catalogue contains 14,641 placements: 5,072 retained and 9,569
 excluded. Named pets and enemies are cut even without a Unique flag. Fourteen
