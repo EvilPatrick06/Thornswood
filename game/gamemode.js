@@ -42080,6 +42080,17 @@ log('gamemode loaded:',
   } catch(error) { active=false;console.log('[dungeon] rewards unavailable: '+error); }
   var LOOT_WORD = new RegExp('chest|urn|coffin|sarcophag|strongbox|coffer|safe|knapsack', 'i');
   var SKIP_WORD = new RegExp('barrel|sack|cupboard|dresser|endtable|wardrobe|shelf|crate|basket|drawer|nightstand', 'i');
+  /*
+    The two lists match inside a name, so a word that holds another word
+    has to come out before the test (#510). Measured over the 895 containers
+    the load order's winning records name: "sack" refused every knapsack,
+    TreasKnapsack among them, though a knapsack is on the list; and "urn"
+    paid a chest pile out of TreasBurntCorpse01 to 05, MQ104BurntCorpse03
+    and 04 and POIYisraBurnt, which are burnt people, not urns, and out of
+    EE_JournalsStorage. A person is never searched (docs\systems\dungeon-loot.md).
+  */
+  var NOT_SKIP = new RegExp('knapsack', 'ig');
+  var NOT_LOOT = new RegExp('burnt|journal', 'ig');
 
   var CELLS = {
     '10a8b:dawnguard.esm': 2,
@@ -42627,8 +42638,8 @@ log('gamemode loaded:',
   function isLootContainer(baseId) {
     var name = edidOf(baseId);
     if (!name) return false;
-    if (SKIP_WORD.test(name)) return false;
-    return LOOT_WORD.test(name);
+    if (SKIP_WORD.test(name.replace(NOT_SKIP, ''))) return false;
+    return LOOT_WORD.test(name.replace(NOT_LOOT, ''));
   }
 
   function give(actorId, rolled) {
