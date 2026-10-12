@@ -63,7 +63,9 @@ the part to check first.
 ### What the exe is
 
 `scripts\release\Build-Launcher.ps1` compiles every `launcher\app\*.cs` with the .NET
-Framework 4 csc (C# 5 only) into `<Root>\Launcher\Thornswood.exe`. It embeds,
+Framework 4 csc (so C# 5, until the build moves to MSBuild, #498) into
+`<Root>\Launcher\Thornswood.exe`. `launcher\app\Thornswood.csproj` builds the same exe with
+MSBuild (`Build-Launcher.ps1 -With msbuild`). It embeds,
 as resources: `launcher\ui.xaml`, the emblem, header art and video, the WebView2
 DLLs, `launcher\voice-host.html`, the `Thornswood.ini` template from
 `launcher`, and `records\client-build.json`. The update system publishes
