@@ -50,8 +50,8 @@ queued for Claude. The one decision only Patrick can make is in section 6.
 
 | # | Finding | Evidence | Class |
 | --- | --- | --- | --- |
-| F1 | Pull request code from any branch in this repository runs on the production box | build.yml: `on: pull_request` and `runs-on: [self-hosted, Windows, thornswood-vps]`. The check reports it as a risk row | Risk, see section 6 |
-| F2 | Install-Runner.ps1's header says build.yml sends pull requests to the label `thornswood-pr`, which no VPS runner carries. build.yml has never used that label (git log -S finds none) | Install-Runner.ps1 "OFF THE BOX"; build.yml | Stale documentation, or the move was never finished: depends on F1's decision |
+| F1 | Pull request code from any branch in this repository runs on the production box | build.yml: `on: pull_request` and `runs-on: [self-hosted, Windows, thornswood-vps]`. The check reports it as a risk row | Risk until the Codex lane moves pull request builds to GitHub-hosted runners (section 6) |
+| F2 | Install-Runner.ps1's header says build.yml sends pull requests to the label `thornswood-pr`, which no VPS runner carries. build.yml has never used that label (git log -S finds none) | Install-Runner.ps1 "OFF THE BOX"; build.yml | Resolved by the decision in section 6 |
 | F3 | VPS runner accounts have no outbound limit | Install-Runner.ps1 puts firewall rules on -OffBox only; the check counts rules naming each runner SID | Risk, measured by the check |
 | F4 | A job can read its runner's `.credentials` and leave files for the next job | GitHub's runner design; `_work\_temp` leftovers are counted by the check | Residual, inherent to persistent self-hosted runners |
 | F5 | Fork pull requests cannot run here | repository settings above | OK |
@@ -84,7 +84,34 @@ Owner: the Installer lane owns the scripts and the record. Claude runs
 `-Collect` after any `Install-Runner.ps1` or `Lock-VpsFolders.ps1` run and
 monthly.
 
-## 6. Decision needed (Patrick)
+## 6. Decision (Patrick, 11 Oct 2026)
+
+Decided by Patrick on 11 Oct 2026, relayed by Smeagle: pull request builds
+move to GitHub-hosted runners, off the VPS. That is the second choice below
+in spirit, with GitHub's own runners in place of an off-box 	hornswood-pr
+machine.
+
+- Owner of the build.yml move: Codex lane. Until it lands, F1 stays a risk
+  row in every check run, which is correct: it is the state being fixed.
+- What stays on the VPS: pushes to main, nightly, release and every Ship and
+  deploy job. Their triggers are not pull requests, so the check reports
+  them ok.
+- F2 is resolved by this decision: the Install-Runner.ps1 header described
+  a move of pull requests off the box that was never made. With pull
+  requests on GitHub-hosted runners, no 	hornswood-pr runner is needed for
+  the build check, and the header's "OFF THE BOX" section describes an
+  optional setup, not what build.yml does.
+- F3 (no outbound limit on the VPS runner accounts) stays recorded. With no
+  pull request code on the box, what runs there is code already merged to
+  main or tagged, so it is accepted as residual for now.
+- Verification: after the Codex change, Check-RunnerIsolation.ps1 reports
+  the uild.yml runs on row as ok, and tests\test-runner-isolation.ps1
+  checks that against the real build.yml whichever way it stands.
+- Rollback: put 	hornswood-vps back on the pull request job in build.yml;
+  the check then reports F1 as a risk again.
+
+The three choices that were put to Patrick, kept for the record:
+### The choices
 
 Residual risk acceptance. Today pull requests from branches in this
 repository run on the production box (F1), with no outbound limit (F3).
