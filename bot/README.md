@@ -136,10 +136,13 @@ token for that repository's issues. No token, neither is kept, said once in the
 log.
 
 - `#known-issues`, read only: one post per open issue labelled Dev Findings
-  or Main Findings, titled with the issue's title and tagged Dev or Main. No
-  issue number and no link, because testers have no GitHub. The post is
-  deleted the moment the issue is no longer an open finding: fixed and closed,
-  closed any other way, or its label taken off.
+  or Main Findings, tagged Dev or Main. Its title and body are the issue's
+  last comment that starts `Known issue:` (a short title, at most 45
+  characters, then what goes wrong, where, and how to avoid it), the same
+  shape as a test task below; until somebody writes one, the issue's own title
+  and a plain line. No issue number and no link, because testers have no
+  GitHub. The post is deleted the moment the issue is no longer an open
+  finding: fixed and closed, closed any other way, or its label taken off.
 - `#test-tasks`: one post for each issue closed as fixed from the day this
   began. Its title and body are the issue's last comment that starts
   `Test task:`, written by whoever fixed it:
@@ -148,11 +151,22 @@ log.
       Server: Dev            (optional, Dev or Main)
       <what to do in the game and what should happen>
 
-  A fixed finding with no such comment gets its own title and a plain line
-  asking testers to check it; a fixed issue that is neither a finding nor has
-  that comment gets no post. A reopened issue loses its test task and comes
+  `Test task:` with nothing after the colon takes the issue's own title. A
+  closed issue also gets a post when its latest `Test task:` comment was
+  written after that day, however long ago it closed. A fixed finding with no
+  such comment gets its own title and a plain line asking testers to check
+  it; a fixed issue that is neither a finding nor has that comment gets no
+  post. A reopened issue loses its test task and comes
   back to `#known-issues` if it is still a finding. Staff close a test task
   in Discord once it is confirmed.
+
+A rewritten `Known issue:` or `Test task:` comment edits its post (title,
+body and tag) on the next pass. Comments are read only for an issue GitHub
+says changed since the last pass. A test task posted by hand with
+`--post-task` can be given to its issue so it is kept up to date too, with
+the bot stopped (the running bot holds the file in memory):
+
+    python bot.py --adopt-task --issue N --thread <post id>
 
 Which post is which issue is kept in `data\known-issues.json`, written
 straight after each post, and a post is matched back by its title among the
