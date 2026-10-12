@@ -13,6 +13,16 @@ function fixture(options={}) {
     getDescFromId:()=>human().desc,getIdFromDesc:d=>d==='f:Skyrim.esm'?15:d==='ore:Skyrim.esm'?100:0,
     get:(id,key)=>{if(mode==='readback' && calls)throw Error('readback unavailable');return clone(key==='inventory'?inventory:record);},
     getInventoryReceipt:()=>receipt,getSavedInventoryReceipt:()=>saved,
+    compareAndSetActorProperty(id,owner,change) {
+      calls++;assert.equal(owner,profile);assert.equal(change.expectedLifeGeneration,0);
+      assert.equal(change.expectedRuntimeIdentity,runtime);
+      if(mode==='before')throw new Error('before mutation');
+      if(mode==='refuse')return false;
+      assert.deepEqual(change.expected,record);record=clone(change.replacement);
+      if(mode==='unknown' || mode==='readback'){record={other:true};throw new Error('unknown outcome');}
+      if(mode==='after')throw new Error('uncertain queued outcome');
+      return true;
+    },
     compareAndSetInventoryAndProperty(id,expected,old,next,seq,owner,change) {
       calls++;assert.equal(owner,profile);assert.equal(change.expectedLifeGeneration,0);
       assert.equal(change.expectedRuntimeIdentity,runtime);
@@ -38,7 +48,7 @@ let f=fixture();
 assert.equal(f.transfer.commit(10,f.record(),next,[{item:'f:Skyrim.esm',count:25}]).ok,true);
 assert.deepEqual(f.record(),next);assert.equal(f.inventory().entries[0].count,65);
 assert.equal(f.inventory().entries[1].name,'Keepsake');assert.equal(f.calls(),1);
-assert.equal(f.transfer.commit(10,next,next,[]).ok,false,'an unsaved preceding commit stays fenced');
+assert.equal(f.transfer.commit(10,next,next,[]).ok,true,'metadata survives an unsaved preceding inventory commit');
 f.save();
 assert.equal(f.transfer.commit(10,next,next,[{item:'ore:Skyrim.esm',count:-2}]).ok,true);
 assert.equal(f.inventory().entries.find(x=>x.baseId===100).count,2);
@@ -52,8 +62,8 @@ f=fixture();f.mode('after');
 assert.equal(f.transfer.commit(10,f.record(),next,[{item:'f:Skyrim.esm',count:25}]).ok,true,'live receipt establishes a committed write despite notification error');
 assert.equal(f.calls(),1);assert.equal(f.inventory().entries[0].count,65);
 f=fixture();f.mode('after');
-assert.equal(f.transfer.commit(10,f.record(),{...next,open:{ebony:{drawn:1,gem:undefined}}},[]).ok,true,
-  'native JSON readback establishes a commit when optional fields were omitted');
+assert.equal(f.transfer.commit(10,f.record(),{...next,open:{ebony:{drawn:1,gem:undefined}}},[]).uncertain,true,
+  'unchanged inventory receipts cannot acknowledge metadata after an exception');
 f=fixture();f.mode('unknown');
 assert.equal(f.transfer.commit(10,f.record(),next,[]).ok,false);assert.equal(f.transfer.available(),false);
 f.mode('');assert.equal(f.transfer.commit(10,f.record(),next,[]).ok,false);assert.equal(f.calls(),1);
@@ -61,7 +71,14 @@ f=fixture({log:()=>{throw Error('logger failed');}});f.mode('readback');
 assert.equal(f.transfer.commit(10,f.record(),next,[]).uncertain,true);
 assert.equal(f.transfer.available(),false,'revocation must precede fallible diagnostics');
 f=fixture();f.pending(true);
-assert.equal(f.transfer.commit(10,f.record(),next,[]).ok,false);assert.equal(f.calls(),0);
+const metadataReceipt=f.receipt(),metadataInventory=f.inventory();
+for(let kills=1;kills<=3;kills++) {
+  assert.equal(f.transfer.commit(10,f.record(),{...next,open:{camp:{kills}}},[]).ok,true,
+    'successive camp kills cannot wait for inventory save acknowledgement');
+}
+assert.equal(f.calls(),3);assert.equal(f.receipt(),metadataReceipt);assert.deepEqual(f.inventory(),metadataInventory);
+assert.equal(f.transfer.commit(10,f.record(),next,[{item:'f:Skyrim.esm',count:25}]).ok,false,
+  'goods and rewards remain fenced while a merchant transfer is pending');
 f=fixture();const original=f.inventory();
 for(const changes of [[{item:'missing',count:1}],[{item:'ore:Skyrim.esm',count:-5}],[{item:'f:Skyrim.esm',count:0.5}]])
   assert.equal(f.transfer.commit(10,f.record(),next,changes).ok,false);

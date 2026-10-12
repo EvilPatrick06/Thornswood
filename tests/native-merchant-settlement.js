@@ -128,7 +128,11 @@ vm.runInContext(source.slice(source.indexOf('// NPC MERCHANT PURSES BEGIN'),sour
   assert.equal(mp.get(human,'inventory').entries.filter(x=>x.baseId===15).reduce((n,x)=>n+x.count,0),questGold+25);
   assert.deepEqual(mp.get(human,'inventory').entries.filter(x=>x.baseId!==15),questBefore.entries.filter(x=>x.baseId!==15));
   const questReceipt=mp.getInventoryReceipt(human);
-  assert.equal(quests.commit(human,questRecord,questRecord,[]).ok,false,'the shared lease refuses an unsaved quest receipt');
+  assert.equal(quests.commit(human,questRecord,questRecord,[]).ok,true,'metadata can queue while a goods receipt is unsaved');
+  assert.equal(mp.getInventoryReceipt(human),questReceipt,'metadata does not advance the goods receipt');
+  assert.equal(quests.commit(human,questRecord,questRecord,[{item:'f:Skyrim.esm',count:1}]).ok,false,
+    'another goods transaction still waits for its exact saved receipt');
+  assert.equal(mp.get(human,'inventory').entries.filter(x=>x.baseId===15).reduce((n,x)=>n+x.count,0),questGold+25);
   for(let i=0;i<600 && mp.getSavedInventoryReceipt(human)!==questReceipt;i++){mp.tick();await new Promise(resolve=>setTimeout(resolve,10));}
   assert.equal(mp.getSavedInventoryReceipt(human),questReceipt);
   assert.equal(quests.commit(human,null,questRecord,[{item:'f:Skyrim.esm',count:25}]).ok,false,'a stale quest record cannot pay twice');
