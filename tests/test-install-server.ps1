@@ -66,6 +66,10 @@
       Publish-Server payloads carry this checkout's gamemode artifact and a
       stamp for the channel, as Export-ServerPayload.ps1 makes them, so they
       are told apart by what they ship into data.
+    - issue #2323: every stub server here starts on ports below the range
+      Windows hands to outgoing connections, each pair bound before it is
+      handed out, so a block Windows keeps for TCP or a connection that took
+      the port cannot stop a start the case expects to answer.
 
   Connects to nothing but 127.0.0.1.
 #>
@@ -267,22 +271,90 @@ function WaitUp([int]$port) {
     for ($i = 0; $i -lt 40; $i++) { if (Answers $port) { return $true }; Start-Sleep -Milliseconds 250 }
     return $false
 }
-# A game port the system hands out, with the port above it free as well,
-# because the server in a payload binds its game port and the resources port
-# one above it. Not one already taken by this run ($avoid). 0 when the system
-# hands out none such in fifty asks. For the Publish-Server runs below, which
-# until #1728 needed the dev and live servers' own ports and skipped when
-# anything held one.
+# A game port for a stub server, with the port above it for its resources:
+# the stub binds UDP on the first and listens on TCP on the second, as
+# skymp5-server does. Not within two of one this run already took ($avoid).
+# 0 when fifty tries find none. Every server below takes its ports from here:
+# the installs, the scratch root's other server, and the Publish-Server runs,
+# which until #1728 needed the dev and live servers' own ports.
+#
+# BELOW THE RANGE WINDOWS HANDS OUT, AND PROVED BY BINDING BOTH (#2323). The
+# dev and live pairs used to be asked of the system (UdpClient(0)), which
+# answers from the dynamic range, 49152 and up. Two things there stopped a
+# stub from ever answering, measured on One on 12 Oct:
+#   - Windows reserves blocks of that range for TCP alone (netsh int ipv4 show
+#     excludedportrange: 49709-49808, 50321-50420, 51343-51442, 63701-63800
+#     and 63874-63973 that day). A UDP port handed out next to one has its
+#     TCP port above inside it, nothing holds it, so "free" said yes, and the
+#     stub's listen failed with EACCES.
+#   - every outgoing connection on the machine takes its own port from the
+#     same range, so the port above can be taken between the choice and the
+#     start.
+#   A start with either never answers. Of 35 stub starts that day, the same
+#   cmd, roll-log and node chain the installer registers, on random ports in
+#   that range, 3 never answered: the stub's log said EACCES on 49731, inside
+#   49709-49808, and EACCES on 50426 with an established connection on it.
+#   On 11 Oct the two live Publish-Server cases failed together in one run,
+#   the way a live pair whose resources port cannot be listened on fails: the
+#   first install had no old folder to go back to, so it was INSTALL FAILED
+#   after the swap and the lock, and the one over it rolled back and kept its
+#   .failed folder.
+# So ports come from below the dynamic range, which no outgoing connection is
+# given, and each pair is bound here, UDP and TCP the way the stub binds them,
+# before it is handed out: a reserved block, wherever it is, refuses the bind.
+$script:dynamicStart = 49152
+try {
+    $starts = @(@(Get-NetTCPSetting -ErrorAction Stop) + @(Get-NetUDPSetting -ErrorAction Stop) |
+                ForEach-Object { [int]$_.DynamicPortRangeStartPort } | Where-Object { $_ -gt 0 } | Sort-Object)
+    if ($starts.Count) { $script:dynamicStart = $starts[0] }
+} catch { }
+$script:portLow = 41000
+$script:portTop = [Math]::Min(48000, $script:dynamicStart - 2)
+$script:portRand = New-Object Random
+function Bindable([int]$p) {
+    if (-not ((Free $p) -and (Free ($p + 1)))) { return $false }
+    $u = $null
+    $t = $null
+    try {
+        $u = New-Object Net.Sockets.UdpClient((New-Object Net.IPEndPoint([Net.IPAddress]::Loopback, $p)))
+        $t = New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback, ($p + 1))
+        $t.Start()
+        return $true
+    } catch { return $false }
+    finally {
+        if ($t) { $t.Stop() }
+        if ($u) { $u.Close() }
+    }
+}
 function Pair([int[]]$avoid) {
+    if ($script:portTop -le $script:portLow) { return 0 }
     for ($i = 0; $i -lt 50; $i++) {
-        $u = New-Object Net.Sockets.UdpClient(0)
-        $p = ([Net.IPEndPoint]$u.Client.LocalEndPoint).Port
-        $u.Close()
+        $p = $script:portRand.Next($script:portLow, $script:portTop)
         $near = @($avoid | Where-Object { [Math]::Abs($_ - $p) -le 2 }).Count
-        if ($p -lt 65535 -and $near -eq 0 -and (Free $p) -and (Free ($p + 1))) { return $p }
+        if ($near -eq 0 -and (Bindable $p)) { return $p }
     }
     return 0
 }
+# The case measured: a TCP block Windows reserved, with nothing in it for
+# "free" to see. A pair whose resources port is the block's first is not
+# handed out. A machine with no such block has nothing to show it on.
+$blocks = @()
+try {
+    foreach ($l in @(& netsh int ipv4 show excludedportrange protocol=tcp 2>$null)) {
+        $m = [regex]::Match([string]$l, '^\s*(\d+)\s+(\d+)')
+        if ($m.Success) { $blocks += [int]$m.Groups[1].Value }
+    }
+} catch { }
+$blockAt = @($blocks | Where-Object { $_ -gt 1025 -and $_ -lt 65535 -and (Free ($_ - 1)) -and (Free $_) } | Select-Object -First 1)
+if ($blockAt.Count) {
+    Yes ("a pair whose resources port is in a block Windows keeps for TCP ({0}) is not handed out, though nothing holds it (#2323)" -f $blockAt[0]) (
+        -not (Bindable ($blockAt[0] - 1)))
+} else {
+    Write-Host 'SKIP  no TCP block is kept on this machine, so the refusal of one is not shown here'
+}
+$probe = Pair @()
+Yes ('a pair is handed out below the range outgoing connections take ports from, which starts at ' + $script:dynamicStart) (
+    $probe -ge $script:portLow -and ($probe + 1) -lt $script:dynamicStart)
 
 # The task scheduler, for the far side. A task is a file holding its action;
 # starting it starts that action, the real cmd.exe line, and stopping it ends
@@ -495,9 +567,10 @@ function Payload {
     return $zip
 }
 
-$rand = New-Object Random
 try {
-    do { $P = $rand.Next(41000, 48000) } until ((Free $P) -and (Free ($P + 1)))
+    $P = Pair @()
+    Yes ("a game port for the installs, {0}, and {1} above it, both bound and let go below the dynamic range, which starts at {2}" -f $P, ($P + 1), $script:dynamicStart) ($P -gt 0)
+    if (-not $P) { throw ('no pair of ports from {0} to {1} could be bound, so no stub server can start' -f $script:portLow, $script:portTop) }
 
     # ---- a first install ---------------------------------------------------
     $v1 = Payload -Gamemode '// v1' -Binary 'binary v1' -Shipped 'shipped v1'
@@ -515,8 +588,8 @@ try {
     # docs\RESTORING.md installs into C:\Thornswood-RestoreTest\server with
     # -NoTask, from a payload whose settings are the live server's. The stop
     # must be by this root's own processes: the one on that port is live.
-    $Q = 0
-    do { $Q = $rand.Next(41000, 48000) } until ((Free $Q) -and (Free ($Q + 1)) -and [Math]::Abs($Q - $P) -gt 2)
+    $Q = Pair @($P)
+    if (-not $Q) { throw ('no second pair of ports from {0} to {1} could be bound, so the other server cannot start' -f $script:portLow, $script:portTop) }
     $other = Join-Path $work 'other-server'
     Put (Join-Path $other 'gamemode.js') '// the other server'
     Put (Join-Path $other 'server-settings.json') ((@{ port = $Q; name = 'other' }) | ConvertTo-Json)
@@ -822,10 +895,10 @@ try {
     # Publish-Server holds the payload to a game port and checks the answer on
     # the resources port. By default those are the dev server's own, 7787 and
     # 7788, which the dev server holds on the VPS where this runs; so this
-    # takes a pair from the system and passes them (-GamePort, -ResourcesPort,
-    # #1728). A pair the system will not give fails here rather than skipping.
+    # takes a pair of its own and passes them (-GamePort, -ResourcesPort,
+    # #1728). No pair to be had fails here rather than skipping.
     $D = Pair @($P, $Q)
-    Yes ("a game port from the system for the dev Publish-Server runs, {0}, and {1} above it, both free" -f $D, ($D + 1)) ($D -gt 0)
+    Yes ("a game port for the dev Publish-Server runs, {0}, and {1} above it, both bound and let go" -f $D, ($D + 1)) ($D -gt 0)
     if ($D -gt 0) {
         $devRoot = Join-Path $box 'Thornswood-Server-Dev'
         $dist = Join-Path $work 'dist'
@@ -1028,9 +1101,9 @@ try {
 
     # ---- Publish-Server.ps1, whole, on the live channel (#1222) --------------------
     # The same over a live server. Its own ports, 7777 and 3000, are the live
-    # server's on the VPS, so this takes a pair from the system too (#1728).
+    # server's on the VPS, so this takes a pair of its own too (#1728).
     $L = Pair @($P, $Q, $D)
-    Yes ("a game port from the system for the live Publish-Server runs, {0}, and {1} above it, both free" -f $L, ($L + 1)) ($L -gt 0)
+    Yes ("a game port for the live Publish-Server runs, {0}, and {1} above it, both bound and let go" -f $L, ($L + 1)) ($L -gt 0)
     if ($L -gt 0 -and $D -gt 0) {
         $liveRoot = Join-Path $box 'Live\Thornswood-Server'
         $script:PayloadStampFor = 'main'
