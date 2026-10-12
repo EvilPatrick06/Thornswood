@@ -5680,7 +5680,10 @@
       carried = (pc && form) ? pc.getItemCount(form) : 0;
     } catch (e) { carried = 0; }
     if (!(carried > 0) || !(stampedMolds(pc, mold) > 0)) { return null; }
-    return { hex: hex, verb: 'key', words: 'Cut a key from your key mold' };
+    // And the mold key's row for the master key, cut again from the same mold
+    // for two iron ingots (#2254). See masterPress.
+    return { hex: hex, verb: 'key', words: 'Cut a key from your key mold',
+             master: 'Cut a master key from your key mold, 2 iron ingots' };
   }
 
   function plainWords(text) { return String(text || '').replace(/[<>&"]/g, ''); }
@@ -5702,6 +5705,7 @@
     const rows = [];
     if (now && now.e) { rows.push(lockRow('E', now.e)); }
     if (now && now.words) { rows.push(lockRow(LOCK_NAME, now.words)); }
+    if (now && now.master) { rows.push(lockRow(MOLD_NAME, now.master)); }
     const html = (info ? '<div style="font-size:16px;color:#c9b99a;margin-bottom:3px">' + info + '</div>' : '') +
                  rows.join('');
     if (html === lockShown) { return; }
@@ -5749,6 +5753,33 @@
     lockSentAt = t;
     tellServer('/' + sig);
     say('pressed ' + LOCK_NAME + ' for /' + sig);
+    return true;
+  }
+
+  /*
+    THE MASTER KEY AT A FORGE (#2254). Patrick, 12 Oct 2026: a lost master
+    key is cut again from the building's mold for two iron ingots. At a forge
+    with a stamped mold in the pack the lock key's line has a second row, the
+    mold key's, and the mold key sends /key with the forge's id and master.
+    U means nothing else there: the mold's own line wants a door, the sleep
+    key a person, the repair line the inventory. The server checks the rest:
+    the smith, the forge, the mold, the holder standing there and the ingots.
+  */
+  let masterSentFor = '';
+  let masterSentAt = 0;
+  function masterPress() {
+    if (!T.ready) { return false; }
+    if (claims.chat) { return false; }
+    const now = lockKeyNow();
+    drawLock(now);
+    if (!now || !now.master) { return false; }
+    const sig = 'key ' + now.hex + ' master';
+    const t = Date.now();
+    if (sig === masterSentFor && t - masterSentAt < 1500) { return true; }
+    masterSentFor = sig;
+    masterSentAt = t;
+    tellServer('/' + sig);
+    say('pressed ' + MOLD_NAME + ' for /' + sig);
     return true;
   }
 
@@ -8514,6 +8545,8 @@
     if (e.code === SLEEP_KEY && sleepPress()) { return; }
     // The same key in the inventory, with a repair kit in the pack (#1384).
     if (e.code === MOLD_KEY && repairPress()) { return; }
+    // The same key at a forge with a stamped mold: the master key (#2254).
+    if (e.code === MOLD_KEY && masterPress()) { return; }
     if (e.code === LOCK_KEY && lockPress()) { return; }
     // The same key on a hurt person under the crosshair (#1383). See TREAT_KEY.
     if (e.code === TREAT_KEY && treatPress()) { return; }

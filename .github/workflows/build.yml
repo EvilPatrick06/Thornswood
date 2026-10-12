@@ -445,7 +445,7 @@ jobs:
                  'test-1588-tools-50.js',
                  'test-1741-encoding.js',
                  'test-1634-apprentice-gui.js',
-                 'test-1637-door-gui.js', 'test-2250-claim-door.js', 'test-2256-locked-for-everyone.js', 'test-2245-drawn-pick.js', 'test-2244-after-mining-measure.js', 'test-item-names.js', 'test-2255-key-mold-models.js', 'test-2258-house-parts-hidden.js', 'test-2468-last-plugin.js', 'test-2298-held-board.ps1',
+                 'test-1637-door-gui.js', 'test-2250-claim-door.js', 'test-2256-locked-for-everyone.js', 'test-2245-drawn-pick.js', 'test-2244-after-mining-measure.js', 'test-item-names.js', 'test-2255-key-mold-models.js', 'test-2254-master-key.js', 'test-2258-house-parts-hidden.js', 'test-2468-last-plugin.js', 'test-2298-held-board.ps1',
                  'test-502-no-bounty.js',
                  'test-502-jail-cells.js',
                  'test-502-guard-board.js',

@@ -294,6 +294,9 @@ function client(opt) {
     'const SLEEP_KEY = MOLD_KEY;',
     'function sleepPress() { return false; }',
     'function repairPress() { return false; }',
+    // And at a forge with a stamped mold, the master key (#2254). No forge
+    // is looked at here; test-1637-door-gui.js has what it does.
+    'function masterPress() { return false; }',
     // A warrior's maneuver key (#1386), 9, scan code 10, asked ahead of K.
     // No press here is 9; test-1386-warrior.js has what it does.
     'const MANEUVER_KEY = iniNumber(iniText, "ManeuverKey", 10);',
