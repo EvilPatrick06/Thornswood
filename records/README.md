@@ -61,9 +61,12 @@ read it (issue #440, phase 8):
   built again.
 - `most-online.json`: the most people in the world at once (`people`) and
   the seats over it that only the Discord staff roles may take
-  (`staffSeats`), with Patrick's decisions in its `note` (issue #481).
+  (`staffSeats`), with Patrick's decisions in its `note` (issue #481), and
+  the most people the voice service takes at once (`voice`), never fewer than
+  the two together, since everybody seated and everybody waiting in line at
+  the menu holds a socket to it.
   `scripts\deploy\MaxOnline.ps1` reads it for Deploy-Gamemode,
-  Deploy-DevGamemode, Publish-Server and Publish-Update, and `site\server.js`
+  Deploy-DevGamemode, Publish-Server, Publish-Update and Install-Voice, and `site\server.js`
   reads `people` when the site runs from the repository. No script writes
   this one: it is changed by hand in a pull request, then each server is
   deployed and a Ship carries it to the feed.

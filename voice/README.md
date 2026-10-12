@@ -66,6 +66,19 @@ for two minutes (`THORNSWOOD_TOKEN_SECONDS`, 120 when unset), so the
 launcher's voice page and the game's chat each ask the launcher for a fresh
 one whenever they connect; a token presented twice is refused and written
 down as copied (#1322).
+`THORNSWOOD_VOICE_MOST` is the most people it takes at once (#481): people,
+not sockets, so a person's voice page and chat, and a reconnect overlapping
+the socket it replaces, count once by the profile their tokens proved, and a
+profile already in is always let in. Past it a new person's socket is sent one
+chat line saying voice and chat are full, then closed with 1013, and the pages
+try again on their own backoff; `/health` gives `most`, `people` and
+`refusedFull`. Unset or 0 is no cap. Install-Voice.ps1 sets it from `voice` in
+`records\most-online.json`, which is never fewer than the world's seats,
+because everybody seated and everybody waiting in line at the menu holds a
+socket here. `test-most.js` covers it. `load-voice.js` is not a harness: it
+plays an evening at a copy of the service with no people (two sockets each, a
+join storm, the WebRTC signalling for every pair, walking and talk) and prints
+what the service cost at each size, which is where that number came from.
 `THORNSWOOD_VOICE_AUTH`, which once let unproven joins in, is not read any
 more. `/health`
 reports

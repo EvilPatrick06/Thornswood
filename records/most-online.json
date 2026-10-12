@@ -1,5 +1,6 @@
 {
   "people": 25,
   "staffSeats": 5,
-  "note": "The most people in the world at once, and the extra seats over it that only the Discord staff roles may take. Patrick, 28 Sep: 25 at once for the alpha, raised later; 29 Sep: 5 staff seats for now. Anyone past the number waits in line at the game's menu. Change it here, then run the deploy for each server. scripts\\deploy\\MaxOnline.ps1 says who reads it."
+  "voice": 60,
+  "note": "The most people in the world at once, and the extra seats over it that only the Discord staff roles may take. Patrick, 28 Sep: 25 at once for the alpha, raised later; 29 Sep: 5 staff seats for now. Anyone past the number waits in line at the game's menu. voice is the most people the voice service takes at once, never fewer than people and staffSeats together, because everybody seated and everybody waiting in line holds a socket to it: 60 is the 30 seats and a line as long again, chosen on 11 Oct from voice\\load-voice.js, where the service on One took 100 people with a restart under five seconds and fell behind at 200 (#481). Change it here, then run the deploy for each server and Install-Voice.ps1. scripts\\deploy\\MaxOnline.ps1 says who reads it."
 }
