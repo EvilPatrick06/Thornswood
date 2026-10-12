@@ -105,12 +105,15 @@ page.list.forEach(function (s, i) {
 });
 const still = npcRows.filter(function (x) { return /stand still/i.test(x.row.what); })[0];
 const differs = npcRows.filter(function (x) { return /differ/i.test(x.row.what); })[0];
-yes('the row for NPCs standing still is still on the page', !!still);
-yes('and so is the row for NPC behaviour differing near the same enemy', !!differs);
-
-/* They keep the reason SkyMP gives, which is still true today. */
-yes('the standing still row still gives the reason: no server side AI',
-    !!still && /server side AI/i.test(still.row.why));
+/* Issue #504, 11 Oct: release 1.2.3 runs NPCs on the server, and they keep
+   moving with nobody connected (the "Shared NPC activity" line in
+   game/gamemode.js). The standing still row, and its "no server side AI"
+   reason, became false about the server, so it is gone and the section says
+   what replaced it. The differing row stays until two people have checked it
+   in the game. */
+yes('no row says NPCs stand still when nobody is nearby any more', !still);
+yes('and nothing on the page says SkyMP has no server side AI', !/server side AI/i.test(text || ''));
+yes('the row for NPC behaviour differing near the same enemy is still on the page', !!differs);
 yes('the differing row still gives the reason: hosting changes every two seconds',
     !!differs && /(2|two) seconds/i.test(differs.row.why));
 
@@ -137,6 +140,8 @@ yes('the NPC section says the traders stay', /\btraders?\b/i.test(home.lead));
 yes('and the carriage workers', /\bcarriages?\b/i.test(home.lead));
 yes('and the ferry workers', /\bferr(y|ies)\b/i.test(home.lead));
 yes('and that the rest go or are remade', /\b(taken out|removed|remade|rebuilt)\b/i.test(home.lead));
+yes('the NPC section says the server keeps them moving with nobody nearby',
+    /server[^.]*keep moving when nobody is nearby/i.test(home.lead.replace(/\s+/g, ' ')));
 yes('it says what is still worth reporting',
     /report[^.]*only if|only report|worth reporting|worth a report/i.test(home.lead));
 
