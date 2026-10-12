@@ -348,6 +348,15 @@ if (Test-Path -LiteralPath $clientRecord) {
 # tell Skyrim's own files from mods put into the Steam copy by hand, and makes
 # and refreshes nothing without it.
 $skyrimRecord = Join-Path $Here '..\..\records\skyrim-files.json'
+# RecordShape.ps1 (#2180): the two records compiled into the launcher must be
+# a version this checkout knows with every field OwnGame reads, or the build
+# stops here; a launcher with a half-read list in it is worse than none.
+. (Join-Path $Here 'RecordShape.ps1')
+foreach ($embedded in @(@{ Path = $skyrimRecord; Kind = 'skyrim-files' }, @{ Path = (Join-Path $Here '..\..\records\ui-gone.json'); Kind = 'ui-gone' })) {
+    if (Test-Path -LiteralPath $embedded.Path) {
+        try { $null = Read-ThornswoodRecord -Path $embedded.Path -Kind $embedded.Kind } catch { Die ($_.Exception.Message + ' Nothing was built.') }
+    }
+}
 if (Test-Path -LiteralPath $skyrimRecord) {
     $cscArgs += "/resource:$((Resolve-Path $skyrimRecord).Path),skyrim-files.json"
 } else {

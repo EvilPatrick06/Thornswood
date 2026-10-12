@@ -345,7 +345,7 @@
         // Anything typed while the socket was down goes now rather than being
         // lost, which is what an unacknowledged send would have been.
         while (queue.length) {
-          try { ws.send(JSON.stringify({ t: 'chat', text: queue.shift() })); }
+          try { ws.send(JSON.stringify(chatFrame(queue.shift()))); }
           catch (e) { break; }
         }
         return;
@@ -550,6 +550,12 @@
     return count === 1 ? String(sides) : (count + 'x' + sides);
   }
 
+  /* A queued line is its text, or { text, press } for one a key sent (#2251). */
+  function chatFrame(item) {
+    if (item && typeof item === 'object') return { t: 'chat', text: item.text, press: true };
+    return { t: 'chat', text: item };
+  }
+
   window.thornswoodNet = {
     /*
       auto is true for every line thornswood-front.js sends through
@@ -576,13 +582,17 @@
         // The command, not the answer. See the note over ROLL.
         text = '/roll ' + spec;
       }
+      // A line a key or a button sent says so (#2251), so the chat log does
+      // not record the lock key as somebody typing /lock. Queued with the
+      // flag, so a line held through an outage keeps it.
+      var item = auto ? { text: text, press: true } : text;
       if (ws && ws.readyState === 1 && joined) {
-        try { ws.send(JSON.stringify({ t: 'chat', text: text })); return true; }
+        try { ws.send(JSON.stringify(chatFrame(item))); return true; }
         catch (e) { }
       }
       // Held rather than dropped, and capped so a long outage does not grow
       // without limit.
-      queue.push(text);
+      queue.push(item);
       while (queue.length > 20) queue.shift();
       if (!auto) note('Not connected yet, that is queued.', C_WARN);
       return false;

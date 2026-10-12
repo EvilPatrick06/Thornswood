@@ -16,13 +16,14 @@ What it does:
            staff channel, the day it arrives
   Holds    a panel in #choose-your-hold where a Member picks their hold
            and which announcements ping them
-  Live smoke the living checklist in #test-tasks: /live-smoke start opens a
-           dated session thread with one message per row of the Live set, and
-           testers mark their own rows on it. /live-smoke refresh keeps the
-           same rows standing in the channel between sessions, and
-           /live-smoke report counts a session's marks back to staff. The
-           rows come out of live-smoke-discord-export.json beside this file,
-           and a mark is an edit to a Discord message and nothing else
+  Testing  #known-issues is a forum with one post per open GitHub issue
+           labelled Dev Findings or Main Findings; the post goes when the
+           issue is fixed. #test-tasks is a forum of test tasks, tagged Dev or
+           Main: one for each issue closed as fixed (its "Test task:" comment),
+           plus any posted by hand (/test-task, python bot.py --post-task). The
+           channels get there once, by hand, with
+           python bot.py --setup-channels [--apply] (the testing channels
+           section below)
   Heartbeat writes heartbeat.json beside this file every minute, so the
            watchdog can tell a bot that is running from one that is on
            Discord (issue #449)
@@ -51,14 +52,15 @@ Everything it needs is in env:
   WATCH_READ_EVERY seconds between reads of its outbox, default 60
   HOLD_CHANNEL     channel the hold panel lives in, default choose-your-hold
   MEMBER_ROLE      role ID (preferred) or name that may pick a hold, default Member
-  LIVE_SMOKE_EXPORT       the Live set, default live-smoke-discord-export.json
-                          beside this file
-  LIVE_SMOKE_CHANNEL      channel the sessions live in, default test-tasks
-  LIVE_SMOKE_ADMIN_ROLES  comma separated role IDs (preferred) or names, who
-                          may start, reset and refresh a session, default
-                          Owner,Dev,Lead GM,Lead Gamemaster
-  LIVE_SMOKE_DENY_USER_IDS comma separated account ids that may not mark a
-                          row, empty by default and set only on the VPS
+  TEST_TASK_ROLES  comma separated role IDs (preferred) or names, who may
+                   post a test task, default Owner,Dev,Lead Gamemaster,Lead GM
+  TEST_TASKS_CHANNEL, TEST_FINDINGS_CHANNEL, KNOWN_ISSUES_CHANNEL
+                   default test-tasks, test-findings, known-issues
+  GITHUB_TOKEN     read only token for the repository's issues. A secret, set
+                   only in bot.env.json. Not set means no #known-issues posts
+  KNOWN_ISSUES_REPO   default EvilPatrick06/Thornswood
+  KNOWN_ISSUES_LABELS default Dev Findings,Main Findings
+  KNOWN_ISSUES_EVERY  seconds between GitHub reads, default 300, never under 60
   HEARTBEAT_FILE   where the heartbeat goes, default heartbeat.json beside this
                    file, which is where the watchdog reads it
   HEARTBEAT_EVERY  seconds between heartbeats, default 60
@@ -80,7 +82,9 @@ import re
 import ssl
 import time
 import traceback
+import sys
 import typing
+import urllib.parse
 import urllib.request
 
 # Windows Server ships with an empty root certificate store and the automatic
@@ -100,6 +104,24 @@ if not os.environ.get('SSL_CERT_FILE'):
 import discord
 
 import card
+
+
+def _load_env_file(argv):
+    """
+    --env-file PATH: read bot.env.json into the environment before anything
+    below reads it, so the one-time setup and --post-task can be run by hand
+    on the VPS with the service's settings. The service never passes it.
+    """
+    if '--env-file' not in argv:
+        return
+    at = argv.index('--env-file')
+    with open(argv[at + 1], encoding='utf-8-sig') as f:
+        for k, v in json.load(f).items():
+            os.environ[str(k)] = str(v)
+
+
+if __name__ == '__main__':
+    _load_env_file(sys.argv)
 
 TOKEN = os.environ.get('DISCORD_TOKEN', '').strip()
 SITE = os.environ.get('THORNSWOOD_SITE', 'https://thornswood.net').rstrip('/')
@@ -322,12 +344,6 @@ class Thornswood(discord.Client):
         self.add_view(TicketPanel())          # so it keeps working after a restart
         self.add_view(TicketTools())          # and so does Close on every old ticket
         self.add_view(HoldPanel())            # and the hold and ping buttons
-        # One per row in the Live smoke export, so a session opened before the
-        # last restart can still be marked. A row dropped from the export is a
-        # row whose buttons go quiet, which is why a changed set gets a new
-        # session rather than the old one carried on.
-        for view in live_smoke_views():
-            self.add_view(view)
 
 
 client = Thornswood(intents=intents)
@@ -1394,7 +1410,7 @@ def is_ticket_thread(ch):
     plain message, never a thread, so that channel has none to close.
 
     This used to be any thread at all (#1776). /close in a Live smoke session
-    thread or a #tales post archived and locked it and wrote "Closed: ..."
+    thread (since removed) or a #tales post archived and locked it and wrote "Closed: ..."
     into the staff ticket record as if it were a ticket.
 
     A thread whose parent is not in the bot's cache is not a ticket here:
@@ -1938,1004 +1954,913 @@ async def ensure_hold_panel(guild):
         log('hold panel failed:\n' + traceback.format_exc())
 
 
-# ------------------------------------------------------------ live smoke --
+# ------------------------------------------------------- testing channels --
 #
-# The living Live smoke checklist in #test-tasks, decided on 1 October.
+# Patrick's card of 11 October. The Live smoke checklist that lived in
+# #test-tasks (dated sessions, Pass/Fail/Skip/Fail-known rows, /live-smoke)
+# is gone, and the testing channels are three things instead:
 #
-# The criteria are not written here. They live in the vault, in
-# wiki/quality/playtest-acceptance.md, and Cynthia exports the Live slice of
-# them to live-smoke-discord-export.json, a copy of which is deployed beside
-# this file. The bot reads that file and nothing else: no request to the
-# vault, no request to the site, and nothing written back anywhere.
+#   #test-tasks     a Forum. One thread per test task, tagged Dev or Main: the
+#                   bot posts one for each issue closed as fixed (see known
+#                   issues below), and staff can post one by hand (/test-task,
+#                   or python bot.py --post-task).
+#   #test-findings  what #test-results was, renamed. Nothing else about it moves.
+#   #known-issues   a Forum, read only: one bot post per open GitHub issue
+#                   labelled Dev Findings or Main Findings, title only, no
+#                   number and no link. The post goes when the issue is fixed
+#                   (Patrick, 11 Oct: one entry per issue, not one list).
 #
-# IT RUNS ONE WAY. Vault to Discord. A mark pressed here is an edit to the
-# Discord message the button sits on, and that is the whole of where it is
-# kept. Nothing in this section writes a mark, a name or a Discord id to the
-# site, to the bot's own records, to a database or to the log, and the two
-# places that would have done it by accident say so where they are: the mark
-# handler logs no traceback, because a Discord error carries the message it
-# refused and that message holds names and marks.
+# THE ONE-TIME SETUP. Getting the server from the old shape to that one is the
+# only channel change the bot makes, and Patrick's explicit exception to the
+# never-touch-channels rule, for these three changes only. It runs only when
+# asked, from the command line, never on a normal start:
 #
-# WHAT A REPORT IS. The same marks read back, not a second record of them.
-# /live-smoke report counts the rows in one session thread and says the total
-# to whoever ran it as an ephemeral, so a Fail is not missed halfway down a
-# session of twenty eight rows. It reads the messages Discord already holds,
-# names people by the display names those messages already carry, and posts
-# nothing in the thread. Keeping marks anywhere off Discord is a different
-# thing and needs the Privacy page changed first.
+#   python bot.py --setup-channels            says what it would do, changes nothing
+#   python bot.py --setup-channels --apply    does it, once
 #
-# Marks are visible to everybody who can read the session thread. That is the
-# Owner's call rather than an accident. The channel itself is pathfind in
-# Build-Discord.py: testers and staff, never @everyone, plus the lead
-# gamemaster role on that channel's own line, because the admin list below is
-# not the same list as pathfind and somebody holding only that role could
-# otherwise run a session in a channel they cannot see.
+# A finished apply is written to channel-setup.json in the data folder, and a
+# second run reads it and does nothing at all. Each step also looks at the
+# server before it acts, so an apply that stopped half way picks up where it
+# stopped. Permission overwrites are copied, never invented.
 #
-# WHAT GOES ON DISCORD. The checklist rows, and nothing wrapped around them.
-# Djinn on 1 October, twice: testers have no GitHub, so no ticket number, no
-# issue number and no pull request number is ever appended to a row; and the
-# blocks of instructions that used to sit above and below the rows are gone,
-# because the rows say what to do and nobody read the rest. What is kept is
-# the versioning, which is the session title and one short line off the
-# export's own updated date.
-#
-# WHO MAY START ONE. Owner, Dev and Lead Gamemaster, which is wider than
-# Owner and Dev and narrower than STAFF: a Moderator alone does not start,
-# reset, refresh or report on a session. Roles were deleted and renamed in
-# the cleanup, so LIVE_SMOKE_ADMIN_ROLES in bot.env.json carries them, as
-# role ids (preferred, since an id survives a rename) or names, matched the
-# way STAFF_ROLES is (#1355). The defaults are names, so no snowflake is
-# written down anywhere here.
-#
-# The default is in this file and not read out of the export, so content that
-# moves when Cynthia refreshes the Live set can never widen who may start a
-# session.
-LIVE_SMOKE_EXPORT = (os.environ.get('LIVE_SMOKE_EXPORT', '').strip() or
-                     os.path.join(HERE, 'live-smoke-discord-export.json'))
-LIVE_SMOKE_SCHEMA = 'thornswood.live-smoke.v1'
-LIVE_SMOKE_CHANNEL = [n.strip().lower() for n in
-                      os.environ.get('LIVE_SMOKE_CHANNEL', 'test-tasks').split(',')
-                      if n.strip()]
-# Lead Gamemaster and Lead GM are both here because the role has been written
-# both ways and the scrub is not finished. A name matches ignoring case and a
-# digit token matches the role id, the way STAFF_ROLES works, so the order is
-# only what a refusal names first: Lead Gamemaster, which is the canonical
-# spelling the export carries, and Lead GM after it as the alias.
-LIVE_SMOKE_ADMIN_NAMES = [r.strip() for r in
-                          os.environ.get('LIVE_SMOKE_ADMIN_ROLES',
-                                         'Owner,Dev,Lead Gamemaster,Lead GM').split(',')
-                          if r.strip()]
-LIVE_SMOKE_ADMIN = [r.lower() for r in LIVE_SMOKE_ADMIN_NAMES]
-# The second lock on agents, after interaction.user.bot. Empty here on
-# purpose: an account that has to be named is named in bot.env.json on the
-# VPS, never in the repository.
-LIVE_SMOKE_DENY = set(int(i) for i in
-                      os.environ.get('LIVE_SMOKE_DENY_USER_IDS', '').split(',')
-                      if i.strip().isdigit())
-
-LIVE_SMOKE_MARKS = ('Pass', 'Fail', 'Skip', 'Fail-known')
-LIVE_SMOKE_TITLE = 'Live smoke'
-# The post the standing checklist hangs off, found again by these words.
-LIVE_SMOKE_CHECKLIST_HEAD = '**Live smoke checklist**'
-# The thread the standing rows sit in, off that post. The name must not start
-# with LIVE_SMOKE_TITLE: a reset archives and locks every thread under the
-# channel that does, and those are the session threads, never this one.
-LIVE_SMOKE_ROWS = 'Checklist rows'
-# What the marks on an item message sit under, so they can be found again and
-# one person's line replaced rather than a second one added.
-LIVE_SMOKE_MARKS_HEAD = '\n\nMarks:\n'
-# A Discord message holds 2000 characters. Well under it, so an item message
-# that is nearly full says so instead of being refused by Discord.
-LIVE_SMOKE_ROOM = 1900
+# Discord cannot turn a text channel into a forum (a channel's type can only go
+# between text and announcement). The edit is asked for anyway, in case that
+# changes, and when Discord refuses it a new forum called test-tasks is made in
+# the same category, at the same position, with the old channel's overwrites,
+# and the old one is renamed test-tasks-archive with sending switched off for
+# everyone but the bot. Nothing is deleted.
+TASKS_NAME = os.environ.get('TEST_TASKS_CHANNEL', 'test-tasks').strip().lower()
+TASKS_ARCHIVE = TASKS_NAME + '-archive'
+FINDINGS_OLD = 'test-results'
+FINDINGS_NAME = os.environ.get('TEST_FINDINGS_CHANNEL', 'test-findings').strip().lower()
+KNOWN_NAME = os.environ.get('KNOWN_ISSUES_CHANNEL', 'known-issues').strip().lower()
+TASK_TAGS = ('Dev', 'Main')
+SETUP_STATE = os.path.join(DATA_DIR, 'channel-setup.json')
+KNOWN_STATE = os.path.join(DATA_DIR, 'known-issues.json')
+SETUP_REASON = 'Thornswood channel setup (one time, Patrick 11 Oct)'
+# The send permissions switched off on the archived channel, and only those.
+ARCHIVE_LOCK = ('send_messages', 'send_messages_in_threads',
+                'create_public_threads', 'create_private_threads')
+# Who may post a test task with /test-task. The same people who could run the
+# Live smoke sessions, by id (preferred) or by name. A bot.env.json that still
+# carries LIVE_SMOKE_ADMIN_ROLES (with the role ids in it) keeps working.
+TASK_ROLE_NAMES = [r.strip() for r in
+                   (os.environ.get('TEST_TASK_ROLES', '').strip()
+                    or os.environ.get('LIVE_SMOKE_ADMIN_ROLES', '').strip()
+                    or 'Owner,Dev,Lead Gamemaster,Lead GM').split(',')
+                   if r.strip()]
+# Forum titles are capped at 100 by Discord and a first message at 2000.
+TASK_TITLE_ROOM = 100
+TASK_BODY_ROOM = 2000
 
 
-def _live_smoke_or(names):
-    """a, b or c, for a refusal that names the roles."""
-    names = [n for n in names if n]
-    if not names:
-        return 'nobody'
-    if len(names) == 1:
-        return names[0]
-    return ', '.join(names[:-1]) + ' or ' + names[-1]
-
-
-def live_smoke_items(export):
-    """
-    Every item in the export, in the order it gives, each one a dict.
-
-    An item with no id or no line for Discord is dropped rather than posted
-    half built: the id is what its buttons are keyed by, and the line is the
-    whole of what a tester reads. An order that is not a number keeps the
-    place the file put it in.
-    """
-    out = []
-    for n, raw in enumerate((export or {}).get('items') or []):
-        if not isinstance(raw, dict):
+def _channel_named(guild, name, kinds=None):
+    """Any channel in the server by name, text, forum or other, optionally of
+       the given kinds ('text', 'forum'). guild.channels, not text_channels,
+       because a forum is not in text_channels."""
+    for ch in list(getattr(guild, 'channels', None) or []):
+        if str(getattr(ch, 'name', '') or '').lower() != name:
             continue
-        ident = str(raw.get('id') or '').strip()
-        line = str(raw.get('discord_line') or '').strip()
-        if not ident or not line:
+        if kinds and _kind(ch) not in kinds:
             continue
-        try:
-            order = int(raw.get('order'))
-        except (TypeError, ValueError):
-            order = n + 1
-        skip = raw.get('skip_rule')
-        out.append({
-            'id': ident,
-            'order': order,
-            'label': str(raw.get('label') or '').strip(),
-            'tickets': [str(t).strip() for t in (raw.get('tickets') or [])
-                        if str(t).strip()],
-            # null on every row of the Live set as it stands, and read anyway,
-            # because the export is what decides. When one does carry a rule it
-            # is shown on the message, so a tester knows Skip is the right mark
-            # without opening the vault.
-            'skip_rule': str(skip).strip() if skip else '',
-            'discord_line': line,
-        })
-    out.sort(key=lambda i: i['order'])
-    return out
-
-
-def live_smoke_load(path=None):
-    """
-    The export, read off the file beside this one.
-
-    Anything wrong with it raises ValueError carrying words a person can act
-    on, because every one of these is said back to whoever ran the command as
-    an ephemeral rather than left in a log nobody is reading at the time.
-
-    The schema is checked and not guessed. A later export shape with the same
-    file name would otherwise be posted as an empty session.
-    """
-    where = path or LIVE_SMOKE_EXPORT
-    try:
-        with open(where, encoding='utf-8') as f:
-            got = json.load(f)
-    except (IOError, OSError):
-        raise ValueError('There is no Live smoke export at %s. It is deployed '
-                         'beside bot.py by Install-Bot.ps1 -CodeOnly.' % where)
-    except ValueError:
-        raise ValueError('The Live smoke export at %s is not readable JSON.' % where)
-    if not isinstance(got, dict):
-        raise ValueError('The Live smoke export at %s is not what this reads.' % where)
-    if got.get('schema') != LIVE_SMOKE_SCHEMA:
-        raise ValueError('The Live smoke export at %s says schema %s, and this '
-                         'bot reads %s. Deploy the export that matches.'
-                         % (where, got.get('schema') or 'nothing',
-                            LIVE_SMOKE_SCHEMA))
-    items = live_smoke_items(got)
-    if not items:
-        raise ValueError('The Live smoke export at %s has no items in it.' % where)
-    # A custom_id is 100 characters, and an id too long for one is a session
-    # whose buttons Discord refuses halfway through posting it.
-    wide = [i['id'] for i in items
-            if len(live_smoke_custom_id(i['id'], 'Fail-known')) > 100]
-    if wide:
-        raise ValueError('These Live smoke item ids are too long to put on a '
-                         'button: %s.' % ', '.join(wide))
-    return got
-
-
-def live_smoke_custom_id(item_id, mark):
-    return 'ls:%s:%s' % (item_id, mark)
-
-
-def live_smoke_read_id(custom_id):
-    """
-    The item and the mark a button carries, or None when it is not one of
-    ours. Split from the right, so an item id with a colon in it still reads.
-    """
-    s = str(custom_id or '')
-    if not s.startswith('ls:') or ':' not in s[3:]:
-        return None
-    item_id, mark = s[3:].rsplit(':', 1)
-    if not item_id or mark not in LIVE_SMOKE_MARKS:
-        return None
-    return item_id, mark
-
-
-def live_smoke_title_of(export, settings_version, day=None):
-    """The session title: the format the export asks for, the date and the
-       version off the launcher's Settings window."""
-    fmt = str(((export or {}).get('session') or {}).get('title_format')
-              or 'Live smoke {YYYY-MM-DD} {settings_version}')
-    when = (day or datetime.date.today()).strftime('%Y-%m-%d')
-    return (fmt.replace('{YYYY-MM-DD}', when)
-               .replace('{settings_version}', str(settings_version or '').strip())
-               .strip())
-
-
-def live_smoke_show_tickets(export):
-    """
-    Whether the ticket numbers on a row may go on Discord. Off unless the
-    export asks for them in so many words.
-
-    Djinn's rule of 1 October: testers do not have GitHub, so an issue number
-    on a row is a thing they cannot open and a number they may write down as
-    if it meant something to them. The tickets stay in the export for the
-    staff map and for the harness.
-    """
-    return ((export or {}).get('rules') or {}).get('discord_show_tickets') is True
-
-
-def live_smoke_stamp(export):
-    """
-    The one short line that says which Live set this is, or nothing.
-
-    All that is left of the prose around the checklist: the set moves when
-    Cynthia refreshes it, and a tester reading a row has to be able to tell
-    which day's set they are marking.
-    """
-    export = export or {}
-    updated = str(export.get('updated') or '').strip()
-    if not updated:
-        return ''
-    fmt = str((export.get('session') or {}).get('version_stamp')
-              or 'Checklist updated: {updated}').strip()
-    return fmt.replace('{updated}', updated)
-
-
-def live_smoke_opener(title, live_channel, settings_version, stamp=''):
-    """
-    The message the session thread hangs off: the three things a session has
-    to record, and nothing else.
-
-    Djinn's layout call of 1 October. This used to carry a how to mark block
-    and a paragraph about where the marks go, above rows that each say what to
-    do. Testers read the rows and scrolled past the rest, so the rest is gone
-    and what is left is the session's own name.
-    """
-    out = ('**%s**\n'
-           'Live channel: %s\n'
-           'Settings version: %s'
-           % (title, str(live_channel).strip(), str(settings_version).strip()))
-    if stamp:
-        out += '\n' + stamp
-    return out
-
-
-def live_smoke_item_text(item, total=None, tickets=False):
-    """One row, as it is posted: what to do, and the skip rule when the export
-       gives one, which is what tells a tester that Skip is the honest mark.
-       Ticket numbers only when the export asks for them."""
-    head = 'Live %d' % item['order']
-    if total:
-        head += ' of %d' % total
-    if item['label']:
-        head += ': ' + item['label']
-    out = '**%s**' % head
-    if tickets and item['tickets']:
-        out += '  ' + ' '.join('#' + t for t in item['tickets'])
-    out += '\n' + item['discord_line']
-    if item['skip_rule']:
-        out += '\nSkip rule: ' + item['skip_rule']
-    if len(out) > LIVE_SMOKE_ROOM:
-        out = (out[:LIVE_SMOKE_ROOM].rstrip()
-               + '\n(the rest of this row is in the export)')
-    return out
-
-
-def live_smoke_mark(content, who, mark):
-    """
-    The item message with this person's mark on it, as words.
-
-    One line per person, keyed by the name shown in Discord, so marking twice
-    corrects the mark instead of adding a second one. Two people marking the
-    same row at the same moment is last write wins on the whole message, which
-    is worth less than it sounds: the loser presses it again.
-
-    A pure function of the message's own text, so the harness can check the
-    wording of it without a Discord to press buttons in.
-    """
-    text = str(content or '')
-    at = text.find(LIVE_SMOKE_MARKS_HEAD)
-    if at < 0:
-        body, lines = text.rstrip(), []
-    else:
-        body = text[:at].rstrip()
-        lines = [l for l in text[at + len(LIVE_SMOKE_MARKS_HEAD):].split('\n')
-                 if l.strip()]
-    name = str(who or '').strip() or 'Somebody'
-    line = '%s: %s' % (name, mark)
-    for i, had in enumerate(lines):
-        # Split off the end, not the front: a mark carries no colon and a name
-        # in Discord may.
-        if had.rsplit(': ', 1)[0].strip() == name:
-            lines[i] = line
-            break
-    else:
-        lines.append(line)
-    return body + LIVE_SMOKE_MARKS_HEAD + '\n'.join(lines)
-
-
-def live_smoke_read_marks(content):
-    """
-    Who marked this row what, in the order they marked it, off the message's
-    own words.
-
-    The other half of live_smoke_mark, and pure for the same reason: a report
-    is the rows in the thread counted up, so the harness can prove what a
-    session of marks reads as without a Discord to press buttons in.
-
-    A line under the heading that is not a name against one of the four marks
-    is left out rather than counted as something. Split off the end, the way
-    live_smoke_mark writes it, because a name in Discord may carry a colon.
-    """
-    text = str(content or '')
-    at = text.find(LIVE_SMOKE_MARKS_HEAD)
-    if at < 0:
-        return []
-    out = []
-    for line in text[at + len(LIVE_SMOKE_MARKS_HEAD):].split('\n'):
-        if ': ' not in line:
-            continue
-        who, mark = line.rsplit(': ', 1)
-        who, mark = who.strip(), mark.strip()
-        if not who or mark not in LIVE_SMOKE_MARKS:
-            continue
-        out.append((who, mark))
-    return out
-
-
-# The words a row's heading starts with, which is how a message in a session
-# thread is told from the opener above it and from anything anybody else
-# posted in it. live_smoke_item_text writes the heading.
-LIVE_SMOKE_ROW_HEAD = re.compile(r'^\*\*(Live \d+)')
-
-
-def live_smoke_row_name(content):
-    """
-    Live 13, off a row's own heading, or '' when this message is not a row.
-
-    Short on purpose: a report names every row of the set, and the number is
-    what a row is called in the thread, in the standing checklist and in the
-    export, so it is the one word that reaches all three.
-    """
-    got = LIVE_SMOKE_ROW_HEAD.match(str(content or '').lstrip())
-    return got.group(1) if got else ''
-
-
-def live_smoke_opener_stamp(content):
-    """
-    The stamp line off a session's opener, or ''.
-
-    Which Live set a session was opened against is the one thing a report has
-    to say that the thread's name does not. The opener's other lines are known,
-    because live_smoke_opener writes them, so the stamp is whatever is left and
-    this holds whatever wording the export's version_stamp gives it.
-    """
-    lines = [l.strip() for l in str(content or '').split('\n') if l.strip()]
-    for line in lines[1:]:
-        if line.startswith('Live channel:') or line.startswith('Settings version:'):
-            continue
-        return line
-    return ''
-
-
-def live_smoke_row_line(name, marks):
-    """
-    One row in a report: its name, then each mark somebody gave it with how
-    many gave it, and for a Fail or a Fail-known who they were.
-
-    Named for the two marks Dev acts on and counted for the other two. Eleven
-    names on a Pass are eleven names between whoever is reading and the one
-    Fail under it, and the thread itself still has them.
-    """
-    said = []
-    for mark in LIVE_SMOKE_MARKS:
-        who = [w for w, k in marks if k == mark]
-        if not who:
-            continue
-        if mark in ('Fail', 'Fail-known'):
-            said.append('%s %d (%s)' % (mark, len(who), ', '.join(who)))
-        else:
-            said.append('%s %d' % (mark, len(who)))
-    return '%s: %s' % (name, ', '.join(said))
-
-
-def live_smoke_report_text(title, stamp, rows):
-    """
-    What an admin reads instead of scrolling the whole session: the session's
-    own name, how many rows it has, which of them carry a Fail, which nobody
-    has marked, and then a line for each row that somebody marked.
-
-    rows is (name, marks) for every row in the thread, in the order the
-    session posted them, as live_smoke_row_name and live_smoke_read_marks read
-    them off each message.
-
-    Display names only, the same ones the rows themselves carry, and no
-    account id: this is the thread's own words counted up and said back to one
-    person. Pure, so the harness can read a session of marks without Discord.
-    """
-    head = ['**%s**' % (str(title or '').strip() or LIVE_SMOKE_TITLE)]
-    if stamp:
-        head.append(stamp)
-    if not rows:
-        head.append('There are no checklist rows in this thread to read.')
-        return '\n'.join(head)
-    marked = [(n, m) for n, m in rows if m]
-    blank = [n for n, m in rows if not m]
-    if not marked:
-        head.append('%d row(s), none of them marked yet.' % len(rows))
-    elif blank:
-        head.append('%d row(s). %d marked, %d not marked yet.'
-                    % (len(rows), len(marked), len(blank)))
-    else:
-        head.append('%d row(s), every one of them marked.' % len(rows))
-    for mark in ('Fail', 'Fail-known'):
-        named = [n for n, m in rows if any(k == mark for _w, k in m)]
-        if named:
-            head.append('%s on: %s.' % (mark, ', '.join(named)))
-    if blank:
-        head.append('Not marked: %s.' % ', '.join(blank))
-    body = [live_smoke_row_line(n, m) for n, m in marked]
-    said = '\n'.join(head + [''] + body) if body else '\n'.join(head)
-    # A Discord message holds what it holds, and the lines above the list name
-    # every Fail, so the list is what gives way when a session runs long.
-    while len(said) > LIVE_SMOKE_ROOM and body:
-        body.pop()
-        said = '\n'.join(head + [''] + body
-                         + ['(%d more marked row(s) are in the thread. Every '
-                            'Fail is named above.)' % (len(marked) - len(body))])
-    if len(said) > LIVE_SMOKE_ROOM:
-        said = said[:LIVE_SMOKE_ROOM].rstrip() + '\n(the rest is in the thread)'
-    return said
-
-
-def live_smoke_report_refusal(channel):
-    """
-    Why the marks cannot be counted here, or None.
-
-    A report is of one dated session, so it is read in that session's own
-    thread, while that session is the one open. The channel itself holds no
-    marks, and neither does the thread the standing checklist stands in: those
-    rows carry no buttons, because a mark belongs to a dated session.
-    """
-    if not live_smoke_in_session(channel):
-        return ('Run this in the session thread whose marks you want, under '
-                '#%s.' % LIVE_SMOKE_CHANNEL[0])
-    if not str(getattr(channel, 'name', '') or '').startswith(LIVE_SMOKE_TITLE):
-        return ('This is not a Live smoke session thread, so there are no '
-                'marks in it: the rows in %s carry no buttons. Run this in '
-                'the thread of the session you want.' % LIVE_SMOKE_ROWS)
-    if getattr(channel, 'archived', False) or getattr(channel, 'locked', False):
-        return ('That session is closed, so this reports on the session that '
-                'is open. Its rows are still in the thread, marks and all, '
-                'for anybody who can read it.')
+        return ch
     return None
 
 
-def live_smoke_head(export):
-    """
-    The post the standing rows hang off: the heading refresh finds it by
-    again, and the day the set last changed, which is the versioning Djinn
-    asked to keep.
+def _kind(ch):
+    t = getattr(ch, 'type', None)
+    return getattr(t, 'name', str(t or ''))
 
-    Nothing else. The rows are messages of their own in the thread off this
-    one, so each of them carries the whole of what a tester does.
-    """
-    out = LIVE_SMOKE_CHECKLIST_HEAD
-    stamp = live_smoke_stamp(export)
-    if stamp:
-        out += '\n' + stamp
+
+def _copy_overwrites(ch):
+    """The channel's overwrites as a fresh dict, each one copied, so changing
+       the copy never touches the original."""
+    out = {}
+    for target, ow in dict(getattr(ch, 'overwrites', None) or {}).items():
+        allow, deny = ow.pair()
+        out[target] = discord.PermissionOverwrite.from_pair(allow, deny)
     return out
 
 
-def live_smoke_checklist(export, items):
+def known_overwrites(guild, like):
     """
-    Every message the standing checklist is made of: the post above, then one
-    message for each row, worded the way a session words it.
-
-    This is what somebody reading #test-tasks between sessions has in front of
-    them, so it is the line the vault wrote and not the label off the top of
-    it. Up to 2 October the post was one numbered list of labels, which named
-    every check in the set and said how to run none of them.
-
-    Humans only. No row here carries a button: a mark belongs to a dated
-    session, not to the copy that stands in the channel between them.
+    #known-issues' overwrites: #test-findings' copied, so the same people see
+    it, then made read only (Patrick, 11 Oct). Sending and threads are off for
+    @everyone and every copied role or member; the bot alone may send.
     """
-    tickets = live_smoke_show_tickets(export)
-    return ([live_smoke_head(export)]
-            + [live_smoke_item_text(i, len(items), tickets) for i in items])
+    out = _copy_overwrites(like) if like is not None else {}
+    me = getattr(guild, 'me', None)
+    everyone = getattr(guild, 'default_role', None)
+    if everyone is not None and everyone not in out:
+        out[everyone] = discord.PermissionOverwrite()
+    for t, ow in out.items():
+        if t == me:
+            continue
+        ow.update(**dict((n, False) for n in ARCHIVE_LOCK))
+    if me is not None:
+        mine = out.get(me) or discord.PermissionOverwrite()
+        # In a forum, send_messages is making a post and manage_threads is
+        # deleting one: the bot does both as issues come and go.
+        mine.update(view_channel=True, send_messages=True,
+                    send_messages_in_threads=True, manage_threads=True,
+                    read_message_history=True)
+        out[me] = mine
+    return out
 
 
-def is_live_smoke_admin(who):
-    """Owner, Dev or Lead Gamemaster, by the ids or names
-       LIVE_SMOKE_ADMIN_ROLES carries. A Moderator alone is not one of them.
-       The one list behind start, reset, refresh and report."""
+def _state_read(path):
     try:
-        ids, names = _role_tokens(LIVE_SMOKE_ADMIN_NAMES)
+        with open(path, encoding='utf-8') as f:
+            got = json.load(f)
+        return got if isinstance(got, dict) else {}
+    except FileNotFoundError:
+        return {}
+    except Exception:
+        return None
+
+
+def _state_write(path, data):
+    tmp = path + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=1, sort_keys=True)
+    os.replace(tmp, path)
+
+
+def setup_done(guild, path=None):
+    """When the setup finished on this server, or None."""
+    got = _state_read(path or SETUP_STATE) or {}
+    rec = (got.get('guilds') or {}).get(str(getattr(guild, 'id', '')))
+    return rec.get('done') if isinstance(rec, dict) else None
+
+
+def _tags_missing(forum):
+    have = set(str(getattr(t, 'name', '')).lower()
+               for t in (getattr(forum, 'available_tags', None) or []))
+    return [t for t in TASK_TAGS if t.lower() not in have]
+
+
+async def channel_setup(guild, apply=False, path=None):
+    """
+    The one-time setup on one server. Returns what it did (or with apply
+    False, what it would do), one line per change.
+
+    Never runs twice: a server channel-setup.json says is done gets one line
+    saying so, and nothing is asked of Discord.
+    """
+    path = path or SETUP_STATE
+    said = []
+    verb = '' if apply else 'would '
+    state = _state_read(path)
+    if state is None:
+        return ['%s is there but cannot be read, so nothing was changed. Look '
+                'at it by hand.' % path]
+    done = setup_done(guild, path)
+    if done and known_forum_done(guild, path):
+        return ['already done on %s, nothing changed' % done]
+    if done:
+        # Set up before #known-issues was a forum: that one step, once.
+        return await known_forum_setup(guild, apply, path)
+
+    # 1. #test-tasks becomes a forum.
+    tasks = _channel_named(guild, TASKS_NAME, ('forum',))
+    old = _channel_named(guild, TASKS_NAME, ('text',))
+    if tasks is None and old is None:
+        return ['there is no #%s in "%s", so nothing was changed. Make it '
+                '(Build-Discord.py) and run this again.'
+                % (TASKS_NAME, getattr(guild, 'name', '?'))]
+    if tasks is None:
+        said.append('%stry to convert #%s to a forum' % (verb, TASKS_NAME))
+        if apply:
+            try:
+                await old.edit(type=discord.ChannelType.forum, reason=SETUP_REASON)
+                tasks = _channel_named(guild, TASKS_NAME, ('forum',))
+                if tasks is not None:
+                    old = None
+            except (discord.HTTPException, TypeError, ValueError,
+                    AttributeError) as e:
+                said.append('Discord refused the conversion (%s), so the '
+                            'fallback' % (getattr(e, 'text', '') or type(e).__name__))
+        if tasks is None:
+            said.append('%smake a new forum #%s in %s with the old channel\'s '
+                        '%d permission overwrite(s) and the tags %s'
+                        % (verb, TASKS_NAME,
+                           getattr(old.category, 'name', None) or 'no category',
+                           len(getattr(old, 'overwrites', {}) or {}),
+                           ', '.join(TASK_TAGS)))
+            if apply:
+                tasks = await guild.create_forum(
+                    TASKS_NAME, category=old.category,
+                    position=getattr(old, 'position', None) or 0,
+                    overwrites=_copy_overwrites(old),
+                    topic='One thread per test task, tagged Dev or Main.',
+                    available_tags=[discord.ForumTag(name=t) for t in TASK_TAGS],
+                    reason=SETUP_REASON)
+    if old is not None:
+        # The text channel still called test-tasks, beside the new forum.
+        said.append('%srename the old text #%s to #%s and switch off sending '
+                    'in it for everyone but the bot (nothing deleted)'
+                    % (verb, TASKS_NAME, TASKS_ARCHIVE))
+        if apply:
+            await old.edit(name=TASKS_ARCHIVE, reason=SETUP_REASON)
+            me = getattr(guild, 'me', None)
+            targets = [t for t in (getattr(old, 'overwrites', {}) or {})
+                       if t != me]
+            everyone = getattr(guild, 'default_role', None)
+            if everyone is not None and everyone not in targets:
+                targets.append(everyone)
+            for t in targets:
+                ow = old.overwrites_for(t)
+                ow.update(**dict((n, False) for n in ARCHIVE_LOCK))
+                await old.set_permissions(t, overwrite=ow, reason=SETUP_REASON)
+    if tasks is not None:
+        missing = _tags_missing(tasks)
+        if missing:
+            said.append('%sadd the forum tag(s) %s to #%s'
+                        % (verb, ', '.join(missing), TASKS_NAME))
+            if apply:
+                tags = list(getattr(tasks, 'available_tags', None) or [])
+                tags += [discord.ForumTag(name=t) for t in missing]
+                await tasks.edit(available_tags=tags, reason=SETUP_REASON)
+
+    # 2. #test-results becomes #test-findings. A rename keeps everything else.
+    findings = _channel_named(guild, FINDINGS_NAME)
+    if findings is None:
+        was = _channel_named(guild, FINDINGS_OLD)
+        if was is None:
+            said.append('there is no #%s or #%s, so that rename was skipped'
+                        % (FINDINGS_OLD, FINDINGS_NAME))
+        else:
+            said.append('%srename #%s to #%s' % (verb, FINDINGS_OLD, FINDINGS_NAME))
+            if apply:
+                await was.edit(name=FINDINGS_NAME, reason=SETUP_REASON)
+            findings = was
+
+    # 3. #known-issues, a forum beside #test-findings, with its overwrites.
+    said += await _known_forum_make(guild, findings, apply, verb)
+
+    if apply:
+        state = _state_read(path) or {}
+        now = _utc_stamp()
+        state.setdefault('guilds', {})[str(guild.id)] = {
+            'done': now, 'known_forum': now,
+            'name': getattr(guild, 'name', ''),
+        }
+        _state_write(path, state)
+        said.append('recorded in %s, so this never runs again' % path)
+    elif not said:
+        said.append('nothing to change')
+    return said
+
+
+def _utc_stamp():
+    return (datetime.datetime.now(datetime.timezone.utc)
+            .strftime('%Y-%m-%dT%H:%M:%SZ'))
+
+
+def known_forum_done(guild, path=None):
+    """When #known-issues was made a forum on this server, or None."""
+    got = _state_read(path or SETUP_STATE) or {}
+    rec = (got.get('guilds') or {}).get(str(getattr(guild, 'id', '')))
+    return rec.get('known_forum') if isinstance(rec, dict) else None
+
+
+async def _known_forum_make(guild, like, apply, verb):
+    """The #known-issues forum, read only, with the Dev and Main tags, when
+       there is none. One line per change."""
+    said = []
+    if _channel_named(guild, KNOWN_NAME, ('forum',)) is not None:
+        return said
+    said.append('%smake the forum #%s in %s with %s and the tags %s' % (
+        verb, KNOWN_NAME,
+        getattr(getattr(like, 'category', None), 'name', 'no category'),
+        ('the %d permission overwrite(s) of #%s'
+         % (len(getattr(like, 'overwrites', {}) or {}), FINDINGS_NAME))
+        if like is not None else 'no overwrites of its own',
+        ', '.join(TASK_TAGS)))
+    said.append('%smake #%s read only: posting and replies off for @everyone '
+                'and every copied overwrite; the bot alone posts and deletes '
+                'there' % (verb, KNOWN_NAME))
+    if apply:
+        await guild.create_forum(
+            KNOWN_NAME, category=getattr(like, 'category', None),
+            position=(getattr(like, 'position', None) or 0) + 1,
+            overwrites=known_overwrites(guild, like),
+            topic='One post per known issue being worked on. Kept by the bot: '
+                  'a post goes when its issue is fixed and becomes a test task.',
+            available_tags=[discord.ForumTag(name=t) for t in TASK_TAGS],
+            reason=SETUP_REASON)
+    return said
+
+
+async def known_forum_setup(guild, apply=False, path=None):
+    """
+    The second one-time step (Patrick, 11 Oct): #known-issues is a forum with
+    one post per known issue, not one channel of messages. On a server whose
+    first setup made a text #known-issues, that channel goes: deleted when
+    every message in it is the bot's own (all it ever held was the bot's
+    list), otherwise renamed known-issues-archive and locked like the tasks
+    archive. Then the forum is made. Recorded as known_forum, so it runs once.
+    """
+    path = path or SETUP_STATE
+    verb = '' if apply else 'would '
+    said = []
+    old = _channel_named(guild, KNOWN_NAME, ('text',))
+    if old is not None:
+        me = getattr(guild, 'me', None)
+        mine_only, n = True, 0
+        async for msg in old.history(limit=1000):
+            n += 1
+            if getattr(msg.author, 'id', None) != getattr(me, 'id', None):
+                mine_only = False
+                break
+        if mine_only:
+            said.append('%sdelete the text #%s: its %d message(s) are all the '
+                        'bot\'s own list' % (verb, KNOWN_NAME, n))
+            if apply:
+                await old.delete(reason=SETUP_REASON)
+        else:
+            archive = KNOWN_NAME + '-archive'
+            said.append('%srename the text #%s to #%s and switch off sending in '
+                        'it (it holds messages that are not the bot\'s, so '
+                        'nothing is deleted)' % (verb, KNOWN_NAME, archive))
+            if apply:
+                await old.edit(name=archive, reason=SETUP_REASON)
+                for t in list((getattr(old, 'overwrites', {}) or {})):
+                    if t == me:
+                        continue
+                    ow = old.overwrites_for(t)
+                    ow.update(**dict((x, False) for x in ARCHIVE_LOCK))
+                    await old.set_permissions(t, overwrite=ow, reason=SETUP_REASON)
+    findings = _channel_named(guild, FINDINGS_NAME)
+    said += await _known_forum_make(guild, findings, apply, verb)
+    tasks = _channel_named(guild, TASKS_NAME, ('forum',))
+    me = getattr(guild, 'me', None)
+    if tasks is not None and me is not None and not tasks.overwrites_for(me).manage_threads:
+        said.append('%slet the bot delete posts in #%s (manage threads, for a '
+                    'test task whose issue is reopened)' % (verb, TASKS_NAME))
+        if apply:
+            ow = tasks.overwrites_for(me)
+            ow.update(view_channel=True, send_messages=True,
+                      send_messages_in_threads=True, manage_threads=True)
+            await tasks.set_permissions(me, overwrite=ow, reason=SETUP_REASON)
+    if apply:
+        state = _state_read(path) or {}
+        rec = state.setdefault('guilds', {}).setdefault(str(guild.id), {})
+        rec['known_forum'] = _utc_stamp()
+        _state_write(path, state)
+        said.append('recorded in %s, so this never runs again' % path)
+    elif not said:
+        said.append('nothing to change')
+    return said
+
+
+# ------------------------------------------------------------ test tasks --
+def is_task_poster(who):
+    """Owner, Dev or Lead Gamemaster by TEST_TASK_ROLES. Nobody else."""
+    try:
+        ids, names = _role_tokens(TASK_ROLE_NAMES)
         return _who_hits(who, ids, names)
     except Exception:
         return False
 
 
-def live_smoke_admin_missing(guild):
-    """Which of those role ids or names this server has not got. The scrub
-       renamed roles, so this is the difference between nobody being allowed
-       and nobody being able to be. Digit tokens match role.id; others match
-       name case-insensitively."""
-    try:
-        roles = list(getattr(guild, 'roles', None) or [])
-    except Exception:
-        return list(LIVE_SMOKE_ADMIN_NAMES)
-    missing = []
-    for token in LIVE_SMOKE_ADMIN_NAMES:
-        ids, names = _role_tokens([token])
-        if not any(_role_hit(r, ids, names) for r in roles):
-            missing.append(token)
-    return missing
-
-
-def live_smoke_admin_refusal(guild):
-    """
-    Why this person cannot start, reset, refresh or report, in words they can
-    do something about.
-
-    Only a server carrying none of the names at all is told about missing
-    roles. Lead GM and Lead Gamemaster are two spellings of one role, so one
-    of them is always missing and saying so every time would send somebody
-    looking for a role that was never meant to be there.
-    """
-    missing = live_smoke_admin_missing(guild)
-    if len(missing) == len(LIVE_SMOKE_ADMIN_NAMES):
-        return ('No role that may run this is on this server: %s. Set '
-                'LIVE_SMOKE_ADMIN_ROLES in bot.env.json to the ids or names '
-                'those roles carry now, and run Install-Bot.ps1 again.'
-                % ', '.join(missing))
-    return ('%s start, reset, refresh and report on a Live smoke session. Ask '
-            'one of them.' % _live_smoke_or(LIVE_SMOKE_ADMIN_NAMES))
-
-
-def live_smoke_tick_refusal(who):
-    """
-    Why this one cannot mark a row, or None.
-
-    Agents do not tick. The lock is what Discord itself says about the
-    account, so it holds for an agent nobody has heard of yet, and the id
-    list after it is only for an account that has to be named by hand.
-    """
-    if getattr(who, 'bot', False) or getattr(who, 'system', False):
-        return ('Agents do not mark these rows. A person marks their own, '
-                'from what they saw in the world.')
-    try:
-        if int(getattr(who, 'id', 0)) in LIVE_SMOKE_DENY:
-            return 'This account is not marking Live smoke rows. Ask staff.'
-    except (TypeError, ValueError):
-        pass
+def task_tag_of(forum, tag):
+    """The forum's Dev or Main tag object, or None."""
+    want = str(tag or '').strip().lower()
+    for t in getattr(forum, 'available_tags', None) or []:
+        if str(getattr(t, 'name', '')).lower() == want:
+            return t
     return None
 
 
-def live_smoke_in_session(channel):
+async def post_test_task(guild, title, body, tag):
     """
-    True when this is a thread under the Live smoke channel.
+    One thread in the #test-tasks forum, titled and tagged.
 
-    Read off the channel rather than remembered in this process, so the
-    buttons on a session opened before the last restart still work, and a
-    button reached from anywhere else does nothing.
+    Returns (thread or None, what to say). A thread already open under that
+    exact title is not made twice; the existing one is handed back.
     """
-    parent = getattr(channel, 'parent', None)
-    name = str(getattr(parent, 'name', '') or '').lower()
-    return bool(name) and name in LIVE_SMOKE_CHANNEL
+    title = str(title or '').strip()
+    body = str(body or '').strip()
+    want = str(tag or '').strip().capitalize()
+    if want not in TASK_TAGS:
+        return None, 'The tag is Dev or Main, not %r.' % tag
+    if not title or not body:
+        return None, 'A test task needs a title and a body.'
+    if len(title) > TASK_TITLE_ROOM:
+        return None, 'That title is %d characters; Discord takes %d.' % (
+            len(title), TASK_TITLE_ROOM)
+    if len(body) > TASK_BODY_ROOM:
+        return None, 'That body is %d characters; Discord takes %d.' % (
+            len(body), TASK_BODY_ROOM)
+    forum = _channel_named(guild, TASKS_NAME, ('forum',))
+    if forum is None:
+        return None, ('#%s is not a forum yet. The one-time setup '
+                      '(python bot.py --setup-channels --apply) makes it one.'
+                      % TASKS_NAME)
+    t = task_tag_of(forum, want)
+    if t is None:
+        return None, ('#%s has no %s tag. The one-time setup adds it.'
+                      % (TASKS_NAME, want))
+    for th in list(getattr(forum, 'threads', None) or []):
+        if (str(getattr(th, 'name', '')) == title
+                and not getattr(th, 'archived', False)):
+            return th, 'Already there: %s' % getattr(th, 'mention', title)
+    made = await forum.create_thread(name=title, content=body,
+                                     applied_tags=[t],
+                                     reason='Thornswood test task')
+    thread = getattr(made, 'thread', made)
+    return thread, 'Posted: %s' % getattr(thread, 'mention', title)
 
 
-LIVE_SMOKE_STYLES = {
-    'Pass': discord.ButtonStyle.success,
-    'Fail': discord.ButtonStyle.danger,
-    'Skip': discord.ButtonStyle.secondary,
-    'Fail-known': discord.ButtonStyle.secondary,
-}
-
-
-class LiveSmokeMark(discord.ui.Button):
-    def __init__(self, item_id, mark):
-        super().__init__(label=mark,
-                         style=LIVE_SMOKE_STYLES.get(mark,
-                                                     discord.ButtonStyle.secondary),
-                         custom_id=live_smoke_custom_id(item_id, mark))
-        self.mark = mark
-
-    async def callback(self, interaction):
-        await live_smoke_tick(interaction, self.mark)
-
-
-class LiveSmokeItem(discord.ui.View):
-    """
-    The four buttons on one row. One view per row and not one view carrying
-    every row: the Live set runs to ten rows and forty buttons, and Discord
-    takes five to a line and twenty five to a message.
-
-    Persistent, like the ticket and hold panels, so a session outlives a
-    restart. setup_hook registers one of these per item in the export.
-    """
-    def __init__(self, item_id):
-        super().__init__(timeout=None)
-        for mark in LIVE_SMOKE_MARKS:
-            self.add_item(LiveSmokeMark(item_id, mark))
-
-
-def live_smoke_views():
-    """One view per item in the export, for setup_hook. An export that will
-       not load leaves the buttons to the commands to complain about, rather
-       than stopping the whole bot from starting."""
-    try:
-        items = live_smoke_items(live_smoke_load())
-    except ValueError as e:
-        log('live smoke: %s' % e)
-        return []
-    return [LiveSmokeItem(i['id']) for i in items]
-
-
-async def live_smoke_tick(interaction, mark):
-    """
-    Somebody pressed Pass, Fail, Skip or Fail-known.
-
-    The mark is an edit to the message the button is on, in the thread it was
-    posted in, and that is all of it. Nothing is written down anywhere else,
-    and nothing about who pressed what reaches this bot's log.
-    """
-    no = live_smoke_tick_refusal(interaction.user)
-    if no:
-        await _say(interaction, no)
+@tree.command(name='test-task',
+              description='Post a test task in #test-tasks, tagged Dev or '
+                          'Main. Owner, Dev and Lead Gamemaster only.')
+@discord.app_commands.describe(title='The thread title.',
+                               body='What to test, as the first post.',
+                               tag='Dev or Main.')
+async def test_task_cmd(interaction: discord.Interaction, title: str,
+                        body: str, tag: typing.Literal['Dev', 'Main']):
+    if interaction.guild is None:
+        await _say(interaction, 'This one works in the server.')
         return
-    if not live_smoke_in_session(interaction.channel):
-        await _say(interaction, 'Marks go on the rows in a session thread '
-                                'under #%s.' % LIVE_SMOKE_CHANNEL[0])
+    if not is_task_poster(interaction.user):
+        await _say(interaction, 'Only %s post test tasks.'
+                   % ', '.join(TASK_ROLE_NAMES))
         return
-    who = (getattr(interaction.user, 'display_name', None)
-           or getattr(interaction.user, 'name', ''))
-    said = live_smoke_mark(getattr(interaction.message, 'content', ''), who, mark)
-    if len(said) > LIVE_SMOKE_ROOM:
-        await _say(interaction, 'This row holds as many marks as a Discord '
-                                'message takes. Staff can open a fresh session '
-                                'with /live-smoke reset.')
-        return
-    try:
-        await interaction.response.edit_message(content=said)
-    except Exception:
-        # No traceback, and not a word of the message. Discord hands back what
-        # it refused, and what it refused is a list of names against marks.
-        log('live smoke: a mark did not go through')
-        try:
-            await _say(interaction, 'That did not go through. Press it again.')
-        except Exception:
-            pass
-
-
-live_smoke = discord.app_commands.Group(
-    name='live-smoke',
-    description='The living Live smoke checklist in #test-tasks.')
-tree.add_command(live_smoke)
-
-
-def live_smoke_failed(error, ch, needs):
-    """
-    What a person is told when posting the checklist or a session failed.
-
-    Permissions only when Discord said it was permissions (50001 Missing
-    Access, 50013 Missing Permissions). Every failure used to be put down to
-    them, so a refusal of something else entirely, an edit of a thread's
-    starter message on 6 Oct (#2018), told an administrator bot to check its
-    permissions twice. Anything else is said as Discord said it, and the log
-    has the rest.
-    """
-    code = getattr(error, 'code', None)
-    if code in (50001, 50013):
-        return ('That did not go through. In #%s the bot needs %s.'
-                % (ch.name, needs))
-    text = str(getattr(error, 'text', '') or error).strip() or type(error).__name__
-    return ('That did not go through: Discord said %s%s. The bot log has the '
-            'rest.' % (text, ' (error %s)' % code if code else ''))
-
-
-async def _live_smoke_ready(interaction):
-    """
-    The channel and the export, or None once the person has been told what is
-    wrong. The one gate on all four commands.
-    """
-    guild = interaction.guild
-    if guild is None:
-        await _say(interaction, 'This one works in the server, not in a '
-                                'message to the bot.')
-        return None
-    if not is_live_smoke_admin(interaction.user):
-        await _say(interaction, live_smoke_admin_refusal(guild))
-        return None
-    ch = by_name(guild, LIVE_SMOKE_CHANNEL)
-    if ch is None:
-        await _say(interaction, 'There is no #%s in this server. Build-Discord.py '
-                                'makes it, in Testing.' % LIVE_SMOKE_CHANNEL[0])
-        return None
-    try:
-        export = live_smoke_load()
-    except ValueError as e:
-        await _say(interaction, str(e))
-        return None
-    return ch, export
-
-
-async def live_smoke_close_old(ch):
-    """
-    Archive and lock any session thread still open under the channel, and say
-    how many. A reset is a new dated session rather than last week's ticks
-    rewritten, so the old one is closed where it stands and stays readable.
-    """
-    done = 0
-    for t in list(getattr(ch, 'threads', None) or []):
-        if getattr(t, 'archived', False) or getattr(t, 'locked', False):
-            continue
-        if not str(getattr(t, 'name', '')).startswith(LIVE_SMOKE_TITLE):
-            continue
-        try:
-            await t.edit(archived=True, locked=True)
-            done += 1
-        except Exception:
-            log('live smoke: a session thread could not be closed')
-    return done
-
-
-async def live_smoke_open(interaction, settings_version, live_channel, close_old):
-    """Start a session: the opener in the channel, a thread off it, and one
-       message per row in the thread. What start and reset both do."""
-    ready = await _live_smoke_ready(interaction)
-    if ready is None:
-        return
-    ch, export = ready
-    items = live_smoke_items(export)
-    title = live_smoke_title_of(export, settings_version)
-    # An opener, a thread and one message per row is more than the three
-    # seconds Discord gives a command to answer in.
     await interaction.response.defer(ephemeral=True, thinking=True)
-    closed = await live_smoke_close_old(ch) if close_old else 0
     try:
-        opener = await ch.send(live_smoke_opener(title, live_channel,
-                                                 settings_version,
-                                                 live_smoke_stamp(export)))
-        thread = await opener.create_thread(name=title[:100],
-                                            auto_archive_duration=10080)
-        tickets = live_smoke_show_tickets(export)
-        for item in items:
-            await thread.send(live_smoke_item_text(item, len(items), tickets),
-                              view=LiveSmokeItem(item['id']))
-    except Exception as e:
-        # Nothing is marked yet, so there is nothing here to keep off the log.
-        log('live smoke: the session could not be posted:\n'
-            + traceback.format_exc())
-        await interaction.followup.send(
-            live_smoke_failed(e, ch, 'View Channel, Send Messages, Create Public '
-                                     'Threads and Send Messages in Threads'),
-            ephemeral=True)
-        return
-    log('live smoke: a session is open in #%s, %d row(s)' % (ch.name, len(items)))
-    said = 'Session open: %s' % thread.mention
-    if closed:
-        said += ' The session before it is closed and locked.'
+        _, said = await post_test_task(interaction.guild, title, body, tag)
+    except discord.HTTPException as e:
+        log('test task: Discord refused a post: %s' % getattr(e, 'text', e))
+        said = ('That did not go through. In #%s the bot needs View Channel, '
+                'Send Messages and Create Posts.' % TASKS_NAME)
     await interaction.followup.send(said, ephemeral=True)
 
 
-@live_smoke.command(name='start',
-                    description='Open a dated Live smoke session. Owner, Dev '
-                                'and Lead Gamemaster only.')
-@discord.app_commands.describe(
-    settings_version='The version in the launcher\u2019s Settings window.',
-    live_channel='The live channel being tested, named in the opener.')
-async def live_smoke_start(interaction: discord.Interaction,
-                           settings_version: str, live_channel: str):
-    await live_smoke_open(interaction, settings_version, live_channel, False)
+# ---------------------------------------------------------- known issues --
+#
+# Patrick, 11 Oct: the issue board is not where testers look. Two forums are
+# kept from it, automatically, as things are found and fixed:
+#
+#   #known-issues  one post per open issue labelled Dev Findings or Main
+#                  Findings, tagged Dev or Main. The post goes the moment its
+#                  issue is no longer an open finding: fixed and closed, closed
+#                  any other way, or its label taken off.
+#   #test-tasks    one post per issue closed as fixed from the day this began
+#                  (see the since stamp below), for testers to check. Its
+#                  title and body are the issue's last comment that starts
+#                  "Test task:" (written by whoever fixed it); a finding with
+#                  no such comment gets its own title and a plain line. An
+#                  issue that is reopened loses its test task, and comes back
+#                  to #known-issues if it is still a finding.
+#
+# Posts carry no issue number and no link: testers have no GitHub. The bot
+# remembers which post is which issue in known-issues.json in the data folder,
+# written straight after each post, so a restart never posts twice; a post
+# made just before a crash is found again by its title among the bot's own.
+#
+# GitHub: GITHUB_TOKEN in bot.env.json, a read only token for the issues of
+# KNOWN_ISSUES_REPO. No token means neither forum is kept, said once.
+KNOWN_REPO = os.environ.get('KNOWN_ISSUES_REPO', 'EvilPatrick06/Thornswood').strip()
+KNOWN_LABELS = [l.strip() for l in
+                os.environ.get('KNOWN_ISSUES_LABELS',
+                               'Dev Findings,Main Findings').split(',')
+                if l.strip()]
+KNOWN_EVERY = max(60, _int_env('KNOWN_ISSUES_EVERY', 300))
+GITHUB_API = os.environ.get('GITHUB_API', 'https://api.github.com').rstrip('/')
+TASK_MARK = re.compile(r'^\s*test task\s*:\s*(.*)$', re.I)
+KNOWN_MARK = re.compile(r'^\s*known issue\s*:\s*(.*)$', re.I)
+TASK_SERVER = re.compile(r'^\s*server\s*:\s*(dev|main)\s*$', re.I)
 
 
-@live_smoke.command(name='reset',
-                    description='Close the session open now and start a fresh '
-                                'one. Owner, Dev and Lead Gamemaster only.')
-@discord.app_commands.describe(
-    settings_version='The version in the launcher\u2019s Settings window.',
-    live_channel='The live channel being tested, named in the opener.')
-async def live_smoke_reset(interaction: discord.Interaction,
-                           settings_version: str, live_channel: str):
-    await live_smoke_open(interaction, settings_version, live_channel, True)
+def _github_get(url):
+    token = os.environ.get('GITHUB_TOKEN', '').strip()
+    req = urllib.request.Request(url, headers={
+        'Accept': 'application/vnd.github+json',
+        'Authorization': 'Bearer ' + token,
+        'User-Agent': 'thornswood-bot',
+        'X-GitHub-Api-Version': '2022-11-28'})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        return json.loads(r.read().decode('utf-8'))
 
 
-async def live_smoke_rows_thread(head):
-    """
-    The thread the standing rows sit in, made off the checklist post when it
-    is not there and woken when Discord has archived it.
-
-    A public thread wakes for anybody who may post in it, so this asks for no
-    permission the bot has not got already, and a refusal is said in the log
-    rather than stopping the refresh.
-
-    It is asked for twice before one is made. Discord drops an archived thread
-    out of the cache the message carries, and refreshes are weeks apart, so the
-    thread this wants is usually the one the message says it has not got; a
-    second thread on the same message is refused rather than made.
-    """
-    thread = getattr(head, 'thread', None)
-    if thread is None:
-        try:
-            thread = await head.fetch_thread()
-        except Exception:
-            thread = None
-    if thread is None:
-        return await head.create_thread(name=LIVE_SMOKE_ROWS,
-                                        auto_archive_duration=10080)
-    if getattr(thread, 'archived', False):
-        try:
-            await thread.edit(archived=False)
-        except Exception:
-            log('live smoke: the checklist rows thread would not wake')
-    return thread
-
-
-async def live_smoke_write_rows(thread, rows):
-    """
-    The rows in the thread, in the export's order: what is there already is
-    edited where the export moved it, what is missing is posted, and a row the
-    set no longer carries is taken down.
-
-    Edited rather than posted again, so a thread does not collect a copy of
-    the whole set every time Cynthia refreshes it. A message the bot posted is
-    its own to take down, which Discord allows without Manage Messages.
-
-    Only the bot's plain messages are rows. A thread made from a message
-    opens with a thread starter message that Discord gives the bot as author
-    and lets nobody edit, so counted as row 1 it took the whole refresh down
-    (#2018: 403, error 50021, 6 Oct). It is no use asking is_system():
-    discord.py counts a thread starter message as not a system message, so
-    that check let it through at 11:45 AM. The type says it plainly.
-    """
-    had = [m async for m in thread.history(limit=None, oldest_first=True)
-           if m.author.id == client.user.id
-           and m.type == discord.MessageType.default]
-    for n, said in enumerate(rows):
-        if n >= len(had):
-            await thread.send(said)
-        elif had[n].content != said:
-            await had[n].edit(content=said)
-    for old in had[len(rows):]:
-        await old.delete()
-
-
-@live_smoke.command(name='refresh',
-                    description='Read the export again and rewrite the '
-                                'checklist. Owner, Dev and Lead '
-                                'Gamemaster only.')
-async def live_smoke_refresh(interaction: discord.Interaction):
-    """
-    What is run after Cynthia moves the Live set and the new export is
-    deployed. It rewrites the standing checklist humans read in the channel:
-    the post, and under it one message for each row carrying the whole of what
-    a tester does.
-
-    A session already open keeps the rows it was opened with, because
-    rewriting rows underneath somebody's ticks loses what they meant, so the
-    reply says where the new rows to mark come from, which is a reset.
-    """
-    ready = await _live_smoke_ready(interaction)
-    if ready is None:
-        return
-    ch, export = ready
-    await interaction.response.defer(ephemeral=True, thinking=True)
-    items = live_smoke_items(export)
-    said = live_smoke_checklist(export, items)
-    try:
-        head = None
-        async for m in ch.history(limit=50):
-            if m.author.id != client.user.id:
-                continue
-            if str(m.content or '').startswith(LIVE_SMOKE_CHECKLIST_HEAD):
-                head = m
+def github_open_findings(get=None):
+    """Every open issue (not pull request) carrying one of KNOWN_LABELS, by
+       number. One query per label because GitHub ANDs labels in one."""
+    get = get or _github_get
+    out = {}
+    for label in KNOWN_LABELS:
+        page = 1
+        while True:
+            url = ('%s/repos/%s/issues?state=open&per_page=100&page=%d&labels=%s'
+                   % (GITHUB_API, KNOWN_REPO, page,
+                      urllib.parse.quote(label)))
+            rows = get(url) or []
+            for row in rows:
+                if isinstance(row, dict) and 'pull_request' not in row:
+                    out.setdefault(int(row['number']), row)
+            if len(rows) < 100:
                 break
-        if head is None:
-            head = await ch.send(said[0])
-            try:
-                await head.pin()
-            except Exception:
-                # The running bot asks for neither Manage Messages nor Pin
-                # Messages (Build-Discord.py, RUN_BITS), so Discord refusing
-                # this is ordinary. The post is found again by reading the
-                # channel, which is how the ticket and hold panels find
-                # themselves too.
-                pass
-        elif head.content != said[0]:
-            await head.edit(content=said[0])
-        await live_smoke_write_rows(await live_smoke_rows_thread(head), said[1:])
-    except Exception as e:
-        log('live smoke: the checklist could not be written:\n'
-            + traceback.format_exc())
-        await interaction.followup.send(
-            live_smoke_failed(e, ch, 'View Channel, Send Messages, Read Message '
-                                     'History, Create Public Threads and Send '
-                                     'Messages in Threads'), ephemeral=True)
-        return
-    await interaction.followup.send(
-        'The checklist in #%s now says what the export says: %d row(s), each '
-        'with the whole of what a tester does. A session already open keeps '
-        'the rows it started with, so open a new one with /live-smoke reset '
-        'when testers need these.' % (ch.name, len(items)), ephemeral=True)
-
-
-async def live_smoke_rows_marked(thread):
-    """
-    Every checklist row in a session thread with who marked it what, in the
-    order the session posted them.
-
-    The bot's own messages only, and of those the ones whose heading says they
-    are a row, so the opener and anything anybody else said in the thread are
-    not counted as rows with nobody on them.
-    """
-    out = []
-    async for m in thread.history(limit=None, oldest_first=True):
-        if m.author.id != client.user.id:
-            continue
-        said = str(m.content or '')
-        name = live_smoke_row_name(said)
-        if name:
-            out.append((name, live_smoke_read_marks(said)))
+            page += 1
     return out
 
 
-async def live_smoke_session_stamp(thread):
-    """
-    The stamp off the message a session thread hangs off, or ''.
+def github_closed_since(since, get=None):
+    """Every issue (not pull request) that is closed and was updated at or
+       after since, an ISO stamp, by number. A close and a new comment both
+       move the update time, so this holds every issue closed since then and
+       every closed issue with a comment since then."""
+    get = get or _github_get
+    out = {}
+    page = 1
+    while True:
+        url = ('%s/repos/%s/issues?state=closed&per_page=100&page=%d'
+               '&sort=updated&direction=desc&since=%s'
+               % (GITHUB_API, KNOWN_REPO, page, urllib.parse.quote(since)))
+        rows = get(url) or []
+        for row in rows:
+            if isinstance(row, dict) and 'pull_request' not in row:
+                out.setdefault(int(row['number']), row)
+        if len(rows) < 100:
+            break
+        page += 1
+    return out
 
-    Asked of the thread first and fetched after that, the way the standing
-    rows thread is found: Discord drops the starter message out of the cache,
-    and a session opened before the last restart is the ordinary case. A
-    report without the stamp is still a report, so a refusal here is '' rather
-    than a failure.
-    """
-    got = getattr(thread, 'starter_message', None)
-    if got is None:
+
+def github_issue(number, get=None):
+    get = get or _github_get
+    return get('%s/repos/%s/issues/%d' % (GITHUB_API, KNOWN_REPO, int(number)))
+
+
+def github_comments(number, get=None):
+    get = get or _github_get
+    out, page = [], 1
+    while True:
+        rows = get('%s/repos/%s/issues/%d/comments?per_page=100&page=%d'
+                   % (GITHUB_API, KNOWN_REPO, int(number), page)) or []
+        out += [r for r in rows if isinstance(r, dict)]
+        if len(rows) < 100:
+            break
+        page += 1
+    return out
+
+
+def _labels(issue):
+    return [str((l or {}).get('name') if isinstance(l, dict) else l)
+            for l in (issue.get('labels') or [])]
+
+
+def issue_tags(issue, server=None):
+    """Dev, Main or both, from the findings labels; server ('Dev' or 'Main')
+       when a test task names one; Dev when nothing says."""
+    if server:
+        return [server.capitalize()]
+    names = _labels(issue)
+    tags = [t for t in TASK_TAGS if ('%s Findings' % t) in names]
+    return tags or ['Dev']
+
+
+def known_title(issue):
+    return (str(issue.get('title') or '').strip() or 'untitled')[:TASK_TITLE_ROOM]
+
+
+def known_body(issue):
+    where = ' and '.join(issue_tags(issue))
+    return 'Known on %s. The team is working on it; this post goes when it is fixed.' % where
+
+
+def _marked(issue, comments, mark):
+    """(title, body, server or None, created_at) from the issue's last comment
+       whose first line matches mark ("Test task:" or "Known issue:"), or
+       None. A first line with nothing after the colon takes the issue's own
+       title."""
+    for c in reversed(comments or []):
+        lines = str(c.get('body') or '').replace('\r\n', '\n').strip().split('\n')
+        m = mark.match(lines[0]) if lines else None
+        if not m:
+            continue
+        title = (m.group(1).strip() or known_title(issue))[:TASK_TITLE_ROOM]
+        rest = lines[1:]
+        server = None
+        if rest and TASK_SERVER.match(rest[0]):
+            server = TASK_SERVER.match(rest[0]).group(1).capitalize()
+            rest = rest[1:]
+        body = '\n'.join(rest).strip()[:TASK_BODY_ROOM]
+        return title, body, server, str(c.get('created_at') or '')
+    return None
+
+
+def test_task_of(issue, comments):
+    """(title, body, server, created_at) from the last "Test task:" comment."""
+    got = _marked(issue, comments, TASK_MARK)
+    if got and not got[1]:
+        got = (got[0], 'Check this on %s.' % (got[2] or 'Dev'), got[2], got[3])
+    return got
+
+
+def known_of(issue, comments):
+    """(title, body, tags) for the #known-issues post: the last "Known
+       issue:" comment, or the issue's title and a plain line until somebody
+       writes one."""
+    got = _marked(issue, comments, KNOWN_MARK)
+    if got:
+        return got[0], got[1] or known_body(issue), issue_tags(issue, got[2])
+    return known_title(issue), known_body(issue), issue_tags(issue)
+
+
+def _sig(title, body, tags):
+    return '%s\n%s\n%s' % (title, body, ','.join(sorted(tags)))
+
+
+def default_task_body(issue):
+    where = issue_tags(issue)[0]
+    return ('This was fixed. Check it on %s, and say in #%s if it still happens.'
+            % (where, FINDINGS_NAME))
+
+
+async def _forum_thread(forum, tid):
+    """The thread by id, or None when it is gone."""
+    guild = getattr(forum, 'guild', None)
+    th = None
+    getter = getattr(guild, 'get_thread', None)
+    if getter is not None:
+        th = getter(int(tid))
+    if th is None and guild is not None:
         try:
-            got = await thread.parent.fetch_message(thread.id)
+            th = await guild.fetch_channel(int(tid))
+        except discord.NotFound:
+            return None
+    return th
+
+
+async def _forum_post(forum, title, body, tags, me_id=None):
+    """A post in the forum, tagged; an open post of the bot's with that exact
+       title is handed back rather than made twice. Returns the thread."""
+    for th in list(getattr(forum, 'threads', None) or []):
+        if (str(getattr(th, 'name', '')) == title
+                and not getattr(th, 'archived', False)
+                and (me_id is None or getattr(th, 'owner_id', me_id) == me_id)):
+            return th
+    applied = [t for t in (task_tag_of(forum, x) for x in tags) if t is not None]
+    made = await forum.create_thread(name=title, content=body,
+                                     applied_tags=applied,
+                                     allowed_mentions=discord.AllowedMentions.none(),
+                                     reason='Thornswood known issues and test tasks')
+    return getattr(made, 'thread', made)
+
+
+async def _forum_drop(forum, tid):
+    th = await _forum_thread(forum, tid)
+    if th is not None:
+        await th.delete()
+
+
+async def _forum_edit(forum, tid, title, body, tags):
+    """Brings an existing post to this title, body and tags. False when the
+       post is gone (deleted by hand), so the caller can make it again."""
+    th = await _forum_thread(forum, tid)
+    if th is None:
+        return False
+    applied = [x for x in (task_tag_of(forum, n) for n in tags) if x is not None]
+    await th.edit(name=title, applied_tags=applied)
+    msg = getattr(th, 'starter_message', None)
+    if msg is None:
+        try:
+            msg = await th.fetch_message(th.id)
+        except discord.NotFound:
+            msg = None
+    if msg is not None:
+        await msg.edit(content=body, allowed_mentions=discord.AllowedMentions.none())
+    return True
+
+
+async def known_issues_once(forum, state, get=None, save=None, me_id=None):
+    """
+    One pass over #known-issues, a forum. state is the dict kept in
+    known-issues.json, changed in place; the caller writes it. Returns the
+    issue numbers posted, edited and removed.
+
+    Comments are read only for an issue GitHub says changed since the last
+    pass (its updated_at), so an untouched issue costs nothing.
+    """
+    loop = asyncio.get_running_loop()
+    issues = await loop.run_in_executor(None, github_open_findings, get)
+    rec = state.setdefault('issues', {})
+    # Records from before #known-issues was a forum point at messages in a
+    # channel that is gone: they are forgotten, not deleted again.
+    for key, have in list(rec.items()):
+        if have.get('channel_id') != getattr(forum, 'id', None) or 'thread_id' not in have:
+            rec.pop(key, None)
+            state['_dirty'] = True
+    posted, edited, removed = [], [], []
+    for num in sorted(issues):
+        key = str(num)
+        issue = issues[num]
+        have = rec.get(key)
+        if have and have.get('updated') == issue.get('updated_at'):
+            continue
+        comments = await loop.run_in_executor(None, github_comments, num, get)
+        title, body, tags = known_of(issue, comments)
+        sig = _sig(title, body, tags)
+        if have:
+            if have.get('sig') != sig:
+                try:
+                    if not await _forum_edit(forum, have['thread_id'], title, body, tags):
+                        have = None
+                        rec.pop(key, None)
+                    else:
+                        edited.append(num)
+                except discord.HTTPException:
+                    continue
+            if have:
+                have.update(sig=sig, updated=issue.get('updated_at'))
+                state['_dirty'] = True
+                continue
+        th = await _forum_post(forum, title, body, tags, me_id)
+        rec[key] = {'thread_id': th.id, 'channel_id': forum.id, 'sig': sig,
+                    'updated': issue.get('updated_at')}
+        state['_dirty'] = True
+        if save:
+            save(state)      # straight away, so a crash cannot double it
+        posted.append(num)
+    for key, have in list(rec.items()):
+        if int(key) in issues:
+            continue
+        try:
+            await _forum_drop(forum, have['thread_id'])
+        except discord.HTTPException:
+            continue
+        rec.pop(key, None)
+        state['_dirty'] = True
+        removed.append(int(key))
+    return posted, edited, removed
+
+
+async def test_tasks_once(forum, state, get=None, save=None, me_id=None, now=None):
+    """
+    One pass over #test-tasks. An issue closed as fixed gets a post when it
+    was closed after state['since'] (set to now on the first pass, so nothing
+    from before this began floods in), or when its latest "Test task:"
+    comment was written after since. A rewritten comment edits the post; an
+    issue that is reopened loses it. Returns the issue numbers posted,
+    edited and removed.
+    """
+    loop = asyncio.get_running_loop()
+    since = state.get('since')
+    if not since:
+        state['since'] = since = now or _utc_stamp()
+        state['_dirty'] = True
+    rec = state.setdefault('tasks', {})
+    closed = await loop.run_in_executor(None, github_closed_since, since, get)
+    posted, edited, removed = [], [], []
+    for num in sorted(closed):
+        key = str(num)
+        issue = closed[num]
+        have = rec.get(key)
+        if (issue.get('state_reason') or 'completed') != 'completed':
+            continue
+        if have and have.get('updated') == issue.get('updated_at'):
+            continue
+        comments = await loop.run_in_executor(None, github_comments, num, get)
+        task = test_task_of(issue, comments)
+        new_enough = (str(issue.get('closed_at') or '') >= since
+                      or (task is not None and task[3] >= since))
+        if not have and not new_enough:
+            continue
+        if task is None and not issue_tags_found(issue):
+            continue        # not a finding and nobody wrote a test task
+        if task is None:
+            title, body, server = known_title(issue), default_task_body(issue), None
+        else:
+            title, body, server = task[0], task[1], task[2]
+        tags = issue_tags(issue, server)
+        sig = _sig(title, body, tags)
+        if have:
+            if have.get('sig') != sig:
+                try:
+                    if await _forum_edit(forum, have['thread_id'], title, body, tags):
+                        edited.append(num)
+                    else:
+                        rec.pop(key, None)     # deleted by hand: confirmed
+                        state['_dirty'] = True
+                        continue
+                except discord.HTTPException:
+                    continue
+            have.update(sig=sig, updated=issue.get('updated_at'))
+            state['_dirty'] = True
+            continue
+        th = await _forum_post(forum, title, body, tags, me_id)
+        rec[key] = {'thread_id': th.id, 'channel_id': forum.id, 'sig': sig,
+                    'updated': issue.get('updated_at')}
+        state['_dirty'] = True
+        if save:
+            save(state)
+        posted.append(num)
+    for key, have in list(rec.items()):
+        if int(key) in closed:
+            continue
+        try:
+            issue = await loop.run_in_executor(None, github_issue, int(key), get)
         except Exception:
-            return ''
-    return live_smoke_opener_stamp(getattr(got, 'content', ''))
+            continue
+        if str(issue.get('state')) == 'open':
+            try:
+                await _forum_drop(forum, have['thread_id'])
+            except discord.HTTPException:
+                continue
+            rec.pop(key, None)
+            state['_dirty'] = True
+            removed.append(int(key))
+        elif have.get('updated') != issue.get('updated_at'):
+            # Closed before since and changed since the last pass (an adopted
+            # post whose comment was rewritten): brought up to date.
+            comments = await loop.run_in_executor(None, github_comments, int(key), get)
+            task = test_task_of(issue, comments)
+            if task is not None:
+                tags = issue_tags(issue, task[2])
+                sig = _sig(task[0], task[1], tags)
+                if have.get('sig') != sig:
+                    try:
+                        if await _forum_edit(forum, have['thread_id'], task[0], task[1], tags):
+                            edited.append(int(key))
+                    except discord.HTTPException:
+                        continue
+                have['sig'] = sig
+            have['updated'] = issue.get('updated_at')
+            state['_dirty'] = True
+    return posted, edited, removed
 
 
-@live_smoke.command(name='report',
-                    description='Count the marks on the session thread this '
-                                'is run in. Owner, Dev and Lead Gamemaster '
-                                'only.')
-async def live_smoke_report(interaction: discord.Interaction):
-    """
-    What Dev reads after a session instead of scrolling every row: the counts,
-    who failed what, and the rows nobody has marked.
+def adopt_task(number, thread_id, path=None):
+    """Records a test task post made by hand (--post-task) as issue number's,
+       so later passes edit it and take it down if the issue reopens. Run
+       with the bot stopped: the running bot holds the file in memory."""
+    path = path or KNOWN_STATE
+    state = _state_read(path)
+    if state is None:
+        raise RuntimeError('%s will not read; nothing was changed' % path)
+    state.setdefault('tasks', {})[str(int(number))] = {
+        'thread_id': int(thread_id), 'channel_id': None, 'sig': '', 'updated': ''}
+    _state_write(path, state)
+    return 'issue %d now owns test task post %d' % (int(number), int(thread_id))
 
-    Run in the session thread itself, because that is where the marks are, and
-    answered only to whoever ran it. Nothing is posted in the thread and
-    nothing is written anywhere off Discord: this reads the messages Discord
-    already holds, counts them, and says the total back once.
-    """
-    ready = await _live_smoke_ready(interaction)
-    if ready is None:
+
+def issue_tags_found(issue):
+    names = _labels(issue)
+    return any(l in names for l in KNOWN_LABELS)
+
+
+def _known_save(state, path=None):
+    clean = dict((k, v) for k, v in state.items() if not k.startswith('_'))
+    _state_write(path or KNOWN_STATE, clean)
+    state.pop('_dirty', None)
+
+
+async def watch_known_issues():
+    await client.wait_until_ready()
+    if not os.environ.get('GITHUB_TOKEN', '').strip():
+        log('known issues: no GITHUB_TOKEN in bot.env.json, so #%s and #%s '
+            'are not kept' % (KNOWN_NAME, TASKS_NAME))
         return
-    no = live_smoke_report_refusal(interaction.channel)
-    if no:
-        await _say(interaction, no)
+    state = _state_read(KNOWN_STATE)
+    if state is None:
+        log('known issues: %s will not read, so nothing is posted until it is '
+            'fixed by hand (posting from empty would double every post)'
+            % KNOWN_STATE)
         return
-    # Reading a session's worth of rows is more than the three seconds Discord
-    # gives a command to answer in.
-    await interaction.response.defer(ephemeral=True, thinking=True)
-    thread = interaction.channel
-    try:
-        rows = await live_smoke_rows_marked(thread)
-        stamp = await live_smoke_session_stamp(thread)
-    except Exception:
-        # No traceback and no count. What Discord hands back when it refuses
-        # to read a thread carries the messages it did read, and those are
-        # names against marks.
-        log('live smoke: a report could not be read')
-        await interaction.followup.send(
-            'That did not go through. In #%s the bot needs View Channel, Read '
-            'Message History and Send Messages in Threads.'
-            % LIVE_SMOKE_CHANNEL[0], ephemeral=True)
-        return
-    await interaction.followup.send(
-        live_smoke_report_text(getattr(thread, 'name', ''), stamp, rows),
-        ephemeral=True)
+    said_text = False
+    while not client.is_closed():
+        try:
+            known = tasks = None
+            for g in client.guilds:
+                known = known or _channel_named(g, KNOWN_NAME, ('forum',))
+                tasks = tasks or _channel_named(g, TASKS_NAME, ('forum',))
+                if known is None and not said_text and _channel_named(g, KNOWN_NAME, ('text',)):
+                    log('known issues: #%s is still a text channel. The one-time '
+                        'step (python bot.py --setup-channels --apply) makes it '
+                        'a forum.' % KNOWN_NAME)
+                    said_text = True
+            me = getattr(client.user, 'id', None)
+            if known is not None:
+                posted, edited, removed = await known_issues_once(
+                    known, state, save=_known_save, me_id=me)
+                if posted or edited or removed:
+                    log('known issues: posted %s, edited %s, removed %s'
+                        % (posted or 'none', edited or 'none', removed or 'none'))
+            if tasks is not None:
+                posted, edited, removed = await test_tasks_once(
+                    tasks, state, save=_known_save, me_id=me)
+                if posted or edited or removed:
+                    log('test tasks: posted %s, edited %s, removed %s'
+                        % (posted or 'none', edited or 'none', removed or 'none'))
+            if state.get('_dirty'):
+                _known_save(state)
+        except Exception as e:
+            # Never the URL with the token, and never the token: the request
+            # carries it in a header, which str(e) does not print.
+            log('known issues: a pass failed: %s' % type(e).__name__)
+        await asyncio.sleep(KNOWN_EVERY)
 
 
 # ----------------------------------------------------- the staff channel --
@@ -3954,6 +3879,7 @@ async def on_ready():
         asyncio.create_task(watch_services())
         asyncio.create_task(watch_reports())
         asyncio.create_task(watch_moderation())
+        asyncio.create_task(watch_known_issues())
 
     log('up as %s' % client.user)
 
@@ -4000,6 +3926,77 @@ async def on_ready():
             log('join cards will go to #%s in "%s"' % (ch.name, g.name))
 
 
+def run_cli(argv):
+    """
+    The by-hand jobs, on a connection of their own that starts none of the
+    bot's watchers, panels or command sync, and closes when it is done:
+
+      --setup-channels [--apply]   the one-time setup, a preview without --apply
+      --post-task --title T --body B|--body-file F --tag Dev|Main
+      --adopt-task --issue N --thread ID   (offline; with the bot stopped)
+
+    Returns the exit code.
+    """
+    import argparse
+    ap = argparse.ArgumentParser(prog='bot.py')
+    ap.add_argument('--env-file')
+    ap.add_argument('--setup-channels', action='store_true')
+    ap.add_argument('--apply', action='store_true')
+    ap.add_argument('--post-task', action='store_true')
+    ap.add_argument('--title')
+    ap.add_argument('--body')
+    ap.add_argument('--body-file')
+    ap.add_argument('--tag', choices=list(TASK_TAGS))
+    ap.add_argument('--guild', type=int, default=0)
+    ap.add_argument('--adopt-task', action='store_true')
+    ap.add_argument('--issue', type=int)
+    ap.add_argument('--thread', type=int)
+    a = ap.parse_args(argv)
+    if a.adopt_task:
+        if not a.issue or not a.thread:
+            ap.error('--adopt-task needs --issue and --thread')
+        print(adopt_task(a.issue, a.thread))
+        return 0
+    if a.post_task:
+        body = a.body
+        if a.body_file:
+            with open(a.body_file, encoding='utf-8-sig') as f:
+                body = f.read()
+        if not a.title or not body or not a.tag:
+            ap.error('--post-task needs --title, --body or --body-file, and --tag')
+    out = {'code': 0}
+    cli = discord.Client(intents=discord.Intents(guilds=True))
+
+    @cli.event
+    async def on_ready():
+        try:
+            guilds = [g for g in cli.guilds if not a.guild or g.id == a.guild]
+            if not guilds:
+                print('the bot is in no server%s' % (
+                    ' with id %d' % a.guild if a.guild else ''))
+                out['code'] = 1
+            for g in guilds:
+                print('"%s" (%d):' % (g.name, g.id))
+                if a.setup_channels:
+                    for line in await channel_setup(g, apply=a.apply):
+                        print('  ' + line)
+                    if not a.apply:
+                        print('  (preview only; add --apply to do it)')
+                else:
+                    thread, said = await post_test_task(g, a.title, body, a.tag)
+                    print('  ' + said)
+                    if thread is None:
+                        out['code'] = 1
+        except Exception:
+            traceback.print_exc()
+            out['code'] = 1
+        finally:
+            await cli.close()
+
+    cli.run(TOKEN, log_handler=None)
+    return out['code']
+
+
 # Under a main guard, so that importing this file reads it instead of running
 # it. Without one, `import bot` connects to Discord with whatever token is in
 # env, which is why nothing in here had ever been tested: there was no way to
@@ -4007,6 +4004,9 @@ async def on_ready():
 # `python bot.py`, where __name__ is __main__, so this changes nothing about
 # how it runs on the VPS.
 if __name__ == '__main__':
+    if ('--setup-channels' in sys.argv or '--post-task' in sys.argv
+            or '--adopt-task' in sys.argv):
+        raise SystemExit(run_cli(sys.argv[1:]))
     # One heartbeat before anything can hang, so a bot stuck logging in has
     # this run's pid in the file and the watchdog can say how long it has sat.
     beat_now()

@@ -351,11 +351,15 @@ function chatDay(at) {
   return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
 }
 
-function chatWrite(kind, peerId, me, text) {
+/* via is 'press' for a command a key or a panel sent rather than one somebody
+   typed (#2251): the lock key's /lock used to sit in the log looking typed.
+   It is the client's own word, so it labels the line and nothing else: the
+   command is logged either way, and run either way. */
+function chatWrite(kind, peerId, me, text, via) {
   try {
     if (!fs.existsSync(CHAT_DIR)) fs.mkdirSync(CHAT_DIR, { recursive: true });
     const at = Date.now();
-    const line = JSON.stringify({
+    const entry = {
       at: at,
       kind: kind,                                   /* say or command */
       peer: peerId,
@@ -364,8 +368,9 @@ function chatWrite(kind, peerId, me, text) {
       proven: !!(me && me.proven),
       mode: (me && me.mode) || '',
       text: text
-    });
-    fs.appendFileSync(path.join(CHAT_DIR, chatDay(at) + '.jsonl'), line + '\n');
+    };
+    if (via === 'press') entry.via = 'press';
+    fs.appendFileSync(path.join(CHAT_DIR, chatDay(at) + '.jsonl'), JSON.stringify(entry) + '\n');
   } catch (e) {
     /* Never let writing the log stop the message going out. Somebody losing
        chat because a disk was full would be a worse fault than a gap here. */
@@ -2425,7 +2430,8 @@ server.on('upgrade', (req, socket, head) => {
       if (text.charAt(0) === '/') {
         // A join pass is good for ten minutes to whoever holds it, so the
         // chat log keeps that one was sent and never the pass itself (#937).
-        chatWrite('command', myId, me, /^\/joinpass\b/i.test(text) ? '/joinpass [pass]' : text);
+        chatWrite('command', myId, me, /^\/joinpass\b/i.test(text) ? '/joinpass [pass]' : text,
+                  msg.press === true ? 'press' : '');
         // Full: the newest is refused and its sender told, and everything
         // already taken stays. See the note over COMMAND_CAP.
         if (commands.length >= COMMAND_CAP) {

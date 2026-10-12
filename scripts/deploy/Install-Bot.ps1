@@ -142,7 +142,7 @@ $docsWin = $DocsRoot.Replace('/','\')
 . (Join-Path $Here 'Artifact.ps1')
 $artifact = $null
 if (-not $PutBack -and -not $SetPing) {
-$artifact = New-ThornswoodArtifact -Component bot -RepoDir $Repo -Paths 'bot/bot.py', 'bot/card.py', 'bot/dev-channel.txt', 'bot/requirements.txt', 'bot/live-smoke-discord-export.json', 'bot/staff-channel.txt', 'bot/assets/join-card.png', 'scripts/vps/BotService.cs'
+$artifact = New-ThornswoodArtifact -Component bot -RepoDir $Repo -Paths 'bot/bot.py', 'bot/card.py', 'bot/dev-channel.txt', 'bot/requirements.txt', 'bot/staff-channel.txt', 'bot/assets/join-card.png', 'scripts/vps/BotService.cs'
 Write-Host ('artifact ' + (Format-ThornswoodArtifact $artifact)) -ForegroundColor DarkGray
 Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
 $Repo = $artifact.Folder
@@ -360,14 +360,12 @@ Head 'Staging it'
 #
 # requirements.txt too, because the full run installs the libraries from it.
 #
-# live-smoke-discord-export.json too: the Live smoke rows, which bot.py reads
-# from beside itself and nowhere else. From 2 Oct (#1537) to 6 Oct (#2018) it
-# was left out to make the join-card harness's exact list pass, and nothing
-# else sends it, so the box kept the export of 2 Oct while main moved on and
-# /live-smoke refresh posted rows that were days old. The harness's point is
-# that joins.json, the bot's own record, is never sent; it still checks that.
+# The Live smoke export went up with these from 6 Oct (#2018) until the Live
+# smoke checklist was taken out on 11 Oct. Nothing reads it now. The join-card
+# harness's point is that joins.json, the bot's own record, is never sent; it
+# still checks that.
 $send = [ordered]@{}
-foreach ($f in 'bot.py', 'card.py', 'dev-channel.txt', 'requirements.txt', 'live-smoke-discord-export.json') {
+foreach ($f in 'bot.py', 'card.py', 'dev-channel.txt', 'requirements.txt') {
   $src = Join-Path $Repo "bot\$f"
   if (-not (Test-Path $src)) { Die "missing: $src" }
   $send[$f] = $src
@@ -636,7 +634,7 @@ function Invoke-BotSwap([bool]$noServiceOk) {
 #
 # A run said artifact, 8 files, STAGE OK, SWAP OK and the bot watching, and
 # then Test-Path on C:\Thornswood-Bot\data\bot.log and on
-# C:\Thornswood-Bot\live-smoke-discord-export.json both answered False. Every
+# the Live smoke export (since retired) at the same root both answered False. Every
 # line the run printed was about the box; the two answers were about whatever
 # machine typed them, and C:\Thornswood-Bot is a folder on the VPS. Nothing
 # in the run itself had ever said what those paths hold on the box, so there
@@ -801,8 +799,13 @@ Set-Location '$rootWin'
 # that folder in with the code and puts the old one back when the bot does
 # not come up, so a bump that breaks the start does not leave the new
 # libraries under the old code (#1076).
+#
+# By hash as well as version (#2190): requirements.txt lists every library
+# the bot pulls in with the sha256 of each published wheel, and
+# --require-hashes refuses a file that does not match or a library it does
+# not list. Wheels only, so nothing is built from source on the box.
 New-Item -ItemType Directory -Force -Path '$rootWin\$stageName\py-libs' | Out-Null
-& python -m pip install --quiet --disable-pip-version-check --upgrade --target '$rootWin\$stageName\py-libs' -r '$rootWin\$stageName\requirements.txt' 2>&1 | Out-Null
+& python -m pip install --quiet --disable-pip-version-check --require-hashes --only-binary :all: --upgrade --target '$rootWin\$stageName\py-libs' -r '$rootWin\$stageName\requirements.txt' 2>&1 | Out-Null
 if (`$LASTEXITCODE -eq 0) { 'discord.py, pillow and certifi ready, in py-libs, at the versions in requirements.txt' } else { 'PIP FAILED with ' + `$LASTEXITCODE }
 # pip --target builds in a folder made by Python's tempfile.mkdtemp, which on
 # Windows (Python 3.12.4 and later) holds only SYSTEM, Administrators and its

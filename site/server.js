@@ -1636,8 +1636,9 @@ async function standingCached(id) {
   const hit = standCache.get(id);
   // A staff ban (#412) is this site's own file, so a remembered one is asked
   // again: one that ran out or was lifted lets them in now, not in a minute.
-  const stale = hit && hit.v && hit.v.byFile &&
-    !banActive(jsonFile(BANS, {})[String(id)] || null, Date.now());
+  const nowBans = bansNow();
+  const stale = hit && hit.v && (nowBans.broken ? !hit.v.bansBroken
+    : (hit.v.byFile && !banActive(nowBans.table[String(id)] || null, Date.now())));
   if (hit && !stale && Date.now() - hit.at < 60000) return hit.v;
   const v = await standing(id);
   standCache.set(id, { at: Date.now(), v });
@@ -2345,6 +2346,35 @@ const LINKED = path.join(DATA, 'linked.json');
   /banaccount the account; the hub offers both.
 */
 const BANS = path.join(DATA, 'bans.json');
+/* THE BAN LIST FAILS CLOSED (#2186). jsonFile() hands back its fallback for a
+   file that is there but will not parse, so a bans.json cut short by a crash
+   read as no bans at all and let every banned account in. Every read that
+   decides who may play goes through readBans(): a missing file is the normal
+   empty list, and a file that is there but will not read as an object is
+   BROKEN. While it is broken nobody is let in to play (standing says banned,
+   /api/allowed lists nobody), no ban or unban is written over it, and the
+   site says so on its log once each time it breaks. The pages stay up. */
+let bansBrokenSaid = '';
+function readBans() {
+  let text;
+  try { text = fs.readFileSync(BANS, 'utf8'); }
+  catch (e) { return (e && e.code === 'ENOENT') ? { table: {}, broken: '' } : { table: {}, broken: 'cannot be read (' + ((e && e.code) || 'unknown') + ')' }; }
+  let doc;
+  try { doc = JSON.parse(text.replace(/^\uFEFF/, '')); } catch (e) { return { table: {}, broken: 'will not parse' }; }
+  if (!doc || typeof doc !== 'object' || Array.isArray(doc)) return { table: {}, broken: 'is not a table of bans' };
+  return { table: doc, broken: '' };
+}
+function bansNow() {
+  const b = readBans();
+  if (b.broken && bansBrokenSaid !== b.broken) {
+    console.error('[thornswood-docs] BANS BROKEN: ' + BANS + ' ' + b.broken + '. Nobody is let in to play until it is repaired (#2186).');
+  } else if (!b.broken && bansBrokenSaid) {
+    console.log('[thornswood-docs] bans.json reads again; play is open to those not banned.');
+  }
+  bansBrokenSaid = b.broken;
+  return b;
+}
+const BANS_BROKEN_WHY = 'the ban list cannot be read, so nobody can be let in until staff repair it';
 /*
   Characters staff have killed for good (#1010, PK). Keyed by profile id:
   {"<profile>": {"at", "by", "byId", "why", "name", "account", "from"}}.
@@ -2402,7 +2432,9 @@ function characterBar(pid, now) {
   if (pk && pkActive(pk[String(n)])) {
     return { pk: true, at: Number((pk[String(n)] || {}).at) || 0 };
   }
-  const byChar = jsonFile(BANS, {});
+  const readB = bansNow();
+  if (readB.broken) return { pk: false, why: BANS_BROKEN_WHY, until: 0 };
+  const byChar = readB.table;
   const b = byChar && byChar['p:' + n];
   if (banActive(b, now)) return { pk: false, why: String(b.why || ''), until: Number(b.until) || 0 };
   return null;
@@ -2430,7 +2462,8 @@ function accountBanned(st) {
 }
 /* Every profile an active ban covers, with why and until, for the door. */
 function activeBans(now) {
-  const table = jsonFile(BANS, {});
+  const readB = bansNow();
+  const table = readB.table;
   const linked = jsonFile(LINKED, {});
   const out = [];
   for (const k of Object.keys(table || {})) {
@@ -2445,11 +2478,15 @@ function activeBans(now) {
     if (set.size) out.push({ profiles: Array.from(set), why: String(b.why || ''), until: Number(b.until) || 0,
                              scope: k.indexOf('p:') === 0 ? 'character' : 'account' });
   }
+  // Carried on the list, not sent: the door reads it to let nobody in (#2186).
+  if (readB.broken) Object.defineProperty(out, 'broken', { value: readB.broken });
   return out;
 }
 /* A ban, made or replaced. The account's standing is asked again at once. */
 function putBan(key, row) {
-  const table = jsonFile(BANS, {});
+  const readB = bansNow();
+  if (readB.broken) return false;
+  const table = readB.table;
   const had = table[key] || {};
   const profiles = new Set([].concat(had.profiles || [], row.profiles || []).map(Number).filter((n) => n > 0));
   table[key] = Object.assign({}, row, { profiles: Array.from(profiles) });
@@ -2458,7 +2495,9 @@ function putBan(key, row) {
   return ok;
 }
 function dropBan(keys) {
-  const table = jsonFile(BANS, {});
+  const readB = bansNow();
+  if (readB.broken) return { was: false, ok: false };
+  const table = readB.table;
   let was = false;
   for (const k of keys) {
     if (k && Object.prototype.hasOwnProperty.call(table, k)) { delete table[k]; was = true; standCache.delete(k); }
@@ -3287,7 +3326,8 @@ function chatSlice(profileId, from, to, channel) {
       const at = Number(o.at) || 0;
       if (at < from || at > to) continue;
       out.push({ at: at, kind: String(o.kind || ''), mode: String(o.mode || ''),
-                 name: String(o.name || ''), proven: !!o.proven, text: String(o.text || '') });
+                 name: String(o.name || ''), proven: !!o.proven, text: String(o.text || ''),
+                 via: o.via === 'press' ? 'press' : '' });
       if (out.length > 4000) break;
     }
     if (out.length > 4000) break;
@@ -3461,7 +3501,12 @@ async function standing(discordId) {
     So the list is read here, where nothing can route around it, and it wins.
   */
   // A ban with an end (#412) stops counting once it has passed.
-  const bans = jsonFile(BANS, {});
+  const readB = bansNow();
+  if (readB.broken) {
+    out.banned = true; out.reason = BANS_BROKEN_WHY; out.until = 0; out.byFile = true; out.bansBroken = true;
+    return out;
+  }
+  const bans = readB.table;
   if (bans && Object.prototype.hasOwnProperty.call(bans, String(discordId)) &&
       !(Number((bans[String(discordId)] || {}).until) > 0 &&
         Number((bans[String(discordId)] || {}).until) <= Date.now())) {
@@ -5844,6 +5889,15 @@ async function handle(req, res) {
        and the bans go to the door with why and until, so the game server can
        end the session of anybody banned who is online and tell them both. */
     out.bans = activeBans(Date.now());
+    // A broken ban list lets nobody through the door (#2186): every list is
+    // emptied and the door is told why.
+    if (out.bans.broken) {
+      out.bansBroken = true;
+      for (const k of ['profiles', 'devProfiles', 'adminProfiles', 'jarlProfiles', 'staffRoleProfiles', 'failedProfiles']) {
+        if (Array.isArray(out[k])) out[k] = [];
+      }
+      if (Array.isArray(out.people)) out.people = [];
+    }
     /* And every character staff have killed for good (#1010), left out the
        same way and sent as pk, so the game server ends it quietly if it is
        in the world. */

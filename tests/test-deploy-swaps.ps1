@@ -503,10 +503,6 @@ Put (Join-Path $repo 'site\data\site\about.md') 'about'
 Put (Join-Path $repo 'voice\headlines.js') "module.exports = {};`n"
 Put (Join-Path $repo 'bot\card.py') 'CARD = 1'
 Put (Join-Path $repo 'bot\dev-channel.txt') '0'
-# What bot.py reads from beside itself for the live smoke (LIVE_SMOKE_EXPORT).
-# Written without a byte order mark by Put, as the real one is, because the
-# stage check parses every .json it sends and refuses one that has a mark.
-Put (Join-Path $repo 'bot\live-smoke-discord-export.json') '{ "channels": [] }'
 Put (Join-Path $repo 'bot\requirements.txt') ''
 Put (Join-Path $repo 'bot\staff-channel.txt') '0'
 Put (Join-Path $repo 'bot\assets\join-card.png') 'not really a picture'
@@ -809,12 +805,10 @@ try {
     $failed = $script:fail
     Yes 'Install-Bot -CodeOnly: good code is SWAP OK and the new bot says it is watching' ($r.Ok -and $r.Said -match 'SWAP OK' -and (BotSays 'bot v2'))
     Yes '  and only then the box records the bot artifact' ((Current 'thornswood-bot').name -like 'bot-*')
-    # The live smoke export goes up beside bot.py, the one place the bot reads
-    # it (#2018). From #1537 to #2018 it was left out, and the box kept the
-    # export of 2 Oct while main moved on.
-    Yes '  and the live smoke export is copied up beside bot.py' (
-        (Test-Path -LiteralPath (Join-Path $botRoot 'live-smoke-discord-export.json')) -and
-        ([IO.File]::ReadAllText((Join-Path $botRoot 'live-smoke-discord-export.json')) -eq [IO.File]::ReadAllText((Join-Path $repo 'bot\live-smoke-discord-export.json'))))
+    # The live smoke export went up beside bot.py from #2018 until the Live
+    # smoke checklist was taken out on 11 Oct. Nothing sends it now.
+    Yes '  and no live smoke export is sent any more' (
+        -not (Test-Path -LiteralPath (Join-Path $botRoot 'live-smoke-discord-export.json')))
     # And the run says so itself, asking the box for the full path under the
     # root the swap moved the files to. A green run once left the export and
     # data\bot.log reported missing from the install root with nothing in the

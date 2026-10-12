@@ -80,6 +80,9 @@ if ($liveWhy.Count) {
 if (-not (Test-Path -LiteralPath $Record)) { throw "there is no build record at $Record, so nothing says which build these server files are. Nothing was packed." }
 $rec = $null
 try { $rec = [IO.File]::ReadAllText($Record) | ConvertFrom-Json } catch { throw "$Record does not parse: $($_.Exception.Message). Nothing was packed." }
+. (Join-Path $PSScriptRoot 'RecordShape.ps1')   # #2180: a version this checkout knows, every field
+$recBad = @(Get-ThornswoodRecordProblems -Doc $rec -Kind server-build)
+if ($recBad.Count) { throw ("$Record is not a server-build record this checkout can trust: " + ($recBad -join '; ') + '. Nothing was packed.') }
 $why = @(Get-ThornswoodServerBuildProblems $rec (Get-ThornswoodServerFolderSums $Dist) $Dist $Record)
 if ($why.Count) {
     # Said a line each rather than inside the error, which Windows PowerShell

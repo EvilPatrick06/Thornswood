@@ -299,7 +299,10 @@ Write-Host '  gamemode.js parses'
 $devRecordPath = Join-Path $Here '..\..\records\server-build.json'
 if (-not (Test-Path -LiteralPath $devRecordPath)) { throw 'there is no records\server-build.json, so nothing says which server build this gamemode is written for. Nothing was sent.' }
 $devRecordSum = Get-ThornswoodRecordSum ([IO.File]::ReadAllBytes($devRecordPath))
-$devRecordCommit = [string]((ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $devRecordPath -Raw) $devRecordPath).source.commit)
+# RecordShape.ps1 (#2180): the record must be a version this checkout knows,
+# with the fields read below, or the deploy stops here, before anything is sent.
+. (Join-Path $Here '..\release\RecordShape.ps1')
+$devRecordCommit = [string]((Read-ThornswoodRecord -Path $devRecordPath -Kind server-build).source.commit)
 $devBoxSaid = @(Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script ($ThornswoodRecordSumText + "`r`n" + @"
 `$rp = '$($Root.Replace('/', '\').Replace("'", "''"))\server-build.json'
 if (Test-Path -LiteralPath `$rp) {

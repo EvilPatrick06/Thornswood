@@ -9,6 +9,15 @@
       .\scripts\vps\Fetch-Backups.ps1 -All         bring down everything, again
       .\scripts\vps\Fetch-Backups.ps1 -NoVerify    just copy, do not open them
 
+  EVERY ONE IT BRINGS DOWN IS CHECKED (issue #2200), with Restore-Backup.ps1
+  -CheckOnly, not just the newest: a newest-only check says nothing about the
+  others. Each file is named with its result. One that fails, or arrives
+  short, is renamed out of the backup pattern to <name>.failed-<stamp>, kept
+  for a look and never counted, pruned or skipped as already here, and the
+  run ends non-zero. No passphrase, or no Restore-Backup.ps1 beside this
+  script, is a failure too, because then nothing was checked. -NoVerify is the
+  one way to skip the check, and says so.
+
   Everything it brings down is encrypted, so where it lands matters less than
   it would otherwise. The passphrase is the thing to keep carefully, and it is
   not in here.
@@ -79,6 +88,17 @@ function Log($m) {
       Add-Content -LiteralPath (Join-Path $To 'fetch.log') -Value ((Get-Date -Format 'yyyy-MM-dd HH:mm:ss') + '  ' + $m) -Encoding UTF8
     }
   } catch { }
+}
+
+# A file that failed is renamed out of the backup pattern, so it is never
+# kept as one of the newest seven, never pruned and never taken for a copy
+# already here. Kept, not deleted, so it can be looked at (#2200).
+function Set-Aside($path) {
+  $to = $path + '.failed-' + (Get-Date -Format 'yyyyMMdd-HHmmss')
+  try {
+    Move-Item -LiteralPath $path -Destination $to -Force
+    Say ("          set aside as {0}" -f (Split-Path -Leaf $to)) 'Yellow'
+  } catch { Say ("          could not set {0} aside: {1}" -f (Split-Path -Leaf $path), $_.Exception.Message) 'Red' }
 }
 
 # Everything from the last $KeepDays days, and the newest seven whatever
@@ -215,6 +235,7 @@ foreach ($b in $want) {
   $len = (Get-Item $local).Length
   if ($len -ne $b.Length) {
     Say ("  SHORT   {0}  got {1} of {2} bytes" -f $b.Name, $len, $b.Length) 'Red'
+    Set-Aside $local
     $failed++
     continue
   }
@@ -224,26 +245,40 @@ foreach ($b in $want) {
 
 if ($NoVerify -or -not $got.Count) {
   Write-Host ''
+  if ($NoVerify -and $got.Count) { Say ("  -NoVerify: {0} copied and NOT checked" -f $got.Count) 'Yellow' }
   Prune
   if (-not $NoPause) { [void](Read-Host 'Enter to close') }
   if ($failed) { exit 1 }
   exit 0
 }
 
-Head 'Checking the newest one opens'
+Head ("Checking every one opens ({0})" -f $got.Count)
 # Copying a file proves the bytes moved. It does not prove the backup is a
 # backup, and that is the failure worth catching: the two that existed before
-# any of this were both readable and both had no characters in them.
-$newest = $got | Sort-Object | Select-Object -Last 1
+# any of this were both readable and both had no characters in them. Every
+# file this run brought down is checked, in name order, not only the newest
+# (#2200): a newest-only check proves nothing about the rest.
 $restore = Join-Path $Here 'Restore-Backup.ps1'
 if (-not (Test-Path -LiteralPath $restore)) {
-  Say '  Restore-Backup.ps1 is not next to this script, so it was not checked.' 'Yellow'
+  Say ("  NOT CHECKED  Restore-Backup.ps1 is not next to this script, so none of the {0} could be opened." -f $got.Count) 'Red'
+  $failed++
 } elseif (-not (Test-Path -LiteralPath $KeyFile)) {
-  Say "  No passphrase at $KeyFile, so it could not be opened. Pass -KeyFile." 'Yellow'
+  Say ("  NOT CHECKED  No passphrase at {0}, so none of the {1} could be opened. Pass -KeyFile, or -NoVerify to only copy." -f $KeyFile, $got.Count) 'Red'
+  $failed++
 } else {
-  & $restore -Backup $newest -KeyFile $KeyFile -CheckOnly -NoPause
-  if ($LASTEXITCODE -ne 0) { Say '  THAT BACKUP DID NOT OPEN. Do not trust the rest until you know why.' 'Red'; $failed++ }
-  else { Say ("  {0} opens and its signature is good" -f (Split-Path -Leaf $newest)) 'Green' }
+  foreach ($one in ($got | Sort-Object)) {
+    $leaf = Split-Path -Leaf $one
+    $global:LASTEXITCODE = 0
+    try { & $restore -Backup $one -KeyFile $KeyFile -CheckOnly -NoPause; $code = $LASTEXITCODE }
+    catch { Say ("  {0}: {1}" -f $leaf, $_.Exception.Message) 'Red'; $code = 1 }
+    if ($code -ne 0) {
+      Say ("  FAILED  {0}  did not open (exit {1}). Do not trust it until you know why." -f $leaf, $code) 'Red'
+      Set-Aside $one
+      $failed++
+    } else {
+      Say ("  OK      {0}  opens and its signature is good" -f $leaf) 'Green'
+    }
+  }
 }
 
 Prune

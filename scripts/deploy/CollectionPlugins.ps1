@@ -32,6 +32,7 @@
   Works on Windows PowerShell 5.1 and PowerShell 7.
 #>
 . (Join-Path $PSScriptRoot '..\release\Read-JsonFile.ps1')
+. (Join-Path $PSScriptRoot '..\release\RecordShape.ps1')
 
 function Get-ThornswoodPluginSha256([string]$Path) {
     $Path = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
@@ -58,6 +59,10 @@ function Read-ThornswoodCollectionPluginRecord([string]$Path) {
         if ($table.ContainsKey($n)) { throw "$Path lists $n twice" }
         $table[$n] = [pscustomobject]@{ Name = $n; Size = [int64]$s; Sha256 = $h.ToLowerInvariant() }
     }
+    # The same contract Check-Records holds the committed record to (#2180),
+    # after the row checks above so their messages come first.
+    $shape = @(Get-ThornswoodRecordProblems -Doc $doc -Kind collection-plugins)
+    if ($shape.Count) { throw ("$Path is not a collection-plugins record this checkout can trust: " + ($shape -join '; ')) }
     return , $table
 }
 

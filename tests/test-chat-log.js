@@ -35,7 +35,9 @@ const SRC = path.join(REPO_DIR, 'voice', 'voice-server.js');
 const src = fs.readFileSync(SRC, 'utf8');
 
 function grab(name) {
-  const at = src.indexOf('function ' + name);
+  // By the exact name and its bracket: 'function chatPrune' also starts
+  // 'function chatPruneSay', which #2191 put above it (#2278).
+  const at = src.indexOf('function ' + name + '(');
   if (at < 0) throw new Error('voice/voice-server.js has no function ' + name);
   const b = src.indexOf('{', at);
   let d = 0;
@@ -54,9 +56,17 @@ const console2 = { log: (m) => logged.push(m) };
 // The name a line is logged under is peerName's (#410): the game server's
 // name for a proven profile, none known here, so the page's.
 const positions = new Map();
+// What the prune reads since #2191: its failure book, its alert count, and a
+// timer that is never really set here, so the harness does not wait six hours.
+const CHAT_PRUNE_ALERT = 3;
+const chatPruneFailures = {};
+let chatOverdue = 0, chatPruneError = '', chatPruneTimer = null;
+const setTimeout = () => 0;
+const clearTimeout = () => {};
 eval(grab('peerName') + '\n' +
      grab('chatDay').replace(/^function/, 'function') + '\n' +
      grab('chatWrite').replace('console.log', 'console2.log') + '\n' +
+     grab('chatPruneSay').replace('console.log', 'console2.log') + '\n' +
      grab('chatPrune'));
 
 let pass = 0, fail = 0;
