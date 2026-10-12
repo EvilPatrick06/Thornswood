@@ -64144,7 +64144,8 @@ function createSettlement(deps) {
       Number.isSafeInteger(pending.sequence) && pending.sequence > 0 && pending.sequence < Number.MAX_SAFE_INTEGER &&
       pending.debitReceipt === receiptAt(pending.human, pending.sequence) &&
       pending.finalReceipt === receiptAt(pending.human, pending.sequence + 1) &&
-      (pending.phase==='credit' && pending.expectedReceipt===undefined ||
+      (pending.phase==='credit' && pending.expectedReceipt===undefined && pending.expected===undefined && pending.debit===undefined &&
+        pending.previous && pending.previous.purse===undefined && pending.previous.stock===undefined ||
         pending.expectedReceipt===(pending.sequence===1?'null':receiptAt(pending.human,pending.sequence-1)));
   }
   function commitMerchant(id, state) {
@@ -64269,6 +64270,9 @@ function createSettlement(deps) {
       if (!human || human.profileId !== offer.profileId || !state || state.pending ||
           !equal(state, offer.previous) || !admitted(human, state.reference))
         return {accepted:false,done:false,reason:'A transfer is waiting.'};
+      var previous;
+      try {previous=merchantSnapshot(state);merchantSnapshot(offer.next);}
+      catch(error) {active=false;throw error;}
       if (offer.kind === 'supply') {
         var key = changedSupplyKey(state, offer.next), owner;
         try { owner = JSON.parse(key); } catch (error) { owner = null; }
@@ -64284,7 +64288,7 @@ function createSettlement(deps) {
       if (!Number.isSafeInteger(sequence + 1)) throw new Error('Inventory receipt sequence is exhausted.');
       var pending = {version:2,id:world + ':' + state.reference + ':' + (state.revision || 0),world:world,
         reference:state.reference,base:state.base,human:human,kind:offer.kind,phase:'debit',
-        previous:{purse:state.purse,stock:copy(state.stock),supply:copy(state.supply || {})},next:copy(offer.next),
+        previous:copy(previous),next:copy(offer.next),
         expected:expected,expectedReceipt:receipt,debit:inventory(offer.debit),credit:inventory({entries:offer.credit}).entries,
         sequence:sequence,debitReceipt:receiptAt(human,sequence),finalReceipt:receiptAt(human,sequence+1)};
       // Use the same native validator as CAS, including its serialized-byte
@@ -64293,6 +64297,7 @@ function createSettlement(deps) {
         if(transfer.validate(snapshot)!==true) throw new Error('Native inventory validation failed.');
       });
       var armed = Object.assign({}, copy(state), {pending:pending});
+      if(!valid(pending,state)) {active=false;throw new Error('Pending merchant records cannot be verified.');}
       // Either recovery inventory can reach the native/JS inventory limit.
       // Reserve both plus the JSON envelope before charging, including later
       // inventory growth. The 512 KiB intent bound stays unchanged.

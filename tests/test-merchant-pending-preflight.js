@@ -5,7 +5,7 @@ const context={require,console};vm.createContext(context);vm.runInContext(source
 const copy=x=>JSON.parse(JSON.stringify(x));
 function armed(){const f=context.fixture(),s=f.make();s.begin(f.offer());f.save();s.shutdown();f.calls.length=0;return f;}
 for(const defect of ['transaction','human','human-alias','receipt','reference','base','previous','next','world','kind','phase','descriptor',
- 'pending-false','pending-zero','pending-empty','previous-supply','next-supply','expected-receipt','expected-owner','expected-sequence','profile-overflow','stock-shape','receipt-whitespace']){
+ 'pending-false','pending-zero','pending-empty','previous-supply','next-supply','expected-receipt','expected-owner','expected-sequence','profile-overflow','stock-shape','receipt-whitespace','full-credit-receipt']){
  const f=armed(),state=copy(f.states.get(1)),p=state.pending;
  state.reference='2:Skyrim.esm';p.reference=state.reference;
  p.id='second';p.human={desc:'20',profileId:8};
@@ -37,6 +37,9 @@ for(const defect of ['transaction','human','human-alias','receipt','reference','
  if(defect==='expected-sequence')p.expectedReceipt=p.finalReceipt;
  if(defect==='stock-shape')p.next.stock=[null];
  if(defect==='receipt-whitespace')p.expectedReceipt=' null ';
+ if(defect==='full-credit-receipt'){
+  p.phase='credit';state.purse=p.next.purse;state.stock=copy(p.next.stock);delete p.expectedReceipt;
+ }
  if(defect==='profile-overflow'){
   p.human.profileId=2147483648;
   p.debitReceipt=JSON.stringify({actor:p.human.desc,profile:p.human.profileId,sequence:1});
@@ -96,5 +99,24 @@ for(const action of ['begin','prune','inventory']){
   const purse=ctx.createNpcMerchantPurses(api,{keep:[['1:Skyrim.esm','a:Skyrim.esm',null,null,null,null,'trader']]},storage);
   assert.equal(purse.pendingRecords().length,1,'the production adapter exposes malformed falsy intents for quarantine');
  }
+ for(const invalid of [false,null,[]]){
+  const f=context.fixture(),state={...copy(f.states.get(1)),version:1,supply:invalid};let writes=0;
+  const stored={version:1,entries:{'1:Skyrim.esm':state}},before=JSON.stringify(stored);
+  const storage={durable:true,load:()=>copy(stored),save(){writes++;return true;}};
+  const api={makeProperty(){},getIdFromDesc:()=>1,getNpcAIState:()=>({isHuman:false}),get:(id,key)=>key==='baseDesc'?'a:Skyrim.esm':undefined,set(){}};
+  const purse=ctx.createNpcMerchantPurses(api,{keep:[['1:Skyrim.esm','a:Skyrim.esm',null,null,null,null,'trader']]},storage);
+  const s=require('../game/merchant-settlement').createSettlement({purses:purse,transfer:f.transfer,world:'dev:test-ledger'});
+  const offer=f.offer();offer.previous=purse.read(1);
+  assert.throws(()=>s.begin(offer),/pending.*verified/i);
+  assert.equal(writes,0,'malformed current supply is rejected before the durable intent');
+  assert.equal(JSON.stringify(stored),before);assert.equal(f.calls.length,0);
+ }
+}
+{
+ const f=context.fixture();f.transfer.receipt=()=> ' null ';f.transfer.saved=f.transfer.receipt;
+ const before=JSON.stringify(Array.from(f.states)),s=f.make();
+ assert.throws(()=>s.begin(f.offer()),/pending.*verified/i);
+ assert.equal(JSON.stringify(Array.from(f.states)),before,'new intents have exact original receipts before reservation');
+ assert.equal(f.calls.length,0);
 }
 console.log('PASS whole-list merchant pending identity/state validation before recovery and admission');
