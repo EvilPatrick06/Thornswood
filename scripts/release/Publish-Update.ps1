@@ -153,6 +153,8 @@ if ($Dev -and -not (Test-Path (Join-Path $Root 'Launcher'))) {
 . (Join-Path $Here 'Dev-News.ps1')
 # Which content plugin the channel's server holds (#2308, ServerContent.ps1).
 . (Join-Path $Here '..\deploy\ServerContent.ps1')
+# Where the notes are kept, in the feed or as a file of their own (#1050).
+. (Join-Path $Here 'Feed-News.ps1')
 if (-not $ReleaseDir) { $ReleaseDir = Get-FeedStoreDir $Channel }
 if (-not (Test-Path -LiteralPath $ReleaseDir)) { New-Item -ItemType Directory -Path $ReleaseDir -Force | Out-Null }
 $haveLocal = (Test-Path -LiteralPath (Join-Path $ReleaseDir 'version.json')) -and (Test-Path -LiteralPath (Join-Path $ReleaseDir 'published.json'))
@@ -2000,8 +2002,14 @@ try {
 # The launcher's News page reads this. Without it the page sits empty however
 # many releases go out, because the notes were only ever going into the GitHub
 # release body, which nobody playing the game ever sees.
-$news = @()
-if ($doc.PSObject.Properties['news'] -and $doc.news) { $news = @($doc.news) }
+#
+# Every note the feed has, wherever it keeps them (Feed-News.ps1, #1050): in
+# "news", or, once the channel's minLauncher reads it, the news file it names.
+# Held whole in "news" in memory from here, so the DEV marks below see every
+# note, and put back the way the channel keeps them just before the feed is
+# written (the news out block).
+try { $news = @(Open-FeedNewsList $doc (Get-FeedStoreSiteDir $SiteDir) $SiteUrl) }
+catch { Die ("The notes the feed already has could not be read, so nothing was written: " + $_.Exception.Message) }
 
 # A note can be a headline on its own, or a headline followed by lines. Any
 # line starting with - or * becomes its own bullet on the News page, which is
@@ -2158,7 +2166,7 @@ if ($Dev) {
         Say "  could not read main's feed, so the dev marks were left alone: $($_.Exception.Message)" 'Yellow'
     }
     if ($null -ne $mainDoc) {
-        $marks = Set-DevFeedMarks $doc $mainDoc $RepoDir
+        $marks = Set-DevFeedMarks $doc $mainDoc $RepoDir $SiteDir $SiteUrl
         Say ("  {0} note{1} marked dev, the ones main has not had" -f $marks.Marked, $(if ($marks.Marked -eq 1) { '' } else { 's' })) 'DarkGray'
         if ($marks.MainVersion) { Say "  main is on $($marks.MainVersion), this one is on $launcherVersion" 'DarkGray' }
     } else {
@@ -2190,6 +2198,22 @@ $relRecord = New-ReleaseRecord $Id $Channel (Val $doc 'launcherVersion') $relPac
 Set-Prop $doc 'release' $relRecord
 Say ("  release {0}{1}" -f $Id, $(if ($relRecord.commit) { ', built from ' + $relRecord.commit.Substring(0, 12) } else { ', not from a git checkout' })) 'Green'
 # ==== end thornswood release record ====
+
+# ==== thornswood news out ====
+# THE NOTES GO WHERE THE CHANNEL KEEPS THEM (#1050, Feed-News.ps1): in "news"
+# while any launcher let in reads only that, and from the first minLauncher
+# that reads the news file (1.2.4) as one asset named as "newsFile", sent to
+# the site before the feed names it, with "news" left []. minLauncher is the
+# one this publish writes (the min launcher block). A dry run (-NoUpload
+# -NoPush) writes the file here and sends nothing, like the rest of it; a run
+# that sends the feed but uploads nothing keeps the notes in "news", so the
+# feed never names a file the site does not hold.
+$newsMin = if ($NoUpload -and -not $NoPush) { '' } else { Val $doc 'minLauncher' }
+try {
+    $newsWhere = Set-FeedNewsList $doc @($doc.news) $Channel $newsMin (Join-Path $DistDir ('news-' + $Id)) $SiteDir -NoSend:$NoUpload
+    if ($newsWhere -eq 'file') { Say ("  the {0} notes are one file on the site, named in the feed (every launcher let in reads it)" -f @($news).Count) 'Green' }
+} catch { Die ($_.Exception.Message + ' Run Ship again.') }
+# ==== end thornswood news out ====
 
 # Set-Content -Encoding UTF8 writes a byte order mark on Windows PowerShell,
 # and a BOM is not JSON. The launcher's reader stops on it and reports an
