@@ -37,7 +37,7 @@ namespace Thornswood
         public static Count Ask(Config cfg)
         {
             if (cached != null && (DateTime.UtcNow - cachedAt).TotalSeconds < 10) return cached;
-            Count got = AskPort(cfg, SkyMp.ResourcePortFor(cfg));
+            Count got = AskPort(cfg, SkyMp.ResourcePortFor(cfg), cfg != null && cfg.MaxOnline > 0 ? cfg.MaxOnline : 0);
             cached = got;
             cachedAt = DateTime.UtcNow;
             return got;
@@ -53,13 +53,18 @@ namespace Thornswood
             int mine = SkyMp.ResourcePortFor(cfg);
             // Main resources are on 3000; Dev is game-port+1 (7788 when Dev is 7787).
             int other = mine == 3000 ? 7788 : 3000;
-            return AskPort(cfg, other);
+            // No fallback number: cfg.MaxOnline is this build's own feed's,
+            // and main and dev seat differently since 12 Oct (30 and 5), so
+            // the other server's number is only ever the one it announces.
+            return AskPort(cfg, other, 0);
         }
 
-        static Count AskPort(Config cfg, int resourcePort)
+        // fallbackMax is the feed's copy of this server's seats, shown until
+        // the server says its own.
+        static Count AskPort(Config cfg, int resourcePort, int fallbackMax)
         {
             var got = new Count();
-            got.Max = cfg != null && cfg.MaxOnline > 0 ? cfg.MaxOnline : 0;
+            got.Max = fallbackMax;
             try
             {
                 if (cfg != null && !string.IsNullOrEmpty(cfg.ServerAddress) && resourcePort > 0)

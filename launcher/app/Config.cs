@@ -112,9 +112,12 @@ namespace Thornswood
             get { return VoiceAutoSetting != false; }
             set { VoiceAutoSetting = value; }
         }
-        // How many the server seats. Shipped with the build so the Play page
-        // can say something useful even when the server does not announce itself.
-        [DataMember] public int MaxOnline = 25;
+        // How many the server seats, the M of "N of M awake", as this build's
+        // feed last gave it (maxOnline), for when the server does not announce
+        // itself. 0 until the feed says: main and dev seat differently since
+        // 12 Oct (30 and 5, records\most-online.json), so no number built in
+        // here is right for both, and 0 shows "N awake" with no "of".
+        [DataMember] public int MaxOnline = 0;
 
         [DataMember] public long ExpectedExeBytes = 37157144;
 

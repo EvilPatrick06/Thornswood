@@ -1926,8 +1926,12 @@ if (Test-Path $cfgPath) {
         # records\most-online.json, the one place the number lives, which the
         # deploy scripts write into the servers too (#481); it used to be this
         # machine's launcher config.json, which the launcher rewrites itself.
+        # The channel's own numbers (dev's are the record's dev object), and
+        # its seats, people and staff seats together, because this is the M
+        # of "N of M awake" (Patrick, 12 Oct: "the real cap is 30 but 25 for
+        # people with non staff roles I still want it to say of 30 awake").
         . (Join-Path $PSScriptRoot '..\deploy\MaxOnline.ps1')
-        $mo = (Get-MostOnline).Value
+        $mo = (Get-MostOnline -Channel $Channel).Seats
         if ($mo -gt 0) { Set-Prop $doc 'maxOnline' $mo }
 
         # Which collection revision this release agrees with.
