@@ -306,13 +306,13 @@ function frontRig(opts) {
     (F.closeKey || '') + '\n' + (F.closeGame || '') + '\n' + (F.creatingFrom || '') + '\n' +
     F.race + '\n' + F.messages + '\n';
   new Function('sp', 'T', 'Date', 'ini', 'log', 'say', 'guard', 'tellServer', 'treeFromView', 'treeFromMap',
-               'maneuversFromView', body)(
+               'maneuversFromView', 'perksFromView', body)(
     sp, T, clock.Date, opts.ini === undefined ? '' : opts.ini,
     function () { w.logs.push(Array.prototype.slice.call(arguments).join(' ')); },
     function (t) { w.logs.push(String(t)); },
     guard,
     function (line) { w.server.push(line); },
-    function () { }, function () { }, function () { });
+    function () { }, function () { }, function () { }, function () { });
   w.update = function () { (w.handlers.update || []).forEach(function (f) { f(); }); };
   w.frames = function (ms) {
     // Updates every 50ms of pretend time, the way a slow frame rate would.
