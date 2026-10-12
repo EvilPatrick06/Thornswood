@@ -9557,11 +9557,71 @@
       if (!r || typeof r.key !== 'string' || !/^[a-z]+$/.test(r.key)) { continue; }
       rows.push({ key: r.key, name: String(r.name || r.key), stamina: Number(r.stamina) || 0,
                   cooldown: Number(r.cooldown) || 0, ready: !!r.ready });
+      if (r.key === 'plant') { plantSeen(!!r.on, Number(r.seconds) || 0); }
     }
+    if (!list.some(function (r) { return r && r.key === 'plant'; })) { plantSeen(false, 0); }
     const was = JSON.stringify(maneuverRows);
     maneuverRows = rows;
     if (JSON.stringify(rows) !== was) { maneuversToPage(); }
   }
+
+  /*
+    PLANT: "You are not staggered for 8 seconds" (#1386). The server refuses
+    the staggers it sends itself (Break and Wreck). Every other one, a power
+    attack, a shield bash, a shout, a spell, is played by the game on the
+    person's own machine as the animation event staggerStart on their own
+    character, which passes through Skyrim Platform's sendAnimationEvent
+    hook; skymp5-client's deathService blanks that same event in that same
+    hook to keep staggers off everybody else's characters. So while the
+    view says Plant is on, staggerStart for 0x14, your own character, is
+    blanked and the stagger never starts.
+
+    The view's on turns false when the server's window ends, and the server
+    redraws the view then. If that redraw never arrives (the connection
+    dropped), the row's own length, seconds from the moment on was first
+    seen, is the end: nothing here outlasts the maneuver.
+  */
+  let plantUntil = 0;     // when this machine stops refusing staggers, 0 for not planted
+  let plantRefused = 0;   // staggers refused in this Plant, for the log
+  let plantSaid = 0;
+
+  function plantSeen(on, secs) {
+    const now = Date.now();
+    if (!on) {
+      if (plantUntil) {
+        say('plant: over, ' + plantRefused + ' stagger(s) refused');
+        plantUntil = 0;
+      }
+      return;
+    }
+    if (plantUntil && now < plantUntil) { return; }   // the same Plant, seen again
+    const len = Math.max(0, Math.min(60, secs)) * 1000;
+    if (!len) { return; }
+    plantUntil = now + len;
+    plantRefused = 0;
+    plantSaid = 0;
+    say('plant: no stagger lands on this character for ' + (len / 1000) + ' seconds');
+  }
+
+  try {
+    sp.hooks.sendAnimationEvent.add({
+      enter: function (ctx) {
+        if (!plantUntil || Date.now() >= plantUntil) { return; }
+        ctx.animEventName = '';
+        plantRefused++;
+      },
+      leave: function () { }
+    }, 0x14, 0x14, 'staggerStart');
+  } catch (e) {
+    log('plant: could not hook animation events, so Plant stops only the server\'s own staggers:', e);
+  }
+
+  // One line for each stagger refused, said outside the hook.
+  sp.on('update', guard('plant', () => {
+    if (plantRefused === plantSaid) { return; }
+    plantSaid = plantRefused;
+    say('plant: refused a stagger (' + plantRefused + ' in this Plant)');
+  }));
 
   /* The maneuver key, with the panel shut: a panel up holds the keyboard, and
      then the page hears the key and closes itself. */

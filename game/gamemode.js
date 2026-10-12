@@ -45508,11 +45508,23 @@ log('gamemode loaded:',
   percentages. Some of the rows are the game's to do on somebody's own machine
   and the server cannot reach them from here. Each start line says which, so
   nobody is told an effect is on when it is not, and the issue lists them:
-    Set     halving what a block costs. The game works that cost out on the
-            blocker's machine. Only the stamina and the clocks are real.
+    Set     halving what a block costs. Only the stamina and the clocks are
+            real. Measured on 11 Oct (#1386): a block costs no stamina here
+            at all. The engine's hit (ActionListener::OnWeaponHit) decides
+            the block and writes health and nothing else, and every other
+            actor on a person's machine deals that machine no damage
+            (skymp5-client formView.ts sets attackDamageMult 0), so the
+            game's own cost, fStaminaBlockDmgMult 0.25 of the damage
+            blocked with fStaminaBlockBase 0 (Skyrim.esm, overridden by
+            nothing in the load order), comes to nothing. There is nothing
+            to halve until blocks cost stamina, which is Patrick's to decide.
     Plant   not being staggered. A stagger is an animation on the machine that
-            animates you; the server refuses the staggers it sends itself
-            (Break and Wreck), and no other.
+            animates you, so the server refuses the staggers it sends itself
+            (Break and Wreck), and the front plugin refuses every other one
+            on the person's own machine while the view says Plant is on
+            (the row's on, below): it blanks staggerStart for your own
+            character, the same hook skymp5-client's deathService uses to
+            keep staggers off other people's characters.
     Cover   20% less damage for one person while you block. Applied here, by
             giving back a fifth of what each hit took. The block is read from
             the animation events the engine is sent (blockStart, blockStop),
@@ -45871,14 +45883,27 @@ log('gamemode loaded:',
       var key = ORDER[i];
       if (!mine[key]) { continue; }
       var m = MANEUVERS[key];
-      out.push({ key: key, name: m.name, stamina: m.stamina, cooldown: m.cooldown, ready: !(readyAt(actorId, key) > t) });
+      var row = { key: key, name: m.name, stamina: m.stamina, cooldown: m.cooldown, ready: !(readyAt(actorId, key) > t) };
+      /*
+        PLANT IS ON, for the front plugin, which refuses every stagger on
+        the person's own machine while it is (#1386). on moves twice a use,
+        like ready: the start redraws (push in use) and so does the end
+        (tick). seconds never moves; it is how long the front holds it if
+        the end never reaches it.
+      */
+      if (key === 'plant') {
+        var rec = onOf(actorId, false);
+        row.seconds = m.seconds;
+        if (rec && rec.plant && rec.plant > t) { row.on = true; }
+      }
+      out.push(row);
     }
     return out.length ? out : null;
   }
 
   var STARTED = {
     set: 'Set, for 8 seconds. Halving what a block costs is not in the game yet, so for now this spends the stamina and starts the wait.',
-    plant: 'Plant, for 8 seconds. A Break or a Wreck does not stagger you. Other staggers still land: stopping those is not in the game yet.',
+    plant: 'Plant, for 8 seconds. Nothing staggers you.',
     wall: 'Wall, for 10 seconds. You, and your party within 3 metres of you, take 20% less damage.',
     rush: 'Rush: +4 speed for 5 seconds.',
     heavy: 'Heavy. Your next power attack in the next 8 seconds deals 25% more.',
@@ -46244,7 +46269,12 @@ log('gamemode loaded:',
       if (rec.cover && rec.cover.until <= t) { delete rec.cover; delete ST.block[holder]; }
       var timed = ['set', 'plant', 'wall', 'rush', 'heavy', 'break', 'wreck'];
       for (var i = 0; i < timed.length; i++) {
-        if (rec[timed[i]] && rec[timed[i]] <= t) { delete rec[timed[i]]; }
+        if (rec[timed[i]] && rec[timed[i]] <= t) {
+          delete rec[timed[i]];
+          // The view's on for Plant goes off, so the front stops refusing
+          // staggers the moment the server's window ends. See view.
+          if (timed[i] === 'plant' && onlineOf(holder)) { push(holder); }
+        }
       }
       var left = false;
       for (var f in rec) { if (has(rec, f)) { left = true; break; } }
