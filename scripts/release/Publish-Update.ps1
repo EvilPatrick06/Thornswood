@@ -80,6 +80,7 @@ param(
     [switch]$AllowStaleCheckout
 )
 . (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
+. (Join-Path $PSScriptRoot 'RecordShape.ps1')     # #2180: the Skyrim pin is held to its shape before it goes into the feed
 
 # A stale or dirty checkout sends old or unlanded code; refuse it (#2118).
 # The branch rule is Ship's own, through Test-FreshAnyBranch (#2235): a dev
@@ -1890,6 +1891,10 @@ if (Test-Path $cfgPath) {
 $pinPath = Join-Path $PSScriptRoot '..\..\records\skyrim-pin.json'
 try {
     $pin = (Get-Content -LiteralPath $pinPath -Raw).TrimStart([char]0xFEFF) | ConvertFrom-Json
+    # RecordShape.ps1 (#2180): a pin at a version this checkout does not know,
+    # or short of a field, is not written into the feed; the feed keeps its pin.
+    $pinShape = @(Get-ThornswoodRecordProblems -Doc $pin -Kind skyrim-pin)
+    if ($pinShape.Count) { throw ('it is not a skyrim-pin record this checkout can trust: ' + ($pinShape -join '; ')) }
     $pinExe = [long](Val $pin 'expectedExeBytes')
     $pinNewer = [long](Val $pin 'newerExeBytes')
     $pinDepots = @()

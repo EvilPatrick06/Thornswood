@@ -314,6 +314,8 @@ try {
             return ''
         }
         function Say($m, $c) { $script:said += $m }
+        # Publish-Update loads RecordShape.ps1 at its top (#2180); the block asks it.
+        . (Join-Path $Root 'scripts\release\RecordShape.ps1')
         $run = [scriptblock]::Create($block)
 
         $script:PinUnderTest = $recordPath

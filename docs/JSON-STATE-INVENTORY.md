@@ -1,6 +1,6 @@
 # Critical JSON state and configuration
 
-The JSON files Thornswood's release, deploy, game, site, bot and voice trust, who writes each one, who reads it, and how it is checked today. This is the inventory #2180 asks for. The first slice also adds fail-closed shape and version checks for the four records marked **held**. The rest are listed so the next slices can take them in order of risk. Nothing here changes a file's format: there is no migration.
+The JSON files Thornswood's release, deploy, game, site, bot and voice trust, who writes each one, who reads it, and how it is checked today. This is the inventory #2180 asks for. The first slice also adds fail-closed shape and version checks for the records marked **held** (four in the first slice, four more in the third). The rest are listed so the next slices can take them in order of risk. Nothing here changes a file's format: there is no migration.
 
 **How a check works.** `scripts\release\RecordShape.ps1` reads a record through `ConvertFrom-ThornswoodJson` (an empty or broken file names itself). It then refuses a version this checkout does not know, and refuses a missing or wrongly typed field the readers depend on. Records written before a version field existed are read as version 1. A file that says 2 is refused, not half understood. `scripts\release\Check-Records.ps1` runs this over the committed records, and `tests\test-record-shapes.ps1` holds it.
 
@@ -12,10 +12,10 @@ The JSON files Thornswood's release, deploy, game, site, bot and voice trust, wh
 | `records/client-build.json` | New-ClientBuildRecord.ps1 | Ship, Sync-Client, Publish-Update, Build-Launcher (into the launcher), launcher ClientRuntime/OwnGame | High: every client and Ship is held to it | **held** (forkCommit, files map) |
 | `records/most-online.json` | by hand | MaxOnline.ps1 (Deploy-Gamemode, Deploy-DevGamemode, Publish-Server, Publish-Update), site | High: the engine's seat count; over 1000 stops the server starting | **held** (people 1 to 1000, staffSeats) |
 | `records/collection-plugins.json` | New-CollectionPluginRecord.ps1 | CollectionPlugins.ps1 (Deploy-Server, Deploy-DevGamemode -LoadOrder) | High: full deploys refuse on it (#2019) | **held** (version 1 required, plugins rows) |
-| `records/skyrim-pin.json` | by hand | Publish-Update (into version.json), launcher Downgrade/Config | High: the pinned game build | test-skyrim-pin.ps1 (agreement), not shape |
-| `records/ui-gone.json` | by hand | Ship-Rules, Build-Launcher, launcher OwnGame | Medium: what every pack deletes | Ship-Rules refuses empty or broken; test-ship-rules |
-| `records/skyrim-files.json` | New-SkyrimFilesRecord.ps1 | Build-Launcher (into the launcher), launcher OwnGameKinds | Medium | named on a bad read (#2119) |
-| `records/generated.json` | by hand | Build-Generated, Generated, Ship-Rules, Check-ShipReady | Medium | test-build-generated |
+| `records/skyrim-pin.json` | by hand | Publish-Update (into version.json), launcher Downgrade/Config | High: the pinned game build | **held** (build, appId, exe sizes, three depots as digit strings; Publish-Update keeps the feed's pin on a problem); Check-Records holds it to skyrim-files' build; test-skyrim-pin.ps1 (agreement) |
+| `records/ui-gone.json` | by hand | Ship-Rules, Build-Launcher, launcher OwnGame | Medium: what every pack deletes | **held** (daedric name to sha256, unused names); Ship-Rules and Build-Launcher stop on a problem |
+| `records/skyrim-files.json` | New-SkyrimFilesRecord.ps1 | Build-Launcher (into the launcher), launcher OwnGameKinds | Medium | **held** (build, appId, files with bytes, sha1, depot); Build-Launcher stops on a problem |
+| `records/generated.json` | by hand | Build-Generated, Generated, Ship-Rules, Check-ShipReady | Medium | **held** (pandora.patches, bodyslide.sets and sliders); Generated.ps1 stops on a problem; test-build-generated |
 | `records/steam-build.json` | Check-Outside.ps1 | Check-Outside.ps1 | Low | none |
 | `records/update-creation-club.json` | Build-HarvestTable tooling | Build-HarvestTable, Build-HuntTable | Low (build time only) | none |
 | `records/upstream-not-taken.json` | by hand | people | Low | none |
@@ -48,5 +48,5 @@ The JSON files Thornswood's release, deploy, game, site, bot and voice trust, wh
 
 1. **Authorization state:** `bans.json` and `pk.json` fail closed on a malformed file (#2186; site lane).
 2. **Box-side reads:** `server-settings.json` and `server-build.json`, inside the text Swap.ps1 and Install-ThornswoodServer run on the box. The helper has to travel with the payload first.
-3. **Feed:** `version.json`, `skyrim-pin.json` and `ui-gone.json` get a contract in RecordShape.ps1.
+3. **Feed:** `version.json` gets a contract in RecordShape.ps1. (`skyrim-pin.json`, `skyrim-files.json`, `ui-gone.json` and `generated.json` were held in slice 3.)
 4. **Site identity state:** `linked.json`, `sessions.json` and `signins.json` get a startup check with a readiness signal.
