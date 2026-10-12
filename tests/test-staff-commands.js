@@ -514,18 +514,14 @@ async function health() {
   return null;
 }
 
+// The Python the bot runs on, with discord.py (tests\bot-python.js, #2437),
+// or { why } naming what each Python here said when none loads the bot.
 function python(args) {
   const { spawnSync } = require('child_process');
-  // The first one that has discord.py, which bot.py needs to load at all.
-  let had = null;
-  for (const exe of ['py', 'python', 'python3']) {
-    const r = spawnSync(exe, args, { encoding: 'utf8', cwd: path.join(ROOT, 'bot'),
-      env: Object.assign({}, process.env, { DISCORD_TOKEN: 'not-a-real-token', PYTHONIOENCODING: 'utf-8' }) });
-    if (r.error) { continue; }
-    if (/No module named 'discord'/.test(String(r.stderr || ''))) { had = had || r; continue; }
-    return r;
-  }
-  return had;
+  const py = require('./bot-python').find();
+  if (!py.cmd) { return { missing: py.why }; }
+  return spawnSync(py.cmd, py.args.concat(args), { encoding: 'utf8', cwd: path.join(ROOT, 'bot'),
+    env: Object.assign({}, process.env, { DISCORD_TOKEN: 'not-a-real-token', PYTHONIOENCODING: 'utf-8' }) });
 }
 
 (async () => {
@@ -599,11 +595,10 @@ function python(args) {
   // A Python with no discord.py stops at bot.py's first import, which says
   // nothing about the bot. Said once, with the line that fixes it, rather than
   // as four checks of the bot failing (#1008).
-  const noLibrary = !!py && /No module named 'discord'/.test(String(py.stderr || ''));
-  if (!py) { yes('python is here to check the bot', false); }
-  else if (noLibrary) {
-    yes('a Python here has the bot\'s libraries (none does: from the repository folder, ' +
-        'py -m pip install -r bot\\requirements.txt, Developer-Guide.md "Setting up a machine")', false);
+  if (py.missing) {
+    yes('a Python here runs the bot with its libraries (none does: from the repository folder, ' +
+        'py -3.12 -m pip install -r bot\\requirements.txt, Developer-Guide.md "Setting up a machine"; ' +
+        py.missing + ')', false);
   }
   else {
     const out = String(py.stdout || '').split(/\r?\n/);
