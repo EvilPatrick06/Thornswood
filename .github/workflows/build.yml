@@ -321,6 +321,10 @@ jobs:
           # worldspace the server has it in, from the list the server sends;
           # tests\test-1597-board-objects.js runs the plugin's board code on a
           # pretend game. Under a second.
+          # Issue #503: tests/test-papyrus-event-list.js holds the fork's Papyrus
+          # event list, records/papyrus-events.json, to the rest of this
+          # repository and proves its reader on a small fork it makes. The
+          # fork itself is read against the record in the nightly. A second.
           # $six is a historical name: the gate list grew well past six (#1368).
           # Issue #1589: a line here with no comma after it ends the list, and
           # every name below it only prints itself. test-gate-list.ps1 parses
@@ -375,6 +379,7 @@ jobs:
                  'test-2337-kiln-menu.js',
                  'test-1306-pr-workflow.js',
                  'test-2261-tome-refused.js',
+                 'test-papyrus-event-list.js',
                  'test-1383-treatments.js',
                  'test-1384-condition.js',
                  'test-1385-perks.js',
