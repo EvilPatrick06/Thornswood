@@ -81,9 +81,10 @@ param(
   # social media rather than staff, so it has no business reading a report
   # about somebody or another person's playtest application.
   [string]$CreatorRoles  = 'Content Creator',
-  # Pulled into Faction Leader tickets, with Owner always added. Empty
-  # means Owner only, never the general staff list. A future Lead role
-  # is added here by its Discord role ID, not by a name prefix.
+  # Faction Leader tickets. IDs only. Install-Bot -UpperStaffRoles should
+  # carry the Owner role ID and the Lead Gamemaster role ID (and any later
+  # Lead department role ID). Names are ignored. Empty means those tickets
+  # are refused, not opened to general staff.
   [string]$UpperStaffRoles = '',
   # Every run used to mint a new shared key, which meant every run also
   # silently stopped tickets reaching the site inbox until Deploy-Docs was run

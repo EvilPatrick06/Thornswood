@@ -84,14 +84,17 @@ yes('F7 is_staff still leaves Lead and Trial Gamemaster out, and the flag list i
     /def is_staff\(who\):/.test(bot) &&
     /The one gate on \/close, the Close ticket button/.test(bot));
 
-yes('F8 Faction Leader tickets go to UPPER_STAFF_ROLES plus Owner, never a Lead name prefix',
-    /UPPER_STAFF_ROLES/.test(bot) &&
-    /UPPER_STAFF_NAMES\.add\('owner'\)/.test(bot) &&
-    /def ticket_pull_roles\(/.test(bot) &&
-    /kind == 'faction'/.test(bot) &&
+yes('F8 Faction Leader routing is IDs only; empty list refuses; no staff-log fallback',
+    /def upper_staff_ids\(/.test(bot) &&
+    /FACTION_REFUSED/.test(bot) &&
+    /FACTION_THREAD_FAILED/.test(bot) &&
+    /was not written to the staff log or the site inbox/.test(bot) &&
+    bot.indexOf("UPPER_STAFF_NAMES.add('owner')") === -1 &&
     !/startswith\(['"]Lead/.test(bot) &&
     bot.indexOf("name='faction-seat'") === -1 &&
-    install.indexOf('UPPER_STAFF_ROLES') !== -1);
+    install.indexOf('UPPER_STAFF_ROLES') !== -1 &&
+    /Owner role ID/.test(install) &&
+    /Lead Gamemaster role ID/.test(install));
 
 yes('F9 submit re-checks a known name; Other is not flagged; there is no seat file',
     /faction_pick_is_known\(picked\)/.test(bot) &&

@@ -296,7 +296,7 @@ jobs:
           # reader that wakes without the check. Under a second.
           # Djinn, 12 Oct 2026: Apply: Faction Leader replaced Apply: Trading
           # Company. tests\test-faction-leader.js holds the panel, the install
-          # list, the staff flag and the seat command to those decisions.
+          # list, the staff flag and the upper-staff routing to those decisions.
           # Under a second. bot\test-faction-leader.py is the behavioural
           # half and runs with the other bot harnesses at night.
           $six ='test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',

@@ -64,12 +64,13 @@ class Person(object):
         self.mention = '<@%d>' % uid
         self.roles = list(roles)
         self.bot = False
+        self.dms = []
 
     def __str__(self):
         return self.name
 
     async def send(self, *a, **k):
-        pass
+        self.dms.append(a[0] if a else '')
 
 
 class Perms(object):
@@ -117,12 +118,15 @@ class Channel(Posts):
         self.name = name
         self.guild = guild
         self.made = []
+        self.refuse_threads = False
 
     def permissions_for(self, who):
         return Perms(who is self.guild.me)
 
     async def create_thread(self, name=None, **k):
         await asyncio.sleep(0)
+        if self.refuse_threads:
+            raise RuntimeError('no private threads today')
         t = Thread(9000 + len(self.made), name)
         t.opened_as = k
         self.made.append(t)
@@ -245,6 +249,8 @@ try:
     G = Guild(1, mo, pat)
     CH = G.text_channels[0]
     ada = Person(101, 'Ada')
+    # Owner's ID, as Install-Bot -UpperStaffRoles must carry. Empty is refuse.
+    bot.UPPER_STAFF_IDS = {10}
 
     # ------------------------------------------------------- the form itself
     yes('the panel kind is faction, labelled Apply: Faction Leader',
@@ -402,25 +408,39 @@ try:
         'Holds a staff role' not in CH.made[-1].body())
 
     # ------------------------------------------------- routing
+    ids, ignored = bot.upper_staff_ids(['Owner', '10', 'Lead Gamemaster', '88'])
+    yes('UPPER_STAFF_ROLES keeps IDs and ignores names, including Owner',
+        ids == {10, 88} and ignored == ['Owner', 'Lead Gamemaster'])
+
     fake = Person(401, 'Fay', [Role('Lead Something', rid=88)])
     G.roles.append(Role('Lead Something', [fake], rid=88))
+    bot.UPPER_STAFF_IDS = set()
     pulled = bot.ticket_pull_roles('faction', G)
-    yes('a role whose name starts with Lead is not pulled unless its ID is listed',
-        all(r.name != 'Lead Something' for r in pulled)
-        and all(r.name != 'Moderator' for r in pulled)
-        and any(r.name == 'Owner' for r in pulled)
-        and 'owner' in bot.UPPER_STAFF_NAMES
-        and bot.UPPER_STAFF_IDS == set())
+    yes('Owner is not pulled by name when the ID list is empty',
+        pulled == []
+        and all(r.name != 'Owner' for r in pulled)
+        and all(r.name != 'Moderator' for r in pulled))
 
-    keep_ids, keep_names = bot.UPPER_STAFF_IDS, set(bot.UPPER_STAFF_NAMES)
+    n = len(CH.made)
+    pushed = len(PUSHED)
+    empty = Person(108, 'Ned')
+    refused, _m = send_faction(G, empty, 'The Companions', answers=['A', 'B', 'C'])
+    yes('an empty UPPER_STAFF_ROLES refuses the ticket, to them alone',
+        len(CH.made) == n
+        and len(PUSHED) == pushed
+        and refused.response.said
+        and refused.response.said[0][0] == bot.FACTION_REFUSED
+        and refused.response.said[0][1] is True)
+    yes('and says so in the log',
+        any('UPPER_STAFF_ROLES is empty' in s for s in LOGGED))
+
     bot.UPPER_STAFF_IDS = {88}
-    bot.UPPER_STAFF_NAMES = {'owner'}
     listed = bot.ticket_pull_roles('faction', G)
-    yes('an ID in UPPER_STAFF_ROLES is pulled, with Owner, still not Moderator',
-        any(r.id == 88 for r in listed)
-        and any(r.name == 'Owner' for r in listed)
+    yes('an ID in UPPER_STAFF_ROLES is pulled; Owner is not added by name',
+        [r.id for r in listed] == [88]
+        and all(r.name != 'Owner' for r in listed)
         and all(r.name != 'Moderator' for r in listed))
-    bot.UPPER_STAFF_IDS, bot.UPPER_STAFF_NAMES = keep_ids, keep_names
+    bot.UPPER_STAFF_IDS = {10}
 
     n = len(CH.made)
     ivy = Person(106, 'Ivy')
@@ -430,6 +450,22 @@ try:
         len(CH.made) == n + 1
         and any(r.name == 'Moderator' and r.mention in jarl_t.head() for r in G.roles)
         and mo in jarl_t.added)
+
+    n = len(CH.made)
+    pushed = len(PUSHED)
+    CH.refuse_threads = True
+    blocked = Person(107, 'Ora')
+    failed, _m = send_faction(G, blocked, 'The Companions', answers=['A', 'B', 'C'])
+    CH.refuse_threads = False
+    yes('a Faction Leader thread that will not open does not fall back',
+        len(CH.made) == n
+        and len(PUSHED) == pushed
+        and failed.followup.said
+        and failed.followup.said[0][0] == bot.FACTION_THREAD_FAILED
+        and bot.FACTION_THREAD_FAILED in blocked.dms)
+    yes('and the log says it stayed out of the staff log and the inbox',
+        any('was not written to the staff log or the site inbox' in s
+            for s in LOGGED))
 
     # Site inbox still gets the kind as a free string.
     yes('the site copy is kind faction, with the answers in detail',

@@ -557,6 +557,39 @@ def startup():
 run('startup', startup)
 
 
+def faction_thread_fails():
+    # Djinn: a Faction Leader ticket that cannot open a private thread
+    # must not land in #tickets or the site inbox. General staff read both.
+    g, panel, mod = server(threads=False)
+    owner = [r for r in g.roles if r.name == 'Owner'][0]
+    book = g.channel('tickets', overwrites=staff_only(g, mod))
+    keep = bot.UPPER_STAFF_IDS
+    bot.UPPER_STAFF_IDS = {owner.id}
+    who = Person('Brynjolf')
+    ix = Interaction(g, who)
+    PUSHED[:] = []
+
+    async def go():
+        m = bot.TicketModal('faction', 'Apply: Faction Leader')
+        m.faction_select._values = ['The Companions']
+        m.faction_other._value = ''
+        for f in m.fields:
+            f._value = 'yes'
+        await m.on_submit(ix)
+
+    asyncio.run(go())
+    bot.UPPER_STAFF_IDS = keep
+    yes('a Faction Leader thread that fails is not written to #tickets',
+        book.text() == '')
+    nowhere_public('and not in the panel channel', [panel])
+    yes('and not pushed to the site inbox', not PUSHED)
+    yes('and the applicant is told to try again later',
+        bot.FACTION_THREAD_FAILED in ix.followup.said
+        and bot.FACTION_THREAD_FAILED in who.dms)
+
+run('faction thread fails', faction_thread_fails)
+
+
 # -------------------------------------------------------------- source --
 src = open(os.path.join(HERE, 'bot.py'), encoding='utf-8').read()
 yes('no fallback into the panel channel is left in the source',
