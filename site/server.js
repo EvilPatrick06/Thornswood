@@ -3287,7 +3287,8 @@ function chatSlice(profileId, from, to, channel) {
       const at = Number(o.at) || 0;
       if (at < from || at > to) continue;
       out.push({ at: at, kind: String(o.kind || ''), mode: String(o.mode || ''),
-                 name: String(o.name || ''), proven: !!o.proven, text: String(o.text || '') });
+                 name: String(o.name || ''), proven: !!o.proven, text: String(o.text || ''),
+                 via: o.via === 'press' ? 'press' : '' });
       if (out.length > 4000) break;
     }
     if (out.length > 4000) break;
