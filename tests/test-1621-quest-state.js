@@ -123,7 +123,10 @@ function boot(into) {
     return true;
   };
   ctx.MERCHANT_TRADING = {createQuestTransactions: function () {
-    return {identity: function (a) { return ctx.__identityToken || 'actor:' + a; }, shutdown: function () {},available:function(){return !ctx.__revoked;},
+    return {identity: function (a) {
+      if(ctx.__runtimeIdentityApi)return require('../game/quest-transactions').actorIdentity(ctx.__runtimeIdentityApi,a);
+      return ctx.__identityToken || 'actor:' + a;
+    }, shutdown: function () {},available:function(){return !ctx.__revoked;},
       commit: function (a, expected, next, changes) {
         if (fault.write) throw new Error('the write was refused');
         const current = form(a);
@@ -392,6 +395,16 @@ unread({ v: 2, open: {}, cool: {} }, 'a record of another shape');
   w.ctx.__identityToken='original';w.svc.mineRare(32,here[0],EBONY);
   w.ctx.__identityToken='replacement';finish();
   yes('a delayed mining callback cannot draw for a replacement identity',have(32,EBONY.ore)===0);
+}
+{
+  ranks['36:miner']='master';w=restart();w.svc.offer(36,'ebony');
+  let finish,runtime='100';
+  w.ctx.__runtimeIdentityApi={getActorRuntimeIdentity:()=>runtime,
+    getDescFromId:()=> 'ff000024:Skyrim.esm',getNpcAIState:()=>({isHuman:true,profileId:36,lifeGeneration:0})};
+  w.ctx.swing=function(a,anim,done){finish=done;};
+  w.svc.mineRare(36,here[0],EBONY);
+  runtime='101';finish();
+  yes('a delayed mining callback refuses a new native session with unchanged profile and NPC life',have(36,EBONY.ore)===0);
 }
 {
   w=restart();

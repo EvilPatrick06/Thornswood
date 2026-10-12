@@ -96,7 +96,7 @@ none, the launcher downloads Microsoft's own bootstrapper from Microsoft's link
 
 The six files recorded in `records\client-build.json` correspond to
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
-commit `f1e18a4a` (in full, `f1e18a4ad64471f649ae53cb74019d98d797deed`). That
+commit `ea523711` (in full, `ea523711f39c46b1b78a416d94695c3c50d1f912`). That
 is upstream skyrim-multiplayer/skymp at `2849e676` with Thornswood's changes on
 top. Check-Secrets.ps1 stops a release whose copy of any of the six is not the
 recorded sha256 (client-not-recorded-build), and Sync-Client.ps1 puts in the
@@ -437,7 +437,7 @@ with.
 
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`, is AGPL-3.0. That record and the client record
-  name `f1e18a4ad64471f649ae53cb74019d98d797deed` on the public fork. The
+  name `ea523711f39c46b1b78a416d94695c3c50d1f912` on the public fork. The
   server module and the six client files were built from that commit, which
   adds the 5 October security fixes (the RPC route, request bodies, metrics,
   the login line, the settings files), the server's equipment write for a new
@@ -450,10 +450,14 @@ with.
   above a rank can be refused, lets the gamemode ask which saved characters
   could not be read, sends a piece's new condition and name to whoever holds
   it at once, and stops a key let go after a panel closes from repeating into
-  the page. The server module's SHA256 is
-  `1ce9da49b07913d40420cf7ae8880c2e927b1129571bf74cac86f127235ef0bb`, built
-  2026-10-11T20:18:57Z. This is the recorded next release, not a deployment
-  claim. Main remains on `0f54ad4541fff9bf75c8d8107fc767e47037a2d6`.
+  the page. Since `f1e18a4a` it also fences the server's delayed actor work
+  by each actor's lifecycle and owner, so a queued combat or quest write
+  never lands on an actor that was unloaded or reused (Thornswood #1373). The
+  server module's SHA256 is
+  `c9031333a2e3e4aafd57393dfc46c2da6dbce56c5efae11da4a26d9610291485`, built
+  2026-10-12T09:06:15Z. This is the recorded next release, not a deployment
+  claim. Main remains on `f1e18a4ad64471f649ae53cb74019d98d797deed`;
+  dev runs that engine too, as reported by Claude on 11 October.
   It goes to the dev server (Publish-Server -Channel dev) and to the dev
   feed's client files (a dev Ship) first.
   Section 13 of the AGPL asks that everybody who connects to a modified server
@@ -486,11 +490,11 @@ For the six recorded client files and the recorded game server module, the
 Corresponding Source is the fork at the commit each record names. The six
 client files and the game server module, at the one commit both records name:
 
+https://github.com/EvilPatrick06/skymp/tree/ea523711f39c46b1b78a416d94695c3c50d1f912
+
+For the earlier engine reported deployed on Main and dev:
+
 https://github.com/EvilPatrick06/skymp/tree/f1e18a4ad64471f649ae53cb74019d98d797deed
-
-For the earlier engine still deployed on Main:
-
-https://github.com/EvilPatrick06/skymp/tree/0f54ad4541fff9bf75c8d8107fc767e47037a2d6
 
 It is on the branch `thornswood/engine-changes`, it is public, and the branch
 answered an anonymous request on 24 September. It builds with CMake and
