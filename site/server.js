@@ -415,12 +415,16 @@ const DOCS = {
 /* Boards. A board is sections, each section a table with its own columns, so
    a column can be added to one without touching the rest.
 
-   No Known Issues board (#2414). /known is data/known.md and nothing else.
-   A board copy stayed here after the hub stopped editing boards (#433),
-   nothing showed it and nothing could edit it, and it went stale: it still
-   said NPCs stand still with nobody near after #504. One copy, the page. */
+   KNOWN ISSUES IS A BOARD, AND THE ONLY COPY (#2414). Until 12 October the
+   text was kept twice, data/known.md for /known and a known board here that
+   nothing showed and, after the hub stopped editing boards (#433), nothing
+   could edit, so it went stale (it still said NPCs stand still with nobody
+   near after #504). Patrick, 12 October: the hub board is the one source.
+   So /known and /api/page/known are this board rendered (knownMarkdown,
+   below), the hub edits it at /hub/known, and known.md is gone. */
 const BOARDS = {
   active:      'Active Issues',
+  known:       'Known Issues',
   roadmap:     'Roadmap',
   suggestions: 'Suggestions',
   archive:     'Archive',
@@ -446,9 +450,11 @@ const BOARDS = {
    The page now matches the doors behind it. The linked accounts are 'staff'
    since #1010, because that page is where staff ban, PK and write notes, and
    every staff role may. The other two stay 'admin': the play sessions and
-   the report inbox. */
+   the report inbox. Known Issues is 'admin' like every board: a board is
+   saved through the admins-only door (#2414). */
 const LEVEL = {
-  uploads: 'staff', linked: 'staff', sessions: 'admin', inbox: 'admin'
+  uploads: 'staff', linked: 'staff', sessions: 'admin', inbox: 'admin',
+  known: 'admin'
 };
 
 /* The public front lives at / and needs no password. The working area moved
@@ -459,17 +465,17 @@ const PUBLIC_PAGES = ['/', '/world', '/rules', '/credits', '/join',
                       '/downloads', '/report',
                       // Known Issues and Help are for the person whose install
                       // will not start or who cannot sign in, so they cannot
-                      // sit behind the sign in. They are known.md and help.md
-                      // in the data folder, read through /api/page like the
-                      // site pages. The hub's own pages moved to /hub/known
-                      // and /hub/help to make room.
+                      // sit behind the sign in. Help is help.md in the data
+                      // folder and Known Issues is the known board rendered
+                      // (#2414), both read through /api/page like the site
+                      // pages. The hub edits Known Issues at /hub/known.
                       '/known', '/help',
                       // What is kept about somebody and what they are
                       // agreeing to cannot sit behind a sign in, because
                       // the person deciding whether to sign up is the one
                       // who needs to read them.
                       '/privacy', '/terms', '/cookies'];
-const PUBLIC_DOCS = ['known', 'help'];
+const PUBLIC_DOCS = ['help'];
 /* The public pages are markdown on disk like everything else here, so the
    wording can be fixed from the site rather than by a deploy. */
 const SITE = path.join(DATA, 'site');
@@ -631,9 +637,57 @@ function pageHtml(md) {
   }
   return '<pre class="pre-wrap">' + escAttr(md) + '</pre>';
 }
-// A written page's markdown, or null. Known Issues and Help live in the data
-// folder with the other documents (Help is edited in the hub), not under site.
+/*
+  THE KNOWN ISSUES PAGE, WRITTEN OUT OF ITS BOARD (#2414).
+
+  The board is the one copy and the hub edits it; this turns it into the
+  markdown /known and /api/page/known serve. Its intro under the title, then
+  each section as a heading, its note, and its table. A row ticked done in
+  the hub is fixed, so it leaves the page. A section with no note and nothing
+  left in its table is left out. A cell is one table cell whatever is typed in
+  it: a | is escaped and a line break becomes a space, so a row cannot split
+  the table (a <br> would not do: the page renderer refuses HTML and would
+  show it as typed). The seed was taken from known.md, so this writes that
+  page back byte for byte.
+*/
+// ==== thornswood known board ====
+function knownMarkdown(title, b) {
+  const board = b && typeof b === 'object' ? b : {};
+  const text = (v) => String(v == null ? '' : v).replace(/\r\n/g, '\n').trim();
+  const cell = (v) => text(v).replace(/\|/g, '\\|').replace(/\s*\n\s*/g, ' ');
+  const out = ['# ' + title, ''];
+  if (text(board.intro)) out.push(text(board.intro), '');
+  for (const sec of (Array.isArray(board.sections) ? board.sections : [])) {
+    if (!sec || typeof sec !== 'object') continue;
+    const cols = Array.isArray(sec.columns) ? sec.columns.filter((c) => c && c.id) : [];
+    const rows = (Array.isArray(sec.rows) ? sec.rows : []).filter((r) => r && !r.done);
+    const note = text(sec.note);
+    const table = cols.length && rows.length;
+    if (!note && !table) continue;
+    out.push('## ' + text(sec.name), '');
+    if (note) out.push(note, '');
+    if (table) {
+      out.push('| ' + cols.map((c) => cell(c.name)).join(' | ') + ' |');
+      out.push('|' + cols.map(() => '---').join('|') + '|');
+      for (const r of rows) {
+        out.push('| ' + cols.map((c) => cell((r.cells || {})[c.id])).join(' | ') + ' |');
+      }
+      out.push('');
+    }
+  }
+  while (out.length && out[out.length - 1] === '') out.pop();
+  return out.join('\n') + '\n';
+}
+// ==== end thornswood known board ====
+
+// A written page's markdown, or null. Help lives in the data folder with the
+// other documents, not under site; Known Issues is its board (#2414).
 function pageMarkdown(name) {
+  if (name === 'known') {
+    const b = readBoard().known;
+    if (!b || typeof b !== 'object') return null;
+    try { return forMode(knownMarkdown(BOARDS.known, b), cfg.open); } catch (e) { return null; }
+  }
   const dir = PUBLIC_DOCS.indexOf(name) >= 0 ? DATA : SITE;
   const file = path.join(dir, name + '.md');
   if (!file.startsWith(dir + path.sep) || !fs.existsSync(file)) return null;
@@ -910,7 +964,9 @@ const PAGES = {
   '/uploads':     'uploads',
   '/linked':      'linked',
   '/sessions':    'sessions',
-  '/inbox':       'inbox'
+  '/inbox':       'inbox',
+  // The Known Issues board, which /known is written from (#2414).
+  '/hub/known':   'known'
 };
 
 /*
