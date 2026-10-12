@@ -46,7 +46,7 @@ at load, which is why it can reach blocks that sit below it.
 | 335-638 | Respawn resolution | A port of `respawnResolver.ts`: `arrive` (391), `resolveArrival` (415). `ensureProperties` (467) declares the actor properties the early blocks use. |
 | 639-1497 | Gathering stations | `ORES_BY_BASE` (686-1271), the stations' cooldown (`COOLDOWN_MS` 1285), `addItem`, `takeItem` (1436-1493). |
 | 1498-1650 | Class and profession gates | `classGate` (1515), `halfGate` (1530), `creditWork` (1549), `rankStep` (1639). |
-| 1651-3617 | Starting tools, mining, chopping, charcoal | `TOOLS` (1739) and tool wear (1810-2113); salt (`mineSalt` 2114); the swing animation (2632-2898); ore deposits (`DEPOSIT_SIZE` 2255, 2959-3058); `mineOre` (3059); chopping blocks (3342-3549, `chopWood` 3463); the kiln (`burnCharcoal` 3553). |
+| 1651-3617 | Starting tools, mining, chopping, charcoal | `TOOLS` (1739) and tool wear (1810-2113); salt (`mineSalt` 2114); the swing animation (2632-2898); ore deposits (`DEPOSIT_SIZE` 2255, 2959-3058); `mineOre` (3059); chopping blocks (3342-3549, `chopWood` 3463). The kiln is a bench since #2337, answered by nothing here. |
 | 3618-5070 | Character creation (chargen) | See "Character creation" below. |
 | 5071-5232 | Event handlers | `mp.onDeath` (5090), `mp.onRespawn` (5223). `ensureProperties()` and `startChargenTimer()` run at load here (5078-5079). |
 | 5233-7466 | Scripted activators, harvesting, fishing, hunting | The generated `HARVESTS_BY_BASE`, `FISH_BY_BASE`, `GAME_BY_BASE`, `CROPS_BY_BASE`, `HUNTS_BY_BASE` blocks; `harvest` (6165), `fish` (6236), `game` (6343), `loot` for carcasses (6996), `farmActivate` (7102); `mp.onActivate` (7139), which routes every press; `publishServerBases` (7393). |
