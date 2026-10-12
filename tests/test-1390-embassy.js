@@ -350,12 +350,15 @@ if (block && RECIPES && ADMIN_ITEMS) {
     function lineAt(building, held) {
       let line = null;
       const fn = new Function('globalThis', 'mp', 'DOOR_PROPERTY', 'DOOR_MEMORY_MS', 'buildingOf', 'holderOf', 'holdsDeed',
-        'nameOf', 'doorsOf', 'idOf', 'DOOR_LINE_PROPERTY', 'plog', 'doorLineStamp', lineSrc + '\nreturn doorLine;');
+        'nameOf', 'doorsOf', 'idOf', 'DOOR_LINE_PROPERTY', 'plog', 'doorLineStamp',
+        // No cell door at the embassy (#502).
+        'jailHoldOf', 'isGuard', 'cellLocked', lineSrc + '\nreturn doorLine;');
       const doorLine = fn({ __thornswoodEmbassy: E },
         { get: function () { return { door: 'door', at: Date.now() }; }, set: function (a, p, v) { line = v; } },
         'thornswoodDoor', 60000, function () { return building; }, function () { return held || null; },
         function () { return false; }, function (b) { return b; }, function () { return ['5cb0:The Great City of Solitude.esp']; },
-        function () { return 0x5cb0; }, 'thornswoodDoorLine', function () { }, 0);
+        function () { return 0x5cb0; }, 'thornswoodDoorLine', function () { }, 0,
+        function () { return null; }, function () { return false; }, function () { return false; });
       doorLine(0x14, 50);
       return line;
     }
