@@ -305,7 +305,11 @@ function Get-LoadOrderCopyDiffs([hashtable]$Copies) { return @() }
     # machine's working copies of it as the last run left them.
     foreach ($d in (Join-Path $site 'feed'), (Join-Path $site 'feed-dev')) { New-Item -ItemType Directory -Force -Path $d | Out-Null }
     foreach ($pair in @(@($rel, 'feed'), @($relDev, 'feed-dev'))) {
-        $v = if ($pair[1] -eq 'feed') { '{"launcherVersion":"1.1.93","packs":[]}' } else { '{"launcherVersion":"1.1.93.2","packs":[],"serverPort":7001}' }
+        # Main's feed offers 1.1.92: main moved to 1.1.93 with Bump-Version and has
+        # not shipped it, the state a main Ship starts from. A main feed already
+        # offering 1.1.93 from other launcher sources is refused before anything is
+        # built (#2347, tests\test-2347-dev-launcher-version.ps1).
+        $v = if ($pair[1] -eq 'feed') { '{"launcherVersion":"1.1.92","packs":[]}' } else { '{"launcherVersion":"1.1.93.2","packs":[],"serverPort":7001}' }
         $b = if ($pair[1] -eq 'feed') { '{"main":"as last published"}' } else { '{"dev":"as last published"}' }
         [IO.File]::WriteAllText((Join-Path $site ($pair[1] + '\version.json')), $v)
         [IO.File]::WriteAllText((Join-Path $site ($pair[1] + '\published.json')), $b)
@@ -333,18 +337,33 @@ function Get-LoadOrderCopyDiffs([hashtable]$Copies) { return @() }
                            '[switch]$NoPause, [switch]$MoveServer, [switch]$AcceptSize, [switch]$Launcher, ' +
                            '[string]$Channel, [string]$VersionOverride, [switch]$NoUpload, [switch]$NoPush, ' +
                            # A dry run also passes these two since #494: close no game, prune no packs.
-                           '[switch]$NoClose, [int]$KeepPacks = 10') @'
+                           '[switch]$NoClose, [int]$KeepPacks = 10, ' +
+                           # And the fingerprint of the launcher's sources since #921, which
+                           # the feed records with the launcher (#2347 compares it).
+                           '[string]$LauncherInputs') @'
 # F: the send of the feed failed, the way the real one ends then (#1055).
 if ($env:TS_PUB_FAIL) { Write-Host 'NOT SHIPPED. the store refused version.json'; exit 1 }
 . (Join-Path $PSScriptRoot 'Feed-Store.ps1')
 if (-not $NoPush) { [void](Receive-FeedStore $(if ($Channel) { $Channel } else { 'main' }) $ReleaseDir) }
 $vf = Join-Path $ReleaseDir 'version.json'
-$was = [string]((Get-Content -LiteralPath $vf -Raw | ConvertFrom-Json).launcherVersion)
-$now = if ($VersionOverride) { $VersionOverride } else { $was }
+$feedWas = Get-Content -LiteralPath $vf -Raw | ConvertFrom-Json
+$was = [string]$feedWas.launcherVersion
+# The launcher number the real one records: -VersionOverride, else with
+# -Launcher the number in launcher\app\Updater.cs beside it, else the feed's
+# own (a Ship that sends no launcher keeps the one the feed offers). With a
+# launcher it records that launcher's fingerprint; without, the feed's stays.
+$now = $was
+$inputsNow = if ($feedWas.PSObject.Properties['launcherInputs']) { [string]$feedWas.launcherInputs } else { '' }
+if ($Launcher) {
+    $m = [regex]::Match([IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\..\launcher\app\Updater.cs')), 'Version\s*=\s*"([^"]+)"')
+    if ($m.Success) { $now = $m.Groups[1].Value }
+    $inputsNow = [string]$LauncherInputs
+}
+if ($VersionOverride) { $now = $VersionOverride }
 # With the release record the real one writes (#444): one name, 20990101-0000,
 # for the pack, the launcher it offers and the commit it was built from.
 $ch = if ($Channel -eq 'dev') { 'dev' } else { 'main' }
-[IO.File]::WriteAllText($vf, '{"launcherVersion":"' + $now + '","packs":[{"id":"20990101-0000"}],' +
+[IO.File]::WriteAllText($vf, '{"launcherVersion":"' + $now + '","launcherInputs":"' + $inputsNow + '","packs":[{"id":"20990101-0000"}],' +
     '"release":{"id":"20990101-0000","channel":"' + $ch + '","launcherVersion":"' + $now + '","packs":["20990101-0000"],' +
     '"baseline":"","commit":"' + ('ab12' * 10) + '","branch":"main","uncommitted":0,"tag":"release/' + $ch + '/20990101-0000"}}')
 [IO.File]::WriteAllText((Join-Path $ReleaseDir 'published.json'), '{"written":"by the publisher"}')
