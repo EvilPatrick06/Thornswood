@@ -799,8 +799,13 @@ Set-Location '$rootWin'
 # that folder in with the code and puts the old one back when the bot does
 # not come up, so a bump that breaks the start does not leave the new
 # libraries under the old code (#1076).
+#
+# By hash as well as version (#2190): requirements.txt lists every library
+# the bot pulls in with the sha256 of each published wheel, and
+# --require-hashes refuses a file that does not match or a library it does
+# not list. Wheels only, so nothing is built from source on the box.
 New-Item -ItemType Directory -Force -Path '$rootWin\$stageName\py-libs' | Out-Null
-& python -m pip install --quiet --disable-pip-version-check --upgrade --target '$rootWin\$stageName\py-libs' -r '$rootWin\$stageName\requirements.txt' 2>&1 | Out-Null
+& python -m pip install --quiet --disable-pip-version-check --require-hashes --only-binary :all: --upgrade --target '$rootWin\$stageName\py-libs' -r '$rootWin\$stageName\requirements.txt' 2>&1 | Out-Null
 if (`$LASTEXITCODE -eq 0) { 'discord.py, pillow and certifi ready, in py-libs, at the versions in requirements.txt' } else { 'PIP FAILED with ' + `$LASTEXITCODE }
 # pip --target builds in a folder made by Python's tempfile.mkdtemp, which on
 # Windows (Python 3.12.4 and later) holds only SYSTEM, Administrators and its
