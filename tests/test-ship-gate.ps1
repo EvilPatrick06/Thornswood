@@ -87,7 +87,7 @@ $versionGuard = $ast.Find({ param($n) $n -is [Management.Automation.Language.Fun
 $feedStubs = 'function Get-FeedStoreLaunchers($ch) { return @() }; function Get-FeedStoreDir($ch) { return "" }; function Get-PublishedLauncher($dir, $ch) { return $null };'
 $verSb = [scriptblock]::Create(
     '$current = $args[0]; $Version = $args[1]; $Dev = $args[2]; $ModsOnly = $args[3];' +
-    '$MainReleaseDir = $args[4]; $ReleaseDir = $args[4]; $MainSourceAligned = $false;' + $stubs + $feedStubs + $versionGuard.Extent.Text + $ver + '; return $target')
+    '$MainReleaseDir = $args[4]; $ReleaseDir = $args[4]; $MainSourceAligned = $false; $MainEquivalent = $false; $LauncherInputs = '''';' + $stubs + $feedStubs + $versionGuard.Extent.Text + $ver + '; return $target')
 
 # '' when the gate lets the release through, the STOP line when it does not.
 function Gate([string]$repo, [bool]$dev) {

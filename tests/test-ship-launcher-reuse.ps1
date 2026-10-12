@@ -52,7 +52,7 @@ Yes 'Ship.ps1 parses' (@($e).Count -eq 0)
 $FnAst = [System.Management.Automation.Language.FunctionDefinitionAst]
 $fns = @{}
 foreach ($f in $ast.FindAll({ param($n) $n -is $FnAst }, $false)) { $fns[$f.Name] = $f.Extent.Text }
-$want = 'Get-LauncherInputHash', 'Get-PublishedLauncher', 'Test-LauncherUnchanged'
+$want = 'Get-LauncherInputHash', 'Get-PublishedLauncher', 'Test-LauncherUnchanged', 'Test-KeepFeedLauncher'
 foreach ($n in $want) { Yes "Ship.ps1 has $n" ($fns.ContainsKey($n)) }
 foreach ($n in $want) { if (-not $fns.ContainsKey($n)) { Done } }
 foreach ($n in $want) { Invoke-Expression $fns[$n] }
@@ -118,15 +118,22 @@ try {
     $sha = ('a' * 64)
     $pub = [pscustomobject]@{ Version = '1.1.102'; Url = 'https://thornswood.net/feed/assets/x'; Sha = $sha; Inputs = $h5 }
     Yes 'same fingerprint, whole launcher on the feed: unchanged' (Test-LauncherUnchanged $pub $h5)
-    $reuse = $ast.Find({ param($n) $n -is [Management.Automation.Language.IfStatementAst] -and
-        $n.Clauses[0].Item1.Extent.Text.Contains('Test-LauncherUnchanged $pubLauncher') }, $true)
-    $condition = [scriptblock]::Create('return ' + $reuse.Clauses[0].Item1.Extent.Text)
-    $pubLauncher = $pub; $LauncherInputs = $h5; $current = '1.1.103'; $MainSourceAligned = $true
-    Yes 'identical inputs cannot retain a different version when source is aligned' (-not (& $condition))
-    $current = $pub.Version
-    Yes 'identical inputs and aligned version reuse the existing signed launcher' (& $condition)
-    $current = '1.1.103'; $MainSourceAligned = $false
-    Yes 'a separate Dev branch retains normal fingerprint reuse' (& $condition)
+    # Test-KeepFeedLauncher $pub $inputs $current $dev $aligned $mainEquivalent $mainPub
+    Yes 'main: identical inputs cannot retain a different version when source is aligned' (-not (Test-KeepFeedLauncher $pub $h5 '1.1.103' $false $true $false $null))
+    Yes 'main: identical inputs and aligned version reuse the existing signed launcher' (Test-KeepFeedLauncher $pub $h5 '1.1.102' $false $true $false $null)
+    Yes 'dev, main''s own launcher: kept only under main''s number' (-not (Test-KeepFeedLauncher $pub $h5 '1.1.103' $true $true $true $pub))
+    Yes 'dev, main''s own launcher already on dev under main''s number: kept' (Test-KeepFeedLauncher $pub $h5 '1.1.102' $true $true $true $pub)
+    $devPub = [pscustomobject]@{ Version = '1.1.102.4'; Url = 'u'; Sha = $sha; Inputs = $h5 }
+    Yes 'a separate Dev branch retains normal fingerprint reuse of a dev number' (Test-KeepFeedLauncher $devPub $h5 '1.1.103' $true $false $false $null)
+    # #2347: the dev feed's 1.2.3 of 12 Oct, built from other sources than
+    # main's 1.2.3, is never kept: a dev launcher on 1.2.3 would not take it.
+    $main123 = [pscustomobject]@{ Version = '1.2.3'; Url = 'u'; Sha = $sha; Inputs = ('a' * 64) }
+    $dev123  = [pscustomobject]@{ Version = '1.2.3'; Url = 'u'; Sha = $sha; Inputs = $h5 }
+    Yes 'dev: a launcher under main''s number from other sources is not kept (#2347)' (-not (Test-KeepFeedLauncher $dev123 $h5 '1.2.3' $true $true $false $main123))
+    Yes '  nor from a branch' (-not (Test-KeepFeedLauncher $dev123 $h5 '1.2.3' $true $false $false $main123))
+    Yes '  nor when main''s feed cannot be read to say it is main''s' (-not (Test-KeepFeedLauncher $dev123 $h5 '1.2.3' $true $false $false $null))
+    $main122 = [pscustomobject]@{ Version = '1.2.2'; Url = 'u'; Sha = $sha; Inputs = ('a' * 64) }
+    Yes '  but a three part number main has not published is kept' (Test-KeepFeedLauncher $dev123 $h5 '1.2.3' $true $false $false $main122)
     Yes 'a different fingerprint: changed' (-not (Test-LauncherUnchanged $pub $h4))
     Yes 'no feed: changed' (-not (Test-LauncherUnchanged $null $h5))
     Yes 'no fingerprint worked out: changed' (-not (Test-LauncherUnchanged $pub ''))
@@ -166,7 +173,7 @@ finally {
 
 # ---- the wiring ---------------------------------------------------------------
 $iHash    = $src.IndexOf('$LauncherInputs = Get-LauncherInputHash $RepoDir')
-$iTest    = $src.IndexOf('if ((Test-LauncherUnchanged $pubLauncher $LauncherInputs)')
+$iTest    = $src.IndexOf('if (Test-KeepFeedLauncher $pubLauncher $LauncherInputs')
 $iSet     = $src.IndexOf('$ModsOnly = $true', [Math]::Max(0, $iTest))
 $iVersion = $src.IndexOf("if (`$ModsOnly) {`r`n    `$target = `$current")
 if ($iVersion -lt 0) { $iVersion = $src.IndexOf("if (`$ModsOnly) {`n    `$target = `$current") }
