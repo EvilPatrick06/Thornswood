@@ -214,8 +214,8 @@ is `thornswoodNeeds`.
 
 ## Chat and commands
 
-`WORDS` (`gamemode.js:WORDS`) is every word the server answers, and `PLAYER`
-(`gamemode.js:PLAYER is the subset a person who is not a playtester is told about`) is the part everybody is told about. `handle`
+`WORDS` (`gamemode.js:WORDS`) is every word the server answers, and
+`gamemode.js:PLAYER_WORDS` is the part everybody is told about. `handle`
 (`gamemode.js:handle`) answers each one. The teleport is here
 (`gamemode.js:coc does nothing on this server and never did`), because the client forwards only five console commands
 and `coc` is not one of them. Roles are `admins`, `isDev`, `isPlaytester`
