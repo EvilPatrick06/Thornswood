@@ -122,7 +122,7 @@ try {
         Copy-Item -LiteralPath (Join-Path $repo "scripts\deploy\$f") -Destination (Join-Path $installer $f)
     }
     # The record contracts the installer loads from beside itself (#2180).
-    foreach ($f in 'Read-JsonFile.ps1', 'RecordShape.ps1') { Copy-Item -LiteralPath (Join-Path $repo "scripts\release\$f") -Destination (Join-Path $tools $f) }
+    foreach ($f in 'Read-JsonFile.ps1', 'RecordShape.ps1') { Copy-Item -LiteralPath (Join-Path $repo "scripts\release\$f") -Destination (Join-Path $installer $f) }
     $ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
     function New-Payload([string]$name, [string[]]$order) {
         $d = Join-Path $T ('payload-' + $name)
