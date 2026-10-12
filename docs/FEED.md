@@ -478,7 +478,7 @@ carries `uiAssets`, the front's hashed file names (2,569 bytes, read by no
 launcher, script or page): they are `Data\Platform\UI\thornswood-ui-assets.txt`,
 a file of the release that its record already holds by sha256. And every
 writer writes version.json compact, with no indentation or line breaks,
-through one function, `Write-FeedVersionFile` in `Feed-Store.ps1`
+through one function, `Write-FeedVersionFile` in `Feed-Json.ps1`
 (`tests\test-1050-feed-compact.ps1`). Both are JSON every launcher ever
 published reads the same way. On the same two feeds that is 4,250 bytes on
 main and 2,187 on dev. Of main's, 2,277 is the release note in

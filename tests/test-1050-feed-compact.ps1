@@ -13,7 +13,8 @@
   "uiAssets", read by no launcher. Nine scripts wrote the file, each with its
   own ConvertTo-Json line, so one forgotten writer would put the indentation
   back on the next feed edit. Since #1050 they all go through one function,
-  Write-FeedVersionFile in scripts\release\Feed-Store.ps1. This proves:
+  Write-FeedVersionFile in scripts\release\Feed-Json.ps1, which Feed-Store.ps1
+  dot-sources. This proves:
     - no script under scripts\ writes a version.json any other way, and each
       of the ten known writers calls Write-FeedVersionFile
     - what it writes is one line of JSON with no byte order mark and no
@@ -175,6 +176,9 @@ if ($ParseFeed) {
 # ============================================================================
 . (Join-Path $Repo 'scripts\release\Feed-Store.ps1')
 . (Join-Path $Repo 'scripts\release\Release-Name.ps1')
+Yes 'Feed-Store.ps1 brings the writer with it, from Feed-Json.ps1' (
+    [bool](Get-Command Write-FeedVersionFile -ErrorAction SilentlyContinue) -and
+    [IO.File]::ReadAllText((Join-Path $Repo 'scripts\release\Feed-Store.ps1')) -match "\. \(Join-Path \`$PSScriptRoot 'Feed-Json\.ps1'\)")
 
 Write-Host 'every script that writes version.json goes through Write-FeedVersionFile'
 # A version.json path is a variable set from Join-Path ... 'version.json'. Any

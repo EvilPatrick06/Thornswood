@@ -197,7 +197,7 @@ if ($DryRun) {
 
 Head 'Repairing'
 $doc.packs = $good
-# Compact, no byte order mark (Feed-Store.ps1, Write-FeedVersionFile): a BOM
+# Compact, no byte order mark (Feed-Json.ps1, Write-FeedVersionFile): a BOM
 # is not JSON, which takes the update check out for everyone at once.
 Write-FeedVersionFile $VersionFile $doc
 Say ("  version.json now lists {0} pack(s)" -f $good.Count) 'Green'

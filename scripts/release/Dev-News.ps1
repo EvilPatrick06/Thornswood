@@ -319,7 +319,7 @@ function Update-DevFeedMarks {
         $min = Get-DevNewsVal $doc 'minLauncher'
         if (-not $min) { $min = Get-DevNewsVal $doc 'launcherVersion' }
         [void](Set-FeedNewsList $doc @($doc.news) 'dev' $min (Join-Path $Dir 'news-out') $SiteDir)
-        # Compact, no byte order mark (Feed-Store.ps1, Write-FeedVersionFile).
+        # Compact, no byte order mark (Feed-Json.ps1, Write-FeedVersionFile).
         Write-FeedVersionFile $file $doc
         $sent = Send-FeedStore 'dev' $Dir @('version.json') -SiteDir $SiteDir -To $To
         $r.Sent = (@($sent.Sent).Count -gt 0)

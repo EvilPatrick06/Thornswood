@@ -2253,7 +2253,7 @@ try {
 # ==== end thornswood news out ====
 
 # Compact and without a byte order mark, the one way every feed writer writes
-# it (Feed-Store.ps1, Write-FeedVersionFile, #1050). A BOM is not JSON: the
+# it (Feed-Json.ps1, Write-FeedVersionFile, #1050). A BOM is not JSON: the
 # launcher's reader stops on it, which takes out the update check for everyone
 # at once, including their route to a fix.
 Write-FeedVersionFile $VersionFile $doc

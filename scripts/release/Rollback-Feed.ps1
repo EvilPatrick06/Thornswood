@@ -618,7 +618,7 @@ $minNews = if ($doc.PSObject.Properties['minLauncher'] -and [string]$doc.minLaun
 try { [void](Set-FeedNewsList $doc $news $Channel $minNews (Join-Path $WorkDir ('news-' + $Id)) $SiteDir) }
 catch { Die ($_.Exception.Message + ' Run this again.') }
 
-# Compact, no byte order mark (Feed-Store.ps1, Write-FeedVersionFile).
+# Compact, no byte order mark (Feed-Json.ps1, Write-FeedVersionFile).
 Write-FeedVersionFile $VersionFile $doc
 Copy-Item -LiteralPath $manifestPath -Destination $StateFile -Force
 try { $sent = Send-FeedStore $Channel $ReleaseDir @('version.json', 'published.json', $FeedReleasesFile) -SiteDir $SiteDir }

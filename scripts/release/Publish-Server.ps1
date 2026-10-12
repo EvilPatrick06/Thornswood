@@ -976,7 +976,7 @@ if (-not $NoNews -and $up) {
                 $minNews = if ($doc.PSObject.Properties['minLauncher'] -and [string]$doc.minLauncher) { [string]$doc.minLauncher } else { [string]$doc.launcherVersion }
                 [void](Set-FeedNewsList $doc $newsList 'main' $minNews (Join-Path $ReleaseDir 'news-out') '' -NoSend:$NoPush)
 
-                # Compact, no byte order mark (Feed-Store.ps1,
+                # Compact, no byte order mark (Feed-Json.ps1,
                 # Write-FeedVersionFile). A BOM takes out the update check for
                 # everybody at once, including their route to a fix.
                 Write-FeedVersionFile $VersionFile $doc
