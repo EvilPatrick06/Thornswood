@@ -52,7 +52,7 @@ queued for Claude. The one decision only Patrick can make is in section 6.
 | --- | --- | --- | --- |
 | F1 | Pull request code from any branch in this repository runs on the production box | build.yml: `on: pull_request` and `runs-on: [self-hosted, Windows, thornswood-vps]`. The check reports it as a risk row | Risk while pull request code can run on the VPS; hosted runners become the default (section 6) |
 | F2 | Install-Runner.ps1's header says build.yml sends pull requests to the label `thornswood-pr`, which no VPS runner carries. build.yml has never used that label (git log -S finds none) | Install-Runner.ps1 "OFF THE BOX"; build.yml | Resolved by the decision in section 6 |
-| F3 | VPS runner accounts have no outbound limit | Install-Runner.ps1 puts firewall rules on -OffBox only; the check counts rules naming each runner SID | Risk until the outbound limits in section 6 are on, measured by the check |
+| F3 | VPS runner accounts have no outbound limit | Install-Runner.ps1 puts firewall rules on with -OffBox, and since #2161 on one VPS runner account at a time with -NetworkOnly; the check counts rules naming each runner SID | Risk until the outbound limits in section 6 are on, measured by the check |
 | F4 | A job can read its runner's `.credentials` and leave files for the next job | GitHub's runner design; `_work\_temp` leftovers are counted by the check | Residual, inherent to persistent self-hosted runners |
 | F5 | Fork pull requests cannot run here | repository settings above | OK |
 | F6 | Runners are not administrators | account groups above | OK, rechecked by every run |
@@ -95,8 +95,9 @@ outbound limit as residual risk.
    ranges) and the package feeds the workflows install from. Everything
    else is blocked. This closes F3. It is a live box change, Claude's, done
    only after the hosting console login is confirmed working (#2182), by
-   reusing the per account outbound rules `Install-Runner.ps1 -OffBox`
-   already makes (`tests\test-runner-offbox.ps1`), not hand written rules.
+   running `Install-Runner.ps1 -NetworkOnly` (#2161) for each runner
+   account: the same outbound rules -OffBox makes, and nothing else
+   (`tests\test-runner-offbox.ps1`), not hand written rules.
    The feeds read from the workflows today: `pypi.org` and
    `files.pythonhosted.org` (build.yml and nightly.yml install ruff and the
    bot's requirements with pip, hash pinned), and `registry.npmjs.org`
@@ -122,8 +123,8 @@ What follows for the check:
   every runner's `outbound` row should read ok.
 - Verification: a green build on a VPS runner after the limits are on, and
   the check's network rows ok. Rollback: remove the outbound rule group for
-  that account, the same way `Install-Runner.ps1 -OffBox -Remove` takes its
-  own off.
+  that account, with `Install-Runner.ps1 -NetworkOnly -Remove`
+  for that account.
 
 The three choices that were put to Patrick, kept for the record:
 ### The choices

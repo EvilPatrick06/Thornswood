@@ -1,4 +1,4 @@
-﻿<#
+<#
   test-runner-offbox.ps1
 
   Issue #1306. Install-Runner.ps1 -OffBox puts the pull request runner
@@ -12,6 +12,9 @@
   C:\ folder or runner registration is touched. The firewall guards run
   against stand-ins for the NetSecurity cmdlets, so no real rule is read or
   made; the read guards deny ANONYMOUS LOGON on scratch folders only.
+  Issue #2161: -NetworkOnly writes the outbound rules alone (no read deny,
+  lock, account or service step), may name a VPS-label runner, and full
+  -OffBox still refuses that label.
 #>
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -135,6 +138,27 @@ try {
         Yes ("the VPS (no -OffBox) $($m -join ' ') gets no firewall rule and no read deny") ($r.Code -eq 0 -and $r.Text -notmatch 'RunnerFirewall|RunnerReads')
     }
 
+    # ---- -NetworkOnly (#2161): the outbound rules alone ---------------------
+    # A step run, not a function the guard library defines: a line that starts with it.
+    $noLock = '(?m)^\s*(&\s*icacls|Close-RunnerReads|Open-RunnerReads|Lock-RunnerRoot|Close-RunnerAccount|New-LocalUser|Remove-LocalUser|Remove-RunnerWatchers)\b|config\.cmd|ExclusionPath'
+    Yes 'the lock-step pattern does catch a full -OffBox install (a control)' ((Dry @('-OffBox')).Text -match $noLock)
+    $r = Dry @('-NetworkOnly', '-Number', '4', '-AllowHost', 'pypi.org')
+    $t = $r.Text
+    Yes "-NetworkOnly -Number 4 dry run ends 0 and goes to the VPS names (exit $($r.Code))" ($r.Code -eq 0 -and $t -match [regex]::Escape("`$grdAcct = 'thornswood-runner4'"))
+    Yes '  it writes the outbound block rules for that account alone' ($t -match [regex]::Escape('Set-RunnerFirewall $grdAcct $grdGroup $grdBlocks') -and $t -match '-Direction Outbound -Action Block' -and $t -match [regex]::Escape("`$grdGroup = 'Thornswood PR runner thornswood-runner4'"))
+    Yes '  blocking everything outside GitHub''s lists, with the -AllowHost hole' ($t -match [regex]::Escape("'128.0.0.0-140.82.111.255'") -and $t -match [regex]::Escape("-203.0.113.6'") -and $t -match [regex]::Escape("'203.0.113.8-") -and $t -notmatch [regex]::Escape("'140.82.112.0"))
+    Yes '  and no read deny, folder lock, account, service or Defender step' ($t -notmatch $noLock)
+    Yes '  only one script, and GitHub was never asked' (([regex]::Matches($t, '# ==== a script it would run')).Count -eq 1 -and -not (Test-Path -LiteralPath $ghCalled))
+    $r = Dry @('-OffBox', '-NetworkOnly', '-Label', 'thornswood-vps')
+    Yes "-NetworkOnly is let through with the VPS label (exit $($r.Code))" ($r.Code -eq 0 -and $r.Said -notmatch 'never takes the VPS label' -and $r.Text -match [regex]::Escape('Set-RunnerFirewall $grdAcct $grdGroup $grdBlocks') -and $r.Text -notmatch $noLock)
+    $r = Dry @('-OffBox', '-Label', 'thornswood-vps')
+    Yes "  while full -OffBox with the VPS label is still refused (exit $($r.Code))" ($r.Code -eq 1 -and $r.Said -match 'never takes the VPS label' -and -not $r.Text)
+    $r = Dry @('-NetworkOnly', '-Number', '4', '-Remove')
+    Yes '-NetworkOnly -Remove takes the firewall group off and nothing else' ($r.Code -eq 0 -and $r.Text -match [regex]::Escape('Remove-RunnerFirewall $grdGroup') -and $r.Text -notmatch $noLock)
+    $r = Dry @('-NetworkOnly', '-Number', '4', '-Status')
+    Yes '-NetworkOnly -Status counts the rules' ($r.Code -eq 0 -and $r.Text -match [regex]::Escape('Get-RunnerFirewall $grdGroup'))
+    $r = Dry @('-NetworkOnly', '-Lock')
+    Yes "-NetworkOnly with -Lock is refused (exit $($r.Code))" ($r.Code -eq 1 -and -not $r.Text)
     # ---- the range arithmetic ----------------------------------------------
     $rl = [regex]::Match($src, "(?s)\`$rangeLib = @'\r?\n(.*?)\r?\n'@").Groups[1].Value
     Yes 'the range library is where it was' ($rl -match 'function Get-RunnerBlockRanges')
