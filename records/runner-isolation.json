@@ -1,0 +1,15 @@
+{
+  "about": "What a GitHub Actions runner account on the VPS should and should not reach. scripts/vps/Check-RunnerIsolation.ps1 compares Get-RunnerFacts.ps1 output, the workflows and the repository's Actions settings against it. Issue #2161. No secret belongs here.",
+  "productionLabel": "thornswood-vps",
+  "forbiddenGroups": ["Administrators", "Backup Operators", "Remote Desktop Users", "Remote Management Users", "Hyper-V Administrators", "Network Configuration Operators"],
+  "noReach": [
+    "C:\\Thornswood-Docs\\config.json", "C:\\Thornswood-Docs\\feed", "C:\\Thornswood-Docs\\feed-dev",
+    "C:\\Thornswood-Bot\\bot.env.json", "C:\\Thornswood-Backup", "C:\\Thornswood-Backup\\key.txt",
+    "C:\\Thornswood-Server\\private", "C:\\Thornswood-Server-Dev\\private", "C:\\Thornswood-Server\\world",
+    "C:\\Thornswood-Deploys", "C:\\Thornswood-Caddy", "C:\\Thornswood-Watch",
+    "C:\\ProgramData\\ssh", "C:\\Users\\Administrator"
+  ],
+  "writeOnly": ["C:\\Thornswood-Dumps"],
+  "tempMaxHours": 24,
+  "intentional": []
+}
