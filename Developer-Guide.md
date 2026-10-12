@@ -1943,9 +1943,12 @@ it per session and ignores which profile Vortex has on.
 - `lore\`: history and the Accord. `site\data\site\*.md`: the public
   pages (join, rules, classes, world, credits, privacy, terms), also live on
   the site.
-- The site's hub boards (Active Issues, Known Issues, Test These, Suggestions,
-  Archive, the Patrick runbook) are older than the board and are being retired
-  (issue #433); where they disagree with the board, the board is right.
+- The site's hub boards (Active Issues, Test These, Suggestions, Archive, the
+  Patrick runbook) are older than the board and are being retired (issue
+  #433); where they disagree with the board, the board is right. Known
+  Issues is not one of them: it is the public page's only copy, the known
+  board in `site\dataoard.json`, edited in the hub at `/hub/known` and
+  written out at `/known` (decided by Patrick on 12 Oct, issue #2414).
 - `docs\archive`: dated snapshots (HANDOFF, the 17 September audit,
   WORKING-NOTES and the old To Do List), history only.
 

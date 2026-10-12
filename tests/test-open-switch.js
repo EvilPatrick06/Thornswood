@@ -233,7 +233,7 @@ function standingWith(open, roleIds) {
 
   // -------------------------------------- nothing people read says it --
   const PEOPLE = ['README.md', 'SECURITY.md', 'installer/READ ME FIRST.txt', 'site/data/help.md',
-                  'site/data/known.md', 'site/public/home.html', 'site/public/home.js', 'bot/content.py',
+                  'site/public/home.html', 'site/public/home.js', 'bot/content.py',
                   'launcher/app/Help.cs', 'launcher/ui.xaml', 'launcher/app/ShellPacks.cs']
     .concat(fs.readdirSync(path.join(ROOT, 'site/data/site')).filter((n) => /\.md$/.test(n))
       .map((n) => 'site/data/site/' + n));
@@ -243,6 +243,9 @@ function standingWith(open, roleIds) {
       ' read' + (said.length ? '; still in ' + said.join(', ') : '') + ')', said.length === 0);
   const board = JSON.parse(read('site/data/board.json'));
   yes('nor the Patreon wording kept on the board', !/closed[\s-]+playtest/i.test(JSON.stringify(board)));
+  // Known Issues is the known board, written out as /known writes it (#2414).
+  yes('nor the Known Issues page, across line breaks too',
+      !/closed[\s-]+playtest/i.test(require('./fixtures/known-page').knownPage() || ''));
   yes('the launcher no longer holds the collection back until an application is accepted',
       !/b\.Content = "Apply first"/.test(read('launcher/app/ShellPacks.cs')) &&
       !/The collection opens once you have been accepted/.test(read('launcher/app/ShellPacks.cs')) &&

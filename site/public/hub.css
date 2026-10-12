@@ -325,6 +325,14 @@ textarea.md:focus{outline:none;border-color:var(--gold-dim)}
 .sechead .count{font:600 11px var(--sans);letter-spacing:.06em;color:var(--faint)}
 .sechead .acts{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
 .secnote{color:var(--dim);font-size:13.5px;margin:0 0 10px;max-width:70ch}
+.secnote p{margin:0 0 8px}
+[data-intro],[data-note]{cursor:text;border-radius:5px}
+[data-intro]:hover,[data-note]:hover{background:var(--raised)}
+.empty-note{color:var(--faint);font-style:italic}
+textarea.notebox{width:100%;min-height:90px;padding:10px 12px;background:#0D100B;color:var(--text);
+  border:1px solid var(--gold-dim);border-radius:5px;font:14px/1.6 var(--sans);resize:vertical;
+  display:block}
+textarea.notebox:focus{outline:none}
 
 .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
 table.board{width:100%;border-collapse:collapse;font-size:14px;min-width:420px}
