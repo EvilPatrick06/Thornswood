@@ -77,6 +77,20 @@ const docNames = doc.scarce.map(function (row) { return row[0]; })
 assert.ok(docNames.indexOf('Supply') < 0 && docNames.indexOf('A dragon') < 0);
 
 function world(ranks) {
+  const population = require('../game/data/npc-population.json');
+  const compact = {keep:population.npcs.filter(r=>r.keep).map(r=>[r.ref,r.base,r.world||r.cell,r.pos,r.leash,
+    r.returnMinutes,r.role,r.habitat,r.tier,r.cap,r.populationBucket,0,r.species])};
+  const bodies = new Map(), ids = new Map();
+  compact.keep.forEach((r,i)=>{
+    ids.set(r[0],i+100);
+    bodies.set(i+100,{ref:r[0],base:r[1],world:r[2],pos:r[3].slice(),race:r[12]+'Race',
+      profileId:-1,isHuman:false,isDead:false,isServerControlled:true,lifeGeneration:0,runtimeLifeIdentity:'100'});
+  });
+  const native = {getIdFromDesc:ref=>ids.get(ref),getDescFromId:id=>bodies.get(id).ref,
+    getNpcAIState:id=>JSON.parse(JSON.stringify(bodies.get(id))),
+    get:(id,key)=>key==='baseDesc'?bodies.get(id).base:key==='worldOrCellDesc'?bodies.get(id).world:undefined};
+  const killContracts = require('../game/kill-contracts').createKillContracts({mp:native,population:compact,
+    raceOf:id=>bodies.get(id).race,identity:actor=>'actor:'+actor});
   const inv = new Map();
   const adds = [];
   let purseTouches = 0;
@@ -89,6 +103,7 @@ function world(ranks) {
     load: function (actor) { return kept.has(actor) ? JSON.parse(kept.get(actor)) : undefined; },
     save: function (actor, rec) { kept.set(actor, JSON.stringify(rec)); },
     identity: function (actor) {return 'actor:'+actor;},
+    killContracts: killContracts,
     commit: function (actor, expected, next, changes) {
       assert.deepEqual(kept.has(actor)?JSON.parse(kept.get(actor)):null,expected);
       const pack=new Map(inv);
@@ -132,7 +147,7 @@ function world(ranks) {
     creditWork: function () { return null; },
     wearTool: function () { return null; }
   });
-  return { svc: svc, inv: inv, adds: adds, purse: purse, touches: function () { return purseTouches; } };
+  return { svc: svc, inv: inv, adds: adds, purse: purse, bodies, ids, touches: function () { return purseTouches; } };
 }
 let clock = 1000;
 const names = {};
@@ -239,25 +254,27 @@ svc.bindPlace('wolf', { cell: 'pad-1' });
 assert.equal(svc.offer(1, 'wolf').ok, true);
 names[10] = 'Dragon'; cells[10] = 'pad-1';
 svc.noteKill(1, 10);
-names[11] = 'Wolf'; cells[11] = 'elsewhere';
-svc.noteKill(1, 11);
+const wolfId=box.ids.get('86a88:Skyrim.esm'), wolfBody=box.bodies.get(wolfId);
+wolfBody.isDead=true;wolfBody.world='elsewhere';
+svc.noteKill(1, wolfId);
 assert.equal(svc.turnIn(1, 'wolf').ok, false);
 assert.equal(box.adds.filter(function (row) { return row.count === wolf.gold; }).length, 0);
-names[12] = 'Wolf'; cells[12] = 'pad-1';
-svc.noteKill(1, 12);
-assert.equal(svc.turnIn(1, 'wolf').ok, true);
+wolfBody.world='151f9:Skyrim.esm';
+assert.equal(svc.noteKill(1, wolfId).ok,true);
+holds['trader-1']='Whiterun';
+assert.equal(svc.turnIn(1, 'wolf', 'trader-1').ok, true);
 assert.equal(box.adds.filter(function (row) { return row.item === 'f:Skyrim.esm' && row.count === wolf.gold; }).length, 1);
 
 const camp = line.scene.find(function (row) { return row.name === 'The camp'; });
 svc.bindPlace('camp', { cell: 'camp-1' });
 assert.equal(svc.offer(1, 'camp').ok, true);
-names[21] = 'Bandit'; names[22] = 'Bandit Outlaw'; names[23] = 'Bandit';
-cells[21] = cells[22] = cells[23] = 'camp-1';
-svc.noteKill(1, 21);
-svc.noteKill(1, 22);
-assert.equal(svc.turnIn(1, 'camp').ok, false);
-svc.noteKill(1, 23);
-assert.equal(svc.turnIn(1, 'camp').ok, true);
+const campIds=['50533','50549','5054a'].map(ref=>box.ids.get(ref+':Skyrim.esm'));
+campIds.forEach(id=>{box.bodies.get(id).isDead=true;});
+svc.noteKill(1, campIds[0]);
+svc.noteKill(1, campIds[1]);
+assert.equal(svc.turnIn(1, 'camp', 'trader-1').ok, false);
+svc.noteKill(1, campIds[2]);
+assert.equal(svc.turnIn(1, 'camp', 'trader-1').ok, true);
 assert.equal(box.adds.filter(function (row) { return row.count === camp.gold; }).length, 1);
 
 assert.equal(svc.offer(4, 'geode').ok, true, 'either Enchanter half may take the geode');
