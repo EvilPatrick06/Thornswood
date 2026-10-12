@@ -1,4 +1,4 @@
-# Every pull request and every push to main gets the checks a release starts
+﻿# Every pull request and every push to main gets the checks a release starts
 # with: do all the PowerShell scripts parse, does every game script parse,
 # does the bot parse, do the test harnesses still pass, and does the launcher
 # compile with the .NET Framework 4 csc (C# 5). A red mark here means the
@@ -271,7 +271,7 @@ jobs:
           # source, a moment, and goes red on the fail-open it replaced.
           # Issue #1345: site auth (door key header, Discord cookie, OAuth state,
           # gamemode refresh()) on every PR. ~2s; test-token-refresh.js does not
-          # exist on main — site-auth already drives the refresh() path.
+          # exist on main â€” site-auth already drives the refresh() path.
           # Issue #1163: the Discord sign-in callback gives up inside ten
           # seconds when the token exchange or the profile lookup stalls,
           # never answers, or drops halfway, and the page says to try again.
