@@ -79,7 +79,7 @@ Where the evidence differs from section 2:
 | Publish-Server is a file deploy | It copies the zip and four libraries to `C:\` and runs `Install-ThornswoodServer.ps1`, which registers the SYSTEM task | Admin (first install). Day to day server deploys are Deploy-Server |
 | Watch is a read | Watch-Services and Watch-Load write their scripts into locked folders and register or delete their tasks | Admin for those calls; their status reads stay read-status |
 | Feed writes are Feed-Store, Publish-Update and Publish-Discord | Feed writes also come from Remirror-Site-Feed, Publish-News (`news.json`) and Publish-Installer (site `files`) | All feed-send; the feed verb must cover those folders too |
-| Request-Restart stops and starts a task | It only drops a request json in the server data folder; the gamemode warns, clears players and deletes it | stage (a file write), no task rights needed |
+| Request-Restart stops and starts a task | It only drops a request json in the server data folder; the gamemode warns everyone on the server, sends them off and deletes it | stage (a file write), no task rights needed |
 | (not listed) | Restart-Server uses `Restart-Service`; Go.ps1 copies `voice-server.js` straight into the live voice folder and kills the voice process; Wipe-Saves, Reset-Character, Set-Door and Clean-Everything delete or rewrite game data and stop processes; Backup-Server and Fetch-Backups read every secret | Admin, outside every gate verb |
 | (not listed) | Every secret write (Rotate-*, Set-DiscordLogin, Install-Bot and Install-Runner tokens, the site password) | Admin. No gate verb carries a secret |
 
