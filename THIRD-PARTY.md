@@ -358,7 +358,7 @@ and the servers' own copies:
 
 | Channel | Release | Built from | Bytes | sha256 | Records |
 |---|---|---|---|---|---|
-| main | every main release from the first of 12 October, the one after `20261011-175014`; the live server holds the same file | `f8527daa` or later | 146,941 | `d05679e76d8dc930b236ebd906274a4c26b7959228d5ebca727cf5800469bf31` | 419 |
+| main | every main release from `20261012-115531` (launcher 1.2.4, 12 October 11:55 AM); the live server has held it since 11:42 AM | `e34bf423` on | 146,941 | `d05679e76d8dc930b236ebd906274a4c26b7959228d5ebca727cf5800469bf31` | 419 |
 | dev | every dev release from `20261012-004958-dev` (12 October 12:49 AM); the dev server has held it since 12:43 AM | `9ec48194` on | 146,941 | `d05679e76d8dc930b236ebd906274a4c26b7959228d5ebca727cf5800469bf31` | 419 |
 
 The repository has held this file since `f8527daa` (#2336). Before it, every
