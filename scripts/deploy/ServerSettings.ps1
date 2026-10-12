@@ -200,6 +200,93 @@ function Get-ThornswoodPassSwitchProblem($Settings, [string]$Script = '.\scripts
 }
 
 <#
+  A LOAD ORDER THAT DROPS WHAT THE SERVER LOADS (#2320). On 5 Oct at 9:56 PM
+  Publish-Server.ps1 -Channel dev sent a payload built from a fresh engine
+  build (720a5f7c) whose server-settings.json still held the engine's own
+  order, the five base masters, before Deploy-Gamemode.ps1 -Vortex had written
+  the collection's into it. The installer took loadOrder from the release, as
+  a release key, and checked only that every plugin it named was there, which
+  five masters are. The dev server ran 48 plugins before and started on five:
+  nine Riekling characters were set aside with "bad raceId", every NPC change
+  from Populated Cities failed to parse, and the NPC runtime refused to start,
+  until the 10:01 PM start had the order again.
+
+  A plugin the running server loads and the new order does not is every form
+  of it gone from the world, and every full plugin after it one index lower,
+  which is the shape ServerOrder.ps1 already says out loud for the light
+  order. So an install or a deploy that takes loadOrder over a running
+  server's refuses one that leaves out any plugin the running order has,
+  unless the person running it names each one that may go, in that run:
+  Publish-Server.ps1, Deploy-Server.ps1 and Deploy-DevGamemode.ps1 -Dist all
+  take -DropPlugins. Names are compared by file name, any case, whatever the
+  folder in front. A plugin added, or the same plugins in another order, is
+  not this check's.
+
+  Returns Dropped (every plugin the running order has and the next does not),
+  Unasked (those -DropPlugins did not name), Said (the lines to print) and
+  Problem ('' when nothing unasked goes, otherwise the refusal). A running
+  server with no loadOrder, or a next one with none, drops nothing here: the
+  first has nothing to keep, and the second keeps the running one.
+#>
+function Get-ThornswoodPluginLeaf([string]$Path) {
+    return @("$Path".Trim() -split '[\\/]')[-1]
+}
+function Test-ThornswoodLoadOrderDrop($Running, $Next, [string[]]$Allowed = @()) {
+    $out = [pscustomobject]@{ Dropped = @(); Unasked = @(); Said = @(); Problem = '' }
+    if ($null -eq $Running -or $null -eq $Next) { return $out }
+    if ((Get-ThornswoodSettingNames $Running) -notcontains 'loadOrder' -or (Get-ThornswoodSettingNames $Next) -notcontains 'loadOrder') { return $out }
+    $was = @(@($Running.loadOrder) | ForEach-Object { Get-ThornswoodPluginLeaf $_ } | Where-Object { $_ })
+    $now = @{}
+    foreach ($p in @($Next.loadOrder)) { $n = Get-ThornswoodPluginLeaf $p; if ($n) { $now[$n.ToLowerInvariant()] = $true } }
+    $ok = @{}
+    foreach ($a in @($Allowed)) { $n = Get-ThornswoodPluginLeaf $a; if ($n) { $ok[$n.ToLowerInvariant()] = $true } }
+    $dropped = @()
+    foreach ($n in $was) { if (-not $now.ContainsKey($n.ToLowerInvariant()) -and $dropped -notcontains $n) { $dropped += $n } }
+    $unasked = @($dropped | Where-Object { -not $ok.ContainsKey($_.ToLowerInvariant()) })
+    $said = @()
+    $named = @($dropped | Where-Object { $ok.ContainsKey($_.ToLowerInvariant()) })
+    if ($named.Count) { $said += ('the load order drops ' + $named.Count + ' plugin(s) this run named with -DropPlugins: ' + ($named -join ', ')) }
+    $notDropped = @(@($Allowed) | ForEach-Object { Get-ThornswoodPluginLeaf $_ } | Where-Object { $_ -and $now.ContainsKey($_.ToLowerInvariant()) })
+    if ($notDropped.Count) { $said += ('-DropPlugins named ' + ($notDropped -join ', ') + ', which the load order keeps, so nothing is dropped for it') }
+    $problem = ''
+    if ($unasked.Count) {
+        $list = @($unasked | Select-Object -First 12) -join ', '
+        if ($unasked.Count -gt 12) { $list += (', and ' + ($unasked.Count - 12) + ' more') }
+        $problem = ('the load order this run would install has ' + @($Next.loadOrder).Count + ' plugins and leaves out ' + $unasked.Count +
+                    ' of the ' + $was.Count + ' the running server loads: ' + $list + '. Every form of theirs would be gone from the world ' +
+                    'and every full plugin after one would move up an index (#2320). Build the release with the server''s order ' +
+                    '(Deploy-Gamemode.ps1 keeps it), or name each plugin that may go with -DropPlugins in this run.')
+    }
+    $out.Dropped = $dropped
+    $out.Unasked = $unasked
+    $out.Said = $said
+    $out.Problem = $problem
+    return $out
+}
+
+<#
+  -DropPlugins as it crosses an ssh command line to Install-ThornswoodServer.ps1:
+  plugin names have spaces in them, which do not survive that line the same
+  way twice, so Publish-Server.ps1 sends them as base64 of the names one to a
+  line, and the installer reads them back.
+#>
+function ConvertTo-ThornswoodNamesArg([string[]]$Names) {
+    $t = (@($Names | Where-Object { $_ }) -join "`n")
+    if (-not $t) { return '' }
+    return [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($t))
+}
+function ConvertFrom-ThornswoodNamesArg([string]$Arg) {
+    if (-not $Arg) { return @() }
+    return @([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Arg)) -split "`n" | Where-Object { $_ })
+}
+# The line Deploy-Server puts in front of $settingsCarryBlock, so the box has
+# $DropPlugins: the names as single quoted strings.
+function Get-ThornswoodDropLine([string[]]$Names) {
+    $q = @(@($Names) | Where-Object { $_ } | ForEach-Object { "'" + $_.Replace("'", "''") + "'" })
+    return ('$DropPlugins = @(' + ($q -join ', ') + ')' + "`r`n")
+}
+
+<#
   What makes a settings file wrong to send at all, whatever it is carried
   into. Any channel: an npcSettings "default" key, which the engine reads as a
   plugin name and so refuses every NPC (#879). -Channel main: anything that is
@@ -228,8 +315,10 @@ function Get-ThornswoodServerSettingsProblems($Settings, [string]$Channel = '') 
   Deploy-Server.ps1's carry, run on the box against its stage, after the files
   are up and before the stage is checked. It takes $Root, $Stage and
   $ReleaseKeys from the lines SwapVars puts in front of it, $Asked (what this
-  run asked for, #1223; absent is nothing) from the line Deploy-Server puts
-  after those, and this file's functions from the text in front of them all.
+  run asked for, #1223; absent is nothing) and $DropPlugins (#2320; absent
+  is none) from the lines Deploy-Server puts after those, and this file's
+  functions from the text in front of them all. An order that leaves out a
+  plugin the server loads, not named in $DropPlugins, is CARRY REFUSED.
   Ends with CARRIED <sha256 of the settings it wrote> or CARRY REFUSED.
 #>
 $settingsCarryBlock = @'
@@ -249,7 +338,11 @@ if ($null -eq $run -or $null -eq $rel) {
 } else {
   $m = Join-ThornswoodServerSettings $run $rel $ReleaseKeys $Asked
   foreach ($l in $m.Said) { $l }
+  if (-not (Test-Path -LiteralPath variable:DropPlugins)) { $DropPlugins = @() }
+  $drop = Test-ThornswoodLoadOrderDrop $run $m.Settings $DropPlugins
+  foreach ($l in $drop.Said) { $l }
   $passWhy = Get-ThornswoodPassSwitchProblem $m.Settings
+  if ($drop.Problem) { $passWhy = $drop.Problem }
   if ($passWhy) {
     $passWhy
     Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue
