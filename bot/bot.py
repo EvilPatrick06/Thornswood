@@ -21,7 +21,7 @@ What it does:
            issue is closed, which is when its fix is on main. #test-tasks is a
            forum of test tasks: one for each issue closed as fixed (its "Test
            task:" comment), always tagged Main, because main is where testers
-           test, plus any posted by hand, tagged Dev or Main (/test-task,
+           test, plus any posted by hand, tagged Main too (/test-task,
            python bot.py --post-task). The
            channels get there once, by hand, with
            python bot.py --setup-channels [--apply] (the testing channels
@@ -2162,7 +2162,7 @@ async def channel_setup(guild, apply=False, path=None):
                     TASKS_NAME, category=old.category,
                     position=getattr(old, 'position', None) or 0,
                     overwrites=_copy_overwrites(old),
-                    topic='One thread per test task, tagged Dev or Main.',
+                    topic='One thread per test task, tagged Main.',
                     available_tags=[discord.ForumTag(name=t) for t in TASK_TAGS],
                     reason=SETUP_REASON)
     if old is not None:
