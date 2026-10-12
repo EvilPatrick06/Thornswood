@@ -136,6 +136,18 @@ against a copy: with a page made to throw, `/api/play/who` still answers its
 401, and with a page made to hold the loop for a second and a half, the same
 question waits until it lets go.
 
+## The site log
+
+`site.log` sits beside `server.js` and rolls at 4 MB, keeping `site.log.1` to
+`.5`. If a roll fails (usually a rotated file held open by an editor, a tail
+or a backup, or the folder losing delete rights), the site says so once, on
+the console and in the log, with the file and the error, and tries again
+every minute rather than on every line. The active file has an emergency
+ceiling of 8 MB (twice the roll size): past it one line says so and the file
+stops growing, with lines going to the console only, until a roll works,
+which is said once too. `tests\test-2189-log-rotation.js` covers it. Disk
+space for the folder as a whole is a storage alert (#2178), not this.
+
 ## The gallery
 
 The public gallery is `data\gallery.json`, a list of `{ name, url: '/shot/'+name,

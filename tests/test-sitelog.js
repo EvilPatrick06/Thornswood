@@ -11,7 +11,7 @@ const os = require('os');
 
 const SRC = path.join(REPO_DIR, 'site', 'server.js');
 const text = fs.readFileSync(SRC, 'utf8');
-const a = text.indexOf('function makeLog(dir, name, maxBytes, keep) {');
+const a = text.indexOf('function makeLog(dir, name, maxBytes, keep, opts) {');
 const b = text.indexOf('// Four megabytes is a few days');
 if (a < 0 || b < 0) {
   console.error('the site log block is not in server.js the way this expects');
