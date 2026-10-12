@@ -680,7 +680,7 @@ if (-not (Test-Path -LiteralPath `$gm)) { `$why = 'there is no gamemode.js in ' 
 elseif ((Get-FileHash -LiteralPath `$gm -Algorithm SHA256).Hash.ToLowerInvariant() -ne `$want) { `$why = 'the gamemode.js in ' + `$r + ' is not the one in ' + $(& $q $Name) }
 else {
   `$s = `$null
-  try { `$s = ([IO.File]::ReadAllText((Join-Path `$r 'thornswood-build.json')) -replace '^﻿', '') | ConvertFrom-Json } catch { `$s = `$null }
+  try { `$s = ([IO.File]::ReadAllText((Join-Path `$r 'thornswood-build.json')) -replace '^\uFEFF', '') | ConvertFrom-Json } catch { `$s = `$null }
   if (-not `$s -or [string]`$s.gamemodeSha256 -ne `$want) { `$why = 'the thornswood-build.json in ' + `$r + ' does not describe that gamemode.js' }
 }
 if (`$why) { 'SERVER NOT RECORDED: ' + `$why }
@@ -740,9 +740,9 @@ if (Test-Path -LiteralPath (Join-Path `$r 'gamemode.js')) { `$sha = (Get-FileHas
 if (Test-Path -LiteralPath `$b) {
   `$name = 'an older copy its record does not describe'
   try {
-    `$n = [string](([IO.File]::ReadAllText(`$b) -replace '^﻿', '') | ConvertFrom-Json).name
+    `$n = [string](([IO.File]::ReadAllText(`$b) -replace '^\uFEFF', '') | ConvertFrom-Json).name
     if (`$n -match '^gamemode-[0-9a-f]{12}-[0-9a-f]{16}\.zip$') {
-      `$a = ([IO.File]::ReadAllText((Join-Path `$st ('gamemode\' + `$n.Replace('.zip', '.json')))) -replace '^﻿', '') | ConvertFrom-Json
+      `$a = ([IO.File]::ReadAllText((Join-Path `$st ('gamemode\' + `$n.Replace('.zip', '.json')))) -replace '^\uFEFF', '') | ConvertFrom-Json
       if (`$sha -and @(`$a.files | Where-Object { `$_.path -eq 'game/gamemode.js' -and `$_.sha256 -eq `$sha }).Count -eq 1) { `$ok = `$true; `$name = `$n }
     }
   } catch { `$ok = `$false }

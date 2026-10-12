@@ -515,7 +515,7 @@ try {
                 $zr = New-Object IO.StreamReader($ze.Open())
                 try { $stampText = $zr.ReadToEnd() } finally { $zr.Dispose() }
                 # One that does not parse is refused below as one that says nothing.
-                try { $zipStamp = ($stampText -replace '^﻿', '') | ConvertFrom-Json } catch { $zipStamp = $null }
+                try { $zipStamp = ($stampText -replace '^\uFEFF', '') | ConvertFrom-Json } catch { $zipStamp = $null }
             }
             elseif (Test-ThornswoodServerForkFile $rel) { $zipSums[$rel] = Get-EntrySum $ze }
         }
