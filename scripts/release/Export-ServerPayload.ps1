@@ -12,7 +12,9 @@
     first: scam_native.node, dist_back\skymp5-server.js and its map,
     package.json, yarn.lock, launch_server.bat and data\scripts
     (scripts\deploy\ServerBuild.ps1 says which and why)
-    gamemode.js and thornswood-build.json, ours
+    gamemode.js and thornswood-build.json, ours (the stamp from -Stamp
+    when it is given, which is how Publish-Server.ps1 sends one made for
+    the channel, #459)
     server-settings.json, rewritten below
     server-build.json, the record itself, for the installer to hold them again
   Whatever else sits in the build folder stays there and is named: an old
@@ -44,7 +46,13 @@ param(
     [ValidateSet('main', 'dev')][string]$Channel = 'main',
     # The build record the binary is held to and that goes into the payload as
     # server-build.json, so the installer on the box holds it too (#1214).
-    [string]$Record = (Join-Path $PSScriptRoot '..\..\records\server-build.json')
+    [string]$Record = (Join-Path $PSScriptRoot '..\..\records\server-build.json'),
+    # The build stamp to pack as thornswood-build.json, in place of the one in
+    # the build (#459). Publish-Server.ps1 makes it for the channel it
+    # publishes to, beside the gamemode artifact, so a dev stamp never sits in
+    # the build for the next live deploy to send, the way the dev ports once
+    # did (#1114). Left off, the build's own is packed, when there is one.
+    [string]$Stamp = ''
 )
 . (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
@@ -105,7 +113,9 @@ Write-Host ('every server file is the recorded build of ' + ([string]$rec.source
 if (-not (Test-Path -LiteralPath (Join-Path $Dist 'gamemode.js'))) {
     throw "there is no gamemode.js in $Dist, so the server would start with no gamemode. Publish-Server.ps1 copies game\gamemode.js into the build; Export-ServerPayload.ps1 by itself needs it there first. Nothing was packed."
 }
-if (-not (Test-Path -LiteralPath (Join-Path $Dist 'thornswood-build.json'))) {
+if ($Stamp) {
+    if (-not (Test-Path -LiteralPath $Stamp)) { throw "there is no build stamp at $Stamp, which this run was told to pack. Nothing was packed." }
+} elseif (-not (Test-Path -LiteralPath (Join-Path $Dist 'thornswood-build.json'))) {
     Write-Host "no thornswood-build.json in $Dist, so the server will not be able to say which gamemode it runs" -ForegroundColor Yellow
 }
 
@@ -119,6 +129,7 @@ $own = @('gamemode.js', 'thornswood-build.json')
 $taken = @{}
 foreach ($rel in @($recFiles.Keys) + $own) {
     $from = Join-Path $Dist ($rel -replace '/', '\')
+    if ($rel -eq 'thornswood-build.json' -and $Stamp) { $from = $Stamp }
     if (-not (Test-Path -LiteralPath $from)) { continue }
     $to = Join-Path $OutDir ($rel -replace '/', '\')
     New-Item -ItemType Directory -Path (Split-Path -Parent $to) -Force | Out-Null

@@ -8,7 +8,8 @@
   them at serve time from data/deployed-build.json (written by
   scripts/deploy/DeployedBuild.ps1 after a server deploy) and from the
   feed/feed-dev version.json it serves, and keeps the hand text when either
-  is missing or unreadable.
+  is missing or unreadable. A record with only one server in it fills that
+  one (#2303), and the hand text names no commit for either server.
 
   Part one runs fillCreditsCommits, cut out of server.js by its markers, on
   the real credits.md. Part two starts a copy of server.js in a temp folder
@@ -35,24 +36,36 @@ function yes(what, cond) {
 
 const A = 'a'.repeat(40), B = 'b'.repeat(40);
 const recorded = (/built from one commit,\s+\[`[0-9a-f]{7,40}`\]\(https:\/\/github\.com\/EvilPatrick06\/skymp\/tree\/([0-9a-f]{40})\)/.exec(CREDITS) || [])[1];
-const HAND = /still runs\s+\[`0f54ad45`\]/;
+const HAND = /Each server records which commit it runs, and this page names it here once\s+that record can be read\./;
 
 // ---- part one: the pure fill -------------------------------------------------
 const cut = /\/\/ ==== thornswood credits fill ====([\s\S]*?)\/\/ ==== end thornswood credits fill ====/.exec(SRC);
 yes('server.js has the credits fill between its markers', !!cut);
 const fill = cut ? new Function(cut[1] + '\nreturn fillCreditsCommits;')() : function (m) { return m; };
-yes('credits.md still has the hand sentence the fill replaces', HAND.test(CREDITS) && /the earlier engine/.test(CREDITS));
+yes('credits.md still has the hand sentence the fill replaces', HAND.test(CREDITS));
+const para = (/then to the main server\.[\s\S]*?(?=\n\s*\n)/.exec(CREDITS) || [''])[0];
+yes('and the hand text names no commit for either server (#2303)', para.length > 0 && !/[0-9a-f]{7,40}/.test(para));
 yes('credits.md names the recorded commit the fill compares with', /^[0-9a-f]{40}$/.test(recorded || ''));
 
 yes('no file: the page is the hand text, unchanged', fill(CREDITS, null, {}) === CREDITS);
-yes('a file with only live: unchanged', fill(CREDITS, { live: { commit: A } }, {}) === CREDITS);
-yes('a commit that is not 40 hex: unchanged', fill(CREDITS, { live: { commit: 'zz' + A.slice(2) }, dev: { commit: A } }, {}) === CREDITS);
+let one = fill(CREDITS, { live: { commit: A } }, {});
+yes('a file with only live: the page names the main server (#2303)', one.indexOf('The main server runs [`aaaaaaaa`](https://github.com/EvilPatrick06/skymp/tree/' + A + ').') >= 0);
+yes('  and the hand sentence is gone, with nothing said about the test server', !HAND.test(one) && one.indexOf('test server runs') < 0);
+one = fill(CREDITS, { live: { commit: recorded } }, {});
+yes('only live, on the recorded commit: it says the main server runs it', one.indexOf('The main server runs it, [`' + recorded.slice(0, 8) + '`]') >= 0);
+one = fill(CREDITS, { dev: { commit: B } }, {});
+yes('a file with only dev: the page names the test server', one.indexOf('The test server runs [`bbbbbbbb`]') >= 0 && one.indexOf('main server runs') < 0 && !HAND.test(one));
+yes('one server whose commit is not 40 hex: unchanged', fill(CREDITS, { live: { commit: 'abc' } }, {}) === CREDITS);
+one = fill(CREDITS, { live: { commit: 'zz' + A.slice(2) }, dev: { commit: A } }, {});
+yes('a live commit that is not 40 hex beside a good dev one: only dev is said',
+  one.indexOf('The test server runs [`aaaaaaaa`]') >= 0 && one.indexOf('main server runs') < 0 && one.indexOf('zz') < 0);
 yes('garbage shapes do not throw and change nothing',
   fill(CREDITS, 'nope', 7) === CREDITS && fill(CREDITS, { live: 3, dev: [] }, null) === CREDITS);
 
 let out = fill(CREDITS, { live: { commit: A }, dev: { commit: A } }, {});
 yes('both on a new commit: the page names it', out.indexOf('Both servers run [`aaaaaaaa`](https://github.com/EvilPatrick06/skymp/tree/' + A + ')') >= 0);
-yes('both on a new commit: the stale hand sentence is gone', !HAND.test(out) && out.indexOf('the earlier engine') < 0);
+yes('both on a new commit: the hand sentence is gone', !HAND.test(out));
+yes('  and the paragraph after it is untouched', out.indexOf('The six client files are built from the commit named by the feed') >= 0);
 yes('both on a new commit: it still says the record is not deployed', out.indexOf('The recorded build has not been deployed yet.') >= 0);
 
 out = fill(CREDITS, { live: { commit: recorded }, dev: { commit: recorded } }, {});
@@ -71,7 +84,10 @@ yes('the feeds: the server sentence is left alone', HAND.test(out));
 out = fill(CREDITS, null, { public: 'not a commit' });
 yes('a feed commit that is not hex: the row keeps its hand text', out === CREDITS);
 out = fill(CREDITS, { live: { commit: '<img src=x onerror=alert(1)>' }, dev: { commit: A } }, { public: '"><script>' });
-yes('markup in either file never reaches the page', out === CREDITS);
+yes('markup in either file never reaches the page: only the good dev commit is said',
+  out.indexOf('<img') < 0 && out.indexOf('<script>') < 0 && out.indexOf('The test server runs [`aaaaaaaa`]') >= 0 && out.indexOf('main server runs') < 0);
+out = fill(CREDITS, { live: { commit: '<img src=x onerror=alert(1)>' } }, { public: '"><script>' });
+yes('and with nothing good in either, the page is the hand text', out === CREDITS);
 
 // ---- part two: the server, end to end ----------------------------------------
 function freePort() {
@@ -112,12 +128,18 @@ function wait(ms) { return new Promise(function (ok) { setTimeout(ok, ms); }); }
     yes('the copy starts', log.indexOf('listening on ') >= 0);
 
     let r = await get(port, '/credits');
-    yes('no deployed-build.json: /credits is 200 with the hand text', r.status === 200 && r.body.indexOf('0f54ad45') >= 0 && r.body.indexOf('the earlier engine') >= 0);
+    yes('no deployed-build.json: /credits is 200 with the hand text', r.status === 200 && r.body.indexOf('this page names it here once') >= 0);
+
+    // What the box held on 11 Oct (#2303): live alone.
+    fs.writeFileSync(path.join(dir, 'data', 'deployed-build.json'), JSON.stringify({ live: { commit: B } }));
+    r = await get(port, '/credits');
+    yes('a record with only live: /credits names the main server\'s commit',
+      r.status === 200 && r.body.indexOf('The main server runs') >= 0 && r.body.indexOf('tree/' + B) >= 0 && r.body.indexOf('this page names it here once') < 0);
 
     fs.writeFileSync(path.join(dir, 'data', 'deployed-build.json'), JSON.stringify({ live: { commit: A }, dev: { commit: A } }));
     r = await get(port, '/credits');
     yes('after the file changes, with no hand edit and no restart, /credits names the new commit',
-      r.status === 200 && r.body.indexOf('aaaaaaaa') >= 0 && r.body.indexOf('tree/' + A) >= 0 && r.body.indexOf('the earlier engine') < 0);
+      r.status === 200 && r.body.indexOf('aaaaaaaa') >= 0 && r.body.indexOf('tree/' + A) >= 0 && r.body.indexOf('Both servers run') >= 0);
 
     fs.mkdirSync(path.join(dir, 'feed'));
     fs.writeFileSync(path.join(dir, 'feed', 'version.json'), JSON.stringify({ clientRuntime: { forkCommit: B } }));
@@ -127,7 +149,7 @@ function wait(ms) { return new Promise(function (ok) { setTimeout(ok, ms); }); }
     fs.writeFileSync(path.join(dir, 'data', 'deployed-build.json'), '{ not json');
     fs.rmSync(path.join(dir, 'feed'), { recursive: true, force: true });
     r = await get(port, '/credits');
-    yes('an unreadable file: /credits falls back to the hand text', r.status === 200 && r.body.indexOf('0f54ad45') >= 0 && r.body.indexOf('aaaaaaaa') < 0);
+    yes('an unreadable file: /credits falls back to the hand text', r.status === 200 && r.body.indexOf('this page names it here once') >= 0 && r.body.indexOf('aaaaaaaa') < 0);
     yes('credits.md on disk was never edited', fs.readFileSync(path.join(dir, 'data', 'site', 'credits.md'), 'utf8') === CREDITS);
   } finally {
     if (child) { try { child.kill(); } catch (e) {} await wait(300); }
