@@ -56129,14 +56129,34 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   var fires = g.__thornswoodHurtFires;
   var FIRE_GAP_MS = 6000;  // the needs block lets go of a silent client after three of its beats
 
+  /*
+    A FIRE NOBODY PUT OUT STILL BURNT (#2260). The burn used to be written
+    only when the client said /burn 0, so logging out while alight, or a
+    client that went quiet, sent no 0 and left no burn. Now a fire silent past
+    FIRE_GAP_MS is settled at its last report: by the next /burn, and by the
+    hurt tick for somebody who never came back to send one.
+  */
   function burning(actorId, on, now) {
     now = now || Date.now();
     var f = has(fires, actorId) ? fires[actorId] : null;
     if (on) {
-      if (!f || (now - f.last) > FIRE_GAP_MS) { fires[actorId] = { from: now, last: now }; }
+      if (f && (now - f.last) > FIRE_GAP_MS) { settleFire(actorId, f.last); f = null; }
+      if (!f) { fires[actorId] = { from: now, last: now }; }
       else { f.last = now; }
       return '';
     }
+    if (!f) { return ''; }
+    return settleFire(actorId, (now - f.last) > FIRE_GAP_MS ? f.last : now);
+  }
+  /* Fires gone quiet, settled at their last report. Run from the hurt tick. */
+  function settleQuietFires(now) {
+    now = now || Date.now();
+    for (var k in fires) {
+      if (has(fires, k) && (now - fires[k].last) > FIRE_GAP_MS) { settleFire(Number(k), fires[k].last); }
+    }
+  }
+  function settleFire(actorId, now) {
+    var f = has(fires, actorId) ? fires[actorId] : null;
     if (!f) { return ''; }
     delete fires[actorId];
     var seconds = Math.max(1, Math.round((now - f.from) / 1000));
@@ -57057,7 +57077,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   });
 
   if (g.__thornswoodHurtTimer) { try { clearInterval(g.__thornswoodHurtTimer); } catch (e) { } }
-  g.__thornswoodHurtTimer = setInterval(guard('hurtTick', tick), TICK_MS);
+  g.__thornswoodHurtTimer = setInterval(guard('hurtTick', function () { settleQuietFires(); tick(); }), TICK_MS);
   if (g.__thornswoodBleedTimer) { try { clearInterval(g.__thornswoodBleedTimer); } catch (e) { } }
   g.__thornswoodBleedTimer = setInterval(guard('bleedTick', bleedTick), BLEED_MS);
 
@@ -57067,7 +57087,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     CHILL_AFTER_MIN: CHILL_AFTER_MIN,
     read: read, write: write, step: step, tick: tick, bleedTick: bleedTick, bleedRate: bleedRate,
     stageOf: stageOf, lines: lines, chanceFor: chanceFor,
-    forNeeds: forNeeds, burntWear: burntWear, wound: wound, burning: burning,
+    forNeeds: forNeeds, burntWear: burntWear, wound: wound, burning: burning, settleQuietFires: settleQuietFires,
     healed: healed, cast: cast, hit: hit, swallowed: swallowed, rite: rite,
     exposed: exposed, craftRefusal: craftRefusal, died: died, scarOf: scarOf, staff: staff,
     BITERS: BITERS, TREAT: TREAT, TREAT_REACH: TREAT_REACH,
