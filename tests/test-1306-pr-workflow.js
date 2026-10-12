@@ -1,5 +1,6 @@
 // #1306: pull requests build on GitHub's hosted runner, in their own workflow
-// file, and never on the VPS; build.yml keeps main and manual runs on the VPS.
+// file. The VPS is the fallback for them too (Patrick, 12 Oct 2026), for a
+// branch of this repository only, never a fork.
 // build-pr.yml is generated from build.yml and must match it.
 'use strict';
 const fs = require('fs');
@@ -28,16 +29,25 @@ yes('a manual run can pick the box', /runner:\n[\s\S]*?options: \[hosted, vps\]/
 yes('build-pr.yml exists', !!pr);
 yes('build-pr.yml runs on a pull request and nothing else', JSON.stringify(triggers(pr)) === '["pull_request"]');
 yes('on GitHub\'s hosted windows-latest', /\n    runs-on: windows-latest\n/.test(pr));
-yes('and the VPS label is nowhere in its jobs', !!pr && !/thornswood-vps|self-hosted/.test(code(pr)));
+const SAME = "github.event.pull_request.head.repo.full_name == github.repository";
+const prVps = /\n  launcher-vps:\n[\s\S]*?\n    runs-on: \[self-hosted, Windows, thornswood-vps\]\n/.exec(pr);
+yes('a VPS fallback job builds a pull request the hosted job did not', !!prVps &&
+    /\n  launcher-vps:\n    name: Launcher builds \(VPS fallback\)\n    needs: launcher\n    if: \$\{\{ always\(\) && needs\.launcher\.result != 'success' && needs\.launcher\.result != 'cancelled' && github\.event\.pull_request\.head\.repo\.full_name == github\.repository \}\}\n/.test(pr));
+yes('  only for a branch of this repository, never a fork', !!prVps && code(pr).split(SAME).length - 1 === 1);
+yes('  and that job is the only one on the VPS', code(pr).split('runs-on: [self-hosted').length - 1 === 1);
+yes('  so the hosted job keeps its own check, and its red stays visible', /\n  launcher:\n    name: Launcher builds\n/.test(pr));
 yes('it takes no secrets', !!pr && !/\$\{\{\s*secrets\./.test(pr));
 yes('its check keeps the name Launcher builds', /\n    name: Launcher builds\n/.test(pr));
-// No other workflow runs a pull request on the VPS either.
+// No other workflow runs a pull request on the VPS, and none without the
+// same-repository condition.
 const others = fs.readdirSync(WF).filter(f => /\.ya?ml$/.test(f)).filter(f => {
   const t = read(path.join(WF, f));
   const tr = triggers(t);
-  return (tr.indexOf('pull_request') >= 0 || tr.indexOf('pull_request_target') >= 0) && /thornswood-vps/.test(code(t));
+  if (tr.indexOf('pull_request_target') >= 0) { return true; }
+  if (tr.indexOf('pull_request') < 0 || !/thornswood-vps/.test(code(t))) { return false; }
+  return f !== 'build-pr.yml' || code(t).indexOf(SAME) < 0;
 });
-yes('no workflow runs a pull request on the VPS (' + (others.join(', ') || 'none') + ')', others.length === 0);
+yes('no other workflow runs a pull request on the VPS (' + (others.join(', ') || 'none') + ')', others.length === 0);
 let gen = null;
 try { gen = require(path.join(REPO, 'scripts', 'dev', 'Build-PrWorkflow.js')); } catch (e) { gen = null; }
 yes('the generator is there', !!gen);
