@@ -19,11 +19,19 @@
   stopped on "setup-stub.exe is missing" after the release was out, because
   a main Ship never runs Build-Launcher, which is what compiles the stub.
 
-  This lifts the two functions that do it, Get-SourceRepo and
-  Get-ReleaseLauncher, out of the shipped Ship.ps1 by the parser, the way the
-  other ship tests lift their blocks, and drives them with a fake gh on PATH so
-  nothing here reaches GitHub. If a function is renamed or moved, this says so
-  rather than quietly testing nothing.
+  Since issue #2432 the draft is found in GitHub's REST list of releases and
+  each file is downloaded by its asset id, because gh release download finds
+  a draft by its tag through GraphQL, and on 12 October GraphQL's secondary
+  limit made a main Ship say there was no launcher while the draft held all
+  three files. The fake gh answers those two REST calls, and the exe it hands
+  over is every byte value with CR, LF and Ctrl-Z among them, so a download
+  that went through a text pipe would not come out the same.
+
+  This lifts the functions that do it, Get-SourceRepo, Get-ReleaseLauncher,
+  Get-ReleaseStub and the REST helpers they call, out of the shipped Ship.ps1
+  by the parser, the way the other ship tests lift their blocks, and drives
+  them with a fake gh on PATH so nothing here reaches GitHub. If a function is
+  renamed or moved, this says so rather than quietly testing nothing.
 
   Cross platform on purpose, so it runs in the cloud and on the VPS: the fake gh
   is a .ps1 on Windows and a shell script elsewhere calling the same
@@ -61,13 +69,16 @@ Yes 'Ship.ps1 parses' (@($e).Count -eq 0)
 $FnAst = [System.Management.Automation.Language.FunctionDefinitionAst]
 $fns = @{}
 foreach ($f in $ast.FindAll({ param($n) $n -is $FnAst }, $true)) { $fns[$f.Name] = $f.Extent.Text }
-Yes 'Ship.ps1 has Get-SourceRepo' ($fns.ContainsKey('Get-SourceRepo'))
-Yes 'Ship.ps1 has Get-ReleaseLauncher' ($fns.ContainsKey('Get-ReleaseLauncher'))
-Yes 'Ship.ps1 has Get-ReleaseStub' ($fns.ContainsKey('Get-ReleaseStub'))
-if (-not ($fns.ContainsKey('Get-SourceRepo') -and $fns.ContainsKey('Get-ReleaseLauncher') -and $fns.ContainsKey('Get-ReleaseStub'))) { Done }
-Invoke-Expression $fns['Get-SourceRepo']
-Invoke-Expression $fns['Get-ReleaseLauncher']
-Invoke-Expression $fns['Get-ReleaseStub']
+$lift = 'Get-SourceRepo', 'Get-ReleaseLauncher', 'Get-ReleaseStub', 'ConvertTo-GhArgument', 'Invoke-GhToStream', 'Find-ReleaseByTag', 'Save-ReleaseAssets'
+foreach ($n in $lift) { Yes "Ship.ps1 has $n" ($fns.ContainsKey($n)) }
+if (@($lift | Where-Object { -not $fns.ContainsKey($_) }).Count) { Done }
+foreach ($n in $lift) { Invoke-Expression $fns[$n] }
+# Issue #2432: nothing in the release download asks GraphQL any more.
+$dl = ($lift | Where-Object { $_ -ne 'Get-SourceRepo' } | ForEach-Object { $fns[$_] }) -join "`n"
+Yes 'the launcher and the setup program are no longer fetched with gh release download (GraphQL)' ($dl -notmatch 'release download' -and $dl -notmatch '(?i)graphql')
+Yes '  but from the REST list of releases, drafts included' ($dl.Contains('repos/$repo/releases?per_page=100&page=$page'))
+Yes '  and by asset id, as application/octet-stream' ($dl.Contains("'Accept: application/octet-stream', `"repos/`$repo/releases/assets/`$(`$a.id)`""))
+Yes '  straight from gh''s standard output into the file, not through a PowerShell redirect' ($dl.Contains('$p.StandardOutput.BaseStream.CopyTo($to)') -and $dl.Contains('[IO.File]::Create($path)'))
 
 $onWindows = ($PSVersionTable.PSVersion.Major -lt 6) -or $IsWindows
 
@@ -108,38 +119,76 @@ try {
     }
 
     # ---- a fake gh on PATH -------------------------------------------------------
-    # On "release download" it writes each asset its --pattern names into --dir,
-    # with a SHA256SUMS listing Thornswood.exe and setup-stub.exe, the way the
-    # real gh would from the release CI drafted. TS_FAKE_GH_MODE bends it: good
-    # (default), mismatch (wrong hashes), noline (no line for either), fail
-    # (exits non-zero and writes nothing, as a missing release does), nostub (a
-    # release drafted before #932: the launcher and its line, no setup program).
+    # It answers the two REST calls Ship makes (#2432), the way GitHub does for
+    # the drafts release.yml makes:
+    #   api ... repos/<repo>/releases?per_page=100&page=<n>   the list, as JSON
+    #   api -H Accept: application/octet-stream repos/<repo>/releases/assets/<id>
+    #                                                          the file's bytes
+    # Every call is written to TS_FAKE_GH_LOG. TS_FAKE_GH_MODE bends it: good
+    # (default), mismatch (wrong hashes), noline (no line for either), nostub
+    # (a release drafted before #932: the launcher and its line, no setup
+    # program), norelease (the repository has no release for the tag), fail
+    # (gh stops on GitHub's rate limit, the 12 October case), twodrafts (an
+    # older draft for the same tag with wrong hashes, listed first), paged (the
+    # draft is on the second page of the list), short (the file comes down
+    # shorter than the release lists), dlfail (the list answers, the download
+    # does not).
     $helper = Join-Path $bin 'fake-gh.ps1'
     [IO.File]::WriteAllText($helper, @'
 $mode = $env:TS_FAKE_GH_MODE; if (-not $mode) { $mode = 'good' }
-if ($mode -eq 'fail') { exit 3 }
-$dir = ''
-$want = @()
-for ($i = 0; $i -lt $args.Count; $i++) {
-    if ($args[$i] -eq '--dir') { $dir = $args[$i + 1] }
-    if ($args[$i] -eq '--pattern') { $want += [string]$args[$i + 1] }
+if ($env:TS_FAKE_GH_LOG) { [IO.File]::AppendAllText($env:TS_FAKE_GH_LOG, ((@('gh') + @($args | ForEach-Object { [string]$_ })) -join ' ') + "`n") }
+function Out-Bytes([byte[]]$b) { $o = [Console]::OpenStandardOutput(); $o.Write($b, 0, $b.Length); $o.Flush() }
+if ($mode -eq 'fail') { [Console]::Error.WriteLine('HTTP 403: You have exceeded a secondary rate limit.'); exit 1 }
+$utf8 = New-Object Text.UTF8Encoding($false)
+$exe = New-Object byte[] 518
+for ($i = 0; $i -lt 512; $i++) { $exe[$i] = [byte]($i % 256) }
+$tail = 13, 10, 10, 13, 26, 0
+for ($j = 0; $j -lt $tail.Count; $j++) { $exe[512 + $j] = [byte]$tail[$j] }
+$stub = $utf8.GetBytes('the setup program CI built for this tag')
+function Hash([byte[]]$b) { $s = [Security.Cryptography.SHA256]::Create(); try { return (($s.ComputeHash($b) | ForEach-Object { $_.ToString('x2') }) -join '') } finally { $s.Dispose() } }
+function Sums([bool]$bad, [bool]$withStub) {
+    $l = @()
+    foreach ($p in @(@('Thornswood.exe', $exe), @('setup-stub.exe', $stub))) {
+        if ($p[0] -eq 'setup-stub.exe' -and -not $withStub) { continue }
+        $h = if ($bad) { '0' * 64 } else { Hash $p[1] }
+        $n = if ($mode -eq 'noline') { 'something-else.exe' } else { $p[0] }
+        $l += "$h  $n"
+    }
+    return $utf8.GetBytes(($l -join "`n") + "`n")
 }
-if (-not $dir) { exit 0 }
-New-Item -ItemType Directory -Force -Path $dir | Out-Null
-$assets = [ordered]@{ 'Thornswood.exe' = 'the launcher CI built for this tag'; 'setup-stub.exe' = 'the setup program CI built for this tag' }
-if ($mode -eq 'nostub') { $assets.Remove('setup-stub.exe') }
-$lines = @()
-foreach ($n in $assets.Keys) {
-    $tmp = [IO.Path]::GetTempFileName()
-    [IO.File]::WriteAllText($tmp, $assets[$n])
-    $h = (Get-FileHash -LiteralPath $tmp -Algorithm SHA256).Hash.ToLower()
-    if ($want -contains $n) { Move-Item -LiteralPath $tmp -Destination (Join-Path $dir $n) -Force } else { Remove-Item -LiteralPath $tmp -Force }
-    if ($mode -eq 'mismatch') { $h = ('0' * 64) }
-    $name = if ($mode -eq 'noline') { 'something-else.exe' } else { $n }
-    $lines += ("$h  $name")
+$withStub = $mode -ne 'nostub'
+$files = @{ 11 = $exe; 12 = $stub; 13 = (Sums ($mode -eq 'mismatch') $withStub); 51 = $exe; 52 = $stub; 53 = (Sums $true $true) }
+function Asset([int]$id, [string]$name, [int]$extra = 0) { return [ordered]@{ id = $id; name = $name; size = $files[$id].Length + $extra } }
+function Release([long]$id, [string]$tag, $assets) { return [ordered]@{ id = $id; tag_name = $tag; draft = $true; assets = @($assets) } }
+$extra = if ($mode -eq 'short') { 7 } else { 0 }
+$mine = @((Asset 11 'Thornswood.exe' $extra), (Asset 13 'SHA256SUMS'))
+if ($withStub) { $mine = @((Asset 12 'setup-stub.exe' $extra)) + $mine }
+$other = Release 300 'v1.2.2' @()
+$list = switch ($mode) {
+    'norelease' { @($other) }
+    'twodrafts' { @((Release 400 'v1.2.3' @((Asset 51 'Thornswood.exe'), (Asset 52 'setup-stub.exe'), (Asset 53 'SHA256SUMS'))), $other, (Release 401 'v1.2.3' $mine)) }
+    default { @((Release 401 'v1.2.3' $mine), $other) }
 }
-if ($want -contains 'SHA256SUMS') { Set-Content -LiteralPath (Join-Path $dir 'SHA256SUMS') -Value $lines -Encoding ascii }
-exit 0
+$target = [string]$args[$args.Count - 1]
+$m = [regex]::Match($target, '^repos/[^/]+/[^/]+/releases\?per_page=100&page=(\d+)$')
+if ($m.Success) {
+    $page = [int]$m.Groups[1].Value
+    if ($mode -eq 'paged') {
+        if ($page -eq 1) { $list = @(1..100 | ForEach-Object { Release (1000 + $_) ('v0.0.' + $_) @() }) } elseif ($page -ne 2) { $list = @() }
+    } elseif ($page -ne 1) { $list = @() }
+    Out-Bytes ($utf8.GetBytes((ConvertTo-Json -InputObject @($list) -Depth 5 -Compress)))
+    exit 0
+}
+$m = [regex]::Match($target, '^repos/[^/]+/[^/]+/releases/assets/(\d+)$')
+if ($m.Success -and ($args -contains 'Accept: application/octet-stream')) {
+    if ($mode -eq 'dlfail') { [Console]::Error.WriteLine('HTTP 502: Bad Gateway'); exit 1 }
+    $id = [int]$m.Groups[1].Value
+    if (-not $files.ContainsKey($id)) { [Console]::Error.WriteLine('HTTP 404: Not Found'); exit 1 }
+    Out-Bytes $files[$id]
+    exit 0
+}
+[Console]::Error.WriteLine("the fake gh does not know: $($args -join ' ')")
+exit 9
 '@)
     if ($onWindows) {
         # A .ps1, not a .cmd (issue #1092): PowerShell finds it on PATH ahead of
@@ -153,6 +202,15 @@ exit 0
         & chmod +x $sh
     }
     $env:PATH = $bin + [IO.Path]::PathSeparator + $oldPath
+    $ghLog = Join-Path $work 'gh-calls.txt'
+    $env:TS_FAKE_GH_LOG = $ghLog
+    function Calls { if (Test-Path -LiteralPath $ghLog) { return @(Get-Content -LiteralPath $ghLog | Where-Object { $_ }) } return @() }
+    # The exe the fake hands over: every byte value, then CR LF LF CR, Ctrl-Z
+    # and a zero, which a text pipe would change or cut short.
+    $exeBytes = New-Object byte[] 518
+    for ($i = 0; $i -lt 512; $i++) { $exeBytes[$i] = [byte]($i % 256) }
+    $tail = 13, 10, 10, 13, 26, 0
+    for ($j = 0; $j -lt $tail.Count; $j++) { $exeBytes[512 + $j] = [byte]$tail[$j] }
 
     # ---- Get-ReleaseLauncher -----------------------------------------------------
     $into = Join-Path $work 'download'
@@ -162,6 +220,14 @@ exit 0
     $why = Get-ReleaseLauncher 'EvilPatrick06/Thornswood' '1.2.3' $into
     Yes "a matching download verifies and returns nothing: '$why'" ($why -eq '')
     Yes '  and the exe is sitting in the folder' (Test-Path -LiteralPath (Join-Path $into 'Thornswood.exe'))
+    $got = if (Test-Path -LiteralPath (Join-Path $into 'Thornswood.exe')) { [IO.File]::ReadAllBytes((Join-Path $into 'Thornswood.exe')) } else { @() }
+    Yes ("  byte for byte, CR, LF, Ctrl-Z and zero bytes included ({0} of {1} bytes)" -f $got.Length, $exeBytes.Length) (
+        $got.Length -eq $exeBytes.Length -and [Convert]::ToBase64String($got) -eq [Convert]::ToBase64String($exeBytes))
+    $calls = Calls
+    Yes ("  found through the REST list of releases and downloaded by asset id, nothing else asked of gh: " + ($calls -join '; ')) (
+        $calls.Count -eq 3 -and $calls[0] -match '^gh api .*repos/EvilPatrick06/Thornswood/releases\?per_page=100&page=1$' -and
+        @($calls | Where-Object { $_ -match '^gh api -H Accept: application/octet-stream repos/EvilPatrick06/Thornswood/releases/assets/(11|13)$' }).Count -eq 2)
+    Yes '  and nothing in this folder is left beside them' (@(Get-ChildItem -LiteralPath $into -File | Where-Object { $_.Name -notin 'Thornswood.exe', 'SHA256SUMS' }).Count -eq 0)
 
     # 2. A checksum that does not match is refused, and says so.
     $env:TS_FAKE_GH_MODE = 'mismatch'
@@ -176,12 +242,47 @@ exit 0
     Yes 'a SHA256SUMS with no Thornswood.exe line is refused' ($why -match 'no line for Thornswood\.exe')
 
     # 4. No release yet is the handoff: push the tag, wait for CI, Ship again.
-    $env:TS_FAKE_GH_MODE = 'fail'
+    $env:TS_FAKE_GH_MODE = 'norelease'
     $why = Get-ReleaseLauncher 'EvilPatrick06/Thornswood' '1.2.3' $into
     Yes 'no release yet stops the ship' ($why -ne '')
     Yes "  and says this machine does not compile it: '$why'" ($why -match 'this machine does not compile it')
     Yes '  and hands over the exact tag commands' ($why -match 'git tag v1\.2\.3' -and $why -match 'git push origin v1\.2\.3')
     Yes '  in the house words' ($why -notmatch 'player' -and $why.IndexOf([char]0x2014) -lt 0)
+    Yes '  and nothing is left in the folder to be taken for it' (-not (Test-Path -LiteralPath (Join-Path $into 'Thornswood.exe')))
+
+    # 4a. GitHub refusing gh (the 12 October rate limit) is not "no launcher":
+    # it says what gh said and that the release is not the problem (#2432).
+    $env:TS_FAKE_GH_MODE = 'fail'
+    $why = Get-ReleaseLauncher 'EvilPatrick06/Thornswood' '1.2.3' $into
+    Yes "gh failing stops the ship with what gh said: '$why'" ($why -match 'secondary rate limit' -and $why -match 'Nothing was published')
+    Yes '  and does not say there is no launcher for the tag' ($why -notmatch 'There is no verified launcher' -and $why -notmatch 'git push origin')
+    Yes '  in the house words' ($why -notmatch 'player' -and $why.IndexOf([char]0x2014) -lt 0)
+
+    # 4b. Two drafts for one tag (v1.1.96 has two): the newest is taken, even
+    # listed after the older one, whose hashes would not match.
+    Remove-Item -LiteralPath $ghLog -Force -ErrorAction SilentlyContinue
+    $env:TS_FAKE_GH_MODE = 'twodrafts'
+    $why = Get-ReleaseLauncher 'EvilPatrick06/Thornswood' '1.2.3' $into
+    Yes "two drafts for the tag: the newest is taken and verifies: '$why'" ($why -eq '')
+    Yes '  its files, not the older draft''s' (@(Calls | Where-Object { $_ -match 'releases/assets/1[13]$' }).Count -ge 2 -and @(Calls | Where-Object { $_ -match 'releases/assets/5[13]$' }).Count -eq 0)
+
+    # 4c. A draft on the second page of the list is still found.
+    Remove-Item -LiteralPath $ghLog -Force -ErrorAction SilentlyContinue
+    $env:TS_FAKE_GH_MODE = 'paged'
+    $why = Get-ReleaseLauncher 'EvilPatrick06/Thornswood' '1.2.3' $into
+    Yes "a draft on the second page of 100 is found: '$why'" ($why -eq '' -and @(Calls | Where-Object { $_ -match 'page=2$' }).Count -eq 1 -and @(Calls | Where-Object { $_ -match 'page=3$' }).Count -eq 0)
+
+    # 4d. A file that comes down shorter than the release lists is refused and
+    # not left in the folder.
+    $env:TS_FAKE_GH_MODE = 'short'
+    $why = Get-ReleaseLauncher 'EvilPatrick06/Thornswood' '1.2.3' $into
+    Yes "a download shorter than the release lists is refused: '$why'" ($why -match 'came down as 518 bytes, and the release lists 525' -and $why -match 'Nothing was published')
+    Yes '  and the short file is not left there' (-not (Test-Path -LiteralPath (Join-Path $into 'Thornswood.exe')))
+
+    # 4e. The list answers and the download does not: said as that.
+    $env:TS_FAKE_GH_MODE = 'dlfail'
+    $why = Get-ReleaseLauncher 'EvilPatrick06/Thornswood' '1.2.3' $into
+    Yes "a download gh could not make is refused with what gh said: '$why'" ($why -match 'could not download Thornswood\.exe' -and $why -match 'HTTP 502' -and $why -notmatch 'There is no verified launcher')
 
     # ---- Get-ReleaseStub (issue #932) ---------------------------------------------
     $stubInto = Join-Path $work 'stub'
@@ -210,13 +311,19 @@ exit 0
     Yes '  and hands over the exact command that builds the tag again' ($why -match [regex]::Escape('gh workflow run release.yml --repo EvilPatrick06/Thornswood -f tag=v1.2.3'))
     Yes '  in the house words' ($why -notmatch 'player' -and $why.IndexOf([char]0x2014) -lt 0)
 
-    $env:TS_FAKE_GH_MODE = 'fail'
+    $env:TS_FAKE_GH_MODE = 'norelease'
     $why = Get-ReleaseStub 'EvilPatrick06/Thornswood' '1.2.3' $stubInto
     Yes 'no release at all stops it too' ($why -match 'no setup program')
+
+    # 9. GitHub refusing gh is said as that here too, not as a missing stub.
+    $env:TS_FAKE_GH_MODE = 'fail'
+    $why = Get-ReleaseStub 'EvilPatrick06/Thornswood' '1.2.3' $stubInto
+    Yes "gh failing stops it with what gh said, not as no setup program: '$why'" ($why -match 'secondary rate limit' -and $why -notmatch 'no setup program' -and $why -match 'Nothing was published')
 }
 finally {
     $env:PATH = $oldPath
     $env:TS_FAKE_GH_MODE = $oldMode
+    $env:TS_FAKE_GH_LOG = $null
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
 }
 
