@@ -32,6 +32,14 @@
   its own id, the launcher the feed keeps, its one pack, its baseline, and no
   commit, so no tag. The store's releases.txt then gets a line for it.
 
+  ONCE THE PACKS ARE GONE (#1050): when the feed's minLauncher is at or above
+  the first launcher that syncs to the record (Test-FeedPacksGone,
+  Release-Baseline.ps1), the feed carries no packs and the rollback is the
+  record alone: no pack goes on the feed, the plugin list is the target
+  record's own :golden: entries, and a record whose files cannot all be had
+  is refused with nothing sent. The list of releases it goes back to is the
+  store's releases.json beside the feed since then, not "releases" in it.
+
   Each file is taken first from the site's copy beside the release record
   (/feed[-dev]/assets/<sha256>, #1050), then from the packs already on the
   site, found by size and sha256, and checked again when it is read. A file
@@ -134,7 +142,8 @@ function Get-ReleaseWhen([string]$rid) {
 
 # ------------------------------------------------------------ the feed
 Head "The $Channel feed"
-try { [void](Receive-FeedStore $Channel $ReleaseDir -SiteDir $SiteDir) }
+# With the store's list of releases, kept beside the feed since #1050.
+try { [void](Receive-FeedStore $Channel $ReleaseDir @('version.json', 'published.json', $FeedReleasesFile) -SiteDir $SiteDir) }
 catch { Die ("Could not receive the $Channel feed from the VPS, so nothing was changed: " + $_.Exception.Message) }
 $VersionFile = Join-Path $ReleaseDir 'version.json'
 $StateFile = Join-Path $ReleaseDir 'published.json'
@@ -142,7 +151,14 @@ if (-not (Test-Path -LiteralPath $VersionFile)) { Die "The VPS has no version.js
 $doc = ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($VersionFile)) $VersionFile
 $cur = $null
 try { $cur = Get-FeedBaselinePointer $doc } catch { Die $_.Exception.Message }
-$releases = @(Get-FeedReleases $doc)
+try { $releases = @(Get-StoreReleases $ReleaseDir $doc) } catch { Die ("The store's list of releases could not be read, so nothing was changed: " + $_.Exception.Message) }
+# Once every launcher the feed lets in syncs to the record, the feed carries no
+# packs (Release-Baseline.ps1, Test-FeedPacksGone, #1050), and a rollback is
+# the record alone: its files beside it on the site are the whole of it, and
+# its plugin list is the record's own :golden: entries. No pack is built.
+$minNow = if ($doc.PSObject.Properties['minLauncher'] -and [string]$doc.minLauncher) { [string]$doc.minLauncher } else { Get-Prop $doc 'launcherVersion' }
+$packsGone = Test-FeedPacksGone $Channel $minNow
+if ($packsGone) { Say ("  the feed carries no packs (every launcher let in, from {0}, syncs to the record), so the rollback is a record and its files" -f $minNow) 'DarkGray' }
 
 # Where the release the feed is on sits in the list. A Ship from a branch
 # without the release list moves "baseline" and not the list, so the feed can
@@ -367,6 +383,9 @@ foreach ($ptr in @($tgt, $cur)) {
 $packs = @()
 if ($doc.PSObject.Properties['packs'] -and $doc.packs) { $packs = @($doc.packs | Where-Object { $null -ne $_ -and (Get-Prop $_ 'id') }) }
 $lastPack = Get-Prop $tgt 'lastPack'
+# With the packs gone the plugin list is the target record's own :golden:
+# entries, already in the new record, and a pack it ended on need not be listed.
+if ($packsGone) { $lastPack = '' }
 $order = @()
 if ($lastPack) {
     $lp = @($packs | Where-Object { (Get-Prop $_ 'id') -eq $lastPack })
@@ -419,16 +438,29 @@ if ($need.Count) {
     Die ('They came with the installer and no update ever carried them, so the site does not hold their old bytes. ' +
          'Nothing was sent. Point -FilesFrom at a folder holding them (a game folder from before the release being undone), and run it again.')
 }
-if ($listMoved -and $profileFound -notcontains 'plugins.txt') {
+if ($packsGone -and $listMoved -and -not $newMap.ContainsKey(':golden:plugins.txt')) {
+    Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
+    Die ("The plugin list differs between the feed now and $tgtId, and the record of $tgtId carries none. Nothing was sent.")
+}
+if (-not $packsGone -and $listMoved -and $profileFound -notcontains 'plugins.txt') {
     Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
     Die ("The plugin list differs between the feed now and $tgtId, and the pack $tgtId ended on carries none. Nothing was sent.")
 }
 
 # ------------------------------------------------------------ the pack
-Head 'Building the pack'
-# Never an id the feed already names, a pack or a release (#1057).
-if (-not $Id) { $Id = New-ReleaseId $doc -Dev:$Dev }
-if ((Get-FeedTakenIds $doc).Contains($Id)) {
+# With the packs gone the zip is still built from what was staged, because
+# Check-Secrets reads it (a -FilesFrom folder is this machine's), and it is
+# not sent: nothing names it.
+Head $(if ($packsGone) { 'Checking what was staged' } else { 'Building the pack' })
+# Never an id the feed or the store's list already names, a pack or a release (#1057).
+$idsTaken = [pscustomobject]@{
+    packs    = $(if ($doc.PSObject.Properties['packs'] -and $doc.packs) { @($doc.packs) } else { @() })
+    release  = $(if ($doc.PSObject.Properties['release']) { $doc.release } else { $null })
+    baseline = $(if ($doc.PSObject.Properties['baseline']) { $doc.baseline } else { $null })
+    releases = @($releases)
+}
+if (-not $Id) { $Id = New-ReleaseId $idsTaken -Dev:$Dev }
+if ((Get-FeedTakenIds $idsTaken).Contains($Id)) {
     Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
     Die "The feed already names a pack or release $Id. Leave -Id out and a free one is made."
 }
@@ -489,7 +521,12 @@ foreach ($h in @($wantFiles.Keys)) {
     }
     if ($got) { $sendFiles += (Join-Path $fileDir $h) } else { $cannot += $h }
 }
-if ($cannot.Count) {
+if ($cannot.Count -and $packsGone) {
+    # No pack goes out, so a record without its files would leave every
+    # launcher nothing to take: it would be no rollback at all.
+    Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
+    Die ("{0} file(s) of {1} are not on the site one by one, and the feed carries no packs, so no launcher could take this rollback. Nothing was sent. Point -FilesFrom at a folder holding them, and run it again." -f $cannot.Count, $tgtId)
+} elseif ($cannot.Count) {
     Say ("  {0} file(s) of {1} are not on the site one by one, so launchers take this as a pack, not file by file" -f $cannot.Count, $tgtId) 'Yellow'
 } else {
     $newMap[$RecordFilesKey] = '1'
@@ -498,7 +535,6 @@ if ($cannot.Count) {
 
 $manifestPath = Join-Path $WorkDir ("manifest-$Id.json")
 $manifestSha = Write-BaselineFile $newMap $manifestPath
-$pointer = New-FeedBaselinePointer $Id $manifestSha (Get-HostFeedAssetUrl $manifestSha -Dev:$Dev) $newMap.Count
 $packUrl = Get-HostFeedAssetUrl $zipSha -Dev:$Dev
 if (-not (Test-FeedPackUrl $packUrl (Get-FeedRepo $doc))) { Die "The pack would be named at $packUrl, which a launcher cannot download. Nothing was sent." }
 
@@ -517,19 +553,28 @@ if ($problems.Count) {
     foreach ($p in $problems) { Say "  $p" 'Red' }
     Die 'The note would go to the launcher, the site and Discord as it is. Rewrite it; nothing was sent.'
 }
+# The record's pointer carries the note, for the update card of a launcher that
+# syncs to it (Sync.cs RecordDue, #1050).
+$pointer = New-FeedBaselinePointer $Id $manifestSha (Get-HostFeedAssetUrl $manifestSha -Dev:$Dev) $newMap.Count $Notes
 
 if ($DryRun) {
     Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
     Head 'Dry run'
-    Say "  nothing was sent. The pack is $zipPath and the record $manifestPath." 'Yellow'
-    Say ("  it would add pack {0} to the {1} feed and name what it installs ({2:n0} entries)." -f $Id, $Channel, $newMap.Count) 'Yellow'
+    if ($packsGone) {
+        Say "  nothing was sent. The record is $manifestPath." 'Yellow'
+        Say ("  it would name it on the {0} feed ({1:n0} entries), with no pack." -f $Channel, $newMap.Count) 'Yellow'
+    } else {
+        Say "  nothing was sent. The pack is $zipPath and the record $manifestPath." 'Yellow'
+        Say ("  it would add pack {0} to the {1} feed and name what it installs ({2:n0} entries)." -f $Id, $Channel, $newMap.Count) 'Yellow'
+    }
     Write-Host ''
     exit 0
 }
 
 # ------------------------------------------------------------ send
 Head 'Sending'
-$sendArgs = @{ Dev = $Dev; Send = @(@($zipPath, $manifestPath) + @($sendFiles)); Quiet = $true; WorkDir = $WorkDir }
+$sendZip = @(if (-not $packsGone) { $zipPath })
+$sendArgs = @{ Dev = $Dev; Send = @($sendZip + @($manifestPath) + @($sendFiles)); Quiet = $true; WorkDir = $WorkDir }
 if ($SiteDir) { $sendArgs['SiteDir'] = $SiteDir }
 $global:LASTEXITCODE = 0
 $why = ''
@@ -537,18 +582,20 @@ try { & (Join-Path $Here '..\deploy\Remirror-Site-Feed.ps1') @sendArgs } catch {
 if (-not $why -and $LASTEXITCODE -ne 0) { $why = "Remirror-Site-Feed.ps1 -Send exited $LASTEXITCODE" }
 Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
 if ($why) { Die ("The pack or its record did not reach the site, so version.json has not been touched: $why") }
-Say '  the pack and its record are on the site' 'Green'
+Say $(if ($packsGone) { '  the record and its files are on the site' } else { '  the pack and its record are on the site' }) 'Green'
 
 $lastPackBefore = Get-FeedLastPackId $doc
-$packs = @($packs) + [pscustomobject][ordered]@{ id = $Id; url = $packUrl; sha256 = $zipSha; notes = $Notes }
+if ($packsGone) { $packs = @() }
+else { $packs = @($packs) + [pscustomobject][ordered]@{ id = $Id; url = $packUrl; sha256 = $zipSha; notes = $Notes } }
 if ($doc.PSObject.Properties['packs']) { $doc.packs = $packs } else { $doc | Add-Member -NotePropertyName 'packs' -NotePropertyValue $packs }
-[void](Add-FeedRelease $doc $pointer $Id $lastPackBefore $tgtId)
+# The store's list, beside the feed since #1050 (Release-Baseline.ps1).
+[void](Add-FeedRelease $doc $pointer $(if ($packsGone) { '' } else { $Id }) $lastPackBefore $tgtId -Dir $ReleaseDir)
 $doc.baseline = $pointer
 # A rollback is its own release (#1058). Left alone, "release" kept naming the
 # Ship this goes back from, Get-ReleaseDisagreements failed, and releases.txt
 # never gained a line. This id, the launcher the feed already offers, this one
-# pack, this baseline, and no commit, so no tag.
-$relRecord = New-ReleaseRecord $Id $Channel (Get-Prop $doc 'launcherVersion') @($Id) $Id '' '' 0
+# pack (none once the packs are gone), this baseline, and no commit, so no tag.
+$relRecord = New-ReleaseRecord $Id $Channel (Get-Prop $doc 'launcherVersion') $(if ($packsGone) { @() } else { @($Id) }) $Id '' '' 0
 if ($doc.PSObject.Properties['release']) { $doc.release = $relRecord }
 else { $doc | Add-Member -NotePropertyName 'release' -NotePropertyValue $relRecord }
 Say ("  release {0}, the launcher the feed keeps, no commit" -f $Id) 'DarkGray'
@@ -568,14 +615,15 @@ if ($doc.PSObject.Properties['news']) { $doc.news = $news } else { $doc | Add-Me
 # No byte order mark: the launcher's reader stops on one (Publish-Update.ps1).
 [IO.File]::WriteAllText($VersionFile, ($doc | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))
 Copy-Item -LiteralPath $manifestPath -Destination $StateFile -Force
-try { $sent = Send-FeedStore $Channel $ReleaseDir @('version.json', 'published.json') -SiteDir $SiteDir }
+try { $sent = Send-FeedStore $Channel $ReleaseDir @('version.json', 'published.json', $FeedReleasesFile) -SiteDir $SiteDir }
 catch {
     Die ("The feed was not sent, so no launcher sees the rollback: " + $_.Exception.Message +
-         ' The pack is on the site and nothing names it. Run this again; it starts from what is up there now.')
+         ' What it sent is on the site and nothing names it. Run this again; it starts from what is up there now.')
 }
 
 Head 'Done'
-Say ("The {0} feed is back to {1}: every launcher on it takes pack {2} at its next check." -f $Channel, $tgtId, $Id) 'Green'
+if ($packsGone) { Say ("The {0} feed is back to {1}: every launcher on it syncs to it at its next check." -f $Channel, $tgtId) 'Green' }
+else { Say ("The {0} feed is back to {1}: every launcher on it takes pack {2} at its next check." -f $Channel, $tgtId, $Id) 'Green' }
 Say ("To put it forward again: .\scripts\release\Rollback-Feed.ps1 -Channel {0} -To {1}" -f $Channel, [string]$cur.id) 'Gray'
 Say 'The server is not part of the feed. If the release undone changed the gamemode or the plugins the server loads, put the server back too.' 'Yellow'
 Write-Host ''

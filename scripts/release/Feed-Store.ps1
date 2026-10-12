@@ -22,6 +22,12 @@
       C:\Thornswood-Docs\feed\releases.txt      every release the feed has named,
                                                 by its id, with what else it is
                                                 known by (#444, not served)
+      C:\Thornswood-Docs\feed\releases.json     the record of each of the last
+                                                thirty releases, which a rollback
+                                                goes back to (#442); in the feed
+                                                as "releases" until #1050 (not
+                                                served). Received and sent by
+                                                name, like published.json
       C:\Thornswood-Docs\feed\history\          each file as it was before it
                                                 was replaced, <utc stamp>-<name>
                                                 (not served)
@@ -167,12 +173,14 @@ if ($op -eq 'forget') {
   }
   if ($moved.Count) { 'MOVED|' + ($moved -join '; '); return }
   # Names that still count as live assets. version.json is scanned as text
-  # (pack and record sha256 fields). published.json is often a baseline
+  # (pack and record sha256 fields), and so is releases.json, the list of
+  # each release's record a rollback reads, which left version.json for the
+  # store in #1050. published.json is often a baseline
   # record: only size:sha256 file entries name assets. A bare :gone: sha256
   # (#1261) is a launcher instruction, not a live asset, so it must not keep
   # the bytes on the site.
   $said = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
-  foreach ($f in @('feed\version.json', 'feed-dev\version.json')) {
+  foreach ($f in @('feed\version.json', 'feed-dev\version.json', 'feed\releases.json', 'feed-dev\releases.json')) {
     $p = Join-Path $root $f
     if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { continue }
     foreach ($m in [regex]::Matches([IO.File]::ReadAllText($p), '[0-9a-fA-F]{64}')) { [void]$said.Add($m.Value.ToLowerInvariant()) }
@@ -320,7 +328,10 @@ function Copy-FeedStoreFile([string]$Channel, [string]$from, [string]$dest, [swi
 # What is up there now: a hashtable of name to sha256, '' for a file that is
 # not there. Throws when the VPS did not answer, so a caller can never mistake
 # no answer for no file.
-function Get-FeedStoreThere([string]$Channel, [string[]]$Files = @('version.json', 'published.json'), [string]$SiteDir, [hashtable]$To) {
+# releases.json (#1050) is one of the store's own files, so every script that
+# edits the feed receives it and every send checks it did not move meanwhile,
+# the same as published.json.
+function Get-FeedStoreThere([string]$Channel, [string[]]$Files = @('version.json', 'published.json', 'releases.json'), [string]$SiteDir, [hashtable]$To) {
     $lines = @(Invoke-FeedStoreOp $Channel 'look' $Files @{} @{} $SiteDir $To)
     if ($lines -notcontains 'DONE') {
         throw ("The VPS did not say what the " + (Get-FeedStorePrefix $Channel) + " store holds: " + (($lines | Select-Object -Last 3) -join ' ').Trim() +
@@ -361,7 +372,7 @@ function Write-FeedStoreRead([string]$Dir, [string]$Channel, [hashtable]$there) 
 # checked against the sha256 the VPS gave for it, so a feed replaced halfway
 # through the fetch is caught rather than half read. Returns the hashtable of
 # what was read.
-function Receive-FeedStore([string]$Channel, [string]$Dir, [string[]]$Files = @('version.json', 'published.json'), [string]$SiteDir, [hashtable]$To) {
+function Receive-FeedStore([string]$Channel, [string]$Dir, [string[]]$Files = @('version.json', 'published.json', 'releases.json'), [string]$SiteDir, [hashtable]$To) {
     if (-not $Dir) { $Dir = Get-FeedStoreDir $Channel }
     New-Item -ItemType Directory -Force -Path $Dir | Out-Null
     $there = Get-FeedStoreThere $Channel $Files $SiteDir $To

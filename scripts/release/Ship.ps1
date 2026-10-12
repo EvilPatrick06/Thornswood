@@ -1507,9 +1507,22 @@ function Measure-Installer {
         $vf = Join-Path $ReleaseDir 'version.json'
         if (Test-Path $vf) {
             $doc = ConvertFrom-ThornswoodJson (Get-Content $vf -Raw) $vf
-            if ($doc.PSObject.Properties['packs'] -and $doc.packs) {
+            # Each release by its id: the packs on the feed, and since the packs
+            # came off it (#1050) the releases the store lists beside it and the
+            # one the feed is on. A release that carried a pack has the same id
+            # in both, so it counts once.
+            $ids = @()
+            if ($doc.PSObject.Properties['packs'] -and $doc.packs) { $ids += @($doc.packs) }
+            if ($doc.PSObject.Properties['releases'] -and $doc.releases) { $ids += @($doc.releases) }
+            if ($doc.PSObject.Properties['release'] -and $doc.release) { $ids += @($doc.release) }
+            $rf = Join-Path $ReleaseDir 'releases.json'
+            if (Test-Path -LiteralPath $rf) {
+                try { $ids += @(Read-ReleaseListFile $rf) }
+                catch { Say "  could not read $rf for the installer count: $($_.Exception.Message)" 'Yellow' }
+            }
+            if ($ids.Count) {
                 $seen = @{}
-                foreach ($p in @($doc.packs)) {
+                foreach ($p in @($ids | Where-Object { $null -ne $_ -and $_.PSObject.Properties['id'] })) {
                     # ids are yyyyMMdd-HHmm, yyyyMMdd-HHmmss since #1057, with
                     # -2 -3 on the split ones, and three parts of one release
                     # are still one release; two releases in one minute are two.

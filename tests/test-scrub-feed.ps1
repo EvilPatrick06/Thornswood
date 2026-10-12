@@ -510,7 +510,11 @@ Yes '  every other key as it was, the voice token every release deletes still li
 Yes '  and the files are not listed as gone either' (-not $nR3.ContainsKey(':gone:Data\Scripts\Source\IED.psc') -and -not $nR3.ContainsKey(':gone:Data\Platform\thornswood-pass.txt'))
 Yes '  while another author''s file we shipped is gone with its sha256 (#1261)' (
     $nR3.ContainsKey(':gone:Data\Interface\racesex_menu.swf') -and $nR3[':gone:Data\Interface\racesex_menu.swf'] -eq (Sha-Text $raceText))
-$rels = @($dd.releases)
+# The list is the store's releases.json beside the feed since #1050: the run
+# read it out of the feed, which still carried it, and wrote it back there.
+$rels = @(Get-StoreReleases (Join-Path $site 'feed-dev') $dd)
+Yes 'the release list goes back to the store beside the feed, and the feed carries none' (
+    (Test-Path -LiteralPath (Join-Path $site 'feed-dev\releases.json')) -and -not $dd.PSObject.Properties['releases'])
 $nR1 = Read-BaselineFile (Join-Path $da $rels[2].sha256)
 Yes 'the release list names the three records again, same ids and order, new sha256s' (
     ($rels | ForEach-Object { $_.id }) -join ',' -eq "$IR3,$IR2,$IR1" -and $rels[0].sha256 -eq $b.sha256 -and $rels[1].sha256 -ne $rec['R2'].Sha -and $rels[2].sha256 -ne $rec['R1'].Sha -and $rels[2].lastPack -eq $PC)
@@ -599,8 +603,12 @@ $ErrorActionPreference = $old
 if ($rc -ne 0) { Write-Host ((@($out) | Select-Object -Last 12) -join "`n") -ForegroundColor DarkGray }
 $db = Feed 'feed-dev'
 Yes 'going back a release reads the new records and finds every file it needs' ($rc -eq 0 -and $db.baseline.id -eq '20260929-150000-dev')
-$rbPack = Join-Path $da ([string]@($db.packs)[-1].sha256)
-Yes '  its pack carries none of Bethesda''s or one machine''s files' (@((Zip-Shape $rbPack).Keys | Where-Object { $_.StartsWith('game/') -and ((Test-ShipBethesda ($_.Substring(5).Replace('/', '\'))) -or (Test-ShipOneMachine ($_.Substring(5).Replace('/', '\')))) }).Count -eq 0)
+# The dev feed offers 1.1.102.10, past the first dev launcher that syncs to the
+# record (1.1.102.8), so the rollback is the record alone and the feed carries
+# no packs (Release-Baseline.ps1, Test-FeedPacksGone, #1050).
+$rbRec = Read-BaselineFile (Join-Path $da ([string]$db.baseline.sha256))
+Yes '  with every launcher let in syncing, it adds no pack and the feed carries none' (@($db.packs).Count -eq 0 -and [string]$rbRec[':record:files'] -eq '1')
+Yes '  and its record names none of Bethesda''s or one machine''s files' (@($rbRec.Keys | Where-Object { -not $_.StartsWith(':') -and ((Test-ShipBethesda $_) -or (Test-ShipOneMachine $_)) }).Count -eq 0)
 [void](Update $synced 'feed-dev')
 Yes '  and the synced install follows it to the older texture' ((Get-Game $synced)['Data\Platform\textures\ours.dds'] -eq 'a texture of ours, older')
 

@@ -684,6 +684,10 @@ namespace Thornswood
         public string id = "";
         public string sha256 = "";
         public string url = "";
+        // The release note, title first, written beside the record since the
+        // packs left the feed (#1050), because the update card used to read it
+        // off the last pack. "" on a feed that does not say.
+        public string notes = "";
 
         /// <summary>The "baseline" of a feed, or null when it names none or
         /// names one this launcher cannot use. Never throws.</summary>
@@ -701,6 +705,7 @@ namespace Thornswood
                 r.id = Json.Str(o, "id");
                 r.sha256 = Json.Str(o, "sha256").ToLowerInvariant();
                 r.url = Json.Str(o, "url").Trim();
+                r.notes = Json.Str(o, "notes").Trim();
                 if (!IsSha(r.sha256) || r.url.Length == 0) return null;
                 if (r.id.Length == 0) r.id = r.sha256.Substring(0, 12);
                 return r;

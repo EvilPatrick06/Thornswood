@@ -82,6 +82,7 @@ trap { $script:fail++; Write-Host ("FAIL  stopped: " + $_.Exception.Message + ' 
 
 . (Join-Path $repo 'scripts\release\Release-Baseline.ps1')
 . (Join-Path $repo 'scripts\release\Feed-Store.ps1')
+. (Join-Path $repo 'scripts\release\Release-Name.ps1')
 Add-Type -AssemblyName System.IO.Compression -ErrorAction SilentlyContinue
 Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction SilentlyContinue
 $ascii = New-Object Text.ASCIIEncoding
@@ -533,7 +534,12 @@ Yes 'a fresh install with no applied.txt at all reaches the third release too' (
 $one = New-Install 'one-behind' @{} $ids
 $saveFeed = [IO.File]::ReadAllBytes((Join-Path $feedDir 'version.json'))
 Use-Install $one
-$r2ptr = @($d3.releases | Where-Object { $_.id -eq $R2 })[0]
+# The list of releases is the store's releases.json since #1050, beside the
+# feed and not in it.
+$storeReleases = @(Get-StoreReleases $feedDir (Feed))
+Yes 'the releases a rollback can go back to are in the store beside the feed, and the feed carries none' (
+    $storeReleases.Count -ge 3 -and -not $d3.PSObject.Properties['releases'])
+$r2ptr = @($storeReleases | Where-Object { $_.id -eq $R2 })[0]
 $rec2 = [Activator]::CreateInstance($asm.GetType('Thornswood.RecordRef')); $rec2.id = $R2; $rec2.sha256 = [string]$r2ptr.sha256; $rec2.url = [string]$r2ptr.url
 $script:said.Clear()
 [void](Invoke-Sync $rec2 (Parse-Feed))
@@ -687,6 +693,66 @@ $r = Rollback @('-To', $R3, '-Id', $RF)
 Yes 'and forward again to the third' ($r.Code -eq 0 -and [string](Feed).baseline.id -eq $RF)
 [void](Update-New $fresh); [void](Update-Old $oldL)
 Yes '  both kinds of launcher follow it' ((Test-Lands $fresh $records[$R3]) -and (Test-Lands $oldL $records[$R3]))
+
+# ---- the packs come off the feed (#1050) ------------------------------------------
+# Once the launcher the feed lets in (minLauncher, which a publish sets to the
+# launcher it offers) is at or above the first one that syncs (main 1.1.103), a
+# release adds no pack and the feed's packs become []. As if 1.2.3 had shipped:
+Write-Host ''; Write-Host 'the packs come off the feed'
+$fd = Feed
+$fd.launcherVersion = '1.2.3'; $fd.minLauncher = '1.2.3'
+Put (Join-Path $feedDir 'version.json') ($fd | ConvertTo-Json -Depth 8)
+$R5 = '20260930-0600'
+Set-Build 'Data\Platform\UI\thornswood-new3.esp' 'changed by the fifth release'
+$note5 = 'Keys open their own doors'
+Yes 'a release goes out with every launcher let in syncing to the record' (Release $R5 $note5)
+$d5 = Feed; $m5 = $records[$R5]
+Yes '  the feed carries packs as an empty list, the shape every launcher reads' ($d5.PSObject.Properties['packs'] -and @($d5.packs).Count -eq 0 -and
+    ([IO.File]::ReadAllText((Join-Path $feedDir 'version.json')) -match '"packs":\s*\[\s*\]'))
+Yes '  and minLauncher is 1.2.3' ([string]$d5.minLauncher -eq '1.2.3')
+Yes '  the release names no pack, and its record says every file is up' (@($d5.release.packs).Count -eq 0 -and [string]$m5[':record:files'] -eq '1' -and
+    @((Get-RecordFileShas $m5).Keys | Where-Object { -not (Test-Path -LiteralPath (Join-Path $feedDir "assets\$_")) }).Count -eq 0)
+$zip5 = @(Get-ChildItem -LiteralPath (Join-Path $pub 'dist') -Recurse -File -Filter "pack-$R5.zip")
+Yes '  its pack was built for the secrets check and kept here, and never sent' ($zip5.Count -eq 1 -and -not (Test-Path -LiteralPath (Join-Path $feedDir ("assets\" + (Get-BaselineFileSha $zip5[0].FullName)))))
+Yes '  the record''s pointer carries the note, for the update card' ([string]$d5.baseline.notes -eq ($note5 + "`n- what changed"))
+$list5 = @(Get-StoreReleases $feedDir (Feed))
+Yes '  the store''s list starts with it, ending on no pack' ([string]$list5[0].id -eq $R5 -and [string]$list5[0].lastPack -eq '' -and -not $d5.PSObject.Properties['releases'])
+$bad5 = @(Get-ReleaseDisagreements $d5 $list5)
+Yes ('  every name for it agrees' + $(if ($bad5.Count) { ': ' + ($bad5 -join '; ') } else { '' })) ($bad5.Count -eq 0)
+$sz = (Get-Item -LiteralPath (Join-Path $feedDir 'version.json')).Length
+Yes ("  version.json is {0:n0} bytes" -f $sz) ($sz -gt 0)
+
+Use-Install $fresh
+$pend5 = @(Pending-Of (Parse-Feed))
+Yes 'a launcher on the last release is offered this one, with its note on the card' ($pend5.Count -eq 1 -and $null -ne $pend5[0].Record -and $pend5[0].Record.id -eq $R5 -and
+    [string]$pend5[0].notes -eq ($note5 + "`n- what changed"))
+[void](Update-New $fresh)
+Yes '  and syncs to it, downloading the one file that changed' ((Test-Lands $fresh $m5) -and (Fetched) -eq 1 -and (Pending-Of (Parse-Feed)).Count -eq 0)
+$noApplied5 = New-Install 'no-applied-5' $installerFiles $null
+[void](Update-New $noApplied5)
+Yes 'a fresh install with no applied.txt reaches it from the record alone' ((Test-Lands $noApplied5 $m5) -and (Plugins-Match $noApplied5 $m5))
+$sev5 = New-Install 'several-behind-5' $several @()
+[void](Update-New $sev5)
+Yes 'one several releases behind lands on it, taking out what the old pack took out' ((Test-Lands $sev5 $m5) -and (Said '^removed Data\\Platform\\UI\\thornswood-ancient\.esp'))
+Yes 'a launcher from before the sync finds no pack to replay, so the launcher is all it is offered' ((Update-Old $oldL) -eq 0)
+
+# A rollback with the packs gone is the record alone.
+$RG = '20260930-0700'
+$r = Rollback @('-Back', '1', '-Id', $RG)
+$dg = Feed; $mg = Record-Of $dg
+$zipG = Join-Path $work "pack-$RG.zip"
+Yes 'a rollback with the packs gone names a new record and sends no pack' ($r.Code -eq 0 -and [string]$dg.baseline.id -eq $RG -and @($dg.packs).Count -eq 0 -and
+    (-not (Test-Path -LiteralPath $zipG) -or -not (Test-Path -LiteralPath (Join-Path $feedDir ("assets\" + (Get-BaselineFileSha $zipG))))))
+Yes '  its record says every file is up, with the plugin list of the release it went back to' ([string]$mg[':record:files'] -eq '1' -and
+    [string]$mg[':golden:plugins.txt'] -eq [string]$records[$R3][':golden:plugins.txt'])
+$listG = @(Get-StoreReleases $feedDir (Feed))
+Yes '  the store''s list names it first, put back to the release before' ([string]$listG[0].id -eq $RG -and [string]$listG[0].to -eq $RF -and [string]$listG[0].lastPack -eq '')
+Yes '  and every name for it agrees' (@(Get-ReleaseDisagreements $dg $listG).Count -eq 0)
+[void](Update-New $fresh)
+Yes 'a launcher that syncs lands back on the third release''s files' ((Test-Lands $fresh $records[$R3]) -and (Fetched) -eq 1)
+$r = Rollback @('-To', $R5, '-Id', '20260930-0800')
+[void](Update-New $fresh)
+Yes '  and forward again to the fifth' ($r.Code -eq 0 -and @((Feed).packs).Count -eq 0 -and (Test-Lands $fresh $m5))
 
 # ---- nothing here weakens the launcher's own update -------------------------------
 Write-Host ''; Write-Host 'the launcher itself'
