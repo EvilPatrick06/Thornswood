@@ -14,7 +14,7 @@ five in one sub-skill are refused.
 | Vitality | +10 health | Cheat Death. Once a day, the blow that would kill you leaves you at 1 health |
 | Fortitude | +10% health recovery | Troll's Blood. During a fight, health returns at 2 a second |
 | Might | +0.05 melee damage | Devastating Blow. A power attack deals 25% more |
-| Resilience | +10 armour | Unshakeable. A block cannot stagger you |
+| Resilience | +10 armour | Unshakeable. Nothing staggers you while you block |
 | Toughness | +10 poison resistance and +10 disease resistance | Purified Blood. Disease does not take. Poison deals 25% |
 | Capacity | +10 magicka | Archmage's Vessel. Drop below a tenth of magicka and it returns to half, once a day |
 | Clarity | +10% magicka recovery | Leyline Attunement. Magicka still returns while you cast, at half the usual rate |
@@ -87,10 +87,32 @@ a long time. See [Professions](professions.md) for how a rank is earned.
 The fifteen sub-skills, the cap of 5, the per-point numbers, the placed
 points and the free point per rank are in the server and on the K panel.
 
-A perk is ticked here when the server makes it fire. Each time one fires,
-the server writes `perks: <name> fired` to its log, so a tester can see
-it happen. Troll's Blood and Leyline Attunement write one line a fight
+A perk is ticked here when it fires. Each time the server fires one, it
+writes `perks: <name> fired` to its log, so a tester can see it happen. Troll's Blood and Leyline Attunement write one line a fight
 and one a cast, not one a second.
+
+Three happen on your own machine, because the game works them out there
+and the server cannot reach them: Unshakeable, Tireless and Windwalker's
+fall. The front plugin does them, from the list of perks the K panel's view
+carries, and writes them in `thornswood-front.log`:
+`unshakeable: refused a stagger while blocking` for each stagger refused,
+`unshakeable: a stagger played with the block down` for each one let
+through, and a `perks:` line naming each game setting it changes. Tireless
+and the fall are the game's own sums, from game settings read out of
+Skyrim.esm that nothing in the load order changes:
+
+| Perk | Game setting | The game's own | Held at |
+| --- | --- | --- | --- |
+| Windwalker, the fall | `fJumpFallHeightMult` | 0.1 | 0, so a fall comes to nothing |
+| Tireless, a sprint | `fSprintStaminaDrainMult` | 7 | half |
+| Tireless, a power attack | `fStaminaAttackWeaponBase` and `fStaminaAttackWeaponMult` | 20 and 1 | half of each |
+
+The fall's settings are your own character's: everybody else's are the same
+names ending in NPC, so nobody else's fall changes. Tireless's have no
+second set, so an NPC your machine runs pays half for a sprint and a power
+attack too (issue #1385 asks whether that stays). Running costs nothing in
+this game and neither does a plain swing; a sprint and a power attack are
+what cost stamina.
 
 Nothing here is a command. Font of Magic, the one perk a person starts,
 is the Use button beside it on the K panel. The K panel also says, beside
@@ -111,15 +133,15 @@ not left on you (issue #1642).
 | Cheat Death | No | All of it. The engine ends you the moment health reaches nothing, and sends the death before the server is asked. The engine has to ask first (issue #1626). The once-a-day clock is in the server, waiting for that |
 | Troll's Blood | Yes. A fight is a hit landed or taken, or health falling, in the last 15 seconds | |
 | Devastating Blow | Yes. With a warrior's Heavy on the same blow, each adds its share to what the blow took before it | |
-| Unshakeable | No | All of it. The stagger is played on your own machine, where the server cannot stop it |
+| Unshakeable | Yes, on your own machine. A stagger is played there, so the front plugin refuses it while your block is up, by the game's own IsBlocking. The server refuses its own Break and Wreck on you the same way | |
 | Purified Blood | Yes. The tree's disease resistance comes to 100 and its poison resistance to 75. What your race resists comes on top, as far as the game allows | |
 | Archmage's Vessel | Yes | |
 | Leyline Attunement | Yes. The server sees a cast as magicka falling. The usual rate is your race's own, raised by your Clarity | |
 | Overcharge | Yes, the damage. Every fifth spell of yours that takes health takes double | Holding twice as long |
 | Spellbreaker | Yes. A spell you hold up, like Flames, counts once a second | |
 | Font of Magic | Yes, from the Use button on the K panel. For 15 seconds each school's cost is taken off in full, the way the game's own Fortify enchantments take it off, so the game takes no magicka at all | |
-| Tireless | No | All of it. What running and a swing cost is worked out on your own machine |
+| Tireless | Yes, on your own machine: a sprint and a power attack cost half | |
 | Second Wind | Yes | |
-| Windwalker | Yes, the speed | A fall still hurts. It is taken on your own machine |
-| Pack Mule | No | All of it. The slowing is the game's own, on your own machine |
+| Windwalker | Yes. The speed from the server, the fall on your own machine | |
+| Pack Mule | No | All of it. Being overloaded makes the game walk you, on your own machine, and no game setting changes that. What it should be waits on Patrick (issue #1385) |
 | Lethal Aim | Yes. An arrow or a bolt is worked out again against half the armour, by the same sum the server uses for every blow | |
