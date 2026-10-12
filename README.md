@@ -9,8 +9,9 @@ and follow [thornswood.net/join](https://thornswood.net/join).
 ## What is in here
 
 - `launcher/`: launcher chrome (window, art, voice page). The C# app lives in
-  `launcher/app/` (C# 5 / WPF), built by `scripts/release/Build-Launcher.ps1`
-  with the .NET Framework 4 csc. See `launcher/app/ARCHITECTURE.md`.
+  `launcher/app/` (C# / WPF), built by `scripts/release/Build-Launcher.ps1`
+  with the .NET Framework 4 csc, so C# 5 until the build moves to MSBuild
+  and `launcher/app/Thornswood.csproj` (#498). See `launcher/app/ARCHITECTURE.md`.
 - `installer/`: what a new person runs first. `installer/setup/` is the small
   setup program people download (one installer tree, not two products).
 - `game/`: everything that runs as the multiplayer game on the server and
