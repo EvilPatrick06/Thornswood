@@ -1,6 +1,7 @@
 {
   "about": "What a GitHub Actions runner account on the VPS should and should not reach. scripts/vps/Check-RunnerIsolation.ps1 compares Get-RunnerFacts.ps1 output, the workflows and the repository's Actions settings against it. Issue #2161. No secret belongs here.",
   "productionLabel": "thornswood-vps",
+  "decision": "Patrick, 11 Oct 2026: pull request builds run on GitHub-hosted runners, never on productionLabel; pushes to main, nightly, release and Ship stay on the VPS. Owner of the build.yml move: Codex lane. docs/RUNNER-ISOLATION.md section 6.",
   "forbiddenGroups": ["Administrators", "Backup Operators", "Remote Desktop Users", "Remote Management Users", "Hyper-V Administrators", "Network Configuration Operators"],
   "noReach": [
     "C:\\Thornswood-Docs\\config.json", "C:\\Thornswood-Docs\\feed", "C:\\Thornswood-Docs\\feed-dev",
