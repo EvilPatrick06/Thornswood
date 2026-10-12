@@ -95,12 +95,11 @@ outbound limit as residual risk.
    ranges) and the package feeds the workflows install from. Everything
    else is blocked. This closes F3. It is a live box change, Claude's, done
    only after the hosting console login is confirmed working (#2182), by
-   reusing the per account outbound rules Install-Runner.ps1 -OffBox
-   already makes (tests\test-runner-offbox.ps1), not hand written rules.
-   The feeds read from the workflows today: pypi.org and
-   iles.pythonhosted.org (build.yml and nightly.yml install ruff and the
-   bot's requirements with pip, hash pinned), and 
-egistry.npmjs.org
+   reusing the per account outbound rules `Install-Runner.ps1 -OffBox`
+   already makes (`tests\test-runner-offbox.ps1`), not hand written rules.
+   The feeds read from the workflows today: `pypi.org` and
+   `files.pythonhosted.org` (build.yml and nightly.yml install ruff and the
+   bot's requirements with pip, hash pinned), and `registry.npmjs.org`
    (build.yml and nightly.yml install eslint with npm).
 2. GitHub-hosted runners are the default for builds. The VPS runners are a
    backup only: used by hand, or automatically when a hosted run fails
@@ -112,7 +111,7 @@ egistry.npmjs.org
 What follows for the check:
 
 - F1 (pull request code on the production box): a fallback job that can
-  still run pull request code on 	hornswood-vps is reported as a risk row
+  still run pull request code on `thornswood-vps` is reported as a risk row
   for a person to read, not a failure; the check only fails with -Strict.
   That is deliberate: a backup path on the VPS is allowed by this decision,
   and each run of it should be visible.
@@ -120,10 +119,10 @@ What follows for the check:
   an off-box pull request runner that build.yml never used; with hosted
   runners as the default, the build check needs no such runner.
 - F3 (no outbound limit): risk until Claude's live step above is done; then
-  every runner's outbound row should read ok.
+  every runner's `outbound` row should read ok.
 - Verification: a green build on a VPS runner after the limits are on, and
   the check's network rows ok. Rollback: remove the outbound rule group for
-  that account, the same way Install-Runner.ps1 -OffBox -Remove takes its
+  that account, the same way `Install-Runner.ps1 -OffBox -Remove` takes its
   own off.
 
 The three choices that were put to Patrick, kept for the record:
