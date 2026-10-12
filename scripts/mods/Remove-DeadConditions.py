@@ -62,8 +62,10 @@ COMPRESSED = 0x00040000
 
 # A CTDA is 32 bytes in Skyrim. The two form id parameters sit at 12 and 16.
 CTDA_SIZE = 32
+CTDA_FUNC = 8
 CTDA_PARAM1 = 12
 CTDA_PARAM2 = 16
+
 
 # A condition's own string parameters follow it and belong to it, so they go
 # when it goes. Neither of the three here has one; this is so that a later
@@ -188,41 +190,60 @@ def main():
     print('')
     print('Records about to be deleted, whose conditions have to go first')
     print('  %d of them' % len(doomed))
-    if not doomed:
-        print('  nothing matches those prefixes, so there is nothing to do')
-        return 0
+    
 
+    
     print('')
-    print('Conditions that test for one of them')
+    print('Conditions to remove')
     edits, blocked = [], []
     for r in records:
         if r.compressed:
-            # Prove it is not hiding one rather than assuming it is not.
+            if r.tag == b'COBJ':
+                blocked.append(
+                    'COBJ 0x%07X is compressed; cannot safely inspect its conditions'
+                    % r.fid
+                )
             for fid in doomed:
                 if struct.pack('<I', fid) in r.data:
-                    blocked.append('%s 0x%07X is compressed and holds 0x%07X'
-                                   % (r.tag.decode(), r.fid, fid))
+                    blocked.append(
+                        '%s 0x%07X is compressed and holds 0x%07X'
+                        % (r.tag.decode(), r.fid, fid)
+                    )
             continue
+
         pairs = subrecords(r.data)
         keep, drop, i = [], [], 0
         while i < len(pairs):
             tag, body = pairs[i]
             hit = None
-            if tag == b'CTDA' and len(body) >= CTDA_PARAM2 + 4:
-                for off in (CTDA_PARAM1, CTDA_PARAM2):
-                    p = struct.unpack_from('<I', body, off)[0]
-                    if p in doomed:
-                        hit = p
-            if hit is None:
+            reason = None
+
+            if tag == b'CTDA' and len(body) >= CTDA_SIZE:
+                func = struct.unpack_from('<H', body, CTDA_FUNC)[0]
+
+                if r.tag == b'COBJ' and func == CONDITION_VANILLA_PERK:
+                    reason = 'vanilla-perk'
+                else:
+                    for off in (CTDA_PARAM1, CTDA_PARAM2):
+                        p = struct.unpack_from('<I', body, off)[0]
+                        if p in doomed:
+                            hit = p
+                            reason = 'dead-record'
+                            break
+
+            if reason is None:
                 keep.append((tag, body))
                 i += 1
                 continue
-            drop.append((r, hit))
+
+            drop.append((r, hit, reason))
             i += 1
             while i < len(pairs) and pairs[i][0] in CTDA_TRAILERS:
                 i += 1
+
         if drop:
             edits.append((r, keep, drop))
+
 
     if blocked:
         for b in blocked:
@@ -236,8 +257,21 @@ def main():
         print('  none')
         return 0
 
+   
     for r, keep, drop in edits:
-        for _, fid in drop:
+        for _, fid, reason in drop:
+            if reason == 'vanilla-perk':
+                print(
+                    '  COBJ 0x%07X %-32s removes HasPerk (function 448)'
+                    % (r.fid, r.editor_id())
+                )
+            else:
+                print(
+                    '  %s 0x%07X %-32s tests for 0x%07X (%s)'
+                    % (r.tag.decode(), r.fid, r.editor_id(),
+                       fid, doomed[fid])
+                )
+
             print('  %s 0x%07X %-32s tests for 0x%07X (%s)'
                   % (r.tag.decode(), r.fid, r.editor_id(), fid, doomed[fid]))
 

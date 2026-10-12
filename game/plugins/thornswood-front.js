@@ -6690,7 +6690,7 @@
       keyDown: function () { pressAt = 0; upAtPress = false; }
     };
   }
-
+ 
   const STATS_MENU = 'StatsMenu';
   // The native MenuOpenHandler hook rejects this control before Skyrim asks
   // for StatsMenu. Closing a menu after buttonEvent cannot prevent a flash.
