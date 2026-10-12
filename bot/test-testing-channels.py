@@ -79,12 +79,29 @@ class Category(object):
 
 
 class Thread(object):
-    def __init__(self, name, tags, content):
+    def __init__(self, name, tags, content, forum=None, owner=2):
         self.name = name
         self.applied_tags = tags
         self.content = content
         self.archived = False
         self.mention = '<#%s>' % name
+        self.forum = forum
+        self.owner_id = owner
+        Thread.next = getattr(Thread, 'next', 50000) + 1
+        self.id = Thread.next
+        if forum is not None:
+            forum.guild.threads[self.id] = self
+
+    async def delete(self):
+        self.forum.guild.calls.append(('delete_thread', self.forum.name, self.name))
+        self.forum.threads.remove(self)
+        del self.forum.guild.threads[self.id]
+
+
+class Said(object):
+    def __init__(self, author, content='x'):
+        self.author = author
+        self.content = content
 
 
 class Channel(object):
@@ -101,7 +118,16 @@ class Channel(object):
         self.convertible = convertible
         self.id = 9000 + len(guild.channels)
         self.sent = []
+        self.said = []
         guild.channels.append(self)
+
+    async def history(self, limit=100):
+        for m in self.said[:limit]:
+            yield m
+
+    async def delete(self, reason=None):
+        self.guild.calls.append(('delete', self.name))
+        self.guild.channels.remove(self)
 
     def overwrites_for(self, t):
         ow = self.overwrites.get(t)
@@ -125,9 +151,9 @@ class Channel(object):
         self.guild.calls.append(('set_permissions', self.name, t))
         self.overwrites[t] = overwrite
 
-    async def create_thread(self, name, content, applied_tags, reason=None):
+    async def create_thread(self, name, content, applied_tags, reason=None, **k):
         self.guild.calls.append(('create_thread', self.name, name))
-        th = Thread(name, applied_tags, content)
+        th = Thread(name, applied_tags, content, self)
         self.threads.append(th)
         return th
 
@@ -140,6 +166,15 @@ class Guild(object):
         self.calls = []
         self.default_role = Target('@everyone', gid)
         self.me = Target('Thornswood Bot', 2)
+        self.threads = {}
+
+    def get_thread(self, tid):
+        return self.threads.get(tid)
+
+    async def fetch_channel(self, tid):
+        if tid in self.threads:
+            return self.threads[tid]
+        raise discord.NotFound(type('R', (), {'status': 404, 'reason': 'gone'})(), 'Unknown Channel')
 
     async def create_forum(self, name, category=None, position=0,
                            overwrites=None, topic=None, available_tags=None,
@@ -224,7 +259,7 @@ yes('  and says each of the three changes it would make',
     and 'would make a new forum #test-tasks in Testing' in text
     and 'would rename the old text #test-tasks to #test-tasks-archive' in text
     and 'would rename #test-results to #test-findings' in text
-    and 'would make #known-issues in Testing' in text
+    and 'would make the forum #known-issues in Testing' in text
     and 'would make #known-issues read only' in text)
 
 said = run(bot.channel_setup(g, apply=True, path=state))
@@ -261,7 +296,10 @@ yes('#test-results is renamed #test-findings, the same channel and overwrites',
     results.name == 'test-findings'
     and pairs(results.overwrites)[play] == pairs(
         {play: OW(view_channel=True, send_messages=True)})[play])
-known = bot._channel_named(g, 'known-issues', ('text',))
+known = bot._channel_named(g, 'known-issues', ('forum',))
+yes('#known-issues is made as a FORUM, with the Dev and Main tags',
+    known is not None and bot._channel_named(g, 'known-issues', ('text',)) is None
+    and sorted(x.name for x in known.available_tags) == ['Dev', 'Main'])
 yes('#known-issues is made beside #test-findings, seen by the same people',
     known is not None and known.category is results.category
     and set(results.overwrites) <= set(known.overwrites)
@@ -273,14 +311,16 @@ yes('  and read only: no sending or threads for @everyone or the copied '
         and known.overwrites[t].send_messages_in_threads is False
         and known.overwrites[t].create_public_threads is False
         for t in (g.default_role, play)))
-yes('  while the bot keeps send there',
+yes('  while the bot keeps posting there, and may delete its posts',
     known.overwrites[g.me].send_messages is True
-    and known.overwrites[g.me].view_channel is True)
+    and known.overwrites[g.me].view_channel is True
+    and known.overwrites[g.me].manage_threads is True)
 yes('  and #test-findings itself is untouched by that',
     results.overwrites[play].send_messages is True)
 done = json.load(open(state))
-yes('the apply is recorded in the state file by server id',
-    '1' in done.get('guilds', {}) and done['guilds']['1'].get('done'))
+yes('the apply is recorded in the state file by server id, the forum step too',
+    '1' in done.get('guilds', {}) and done['guilds']['1'].get('done')
+    and done['guilds']['1'].get('known_forum'))
 
 g.calls = []
 said = run(bot.channel_setup(g, apply=True, path=state))
@@ -296,7 +336,7 @@ run(bot.channel_setup(g, apply=True, path=state2))
 yes('a channel Discord does convert stays the one channel, no forum made '
     'and nothing archived',
     tasks.type is discord.ChannelType.forum and tasks.name == 'test-tasks'
-    and not [c for c in g.calls if c[0] == 'create_forum']
+    and not [c for c in g.calls if c[0] == 'create_forum' and c[1] == 'test-tasks']
     and not bot._channel_named(g, 'test-tasks-archive'))
 yes('  and it is given the Dev and Main tags',
     sorted(t.name for t in tasks.available_tags) == ['Dev', 'Main'])
@@ -312,7 +352,7 @@ g.calls = []
 said = run(bot.channel_setup(g, apply=True, path=state3))
 yes('an apply that stopped half way does only what is left: the missing '
     'Main tag and #known-issues',
-    [c[0] for c in g.calls] == ['edit', 'create_text_channel']
+    [c[0] for c in g.calls] == ['edit', 'create_forum']
     and 'available_tags' in g.calls[0][2])
 
 # A state file that will not read changes nothing.
@@ -329,6 +369,59 @@ said = run(bot.channel_setup(g, apply=True, path=os.path.join(TMP, 'none.json'))
 yes('a server with no #test-tasks is told so and nothing is made',
     g.calls == [] and 'there is no #test-tasks' in said[0]
     and not os.path.exists(os.path.join(TMP, 'none.json')))
+
+
+# ----------------------------------- 2b. #known-issues becomes a forum --
+# A server set up on 11 Oct before this: a text #known-issues full of the
+# bot's own list, and a state file with done but no known_forum.
+def old_shape(state_path, with_human=False):
+    g, tasks, results, play, staff = server()
+    run(bot.channel_setup(g, apply=True, path=state_path))
+    forum_k = bot._channel_named(g, 'known-issues', ('forum',))
+    g.channels.remove(forum_k)
+    k = Channel(g, 'known-issues', 'text', results.category, 5,
+                bot.known_overwrites(g, results))
+    k.said = [Said(g.me) for _ in range(26)]
+    if with_human:
+        k.said.append(Said(play, 'a person wrote here'))
+    st = json.load(open(state_path))
+    st['guilds']['1'].pop('known_forum', None)
+    json.dump(st, open(state_path, 'w'))
+    tasks_forum = bot._channel_named(g, 'test-tasks', ('forum',))
+    tasks_forum.overwrites[g.me] = OW(view_channel=True, send_messages=True)
+    g.calls = []
+    return g, k, tasks_forum
+
+
+mig = os.path.join(TMP, 'migrate.json')
+g, k, tf = old_shape(mig)
+said = run(bot.channel_setup(g, apply=False, path=mig))
+text = '\n'.join(said)
+yes('on a server set up before, a preview says it would delete the text '
+    '#known-issues (only the bot\'s own list) and make the forum, and asks '
+    'Discord for nothing',
+    g.calls == [] and 'would delete the text #known-issues' in text
+    and 'its 26 message(s) are all the bot' in text
+    and 'would make the forum #known-issues' in text)
+said = run(bot.channel_setup(g, apply=True, path=mig))
+kf = bot._channel_named(g, 'known-issues', ('forum',))
+yes('  the apply deletes that text channel and makes the forum in its place',
+    ('delete', 'known-issues') in g.calls and k not in g.channels
+    and kf is not None and kf.category is k.category)
+yes('  the bot may now delete posts in #test-tasks too (for a reopened issue)',
+    tf.overwrites[g.me].manage_threads is True)
+yes('  recorded as known_forum, and a second run does nothing',
+    json.load(open(mig))['guilds']['1'].get('known_forum')
+    and (lambda c: (run(bot.channel_setup(g, apply=True, path=mig)), g.calls == c)[1])(list(g.calls)))
+
+mig2 = os.path.join(TMP, 'migrate2.json')
+g, k, tf = old_shape(mig2, with_human=True)
+run(bot.channel_setup(g, apply=True, path=mig2))
+yes('a text #known-issues holding anything that is not the bot\'s is kept, '
+    'renamed known-issues-archive and locked, never deleted',
+    k in g.channels and k.name == 'known-issues-archive'
+    and not [c for c in g.calls if c[0] == 'delete']
+    and bot._channel_named(g, 'known-issues', ('forum',)) is not None)
 
 
 # --------------------------------------------------- 3. test tasks --
@@ -359,46 +452,14 @@ yes('before the setup, it says #test-tasks is not a forum yet',
 
 
 # --------------------------------------------------- 4. known issues --
-class Msg(object):
-    def __init__(self, ch, mid, content, author):
-        self.channel = ch
-        self.id = mid
-        self.content = content
-        self.author = author
-
-    async def edit(self, content=None, **k):
-        self.channel.edits.append((self.id, content))
-        self.content = content
-
-
-class Known(object):
-    def __init__(self, me):
-        self.id = 777
-        self.me = me
-        self.messages = {}
-        self.edits = []
-        self.next = 100
-
-    async def send(self, content, **k):
-        self.next += 1
-        m = Msg(self, self.next, content, self.me)
-        self.messages[m.id] = m
-        return m
-
-    async def fetch_message(self, mid):
-        return self.messages[mid]
-
-    async def history(self, limit=100):
-        for mid in sorted(self.messages, reverse=True)[:limit]:
-            yield self.messages[mid]
-
-
 ISSUES = {}
+COMMENTS = {}
 
 
-def issue(num, title, label, state='open', reason=None, pr=False):
+def issue(num, title, label, state='open', reason=None, pr=False,
+          closed_at=None):
     row = {'number': num, 'title': title, 'state': state,
-           'state_reason': reason,
+           'state_reason': reason, 'closed_at': closed_at,
            'html_url': 'https://github.com/EvilPatrick06/Thornswood/issues/%d' % num,
            'labels': [{'name': l} for l in label]}
     if pr:
@@ -411,93 +472,115 @@ ASKED = []
 
 def gh(url):
     ASKED.append(url)
-    if '/issues/' in url and '?' not in url:
-        return ISSUES[int(url.rsplit('/', 1)[1])]
+    path = url.split('?')[0]
+    if path.endswith('/comments'):
+        return COMMENTS.get(int(path.split('/')[-2]), [])
+    if '/issues/' in path:
+        return ISSUES[int(path.rsplit('/', 1)[1])]
+    if 'state=closed' in url:
+        return [r for r in ISSUES.values() if r['state'] == 'closed']
     label = bot.urllib.parse.unquote(url.split('labels=')[1])
     return [r for r in ISSUES.values() if r['state'] == 'open'
             and label in [l['name'] for l in r['labels']]]
 
 
-me = Target('Thornswood Bot', 2)
-ch = Known(me)
+g, tasks, results, play, staff = server()
+run(bot.channel_setup(g, apply=True, path=os.path.join(TMP, 'known.json')))
+kf = bot._channel_named(g, 'known-issues', ('forum',))
+tf = bot._channel_named(g, 'test-tasks', ('forum',))
+me = g.me
 issue(10, 'Ferry sinks', ['Dev Findings'])
 issue(11, 'Gold resets', ['Main Findings', 'Dev Findings'])
 issue(12, 'A PR', ['Dev Findings'], pr=True)
 issue(13, 'Unlabelled', ['bug'])
-st = {}
+st = {'issues': {'99': {'message_id': 5, 'channel_id': 1234, 'closed': None}}}
 saves = []
-posted, edited = run(bot.known_issues_once(ch, st, gh,
-                                           save=lambda s: saves.append(len(s['issues']))))
-yes('one post per open labelled issue, never for a pull request or an '
-    'unlabelled issue, and one only for an issue with both labels',
-    posted == [10, 11] and len(ch.messages) == 2)
-texts = [ch.messages[st['issues'][str(n)]['message_id']].content for n in (10, 11)]
-yes('  each is the title and its status, nothing else',
-    texts == ['**Ferry sinks**\nStatus: Open', '**Gold resets**\nStatus: Open'])
-yes('  with no issue number and no link',
-    not any('#10' in t or '#11' in t or 'http' in t or 'github' in t.lower()
-            for t in texts))
-yes('  saved straight after each post, not at the end', saves == [1, 2])
-yes('  GitHub was asked with one query per label (labels are ANDed there)',
-    len([u for u in ASKED if 'labels=' in u]) == 2)
-
-posted, edited = run(bot.known_issues_once(ch, st, gh))
-yes('a second pass posts nothing', posted == [] and len(ch.messages) == 2)
-
+posted, removed = run(bot.known_issues_once(kf, st, gh,
+                      save=lambda s: saves.append(len(s['issues'])), me_id=me.id))
+yes('one forum POST per open labelled issue, never for a pull request or an '
+    'unlabelled issue, one only for an issue with both labels',
+    posted == [10, 11] and len(kf.threads) == 2)
+yes('  each titled with the issue\'s title, tagged Dev or Main by its label',
+    [(th.name, sorted(x.name for x in th.applied_tags)) for th in kf.threads]
+    == [('Ferry sinks', ['Dev']), ('Gold resets', ['Dev', 'Main'])])
+yes('  with no issue number and no link in the post',
+    not any('#1' in th.content or 'http' in th.content for th in kf.threads))
+yes('  saved straight after each post', saves == [1, 2])
+yes('  and a record from the old text channel is forgotten, not acted on',
+    '99' not in st['issues'] and removed == [])
+posted, removed = run(bot.known_issues_once(kf, st, gh, me_id=me.id))
+yes('a second pass posts and removes nothing', posted == [] and removed == []
+    and len(kf.threads) == 2)
 path = os.path.join(TMP, 'known-issues.json')
 bot._known_save(dict(st, _dirty=True), path)
-st2 = bot._state_read(path)
-posted, _ = run(bot.known_issues_once(ch, st2, gh))
-yes('after a restart, read back from known-issues.json, nothing is posted '
-    'again', posted == [] and len(ch.messages) == 2)
-
-# A crash between the post and its save: the file has 10 only.
+posted, _ = run(bot.known_issues_once(kf, bot._state_read(path), gh, me_id=me.id))
+yes('after a restart, read back from the file, nothing is posted again',
+    posted == [] and len(kf.threads) == 2)
 st3 = {'issues': {'10': st['issues']['10']}}
-posted, _ = run(bot.known_issues_once(ch, st3, gh, me_id=me.id))
-yes('a post that never reached the file is found again in the channel and '
-    'not doubled', posted == [] and len(ch.messages) == 2
-    and st3['issues']['11']['message_id'] == st['issues']['11']['message_id'])
+posted, _ = run(bot.known_issues_once(kf, st3, gh, me_id=me.id))
+yes('a post that never reached the file is found again by its title, not doubled',
+    posted == [11] and len(kf.threads) == 2
+    and st3['issues']['11']['thread_id'] == st['issues']['11']['thread_id'])
 
-issue(10, 'Ferry sinks', ['Dev Findings'], state='closed', reason='completed')
-issue(11, 'Gold resets', ['Main Findings'], state='closed', reason='not_planned')
-posted, edited = run(bot.known_issues_once(ch, st, gh))
-m10 = ch.messages[st['issues']['10']['message_id']].content
-m11 = ch.messages[st['issues']['11']['message_id']].content
-yes('closed as completed: the post is struck through and says Fixed',
-    10 in edited and m10 == '~~**Ferry sinks**~~\nStatus: Fixed'
-    and st['issues']['10']['closed'] == 'completed')
-yes('closed as not planned: it says Closed, not fixed',
-    m11 == '~~**Gold resets**~~\nStatus: Closed, not fixed'
-    and st['issues']['11']['closed'] == 'not_planned')
-n = len(ch.edits)
-posted, edited = run(bot.known_issues_once(ch, st, gh))
-yes('a closed post is not edited again on the next pass',
-    edited == [] and len(ch.edits) == n and posted == [])
-
+issue(10, 'Ferry sinks', ['Dev Findings'], state='closed', reason='completed',
+      closed_at='2026-10-12T05:00:00Z')
+issue(11, 'Gold resets', ['bug'])
+posted, removed = run(bot.known_issues_once(kf, st, gh, me_id=me.id))
+yes('fixed and closed, or the findings label taken off: the post is DELETED',
+    sorted(removed) == [10, 11] and kf.threads == []
+    and [c for c in g.calls if c[0] == 'delete_thread'])
 issue(10, 'Ferry sinks', ['Dev Findings'])
-posted, edited = run(bot.known_issues_once(ch, st, gh))
-yes('reopened on GitHub: the same post goes back to open, no new post',
-    edited == [10] and posted == [] and len(ch.messages) == 2
-    and ch.messages[st['issues']['10']['message_id']].content
-    == '**Ferry sinks**\nStatus: Open')
+posted, removed = run(bot.known_issues_once(kf, st, gh, me_id=me.id))
+yes('reopened as a finding: a post again', posted == [10] and len(kf.threads) == 1)
 
-st4 = {}
-run(bot.known_issues_recover(ch, st4, me.id, {10: ISSUES[10], 11: ISSUES[11]}))
-yes('recovery matches posts back by title and reads a Closed one as closed',
-    st4['issues']['11']['closed'] == 'not_planned'
-    and st4['issues']['10']['closed'] is None
-    and st4['issues']['10']['message_id'] == st['issues']['10']['message_id'])
 
-# Two open issues with one title: each gets its own post, recovery or not.
-issue(20, 'Same name', ['Dev Findings'])
-issue(21, 'Same name', ['Main Findings'])
-before = len(ch.messages)
-posted, _ = run(bot.known_issues_once(ch, st, gh, me_id=me.id))
-posted2, _ = run(bot.known_issues_once(ch, {'issues': dict(
-    (k, v) for k, v in st['issues'].items() if k != '21')}, gh, me_id=me.id))
-yes('two issues with the same title get two posts, and a recovery never '
-    'hands one post to both',
-    posted == [20, 21] and len(ch.messages) == before + 2 and posted2 == [])
+# --------------------------------------------- 5. automatic test tasks --
+ISSUES.clear()
+tst = {}
+issue(30, 'Old fix', ['Dev Findings'], state='closed', reason='completed',
+      closed_at='2026-10-01T00:00:00Z')
+posted, removed = run(bot.test_tasks_once(tf, tst, gh, me_id=me.id,
+                                         now='2026-10-12T04:00:00Z'))
+yes('the first pass only sets the start: nothing closed before it is posted',
+    posted == [] and tst['since'] == '2026-10-12T04:00:00Z' and tf.threads == [])
+issue(31, 'Ferry sinks', ['Dev Findings'], state='closed', reason='completed',
+      closed_at='2026-10-12T05:00:00Z')
+COMMENTS[31] = [{'body': 'Fixed in the gamemode.'},
+                {'body': 'Test task: Ride the ferry to Solstheim\nServer: Main\n'
+                         'Board at Windhelm and ride across.\nYou arrive dry.'}]
+issue(32, 'Gold resets', ['Main Findings'], state='closed', reason='completed',
+      closed_at='2026-10-12T05:01:00Z')
+issue(33, 'Tooling only', ['area: Release'], state='closed', reason='completed',
+      closed_at='2026-10-12T05:02:00Z')
+issue(34, 'Will not do', ['Dev Findings'], state='closed', reason='not_planned',
+      closed_at='2026-10-12T05:03:00Z')
+issue(35, 'Launcher fix', ['area: Launcher'], state='closed', reason='completed',
+      closed_at='2026-10-12T05:04:00Z')
+COMMENTS[35] = [{'body': 'test task: Open the server list\nIt opens on your server.'}]
+posted, removed = run(bot.test_tasks_once(tf, tst, gh, me_id=me.id))
+by = dict((th.name, th) for th in tf.threads)
+yes('a fixed issue becomes a test task post, titled and written from its '
+    '"Test task:" comment, tagged by the Server line',
+    'Ride the ferry to Solstheim' in by
+    and by['Ride the ferry to Solstheim'].content
+    == 'Board at Windhelm and ride across.\nYou arrive dry.'
+    and [x.name for x in by['Ride the ferry to Solstheim'].applied_tags] == ['Main'])
+yes('  a fixed finding with no such comment gets its own title and a plain line, '
+    'tagged by its label',
+    'Gold resets' in by and by['Gold resets'].content.startswith('This was fixed.')
+    and [x.name for x in by['Gold resets'].applied_tags] == ['Main'])
+yes('  any fixed issue with a "Test task:" comment is posted, finding or not',
+    'Open the server list' in by)
+yes('  but not a fixed issue with neither, and not one closed as not planned',
+    'Tooling only' not in by and 'Will not do' not in by
+    and sorted(posted) == [31, 32, 35])
+posted, removed = run(bot.test_tasks_once(tf, tst, gh, me_id=me.id))
+yes('a second pass posts nothing twice', posted == [] and len(tf.threads) == 3)
+issue(32, 'Gold resets', ['Main Findings'])
+posted, removed = run(bot.test_tasks_once(tf, tst, gh, me_id=me.id))
+yes('a reopened issue loses its test task post',
+    removed == [32] and 'Gold resets' not in [th.name for th in tf.threads])
+
 
 saved_token = os.environ.pop('GITHUB_TOKEN', None)
 
