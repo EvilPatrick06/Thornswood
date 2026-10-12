@@ -291,7 +291,7 @@ door(null);
 
 // ------------------------------------------------------------ the voice log
 yes('the voice service writes /joinpass to the chat log without the pass',
-    /chatWrite\('command', myId, me, \/\^\\\/joinpass\\b\/i\.test\(text\) \? '\/joinpass \[pass\]' : text\);/.test(voice));
+    /chatWrite\('command', myId, me, \/\^\\\/joinpass\\b\/i\.test\(text\) \? '\/joinpass \[pass\]' : text,\s*msg\.press === true \? 'press' : ''\);/.test(voice));
 
 // ------------------------------------------------------------ the front plugin
 {
