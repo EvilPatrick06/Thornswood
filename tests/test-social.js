@@ -662,7 +662,10 @@ if (social && trade) {
   let update, target = '', prompt = null;
   const sp = { on(event, fn) { update = fn; }, Game: { getCurrentCrosshairRef() { return { getFormID() { return 0xff001234; } }; } } };
   const run = new Function('sp', 'guard', 'globalThis', 'nearList', 'drawPrompt', 'say',
-    'let nearAt=0, lookingAt=""; const NEAR_EVERY=1; ' + FRONT.slice(start,end+8) + '; return function(fn){ fn(); return lookingAt; };');
+    // Nothing open: no panel claim and no menu (#1739 hides the prompt under
+    // them; test-1739-look-covered.js has those cases).
+    'let nearAt=0, lookingAt="", lookingSig="", lookCover=""; const NEAR_EVERY=1; ' +
+    'function anyClaim() { return false; } function lookCoveredBy() { return ""; } ' + FRONT.slice(start,end+8) + '; return function(fn){ fn(); return lookingAt; };');
   const next = run(sp, (label, fn) => fn, client, () => client.thornswoodNear, row => { prompt=row; }, () => {});
   target = next(update);
   yes('D3: a differently mapped client actor arms the prompt with its server ID', target === 'ff000004' && !!prompt && prompt.n === 'Second');
