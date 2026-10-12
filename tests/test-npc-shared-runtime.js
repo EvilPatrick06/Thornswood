@@ -625,6 +625,32 @@ for (const reciprocal of [true,false]) {
   });
 }
 
+// #2032: rereading every triangle's links at each finished mesh made one
+// background route search cost 20 to 47 ms while the cast was prepared.
+test('A triangle\'s links are read again only when a mesh they lead to arrives', () => {
+  const {records} = externalPair(true);
+  records.set(1000062,{cell:60,mesh:isolated(),mapping:new Map()});
+  const context = {Buffer,Math,Date,Number,Map,Set,JSON};
+  vm.createContext(context);
+  vm.runInContext(source.slice(begin,end),context);
+  let ids = [1000060];
+  const nav = context.createNpcNavigation({
+    getNavmeshRecords: () => ids.slice(),
+    lookupEspmRecordById(id) {
+      const record = records.get(id);
+      return {record:{fields:[{type:'NVNM',data:record.mesh.data}]},toGlobalRecordId:local => record.mapping.get(local) || 0};
+    }},() => 0,() => {},() => {});
+  const load = (list,pos) => { ids = list; nav.ensureBank(60,pos); while(nav.pending()) nav.work(); };
+  load([1000060],[100,100,0]);
+  const node = context.npcTriangleAt(nav.meshes.get(1000060),0);
+  assert.equal(nav.nodeLinks(node).length,0,'The mesh across its external edge has not arrived');
+  load([1000061],[5000,5000,0]);
+  const links = nav.nodeLinks(node);
+  assert.equal(links.length,1,'Once it arrives the link is read');
+  assert.equal(links[0].node.mesh,1000061);
+  load([1000062],[9000,9000,0]);
+  assert.ok(nav.nodeLinks(node) === links,'A mesh the triangle does not lead to leaves its links unread');
+});
 function largeMesh(corrupt) {
   const mesh = geometry([[0,0,0],[300,0,0],[0,300,0]],
     Array.from({length:2200},() => [0,1,2]),[],false);

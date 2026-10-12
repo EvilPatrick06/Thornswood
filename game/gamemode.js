@@ -62492,32 +62492,43 @@ function createNpcNavigation(api, now, report, ready) {
     if(--bank.remaining!==0) return;
     bank.ready=true;ready(bank);
   }
+  // A triangle's links depend only on its own mesh and the meshes its
+  // external edges lead to, so they are kept once every one of those was
+  // loaded when they were read. Until then a link into a mesh still loading
+  // is missing, and they are read again after the next mesh finishes. Reading
+  // them all again at every finished mesh (#2032) made one background step's
+  // route search reread up to 128 triangles, 20 to 47 ms on One while the
+  // cast was being prepared. Each triangle's corners are read once here.
   function nodeLinks(n) {
-    if(n.linksVersion===geometryVersion) return n.cachedLinks;
-    const bank={meshes:sharedMeshes},links=[];
-    if(!bank.meshes.has(n.mesh)) return links;
+    if(n.cachedLinks && (n.linksComplete || n.linksVersion===geometryVersion)) return n.cachedLinks;
+    const links=[],mesh=sharedMeshes.get(n.mesh);
+    if(!mesh) return links;
+    const points=n.points,edges=n.edges,flags=n.flags;
+    let complete=true;
     for(let e=0;e<3;e++) {
-      const mesh=bank.meshes.get(n.mesh);
-      const external=!!(n.flags&(1<<e));
-      const edge=n.edges[e];
+      const external=!!(flags&(1<<e));
+      const edge=edges[e];
       const ext=external && npcExternal(mesh,edge);
       if(external && (!ext || ext.type!==0)) continue;
-      const targetMesh=external ? bank.meshes.get(ext.mesh) : mesh;
-      const other=targetMesh && npcTriangleAt(targetMesh,external ? ext.index : edge);
-      if(!other || other===n || other.flags&(8|32) || !npcHasGround(other.points)) continue;
-      const p=n.points[e],q=n.points[(e+1)%3];
-      const oe=other.points.findIndex((v,j)=>
-        (distance(v,p)<0.1 && distance(other.points[(j+1)%3],q)<0.1) ||
-        (distance(v,q)<0.1 && distance(other.points[(j+1)%3],p)<0.1));
+      const targetMesh=external ? sharedMeshes.get(ext.mesh) : mesh;
+      if(!targetMesh) {complete=false;continue;}
+      const other=npcTriangleAt(targetMesh,external ? ext.index : edge);
+      if(!other || other===n) continue;
+      const otherFlags=other.flags,corners=other.points;
+      if(otherFlags&(8|32) || !npcHasGround(corners)) continue;
+      const p=points[e],q=points[(e+1)%3];
+      const oe=corners.findIndex((v,j)=>
+        (distance(v,p)<0.1 && distance(corners[(j+1)%3],q)<0.1) ||
+        (distance(v,q)<0.1 && distance(corners[(j+1)%3],p)<0.1));
       if(oe<0) continue;
-      const oext=!!(other.flags&(1<<oe));
-      const om=bank.meshes.get(other.mesh),olink=oext && npcExternal(om,other.edges[oe]);
+      const oext=!!(otherFlags&(1<<oe)),otherEdge=other.edges[oe];
+      const olink=oext && npcExternal(targetMesh,otherEdge);
       const reciprocal=oext ? olink && olink.type===0 && olink.mesh===n.mesh && olink.index===n.index :
-        other.mesh===n.mesh && other.edges[oe]===n.index;
+        other.mesh===n.mesh && otherEdge===n.index;
       if(!reciprocal) continue;
       if(!links.some(l=>l.node===other)) links.push(Object.assign(Object.create(npcPortal),{node:other,source:n,edge:e}));
     }
-    n.linksVersion=geometryVersion;n.cachedLinks=links;return links;
+    n.linksVersion=geometryVersion;n.linksComplete=complete;n.cachedLinks=links;return links;
   }
   // One slice of mesh work, inside the same cost, insertion and time budget.
   function work() {
