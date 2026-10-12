@@ -99,7 +99,13 @@ foreach ($wf in Get-ChildItem -LiteralPath $Workflows -Filter *.yml) {
     $onProd = $t -match ('runs-on:\s*\[[^\]]*\b' + [regex]::Escape($r.productionLabel) + '\b')
     $perm = (Get-TopBlock 'permissions') -join ' '
     $name = $wf.Name
-    Row 'workflow' "$name runs on" "not $($r.productionLabel) for untrusted code" ("triggers " + ($triggers -join ',') + $(if ($onProd) { "; on $($r.productionLabel)" } else { '' })) (-not ($onProd -and ($triggers -contains 'pull_request' -or $triggers -contains 'pull_request_target')))
+    # A pull request may reach the production label only through a job that
+    # names this repository as the head, so a fork never does (Patrick, 12 Oct
+    # 2026: the VPS backs up pull request builds too, same-repository only).
+    # pull_request_target is never allowed there.
+    $sameRepo = $t -match 'github\.event\.pull_request\.head\.repo\.full_name == github\.repository'
+    $prOnProd = $onProd -and ($triggers -contains 'pull_request_target' -or ($triggers -contains 'pull_request' -and -not $sameRepo))
+    Row 'workflow' "$name runs on" "not $($r.productionLabel) for untrusted code" ("triggers " + ($triggers -join ',') + $(if ($onProd) { "; on $($r.productionLabel)" } else { '' }) + $(if ($onProd -and $sameRepo) { '; same-repository pull requests only' } else { '' })) (-not $prOnProd)
     if ($triggers -contains 'pull_request_target') { Row 'workflow' "$name pull_request_target" 'not used' 'used' $false }
     Row 'workflow' "$name token" 'permissions set per workflow, no write-all' $(if ($perm) { $perm.Trim() } else { 'not set (repository default)' }) ([bool]$perm -and $perm -notmatch 'write-all')
 }

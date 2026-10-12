@@ -75,12 +75,11 @@ const EVENTS = ['onActivate', 'onCraft', 'onDeath', 'onDropItem', 'onEatItem',
                 'onPutItem', 'onReadBook', 'onRespawn', 'onTakeItem',
                 'onUpdateAppearanceAttempt', 'onUpdateEquipmentAttempt'];
 // The Papyrus family: the engine calls mp['onPapyrusEvent:' + name] for each
-// of these. Read out of every SendPapyrusEvent call in the fork.
+// of these. They are the server half of the fork's event list,
+// records\papyrus-events.json (issue #503), read out of every
+// SendPapyrusEvent call in the fork by scripts\dev\PapyrusEventList.js.
 const PAPYRUS_PREFIX = 'onPapyrusEvent:';
-const PAPYRUS = ['OnActivate', 'OnCellLoad', 'OnHit', 'OnInit', 'OnItemAdded',
-                 'OnLoad', 'OnObjectEquipped', 'OnSpellCast', 'OnTrigger',
-                 'OnTriggerEnter', 'OnTriggerLeave', 'OnUpdate',
-                 'SkympOnActivateClose'];
+const PAPYRUS = JSON.parse(fs.readFileSync(path.join(REPO_DIR, 'records', 'papyrus-events.json'), 'utf8')).server.sends;
 // The console commands the client forwards, consoleCommandsService.ts.
 const CONSOLE = ['additem', 'equipitem', 'placeatme', 'disable', 'mp'];
 
