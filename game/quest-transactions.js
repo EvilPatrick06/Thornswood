@@ -33,7 +33,7 @@ function createQuestTransactions(deps) {
   function report(message,error) {try{log(message+String(error));}catch(ignored){}}
   function available() {
     return active && typeof deps.withInventoryMutation==='function' && !!mp &&
-      ['compareAndSetInventoryAndProperty','getInventoryReceipt','getSavedInventoryReceipt',
+      ['compareAndSetActorProperty','compareAndSetInventoryAndProperty','getInventoryReceipt','getSavedInventoryReceipt',
         'get','getIdFromDesc','getDescFromId','getNpcAIState','getActorRuntimeIdentity'].every(function(key){return typeof mp[key]==='function';});
   }
   function identity(actor) {
@@ -46,6 +46,30 @@ function createQuestTransactions(deps) {
       if(!token)return {ok:false,why:'identity'};
       // Match the addon's JSON boundary, including omitted optional fields.
       nextRecord=JSON.parse(JSON.stringify(nextRecord));
+      if(!Array.isArray(changes))throw new Error('Invalid quest goods.');
+      if(changes.length===0) {
+        var metadataOwner=JSON.parse(token);
+        if(!available() || identity(actor)!==token)return {ok:false,why:'identity'};
+        try {
+          var committed=mp.compareAndSetActorProperty(actor,metadataOwner.profileId,
+            {name:property,expected:expectedRecord===undefined?null:expectedRecord,replacement:nextRecord,
+              expectedLifeGeneration:metadataOwner.life,expectedRuntimeIdentity:metadataOwner.runtime});
+          return {ok:committed===true,why:committed===true?'':'changed'};
+        } catch(error) {
+          // An unchanged inventory receipt says nothing about a metadata save.
+          // Only a verified unchanged property establishes a refused operation.
+          try {
+            var record=mp.get(actor,property);
+            if(identity(actor)===token && same(record==null?null:record,expectedRecord==null?null:expectedRecord)) {
+              report('quest metadata refused: ',error);
+              return {ok:false,why:'unwritten'};
+            }
+          } catch(readError) { /* Unreadable outcomes revoke the service below. */ }
+          active=false;
+          report('quest metadata outcome is unknown; service revoked: ',error);
+          return {ok:false,why:'unavailable',uncertain:true};
+        }
+      }
       return deps.withInventoryMutation(actor,function(human,stillActive){
         if(!available() || !stillActive())return {ok:false,why:'unavailable'};
         if(identity(actor)!==token)return {ok:false,why:'identity'};
