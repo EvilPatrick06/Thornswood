@@ -70,6 +70,48 @@
       "bind": "any",
       "process": "*",
       "why": "dev resources"
+    },
+    {
+      "proto": "udp",
+      "port": 443,
+      "bind": "public",
+      "process": "caddy",
+      "why": "Caddy HTTP/3 (QUIC) on the same 443 door; Caddy opens it by default next to tcp 443"
+    },
+    {
+      "proto": "tcp",
+      "port": 135,
+      "bind": "any",
+      "process": "*",
+      "why": "Windows RPC endpoint mapper, part of the OS; shut from outside (Claude, Oct 11 run)"
+    },
+    {
+      "proto": "tcp",
+      "port": 445,
+      "bind": "any",
+      "process": "*",
+      "why": "Windows SMB, part of the OS; shut from outside (Claude, Oct 11 run)"
+    },
+    {
+      "proto": "udp",
+      "port": 123,
+      "bind": "any",
+      "process": "*",
+      "why": "Windows Time (NTP client), part of the OS"
+    },
+    {
+      "proto": "udp",
+      "port": 5353,
+      "bind": "any",
+      "process": "*",
+      "why": "Windows mDNS, part of the OS; shut from outside. Turning it off is a separate call for Patrick"
+    },
+    {
+      "proto": "udp",
+      "port": 5355,
+      "bind": "any",
+      "process": "*",
+      "why": "Windows LLMNR, part of the OS; shut from outside. Turning it off is a separate call for Patrick"
     }
   ],
   "tasks": [
@@ -110,6 +152,21 @@
       "triggers": [
         "Daily"
       ]
+    },
+    {
+      "name": "Thornswood Load",
+      "user": "SYSTEM",
+      "why": "scripts/vps/Watch-Load.ps1 -Install, every five minutes as SYSTEM (#2061)"
+    },
+    {
+      "name": "Thornswood Maint Update",
+      "user": "*",
+      "why": "maintenance update task found on the box in the Oct 11 run; its account is not in the repository yet, so any account passes"
+    },
+    {
+      "name": "Thornswood Dev Crash Capture",
+      "user": "*",
+      "why": "dev crash capture task found on the box in the Oct 11 run; its account is not in the repository yet, so any account passes"
     }
   ],
   "services": [
@@ -129,7 +186,9 @@
   "files": [
     {
       "live": "C:\\Thornswood-Caddy\\Caddyfile",
-      "repo": "scripts/deploy/Caddyfile"
+      "repo": "scripts/deploy/Caddyfile",
+      "compare": "config",
+      "why": "compared without comment and blank lines: the repository copy carries a comment header the live copy does not need"
     },
     {
       "live": "C:\\Thornswood-Docs\\server.js",
