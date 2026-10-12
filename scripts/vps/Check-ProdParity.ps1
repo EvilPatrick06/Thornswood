@@ -99,7 +99,7 @@ $f.listeners | Where-Object { (Get-BindKind $_.address) -eq 'public' -and "$($_.
 foreach ($e in $r.tasks) {
     $t = @($f.tasks | Where-Object name -eq $e.name) | Select-Object -First 1
     if (-not $t) { Row 'task' $e.name "as $($e.user)" 'missing' $false; continue }
-    $userOk = ($e.user -eq '*') -or ([string]$t.user) -match ('^(NT AUTHORITY\\)?' + [regex]::Escape($e.user) + '$')
+    $userOk = ([string]$t.user) -match ('^(NT AUTHORITY\\)?' + [regex]::Escape($e.user) + '$')
     Row 'task' $e.name "as $($e.user)" "as $($t.user)" $userOk
     if ($e.triggers) {
         $miss = @($e.triggers | Where-Object { $_ -notin @($t.triggers) })

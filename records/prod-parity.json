@@ -160,13 +160,13 @@
     },
     {
       "name": "Thornswood Maint Update",
-      "user": "*",
-      "why": "maintenance update task found on the box in the Oct 11 run; its account is not in the repository yet, so any account passes"
+      "user": "SYSTEM",
+      "why": "maintenance update task found on the box in the Oct 11 run; runs as SYSTEM, Highest per docs/DEPLOY-IDENTITIES.md section 1"
     },
     {
       "name": "Thornswood Dev Crash Capture",
-      "user": "*",
-      "why": "dev crash capture task found on the box in the Oct 11 run; its account is not in the repository yet, so any account passes"
+      "user": "SYSTEM",
+      "why": "dev crash capture task found on the box in the Oct 11 run; runs as SYSTEM, Highest per docs/DEPLOY-IDENTITIES.md section 1"
     }
   ],
   "services": [
