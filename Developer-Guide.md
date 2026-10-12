@@ -59,6 +59,7 @@ The outline nests, and the table of contents follows it. A part is a numbered se
       - [Signing, the build check, and the six shared files](#signing-the-build-check-and-the-six-shared-files)
     - [How work moves, the long form](#how-work-moves-the-long-form)
 - [3. How to release to dev](#3-how-to-release-to-dev)
+  - [The content plugin goes to the server first](#the-content-plugin-goes-to-the-server-first)
   - [Say so, then write the note](#say-so-then-write-the-note)
   - [Mark the dev notes again](#mark-the-dev-notes-again)
   - [Put the gamemode on the dev server](#put-the-gamemode-on-the-dev-server)
@@ -66,6 +67,7 @@ The outline nests, and the table of contents follows it. A part is a numbered se
   - [What any developer may do](#what-any-developer-may-do)
 - [4. How to release to main](#4-how-to-release-to-main)
   - [Move the version first](#move-the-version-first)
+  - [The content plugin goes to the live server first](#the-content-plugin-goes-to-the-live-server-first)
   - [Ship main](#ship-main)
   - [Deploy the live pieces the pull request touched](#deploy-the-live-pieces-the-pull-request-touched)
   - [A hotfix](#a-hotfix)
@@ -1330,6 +1332,19 @@ Everything goes to the dev build first, including a small change. A dev release 
 
 The machine that runs `Ship.ps1` still has to sign the build. [Setting up a machine](#setting-up-a-machine) and [Shipping from another machine](#shipping-from-another-machine) are how a PC gets there.
 
+### The content plugin goes to the server first
+
+The server gets the content plugin first, then the Ship. When `game\content\Thornswood-Content.esp` changed since the last dev release, put it on the dev server before you Ship, with the note the dev updates channel gets:
+
+```powershell
+.\scripts\deploy\Deploy-DevGamemode.ps1 -LoadOrder -Note "The forge takes the new ores
+- Iron and silver ore smelt at every forge."
+```
+
+`-LoadOrder` keeps the dev server's own load order and sends every plugin it names that the server does not hold at the same bytes: the content plugin from your checkout, the others from the collection. It needs no server build, so it runs from the fresh checkout the deploy asks for. `-Dist <a built dist\server folder>` also writes that build's load order over the dev one.
+
+Ship asks the dev server which content plugin it holds, by size and sha256. When this release would send clients another one, Ship stops before it publishes, posts or tells the server anything, and names the command above. On 11 Oct a dev Ship sent a new content plugin while the dev server still had the old one, and for eight minutes every dev client that updated held a plugin the server did not (#2308).
+
 ### Say so, then write the note
 
 The note is what people read. The first line is a title of three words or more, from the person's side. Then one line starting with `- ` for each thing they will notice. Ship refuses a title that is shorter, a note with no `- ` line, an issue number, a file name, a setting name, and the word the Words section bans.
@@ -1391,7 +1406,7 @@ The machine that runs `Ship.ps1` still has to sign the build. `records\signing\s
 | Live gamemode | `.\scripts\deploy\Deploy-Server.ps1 -GamemodeOnly`, from any machine, needs no server build | Live server |
 | Live server build, or the live settings Deploy-Gamemode writes | `.\scripts\deploy\Deploy-Gamemode.ps1`, then `.\scripts\deploy\Deploy-Server.ps1`, from a machine with the fork built | Live server |
 
-`Deploy-Server.ps1 -GamemodeOnly` sends the committed `game\gamemode.js`, its build stamp, and `game\content\Thornswood-Content.esp` when its size is not the live server's copy's. The live server keeps its own settings, and no setting may change. Before anything is sent it asks the live server which server build it runs, and refuses unless that is the build `records\server-build.json` names at your commit. A gamemode that needs a new server build, or a change to the live settings (the load order, the NPC, gear, reloot and damage settings, the join pass and the role lists), goes the full way, from a machine with the build. `-PutBack` puts back what either one replaced. Decided by Patrick on 5 Oct, #1089: any machine may put a gamemode live this way.
+`Deploy-Server.ps1 -GamemodeOnly` sends the committed `game\gamemode.js`, its build stamp, and `game\content\Thornswood-Content.esp` when the live server's copy is not the same size and sha256. The live server keeps its own settings, and no setting may change. Before anything is sent it asks the live server which server build it runs, and refuses unless that is the build `records\server-build.json` names at your commit. A gamemode that needs a new server build, or a change to the live settings (the load order, the NPC, gear, reloot and damage settings, the join pass and the role lists), goes the full way, from a machine with the build. `-PutBack` puts back what either one replaced. Decided by Patrick on 5 Oct, #1089: any machine may put a gamemode live this way.
 
 A dev release can run from any branch on any developer's machine. A main release runs from `main` after `git pull`, with a clean tree that matches GitHub. The note shape is in [Say so, then write the note](#say-so-then-write-the-note). The command for each file is in [After a pull request is merged](#after-a-pull-request-is-merged). The restart warning is in [How a release goes out](#how-a-release-goes-out).
 
@@ -1418,6 +1433,16 @@ git switch main
 git pull
 .\scripts\release\Bump-Version.ps1
 ```
+
+### The content plugin goes to the live server first
+
+When `game\content\Thornswood-Content.esp` changed since the last main release, the live server gets it before the Ship, from `main` after `git pull`:
+
+```powershell
+.\scripts\deploy\Deploy-Server.ps1 -GamemodeOnly
+```
+
+It sends the committed gamemode and the content plugin whenever the live server's copy is not the same size and sha256. A main Ship asks the live server the same question and stops, with nothing published, posted or told to a server, while the answer is another plugin.
 
 ### Ship main
 
@@ -1586,7 +1611,7 @@ repository folder. Any developer may.
 
 1. `git checkout main`, then `git pull`. Ship.ps1 refuses a main release
    that is behind origin, so the pull comes first.
-2. Then one command for each part the pull request touched. The note on a Ship is the one in [Say so, then write the note](#say-so-then-write-the-note). A pull request that touches several of these gets every one of them, in the same sitting, so nothing goes out half done.
+2. Then one command for each part the pull request touched. The note on a Ship is the one in [Say so, then write the note](#say-so-then-write-the-note). A pull request that touches several of these gets every one of them, in the same sitting, so nothing goes out half done. When it changed `game\content\Thornswood-Content.esp`, the server command goes before the Ship: `Deploy-DevGamemode.ps1 -LoadOrder` for dev, `Deploy-Server.ps1 -GamemodeOnly` for live ([The content plugin goes to the server first](#the-content-plugin-goes-to-the-server-first)).
 
 | You changed | Run |
 | --- | --- |

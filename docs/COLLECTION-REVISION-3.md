@@ -107,9 +107,10 @@ in game\gamemode.js) are rebuilt from it, with their tests, in one PR.
 
 ## 5. Dev first
 
-Deploy-DevGamemode.ps1 -LoadOrder sends Dev the 49-position list, with the
-world reset that the moved indexes need. Ship -Channel dev from Dev's own
-folder.
+Deploy-DevGamemode.ps1 -LoadOrder -Dist, with the dist\server folder
+Deploy-Gamemode.ps1 wrote, sends Dev the 49-position list, with the world
+reset that the moved indexes need. Without -Dist it keeps Dev's own order
+(#2309). Ship -Channel dev from Dev's own folder.
 
 ## 6. Check the clean install on Dev
 
