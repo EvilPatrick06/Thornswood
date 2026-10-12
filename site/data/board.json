@@ -284,6 +284,7 @@
   },
   "known": {
     "intro": "What is limited or broken right now, and why. Worth reading before you report\nsomething, because a lot of what looks like a bug is how a shared Skyrim has\nto work.\n\nNot all of it is permanent. The first group follows from SkyMP itself, and\nnone of it is settled for good. Everything after it is where things stand\ntoday, and some of that is being worked on.",
+    "seeded": "2414",
     "sections": [
       {
         "id": "sk1",

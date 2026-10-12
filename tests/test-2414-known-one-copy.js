@@ -108,11 +108,17 @@ yes('the page says NPCs keep moving when nobody is nearby', /keep moving when no
         .indexOf('| one \\| two | first second |') >= 0);
 }
 
-// 6. Deploy-Docs -Board: one board replaced, every other one left as typed.
+// 6. Deploy-Docs puts the board on the box: once by itself, then as typed.
+yes('the repo\'s known board carries the seeded mark Deploy-Docs looks for', board.known && board.known.seeded === '2414');
 yes('Deploy-Docs takes -Board', /\[string\[\]\]\$Board,/.test(deploy));
 yes('and refuses it beside -Boards or -SeedDocs', /if \(\$Board -and \(\$Boards -or \$SeedDocs\)\) \{\s*throw/.test(deploy));
+yes('every plain deploy asks for the boards the repo marks seeded',
+    /\$bp\.Value\.PSObject\.Properties\.Name -contains 'seeded'\) \{ \$seedNames \+= \$bp\.Name \}/.test(deploy) &&
+    /\$boardArgs = @\(\$boardNames \| ForEach-Object \{ \$_ \+ '=force' \}\) \+ @\(\$seedNames \| ForEach-Object \{ \$_ \+ '=seed' \}\)/.test(deploy));
+yes('the step on the box is plain ASCII, as Set-Content -Encoding ASCII writes it',
+    /^[\x00-\x7F]*$/.test((/Set-Content -LiteralPath `\$js -Encoding ASCII -Value @'\n([\s\S]*?)\n'@/.exec(deploy) || [])[1] || String.fromCharCode(255)));
 {
-  const js = (/^(var fs = require\('fs'\);[\s\S]*?^fs\.renameSync\(live \+ '\.new', live\);)$/m.exec(deploy) || [])[1] || '';
+  const js = (/^(var fs = require\('fs'\);[\s\S]*?^\}\n)'@$/m.exec(deploy) || [])[1] || '';
   yes('the step it runs on the box is in the script', js.length > 0);
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-2414-'));
   try {
@@ -120,17 +126,32 @@ yes('and refuses it beside -Boards or -SeedDocs', /if \(\$Board -and \(\$Boards 
     fs.writeFileSync(step, js);
     const live = path.join(tmp, 'board.json'), repo = path.join(tmp, 'board.json.from-repo');
     const typed = { active: { intro: 'typed on the site', sections: [] }, known: { intro: 'stale', sections: [] }, _rev: { active: 4, known: 9 } };
-    fs.writeFileSync(live, '﻿' + JSON.stringify(typed, null, 2));
+    fs.writeFileSync(live, String.fromCharCode(0xFEFF) + JSON.stringify(typed, null, 2));
     fs.writeFileSync(repo, JSON.stringify({ active: { intro: 'the repo copy', sections: [] }, known: board.known }, null, 2));
-    const run = (names) => cp.spawnSync(process.execPath, [step, live, repo].concat(names), { encoding: 'utf8' });
-    let r = run(['known']);
-    const after = JSON.parse(fs.readFileSync(live, 'utf8'));
-    yes('it replaces the named board with the repo copy', r.status === 0 && JSON.stringify(after.known) === JSON.stringify(board.known));
-    yes('and leaves every other board as it was typed', after.active.intro === 'typed on the site');
-    yes('and moves that board\'s revision on, and only that one', after._rev.known === 10 && after._rev.active === 4);
-    yes('and says so', /BOARD REPLACED known, now at revision 10/.test(r.stdout));
+    const run = (asks) => cp.spawnSync(process.execPath, [step, live, repo].concat(asks), { encoding: 'utf8' });
+    const now = () => JSON.parse(fs.readFileSync(live, 'utf8'));
+
+    let r = run(['known=seed']);
+    let after = now();
+    yes('a live board without the mark is seeded from the repo', r.status === 0 && JSON.stringify(after.known) === JSON.stringify(board.known));
+    yes('every other board is left as it was typed', after.active.intro === 'typed on the site');
+    yes('that board\'s revision moves on, and only that one', after._rev.known === 10 && after._rev.active === 4);
+    yes('what was there is kept in board.json.bak', /"stale"/.test(fs.readFileSync(live + '.bak', 'utf8')));
+    yes('and it says so', /BOARD REPLACED known, now at revision 10/.test(r.stdout));
+
+    // Somebody edits it in the hub: the save keeps the mark.
+    after.known.sections[0].rows.push({ id: 'typed', done: false, cells: {}, at: 1, by: 'a person' });
+    fs.writeFileSync(live, JSON.stringify(after, null, 2));
+    r = run(['known=seed']);
+    yes('the next deploy finds it seeded and leaves what was typed', r.status === 0 && /BOARD KEPT known/.test(r.stdout) &&
+        now().known.sections[0].rows.some((x) => x.id === 'typed') && now()._rev.known === 10);
+
+    r = run(['known=force']);
+    yes('-Board puts the repo copy in all the same', r.status === 0 && /BOARD REPLACED known, now at revision 11/.test(r.stdout) &&
+        !now().known.sections[0].rows.some((x) => x.id === 'typed'));
+
     const before = fs.readFileSync(live, 'utf8');
-    r = run(['nosuch']);
+    r = run(['nosuch=force']);
     yes('a board the repo does not have is refused, and the file is left alone',
         r.status !== 0 && /BOARD NOT REPLACED/.test(r.stdout) && fs.readFileSync(live, 'utf8') === before);
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }

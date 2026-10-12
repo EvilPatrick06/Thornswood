@@ -20,7 +20,10 @@
     .\Deploy-Docs.ps1 -Board known
                                replaces just the named board inside the live
                                board.json with the repo's, .bak first, and
-                               leaves every other board as it was typed
+                               leaves every other board as it was typed. A
+                               board the repo marks "seeded" goes in once by
+                               itself, on the first deploy that finds the
+                               live copy without that mark (#2414)
     .\Deploy-Docs.ps1 -SeedDocs
                                flattens every document with the repo copy.
                                First install only. Takes a .bak of each first.
@@ -84,10 +87,10 @@ param(
   [switch]$Boards,
   # One board out of board.json, by its key (known), put in place of the
   # live one while every other board stays exactly as typed on the site
-  # (#2414). -Boards flattens them all, which is why the Known Issues board
-  # could not be seeded with it. The live board.json goes to .bak first, and
-  # the board's revision moves on, so a hub page still open on the old copy
-  # is told to reload rather than saving over the new one.
+  # (#2414). -Boards flattens them all. The live board.json goes to .bak
+  # first, and the board's revision moves on, so a hub page still open on the
+  # old copy is told to reload rather than saving over the new one. A board
+  # the repo marks "seeded" does not need it: see BOARDS THE REPO SEEDS.
   [string[]]$Board,
   # Just the public pages under data\site. Those are not editable in the
   # browser, so pushing them overwrites nobody's work. This is what you want
@@ -388,12 +391,28 @@ Get-ChildItem (Join-Path $App 'data') | Where-Object { $_.Extension -in '.md','.
 if (-not $sent) {
   Write-Host '  all present, nothing overwritten (use -SeedDocs to replace them)'
 }
-# -Board: the named boards go into the live board.json in place of what is
-# there, and nothing else in it moves (#2414). The repo's board.json goes up
-# beside it, node on the box (the site's own) swaps the named keys and moves
-# each one's _rev on, and the result replaces the file in one rename. The
-# .bak above holds what was there.
-if ($boardNames.Count) {
+# BOARDS THE REPO SEEDS, AND -Board (#2414). Every deploy puts a board from
+# the repo into the live board.json when it carries a "seeded" mark the live
+# copy does not have yet: the first deploy after it lands seeds it, whatever
+# that deploy was for, and every later one leaves it as typed on the site,
+# because hub saves keep the mark. -Board puts the named boards in whatever
+# the live copy says. Nothing else in the file moves. The repo's board.json
+# goes up beside it, node on the box (the site's own) swaps the keys and moves
+# each one's _rev on, so a hub page still open on the old copy reloads rather
+# than saving over it, and the result replaces the file in one rename, after a
+# board.json.bak of what was there.
+$seedNames = @()
+$repoBoardFile = Join-Path $App 'data/board.json'
+if (-not $SeedDocs -and -not $Boards -and (Test-Path -LiteralPath $repoBoardFile)) {
+  $repoAll = Get-Content -Raw -LiteralPath $repoBoardFile | ConvertFrom-Json
+  foreach ($bp in $repoAll.PSObject.Properties) {
+    if ($bp.Name -match '^[a-z]+$' -and $boardNames -notcontains $bp.Name -and
+        $bp.Value -is [System.Management.Automation.PSCustomObject] -and
+        $bp.Value.PSObject.Properties.Name -contains 'seeded') { $seedNames += $bp.Name }
+  }
+}
+$boardArgs = @($boardNames | ForEach-Object { $_ + '=force' }) + @($seedNames | ForEach-Object { $_ + '=seed' })
+if ($boardArgs.Count) {
   Push (Join-Path $App 'data/board.json') "$Root/data/board.json.from-repo"
   $boardOut = @(Remote @"
 `$node = (Get-Command node -EA SilentlyContinue).Source
@@ -401,28 +420,39 @@ if (-not `$node) { 'BOARD NOT REPLACED: node is not on this machine'; return }
 `$js = Join-Path `$env:TEMP ('ts-board-' + [guid]::NewGuid().ToString('N') + '.js')
 Set-Content -LiteralPath `$js -Encoding ASCII -Value @'
 var fs = require('fs');
-var a = process.argv.slice(2), live = a[0], repo = a[1], names = a.slice(2);
-function read(f) { return JSON.parse(fs.readFileSync(f, 'utf8').replace(/^﻿/, '')); }
-var L = read(live), R = read(repo);
+var a = process.argv.slice(2), live = a[0], repo = a[1], asks = a.slice(2);
+var BOM = String.fromCharCode(0xFEFF);
+function read(f) { var t = fs.readFileSync(f, 'utf8'); return JSON.parse(t.charAt(0) === BOM ? t.slice(1) : t); }
+var L = read(live), R = read(repo), moved = 0;
 var rev = (L._rev && typeof L._rev === 'object') ? L._rev : {};
-L._rev = rev;
-for (var i = 0; i < names.length; i++) {
-  var n = names[i];
+for (var i = 0; i < asks.length; i++) {
+  var n = asks[i].split('=')[0], how = asks[i].split('=')[1];
   if (!R[n] || typeof R[n] !== 'object') { console.log('BOARD NOT REPLACED: the repo has no board ' + n); process.exit(1); }
+  if (how === 'seed' && L[n] && typeof L[n] === 'object' && L[n].seeded === R[n].seeded) {
+    console.log('BOARD KEPT ' + n + ', already seeded ' + R[n].seeded + ', as typed on the site');
+    continue;
+  }
   L[n] = R[n];
   rev[n] = (typeof rev[n] === 'number' ? rev[n] : 0) + 1;
+  moved++;
   console.log('BOARD REPLACED ' + n + ', now at revision ' + rev[n]);
 }
-fs.writeFileSync(live + '.new', JSON.stringify(L, null, 2) + '\n', 'utf8');
-fs.renameSync(live + '.new', live);
+if (moved) {
+  L._rev = rev;
+  fs.copyFileSync(live, live + '.bak');
+  fs.writeFileSync(live + '.new', JSON.stringify(L, null, 2) + '\n', 'utf8');
+  fs.renameSync(live + '.new', live);
+}
 '@
-& `$node `$js '$rootWin\data\board.json' '$rootWin\data\board.json.from-repo' $($boardNames -join ' ')
+& `$node `$js '$rootWin\data\board.json' '$rootWin\data\board.json.from-repo' $($boardArgs -join ' ')
 Remove-Item -LiteralPath `$js, '$rootWin\data\board.json.from-repo' -Force -EA SilentlyContinue
 "@ | Where-Object { $_ -is [string] } | ForEach-Object { "$_".Trim() })
   $boardOut | ForEach-Object { Write-Host "  $_" }
-  if (@($boardOut | Where-Object { $_ -like 'BOARD REPLACED *' }).Count -ne $boardNames.Count) {
+  $answered = @($boardOut | Where-Object { $_ -like 'BOARD REPLACED *' -or $_ -like 'BOARD KEPT *' }).Count
+  $forced = @($boardOut | Where-Object { $_ -like 'BOARD REPLACED *' }).Count
+  if ($answered -ne $boardArgs.Count -or $forced -lt $boardNames.Count) {
     Write-Host ''
-    Write-Host '  THE BOARD WAS NOT REPLACED. The live board.json is as it was (board.json.bak has it too).' -ForegroundColor Red
+    Write-Host '  THE BOARDS WERE NOT PUT IN PLACE. The live board.json is as it was.' -ForegroundColor Red
     Write-Host '  The lines above say why. Nothing after this step was done.' -ForegroundColor Red
     exit 1
   }
