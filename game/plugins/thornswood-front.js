@@ -4848,15 +4848,51 @@
     Right of centre and a little below the crosshair, which is where Skyrim
     puts its own activate prompt and is where an eye already is. Never over
     the crosshair itself: a panel you cannot see past is worse than no panel.
+
+    BENEATH OUR PANELS (#1739). It stood at 2147483400, above every panel
+    (2147483000 to 2147483300), so a panel opened while somebody was under
+    the crosshair had the prompt drawn on top of it. It sits with the key
+    mold line now, under all of them, and it is taken down while any of them
+    is open (see lookCoveredBy).
   */
   const LOOK_CSS =
-    'position:fixed;left:54%;top:46%;z-index:2147483400;pointer-events:none;' +
+    'position:fixed;left:54%;top:46%;z-index:2147482900;pointer-events:none;' +
     'font-family:Georgia,serif;font-size:19px;letter-spacing:.03em;' +
     'background:rgba(12,10,8,.62);border:2px solid rgba(0,0,0,.65);' +
     'border-radius:9px;padding:11px 16px 14px;' +
     'text-shadow:0 2px 4px rgba(0,0,0,.95)';
 
+  /*
+    NEVER OVER A MENU OR A PANEL (#1739). A tester, on dev and main: the
+    panel that names who you look at "doesn't disappear when opening other
+    menus and things, and it gets in the way". The crosshair poll below drew
+    it from two things only, the crosshair and the server's near list, and
+    asked nothing about what else was on screen. Skyrim keeps the same
+    reference under the crosshair while one of its menus is up, so the
+    prompt stayed drawn over the inventory, the magic menu, the map, the
+    Tab menu, a container, a trader's barter, a book, the favourites on Q
+    and every other menu in KEYBOARD_MENUS; and over our own panels (K, P,
+    J, the trade window, a trader's wares, the board, help, the maneuvers,
+    the emote wheel and the rest of CAP_CLOSES) and the chat while it is
+    being typed in, which the page draws beneath it.
+
+    So what is open is part of what it is drawn from: nothing that holds
+    the keyboard (a claim, the same list the focus arbiter keeps) and none
+    of Skyrim's menus that take it. Who is being looked at is still
+    followed while it is down, so the keys and the prompt are right the
+    moment the menu closes.
+  */
+  let lookCover = '';      // what the prompt was last taken down for, for one line each time
+
+  function lookCoveredBy() {
+    for (const k in claims) { if (claims[k]) { return 'the ' + k + ' panel'; } }
+    return busyMenuOpen();
+  }
+
+  // A claim is a variable read, so it is asked every frame and a panel takes
+  // the prompt down in the frame it opens, not on the next poll.
   sp.on('update', guard('crosshair', () => {
+    if (lookingSig && anyClaim()) { drawPrompt(null); }
     const now = Date.now();
     if (now - nearAt < NEAR_EVERY) { return; }
     nearAt = now;
@@ -4884,7 +4920,29 @@
       lookingAt = hex;
       say('looking at ' + row.n + ' (' + hex + ')');
     }
-    drawPrompt(row);
+    const cover = lookCoveredBy();
+    if (cover !== lookCover) {
+      if (cover) { say('look prompt down while ' + cover + ' is open'); }
+      lookCover = cover;
+    }
+    drawPrompt(cover ? null : row);
+  }));
+
+  /*
+    One of Skyrim's menus takes the prompt down the moment it opens, rather
+    than on the next poll, and the menu memory busyMenuOpen keeps for a
+    quarter of a second is let go of, so a "no menu" read just before the
+    menu opened cannot put the prompt back over it. Closing lets go of it
+    too, so the prompt is back on the next poll.
+  */
+  sp.on('menuOpen', guard('look menu', (e) => {
+    if (KEYBOARD_MENUS.indexOf(String((e && e.name) || '')) === -1) { return; }
+    menuCachedAt = 0;
+    drawPrompt(null);
+  }));
+  sp.on('menuClose', guard('look menu closed', (e) => {
+    if (KEYBOARD_MENUS.indexOf(String((e && e.name) || '')) === -1) { return; }
+    menuCachedAt = 0;
   }));
 
   /*
