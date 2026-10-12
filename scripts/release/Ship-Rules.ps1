@@ -34,7 +34,7 @@
       Get-ShipLooseArt $files      loose textures and meshes an installer carries that are not ours, by folder
       Test-ShipNotOurs $rel        another author's loose file (outside Data\Platform, not named ours); never packed, recorded or listed as removed
       Test-ShipOurs $rel           ours outside Data\Platform: the named files, the client runtime, required data, the menu, Nemesis's output, the BodySlide builds until #1259
-      Test-ShipHeld $rel           a loose file that ships until the collection revision that carries its mod
+      Test-ShipHeld $rel           a loose file that ships until the collection revision that carries its mod, or while the content plugin names it
       Get-ShipCollectionRevision   the revision a release is built against, for $ShipCollectionRevision
       Get-ShipLoadOrderDir         where the reference plugins.txt and loadorder.txt are read from
       Get-ShipRequiredDataRoot     game\required-data in the repo
@@ -1250,38 +1250,126 @@ $ShipGeneratedPatterns = $ShipGeneratedBodyFiles + @(
 # bytes). Revision 2 adds each mod (Claude Cowork's checklist says how, and
 # stops if one brings a plugin, which would move the load order), and a person
 # checks in game that nothing looks different.
-function New-ShipHeld([string]$Path, [string]$Mod) {
-    return [pscustomobject]@{ Path = $Path; Revision = 2; Mod = $Mod }
+#
+# EVERY LINE NAMES ITS OWN WAY OUT, AND THERE IS NO DEFAULT (#2298). Either
+# -Revision N, the collection revision that carries (or drops) its mod, or
+# -WhileContentNamesIt, for a mesh no collection revision settles: it ships for
+# exactly as long as game\content\Thornswood-Content.esp (the plugin every
+# release places, Ensure-ShipRequiredData) names it as a model, so it leaves in
+# the same release as the plugin stops needing it, and never before.
+#
+# Until 11 October this function gave every line Revision 2 whatever it was
+# given, the message board's included, though that line's own comment said no
+# revision carries it. Releases are built against revision 2 since 3 October
+# (records\collection-plugins.json), so dev 1.2.3 listed the board mesh as gone
+# and every board the plugin places lost its model while the plugin still named
+# it. A line now refuses to be made without a way out, and the board's way out
+# is the plugin itself.
+function New-ShipHeld {
+    param(
+        [Parameter(Mandatory = $true, Position = 0)][string]$Path,
+        [Parameter(Mandatory = $true, Position = 1)][string]$Mod,
+        [int]$Revision = 0,
+        [switch]$WhileContentNamesIt
+    )
+    if (($Revision -gt 0) -eq [bool]$WhileContentNamesIt) {
+        throw ('New-ShipHeld ' + $Path + ': name exactly one way out, -Revision N or -WhileContentNamesIt.')
+    }
+    $model = ''
+    if ($WhileContentNamesIt) {
+        if (-not $Path.StartsWith('Data\meshes\', 'OrdinalIgnoreCase') -or $Path.EndsWith('\')) {
+            throw ('New-ShipHeld ' + $Path + ': -WhileContentNamesIt is for one mesh file under Data\meshes\.')
+        }
+        # A plugin's MODL is relative to meshes\.
+        $model = $Path.Substring('Data\meshes\'.Length)
+    }
+    return [pscustomobject]@{ Path = $Path; Revision = $Revision; ContentModel = $model; Mod = $Mod }
+}
+
+# The plugin a release places. A test points this at a copy.
+$ShipContentPlugin = Join-Path $PSScriptRoot '..\..\game\content\Thornswood-Content.esp'
+
+# Every model (MODL) the plugin names, lower case with backslashes. Compressed
+# records are inflated and read too, so a model inside one is not missed.
+# Throws when the plugin is missing or does not read as records, because then
+# whether the board ships would be a guess.
+function Get-ShipContentModels([string]$Plugin = $ShipContentPlugin) {
+    if (-not (Test-Path -LiteralPath $Plugin -PathType Leaf)) {
+        throw ('The content plugin is not at ' + $Plugin + ', so what it names cannot be read.')
+    }
+    $b = [IO.File]::ReadAllBytes($Plugin)
+    $found = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    $ascii = [Text.Encoding]::ASCII
+    $p = 24 + [BitConverter]::ToUInt32($b, 4)
+    if ($b.Length -lt 24 -or $ascii.GetString($b, 0, 4) -ne 'TES4' -or $p -gt $b.Length) {
+        throw ('The content plugin at ' + $Plugin + ' does not start with a TES4 header.')
+    }
+    while ($p + 24 -le $b.Length) {
+        $tag = $ascii.GetString($b, $p, 4)
+        $size = [BitConverter]::ToUInt32($b, $p + 4)
+        # A group's size counts its own 24 bytes; step inside it.
+        if ($tag -eq 'GRUP') { $p += 24; continue }
+        if ($p + 24 + $size -gt $b.Length) { throw ('The content plugin at ' + $Plugin + ' ends inside a record.') }
+        $flags = [BitConverter]::ToUInt32($b, $p + 8)
+        $data = New-Object byte[] $size
+        [Array]::Copy($b, $p + 24, $data, 0, $size)
+        if (($flags -band 0x00040000) -ne 0) {
+            # Four bytes of length, then a zlib stream: two header bytes, then deflate.
+            $ms = [IO.MemoryStream]::new($data, 6, $size - 6)
+            $ds = [IO.Compression.DeflateStream]::new($ms, [IO.Compression.CompressionMode]::Decompress)
+            $out = [IO.MemoryStream]::new()
+            $ds.CopyTo($out); $ds.Dispose()
+            $data = $out.ToArray()
+        }
+        $i = 0
+        while ($i + 6 -le $data.Length) {
+            $st = $ascii.GetString($data, $i, 4)
+            $sn = [BitConverter]::ToUInt16($data, $i + 4)
+            if ($st -eq 'MODL' -and $i + 6 + $sn -le $data.Length) {
+                $found.Add($ascii.GetString($data, $i + 6, $sn).TrimEnd([char]0).Replace('/', '\')) | Out-Null
+            }
+            $i += 6 + $sn
+        }
+        $p += 24 + $size
+    }
+    return , $found
+}
+
+# True when the content plugin names this model (relative to meshes\).
+function Test-ShipContentNames([string]$Model, [string]$Plugin = $ShipContentPlugin) {
+    return (Get-ShipContentModels $Plugin).Contains($Model.Replace('/', '\'))
 }
 $ShipHeldForCollection = @(
     # Male faces' expressions and beards: Expressive Facial Animation - Male
     # Edition (Nexus 19532), 1.21. Expressive Facegen Morphs, in the
     # collection, carries only the chargen and race morphs beside these.
-    (New-ShipHeld 'Data\meshes\actors\character\character assets\MaleHead.tri' 'Expressive Facial Animation - Male Edition (19532)'),
-    (New-ShipHeld 'Data\meshes\actors\character\character assets\EyesMale.tri' 'Expressive Facial Animation - Male Edition (19532)'),
-    (New-ShipHeld 'Data\meshes\actors\character\character assets\faceparts\' 'Expressive Facial Animation - Male Edition (19532)'),
-    (New-ShipHeld 'Data\meshes\actors\character\character assets\mouth\' 'Expressive Facial Animation - Male Edition (19532)'),
-    (New-ShipHeld 'Data\meshes\actors\character\character assets\beards\' 'Expressive Facial Animation - Male Edition (19532)'),
+    (New-ShipHeld 'Data\meshes\actors\character\character assets\MaleHead.tri' 'Expressive Facial Animation - Male Edition (19532)' -Revision 2),
+    (New-ShipHeld 'Data\meshes\actors\character\character assets\EyesMale.tri' 'Expressive Facial Animation - Male Edition (19532)' -Revision 2),
+    (New-ShipHeld 'Data\meshes\actors\character\character assets\faceparts\' 'Expressive Facial Animation - Male Edition (19532)' -Revision 2),
+    (New-ShipHeld 'Data\meshes\actors\character\character assets\mouth\' 'Expressive Facial Animation - Male Edition (19532)' -Revision 2),
+    (New-ShipHeld 'Data\meshes\actors\character\character assets\beards\' 'Expressive Facial Animation - Male Edition (19532)' -Revision 2),
     # Vanilla women's hoods and the Creation Club fishing and apprentice robes
     # fitted to the body: CBBE 3BA Vanilla Outfits Redone (Nexus 109194), its
     # prebuilt meshes files.
-    (New-ShipHeld 'Data\meshes\clothes\robemythicdawn\' 'CBBE 3BA Vanilla Outfits Redone (109194)'),
-    (New-ShipHeld 'Data\meshes\clothes\thalmor\' 'CBBE 3BA Vanilla Outfits Redone (109194)'),
-    (New-ShipHeld 'Data\meshes\creationclub\bgssse001\clothes\' 'CBBE 3BA Vanilla Outfits Redone (109194)'),
+    (New-ShipHeld 'Data\meshes\clothes\robemythicdawn\' 'CBBE 3BA Vanilla Outfits Redone (109194)' -Revision 2),
+    (New-ShipHeld 'Data\meshes\clothes\thalmor\' 'CBBE 3BA Vanilla Outfits Redone (109194)' -Revision 2),
+    (New-ShipHeld 'Data\meshes\creationclub\bgssse001\clothes\' 'CBBE 3BA Vanilla Outfits Redone (109194)' -Revision 2),
     # Children's clothes: Styles of Skyrim Mashups - Children Clothes
     # Variations and Mesh Fixes (Nexus 154063), Vanilla Mesh Fixes Standalone.
-    (New-ShipHeld 'Data\meshes\clothes\childrenclothes\' 'Styles of Skyrim Mashups - Children Clothes Variations and Mesh Fixes (154063)'),
-    (New-ShipHeld 'Data\meshes\_byoh\clothes\childrenclothesvariants\' 'Styles of Skyrim Mashups - Children Clothes Variations and Mesh Fixes (154063)'),
+    (New-ShipHeld 'Data\meshes\clothes\childrenclothes\' 'Styles of Skyrim Mashups - Children Clothes Variations and Mesh Fixes (154063)' -Revision 2),
+    (New-ShipHeld 'Data\meshes\_byoh\clothes\childrenclothesvariants\' 'Styles of Skyrim Mashups - Children Clothes Variations and Mesh Fixes (154063)' -Revision 2),
     # A noble end table's mesh fix: Assorted Mesh Fixes (Nexus 32117).
-    (New-ShipHeld 'Data\meshes\furniture\noble\nobleendtable04.nif' 'Assorted Mesh Fixes (32117)'),
+    (New-ShipHeld 'Data\meshes\furniture\noble\nobleendtable04.nif' 'Assorted Mesh Fixes (32117)' -Revision 2),
     # The message board Thornswood-Content.esp itself places, from the other
     # server's kzolivar records Patrick kept. Dev packs carry it (main never
     # has) and no mod in the collection has it at this path; a board of the
     # same name is in Missives - Unique Missive Boards (Nexus 111375, a quest
-    # mod with a plugin of its own) at meshes\clutter\missives. Revision 2's
-    # rebuilt Thornswood Content has to point its board at a mesh the
-    # collection installs before this may leave.
-    (New-ShipHeld 'Data\meshes\olivar-messageboard\missiveboardcotnd.nif' 'none yet: Thornswood Content must point its board at a mesh the collection installs')
+    # mod with a plugin of its own) at meshes\clutter\missives, and its bytes
+    # are not this one's (#1258). No collection revision carries this path, so
+    # it ships while the plugin names it, and leaves the release the plugin's
+    # board points at a mesh the collection installs or one Thornswood ships
+    # as its own (#2298).
+    (New-ShipHeld 'Data\meshes\olivar-messageboard\missiveboardcotnd.nif' 'none yet: Thornswood Content must point its board at a mesh the collection installs' -WhileContentNamesIt)
 )
 
 # The collection revision this release is built against: what the feed's
@@ -1381,12 +1469,21 @@ function Assert-ShipGeneratedBodyFiles([string]$GameDir, [string]$ProfileDir) {
 # Whether a loose file waits for the collection, at this revision. Either slash:
 # the held list is written with backslashes, and a path with forward ones (a zip
 # entry, a git path) used to read as not held, so it would not ship at all.
+#
+# A line held while the content plugin names it (-WhileContentNamesIt) is asked
+# of the plugin, whatever the revision; the plugin is read only for a path that
+# matches such a line, so a scan of the game folder reads it once per hit.
 function Test-ShipHeld([string]$rel, [int]$Revision = $ShipCollectionRevision) {
     $rel = $rel.Replace('/', '\')
     foreach ($h in $ShipHeldForCollection) {
         $p = [string]$h.Path
         $hit = if ($p.EndsWith('\')) { $rel.StartsWith($p, 'OrdinalIgnoreCase') } else { $rel -ieq $p }
-        if ($hit -and $Revision -lt [int]$h.Revision) { return $true }
+        if (-not $hit) { continue }
+        if ([string]$h.ContentModel) {
+            if (Test-ShipContentNames ([string]$h.ContentModel)) { return $true }
+            continue
+        }
+        if ($Revision -lt [int]$h.Revision) { return $true }
     }
     return $false
 }
