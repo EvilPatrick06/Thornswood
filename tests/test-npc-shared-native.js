@@ -26,6 +26,48 @@ assert.ok(!process.argv[5] || populationMode || enumerationMode || populationEnu
 // One cold native placed-form load cannot yield midway through construction.
 // Keep it separate from steady activity and do not accumulate a loading batch.
 const maxCallbackMs = 50, maxColdLoadMs = 100, maxRssBytes = 2 * 1024 ** 3;
+// A callback's limit bounds the work it does. Its wall time also counts two
+// things that are not its work (#2032, measured on One on 11 Oct):
+// - time the operating system gave the CPU to other programs. With the
+//   machine at 80% and up to 37 threads waiting for a processor, 44 callbacks
+//   in one run took 50 to 200 ms while their thread ran for at most 31 ms,
+//   and a loop that only reads the clock lost the CPU for up to 71 ms;
+// - a garbage collection that the heap's allocation, not this callback,
+//   started inside it. Young collections took 3 to 7 ms on average there and
+//   up to 179 ms when their helper threads were not given a processor.
+// Its work is at most its wall time less the collections inside it, and at
+// most the CPU time its thread used. The thread clock moves in steps (15.6 ms
+// on Windows), so the CPU bound is the reading plus one step. Either bound
+// inside the limit means the work is. The CPU bound leaves out any wait in
+// the kernel, a page of a memory-mapped plugin as well as a processor; the
+// stalls measured that night came late in runs too, after both preparations
+// had read every record, and at the same sizes as the clock loop's.
+assert.equal(typeof process.threadCpuUsage,'function','Measure callback work in thread CPU time');
+// Collections arrive as performance entries once the event loop turns, so a
+// callback over its limit in wall time is checked when advance next yields.
+// (v8.GCProfiler reads them synchronously, but with it on every run stopped
+// within 20 s on a callback using 47 to 63 ms of CPU; without it the same
+// start ran on past a minute.)
+const collections = [];
+new (require('node:perf_hooks').PerformanceObserver)(list => {
+  for(const entry of list.getEntries()) {
+    collections.push([entry.startTime,entry.startTime+entry.duration]);
+    worst.gcPause = Math.max(worst.gcPause,entry.duration);
+  }
+}).observe({entryTypes:['gc']});
+const turn = () => new Promise(resolve => setTimeout(resolve,0)).then(() => new Promise(resolve => setImmediate(resolve)));
+const threadCpuMs = () => { const u = process.threadCpuUsage(); return (u.user+u.system)/1000; };
+const cpuClockStepMs = (() => {
+  let step = 0;
+  for(let i = 0; i < 3; i++) {
+    let at = threadCpuMs(), next;
+    while((next = threadCpuMs()) === at);
+    at = next;
+    while((next = threadCpuMs()) === at);
+    step = Math.max(step,next-at);
+  }
+  return step;
+})();
 assert.equal(installed.loadOrder.length, 102, 'Use the actual installed 102-plugin fixture');
 const server = new addon.ScampServer(JSON.stringify({port:0,maxPlayers:2,offlineMode:true,
   name:'npc-shared-native-check',dataDir:path.dirname(installed.loadOrder[0]),
@@ -133,7 +175,8 @@ const attackAttempts = new Map(), nativeStates = new Map();
 const nativeSpeeds = new Map(), stoppedActors = new Set();
 const savedBeforeRestart = new Map(), writeSequences = new Map();
 const validationFailures = [];
-const worst = {callback:0,callbackTask:'',load:0,state:0,nav:0,geometry:0,movement:0,attack:0};
+const worst = {callback:0,callbackTask:'',callbackWork:0,callbackWorkTask:'',cpuClockStepMs,gcPause:0,wallOverLimit:0,
+  load:0,state:0,nav:0,geometry:0,movement:0,attack:0};
 const timers = {
   setTimeout(fn,delay) {
     assert.ok(Number.isFinite(delay) && delay >= 0, 'Scheduled delay is finite and nonnegative');
@@ -278,7 +321,25 @@ const indexingMs = performance.now()-indexed;
 console.log('Indexed '+candidates+' existing NPC candidates');
 sampleRss();
 const sampledNow = () => time+(callbackAt ? performance.now()-callbackAt : 0);
-function advance(ms) {
+const overLimit = [];
+function noteWork(name,work) {
+  if(work > worst.callbackWork) { worst.callbackWork = work; worst.callbackWorkTask = name; }
+}
+async function checkOverLimit() {
+  if(!overLimit.length) return;
+  await turn();
+  for(const c of overLimit) {
+    let gc = 0;
+    for(const [begin,end] of collections) gc += Math.max(0,Math.min(end,c.end)-Math.max(begin,c.start));
+    const work = Math.min(c.duration-gc,c.cpu+cpuClockStepMs);
+    noteWork(c.name,work);
+    assert.ok(work <= c.limit,'Scheduled callback exceeded '+c.limit+' ms: '+c.name+' '+c.duration.toFixed(2)+' ms, '+
+      gc.toFixed(1)+' ms of it collecting garbage, '+c.cpu.toFixed(1)+' ms on the CPU');
+  }
+  overLimit.length = 0;
+  collections.length = 0;
+}
+async function advance(ms) {
   const until = time+ms;
   let calls = 0;
   while(pending.size) {
@@ -287,23 +348,30 @@ function advance(ms) {
     time = task.at;
     pending.delete(id);
     current = {moves:0};
-    callbackAt = performance.now();
-    let duration=0;
+    const start = performance.now();
+    callbackAt = start;
+    const cpuAt = threadCpuMs();
+    let duration=0, cpu=0;
     try { task.fn(); }
     finally {
-      duration = performance.now()-callbackAt;
+      cpu = threadCpuMs()-cpuAt;
+      duration = performance.now()-start;
       callbackAt = 0;
       if(duration > worst.callback) { worst.callback = duration; worst.callbackTask = task.name; }
     }
     assert.ok(current.moves <= 96,'A scheduled callback must bound movement work');
     assert.deepEqual(validationFailures,[],'Actor-local catches must not hide acceptance assertion failures');
-    const durationLimit=task.name==='preload' ? maxColdLoadMs : maxCallbackMs;
-    assert.ok(duration <= durationLimit,
-      'Scheduled callback exceeded '+durationLimit+' ms: '+task.name+' '+duration.toFixed(2)+' ms');
+    const limit=task.name==='preload' ? maxColdLoadMs : maxCallbackMs;
+    if(duration > limit) {
+      worst.wallOverLimit++;
+      overLimit.push({name:task.name,start,end:start+duration,duration,cpu,limit});
+    } else noteWork(task.name,Math.min(duration,cpu+cpuClockStepMs));
     if(++callbacks % 100 === 0) sampleRss();
     assert.ok(++calls < 200000,'Runtime must yield with finitely many scheduled callbacks');
+    if(callbacks % 1000 === 0) await checkOverLimit();
   }
   time = until;
+  await checkOverLimit();
   sampleRss();
 }
 function status() {
@@ -324,10 +392,10 @@ function status() {
   assert.ok(typeof state.loadingComplete === 'boolean');
   return state;
 }
-function finishPreparation(stage) {
+async function finishPreparation(stage) {
   const start = time;
   while(time-start < completionLimitMs) {
-    advance(1000);
+    await advance(1000);
     const state = status();
     if(state.loadingComplete && state.preparing === 0 && state.pendingMeshes === 0 &&
         state.active+state.unavailable+(state.held || 0) === state.loaded) break;
@@ -375,7 +443,7 @@ function finishPreparation(stage) {
     assert.ok(controlled.has(id),'Unavailable navigation cannot release native authority');
   }
 }
-function proveActivity(stage) {
+async function proveActivity(stage) {
   // A fresh window after preparation prevents initial motion alone passing.
   moved.clear();
   acceptedAttackers.clear();
@@ -389,7 +457,7 @@ function proveActivity(stage) {
     return !state.isDead && !state.isDisabled && !state.immobile;
   });
   assert.ok(eligible.length > 1000,'Exercise a substantial eligible native cast');
-  advance(120000);
+  await advance(120000);
   // Native combat can kill an eligible actor before its first scheduled turn.
   // Freeze activity evidence at the window boundary, then give terminal actors
   // a bounded fair sweep to publish their native stop and prove it stays still.
@@ -412,7 +480,20 @@ function proveActivity(stage) {
     for(const id of loaded) assert.ok(expectedIds.has(id),'Policy cannot load an identity outside the exact retained intersection');
     for(const id of cutIds) assert.ok(!nativeLoaded.has(id) && !loaded.has(id),'Fresh policy world cannot load a cut placement');
   }
-  advance(10000);
+  // Fair means every terminal actor has had its next turn. Background work
+  // gets 4 ms of wall time every 20 ms, so a pass over the cast takes as long
+  // as the machine needs: in 10 s it reached 2,781 to 5,931 of 11,142 actors
+  // on One on 11 Oct, and each actor that failed here had died after its last
+  // turn and not had another (#2032). It steps at least one actor a tick, so
+  // a pass over the full cast fits in five simulated minutes.
+  const turns = new Map([...terminalPositions.keys()].map(id => [id,(runtime.getActorStatus(id) || {}).lastUpdate]));
+  const sweepStart = time;
+  await advance(10000);
+  while(time-sweepStart < completionLimitMs && [...turns].some(([id,last]) => {
+    const activity = runtime.getActorStatus(id);
+    return activity && activity.lastUpdate === last;
+  })) await advance(1000);
+  const terminalSweepMs = time-sweepStart;
   for(const [id,position] of terminalPositions) {
     const native = server.getNpcAIState(id), activity = runtime.getActorStatus(id);
     assert.ok(controlled.has(id) && native.isServerControlled,'Terminal actors retain native authority');
@@ -448,7 +529,7 @@ function proveActivity(stage) {
   assert.ok(windowMoved.size > 1000,stage+' must physically move a substantial native cast');
   assert.ok(progressedSequences > 1000,stage+' must persist sequence progress across the native cast');
   console.log(JSON.stringify({stage,eligible:eligible.length,moved:windowMoved.size,acceptedAttackers:windowAttackers.size,
-    terminalPaused:terminalPositions.size,
+    terminalPaused:terminalPositions.size,terminalSweepMs,
     progressedSequences,status:status(),peakRssMiB:peakRss/1048576,worst}));
 }
 function diagnosticRead(fn) {
@@ -484,11 +565,12 @@ function reportIdleActor(id,stage) {
     attempts:attackAttempts.get(id) || {attempted:0,accepted:0,rejected:0,errors:0},
     targetAttempts:attackAttempts.get(targetId) || null,equippedSources:sourceDetails(actor.equipment)}));
 }
+(async () => {
 try {
   let population = populationMode ? context.createNpcPopulation(api,populationData,pluginNames) : null;
   runtime = context.startSharedNpcServerRuntime(api,timers,sampledNow,log,population);
-  finishPreparation('initial preparation');
-  proveActivity('before gamemode reload');
+  await finishPreparation('initial preparation');
+  await proveActivity('before gamemode reload');
   const originalIds = new Set(loaded);
   runtime.stop();
   assert.equal(pending.size,0,'Stop must cancel every scheduled callback');
@@ -502,7 +584,7 @@ try {
   loaded.clear();observedNativeIds.clear();restarting = true;
   population = populationMode ? context.createNpcPopulation(api,populationData,pluginNames) : null;
   runtime = context.startSharedNpcServerRuntime(api,timers,sampledNow,log,population);
-  finishPreparation('gamemode reload preparation');
+  await finishPreparation('gamemode reload preparation');
   assert.equal(loaded.size,originalIds.size);
   for(const id of loaded) assert.ok(originalIds.has(id),'Reload must preserve each existing cast identity');
   for(const id of controlled) {
@@ -514,7 +596,7 @@ try {
       assert.equal(saved.sequence,savedBeforeRestart.get(id).sequence);
     }
   }
-  proveActivity('after gamemode reload');
+  await proveActivity('after gamemode reload');
   runtime.stop();
   assert.equal(pending.size,0);
   console.log(JSON.stringify({passed:true,population:baselineSummary,candidates,indexingMs,loadedForms:server.getLoadedFormCount(),
@@ -528,3 +610,4 @@ try {
     status:runtime && typeof runtime.getStatus === 'function' ? runtime.getStatus() : null}));
   process.exit(1);
 }
+})();
