@@ -104,7 +104,7 @@ jobs:
   launcher-vps:
     name: Launcher builds (VPS fallback)
     needs: launcher
-    if: ${{ always() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}
+    if: ${{ !cancelled() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}
     runs-on: [self-hosted, Windows, thornswood-vps]
     # About fifteen minutes on the VPS. Past this it is stuck, not slow.
     timeout-minutes: 20

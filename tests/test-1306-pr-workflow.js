@@ -23,7 +23,7 @@ yes('build.yml still runs a push to main and a manual run', /push:\n    branches
 yes('main builds default to GitHub\'s hosted runner', /\n  launcher:\n    name: Launcher builds\n    if: \$\{\{ vars\.BUILD_RUNNER != 'vps' && inputs\.runner != 'vps' \}\}\n    runs-on: windows-latest\n/.test(build));
 yes('the VPS is a fallback job, on the box', /\n  launcher-vps:\n[\s\S]*?\n    runs-on: \[self-hosted, Windows, thornswood-vps\]\n/.test(build));
 yes('  run only when the hosted job did not succeed (skipped by BUILD_RUNNER or a manual vps run, or failed)',
-    /\n  launcher-vps:\n    name: [^\n]*\n    needs: launcher\n    if: \$\{\{ always\(\) && needs\.launcher\.result != 'success' && needs\.launcher\.result != 'cancelled' \}\}\n/.test(build));
+    /\n  launcher-vps:\n    name: [^\n]*\n    needs: launcher\n    if: \$\{\{ !cancelled\(\) && needs\.launcher\.result != 'success' && needs\.launcher\.result != 'cancelled' \}\}\n/.test(build));
 yes('  with the same steps as the hosted job (one anchor)', /steps: &checks\n/.test(build) && /steps: \*checks\n/.test(build));
 yes('a manual run can pick the box', /runner:\n[\s\S]*?options: \[hosted, vps\]/.test(build));
 yes('build-pr.yml exists', !!pr);
@@ -32,7 +32,7 @@ yes('on GitHub\'s hosted windows-latest', /\n    runs-on: windows-latest\n/.test
 const SAME = "github.event.pull_request.head.repo.full_name == github.repository";
 const prVps = /\n  launcher-vps:\n[\s\S]*?\n    runs-on: \[self-hosted, Windows, thornswood-vps\]\n/.exec(pr);
 yes('a VPS fallback job builds a pull request the hosted job did not', !!prVps &&
-    /\n  launcher-vps:\n    name: Launcher builds \(VPS fallback\)\n    needs: launcher\n    if: \$\{\{ always\(\) && needs\.launcher\.result != 'success' && needs\.launcher\.result != 'cancelled' && github\.event\.pull_request\.head\.repo\.full_name == github\.repository \}\}\n/.test(pr));
+    /\n  launcher-vps:\n    name: Launcher builds \(VPS fallback\)\n    needs: launcher\n    if: \$\{\{ !cancelled\(\) && needs\.launcher\.result != 'success' && needs\.launcher\.result != 'cancelled' && github\.event\.pull_request\.head\.repo\.full_name == github\.repository \}\}\n/.test(pr));
 yes('  only for a branch of this repository, never a fork', !!prVps && code(pr).split(SAME).length - 1 === 1);
 yes('  and that job is the only one on the VPS', code(pr).split('runs-on: [self-hosted').length - 1 === 1);
 yes('  so the hosted job keeps its own check, and its red stays visible', /\n  launcher:\n    name: Launcher builds\n/.test(pr));
@@ -54,5 +54,12 @@ yes('the generator is there', !!gen);
 let want = '';
 try { want = gen ? gen.build(build) : ''; } catch (e) { console.log('  ' + e.message); }
 yes('build-pr.yml is exactly what build.yml generates (run node scripts/dev/Build-PrWorkflow.js)', !!want && want === pr);
+// #1306, 12 Oct: always() ignores a cancelled run, so a new push could not
+// cancel an older run whose fallback waited for a runner. The older run held
+// the concurrency group and the new run sat pending behind it. !cancelled()
+// lets cancel-in-progress take the waiting fallback down with its run.
+yes('main\'s fallback does not use always(), so a newer run cancels it', code(build).indexOf('always()') < 0);
+yes('the pull request fallback does not use always() either', code(pr).indexOf('always()') < 0);
+yes('both workflows still cancel the older run on the same ref', /\n  cancel-in-progress: true\n/.test(build) && /\n  cancel-in-progress: true\n/.test(pr));
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
