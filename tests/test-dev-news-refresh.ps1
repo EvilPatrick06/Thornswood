@@ -170,6 +170,16 @@ try {
     }
 
     if ($haveLib) {
+        # ---- 0. An empty sourceCommit is no commit -----------------------------------
+        # 11 Oct: "Number keys are your favourites hotkeys again" (dev, 6 Oct) was
+        # published with sourceCommit "" and stayed DEV after main 1.2.3 shipped
+        # its work, because "" was asked about as a commit and is on no branch.
+        Write-Host ''; Write-Host 'a note whose sourceCommit is empty'
+        $one = Stale-DevFeed
+        $one.news = @(Note 'Note with an empty sourceCommit' 'dev' '')
+        $null = Update-DevNewsChannels $one $one.news $mainFeed $git
+        Yes 'reads as one from before sourceCommit: its clean dev release is on main, so it loses the mark' ($one.news[0].channel -eq '')
+
         # ---- 1. Update-DevFeedMarks against the stand-in store -----------------------
         Write-Host ''; Write-Host 'the refresh, against a stand-in store'
         $site = Join-Path $Scratch 'site'

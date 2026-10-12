@@ -149,7 +149,11 @@ function Update-DevNewsChannels($doc, $news, $mainDoc, [string]$sourceRepo) {
     $marked = 0
     foreach ($n in @($news)) {
         $commit = Get-DevNewsVal $n 'sourceCommit'
-        if ($n.PSObject.Properties['sourceCommit']) { $published = Is-Published $commit }
+        # An empty sourceCommit names no commit, so it reads as a note from
+        # before sourceCommit. Asked about as a commit, "" is on no branch, and
+        # on 11 Oct a 6 Oct note published with sourceCommit "" stayed DEV after
+        # main had its work.
+        if ($commit) { $published = Is-Published $commit }
         elseif ($legacyKnown) { $published = $legacyPublished }
         else { $published = ((Get-DevNewsVal $n 'channel') -ne 'dev') }
         $want = if ($published) { '' } else { 'dev' }
