@@ -111,10 +111,10 @@ encounters and wildlife in natural habitats, cut town fillers, limit city
 animals, and implement merchant quests. The earlier instruction to remove
 bandit camps is superseded. Guild sites are recorded and can move later.
 
-Dev currently runs the first authored inn routine. The broader shared
-controller, population catalogue, habitat limits, difficulty tiers, stock
-controls and merchant quests are being implemented and verified. They
-are not described as shipped until a complete dev release contains them.
+Release 1.2.3 runs the population cut on both dev and main: the shared
+controller, population catalogue, habitat limits and difficulty tiers are live.
+Guards, courts, priests, town fillers and named creatures are not placed.
+Stock controls and merchant quests are still being implemented and verified.
 See [Shared NPC activity](../NPC-SERVER-ACTIVITY.md) for verification.
 The [population catalogue](../NPC-POPULATION.md) lists authored counts, locations,
 caps and return times. Its coordinate files and the server policy come from the
