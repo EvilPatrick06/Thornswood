@@ -62853,12 +62853,21 @@ function startSharedNpcServerRuntime(api, timers, now, report, population) {
               .filter(p=>withinHome(a,p)).sort((p,q)=>distance(q,targetState.pos)-distance(p,targetState.pos));
             if(safe.length) a.path=[safe[0]];else ambient(a);
           }
-        } else if(a.node===tn && distance(a.pos,targetState.pos)<=attackDistance) {
-          a.path=[];
-          if(api.serverNpcAttack(a.id,target)) attacks++;
         } else {
-          a.path=route;
-          while(a.path.length && distance(a.pos,aim(a.path[0]))<0.01) a.path.shift();
+          // Route points the actor already stands on are behind it. With none
+          // left it has arrived beside the target, which reachable above has
+          // put within attack distance. Its triangle need not be the target's:
+          // a destination on the edge the two share is reached without ever
+          // entering the target's triangle, and the engine's 32-bit copy of a
+          // point on that edge can fall just outside the actor's own (#2032:
+          // 526e9 and 526ea stood on an edge middle beside their targets and
+          // neither moved nor attacked for the whole two minutes).
+          const ahead=route.slice();
+          while(ahead.length && distance(a.pos,aim(ahead[0]))<0.01) ahead.shift();
+          if(!ahead.length || a.node===tn && distance(a.pos,targetState.pos)<=attackDistance) {
+            a.path=[];
+            if(api.serverNpcAttack(a.id,target)) attacks++;
+          } else a.path=ahead;
         }
       } else {target=0;targetState=null;}
     }
