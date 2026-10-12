@@ -21,9 +21,11 @@ What it does:
            issue is closed, which is when its fix is on main. #test-tasks is a
            forum of test tasks: one for each issue closed as fixed (its "Test
            task:" comment), always tagged Main, because main is where testers
-           test, plus any posted by hand, tagged Main too (/test-task,
-           python bot.py --post-task). The
-           channels get there once, by hand, with
+           test, plus any posted by hand, tagged Main (/test-task,
+           python bot.py --post-task). #dev-test-tasks, a staff only forum
+           in Staff, holds the test tasks whose comment says "Server: Dev":
+           a measurement someone on dev has to take, open issue or closed.
+           The channels get there once, by hand, with
            python bot.py --setup-channels [--apply] (the testing channels
            section below)
   Heartbeat writes heartbeat.json beside this file every minute, so the
@@ -58,6 +60,9 @@ Everything it needs is in env:
                    post a test task, default Owner,Dev,Lead Gamemaster,Lead GM
   TEST_TASKS_CHANNEL, TEST_FINDINGS_CHANNEL, KNOWN_ISSUES_CHANNEL
                    default test-tasks, test-findings, known-issues
+  DEV_TASKS_CHANNEL   the staff forum of dev test tasks, default dev-test-tasks
+  DEV_TASKS_CATEGORY  id of the category it is made in, default the Staff
+                      category, 1549254990110134374
   GITHUB_TOKEN     read only token for the repository's issues. A secret, set
                    only in bot.env.json. Not set means no #known-issues posts
   KNOWN_ISSUES_REPO   default EvilPatrick06/Thornswood
@@ -1975,6 +1980,10 @@ async def ensure_hold_panel(guild):
 #                   number and no link. The post goes when the issue is closed,
 #                   which is when its fix is on main (Patrick, 11 Oct: one
 #                   entry per issue, not one list).
+#   #dev-test-tasks a Forum in Staff, staff only (Patrick, 12 Oct): the test
+#                   tasks someone on dev has to measure, from comments that
+#                   say "Server: Dev" (see known issues below). Most go to
+#                   #test-tasks, because testers play on main in the alpha.
 #
 # THE ONE-TIME SETUP. Getting the server from the old shape to that one is the
 # only channel change the bot makes, and Patrick's explicit exception to the
@@ -1995,11 +2004,33 @@ async def ensure_hold_panel(guild):
 # the same category, at the same position, with the old channel's overwrites,
 # and the old one is renamed test-tasks-archive with sending switched off for
 # everyone but the bot. Nothing is deleted.
+#
+# #dev-test-tasks is the third one-time step (Patrick, 12 Oct), on a server
+# that already had the first two: the forum is made in the category whose id
+# is DEV_TASKS_CATEGORY, with that category's overwrites copied, so the same
+# staff see it, and the bot's own forum rights from #test-tasks. Its id is
+# written to channel-setup.json as dev_tasks_id, and from then on the bot
+# finds it by that id and never by its name, so a rename keeps it and no
+# second one is made. A forum of that name already in the category (made by
+# hand or by Build-Discord.py) is taken as it is and its id recorded.
 TASKS_NAME = os.environ.get('TEST_TASKS_CHANNEL', 'test-tasks').strip().lower()
 TASKS_ARCHIVE = TASKS_NAME + '-archive'
 FINDINGS_OLD = 'test-results'
 FINDINGS_NAME = os.environ.get('TEST_FINDINGS_CHANNEL', 'test-findings').strip().lower()
 KNOWN_NAME = os.environ.get('KNOWN_ISSUES_CHANNEL', 'known-issues').strip().lower()
+DEV_TASKS_NAME = os.environ.get('DEV_TASKS_CHANNEL', 'dev-test-tasks').strip().lower()
+# The Staff category (Patrick, 12 Oct: "a new forum under 1549254990110134374
+# the Staff category").
+DEV_TASKS_CATEGORY = _int_env('DEV_TASKS_CATEGORY', 1549254990110134374)
+# The one tag a post in #dev-test-tasks carries.
+DEV_TAG = 'Dev'
+DEV_TOPIC = ('Test tasks someone on dev has to measure, from the board. Kept '
+             'by the bot: a post goes when its issue closes as fixed or its '
+             'test task no longer says Server: Dev.')
+# What the bot is allowed in a forum it keeps: see it, make a post, write in
+# a post, delete a post (manage threads), and read back what is there.
+FORUM_BOT_NEEDS = ('view_channel', 'send_messages', 'send_messages_in_threads',
+                   'manage_threads', 'read_message_history')
 TASK_TAGS = ('Dev', 'Main')
 # The only tag a test task is posted with, automatic or by hand (Patrick,
 # 12 Oct, #2276 option B): testers test on main, so #test-tasks is Main only.
@@ -2114,22 +2145,41 @@ async def channel_setup(guild, apply=False, path=None):
     The one-time setup on one server. Returns what it did (or with apply
     False, what it would do), one line per change.
 
-    Never runs twice: a server channel-setup.json says is done gets one line
-    saying so, and nothing is asked of Discord.
+    Never runs twice: a server channel-setup.json says is done, with its
+    #known-issues forum and its #dev-test-tasks forum (still there, by id),
+    gets one line saying so, and nothing is asked of Discord. A server set up
+    before a later step existed gets that step alone, once.
     """
     path = path or SETUP_STATE
-    said = []
-    verb = '' if apply else 'would '
     state = _state_read(path)
     if state is None:
         return ['%s is there but cannot be read, so nothing was changed. Look '
                 'at it by hand.' % path]
     done = setup_done(guild, path)
-    if done and known_forum_done(guild, path):
+    if (done and known_forum_done(guild, path)
+            and dev_tasks_forum(guild, path) is not None):
         return ['already done on %s, nothing changed' % done]
-    if done:
+    if not done:
+        said, stop = await _first_setup(guild, apply, path)
+        if stop:
+            return said
+    elif not known_forum_done(guild, path):
         # Set up before #known-issues was a forum: that one step, once.
-        return await known_forum_setup(guild, apply, path)
+        said = await known_forum_setup(guild, apply, path)
+    else:
+        said = []
+    said += await dev_tasks_setup(guild, apply, path)
+    if not said:
+        said.append('nothing to change')
+    return said
+
+
+async def _first_setup(guild, apply, path):
+    """The first one-time setup: #test-tasks a forum, #test-results renamed
+       #test-findings, the #known-issues forum. Returns (lines, stop), stop
+       True when nothing could be done and no later step should run."""
+    said = []
+    verb = '' if apply else 'would '
 
     # 1. #test-tasks becomes a forum.
     tasks = _channel_named(guild, TASKS_NAME, ('forum',))
@@ -2137,7 +2187,7 @@ async def channel_setup(guild, apply=False, path=None):
     if tasks is None and old is None:
         return ['there is no #%s in "%s", so nothing was changed. Make it '
                 '(Build-Discord.py) and run this again.'
-                % (TASKS_NAME, getattr(guild, 'name', '?'))]
+                % (TASKS_NAME, getattr(guild, 'name', '?'))], True
     if tasks is None:
         said.append('%stry to convert #%s to a forum' % (verb, TASKS_NAME))
         if apply:
@@ -2211,15 +2261,11 @@ async def channel_setup(guild, apply=False, path=None):
     if apply:
         state = _state_read(path) or {}
         now = _utc_stamp()
-        state.setdefault('guilds', {})[str(guild.id)] = {
-            'done': now, 'known_forum': now,
-            'name': getattr(guild, 'name', ''),
-        }
+        rec = state.setdefault('guilds', {}).setdefault(str(guild.id), {})
+        rec.update(done=now, known_forum=now, name=getattr(guild, 'name', ''))
         _state_write(path, state)
         said.append('recorded in %s, so this never runs again' % path)
-    elif not said:
-        said.append('nothing to change')
-    return said
+    return said, False
 
 
 def _utc_stamp():
@@ -2319,8 +2365,125 @@ async def known_forum_setup(guild, apply=False, path=None):
         rec['known_forum'] = _utc_stamp()
         _state_write(path, state)
         said.append('recorded in %s, so this never runs again' % path)
-    elif not said:
-        said.append('nothing to change')
+    return said
+
+
+def _setup_rec(guild, path=None):
+    got = _state_read(path or SETUP_STATE) or {}
+    rec = (got.get('guilds') or {}).get(str(getattr(guild, 'id', '')))
+    return rec if isinstance(rec, dict) else {}
+
+
+def _by_id(guild, cid):
+    """The server's channel or category with this id, or None."""
+    try:
+        cid = int(cid or 0)
+    except (TypeError, ValueError):
+        return None
+    if not cid:
+        return None
+    getter = getattr(guild, 'get_channel', None)
+    return getter(cid) if getter is not None else None
+
+
+def dev_tasks_forum(guild, path=None):
+    """The #dev-test-tasks forum, by the id the setup recorded, or None when
+       the setup has not made it or it has been deleted since. Never looked
+       for by name: a rename keeps it."""
+    ch = _by_id(guild, _setup_rec(guild, path).get('dev_tasks_id'))
+    return ch if ch is not None and _kind(ch) == 'forum' else None
+
+
+def dev_overwrites(guild, category, tasks=None):
+    """
+    #dev-test-tasks' overwrites: the category's copied, so it is staff only
+    the way the category is, then the bot's own overwrite from #test-tasks
+    with every forum right it needs there (FORUM_BOT_NEEDS) switched on.
+    """
+    out = _copy_overwrites(category) if category is not None else {}
+    me = getattr(guild, 'me', None)
+    if me is not None:
+        mine = out.get(me) or discord.PermissionOverwrite()
+        if tasks is not None and me in (getattr(tasks, 'overwrites', None) or {}):
+            a, d = tasks.overwrites[me].pair()
+            mine = discord.PermissionOverwrite.from_pair(a, d)
+        mine.update(**dict((n, True) for n in FORUM_BOT_NEEDS))
+        out[me] = mine
+    return out
+
+
+async def dev_tasks_setup(guild, apply=False, path=None):
+    """
+    The third one-time step (Patrick, 12 Oct): the #dev-test-tasks forum in
+    the Staff category, staff only, tagged Dev. Recorded with its id as
+    dev_tasks_id, so it runs once and the bot finds the forum by that id.
+    Nothing to do when the recorded forum is still there.
+    """
+    path = path or SETUP_STATE
+    verb = '' if apply else 'would '
+    rec = _setup_rec(guild, path)
+    if dev_tasks_forum(guild, path) is not None:
+        return []
+    said = []
+    if rec.get('dev_tasks_id'):
+        said.append('the #%s recorded in %s (id %s) is not on the server any '
+                    'more' % (DEV_TASKS_NAME, path, rec.get('dev_tasks_id')))
+    cat = _by_id(guild, DEV_TASKS_CATEGORY)
+    if cat is None or _kind(cat) != 'category':
+        return said + ['there is no category with id %d in "%s", so #%s was not '
+                       'made. Set DEV_TASKS_CATEGORY in bot.env.json to the '
+                       'Staff category\'s id and run this again.'
+                       % (DEV_TASKS_CATEGORY, getattr(guild, 'name', '?'),
+                          DEV_TASKS_NAME)]
+    me = getattr(guild, 'me', None)
+    there = [ch for ch in (getattr(cat, 'channels', None) or [])
+             if str(getattr(ch, 'name', '')).lower() == DEV_TASKS_NAME]
+    forum = next((ch for ch in there if _kind(ch) == 'forum'), None)
+    if forum is None and there:
+        return said + ['there is a #%s in %s that is not a forum, so nothing was '
+                       'made. Rename or remove it by hand, then run this again.'
+                       % (DEV_TASKS_NAME, getattr(cat, 'name', '?'))]
+    if forum is not None:
+        said.append('#%s is already in %s: %staken as it is, by its id %s'
+                    % (DEV_TASKS_NAME, getattr(cat, 'name', '?'), verb, forum.id))
+        if task_tag_of(forum, DEV_TAG) is None:
+            said.append('%sadd the forum tag %s to #%s' % (verb, DEV_TAG, DEV_TASKS_NAME))
+            if apply:
+                tags = list(getattr(forum, 'available_tags', None) or [])
+                tags.append(discord.ForumTag(name=DEV_TAG))
+                await forum.edit(available_tags=tags, reason=SETUP_REASON)
+        have = forum.overwrites_for(me) if me is not None else None
+        if have is not None and not all(getattr(have, n) is True for n in FORUM_BOT_NEEDS):
+            said.append('%slet the bot post, reply and delete its posts in #%s'
+                        % (verb, DEV_TASKS_NAME))
+            if apply:
+                have.update(**dict((n, True) for n in FORUM_BOT_NEEDS))
+                await forum.set_permissions(me, overwrite=have, reason=SETUP_REASON)
+    else:
+        tasks = _channel_named(guild, TASKS_NAME, ('forum',))
+        said.append('%smake the forum #%s in %s with the category\'s %d '
+                    'permission overwrite(s), so only the people who see %s '
+                    'see it, and the tag %s'
+                    % (verb, DEV_TASKS_NAME, getattr(cat, 'name', '?'),
+                       len(getattr(cat, 'overwrites', {}) or {}),
+                       getattr(cat, 'name', '?'), DEV_TAG))
+        said.append('%sgive the bot its #%s rights there: see it, post, reply, '
+                    'delete its posts and read them back' % (verb, TASKS_NAME))
+        if apply:
+            forum = await guild.create_forum(
+                DEV_TASKS_NAME, category=cat,
+                overwrites=dev_overwrites(guild, cat, tasks),
+                topic=DEV_TOPIC,
+                available_tags=[discord.ForumTag(name=DEV_TAG)],
+                reason=SETUP_REASON)
+    if apply:
+        state = _state_read(path) or {}
+        r = state.setdefault('guilds', {}).setdefault(str(guild.id), {})
+        r['dev_tasks'] = _utc_stamp()
+        r['dev_tasks_id'] = forum.id
+        _state_write(path, state)
+        said.append('recorded #%s (id %s) in %s, so this never runs again and '
+                    'the bot finds it by that id' % (DEV_TASKS_NAME, forum.id, path))
     return said
 
 
@@ -2431,10 +2594,25 @@ async def test_task_cmd(interaction: discord.Interaction, title: str,
 # nothing breaks the game, and main is where testers test, since we are in
 # alpha. So a fix people would notice is closed, with its "Test task:"
 # comment, when it reaches main, not when it merges or reaches dev, and every
-# test task the bot posts is tagged Main. A "Server: Dev" or "Server: Main"
-# line under "Test task:", which comments carried before that day, is still
-# read so it never shows in the post, and it changes nothing. A "Server:"
-# line under "Known issue:" still sets that post's tag.
+# test task the bot posts in #test-tasks is tagged Main. A "Server:" line
+# under "Known issue:" still sets that post's tag.
+#
+#   #dev-test-tasks (Patrick, 12 Oct) one post per issue whose last "Test
+#                  task:" comment has "Server: Dev" straight under it, open or
+#                  closed: the code is done and someone on dev has to measure
+#                  something. Most test tasks are Main, because testers play
+#                  on main. The post goes when the issue closes as fixed (any
+#                  close after the comment), or when a newer "Test task:"
+#                  comment does not say Server: Dev; a closed issue's newest
+#                  test task then goes to #test-tasks as before, if it is
+#                  Main. An issue whose last test task says Server: Dev gets
+#                  no #test-tasks post from it.
+#
+# "Server: Dev" counts only on a comment written from the day #dev-test-tasks
+# began (state['dev_since'], set on the first pass that finds the forum).
+# Comments from before that carried "Server: Dev" when every test task went
+# to #test-tasks; they stay Main, so no post already up moves. Until the
+# forum is made, every Server line is read and changes nothing, as before.
 #
 # Each record holds the form of the post it was made with (TASK_FORM,
 # KNOWN_FORM). When the way a post is written changes, the form goes up by
@@ -2464,6 +2642,7 @@ TASK_TAG = 'Main'
 # whatever their Server line, and both bodies say the fix is on main (11 Oct).
 TASK_FORM = 2
 KNOWN_FORM = 2
+DEV_FORM = 1
 
 
 def _github_get(url):
@@ -2509,6 +2688,28 @@ def github_closed_since(since, get=None):
     while True:
         url = ('%s/repos/%s/issues?state=closed&per_page=100&page=%d'
                '&sort=updated&direction=desc&since=%s'
+               % (GITHUB_API, KNOWN_REPO, page, urllib.parse.quote(since)))
+        rows = get(url) or []
+        for row in rows:
+            if isinstance(row, dict) and 'pull_request' not in row:
+                out.setdefault(int(row['number']), row)
+        if len(rows) < 100:
+            break
+        page += 1
+    return out
+
+
+def github_changed_since(since, get=None):
+    """Every issue (not pull request), open or closed, updated at or after
+       since, by number. A new comment, a close and a reopen all move the
+       update time, so this holds every issue whose dev test task can have
+       come or gone since then."""
+    get = get or _github_get
+    out = {}
+    page = 1
+    while True:
+        url = ('%s/repos/%s/issues?state=all&per_page=100&page=%d'
+               '&sort=updated&direction=asc&since=%s'
                % (GITHUB_API, KNOWN_REPO, page, urllib.parse.quote(since)))
         rows = get(url) or []
         for row in rows:
@@ -2585,15 +2786,46 @@ def _marked(issue, comments, mark):
     return None
 
 
-def test_task_of(issue, comments):
-    """(title, body, created_at) from the last "Test task:" comment, or None.
-       A Server line under it is read so it is not in the body, and then
-       dropped: every test task is on main (Patrick, 11 Oct)."""
+def last_task(issue, comments, dev_since=None):
+    """(title, body, server, created_at) from the last "Test task:" comment,
+       or None. server is 'Dev' when a "Server: Dev" line is straight under
+       it and the comment was written at or after dev_since, the day
+       #dev-test-tasks began; 'Main' otherwise, so a Server line from before
+       that day, or with no dev_since at all, is read and changes nothing."""
     got = _marked(issue, comments, TASK_MARK)
     if got is None:
         return None
-    title, body, _server, created = got
-    return title, body or 'Check this on main.', created
+    title, body, server, created = got
+    if server == 'Dev' and dev_since and created >= dev_since:
+        return title, body or 'Measure this on dev.', 'Dev', created
+    return title, body or 'Check this on main.', 'Main', created
+
+
+def test_task_of(issue, comments, dev_since=None):
+    """(title, body, created_at) from the last "Test task:" comment when it
+       is one for main, or None. A Server line under it is read so it is not
+       in the body. The last one saying Server: Dev (last_task) is not a
+       test task for main, so this is None for it."""
+    got = last_task(issue, comments, dev_since)
+    if got is None or got[2] == 'Dev':
+        return None
+    return got[0], got[1], got[3]
+
+
+def dev_post_of(issue, comments, dev_since):
+    """(title, body, tags) for an issue's #dev-test-tasks post, or None when
+       it has none: its last "Test task:" comment does not say Server: Dev
+       (last_task), or the issue was closed after that comment was written."""
+    if not dev_since:
+        return None
+    got = last_task(issue, comments, dev_since)
+    if got is None or got[2] != 'Dev':
+        return None
+    if str(issue.get('state')) != 'open':
+        closed = str(issue.get('closed_at') or '')
+        if closed and closed >= got[3]:
+            return None
+    return got[0], got[1], [DEV_TAG]
 
 
 def known_of(issue, comments):
@@ -2617,10 +2849,13 @@ def default_task_body(issue):
             'in #%s if it still happens.' % FINDINGS_NAME)
 
 
-def task_post_of(issue, comments):
+def task_post_of(issue, comments, dev_since=None):
     """(title, body, tags) for an issue's #test-tasks post, or None when it
-       gets none (not a finding and nobody wrote a test task)."""
-    task = test_task_of(issue, comments)
+       gets none (not a finding and nobody wrote a test task, or its last
+       test task says Server: Dev, which is #dev-test-tasks')."""
+    task = last_task(issue, comments, dev_since)
+    if task is not None and task[2] == 'Dev':
+        return None
     if task is not None:
         return task[0], task[1], [TASK_TAG]
     if issue_tags_found(issue):
@@ -2757,9 +2992,12 @@ async def test_tasks_once(forum, state, get=None, save=None, me_id=None, now=Non
     comment was written after since. Every post is tagged Main (TASK_TAG).
     A rewritten comment edits the post, and so does a record made with an
     older form of the post (TASK_FORM), once; an issue that is reopened
-    loses it. Returns the issue numbers posted, edited and removed.
+    loses it. An issue whose last test task says Server: Dev, from the day
+    #dev-test-tasks began (state['dev_since']), gets no post here: it is
+    in #dev-test-tasks. Returns the issue numbers posted, edited and removed.
     """
     loop = asyncio.get_running_loop()
+    dev_since = state.get('dev_since')
     since = state.get('since')
     if not since:
         state['since'] = since = now or _utc_stamp()
@@ -2777,14 +3015,21 @@ async def test_tasks_once(forum, state, get=None, save=None, me_id=None, now=Non
                 and have.get('form') == TASK_FORM):
             continue
         comments = await loop.run_in_executor(None, github_comments, num, get)
-        task = test_task_of(issue, comments)
+        task = test_task_of(issue, comments, dev_since)
         new_enough = (str(issue.get('closed_at') or '') >= since
                       or (task is not None and task[2] >= since))
         if not have and not new_enough:
             continue
-        post = task_post_of(issue, comments)
+        post = task_post_of(issue, comments, dev_since)
         if post is None:
-            continue        # not a finding and nobody wrote a test task
+            # Not a finding and nobody wrote a test task, or its last test
+            # task says Server: Dev and is #dev-test-tasks'. A post already
+            # here is left as it is, and not read again until the issue
+            # changes.
+            if have:
+                have.update(updated=issue.get('updated_at'), form=TASK_FORM)
+                state['_dirty'] = True
+            continue
         title, body, tags = post
         sig = _sig(title, body, tags)
         if have:
@@ -2829,7 +3074,7 @@ async def test_tasks_once(forum, state, get=None, save=None, me_id=None, now=Non
             # post whose comment was rewritten) or made with an older form of
             # the post: brought up to date.
             comments = await loop.run_in_executor(None, github_comments, int(key), get)
-            post = task_post_of(issue, comments)
+            post = task_post_of(issue, comments, dev_since)
             if post is not None:
                 sig = _sig(*post)
                 if have.get('sig') != sig:
@@ -2842,6 +3087,84 @@ async def test_tasks_once(forum, state, get=None, save=None, me_id=None, now=Non
             have['updated'] = issue.get('updated_at')
             have['form'] = TASK_FORM
             state['_dirty'] = True
+    return posted, edited, removed
+
+
+async def dev_tasks_once(forum, state, get=None, save=None, me_id=None, now=None):
+    """
+    One pass over #dev-test-tasks, found by the id the setup recorded. An
+    issue, open or closed, whose last "Test task:" comment says Server: Dev
+    gets a post tagged Dev (dev_post_of); it goes when the issue is closed
+    after that comment, or a newer test task does not say Server: Dev. A
+    rewritten comment edits the post.
+
+    The first pass sets state['dev_since'] to now: nothing written before it
+    counts as a dev test task, so nothing from before floods in and no post
+    already in #test-tasks moves. Each pass reads only the issues GitHub says
+    changed since the last (state['dev_seen'], GitHub's own update time of
+    the last issue read), so an untouched issue costs nothing. An issue
+    Discord refused is read again on the next pass.
+    Returns the issue numbers posted, edited and removed.
+    """
+    loop = asyncio.get_running_loop()
+    since = state.get('dev_since')
+    if not since:
+        state['dev_since'] = since = now or _utc_stamp()
+        state['_dirty'] = True
+    mark = state.get('dev_seen') or since
+    rec = state.setdefault('dev', {})
+    read = state.setdefault('dev_read', {})
+    changed = await loop.run_in_executor(None, github_changed_since, mark, get)
+    posted, edited, removed, refused = [], [], [], []
+    newest = mark
+    for num in sorted(changed):
+        key = str(num)
+        issue = changed[num]
+        upd = str(issue.get('updated_at') or '')
+        newest = max(newest, upd)
+        have = rec.get(key)
+        if read.get(key) == upd and (not have or have.get('form') == DEV_FORM):
+            continue            # read at this update time on an earlier pass
+        comments = await loop.run_in_executor(None, github_comments, num, get)
+        post = dev_post_of(issue, comments, since)
+        try:
+            if post is None:
+                if have:
+                    await _forum_drop(forum, have['thread_id'])
+                    rec.pop(key, None)
+                    removed.append(num)
+            else:
+                title, body, tags = post
+                sig = _sig(title, body, tags)
+                if have and have.get('sig') != sig:
+                    if await _forum_edit(forum, have['thread_id'], title, body, tags):
+                        edited.append(num)
+                    else:
+                        rec.pop(key, None)     # deleted by hand: made again
+                        have = None
+                if have:
+                    have.update(sig=sig, updated=upd, form=DEV_FORM)
+                else:
+                    th = await _forum_post(forum, title, body, tags, me_id)
+                    rec[key] = {'thread_id': th.id, 'channel_id': forum.id,
+                                'sig': sig, 'updated': upd, 'form': DEV_FORM}
+                    if save:
+                        save(state)    # straight away, so a crash cannot double it
+                    posted.append(num)
+        except discord.HTTPException:
+            refused.append(upd)
+            continue
+        read[key] = upd
+        state['_dirty'] = True
+    # GitHub's since is inclusive, so the next pass starts at the newest
+    # update read, or at the oldest one Discord refused, to try it again.
+    mark = min([newest] + refused)
+    if state.get('dev_seen') != mark:
+        state['dev_seen'] = mark
+        state['_dirty'] = True
+    for key in [k for k, v in read.items() if v < mark]:
+        read.pop(key, None)
+        state['_dirty'] = True
     return posted, edited, removed
 
 
@@ -2873,8 +3196,8 @@ def _known_save(state, path=None):
 async def watch_known_issues():
     await client.wait_until_ready()
     if not os.environ.get('GITHUB_TOKEN', '').strip():
-        log('known issues: no GITHUB_TOKEN in bot.env.json, so #%s and #%s '
-            'are not kept' % (KNOWN_NAME, TASKS_NAME))
+        log('known issues: no GITHUB_TOKEN in bot.env.json, so #%s, #%s and '
+            '#%s are not kept' % (KNOWN_NAME, TASKS_NAME, DEV_TASKS_NAME))
         return
     state = _state_read(KNOWN_STATE)
     if state is None:
@@ -2882,13 +3205,24 @@ async def watch_known_issues():
             'fixed by hand (posting from empty would double every post)'
             % KNOWN_STATE)
         return
-    said_text = False
+    said_text = said_dev = False
     while not client.is_closed():
         try:
-            known = tasks = None
+            known = tasks = dev = None
             for g in client.guilds:
                 known = known or _channel_named(g, KNOWN_NAME, ('forum',))
                 tasks = tasks or _channel_named(g, TASKS_NAME, ('forum',))
+                # By the id the one-time setup recorded, read each pass so a
+                # setup run while the bot is up is picked up without a restart.
+                dev = dev or dev_tasks_forum(g)
+                if (dev is None and not said_dev
+                        and _setup_rec(g).get('dev_tasks_id')):
+                    log('known issues: the #%s recorded in %s (id %s) is not on '
+                        'the server, so dev test tasks are not posted. The '
+                        'one-time step (python bot.py --setup-channels --apply) '
+                        'makes it again.' % (DEV_TASKS_NAME, SETUP_STATE,
+                                             _setup_rec(g).get('dev_tasks_id')))
+                    said_dev = True
                 if known is None and not said_text and _channel_named(g, KNOWN_NAME, ('text',)):
                     log('known issues: #%s is still a text channel. The one-time '
                         'step (python bot.py --setup-channels --apply) makes it '
@@ -2906,6 +3240,12 @@ async def watch_known_issues():
                     tasks, state, save=_known_save, me_id=me)
                 if posted or edited or removed:
                     log('test tasks: posted %s, edited %s, removed %s'
+                        % (posted or 'none', edited or 'none', removed or 'none'))
+            if dev is not None:
+                posted, edited, removed = await dev_tasks_once(
+                    dev, state, save=_known_save, me_id=me)
+                if posted or edited or removed:
+                    log('dev test tasks: posted %s, edited %s, removed %s'
                         % (posted or 'none', edited or 'none', removed or 'none'))
             if state.get('_dirty'):
                 _known_save(state)

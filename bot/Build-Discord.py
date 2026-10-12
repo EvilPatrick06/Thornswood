@@ -454,6 +454,14 @@ PLAN = [
    # Information: that one carries the key, and the release webhook with it.
    dict(kind='announce', name='news',      mode='staff'),
    dict(kind='forum', name='dev-test-results', mode='staff'),
+   # The test tasks someone on dev has to measure (Patrick, 12 Oct). Made by
+   # the bot's one-time `python bot.py --setup-channels --apply`, which finds
+   # it by id from then on, never by this: named here so -Prune leaves it and
+   # a run does not make a second one. The topic is the bot's DEV_TOPIC.
+   dict(kind='forum', name='dev-test-tasks', mode='staff', make=False,
+        topic='Test tasks someone on dev has to measure, from the board. Kept '
+              'by the bot: a post goes when its issue closes as fixed or its '
+              'test task no longer says Server: Dev.'),
    dict(kind='text',  name='staff-general', mode='staff',
         topic='Nobody else can see this.'),
    dict(kind='voice', name='Staff Room',    mode='staff'),
@@ -507,7 +515,7 @@ RETIRED = [
 KEEP = (
     'general-chat', 'welcome-travelers', 'server-progression-and-economy',
     'play-testing', 'dev-test-results', 'test-results', 'test-tasks',
-    'test-findings', 'test-tasks-archive', 'known-issues',
+    'test-findings', 'test-tasks-archive', 'known-issues', 'dev-test-tasks',
 )
 
 

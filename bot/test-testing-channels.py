@@ -27,6 +27,17 @@ This holds:
   6. Posts made with an older form (TASK_FORM, KNOWN_FORM) are written again
      once after the bot is updated, though GitHub says nothing changed, and
      after that an unchanged issue is not read again.
+  7. #dev-test-tasks (Patrick, 12 Oct): the one-time setup makes it in the
+     Staff category by its id, with the category's overwrites and the bot's
+     #test-tasks rights, records its id, finds it again by that id after a
+     rename, never makes a second, and takes one already there as it is.
+  8. A "Test task:" comment with "Server: Dev", written from the day
+     #dev-test-tasks began, is a post there, open issue or closed, and never
+     a #test-tasks post. It goes when the issue closes after it or a newer
+     test task is not Dev, and a closed issue's Main test task goes to
+     #test-tasks as before. Nothing is posted twice, not after a restart and
+     not after a crash between a post and its save; a post Discord refused
+     is tried again. A Server: Dev line from before that day changes nothing.
 
 The real bot module is imported. Discord and GitHub are stand-ins that
 count what is asked of them. Never connects to anything.
@@ -81,8 +92,14 @@ class Target(object):
 
 
 class Category(object):
-    def __init__(self, name):
+    def __init__(self, name, cid=None, overwrites=None, guild=None):
         self.name = name
+        self.id = cid or (8000 + len(getattr(guild, 'categories', []) or []))
+        self.type = discord.ChannelType.category
+        self.overwrites = dict(overwrites or {})
+        self.channels = []
+        if guild is not None:
+            guild.categories.append(self)
 
 
 class Thread(object):
@@ -143,6 +160,8 @@ class Channel(object):
         self.sent = []
         self.said = []
         guild.channels.append(self)
+        if category is not None and hasattr(category, 'channels'):
+            category.channels.append(self)
 
     async def history(self, limit=100):
         for m in self.said[:limit]:
@@ -151,6 +170,8 @@ class Channel(object):
     async def delete(self, reason=None):
         self.guild.calls.append(('delete', self.name))
         self.guild.channels.remove(self)
+        if self.category is not None and self in getattr(self.category, 'channels', []):
+            self.category.channels.remove(self)
 
     def overwrites_for(self, t):
         ow = self.overwrites.get(t)
@@ -190,6 +211,13 @@ class Guild(object):
         self.default_role = Target('@everyone', gid)
         self.me = Target('Thornswood Bot', 2)
         self.threads = {}
+        self.categories = []
+
+    def get_channel(self, cid):
+        for ch in self.channels + self.categories:
+            if getattr(ch, 'id', None) == cid:
+                return ch
+        return None
 
     def get_thread(self, tid):
         return self.threads.get(tid)
@@ -216,11 +244,24 @@ def OW(**k):
     return discord.PermissionOverwrite(**k)
 
 
-def server(convertible=False):
+STAFF_ID = 1549254990110134374
+
+
+def server(convertible=False, staff_category=True):
     g = Guild()
-    testing = Category('Testing')
+    testing = Category('Testing', guild=g)
     play = Target('Playtester', 11)
     staff = Target('Moderator', 12)
+    if staff_category:
+        # The Staff category, by the id Patrick gave: shut to @everyone and
+        # to Playtester, open to staff, and the bot's own way in.
+        Category('Staff', STAFF_ID, {
+            g.default_role: OW(view_channel=False),
+            play: OW(view_channel=False),
+            staff: OW(view_channel=True, send_messages=True),
+            g.me: OW(view_channel=True, send_messages=True,
+                     read_message_history=True),
+        }, guild=g)
     tasks = Channel(g, 'test-tasks', 'text', testing, 4, {
         g.default_role: OW(view_channel=False),
         play: OW(view_channel=True, send_messages=True),
@@ -283,7 +324,8 @@ yes('  and says each of the three changes it would make',
     and 'would rename the old text #test-tasks to #test-tasks-archive' in text
     and 'would rename #test-results to #test-findings' in text
     and 'would make the forum #known-issues in Testing' in text
-    and 'would make #known-issues read only' in text)
+    and 'would make #known-issues read only' in text
+    and 'would make the forum #dev-test-tasks in Staff' in text)
 
 said = run(bot.channel_setup(g, apply=True, path=state))
 text = '\n'.join(said)
@@ -341,9 +383,12 @@ yes('  while the bot keeps posting there, and may delete its posts',
 yes('  and #test-findings itself is untouched by that',
     results.overwrites[play].send_messages is True)
 done = json.load(open(state))
-yes('the apply is recorded in the state file by server id, the forum step too',
+yes('the apply is recorded in the state file by server id, the forum steps too',
     '1' in done.get('guilds', {}) and done['guilds']['1'].get('done')
-    and done['guilds']['1'].get('known_forum'))
+    and done['guilds']['1'].get('known_forum')
+    and done['guilds']['1'].get('dev_tasks')
+    and done['guilds']['1'].get('dev_tasks_id')
+    == getattr(bot._channel_named(g, 'dev-test-tasks', ('forum',)), 'id', None))
 
 g.calls = []
 said = run(bot.channel_setup(g, apply=True, path=state))
@@ -374,9 +419,10 @@ results.name = 'test-findings'
 g.calls = []
 said = run(bot.channel_setup(g, apply=True, path=state3))
 yes('an apply that stopped half way does only what is left: the missing '
-    'Main tag and #known-issues',
-    [c[0] for c in g.calls] == ['edit', 'create_forum']
-    and 'available_tags' in g.calls[0][2])
+    'Main tag, #known-issues and #dev-test-tasks',
+    [c[0] for c in g.calls] == ['edit', 'create_forum', 'create_forum']
+    and 'available_tags' in g.calls[0][2]
+    and [c[1] for c in g.calls[1:]] == ['known-issues', 'dev-test-tasks'])
 
 # A state file that will not read changes nothing.
 bad = os.path.join(TMP, 'bad.json')
@@ -493,6 +539,7 @@ COMMENTS = {}
 
 
 UPD = [0]
+HOUR = ['2026-10-12T06']
 
 
 def issue(num, title, label, state='open', reason=None, pr=False,
@@ -500,7 +547,7 @@ def issue(num, title, label, state='open', reason=None, pr=False,
     UPD[0] += 1
     row = {'number': num, 'title': title, 'state': state,
            'state_reason': reason, 'closed_at': closed_at,
-           'updated_at': '2026-10-12T06:%02d:%02dZ' % divmod(UPD[0], 60),
+           'updated_at': HOUR[0] + ':%02d:%02dZ' % divmod(UPD[0], 60),
            'html_url': 'https://github.com/EvilPatrick06/Thornswood/issues/%d' % num,
            'labels': [{'name': l} for l in label]}
     if pr:
@@ -518,6 +565,10 @@ def gh(url):
         return COMMENTS.get(int(path.split('/')[-2]), [])
     if '/issues/' in path:
         return ISSUES[int(path.rsplit('/', 1)[1])]
+    if 'state=all' in url:
+        since = bot.urllib.parse.unquote(url.split('since=')[1].split('&')[0])
+        return sorted([r for r in ISSUES.values() if r['updated_at'] >= since],
+                      key=lambda r: r['updated_at'])
     if 'state=closed' in url:
         since = bot.urllib.parse.unquote(url.split('since=')[1].split('&')[0])
         return [r for r in ISSUES.values() if r['state'] == 'closed'
@@ -831,6 +882,360 @@ yes('once rewritten and read back after a restart, the next passes read no '
     'comments and change nothing: the rewrite happens once, not every pass',
     after == before and len(g.calls) == calls
     and t_out == ([], [], []) and k_out == ([], [], []))
+
+
+# -------------------------------------------- 9. #dev-test-tasks, the setup --
+def names(forum):
+    return [th.name for th in forum.threads]
+
+
+def before_dev(path):
+    """A server set up before #dev-test-tasks existed: the first two steps
+       done and recorded, no dev forum and no record of one."""
+    g, tasks, results, play, staff = server()
+    run(bot.channel_setup(g, apply=True, path=path))
+    run(bot._channel_named(g, 'dev-test-tasks', ('forum',)).delete())
+    stj = json.load(open(path))
+    for k in ('dev_tasks', 'dev_tasks_id'):
+        stj['guilds']['1'].pop(k, None)
+    json.dump(stj, open(path, 'w'))
+    g.calls = []
+    return g, play
+
+
+dpath = os.path.join(TMP, 'dev-setup.json')
+g, tasks, results, play, staff = server()
+staffcat = g.get_channel(STAFF_ID)
+said = run(bot.channel_setup(g, apply=False, path=dpath))
+text = '\n'.join(said)
+yes('a preview says it would make #dev-test-tasks in Staff with the category\'s '
+    '4 overwrites, and asks Discord for nothing',
+    g.calls == [] and 'would make the forum #dev-test-tasks in Staff with the '
+    'category\'s 4 permission overwrite(s)' in text)
+run(bot.channel_setup(g, apply=True, path=dpath))
+df = bot._channel_named(g, 'dev-test-tasks', ('forum',))
+yes('the apply makes #dev-test-tasks as a FORUM in the category with Patrick\'s '
+    'id (Staff), tagged Dev only',
+    df is not None and df.category is staffcat
+    and [t.name for t in df.available_tags] == ['Dev'])
+others = [t for t in staffcat.overwrites if t is not g.me]
+yes('  staff only like the category: its overwrites copied exactly, as new '
+    'objects, so @everyone and Playtester cannot see it',
+    set(df.overwrites) == set(staffcat.overwrites)
+    and all(pairs({t: df.overwrites[t]}) == pairs({t: staffcat.overwrites[t]})
+            for t in others)
+    and not any(df.overwrites[t] is staffcat.overwrites[t] for t in df.overwrites)
+    and df.overwrites[play].view_channel is False
+    and df.overwrites[g.default_role].view_channel is False)
+yes('  the bot may see it, post, reply, delete its posts and read them back',
+    all(getattr(df.overwrites[g.me], n) is True for n in bot.FORUM_BOT_NEEDS))
+rec = json.load(open(dpath))['guilds']['1']
+yes('  its id is recorded as dev_tasks_id',
+    rec.get('dev_tasks_id') == df.id and rec.get('dev_tasks'))
+g.calls = []
+said = run(bot.channel_setup(g, apply=True, path=dpath))
+yes('a second run does nothing and says it was already done',
+    g.calls == [] and said[0].startswith('already done'))
+df.name = 'dev-tests'
+said = run(bot.channel_setup(g, apply=True, path=dpath))
+yes('renamed by hand, it is found again by its id: nothing is made, no second forum',
+    g.calls == [] and said[0].startswith('already done')
+    and bot.dev_tasks_forum(g, dpath) is df
+    and len([c for c in staffcat.channels if bot._kind(c) == 'forum']) == 1)
+run(df.delete())
+g.calls = []
+said = run(bot.channel_setup(g, apply=True, path=dpath))
+df2 = bot.dev_tasks_forum(g, dpath)
+yes('deleted by hand, the next apply says the recorded one is gone, makes it '
+    'again and records the new id',
+    'is not on the server any more' in '\n'.join(said)
+    and df2 is not None and df2 is not df
+    and [c[0] for c in g.calls] == ['create_forum']
+    and json.load(open(dpath))['guilds']['1']['dev_tasks_id'] == df2.id)
+
+opath = os.path.join(TMP, 'dev-before.json')
+g, play = before_dev(opath)
+tf = bot._channel_named(g, 'test-tasks', ('forum',))
+tf.overwrites[g.me] = OW(view_channel=True, send_messages=True,
+                         send_messages_in_threads=True, manage_threads=True,
+                         embed_links=True)
+said = run(bot.channel_setup(g, apply=False, path=opath))
+yes('on a server set up before, a preview says only the #dev-test-tasks step, '
+    'and asks Discord for nothing',
+    g.calls == [] and len(said) == 2
+    and 'would make the forum #dev-test-tasks' in said[0])
+run(bot.channel_setup(g, apply=True, path=opath))
+d = bot.dev_tasks_forum(g, opath)
+yes('  the apply makes that forum and nothing else',
+    [c[0] for c in g.calls] == ['create_forum'] and d is not None)
+yes('  the bot\'s overwrite there is its #test-tasks one, with the forum rights on',
+    d.overwrites[g.me].embed_links is True
+    and all(getattr(d.overwrites[g.me], n) is True for n in bot.FORUM_BOT_NEEDS))
+
+apath = os.path.join(TMP, 'dev-adopt.json')
+g, play = before_dev(apath)
+staffcat = g.get_channel(STAFF_ID)
+by_hand = Channel(g, 'dev-test-tasks', 'forum', staffcat, 7,
+                  {g.default_role: OW(view_channel=False),
+                   g.me: OW(view_channel=True)}, [])
+said = run(bot.channel_setup(g, apply=True, path=apath))
+yes('a #dev-test-tasks forum already in Staff is taken as it is: no second '
+    'forum, its id recorded, the Dev tag and the bot\'s rights added, the rest '
+    'of its overwrites left alone',
+    not [c for c in g.calls if c[0] == 'create_forum']
+    and bot.dev_tasks_forum(g, apath) is by_hand
+    and [t.name for t in by_hand.available_tags] == ['Dev']
+    and all(getattr(by_hand.overwrites[g.me], n) is True for n in bot.FORUM_BOT_NEEDS)
+    and by_hand.overwrites[g.default_role].view_channel is False)
+
+tpath = os.path.join(TMP, 'dev-text.json')
+g, play = before_dev(tpath)
+Channel(g, 'dev-test-tasks', 'text', g.get_channel(STAFF_ID), 7)
+said = run(bot.channel_setup(g, apply=True, path=tpath))
+yes('a text #dev-test-tasks in Staff is said, and nothing is made or recorded',
+    'is not a forum' in '\n'.join(said) and g.calls == []
+    and not json.load(open(tpath))['guilds']['1'].get('dev_tasks_id'))
+
+npath = os.path.join(TMP, 'dev-nocat.json')
+g, *_ = server(staff_category=False)
+said = run(bot.channel_setup(g, apply=True, path=npath))
+yes('a server with no category of that id is told so: the first steps are '
+    'done, and #dev-test-tasks is not made or recorded',
+    'there is no category with id %d' % STAFF_ID in '\n'.join(said)
+    and bot._channel_named(g, 'dev-test-tasks') is None
+    and bot._channel_named(g, 'known-issues', ('forum',)) is not None
+    and not json.load(open(npath))['guilds']['1'].get('dev_tasks_id'))
+
+
+# ------------------------- 10. dev test tasks, and the move to #test-tasks --
+ISSUES.clear()
+COMMENTS.clear()
+HOUR[0] = '2026-10-13T07'
+UPD[0] = 0
+
+
+def tick():
+    UPD[0] += 1
+    return HOUR[0] + ':%02d:%02dZ' % divmod(UPD[0], 60)
+
+
+def bump(num, **k):
+    ISSUES[num].update(k)
+    ISSUES[num]['updated_at'] = tick()
+
+
+def comments_read():
+    return len([u for u in ASKED if '/comments' in u])
+
+
+def task(title, server, *lines):
+    return {'body': '\n'.join(['Test task: ' + title]
+                              + (['Server: ' + server] if server else [])
+                              + list(lines)),
+            'created_at': tick()}
+
+
+g, tasks, results, play, staff = server()
+run(bot.channel_setup(g, apply=True, path=os.path.join(TMP, 'devpass.json')))
+tf = bot._channel_named(g, 'test-tasks', ('forum',))
+df = bot._channel_named(g, 'dev-test-tasks', ('forum',))
+me = g.me
+ds = {}
+
+
+def both(state=None):
+    s = ds if state is None else state
+    t = run(bot.test_tasks_once(tf, s, gh, me_id=me.id))
+    d = run(bot.dev_tasks_once(df, s, gh, me_id=me.id))
+    return t, d
+
+
+run(bot.test_tasks_once(tf, ds, gh, me_id=me.id, now='2026-10-13T06:59:00Z'))
+run(bot.dev_tasks_once(df, ds, gh, me_id=me.id, now='2026-10-13T06:59:30Z'))
+yes('the first dev pass only sets the day #dev-test-tasks began',
+    ds.get('dev_since') == '2026-10-13T06:59:30Z' and df.threads == [])
+
+COMMENTS[80] = [{'body': 'Test task: Old dev ask\nServer: Dev\nDo it.',
+                 'created_at': '2026-10-11T20:00:00Z'}]
+issue(80, 'Old one', ['Dev Findings'])
+COMMENTS[81] = [{'body': 'Fixed on the branch.', 'created_at': tick()},
+                task('Ferry lag on dev', 'Dev', '1. Ride the ferry.',
+                     'What should happen: no stutter.')]
+issue(81, 'Ferry stutters', ['Dev Findings'])
+COMMENTS[82] = [task('Gold stays put', 'Main', '1. Log out and in.',
+                     'What should happen: your gold is there.')]
+issue(82, 'Gold resets', ['Main Findings'], state='closed', reason='completed',
+      closed_at=tick())
+COMMENTS[87] = [{'body': 'Test task: Doors open\nServer: Dev\nOpen one.',
+                 'created_at': '2026-10-12T01:00:00Z'}]
+issue(87, 'Doors stick', ['Dev Findings'], state='closed', reason='completed',
+      closed_at=tick())
+(tp, te, tr), (dp, de, dr) = both()
+th81 = [th for th in df.threads if th.name == 'Ferry lag on dev']
+yes('an OPEN issue whose last "Test task:" says Server: Dev is a post in '
+    '#dev-test-tasks at once, titled and written from it, tagged Dev, the '
+    'Server line not in the body',
+    dp == [81] and len(th81) == 1
+    and th81[0].content == '1. Ride the ferry.\nWhat should happen: no stutter.'
+    and [x.name for x in th81[0].applied_tags] == ['Dev'])
+yes('  and nothing in #test-tasks for it while it is open',
+    81 not in tp and 'Ferry lag on dev' not in names(tf))
+yes('a "Server: Dev" written before #dev-test-tasks began changes nothing: '
+    'open, no dev post; closed, its #test-tasks post tagged Main as before',
+    80 not in dp and 87 not in dp and 87 in tp
+    and [x.name for x in [th for th in tf.threads if th.name == 'Doors open'][0]
+         .applied_tags] == ['Main'])
+yes('a closed issue whose last test task is Main goes to #test-tasks, tagged '
+    'Main, and not to #dev-test-tasks',
+    82 in tp and 'Gold stays put' in names(tf) and 82 not in dp)
+
+COMMENTS[82].append(task('Gold on dev after restart', 'Dev', '1. Restart dev.',
+                         'What should happen: gold is kept.'))
+bump(82)
+(tp, te, tr), (dp, de, dr) = both()
+yes('a CLOSED issue gets a dev post when its Server: Dev test task was '
+    'written after it closed',
+    dp == [82] and 'Gold on dev after restart' in names(df))
+yes('  and its #test-tasks post stays as it was, not made into the dev task',
+    tp == te == tr == [] and 'Gold stays put' in names(tf)
+    and 'Gold on dev after restart' not in names(tf))
+
+n, calls = comments_read(), len(g.calls)
+out = both()
+yes('a second pass reads no comments and changes nothing in either forum',
+    comments_read() == n and len(g.calls) == calls
+    and out == (([], [], []), ([], [], [])))
+
+dpth = os.path.join(TMP, 'dev-known-issues.json')
+bot._known_save(dict(ds, _dirty=True), dpth)
+back = bot._state_read(dpth)
+count = (len(tf.threads), len(df.threads))
+out = both(back)
+yes('after a restart, read back from the file, nothing is posted again in '
+    'either forum',
+    out == (([], [], []), ([], [], []))
+    and (len(tf.threads), len(df.threads)) == count)
+
+bot._known_save(dict(ds, _dirty=True), dpth)
+snap = bot._state_read(dpth)
+COMMENTS[83] = [task('Riften doors on dev', 'Dev', '1. Open a door.')]
+issue(83, 'Riften doors', ['Dev Findings'])
+saves = []
+dp = run(bot.dev_tasks_once(df, ds, gh, save=lambda s: saves.append(1),
+                            me_id=me.id))[0]
+yes('a new dev post is saved straight after it is made', dp == [83] and saves)
+n83 = len(df.threads)
+dp = run(bot.dev_tasks_once(df, snap, gh, me_id=me.id))[0]
+yes('a dev post that never reached the file is found again by its title, '
+    'not doubled',
+    len(df.threads) == n83
+    and snap['dev']['83']['thread_id'] == ds['dev']['83']['thread_id'])
+
+COMMENTS[81].append(task('Ferry crossing is smooth', 'Main', '1. Ride the ferry.',
+                         'What should happen: no stutter.'))
+bump(81, state='closed', state_reason='completed', closed_at=tick())
+(tp, te, tr), (dp, de, dr) = both()
+moved = [th for th in tf.threads if th.name == 'Ferry crossing is smooth']
+yes('closed as fixed with a newer Main test task: the dev post is DELETED, '
+    'and the Main one is posted in #test-tasks, tagged Main',
+    81 in dr and 'Ferry lag on dev' not in names(df) and 81 in tp
+    and len(moved) == 1 and [x.name for x in moved[0].applied_tags] == ['Main'])
+
+bump(83, state='closed', state_reason='completed', closed_at=tick())
+(tp, te, tr), (dp, de, dr) = both()
+yes('closed as fixed while its last test task still says Server: Dev: the dev '
+    'post goes, and #test-tasks gets nothing from it, not even the plain line',
+    dr == [83] and 'Riften doors on dev' not in names(df)
+    and 83 not in tp and 'Riften doors' not in names(tf))
+
+COMMENTS[84] = [task('Smithing on dev', 'Dev', '1. Smith a dagger.')]
+issue(84, 'Smithing', ['Dev Findings'])
+dp = both()[1][0]
+COMMENTS[84].append(task('Smithing works', None, '1. Smith a dagger.'))
+bump(84)
+(tp, te, tr), (dp2, de, dr) = both()
+yes('an open issue whose test task is rewritten without Server: Dev leaves '
+    '#dev-test-tasks, and is not in #test-tasks while open',
+    dp == [84] and dr == [84] and 'Smithing on dev' not in names(df)
+    and 84 not in tp and 'Smithing works' not in names(tf))
+
+COMMENTS[85] = [task('Forge timing', 'Dev', 'Use a forge.')]
+issue(85, 'Forge', ['Dev Findings'])
+both()
+th85 = [th for th in df.threads if th.name == 'Forge timing'][0]
+COMMENTS[85].append(task('Forge timing in Whiterun', 'Dev', 'Use the Whiterun forge.'))
+bump(85)
+(tp, te, tr), (dp, de, dr) = both()
+yes('a rewritten dev test task EDITS its post: the same thread, new title and body',
+    de == [85] and dp == [] and th85.name == 'Forge timing in Whiterun'
+    and th85.content == 'Use the Whiterun forge.' and th85 in df.threads)
+
+real_create = df.create_thread
+refusals = [1]
+
+
+async def refuse_once(**k):
+    if refusals:
+        refusals.pop()
+        raise Refused('Missing Permissions')
+    return await real_create(**k)
+
+
+df.create_thread = refuse_once
+COMMENTS[86] = [task('Hold panel on dev', 'Dev', 'Pick a hold.')]
+issue(86, 'Hold panel', ['Dev Findings'])
+issue(88, 'Changed later in the same pass', ['area: Launcher'])
+dp = run(bot.dev_tasks_once(df, ds, gh, me_id=me.id))[0]
+dp2 = run(bot.dev_tasks_once(df, ds, gh, me_id=me.id))[0]
+del df.create_thread
+yes('a post Discord refused is tried again on the next pass, though an issue '
+    'changed after it was read in that pass, and made once',
+    dp == [] and dp2 == [86]
+    and names(df).count('Hold panel on dev') == 1)
+
+run(th85.delete())
+COMMENTS[85].append(task('Forge timing, last', 'Dev', 'Use any forge.'))
+bump(85)
+dp = both()[1][0]
+yes('a dev post deleted by hand is made again when its test task is rewritten',
+    dp == [85] and 'Forge timing, last' in names(df))
+
+bump(81, state='open', state_reason=None, closed_at=None)
+(tp, te, tr), (dp, de, dr) = both()
+yes('a reopened issue loses its #test-tasks post, as before, and gets no dev '
+    'post from a Main test task',
+    81 in tr and 'Ferry crossing is smooth' not in names(tf) and 81 not in dp)
+COMMENTS[81].append(task('Ferry lag again on dev', 'Dev', '1. Ride the ferry.'))
+bump(81)
+dp = both()[1][0]
+yes('  and a new Server: Dev test task on it is a dev post again', dp == [81]
+    and 'Ferry lag again on dev' in names(df))
+
+no, said = run(bot.post_test_task(g, 'Measure on dev', 'x', 'Dev'))
+th, said2 = run(bot.post_test_task(g, 'By hand', 'Do it on main.'))
+yes('/test-task by hand is still Main only: a Dev one is refused and nothing '
+    'reaches #dev-test-tasks; a Main one lands in #test-tasks, tagged Main',
+    no is None and 'Main only' in said and 'Measure on dev' not in names(df)
+    and th in tf.threads and [x.name for x in th.applied_tags] == ['Main'])
+
+import importlib.util  # noqa: E402
+_spec = importlib.util.spec_from_file_location(
+    'build_discord', os.path.join(HERE, 'Build-Discord.py'))
+B = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(B)
+_plan = [s for _c, specs in B.PLAN for s in specs if s['name'] == 'dev-test-tasks']
+yes('Build-Discord.py names #dev-test-tasks in Staff, never makes it (the bot\'s '
+    'setup does), never deletes it, and writes the bot\'s own topic on it',
+    [c for c, specs in B.PLAN if any(s['name'] == 'dev-test-tasks' for s in specs)]
+    == ['Staff'] and len(_plan) == 1 and _plan[0].get('make') is False
+    and _plan[0]['kind'] == 'forum' and 'dev-test-tasks' in B.KEEP
+    and _plan[0].get('topic') == bot.DEV_TOPIC)
+
+wsrc = inspect.getsource(bot.watch_known_issues)
+yes('the watcher finds #dev-test-tasks by the id the setup recorded, never by '
+    'its name, and keeps it each pass',
+    'dev_tasks_forum(g)' in wsrc and 'dev_tasks_once(' in wsrc
+    and '_channel_named(g, DEV_TASKS_NAME' not in wsrc)
 
 
 saved_token = os.environ.pop('GITHUB_TOKEN', None)

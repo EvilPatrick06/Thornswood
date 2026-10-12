@@ -963,9 +963,18 @@ How to use it:
   should happen, with no issue numbers, links or code, and closes the issue.
   The bot turns that comment into a post in the #test-tasks forum the moment
   the issue closes, tagged Main, so closing it when it merges or when it
-  reaches dev sends testers to look for a fix that main does not have. The
-  `Server:` line those comments carried before is no longer needed; the bot
-  reads it and ignores it (`bot\README.md`, Testing).
+  reaches dev sends testers to look for a fix that main does not have. Write
+  `Server: Main` on the line under the title, or no `Server:` line at all.
+- Most test tasks are Main, because testers play on main in the alpha and dev
+  is where the team checks nothing is broken (Patrick, 12 Oct). When the code
+  is done and someone on dev has to measure something first, write the same
+  comment with `Server: Dev` on the line under the title, and leave the issue
+  open. The bot posts it at once in #dev-test-tasks, a forum in the Staff
+  category that only staff see, and takes it down when the issue closes or a
+  newer `Test task:` comment does not say `Server: Dev`. Put what was
+  measured on the issue: the post is deleted when it goes. When the fix
+  reaches main, write the Main test task and close the issue as above, and
+  it moves to #test-tasks (`bot\README.md`, Testing).
 
 #### What is not a reason to skip an issue
 
