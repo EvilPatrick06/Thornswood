@@ -2617,4 +2617,4 @@ Not from the chat: `/restart` and `/shutdown` answer that restarts are not run f
 | Command | Who | What it does |
 | --- | --- | --- |
 | `/close [why]` | Staff, in a ticket: the bot's `STAFF_ROLES`, by id or name, never Manage Threads alone (#1342) | Closes the ticket |
-| `/live-smoke start`, `reset`, `refresh`, `report` | Owner, Dev and Lead Gamemaster | The Live smoke checklist in #test-tasks: opens a dated session, closes it and starts a fresh one, rewrites the checklist, counts a session's marks |
+| `/test-task title body tag` | Owner, Dev and Lead Gamemaster (`TEST_TASK_ROLES`) | Posts one thread in the #test-tasks forum, tagged Dev or Main. The Live smoke checklist and `/live-smoke` were taken out on 11 October |
