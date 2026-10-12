@@ -437,6 +437,20 @@ test('A reciprocal shared edge with tiny surface noise cannot freeze reachable c
   assert.ok(!f.logs.some(line => line.includes('Movement crossed an unverified navigation edge')));
   f.stop();
 });
+test('An NPC standing on a shared edge beside its target attacks instead of waiting for a step it never takes', () => {
+  // #2032: 526e9 stood on the middle of the edge its triangle shares with
+  // its target's, and the target's position, the same point as 32-bit floats,
+  // fell 1.3e-5 outside its triangle. Here the target is 0.0057 units over
+  // the diagonal of the square: inside navigation's 0.01 arrival distance,
+  // outside triangle 0's edge tolerance, so the route is all behind the NPC.
+  const f = fixture({count:1,humans:[100],
+    npc:{1:{pos:[300,300,0],combatTarget:100}},
+    human:{100:{pos:[300.004,300.004,0]}}});
+  f.advance(15000);
+  assert.ok(f.attacks.length > 0,'An NPC that has arrived beside its target attacks it');
+  assert.ok(f.controlled.has(1));
+  f.stop();
+});
 test('An overlapping unlinked triangle cannot displace a verified movement neighbor', () => {
   const mesh = geometry([[0,0,0],[600,0,0],[0,600,0],[600,600,0]],
     [[0,1,2],[1,3,2],[1,3,2]],[],false);
