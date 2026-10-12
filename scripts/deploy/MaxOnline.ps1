@@ -5,8 +5,9 @@
   it is written, records\most-online.json, and put into server-settings.json.
   Dot-sourced by Deploy-Gamemode.ps1 (the live server, through the built
   server's settings), Deploy-DevGamemode.ps1 (the dev server, in place),
-  Publish-Server.ps1 (the settings it packs) and Publish-Update.ps1 (the
-  feed's maxOnline).
+  Publish-Server.ps1 (the settings it packs), Publish-Update.ps1 (the
+  feed's maxOnline) and Install-Voice.ps1 (the voice service's own number,
+  voice, which goes on its command line as THORNSWOOD_VOICE_MOST).
 
   WHY, issue #481: "Nothing anywhere limits how many people can connect, and
   the only number that looks like a limit is decoration." Patrick, 28 Sep:
@@ -49,7 +50,7 @@ $MostOnlineRecord = Join-Path $PSScriptRoot '..\..\records\most-online.json'
 function Get-MostOnline([string]$Path = '') {
     $ceiling = 1000
     if (-not $Path) { $Path = $MostOnlineRecord }
-    $r = [pscustomobject]@{ Value = 0; Staff = 0; Seats = 0; From = $Path; Why = '' }
+    $r = [pscustomobject]@{ Value = 0; Staff = 0; Seats = 0; Voice = 0; From = $Path; Why = '' }
     if (-not $Path -or -not (Test-Path -LiteralPath $Path)) { $r.Why = 'there is no most-online.json there'; return $r }
     $doc = $null
     try {
@@ -87,6 +88,18 @@ function Get-MostOnline([string]$Path = '') {
     $r.Value = $n
     $r.Staff = $staff
     $r.Seats = $n + $staff
+    # The most people the voice service takes at once (#481), which every
+    # person seated holds a socket to and every person waiting in line at the
+    # menu as well, so it is never fewer than the seats. 0 when the record
+    # has none, and Install-Voice.ps1 then leaves the service uncapped.
+    if ($doc.PSObject.Properties.Name -contains 'voice') {
+        $v = 0
+        [void][int]::TryParse([string]$doc.voice, [ref]$v)
+        if ($v -lt $r.Seats) {
+            throw ("{0} gives voice {1}, fewer than the {2} seats ({3} people and {4} for staff roles), so somebody seated could be kept out of voice and chat. Nothing was written." -f $Path, $doc.voice, $r.Seats, $n, $staff)
+        }
+        $r.Voice = $v
+    }
     return $r
 }
 

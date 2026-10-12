@@ -49,7 +49,7 @@ const STUN_ONLY = '{"iceServers":[{"urls":"stun:stun.l.google.com:19302"}]}';
 // (voice/test-chat-retention.js, #2191).
 // deploy is the artifact record Install-Voice.ps1 leaves beside the service (#459).
 const HEALTH_FIELDS = ['ok', 'build', 'deploy', 'auth', 'uptimeSeconds', 'startedAt', 'bind', 'turn',
-                       'chatRange', 'peers', 'tracked', 'queuedCommands',
+                       'chatRange', 'peers', 'tracked', 'most', 'people', 'refusedFull', 'queuedCommands',
                        'backed', 'largestQueueBytes', 'droppedPositions', 'skippedRosters',
                        'closedBacklogged', 'closedSilent', 'chatRetention'];
 // The two lines every start wrote, with nothing configured, on the port that
