@@ -103,6 +103,21 @@ function Get-FreshCheckoutState {
     return [pscustomobject]$r
 }
 
+# WHICH BRANCH A RELEASE MAY COME FROM, ONE ANSWER FOR SHIP AND PUBLISH-UPDATE
+# (#2235). A dev release may ship any pushed branch; a live (main) release
+# ships from main, or from a hotfix/ branch (Ship's git gate holds the rest).
+# Until 11 October Ship asked with -AnyBranch and Publish-Update, which Ship
+# calls after building, signing and installing the launcher, asked without
+# it, so a dev Ship from a branch got halfway and then Publish-Update refused
+# it as "diverged from origin/main". Both now ask this, with their -Channel.
+function Test-FreshAnyBranch {
+    param([Parameter(Mandatory)][string]$RepoDir, [string]$Channel = 'main')
+    if ($Channel -eq 'dev') { return $true }
+    $br = Invoke-FreshGit $RepoDir @('rev-parse', '--abbrev-ref', 'HEAD')
+    $b = if ($br.Code -eq 0 -and $br.Out.Count) { $br.Out[0].Trim() } else { '' }
+    return ($b -like 'hotfix/*')
+}
+
 function Assert-FreshCheckout {
     param(
         [Parameter(Mandatory)][string]$RepoDir,
