@@ -19,8 +19,10 @@
 
   What is still typed is named here, and nothing else: /stuck, /helpme and
   /report (Patrick, 4 October, #1682), and how a line is said, /me, /do, /w,
-  /s, /y and /ooc, with /roll (#1639). The same list is PLAYER_WORDS in the
-  gamemode, and tests/test-1633-help-panel.js holds the two together.
+  /s, /y and /ooc, with /roll (#1639), and /needs, the four bars as a line
+  of text for somebody who hid them (Patrick, 11 October, #2267). The same
+  list is PLAYER_WORDS in the gamemode, and tests/test-1633-help-panel.js
+  holds the two together.
 
   The words are the page's own rather than the server's, so the panel opens
   at once, with or without the chat's connection, which is when somebody
@@ -83,7 +85,8 @@
     { id: 'living', title: 'Living', text: function (k) {
       return [
         'The four bars are food, water, rest and how warm you are, and the Body page on ' +
-          k.skills + ' says why. Eat or drink from your pack.',
+          k.skills + ' says why. Eat or drink from your pack. With the bars hidden in the ' +
+          'launcher\'s Settings, /needs in the chat says all four as a line of text.',
         'Sit or lie down to rest: on a seat, on the ground with Sit on the emote wheel (' +
           k.wheel + '), or in a bed. By a fire is better, and your own bed is best. ' +
           'Somebody else\'s bed counts when they let you sleep there or you carry its key. ' +
