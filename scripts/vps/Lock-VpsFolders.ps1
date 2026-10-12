@@ -16,8 +16,8 @@
   and the dev one (the key the site trusts), server-settings.json, the voice
   services' token-key.txt and their chat logs. The game servers and voice run
   as SYSTEM, the site reads what Deploy-Docs.ps1 grants it by name, and the bot
-  reads private\moderation.log through a rule on that file (Install-Bot.ps1).
-  Nothing needs the Users rule.
+  reads the staff log in for-bot through a rule on that folder (Install-Bot.ps1,
+  #2321). Nothing needs the Users rule.
 
   WHAT IT DOES, for C:\Thornswood-Server, C:\Thornswood-Server-Dev,
   C:\Thornswood-Voice, C:\Thornswood-Voice-Dev, the .prev, .undone and
@@ -39,9 +39,11 @@
       account running this have Full Control; every rule set on it by name
       stays (the site's, a deny for the build runner); Users, Everyone,
       Authenticated Users and CREATOR OWNER go.
-    data and private under a server the same way, and private keeps nothing
-      of the root's: SYSTEM and Administrators only. Rules on single files,
-      the bot's on moderation.log, stay where they are.
+    data, private and for-bot under a server the same way, and private keeps
+      nothing of the root's: SYSTEM and Administrators only. for-bot keeps its
+      rules by name, the bot's read among them (#2321), and a server whose
+      for-bot has no rule of the bot's is said, with what to run. Rules on
+      single files stay where they are.
   Install-ThornswoodServer.ps1 does the same at every server install from now
   on, and vps-dev-instance.ps1 for the dev folders it makes.
   The service folders are locked as they are made, by the same rules, through
@@ -206,7 +208,7 @@ foreach ($f in $folders) {
     $isDumps = $f.Name -eq 'Thornswood-Dumps'
     $parts = @(@{ P = $path; Only = ($isBackup -or $isDumps); W = $(if ($isDumps) { $dumpWriters } else { @() }) })
     if (-not $isVoice -and -not $isBackup -and -not $isSvc) {
-        foreach ($sub in 'data', 'private') {
+        foreach ($sub in 'data', 'private', 'for-bot') {
             $p = Join-Path $path $sub
             if (Test-Path -LiteralPath $p) { $parts += @{ P = $p; Only = ($sub -eq 'private'); W = @() } }
         }
@@ -224,12 +226,13 @@ foreach ($f in $folders) {
         catch { Say ('COULD NOT LOCK ' + $x.P + ': ' + $_.Exception.Message); $refused++ }
     }
     if (-not $isVoice -and -not $isBackup -and -not $isSvc) {
-        $mod = Join-Path $path 'private\moderation.log'
-        if ((Test-Path -LiteralPath $mod) -and (Get-Service -Name 'ThornswoodBot' -ErrorAction SilentlyContinue)) {
-            $botSid = ''
-            try { $botSid = (New-Object Security.Principal.NTAccount('NT SERVICE\ThornswoodBot')).Translate([Security.Principal.SecurityIdentifier]).Value } catch { }
-            if ($botSid -and -not @(Explicit $mod | Where-Object { $_.IdentityReference.Value -eq $botSid }).Count) {
-                Say ('  the bot has no rule on ' + $mod + ', so it cannot read it: run .\scripts\deploy\Install-Bot.ps1 once')
+        # The gamemode's staff log, which the bot reads by its rule on for-bot (#2321).
+        $fb = Join-Path $path 'for-bot'
+        if ($BotSid -ne 'none' -and $f.Name -notmatch '\.(prev|undone|failed)-') {
+            if (-not (Test-Path -LiteralPath $fb)) {
+                Say ('  ' + $path + ' has no for-bot yet, where the gamemode writes its staff log for the bot: run .\scripts\deploy\Install-Bot.ps1 once')
+            } elseif (-not @(Explicit $fb | Where-Object { $_.IdentityReference.Value -eq $BotSid -and $_.AccessControlType -eq 'Allow' }).Count) {
+                Say ('  the bot has no rule on ' + $fb + ', so it cannot read the staff log: run .\scripts\deploy\Install-Bot.ps1 once')
             }
         }
     }

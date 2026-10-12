@@ -2566,7 +2566,7 @@ A staff command also needs the chat to have proved who you are. When it has not,
 
 A person, wherever these say `<person>`, is their name or the start of it while only one name starts that way, the form id the crosshair gives, or their profile number. A profile number reaches somebody who has left, for a ban, a note or `/unsilence`.
 
-Each staff command answers you in your chat, tells the person it was done to, writes a line to `thornswood.log`, and writes a line to `private\moderation.log`, which the bot says in the staff channel.
+Each staff command answers you in your chat, tells the person it was done to, writes a line to `thornswood.log`, and writes a line to `for-bot\moderation.log` beside the server, which the bot says in the staff channel.
 
 #### For yourself
 
