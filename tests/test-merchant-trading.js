@@ -1,6 +1,13 @@
 'use strict';
 const assert = require('node:assert/strict');
 const trading = require('../game/merchant-trading.js');
+const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
+const mode = fs.readFileSync(path.join(__dirname,'../game/gamemode.js'),'utf8');
+const lookupSource = mode.slice(mode.indexOf('  function findIn('),mode.indexOf('  function findBeast('));
+const lookupContext = {globalThis:{},buildThings:()=>({'iron ingot':{name:'Iron Ingot',desc:'5ace4:Skyrim.esm'}}),idOf:()=>100};
+vm.runInNewContext(lookupSource,lookupContext);
+assert.equal(lookupContext.globalThis.__thornswoodResolveItem('Iron Ingot').baseId,100,
+  'the production item lookup resolves capitalized price labels');
 
 function memoryPurses(seed) {
   const states = new Map();
@@ -82,7 +89,7 @@ function resolve(name) {
   return null;
 }
 
-function service(native, purse, clock) {
+function service(native, purse, clock, market) {
   const world = worldOf(native);
   const purses = memoryPurses([[1, {
     version: 1, reference: '1:Skyrim.esm', base: 'a:Skyrim.esm', purse: purse, stock: [], supply: {}
@@ -90,7 +97,7 @@ function service(native, purse, clock) {
     version: 1, reference: '2:Skyrim.esm', base: 'b:Skyrim.esm', purse: 250, stock: []
   }]]);
   const deps = {
-    purses, prices, transfer: world.transfer, world, places, resolve,
+    purses, prices:market || prices, transfer: world.transfer, world, places, resolve,
     isTrader: function (id) { return id === 1 || id === 2; },
     now: clock || (() => 1_700_000_000_000)
   };
@@ -109,6 +116,100 @@ assert.equal(opened.view.open, true);
 assert.equal(opened.view.purse, 250);
 assert.equal(opened.view.transfer, true);
 assert.equal(opened.view.offers[0].stock, 0);
+assert.equal(opened.view.offers[0].carried, 8, 'the server supplies the carried count for a quoted item');
+assert.equal(opened.view.offers[1].carried, 2, 'zero-price goods still have a carried count');
+assert.equal(opened.view.offers[0].maxSell, 8);
+assert.equal(opened.view.sellReason, '');
+const partial=service({on:true},10);
+assert.equal(open(partial.api).view.offers[0].maxSell,3,'the purse limits the selectable quantity');
+const emptyPurse=service({on:true},0);
+assert.equal(open(emptyPurse.api).view.offers[0].maxSell,0);
+assert.equal(open(emptyPurse.api).view.offers[1].maxSell,2,'free quoted goods can be given to an empty purse');
+delete emptyPurse.world.inv[10][101];
+assert.match(open(emptyPurse.api).view.sellReason,/cannot afford/);
+const noPrices=service({on:true},250,undefined,{catalog(){return [];},quote(){return {buy:null,sell:null};}});
+assert.equal(open(noPrices.api).view.offers.length,0);
+assert.match(open(noPrices.api).view.sellReason,/no submitted buy prices/);
+const aliasMarket={catalog(){return [{name:'iron ingots',buy:9,sell:12}];},
+  quote(hold,name){return name==='iron ingots'?{buy:9,sell:12}:{buy:null,sell:null};}};
+const alias=service({on:true},250,undefined,aliasMarket);
+alias.deps.resolve=name=>String(name).toLowerCase()==='iron ingots'?{name:'Iron Ingot',baseId:100}:resolve(name);
+assert.equal(open(alias.api).view.offers[0].buy,9,'display quotes the actual submitted label');
+assert.equal(open(alias.api).view.offers[0].name,'iron ingots');
+assert.match(alias.api.command({actorId:10,profileId:7,parts:['/merchant','sell','1','@9','iron','ingots']}).text,/Sold 1/,
+  'an alias-only price remains usable while the shelf stores its canonical inventory name');
+const suppliedAlias=alias.api.command({actorId:10,profileId:7,parts:['/merchant','supply','iron','ingots']});
+assert.match(suppliedAlias.text,/Sold 5/);
+assert.equal(suppliedAlias.view.supply[0].ready,false,'an alias uses the canonical completed supply cooldown');
+let liveBuy=3;
+const changedQuote=service({on:true},250,undefined,{catalog:prices.catalog,quote(){return {buy:liveBuy,sell:5};}});
+open(changedQuote.api);liveBuy=2;
+const rejectedQuote=changedQuote.api.command({actorId:10,profileId:7,parts:['/merchant','sell','2','@3','Iron','Ingot']});
+assert.match(rejectedQuote.text,/price changed/);
+assert.equal(changedQuote.world.inv[10][100],8);
+assert.equal(changedQuote.purses.read(1).purse,250);
+assert.equal(rejectedQuote.view.offers[0].buy,2);
+const replacedQuote=service({on:true},250,undefined,{catalog:prices.catalog,quote(){return {buy:2,sell:5};}});
+open(replacedQuote.api);
+let quoteReentered=false;
+const quoteInventory=replacedQuote.world.transfer.inventory;
+replacedQuote.world.transfer.inventory=function(id){
+  if(!quoteReentered){quoteReentered=true;open(replacedQuote.api);}
+  return quoteInventory.call(this,id);
+};
+const oldQuote=replacedQuote.api.command({actorId:10,profileId:7,parts:['/merchant','sell','1','@3','Iron','Ingot']});
+assert.equal(oldQuote.view,null,'old quote feedback cannot take over a replacement panel');
+const refresh=service({on:true},250);
+let inventoryReads=0;
+const readInventory=refresh.world.transfer.inventory;
+refresh.world.transfer.inventory=function(id){inventoryReads++;return readInventory.call(this,id);};
+const initial=open(refresh.api).view;
+refresh.api.acknowledgeView(10,initial);
+inventoryReads=0;
+assert.deepEqual(refresh.api.recover(),[],'unchanged views are not republished');
+assert.equal(inventoryReads,1,'one validated pack snapshot serves the entire catalogue');
+refresh.world.inv[10][100]=1;
+const updated=refresh.api.recover();
+assert.equal(updated.length,1,'pack changes refresh sale eligibility without a settlement');
+assert.equal(updated[0].view.offers[0].maxSell,1);
+refresh.api.acknowledgeView(10,updated[0].view);
+assert.deepEqual(refresh.api.recover(),[]);
+const pendingUi=service({on:true,fail:'stuck'},250);
+open(pendingUi.api);
+pendingUi.api.command({actorId:10,profileId:7,parts:['/merchant','sell','1','Iron','Ingot']});
+const heldView=open(pendingUi.api).view;
+assert.equal(heldView.offers.every(row=>row.maxSell===0),true,'a pending transfer hides all pack sales');
+assert.match(heldView.sellReason,/finishing|waiting/);
+const swapped=service({on:true},250);
+open(swapped.api);
+const swapInventory=swapped.world.transfer.inventory;
+swapped.world.transfer.inventory=function(id) {
+  const result=swapInventory.call(this,id);
+  swapped.world.actors[10].runtimeIdentity='999';
+  return result;
+};
+const oldPack=swapped.api.recover();
+assert.deepEqual(oldPack,[],'neither inventory nor a closure can publish to a replacement character');
+const nestedView=service({on:true},250);
+open(nestedView.api);
+let replaceOnce=false;
+const nestedInventory=nestedView.world.transfer.inventory;
+nestedView.world.transfer.inventory=function(id) {
+  if(!replaceOnce){replaceOnce=true;open(nestedView.api);}
+  return nestedInventory.call(this,id);
+};
+assert.deepEqual(nestedView.api.recover(),[],'an old refresh cannot publish under a replacement panel session');
+const feedback=service({on:true},250);
+const feedbackView=open(feedback.api).view;
+feedbackView.note='You take the work.';
+feedback.api.acknowledgeView(10,feedbackView);
+feedback.world.inv[10][100]=4;
+assert.equal(feedback.api.recover()[0].view.note,'You take the work.','inventory updates retain quest feedback');
+const corruptPack=service({on:true},250);
+corruptPack.world.transfer.inventory=()=>({entries:[{baseId:100,count:-1}]});
+const unreadable=open(corruptPack.api).view;
+assert.equal(unreadable.offers.every(row=>row.maxSell===0),true);
+assert.match(unreadable.sellReason,/could not be read/);
 const questCalls=[],described=[];
 box.deps.quests=()=>({describe:(...args)=>{described.push(args);return [{id:'ebony',name:'The ebony'}];},
   capture:()=>({owner:'held-session'}),
@@ -193,7 +294,7 @@ assert.equal(takenView.note,'You take the work.');
 cooldownPanel.api.acknowledgeView(10,takenView);
 assert.equal(cooldownPanel.api.recover().length,0,'unchanged recovery retains the action feedback without replacing the view');
 cooldownPanel.world.actors[10].lifeGeneration=1;
-assert.deepEqual(cooldownPanel.api.recover()[0].view,{open:false},'recovery closes an obsolete character session');
+assert.deepEqual(cooldownPanel.api.recover(),[],'recovery retires the obsolete session without closing a replacement runtime');
 
 let sold = box.api.command({ actorId: 10, profileId: 7, parts: ['/merchant', 'sell', '2', 'Iron', 'Ingot'] });
 assert.match(sold.text, /Sold 2/);
@@ -441,4 +542,140 @@ for (const hold of Object.values(trading.BOOK_HOLD)) {
   assert.ok(trading.guildSite(hold).place);
 }
 
+const finalFailures=[];
+function finalCase(name,run){try{run();}catch(error){finalFailures.push(name+': '+error.message);}}
+finalCase('command keeps its originating session',()=>{
+  const b=service({on:true},250);open(b.api);
+  let nested=false;
+  b.deps.resolve=name=>{if(!nested){nested=true;open(b.api);}return resolve(name);};
+  const result=b.api.command({actorId:10,profileId:7,parts:['/merchant','sell','1','@4','Iron','Ingot']});
+  assert.equal(result.view,null);
+  assert.equal(b.world.inv[10][100],8);
+});
+finalCase('open keeps ownership across prepare',()=>{
+  const b=service({on:true},250);open(b.api);
+  const prepare=b.purses.prepare.bind(b.purses);let nested=false,newer;
+  b.purses.prepare=id=>{if(!nested){nested=true;newer=open(b.api).view;}return prepare(id);};
+  const old=open(b.api);
+  assert.equal(old.view,null);
+  b.purses.prepare=prepare;
+  b.world.inv[10][100]++;
+  assert.equal(b.api.recover()[0].view.sessionId,newer.sessionId);
+});
+finalCase('reach callback cannot delete replacement',()=>{
+  const b=service({on:true},250);open(b.api);
+  const actor=b.world.actor.bind(b.world);let nested=false;
+  b.world.actor=id=>{if(id===10&&!nested){nested=true;open(b.api);return null;}return actor(id);};
+  assert.deepEqual(b.api.recover(),[]);
+  b.world.actor=actor;b.world.inv[10][100]++;
+  assert.equal(b.api.recover().length,1);
+});
+finalCase('batch cannot retain an obsolete runtime view',()=>{
+  const b=service({on:true},250);open(b.api);
+  b.world.actors[11]={...b.world.actors[10],profileId:8};b.world.inv[11]={...b.world.inv[10]};
+  b.api.command({actorId:11,profileId:8,parts:['/merchant','1']});
+  b.world.inv[10][100]++;
+  const inventory=b.world.transfer.inventory;let nested=false;
+  b.world.transfer.inventory=function(id){if(id===11&&!nested){nested=true;b.world.actors[10].runtimeIdentity='200';open(b.api);}return inventory.call(this,id);};
+  assert.equal(b.api.recover().some(row=>row.actorId===10),false);
+});
+finalCase('supply retains displayed price consent',()=>{
+  const b=service({on:true},250);open(b.api);
+  const result=b.api.command({actorId:10,profileId:7,parts:['/merchant','supply','@4','Iron','Ingot']});
+  assert.match(result.text,/price changed/);
+  assert.equal(b.world.inv[10][100],8);
+  assert.equal(b.purses.read(1).purse,250);
+});
+finalCase('publication rechecks collected views and closures',()=>{
+  const b=service({on:true},250);open(b.api);b.world.inv[10][100]++;
+  const collected=b.api.recover()[0].view;
+  assert.equal(b.api.isCurrentView(10,collected),true);
+  open(b.api);
+  assert.equal(b.api.isCurrentView(10,collected),false);
+  b.world.actors[10].pos=[9000,0,0];
+  const closed=b.api.recover()[0].view;
+  assert.equal(b.api.isCurrentView(10,closed),true);
+  b.world.actors[10].pos=[0,0,0];open(b.api);
+  assert.equal(b.api.isCurrentView(10,closed),false);
+});
+finalCase('command closure cannot close a later panel',()=>{
+  const b=service({on:true},250);open(b.api);
+  const closed=b.api.command({actorId:10,profileId:7,parts:['/merchant','close']}).view;
+  open(b.api);assert.equal(b.api.isCurrentView(10,closed),false);
+});
+finalCase('failure closures cannot close a later panel',()=>{
+  for(const parts of [['/merchant','2'],['/merchant','sell','1','Iron','Ingot']]) {
+    const b=service({on:true},250);open(b.api);
+    b.world.actors[10].pos=[9000,0,0];
+    const closed=b.api.command({actorId:10,profileId:7,parts}).view;
+    assert.equal(closed.open,false);
+    b.world.actors[10].pos=[0,0,0];open(b.api);
+    assert.equal(b.api.isCurrentView(10,closed),false);
+  }
+});
+finalCase('closure cannot cross to a different profile runtime',()=>{
+  const b=service({on:true},250);open(b.api);b.world.actors[10].pos=[9000,0,0];
+  const closed=b.api.recover()[0].view;
+  Object.assign(b.world.actors[10],{pos:[0,0,0],profileId:8,runtimeIdentity:'200'});
+  b.api.command({actorId:10,profileId:8,parts:['/merchant','1']});
+  assert.equal(b.api.isCurrentView(10,closed),false);
+});
+finalCase('opening owns final timestamp construction',()=>{
+  let b,armed=false,calls=0,newer;
+  b=service({on:true},250,()=>{if(armed && ++calls===2){armed=false;newer=open(b.api).view;}return 1700000000000;});
+  armed=true;
+  const old=open(b.api);
+  assert.equal(old.view,null);
+  assert.equal(b.api.isCurrentView(10,newer),true);
+});
+finalCase('activation keeps ownership across trader lookup',()=>{
+  const b=service({on:true},250);open(b.api);let newer;
+  b.deps.isTrader=()=>{newer=open(b.api).view;return true;};
+  const old=b.api.command({actorId:10,profileId:7,parts:['/merchant','e','1']});
+  assert.equal(old.view,null);assert.equal(b.api.isCurrentView(10,newer),true);
+});
+finalCase('identity replacement blocks supply history mutation',()=>{
+  const b=service({on:true},250);let state=b.purses.prepare(1);state.supply={expired:1};b.purses.commit(1,state);
+  open(b.api);const identity=b.world.transfer.identity;let armed=true;
+  b.world.transfer.identity=function(id){if(armed){armed=false;open(b.api);}return identity.call(this,id);};
+  b.api.command({actorId:10,profileId:7,parts:['/merchant','sell','1','Iron','Ingot']});
+  assert.deepEqual(b.purses.read(1).supply,{expired:1});
+  assert.equal(b.world.inv[10][100],8);
+});
+finalCase('obsolete quest feedback is suppressed',()=>{
+  const b=service({on:true},250);open(b.api);
+  b.deps.quests=()=>({capture:()=>({}),describe:()=>[],act:()=>{open(b.api);return {ok:true};}});
+  const old=b.api.command({actorId:10,profileId:7,parts:['/merchant','quest','take','ebony']});
+  assert.deepEqual(old,{text:'',view:null});
+});
+finalCase('obsolete committed trade feedback is suppressed',()=>{
+  const b=service({on:true},250);open(b.api);
+  const prepare=b.purses.prepare.bind(b.purses);let armed=true;
+  b.purses.prepare=id=>{const state=prepare(id);if(armed&&state.purse===247){armed=false;open(b.api);}return state;};
+  const old=b.api.command({actorId:10,profileId:7,parts:['/merchant','sell','1','Iron','Ingot']});
+  assert.deepEqual(old,{text:'',view:null});
+  assert.equal(b.world.inv[10][100],7,'a committed trade is retained, never replayed or compensated');
+});
+finalCase('later validation cannot retain an earlier replaced view',()=>{
+  const b=service({on:true},250);open(b.api);
+  b.world.actors[11]={...b.world.actors[10],profileId:8};b.world.inv[11]={...b.world.inv[10]};
+  b.api.command({actorId:11,profileId:8,parts:['/merchant','1']});
+  b.world.inv[10][100]++;b.world.inv[11][100]++;
+  const actor=b.world.actor.bind(b.world);let reads=0,newer;
+  b.world.actor=id=>{if(id===11&&++reads===4)newer=open(b.api).view;return actor(id);};
+  assert.equal(b.api.recover().some(row=>row.actorId===10),false);
+  assert.ok(newer,'the replacement occurs during the later view validation');
+});
+finalCase('production publication checks after serialization',()=>{
+  const b=service({on:true},250);let armed=false;
+  const quests=[];quests.toJSON=()=>{if(armed){armed=false;open(b.api);}return [];};
+  b.deps.quests=()=>({describe:()=>quests});
+  const view=open(b.api).view;
+  const source=fs.readFileSync(path.join(__dirname,'../game/merchant-trading.js'),'utf8');
+  const push=source.slice(source.indexOf('  trading.push = function'),source.indexOf('  var timers=env.timers'));
+  const writes=[];vm.runInNewContext(push,{trading:b.api,mp:{set:(...args)=>writes.push(args)},property:'view',log:()=>{}});
+  armed=true;b.api.push(10,view);
+  assert.deepEqual(writes,[]);
+});
+assert.deepEqual(finalFailures,[]);
 console.log('PASS merchant trading quotes, stock, depletion, supply, reach and native gate');
