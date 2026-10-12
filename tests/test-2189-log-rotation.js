@@ -16,6 +16,14 @@
   D. once renames work again the next write rolls, says so once, and
      ordinary logging resumes under the cap
   E. the unchanged path: rolling that works never says anything
+
+  The retry window runs on a pretend clock (#2346). makeLog reads the time
+  through Date.now(), and it is handed a Date whose now() is a number this
+  file moves by hand, so "inside the window" and "after it" are steps here,
+  not sleeps. With real time, A to C had to finish inside the 300 ms window:
+  on the hosted runner they did not, a roll was tried during C, and C4, D3
+  and D5 saw three failed tries instead of two. Slowing each append by 40 ms
+  here gave the same three failures.
 */
 const fs = require('fs');
 const os = require('os');
@@ -39,11 +47,17 @@ const stubFs = Object.assign({}, fs, {
 });
 const said = [];
 const fakeProcess = { stdout: { write(s) { said.push(String(s)); } } };
-const makeLog = new Function('fs', 'path', 'process', text.slice(a, b) + '\nreturn makeLog;')(stubFs, path, fakeProcess);
+// The pretend clock. new Date() with no argument still gives the real time,
+// which is only used for the stamp at the start of each line.
+let clock = Date.UTC(2026, 9, 12, 7, 0, 0);
+class PretendDate extends Date {
+  static now() { return clock; }
+}
+const makeLog = new Function('fs', 'path', 'process', 'Date', text.slice(a, b) + '\nreturn makeLog;')(stubFs, path, fakeProcess, PretendDate);
 
 const work = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-2189-'));
 process.on('exit', () => { try { fs.rmSync(work, { recursive: true, force: true }); } catch (e) { } });
-const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
+const later = (ms) => { clock += ms; };
 const size = (f) => { try { return fs.statSync(f).size; } catch (e) { return 0; } };
 const LINE = 'x'.repeat(40);
 
@@ -84,7 +98,10 @@ const LINE = 'x'.repeat(40);
   yes('C2 the ceiling is said once', said.filter((s) => /emergency ceiling/.test(s)).length === 1 &&
       (fs.readFileSync(file, 'utf8').match(/emergency ceiling/g) || []).length === 1);
   yes('C3 a write past it returns false, and the log is not marked broken', log.write(LINE) === false && log.broken() === false);
-  await sleep(350);
+  later(299);
+  log.write(LINE);
+  yes('C3b one millisecond inside the retry window, still no roll is tried', log.rolling().failures === 1);
+  later(1);
   log.write(LINE);
   yes('C4 after the retry window one more roll is tried, still failing, still not said again',
       log.rolling().failures === 2 && said.filter((s) => /could not roll/.test(s)).length === 1);
@@ -92,7 +109,7 @@ const LINE = 'x'.repeat(40);
 
   // D: recovery.
   gate.busy = false;
-  await sleep(350);
+  later(300);
   yes('D1 the next write after renames work is kept', log.write('after') === true);
   const st = log.rolling();
   yes('D2 the failures are cleared and the hold lifted', st.failures === 0 && st.held === false && st.error === null);
