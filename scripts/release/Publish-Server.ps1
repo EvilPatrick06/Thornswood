@@ -73,6 +73,15 @@
   it holds in its server-settings.json, as it always has; the build is
   otherwise read, not changed.
 
+  A LOAD ORDER THAT DROPS PLUGINS (#2320). The installer refuses, before
+  anything is stopped, a payload whose load order leaves out a plugin the
+  running server loads. On 5 Oct at 9:56 PM a dev publish of a fresh engine
+  build carried the engine's own five base masters, because Deploy-Gamemode.ps1
+  -Vortex had not yet written the collection's order into that build, and the
+  dev server ran 48 plugins before and five after. When a plugin really is
+  leaving the collection, name each one:
+      .\scripts\release\Publish-Server.ps1 -Channel dev -DropPlugins 'Old Mod.esp'
+
   It also writes a line into the launcher's News page and pushes it.
 
   A server change ships nothing. The gamemode runs on the VPS, so there is no
@@ -155,6 +164,12 @@ param(
     # its own, and one with neither true nor false is refused. Live goes on
     # only when Patrick says Main.
     [ValidateSet('', 'on', 'off')][string]$RequirePass = '',
+    # The plugins the running server loads that this release's load order may
+    # leave out, each by its file name (#2320). Left off, the installer
+    # refuses an order that drops any plugin the running server loads, which
+    # is what a payload built before Deploy-Gamemode.ps1 -Vortex wrote the
+    # collection's order carries: on 5 Oct, the engine's five base masters.
+    [string[]]$DropPlugins = @(),
     # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
     [switch]$AllowStaleCheckout
 )
@@ -202,6 +217,9 @@ function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if
 # sent or asked, the way Deploy-Server.ps1 refuses -PutBack with -RequirePass.
 if ($PutBack -and $RequirePass) {
     Die '-PutBack sets no setting: it puts the previous server back with the running server''s own settings. Run it without -RequirePass, then a publish with it. Nothing was sent.'
+}
+if ($PutBack -and @($DropPlugins).Count) {
+    Die '-PutBack brings back an order the server ran, so it does not take -DropPlugins. Nothing was sent.'
 }
 
 $target = "$VpsUser@$VpsHost"
@@ -639,6 +657,12 @@ $instArgs = "-Zip C:\thornswood-server.zip -Root '$VpsRoot' -TaskName '$TaskName
 if ($RequirePass) {
     Say "the installer sets the join pass hold $RequirePass, as asked" 'Yellow'
     $instArgs += " -RequirePass $RequirePass"
+}
+if (@($DropPlugins).Count) {
+    # Names with spaces cross the ssh command line as base64 (ServerSettings.ps1).
+    . $settingsLib
+    Say ('the installer may leave these out of the running server''s load order, as asked: ' + (@($DropPlugins) -join ', ')) 'Yellow'
+    $instArgs += (' -DropPlugins ' + (ConvertTo-ThornswoodNamesArg $DropPlugins))
 }
 if ($FreshWorld) {
     # Not deleted any more: the installer starts the new server with no world

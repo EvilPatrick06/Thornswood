@@ -562,6 +562,59 @@ yes('the blocked event list counts HandleX against TestA', same(blockedBy('Handl
 yes('OnActivate is counted against every plugin that waits on it',
   ['TestA.esp', 'TestB.esp', 'TestDead.esp'].every(function (p) { return blockedBy('OnActivate').indexOf(p) >= 0; }));
 
+// The server half, by the repository's record: nothing a mod or the game
+// attaches is in the server's storage, so nothing fires there.
+function server(pl) { return P[pl] ? P[pl].server : null; }
+yes('by the record, no plugin fires on the server: TestDead is not loaded, a quest only plugin is not on a reference',
+    R.plugins.every(function (p) { return p.server.status !== 'fires'; }) &&
+    server('TestDead.esp').status === 'not loaded' && same(server('TestDead.esp').notLoaded, ['TS_Dead']) &&
+    server('TestStuck.esp').status === 'not on a reference' && server('TestRecords.esm').status === 'records only');
+yes('so a plugin dead on the machine fires nowhere, and a partial one is not called that',
+    of('TestDead.esp', 'firesNowhere') === true && of('TestStuck.esp', 'firesNowhere') === true &&
+    of('TestA.esp', 'firesNowhere') === false && of('TestRecords.esm', 'firesNowhere') === false);
+yes('the events reference scripts wait on that the server sends are counted, were they loaded: OnActivate in TestDead',
+    !!R.serverSentEventsIfLoaded.OnActivate && R.serverSentEventsIfLoaded.OnActivate.plugins.indexOf('TestDead.esp') >= 0);
+yes('the report prints both halves and the plugins nothing fires in',
+    /By plugin, on the server/.test(run.stdout) && /nothing fires on either half/.test(run.stdout));
+
+// Another list, written here, proves the audit judges by the record and not
+// by anything of its own. The server loads TS_Dead, TS_Muted, TS_AliasScript
+// and TS_Timer, drops TS_Shared by name, and the client lets OnActivate through.
+const realRecord = JSON.parse(fs.readFileSync(path.join(REPO, 'records', 'papyrus-events.json'), 'utf8'));
+const other = JSON.parse(JSON.stringify(realRecord));
+other.server.loads.dataScripts = ['TS_Dead', 'TS_Muted', 'TS_AliasScript', 'TS_Timer', 'TS_Shared'];
+other.server.dropsByName = ['TS_Shared'];
+other.client.letsThrough = ['OnUpdate', 'OnActivate'];
+const OTHER = path.join(ROOT, 'other-record.json');
+fs.writeFileSync(OTHER, JSON.stringify(other));
+const OUT2 = path.join(ROOT, 'out2.json');
+const run2 = py([AUDIT, '--data', DATA, '--plugins', PLUGINS, '--json', OUT2, '--record', OTHER]);
+let R2 = null;
+try { R2 = JSON.parse(fs.readFileSync(OUT2, 'utf8')); } catch (e) { R2 = null; }
+yes('the audit runs with --record naming another list', run2.status === 0 && !!R2);
+const P2 = {};
+(R2 ? R2.plugins : []).forEach(function (p) { P2[p.plugin] = p; });
+const s2 = function (pl) { return P2[pl] ? P2[pl].server : {}; };
+yes('a loaded script on an activator that handles a sent event fires on the server: TS_Dead on OnActivate',
+    s2('TestDead.esp').status === 'fires' && same(s2('TestDead.esp').fires, { TS_Dead: ['OnActivate'] }) &&
+    P2['TestDead.esp'].firesNowhere === false);
+yes('and the client half follows the record too: with OnActivate let through, TestDead works on the machine',
+    P2['TestDead.esp'].status === 'works');
+yes('a loaded script on a quest never runs there: TS_Timer is not on a reference',
+    s2('TestStuck.esp').status === 'not on a reference');
+yes('a loaded script that handles nothing the server sends is loaded, never sent: TS_Muted',
+    s2('TestQuiet.esp').status === 'loaded, never sent' && same(s2('TestQuiet.esp').loadedNeverSent, ['TS_Muted']));
+yes('a script dropped by name is not loaded, though the storage holds it: TS_Shared, credited to TestA',
+    (s2('TestA.esp').notLoaded || []).indexOf('TS_Shared') >= 0 && !('TS_Shared' in (s2('TestA.esp').fires || {})));
+yes('and one the storage does not hold is not loaded: TS_Added in TestB',
+    s2('TestB.esp').status === 'not loaded' && (s2('TestB.esp').notLoaded || []).indexOf('TS_Added') >= 0);
+yes('an alias script in the storage still does not fire, and is counted as not on a reference',
+    !!s2('TestA.esp').fires && !('TS_AliasScript' in s2('TestA.esp').fires) && s2('TestA.esp').notOnAReference > 0);
+const bad = path.join(ROOT, 'bad-record.json');
+fs.writeFileSync(bad, '{"client": {}}');
+const run3 = py([AUDIT, '--data', DATA, '--plugins', PLUGINS, '--record', bad]);
+yes('a record it cannot read stops it with a message', run3.status === 1 && /STOP/.test(run3.stdout));
+
 const stop = py([AUDIT, '--data', path.join(ROOT, 'nowhere'), '--plugins', PLUGINS]);
 yes('a Data folder that is not there stops with a message', stop.status === 1 && /STOP/.test(stop.stdout));
 

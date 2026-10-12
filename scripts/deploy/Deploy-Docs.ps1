@@ -118,6 +118,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 . (Join-Path $Here '..\vps\Send-Script.ps1')
 . (Join-Path $Here '..\vps\Send-Secret.ps1')
 . (Join-Path $Here 'DocsPasswordFile.ps1')
+. (Join-Path $Here 'SiteConfigSet.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 . (Join-Path $Here 'Swap.ps1')
@@ -389,15 +390,14 @@ if ($Password) {
   # client id and secret, the bot token, the bot key, the admins, the server
   # password and the cookie secret with it. With no client id, discordReady()
   # in server.js is false, and isMember and /api/login take the password
-  # again, so a wipe reopened the door Discord had shut. Rotate-ServerPassword
-  # already reads before it writes; this is the same shape.
+  # again, so a wipe reopened the door Discord had shut.
   #
-  # A file that is there and will not parse is left exactly as it is, which is
-  # server.js's own rule: unreadable is not empty, and the difference is
-  # somebody's client secret. Read as UTF-8 because Get-Content in Windows
-  # PowerShell reads a file with no byte order mark as the local code page,
-  # and node writes none. Written with no mark, because one is how the site
-  # once ran for days on its defaults while looking configured.
+  # The read, the check and the write are SiteConfigSet.ps1, the one block
+  # Rotate-ServerPassword uses too (#2317): a file that is there and will not
+  # parse is left exactly as it is, which is server.js's own rule
+  # (unreadable is not empty, and the difference is somebody's client
+  # secret), it reads as UTF-8 and writes with no byte order mark, and the
+  # order of the settings is kept. That file says why each of those matters.
   #
   # The password goes on ssh's standard input (Send-Secret.ps1, issue #451),
   # so it is on no command line on either machine and in no file. Until then
@@ -405,22 +405,7 @@ if ($Password) {
   # here and of powershell on the VPS for the length of the call.
   # The value comes either from the box's own file (#2116), read there, or on
   # ssh's standard input from the prompt. What writes it is the same.
-  $setTail = @"
-`$f = '$rootWin\config.json'
-`$cfg = [ordered]@{}
-if (Test-Path -LiteralPath `$f) {
-  `$old = `$null
-  try { `$old = ConvertFrom-Json -InputObject ([IO.File]::ReadAllText(`$f, [Text.Encoding]::UTF8)) } catch { }
-  if (-not (`$old -is [Management.Automation.PSCustomObject])) {
-    'CONFIG.JSON IS THERE AND WILL NOT READ AS JSON. Nothing written, the password is unchanged.'
-    return
-  }
-  foreach (`$p in `$old.PSObject.Properties) { `$cfg[`$p.Name] = `$p.Value }
-}
-`$cfg['password'] = `$pw
-[IO.File]::WriteAllText(`$f, (ConvertTo-Json -InputObject `$cfg -Depth 6), (New-Object Text.UTF8Encoding(`$false)))
-'set, ' + (`$cfg.Count - 1) + ' other setting(s) kept'
-"@
+  $setTail = Get-ThornswoodSiteConfigSet -ConfigPath "$rootWin\config.json" -Key 'password' -What 'password'
   if ($pwFromBox) {
     Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script ((Get-ThornswoodDocsPasswordSetHead $PasswordFile) + $setTail) |
       Where-Object { $_ -is [string] } | ForEach-Object { "  $_" }

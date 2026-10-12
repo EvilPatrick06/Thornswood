@@ -34,6 +34,8 @@ if (-not $ps51) { Write-Host 'SKIP  needs Windows PowerShell 5.1'; Done }
 . (Join-Path $Repo 'scripts\vps\Send-Script.ps1')
 . (Join-Path $Repo 'scripts\vps\Send-Secret.ps1')
 . (Join-Path $Repo 'scripts\deploy\DocsPasswordFile.ps1')
+# The read and write of config.json that -Password runs (#2317).
+. (Join-Path $Repo 'scripts\deploy\SiteConfigSet.ps1')
 
 Yes 'the file the code expects is C:\Thornswood-Secrets\docs-site-password.txt' ((Get-ThornswoodDocsPasswordFile) -eq 'C:\Thornswood-Secrets\docs-site-password.txt')
 Yes 'it is outside the site''s own folder, which LOCAL SERVICE can read' (-not (Get-ThornswoodDocsPasswordFile).StartsWith('C:\Thornswood-Docs', [StringComparison]::OrdinalIgnoreCase))
@@ -132,7 +134,7 @@ try {
     Yes 'with the locked file there, nobody is asked' ($r.asked -eq 0 -and $r.fromBox)
     Yes 'config.json gets the file''s value, trimmed' ($c.password -eq $secret)
     Yes 'and keeps every other setting' ($c.cookieSecret -eq 'keep-me' -and $c.gamePort -eq 7777)
-    Yes 'it says set' ($r.said -match 'set, 2 other setting\(s\) kept')
+    Yes 'it says set' ($r.said -match 'set password, 2 other setting\(s\) kept')
     $all = ($script:lines -join "`n")
     Yes 'the value is on no command line or script it sent' (-not $all.Contains($secret))
     Yes 'and nothing printed it' (-not $r.said.Contains($secret))
