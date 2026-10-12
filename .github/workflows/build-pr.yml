@@ -1,0 +1,676 @@
+# GENERATED from build.yml by scripts/dev/Build-PrWorkflow.js. Do not edit:
+# change build.yml and run  node scripts/dev/Build-PrWorkflow.js
+#
+# Every pull request runs the same checks as build.yml, on GitHub's hosted
+# windows-latest runner and never on the VPS beside the live server (#1306,
+# Patrick, 11 Oct 2026, option C; isolation check #2161). No secrets, no
+# live folders: every scratch path is under RUNNER_TEMP. A push to main and
+# a manual run stay on the VPS in build.yml. The job keeps the name
+# "Launcher builds" so a pull request's check reads the same as before.
+name: Build check (pull requests)
+on:
+  pull_request:
+permissions:
+  contents: read
+# One run per branch at a time. A newer push cancels the run it replaces, so
+# no runner is left building a commit nobody wants.
+concurrency:
+  group: build-pr-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  launcher:
+    name: Launcher builds
+    runs-on: windows-latest
+    # About two minutes on the VPS. Past this it is stuck, not slow.
+    # The hosted runner has two cores: the harness step alone took over
+    # eighteen minutes on it, so it gets an hour.
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # The hosted image ships whatever node and python it has this month;
+      # these are pinned so a check means the same thing as on the VPS.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Scan the tree for secrets
+        shell: pwsh
+        run: |
+          # Entry 236. Every tracked file, by the rules in scripts\dev\Check-Secrets.ps1.
+          # A hit names the file, the line and the rule and never the value,
+          # because anybody on the repository can read this log. A known
+          # non-secret goes in scripts\dev\Check-Secrets.allow.txt with its reason.
+          .\scripts\dev\Check-Secrets.ps1
+          exit $LASTEXITCODE
+
+      - name: Parse every PowerShell script
+        shell: pwsh
+        run: |
+          $bad = 0
+          Get-ChildItem -Path scripts, tests, installer -Filter *.ps1 -Recurse -File | ForEach-Object {
+            $tokens = $null; $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors)
+            foreach ($e in $errors) {
+              $bad++
+              Write-Host ("::error file={0},line={1}::{2}" -f $_.FullName, $e.Extent.StartLineNumber, $e.Message)
+            }
+          }
+          if ($bad) { exit 1 }
+          Write-Host "every script parses"
+
+      - name: Check the writing rules
+        shell: pwsh
+        run: |
+          # The Words section of Developer-Guide.md, over every file people read
+          # (every Markdown file outside lore and the archive, the launcher's
+          # help and window, the bot's posts, the public pages, the installer's
+          # read me). Written down since the start and never checked, and on
+          # 24 September eleven hits had gone out in those files. Each hit is
+          # marked on its line with the rule it breaks.
+          #
+          # Issue #460: then the two harnesses that prove the checks catch what
+          # they should, this one and the release note check Ship runs
+          # (scripts\release\Note-Rules.ps1), by planting a break of every rule.
+          # A few seconds between them. They ran only at night before, and a
+          # name in a component README sat red there for a day (#1034).
+          .\scripts\dev\Check-Words.ps1
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $failed = @()
+          # Issue #1081: Ship runs Check-Words before it builds. The harness
+          # plants one hit in a temp tree and a dry-run Ship must stop and
+          # name that hit.
+          foreach ($n in 'test-check-words.ps1', 'test-note-rules.ps1', 'test-ship-check-words.ps1') {
+            Write-Host ("--- {0}" -f $n)
+            & pwsh -NoProfile -File (Join-Path 'tests' $n)
+            if ($LASTEXITCODE -ne 0) { $failed += $n; Write-Host ("::error file=tests/{0}::a writing check let a planted break through or reported an allowed line; the FAIL lines above say which" -f $n) }
+          }
+          if ($failed.Count) { exit 1 }
+
+      - name: Check the ownership page
+        shell: pwsh
+        run: |
+          # Issue #752. docs\OWNERSHIP.md says where every credential file
+          # lives, who holds it and who the second holder is, and
+          # tests\test-ownership.js greps scripts\<area>\*.ps1 and
+          # launcher\app\*.cs for the file names rather than trusting the page.
+          # #697 added discord-avatar.txt with neither a row on that page nor a
+          # line saying it is not a secret, and nothing said so until #750 and
+          # #751 found it by hand. A tenth of a second, so it runs here on every
+          # pull request and not only in the nightly checks.
+          #
+          # Fail closed: no node on the runner is a check that did not happen,
+          # which is the failure this step exists to stop, so it is red.
+          if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+            Write-Host '::error file=tests/test-ownership.js::no node on this runner, so the ownership page was not checked'
+            exit 1
+          }
+          node tests\test-ownership.js
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::error file=docs/OWNERSHIP.md::the ownership page does not match what the scripts and the launcher name; the FAIL lines above say which rows'
+            exit 1
+          }
+
+      - name: Check the old mod's name stays out
+        shell: pwsh
+        run: |
+          # Issue #497. The multiplayer mod this build replaced was taken out
+          # of the whole tree on 28 September, after weeks of clean ups that
+          # each found more because nothing failed when one came back. One
+          # read of every tracked file, a second or two, so it runs here.
+          if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+            Write-Host '::error file=tests/test-old-name-gone.js::no node on this runner, so the old name was not checked'
+            exit 1
+          }
+          node tests\test-old-name-gone.js
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::error file=tests/test-old-name-gone.js::the old multiplayer mod is named again; the lines above say where'
+            exit 1
+          }
+
+      - name: Check the engine is one commit
+        shell: pwsh
+        run: |
+          # Issue #1200. The commit engine\skymp is pinned to, the commit
+          # records\client-build.json and records\server-build.json say the
+          # two halves were built from must be one fork commit. On 29
+          # September the server record was two days and several fixes behind
+          # the pin and nothing said so, so the servers ran old engine code.
+          # Reads only the checkout (the pin is the gitlink in HEAD's tree),
+          # well under a second. Fail closed, like the steps above. It also
+          # holds engine\README.md to naming no commit or hash in full, since
+          # the page went stale twice copying the pin (issue #1346).
+          if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+            Write-Host '::error file=tests/test-one-engine.js::no node on this runner, so the engine commit was not checked'
+            exit 1
+          }
+          node tests\test-one-engine.js
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::error file=records/server-build.json::the engine pin and the client and server build records do not name one fork commit, or engine/README.md names a commit or hash in full; the lines above say which'
+            exit 1
+          }
+
+      - name: Check the high-risk records
+        shell: pwsh
+        run: |
+          # Issue #2180. records\server-build.json, client-build.json,
+          # most-online.json and collection-plugins.json must each be a version
+          # this checkout knows, with every field its readers depend on
+          # (scripts\release\RecordShape.ps1). The deploys refuse a record that
+          # is not; this says so at merge instead. Reads four files, under a
+          # second. Fail closed, like the steps above.
+          .\scripts\release\Check-Records.ps1
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::error file=records/server-build.json::a high-risk record is at a version this checkout does not know, or is missing a field its readers need; the lines above say which'
+            exit 1
+          }
+
+      - name: Run the harnesses that went red unseen
+        shell: pwsh
+        run: |
+          # Issue #875. These six failed on main for days while this build
+          # stayed green, because it ran none of them and the nightly run that
+          # holds them was not finishing: the script index and the script paths
+          # falling behind a change, the architecture page naming methods that
+          # had moved file, and three launcher harnesses whose stand-ins no
+          # longer compiled against the code they lift. All six read only the
+          # checkout and a temp folder of their own, and together take under a
+          # minute, so they earn a place here the way test-ownership.js did.
+          # pwsh on purpose: test-script-paths.ps1 needs .NET's
+          # Path.GetRelativePath, and test-script-index.ps1 starts Windows
+          # PowerShell 5.1 itself to compare what the two write.
+          if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+            Write-Host '::error file=tests/test-architecture.js::no node on this runner, so the architecture page was not checked'
+            exit 1
+          }
+          # Issue #454 added the seventh: the new-box runbook read against the
+          # scripts it names, about twenty seconds, so a renamed script or
+          # parameter fails here rather than on the day the box is gone.
+          # Issue #1085 added one: Remote.ps1's header examples against its
+          # param block, so a switch the script does not have fails here
+          # instead of when someone copies the line. It only reads the file.
+          # Issue #1088 added three more, which ran only in the nightly, so a
+          # pull request that wrote the VPS address into a script again or
+          # broke a deploy artifact was green here and merged before anything
+          # said so: the VPS address and ssh user kept in scripts/vps/vps.json
+          # alone, a deploy artifact the same bytes for the same commit with
+          # its record matching, and the site and voice handing those records
+          # back. Each reads only the checkout and a temp folder, a few
+          # seconds to half a minute.
+          # Issues #1218 and #1217 added one: Thornswood's own folder follows
+          # Vortex whatever build the Steam copy is on, the Steam copy is never
+          # written, and a shared archive written over there is caught before
+          # Play. It compiles the launcher's OwnGame and Downgrade code and runs
+          # it on a pretend machine in a temp folder, a few seconds.
+          # Issue #1226 added one: with Thornswood's own folder chosen in the
+          # setup window, the installer, the launcher's first start, packs and
+          # Make never write into the Steam copy; not chosen, the folder turned
+          # on later takes Thornswood's files back out of it. It runs the real
+          # Setup-Thornswood.ps1 and the whole launcher on a pretend Steam in a
+          # temp folder, about twenty seconds.
+          # Issue #1233 added one: a second setup over a folder the launcher
+          # already made updates Thornswood's own files in it, does not park
+          # it, and does not write through a hard link. It runs
+          # Setup-Thornswood.ps1 on a pretend Steam in a temp folder, a few
+          # seconds. A Game folder with no files.txt is still parked.
+          # Issue #1359 widened test-deploy-records.js rather than adding a
+          # harness: it now starts a copy of the site in a temp folder on a
+          # spare port and asks /api/deploys as nobody, as a hub member and
+          # as an admin, so the door going back to open fails here. About a
+          # second on top of what it already took.
+          # Issue #1361 added one: Secrets.Protect logs and throws when DPAPI
+          # refuses, instead of handing the plain secret back to be written to
+          # disk, and Unprotect is left as it was. It reads the launcher's
+          # source, a moment, and goes red on the fail-open it replaced.
+          # Issue #1345: site auth (door key header, Discord cookie, OAuth state,
+          # gamemode refresh()) on every PR. ~2s; test-token-refresh.js does not
+          # exist on main — site-auth already drives the refresh() path.
+          # Issue #1163: the Discord sign-in callback gives up inside ten
+          # seconds when the token exchange or the profile lookup stalls,
+          # never answers, or drops halfway, and the page says to try again.
+          # Issue #1597: every notice board gets its object, in the cell or
+          # worldspace the server has it in, from the list the server sends;
+          # tests\test-1597-board-objects.js runs the plugin's board code on a
+          # pretend game. Under a second.
+          # $six is a historical name: the gate list grew well past six (#1368).
+          # Issue #1589: a line here with no comma after it ends the list, and
+          # every name below it only prints itself. test-gate-list.ps1 parses
+          # this step and fails on any harness named outside the list.
+          # Djinn, 11 Oct 2026: Main is the full badge at every size. #1581
+          # put the site favicon's crest into the small frames of app.ico,
+          # so shortcuts and the taskbar showed the tab icon.
+          # tests\test-launcher-icons.js fails if any frame of
+          # launcher\app.ico matches a frame of site\public\favicon.ico, or
+          # if app.ico and app-dev.ico share a frame.
+          # Issue #485: the whose-game gate is one copy, in
+          # thornswood-front.js, and every other plugin reads it on the first
+          # tick and stays idle without it. tests\test-whose-game-gate.js
+          # runs each plugin in a sandbox and fails on a second copy or a
+          # reader that wakes without the check. Under a second.
+          $six ='test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
+                 'test-collection-visible.js', 'test-play-collection-refresh.js',
+                 'test-docs-index.js',
+                 'test-third-party.js',
+                 'test-ship-rules.ps1',
+                 'test-chargen-gone.ps1',
+                 'test-hand-install-retired.ps1',
+                 'test-downgrade-steam-window.ps1', 'test-address-library.ps1', 'test-vortex-folder.ps1',
+                 'test-new-box-runbook.ps1', 'test-remote-header.ps1',
+                 'test-vps-defaults.ps1', 'test-runner-lock.ps1', 'test-runner-offbox.ps1', 'test-restore-staging.ps1', 'test-deploy-artifact.ps1', 'test-deploy-records.js',
+                 'test-own-folder-alone.ps1', 'test-own-folder-first.ps1', 'test-own-folder-again.ps1', 'test-setup-game-files.ps1', 'test-setup-robocopy.ps1', 'test-sign-pilot.ps1', 'test-prod-parity.ps1', 'test-runner-isolation.ps1', 'test-discord-announced-shared.ps1', 'test-check-build.ps1', 'test-client-build-record.ps1', 'test-npc-runtime.js',
+                 'test-mold-key.js', 'test-putback-flora.js', 'test-staff-spells.js', 'test-join-pass-trust.js',
+                 'test-npc-shared-runtime.js', 'test-npc-navigation-equivalence.js', 'test-npc-population-runtime.js',
+                 'test-shared-resource-stock.js', 'test-resource-stock-integration.js',
+                 'test-npc-death-policy.js', 'test-vortex-profile-state.ps1',
+                 'test-books.js', 'test-guild-ledger-safety.js', 'test-book-review-regressions.js',
+                 'test-recipeless-craft.js',
+                 'test-npc-merchant-purses.js', 'test-merchant-ledger-storage.js', 'test-npc-merchant-startup.js',
+                 'test-merchant-ledger-revisions.js', 'test-merchant-settlement.js', 'test-merchant-trading.js', 'test-merchant-deployment.js', 'test-merchant-traders.js',
+                 'test-dungeon-loot.js', 'test-dungeon-reward-safety.js', 'test-dungeon-reward-storage.js', 'test-one-mint.js',
+                 'test-1319-pass-switch.js',
+                 'test-1319-pass-switch.ps1',
+                 'test-1320-pass-one-session.js',
+                 'test-1373-scarce-scene.js', 'test-quest-transactions.js',
+                 'test-nobody-makes.js',
+                 'test-1378-shared-gather.js',
+                 'test-special-edition-only.js',
+                 'test-1374-letters.js',
+                 'test-1597-board-objects.js',
+                 'test-1380-rare-mines.js',
+                 'test-1621-quest-state.js',
+                 'test-unpin.js', 'test-coffers.js',
+                 'test-1383-injury.js',
+                 'test-chat-log.js',
+                 'test-2260-burn-relog.js',
+                 'test-2259-forge-burn.js',
+                 'test-1306-pr-workflow.js',
+                 'test-2261-tome-refused.js',
+                 'test-1383-treatments.js',
+                 'test-1384-condition.js',
+                 'test-1385-perks.js',
+                 'test-1127-unplaceable-tomes.js',
+                 'test-1386-warrior.js',
+                 'test-1387-college.js',
+                 'test-1148-semester-points.js',
+                 'test-1149-pick-spell-tome.js',
+                 'test-python-defaults.js',
+                 'test-1388-apprentice.js',
+                 'test-launcher-help.js', 'test-classes-page.js',
+                 'test-tester-checklist.js',
+                 'test-1389-lists.js',
+                 'test-1590-hunter-lists.js',
+                 'test-1390-embassy.js',
+                 'test-1603-beds.js',
+                 'test-1606-logout-fill.js',
+                 'test-1734-rest-reconnect.js',
+                 'test-1676-rest-gate.js',
+                 'test-1677-ale-curve.js',
+                 'test-1648-soulgem-rank.js',
+                 'test-1733-injury-gate.js',
+                 'test-1767-creation-tools.js',
+                 'test-1588-tools-50.js',
+                 'test-1741-encoding.js',
+                 'test-1634-apprentice-gui.js',
+                 'test-1637-door-gui.js', 'test-2250-claim-door.js', 'test-2256-locked-for-everyone.js', 'test-2245-drawn-pick.js', 'test-2244-freed-after-mining.js', 'test-item-names.js', 'test-2255-key-mold-models.js',
+                 'test-1636-farm-gui.js',
+                 'test-1394-fares.js',
+                 'test-1635-ride-panel.js',
+                 'test-1393-company.js',
+                 'test-1594-trade-extras.js',
+                 'test-1718-trade-pieces.js',
+                 'test-1627-board-panel.js',
+                 'test-1595-deliver.js',
+                 'test-1797-voice-proxied.js',
+                 'test-1303-voice-auth.js',
+                 'test-1304-voice-tls-only.js',
+                 'test-voice-reconnect.js',
+                 'test-1398-fuel.js',
+                 'test-1398-weaver.js',
+                 'test-1831-dead-waits.js',
+                 'test-1766-fishing-mod-poles.js',
+                 'test-1826-stock-wait-seconds.js',
+                 'test-1887-shared-waits.js',
+                 'test-1622-recipe-generator.js',
+                 'test-1007-worldspaces.js',
+                 'test-1896-worldspaces.js',
+                 'test-1714-cut-file.js',
+                 'test-1713-bench-table.js',
+                 'test-1712-builders-skip-off.js',
+                 'test-1787-ore-eol.js',
+                 'test-1828-harvest-spell-eol.js',
+                 'test-1808-hunt-not-a-body.js',
+                 'test-1874-hunting-spots.js',
+                 'test-1628-social-gui.js',
+                 'test-1630-journal-gui.js',
+                 'test-1629-party-gui.js',
+                 'test-1695-party-ask-id.js',
+                 'test-1640-jarl-word.js',
+                 'test-1638-office.js',
+                 'test-1631-needs-gui.js',
+                 'test-1764-away-no-rest.js',
+                 'test-1633-help-panel.js',
+                 'test-1642-effects-restart.js',
+                 'test-1730-forced-panel.js',
+                 'test-1852-wheel-keys.js',
+                 'test-1918-emote-cap-close.js',
+                 'test-1917-panel-keys.js',
+                 'test-1919-p-k-close.js',
+                 'test-1717-property-page.js',
+                 'test-1703-test-ports.js',
+                 'test-1721-social-tick.js',
+                 'test-1307-ice-relay.js',
+                 'test-1821-ice-on-socket.js',
+                 'test-1822-voice-page-gone.js',
+                 'test-1925-voice-relay-peers.js',
+                 'test-1869-voice-negotiation.js',
+                 'test-1924-voice-whole-view.js',
+                 'test-1959-relay-keeps-reading.js',
+                 'test-1336-missing-stops.ps1',
+                 'test-1223-live-pass-asked.ps1',
+                 'test-1814-loadorder-missing.ps1',
+                 'test-1804-install-pass-switch.ps1',
+                 'test-live-parse-check.ps1',
+                 'test-dev-instance.ps1',
+                 'test-1692-release-root.ps1',
+                 'test-local-places.ps1',
+                 'test-1367-cross-site.js',
+                 'test-1326-engine-secrets.ps1',
+                 'test-1203-engine-jobs.ps1',
+                 'test-1321-socket-origin.js',
+                 'test-1323-door-limits.js',
+                 'test-1330-webview2-signature.js',
+                 'test-1352-site-answer-limit.js',
+                 'test-1235-skyrim-facts.js',
+                 'test-1170-addons-on-rail.js',
+                 'test-1351-unmasked-frames.js',
+                 'test-1349-relay-shapes.js',
+                 'test-1033-pulse-cost.js',
+                 'test-1157-session-ends.js',
+                 'test-1994-load-refused.js',
+                 'test-1894-door-sentence.js',
+                 'test-1180-own-plugins.js',
+                 'test-1885-manifest-order.js',
+                 'test-1075-script-citations.js',
+                 'test-table-install.js',
+                 'test-secrets-fail-closed.js',
+                 'test-our-key-menus.js', 'test-slash-key.js', 'test-social-keys.js', 'test-server-pick-order.ps1',
+                 'test-2037-journal-new.js', 'test-2135-journal-press.js', 'test-social.js', 'test-2157-reconfigure.ps1', 'test-2210-links-attributes.ps1',
+                 'test-site-auth.js',
+                 'test-site-route-gaps.js', 'test-2215-play-pressed-by.ps1',
+                 'test-docs-pwfile.ps1',
+                 'test-site-credits-fill.js', 'test-deployed-build.ps1',
+                 'test-site-headers.js', 'test-generated-source-chain.ps1',
+                 'test-site-render.js', 'test-site-discovery.js',
+                 'test-home-status.js', 'test-seats.js', 'test-age-gate.js', 'test-download-hash.js', 'test-2233-inuse-image.ps1',
+                 'test-download-button.js', 'test-gallery-ux.js', 'test-gallery.js', 'test-site-local.js',
+                 'test-session-cards.js', 'test-staff-bans.js', 'test-hub-staff-gallery.js', 'test-known-issues.js',
+                 'test-join-outage.js', 'test-join-pass-site.js', 'test-open-switch.js', 'test-component-readmes.js',
+                 'test-site-front-resilience.js', 'test-site-upload-guard.js',
+                 'test-report-limits.js', 'test-site-hangs.js',
+                 'test-site-oauth-gaps.js', 'test-site-escaping.js', 'test-2185-site-bind.js', 'test-2193-hero-video.js', 'test-2187-signin-addr.js', 'test-2192-age-expiry.js', 'test-2189-log-rotation.js', 'test-2188-board-revision.js', 'test-2235-dev-ship-guard.ps1', 'test-2243-installer-throw.ps1', 'test-2251-key-press-log.js', 'test-swap-helpers.ps1',
+                 'test-backup-restore.ps1', 'test-backup-streaming.ps1', 'test-fetch-verify-all.ps1', 'test-2199-zip-policy.ps1',
+                 'test-content-release.ps1',
+                 'test-cooldown-sweep.js', 'test-voice-moved-clients.js',
+                 'test-release-parity.ps1', 'test-dev-version.ps1', 'test-ship-launcher-reuse.ps1',
+                 'test-server-stage-directories.ps1',
+                 'test-dev-settings-keys.ps1',
+                 'test-dev-gamemode-notes.ps1',
+                 'test-2076-dev-build-check.ps1',
+                 'test-1929-dev-gamemode-note.ps1',
+                 'test-1938-server-ready-wait.ps1',
+                 'test-1955-ship-stack-note.ps1',
+                 'test-package-release-dir.ps1', 'test-no-machine-files.ps1',
+                 'test-main-runtime-startup.js',
+                 'test-spawn-reply.js',
+                 'test-nightly-stray.ps1',
+                 'test-discord-callback-hang.js',
+                 'test-member-role-wording.js',
+                 'test-page-changed.js',
+                 'test-missing-files-stop.ps1',
+                 'test-ship-launcher-drift.ps1',
+                 'test-client-by-hash.ps1',
+                 'test-build-vs-install.ps1',
+                 'test-ship-dry-run.ps1',
+                 'test-launcher-icons.js',
+                 'test-whose-game-gate.js',
+                 'test-gate-list.ps1',
+                 'test-storage-forecast.ps1'
+          $failed = @()
+          foreach ($n in $six) {
+            $p = Join-Path 'tests' $n
+            $sw = [Diagnostics.Stopwatch]::StartNew()
+            Write-Host ("--- {0}" -f $n)
+            if ($n -like '*.js') { & node $p } else { & pwsh -NoProfile -File $p }
+            $code = $LASTEXITCODE
+            Write-Host ("--- {0}: exit {1}, {2}s" -f $n, $code, [Math]::Round($sw.Elapsed.TotalSeconds, 1))
+            if ($code -ne 0) { $failed += $n; Write-Host ("::error file=tests/{0}::harness failed, the FAIL lines above say what" -f $n) }
+          }
+          if ($failed.Count) { Write-Host ("{0} harness(es) failed: {1}" -f $failed.Count, ($failed -join ', ')); exit 1 }
+          Write-Host ('all {0} passed' -f $six.Count)
+
+      - name: Run the signer check
+        shell: pwsh
+        run: |
+          # Issue #2046. tests\test-signer-check.ps1 sat 1 of 34 red every
+          # night from 5 Oct while this build stayed green, because it ran
+          # only at night. It compiles Signature.cs and points Refusal and
+          # MicrosoftRefusal at real files, about two seconds. The harness
+          # restarts itself in Windows PowerShell 5.1, the .NET Framework
+          # the launcher runs on.
+          & pwsh -NoProfile -File tests\test-signer-check.ps1
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::error file=tests/test-signer-check.ps1::the signer check failed, the FAIL lines above say what'
+            exit 1
+          }
+
+      - name: Run the generated-files build harness
+        shell: pwsh
+        run: |
+          # Issue #1982. tests\test-build-generated.ps1 failed cases C to K
+          # because case B overwrote the path to Build-Generated.ps1. It ran
+          # nowhere on push, so nothing caught it. It compiles stand-ins for
+          # Pandora and BodySlide with the .NET Framework csc and builds into
+          # a temp folder; it touches no real game folder.
+          & pwsh -NoProfile -File tests\test-build-generated.ps1
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::error file=tests/test-build-generated.ps1::the generated-files build harness failed, the FAIL lines above say what'
+            exit 1
+          }
+
+      - name: Check NPC population policy
+        shell: pwsh
+        run: |
+          & python tests/test-npc-population.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Check the launcher window
+        shell: powershell
+        run: |
+          # The launcher builds its window from ui.xaml at startup and finds
+          # every control by name, so a renamed control or a window that does
+          # not parse compiles clean and is found by the person using it. This
+          # fails on either. Windows PowerShell on purpose: it parses with the
+          # .NET Framework WPF the launcher runs on, not the newer one in pwsh.
+          & powershell -NoProfile -File scripts\dev\Check-Controls.ps1 -NoPause
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error file=launcher/ui.xaml::the launcher window does not line up with the C#, see the lines above'; exit 1 }
+
+      - name: Check the launcher UI thread
+        shell: pwsh
+        run: |
+          # Issue #1216. A Log() from a background thread throws on the
+          # window, and the catch then reports a success as a failure.
+          # This follows calls out of ThreadPool and Thread delegates in
+          # launcher\app. No arguments: the script finds launcher\app from
+          # where it lives. A finding exits 1. No python is a check that
+          # did not happen, so it is red.
+          if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
+            Write-Host '::error file=scripts/dev/Check-UiThread.py::no python on this runner, so the UI thread check did not run'
+            exit 1
+          }
+          & python scripts/dev/Check-UiThread.py
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::error file=scripts/dev/Check-UiThread.py::the launcher touches the window from a background thread; the lines above say where'
+            exit 1
+          }
+
+      - name: Parse every game script
+        shell: pwsh
+        run: |
+          $bad = 0
+          # game\ since the reorganisation's phase 6 (issue #440): the gamemode,
+          # the plugins and the overlays.
+          $files = @(Get-ChildItem -Path scripts -Filter *.js -File -Recurse) + @(Get-ChildItem -Path game -Filter *.js -File) +
+                   @(Get-ChildItem -Path game\plugins, game\ui -Filter *.js -File -ErrorAction SilentlyContinue) +
+                   @(Get-ChildItem -Path site\server.js, voice\voice-server.js -File)
+          foreach ($f in $files) {
+            & node --check $f.FullName 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+              $bad++
+              Write-Host ("::error file={0}::does not parse" -f $f.FullName)
+            }
+          }
+          if ($bad) { exit 1 }
+          Write-Host ("{0} game script(s) parse" -f $files.Count)
+
+      - name: Parse every bot file
+        shell: pwsh
+        run: |
+          if (-not (Test-Path bot)) { Write-Host 'no bot to parse'; exit 0 }
+          $bad = 0
+          foreach ($f in (Get-ChildItem bot -Filter *.py -Recurse -File)) {
+            & python -c "import ast,sys; ast.parse(open(sys.argv[1],encoding='utf-8').read(), sys.argv[1])" $f.FullName 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+              $bad++
+              Write-Host ("::error file={0}::does not parse" -f $f.FullName)
+            }
+          }
+          if ($bad) { exit 1 }
+          Write-Host 'every bot file parses'
+
+      - name: Check the Python names what exists
+        shell: pwsh
+        run: |
+          # Issue #1343. Parsing (the step above) passes a name that does not
+          # exist, and Python only finds out when that line runs: in the bot,
+          # on the VPS, in front of people. ruff with four rule groups and
+          # nothing else: E9 a file that will not compile, F63 a comparison
+          # or assert that is always true or false, F7 a break, continue,
+          # return or yield where none can be, F82 a name never defined.
+          # No style rules, so no line here is red for how it looks. All 48
+          # Python files passed on main on 5 October with nothing changed.
+          # ruff comes into a venv of this run's own, never the machine's
+          # Python, pinned by version and hash in .github\ruff-requirements.txt.
+          # By hand, from the repository folder, in any venv:
+          #   python -m pip install --only-binary :all: --require-hashes -r .github\ruff-requirements.txt
+          #   python -m ruff check --isolated --select E9,F63,F7,F82 (git ls-files '*.py')
+          $venv = Join-Path $env:RUNNER_TEMP 'ruff-venv'
+          python -m venv $venv
+          $py = Join-Path $venv 'Scripts\python.exe'
+          if (-not (Test-Path -LiteralPath $py)) {
+            Write-Host '::error::could not make a venv for ruff, so the Python was not checked'
+            exit 1
+          }
+          & $py -m pip install --quiet --disable-pip-version-check --only-binary :all: --require-hashes -r .github\ruff-requirements.txt
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::error file=.github/ruff-requirements.txt::could not install the pinned ruff, so the Python was not checked'
+            exit 1
+          }
+          $files = @(git ls-files '*.py')
+          & $py -m ruff check --isolated --no-cache --select E9,F63,F7,F82 --output-format github @files
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Write-Host ("{0} Python file(s) name only what exists" -f $files.Count)
+
+      - name: Lint (warnings only)
+        # Issue #1343. Reports ruff, eslint and PSScriptAnalyzer findings and
+        # never fails the build. PSScriptAnalyzer took about 253 s over the
+        # repository on Ship PC One on 10 Oct (1276 findings), so 8 minutes.
+        continue-on-error: true
+        timeout-minutes: 8
+        shell: pwsh
+        run: |
+          # ruff: the venv the step above made from the hash-pinned
+          # .github\ruff-requirements.txt, so nothing new is installed.
+          $py = Join-Path $env:RUNNER_TEMP 'ruff-venv\Scripts\python.exe'
+          if (Test-Path -LiteralPath $py) {
+            & $py -m ruff check --no-cache --config .github\lint\ruff.toml --exit-zero --output-format github @(git ls-files '*.py')
+          } else { Write-Host '::warning::no ruff venv, ruff lint skipped' }
+
+          # eslint: pinned by version only (no lockfile, no hash).
+          $npm = Join-Path $env:RUNNER_TEMP 'lint-npm'
+          npm install --prefix $npm --no-save --no-audit --no-fund --silent eslint@9.39.5
+          # node runs eslint.js itself, not npm's eslint.cmd shim: cmd.exe reads
+          # the shim, whose 'SET dp0=%~dp0' and '%*' are unquoted, so an '&' in
+          # its folder or an argument (C:\ThornswoodTemps&Worktrees) cut the
+          # command short and eslint never ran (#1343).
+          $eslint = Join-Path $npm 'node_modules\eslint\bin\eslint.js'
+          if (Test-Path -LiteralPath $eslint) {
+            & node $eslint -c (Join-Path $PWD '.github\lint\eslint.config.mjs') .
+          } else { Write-Host '::warning::could not install eslint 9.39.5, eslint lint skipped' }
+
+          # PSScriptAnalyzer: pinned by version only, from the PowerShell Gallery.
+          $psm = Join-Path $env:RUNNER_TEMP 'lint-psm'
+          New-Item -ItemType Directory -Force -Path $psm | Out-Null
+          Save-Module -Name PSScriptAnalyzer -RequiredVersion 1.24.0 -Path $psm -Repository PSGallery -Force
+          Import-Module (Join-Path $psm 'PSScriptAnalyzer\1.24.0\PSScriptAnalyzer.psd1')
+          $found = @(Invoke-ScriptAnalyzer -Path . -Recurse -Settings .github\lint\PSScriptAnalyzerSettings.psd1)
+          foreach ($d in $found) {
+            $lvl = if ($d.Severity -eq 'Error') { 'error' } else { 'warning' }
+            Write-Host ("::{0} file={1},line={2}::{3}: {4}" -f $lvl, $d.ScriptPath, $d.Line, $d.RuleName, $d.Message)
+          }
+          Write-Host ("PSScriptAnalyzer: {0} finding(s)" -f $found.Count)
+          exit 0
+
+      - name: Count the silent catches in the launcher
+        shell: pwsh
+        run: |
+          # Entry 239. A catch with nothing in it leaves no line in
+          # launcher.log when it fires, and there were 386 of them on 24 Sep.
+          # Red when any file in launcher\app has more than
+          # scripts\dev\swallow-baseline.txt allows, and since #756 red when a
+          # file has fewer and its line has not been lowered with it, so the
+          # lowering lands in the branch that made the count fall rather than
+          # waiting for somebody to notice. The script says what to do.
+          .\scripts\dev\Check-Swallow.ps1
+
+      - name: Build the launcher
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP 'Thornswood'
+          New-Item -ItemType Directory -Force -Path (Join-Path $root 'Launcher') | Out-Null
+          .\scripts\release\Build-Launcher.ps1 -Root $root -NoPause
+          if (-not (Test-Path (Join-Path $root 'Launcher\Thornswood.exe'))) { Write-Host '::error::no Thornswood.exe came out of the build'; exit 1 }
+
+      - name: Check the manifests in the built exes
+        shell: pwsh
+        run: |
+          # Issue #463. Reads the manifest embedded in the launcher and the
+          # setup program this build made: per-monitor DPI, asInvoker (neither
+          # ever asks for administrator), and an identity version equal to
+          # Updater.cs. Also runs the window fit at 100 to 200 percent.
+          & pwsh -NoProfile -File tests\test-app-manifest.ps1 -Exe (Join-Path $env:RUNNER_TEMP 'Thornswood\Launcher\Thornswood.exe') -Scratch (Join-Path $env:RUNNER_TEMP 'app-manifest')
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error file=tests/test-app-manifest.ps1::the built exes do not carry the manifest they should, see the lines above'; exit 1 }
+
+      - name: Scan the built launcher for secrets
+        shell: pwsh
+        run: |
+          # The secrets that shipped were in built artefacts, not in the source,
+          # so what this build made is read too, byte by byte: the launcher with
+          # everything Build-Launcher embeds in it, and the setup stub.
+          $built = @(Join-Path $env:RUNNER_TEMP 'Thornswood\Launcher\Thornswood.exe')
+          if (Test-Path out\setup-stub.exe) { $built += (Resolve-Path out\setup-stub.exe).Path }
+          .\scripts\dev\Check-Secrets.ps1 -Binary $built
+          exit $LASTEXITCODE
+
+      - name: Keep the exe from this build
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: Thornswood.exe
+          path: ${{ runner.temp }}/Thornswood/Launcher/Thornswood.exe
+          retention-days: 7
+
+      # No pdb artifact (#1356 / #462): the pdb carries absolute build-machine
+      # source paths. Packs and the installer already skip *.pdb. Keep the exe
+      # above; leave the pdb on the runner only.

@@ -24,8 +24,12 @@
 # the queue reached an hour when the lanes opened pull requests in bursts.
 # Install-Runner.ps1 -Number <n> puts each one after the first beside it with
 # the same label, so a check goes to whichever is free.
-# Safe because the repository is private: nobody outside the team can open a
-# pull request that runs code on the box.
+# NOT PULL REQUESTS, since 11 October (#1306, Patrick's option C; #2161): a
+# pull request runs these same steps on GitHub's hosted Windows runner, in
+# build-pr.yml, which scripts\dev\Build-PrWorkflow.js generates from this
+# file. Only a push to main, already merged, and a manual run use the box.
+# Change a step here, then run  node scripts/dev/Build-PrWorkflow.js;
+# tests\test-1306-pr-workflow.js fails while the two differ.
 #
 # WHY THE ACTIONS ARE PINNED. Every action is named by a full length commit
 # SHA, with the tag it was on in a comment at the end of the line, the same as
@@ -61,7 +65,6 @@
 # once this is green and it has been said in #staff-general.
 name: Build check
 on:
-  pull_request:
   push:
     branches: [main]
   workflow_dispatch:
@@ -330,6 +333,7 @@ jobs:
                  'test-chat-log.js',
                  'test-2260-burn-relog.js',
                  'test-2259-forge-burn.js',
+                 'test-1306-pr-workflow.js',
                  'test-2261-tome-refused.js',
                  'test-1383-treatments.js',
                  'test-1384-condition.js',
