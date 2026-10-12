@@ -29,8 +29,11 @@
 
     1. Update-DevFeedMarks (Dev-News.ps1) on the 27-mark shape: 3 notes with a
        sourceCommit (one on main by ancestry, one squash merged, one main never
-       took) and 24 from before sourceCommit, whose dev release main has. 26
-       lose the mark, 1 keeps it, mainVersion follows main, and only the dev
+       took) and 24 from before sourceCommit, whose own dev release (found by
+       its tag) main has, while the dev feed's newest release is ahead of
+       main (#2401). 26 lose the mark, 1 keeps it; old notes whose release was
+       built with uncommitted files, or that no tag holds, keep the mark they
+       have. mainVersion follows main, and only the dev
        feed's version.json is sent: no pack, no release record, no news entry,
        no baseline. A second run sends nothing. -NoSend sends nothing. No main
        feed, or a store that moved since it was read, sends nothing.
@@ -141,27 +144,45 @@ try {
     # proved by content, not at main's tip.
     $mainShip = Commit 'b.txt' 'branch work, moved on' 'main three'
     Yes ("the stand-in clone has its history (main ships {0})" -f $mainShip.Substring(0, 12)) ($mainShip -match '^[0-9a-f]{40}$' -and $unfinished -match '^[0-9a-f]{40}$')
+    # The annotated tag Ship pushes for each dev release (Add-ReleaseTag), with
+    # the tagger's own clock, which is how a note from before sourceCommit is
+    # matched to its release (#2401).
+    function Tag-DevRelease([string]$dir, [string]$commit, [string]$id, [string]$at, [switch]$Dirty) {
+        $msg = "Thornswood dev release $id`n`nlauncher  1.2.0`npacks     $id`nbaseline  $id`nbranch    HEAD"
+        if ($Dirty) { $msg += "`nbuilt with 1 uncommitted change(s) on top of this commit" }
+        $env:GIT_COMMITTER_DATE = $at
+        try { [void](RunGit $dir @gitId tag -a "release/dev/$id" $commit -m $msg) }
+        finally { Remove-Item Env:GIT_COMMITTER_DATE -ErrorAction SilentlyContinue }
+    }
+    # The release the old notes came with: the branch, which main took by squash.
+    Tag-DevRelease $git $branch '20261005-225302-dev' '2026-10-05T22:54:05-06:00'
+    # One built with an uncommitted change, on another machine's clock, as
+    # 20261006-141047-dev was (6 Oct 2:10 PM, uncommitted 1, tagged at -0400).
+    Tag-DevRelease $git $branch '20261006-141047-dev' '2026-10-06T14:11:23-04:00' -Dirty
 
-    function Note([string]$title, [string]$channel, [string]$commit, [switch]$Legacy) {
-        $n = [ordered]@{ date = '10-5-2026 10:53 PM'; title = $title; body = ''; details = @('a line'); channel = $channel }
+    function Note([string]$title, [string]$channel, [string]$commit, [switch]$Legacy, [string]$Date = '10-5-2026 10:53 PM') {
+        $n = [ordered]@{ date = $Date; title = $title; body = ''; details = @('a line'); channel = $channel }
         if (-not $Legacy) { $n['sourceCommit'] = $commit }
         return [pscustomobject]$n
     }
-    function Stale-DevFeed {
+    # The dev feed's own release is ahead of main, as it is between main
+    # releases. Until #2401 the old notes took that release as their proof
+    # and were all marked DEV; they are proved by the release each came with.
+    function Stale-DevFeed([string]$LegacyDate = '10-5-2026 10:53 PM') {
         $news = @()
         $news += Note 'Work main never took' 'dev' $unfinished
         $news += Note 'Squash merged work' 'dev' $branch
         $news += Note 'Work main has by ancestry' 'dev' $m2
         for ($i = 1; $i -le 13; $i++) { $news += Note ("Main note $i") '' $(if ($i % 2) { $m1 } else { $m2 }) }
-        for ($i = 1; $i -le 24; $i++) { $news += Note ("Note from before sourceCommit $i") 'dev' '' -Legacy }
+        for ($i = 1; $i -le 24; $i++) { $news += Note ("Note from before sourceCommit $i") 'dev' '' -Legacy -Date $LegacyDate }
         return [pscustomobject][ordered]@{
             launcherVersion = '1.2.0'
             launcherUrl = 'https://thornswood.net/feed-dev/assets/' + ('e' * 64)
-            packs = @([pscustomobject]@{ id = '20261005-225302-dev'; url = 'https://thornswood.net/feed-dev/assets/' + ('f' * 64); sha256 = ('f' * 64) })
+            packs = @([pscustomobject]@{ id = '20261011-221215-dev'; url = 'https://thornswood.net/feed-dev/assets/' + ('f' * 64); sha256 = ('f' * 64) })
             news = $news
             mainVersion = '1.1.106'
-            release = [pscustomobject][ordered]@{ id = '20261005-225302-dev'; channel = 'dev'; launcherVersion = '1.2.0'; packs = @('20261005-225302-dev')
-                                                  baseline = '20261005-225302-dev'; commit = $branch; branch = 'work'; uncommitted = 0; tag = 'release/dev/20261005-225302-dev' }
+            release = [pscustomobject][ordered]@{ id = '20261011-221215-dev'; channel = 'dev'; launcherVersion = '1.2.0'; packs = @('20261011-221215-dev')
+                                                  baseline = '20261011-221215-dev'; commit = $unfinished; branch = 'unfinished'; uncommitted = 0; tag = 'release/dev/20261011-221215-dev' }
         }
     }
     $mainFeed = [pscustomobject][ordered]@{
@@ -206,23 +227,29 @@ try {
         $hist = @(Get-ChildItem -LiteralPath (Join-Path $site 'feed-dev\history') -File -ErrorAction SilentlyContinue)
         Yes ("  the feed it replaced is kept in the store's history, and only that ({0})" -f (($hist | ForEach-Object { $_.Name }) -join ', ')) (
             $hist.Count -eq 1 -and $hist[0].Name -like '*-version.json')
-        # A dev release from a dirty tree proves nothing about the notes from
-        # before sourceCommit, so they keep the marks a clean release gave
-        # them (6 Oct 2:10 PM: 20261006-141047-dev, uncommitted 1).
-        $dirty = Stale-DevFeed
-        $dirty.release.uncommitted = 1
+        # An old note whose own release was built with uncommitted files has
+        # nothing to prove it by, so it keeps the mark it has (6 Oct 2:10 PM:
+        # 20261006-141047-dev, uncommitted 1).
+        $dirty = Stale-DevFeed '10-6-2026 2:11 PM'
         foreach ($n in @($dirty.news)) { if (-not $n.PSObject.Properties['sourceCommit']) { $n.channel = '' } }
         $d = Set-DevFeedMarks $dirty $mainFeed $git
-        Yes ("a dirty dev release leaves the old notes as a clean one marked them, none gaining DEV ({0} gained)" -f @($d.Gained).Count) (
+        Yes ("old notes from a dirty dev release keep the mark they had, none gaining DEV ({0} gained)" -f @($d.Gained).Count) (
             @($d.Gained | Where-Object { $_ -like 'Note from before sourceCommit*' }).Count -eq 0 -and
             @($dirty.news | Where-Object { -not $_.PSObject.Properties['sourceCommit'] -and $_.channel -eq 'dev' }).Count -eq 0)
-        $dirty2 = Stale-DevFeed
-        $dirty2.release.uncommitted = 1
+        $dirty2 = Stale-DevFeed '10-6-2026 2:11 PM'
         $d2 = Set-DevFeedMarks $dirty2 $mainFeed $git
         Yes '  and old notes still marked DEV stay marked, since nothing proves them on main' (
             @($dirty2.news | Where-Object { -not $_.PSObject.Properties['sourceCommit'] -and $_.channel -eq 'dev' }).Count -eq 24)
         Yes '  while notes with a sourceCommit are judged by it as before' (
             @($d2.Cleared) -contains 'Squash merged work' -and @($d2.Kept) -contains 'Work main never took')
+        # A date no tagged release's span holds (no release found) keeps its
+        # mark too, and so does a bare date with no time on it.
+        foreach ($when in '9-1-2026 9:00 AM', '10-5-2026') {
+            $lost = Stale-DevFeed $when
+            [void](Set-DevFeedMarks $lost $mainFeed $git)
+            Yes ("  an old note no tagged release holds ({0}) keeps its mark" -f $when) (
+                @($lost.news | Where-Object { -not $_.PSObject.Properties['sourceCommit'] -and $_.channel -eq 'dev' }).Count -eq 24)
+        }
         $raw = [IO.File]::ReadAllBytes($devJson)
         Yes '  written with no byte order mark' (-not ($raw.Length -ge 3 -and $raw[0] -eq 0xEF -and $raw[1] -eq 0xBB -and $raw[2] -eq 0xBF))
         Yes '  and no release line was added to the store''s releases.txt' (-not (Test-Path -LiteralPath (Join-Path $site 'feed-dev\releases.txt')) -or
@@ -303,6 +330,9 @@ try {
     [void](RunGit $fake @gitId commit -q -m 'side work')
     $sideCommit = (RunGit $fake rev-parse HEAD).Out
     [void](RunGit $fake checkout -q --detach $head)
+    # The release the note from before sourceCommit below came with, built
+    # from what main has shipped.
+    Tag-DevRelease $fake $head '20261001-215555-dev' '2026-10-01T21:56:40-06:00'
     Yes ("the stand-in checkout is clean at the build ({0})" -f $head.Substring(0, 12)) ((RunGit $fake status --porcelain).Out -eq '' -and $sideCommit -ne $head)
 
     $inst = Join-Path $Scratch 'install-dev'

@@ -335,6 +335,16 @@ function ServiceProblem($name) {
 function BackupProblem($task, $folder, $hours) {
   $t = Get-ScheduledTask -TaskName $task -EA SilentlyContinue
   if (-not $t) { return ('its task, ' + $task + ', is not registered') }
+  # Retention first, because a run that made its backup and could not drop an
+  # old one also ends non-zero, and the code alone does not say which (#2354).
+  # vps-nightly-backup.ps1 writes one name|error a line, and removes the file
+  # once every drop has gone.
+  $stuck = @(Get-Content -LiteralPath (Join-Path $folder 'retention-failed.txt') -EA SilentlyContinue |
+             Where-Object { "$_".Trim() } | ForEach-Object { ("$_" -split '\|')[0] })
+  if ($stuck.Count) {
+    return ('retention is failing: ' + $stuck.Count + ' backup(s) past the seven daily and four weekly kept would not delete (' +
+            ($stuck -join ', ') + '). See backup.log in ' + $folder)
+  }
   $i = Get-ScheduledTaskInfo -TaskName $task -EA SilentlyContinue
   if ($i -and @(0, 267009, 267011) -notcontains [int64]$i.LastTaskResult) {
     return ('its last run, at ' + $i.LastRunTime.ToString('yyyy-MM-dd HH:mm') + ', ended with code ' + $i.LastTaskResult)

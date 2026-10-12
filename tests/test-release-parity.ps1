@@ -113,28 +113,62 @@ $squashed = (& git -C $gitDir rev-parse HEAD).Trim()
 & git -C $gitDir add squashed.txt
 & git -C $gitDir -c user.name=Fixture -c user.email=fixture@example.invalid commit -qm 'later main work on the same lines'
 $movedOn = (& git -C $gitDir rev-parse HEAD).Trim()
+# The tags Ship pushes for each dev release (Add-ReleaseTag), annotated, with
+# the tagger's own clock: a note from before sourceCommit is matched to its
+# release by them (#2401). The ids and times are the real ones of 1 to 3 Oct.
+function Tag-DevRelease([string]$commit, [string]$id, [string]$taggedAt, [switch]$Dirty) {
+    $msg = "Thornswood dev release $id`n`nlauncher  1.1.103.2`npacks     $id`nbaseline  $id`nbranch    HEAD"
+    if ($Dirty) { $msg += "`nbuilt with 1 uncommitted change(s) on top of this commit" }
+    $env:GIT_COMMITTER_DATE = $taggedAt
+    try { & git -C $gitDir -c user.name=Fixture -c user.email=fixture@example.invalid tag -a "release/dev/$id" $commit -m $msg }
+    finally { Remove-Item Env:GIT_COMMITTER_DATE -ErrorAction SilentlyContinue }
+}
+Tag-DevRelease $base '20261001-200344-dev' '2026-10-01T20:04:26-06:00'
+Tag-DevRelease $base '20261002-015344-dev' '2026-10-02T01:54:30-06:00' -Dirty
+Tag-DevRelease $unfinished '20261003-131311-dev' '2026-10-03T13:14:13-06:00'
+# A tag made by hand without -a has no tagger and no message: no proof.
+& git -C $gitDir tag 'release/dev/20260930-120000-dev' $base
 $mainDoc = [pscustomobject]@{ launcherVersion='1.1.105'; release=[pscustomobject]@{commit=$main;uncommitted=0}; news=@() }
-$doc = [pscustomobject]@{ release=[pscustomobject]@{commit=$base;uncommitted=0}; mainVersion='1.1.103' }
+# The dev feed's own release is ahead of main, as it is between main
+# releases: it says nothing about the notes from before sourceCommit.
+$doc = [pscustomobject]@{ release=[pscustomobject]@{commit=$unfinished;uncommitted=0}; mainVersion='1.1.103' }
 $notes = @([pscustomobject]@{title='Renamed Main feature';channel='dev';sourceCommit=$base},
-    [pscustomobject]@{title='Legacy feature';channel='dev'},
+    [pscustomobject]@{date='10-1-2026 8:04 PM';title='Legacy feature';channel='dev'},
     [pscustomobject]@{title='Unfinished Dev work';channel='dev';sourceCommit=$unfinished},
-    [pscustomobject]@{title='New dirty work';channel='dev';sourceCommit=''})
+    [pscustomobject]@{title='New dirty work';channel='dev';sourceCommit=''},
+    [pscustomobject]@{date='10-3-2026 1:13 PM';title='Legacy work main never took';channel=''},
+    [pscustomobject]@{date='9-30-2026 12:00 PM';title='Legacy note with no annotated tag';channel='dev'},
+    [pscustomobject]@{date='9-30-2026';title='Legacy note with a bare date';channel='dev'})
 $null = Update-DevNewsChannels $doc $notes $mainDoc $gitDir
 Assert ($notes[0].channel -eq '') 'A published ancestor is promoted despite a different news title'
-Assert ($notes[1].channel -eq '') 'Legacy notes clear only when their recorded Dev source is published on Main'
+Assert ($notes[1].channel -eq '') 'A legacy note clears when its own Dev release is on Main, though the newest Dev release is ahead of Main (#2401)'
 Assert ($notes[2].channel -eq 'dev') 'Unmerged Dev work remains marked Dev'
 Assert ($notes[3].channel -eq 'dev') 'A new dirty note cannot borrow an earlier clean release source'
+Assert ($notes[4].channel -eq 'dev') 'A legacy note whose own Dev release Main does not have is marked Dev'
+Assert ($notes[5].channel -eq 'dev' -and $notes[6].channel -eq 'dev') 'A legacy note with no release found keeps its mark'
+$notes[5].channel = ''; $notes[6].channel = ''
+$null = Update-DevNewsChannels $doc $notes $mainDoc $gitDir
+Assert ($notes[5].channel -eq '' -and $notes[6].channel -eq '') 'and keeps an unmarked one unmarked'
+# The release a legacy note came with is its proof, not the dev feed's own:
+# a dirty current release changes nothing for it.
 $doc.release.uncommitted = 1; $notes[1].channel = 'dev'
 $null = Update-DevNewsChannels $doc $notes $mainDoc $gitDir
-Assert ($notes[1].channel -eq 'dev') 'Dirty legacy releases cannot be declared promoted'
+Assert ($notes[1].channel -eq '') 'A dirty newest Dev release leaves a legacy note to its own release'
+$dirtyLegacy = @([pscustomobject]@{date='10-2-2026 1:54 AM';title='From a dirty release';channel='dev'},
+    [pscustomobject]@{date='10-2-2026 1:54 AM';title='From a dirty release, unmarked';channel=''})
+$null = Update-DevNewsChannels $doc $dirtyLegacy $mainDoc $gitDir
+Assert ($dirtyLegacy[0].channel -eq 'dev' -and $dirtyLegacy[1].channel -eq '') 'Dirty legacy releases cannot be declared promoted, and keep the mark they have'
 $notes[0].channel = 'dev'; $before = $notes | ConvertTo-Json -Depth 5 -Compress
 $null = Update-DevNewsChannels $doc $notes $null $gitDir
 Assert (($notes | ConvertTo-Json -Depth 5 -Compress) -eq $before) 'An unreadable Main feed preserves news marks'
 Assert ($doc.mainVersion -eq '1.1.103') 'An unreadable Main feed preserves the last known Main version'
 $squashMain = [pscustomobject]@{ launcherVersion='1.1.106'; release=[pscustomobject]@{commit=$squashed;uncommitted=0}; news=@() }
 $squashDoc = [pscustomobject]@{ release=[pscustomobject]@{commit=$branch;uncommitted=0}; mainVersion='1.1.105' }
+# Two releases a minute apart from one commit, as on 2 Oct at 2:35 and 2:36 PM.
+Tag-DevRelease $branch '20261002-143545-dev' '2026-10-02T14:37:15-06:00'
+Tag-DevRelease $branch '20261002-143641-dev' '2026-10-02T14:37:57-06:00'
 $squashNotes = @([pscustomobject]@{title='Branch work';channel='dev';sourceCommit=$branch},
-    [pscustomobject]@{title='Older legacy note';channel='dev'},
+    [pscustomobject]@{date='10-2-2026 2:37 PM';title='Older legacy note';channel='dev'},
     [pscustomobject]@{title='Branch work main never took';channel='dev';sourceCommit=$branchMore},
     [pscustomobject]@{title='Unfinished Dev work';channel='dev';sourceCommit=$unfinished})
 $null = Update-DevNewsChannels $squashDoc $squashNotes $squashMain $gitDir
