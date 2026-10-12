@@ -511,6 +511,7 @@ jobs:
                  'test-dev-gamemode-notes.ps1',
                  'test-2076-dev-build-check.ps1',
                  'test-2308-content-before-ship.ps1',
+                 'test-1050-news-out.ps1',
                  'test-2309-loadorder-fresh.ps1',
                  'test-1929-dev-gamemode-note.ps1',
                  'test-1938-server-ready-wait.ps1',

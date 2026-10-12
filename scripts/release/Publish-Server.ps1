@@ -852,8 +852,11 @@ if (-not $NoNews -and $up) {
                 named   = $named
             }
 
-            $newsList = @()
-            if ($doc.PSObject.Properties['news'] -and $doc.news) { $newsList = @($doc.news) }
+            # Every note, wherever the feed keeps them (Feed-News.ps1, #1050).
+            # A news file that cannot be read stops the entry here, so a list
+            # without its older notes is never written back.
+            . (Join-Path $Here 'Feed-News.ps1')
+            $newsList = @(Open-FeedNewsList $doc)
 
             # Publishing the server twice over one change is normal while
             # something is being chased. That is one piece of news, not four.
@@ -888,8 +891,10 @@ if (-not $NoNews -and $up) {
                 }
                 # Forty, not twenty. Twenty was one evening's worth.
                 if ($newsList.Count -gt 40) { $newsList = $newsList[0..39] }
-                if ($doc.PSObject.Properties.Name -contains 'news') { $doc.news = $newsList }
-                else { $doc | Add-Member -NotePropertyName news -NotePropertyValue $newsList }
+                # Back the way the live feed keeps them: in "news", or once its
+                # minLauncher reads it, a news file sent to the site first.
+                $minNews = if ($doc.PSObject.Properties['minLauncher'] -and [string]$doc.minLauncher) { [string]$doc.minLauncher } else { [string]$doc.launcherVersion }
+                [void](Set-FeedNewsList $doc $newsList 'main' $minNews (Join-Path $ReleaseDir 'news-out') '' -NoSend:$NoPush)
 
                 # No byte order mark. The launcher's reader stops on one and
                 # reports an unexpected character, which takes out the update

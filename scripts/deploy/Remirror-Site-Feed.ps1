@@ -480,6 +480,11 @@ foreach ($p in (PropList $doc 'optional')) {
   if ($null -eq $p) { continue }
   Want (Prop $p 'url') ('optional pack ' + (Prop $p 'id'))
 }
+# The notes as a file of their own, once the channel keeps them that way
+# (Feed-News.ps1, #1050).
+if ($doc.PSObject.Properties['newsFile'] -and $null -ne $doc.newsFile) {
+  Want (Prop $doc.newsFile 'url') 'news file'
+}
 # ==== end thornswood feed assets wanted ====
 
 Say ("  {0} asset(s) named on the site, {1} still named somewhere else" -f $need.Count, $script:offSite)
