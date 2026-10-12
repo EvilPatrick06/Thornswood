@@ -189,8 +189,7 @@ swapped.world.transfer.inventory=function(id) {
   return result;
 };
 const oldPack=swapped.api.recover();
-assert.equal(oldPack.length,1);
-assert.equal(oldPack[0].view.open,false,'inventory publication cannot cross to a replacement character');
+assert.deepEqual(oldPack,[],'neither inventory nor a closure can publish to a replacement character');
 const nestedView=service({on:true},250);
 open(nestedView.api);
 let replaceOnce=false;
@@ -295,7 +294,7 @@ assert.equal(takenView.note,'You take the work.');
 cooldownPanel.api.acknowledgeView(10,takenView);
 assert.equal(cooldownPanel.api.recover().length,0,'unchanged recovery retains the action feedback without replacing the view');
 cooldownPanel.world.actors[10].lifeGeneration=1;
-assert.deepEqual(cooldownPanel.api.recover()[0].view,{open:false},'recovery closes an obsolete character session');
+assert.deepEqual(cooldownPanel.api.recover(),[],'recovery retires the obsolete session without closing a replacement runtime');
 
 let sold = box.api.command({ actorId: 10, profileId: 7, parts: ['/merchant', 'sell', '2', 'Iron', 'Ingot'] });
 assert.match(sold.text, /Sold 2/);
@@ -598,6 +597,85 @@ finalCase('publication rechecks collected views and closures',()=>{
   assert.equal(b.api.isCurrentView(10,closed),true);
   b.world.actors[10].pos=[0,0,0];open(b.api);
   assert.equal(b.api.isCurrentView(10,closed),false);
+});
+finalCase('command closure cannot close a later panel',()=>{
+  const b=service({on:true},250);open(b.api);
+  const closed=b.api.command({actorId:10,profileId:7,parts:['/merchant','close']}).view;
+  open(b.api);assert.equal(b.api.isCurrentView(10,closed),false);
+});
+finalCase('failure closures cannot close a later panel',()=>{
+  for(const parts of [['/merchant','2'],['/merchant','sell','1','Iron','Ingot']]) {
+    const b=service({on:true},250);open(b.api);
+    b.world.actors[10].pos=[9000,0,0];
+    const closed=b.api.command({actorId:10,profileId:7,parts}).view;
+    assert.equal(closed.open,false);
+    b.world.actors[10].pos=[0,0,0];open(b.api);
+    assert.equal(b.api.isCurrentView(10,closed),false);
+  }
+});
+finalCase('closure cannot cross to a different profile runtime',()=>{
+  const b=service({on:true},250);open(b.api);b.world.actors[10].pos=[9000,0,0];
+  const closed=b.api.recover()[0].view;
+  Object.assign(b.world.actors[10],{pos:[0,0,0],profileId:8,runtimeIdentity:'200'});
+  b.api.command({actorId:10,profileId:8,parts:['/merchant','1']});
+  assert.equal(b.api.isCurrentView(10,closed),false);
+});
+finalCase('opening owns final timestamp construction',()=>{
+  let b,armed=false,calls=0,newer;
+  b=service({on:true},250,()=>{if(armed && ++calls===2){armed=false;newer=open(b.api).view;}return 1700000000000;});
+  armed=true;
+  const old=open(b.api);
+  assert.equal(old.view,null);
+  assert.equal(b.api.isCurrentView(10,newer),true);
+});
+finalCase('activation keeps ownership across trader lookup',()=>{
+  const b=service({on:true},250);open(b.api);let newer;
+  b.deps.isTrader=()=>{newer=open(b.api).view;return true;};
+  const old=b.api.command({actorId:10,profileId:7,parts:['/merchant','e','1']});
+  assert.equal(old.view,null);assert.equal(b.api.isCurrentView(10,newer),true);
+});
+finalCase('identity replacement blocks supply history mutation',()=>{
+  const b=service({on:true},250);let state=b.purses.prepare(1);state.supply={expired:1};b.purses.commit(1,state);
+  open(b.api);const identity=b.world.transfer.identity;let armed=true;
+  b.world.transfer.identity=function(id){if(armed){armed=false;open(b.api);}return identity.call(this,id);};
+  b.api.command({actorId:10,profileId:7,parts:['/merchant','sell','1','Iron','Ingot']});
+  assert.deepEqual(b.purses.read(1).supply,{expired:1});
+  assert.equal(b.world.inv[10][100],8);
+});
+finalCase('obsolete quest feedback is suppressed',()=>{
+  const b=service({on:true},250);open(b.api);
+  b.deps.quests=()=>({capture:()=>({}),describe:()=>[],act:()=>{open(b.api);return {ok:true};}});
+  const old=b.api.command({actorId:10,profileId:7,parts:['/merchant','quest','take','ebony']});
+  assert.deepEqual(old,{text:'',view:null});
+});
+finalCase('obsolete committed trade feedback is suppressed',()=>{
+  const b=service({on:true},250);open(b.api);
+  const prepare=b.purses.prepare.bind(b.purses);let armed=true;
+  b.purses.prepare=id=>{const state=prepare(id);if(armed&&state.purse===247){armed=false;open(b.api);}return state;};
+  const old=b.api.command({actorId:10,profileId:7,parts:['/merchant','sell','1','Iron','Ingot']});
+  assert.deepEqual(old,{text:'',view:null});
+  assert.equal(b.world.inv[10][100],7,'a committed trade is retained, never replayed or compensated');
+});
+finalCase('later validation cannot retain an earlier replaced view',()=>{
+  const b=service({on:true},250);open(b.api);
+  b.world.actors[11]={...b.world.actors[10],profileId:8};b.world.inv[11]={...b.world.inv[10]};
+  b.api.command({actorId:11,profileId:8,parts:['/merchant','1']});
+  b.world.inv[10][100]++;b.world.inv[11][100]++;
+  const actor=b.world.actor.bind(b.world);let reads=0,newer;
+  b.world.actor=id=>{if(id===11&&++reads===4)newer=open(b.api).view;return actor(id);};
+  assert.equal(b.api.recover().some(row=>row.actorId===10),false);
+  assert.ok(newer,'the replacement occurs during the later view validation');
+});
+finalCase('production publication checks after serialization',()=>{
+  const b=service({on:true},250);let armed=false;
+  const quests=[];quests.toJSON=()=>{if(armed){armed=false;open(b.api);}return [];};
+  b.deps.quests=()=>({describe:()=>quests});
+  const view=open(b.api).view;
+  const source=fs.readFileSync(path.join(__dirname,'../game/merchant-trading.js'),'utf8');
+  const push=source.slice(source.indexOf('  trading.push = function'),source.indexOf('  var timers=env.timers'));
+  const writes=[];vm.runInNewContext(push,{trading:b.api,mp:{set:(...args)=>writes.push(args)},property:'view',log:()=>{}});
+  armed=true;b.api.push(10,view);
+  assert.deepEqual(writes,[]);
 });
 assert.deepEqual(finalFailures,[]);
 console.log('PASS merchant trading quotes, stock, depletion, supply, reach and native gate');
