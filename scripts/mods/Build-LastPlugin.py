@@ -1106,7 +1106,12 @@ def main():
     print('  ok    read back in the load order: every cut actor off, every cut quest unable to start')
     if args.check:
         a = same_or_say(OUT, plugin, 'game/content/' + PLUGIN)
-        b = same_or_say(MANIFEST, manifest_bytes(manifest), 'game/data/last-plugin.json')
+        # The manifest is text, and a Windows checkout may hand it back with
+        # CRLF line ends, so it is compared as what it says, not as bytes.
+        have = json.load(open(MANIFEST, encoding='utf-8')) if os.path.isfile(MANIFEST) else None
+        b = have == json.loads(manifest_bytes(manifest).decode('utf-8'))
+        print('  %s game/data/last-plugin.json %s' % (('ok   ', 'says what this builds') if b else
+                                                       ('DIFFERS', 'is not what this builds')))
         return 0 if a and b else 1
     with open(OUT, 'wb') as f:
         f.write(plugin)
