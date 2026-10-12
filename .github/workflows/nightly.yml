@@ -276,9 +276,9 @@ jobs:
             Write-Host '::error::could not make a venv for the bot harnesses, so they did not run'
             exit 1
           }
-          & $py -m pip install --quiet --disable-pip-version-check -r bot\requirements.txt
+          & $py -m pip install --quiet --disable-pip-version-check --require-hashes --only-binary :all: -r bot\requirements.txt
           if ($LASTEXITCODE -ne 0) {
-            Write-Host '::error::could not install discord.py, so the bot harnesses did not run'
+            Write-Host '::error::could not install discord.py from the hash-pinned bot\requirements.txt (a hash that does not match stops it, #2190), so the bot harnesses did not run'
             exit 1
           }
           #
