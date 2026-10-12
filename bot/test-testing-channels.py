@@ -452,26 +452,39 @@ g, tasks, results, play, staff = server()
 run(bot.channel_setup(g, apply=True, path=os.path.join(TMP, 'tasks.json')))
 forum = bot._channel_named(g, 'test-tasks', ('forum',))
 th, said = run(bot.post_test_task(g, 'Ride the ferry to Solstheim',
-                                  'Board at Windhelm and arrive.', 'Dev'))
+                                  'Board at Windhelm and arrive.'))
 yes('a test task is one thread in the forum, titled and with its body',
     th is not None and len(forum.threads) == 1
     and forum.threads[0].name == 'Ride the ferry to Solstheim'
     and forum.threads[0].content == 'Board at Windhelm and arrive.')
-yes('  tagged Dev', [t.name for t in th.applied_tags] == ['Dev'])
+yes('  tagged Main by default (#2276: Main only)',
+    [t.name for t in th.applied_tags] == ['Main'])
 th2, said = run(bot.post_test_task(g, 'Buy a house', 'In Whiterun.', 'main'))
 yes('a Main task gets the Main tag (any case)',
     [t.name for t in th2.applied_tags] == ['Main'])
-again, said = run(bot.post_test_task(g, 'Ride the ferry to Solstheim', 'x', 'Dev'))
+no, said = run(bot.post_test_task(g, 'Fish in Riften', 'At the docks.', 'Dev'))
+yes('#2276: a hand post tagged Dev is refused, nothing is posted',
+    no is None and 'Main only' in said and len(forum.threads) == 2
+    and not [x for x in forum.threads if x.name == 'Fish in Riften'])
+again, said = run(bot.post_test_task(g, 'Ride the ferry to Solstheim', 'x'))
 yes('the same title again is not a second thread',
     again is th and len(forum.threads) == 2 and said.startswith('Already'))
 no, said = run(bot.post_test_task(g, 'x', 'y', 'Live'))
-yes('a tag that is not Dev or Main is refused', no is None and 'Dev or Main' in said)
-no, said = run(bot.post_test_task(g, 'x' * 101, 'y', 'Dev'))
+yes('a tag that is not Main is refused', no is None and 'Main only' in said)
+no, said = run(bot.post_test_task(g, 'x' * 101, 'y'))
 yes('a title Discord would refuse is refused first', no is None)
 g2, *_ = server()
-no, said = run(bot.post_test_task(g2, 'x', 'y', 'Dev'))
+no, said = run(bot.post_test_task(g2, 'x', 'y'))
 yes('before the setup, it says #test-tasks is not a forum yet',
     no is None and 'not a forum yet' in said)
+import inspect as _insp  # noqa: E402
+_params = list(_insp.signature(bot.test_task_cmd.callback).parameters)
+yes('#2276: /test-task has no tag option, so it cannot post to Dev (%s)'
+    % _params, 'tag' not in _params)
+_src = _insp.getsource(bot)
+yes('#2276: --post-task --tag takes Main only, Main by default',
+    "ap.add_argument('--tag', choices=[TASK_POST_TAG], default=TASK_POST_TAG)" in _src
+    and bot.TASK_POST_TAG == 'Main')
 
 
 # --------------------------------------------------- 4. known issues --
