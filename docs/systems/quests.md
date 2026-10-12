@@ -141,7 +141,16 @@ whole draw to leave without a cooldown. These inventory steps require the
 native transaction that saves the quest, inventory and receipt together.
 An unfinished merchant transfer or unsaved inventory receipt holds them
 until its exact save acknowledgement; no reward is inferred from a timer.
-The other scarce and scene offers are not connected to the panel yet.
+Six kill contracts are implemented for the selected wolf, sabre cat, bandit
+camp, bear, barrow and giant sources. They count distinct authored lives
+inside their named places and retain that history through reconnects and
+restarts. Progress saves separately from inventory, so an outstanding goods
+save does not discard a later kill. Rewards still wait for the inventory
+save acknowledgement and are paid once with the completed quest.
+These bindings await the matching native engine and gamemode release;
+implementation does not establish availability on either server.
+The six remaining scarce offers and seven retrieval offers are not connected
+to the panel yet.
 Scene gold is created when the quest is finished. It is not taken
 from a trader's purse. Walking
 away puts the goods back and does not start the cooldown. The rank on
@@ -157,5 +166,6 @@ over them and their quest steps are refused until it is put right.
 The remaining scarce places and scene objects have been selected in
 [Custom quest places](quest-locations.md), with exact source references,
 counts, cooldowns and the distinction between existing sources and markers
-still to be placed. Those interactions are not bound yet, so their offers
-stay shut. A dragon is not a bounty. Papyrus quests do not run.
+still to be placed. The remaining scarce and retrieval interactions are not
+bound yet, so their offers stay shut. A dragon is not a bounty. Papyrus
+quests do not run.

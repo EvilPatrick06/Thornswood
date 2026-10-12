@@ -6,9 +6,11 @@ the winning enabled reference records, `resource-locations.json`, and the kept
 cast in `npc-population.json`. Counts and rewards come from [Custom quests](quests.md).
 
 This is the binding specification. The four rare-mine offers have an
-implementation in PR2065. The other offers below still need their resource or
-scene interaction connected before they can be taken. A reference in this
-document does not mean the quest is deployed or playable.
+implementation in PR2065. The six kill contracts have bindings in PR2130;
+their matching native and gamemode changes still need to be released by
+Claude. The six other scarce offers and seven retrieval offers still need
+their resource or scene interaction connected before they can be taken. A
+reference in this document does not mean the quest is deployed or playable.
 
 Descriptors are local hexadecimal IDs followed by their source plugin. They
 stay the same when full or light plugin indices change. Unless another plugin

@@ -644,6 +644,46 @@ yes('the miner page says the same', /kept on the character/.test(mWhere) &&
   ctx.swingEnd(92,1);const revoked=timers.at(-1);runtime='101';const before=writes.length;revoked.fn();
   yes('a mining-stop timer cannot write into a replacement session',writes.length===before);
 }
+{
+  w=restart();
+  const {createQuestTransactions}=require('../game/quest-transactions');
+  const {createKillContracts}=require('../game/kill-contracts');
+  let record=null,inventory={entries:[{baseId:15,count:40}]};
+  let receipt=JSON.stringify({actor:'ff000060:Skyrim.esm',profile:42,sequence:1}),saved='null',goods=0;
+  const clone=x=>JSON.parse(JSON.stringify(x));
+  const mp={getActorRuntimeIdentity:()=> '100',getNpcAIState:id=>id===96?
+    {isHuman:true,profileId:42,lifeGeneration:0}:npcStates[id],
+    getDescFromId:id=>id===96?'ff000060:Skyrim.esm':npcStates[id].ref,
+    getIdFromDesc:desc=>desc==='f:Skyrim.esm'?15:npcIds[desc],
+    get:(id,key)=>id===96?clone(key==='inventory'?inventory:record):w.ctx.mp.get(id,key),
+    getInventoryReceipt:()=>receipt,getSavedInventoryReceipt:()=>saved,
+    compareAndSetActorProperty(id,profile,change){
+      if(profile!==42 || JSON.stringify(change.expected)!==JSON.stringify(record))return false;
+      record=clone(change.replacement);return true;
+    },
+    compareAndSetInventoryAndProperty(id,before,old,next,sequence,profile,change){
+      if(old!==receipt || JSON.stringify(change.expected)!==JSON.stringify(record))return false;
+      goods++;inventory=clone(next);record=clone(change.replacement);
+      receipt=JSON.stringify({actor:'ff000060:Skyrim.esm',profile,sequence});return true;
+    }};
+  const tx=createQuestTransactions({mp,withInventoryMutation:(id,fn)=>receipt===saved?
+    fn({desc:'ff000060:Skyrim.esm',profileId:42},()=>true):{ok:false,why:'waiting'}});
+  const kills=createKillContracts({mp,population:compactPopulation,raceOf:id=>npcStates[id].race,identity:tx.identity});
+  const svc=w.ctx.__thornswoodCustomQuestsCreate({now:()=>clock.now,goldDesc:'f:Skyrim.esm',
+    load:()=>clone(record),commit:tx.commit,identity:tx.identity,available:tx.available,killContracts:kills,
+    traderHold:()=> 'Whiterun'});
+  for(const ref of kills.rows.find(r=>r.id==='camp').refs) {
+    const state=npcStates[npcIds[ref]];state.isDead=false;state.lifeGeneration++;
+  }
+  yes('a contract opens through the real transaction path while an inventory save is pending',svc.offer(96,'camp').ok===true);
+  for(const id of [31,32,33]){npcStates[id].isDead=true;svc.noteKill(96,id);}
+  yes('three successive authored kills survive the real controller and transaction path',record.open.camp.kills===3);
+  yes('kill progress leaves inventory and its unacknowledged receipt intact',goods===0 && inventory.entries[0].count===40 && saved==='null');
+  yes('the camp reward stays fenced while inventory is unacknowledged',svc.turnIn(96,'camp',9000).ok===false && !!record.open.camp);
+  saved=receipt;
+  yes('acknowledged inventory permits exactly the authored camp reward',svc.turnIn(96,'camp',9000).ok===true && inventory.entries[0].count===85 && goods===1);
+  yes('the completed contract cannot pay twice',svc.turnIn(96,'camp',9000).ok===false && goods===1);
+}
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
