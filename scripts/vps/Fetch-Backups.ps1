@@ -39,7 +39,9 @@
   %LOCALAPPDATA%\Thornswood\Backups-Fetch and points a task on this machine at
   that copy, so the task does not break when a repo folder or worktree is
   moved or removed. The task is given -To as a whole path, the folder this run
-  would use, because the copy has no Where.ps1 beside it to ask. It runs as
+  would use, because the copy has no Where.ps1 beside it to ask; a -To or
+  -KeyFile that is not a whole path (C:\... or \\server\share) is refused
+  before anything is made or registered (#2199). It runs as
   you, while you are signed in, and a run missed because the machine was off
   happens at the next sign in. Run -Schedule again after this script changes
   to refresh the copy, and after the backups folder moves so the task writes
@@ -147,6 +149,22 @@ if (-not $To -and -not $Unschedule) {
     Die "$repoDir is a git worktree, and its local folder goes when the worktree is removed. Run this from the repository folder itself, or pass -To <folder>."
   }
 }
+
+# -To, and under -Schedule -KeyFile, must be whole paths: a drive and a
+# backslash (C:\...) or \\server\share. Each is used as given, and the task
+# -Schedule registers is handed both word for word, so anything else means a
+# different folder depending on where it runs. Measured 12 Oct (#2199): -To
+# given through Git Bash unquoted arrived as C:UsersevilpDownloadsThornswood-
+# Repolocalbackups, a path relative to the current folder on C:. This script
+# made that folder inside the worktree it ran from and registered the task
+# with it, so the next 4:15 AM run would have fetched into a new folder under
+# its own copy's folder and left local\backups to go stale.
+function Test-WholePath([string]$p) { return ($p -match '^[A-Za-z]:[\\/]' -or $p -match '^\\\\[^\\/]+[\\/][^\\/]+') }
+function Stop-NotWholePath([string]$name, [string]$p) {
+  Die ("-{0} is not a whole path: '{1}'. Give it as C:\folder\... or \\server\share\... A path like C:Users... is what a shell that dropped the backslashes passes on (Git Bash does this to an unquoted C:\...); run it from PowerShell, or quote the path." -f $name, $p)
+}
+if ($To -and -not (Test-WholePath $To)) { $bad = $To; $To = ''; Stop-NotWholePath 'To' $bad }
+if ($Schedule -and -not (Test-WholePath $KeyFile)) { Stop-NotWholePath 'KeyFile' $KeyFile }
 if ($To -and -not (Test-Path -LiteralPath $To)) { [void](New-Item -ItemType Directory -Path $To -Force) }
 
 # ---------------------------------------------------------- the schedule ----
