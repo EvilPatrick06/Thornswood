@@ -142,7 +142,7 @@ $docsWin = $DocsRoot.Replace('/','\')
 . (Join-Path $Here 'Artifact.ps1')
 $artifact = $null
 if (-not $PutBack -and -not $SetPing) {
-$artifact = New-ThornswoodArtifact -Component bot -RepoDir $Repo -Paths 'bot/bot.py', 'bot/card.py', 'bot/dev-channel.txt', 'bot/requirements.txt', 'bot/staff-channel.txt', 'bot/assets/join-card.png', 'scripts/vps/BotService.cs'
+$artifact = New-ThornswoodArtifact -Component bot -RepoDir $Repo -Paths 'bot/bot.py', 'bot/card.py', 'bot/dev-channel.txt', 'bot/requirements.txt', 'bot/factions.json', 'bot/staff-channel.txt', 'bot/assets/join-card.png', 'scripts/vps/BotService.cs'
 Write-Host ('artifact ' + (Format-ThornswoodArtifact $artifact)) -ForegroundColor DarkGray
 Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
 $Repo = $artifact.Folder
@@ -364,8 +364,11 @@ Head 'Staging it'
 # smoke checklist was taken out on 11 Oct. Nothing reads it now. The join-card
 # harness's point is that joins.json, the bot's own record, is never sent; it
 # still checks that.
+#
+# factions.json too: the named factions the Faction Leader form reads from
+# beside itself. A file this list does not name never reaches the box.
 $send = [ordered]@{}
-foreach ($f in 'bot.py', 'card.py', 'dev-channel.txt', 'requirements.txt') {
+foreach ($f in 'bot.py', 'card.py', 'dev-channel.txt', 'requirements.txt', 'factions.json') {
   $src = Join-Path $Repo "bot\$f"
   if (-not (Test-Path $src)) { Die "missing: $src" }
   $send[$f] = $src

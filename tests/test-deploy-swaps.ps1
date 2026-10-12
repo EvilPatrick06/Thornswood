@@ -504,6 +504,7 @@ Put (Join-Path $repo 'voice\headlines.js') "module.exports = {};`n"
 Put (Join-Path $repo 'bot\card.py') 'CARD = 1'
 Put (Join-Path $repo 'bot\dev-channel.txt') '0'
 Put (Join-Path $repo 'bot\requirements.txt') ''
+Put (Join-Path $repo 'bot\factions.json') '[]'
 Put (Join-Path $repo 'bot\staff-channel.txt') '0'
 Put (Join-Path $repo 'bot\assets\join-card.png') 'not really a picture'
 Put (Join-Path $repo 'game\gamemode.js') '// the committed gamemode'

@@ -270,8 +270,9 @@ def _staff_channel_id():
 # staff-general up by name, which is what was wanted.
 TROUBLE_ID = _int_env('TROUBLE_CHANNEL_ID', _staff_channel_id())
 
-# The bot's own records, joins.json, open-tickets.json, heartbeat.json and
-# commands-synced.json, go in a folder of their own, data beside bot.py, and
+# The bot's own records, joins.json, open-tickets.json, heartbeat.json,
+# commands-synced.json and faction-seats.json, go in a folder of their own,
+# data beside bot.py, and
 # so does bot.log, which the service writes (issue #1104). The service's
 # account may write there and nowhere else in the bot's folder: the code is
 # read only to it, so nothing that gets into the bot can rewrite bot.py or put
@@ -762,7 +763,7 @@ KINDS = [
     ('playtest',    'Apply to be an alpha playtester',
                     'How you get into the world. Anyone can apply. Break it and write down how.'),
     ('jarl',        'Apply: Jarl',          'A seat in a hold. In character, and the first ones come out of these.'),
-    ('company',     'Apply: Trading Company', 'Haul, make, sell and buy for the Free Skyrim Trading Company. In character.'),
+    ('faction',     'Apply: Faction Leader', 'A seat at the head of a faction. In character, and the first ones come out of these.'),
     ('gamemaster',  'Apply: Gamemaster',    'Run events, settle disputes, hold the line in character.'),
     ('loremaster',  'Apply: Loremaster',    'Keep the history straight and write the rest of it.'),
     ('moderator',   'Apply: Moderator',     'The unglamorous one. Tickets, reports, difficult people.'),
@@ -778,7 +779,7 @@ KINDS = [
 ROLE_FOR = {
     'playtest':   'Playtester',
     'jarl':       'Jarl of the hold named below',
-    'company':    'Trading Company',
+    'faction':    'Faction Lead of the faction named below',
     'gamemaster': 'Gamemaster',
     'loremaster': 'Loremaster',
     'moderator':  'Moderator',
@@ -936,14 +937,18 @@ QUESTIONS = {
         ('What happens if they lose the seat?',
          'A seat that cannot be lost is not a seat. Say how you play that.', True),
     ],
-    # The Free Skyrim Trading Company (#1393, docs/systems/trading-company.md).
-    # The same shape as a Jarl's: answered in character, and the role it
-    # leads to is what lets a character handle a company sale in the game.
-    'company': [
+    # A faction lead seat. The same three questions the Trading Company form
+    # used to ask, answered in character. The second question is reworded so
+    # it fits any faction, not the company and hauling; that wording is a
+    # proposal. Required and optional stay as they were: long means optional.
+    # The faction pick itself is a Select, required, built in TicketModal,
+    # because a form with no faction is useless. The Free Skyrim Trading
+    # Company is one of the seats (bot/factions.json).
+    'faction': [
         ('Who is your character?',
          'Name, where they come from, what they have been doing until now. In character.', True),
-        ('What would they do for the company?',
-         'Haul, make, sell or buy, and what goods. Answer as them, not as you.', True),
+        ('What would they do with the faction?',
+         'What they actually do with it. Answer as them, not as you.', True),
         ('How much time can you give it?', 'Hours a week, and which days.', True),
     ],
     'gamemaster': _job('running events',
@@ -969,12 +974,165 @@ QUESTIONS = {
 }
 
 
+# Named factions, names only, beside this file. Other is always added in
+# code, last, and is never stored here. A name change is a pull request.
+FACTIONS_FILE = os.path.join(HERE, 'factions.json')
+# Which lead seats are filled. Staff write it with /faction-seat. The form
+# only lists seats that are free. Submitting an application never writes this.
+FACTION_SEATS = os.path.join(DATA_DIR, 'faction-seats.json')
+FACTION_OTHER = 'Other'
+FACTION_PICK_Q = 'Which faction?'
+FACTION_OTHER_Q = 'If Other, which faction?'
+FACTION_OTHER_HINT = 'Only if you picked Other. The name of the faction.'
+# Jarl and Faction Leader: staff cannot hold these, so a staff applicant is
+# flagged. Wider than is_staff: Lead Gamemaster and Trial Gamemaster are not
+# staff for /close, and they still cannot hold a lead seat. is_staff is left
+# as it is. Content Creator is on neither list.
+LEADERSHIP_KINDS = ('jarl', 'faction')
+LEADERSHIP_EXTRA = ('Lead Gamemaster', 'Trial Gamemaster')
+
+
+def faction_names():
+    """The named factions, from factions.json beside this file. Other is not in it."""
+    try:
+        with open(FACTIONS_FILE, encoding='utf-8') as f:
+            d = json.load(f)
+        if isinstance(d, list):
+            return [str(n).strip() for n in d if str(n).strip()]
+    except Exception as e:
+        log('could not read factions.json:', e)
+    return []
+
+
+def _seats_read():
+    """The seat record, or {} when there is none yet. Raises when there is one
+       and it cannot be read, so a file that is there and unreadable is never
+       taken for an empty one and written over."""
+    if not os.path.exists(FACTION_SEATS):
+        return {}
+    with open(FACTION_SEATS, encoding='utf-8') as f:
+        d = json.load(f)
+    if not isinstance(d, dict):
+        raise ValueError(FACTION_SEATS + ' is not a JSON object')
+    return d
+
+
+def _seats_write(d):
+    """Written to a file beside it and swapped in, so a write that fails half
+       way leaves the old record whole rather than half of a new one. The same
+       way joins.json is saved."""
+    tmp = FACTION_SEATS + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(d, f)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, FACTION_SEATS)
+
+
+def _seats_or_empty():
+    try:
+        return _seats_read()
+    except Exception as e:
+        log('could not read faction-seats.json:', e)
+        return {}
+
+
+def faction_seat_filled(name, seats=None):
+    if seats is None:
+        seats = _seats_or_empty()
+    rec = seats.get(name)
+    return isinstance(rec, dict) and rec.get('filled') is True
+
+
+def open_faction_names():
+    """Named factions whose lead seat is free. Other is not in this list."""
+    seats = _seats_or_empty()
+    return [n for n in faction_names() if not faction_seat_filled(n, seats)]
+
+
+def faction_pick_options():
+    """Select options for the form: every open named seat, then Other last."""
+    opts = [discord.SelectOption(label=n[:100], value=n[:100])
+            for n in open_faction_names()]
+    opts.append(discord.SelectOption(label=FACTION_OTHER, value=FACTION_OTHER))
+    return opts
+
+
+def faction_pick_is_open(picked):
+    """True only for a named faction whose lead seat is free right now.
+
+    Checked again on submit, because the list was built when the form opened
+    and a seat can be filled in the meantime. Other, a filled seat, and a
+    name that is not on the list are all false.
+    """
+    name = (picked or '').strip()
+    if not name or name == FACTION_OTHER:
+        return False
+    if name not in faction_names():
+        return False
+    return not faction_seat_filled(name)
+
+
+def field_said(item):
+    """What a form field holds: a Select's first pick, or a TextInput's text."""
+    vals = getattr(item, 'values', None)
+    if isinstance(vals, (list, tuple)):
+        return (str(vals[0]) if vals else '').strip()
+    return (getattr(item, 'value', None) or '').strip()
+
+
+def leadership_staff_held(who):
+    """
+    Names of staff roles they hold, including Lead and Trial Gamemaster.
+
+    The list the Faction Leader and Jarl flags use. is_staff does not include
+    those two, and it is left as it is so /close and /faction-seat stay on
+    the same five roles. Content Creator is not on this list either.
+    """
+    try:
+        ids, names = set(STAFF_IDS), set(STAFF_NAMES)
+        for n in LEADERSHIP_EXTRA:
+            names.add(n.lower())
+        found = []
+        for r in getattr(who, 'roles', None) or []:
+            if _role_hit(r, ids, names):
+                found.append(r.name)
+        return found
+    except Exception:
+        return []
+
+
 class TicketModal(discord.ui.Modal):
     def __init__(self, kind, label):
         super().__init__(title=label[:45])
         self.kind = kind
         self.label_text = label
         self.fields = []
+        self.faction_select = None
+        self.faction_other = None
+        # Discord takes five items on a form. The faction kind uses all five:
+        # a required Select of the open seats plus Other (discord.py 2.6.0
+        # put Select inside a modal; 2.7.1 is the pin), an optional Other
+        # box, and the three copied questions.
+        if kind == 'faction':
+            sel = discord.ui.Select(
+                placeholder='Pick a faction',
+                options=faction_pick_options(),
+                min_values=1,
+                max_values=1,
+                required=True)
+            self.faction_select = sel
+            self.add_item(discord.ui.Label(
+                text=FACTION_PICK_Q[:45],
+                component=sel))
+            other = discord.ui.TextInput(
+                label=FACTION_OTHER_Q[:45],
+                placeholder=FACTION_OTHER_HINT[:100],
+                style=discord.TextStyle.short,
+                required=False,
+                max_length=200)
+            self.faction_other = other
+            self.add_item(other)
         for q, ph, long in QUESTIONS[kind]:
             item = discord.ui.TextInput(
                 label=q[:45],
@@ -1006,7 +1164,7 @@ class TicketModal(discord.ui.Modal):
             """What they typed in the question that reads exactly like this."""
             for item, (q, _, _) in zip(self.fields, QUESTIONS[self.kind]):
                 if q == want:
-                    return (item.value or '').strip()
+                    return field_said(item)
             return ''
 
         age_said = answered(AGE_Q[0]) if self.kind in AGE_KINDS else ''
@@ -1018,11 +1176,24 @@ class TicketModal(discord.ui.Modal):
             rules_said = answered(RULES_Q[0])
             rules = {'said': rules_said[:200], 'yes': accepted_rules(rules_said)}
 
+        # The faction pick is read again here, against the seats as they are
+        # now, not as they were when the form opened. A filled or unknown
+        # seat, and Other, get a flag. Submitting never marks a seat filled.
+        # The pick and the Other box stay out of the opening line and out of
+        # Asking for: they go only in the escaped answers below.
+        picked = field_said(self.faction_select) if self.faction_select is not None else ''
+        other_said = field_said(self.faction_other) if self.faction_other is not None else ''
+
         def written(clean):
             lines = []
+            if self.kind == 'faction':
+                lines.append('**%s**\n%s'
+                             % (FACTION_PICK_Q, clean(picked) or 'nothing said'))
+                lines.append('**%s**\n%s'
+                             % (FACTION_OTHER_Q, clean(other_said) or 'nothing said'))
             for item, (q, _, _) in zip(self.fields, QUESTIONS[self.kind]):
                 lines.append('**%s**\n%s'
-                             % (q, clean((item.value or '').strip()) or 'nothing said'))
+                             % (q, clean(field_said(item)) or 'nothing said'))
             out = '\n\n'.join(lines)
             if asking:
                 out = '**Asking for:** ' + asking + '\n\n' + out
@@ -1036,6 +1207,15 @@ class TicketModal(discord.ui.Modal):
             if rules is not None and not rules['yes']:
                 out = ('**CHECK THIS ONE.** Asked if they accept the rules they '
                        'said "%s".\n\n' % (clean(rules_said) or 'nothing')) + out
+            if self.kind == 'faction' and not faction_pick_is_open(picked):
+                out = ('**CHECK THIS ONE.** The faction they picked is not an '
+                       'open named seat.\n\n') + out
+            if self.kind in LEADERSHIP_KINDS:
+                held = leadership_staff_held(who)
+                if held:
+                    out = ('**CHECK THIS ONE.** Holds a staff role (%s); staff '
+                           'cannot hold a Jarl seat or a faction lead.\n\n'
+                           % ', '.join(held)) + out
             return out
 
         # Two copies of the same ticket, because the two places that take it
@@ -1260,8 +1440,8 @@ def _chunks(s, n):
 def is_staff(who):
     """
     Somebody holding one of the STAFF_ROLES roles, matched by id or by name.
-    The one gate on /close, the Close ticket button and the ticket limits, and
-    the same list that pulls staff into every ticket thread.
+    The one gate on /close, /faction-seat, the Close ticket button and the
+    ticket limits, and the same list that pulls staff into every ticket thread.
 
     Nothing else makes somebody staff here, a channel permission included.
     This used to let in anybody the channel trusted with threads as well, and
@@ -1500,6 +1680,79 @@ async def close_cmd(interaction: discord.Interaction,
     await close_here(interaction, why)
 
 
+async def mark_faction_seat(interaction, action, faction):
+    """
+    Fill or free a named faction's lead seat.
+
+    The same is_staff check as /close. Lead Gamemaster and Trial
+    Gamemaster stay out, on purpose. Submitting an application never
+    comes through here: only this command writes the seat file.
+    """
+    if not is_staff(interaction.user):
+        await interaction.response.send_message(
+            'Staff mark these. Say what you need in a ticket and somebody will.',
+            ephemeral=True)
+        return
+    name = (faction or '').strip()
+    if name not in faction_names():
+        await interaction.response.send_message(
+            'That is not a named faction. The list is the names in factions.json.',
+            ephemeral=True)
+        return
+    if action not in ('fill', 'free'):
+        await interaction.response.send_message(
+            'Action is fill or free.', ephemeral=True)
+        return
+    try:
+        rec = _seats_read()
+    except Exception as e:
+        log('could not read faction-seats.json:', e)
+        await interaction.response.send_message(
+            'Could not read the seat record. Nothing was changed.',
+            ephemeral=True)
+        return
+    rec[name] = {
+        'filled': action == 'fill',
+        'by': getattr(interaction.user, 'display_name', None) or str(interaction.user),
+        'by_id': interaction.user.id,
+        'at': datetime.datetime.now(datetime.timezone.utc).strftime(
+            '%Y-%m-%dT%H:%M:%SZ'),
+    }
+    try:
+        _seats_write(rec)
+    except Exception as e:
+        log('could not write faction-seats.json:', e)
+        await interaction.response.send_message(
+            'Could not write the seat record. Nothing was changed.',
+            ephemeral=True)
+        return
+    if action == 'fill':
+        said = 'Filled the lead seat of %s.' % name
+    else:
+        said = 'Freed the lead seat of %s.' % name
+    await interaction.response.send_message(said, ephemeral=True)
+
+
+async def _faction_name_complete(interaction, current):
+    cur = (current or '').lower()
+    return [
+        discord.app_commands.Choice(name=n, value=n)
+        for n in faction_names() if cur in n.lower()
+    ][:25]
+
+
+@tree.command(name='faction-seat',
+              description='Mark a faction lead seat filled or free. Staff only.')
+@discord.app_commands.describe(
+    action='Fill the seat or free it.',
+    faction='Which faction.')
+@discord.app_commands.autocomplete(faction=_faction_name_complete)
+async def faction_seat_cmd(interaction: discord.Interaction,
+                           action: typing.Literal['fill', 'free'],
+                           faction: str):
+    await mark_faction_seat(interaction, action, faction)
+
+
 class TicketPanel(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -1530,9 +1783,10 @@ _PANEL_TOP = ('**Open a ticket**\n\n'
               'Pick the one that fits. It asks a few questions, then opens a thread '
               'only you and staff can see. Nothing here is public and nobody else in '
               'the server can read it.\n\n')
-_PANEL_JOBS = ('**Apply: Jarl** is '
+_PANEL_JOBS = ('**Apply: Jarl** and **Apply: Faction Leader** are '
                'answered in character: the seats are empty, and the first people to '
-               'hold them are picked out of what is written there.\n\n'
+               'hold them are picked out of what is written there. A faction has one '
+               'leader. Staff cannot hold a Jarl seat or a faction lead.\n\n'
                'The jobs below that are open to anybody already in, and they are jobs '
                'rather than titles: each one is work somebody is currently doing '
                'instead of you.\n\n'

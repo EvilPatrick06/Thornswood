@@ -306,6 +306,7 @@ try:
     # start will write down are the ones a person sees in the picker.
     real = bot._command_names()
     yes('the real tree names /close', 'close' in real)
+    yes('and /faction-seat', 'faction-seat' in real)
     yes('and /test-task', 'test-task' in real)
     yes('and the Live smoke group is gone, every subcommand with it (11 Oct)',
         not [n for n in real if n.startswith('live-smoke')])

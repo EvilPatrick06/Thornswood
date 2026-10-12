@@ -29,6 +29,18 @@ Gamemaster, Dev, Loremaster, Moderator.
 Anyone else never sees the tab. There is no empty page and no locked
 row.
 
+## Named factions
+
+Some factions have a lead seat: Imperial Embassy, Thalmor Remnant,
+Dark Brotherhood, The Companions, and the Free Skyrim Trading
+Company. The names live in `bot/factions.json`. Applying is
+Apply: Faction Leader in Discord. A faction has one leader. Staff mark a
+seat filled or free with `/faction-seat`. Staff cannot hold a Jarl seat or a faction lead.
+
+The Discord role Faction Owner is separate: it lets an account found
+a faction book in the game. It is not granted by this application,
+and this application does not make a new Discord role.
+
 ## Founding one
 
 Business Owner may found one business, and name it.

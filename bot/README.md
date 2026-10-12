@@ -202,10 +202,10 @@ Lead Gamemaster and Trial Gamemaster are not in that list, so neither opens
 hold as well.
 
 Neither is staff to the bot either. Closing a ticket, with `/close` or the
-Close ticket button, and skipping the one open ticket rule and the cooldown
-take one of the `STAFF_ROLES` roles in `bot.env.json` (Owner, Dev, Gamemaster,
-Moderator and Loremaster by default), matched by id or name, and nothing
-else. The Manage Threads that both of them carry on every channel used to
+Close ticket button, marking a faction lead seat with `/faction-seat`, and
+skipping the one open ticket rule and the cooldown take one of the
+`STAFF_ROLES` roles in `bot.env.json` (Owner, Dev, Gamemaster, Moderator and
+Loremaster by default), matched by id or name, and nothing else. The Manage Threads that both of them carry on every channel used to
 count as staff there, and it no longer does (#1342). `test-staff-gate.py`
 runs every staff and admin command and button as somebody who is not staff
 for it, and fails on any new one whose gate is not written down in it.
@@ -287,7 +287,8 @@ them, the way [Setting up a machine](../Developer-Guide.md#setting-up-a-machine)
 installs them (#1401).
 
 What goes up with it: `bot.py`, `card.py`, the channel ids, the card artwork,
-and `requirements.txt`. A file the bot reads and this list does
+`requirements.txt`, and `factions.json`, the named factions the Faction
+Leader form reads from beside itself. A file the bot reads and this list does
 not name is a file that is only ever on main, never on the box.
 
 Nothing else stays in the bot's folder (#1184). It holds what that list sends

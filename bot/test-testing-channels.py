@@ -197,9 +197,10 @@ yes('and no Pass/Fail/Skip/Fail-known marks or session buttons',
 yes('the export it read is gone from the repository',
     not os.path.exists(os.path.join(HERE, 'live-smoke-discord-export.json')))
 names = bot._command_names()
-yes('the commands are /close and /test-task, nothing of the checklist (%s)'
+yes('the commands are /close, /faction-seat and /test-task, nothing of the checklist (%s)'
     % ', '.join(names),
-    'test-task' in names and not [n for n in names if 'smoke' in n])
+    'close' in names and 'faction-seat' in names and 'test-task' in names
+    and not [n for n in names if 'smoke' in n])
 import inspect  # noqa: E402
 hook = inspect.getsource(bot.Thornswood.setup_hook)
 yes('setup_hook registers no Live smoke views', 'live_smoke' not in hook)
