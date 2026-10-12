@@ -480,8 +480,6 @@ import inspect as _insp  # noqa: E402
 _params = list(_insp.signature(bot.test_task_cmd.callback).parameters)
 yes('#2276: /test-task has no tag option, so it cannot post to Dev (%s)'
     % _params, 'tag' not in _params)
-_cli = bot.__dict__.get('run_cli') or None
-import argparse as _ap  # noqa: E402
 _src = _insp.getsource(bot)
 yes('#2276: --post-task --tag takes Main only, Main by default',
     "ap.add_argument('--tag', choices=[TASK_POST_TAG], default=TASK_POST_TAG)" in _src
