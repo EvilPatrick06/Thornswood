@@ -413,10 +413,14 @@ const DOCS = {
 };
 
 /* Boards. A board is sections, each section a table with its own columns, so
-   a column can be added to one without touching the rest. */
+   a column can be added to one without touching the rest.
+
+   No Known Issues board (#2414). /known is data/known.md and nothing else.
+   A board copy stayed here after the hub stopped editing boards (#433),
+   nothing showed it and nothing could edit it, and it went stale: it still
+   said NPCs stand still with nobody near after #504. One copy, the page. */
 const BOARDS = {
   active:      'Active Issues',
-  known:       'Known Issues',
   roadmap:     'Roadmap',
   suggestions: 'Suggestions',
   archive:     'Archive',
