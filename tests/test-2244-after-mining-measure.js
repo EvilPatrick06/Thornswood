@@ -27,6 +27,12 @@ yes('it starts on a pickaxe idle and reads at the end of the spell, 0.5 s and 3 
     /MINE_START\.test\(name\)/.test(code) && /idlechairexitstart/i.test(code) && /now \+ 500/.test(code) && /now \+ 3000/.test(code));
 yes('and again after the next equip and unequip, which is what frees them',
     /sp\.on\('equip'/.test(code) && /sp\.on\('unequip'/.test(code));
+yes('only the character\'s own equip and unequip count, not an NPC\'s near the camera',
+    /function afterMine\(e\)[\s\S]*?e\.actor\.getFormID\(\) === pc\.getFormID\(\)/.test(code) &&
+    /guard\('after mining equip', \(e\) => \{\s*if \(!afterWaitEquip \|\| !afterMine\(e\)\)/.test(code) &&
+    /guard\('after mining unequip', \(e\) => \{\s*if \([^)]*!afterMine\(e\)\)/.test(code));
+yes('each spell writes its own events, not only the first spell since the game started',
+    /afterWaitEquip = true;\s*afterEvents = \{\};/.test(code));
 yes('the line has the sit state, the weapon, the hand types and the graph variables',
     /getSitState/.test(code) && /isWeaponDrawn/.test(code) && /getEquippedItemType/.test(code) &&
     /getAnimationVariableBool/.test(code) && /getAnimationVariableInt/.test(code));

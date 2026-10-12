@@ -3082,7 +3082,21 @@
   let afterAsked = [];           // [label, when] to read on a later frame
   let afterEnded = 0;            // when the last mining spell ended, 0 for none
   let afterWaitEquip = false;    // a line is still owed for the next equip
-  const afterEvents = {};
+  let afterEvents = {};          // event names written since the last end, once each
+
+  /*
+    ONLY THE CHARACTER'S OWN EQUIP COUNTS. The game sends equip and unequip
+    for every actor near the camera, so an NPC drawing a sword after the spell
+    used to take the one "after the next equip" line before the person had
+    touched their pickaxe, and the line that should show what the equip
+    changed showed the state they were still stuck in.
+  */
+  function afterMine(e) {
+    try {
+      const pc = sp.Game.getPlayer();
+      return !!(e && e.actor && pc && e.actor.getFormID() === pc.getFormID());
+    } catch (err) { return false; }
+  }
 
   function afterLine(label) {
     const pc = sp.Game.getPlayer();
@@ -3117,6 +3131,7 @@
             afterPick = false;
             afterEnded = now;
             afterWaitEquip = true;
+            afterEvents = {};
             afterAsked.push(['at the end (' + name + ')', now], ['0.5 s later', now + 500], ['3 s later', now + 3000]);
             return;
           }
@@ -3132,13 +3147,13 @@
     say('could not watch the state after mining: ' + e);
   }
 
-  sp.on('equip', guard('after mining equip', () => {
-    if (!afterWaitEquip) { return; }
+  sp.on('equip', guard('after mining equip', (e) => {
+    if (!afterWaitEquip || !afterMine(e)) { return; }
     afterWaitEquip = false;
     afterAsked.push(['after the next equip', Date.now() + 200]);
   }));
-  sp.on('unequip', guard('after mining unequip', () => {
-    if (!afterEnded || afterWaitEquip) { return; }
+  sp.on('unequip', guard('after mining unequip', (e) => {
+    if (!afterEnded || afterWaitEquip || !afterMine(e)) { return; }
     afterAsked.push(['after the next unequip', Date.now() + 200]);
     afterEnded = 0;
   }));
