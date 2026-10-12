@@ -713,7 +713,9 @@ namespace Thornswood
                     // menu crashed"). Only the one this session wrote, because
                     // that folder keeps every crash there has ever been. Second
                     // in the list, so a set too big for the site loses the
-                    // everyday logs before it loses this one.
+                    // everyday logs before it loses this one. Sent with a
+                    // first line naming it, its size and the snapshot beside
+                    // it, so an empty one still arrives (CrashLogText, #2319).
                     new string[] { "crash.log",                  CrashLogSince(Files.SkseLogDir, PendingSince(PendingFile, session)) },
                     new string[] { "thornswood-front.log",       Path.Combine(plat, "thornswood-front.log") },
                     new string[] { "thornswood-voice.log",       Path.Combine(plat, "thornswood-voice.log") },
@@ -740,7 +742,7 @@ namespace Thornswood
                 int n = 0;
                 for (int i = 0; i < want.Length; i++)
                 {
-                    string text = Scrub(ReadLogTail(want[i][1]));
+                    string text = Scrub(want[i][0] == "crash.log" ? CrashLogText(want[i][1]) : ReadLogTail(want[i][1]));
                     if (text.Length == 0) continue;
                     string one = "\"" + Escape(want[i][0]) + "\":\"" + Escape(text) + "\"";
                     // Past what the site reads it drops the connection, and
@@ -950,6 +952,58 @@ namespace Thornswood
                 return best;
             }
             catch { return ""; }
+        }
+
+        /// <summary>
+        /// This session's crash log as it is sent: a first line from the
+        /// launcher naming the log, its size and the full crash snapshot
+        /// beside it, then the log's tail. "" when there is no crash log.
+        ///
+        /// WHY THE FIRST LINE (#2319). A crash that hangs inside the crash
+        /// handler leaves Crash Logger's log empty: the game's own logs stop
+        /// at the second the log is named for, and the game sits until it is
+        /// closed. Three dev crashes went that way between 29 Sep and 6 Oct.
+        /// ReadLogTail gives "" for an empty file and an empty log is never
+        /// sent, so those sessions reached the site with no crash.log, the
+        /// sessions page did not mark them and the staff channel heard
+        /// nothing. With this line the crash is in the set whatever the log
+        /// holds, and the site marks any session whose set has a crash.log,
+        /// which CrashLogSince only ever picks from this session.
+        /// </summary>
+        static string CrashLogText(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return "";
+            long bytes = -1;
+            string dump = Path.ChangeExtension(path, ".dmp");
+            long dumpBytes = -1;
+            try
+            {
+                if (File.Exists(path)) bytes = new FileInfo(path).Length;
+                if (File.Exists(dump)) dumpBytes = new FileInfo(dump).Length;
+            }
+            catch (Exception ex) { Swallow.Note("Discord.CrashLogText", ex); }
+            string head = CrashLogHead(Path.GetFileName(path), bytes, Path.GetFileName(dump), dumpBytes);
+            string tail = bytes > 0 ? ReadLogTail(path) : "";
+            return head + "\n" + tail;
+        }
+
+        /// <summary>
+        /// The launcher's first line on a crash log it sends. bytes and
+        /// dumpBytes are -1 when the file could not be read or is not there.
+        /// The site reads "is empty" in it as the crash with nothing in its
+        /// log (server.js, crashOf).
+        /// </summary>
+        static string CrashLogHead(string log, long bytes, string dump, long dumpBytes)
+        {
+            string s = "Sent by the launcher: this session crashed. Crash Logger's log of it is " + log;
+            if (bytes == 0) s += ", and it is empty: 0 bytes when the launcher read it, so nothing of the crash is in it.";
+            else if (bytes < 0) s += ", and it could not be read when the launcher read it.";
+            else s += ", " + bytes.ToString("N0", CultureInfo.InvariantCulture) + " bytes; what it says follows.";
+            if (dumpBytes >= 0)
+                s += " The full crash snapshot beside it is " + dump + ", " + dumpBytes.ToString("N0", CultureInfo.InvariantCulture) +
+                     " bytes; it stays on that PC.";
+            else s += " There is no crash snapshot beside it.";
+            return s;
         }
 
         /// <summary>
