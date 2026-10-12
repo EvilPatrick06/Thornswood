@@ -1,0 +1,172 @@
+<#
+  test-459-publish-dist.ps1
+
+      pwsh -NoProfile -File .\tests\test-459-publish-dist.ps1
+
+  Publish-Server.ps1 names the built server it packs (#459, the same defect
+  #2309 found in Deploy-DevGamemode -LoadOrder). The deploys run only from a
+  clean checkout at origin (#2118), which on the shipping machine is a fresh
+  worktree, and a fresh worktree has no engine build. Publish-Server's -Dist
+  defaulted to Where.ps1 ServerDist inside that checkout, so from the one
+  place the guard lets it run it skipped the gamemode copy and the start
+  point check without a word and stopped inside Export-ServerPayload with
+  "server dist not found", naming neither -Dist nor the build the record
+  wants. And the default was worked out in the parameter block, where
+  Windows PowerShell 5.1 leaves $PSScriptRoot empty (#2229).
+
+  A publish needs a built server, so -Dist stays: left out it is the
+  checkout's own engine build and never another folder, and with no build
+  there the publish stops before anything is copied, built or sent, saying
+  how to name one.
+
+  HOW. A scratch git repository stands in for a fresh checkout: the scripts,
+  the records, layout.json and game\gamemode.js, committed, and no engine.
+  ssh and scp are stand-ins on PATH that only write down that they were
+  called, and the box is 127.0.0.1 with THORNSWOOD_HARNESS set, so the
+  freshness guard lets the scratch checkout be. It proves:
+    1. with no -Dist, from the fresh checkout, the publish stops naming the
+       checkout's own build folder, -Dist and the engine commit the record
+       names, before the gamemode artifact is built and with no ssh or scp;
+       the same under Windows PowerShell 5.1 when this machine has it;
+    2. -Dist naming no folder, or a folder with no server-settings.json, stops
+       the same way, naming that folder;
+    3. -Dist naming a built server goes past that stop, and a build that is
+       not the one records\server-build.json names is still refused before
+       anything is copied (the shared clone's build of another engine commit
+       is this case);
+    4. the parameter block works nothing out: -Dist and -Zip have no default.
+
+  Everything it writes is in its own temp folder. Nothing connects anywhere.
+#>
+$env:THORNSWOOD_HARNESS = '1'
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+$repo = Split-Path -Parent $Here
+
+$script:pass = 0; $script:fail = 0
+function Yes([string]$what, [bool]$cond) {
+    if ($cond) { $script:pass++; Write-Host "PASS  $what" }
+    else { $script:fail++; Write-Host "FAIL  $what" -ForegroundColor Red }
+}
+function Done {
+    Write-Host ''
+    Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
+    if ($script:fail) { exit 1 }
+    exit 0
+}
+$utf8 = New-Object Text.UTF8Encoding($false)
+function Put([string]$path, [string]$text) {
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $path) | Out-Null
+    [IO.File]::WriteAllText($path, $text, $utf8)
+}
+
+$Scratch = Join-Path ([IO.Path]::GetTempPath()) ('ts-459d-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+New-Item -ItemType Directory -Force -Path $Scratch | Out-Null
+$oldPath = $env:PATH; $oldLog = $env:TS_459D_CALLS
+try {
+    # ---- the fresh checkout: committed, no engine ---------------------------------------
+    $fresh = Join-Path $Scratch 'fresh'
+    New-Item -ItemType Directory -Force -Path $fresh | Out-Null
+    Copy-Item -LiteralPath (Join-Path $repo 'scripts') -Destination $fresh -Recurse -Force
+    Copy-Item -LiteralPath (Join-Path $repo 'records') -Destination $fresh -Recurse -Force
+    Copy-Item -LiteralPath (Join-Path $repo 'layout.json') -Destination (Join-Path $fresh 'layout.json') -Force
+    New-Item -ItemType Directory -Force -Path (Join-Path $fresh 'game') | Out-Null
+    Copy-Item -LiteralPath (Join-Path $repo 'game\gamemode.js') -Destination (Join-Path $fresh 'game\gamemode.js') -Force
+    $eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    try {
+        $null = & git -C $fresh init -q 2>&1
+        $null = & git -C $fresh -c core.autocrlf=false add -A 2>&1
+        $null = & git -C $fresh -c user.name=harness -c user.email=harness@harness.invalid -c commit.gpgsign=false commit -q -m 'the fresh checkout' 2>&1
+        $committed = ($LASTEXITCODE -eq 0)
+    } finally { $ErrorActionPreference = $eap }
+    Yes 'the scratch checkout is a committed git repository' $committed
+    if (-not $committed) { Done }
+    $publish = Join-Path $fresh 'scripts\release\Publish-Server.ps1'
+    $own = [string](& (Join-Path $fresh 'scripts\release\Where.ps1') ServerDist)
+    Yes ("it has no engine build: Where.ps1 ServerDist names {0}, which is not there" -f $own) (
+        $own.StartsWith($fresh, [StringComparison]::OrdinalIgnoreCase) -and -not (Test-Path -LiteralPath $own))
+    $recCommit = [string](([IO.File]::ReadAllText((Join-Path $fresh 'records\server-build.json')) | ConvertFrom-Json).source.commit)
+    $recShort = $recCommit.Substring(0, 8)
+
+    # ---- ssh and scp that only say they were called ---------------------------------------
+    $bin = Join-Path $Scratch 'bin'
+    $log = Join-Path $Scratch 'calls.txt'
+    $env:TS_459D_CALLS = $log
+    foreach ($t in 'ssh', 'scp') { Put (Join-Path $bin "$t.cmd") ("@echo $t %*>>""%TS_459D_CALLS%""`r`n@exit /b 0`r`n") }
+    $env:PATH = $bin + [IO.Path]::PathSeparator + $oldPath
+
+    function Run([string]$shell, [string[]]$more) {
+        if (Test-Path -LiteralPath $log) { Remove-Item -LiteralPath $log -Force }
+        $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+        try {
+            $out = (& $shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $publish -Channel dev -NoPause -VpsHost 127.0.0.1 -VpsUser harness @more 2>&1 | Out-String)
+            $code = $LASTEXITCODE
+        } finally { $ErrorActionPreference = $old }
+        $calls = @(if (Test-Path -LiteralPath $log) { Get-Content -LiteralPath $log | Where-Object { $_ } })
+        $out = $out -replace '\r?\n\s+\|\s+', ' '
+        return [pscustomobject]@{ Code = $code; Out = $out; Calls = $calls }
+    }
+    $artifacts = Join-Path $fresh 'out\deploys'
+
+    # ---- 1. no -Dist, from the fresh checkout -----------------------------------------------
+    $shells = @([pscustomobject]@{ Name = 'PowerShell 7'; Path = (Get-Process -Id $PID).Path })
+    $ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    if ($env:SystemRoot -and (Test-Path -LiteralPath $ps51) -and $shells[0].Path -ne $ps51) { $shells += [pscustomobject]@{ Name = 'Windows PowerShell 5.1'; Path = $ps51 } }
+    elseif ($shells[0].Path -eq $ps51) { $shells[0].Name = 'Windows PowerShell 5.1' }
+    foreach ($sh in $shells) {
+        Write-Host ''; Write-Host ("no -Dist, from the fresh checkout, under {0}" -f $sh.Name)
+        $r = Run $sh.Path @()
+        Yes '  stops with exit 1' ($r.Code -eq 1)
+        Yes '  naming the checkout''s own build folder' ($r.Out.Contains("there is no built server at $own"))
+        Yes ("  and saying to name the build with -Dist, held to engine {0}" -f $recShort) (
+            $r.Out.Contains('-Channel dev -Dist <the engine build''s dist\server>') -and $r.Out.Contains("(engine $recShort)") -and $r.Out.Contains('Nothing was built or sent'))
+        Yes '  before the gamemode artifact is built or the payload packed' (-not (Test-Path -LiteralPath $artifacts) -and $r.Out -notmatch 'gamemode artifact' -and $r.Out -notmatch 'Packing the payload')
+        Yes ("  with no ssh or scp ({0} calls)" -f $r.Calls.Count) ($r.Calls.Count -eq 0)
+        if ($r.Code -ne 1 -or -not $r.Out.Contains('there is no built server')) { Write-Host $r.Out }
+    }
+
+    # ---- 2. -Dist naming no build -------------------------------------------------------------
+    Write-Host ''; Write-Host '-Dist naming no build'
+    $none = Join-Path $Scratch 'no-build-here'
+    $r = Run $shells[0].Path @('-Dist', $none)
+    Yes 'a folder that is not there stops, naming it' ($r.Code -eq 1 -and $r.Out.Contains("there is no built server at $none") -and $r.Out.Contains('-Dist names the engine build') -and $r.Calls.Count -eq 0)
+    $empty = Join-Path $Scratch 'empty-build'
+    New-Item -ItemType Directory -Force -Path $empty | Out-Null
+    $r = Run $shells[0].Path @('-Dist', $empty)
+    Yes 'a folder with no server-settings.json stops, naming it' ($r.Code -eq 1 -and $r.Out.Contains("$empty holds no server-settings.json") -and $r.Calls.Count -eq 0)
+    Yes '  and nothing went into it' (@(Get-ChildItem -LiteralPath $empty -Force).Count -eq 0)
+
+    # ---- 3. -Dist naming a build that is not the recorded one ---------------------------------
+    Write-Host ''; Write-Host '-Dist naming a build of another engine commit'
+    $other = Join-Path $Scratch 'other-build\dist\server'
+    # One plugin, here, with a TES4 header that is not light, for the start point check to read.
+    $esm = Join-Path $Scratch 'plugins\Skyrim.esm'
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $esm) | Out-Null
+    [IO.File]::WriteAllBytes($esm, ([Text.Encoding]::ASCII.GetBytes('TES4') + [byte[]](0, 0, 0, 0, 1, 0, 0, 0)))
+    Put (Join-Path $other 'server-settings.json') ('{"port":7777,"name":"Thornswood","loadOrder":["' + $esm.Replace('\', '/') + '"],"startPoints":[{"worldOrCell":"0x3C","pos":[0,0,0],"angleZ":0}]}')
+    Put (Join-Path $other 'scam_native.node') 'a binary of another engine commit'
+    $r = Run $shells[0].Path @('-Dist', $other)
+    Yes 'goes past the stop, naming the build it packs' ($r.Out -notmatch 'there is no built server' -and $r.Out -match ('built server\s+' + [regex]::Escape($other)))
+    Yes '  and is refused as not the recorded build' ($r.Code -eq 1 -and $r.Out -match 'not the build' -and $r.Out -match 'Export-ServerPayload\.ps1 exited')
+    Yes ("  before anything is copied: no ssh or scp ({0} calls)" -f $r.Calls.Count) ($r.Calls.Count -eq 0 -and $r.Out -notmatch '(?m)^Copying')
+    if ($r.Code -ne 1 -or $r.Out -notmatch 'not the build') { Write-Host $r.Out }
+
+    # ---- 4. the parameter block ----------------------------------------------------------------
+    Write-Host ''; Write-Host 'the script'
+    $src = [IO.File]::ReadAllText((Join-Path $repo 'scripts\release\Publish-Server.ps1'))
+    $ast = [Management.Automation.Language.Parser]::ParseInput($src, [ref]$null, [ref]$null)
+    foreach ($name in 'Dist', 'Zip') {
+        $p = @($ast.ParamBlock.Parameters | Where-Object { $_.Name.VariablePath.UserPath -eq $name })
+        Yes ("-{0} has no default worked out in the parameter block" -f $name) ($p.Count -eq 1 -and ($null -eq $p[0].DefaultValue -or $p[0].DefaultValue.Extent.Text -eq "''"))
+    }
+    $guard = $src.IndexOf('# ------------------------------------------------------- the build it packs ---')
+    $artifactAt = $src.IndexOf('$artifact = New-ThornswoodArtifact')
+    Yes 'the stop comes before the gamemode artifact is built' ($guard -gt 0 -and $artifactAt -gt $guard)
+}
+finally {
+    $env:PATH = $oldPath; $env:TS_459D_CALLS = $oldLog
+    Remove-Item -LiteralPath $Scratch -Recurse -Force -ErrorAction SilentlyContinue
+}
+Done
