@@ -21,13 +21,23 @@
 # again after that append (Build-Launcher.ps1, "Do NOT sign setup-stub.exe").
 #
 # WHERE IT RUNS (#2163, Patrick's decisions of 12 Oct, relayed by Smeagle).
-# GitHub's hosted windows-latest by default, in the job "launcher" below,
-# the same image the build check (build.yml, build-pr.yml) proves green on
-# every pull request, including the MSBuild build of #498. The VPS is the
-# backup for every GitHub runner build, so "launcher-vps" picks a release up
-# on the box the same way build.yml does: when the repository variable
-# BUILD_RUNNER is vps, when a manual run asks for runner: vps, or when the
-# hosted job failed (a quota or billing stop fails it before any step runs).
+# Decided: GitHub's hosted windows-latest, in the job "launcher" below, the
+# same image the build check (build.yml, build-pr.yml) proves green on every
+# pull request, including the MSBuild build of #498, with the VPS as the
+# backup ("launcher-vps"). UNTIL THE SWITCH-OVER the box still builds every
+# release, as it has since #676: a tag push and a manual run that does not
+# ask otherwise skip the hosted job, and "launcher-vps" builds it. The hosted
+# job runs only on a manual run with runner: hosted, which is how the pilot
+# proves it. It cannot be proven while GitHub refuses hosted jobs on billing
+# (#2393), and no launcher built by MSBuild has been started on dev yet
+# (#498, its step 2). Once both are done and a hosted run has drafted a
+# signed launcher that the "verify" job passed, the switch-over is one change
+# here: the hosted job's "if" becomes vars.BUILD_RUNNER != 'vps' &&
+# inputs.runner != 'vps', and the runner input's default becomes hosted, so
+# the box picks a release up the way build.yml does (BUILD_RUNNER is vps, a
+# manual run asks for the box, or the hosted job failed, as a quota or
+# billing stop fails it before any step runs). tests\test-release-workflow.ps1
+# says which side of the switch-over this file is on.
 #
 # HOW IT BUILDS (#498, Patrick's option C). On GitHub's runner the launcher
 # and setup program are built by MSBuild from launcher\app\Thornswood.csproj
@@ -44,9 +54,25 @@
 # -Required signs with the ThornswoodRelease profile, the same script and
 # profile Ship uses, with Microsoft's signing client fetched at the version
 # and sha256 Setup-ShipMachine.ps1 pins. A signing failure fails the job and
-# no draft gets the file. The VPS fallback has no identity and no signing
-# client: its draft is unsigned and says so in its notes, and Ship signs the
-# download on One the way it did before (#921).
+# no draft gets the file. The VPS job has no identity and no signing client:
+# its draft is unsigned and says so in its notes, and Ship signs the download
+# on One the way it did before (#921).
+#
+# CHECKED ON A SECOND MACHINE (#2163, "a clean machine verifies"). When the
+# hosted job drafted a signed launcher, the "verify" job downloads the draft's
+# files onto a VPS runner, which holds no signing setup at all, and runs
+# scripts\release\Test-ReleaseFiles.ps1 -RequireSigned: each file against
+# SHA256SUMS, then the publish gate and the launcher's own Signature.cs on the
+# launcher. A red verify means the draft must not be shipped.
+#
+# ONE DRAFT PER TAG. GET /releases/tags/<tag> never returns a draft (measured
+# 12 Oct: it answered 404 for v1.2.4 while release 410844061 was its draft),
+# so a run that looked there made a second draft every time a tag was built
+# again; v1.1.96 has two. The draft step reads the releases list, which does
+# hold drafts, uploads into the one draft the tag has, and stops when the tag
+# has more than one release or its release is already published (a new build
+# is a new tag, never a replaced asset). The concurrency group is the tag, so
+# a tag push and a manual run for the same tag queue instead of racing.
 #
 # WHY IT IS PINNED. Every action is pinned to a full-length commit SHA: a
 # moved tag on an action cannot change what runs.
@@ -56,9 +82,11 @@ on:
     tags:
       - 'v*'
   # So the exe can be rebuilt for a tag that already exists without moving it,
-  # for a first trial or a runner that died halfway. Run it on the tag
-  # (gh workflow run release.yml --ref v<version> -f tag=v<version>) for a
-  # signed draft; a manual run from main builds on GitHub's runner unsigned.
+  # for a first trial or a runner that died halfway. A signed draft needs the
+  # run started on the tag itself, because only a refs/tags/v ref gets the
+  # signing identity:
+  #   gh workflow run release.yml --ref v<version> -f tag=v<version> -f runner=hosted
+  # A hosted run started from a branch builds on GitHub's runner unsigned.
   workflow_dispatch:
     inputs:
       tag:
@@ -69,26 +97,29 @@ on:
         required: false
         default: ''
       runner:
-        description: 'hosted (GitHub, the default) or vps (the box, the fallback)'
+        description: 'vps (the box, the default until the switch-over) or hosted (GitHub, built with MSBuild and signed on a tag ref)'
         type: choice
-        options: [hosted, vps]
-        default: hosted
+        options: [vps, hosted]
+        default: vps
 # The draft release is created with the repository token, which needs write.
 # The hosted job adds id-token: write for itself only.
 permissions:
   contents: write
-# One run per tag. A release build is not cancelled by a newer one: two pushes
-# of the same tag queue rather than race for the one draft.
+# One run per TAG, whichever way it was started. A release build is not
+# cancelled by a newer one: a tag push and a manual run for the same tag
+# queue rather than race for the one draft. Keyed on github.ref, as it was,
+# a manual run from main and the tag's own push were two groups, which is how
+# v1.1.96 got two drafts in the same second.
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
   cancel-in-progress: false
 jobs:
-  # The default: GitHub's hosted Windows runner (#2163). Skipped when
-  # BUILD_RUNNER is vps or a manual run asked for the box, and then the
-  # fallback below runs instead.
+  # GitHub's hosted Windows runner (#2163). Until the switch-over (header,
+  # WHERE IT RUNS) it runs only when a manual run asks for runner: hosted;
+  # otherwise it is skipped and the VPS job below builds the release.
   launcher:
     name: Build the release launcher
-    if: ${{ vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}
+    if: ${{ inputs.runner == 'hosted' }}
     runs-on: windows-latest
     # The "release" environment only on a v tag: its subject is what the Azure
     # federated credential trusts, and its deployment rule allows v* tags only.
@@ -96,6 +127,11 @@ jobs:
     permissions:
       contents: write
       id-token: write
+    # What the "verify" job needs to find the draft and check it.
+    outputs:
+      release_id: ${{ steps.draft.outputs.release_id }}
+      commit: ${{ steps.tag.outputs.commit }}
+      signed: ${{ steps.draft.outputs.signed }}
     # The build is a few minutes; past this it is stuck, not slow.
     timeout-minutes: 30
     steps: &release
@@ -160,24 +196,14 @@ jobs:
           if (-not (Test-Path 'out\setup-stub.exe')) { Write-Host '::error::no setup-stub.exe came out of the build'; exit 1 }
 
       # SIGNING (#2163 section 8): GitHub's runner, a v tag, nothing else.
-      # The ids are not secrets (they name the app registration, the tenant
-      # and the subscription, and grant nothing without the federated
-      # credential), so they are repository variables Patrick sets.
-      - name: Sign in to Azure with the release identity (OIDC, no secret)
-        if: ${{ runner.environment == 'github-hosted' && startsWith(github.ref, 'refs/tags/v') }}
-        uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2.3.1
-        with:
-          client-id: ${{ vars.AZURE_SIGNING_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_SIGNING_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SIGNING_SUBSCRIPTION_ID }}
-
-      - name: Sign the launcher with ThornswoodRelease
+      # Microsoft's signing client comes first, at the version and sha256
+      # Setup-ShipMachine.ps1 pins, lifted out of it by the parser so the pin
+      # lives in one place; nothing is unpacked unless the bytes match. It is
+      # fetched before the Azure sign in so the sign in is used straight away.
+      - name: Fetch the signing client Setup-ShipMachine.ps1 pins
         if: ${{ runner.environment == 'github-hosted' && startsWith(github.ref, 'refs/tags/v') }}
         shell: pwsh
         run: |
-          # Microsoft's signing client at the version and sha256
-          # Setup-ShipMachine.ps1 pins, lifted out of it by the parser so the
-          # pin lives in one place. Nothing is unpacked unless the bytes match.
           $src = [IO.File]::ReadAllText((Resolve-Path 'scripts\release\Setup-ShipMachine.ps1'))
           $t = $null; $e = $null
           $ast = [System.Management.Automation.Language.Parser]::ParseInput($src, [ref]$t, [ref]$e)
@@ -192,6 +218,22 @@ jobs:
           # signing.json from the tracked template: paths only, no key. It is
           # gitignored and lives on this runner for this job only.
           Copy-Item -LiteralPath 'records\signing\signing.template.json' -Destination 'records\signing\signing.json' -Force
+
+      # The ids are not secrets (they name the app registration, the tenant
+      # and the subscription, and grant nothing without the federated
+      # credential), so they are repository variables Patrick set on 12 Oct.
+      - name: Sign in to Azure with the release identity (OIDC, no secret)
+        if: ${{ runner.environment == 'github-hosted' && startsWith(github.ref, 'refs/tags/v') }}
+        uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2.3.1
+        with:
+          client-id: ${{ vars.AZURE_SIGNING_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_SIGNING_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SIGNING_SUBSCRIPTION_ID }}
+
+      - name: Sign the launcher with ThornswoodRelease
+        if: ${{ runner.environment == 'github-hosted' && startsWith(github.ref, 'refs/tags/v') }}
+        shell: pwsh
+        run: |
           $exe = Join-Path $env:RUNNER_TEMP 'Thornswood\Launcher\Thornswood.exe'
           & .\scripts\release\Sign-Artifact.ps1 -Path $exe -Required
           if ($LASTEXITCODE -ne 0) { Write-Host '::error::signing failed; no draft gets this exe'; exit 1 }
@@ -219,6 +261,7 @@ jobs:
           Set-Content -LiteralPath (Join-Path $out 'SHA256SUMS') -Value $lines -Encoding ascii
 
       - name: Draft a release with the exe, the setup program and their checksums
+        id: draft
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -235,14 +278,13 @@ jobs:
           $stub = Join-Path $out 'setup-stub.exe'
           $sums = Join-Path $out 'SHA256SUMS'
           $signed = (Get-AuthenticodeSignature -LiteralPath $exe).Status -eq 'Valid'
-          $how = 'built on the VPS fallback runner with the in-box csc, UNSIGNED: Ship signs it on download (#921)'
+          $how = 'built on the VPS runner with the in-box csc, UNSIGNED: Ship signs it on download (#921)'
           if ($env:RUNNER_KIND -eq 'github-hosted') { $how = 'built on GitHub''s runner with MSBuild (#498)' }
           if ($signed) { $how += ', the launcher signed by ThornswoodRelease (#2163)' }
           elseif ($env:RUNNER_KIND -eq 'github-hosted') { $how += ', UNSIGNED (not a v tag ref): Ship signs it on download (#921)' }
           $notes = "Launcher exe and setup program for $tag, $how, and verified by SHA256SUMS. Ship downloads these and checks the checksums instead of compiling the shipped binaries (issues #457 and #932).`n`nSource for the SkyMP files Thornswood ships: https://thornswood.net/credits#source"
           # A draft: a person promotes it, and Ship reads a draft's assets. If a
-          # run for this tag already made the release, upload into it instead,
-          # the same fallback Publish-Update.ps1 uses.
+          # run for this tag already made the draft, upload into it instead.
           # Use the GitHub REST API directly; the dedicated runner does not
           # require the GitHub CLI to be installed on its PATH.
           $repo = $env:GITHUB_REPOSITORY
@@ -252,11 +294,29 @@ jobs:
             Accept = 'application/vnd.github+json'
             'X-GitHub-Api-Version' = '2022-11-28'
           }
+          # The releases list, not /releases/tags/<tag>: only the list holds
+          # drafts (header, ONE DRAFT PER TAG). Newest first, a page at a time,
+          # until a short page says there is no more.
+          $same = @()
+          for ($page = 1; $page -le 50; $page++) {
+            # Through ForEach-Object so the page is one release per item whether
+            # or not this PowerShell unrolled the JSON array itself.
+            $batch = @(Invoke-RestMethod -Method Get -Uri "$api/releases?per_page=100&page=$page" -Headers $headers -ErrorAction Stop | ForEach-Object { $_ })
+            $same += @($batch | Where-Object { $_.tag_name -eq $tag })
+            if ($batch.Count -lt 100) { break }
+          }
+          if ($same.Count -gt 1) {
+            Write-Host ("::error::tag $tag already has {0} releases ({1}). Delete the ones that are not wanted, then run this again: gh api -X DELETE repos/$repo/releases/<id>" -f $same.Count, (($same | ForEach-Object { [string]$_.id }) -join ', '))
+            exit 1
+          }
           $release = $null
-          try {
-            $release = Invoke-RestMethod -Method Get -Uri "$api/releases/tags/$tag" -Headers $headers -ErrorAction Stop
-          } catch {
-            if ($_.Exception.Response.StatusCode.value__ -ne 404) { throw }
+          if ($same.Count -eq 1) {
+            $release = $same[0]
+            if (-not $release.draft) {
+              Write-Host "::error::the release for $tag ($($release.id)) is already published, and a published release's files are never replaced (docs\SIGNED-RELEASES.md section 6). A new build is a new tag."
+              exit 1
+            }
+            Write-Host ("uploading into the draft {0} that tag {1} already has" -f $release.id, $tag)
           }
           if (-not $release) {
             $payload = @{
@@ -279,11 +339,15 @@ jobs:
             $uploadUri = "https://uploads.github.com/repos/$repo/releases/$($release.id)/assets?name=$encodedName"
             Invoke-RestMethod -Method Post -Uri $uploadUri -Headers $headers -ContentType 'application/octet-stream' -InFile $asset -ErrorAction Stop | Out-Null
           }
+          Write-Host ("draft {0} for {1} holds Thornswood.exe ({2}), setup-stub.exe and SHA256SUMS" -f $release.id, $tag, $(if ($signed) { 'signed' } else { 'unsigned' }))
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("release_id=" + $release.id)
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("signed=" + $(if ($signed) { 'true' } else { 'false' }))
 
-  # The VPS FALLBACK, the same way build.yml has it (#1306, #2163). It runs
-  # only when
-  #   - the repository variable BUILD_RUNNER is vps, or
-  #   - a manual run asked for runner: vps, or
+  # THE VPS JOB, today's release build and, after the switch-over, the backup
+  # the same way build.yml has it (#1306, #2163). It runs whenever the hosted
+  # job did not succeed and the run was not cancelled:
+  #   - until the switch-over, every tag push and every manual run that did
+  #     not ask for runner: hosted, because the hosted job is skipped;
   #   - the hosted job failed (a quota or billing stop fails it before any
   #     step runs). A real red fails here too; that is the price of not
   #     telling a quota stop from a build failure.
@@ -292,7 +356,7 @@ jobs:
   # the YAML anchor, so the two cannot drift; the MSBuild build and the
   # signing are the hosted-only parts, said by runner.environment above.
   launcher-vps:
-    name: Build the release launcher (VPS fallback)
+    name: Build the release launcher (VPS)
     needs: launcher
     if: ${{ !cancelled() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}
     runs-on: [self-hosted, Windows, X64, thornswood-vps]
@@ -301,3 +365,50 @@ jobs:
     # The build is about two minutes; past this it is stuck, not slow.
     timeout-minutes: 20
     steps: *release
+
+  # A SECOND MACHINE CHECKS THE SIGNED DRAFT (#2163). Only after the hosted
+  # job drafted a signed launcher. A VPS runner holds no signing client, no
+  # signing.json and no Azure sign in, so what it accepts it accepts on the
+  # files alone, the way an installed launcher does. contents: write only
+  # because a draft release is visible to nobody without push access.
+  verify:
+    name: Check the signed draft on a second machine (VPS)
+    needs: launcher
+    if: ${{ needs.launcher.result == 'success' && needs.launcher.outputs.signed == 'true' }}
+    runs-on: [self-hosted, Windows, X64, thornswood-vps]
+    permissions:
+      contents: write
+    timeout-minutes: 10
+    steps:
+      - name: Check out the commit the draft was built from
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.launcher.outputs.commit }}
+          clean: true
+          submodules: false
+
+      - name: Download the draft's files and check them
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ needs.launcher.outputs.release_id }}
+        run: |
+          if ($env:RELEASE_ID -notmatch '^[0-9]+$') { Write-Host '::error::the hosted job gave no release id'; exit 1 }
+          $repo = $env:GITHUB_REPOSITORY
+          $api = "https://api.github.com/repos/$repo"
+          $headers = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
+          $release = Invoke-RestMethod -Method Get -Uri "$api/releases/$($env:RELEASE_ID)" -Headers $headers -ErrorAction Stop
+          $dir = Join-Path $env:RUNNER_TEMP 'draft'
+          if (Test-Path -LiteralPath $dir) { Remove-Item -LiteralPath $dir -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          # Each file by its asset id, as bytes: the octet-stream answer is a
+          # redirect to the file, and PowerShell 7 drops the token on it.
+          $bin = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/octet-stream'; 'X-GitHub-Api-Version' = '2022-11-28' }
+          foreach ($n in 'Thornswood.exe', 'setup-stub.exe', 'SHA256SUMS') {
+            $a = @($release.assets | Where-Object { $_.name -eq $n })
+            if ($a.Count -ne 1) { Write-Host ("::error::draft {0} has {1} files named {2}" -f $env:RELEASE_ID, $a.Count, $n); exit 1 }
+            $ProgressPreference = 'SilentlyContinue'
+            Invoke-WebRequest -Uri "$api/releases/assets/$($a[0].id)" -Headers $bin -OutFile (Join-Path $dir $n) -UseBasicParsing -ErrorAction Stop
+          }
+          & .\scripts\release\Test-ReleaseFiles.ps1 -Dir $dir -RequireSigned
+          if ($LASTEXITCODE -ne 0) { Write-Host "::error::draft $($env:RELEASE_ID) did not pass on a second machine; do not ship it"; exit 1 }
