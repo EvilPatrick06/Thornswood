@@ -151,6 +151,8 @@ if ($Dev -and -not (Test-Path (Join-Path $Root 'Launcher'))) {
 . (Join-Path $Here 'Release-Name.ps1')
 # Which dev notes main has not had: the DEV marks and mainVersion (Dev-News.ps1).
 . (Join-Path $Here 'Dev-News.ps1')
+# Which content plugin the channel's server holds (#2308, ServerContent.ps1).
+. (Join-Path $Here '..\deploy\ServerContent.ps1')
 if (-not $ReleaseDir) { $ReleaseDir = Get-FeedStoreDir $Channel }
 if (-not (Test-Path -LiteralPath $ReleaseDir)) { New-Item -ItemType Directory -Path $ReleaseDir -Force | Out-Null }
 $haveLocal = (Test-Path -LiteralPath (Join-Path $ReleaseDir 'version.json')) -and (Test-Path -LiteralPath (Join-Path $ReleaseDir 'published.json'))
@@ -966,6 +968,39 @@ if (-not $changed.Count -and -not $realRemoved -and -not $profileChanged.Count -
     Write-Host ''
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }; exit 2
 }
+
+# ==== thornswood content on the server first ====
+# THE SERVER GETS THE CONTENT PLUGIN FIRST, THEN THE SHIP (#2308).
+#
+# On 11 Oct dev 20261011-221215-dev sent clients a new Thornswood-Content.esp
+# (146,381 bytes), and Ship went on to post it, tell the dev server to restart
+# and push its tag, while the dev server still had the old one (146,446 bytes):
+# for eight minutes every dev client that updated held a plugin the server it
+# joined did not. Nothing here asked what the server held.
+#
+# So a release whose content plugin is not the one this channel's last release
+# carried (the baseline the diff above read, so "changes the plugin" is the
+# same question the pack answers) asks the channel's server which one it
+# holds, and goes on only when that is the same size and sha256. Anything else
+# stops here, before anything is packed, sent, posted or told to a server, and
+# names the command that sends the plugin there. A box that does not answer is
+# a refusal too. ServerContent.ps1 says why the box is read over ssh rather
+# than through the server's manifest. A dry run (-NoUpload -NoPush) asks the
+# same and stops the same, so it says what the real Ship would do.
+$contentChanged = @($changed | Where-Object { $_ -ieq $ThornswoodContentRel })
+if ($contentChanged.Count) {
+    Head 'The content plugin on the server'
+    $contentEntry = [string]$now[$contentChanged[0]]
+    $contentBox = $null
+    try { $contentBox = Read-ThornswoodServerContent -Channel $Channel }
+    catch { $contentBox = [pscustomobject]@{ Answered = $false; Bytes = [int64]-1; Sha = ''; Order = @(); OrderRead = $false; Said = @($_.Exception.Message) } }
+    $contentProblem = Get-ThornswoodContentShipProblem $Channel $contentEntry $contentBox
+    if ($contentProblem) {
+        Die ('Nothing was published, posted or told to a server: ' + $contentProblem)
+    }
+    Say ("  the {0} server already holds this release's {1} ({2:N0} bytes, the same sha256)" -f $Channel, $ThornswoodContentPlugin, $contentBox.Bytes) 'Green'
+}
+# ==== end thornswood content on the server first ====
 
 # The feed as received, for the ids it already uses (#1057).
 $feedNow = if (Test-Path -LiteralPath $VersionFile) { ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($VersionFile)) $VersionFile } else { $null }

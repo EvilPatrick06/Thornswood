@@ -206,9 +206,11 @@ manifests rather than treating an old server as finished.
 Prepare the local server with Deploy-Gamemode.ps1 -Vortex -NewOrder only when
 the full order is changing and a world migration is intended. With the same
 48-position order, use the explicit own-folder Data and plugin list instead.
-Deploy-DevGamemode.ps1 -LoadOrder updates Dev's gamemode and plugins on
-ports 7787/7788, preserving its own settings. Ship -Channel dev from Dev's own
-release folder and the committed source/build records.
+Deploy-DevGamemode.ps1 -LoadOrder updates Dev's gamemode and the plugins its
+own load order names on ports 7787/7788, preserving its own settings. When
+the order itself moves, add -Dist with the dist\server folder Deploy-Gamemode
+wrote, so that build's order is written over Dev's (#2309). Ship -Channel dev
+from Dev's own release folder and the committed source/build records.
 
 Check: Dev answers, its manifest matches, its generated record is current,
 and its feed serves every asset recorded in the new Dev release.
