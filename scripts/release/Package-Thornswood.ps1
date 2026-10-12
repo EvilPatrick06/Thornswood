@@ -64,7 +64,13 @@ param(
 )
 
 # A stale or dirty checkout sends old or unlanded code; refuse it (#2118).
-. (Join-Path $PSScriptRoot '..\deploy\Fresh-Checkout.ps1'); Assert-FreshCheckout -RepoDir (Join-Path $PSScriptRoot '..\..') -What 'Package-Thornswood' -AllowStale:$AllowStaleCheckout
+# The installer is a live release, so the branch rule is Ship's for a main
+# release, Test-FreshAnyBranch -Channel main (#2436): main, or a clean
+# hotfix/ branch that matches its own origin branch. Publish-Installer, which
+# this calls at the end, asks the same and is handed -AllowStaleCheckout.
+. (Join-Path $PSScriptRoot '..\deploy\Fresh-Checkout.ps1')
+$freshRepo = Join-Path $PSScriptRoot '..\..'
+Assert-FreshCheckout -RepoDir $freshRepo -What 'Package-Thornswood' -AnyBranch:(Test-FreshAnyBranch -RepoDir $freshRepo -Channel main) -AllowStale:$AllowStaleCheckout
 
 
 # The launcher, Thornswood.exe in the launcher folder.
@@ -1285,8 +1291,14 @@ if (-not $NoPublish) {
     Head 'Publishing to the site'
     $pub = Join-Path $PSScriptRoot 'Publish-Installer.ps1'
     if (Test-Path -LiteralPath $pub) {
+        # -AllowStaleCheckout goes on with it (#2436): without it, a run that
+        # had been let past the checkout check here was refused by the same
+        # check inside Publish-Installer, after the build.
+        $pubArgs = @{ OutDir = $OutDir }
+        if ($OneFile) { $pubArgs['OneFile'] = $true }
+        if ($AllowStaleCheckout) { $pubArgs['AllowStaleCheckout'] = $true }
         try {
-            if ($OneFile) { & $pub -OutDir $OutDir -OneFile } else { & $pub -OutDir $OutDir }
+            & $pub @pubArgs
         } catch {
             Say "  could not publish: $_" 'Yellow'
             Say '  The installer is still built and fine. Run' 'DarkGray'
