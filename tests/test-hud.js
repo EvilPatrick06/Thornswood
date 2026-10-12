@@ -181,31 +181,101 @@ if (hud) {
         !/opacity:0\.[0-7]/.test(el.innerHTML));
     yes('S3b it has a backing so it does not fight the scene',
         /background:rgba\(/.test(el.style.cssText));
-    const size = /font-size:(\d+)px/.exec(el.style.cssText);
-    yes('S3b and the text is big enough to read', !!size && Number(size[1]) >= 14);
+    /*
+      In the HUD's own pixels since #2247 (see S3c): 10 of them, which is
+      15px at 1920x1080. Under 14px at 1080p is what "too small" meant.
+    */
+    const size = /font-size:calc\((\d+(?:\.\d+)?) \* var\(--ts\)\)/.exec(el.style.cssText);
+    yes('S3b and the text is big enough to read at 1080p', !!size && Number(size[1]) * 1.5 >= 14);
   }
 
   /*
-    S3c: the size Patrick actually asked for.
+    S3c: SIZED BY THE HUD, AND CLEAR OF ITS BARS AT EVERY SCREEN (#2247).
 
-    23 September, looking at the 15px version: "The indicator area is still to
-    small it all needs to be like 1.5x the current size". 15 x 1.5 is 22, the
-    132px bar becomes 198 and the 19px icon becomes 28. Numbers, not
-    adjectives, so nobody can shrink it back by accident and call it readable.
+    Patrick asked on 23 September for everything 1.5x (22px text, 198px
+    bars, 28px icons), in screen pixels from the bottom left corner. Djinn on
+    26 September: "The survival UI box blocks the magicka bar. It needs to
+    be resized and moved." Four rows that size were about 514 by 193 pixels
+    at 1080p and covered the bars people see there.
+
+    Now the strip is sized in the HUD's own pixels, --ts, the screen's height
+    over 720 or its width over 1280, whichever is smaller, which is how the
+    game shows a 1280x720 menu whole (kShowAll). The bars below are measured
+    from the collection's files, in those same pixels (the note over CSS in
+    hudScript says where each number comes from):
+
+      TrueHUD's player widget, which hides the game's own bars: magicka,
+      health and stamina frames down to y 686.4, and the enchantment charge
+      meter, x 575 to 705, y 689 to 708.
+      SkyHUD's places for the game's own bars, if TrueHUD's widget is ever
+      off: y 602 to 640.
+
+    The strip is worked out from its own CSS at each screen and must not
+    touch any of them, and must stay on the screen.
   */
   {
     const r = run(made, { food: 100, drink: 100, rest: 100, temp: 50 }, {});
+    const css = r.made['ts-hud'].style.cssText;
+    const unit = /--ts:min\(0\.078125vw,0\.1388889vh\)/.test(css);
+    yes('S3c the unit is one pixel of the 1280x720 HUD, shown whole', unit);
+    const num = function (re) { const m = re.exec(css); return m ? Number(m[1]) : NaN; };
+    const L = num(/left:calc\(50vw - (\d+(?:\.\d+)?) \* var\(--ts\)\)/);
+    const B = num(/bottom:calc\(50vh - (\d+(?:\.\d+)?) \* var\(--ts\)\)/);
+    const W = num(/width:calc\((\d+(?:\.\d+)?) \* var\(--ts\)\)/);
+    const H = num(/height:calc\((\d+(?:\.\d+)?) \* var\(--ts\)\)/);
+    yes('S3c it is placed and sized only in those units (left, bottom, width, height)',
+        [L, B, W, H].every(function (v) { return isFinite(v) && v > 0; }) &&
+        /box-sizing:border-box/.test(css) && !/\btop:|\bright:/.test(css));
+    // Every box in the HUD's pixels: [x1, x2, y1, y2].
+    const BARS = {
+      'TrueHUD magicka': [64.5, 349.5, 667.2, 686.4],
+      'TrueHUD health': [497.5, 782.5, 667.2, 686.4],
+      'TrueHUD stamina': [930.5, 1215.5, 667.2, 686.4],
+      'TrueHUD charge meter': [575, 705, 689, 708],
+      'SkyHUD magicka': [117.9, 410.7, 610.8, 640.0],
+      'SkyHUD health': [393.9, 886.1, 617.5, 637.2],
+      'SkyHUD stamina': [870.3, 1163.1, 610.4, 639.8],
+      'SkyHUD charge meter': [137.0, 392.2, 602.9, 615.9]
+    };
+    const SCREENS = [[1280, 720], [1366, 768], [1600, 900], [1920, 1080], [2560, 1440], [3840, 2160],
+                     [1920, 1200], [2560, 1600], [2560, 1080], [3440, 1440], [1280, 1024]];
+    const hits = [];
+    SCREENS.forEach(function (sc) {
+      const vw = sc[0], vh = sc[1];
+      const s = Math.min(vw / 1280, vh / 720);
+      const ox = (vw - 1280 * s) / 2, oy = (vh - 720 * s) / 2;
+      // The strip on the screen, from its own CSS.
+      const x1 = vw / 2 - L * s, x2 = x1 + W * s;
+      const y2 = vh - (vh / 2 - B * s), y1 = y2 - H * s;
+      if (x1 < 0 || y1 < 0 || x2 > vw || y2 > vh) { hits.push(vw + 'x' + vh + ' off the screen'); }
+      Object.keys(BARS).forEach(function (k) {
+        const b = BARS[k];
+        const bx1 = ox + b[0] * s, bx2 = ox + b[1] * s, by1 = oy + b[2] * s, by2 = oy + b[3] * s;
+        if (x1 < bx2 && bx1 < x2 && y1 < by2 && by1 < y2) { hits.push(vw + 'x' + vh + ' ' + k); }
+      });
+    });
+    yes('S3c the strip clears every bar at ' + SCREENS.length + ' screens' +
+        (hits.length ? ': not ' + hits.join(', ') : ''), hits.length === 0 && isFinite(L));
+    yes('S3c and it covers less of the screen than the box that covered the magicka bar (514 by 193 at 1080p)',
+        (W * 1.5) * (H * 1.5) < 514 * 193 / 2 && H * 1.5 < 193 / 4);
+  }
+
+  // S3d: what is inside fits the strip: every row's widths and gaps, added
+  // up from the markup, within the strip less its padding and border.
+  {
+    const r = run(made, { food: 8, drink: 100, rest: 100, temp: 8 }, {});
     const el = r.made['ts-hud'];
-    const size = /font-size:(\d+)px/.exec(el.style.cssText);
-    yes('S3c the text is the asked for 1.5x, not the old 15px',
-        !!size && Number(size[1]) >= 22);
-    const bar = /width:(\d+)px;height:(\d+)px/.exec(el.innerHTML);
-    yes('S3c the bars grew with it', !!bar && Number(bar[1]) >= 198 && Number(bar[2]) >= 16);
-    const icon = /<svg width="(\d+)"/.exec(el.innerHTML);
-    yes('S3c and so did the icons', !!icon && Number(icon[1]) >= 28);
-    // The panel has to grow too, or bigger text inside the same box overflows.
-    const pad = /padding:(\d+)px/.exec(el.style.cssText);
-    yes('S3c the panel behind it grew as well', !!pad && Number(pad[1]) >= 13);
+    const css = el.style.cssText;
+    const W = Number((/width:calc\((\d+(?:\.\d+)?) \* var\(--ts\)\)/.exec(css) || [])[1]);
+    const pad = Number((/padding:0 calc\((\d+(?:\.\d+)?) \* var\(--ts\)\)/.exec(css) || [])[1]);
+    const bord = Number((/border:calc\((\d+(?:\.\d+)?) \* var\(--ts\)\)/.exec(css) || [])[1]);
+    let used = 0;
+    el.innerHTML.replace(/(?:^|[;"])(?:width|margin-right|margin-left):calc\((\d+(?:\.\d+)?) \* var\(--ts\)\)/g,
+      function (all, n) { used += Number(n); return all; });
+    el.innerHTML.replace(/margin:0 calc\((\d+(?:\.\d+)?) \* var\(--ts\)\)/g,
+      function (all, n) { used += 2 * Number(n); return all; });
+    yes('S3d the four rows (' + used + ') fit inside the strip (' + (W - 2 * pad - 2 * bord) + ')',
+        used > 0 && isFinite(W) && used <= W - 2 * pad - 2 * bord);
   }
 
   // S4: THE PER-FRAME GUARD. updateOwner runs every frame; this is what stops
