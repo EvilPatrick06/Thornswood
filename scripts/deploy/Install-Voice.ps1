@@ -182,16 +182,23 @@ try { `$h = Invoke-RestMethod 'http://127.0.0.1:$Port/health' -TimeoutSec 5; `$t
   on the service's command line as THORNSWOOD_VOICE_MOST. With no voice
   number in the record the service is started without one, which is no cap,
   and this says so.
+
+  Dev voice, C:\Thornswood-Voice-Dev (the folder every dev install names,
+  docs\SYSTEM.md), takes the dev server's numbers, the record's dev object;
+  any other folder is the live service and takes main's (Patrick, 12 Oct:
+  dev voice at most 5).
 #>
 . (Join-Path $Here 'MaxOnline.ps1')
 $mostSet = ''
+$voiceChannel = $(if ($Root.TrimEnd('\') -eq 'C:\Thornswood-Voice-Dev') { 'dev' } else { 'main' })
 if (-not $PutBack -and -not $Remove -and -not $Restart) {
-    try { $mostGot = Get-MostOnline } catch { Die $_.Exception.Message }
+    try { $mostGot = Get-MostOnline -Channel $voiceChannel } catch { Die $_.Exception.Message }
+    if ($mostGot.Note) { Say ("  " + $mostGot.Note) 'Yellow' }
     if ($mostGot.Voice -gt 0) {
         $mostSet = "set THORNSWOOD_VOICE_MOST=$([int]$mostGot.Voice)&& "
-        Say ("  most people at once: {0}, from {1}" -f $mostGot.Voice, $mostGot.From) 'DarkGray'
+        Say ("  most people at once: {0}, the {1} numbers, from {2}" -f $mostGot.Voice, $voiceChannel, $mostGot.From) 'DarkGray'
     } else {
-        Say ("  {0} gives no voice number, so the service takes everybody who comes" -f $mostGot.From) 'Yellow'
+        Say ("  {0} gives no {1} voice number, so the service takes everybody who comes" -f $mostGot.From, $voiceChannel) 'Yellow'
     }
 }
 
