@@ -688,7 +688,9 @@ function Test-KeepFeedLauncher($pub, [string]$inputs, [string]$current, [bool]$d
 # fingerprint: a number either feed already offers with a launcher built from
 # other sources is refused (#2347), because the launcher updates by number
 # alone and nobody on that number would ever be offered this one. Publish-Update
-# used to say so only once the launcher was built, signed and sent.
+# used to say so only once the launcher was built, signed and sent; it now
+# refuses the same case itself before anything is sent. A main Ship asks this
+# too, with main's feed alone and $aligned, since main's number is main's own.
 function Assert-DevVersionSelection([string]$selected, [string]$current, [bool]$aligned, [string[]]$published, [object[]]$launchers = @(), [string]$inputs = '') {
     if ($aligned -and $selected -ne $current) {
         Die "Main-equivalent source ships $current in both channels. Use a separate branch for a different Dev version."
@@ -1206,6 +1208,15 @@ if ($Dev -and -not $ModsOnly) {
         if ($liveLauncher -and $liveLauncher.Version) { $publishedVersions += $liveLauncher.Version; $liveLaunchers += $liveLauncher }
     }
     Assert-DevVersionSelection $target $current $MainEquivalent $publishedVersions $liveLaunchers $LauncherInputs
+}
+# A main Ship that would sign CI's exe again for the number main's feed already
+# offers, built from other sources (#2347): nobody on that number would be
+# offered it, so it stops here, before the exe is fetched or signed, in the
+# same terms as the dev case. The same sources, or no launcher (-ModsOnly, or
+# kept above), go on. Main's own number only, so no dev number is read.
+if (-not $Dev -and -not $ModsOnly) {
+    $mainNow = Get-PublishedLauncher $ReleaseDir 'main'
+    if ($mainNow -and $mainNow.Version) { Assert-DevVersionSelection $target $current $true @() @($mainNow) $LauncherInputs }
 }
 
 if ($target -ne $current) {

@@ -413,10 +413,14 @@ const DOCS = {
 };
 
 /* Boards. A board is sections, each section a table with its own columns, so
-   a column can be added to one without touching the rest. */
+   a column can be added to one without touching the rest.
+
+   No Known Issues board (#2414). /known is data/known.md and nothing else.
+   A board copy stayed here after the hub stopped editing boards (#433),
+   nothing showed it and nothing could edit it, and it went stale: it still
+   said NPCs stand still with nobody near after #504. One copy, the page. */
 const BOARDS = {
   active:      'Active Issues',
-  known:       'Known Issues',
   roadmap:     'Roadmap',
   suggestions: 'Suggestions',
   archive:     'Archive',
@@ -1455,6 +1459,35 @@ const KIND = {
   '.md':'text/plain; charset=utf-8', '.cfg':'text/plain; charset=utf-8'
 };
 
+/*
+  Deleting an upload, said truthfully (#2352, #2354). Both doors that delete a
+  file used to catch the failure and answer ok, so a picture somebody asked
+  to have removed could stay on disk with staff told it had gone. This
+  answers { ok } or { ok: false, code } and writes one line to the site's
+  log for a failure: the file's name and the error code, never what it holds.
+  A file already gone is gone, which is what was asked.
+*/
+function deleteUpload(name) {
+  const file = path.join(UP, String(name));
+  if (!file.startsWith(UP + path.sep)) return { ok: false, code: 'BADNAME' };
+  try {
+    fs.unlinkSync(file);
+    return { ok: true };
+  } catch (e) {
+    const code = (e && e.code) || 'unknown';
+    if (code === 'ENOENT') return { ok: true };
+    retentionSay('gallery', { event: 'delete-failed', file: String(name), code: code });
+    return { ok: false, code: code };
+  }
+}
+
+/* A gallery submission staff removed and whose file stayed on disk: marked
+   on uploads.json by DELETE /api/gallery/approved, and never served again. */
+function uploadRemoved(name) {
+  const m = jsonFile(UPMETA, {})[String(name)];
+  return !!(m && m.removed);
+}
+
 function listUploads() {
   const meta = jsonFile(UPMETA, {});
   const out = [];
@@ -1470,6 +1503,7 @@ function listUploads() {
     out.push({
       name, size: st.size, at: m.at || st.mtimeMs,
       orig: m.orig || name, by: m.by || '', note: m.note || '',
+      removed: !!m.removed,
       image: /^image\//.test(KIND[ext] || ''),
       text: (KIND[ext] || '').indexOf('text/') === 0
     });
@@ -2756,7 +2790,12 @@ function noteSignIn(req, me, st, back) {
       roles: Array.isArray(st.roles) ? st.roles.slice(0, 12) : [],
       ip: requestAddr(req)
     });
-    putJson(ATTEMPTS, freshSignIns(rows, Date.now()));
+    // A write that fails leaves rows past thirty days in the file, so it is
+    // said rather than dropped (#2354): the count, never what they hold.
+    const kept = freshSignIns(rows, Date.now());
+    if (!putJson(ATTEMPTS, kept)) {
+      retentionSay('signin', { event: 'write-failed', rows: rows.length, kept: kept.length });
+    }
   } catch (e) { }
 }
 
@@ -2930,22 +2969,54 @@ function putSessionLogs(key, who, logs) {
   on a public server that is weeks. A row marked kept is never pruned, so
   anything an argument rests on can be held indefinitely by marking it.
 */
+/*
+  A LOG SET THAT WILL NOT GO IS SAID (#2354). Each delete that fails used to
+  be caught and dropped, and the whole prune was wrapped twice more, so a set
+  past SLOG_DAYS that would not delete stayed with nothing said, against what
+  site/data/site/privacy.md promises. Now each failure is one line in the
+  site's log, the file's name and the error code and never what it holds,
+  the same shape the voice service's chat days use (#2191), and the answer
+  says how many went and which would not, for the harness.
+*/
+function retentionSay(what, o) {
+  try { console.error('[thornswood-docs] ' + what + '-retention ' + JSON.stringify(o)); } catch (e) { }
+}
 function pruneSessionLogs() {
+  const out = { deleted: 0, failed: [] };
+  let names;
   try {
-    if (!fs.existsSync(SLOGS)) return;
-    const cutoff = Date.now() - SLOG_DAYS * 86400000;
-    const held = new Set(sessionRows().filter(r => r && r.keep).map(r => String(r.session)));
-    for (const f of fs.readdirSync(SLOGS)) {
-      if (!f.endsWith('.json')) continue;
-      const key = f.slice(0, -5);
-      if (held.has(key)) continue;
-      const full = path.join(SLOGS, f);
-      let at = 0;
-      try { at = Number((JSON.parse(fs.readFileSync(full, 'utf8')) || {}).at) || 0; } catch (e) { at = 0; }
-      if (!at) { try { at = fs.statSync(full).mtimeMs; } catch (e) { at = Date.now(); } }
-      if (at < cutoff) { try { fs.unlinkSync(full); } catch (e) { } }
+    if (!fs.existsSync(SLOGS)) return out;
+    names = fs.readdirSync(SLOGS);
+  } catch (e) {
+    out.error = (e && e.code) || 'unknown';
+    retentionSay('session-log', { event: 'prune-failed', code: out.error });
+    return out;
+  }
+  const cutoff = Date.now() - SLOG_DAYS * 86400000;
+  const held = new Set(sessionRows().filter(r => r && r.keep).map(r => String(r.session)));
+  for (const f of names) {
+    if (!f.endsWith('.json')) continue;
+    const key = f.slice(0, -5);
+    if (held.has(key)) continue;
+    const full = path.join(SLOGS, f);
+    // When the set was saved: its own stamp, else the file's time. A set
+    // whose time cannot be read either way is not aged, because a guess
+    // that deletes evidence is the wrong way to be wrong.
+    let at = 0;
+    try { at = Number((JSON.parse(fs.readFileSync(full, 'utf8')) || {}).at) || 0; } catch (e) { at = 0; }
+    if (!at) { try { at = fs.statSync(full).mtimeMs; } catch (e) { at = Date.now(); } }
+    if (at >= cutoff) continue;
+    try {
+      fs.unlinkSync(full);
+      out.deleted++;
+    } catch (e) {
+      const code = (e && e.code) || 'unknown';
+      out.failed.push({ file: f, code: code });
+      retentionSay('session-log', { event: 'delete-failed', file: f, code: code,
+                                    daysPastRetention: Math.floor((cutoff - at) / 86400000) });
     }
-  } catch (e) { }
+  }
+  return out;
 }
 
 /*
@@ -4310,7 +4381,9 @@ async function handle(req, res) {
     if (!w.admin) return sendJson(res, 403, { error: 'admins only' });
     const rows = jsonFile(ATTEMPTS, []);
     const live = freshSignIns(rows, Date.now());
-    if (Array.isArray(rows) && live.length !== rows.length) { putJson(ATTEMPTS, live); }
+    if (Array.isArray(rows) && live.length !== rows.length && !putJson(ATTEMPTS, live)) {
+      retentionSay('signin', { event: 'write-failed', rows: rows.length, kept: live.length });
+    }
     return sendJson(res, 200, { signins: live });
   }
 
@@ -5024,6 +5097,13 @@ async function handle(req, res) {
     if (!file.startsWith(UP + path.sep) || !fs.existsSync(file)) {
       return send(res, 404, 'no such file', 'text/plain');
     }
+    /* A gallery submission that staff removed is not served to anybody
+       (#2352), whether its file is still on disk because staff chose to keep
+       it, because its delete failed, or because the launcher's buttons never
+       ask to delete it. The removal marks it on uploads.json (removedUpload). */
+    if (uploadRemoved(up[1])) {
+      return send(res, 404, 'removed from the gallery', 'text/plain');
+    }
     const st = fs.statSync(file);
     const kind = KIND[path.extname(file).toLowerCase()];
     const inline = kind && !url.searchParams.get('dl');
@@ -5060,7 +5140,11 @@ async function handle(req, res) {
     if (!w.admin) return sendJson(res, 403, { error: 'admins only' });
     const file = path.join(UP, rm[1]);
     if (!file.startsWith(UP + path.sep)) return sendJson(res, 400, { error: 'no' });
-    try { fs.unlinkSync(file); } catch (e) { }
+    // A delete that fails is said, not answered ok (#2352, #2354), and the
+    // file's note stays so the uploads list still shows what is on disk.
+    const gone = deleteUpload(rm[1]);
+    if (!gone.ok) return sendJson(res, 500, { ok: false, name: rm[1], fileKept: true, code: gone.code,
+                                              error: 'The file could not be deleted (' + gone.code + '). It is still on the site.' });
     const meta = jsonFile(UPMETA, {});
     delete meta[rm[1]];
     putJson(UPMETA, meta);
@@ -5166,6 +5250,8 @@ async function handle(req, res) {
     try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { passBodyFailure(e); }
     const name = String(o.name || '');
     if (!name) return sendJson(res, 400, { error: 'no name' });
+    // A removed submission does not come back by its name (#2352).
+    if (uploadRemoved(name)) return sendJson(res, 409, { error: 'That picture was removed from the gallery, so it cannot be accepted.' });
 
     const pending = jsonFile(GPENDING, []);
     const hit = pending.find((x) => String(x.name) === name);
@@ -5240,22 +5326,51 @@ async function handle(req, res) {
     const kept = reports.filter((r) => String(r.name) !== name);
     if (kept.length !== reports.length) putJson(GREPORTS, kept);
 
-    if (o.deleteFile) {
-      const file = path.join(UP, name);
-      if (file.startsWith(UP + path.sep)) {
-        try { fs.unlinkSync(file); } catch (e) { }
-        const meta = jsonFile(UPMETA, {});
-        delete meta[name];
-        putJson(UPMETA, meta);
-      }
-    }
-    return sendJson(res, 200, {
+    /*
+      The file (#2352). Deleted when staff ask (deleteFile); otherwise it
+      stays on the site's disk and is marked removed on uploads.json, which
+      /up/<name> refuses, so a removed submission is not served to anybody
+      either way. A delete that fails is said, never answered ok: the entry
+      is still off both lists, the file is marked removed so it is not
+      served, and the answer and the site's log say it is still there.
+    */
+    const answer = {
       ok: true,
       name: name,
       removed: removedGal + removedPend,
       removedApproved: removedGal,
-      removedPending: removedPend
-    });
+      removedPending: removedPend,
+      fileDeleted: false
+    };
+    const file = path.join(UP, name);
+    if (file.startsWith(UP + path.sep) && fs.existsSync(file)) {
+      const gone = o.deleteFile ? deleteUpload(name) : { ok: false, code: '' };
+      const meta = jsonFile(UPMETA, {});
+      if (gone.ok) {
+        delete meta[name];
+        answer.fileDeleted = true;
+      } else {
+        meta[name] = Object.assign({}, meta[name] || {}, { removed: Date.now() });
+      }
+      if (!putJson(UPMETA, meta)) {
+        // Unmarked, a kept file would still be served at /up/<name>.
+        retentionSay('gallery', { event: 'note-write-failed', file: name });
+        answer.ok = false;
+        answer.fileKept = !gone.ok;
+        answer.error = 'Taken off the gallery, but the site could not record that, so ' +
+                       (gone.ok ? 'its note is still listed.' : 'its file can still be opened by staff. Try again.');
+        return sendJson(res, 500, answer);
+      }
+      if (o.deleteFile && !gone.ok) {
+        answer.ok = false;
+        answer.fileKept = true;
+        answer.code = gone.code;
+        answer.error = 'Taken off the gallery, but its file could not be deleted (' + gone.code +
+                       '). It is no longer shown anywhere and is still on the site.';
+        return sendJson(res, 500, answer);
+      }
+    }
+    return sendJson(res, 200, answer);
   }
 
   // Report an approved shot. Any signed-in play-capable member, or the
@@ -5640,7 +5755,8 @@ async function handle(req, res) {
       }
     }
     if (!putSessions(rows)) return sendJson(res, 500, { ok: false, why: 'could not save' });
-    if (ending) { try { pruneSessionLogs(); } catch (e) { } }
+    // pruneSessionLogs says its own failures and never throws (#2354).
+    if (ending) pruneSessionLogs();
     return sendJson(res, 200, { ok: true });
   }
 
