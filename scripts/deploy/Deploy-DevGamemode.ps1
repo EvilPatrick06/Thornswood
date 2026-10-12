@@ -270,7 +270,7 @@ if (-not $PSBoundParameters.ContainsKey('Wait')) {
   $Wait = Get-ThornswoodServerReadyWait
 }
 if ($PutBack -and $LoadOrder) { throw '-PutBack puts the last files back and sends nothing, so it does not take -LoadOrder.' }
-if (@($DropPlugins).Count -and -not ($LoadOrder -and $Dist)) { throw '-DropPlugins goes with -LoadOrder -Dist, the one run here that writes a load order over the dev server''s. Nothing was sent.' }
+if (@($DropPlugins).Count -and -not $LoadOrder) { throw '-DropPlugins goes with -LoadOrder -Dist, the one run here that writes a load order over the dev server''s. Nothing was sent.' }
 if (-not $PutBack) {
   if (-not $Note.Trim()) {
     Write-Host ''
@@ -418,6 +418,9 @@ if ($LoadOrder) {
   if (-not $boxContent.Answered) {
     throw ("the dev server did not say what it holds (it answered: " + ((@($boxContent.Said | Where-Object { $_ }) | Select-Object -Last 3) -join ' | ') +
            "), so there is no telling which plugins it needs. Nothing was sent and the dev server was not touched.")
+  }
+  if (@($DropPlugins).Count -and -not $Dist) {
+    throw '-DropPlugins goes with -Dist: without it the dev server keeps its own load order, so nothing is dropped. Nothing was sent.'
   }
   if ($Dist) {
     $settingsSrc = Join-Path $Dist 'server-settings.json'
