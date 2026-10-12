@@ -3738,6 +3738,22 @@ function makePass(key, o) {
   return 'jp1.' + body + '.' + mac;
 }
 
+/*
+  THE PASS'S OWN KEY (#1320). The login rides the game's own port, which is not
+  encrypted, so a pass alone in it could be seen and shown again on another
+  connection. With the fork's login challenge (skymp5-server's
+  thornswoodLogin.ts) the game sends each login a fresh nonce, and the client
+  answers with the pass and HMAC-SHA256 of "jlp1." + nonce under this key. The
+  key goes to the launcher here, over https, beside the pass, and never on the
+  game's port; the game server derives the same one from passKey and the pass
+  (the join pass block in gamemode.js). base64url HMAC-SHA256 of "jpk1." and
+  the pass's own mac, keyed on cfg.passKey.
+*/
+function passLoginKey(key, pass) {
+  const mac = String(pass || '').split('.')[2] || '';
+  return b64u(crypto.createHmac('sha256', key).update('jpk1.' + mac).digest());
+}
+
 /* Digits and dots, an optional leading v, nine digits a part at most: the
    same rule FeedNotice.IsVersion keeps in the launcher. Null for anything else. */
 function versionParts(v) {
@@ -6097,7 +6113,7 @@ async function handle(req, res) {
       'Staff have banned that character ' + banUntilText(bar.until) +
       (bar.why ? ': ' + bar.why : '') + '. Pick another character at the menu.' });
     const pass = makePass(cfg.passKey, { p: pid, s: server, v: said, d: String(t.d), i: now, x: now + PASS_MS });
-    return sendJson(res, 200, { ok: true, pass: pass, until: now + PASS_MS, server: server });
+    return sendJson(res, 200, { ok: true, pass: pass, key: passLoginKey(cfg.passKey, pass), until: now + PASS_MS, server: server });
   }
 
   // The same question without asking for the password, for the launcher to
