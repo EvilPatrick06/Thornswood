@@ -79,6 +79,9 @@ socket here. `test-most.js` covers it. `load-voice.js` is not a harness: it
 plays an evening at a copy of the service with no people (two sockets each, a
 join storm, the WebRTC signalling for every pair, walking and talk) and prints
 what the service cost at each size, which is where that number came from.
+The joins and leaves one turn of the event loop handles share one roster, so
+a restart that brings every page back at once costs each socket a few
+rosters rather than one per arrival (#2332, `test-roster-once.js`).
 `THORNSWOOD_VOICE_AUTH`, which once let unproven joins in, is not read any
 more. `/health`
 reports

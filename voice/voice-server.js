@@ -60,7 +60,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1-tls-only-1-ice-socket-1-no-page-1-most-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1-tls-only-1-ice-socket-1-no-page-1-most-1-roster-once-1';
 
 // ==== thornswood deploy record ====
 // Which commit this copy came from (#459): Install-Voice.ps1 leaves the deploy
@@ -725,8 +725,11 @@ setInterval(() => {
 
   The roster sits between the two (sendLatest). Every join and every leave
   sends the whole room to everybody, so when a room fills at once, as it does
-  when the service restarts and every page reconnects, each socket is sent a
+  when the service restarts and every page reconnects, each socket was sent a
   roster per arrival: about 1.3 MB for the first in at two hundred people.
+  Since #2332 the joins and leaves of one turn of the event loop share one
+  roster (sendRoster), which is most of a storm; this still keeps what a
+  slow reader is owed to one.
   Queued in full, that tripped the ceiling below for anybody slow to read,
   and those closed sockets would reconnect into another burst. On
   24 September test-cull.js, whose two hundred sockets join together, had 42
@@ -847,22 +850,27 @@ class Sock {
     message sent to it, whichever comes first. Unlike a position it is never
     dropped, because the next roster only comes when somebody joins or
     leaves. See the note over QUEUE_CEILING.
+
+    It takes the roster already framed, because the same bytes go to every
+    socket in the room and are made once (sendRoster, #2332).
   */
-  sendLatest(obj) {
+  sendLatest(framed) {
     if (this.closed) return;
     if (this.backed) {
       if (this.latest) skippedRosters++;
-      this.latest = obj;
+      this.latest = framed;
       return;
     }
-    this.send(obj);
+    this.flushLatest();
+    if (this.closed) return;
+    try { this.write(framed); } catch (e) { this.close(); }
   }
 
   flushLatest() {
     if (!this.latest || this.closed) return;
-    const obj = this.latest;
+    const framed = this.latest;
     this.latest = null;
-    try { this.write(frame(JSON.stringify(obj))); } catch (e) { this.close(); }
+    try { this.write(framed); } catch (e) { this.close(); }
   }
 
   close() {
@@ -1074,10 +1082,47 @@ function roster() {
   sent the one its connection was opened with, which had run out for most of
   a session, and from then on was handed STUN only. /ice now reads no token.
 */
+/*
+  ONE ROSTER FOR EVERYTHING THAT CHANGED THE ROOM IN ONE TURN (#2332).
+
+  announce() used to send the roster to every socket the moment anybody
+  joined or left, and stringified it once per socket. When the service
+  restarts every page comes back at once, so letting N people in cost N
+  rosters to each of N sockets, each the size of the room: N squared
+  messages, and N cubed bytes and stringify work. Measured on One on 11 Oct
+  with voice/load-voice.js, two sockets a person: 100 people held the one
+  node thread for up to 2.4 s at a time, 200 took 20 s to get in, and 400
+  never did.
+
+  A roster says only who is in the room now; a page reconciles its
+  connections against the whole list each time (onPeers in
+  launcher/voice-host.html, reconcile in game/ui/thornswood-voice.js), so a
+  roster that is replaced before it is sent loses nothing. So announce()
+  only marks the roster as due, and it is sent once, after every join and
+  leave this turn of the event loop has handled (setImmediate runs after the
+  I/O callbacks of the turn that queued it, with no timer in between). A
+  storm of joins that arrives together is one roster to each socket, not one
+  per arrival, and the message is stringified and framed once for the whole
+  room. Nothing on the wire changes shape: the same { t: 'peers', peers,
+  iceServers } a page always had, after its welcome, as before.
+
+  The order #1869 depends on still holds. Every socket is written the same
+  roster in one loop, so a newcomer's roster and the roster naming them to
+  everybody else go out together, before the newcomer can have read theirs
+  and sent anyone an offer. A socket that is backed keeps only the newest,
+  as before (sendLatest), and send() writes it ahead of anything later.
+*/
+let rosterDue = false;
 function announce() {
-  const list = roster();
-  const ice = iceServers();
-  for (const [, p] of peers) p.ws.sendLatest({ t: 'peers', peers: list, iceServers: ice });
+  if (rosterDue) return;
+  rosterDue = true;
+  setImmediate(sendRoster);
+}
+function sendRoster() {
+  rosterDue = false;
+  if (peers.size === 0) return;
+  const once = frame(JSON.stringify({ t: 'peers', peers: roster(), iceServers: iceServers() }));
+  for (const [, p] of peers) p.ws.sendLatest(once);
 }
 
 /*
