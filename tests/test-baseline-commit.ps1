@@ -21,7 +21,8 @@
     3. a baseline another Ship moved up there meanwhile is not overwritten,
        and the release is not failed for it
   and reads the order in the script: the baseline is saved and sent only after
-  the feed was sent, and never when the feed send failed.
+  the feed (version.json, and releases.json since #2361) was sent, and never
+  when the feed send failed.
 
   Read only apart from its own temp folder.
 #>
@@ -43,8 +44,11 @@ $send = [regex]::Match($src, '(?s)# ==== thornswood feed send ====.*?# ==== end 
 Yes 'the feed send block is in Publish-Update.ps1' $send.Success
 if ($send.Success) {
     $b = $send.Value
-    $feedAt = $b.IndexOf("Send-FeedStore `$Channel `$ReleaseDir @('version.json')")
-    Yes 'the feed goes to the VPS before the baseline moves' ($feedAt -ge 0 -and $feedAt -lt $b.IndexOf('Save-State'))
+    # Since #2361 (#1050) the files go in $feedFiles, version.json first and
+    # the store's releases.json beside it when there is one.
+    $feedAt = $b.IndexOf("Send-FeedStore `$Channel `$ReleaseDir `$feedFiles")
+    $listAt = $b.IndexOf("`$feedFiles = @('version.json')")
+    Yes 'the feed goes to the VPS before the baseline moves' ($listAt -ge 0 -and $listAt -lt $feedAt -and $feedAt -lt $b.IndexOf('Save-State'))
     Yes 'and a feed that did not go leaves the baseline where it was, with a note to finish it' ($b -match '(?s)if \(\$pushFailed\) \{\s+Write-Pending')
 }
 Yes 'nothing in Publish-Update commits or pushes a baseline any more' (-not ($src -match 'git -C \$ReleaseDir (add|commit|push|pull)'))
