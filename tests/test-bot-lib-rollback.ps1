@@ -31,11 +31,11 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 $repo = (Resolve-Path (Join-Path $Here '..')).Path
 $install = [IO.File]::ReadAllText((Join-Path $repo 'scripts\deploy\Install-Bot.ps1'))
 $swap = [IO.File]::ReadAllText((Join-Path $repo 'scripts\deploy\Swap.ps1'))
-# The code it sends, the live smoke export included since #2020, and never
-# joins.json, the bot's own record (#2042).
-Yes 'Install-Bot installs into py-libs with pip --target, and sends the code and the smoke export, never joins.json' (
+# The code it sends (the live smoke export was on it from #2020 until the
+# checklist came out on 11 Oct), and never joins.json, the bot's own record (#2042).
+Yes 'Install-Bot installs into py-libs with pip --target, and sends the code, never joins.json' (
     $install.Contains('--target ''$rootWin\$stageName\py-libs''') -and
-    $install.Contains('foreach ($f in ''bot.py'', ''card.py'', ''dev-channel.txt'', ''requirements.txt'', ''live-smoke-discord-export.json'')') -and
+    $install.Contains('foreach ($f in ''bot.py'', ''card.py'', ''dev-channel.txt'', ''requirements.txt'')') -and
     -not $install.Contains('joins.json'''))
 Yes 'the swap is told to put py-libs back with the code' ($install.Contains('$Dirs = @(''''py-libs'''')') -and $swap.Contains('$moveRels'))
 # pip --target on Python 3.12.4 and later leaves its files with the rules of

@@ -6,7 +6,8 @@ for it, and refused (issue #1342).
 
 The audit said some admin commands had no staff role check. Measured on
 5 October, every command does have a gate: /close and the Close ticket button
-answer to is_staff, and the four /live-smoke commands to is_live_smoke_admin.
+answer to is_staff, and /test-task (the four /live-smoke commands until
+11 October) to is_task_poster.
 The hole was inside is_staff, which also let in anybody the channel trusted
 with threads. On the server Build-Discord.py makes, that is Lead Gamemaster
 and Trial Gamemaster, whose GM permissions carry Manage Threads on every
@@ -70,16 +71,13 @@ bot.OPEN_TICKETS = os.path.join(TMP, 'open-tickets.json')
 # Who may run what, as the Developer Guide (Q. Staff commands, In Discord) and
 # bot/README.md say it. A command or a button that is not in here fails below.
 STAFF = 'staff'                    # is_staff: STAFF_ROLES, by id or name
-LIVE_SMOKE = 'live smoke admin'    # is_live_smoke_admin: LIVE_SMOKE_ADMIN_ROLES
+TASKS = 'test task poster'         # is_task_poster: TEST_TASK_ROLES
 ANYBODY = 'anybody'                # somebody's own button, with its own limits
-GATED = (STAFF, LIVE_SMOKE)
+GATED = (STAFF, TASKS)
 
 COMMANDS = {
     'close': STAFF,
-    'live-smoke start': LIVE_SMOKE,
-    'live-smoke reset': LIVE_SMOKE,
-    'live-smoke refresh': LIVE_SMOKE,
-    'live-smoke report': LIVE_SMOKE,
+    'test-task': TASKS,
 }
 
 # Persistent buttons and menus, by their custom_id. One ending in a colon is
@@ -89,19 +87,18 @@ BUTTONS = [
     ('thornswood:ticket', ANYBODY),    # the ticket panel: one open, a cooldown
     ('thornswood:hold:', ANYBODY),     # pick a hold: Member or staff, pick_hold
     ('thornswood:ping:', ANYBODY),     # ping roles: Member or staff, toggle_ping
-    ('ls:', ANYBODY),                  # a Live smoke mark, in a session thread
 ]
 
-# Staff, as the Developer Guide lists them, and the three who run a Live
-# smoke session. Lead Gamemaster and Trial Gamemaster are not staff here.
+# Staff, as the Developer Guide lists them, and the three who post a test
+# task. Lead Gamemaster and Trial Gamemaster are not staff here.
 STAFF_ROLES = ['Owner', 'Dev', 'Gamemaster', 'Moderator', 'Loremaster']
-LIVE_SMOKE_ROLES = ['Owner', 'Dev', 'Lead Gamemaster']
+TASK_ROLES = ['Owner', 'Dev', 'Lead Gamemaster']
 OUTSIDERS = {
     STAFF: [[], ['Member'], ['Playtester'], ['Content Creator'],
             ['Member', 'Content Creator'], ['Trial Gamemaster'],
             ['Lead Gamemaster'], ['Server Booster'], ['Jarl of Whiterun'],
             ['Trading Company']],
-    LIVE_SMOKE: [[], ['Member'], ['Playtester'], ['Content Creator'],
+    TASKS: [[], ['Member'], ['Playtester'], ['Content Creator'],
                  ['Trial Gamemaster'], ['Moderator'], ['Gamemaster'],
                  ['Loremaster']],
 }
@@ -306,10 +303,10 @@ yes('and every command written down here is still registered%s'
 hook = inspect.getsource(bot.Thornswood.setup_hook)
 VIEWS = re.findall(r'add_view\((\w+)\(\)\)', hook)
 yes('setup_hook registers the ticket panel, the ticket tools, the hold panel '
-    'and the Live smoke rows, and no other panel',
+    'and no other panel (the Live smoke rows are gone)',
     sorted(VIEWS) == ['HoldPanel', 'TicketPanel', 'TicketTools']
-    and 'in live_smoke_views()' in hook
-    and hook.count('add_view(') == len(VIEWS) + 1)
+    and 'live_smoke' not in hook
+    and hook.count('add_view(') == len(VIEWS))
 
 
 def gate_of(custom_id):
@@ -321,7 +318,7 @@ def gate_of(custom_id):
 
 
 async def every_button():
-    views = [getattr(bot, n)() for n in VIEWS] + list(bot.live_smoke_views())
+    views = [getattr(bot, n)() for n in VIEWS]
     out = []
     for v in views:
         for item in v.children:
@@ -335,9 +332,8 @@ ITEMS = asyncio.run(every_button())
 loose = sorted(set(c for c, _ in ITEMS if gate_of(c) is None))
 yes('every button and menu the bot keeps has its gate written down here%s'
     % ('; not yet: ' + ', '.join(loose) if loose else ''), not loose)
-yes('and the Live smoke rows are among them, so the list was really read',
-    any(c.startswith('ls:') for c, _ in ITEMS)
-    and any(c == 'thornswood:close' for c, _ in ITEMS))
+yes('and the Close ticket button is among them, so the list was really read',
+    any(c == 'thornswood:close' for c, _ in ITEMS))
 
 
 # --------------------------------------------- 2. not staff, not served --
@@ -374,7 +370,7 @@ def entry_points():
 
 def world():
     ticket = Ticket()
-    tasks = Posted(bot.LIVE_SMOKE_CHANNEL[0])
+    tasks = Posted(bot.TASKS_NAME)
     guild = Server([tasks])
     return guild, ticket, tasks
 
@@ -382,16 +378,13 @@ def world():
 def refusal_for(gate, guild):
     if gate == STAFF:
         return 'Staff close these'
-    return bot.live_smoke_admin_refusal(guild)
+    return 'post test tasks'
 
 
 POINTS = entry_points()
-yes('/close, the Close ticket button and the four /live-smoke commands are '
-    'what this runs',
+yes('/close, the Close ticket button and /test-task are what this runs',
     sorted(l for l, _, _ in POINTS) == sorted(
-        ['/close', '/live-smoke refresh', '/live-smoke report',
-         '/live-smoke reset', '/live-smoke start',
-         'the thornswood:close button']))
+        ['/close', '/test-task', 'the thornswood:close button']))
 
 for label, gate, run in POINTS:
     for roles in OUTSIDERS[gate]:
@@ -449,14 +442,14 @@ for name in STAFF_ROLES:
         and ticket.edited and ticket.edited[0].get('archived')
         and ticket.edited[0].get('locked') and len(BOOK) == 1)
 
-for name in LIVE_SMOKE_ROLES:
-    guild = Server()                  # no test-tasks, so nothing is posted
+for name in TASK_ROLES:
+    guild = Server()                  # no test-tasks forum, so nothing is posted
     ask = Ask(Person([name]), guild, Posted('general'))
-    asyncio.run(LEAVES['live-smoke start'].callback(
-        ask, settings_version='x', live_channel='x'))
-    yes('%s gets past the Live smoke gate' % name,
+    asyncio.run(LEAVES['test-task'].callback(
+        ask, title='x', body='x', tag='Dev'))
+    yes('%s gets past the test task gate' % name,
         ask.response.said
-        and 'There is no #%s' % bot.LIVE_SMOKE_CHANNEL[0] in ask.response.said[0][0])
+        and 'is not a forum yet' in ask.response.said[-1][0])
 
 for roles in (['Moderator'], ['Owner']):
     guild, _t, panel = world()
