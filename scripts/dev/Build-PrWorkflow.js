@@ -34,39 +34,37 @@ function build(src) {
   if (at < 0) { fail('build.yml no longer starts its body with "name: Build check"'); }
   let body = src.slice(at + 1);
   body = swap(body, 'name: Build check\n', 'name: Build check (pull requests)\n', 'its name');
-  body = swap(body, 'on:\n  push:\n    branches: [main]\n  workflow_dispatch:\n', 'on:\n  pull_request:\n', 'its push and manual triggers');
+  const on = /\non:\n(?:  .*\n|    .*\n)+?(?=permissions:)/.exec(body);
+  if (!on || on[0].indexOf('  push:') < 0) { fail('build.yml no longer has its push and manual triggers'); }
+  body = body.replace(on[0], '\non:\n  pull_request:\n');
   body = swap(body, 'group: build-${{ github.ref }}', 'group: build-pr-${{ github.ref }}', 'its concurrency group');
-  body = swap(body, '    runs-on: [self-hosted, Windows, thornswood-vps]\n', '    runs-on: windows-latest\n', 'the VPS runs-on');
-  body = body.replace(/\n    timeout-minutes: \d+\n/, '\n    # The hosted runner has two cores: the harness step alone took over\n' +
-    '    # eighteen minutes on it, so it gets an hour.\n    timeout-minutes: 60\n');
-  const co = '      - uses: actions/checkout@';
-  const ci = body.indexOf(co);
-  if (ci < 0) { fail('build.yml no longer checks out'); }
-  const eol = body.indexOf('\n', ci) + 1;
-  body = body.slice(0, eol) +
-    '\n      # The hosted image ships whatever node and python it has this month;\n' +
-    '      # these are pinned so a check means the same thing as on the VPS.\n' +
-    '      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0\n' +
-    '        with:\n' +
-    "          node-version: '24'\n" +
-    '      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0\n' +
-    '        with:\n' +
-    "          python-version: '3.12'\n" +
-    body.slice(eol);
-  if (/thornswood-vps/.test(body.replace(/^\s*#.*$/gm, ''))) { fail('the VPS label is still in the generated jobs'); }
+  // The VPS fallback job carries the steps under the anchor; lift them out
+  // and drop the job, since a pull request never runs on the box.
+  const jobs = body.indexOf('\njobs:\n');
+  const vps = body.indexOf('\n  launcher-vps:\n');
+  const dflt = body.indexOf('\n  # The default:');
+  if (jobs < 0 || vps < 0 || dflt < vps) { fail('build.yml no longer has the launcher-vps fallback job before the default job'); }
+  const job = body.slice(vps, dflt);
+  const st = job.indexOf('\n    steps: &checks\n');
+  if (st < 0) { fail('the fallback job no longer carries the steps under &checks'); }
+  const steps = job.slice(st + '\n    steps: &checks\n'.length).replace(/\n+$/, '\n');
+  let tail = body.slice(dflt).replace(/^\n(  #[^\n]*\n)+/, '\n');
+  tail = tail.replace(/\n    if: \$\{\{ vars\.BUILD_RUNNER[^\n]*\n/, '\n');
+  tail = swap(tail, '    steps: *checks\n', '    steps:\n' + steps, 'the default job\'s steps: *checks');
+  body = body.slice(0, jobs) + '\njobs:' + tail;
+  if (/thornswood-vps|self-hosted/.test(body.replace(/^\s*#.*$/gm, ''))) { fail('the VPS label is still in the generated jobs'); }
+  if (/\*checks|&checks/.test(body)) { fail('an anchor survived'); }
   const head =
     '# GENERATED from build.yml by scripts/dev/Build-PrWorkflow.js. Do not edit:\n' +
     '# change build.yml and run  node scripts/dev/Build-PrWorkflow.js\n' +
     '#\n' +
     '# Every pull request runs the same checks as build.yml, on GitHub\'s hosted\n' +
     '# windows-latest runner and never on the VPS beside the live server (#1306,\n' +
-    '# Patrick, 11 Oct 2026, option C; isolation check #2161). No secrets, no\n' +
-    '# live folders: every scratch path is under RUNNER_TEMP. A push to main and\n' +
-    '# a manual run stay on the VPS in build.yml. The job keeps the name\n' +
-    '# "Launcher builds" so a pull request\'s check reads the same as before.\n';
+    '# #2161). There is no VPS fallback here, on purpose: pull request code never\n' +
+    '# reaches the box. No secrets, no live folders: every scratch path is under\n' +
+    '# RUNNER_TEMP. The job keeps the name "Launcher builds".\n';
   return head + body;
 }
-
 if (require.main === module) {
   const want = build(fs.readFileSync(SRC, 'utf8'));
   const have = fs.existsSync(OUT) ? fs.readFileSync(OUT, 'utf8').split('\r\n').join('\n') : '';

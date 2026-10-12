@@ -3,10 +3,9 @@
 #
 # Every pull request runs the same checks as build.yml, on GitHub's hosted
 # windows-latest runner and never on the VPS beside the live server (#1306,
-# Patrick, 11 Oct 2026, option C; isolation check #2161). No secrets, no
-# live folders: every scratch path is under RUNNER_TEMP. A push to main and
-# a manual run stay on the VPS in build.yml. The job keeps the name
-# "Launcher builds" so a pull request's check reads the same as before.
+# #2161). There is no VPS fallback here, on purpose: pull request code never
+# reaches the box. No secrets, no live folders: every scratch path is under
+# RUNNER_TEMP. The job keeps the name "Launcher builds".
 name: Build check (pull requests)
 on:
   pull_request:
@@ -21,7 +20,6 @@ jobs:
   launcher:
     name: Launcher builds
     runs-on: windows-latest
-    # About two minutes on the VPS. Past this it is stuck, not slow.
     # The hosted runner has two cores: the harness step alone took over
     # eighteen minutes on it, so it gets an hour.
     timeout-minutes: 60
@@ -29,11 +27,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # The hosted image ships whatever node and python it has this month;
-      # these are pinned so a check means the same thing as on the VPS.
+      # these are pinned so a check means the same thing as on the VPS, which
+      # has its own and skips them.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: runner.environment == 'github-hosted'
         with:
           node-version: '24'
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        if: runner.environment == 'github-hosted'
         with:
           python-version: '3.12'
 
