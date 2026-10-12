@@ -68,10 +68,17 @@ $branch = $t.Substring(1, $t.Length - 2)
 
 # The shape of the old mistake, for anybody reading the source rather than the
 # results: the file is read before it is written, and nothing is written whole
-# from a value made on this machine.
-$read  = $branch.IndexOf('ReadAllText')
-$write = $branch.IndexOf('WriteAllText')
-Yes 'the branch reads config.json before it writes it' ($read -ge 0 -and $write -gt $read)
+# from a value made on this machine. The read and the write are the one block
+# Rotate-ServerPassword shares (SiteConfigSet.ps1, #2317), which the branch
+# takes for its config.json and the password key.
+. (Join-Path $Here 'scripts\deploy\SiteConfigSet.ps1')
+Yes 'the branch writes config.json through the shared block, for the password key' (
+    $branch.Contains('Get-ThornswoodSiteConfigSet -ConfigPath "$rootWin\config.json" -Key ''password'''))
+Yes 'Deploy-Docs.ps1 loads the shared block' ((Get-Content -LiteralPath $DeployPath -Raw).Contains(". (Join-Path `$Here 'SiteConfigSet.ps1')"))
+$block = Get-ThornswoodSiteConfigSet -ConfigPath 'C:\x\config.json' -Key 'password' -What 'password'
+$read  = $block.IndexOf('ReadAllText')
+$write = $block.IndexOf('WriteAllText')
+Yes 'the shared block reads config.json before it writes it' ($read -ge 0 -and $write -gt $read)
 Yes 'no WriteAllBytes is left in Deploy-Docs.ps1' (-not ((Get-Content -LiteralPath $DeployPath -Raw) -match 'WriteAllBytes'))
 # -Password asks, hidden, before anything is sent, and is never a typed value
 # (#1069): typed, the password would stay in the shell's history file.
@@ -214,7 +221,7 @@ try {
         Write-Host ('      the far side said: ' + ($said -join ' | '))
     }
     Yes 'a whole config: no byte order mark on it' ((First3 $f) -ne '239 187 191')
-    Yes 'a whole config: it says it kept the rest' (($said -join ' ') -match 'set, 13 other setting')
+    Yes 'a whole config: it says it kept the rest' (($said -join ' ') -match 'set password, 13 other setting')
     $wire = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($newPw))
     $sent = $script:lines -join "`n"
     Yes 'the password went to ssh at all' ($script:lines.Count -ge 2)
