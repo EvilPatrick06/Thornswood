@@ -40543,17 +40543,26 @@ log('gamemode loaded:',
   water. Gjalund Salt-Sage is Dragonborn's ship between Windhelm and Raven
   Rock, the Northern Maiden.
 
-  TWO WITH NO FACTION IN THE REPO. Thors is the one carriage driver in
-  Winterhold town, from the mod's fix that "adds a carriage to Winterhold".
-  Rolf is the Dragon Bridge ferryman the same fix added "beneath the bridge,
-  on the Karth River", and the Karth is North Coast water. Both are on the
-  issue to check against their factions in the plugin.
+  THORS AND ROLF, READ IN THE PLUGIN (11 Oct). They were placed from the
+  mod fix's description, so their factions were read out of CFTO.esp to
+  check it. Thors (KmodCarriageDriverWinterhold, 1be45a) is in
+  CrimeFactionWinterhold and in no ferry route, as every carriage driver is.
+  Rolf (KmodFerrymanDragonBridge, 2d4c09) is in KmodFerryRoute1Faction, the
+  North Coast, and CrimeFactionHaafingar. Both rows below already said so.
 
-  WHAT IS NOT HERE. The mod also puts people down where nobody drives from:
-  the villages, the Hearthfire homes, the Thalmor Embassy, the small ferry
-  landings. Landing there needs the mod's own markers, the repo does not have
-  their positions, and so those are not on this list yet. A ride to one is
-  refused before any gold moves.
+  THE STOPS NOBODY DRIVES FROM (11 Oct). The mod puts people down at
+  villages, the Hearthfire homes, the Thalmor Embassy and the small ferry
+  landings, where no driver stands. Each lands on the mod's own marker, read
+  out of CFTO.esp: a carriage destination topic sets KmodCarriageDestination
+  and lands on KmodCarriage<place>Marker, and a ferry topic's script names
+  its DestinationMarker. The hold of a carriage stop is the mod's own: its
+  topics group the villages under the hold whose driver lists them as near
+  (KmodFastTravelCarriageReach and the rest), so a ride from that hold's
+  carriage to one is the 10 for a stop in the same hold. The water of a
+  ferry landing is the topic it sits under (KmodFastTravelFerryTopic to
+  Topic04). Icewater Jetty is not here: the mod sends a ferry there only by a
+  persuasion line to Castle Volkihar. Nobody rides from these stops, because
+  no driver stands at them; a ride back starts at a driver.
 
   THE HOLD IS THE STOP'S, written on the row. It is never worked out from
   where the person came from, so Solitude's carriage is Solitude's whoever
@@ -40681,7 +40690,87 @@ log('gamemode loaded:',
       pos: [141310, 34083.7, -13995.5], rot: 353.4 },
     { key: 'maiden:ravenrock', line: 'maiden', name: 'Raven Rock', hold: 'ravenrock', driver: 'Gjalund Salt-Sage',
       ref: '2582c:Dragonborn.esm', base: '2582b:Dragonborn.esm', world: '800:Dragonborn.esm',
-      pos: [28928.7, 33144.2, 309.9], rot: 73.1 }
+      pos: [28928.7, 33144.2, 309.9], rot: 73.1 },
+    // Where the carriage puts you down and nobody drives from (#1394).
+    { key: 'carriage:darkwatercrossing', line: 'carriage', name: 'Darkwater Crossing', hold: 'windhelm',
+      marker: 'b6e4b:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [120550.3, -34049.0, -9731.4], rot: 108.9 },
+    { key: 'carriage:kynesgrove', line: 'carriage', name: 'Kynesgrove', hold: 'windhelm',
+      marker: 'b6e4c:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [134183.8, 11545.6, -12425.2], rot: 91.7 },
+    { key: 'carriage:mixwatermill', line: 'carriage', name: 'Mixwater Mill', hold: 'windhelm',
+      marker: 'b6e4d:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [107035.5, -6730.4, -12931.2], rot: 51.6 },
+    { key: 'carriage:karthwasten', line: 'carriage', name: 'Karthwasten', hold: 'markarth',
+      marker: 'b6e50:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-130993.1, 39383.7, -6394.7], rot: 268.3 },
+    { key: 'carriage:oldhroldan', line: 'carriage', name: 'Old Hroldan', hold: 'markarth',
+      marker: 'b6e52:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-109633.1, -13019.9, -5908.6], rot: 308.4 },
+    { key: 'carriage:soljundssinkhole', line: 'carriage', name: "Soljund's Sinkhole", hold: 'markarth',
+      marker: 'b6e51:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-115870.9, 5902.0, -5229.6], rot: 308.4 },
+    { key: 'carriage:dragonbridge', line: 'carriage', name: 'Dragon Bridge', hold: 'solitude',
+      marker: 'b6e53:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-100960.0, 81165.4, -12555.3], rot: 337.1 },
+    { key: 'carriage:thalmorembassy', line: 'carriage', name: 'Thalmor Embassy', hold: 'solitude',
+      marker: 'b6e54:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-78863.2, 110918.8, -2576.0], rot: 337.1 },
+    { key: 'carriage:rorikstead', line: 'carriage', name: 'Rorikstead', hold: 'whiterun',
+      marker: 'b6e55:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-82477.9, 5177.2, -4608.1], rot: 314.2 },
+    { key: 'carriage:riverwood', line: 'carriage', name: 'Riverwood', hold: 'whiterun',
+      marker: 'b6e4e:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [23877.3, -42735.3, -25.0], rot: 212.0 },
+    { key: 'carriage:ivarstead', line: 'carriage', name: 'Ivarstead', hold: 'riften',
+      marker: 'b6e56:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [75864.0, -60417.1, 10514.4], rot: 180.0 },
+    { key: 'carriage:shorsstone', line: 'carriage', name: "Shor's Stone", hold: 'riften',
+      marker: 'b6e57:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [163069.5, -62681.1, 7520.0], rot: 22.9 },
+    { key: 'carriage:heartwoodmill', line: 'carriage', name: 'Heartwood Mill', hold: 'riften',
+      marker: 'b6e58:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [130433.1, -95544.9, 10899.3], rot: 67.8 },
+    { key: 'carriage:nightgateinn', line: 'carriage', name: 'Nightgate Inn', hold: 'dawnstar',
+      marker: 'b6e59:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [72671.6, 49446.2, -6221.8], rot: 149.0 },
+    { key: 'carriage:heljarchenhall', line: 'carriage', name: 'Heljarchen Hall', hold: 'dawnstar',
+      marker: 'cb328:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [31136.9, 36138.5, -6951.1], rot: 0.0 },
+    { key: 'carriage:stonehills', line: 'carriage', name: 'Stonehills', hold: 'morthal',
+      marker: 'b6e5a:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-8570.0, 64733.7, -11604.0], rot: 114.6 },
+    { key: 'carriage:windstadmanor', line: 'carriage', name: 'Windstad Manor', hold: 'morthal',
+      marker: 'cb327:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-25235.4, 97694.7, -13407.7], rot: 34.4 },
+    { key: 'carriage:halfmoonmill', line: 'carriage', name: 'Half-Moon Mill', hold: 'falkreath',
+      marker: 'b6e4f:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-42393.2, -60582.3, 877.0], rot: 314.2 },
+    { key: 'carriage:lakeviewmanor', line: 'carriage', name: 'Lakeview Manor', hold: 'falkreath',
+      marker: 'cb326:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-9304.6, -71435.0, 2435.8], rot: 348.0 },
+    // Where a ferry puts you down and nobody drives from (#1394).
+    { key: 'coast:windstadmanor', line: 'coast', name: 'Windstad Manor', hold: 'morthal',
+      marker: '14c86:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-28018.0, 101617.9, -13969.5], rot: 193.8 },
+    { key: 'coast:frostflowlighthouse', line: 'coast', name: 'Frostflow Lighthouse', hold: 'winterhold',
+      marker: '38411:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [56529.5, 102638.0, -13949.2], rot: 159.5 },
+    { key: 'honrich:honeyside', line: 'honrich', name: 'Honeyside', hold: 'riften',
+      marker: '14c8e:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [171196.3, -93246.3, 10688.0], rot: 97.4 },
+    { key: 'ilinalta:lakeviewmanor', line: 'ilinalta', name: 'Lakeview Manor', hold: 'falkreath',
+      marker: '14c7e:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-11349.3, -62756.7, 633.4], rot: 154.7 },
+    { key: 'ilinalta:ilinaltasdeep', line: 'ilinalta', name: "Ilinalta's Deep", hold: 'falkreath',
+      marker: '3840e:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-31504.5, -48740.8, 662.0], rot: 68.8 },
+    { key: 'solstheim:bujoldsretreat', line: 'solstheim', name: "Bujold's Retreat", hold: 'ravenrock',
+      marker: '3840d:CFTO.esp', world: '800:Dragonborn.esm',
+      pos: [82535.0, 59126.0, 292.4], rot: 274.1 },
+    { key: 'solstheim:northshorelanding', line: 'solstheim', name: 'Northshore Landing', hold: 'ravenrock',
+      marker: '3840c:CFTO.esp', world: '800:Dragonborn.esm',
+      pos: [21277.0, 91639.9, 305.2], rot: 114.6 }
   ];
 
   var HOLD_NAMES = {
