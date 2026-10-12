@@ -94,6 +94,13 @@ function Done {
     Remove-Variable -Name TsSshSeen, TsScpFail, TsLastCode -Scope Global -ErrorAction SilentlyContinue
     Write-Host ''
     Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
+    # A failing run's whole output is kept (#2323): the one failure of 11 Oct
+    # could not be read because only its last twelve lines were.
+    if ($script:transcript) {
+        try { Stop-Transcript | Out-Null } catch { }
+        if ($script:fail) { Write-Host ('the whole of this run is kept in ' + $script:transcript) }
+        else { Remove-Item -LiteralPath $script:transcript -Force -ErrorAction SilentlyContinue }
+    }
     if ($script:fail) { exit 1 }
     exit 0
 }
@@ -134,6 +141,9 @@ $utf8    = New-Object Text.UTF8Encoding($false)
 $runTag  = [Guid]::NewGuid().ToString('N').Substring(0, 8)
 $TaskPrefix = 'Thornswood Test ' + $runTag   # every task this run makes, and only those
 foreach ($d in $box, $tasks, $far) { $null = [IO.Directory]::CreateDirectory($d) }
+# Beside the scratch folder, not in it, because that is removed at the end.
+$script:transcript = Join-Path ([IO.Path]::GetTempPath()) ('ts-install-' + $runTag + '.log')
+try { Start-Transcript -LiteralPath $script:transcript -Force | Out-Null } catch { $script:transcript = '' }
 
 function Put([string]$path, [string]$text) {
     $null = [IO.Directory]::CreateDirectory((Split-Path -Parent $path))
@@ -148,28 +158,42 @@ function Get([string]$path) {
 # A real task by the name the stand-ins use means a stand-in did not take.
 # Only this run's own tasks carry $TaskPrefix, so only those are taken off
 # again; any other 'Thornswood Test*' task (another run's, or a real one) is
-# left exactly where it is and reported, because it is not ours to remove.
+# left exactly where it is, because it is not ours to remove, and says
+# nothing about this run.
 # The same per-run tag test-deploy-swaps.ps1 uses since #1973 (c8f51230).
-function NoRealTask([string]$own = $TaskPrefix) {
+#
+# Asked by the names this run uses, one by one, never by 'Thornswood Test*'
+# (#2323). Until then it listed every 'Thornswood Test*' task and was true
+# only when there was none at all, so runs side by side failed each other:
+# one run's decoy scene below registers real tasks for a moment, and every
+# far call of another run then said a real task had been touched and threw.
+# Four runs started together on One on 12 Oct all failed that way. And the
+# wildcard listing itself is not safe beside another process: measured the
+# same night, Get-ScheduledTask -TaskName 'Thornswood Test*' threw "The
+# system cannot find the file specified" when a task was removed while it
+# listed, and with SilentlyContinue that is an empty list, a task of this
+# run's missed; the exact name never failed in 80 asks. The installer and
+# Publish-Server register only the -TaskName they are given, so these are
+# every name a stand-in that did not take could leave.
+$script:ownTasks = @('Server', 'Dev', 'Live', 'Scene') | ForEach-Object { $TaskPrefix + ' ' + $_ }
+function NoRealTask {
     # The task folder on disk, when this account can read it, because asking
     # the scheduler takes seconds and this is asked after every far call.
     $folder = Join-Path $env:SystemRoot 'System32\Tasks'
     $readable = $false
     try { $null = [IO.Directory]::GetFiles($folder, 'x'); $readable = $true } catch { }
-    if ($readable -and -not (Test-Path -Path (Join-Path $folder 'Thornswood Test*'))) { return $true }
-    $real = @(Get-ScheduledTask -TaskName 'Thornswood Test*' -ErrorAction SilentlyContinue)
-    foreach ($r in $real) {
-        if ($r.TaskName.StartsWith($own + ' ', [StringComparison]::Ordinal)) {
-            Stop-ScheduledTask -TaskName $r.TaskName -ErrorAction SilentlyContinue
-            Unregister-ScheduledTask -TaskName $r.TaskName -Confirm:$false -ErrorAction SilentlyContinue
-        } else {
-            Write-Host ("      a task this run did not make is left alone: '" + $r.TaskName + "'")
-        }
+    if ($readable -and -not (Test-Path -Path (Join-Path $folder ($TaskPrefix + ' *')))) { return $true }
+    $mine = 0
+    foreach ($n in $script:ownTasks) {
+        if ($null -eq (Get-ScheduledTask -TaskName $n -ErrorAction SilentlyContinue)) { continue }
+        $mine++
+        Stop-ScheduledTask -TaskName $n -ErrorAction SilentlyContinue
+        Unregister-ScheduledTask -TaskName $n -Confirm:$false -ErrorAction SilentlyContinue
     }
-    return ($real.Count -eq 0)
+    return ($mine -eq 0)
 }
 # A decoy 'Thornswood Test <x>' task that is not this run's survives NoRealTask
-# and is reported, while one this run made is taken off. Real tasks, made and
+# and does not count against it, while one this run made is taken off. Real tasks, made and
 # removed here only, under names nothing else uses.
 $decoy = 'Thornswood Test Decoy ' + [Guid]::NewGuid().ToString('N').Substring(0, 8)
 $mine  = $TaskPrefix + ' Scene'
@@ -178,9 +202,10 @@ try {
     $null = Register-ScheduledTask -TaskName $decoy -Action $act -ErrorAction Stop
     $null = Register-ScheduledTask -TaskName $mine  -Action $act -ErrorAction Stop
     $clean = NoRealTask
-    Yes 'a task this run did not make is reported' (-not $clean)
-    Yes 'and left where it was' ($null -ne (Get-ScheduledTask -TaskName $decoy -ErrorAction SilentlyContinue))
+    Yes 'a real task under one of this run''s names counts against this run' (-not $clean)
+    Yes 'a task this run did not make is left where it was' ($null -ne (Get-ScheduledTask -TaskName $decoy -ErrorAction SilentlyContinue))
     Yes 'while a task this run made is removed' ($null -eq (Get-ScheduledTask -TaskName $mine -ErrorAction SilentlyContinue))
+    Yes 'and with only another run''s task there, this run counts as clean, so runs side by side do not fail each other (#2323)' (NoRealTask)
 } catch {
     Yes ('the decoy scene could register its tasks: ' + $_.Exception.Message) $false
 } finally {

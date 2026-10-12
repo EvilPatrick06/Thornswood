@@ -61,6 +61,16 @@
   No build carries the switch (#1223), so a first install always needs it.
   Deploy-Server.ps1 and Deploy-DevGamemode.ps1 refuse the same way.
 
+  A LOAD ORDER THAT DROPS WHAT THE SERVER LOADS IS REFUSED (#2320). On
+  5 Oct at 9:56 PM a dev publish of a fresh engine build carried the engine's
+  own order, the five base masters, and this took it over the 48 plugins the
+  dev server ran, because every plugin it named was there. In step 1 the
+  stage's order is held to the running server's: one that leaves out any
+  plugin the running order has is refused, unless -DropPlugins names each
+  one (Publish-Server.ps1 -DropPlugins passes it; ServerSettings.ps1,
+  Test-ThornswoodLoadOrderDrop, says why). A first install has no running
+  order and a put-back brings an order that ran, so neither is held to it.
+
   The newest two .prev folders are kept, and the last .failed one to read.
   -PutBack puts the newest .prev folder back the same way, keeping what it
   took out as <root>.undone-<stamp>. The renames keep every path the task and
@@ -93,6 +103,12 @@ param(
     # refused (#1804, see the header). Publish-Server.ps1 -RequirePass passes it.
     [ValidateSet('', 'on', 'off')]
     [string]$RequirePass = '',
+    # The plugins this install may leave out of the running server's load
+    # order (#2320), as base64 of the names one to a line, because a name with
+    # a space does not survive the ssh command line Publish-Server.ps1 runs
+    # this on. Publish-Server.ps1 -DropPlugins writes it. Left off, an order
+    # that drops any plugin the running server loads is refused.
+    [string]$DropPlugins = '',
     # How many <root>.prev-<stamp> folders to keep.
     [int]$Keep = 2,
     # Lets tests\test-install-server.ps1 run this on a machine with the game on
@@ -149,6 +165,13 @@ if (-not (Test-Path -LiteralPath $settingsLib)) {
 $asked = New-Object PSObject -Property (New-ThornswoodAsked $RequirePass)
 $askedKeys = @(Get-ThornswoodSettingNames $asked)
 $passScript = '.\scripts\release\Publish-Server.ps1'
+$dropNames = @()
+try { $dropNames = @(ConvertFrom-ThornswoodNamesArg $DropPlugins) }
+catch { Say "-DropPlugins does not read as the names Publish-Server.ps1 sends: $($_.Exception.Message). Nothing was changed." 'Red'; Finish 'INSTALL REFUSED' 1 }
+if ($PutBack -and $dropNames.Count) {
+    Say '-PutBack brings back an order the server ran and drops nothing on purpose, so it does not take -DropPlugins. Nothing was changed.' 'Red'
+    Finish 'INSTALL REFUSED' 1
+}
 if ($PutBack -and $askedKeys.Count) {
     Say '-PutBack sets no setting: it puts the previous folder back with the running server''s own settings. Run it without -RequirePass. Nothing was changed.' 'Red'
     Finish 'INSTALL REFUSED' 1
@@ -440,6 +463,10 @@ if (-not $PutBack) {
         foreach ($l in $m.Said) { Say $l 'Cyan' }
         $s = $m.Settings
         # Before the file is written, so a refusal leaves only the stage to clear.
+        # An order that leaves out a plugin the running server loads (#2320).
+        $drop = Test-ThornswoodLoadOrderDrop $script:running $s $dropNames
+        foreach ($l in $drop.Said) { Say $l 'Yellow' }
+        if ($drop.Problem) { Refuse @($drop.Problem) }
         $passWhy = Get-ThornswoodPassSwitchProblem $s $passScript
         if ($passWhy) { Refuse @($passWhy) }
         [IO.File]::WriteAllText($settingsPath, (ConvertTo-Json -InputObject $s -Depth 30), (New-Object Text.UTF8Encoding($false)))

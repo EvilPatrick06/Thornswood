@@ -2,10 +2,10 @@
 # change build.yml and run  node scripts/dev/Build-PrWorkflow.js
 #
 # Every pull request runs the same checks as build.yml, on GitHub's hosted
-# windows-latest runner and never on the VPS beside the live server (#1306,
-# #2161). There is no VPS fallback here, on purpose: pull request code never
-# reaches the box. No secrets, no live folders: every scratch path is under
-# RUNNER_TEMP. The job keeps the name "Launcher builds".
+# windows-latest runner first (#1306). If that job does not succeed, the VPS
+# fallback builds it, for a branch of this repository only, never a fork
+# (Patrick, 12 Oct 2026). No secrets, no live folders: every scratch path is
+# under RUNNER_TEMP. The hosted job keeps the name "Launcher builds".
 name: Build check (pull requests)
 on:
   pull_request:
@@ -17,13 +17,28 @@ concurrency:
   group: build-pr-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  launcher:
-    name: Launcher builds
-    runs-on: windows-latest
-    # The hosted runner has two cores: the harness step alone took over
-    # eighteen minutes on it, so it gets an hour.
-    timeout-minutes: 60
-    steps:
+  # WHERE IT RUNS, since 11 October (#1306, Patrick's final call on #2161):
+  # GitHub's hosted windows-latest is the default, in the job "launcher"
+  # at the end of this file. This job is the VPS FALLBACK. It runs only
+  # for a trusted event (this file has no pull_request trigger: a pull
+  # request builds in build-pr.yml, hosted only), and only when
+  #   - the repository variable BUILD_RUNNER is vps (hosted minutes ran out,
+  #     or GitHub is down: Settings, Variables, BUILD_RUNNER = vps), or
+  #   - a manual run asked for runner: vps, or
+  #   - the hosted job failed. A quota or billing stop fails it before any
+  #     step runs, and this picks the build up on the box. A real red fails
+  #     here too, so a broken main shows red twice; that is the price of not
+  #     telling a quota stop from a test failure.
+  # The steps are the hosted job's own, by the YAML anchor checks, so the two
+  # can never test different things.
+  launcher-vps:
+    name: Launcher builds (VPS fallback)
+    needs: launcher
+    if: ${{ always() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: [self-hosted, Windows, thornswood-vps]
+    # About fifteen minutes on the VPS. Past this it is stuck, not slow.
+    timeout-minutes: 20
+    steps: &checks
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # The hosted image ships whatever node and python it has this month;
@@ -236,6 +251,10 @@ jobs:
           # worldspace the server has it in, from the list the server sends;
           # tests\test-1597-board-objects.js runs the plugin's board code on a
           # pretend game. Under a second.
+          # Issue #503: tests/test-papyrus-event-list.js holds the fork's Papyrus
+          # event list, records/papyrus-events.json, to the rest of this
+          # repository and proves its reader on a small fork it makes. The
+          # fork itself is read against the record in the nightly. A second.
           # $six is a historical name: the gate list grew well past six (#1368).
           # Issue #1589: a line here with no comma after it ends the list, and
           # every name below it only prints itself. test-gate-list.ps1 parses
@@ -290,6 +309,7 @@ jobs:
                  'test-2337-kiln-menu.js',
                  'test-1306-pr-workflow.js',
                  'test-2261-tome-refused.js',
+                 'test-papyrus-event-list.js',
                  'test-1383-treatments.js',
                  'test-1384-condition.js',
                  'test-1385-perks.js',
@@ -406,7 +426,7 @@ jobs:
                  'test-2037-journal-new.js', 'test-2135-journal-press.js', 'test-social.js', 'test-2157-reconfigure.ps1', 'test-2210-links-attributes.ps1', 'test-2210-refresh-scope.ps1',
                  'test-site-auth.js',
                  'test-site-route-gaps.js', 'test-2215-play-pressed-by.ps1',
-                 'test-docs-pwfile.ps1',
+                 'test-docs-pwfile.ps1', 'test-docs-password.ps1', 'test-2317-rotate-config.ps1',
                  'test-site-credits-fill.js', 'test-deployed-build.ps1', 'test-459-publish-record.ps1',
                  'test-site-headers.js', 'test-generated-source-chain.ps1',
                  'test-site-render.js', 'test-site-discovery.js',
@@ -429,6 +449,7 @@ jobs:
                  'test-1050-news-out.ps1',
                  'test-2309-loadorder-fresh.ps1',
                  'test-459-publish-dist.ps1',
+                 'test-2320-short-load-order.ps1',
                  'test-1929-dev-gamemode-note.ps1',
                  'test-1938-server-ready-wait.ps1',
                  'test-1955-ship-stack-note.ps1',
@@ -700,3 +721,15 @@ jobs:
       # No pdb artifact (#1356 / #462): the pdb carries absolute build-machine
       # source paths. Packs and the installer already skip *.pdb. Keep the exe
       # above; leave the pdb on the runner only.
+
+  # The default: GitHub's hosted Windows runner (#1306). Skipped when
+  # BUILD_RUNNER is vps or a manual run asked for the box, and then the
+  # fallback above runs instead.
+  launcher:
+    name: Launcher builds
+    if: ${{ vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}
+    runs-on: windows-latest
+    # The hosted runner has two cores: the harness step alone took over
+    # eighteen minutes on it, so it gets an hour.
+    timeout-minutes: 60
+    steps: *checks
