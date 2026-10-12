@@ -252,9 +252,13 @@ yes('the grace the README gives, ' + grace + ' hours, is GraceHours in Door.cs',
 // sets the password and writes the rest back, and leaves a file that will not
 // parse alone. If that changes, this fails and the -Password sentence in the
 // README is what to change. tests\test-docs-password.ps1 runs the script itself.
+// The read, the set and the write are SiteConfigSet.ps1, which Deploy-Docs
+// shares with Rotate-ServerPassword (#2317).
+const configSet = read('scripts/deploy/SiteConfigSet.ps1') || '';
 yes('Deploy-Docs.ps1 -Password sets the password in the config.json it read, and the README says so',
-    deploy.indexOf("`$cfg['password'] = `$pw") >= 0 &&
-    deploy.indexOf('WILL NOT READ AS JSON. Nothing written') >= 0 &&
+    deploy.indexOf("Get-ThornswoodSiteConfigSet -ConfigPath \"$rootWin\\config.json\" -Key 'password'") >= 0 &&
+    configSet.indexOf("`$cfg['$Key'] = `$pw") >= 0 &&
+    configSet.indexOf('WILL NOT READ AS JSON. Nothing written') >= 0 &&
     deploy.indexOf('$json = (@{ password = $Password }') < 0 &&
     /`-Password` reads the `config\.json`\s+on the VPS, changes the member password in it and keeps every other setting/.test(readme) &&
     /will not read as JSON, an empty one included, is\s+left exactly as it is and the password is not changed/.test(readme) &&
