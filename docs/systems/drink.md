@@ -45,5 +45,15 @@ not a new station.
 
 The ale curve, the 45 minutes, and the chat line that says which drink
 it was are in the server. The damage help, the sway, and the hangover
-are not. Water is not yet tagged by where you filled it. Every
-non-ale drink is 20.
+are not. Water is tagged by where you filled it. An empty wine bottle fills at a
+well or standing in water; the server keeps where each bottle came from,
+and drinking takes the worst you carry first. A minute by a fire boils
+every unboiled bottle you carry, and leaving the fire before then loses
+the boil. Well water and Frostreach ice water are safe without boiling
+(Patrick, 12 Oct 2026). A well is any of the 30 vanilla wells placed in
+the load order (scripts/dev/Build-WellTable.py), within 400 units, and
+once you fill at one it is done for you for one in-game day (72 real
+minutes); other wells still work. A bottle the server never saw filled,
+like one bought at an inn, is safe. Filling and boiling are /water fill
+and /water boil, for the needs panel's buttons to send; the buttons are
+not built yet. Every other non-ale drink is 20.
