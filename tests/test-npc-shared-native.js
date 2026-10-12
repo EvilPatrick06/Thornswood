@@ -334,7 +334,7 @@ async function checkOverLimit() {
     const work = Math.min(c.duration-gc,c.cpu+cpuClockStepMs);
     noteWork(c.name,work);
     assert.ok(work <= c.limit,'Scheduled callback exceeded '+c.limit+' ms: '+c.name+' '+c.duration.toFixed(2)+' ms, '+
-      gc.toFixed(1)+' ms of it collecting garbage, '+c.cpu.toFixed(1)+' ms on the CPU');
+      gc.toFixed(1)+' ms of it collecting garbage, '+c.cpu.toFixed(1)+' ms on the CPU ('+c.kernel.toFixed(1)+' of it in the kernel)');
   }
   overLimit.length = 0;
   collections.length = 0;
@@ -350,11 +350,12 @@ async function advance(ms) {
     current = {moves:0};
     const start = performance.now();
     callbackAt = start;
-    const cpuAt = threadCpuMs();
-    let duration=0, cpu=0;
+    const cpuAt = threadCpuMs(), kernelAt = process.threadCpuUsage().system;
+    let duration=0, cpu=0, kernel=0;
     try { task.fn(); }
     finally {
       cpu = threadCpuMs()-cpuAt;
+      kernel = (process.threadCpuUsage().system-kernelAt)/1000;
       duration = performance.now()-start;
       callbackAt = 0;
       if(duration > worst.callback) { worst.callback = duration; worst.callbackTask = task.name; }
@@ -364,7 +365,7 @@ async function advance(ms) {
     const limit=task.name==='preload' ? maxColdLoadMs : maxCallbackMs;
     if(duration > limit) {
       worst.wallOverLimit++;
-      overLimit.push({name:task.name,start,end:start+duration,duration,cpu,limit});
+      overLimit.push({name:task.name,start,end:start+duration,duration,cpu,kernel,limit});
     } else noteWork(task.name,Math.min(duration,cpu+cpuClockStepMs));
     if(++callbacks % 100 === 0) sampleRss();
     assert.ok(++calls < 200000,'Runtime must yield with finitely many scheduled callbacks');
