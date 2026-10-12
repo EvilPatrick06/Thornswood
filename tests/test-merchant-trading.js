@@ -151,6 +151,24 @@ box.world.actors[10].pos=[0,0,0];open(box.api);
 }
 
 const cooldownPanel=service({on:true},250);
+for (const during of ['reach','final']) {
+  const nested=service({on:true},250), calls=[];
+  nested.deps.quests=()=>({describe:()=>[],capture:()=>({}),act:()=>{calls.push(1);return {ok:true};}});
+  open(nested.api);
+  const lookup=nested.world.actor;let fired=false,reads=0;
+  nested.world.actor=function(id) {
+    if(!fired && (during==='reach'?id===1:id===10 && ++reads===2)) {
+      fired=true;open(nested.api);
+    }
+    return lookup(id);
+  };
+  const refused=nested.api.command({actorId:10,profileId:7,parts:['/merchant','quest','take','ebony']});
+  assert.equal(calls.length,0,'a '+during+' callback cannot redirect an old command into a replacement panel');
+  assert.equal(refused.view,null,'a refused old command cannot close the replacement panel');
+  nested.world.actor=lookup;
+  nested.api.command({actorId:10,profileId:7,parts:['/merchant','quest','take','ebony']});
+  assert.equal(calls.length,1,'the new panel keeps its command ownership after '+during);
+}
 let cooling=true;
 cooldownPanel.deps.quests=()=>({describe:()=>[{id:'ebony',state:cooling?'cooldown':'available',canTake:!cooling}]});
 open(cooldownPanel.api);

@@ -613,6 +613,32 @@ yes('the miner page says the same', /kept on the character/.test(mWhere) &&
   ctx.swingEnd(92,1);const revoked=timers.at(-1);runtime='101';const before=writes.length;revoked.fn();
   yes('a mining-stop timer cannot write into a replacement session',writes.length===before);
 }
+{
+  ranks['94:miner']='master';w=restart();w.svc.offer(94,'ebony');let armed=false,stopped=0;
+  w.ctx.__runtimeIdentityApi={getNpcAIState:()=>({isHuman:true,profileId:7,lifeGeneration:0}),
+    getDescFromId:()=> 'ff000094:Skyrim.esm',getActorRuntimeIdentity:()=>{
+      if(armed){armed=false;w.svc.shutdown();}return '100';}};
+  w.ctx.mining=()=>{armed=true;return true;};w.ctx.stopMining=()=>stopped++;
+  w.svc.mineRare(94,here[0],EBONY);
+  yes('an identity callback shutdown cannot stop replacement mining',stopped===0);
+}
+{
+  const timers=[],writes=[];let publish=false;
+  const start=gm.indexOf('function swing(actorId, anim, lands, opts) {');
+  const finish=gm.indexOf('\nconst SWING_QUIET',start);
+  const ctx={mp:{set:(...args)=>{writes.push(args);if(publish && args[2].end){publish=false;ctx.swing(95,'new',null,{});}},
+    getActorRuntimeIdentity:()=> '100'},
+    setTimeout:(fn,ms)=>{timers.push({fn,ms});return timers.length;},clearTimeout(){},
+    guard:(label,fn)=>fn,SWING_PROPERTY:'swing',SWING_STOP:'stop',SWING_FREE:'free',
+    SWING_MS:2500,SWING_LAND_MS:900,SWING_QUIET:{},SWING_IN_AIR:{},SWING_CLEAR:{},log(){}};
+  vm.createContext(ctx);vm.runInContext(gm.slice(start,finish),ctx);
+  publish=true;ctx.swingEnd(95,1);
+  const before=writes.length;
+  timers.filter(t=>t.ms===1500).forEach(t=>t.fn());
+  yes('a swing-end publication cannot clear a newer animation',writes.length===before);
+  timers.filter(t=>t.ms===3500).forEach(t=>t.fn());
+  yes('the newer swing keeps its cleanup lease after swing-end publication',!ctx.SWING_IN_AIR[95]);
+}
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
