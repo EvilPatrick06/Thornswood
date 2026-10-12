@@ -32,7 +32,7 @@ is logged and the event goes on. Form ids cross the boundary as descriptors,
 ## How the blocks find each other
 
 The file runs top to bottom. The early part is plain functions and the `mp.on*`
-handlers. From line 10459 on, each system is an immediately run function
+handlers. From the voice feed block (`gamemode.js:path: '/positions'`) on, each system is an immediately run function
 between `// ==== thornswood X ====` and `// ==== end thornswood X ====`,
 which publishes its interface on `globalThis`, for example
 `g.__thornswoodProgression` (`gamemode.js:g.__thornswoodProgression = {`),
@@ -43,36 +43,38 @@ at load, which is why it can reach blocks that sit below it.
 
 ## The map
 
-| Lines | Section | What is there |
-|---|---|---|
-| 1-35 | Header and one-line tables | The contract (1-21), then `DATA`, `STATIONS`, `ITEMS`, `WATERS`, `WEATHER`, `WARMTH`, `FOODS`, `RACES` (23-30), each one line. See "Generated tables". |
-| 37-334 | Small helpers and logging | `rollLog` (82), `sayLogState` (110), `logPath` (124), `log` (139); `gamemodeId` (208), which logs the git blob id of the loading file (222); `voicePort` (249), `guard` (267), `notify` (294), `say` (312). |
-| 335-638 | Respawn resolution | A port of `respawnResolver.ts`: `arrive` (391), `resolveArrival` (415). `ensureProperties` (467) declares the actor properties the early blocks use. |
-| 639-1497 | Gathering stations | `ORES_BY_BASE` (686-1271), the stations' cooldown (`COOLDOWN_MS` 1285), `addItem`, `takeItem` (1436-1493). |
-| 1498-1650 | Class and profession gates | `classGate` (1515), `halfGate` (1530), `creditWork` (1549), `rankStep` (1639). |
-| 1651-3617 | Starting tools, mining, chopping, charcoal | `TOOLS` (1739) and tool wear (1810-2113); salt (`mineSalt` 2114); the swing animation (2632-2898); ore deposits (`DEPOSIT_SIZE` 2255, 2959-3058); `mineOre` (3059); chopping blocks (3342-3549, `chopWood` 3463). The kiln is a bench since #2337, answered by nothing here. |
-| 3618-5070 | Character creation (chargen) | See "Character creation" below. |
-| 5071-5232 | Event handlers | `mp.onDeath` (5090), `mp.onRespawn` (5223). `ensureProperties()` and `startChargenTimer()` run at load here (5078-5079). |
-| 5233-7466 | Scripted activators, harvesting, fishing, hunting | The generated `HARVESTS_BY_BASE`, `FISH_BY_BASE`, `GAME_BY_BASE`, `CROPS_BY_BASE`, `HUNTS_BY_BASE` blocks; `harvest` (6165), `fish` (6236), `game` (6343), `loot` for carcasses (6996), `farmActivate` (7102); `mp.onActivate` (7139), which routes every press; `publishServerBases` (7393). |
-| 7467-9556 | Crafting | `RECIPES_BY_ID` (7549-9499), `isRecipe` (9507), `professionName` (9527). |
-| 9557-9600 | Property doors | `BUILDING_BY_DOOR`, `BUILDING_NAME`, `WAY_OUT`. |
-| 9601-10305 | Benches | `BENCH_BY_BASE` (9627-9633), `raceOf` (9664), `raceGate` (9718), `BENCH_ACCESS` (9735), `benchGate` (9748), `craftAnswer` (9834), `recipelessCraft` (10033). |
-| 10306-10458 | `mp.onCraft` | Key recipe (10306), the handler (10309), and the "gamemode loaded" line (10454). |
-| 10459-10643 | Voice feed | Positions to the voice service; the `online.json` writer (10561). |
-| 10644-10992 | Character roster | `private\characters.json` (10708), sent to the site. |
-| 10994-11515 | The door | The allowed list. See "The door". |
-| 11517-11671 | Server manifest | `data\manifest.json` (11564), `publish` (11570). |
-| 11674-13071 | Progression | The rulebook: `RANKS` (11715), `SPELL_IDS` (11826-11930), `TUNING` (11945), state (12365), rules (12577), the spell book (12885), `TABLE` (12361), `canDo` (13052). |
-| 13073-14363 | Farming | Plots, rank and time (13360), the land (13425), claims in `private\farm-claims.json` (13527), pressing (13746), commands `/plant`, `/claim`, `/plot` (14031). |
-| 14365-16818 | Property | See "Property, offices and rent". |
-| 16820-17238 | Spoils | Nothing weapon, armour, tool or gold is spawned in the world; `strip` (17029), purses (`isPurse` 16990, `purse` 17191), where gold comes from (17157). |
-| 17242-18512 | Character | Stores the answer as `thornswoodCharacter` (17291) and pushes the panel; `gate` (18061), `gateHalf` (18076), `credit` (18129), `/pick` and `/spend` in `command` (18212). |
-| 18514-20800 | Chat commands | See "Chat and commands". |
-| 20802-21085 | Containers and the audit | `mp.onPutItem` (20814), `mp.onTakeItem` (21075), `mp.onDropItem` (21080), audit helpers (21032-21069), lines `take:` and `drop:` in `thornswood.log`. |
-| 21086-22922 | Needs | See "Needs". |
-| 22924-23757 | Social | Friends, parties, mutes, journals, the panel, `thornswoodNear` (22983). |
-| 23759-24247 | Trade | Two people, two offers, both confirm: `begin` (23851), `gold` (24012), `confirm` (24025), `swap` (24048). |
-| after Trade | Mod settings | Issue #488, added 28 September. The 176 GLOB records of five classic mod menus (`MOD_GLOBALS`), kept per profile in `private\mod-settings.json` from the plugin's `/modset` lines and put back at login through `thornswoodModSettings` and its updateOwner script. `tests\test-mod-settings.js`. |
+In file order, top to bottom. Search for a name to find it; the sections have no fixed lines.
+
+| Section | What is there |
+|---|---|
+| Header and one-line tables | The contract, then `DATA`, `STATIONS`, `ITEMS`, `WATERS`, `WEATHER`, `WARMTH`, `FOODS`, `RACES`, each one line. See "Generated tables". |
+| Small helpers and logging | `rollLog`, `sayLogState`, `logPath`, `log`; `gamemodeId`, which logs the git blob id of the loading file; `voicePort`, `guard`, `notify`, `say`. |
+| Respawn resolution | A port of `respawnResolver.ts`: `arrive`, `resolveArrival`. `ensureProperties` declares the actor properties the early blocks use. |
+| Gathering stations | `ORES_BY_BASE`, the stations' cooldown (`COOLDOWN_MS`), `addItem`, `takeItem`. |
+| Class and profession gates | `classGate`, `halfGate`, `creditWork`, `rankStep`. |
+| Starting tools, mining, chopping, charcoal | `TOOLS` and tool wear; salt (`mineSalt`); the swing animation; ore deposits (`DEPOSIT_SIZE`); `mineOre`; chopping blocks (3342-3549, `chopWood`). The kiln is a bench since #2337, answered by nothing here. |
+| Character creation (chargen) | See "Character creation" below. |
+| Event handlers | `mp.onDeath`, `mp.onRespawn`. `ensureProperties()` and `startChargenTimer()` run at load here. |
+| Scripted activators, harvesting, fishing, hunting | The generated `HARVESTS_BY_BASE`, `FISH_BY_BASE`, `GAME_BY_BASE`, `CROPS_BY_BASE`, `HUNTS_BY_BASE` blocks; `harvest`, `fish`, `game`, `loot` for carcasses, `farmActivate`; `mp.onActivate`, which routes every press; `publishServerBases`. |
+| Crafting | `RECIPES_BY_ID`, `isRecipe`, `professionName`. |
+| Property doors | `BUILDING_BY_DOOR`, `BUILDING_NAME`, `WAY_OUT`. |
+| Benches | `BENCH_BY_BASE`, `raceOf`, `raceGate`, `BENCH_ACCESS`, `benchGate`, `craftAnswer`, `recipelessCraft`. |
+| `mp.onCraft` | Key recipe, the handler, and the "gamemode loaded" line. |
+| Voice feed | Positions to the voice service; the `online.json` writer. |
+| Character roster | `private\characters.json`, sent to the site. |
+| The door | The allowed list. See "The door". |
+| Server manifest | `data\manifest.json`, `publish`. |
+| Progression | The rulebook: `RANKS`, `SPELL_IDS`, `TUNING`, state, rules, the spell book, `TABLE`, `canDo`. |
+| Farming | Plots, rank and time, the land, claims in `private\farm-claims.json`, pressing, commands `/plant`, `/claim`, `/plot`. |
+| Property | See "Property, offices and rent". |
+| Spoils | Nothing weapon, armour, tool or gold is spawned in the world; `strip`, purses (`isPurse`, `purse`), where gold comes from. |
+| Character | Stores the answer as `thornswoodCharacter` and pushes the panel; `gate`, `gateHalf`, `credit`, `/pick` and `/spend` in `command`. |
+| Chat commands | See "Chat and commands". |
+| Containers and the audit | `mp.onPutItem`, `mp.onTakeItem`, `mp.onDropItem`, audit helpers, lines `take:` and `drop:` in `thornswood.log`. |
+| Needs | See "Needs". |
+| Social | Friends, parties, mutes, journals, the panel, `thornswoodNear`. |
+| Trade | Two people, two offers, both confirm: `begin`, `gold`, `confirm`, `swap`. |
+| Mod settings | Issue #488, added 28 September. The 176 GLOB records of five classic mod menus (`MOD_GLOBALS`), kept per profile in `private\mod-settings.json` from the plugin's `/modset` lines and put back at login through `thornswoodModSettings` and its updateOwner script. `tests\test-mod-settings.js`. |
 
 ## Startup and settings
 
@@ -100,11 +102,11 @@ gamemode no connect event. `chargenTick` (`gamemode.js:chargenTick`) runs every
 stages kept in the actor property `thornswoodChargen` (`gamemode.js:CHARGEN_PROPERTY`):
 
 1. `appearance`, set by `beginAppearance` (`gamemode.js:beginAppearance`) in the hall
-   (`HALL` 3833, `sendToHall` 4290), while the face is made.
+   (`HALL`, `sendToHall`), while the face is made.
 2. `choosing`, set by `beginChoosing` (`gamemode.js:beginChoosing`): the choice is made
    on K in the character panel.
 3. `done`, set by `arriveAt` (`gamemode.js:arriveAt`), which moves the person to
-   the inn of the town they picked (`CHARGEN.towns` as `PASSAGES`, 3893).
+   the inn of the town they picked (`CHARGEN.towns` as `PASSAGES`).
 
 An old `arriving` state is folded into `done` (`gamemode.js:if (state.stage === 'arriving') {`).
 `"thornswoodChargen": false` in `server-settings.json` switches the hall off.
@@ -187,28 +189,28 @@ The rules are in progression and the three blocks after the character block.
 
 ## Property, offices, rent and gold
 
-The register is `private\property.json` (`registerPath`, `gamemode.js:registerPath`;
-`save`, 14591). A claim is made at the door (`touched` 14730, `claim` 14888)
-and carried by the deed (`giveDeed` 14869). Locks and keys start at 14958
-(`lockScript` 15032, `mold` 15284, `cutKey` 15525). A Jarl, the one admin
-grant, names stewards (`loadStewards` 14635, `stewardCmd` 16708), and only a
-steward can `evict` (16763). A hold's box takes gold only (`putIn` 15948);
-rent (`rentDue` 15996, `rentCmd` 16033) and board fees (`takeGold` 16348)
-land in it. Notice boards are 16100-16700. Coin enters the world in one
-place, the starting purse (`purse` 17191, `test-one-mint.js`), and otherwise
-moves by trade (`gold` 24012). The spoils block strips spawned gold from the
-world (16820), and a coin purse found in it counts as gold (16961).
+The register is `private\property.json` (`gamemode.js:registerPath`;
+`save`). A claim is made at the door (`touched`, `claim`)
+and carried by the deed (`giveDeed`). Locks and keys follow
+(`lockScript`, `mold`, `cutKey`). A Jarl, the one admin
+grant, names stewards (`loadStewards`, `stewardCmd`), and only a
+steward can `evict`. A hold's box takes gold only (`putIn`);
+rent (`rentDue`, `rentCmd`) and board fees (`takeGold`)
+land in it. Notice boards come after them. Coin enters the world in one
+place, the starting purse (`purse`, `test-one-mint.js`), and otherwise
+moves by trade (`gold`). The spoils block strips spawned gold from the
+world, and a coin purse found in it counts as gold.
 
 ## Needs
 
 Hunger, thirst and exhaustion, with warmth, in one block. The whole balance
 is `NEEDS` (`gamemode.js:NEEDS`), `COST` (`gamemode.js:COST`) and `TEMP_COST` (`gamemode.js:TEMP_COST`).
-Warmth: `warmthTarget` (21784), `fireWarmth` (21839), `exposure` (21878),
-`weatherRow` (21920) off `WEATHER`, `insulation` (22134) off `WARMTH`. Food
-and drink: `foodKind` (21972) off `FOODS`, `waterKind` (21862) off `WATERS`,
-`consumed` (21997). The bard (22198), which the tick reads off the emote
-wheel (`bardSeen`, #1631), `/rest` (22329), the tick (22518), the HUD script (22579) and burning (22782). State
-is `thornswoodNeeds` (21137).
+Warmth: `warmthTarget`, `fireWarmth`, `exposure`,
+`weatherRow` off `WEATHER`, `insulation` off `WARMTH`. Food
+and drink: `foodKind` off `FOODS`, `waterKind` off `WATERS`,
+`consumed`. The bard, which the tick reads off the emote
+wheel (`bardSeen`, #1631), `/rest`, the tick, the HUD script and burning. State
+is `thornswoodNeeds`.
 
 ## Chat and commands
 
@@ -291,7 +293,7 @@ because each reads the one before.
 | `ITEMS` | `Install-GamemodeConsts.js` | `items.json` | `Install-GamemodeConsts.js` |
 | `CHARGEN` | `Install-GamemodeConsts.js` | `chargen.json` | `Install-GamemodeConsts.js` |
 
-`DATA`, `STATIONS`, `ITEMS` (lines 23-25) and `CHARGEN` (around line 3878)
+`DATA`, `STATIONS`, `ITEMS` (`gamemode.js:DATA`, `gamemode.js:STATIONS`, `gamemode.js:ITEMS`, at the top) and `CHARGEN` (`gamemode.js:CHARGEN`)
 are installed from checked-in JSON by `scripts\dev\Install-GamemodeConsts.js`
 (`data.json`, `stations.json`, `items.json`, `chargen.json` under `game\data`).
 They are not read out of the plugins: the values were recovered into JSON when

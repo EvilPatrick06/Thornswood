@@ -26,8 +26,8 @@ starts with a slash goes to the voice service, which is not the game
 server. The voice service says `/me`, `/do`, `/w` and `/s` itself and
 never passes them on (`voice/voice-server.js:CHAT_VERBS`). Every other slash
 line is queued for the game server, which collects the queue in the
-chat commands block of `game/gamemode.js`: `dispatch` (43770) first,
-then `handle` (44415).
+chat commands block of `game/gamemode.js`: `dispatch` first,
+then `handle`.
 
 Two lists in that block decide what people are told. `WORDS` is every
 word the server answers. `PLAYER_WORDS` is the words named to everybody,
