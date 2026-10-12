@@ -375,19 +375,53 @@ function chatWrite(kind, peerId, me, text) {
 
 /* Whole days go, never lines out of a day, so a file is either all there or
    not there at all and nobody has to wonder whether it was edited. */
+/* A DAY THAT WILL NOT GO IS SAID (#2191). A failed delete used to be dropped
+   silently, so a locked or protected day could outlive CHAT_DAYS with nobody
+   told. Now each failure is a structured line (the file's name and the error
+   code, never what it holds), a day that has failed CHAT_PRUNE_ALERT passes
+   in a row says ALERT, /health counts the days past their time, and while
+   any is overdue the prune is tried again every hour, not every six. */
+const CHAT_PRUNE_ALERT = 3;
+const chatPruneFailures = {};   // file name -> passes in a row it would not go
+let chatOverdue = 0;
+let chatPruneError = '';
+let chatPruneTimer = null;
+function chatPruneSay(o) { console.log('[voice] chat-retention ' + JSON.stringify(o)); }
 function chatPrune() {
+  let overdue = 0;
   try {
-    if (!fs.existsSync(CHAT_DIR)) return;
-    const cutoff = Date.now() - CHAT_DAYS * 86400000;
-    for (const f of fs.readdirSync(CHAT_DIR)) {
-      const m = /^(\d{4})-(\d{2})-(\d{2})\.jsonl$/.exec(f);
-      if (!m) continue;
-      const at = new Date(+m[1], +m[2] - 1, +m[3]).getTime();
-      if (at < cutoff) { try { fs.unlinkSync(path.join(CHAT_DIR, f)); } catch (e) { } }
+    if (fs.existsSync(CHAT_DIR)) {
+      const cutoff = Date.now() - CHAT_DAYS * 86400000;
+      const seen = {};
+      for (const f of fs.readdirSync(CHAT_DIR)) {
+        const m = /^(\d{4})-(\d{2})-(\d{2})\.jsonl$/.exec(f);
+        if (!m) continue;
+        const at = new Date(+m[1], +m[2] - 1, +m[3]).getTime();
+        if (at >= cutoff) continue;
+        try {
+          fs.unlinkSync(path.join(CHAT_DIR, f));
+          if (chatPruneFailures[f]) { chatPruneSay({ event: 'deleted-after-retry', file: f, failures: chatPruneFailures[f] }); }
+        } catch (e) {
+          seen[f] = true;
+          overdue++;
+          const n = (chatPruneFailures[f] || 0) + 1;
+          chatPruneFailures[f] = n;
+          chatPruneSay({ event: n >= CHAT_PRUNE_ALERT ? 'ALERT-delete-failing' : 'delete-failed', file: f,
+                         code: (e && e.code) || 'unknown',
+                         daysPastRetention: Math.floor((cutoff - at) / 86400000), failures: n });
+        }
+      }
+      for (const f of Object.keys(chatPruneFailures)) { if (!seen[f]) delete chatPruneFailures[f]; }
     }
-  } catch (e) { }
+    chatPruneError = '';
+  } catch (e) {
+    chatPruneError = (e && e.code) || 'unknown';
+    chatPruneSay({ event: 'prune-failed', code: chatPruneError });
+  }
+  chatOverdue = overdue;
+  clearTimeout(chatPruneTimer);
+  chatPruneTimer = setTimeout(chatPrune, (overdue || chatPruneError) ? 3600000 : 6 * 3600000);
 }
-setInterval(chatPrune, 6 * 3600000);
 chatPrune();
 
 /* ------------------------------------------------------ who hears a line ---
@@ -2034,7 +2068,8 @@ const server = http.createServer((req, res) => {
                             droppedPositions: droppedPositions,
                             skippedRosters: skippedRosters,
                             closedBacklogged: closedBacklogged,
-                            closedSilent: closedSilent }));
+                            closedSilent: closedSilent,
+                            chatRetention: { overdueDays: chatOverdue, pruneError: chatPruneError } }));
     return;
   }
 

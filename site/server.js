@@ -1055,14 +1055,40 @@ function writeDoc(n, text) {
 
 const BOARDFILE = path.join(DATA, 'board.json');
 const readBoard = () => jsonFile(BOARDFILE, {});
-function writeBoardOne(name, value) {
-  if (!Object.prototype.hasOwnProperty.call(BOARDS, name)) return false;
+// EVERY BOARD HAS A REVISION (#2188). One board is saved at a time, so two
+// people on two boards never overwrite each other, but until 11 October two
+// people on the SAME board did, silently: last save won and the other edit
+// was gone. Now board.json keeps _rev, a number per board, bumped on every
+// save. /api/all hands the hub each board's number as boardRevs, the hub
+// sends back the one it last saw in X-Board-Rev, and a save made from an
+// older copy is refused with 409 and a sentence saying to reload, rather
+// than written over somebody else's change. A save with no X-Board-Rev at
+// all (a hub page opened before this went live) is refused with 428 for the
+// same reason: it cannot say which copy it was made from. The check and the
+// write are one synchronous step in one process, so two saves cannot both
+// pass it.
+function boardRev(all, name) {
+  const r = all && all._rev && all._rev[name];
+  return (typeof r === 'number' && r >= 0 && Math.floor(r) === r) ? r : 0;
+}
+function writeBoardOne(name, value, seenRev) {
+  if (!Object.prototype.hasOwnProperty.call(BOARDS, name)) return { ok: false, status: 400, error: 'no such board' };
   const all = readBoard();
+  const now = boardRev(all, name);
+  if (seenRev === undefined || seenRev === null || seenRev === '') {
+    return { ok: false, status: 428, error: 'no revision', rev: now,
+      message: 'This page was opened before boards checked for clashing saves. Reload it, then make your change again.' };
+  }
+  if (String(seenRev) !== String(now)) {
+    return { ok: false, status: 409, error: 'conflict', rev: now,
+      message: 'Somebody else saved this board since you opened it, so your change was not saved over theirs. Reload to see their change, then make yours again.' };
+  }
   all[name] = value;
-  // One board at a time, so two people on two boards never overwrite each
-  // other. Two people on the SAME board still do, and last save wins.
+  all._rev = Object.assign({}, all._rev && typeof all._rev === 'object' ? all._rev : {});
+  all._rev[name] = now + 1;
   try { fs.copyFileSync(BOARDFILE, BOARDFILE + '.bak'); } catch (e) { }
-  return putJson(BOARDFILE, all);
+  if (!putJson(BOARDFILE, all)) return { ok: false, status: 500, error: 'could not save' };
+  return { ok: true, status: 200, rev: now + 1 };
 }
 
 const RESULTS = path.join(DATA, 'results.json');
@@ -6039,12 +6065,13 @@ async function handle(req, res) {
       const docs = {}, boards = {};
       for (const n of Object.keys(DOCS))   if (allowed(n, w)) docs[n]   = readDoc(n);
       const all = readBoard();
-      for (const n of Object.keys(BOARDS)) if (allowed(n, w)) boards[n] = all[n] || { intro:'', sections:[] };
+      const boardRevs = {};
+      for (const n of Object.keys(BOARDS)) if (allowed(n, w)) { boards[n] = all[n] || { intro:'', sections:[] }; boardRevs[n] = boardRev(all, n); }
       return sendJson(res, 200, {
         me: w,
         titles: Object.assign({}, DOCS, BOARDS),
         level: LEVEL,
-        docs, boards,
+        docs, boards, boardRevs,
         // Member and admin material, held back from staff who are neither.
         // They are here for the Gallery page, which reads none of these: the
         // queue and the live list are their own doors.
@@ -6209,8 +6236,12 @@ async function handle(req, res) {
       let obj;
       try { obj = JSON.parse(await body(req)); }
       catch (e) { passBodyFailure(e); return sendJson(res, 400, { error: 'bad json' }); }
-      if (!writeBoardOne(mb[1], obj)) return sendJson(res, 400, { error: 'no such board' });
-      return sendJson(res, 200, { ok: true });
+      const saved = writeBoardOne(mb[1], obj, req.headers['x-board-rev']);
+      if (!saved.ok) {
+        if (saved.status === 409) console.warn('board ' + mb[1] + ': a save from revision ' + req.headers['x-board-rev'] + ' was refused, the board is at ' + saved.rev);
+        return sendJson(res, saved.status, { error: saved.error, message: saved.message, rev: saved.rev });
+      }
+      return sendJson(res, 200, { ok: true, rev: saved.rev });
     }
 
     /* Everything from one session, for the View more button on /sessions.
