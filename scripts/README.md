@@ -1,6 +1,6 @@
 # The PowerShell scripts
 
-Every `.ps1` under this folder, 180 of them, by area: `release` builds and
+Every `.ps1` under this folder, 182 of them, by area: `release` builds and
 ships, `deploy` puts things on the VPS, `vps` looks after the box, `ops` runs
 the world day to day, `mods` works on the collection and the plugins, `dev`
 is for whoever is changing this repository. `oneoff` holds finished one time
@@ -129,6 +129,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/BuildStamp.ps1](release/BuildStamp.ps1) | What a server's gamemode is, written down beside it. |
 | [release/Bump-Version.ps1](release/Bump-Version.ps1) | Moves the launcher's version number, commits that one file, and stops. |
 | [release/Check-Build.ps1](release/Check-Build.ps1) | The server does not check plugin names. It checks size and crc32 of every plugin it names, so the wrong version of a mod is the same to it as not having the mod. |
+| [release/Check-Records.ps1](release/Check-Records.ps1) | Holds the committed high-risk records to their shape and version, fail closed (#2180). |
 | [release/Check-ShipReady.ps1](release/Check-ShipReady.ps1) | Whether THIS machine can run a release, and what is missing if it cannot. |
 | [release/Dev-News.ps1](release/Dev-News.ps1) | Which notes on the dev feed are marked DEV, worked out from main's feed, and the one place that writes those marks and the dev feed's mainVersion. |
 | [release/EngineJobs.ps1](release/EngineJobs.ps1) | How many projects an engine build compiles at once, and whether a compile that failed ran the machine out of memory. |
@@ -151,6 +152,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/Publish-Update.ps1](release/Publish-Update.ps1) | Diffs the current build against the last published state, packs only what changed, sends it to the site (thornswood.net/feed[-dev]/assets/<sha256>, #897), and updates version.json so everyone's launcher picks it up. |
 | [release/Publish-VirusTotal.ps1](release/Publish-VirusTotal.ps1) | Optional manual tool: sends a file to VirusTotal, or says plainly that it is not sending and carries on. Not called from publish. |
 | [release/Read-JsonFile.ps1](release/Read-JsonFile.ps1) | ConvertFrom-ThornswoodJson: JSON text read from a file, parsed, or a stop that names the file. |
+| [release/RecordShape.ps1](release/RecordShape.ps1) | The shape and version each high-risk JSON record must have, checked fail closed (#2180, first slice). docs\JSON-STATE-INVENTORY.md lists every critical JSON file, who writes it and who reads it. |
 | [release/Refresh-DevNews.ps1](release/Refresh-DevNews.ps1) | Marks the dev feed's notes DEV again against what main has published, and sets its mainVersion, with no release. |
 | [release/Release-Baseline.ps1](release/Release-Baseline.ps1) | What a release is diffed against, and the record each release publishes of what it left installed (#441). |
 | [release/Release-Name.ps1](release/Release-Name.ps1) | One name for each release, recorded in the feed and the store, and a git tag on the commit it was built from (#444). |
