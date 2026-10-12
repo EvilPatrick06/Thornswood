@@ -60,7 +60,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1-tls-only-1-ice-socket-1-no-page-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1-tls-only-1-ice-socket-1-no-page-1-most-1';
 
 // ==== thornswood deploy record ====
 // Which commit this copy came from (#459): Install-Voice.ps1 leaves the deploy
@@ -1443,6 +1443,54 @@ function doorWait(door, req, now) {
   door.seen.set(key, list);
   return 0;
 }
+/*
+  HOW MANY PEOPLE THE SERVICE TAKES AT ONCE (#481).
+
+  The game server seats so many (records\most-online.json, people and the
+  staff seats over it) and nothing here counted at all, so the one service
+  every person in the world holds a socket to, and every person waiting in
+  line at the menu as well, took everybody who came. The issue's words: cap
+  one without the other and it only moves where it breaks.
+
+  THORNSWOOD_VOICE_MOST is the most PEOPLE, not sockets: a person holds one
+  socket for the launcher's voice page and one for the game's chat, and a
+  reconnect can overlap the socket it replaces until that one is let go, so
+  each of those counts once, by the profile its join token proved. A profile
+  that already holds a socket is always let in, so nobody in the room loses
+  their second page or a reconnect to a full room. Install-Voice.ps1 sets it
+  from records\most-online.json (voice). Unset or 0 is no cap, which is how
+  this ran until now.
+
+  Past it, a new profile's socket is opened, told in one chat line why, and
+  closed with 1013, "try again later", rather than refused at the handshake:
+  a browser never shows a page why a handshake failed, and the game's chat
+  draws a line from the service, so the person reads the reason where they
+  would have talked. Both pages then try again on their own backoff (two
+  seconds to a minute, and one to thirty), each try with a token of its own.
+  The token it came with is spent, as every token is on its handshake. The
+  log says it once a minute at most, and /health counts the refusals.
+*/
+function wholeOrZero(v) {
+  const n = Number(String(v == null ? '' : v).trim());
+  return (Number.isInteger(n) && n > 0) ? n : 0;
+}
+const MOST = wholeOrZero(process.env.THORNSWOOD_VOICE_MOST);
+const heldBy = new Map();     // profileId -> sockets open for it
+let refusedFull = 0;          // sockets turned away for numbers, for /health
+let fullSaidAt = 0;
+const FULL_LINE = 'Voice and chat are full: ' + MOST + ' people are connected, the most they take at once. ' +
+                  'This tries again by itself.';
+
+function holdFor(profileId) { heldBy.set(profileId, (heldBy.get(profileId) || 0) + 1); }
+function letGoFor(profileId) {
+  const n = (heldBy.get(profileId) || 0) - 1;
+  if (n > 0) heldBy.set(profileId, n); else heldBy.delete(profileId);
+}
+/* Whether this profile's socket is past the number. */
+function overMost(profileId) {
+  return MOST > 0 && !heldBy.has(profileId) && heldBy.size >= MOST;
+}
+
 // Places whose minute is over are forgotten.
 setInterval(() => {
   const cut = Date.now() - 60000;
@@ -2068,6 +2116,7 @@ const server = http.createServer((req, res) => {
                             turn: TURN_URL ? (TURN_SECRET ? 'ephemeral' : (TURN_USER ? 'static' : 'MISCONFIGURED')) : 'none',
                             chatRange: CHAT_RANGE,
                             peers: peers.size, tracked: positions.size,
+                            most: MOST, people: heldBy.size, refusedFull: refusedFull,
                             queuedCommands: commands.length,
                             backed: backed, largestQueueBytes: largestQueue,
                             droppedPositions: droppedPositions,
@@ -2236,7 +2285,28 @@ server.on('upgrade', (req, socket, head) => {
     'Sec-WebSocket-Accept: ' + accept(key) + '\r\n' +
     'Sec-WebSocket-Protocol: ' + PROTOCOL + '\r\n\r\n');
 
+  // Past the most people at once (#481): told why, then closed; see MOST.
+  if (overMost(proven)) {
+    refusedFull++;
+    if (Date.now() - fullSaidAt > 60000) {
+      fullSaidAt = Date.now();
+      console.log('[voice] full: ' + heldBy.size + ' people are connected, the most this service takes ' +
+                  '(THORNSWOOD_VOICE_MOST), so profile ' + proven + ' was told and closed (' +
+                  refusedFull + ' turned away so far)');
+    }
+    socket.on('error', () => { });
+    const why = Buffer.from('full', 'utf8');
+    try {
+      socket.write(frame(JSON.stringify({ t: 'chat', from: 0, profileId: 0, name: 'Thornswood', text: FULL_LINE, at: Date.now() })));
+      socket.end(Buffer.concat([Buffer.from([0x88, 2 + why.length, 0x03, 0xf5]), why]));   // FIN+close, 1013 try again later
+    } catch (e) {
+      try { socket.destroy(); } catch (x) { }
+    }
+    return;
+  }
+
   const ws = new Sock(socket);
+  holdFor(proven);
   let myId = 0;
   // When this connection was last told the command queue is full.
   let refusedAt = 0;
@@ -2528,6 +2598,7 @@ server.on('upgrade', (req, socket, head) => {
   };
 
   ws.onclose = () => {
+    letGoFor(proven);
     if (!myId) return;
     const me = peers.get(myId);
     peers.delete(myId);
