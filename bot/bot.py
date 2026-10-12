@@ -2628,7 +2628,11 @@ async def test_task_cmd(interaction: discord.Interaction, title: str,
 #                  comment does not say Server: Dev; a closed issue's newest
 #                  test task then goes to #test-tasks as before, if it is
 #                  Main. An issue whose last test task says Server: Dev gets
-#                  no #test-tasks post from it.
+#                  no #test-tasks post from it. A dev post is for developers
+#                  (Patrick, 12 Oct): the issue, its pull requests, commits,
+#                  labels and build linked, and the whole test task over as
+#                  many messages as it takes (dev_render). #test-tasks posts
+#                  stay plain, with no number, link or code.
 #
 # "Server: Dev" counts only on a comment written from the day #dev-test-tasks
 # began (state['dev_since'], set on the first pass that finds the forum).
@@ -2761,6 +2765,19 @@ def github_comments(number, get=None):
     return out
 
 
+def github_timeline(number, get=None):
+    get = get or _github_get
+    out, page = [], 1
+    while True:
+        rows = get('%s/repos/%s/issues/%d/timeline?per_page=100&page=%d'
+                   % (GITHUB_API, KNOWN_REPO, int(number), page)) or []
+        out += [r for r in rows if isinstance(r, dict)]
+        if len(rows) < 100:
+            break
+        page += 1
+    return out
+
+
 def _labels(issue):
     return [str((l or {}).get('name') if isinstance(l, dict) else l)
             for l in (issue.get('labels') or [])]
@@ -2787,11 +2804,12 @@ def known_body(issue):
             'fix is on main, and then it comes back as a test task.' % where)
 
 
-def _marked(issue, comments, mark):
-    """(title, body, server or None, created_at) from the issue's last comment
-       whose first line matches mark ("Test task:" or "Known issue:"), or
-       None. A first line with nothing after the colon takes the issue's own
-       title."""
+def _marked(issue, comments, mark, room=TASK_BODY_ROOM):
+    """(title, body, server or None, created_at, comment address) from the
+       issue's last comment whose first line matches mark ("Test task:" or
+       "Known issue:"), or None. A first line with nothing after the colon
+       takes the issue's own title. The body is cut at room characters, the
+       most a first post takes; room None keeps all of it."""
     for c in reversed(comments or []):
         lines = str(c.get('body') or '').replace('\r\n', '\n').strip().split('\n')
         m = mark.match(lines[0]) if lines else None
@@ -2803,24 +2821,31 @@ def _marked(issue, comments, mark):
         if rest and TASK_SERVER.match(rest[0]):
             server = TASK_SERVER.match(rest[0]).group(1).capitalize()
             rest = rest[1:]
-        body = '\n'.join(rest).strip()[:TASK_BODY_ROOM]
-        return title, body, server, str(c.get('created_at') or '')
+        body = '\n'.join(rest).strip()
+        if room is not None:
+            body = body[:room]
+        return (title, body, server, str(c.get('created_at') or ''),
+                str(c.get('html_url') or ''))
     return None
 
 
 def last_task(issue, comments, dev_since=None):
-    """(title, body, server, created_at) from the last "Test task:" comment,
-       or None. server is 'Dev' when a "Server: Dev" line is straight under
-       it and the comment was written at or after dev_since, the day
-       #dev-test-tasks began; 'Main' otherwise, so a Server line from before
-       that day, or with no dev_since at all, is read and changes nothing."""
-    got = _marked(issue, comments, TASK_MARK)
+    """(title, body, server, created_at, comment address) from the last
+       "Test task:" comment, or None. server is 'Dev' when a "Server: Dev"
+       line is straight under it and the comment was written at or after
+       dev_since, the day #dev-test-tasks began; 'Main' otherwise, so a
+       Server line from before that day, or with no dev_since at all, is read
+       and changes nothing. A Dev body is kept whole (it is for developers,
+       and posted over as many messages as it takes); a Main body is cut to
+       one first post, as it always was."""
+    got = _marked(issue, comments, TASK_MARK, room=None)
     if got is None:
         return None
-    title, body, server, created = got
+    title, body, server, created, url = got
     if server == 'Dev' and dev_since and created >= dev_since:
-        return title, body or 'Measure this on dev.', 'Dev', created
-    return title, body or 'Check this on main.', 'Main', created
+        return title, body or 'Measure this on dev.', 'Dev', created, url
+    return (title, body[:TASK_BODY_ROOM] or 'Check this on main.', 'Main',
+            created, url)
 
 
 def test_task_of(issue, comments, dev_since=None):
@@ -2834,10 +2859,10 @@ def test_task_of(issue, comments, dev_since=None):
     return got[0], got[1], got[3]
 
 
-def dev_post_of(issue, comments, dev_since):
-    """(title, body, tags) for an issue's #dev-test-tasks post, or None when
-       it has none: its last "Test task:" comment does not say Server: Dev
-       (last_task), or the issue was closed after that comment was written."""
+def dev_task_of(issue, comments, dev_since):
+    """The issue's dev test task (last_task's tuple), or None when it has
+       none: its last "Test task:" comment does not say Server: Dev, or the
+       issue was closed after that comment was written."""
     if not dev_since:
         return None
     got = last_task(issue, comments, dev_since)
@@ -2847,7 +2872,112 @@ def dev_post_of(issue, comments, dev_since):
         closed = str(issue.get('closed_at') or '')
         if closed and closed >= got[3]:
             return None
-    return got[0], got[1], [DEV_TAG]
+    return got
+
+
+def fix_refs(timeline):
+    """
+    (pull requests, commits) from the issue's timeline: every pull request of
+    KNOWN_REPO that mentions the issue and is merged or still open, as dicts
+    of number, title, url and merged_at, by number; and every commit of
+    KNOWN_REPO whose message names the issue, by sha, in the order GitHub
+    saw them. A pull request closed without merging carries nothing, so it
+    is left out. Read from the timeline alone, which the bot's issues token
+    reads; a commit there may be a branch commit as well as a merge.
+    """
+    prs, commits = {}, []
+    for ev in timeline or []:
+        if not isinstance(ev, dict):
+            continue
+        if ev.get('event') == 'cross-referenced':
+            src = (ev.get('source') or {}).get('issue') or {}
+            pr = src.get('pull_request')
+            if not isinstance(pr, dict) or 'number' not in src:
+                continue
+            repo = str((src.get('repository') or {}).get('full_name') or '')
+            if repo and repo.lower() != KNOWN_REPO.lower():
+                continue
+            if src.get('state') == 'closed' and not pr.get('merged_at'):
+                continue
+            prs[int(src['number'])] = {
+                'number': int(src['number']),
+                'title': str(src.get('title') or '').strip(),
+                'url': str(src.get('html_url') or ''),
+                'merged_at': pr.get('merged_at')}
+        elif ev.get('event') == 'referenced' and ev.get('commit_id'):
+            if ('/repos/%s/' % KNOWN_REPO).lower() not in str(ev.get('commit_url') or '').lower():
+                continue
+            sha = str(ev['commit_id'])
+            if sha not in commits:
+                commits.append(sha)
+    return [prs[n] for n in sorted(prs)], commits
+
+
+BUILD_LINE = re.compile(r'^\s*(?:needs\s+)?build\s*:\s*(\S.*?)\s*$', re.I | re.M)
+
+
+def dev_render(issue, task, prs=(), commits=()):
+    """
+    (title, body, tags) for a #dev-test-tasks post (Patrick, 12 Oct: the dev
+    one is for developers with GitHub, so it links the issue, its pull
+    requests and commits, its labels and the build it needs, and keeps the
+    test task whole, in developer terms if it was written that way). The
+    body can be longer than one message; dev_chunks splits it.
+    #test-tasks never gets any of this.
+    """
+    title, body, _server, _created, comment_url = task
+    url = str(issue.get('html_url') or '')
+    site = url.split('/issues/')[0] if '/issues/' in url else ''
+    state = str(issue.get('state') or 'open')
+    if state != 'open':
+        state += ' (%s)' % (issue.get('state_reason') or 'completed').replace('_', ' ')
+    head = ['**Issue:** #%s %s <%s>' % (issue.get('number'),
+                                        str(issue.get('title') or '').strip(), url),
+            '**State:** %s' % state]
+    labels = _labels(issue)
+    if labels:
+        head.append('**Labels:** %s' % ', '.join(labels))
+    if prs:
+        head.append('**Pull requests:**')
+        for pr in prs:
+            head.append('- #%d %s, %s <%s>' % (
+                pr['number'], pr['title'],
+                ('merged %s' % pr['merged_at']) if pr.get('merged_at') else 'not merged yet',
+                pr['url']))
+    if commits:
+        head.append('**Commits naming the issue:**')
+        for sha in commits:
+            head.append('- `%s` <%s/commit/%s>' % (sha[:10], site, sha))
+    build = BUILD_LINE.search(body) or BUILD_LINE.search(str(issue.get('body') or ''))
+    if build:
+        head.append('**Build:** %s' % build.group(1))
+    if comment_url:
+        head.append('**Test task comment:** <%s>' % comment_url)
+    return title, '\n'.join(head) + '\n\n' + body, [DEV_TAG]
+
+
+def dev_chunks(text, room=TASK_BODY_ROOM):
+    """The text in pieces of at most room characters (Discord's limit for one
+       message), cut between lines; a line longer than that is cut where it
+       has to be. Nothing is dropped: the first piece is the post, the rest go
+       in the thread after it, in order."""
+    out, cur = [], ''
+    for line in str(text or '').split('\n'):
+        while len(line) > room:
+            if cur:
+                out.append(cur)
+                cur = ''
+            out.append(line[:room])
+            line = line[room:]
+        joined = line if not cur else cur + '\n' + line
+        if len(joined) > room:
+            out.append(cur)
+            cur = line
+        else:
+            cur = joined
+    if cur.strip():
+        out.append(cur)
+    return [c for c in out if c.strip()] or ['(empty)']
 
 
 def known_of(issue, comments):
@@ -2939,6 +3069,69 @@ async def _forum_edit(forum, tid, title, body, tags):
     if msg is not None:
         await msg.edit(content=body, allowed_mentions=discord.AllowedMentions.none())
     return True
+
+
+async def _thread_more(th, me_id):
+    """The bot's own messages in a thread after its first post, oldest
+       first, by id: the follow-ups of a long dev post."""
+    out = []
+    async for m in th.history(limit=100, oldest_first=True):
+        if (getattr(m, 'id', None) != getattr(th, 'id', None)
+                and (me_id is None or getattr(getattr(m, 'author', None), 'id', None) == me_id)):
+            out.append(m.id)
+    return out
+
+
+async def _sync_more(th, texts, more):
+    """
+    Brings the follow-up messages of a post to texts, in order, and returns
+    their ids. Each one still there is edited; from the first one that is
+    gone (deleted by hand), every later one is deleted and the rest sent
+    again, so the thread always reads in order. Extra old ones are deleted.
+    """
+    none = discord.AllowedMentions.none()
+    ids, keep = [], list(more or [])
+    i = 0
+    while i < len(texts) and i < len(keep):
+        try:
+            msg = await th.fetch_message(int(keep[i]))
+        except discord.NotFound:
+            break
+        await msg.edit(content=texts[i], allowed_mentions=none)
+        ids.append(msg.id)
+        i += 1
+    for mid in keep[i:]:
+        try:
+            msg = await th.fetch_message(int(mid))
+        except discord.NotFound:
+            continue            # already gone, which is what is wanted
+        await msg.delete()
+    for text in texts[i:]:
+        sent = await th.send(text, allowed_mentions=none)
+        ids.append(sent.id)
+    return ids
+
+
+async def _dev_post(forum, title, chunks, tags, me_id=None):
+    """A #dev-test-tasks post over as many messages as its text takes.
+       (thread, follow-up ids). An open post of the bot's with this title,
+       made before a crash, is taken up with what it already holds, never
+       made twice."""
+    found = None
+    for th in list(getattr(forum, 'threads', None) or []):
+        if (str(getattr(th, 'name', '')) == title
+                and not getattr(th, 'archived', False)
+                and (me_id is None or getattr(th, 'owner_id', me_id) == me_id)):
+            found = th
+            break
+    if found is None:
+        th = await _forum_post(forum, title, chunks[0], tags, me_id)
+        more = []
+    else:
+        th = found
+        await _forum_edit(forum, th.id, title, chunks[0], tags)
+        more = await _thread_more(th, me_id)
+    return th, await _sync_more(th, chunks[1:], more)
 
 
 async def known_issues_once(forum, state, get=None, save=None, me_id=None):
@@ -3116,9 +3309,12 @@ async def dev_tasks_once(forum, state, get=None, save=None, me_id=None, now=None
     """
     One pass over #dev-test-tasks, found by the id the setup recorded. An
     issue, open or closed, whose last "Test task:" comment says Server: Dev
-    gets a post tagged Dev (dev_post_of); it goes when the issue is closed
-    after that comment, or a newer test task does not say Server: Dev. A
-    rewritten comment edits the post.
+    gets a post tagged Dev (dev_task_of), written for developers
+    (dev_render: the issue, its pull requests and commits, labels, build,
+    and the whole test task, over as many messages as it takes); it goes
+    when the issue is closed after that comment, or a newer test task does
+    not say Server: Dev. A rewritten comment, or any other change to the
+    issue that changes the post, edits it.
 
     The first pass sets state['dev_since'] to now: nothing written before it
     counts as a dev test task, so nothing from before floods in and no post
@@ -3148,7 +3344,11 @@ async def dev_tasks_once(forum, state, get=None, save=None, me_id=None, now=None
         if read.get(key) == upd and (not have or have.get('form') == DEV_FORM):
             continue            # read at this update time on an earlier pass
         comments = await loop.run_in_executor(None, github_comments, num, get)
-        post = dev_post_of(issue, comments, since)
+        task = dev_task_of(issue, comments, since)
+        post = None
+        if task is not None:
+            timeline = await loop.run_in_executor(None, github_timeline, num, get)
+            post = dev_render(issue, task, *fix_refs(timeline))
         try:
             if post is None:
                 if have:
@@ -3158,8 +3358,12 @@ async def dev_tasks_once(forum, state, get=None, save=None, me_id=None, now=None
             else:
                 title, body, tags = post
                 sig = _sig(title, body, tags)
+                chunks = dev_chunks(body)
                 if have and have.get('sig') != sig:
-                    if await _forum_edit(forum, have['thread_id'], title, body, tags):
+                    if await _forum_edit(forum, have['thread_id'], title, chunks[0], tags):
+                        th = await _forum_thread(forum, have['thread_id'])
+                        have['more'] = await _sync_more(th, chunks[1:],
+                                                        have.get('more') or [])
                         edited.append(num)
                     else:
                         rec.pop(key, None)     # deleted by hand: made again
@@ -3167,9 +3371,10 @@ async def dev_tasks_once(forum, state, get=None, save=None, me_id=None, now=None
                 if have:
                     have.update(sig=sig, updated=upd, form=DEV_FORM)
                 else:
-                    th = await _forum_post(forum, title, body, tags, me_id)
+                    th, more = await _dev_post(forum, title, chunks, tags, me_id)
                     rec[key] = {'thread_id': th.id, 'channel_id': forum.id,
-                                'sig': sig, 'updated': upd, 'form': DEV_FORM}
+                                'more': more, 'sig': sig, 'updated': upd,
+                                'form': DEV_FORM}
                     if save:
                         save(state)    # straight away, so a crash cannot double it
                     posted.append(num)

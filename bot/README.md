@@ -176,7 +176,23 @@ log.
   test task still says `Server: Dev` gets no `#test-tasks` post from it.
   Every other test task is Main, because testers play on main in the alpha.
   The post is deleted when it goes, so what was measured belongs on the
-  issue. A Dev test task posted by hand (`/test-task` with the tag Dev) also
+  issue.
+
+  A dev post is written for developers, who have GitHub (Patrick, 12 Oct):
+  it links the issue and says its state and labels, links every pull request
+  of this repository that mentions the issue and is merged or still open,
+  and every commit of this repository that names it (both read from the
+  issue's timeline, which the same issues token reads; a commit there can be
+  a branch commit as well as a merge), names the build it needs from a
+  `Build:` line in the comment or the issue (a dev release id or a gamemode
+  commit), links the comment, and then gives the whole test task. That
+  comment may be written in developer terms, with file names, log lines,
+  commands and what each should print. Nothing is cut: Discord takes 2000
+  characters in a message, so the rest goes in follow-up messages in the
+  post, in order, kept in step when the comment changes (their ids are in
+  the record's `more`). The links are as of the last change to the issue.
+  `#test-tasks` posts stay exactly as they were: the test task alone, plain
+  words, no numbers, links or code, because testers are not developers. A Dev test task posted by hand (`/test-task` with the tag Dev) also
   lands here; it belongs to no issue, so the bot leaves it for staff to close.
 
 **When an issue is closed** (Patrick, 11 Oct): dev is where the team checks

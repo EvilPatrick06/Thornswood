@@ -113,8 +113,34 @@ class Thread(object):
         self.owner_id = owner
         Thread.next = getattr(Thread, 'next', 50000) + 1
         self.id = Thread.next
+        self.more = []          # messages after the first post, in order
         if forum is not None:
             forum.guild.threads[self.id] = self
+
+    async def send(self, content, **k):
+        assert 0 < len(content) <= 2000, len(content)
+        Thread.next += 1
+        m = Msg(Thread.next, content, self)
+        self.more.append(m)
+        self.forum.guild.calls.append(('send', self.name))
+        return m
+
+    async def fetch_message(self, mid):
+        for m in self.more:
+            if m.id == mid:
+                return m
+        raise discord.NotFound(type('R', (), {'status': 404, 'reason': 'gone'})(),
+                               'Unknown Message')
+
+    async def history(self, limit=100, oldest_first=False):
+        # The first post comes back too, with the thread's own id.
+        yield Msg(self.id, self.content, self)
+        for m in list(self.more)[:limit]:
+            yield m
+
+    def text(self):
+        """Everything the post says, first post and follow-ups, in order."""
+        return '\n'.join([self.content] + [m.content for m in self.more])
 
     async def edit(self, name=None, applied_tags=None, **k):
         self.forum.guild.calls.append(('edit_thread', self.forum.name, name))
@@ -129,6 +155,7 @@ class Thread(object):
 
         class Starter(object):
             async def edit(self, content=None, **k):
+                assert 0 < len(content) <= 2000, len(content)
                 th.content = content
         return Starter()
 
@@ -136,6 +163,21 @@ class Thread(object):
         self.forum.guild.calls.append(('delete_thread', self.forum.name, self.name))
         self.forum.threads.remove(self)
         del self.forum.guild.threads[self.id]
+
+
+class Msg(object):
+    def __init__(self, mid, content, thread):
+        self.id = mid
+        self.content = content
+        self.thread = thread
+        self.author = Target('Thornswood Bot', 2)
+
+    async def edit(self, content=None, **k):
+        assert 0 < len(content) <= 2000, len(content)
+        self.content = content
+
+    async def delete(self):
+        self.thread.more.remove(self)
 
 
 class Said(object):
@@ -197,6 +239,7 @@ class Channel(object):
 
     async def create_thread(self, name, content, applied_tags, reason=None, **k):
         self.guild.calls.append(('create_thread', self.name, name))
+        assert 0 < len(content) <= 2000, len(content)
         th = Thread(name, applied_tags, content, self)
         self.threads.append(th)
         return th
@@ -564,6 +607,7 @@ yes('--post-task --tag takes Main or Dev, Main by default',
 # --------------------------------------------------- 4. known issues --
 ISSUES = {}
 COMMENTS = {}
+TIMELINE = {}
 
 
 UPD = [0]
@@ -591,6 +635,8 @@ def gh(url):
     path = url.split('?')[0]
     if path.endswith('/comments'):
         return COMMENTS.get(int(path.split('/')[-2]), [])
+    if path.endswith('/timeline'):
+        return TIMELINE.get(int(path.split('/')[-2]), [])
     if '/issues/' in path:
         return ISSUES[int(path.rsplit('/', 1)[1])]
     if 'state=all' in url:
@@ -1104,7 +1150,8 @@ yes('an OPEN issue whose last "Test task:" says Server: Dev is a post in '
     '#dev-test-tasks at once, titled and written from it, tagged Dev, the '
     'Server line not in the body',
     dp == [81] and len(th81) == 1
-    and th81[0].content == '1. Ride the ferry.\nWhat should happen: no stutter.'
+    and th81[0].content.endswith('1. Ride the ferry.\nWhat should happen: no stutter.')
+    and 'Server: Dev' not in th81[0].text()
     and [x.name for x in th81[0].applied_tags] == ['Dev'])
 yes('  and nothing in #test-tasks for it while it is open',
     81 not in tp and 'Ferry lag on dev' not in names(tf))
@@ -1196,7 +1243,8 @@ bump(85)
 (tp, te, tr), (dp, de, dr) = both()
 yes('a rewritten dev test task EDITS its post: the same thread, new title and body',
     de == [85] and dp == [] and th85.name == 'Forge timing in Whiterun'
-    and th85.content == 'Use the Whiterun forge.' and th85 in df.threads)
+    and th85.content.endswith('\n\nUse the Whiterun forge.')
+    and 'Use a forge.' not in th85.text() and th85 in df.threads)
 
 real_create = df.create_thread
 refusals = [1]
@@ -1249,6 +1297,178 @@ yes('a hand post tagged Dev lands in #dev-test-tasks and one tagged Main in '
     and 'Measure on dev' not in names(tf)
     and th in tf.threads and [x.name for x in th.applied_tags] == ['Main']
     and out == (([], [], []), ([], [], [])))
+
+# ------------ 11. two shapes: #dev-test-tasks for developers, #test-tasks plain --
+# Patrick, 12 Oct: the dev one is for developers with GitHub, so it links the
+# issue, its pull requests and commits, and gives the whole task, in developer
+# terms if it was written that way; the regular test tasks stay without any
+# of that, because testers are not developers and have no GitHub.
+ISSUES.clear()
+COMMENTS.clear()
+HOUR[0] = '2026-10-14T08'
+UPD[0] = 0
+g, tasks, results, play, staff = server()
+run(bot.channel_setup(g, apply=True, path=os.path.join(TMP, 'shapes.json')))
+tf = bot._channel_named(g, 'test-tasks', ('forum',))
+df = bot._channel_named(g, 'dev-test-tasks', ('forum',))
+ds = {}
+run(bot.test_tasks_once(tf, ds, gh, me_id=me.id, now='2026-10-14T07:59:00Z'))
+run(bot.dev_tasks_once(df, ds, gh, me_id=me.id, now='2026-10-14T07:59:30Z'))
+REPO_URL = 'https://github.com/EvilPatrick06/Thornswood'
+SHA = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'
+
+
+def pr_ref(num, title, state='closed', merged='2026-10-14T07:00:00Z',
+           repo='EvilPatrick06/Thornswood'):
+    return {'event': 'cross-referenced', 'source': {'type': 'issue', 'issue': {
+        'number': num, 'title': title, 'state': state,
+        'html_url': 'https://github.com/%s/pull/%d' % (repo, num),
+        'pull_request': {'merged_at': merged},
+        'repository': {'full_name': repo}}}}
+
+
+timeline = [
+    pr_ref(900, 'Ferry keeps its speed'),
+    pr_ref(901, 'Ferry log line', state='open', merged=None),
+    pr_ref(902, 'Abandoned try', merged=None),
+    pr_ref(903, 'Somebody else', repo='someone/else'),
+    {'event': 'cross-referenced', 'source': {'type': 'issue', 'issue': {
+        'number': 904, 'title': 'An issue, not a PR', 'state': 'open',
+        'html_url': REPO_URL + '/issues/904'}}},
+    {'event': 'referenced', 'commit_id': SHA,
+     'commit_url': 'https://api.github.com/repos/EvilPatrick06/Thornswood/commits/' + SHA},
+    {'event': 'referenced', 'commit_id': 'f' * 40,
+     'commit_url': 'https://api.github.com/repos/someone/else/commits/' + 'f' * 40},
+    {'event': 'labeled', 'label': {'name': 'Dev Findings'}},
+]
+STEPS = ['%d. Run `Get-Content C:\\Thornswood\\Profile\\launcher.log -Tail 40` and '
+         'check the line "ferry speed=%d" is there after the crossing.' % (n, n)
+         for n in range(1, 41)]
+LONG = '\n'.join(STEPS + ['What should happen: every speed line is there, in order.'])
+TIMELINE[90] = timeline
+COMMENTS[90] = [{'body': 'Test task: Ferry speed in the log\nServer: Dev\n'
+                         'Build: gamemode 7feb5dc4 on dev\n' + LONG,
+                 'created_at': tick(),
+                 'html_url': REPO_URL + '/issues/90#issuecomment-1'}]
+issue(90, 'Ferry slows down mid crossing', ['Dev Findings', 'area: Gamemode'])
+TIMELINE[91] = timeline
+COMMENTS[91] = [{'body': 'Test task: Ferry crossing is smooth\nServer: Main\n'
+                         '1. Ride the ferry from Windhelm.\n'
+                         'What should happen: it keeps the same speed.',
+                 'created_at': tick(), 'html_url': REPO_URL + '/issues/91#issuecomment-2'}]
+issue(91, 'Ferry stutters', ['Main Findings'], state='closed', reason='completed',
+      closed_at=tick())
+(tp, te, tr), (dp, de, dr) = both()
+d90 = [th for th in df.threads if th.name == 'Ferry speed in the log']
+m91 = [th for th in tf.threads if th.name == 'Ferry crossing is smooth']
+yes('a dev post links the issue, says its state and labels, and links the test '
+    'task comment',
+    dp == [90] and len(d90) == 1
+    and '**Issue:** #90 Ferry slows down mid crossing <%s/issues/90>' % REPO_URL
+    in d90[0].content
+    and '**State:** open' in d90[0].content
+    and '**Labels:** Dev Findings, area: Gamemode' in d90[0].content
+    and '<%s/issues/90#issuecomment-1>' % REPO_URL in d90[0].content)
+yes('  links the pull requests that carry the fix, merged or still open, and '
+    'not one closed without merging, from another repository, or an issue',
+    '- #900 Ferry keeps its speed, merged 2026-10-14T07:00:00Z <%s/pull/900>'
+    % REPO_URL in d90[0].content
+    and '- #901 Ferry log line, not merged yet <%s/pull/901>' % REPO_URL
+    in d90[0].content
+    and '#902' not in d90[0].text() and '#903' not in d90[0].text()
+    and '#904' not in d90[0].text())
+yes('  links the commits of this repository that name the issue, not another\'s',
+    '- `%s` <%s/commit/%s>' % (SHA[:10], REPO_URL, SHA) in d90[0].content
+    and 'f' * 40 not in d90[0].text())
+yes('  and names the build it needs, from the "Build:" line',
+    '**Build:** gamemode 7feb5dc4 on dev' in d90[0].content)
+pos = [d90[0].text().find(step) for step in STEPS]
+yes('  the WHOLE test task, in developer terms, never cut: it runs on in the '
+    'thread after the first post, every step there once and in order',
+    len(LONG) > 2000 and len(d90[0].more) >= 1
+    and all(p >= 0 for p in pos) and pos == sorted(pos)
+    and all(d90[0].text().count(step) == 1 for step in STEPS)
+    and 'What should happen: every speed line is there' in d90[0].text()
+    and 'Server: Dev' not in d90[0].text())
+yes('  every message within the 2000 characters Discord takes',
+    len(d90[0].content) <= 2000 and all(len(m.content) <= 2000 for m in d90[0].more))
+yes('a #test-tasks post stays plain: the test task alone, no link, no number, '
+    'no label, no pull request, no commit',
+    91 in tp and len(m91) == 1
+    and m91[0].content == '1. Ride the ferry from Windhelm.\n'
+                          'What should happen: it keeps the same speed.'
+    and m91[0].more == []
+    and not any(x in m91[0].content for x in ('http', '#9', '**', 'Labels', SHA[:10])))
+
+COMMENTS[93] = [{'body': 'Test task: Long one for testers\nServer: Main\n' + LONG,
+                 'created_at': tick()}]
+issue(93, 'Long for testers', ['Main Findings'], state='closed', reason='completed',
+      closed_at=tick())
+tp = both()[0][0]
+m93 = [th for th in tf.threads if th.name == 'Long one for testers']
+yes('  and a long one for testers is one first post of 2000 characters, as '
+    'before, with nothing sent after it',
+    tp == [93] and len(m93) == 1 and len(m93[0].content) == 2000
+    and m93[0].more == [])
+
+th90 = d90[0]
+COMMENTS[90].append({'body': 'Test task: Ferry speed, short\nServer: Dev\n'
+                             '1. Cross once.\nWhat should happen: one speed line.',
+                     'created_at': tick()})
+bump(90)
+de = both()[1][1]
+yes('a dev post rewritten shorter EDITS the same thread and deletes the '
+    'follow-ups it no longer needs',
+    de == [90] and th90 in df.threads and th90.name == 'Ferry speed, short'
+    and th90.more == [] and th90.content.endswith('What should happen: one speed line.')
+    and ds['dev']['90']['more'] == [])
+COMMENTS[90].append({'body': 'Test task: Ferry speed in the log\nServer: Dev\n' + LONG,
+                     'created_at': tick()})
+bump(90)
+de = both()[1][1]
+pos = [th90.text().find(step) for step in STEPS]
+yes('  rewritten long again, the follow-ups are sent again, in order, and recorded',
+    de == [90] and len(th90.more) >= 1 and all(p >= 0 for p in pos)
+    and pos == sorted(pos)
+    and ds['dev']['90']['more'] == [m.id for m in th90.more])
+
+run(th90.more[0].delete())
+COMMENTS[90].append({'body': 'Test task: Ferry speed in the log\nServer: Dev\n'
+                             + LONG + '\nAlso: one more line at the end.',
+                     'created_at': tick()})
+bump(90)
+both()
+pos = [th90.text().find(step) for step in STEPS]
+yes('a follow-up deleted by hand is sent again and the thread still reads in '
+    'order, nothing twice',
+    all(p >= 0 for p in pos) and pos == sorted(pos)
+    and all(th90.text().count(step) == 1 for step in STEPS)
+    and th90.text().endswith('Also: one more line at the end.')
+    and ds['dev']['90']['more'] == [m.id for m in th90.more])
+
+dpth = os.path.join(TMP, 'shapes-known.json')
+bot._known_save(dict(ds, _dirty=True), dpth)
+snap = bot._state_read(dpth)
+TIMELINE[92] = []
+COMMENTS[92] = [{'body': 'Test task: Long and crashed\nServer: Dev\n' + LONG,
+                 'created_at': tick()}]
+issue(92, 'Crash between post and save', ['Dev Findings'])
+run(bot.dev_tasks_once(df, ds, gh, me_id=me.id))
+th92 = [th for th in df.threads if th.name == 'Long and crashed'][0]
+n_more = len(th92.more)
+run(bot.dev_tasks_once(df, snap, gh, me_id=me.id))
+yes('a long dev post that never reached the file is taken up again by its '
+    'title: no second thread and no follow-up sent twice',
+    len([th for th in df.threads if th.name == 'Long and crashed']) == 1
+    and len(th92.more) == n_more and n_more >= 1
+    and snap['dev']['92']['more'] == [m.id for m in th92.more]
+    and snap['dev']['92']['thread_id'] == th92.id)
+
+one_line = 'x' * 4500
+parts = bot.dev_chunks(one_line)
+yes('a line longer than one message is cut where it has to be, nothing lost',
+    ''.join(parts) == one_line and all(len(p) <= 2000 for p in parts))
+
 
 import importlib.util  # noqa: E402
 _spec = importlib.util.spec_from_file_location(

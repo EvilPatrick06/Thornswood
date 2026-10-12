@@ -967,14 +967,18 @@ How to use it:
   `Server: Main` on the line under the title, or no `Server:` line at all.
 - Most test tasks are Main, because testers play on main in the alpha and dev
   is where the team checks nothing is broken (Patrick, 12 Oct). When the code
-  is done and someone on dev has to measure something first, write the same
-  comment with `Server: Dev` on the line under the title, and leave the issue
-  open. The bot posts it at once in #dev-test-tasks, a forum in the Staff
-  category that only staff see, and takes it down when the issue closes or a
-  newer `Test task:` comment does not say `Server: Dev`. Put what was
-  measured on the issue: the post is deleted when it goes. When the fix
-  reaches main, write the Main test task and close the issue as above, and
-  it moves to #test-tasks (`bot\README.md`, Testing).
+  is done and someone on dev has to measure something first, write a
+  `Test task:` comment with `Server: Dev` on the line under the title, and
+  leave the issue open. That one is for developers, so write it in developer
+  terms: the files, log lines and commands to run, and what each should
+  print, with a `Build:` line naming the dev release or gamemode commit it
+  needs. The bot posts it at once in #dev-test-tasks, a forum in the Staff
+  category that only staff see, whole, with links to the issue, its pull
+  requests and commits, and its labels. It takes the post down when the
+  issue closes or a newer `Test task:` comment does not say `Server: Dev`.
+  Put what was measured on the issue: the post is deleted when it goes. When
+  the fix reaches main, write the Main test task in plain words and close
+  the issue as above, and it moves to #test-tasks (`bot\README.md`, Testing).
 
 #### What is not a reason to skip an issue
 
