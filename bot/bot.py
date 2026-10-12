@@ -1965,7 +1965,7 @@ async def ensure_hold_panel(guild):
 # #test-tasks (dated sessions, Pass/Fail/Skip/Fail-known rows, /live-smoke)
 # is gone, and the testing channels are three things instead:
 #
-#   #test-tasks     a Forum. One thread per test task, tagged Dev or Main: the
+#   #test-tasks     a Forum. One thread per test task, tagged Main: the
 #                   bot posts one, tagged Main, for each issue closed as fixed
 #                   (see known issues below), and staff can post one by hand
 #                   (/test-task, or python bot.py --post-task).
@@ -2001,6 +2001,10 @@ FINDINGS_OLD = 'test-results'
 FINDINGS_NAME = os.environ.get('TEST_FINDINGS_CHANNEL', 'test-findings').strip().lower()
 KNOWN_NAME = os.environ.get('KNOWN_ISSUES_CHANNEL', 'known-issues').strip().lower()
 TASK_TAGS = ('Dev', 'Main')
+# The only tag a test task is posted with, automatic or by hand (Patrick,
+# 12 Oct, #2276 option B): testers test on main, so #test-tasks is Main only.
+# The forum keeps its Dev tag for older threads; nothing new gets it.
+TASK_POST_TAG = 'Main'
 SETUP_STATE = os.path.join(DATA_DIR, 'channel-setup.json')
 KNOWN_STATE = os.path.join(DATA_DIR, 'known-issues.json')
 SETUP_REASON = 'Thornswood channel setup (one time, Patrick 11 Oct)'
@@ -2339,9 +2343,10 @@ def task_tag_of(forum, tag):
     return None
 
 
-async def post_test_task(guild, title, body, tag):
+async def post_test_task(guild, title, body, tag=TASK_POST_TAG):
     """
-    One thread in the #test-tasks forum, titled and tagged.
+    One thread in the #test-tasks forum, titled and tagged Main. Every
+    test task is Main only (#2276); a Dev tag, or any other, is refused.
 
     Returns (thread or None, what to say). A thread already open under that
     exact title is not made twice; the existing one is handed back.
@@ -2349,8 +2354,9 @@ async def post_test_task(guild, title, body, tag):
     title = str(title or '').strip()
     body = str(body or '').strip()
     want = str(tag or '').strip().capitalize()
-    if want not in TASK_TAGS:
-        return None, 'The tag is Dev or Main, not %r.' % tag
+    if want != TASK_POST_TAG:
+        return None, ('Test tasks are Main only (testers test on main), '
+                      'not %r.' % tag)
     if not title or not body:
         return None, 'A test task needs a title and a body.'
     if len(title) > TASK_TITLE_ROOM:
@@ -2380,13 +2386,12 @@ async def post_test_task(guild, title, body, tag):
 
 
 @tree.command(name='test-task',
-              description='Post a test task in #test-tasks, tagged Dev or '
-                          'Main. Owner, Dev and Lead Gamemaster only.')
+              description='Post a test task in #test-tasks, tagged Main. '
+                          'Owner, Dev and Lead Gamemaster only.')
 @discord.app_commands.describe(title='The thread title.',
-                               body='What to test, as the first post.',
-                               tag='Dev or Main.')
+                               body='What to test, as the first post.')
 async def test_task_cmd(interaction: discord.Interaction, title: str,
-                        body: str, tag: typing.Literal['Dev', 'Main']):
+                        body: str):
     if interaction.guild is None:
         await _say(interaction, 'This one works in the server.')
         return
@@ -2396,7 +2401,7 @@ async def test_task_cmd(interaction: discord.Interaction, title: str,
         return
     await interaction.response.defer(ephemeral=True, thinking=True)
     try:
-        _, said = await post_test_task(interaction.guild, title, body, tag)
+        _, said = await post_test_task(interaction.guild, title, body)
     except discord.HTTPException as e:
         log('test task: Discord refused a post: %s' % getattr(e, 'text', e))
         said = ('That did not go through. In #%s the bot needs View Channel, '
@@ -4006,7 +4011,7 @@ def run_cli(argv):
     bot's watchers, panels or command sync, and closes when it is done:
 
       --setup-channels [--apply]   the one-time setup, a preview without --apply
-      --post-task --title T --body B|--body-file F --tag Dev|Main
+      --post-task --title T --body B|--body-file F [--tag Main]
       --adopt-task --issue N --thread ID   (offline; with the bot stopped)
 
     Returns the exit code.
@@ -4020,7 +4025,7 @@ def run_cli(argv):
     ap.add_argument('--title')
     ap.add_argument('--body')
     ap.add_argument('--body-file')
-    ap.add_argument('--tag', choices=list(TASK_TAGS))
+    ap.add_argument('--tag', choices=[TASK_POST_TAG], default=TASK_POST_TAG)
     ap.add_argument('--guild', type=int, default=0)
     ap.add_argument('--adopt-task', action='store_true')
     ap.add_argument('--issue', type=int)
@@ -4036,8 +4041,8 @@ def run_cli(argv):
         if a.body_file:
             with open(a.body_file, encoding='utf-8-sig') as f:
                 body = f.read()
-        if not a.title or not body or not a.tag:
-            ap.error('--post-task needs --title, --body or --body-file, and --tag')
+        if not a.title or not body:
+            ap.error('--post-task needs --title and --body or --body-file')
     out = {'code': 0}
     cli = discord.Client(intents=discord.Intents(guilds=True))
 

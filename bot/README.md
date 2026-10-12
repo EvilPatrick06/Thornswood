@@ -120,10 +120,11 @@ it back. Until 11 October `#test-tasks` carried the Live smoke checklist
 Patrick's card of that day took all of it out.
 
 **Test tasks.** One thread per test task, from a title and a body, with the
-forum's Dev or Main tag on it:
+forum's Main tag on it. Every test task is Main only, by hand or from the
+board (Patrick, #2276): testers test on main.
 
-    /test-task title body tag     in Discord: Owner, Dev and Lead Gamemaster
-    python bot.py --env-file C:\Thornswood-Bot\bot.env.json --post-task --title "..." --body-file task.txt --tag Dev
+    /test-task title body         in Discord: Owner, Dev and Lead Gamemaster
+    python bot.py --env-file C:\Thornswood-Bot\bot.env.json --post-task --title "..." --body-file task.txt
 
 Who may post is `TEST_TASK_ROLES` in `bot.env.json`, by role id (preferred) or
 name, Owner, Dev, Lead Gamemaster and Lead GM by default. A `bot.env.json`
