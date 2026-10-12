@@ -5979,8 +5979,31 @@
   let partyAt = 0;
   let partySaid = '';
   const partyMarks = {};      // form id hex -> the marker reference
-  const partyTinted = {};     // form id hex -> true while its text is green
-  const nameHidden = {};      // form id hex -> true while its text is clear
+  /*
+    WHAT EACH NAME TAG WAS LAST WRITTEN, by the TAG, not by the person (#2474).
+
+    This used to be one flag per person, "this person's name is green", set
+    the first time their tag was coloured and kept until they left the party.
+    But the client throws a tag away and makes a new one, in its own white,
+    every time somebody stops being drawn: they step behind something, walk
+    past 1000 units, sneak, change cell, or you simply turn your back on them
+    (formView.ts removes the tag the moment the head is behind the camera).
+    The flag was still set, so the new tag was never coloured, and a party
+    member's name was green only until the first time you looked away. The
+    same flag shape left a hidden name showing for up to a pass after its tag
+    came back.
+
+    So what is kept is the tag id each person's colour was written into, and
+    the colour written. A tag id the client has not had before is a new tag:
+    it is coloured once, as it appears. A tag that already has the colour it
+    should have is left alone, whatever happens to it. Text ids only grow
+    (TextsCollection.cpp counts up, and only destroyAllTexts, which neither
+    the client nor any plugin here calls, starts them again), so a new tag
+    never reuses an old id.
+  */
+  const tagWrote = {};        // form id hex -> { id: text id, colour: 'party' | 'hidden' | 'plain' }
+  let tagParty = {};          // form id hex -> true: in your party (the server's party list)
+  let tagHide = {};           // form id hex -> true: you hid their name (near list or party row h)
 
   function partyList() {
     try {
@@ -5993,9 +6016,10 @@
     The client's own table of name tags, by form id.
 
     Written by SweetTaffyNicknamesService every time one is created and
-    deleted, which is why this is read fresh each pass rather than kept: a tag
-    is destroyed and remade whenever somebody walks out of sight and back, and
-    a remembered id would then be coloured after it had been thrown away.
+    deleted, which is why this is read fresh each frame rather than kept: a
+    tag is destroyed and remade whenever somebody walks out of sight and back.
+    Keyed by the server's form id (formViewArray.ts passes form.refrId, the id
+    the server sent), the same id the party list and the near list carry.
   */
   function nameTags() {
     try {
@@ -6004,55 +6028,21 @@
     } catch (e) { return null; }
   }
 
-  function colourNames(want) {
-    const tags = nameTags();
-    if (!tags) { return; }
-    for (const hex in want) {
-      if (!Object.prototype.hasOwnProperty.call(want, hex)) { continue; }
-      const id = parseInt(hex, 16);
-      const textId = tags[id];
-      if (textId === undefined || textId === null) { continue; }
-      if (partyTinted[hex]) { continue; }
-      try { sp.setTextColor(textId, PARTY_COLOUR); partyTinted[hex] = true; }
-      catch (e) { }
-    }
-    /*
-      AND PUT IT BACK when somebody leaves. Not doing this leaves the last
-      party you were in written in green for the rest of the session, which is
-      worse than never colouring anything: the colour would stop meaning
-      anything at all.
-    */
-    for (const hex in partyTinted) {
-      if (!Object.prototype.hasOwnProperty.call(partyTinted, hex)) { continue; }
-      if (want[hex]) { continue; }
-      delete partyTinted[hex];
-      const id = parseInt(hex, 16);
-      const textId = tags[id];
-      if (textId === undefined || textId === null) { continue; }
-      try { sp.setTextColor(textId, PLAIN_COLOUR); } catch (e) { }
-    }
-  }
-
   /*
-    A hidden name is the same tag with no ink. Hide every name blanks the
-    whole table. One person is the near list's h flag, or the party row's,
-    for somebody who is in the party and not standing close enough to be
-    near. The marker and the compass strip are left alone. Applied after
-    the green, so a hidden party name stays blank rather than green.
+    Who should be green and who should be blank, from what the server sent.
+    Read on the party tick. A hidden name is the same tag with no ink: Hide
+    every name blanks the whole table, one person is the near list's h flag,
+    or the party row's, for somebody who is in the party and not standing
+    close enough to be near. Hidden wins over green, so a hidden party name
+    stays blank rather than green.
   */
-  function hideNames(want) {
-    const tags = nameTags();
-    if (!tags) { return; }
-    let hideAll = false;
-    try { hideAll = !!globalThis.thornswoodHideAllNames; } catch (e) { hideAll = false; }
-    const near = nearList() || {};
-    const hide = {};
-    if (hideAll) {
-      for (const key in tags) {
-        if (!Object.prototype.hasOwnProperty.call(tags, key)) { continue; }
-        hide[Number(key).toString(16)] = true;
-      }
+  function tagWants(want) {
+    const party = {};
+    for (const hex in want) {
+      if (Object.prototype.hasOwnProperty.call(want, hex)) { party[hex] = true; }
     }
+    const hide = {};
+    const near = nearList() || {};
     for (const hex in near) {
       if (!Object.prototype.hasOwnProperty.call(near, hex)) { continue; }
       if (near[hex] && near[hex].h) { hide[String(hex)] = true; }
@@ -6061,27 +6051,54 @@
       if (!Object.prototype.hasOwnProperty.call(want, hex)) { continue; }
       if (want[hex] && want[hex].h) { hide[String(hex)] = true; }
     }
-    for (const hex in hide) {
-      if (!Object.prototype.hasOwnProperty.call(hide, hex)) { continue; }
-      const id = parseInt(hex, 16);
-      const textId = tags[id];
-      if (textId === undefined || textId === null) { continue; }
-      try { sp.setTextColor(textId, HIDDEN_COLOUR); nameHidden[hex] = true; }
-      catch (e) { }
-    }
-    for (const hex in nameHidden) {
-      if (!Object.prototype.hasOwnProperty.call(nameHidden, hex)) { continue; }
-      if (hide[hex]) { continue; }
-      delete nameHidden[hex];
-      const id = parseInt(hex, 16);
-      const textId = tags[id];
-      if (textId === undefined || textId === null) { continue; }
-      const colour = want[hex] ? PARTY_COLOUR : PLAIN_COLOUR;
-      if (want[hex]) { partyTinted[hex] = true; }
-      else { delete partyTinted[hex]; }
-      try { sp.setTextColor(textId, colour); } catch (e) { }
-    }
+    tagParty = party;
+    tagHide = hide;
   }
+
+  const TAG_COLOURS = { party: PARTY_COLOUR, hidden: HIDDEN_COLOUR, plain: PLAIN_COLOUR };
+  let tagSaid = '';
+
+  /*
+    Every frame, because that is when the client makes a tag: its own update
+    draws a new one in white, and this writes its colour in the same frame or
+    the next, rather than up to a party tick later. Only a tag whose id or
+    wanted colour changed is written, so a frame with nothing new is a read of
+    a small table and no calls at all.
+  */
+  sp.on('update', guard('name tags', () => {
+    const tags = nameTags();
+    if (!tags) { return; }
+    let hideAll = false;
+    try { hideAll = !!globalThis.thornswoodHideAllNames; } catch (e) { hideAll = false; }
+    const seen = {};
+    let wrote = 0;
+    for (const key in tags) {
+      if (!Object.prototype.hasOwnProperty.call(tags, key)) { continue; }
+      const textId = tags[key];
+      if (textId === undefined || textId === null) { continue; }
+      const hex = Number(key).toString(16);
+      seen[hex] = true;
+      const colour = (hideAll || tagHide[hex]) ? 'hidden' : (tagParty[hex] ? 'party' : 'plain');
+      const had = tagWrote[hex];
+      if (had && had.id === textId && had.colour === colour) { continue; }
+      // A brand new tag that should be plain already is: the client made it white.
+      if (colour !== 'plain' || (had && had.id === textId)) {
+        try { sp.setTextColor(textId, TAG_COLOURS[colour]); wrote++; }
+        catch (e) { say('name tag: setTextColor threw for ' + hex + ': ' + e); continue; }
+      }
+      tagWrote[hex] = { id: textId, colour: colour };
+    }
+    // A tag the client threw away is forgotten, so its next one is new.
+    for (const hex in tagWrote) {
+      if (!Object.prototype.hasOwnProperty.call(tagWrote, hex)) { continue; }
+      if (!seen[hex]) { delete tagWrote[hex]; }
+    }
+    if (wrote) {
+      const said = Object.keys(tagWrote).filter(h => tagWrote[h].colour !== 'plain')
+        .map(h => h + ' ' + tagWrote[h].colour).sort().join(', ');
+      if (said !== tagSaid) { tagSaid = said; say('name tags: ' + (said || 'all plain')); }
+    }
+  }));
 
   function markerFor(hex, name) {
     if (partyMarks[hex]) { return partyMarks[hex]; }
@@ -6133,8 +6150,7 @@
       want[String(row.a)] = row;
     }
 
-    colourNames(want);
-    hideNames(want);
+    tagWants(want);
 
     // A marker for everybody in the party, moved to where the server last
     // said they were.
@@ -6177,6 +6193,18 @@
     speaking mark. The name tag is the client's, and this does not
     touch it: hiding a name leaves the words and the mark where they
     are. One line at a time, for six seconds. The mark is not words.
+
+    THE MARK IS LIVE, the way the microphone at the bottom of your own
+    screen is (#2474, Patrick, 12 Oct: "it should be live and reflective
+    like the one on your screen"). It is up while their talk key is down,
+    gone when it is up, and while it is up it breathes on the same beat as
+    yours: full to 58% and back over 1.15 seconds (twPulse in
+    thornswood-voice.js). Its colour is the distance they are speaking at,
+    the same three colours your own microphone takes while you speak
+    (docs/systems/voice.md): whisper pale blue, ordinary white, yell amber.
+    Never the party's green, which is the name's alone. It is a round dot
+    out of DIN-Pro-bold, a font the fork ships with Skyrim Platform, because
+    the asterisk in the client's own Tavern was eleven pixels high.
   */
   const HEAD_MS = 6000;
   const HEAD_COLOUR = [0.95, 0.91, 0.82, 0.95];
@@ -6185,6 +6213,11 @@
     local: [1, 1, 1, 0.95],
     yell: [0.93, 0.68, 0.22, 0.95]
   };
+  const MARK_TEXT = '\u2022';            // a bullet, in DIN-Pro-bold.spritefont
+  const MARK_FONT = 'DIN-Pro-bold';      // client-deps\common\Data\Platform\Fonts in the fork
+  const MARK_SIZE = 1.6;                 // ten pixels of dot at 1.0, so sixteen
+  const MARK_BEAT_MS = 1150;             // twPulse's 1.15s
+  const MARK_LOW = 0.58;                 // twPulse's low point
   const overheadHeads = {};
   const overheadMarks = {};
   let overheadScreen = [1920, 1080];
@@ -6199,7 +6232,14 @@
     rec.said = '';
   }
 
-  function overheadPut(rec, x, y, text, colour) {
+  /*
+    font and size are for the mark (MARK_FONT, MARK_SIZE); words leave them
+    out and keep the client's Tavern at half size. The colour is written
+    whenever it is not the one last written, which is what lets the mark
+    breathe and lets it change colour when the speaker changes distance
+    without being made again.
+  */
+  function overheadPut(rec, x, y, text, colour, font, size) {
     if (rec.id) {
       let ours = false;
       try { ours = sp.getTextString(rec.id) === rec.said; } catch (e) { ours = false; }
@@ -6207,6 +6247,7 @@
         try {
           if (text !== rec.said) { sp.setTextString(rec.id, text); rec.said = text; }
           sp.setTextPos(rec.id, x, y);
+          if (String(colour) !== rec.colour) { sp.setTextColor(rec.id, colour); rec.colour = String(colour); }
           return;
         } catch (e) { }
       }
@@ -6215,11 +6256,39 @@
     try {
       rec.id = sp.createText(x, y, text, colour);
       rec.said = text;
-      try { sp.setTextSize(rec.id, 0.5); } catch (e2) { }
+      rec.colour = String(colour);
+      if (font) { try { sp.setTextFont(rec.id, font); } catch (e3) { } }
+      try { sp.setTextSize(rec.id, size || 0.5); } catch (e2) { }
     } catch (e) {
       rec.id = 0;
       rec.said = '';
     }
+  }
+
+  /*
+    THE SERVER'S FORM ID IS NOT THIS MACHINE'S (#2474). Words and marks come
+    keyed by the actor id the server knows, out of the voice feed (the
+    gamemode's voiceFeed sends mp's own id). The character standing in front
+    of you is a reference the client placed itself, with an id this machine
+    gave it, and the two are not the same number: the same split #1275 found
+    for the crosshair, which is why the look prompt converts the other way
+    through thornswoodSocialServerId. Looking the server's id up as if it
+    were this machine's found nobody, or somebody else, so no mark and no
+    words ever stood over another person. The client converts it
+    (remoteIdToLocalId in worldViewMisc.ts), handed out by the gamemode's
+    near script as thornswoodSocialClientId.
+  */
+  function localRef(serverId) {
+    const id = Number(serverId) || 0;
+    if (!id) { return null; }
+    let local = 0;
+    try {
+      const convert = globalThis.thornswoodSocialClientId;
+      local = typeof convert === 'function' ? (Number(convert(id >>> 0)) || 0) : 0;
+    } catch (e) { local = 0; }
+    if (!local) { return null; }
+    try { return sp.ObjectReference.from(sp.Game.getFormEx(local >>> 0)); }
+    catch (e) { return null; }
   }
 
   /* The head, in screen pixels, or null when it is behind the camera
@@ -6228,7 +6297,7 @@
     let refr = null;
     try {
       if (key === 'self') { refr = sp.Game.getPlayer(); }
-      else { refr = sp.ObjectReference.from(sp.Game.getFormEx(Number(key) || 0)); }
+      else { refr = localRef(key); }
     } catch (e) { refr = null; }
     if (!refr) { return null; }
     let x = 0, y = 0, z = 0, node = false;
@@ -6337,6 +6406,9 @@
       if (w && h) { overheadScreen = [w, h]; }
     }
     const seen = {};
+    // twPulse: full, down to MARK_LOW halfway through the beat, full again.
+    const phase = (now % MARK_BEAT_MS) / MARK_BEAT_MS;
+    const breath = MARK_LOW + (1 - MARK_LOW) * (0.5 + 0.5 * Math.cos(phase * 2 * Math.PI));
     function drawOne(key) {
       if (seen[key]) { return; }
       seen[key] = true;
@@ -6350,8 +6422,9 @@
       }
       if (words) { overheadPut(words, at.x, at.y - 28, words.text, HEAD_COLOUR); }
       if (mark) {
-        const colour = MARK_COLOUR[mark.mode] || MARK_COLOUR.local;
-        overheadPut(mark, at.x, at.y - (words ? 46 : 28), '*', colour);
+        const base = MARK_COLOUR[mark.mode] || MARK_COLOUR.local;
+        const colour = [base[0], base[1], base[2], Math.round(base[3] * breath * 100) / 100];
+        overheadPut(mark, at.x, at.y - (words ? 46 : 28), MARK_TEXT, colour, MARK_FONT, MARK_SIZE);
       }
     }
     for (const k in overheadHeads) {

@@ -58422,6 +58422,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       '    try { globalThis.thornswoodNear = v.w || {};',
       '      globalThis.thornswoodHideAllNames = v.hideAll ? 1 : 0;',
       '      globalThis.thornswoodSocialServerId = ctx.getFormIdInServerFormat;',
+      // And back (#2474): the voice feed's marks and words are keyed by the
+      // server's id, and the plugin draws them over this machine's reference.
+      '      globalThis.thornswoodSocialClientId = ctx.getFormIdInClientFormat;',
       '    } catch (e) { }',
       '  } catch (e) { }',
       '})();'
