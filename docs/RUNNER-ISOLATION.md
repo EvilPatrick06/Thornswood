@@ -99,7 +99,8 @@ outbound limit as residual risk.
    already makes (tests\test-runner-offbox.ps1), not hand written rules.
    The feeds read from the workflows today: pypi.org and
    iles.pythonhosted.org (build.yml and nightly.yml install ruff and the
-   bot's requirements with pip, hash pinned), and egistry.npmjs.org
+   bot's requirements with pip, hash pinned), and 
+egistry.npmjs.org
    (build.yml and nightly.yml install eslint with npm).
 2. GitHub-hosted runners are the default for builds. The VPS runners are a
    backup only: used by hand, or automatically when a hosted run fails
