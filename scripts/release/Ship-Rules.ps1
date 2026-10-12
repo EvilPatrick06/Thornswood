@@ -315,6 +315,11 @@ $ShipUiGoneText = "$(Get-Content -LiteralPath $ShipUiGoneRecord -Raw -Encoding U
 if (-not $ShipUiGoneText.Trim([char]0xFEFF, ' ', [char]9, [char]13, [char]10)) { throw 'records\ui-gone.json is empty, so the Daedric menu set and unused fork assets cannot be kept out.' }
 try { $script:ShipUiGoneDoc = $ShipUiGoneText.TrimStart([char]0xFEFF) | ConvertFrom-Json }
 catch { throw ('records\ui-gone.json is not valid JSON, so the Daedric menu set and unused fork assets cannot be kept out: ' + $_.Exception.Message) }
+# RecordShape.ps1 (#2180): a version this checkout does not know or a missing
+# list stops here, rather than shipping with half of what must go kept out.
+. (Join-Path $PSScriptRoot 'RecordShape.ps1')
+$ShipUiGoneBad = @(Get-ThornswoodRecordProblems -Doc $script:ShipUiGoneDoc -Kind ui-gone)
+if ($ShipUiGoneBad.Count) { throw ('records\ui-gone.json is not a ui-gone record this checkout can trust, so the Daedric menu set and unused fork assets cannot be kept out: ' + ($ShipUiGoneBad -join '; ')) }
 $ShipDaedricMenu = [ordered]@{}
 foreach ($p in @($script:ShipUiGoneDoc.daedric.PSObject.Properties)) {
     $ShipDaedricMenu[$p.Name] = ([string]$p.Value).ToLowerInvariant()
