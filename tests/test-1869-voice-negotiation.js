@@ -675,9 +675,18 @@ async function partOne() {
   sendRaw(N2, { t: 'join', profileId: 100002, name: 'second in' });
   await until(() => n2.some((m) => m.t === 'peers'));
   const n2Id = (n2.find((m) => m.t === 'welcome') || {}).peer;
+  // skippedRosters moves only inside sendLatest while the socket is backed,
+  // so it rising is the proof the second roster replaced the first on a
+  // backed socket. Whether health says backed at the instant after is not:
+  // backed is a write the kernel has not taken yet, and a reader that has
+  // stopped still has its kernel take more as the receive window grows (seen
+  // on GitHub's hosted Windows runner, 11 Oct: 0 to 1, backed 0 here, backed
+  // again 300 ms later). A drain there flushes the newest roster, which the
+  // order checks below still hold to, so asking for backed at this instant
+  // only measured the kernel's timing.
   const h = await health();
   yes('two people join while it is backed, and the first roster is replaced unsent (skippedRosters ' +
-      skipped0 + ' to ' + h.skippedRosters + ')', h.skippedRosters > skipped0 && h.backed >= 1);
+      skipped0 + ' to ' + h.skippedRosters + ', backed ' + h.backed + ' just after)', h.skippedRosters > skipped0);
 
   // The newcomer offers to it at once, off its own roster, and sends a candidate.
   const theirs = n2.find((m) => m.t === 'peers');
