@@ -88,18 +88,18 @@ if ($churn.Count -eq 1) {
     Yes ('at the bottom of the ladder, ' + $res.Ladder[0] + ', because nothing in churn() is behind a rank') ($c.At -eq 0 -and $c.Rank -eq $res.Ladder[0])
 }
 
-# The three stations that were there before, read the same as before. The
-# counts and grades were read off the reader on the build before this change.
+# The stations that were there before, read the same as before. The counts
+# and grades were read off the reader on the build before this change. The
+# kiln left the list in #2337: it is a bench, and its charcoal is four recipe
+# rows (tests\test-2337-kiln-menu.js).
 $salt = @($res.Rows | Where-Object { $_.Fn -eq 'mineSalt' })
-$kiln = @($res.Rows | Where-Object { $_.Fn -eq 'burnCharcoal' })
 $wood = @($res.Rows | Where-Object { $_.Fn -eq 'chopWood' })
 Yes 'the salt quarry still gives the Salt Pile at novice and the three rare salts above it' (
     $salt.Count -eq 4 -and
     @($salt | Where-Object { $_.Key -eq 'saltPile' -and $_.At -eq 0 }).Count -eq 1 -and
     @($salt | Where-Object { $_.At -eq 2 }).Count -eq 3)
-Yes 'the kiln still gives four grades of charcoal, one a rung' (
-    $kiln.Count -eq 4 -and
-    (($kiln | Sort-Object At | ForEach-Object { $_.Key }) -join ',') -eq 'charcoalT1,charcoalT2,charcoalT3,charcoalT4')
+Yes 'the kiln is not read as a station any more, because it is a bench (#2337)' (
+    @($STATION_VERBS | Where-Object { $_.Fn -eq 'burnCharcoal' }).Count -eq 0)
 Yes 'the chopping blocks still give Firewood at novice' (
     $wood.Count -eq 1 -and $wood[0].Key -eq 'firewood' -and $wood[0].At -eq 0)
 # milk() since #396 (#859): a farmer milks a living cow for a Jug of Milk,
@@ -113,11 +113,11 @@ $egg = @($res.Rows | Where-Object { $_.Fn -eq 'collectEgg' })
 Yes 'a chicken nest gives the farmer Chicken''s Egg at novice' (
     $egg.Count -eq 1 -and $egg[0].Key -eq 'chickenEgg' -and $egg[0].Who -eq 'farmer' -and $egg[0].At -eq 0)
 # hive() since #1377: a farmer takes one Honeycomb off a placed hive,
-# the seventh verb in STATION_VERBS. No rank gate.
+# a verb in STATION_VERBS. No rank gate.
 $hive = @($res.Rows | Where-Object { $_.Fn -eq 'hive' })
 Yes 'a placed hive gives the farmer Honeycomb at novice' (
     $hive.Count -eq 1 -and $hive[0].Key -eq 'honeycomb' -and $hive[0].Who -eq 'farmer' -and $hive[0].At -eq 0)
-Yes 'and nothing but those seven verbs is read' (
-    @($res.Rows | Where-Object { @('mineSalt', 'burnCharcoal', 'chopWood', 'churn', 'milk', 'collectEgg', 'hive') -notcontains $_.Fn }).Count -eq 0)
+Yes 'and nothing but those six verbs is read' (
+    @($res.Rows | Where-Object { @('mineSalt', 'chopWood', 'churn', 'milk', 'collectEgg', 'hive') -notcontains $_.Fn }).Count -eq 0)
 
 Done

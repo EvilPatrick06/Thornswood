@@ -249,7 +249,7 @@ if (block !== null) {
 
   yes('the chopping block is left to Skyrim\'s own furniture',
       code.slice(code.indexOf('function chopWood'),
-                 code.indexOf('const KILN_ARMED'))
+                 code.indexOf('\n}\n', code.indexOf('function chopWood')))
           .indexOf('swing(') === -1);
   yes('the skills panel is not pushed to the browser every frame',
       /st\.thornswoodPanel === body/.test(code));

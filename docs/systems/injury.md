@@ -140,9 +140,8 @@ recipes; Skyrim's own lab only brews.
 
 A broken arm and a missing hand refuse the forges, the armour table,
 the wheel, the smelter, the tanning rack, the loom and the kiln. That is
-asked the same way at a bench's own menu, at a key cut at a forge with
-the lock key, and at a kiln burned by pressing it, before anything is
-taken (#1733). A missing eye is -20% damage with a bow and with
+asked the same way at a bench's own menu, the kiln's included, and at a
+key cut at a forge with the lock key, before anything is taken (#1733). A missing eye is -20% damage with a bow and with
 destruction. A scar is a line on the look prompt.
 
 An agreed loss is written onto the character by staff with /hurt,
