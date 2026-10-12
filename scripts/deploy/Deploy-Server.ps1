@@ -193,6 +193,7 @@ if (-not $PSBoundParameters.ContainsKey('Wait')) {
 . (Join-Path $Here 'ServerSettings.ps1')
 . (Join-Path $Here 'ServerBuild.ps1')
 . (Join-Path $Here 'DeployedBuild.ps1')
+. (Join-Path $Here 'ServerContent.ps1')   # which content plugin the box holds, by size and sha256 (#2308)
 . (Join-Path $Here '..\release\Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
 function Remote($script) {
@@ -619,7 +620,7 @@ if ($GamemodeOnly) {
   # asked: this writes nothing there, and it is short enough to go on the
   # command line, so not even a script file goes up before every answer is in.
   # The box says its port, whether its join pass switch is true or false, the
-  # record of the server build it runs, and the size of its
+  # record of the server build it runs, and the size and sha256 of its
   # Thornswood-Content.esp. No load order is read, here or there: the box
   # keeps its own settings, and the stage check holds its own load order to
   # the plugins on its disk, as it does for every deploy.
@@ -638,25 +639,24 @@ if (Test-Path -LiteralPath $rp) {
   'RECORD ' + (Get-ThornswoodRecordSum ([IO.File]::ReadAllBytes($rp)))
   try { 'RECORDCOMMIT ' + [string](([IO.File]::ReadAllText($rp) | ConvertFrom-Json).source.commit) } catch { }
 } else { 'RECORD none' }
-$ep = Join-Path $root 'plugins\Thornswood-Content.esp'
-if (Test-Path -LiteralPath $ep) { 'ESP ' + (Get-Item -LiteralPath $ep).Length } else { 'ESP none' }
 '@
-  $boxSaid = @(Remote ($ThornswoodRecordSumText + "`r`n`$root = '" + $Root.Replace('/', '\').Replace("'", "''") + "'`r`n" + $boxRead) |
+  # The content plugin the box holds, by size and sha256, rides in the same
+  # answer: ServerContent.ps1's far side text, the read Ship makes (#2308).
+  $boxSaid = @(Remote ($ThornswoodRecordSumText + "`r`n`$root = '" + $Root.Replace('/', '\').Replace("'", "''") + "'`r`n" + $boxRead + "`r`n" + $ThornswoodServerContentText) |
                ForEach-Object { "$_".Trim() })
   $livePort = 0
   $boxPass = ''
   $boxRecord = ''
   $boxRecordCommit = ''
-  $boxEsp = ''
   foreach ($l in $boxSaid) {
     if ($l -match '^PORT (\d+)$') { $livePort = [int]$Matches[1] }
     elseif ($l -match '^PASS (set|missing|neither)$') { $boxPass = $Matches[1] }
     elseif ($l -match '^RECORD ([0-9a-f]{64}|none)$') { $boxRecord = $Matches[1] }
     elseif ($l -match '^RECORDCOMMIT ([0-9a-f]*)$') { $boxRecordCommit = $Matches[1] }
-    elseif ($l -match '^ESP (\d+|none)$') { $boxEsp = $Matches[1] }
   }
+  $boxContent = ConvertFrom-ThornswoodServerContentLines $boxSaid
   $refusals = @()
-  if (-not $boxRecord -or -not $boxEsp -or ($boxSaid -notcontains 'SETTINGS unreadable' -and -not $boxPass)) {
+  if (-not $boxRecord -or -not $boxContent.Answered -or ($boxSaid -notcontains 'SETTINGS unreadable' -and -not $boxPass)) {
     $refusals += ('the box did not answer what it runs: ' + (($boxSaid | Where-Object { $_ }) -join ' | '))
   } else {
     if ($boxSaid -contains 'SETTINGS unreadable') { $refusals += ('the settings in ' + $Root + ' cannot be read, so there is no telling which process is this server') }
@@ -689,18 +689,20 @@ if (Test-Path -LiteralPath $ep) { 'ESP ' + (Get-Item -LiteralPath $ep).Length } 
   # OUR PLUGIN GOES WITH IT WHEN IT CHANGED. Patrick, 5 Oct: a gamemode change
   # often calls for new records in it. It comes from the repository, not the
   # build (OUR OWN PLUGIN below says why), and by the rule the full deploy
-  # uses: sent when the box has none, or one of another size.
+  # uses: sent when the box has none, or one that is not these bytes. By
+  # sha256 as well as size (#2308): Ship refuses a main release whose content
+  # plugin the live server does not hold byte for byte, and names this run.
   $ours = Join-Path $Here '..\..\game\content\Thornswood-Content.esp'
   $sendPlugins = @()
   $changed = @()
   if (Test-Path -LiteralPath $ours) {
-    $ourLen = (Get-Item -LiteralPath $ours).Length
-    if ($boxEsp -eq 'none') {
+    $mine = Get-ThornswoodLocalContent $ours
+    if ($boxContent.Bytes -lt 0) {
       $sendPlugins += $ours
-      $changed += ('Thornswood-Content.esp  not on the box -> {0:N0} bytes' -f $ourLen)
-    } elseif ([int64]$boxEsp -ne $ourLen) {
+      $changed += ('Thornswood-Content.esp  not on the box -> {0:N0} bytes' -f $mine.Bytes)
+    } elseif (-not (Test-ThornswoodContentSame $boxContent $mine.Bytes $mine.Sha)) {
       $sendPlugins += $ours
-      $changed += ('Thornswood-Content.esp  {0:N0} -> {1:N0} bytes' -f [int64]$boxEsp, $ourLen)
+      $changed += ('Thornswood-Content.esp  {0:N0} -> {1:N0} bytes, sha256 {2} -> {3}' -f $boxContent.Bytes, $mine.Bytes, $boxContent.Sha.Substring(0, 12), $mine.Sha.Substring(0, 12))
     }
   }
   Write-Host ''
@@ -708,7 +710,7 @@ if (Test-Path -LiteralPath $ep) { 'ESP ' + (Get-Item -LiteralPath $ep).Length } 
     Write-Host '  Thornswood-Content.esp will go up before the restart:' -ForegroundColor Yellow
     foreach ($c in $changed) { Write-Host ('    changed: ' + $c) -ForegroundColor Yellow }
   } else {
-    Write-Host '  Thornswood-Content.esp is on the VPS at the same size' -ForegroundColor DarkGray
+    Write-Host '  Thornswood-Content.esp is on the VPS at the same bytes' -ForegroundColor DarkGray
   }
 } else {
   # ------------------------------------------------------------- load order
@@ -777,6 +779,15 @@ if (Test-Path -LiteralPath $ep) { 'ESP ' + (Get-Item -LiteralPath $ep).Length } 
   # an evening goes missing, so the question is settled here instead. The repo is
   # where this plugin is made and the repo is what goes up.
   $ours = Join-Path $Here '..\..\game\content\Thornswood-Content.esp'
+  # And ours by sha256 as well as size, in one more read of the box: Ship
+  # refuses a main release whose content plugin the live server does not hold
+  # byte for byte (#2308, ServerContent.ps1), so a deploy that left one of the
+  # same length behind would leave no way past either.
+  $boxContent = Read-ThornswoodServerContent -Channel main -Root $Root -Target "$User@$Vps" -SshArgs $ssh
+  if (-not $boxContent.Answered) {
+    throw ("the live server did not say which content plugin it holds (it answered: " + ((@($boxContent.Said | Where-Object { $_ }) | Select-Object -Last 3) -join ' | ') +
+           "). Nothing was sent and the server was not touched.")
+  }
 
   $sendPlugins = @()
   $changed = @()
@@ -792,6 +803,15 @@ if (Test-Path -LiteralPath $ep) { 'ESP ' + (Get-Item -LiteralPath $ep).Length } 
     # alone: the VPS's copy is then the only copy and overwriting it with nothing
     # is the one outcome worse than it being stale.
     if (-not (Test-Path -LiteralPath $local)) { continue }
+    if ($local -eq $ours) {
+      $mine = Get-ThornswoodLocalContent $ours
+      if (-not (Test-ThornswoodContentSame $boxContent $mine.Bytes $mine.Sha)) {
+        $sendPlugins += $local
+        $changed += ('{0}  {1:N0} -> {2:N0} bytes, sha256 {3} -> {4}' -f $n, $boxContent.Bytes, $mine.Bytes,
+                     $(if ($boxContent.Sha) { $boxContent.Sha.Substring(0, 12) } else { 'none' }), $mine.Sha.Substring(0, 12))
+      }
+      continue
+    }
     $localLen = (Get-Item -LiteralPath $local).Length
     if ($localLen -ne $thereSize[$n]) {
       $sendPlugins += $local
@@ -815,7 +835,7 @@ if (Test-Path -LiteralPath $ep) { 'ESP ' + (Get-Item -LiteralPath $ep).Length } 
     foreach ($p in $sendPlugins) { Write-Host ('    ' + (Split-Path $p -Leaf)) -ForegroundColor Yellow }
     foreach ($c in $changed) { Write-Host ('    changed: ' + $c) -ForegroundColor Yellow }
   } else {
-    Write-Host '  every plugin the load order names is on the VPS at the same size' -ForegroundColor DarkGray
+    Write-Host '  every plugin the load order names is on the VPS at the same size, and ours at the same bytes' -ForegroundColor DarkGray
   }
 }
 

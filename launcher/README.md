@@ -3,7 +3,8 @@
 ## What it is
 
 Everything `Thornswood.exe` is built from. The C# is in `launcher\app`, in C# 5
-for the .NET Framework 4 csc, and `launcher\app\ARCHITECTURE.md` says what each
+for the .NET Framework 4 csc until the build moves to MSBuild and
+`launcher\app\Thornswood.csproj` (#498), when newer C# is allowed, and `launcher\app\ARCHITECTURE.md` says what each
 class owns and how Play runs. The window's layout is `ui.xaml`, parsed at
 startup, so a control renamed there and not in the C# is found by
 `scripts\dev\Check-Controls.ps1` rather than by somebody pressing it. Beside them are
@@ -37,6 +38,14 @@ into a scratch root:
 ```
 .\scripts\release\Build-Launcher.ps1 -Root "$env:TEMP\ts-build" -NoPause
 ```
+
+The same build with MSBuild, from `launcher\app\Thornswood.csproj` and
+`installer\setup\Setup.csproj`, on a machine with Visual Studio 2022 Build
+Tools (`scripts\release\Find-MSBuild.ps1 -Report` says whether it has
+them), is `-With msbuild`. `tests\test-498-msbuild.ps1` builds both ways and
+compares the two exes. A resource added to the launcher goes into
+Build-Launcher.ps1 and into Thornswood.csproj until the switch (#498) leaves
+only the project file.
 
 What the launcher does is written to its own log, `Profile\launcher.log`,
 which is where to look first when anything about it is wrong, voice included.

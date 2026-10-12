@@ -1407,7 +1407,7 @@
                   <TextBlock x:Name="TxtChatFadeNote" Style="{StaticResource Small}" Margin="0,8,0,0"/>
                   <CheckBox x:Name="ChkNeedsBars" Content="Show the needs bars on screen" Margin="0,16,0,0"/>
                   <TextBlock Style="{StaticResource Small}" Margin="28,6,0,0"
-                             Text="Hunger, Thirst, Rest and Temp. Hidden, your needs carry on as before, and the Body page on K shows all of them."/>
+                             Text="Hunger, Thirst, Rest and Temp. Hidden, your needs carry on as before, the Body page on K shows all of them, and /needs in the chat says them as a line of text."/>
                 </StackPanel>
 
 

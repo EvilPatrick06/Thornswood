@@ -138,7 +138,8 @@ if (R0) {
       v.v.open === true && v.v.driver === 'Bjorlam' && v.v.what === 'the carriage' && v.v.from === 'Whiterun' &&
       v.v.ledger === 'Whiterun' && v.v.note === '' && v.v.at > 0);
     yes('and every stop he goes to with its fare, and not his own stop',
-      names.length === 8 && names.indexOf('Solitude 20') >= 0 && names.indexOf('Markarth 20') >= 0 &&
+      names.length === 27 && names.indexOf('Solitude 20') >= 0 && names.indexOf('Markarth 20') >= 0 &&
+      names.indexOf('Riverwood 10') >= 0 && names.indexOf('Lakeview Manor 20') >= 0 &&
       names.indexOf('Winterhold 20') >= 0 && !names.some(function (n) { return /^Whiterun/.test(n); }));
     yes('pressing him did not move anybody or take a coin', !me.moved && gold(me) === 50 && !r.L.funds.whiterun);
 
@@ -149,7 +150,7 @@ if (R0) {
     yes('a short pack is refused with the server\'s line in the chat',
       refused === 'The ride to Solitude is 20 gold and you do not have it. Nothing was taken.');
     yes('and the panel stays, with the same stops and that line on it',
-      rv.open === true && rv.note === refused && rv.stops.length === 8 && rv.at > v.v.at);
+      rv.open === true && rv.note === refused && rv.stops.length === 27 && rv.at > v.v.at);
     yes('and nothing moved and nothing was taken', !me.moved && gold(me) === 19 && !r.L.funds.whiterun);
 
     // A stop the driver does not go to.
@@ -209,7 +210,8 @@ if (R0) {
     C.fare(by('solstheim:telmithryn'), by('solstheim:skaalvillage')) === 10);
   yes('every other ferry is 10', ['coast', 'honrich', 'ilinalta'].every(function (line) {
     const s = C.STOPS.filter(function (x) { return x.line === line; });
-    return s.every(function (a) { return s.every(function (b) { return a === b || C.fare(a, b) === 10; }); });
+    // From a driver: a landing nobody drives from takes nobody anywhere.
+    return s.every(function (a) { return s.every(function (b) { return a === b || !a.driver || C.fare(a, b) === 10; }); });
   }));
   yes('a carriage between two holds is 20', C.fare(by('carriage:whiterun'), by('carriage:riften')) === 20 &&
     C.fare(by('carriage:winterhold'), by('carriage:markarth')) === 20);
@@ -217,11 +219,9 @@ if (R0) {
     return C.STOPS.every(function (b) { return C.fare(a, b) !== 40 || a.line === 'maiden'; });
   }));
   {
-    // A village stop in Whiterun hold, the shape the mod's markers will take.
+    // A village stop in Whiterun hold, on the mod's own marker (#1394, 11 Oct).
     const r = rig();
     const t = r.C.stopByKey('carriage:whiterun');
-    r.C.STOPS.push({ key: 'carriage:riverwood', line: 'carriage', name: 'Riverwood', hold: 'whiterun', driver: '',
-      ref: '', base: '', world: '3c:Skyrim.esm', pos: [t.pos[0] + 20000, t.pos[1] - 30000, t.pos[2]], rot: 0 });
     const v = r.C.stopByKey('carriage:riverwood');
     yes('a carriage to a stop in the same hold is 10', r.C.fare(t, v) === 10 && r.C.FARE_CARRIAGE_IN_HOLD === 10);
     yes('and to another hold still 20', r.C.fare(t, r.C.stopByKey('carriage:solitude')) === 20);

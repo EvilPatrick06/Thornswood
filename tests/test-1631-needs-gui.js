@@ -9,8 +9,10 @@
 //           gets up (#1603). Sit on the emote wheel counts as sitting on the
 //           ground, by what the server sees: the last animation the game sent
 //           for the person, which the engine clears when they move.
-//   /needs  gone. The four bars, and the Body page on K: the meters, the
-//           warmth with its working out and what is counted as worn.
+//   /needs  gone with #1631, and back as a line of text for somebody who
+//           hid the bars (Patrick, 11 Oct, #2267): one of the words people
+//           are told, and tests/test-2267-needs-text.js holds what it says.
+//           The four bars, and the Body page on K, still say it all.
 //   /eat, /drink  gone. They fed and watered with no item at all; eating and
 //           drinking is the item (/ate). Said on #1382 before it went.
 //   /bard   gone. Patrick's answer on #1631: playing the lute, flute or drum
@@ -95,18 +97,20 @@ yes('the needs, property, chat commands and character blocks are in the gamemode
 if (!needsBlock || !propBlock || !chatBlock || !charBlock) { done(); }
 
 // ==================================================== A. nothing is typed
-const GONE = ['/needs', '/eat', '/drink', '/bard'];
+const GONE = ['/eat', '/drink', '/bard'];
 {
   const W = list('WORDS');
   const PW = list('PLAYER_WORDS');
   yes('A1 the server still answers /rest, the line sitting, lying down and getting up send',
       !!W && W.indexOf('/rest') !== -1 && gm.indexOf("    if (word === '/rest') {") !== -1);
-  yes('A1 and answers none of /needs, /eat, /drink or /bard: typed, they are unknown words',
+  yes('A1 and answers none of /eat, /drink or /bard: typed, they are unknown words',
       !!W && GONE.every(function (w) { return W.indexOf(w) === -1; }) &&
       GONE.every(function (w) { return gm.indexOf("word === '" + w + "'") === -1; }));
   yes('A2 none of them, nor /rest, is on the list named to everybody, which /help reads',
       !!PW && PW.indexOf('/helpme') !== -1 &&
       GONE.concat(['/rest']).every(function (w) { return PW.indexOf(w) === -1; }));
+  yes('A2 and /needs is, answered as /needs and /need (Patrick, 11 Oct, #2267)',
+      !!PW && PW.indexOf('/needs') !== -1 && W.indexOf('/needs') !== -1 && W.indexOf('/need') !== -1);
   yes('A3 nothing in the chat commands gives food or drink without an item',
       !/needs\.ate\(/.test(chatBlock) && !/\.ate\(actorId, '(food|drink|ale)'\)/.test(chatBlock));
   yes('A3 and eating or drinking the item is still reported and valued: /ate and consumed',
@@ -115,9 +119,9 @@ const GONE = ['/needs', '/eat', '/drink', '/bard'];
 
   // Every quoted string in the gamemode: none tells anybody to type them.
   const said = (gm.match(/'(?:[^'\\\n]|\\.)*'/g) || []).filter(function (s) {
-    return /\/(needs|eat|drink|bard)\b/.test(s);
+    return /\/(eat|drink|bard)\b/.test(s);
   });
-  yes('A4 no line the server says names /needs, /eat, /drink or /bard' +
+  yes('A4 no line the server says names /eat, /drink or /bard' +
       (said.length ? ' (' + said.slice(0, 3).join(' | ') + ')' : ''), said.length === 0);
 
   // The help is a panel since #1633: its Living topic, as a fresh install reads it.
@@ -125,10 +129,11 @@ const GONE = ['/needs', '/eat', '/drink', '/bard'];
   yes('A5 the help panel\'s Living names the Body page on K, Sit on the emote wheel, the instruments and Sing',
       /Body page on K/.test(text) && /Sit on the emote wheel/.test(text) &&
       /lute, flute or drum/.test(text) && /Sing/.test(text));
-  yes('A5 and names no word to type', text.length > 0 && !/\//.test(text));
+  yes('A5 and names no word to type but /needs, for the bars as text (#2267)',
+      text.length > 0 && (text.match(/\/[a-z]*/g) || []).every(function (w) { return w === '/needs'; }));
 
-  yes('A6 the launcher\'s Help page tells nobody to type /needs, /eat, /drink, /bard or /rest',
-      !/\/(needs|eat|drink|bard|rest)\b/.test(helpCs));
+  yes('A6 the launcher\'s Help page tells nobody to type /eat, /drink, /bard or /rest',
+      !/\/(eat|drink|bard|rest)\b/.test(helpCs));
   const needsItem = (/new HelpItem\("In game", "You will get hungry, thirsty and cold",\s*"((?:[^"\\]|\\.)*)"\)/.exec(helpCs) || [])[1] || '';
   yes('A6 and its needs item points at the Body page on K, the wheel\'s Sit and Sing',
       /Body page on K/.test(needsItem) && /Sit on the emote wheel/.test(needsItem) && /Sing/.test(needsItem));
@@ -142,7 +147,7 @@ const GONE = ['/needs', '/eat', '/drink', '/bard'];
   const stale = [];
   pages.forEach(function (p) {
     const t = read.apply(null, p);
-    if (/`\/(needs|eat|drink|bard)\b|`\/rest bed`/.test(t) || /\/needs gives/.test(t)) { stale.push(p[p.length - 1]); }
+    if (/`\/(eat|drink|bard)\b|`\/rest bed`/.test(t) || /\/needs gives/.test(t)) { stale.push(p[p.length - 1]); }
   });
   yes('A7 no page the issue names tells anybody to type them' + (stale.length ? ' (' + stale.join(', ') + ')' : ''),
       stale.length === 0);
@@ -154,8 +159,9 @@ const GONE = ['/needs', '/eat', '/drink', '/bard'];
   const uiXaml = read('launcher', 'ui.xaml');
   const offLine = (/\? "The needs bars are shown\.[^"]*"\s*:\s*"([^"]*)"\);/.exec(shellCs) || [])[1] || '';
   const boxLine = (/x:Name="ChkNeedsBars"[^>]*\/>\s*<TextBlock[^>]*Text="([^"]*)"/.exec(uiXaml) || [])[1] || '';
-  yes('A8 the Settings page\'s needs bars line, and the line it logs when they go off, tell nobody to type /needs',
-      offLine.length > 0 && boxLine.length > 0 && !/\/needs\b/.test(shellCs) && !/\/needs\b/.test(uiXaml));
+  yes('A8 the Settings page\'s needs bars line, and the line it logs when they go off, are there',
+      offLine.length > 0 && boxLine.length > 0);
+  yes('A8 and the line under the box names /needs, the bars as text (#2267)', /\/needs in the chat/.test(boxLine));
   yes('A8 and both send people to the Body page on K',
       /Body page on K/.test(offLine) && /Body page on K/.test(boxLine));
 }

@@ -1,10 +1,10 @@
 <#
   test-deployed-build.ps1
 
-  After a successful server deploy, Deploy-Server.ps1 writes what the box
-  actually runs (its own server-build.json) into the docs app's
-  data\deployed-build.json, and site/server.js fills the credits page from
-  it. This runs the far-side text of scripts\deploy\DeployedBuild.ps1 with
+  After a successful server deploy, Deploy-Server.ps1 and Publish-Server.ps1
+  write what the box actually runs (its own server-build.json) into the docs
+  app's data\deployed-build.json, and site/server.js fills the credits page
+  from it, for whichever servers the file names (#2303). This runs the far-side text of scripts\deploy\DeployedBuild.ps1 with
   Invoke-ThornswoodArtifactRemote stubbed to run it here, against scratch
   roots (no ssh, no box), then starts a copy of server.js on the scratch
   docs root and checks /credits names the deployed commit with no hand edit.
@@ -126,10 +126,27 @@ try {
   $pb = $pb.Substring(0, $pb.IndexOf("`n}") + 2)
   Yes 'a put-back writes it too, after the swap result passes' ($pb.IndexOf('Save-ThornswoodDeployedBuild') -gt $pb.IndexOf('Show-SwapResult'))
 
+  # Publish-Server.ps1 too (#2303): an engine reaches the dev server that way,
+  # and on 11 Oct the file held live alone because only Deploy-Server wrote it.
+  $ps = [IO.File]::ReadAllText((Join-Path $Repo 'scripts\release\Publish-Server.ps1'))
+  $err = $null; $null = [Management.Automation.PSParser]::Tokenize($ps, [ref]$err)
+  Yes 'Publish-Server.ps1 parses' ($err.Count -eq 0)
+  Yes 'Publish-Server.ps1 loads DeployedBuild.ps1' ($ps -match "\. \(Join-Path \`$Here '\.\.\\deploy\\DeployedBuild\.ps1'\)")
+  $fn = $ps.Substring($ps.IndexOf('function Save-ServerRecords'))
+  $fn = $fn.Substring(0, $fn.IndexOf("`n}") + 2)
+  Yes 'its record step writes the deployed build for the root it installed, after the deploy record' (
+    $fn.IndexOf('Save-ThornswoodDeployedBuild $target $ssh $VpsRoot') -gt $fn.IndexOf('Set-ThornswoodServerRecord') -and
+    $fn.IndexOf('Save-ThornswoodDeployedBuild $target $ssh $VpsRoot') -gt $fn.IndexOf('Restore-ThornswoodServerRecord'))
+  $iInst = $ps.IndexOf('Invoke-Installer $instArgs')
+  Yes 'a publish runs that step only once the installer has said INSTALL OK' ($iInst -gt 0 -and $ps.IndexOf('Save-ServerRecords', $iInst) -gt $iInst)
+  $iBack = $ps.IndexOf('-StartNow -PutBack -Wait $Wait"')
+  Yes 'and a put-back runs it too, after its installer' ($iBack -gt 0 -and $ps.IndexOf('Save-ServerRecords -PutBack', $iBack) -gt $iBack)
+
   # End to end: the file the stubbed deploy wrote is what /credits shows.
+  # First live alone, what the box held on 11 Oct (#2303), then both.
   Put-Record $live $A; Put-Record $dev $A
+  Remove-Item -LiteralPath $out -Force
   $null = Save-ThornswoodDeployedBuild 'u@box' @() $live $docs
-  $null = Save-ThornswoodDeployedBuild 'u@box' @() $dev $docs
   $app = Join-Path $Repo 'site'
   New-Item -ItemType Directory -Force -Path (Join-Path $docs 'public'), (Join-Path $docs 'data\site') | Out-Null
   Copy-Item -LiteralPath (Join-Path $app 'server.js') -Destination $docs
@@ -147,10 +164,14 @@ try {
   $err = $node.StandardError.ReadToEndAsync()
   $said = Wait-OwnLine $node $err '[thornswood-docs]' $port 'the site'
   Yes 'the site says it is listening on its port' ($said -eq '')
-  $body = $null
-  if ($said -eq '') { try { $body = (Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:$port/credits" -TimeoutSec 10).Content } catch { } }
-  Yes 'after the stubbed deploy, /credits names the deployed commit' ($body -and $body.Contains('aaaaaaaa') -and $body.Contains('tree/' + $A))
-  Yes 'and the stale hand sentence is gone, with credits.md untouched' ($body -and -not $body.Contains('the earlier engine') -and
+  function Credits { if ($said -ne '') { return $null }; try { return (Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:$port/credits" -TimeoutSec 10).Content } catch { return $null } }
+  $body = Credits
+  Yes 'with only live deployed, /credits names the main server''s commit' ($body -and $body.Contains('The main server runs') -and $body.Contains('tree/' + $A) -and -not $body.Contains('test server runs'))
+  Yes '  and the hand sentence is gone' ($body -and -not $body.Contains('this page names it here once'))
+  $null = Save-ThornswoodDeployedBuild 'u@box' @() $dev $docs
+  $body = Credits
+  Yes 'after the dev deploy too, /credits says both run the deployed commit' ($body -and $body.Contains('Both servers run') -and $body.Contains('tree/' + $A))
+  Yes '  with credits.md untouched' (
     ([IO.File]::ReadAllText((Join-Path $docs 'data\site\credits.md')) -eq [IO.File]::ReadAllText((Join-Path $app 'data\site\credits.md'))))
 } finally {
   if ($node -and -not $node.HasExited) { try { $node.Kill(); $node.WaitForExit(3000) | Out-Null } catch { } }

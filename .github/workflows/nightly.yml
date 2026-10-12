@@ -180,6 +180,21 @@ jobs:
           # when it cancelled the job, and one of those holding the output
           # pipe open is enough to keep the old "| Out-String" waiting for ever.
           $PER_HARNESS = 300
+          # A harness whose own cases take longer than that says so in its
+          # header, with its measured time beside it ("NIGHTLY CLOCK: 600
+          # seconds"), and gets that clock instead, never more than
+          # MAX_CLOCK. The clock is there to catch a harness that hangs, not
+          # to cut off one that is still passing: test-deploy-swaps runs every
+          # deploy script whole against a stand-in box, and on 12 Oct it was
+          # still passing when 300 s ran out (#1273). MAX_CLOCK keeps one
+          # harness from eating the job's 45 minutes.
+          $MAX_CLOCK = 600
+          function Clock-Of($path) {
+            $head = [IO.File]::ReadAllText($path)
+            if ($head.Length -gt 8000) { $head = $head.Substring(0, 8000) }
+            $m = [regex]::Match($head, '(?im)^[\s#/*<]*NIGHTLY CLOCK:\s*(\d+) seconds')
+            if ($m.Success) { [Math]::Min([int]$m.Groups[1].Value, $MAX_CLOCK) } else { $PER_HARNESS }
+          }
           $tmp = Join-Path $env:RUNNER_TEMP 'harness-out'
           New-Item -ItemType Directory -Path $tmp -Force | Out-Null
           # An empty file for stdin: no harness reads it, and one that tried
@@ -203,7 +218,7 @@ jobs:
           # Start-Process joins -ArgumentList with spaces and quotes nothing,
           # so a path is quoted here. $p.Handle is read at once because
           # without it ExitCode comes back empty once the process is gone.
-          function Run-One($exe, $argList, $name, $path) {
+          function Run-One($exe, $argList, $name, $path, $clock = $PER_HARNESS) {
             $file = $name -replace '[\\/]', '_'
             $o = Join-Path $tmp ($file + '.out'); $e = Join-Path $tmp ($file + '.err')
             $since = (Get-Date).AddSeconds(-1)
@@ -211,22 +226,23 @@ jobs:
             $p = Start-Process -FilePath $exe -ArgumentList $argList -NoNewWindow -PassThru `
                    -RedirectStandardInput $nothing -RedirectStandardOutput $o -RedirectStandardError $e
             $null = $p.Handle
-            $timedOut = -not $p.WaitForExit($PER_HARNESS * 1000)
+            $timedOut = -not $p.WaitForExit($clock * 1000)
             if ($timedOut) { & taskkill.exe /T /F /PID $p.Id 2>&1 | Out-Null; $null = $p.WaitForExit(10000) }
             $code = if ($timedOut) { -1 } else { $p.ExitCode }
             $secs = [Math]::Round($sw.Elapsed.TotalSeconds, 1)
             $left = @(Kill-Left $p.Id $since)
-            Write-Host ("--- {0}  ({1}s)" -f $name, $secs)
+            Write-Host ("--- {0}  ({1}s{2})" -f $name, $secs, $(if ($clock -ne $PER_HARNESS) { ', on a ' + $clock + ' s clock it names' } else { '' }))
             foreach ($f in $o, $e) { if (Test-Path $f) { $txt = Get-Content -Raw $f; if ($txt) { Write-Host $txt.TrimEnd() } } }
-            if ($timedOut) { Write-Host ("::error file={0}::harness timed out after {1}s and was killed" -f $path, $PER_HARNESS) }
+            if ($timedOut) { Write-Host ("::error file={0}::harness timed out after {1}s and was killed" -f $path, $clock) }
             elseif ($code -ne 0) { Write-Host ("::error file={0}::harness failed (exit {1})" -f $path, $code) }
             if ($left.Count) { Write-Host ("::warning file={0}::harness left {1} process(es) running when it ended, now killed: {2}" -f $path, $left.Count, ($left -join ', ')) }
             [pscustomobject]@{ Name = $name; Path = $path; Code = $code; TimedOut = $timedOut; Secs = $secs }
           }
           $all = @(Get-ChildItem tests -File | Where-Object { $_.Name -like 'test-*.js' -or $_.Name -like 'test-*.ps1' } | Sort-Object Name)
           $results = @(foreach ($t in $all) {
-            if ($t.Extension -eq '.js') { Run-One 'node' @('"' + $t.FullName + '"') $t.Name $t.FullName }
-            else { Run-One 'pwsh' @('-NoProfile', '-File', ('"' + $t.FullName + '"')) $t.Name $t.FullName }
+            $clock = Clock-Of $t.FullName
+            if ($t.Extension -eq '.js') { Run-One 'node' @('"' + $t.FullName + '"') $t.Name $t.FullName $clock }
+            else { Run-One 'pwsh' @('-NoProfile', '-File', ('"' + $t.FullName + '"')) $t.Name $t.FullName $clock }
           })
           $failed = @($results | Where-Object { $_.Code -ne 0 } | ForEach-Object { if ($_.TimedOut) { $_.Name + ' (timed out)' } else { $_.Name } })
           $bad = $failed.Count
@@ -276,9 +292,9 @@ jobs:
             Write-Host '::error::could not make a venv for the bot harnesses, so they did not run'
             exit 1
           }
-          & $py -m pip install --quiet --disable-pip-version-check -r bot\requirements.txt
+          & $py -m pip install --quiet --disable-pip-version-check --require-hashes --only-binary :all: -r bot\requirements.txt
           if ($LASTEXITCODE -ne 0) {
-            Write-Host '::error::could not install discord.py, so the bot harnesses did not run'
+            Write-Host '::error::could not install discord.py from the hash-pinned bot\requirements.txt (a hash that does not match stops it, #2190), so the bot harnesses did not run'
             exit 1
           }
           #

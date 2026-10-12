@@ -61,9 +61,12 @@ read it (issue #440, phase 8):
   built again.
 - `most-online.json`: the most people in the world at once (`people`) and
   the seats over it that only the Discord staff roles may take
-  (`staffSeats`), with Patrick's decisions in its `note` (issue #481).
+  (`staffSeats`), with Patrick's decisions in its `note` (issue #481), and
+  the most people the voice service takes at once (`voice`), never fewer than
+  the two together, since everybody seated and everybody waiting in line at
+  the menu holds a socket to it.
   `scripts\deploy\MaxOnline.ps1` reads it for Deploy-Gamemode,
-  Deploy-DevGamemode, Publish-Server and Publish-Update, and `site\server.js`
+  Deploy-DevGamemode, Publish-Server, Publish-Update and Install-Voice, and `site\server.js`
   reads `people` when the site runs from the repository. No script writes
   this one: it is changed by hand in a pull request, then each server is
   deployed and a Ship carries it to the feed.
@@ -90,6 +93,7 @@ names. No script reads them. `THIRD-PARTY.md` and
 - `creation-clothes-provenance.md`: the client and SkyrimPlatformImpl.dll
   built for the starting clothes in character creation (fork commit
   75cb6ca1, 3 October).
+- `runner-isolation.json`: what a runner account on the VPS must not reach (production paths, groups), the crash dump folder it may only write, the age limit for files left in its temp folder, and differences agreed as intentional. `scripts\vps\Check-RunnerIsolation.ps1` compares the runners against it (issue #2161).
 - `prod-parity.json`: what the VPS should look like (which ports listen where and as which program, each task's account and triggers, the services' accounts, which live files must match which repository file, the TLS margin, environment variables that must not be set) and the differences agreed as intentional, each with its reason. `scripts\vps\Check-ProdParity.ps1` compares the box against it; no secret belongs in it (issue #2165).
 - `merchant-runtime-provenance.md`: the server module built for merchant
   settlement, and why the six client files kept their ac044a49 bytes (fork

@@ -200,12 +200,44 @@ scripts/dev/Build-RecipeTable.ps1, because none of the four can be read off a
 MISC at these benches. All four MISC records are cloned from the charcoal,
 like the kits, so no new mesh has to ship.
 
+THE HEARTHFIRE HOUSE PARTS, TAKEN OFF THE FORGE (issue #2258)
+
+Patrick, 25 September: house parts show as craftable "instead of not
+existing". Nobody builds a Hearthfire house here: property is a deed and a key
+cut from a mold. The server already refuses the four (the 'nobody' rows of
+$NOBODY_MAKES in scripts/dev/Build-RecipeTable.ps1, carried into the gamemode's
+recipe table), but the forge menu still lists them, because a menu entry is
+read on the machine in front of the person from the record, and no server code
+reaches it.
+
+So this plugin overrides the four HearthFires.esm recipes, BYOHRecipeNails,
+BYOHRecipeHinge, BYOHRecipeLock and BYOHRecipeFittings, and gives each a
+condition that is never true: GetItemCount of gold, on the person at the bench,
+less than 0. Nobody carries less than no gold, so Skyrim's crafting menu never
+lists them, and the server, which has GetItemCount (condition_functions in the
+fork), turns the craft down on its own account too if a client ever asks.
+Nothing else on the records changes: the same inputs, output, bench and count,
+so the override is the record Bethesda wrote plus one line.
+
+The first time, the records are read out of HearthFires.esm in the game's Data
+folder (--masters), and their form ids are written in this plugin's numbering
+(HearthFires.esm is its master 03 and its own records are 02 in its own file).
+Once they are in this plugin, a later run edits them where they are and needs
+no game. No later plugin in the load order overrides them (read 11 October
+across the main install's load order), so this override is the one that wins.
+
+The other way, the one Collapse-DwarvenIngots.py took for #613, is to drop the
+BNAM so no bench lists the recipe. The condition is used here because it keeps
+the bench on the record, which is what recipes.json and the gamemode read as
+the recipe's bench, and because the server then refuses it too.
+
 THIS IS A SHIPPED FILE, so its size changing means a release and every client
 downloading it again.
 
 Usage (both default to game\\content\\Thornswood-Content.esp in this repo):
     python scripts/mods/Add-ContentRecords.py --check
     python scripts/mods/Add-ContentRecords.py
+    python scripts/mods/Add-ContentRecords.py --masters C:\\Thornswood\\Game\\Data
 
 Exit code 1 if the parse does not round trip, if the result does not verify, or
 if anything it was asked to add is already there.
@@ -264,6 +296,16 @@ DEED = 0x5015493
 # as the deed is: "Key to Breezehome", "Key mold for Honeyside".
 KEY = 0x5015494
 MOLD = 0x5015495
+
+# WHAT THEY LOOK LIKE (#2255). Both were cloned from the charcoal MISC and kept
+# its mesh, so a key and a mold were the same stick of charcoal in the pack and
+# on the ground: "the key item isn't a key and is the same block log item as the
+# mold". Both now wear vanilla meshes from Skyrim.esm, so still no new art ships:
+# the key the 191 KEYM records in Skyrim.esm use most, and the silver mold the
+# Thieves Guild quest uses (MISC TGTQ01SilverMold). The MODT that came with the
+# charcoal is texture data for the charcoal's mesh, so it goes with it.
+KEY_MODEL = 'Clutter\\Key01.nif'
+MOLD_MODEL = 'Clutter\\SilverMold01.nif'
 RECIPE_MOLD = 0x5015496
 RECIPE_KEY = 0x5015497
 
@@ -327,6 +369,38 @@ BLUE_MOUNTAIN_FLOWER = 0x00077E1C  # a gatherer's at advanced (game/data/harvest
 # 0x6CE000. Update.esm is this plugin's master 01. See THE LOOM at the top.
 LOOM_KEYWORD = 0x016CE000
 ALCHEMY_KEYWORD = 0x5042E6B  # ThornswoodCraftingAlchemy, this plugin's own lab
+
+# The four Hearthfire house part recipes (#2258), in this plugin's numbering:
+# HearthFires.esm is master 03. Each with the editor id the master gives it,
+# which the override keeps and this checks.
+HOUSE_PARTS = (
+    (0x0300306D, 'BYOHRecipeNails'),
+    (0x0300306E, 'BYOHRecipeHinge'),
+    (0x0300306F, 'BYOHRecipeLock'),
+    (0x03003036, 'BYOHRecipeFittings'),
+)
+HOUSE_PARTS_MASTER = 'HearthFires.esm'
+
+# A condition that is never true (#2258). A CTDA is 32 bytes: the operator in
+# the top three bits of the first byte (4 is '<', the enum in libespm CTDA.h),
+# three bytes of nothing, the value to compare with (0.0), the function (47,
+# GetItemCount, which the fork's server evaluates as well as Skyrim), two bytes
+# of nothing, the first parameter (Gold001, 0xF in Skyrim.esm, master 00), the
+# second (none), run on the subject (0, the person at the bench), no reference,
+# and the third parameter, -1 for none. GetItemCount is never below 0.
+GOLD = 0x0000000F
+NEVER_TRUE = struct.pack('<B3sfHHIIIIi', 4 << 5, b'\x00\x00\x00', 0.0, 47, 0,
+                         GOLD, 0, 0, 0, -1)
+
+# Where the masters are read from, the first time a master record is copied in.
+MASTERS_DIR = 'C:\\Thornswood\\Game\\Data'
+
+# The subrecords a COBJ carries, and which hold form ids. A record copied in
+# from a master with anything else in it stops the tool, because a form id in
+# a field this does not know would keep the master's numbering.
+COBJ_FORM_FIELDS = {b'CNTO': (0,), b'COED': (0,), b'CNAM': (0,), b'BNAM': (0,),
+                    b'CTDA': (12, 16, 24)}
+COBJ_PLAIN_FIELDS = (b'EDID', b'COCT', b'NAM1', b'CIS1', b'CIS2')
 
 DEED_WORDS = (
     '<p align="center"><font size="30">Deed</font></p>'
@@ -476,6 +550,24 @@ def clone(src, fid, editor_id, sets=None, after=None, drop=None):
     return Rec(src.tag, src.flags, fid, src.extra, pack_subrecords(out))
 
 
+def set_model(rec, model):
+    """The record's MODL set to model and the old mesh's MODT/MODS dropped.
+    True when that changed anything, so a second run is not an edit."""
+    pairs = subrecords(rec.data)
+    want = zstr(model)
+    out = []
+    for t, b in pairs:
+        if t in (b'MODT', b'MODS'):
+            continue
+        out.append((t, want) if t == b'MODL' else (t, b))
+    if not any(t == b'MODL' for t, _ in pairs):
+        raise SystemExit('0x%07X has no MODL to set' % rec.fid)
+    if out == pairs:
+        return False
+    rec.data = pack_subrecords(out)
+    return True
+
+
 def set_inputs(rec, items):
     """Replace every CNTO and set COCT to match. items is (formid, count)."""
     pairs = subrecords(rec.data)
@@ -588,6 +680,108 @@ def other_server_names(rec):
     return found
 
 
+def masters_of(buf):
+    """The MAST names in a plugin's header, in order."""
+    hs = struct.unpack_from('<I', buf, 4)[0]
+    return [b.rstrip(b'\x00').decode('ascii', 'replace')
+            for t, b in subrecords(buf[24:24 + hs]) if t == b'MAST']
+
+
+def record_in(buf, tag, fid):
+    """The record of that type and form id (the file's own numbering), or None.
+    Only the top group of that type is walked."""
+    hs = struct.unpack_from('<I', buf, 4)[0]
+    p = 24 + hs
+    while p + 24 <= len(buf):
+        size = struct.unpack_from('<I', buf, p + 4)[0]
+        if buf[p:p + 4] == b'GRUP' and buf[p + 8:p + 12] == tag:
+            for r in every_record(parse(buf, p + 24, p + size)):
+                if r.fid == fid and r.tag == tag:
+                    return r
+            return None
+        p += size if buf[p:p + 4] == b'GRUP' else 24 + size
+    return None
+
+
+def renumbered(v, mapping, what):
+    """A form id moved from the master's numbering into this plugin's."""
+    idx = v >> 24
+    if idx >= len(mapping):
+        raise SystemExit('STOP. %s names 0x%08X, outside its file\'s masters. '
+                         'Nothing was written.' % (what, v))
+    return (mapping[idx] << 24) | (v & 0xFFFFFF)
+
+
+def from_master(masters_dir, master, local_fid, plugin_masters, tag=b'COBJ'):
+    """A copy of a master's record, in this plugin's numbering.
+
+    local_fid is the id as this plugin writes it (the master's index here in
+    the top byte). The master is read from masters_dir; its own records carry
+    its own master count in the top byte, and every form id in the copy is
+    moved from its numbering to this plugin's. Refuses a compressed record and
+    a subrecord this does not know, rather than guess at what is in it."""
+    path = os.path.join(masters_dir, master)
+    if not os.path.isfile(path):
+        raise SystemExit('STOP. %s is not in %s, and this needs it the first time. '
+                         'Give --masters the game\'s Data folder. Nothing was written.'
+                         % (master, masters_dir))
+    buf = open(path, 'rb').read()
+    src_masters = masters_of(buf)
+    own = len(src_masters)
+    rec = record_in(buf, tag, (own << 24) | (local_fid & 0xFFFFFF))
+    if rec is None:
+        raise SystemExit('STOP. %s has no %s 0x%06X. Nothing was written.'
+                         % (master, tag.decode(), local_fid & 0xFFFFFF))
+    if rec.compressed:
+        raise SystemExit('STOP. %s %s 0x%06X is compressed. Nothing was written.'
+                         % (master, tag.decode(), local_fid & 0xFFFFFF))
+    names = [m.lower() for m in plugin_masters]
+    mapping = []
+    for m in src_masters + [master]:
+        if m.lower() not in names:
+            raise SystemExit('STOP. %s names %s, which is not a master of this plugin. '
+                             'Nothing was written.' % (master, m))
+        mapping.append(names.index(m.lower()))
+    pairs = subrecords(rec.data)
+    if pack_subrecords(pairs) != rec.data:
+        raise SystemExit('STOP. %s 0x%06X does not read back as its own subrecords. '
+                         'Nothing was written.' % (master, local_fid & 0xFFFFFF))
+    out = []
+    for t, b in pairs:
+        if t in COBJ_FORM_FIELDS:
+            b = bytearray(b)
+            offsets = list(COBJ_FORM_FIELDS[t])
+            # A CTDA whose flags say "use global" compares with a GLOB, not a number.
+            if t == b'CTDA' and b[0] & 0x04:
+                offsets.append(4)
+            for o in offsets:
+                v = struct.unpack_from('<I', b, o)[0]
+                if v:
+                    struct.pack_into('<I', b, o, renumbered(v, mapping, '%s %s' % (master, t.decode())))
+            b = bytes(b)
+        elif t not in COBJ_PLAIN_FIELDS:
+            raise SystemExit('STOP. %s 0x%06X carries %s, which this does not know how to '
+                             'renumber. Nothing was written.'
+                             % (master, local_fid & 0xFFFFFF, t.decode()))
+        out.append((t, b))
+    return Rec(rec.tag, rec.flags, renumbered(rec.fid, mapping, master), rec.extra,
+               pack_subrecords(out))
+
+
+def never_listed(rec):
+    """The recipe with NEVER_TRUE among its conditions, after any it has and
+    before its output. True when that changed anything, so a second run is not
+    an edit."""
+    pairs = subrecords(rec.data)
+    if any(t == b'CTDA' and b == NEVER_TRUE for t, b in pairs):
+        return False
+    at = max([i + 1 for i, (t, _) in enumerate(pairs) if t in (b'CTDA', b'CIS1', b'CIS2')] or
+             [i for i, (t, _) in enumerate(pairs) if t == b'CNAM'] or [len(pairs)])
+    pairs.insert(at, (b'CTDA', NEVER_TRUE))
+    rec.data = pack_subrecords(pairs)
+    return True
+
+
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
     ap = argparse.ArgumentParser()
@@ -595,6 +789,8 @@ def main():
         os.path.join(here, '..', '..', 'game', 'content')))
     ap.add_argument('--plugin', default='Thornswood-Content.esp')
     ap.add_argument('--check', action='store_true', help='say what would happen, write nothing')
+    ap.add_argument('--masters', default=MASTERS_DIR,
+                    help="the game's Data folder, read when a master's record is first copied in")
     args = ap.parse_args()
 
     path = os.path.join(args.data, args.plugin)
@@ -742,10 +938,12 @@ def main():
         b'FULL': zstr('Key'),
         b'DATA': struct.pack('<If', 0, 0.0),
     })
+    set_model(key, KEY_MODEL)
     mold = clone(misc_src, MOLD, 'ThornswoodMiscKeyMold', sets={
         b'FULL': zstr('Key Mold'),
         b'DATA': struct.pack('<If', 25, 1.0),
     })
+    set_model(mold, MOLD_MODEL)
     # THE MOLD AND THE KEY ARE BOTH MADE BY A SMITH, WHICH IS WHAT MAKES THE
     # CHAIN START AT ALL.
     #
@@ -911,6 +1109,37 @@ def main():
     make_remedy = recipe(RECIPE_REMEDY, 'ThornswoodRecipeRemedy', REMEDY, ALCHEMY_KEYWORD,
                          [(MUDCRAB_CHITIN, 1), (BLUE_MOUNTAIN_FLOWER, 1)])
 
+    # The Hearthfire house parts (#2258), overrides of a master's records. One
+    # already in this plugin is edited where it is; one that is not is copied
+    # in from HearthFires.esm. See the top.
+    plugin_masters = masters_of(raw)
+    house_new, house_have = [], []
+    for fid, edid in HOUSE_PARTS:
+        have = next((r for r in records if r.fid == fid and r.tag == b'COBJ'), None)
+        if have is not None:
+            if have.compressed or have.editor_id() != edid:
+                print('')
+                print('STOP. COBJ 0x%08X in this plugin is not %s as it should be. '
+                      'Nothing was written.' % (fid, edid))
+                return 1
+            house_have.append(have)
+            continue
+        if fid in taken:
+            print('')
+            print('STOP. 0x%08X is already taken by something that is not a recipe. '
+                  'Nothing was written.' % fid)
+            return 1
+        made_here = from_master(args.masters, HOUSE_PARTS_MASTER, fid, plugin_masters)
+        if made_here.editor_id() != edid:
+            print('')
+            print('STOP. %s 0x%06X is %s, not %s. Nothing was written.'
+                  % (HOUSE_PARTS_MASTER, fid & 0xFFFFFF, made_here.editor_id(), edid))
+            return 1
+        never_listed(made_here)
+        house_new.append(made_here)
+    house_bare = [r for r in house_have
+                  if not any(t == b'CTDA' and b == NEVER_TRUE for t, b in subrecords(r.data))]
+
     print('')
     print('What goes in')
     print('  MISC 0x%07X ThornswoodMiscToolHandle      Tool Handle, %d gold, %s weight'
@@ -965,8 +1194,13 @@ def main():
           % RECIPE_POULTICE)
     print("  COBJ 0x%07X ThornswoodRecipeRemedy        1 mudcrab chitin + 1 blue mountain flower -> 1 Physicker's "
           'Remedy, at the alchemy lab' % RECIPE_REMEDY)
+    for r in house_new:
+        print("  COBJ 0x%08X %-30s HearthFires.esm's, never listed: GetItemCount(gold) < 0"
+              % (r.fid, r.editor_id()))
     print('')
     print('What changes')
+    for r in house_bare:
+        print('  COBJ 0x%08X %-30s gains the condition that is never true' % (r.fid, r.editor_id()))
     print('  COBJ 0x%07X ThornswoodRecipeWeaponPickaxe now wants a handle as well as the ingot'
           % cobj_pickaxe.fid)
     print('  COBJ 0x%07X ThornswoodRecipeWeaponAxe     now wants a handle as well as the ingot'
@@ -1001,7 +1235,7 @@ def main():
                          make_weapon_kit, make_armor_kit, make_sewing_kit,
                          bandage, splint, poultice, remedy,
                          make_bandage, make_splint, make_poultice, make_remedy)
-             if r.editor_id() not in already]
+             if r.editor_id() not in already] + house_new
     # An edit that has already been made is not made twice. A recipe that already
     # asks for a handle would otherwise gain a second one on every run.
     edited = set()
@@ -1014,6 +1248,14 @@ def main():
         edited.add(rec.fid)
     if block is not None and EXECUTION_BLOCK not in removing and drop_script(block):
         edited.add(block.fid)
+    # A house part already overridden here keeps or gains the condition (#2258).
+    for r in house_have:
+        if never_listed(r):
+            edited.add(r.fid)
+    # A key and a mold already in the plugin get their own meshes (#2255).
+    for name, model in (('ThornswoodMiscKey', KEY_MODEL), ('ThornswoodMiscKeyMold', MOLD_MODEL)):
+        if name in already and set_model(by_edid[name], model):
+            edited.add(by_edid[name].fid)
     if not built and not edited and not removing:
         print('')
         print('  Everything this adds is already in the plugin. Nothing was written.')

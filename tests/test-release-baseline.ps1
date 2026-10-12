@@ -315,7 +315,7 @@ try {
     $iUp = $src.IndexOf('# ==== end thornswood site upload ====')
     $iSet = $src.IndexOf("Set-Prop `$doc 'baseline' `$releaseBaseline")
     $iWrite = $src.IndexOf('[IO.File]::WriteAllText($VersionFile')
-    $iSend = $src.IndexOf("Send-FeedStore `$Channel `$ReleaseDir @('version.json')")
+    $iSend = $src.IndexOf("Send-FeedStore `$Channel `$ReleaseDir `$feedFiles")
     Yes 'it runs after the packs are on the site and before the feed is written or sent' ($iUp -gt 0 -and $iMan -gt $iUp -and $iSet -gt $iMan -and $iWrite -gt $iSet -and $iSend -gt $iWrite)
     Yes 'Save-State writes the store copy with the same writer' ($src -match '(?s)function Save-State \{\s+\[void\]\(Write-BaselineFile \$now \$StateFile\)')
     Yes 'the scan records bytes, not file times' ($src -match '\$now\[\$rel\] = Get-BaselineEntry \$f\.FullName' -and $src -notmatch 'LastWriteTimeUtc\.Ticks\)')
@@ -326,11 +326,11 @@ try {
         $site5 = Join-Path $T 'site5'
         New-Item -ItemType Directory -Force -Path (Join-Path $site5 'feed'), (Join-Path $site5 'feed-dev') | Out-Null
         $block = $m.Value
-        function Run-Manifest([bool]$noUpload, [bool]$dev) {
+        function Run-Manifest([bool]$noUpload, [bool]$dev, [string]$notes = "Keys open their own doors`n- A house key opens the house it is named for.") {
             $Here = Join-Path $repo 'scripts\release'
             $DistDir = Join-Path $T 'dist5'
             New-Item -ItemType Directory -Force -Path $DistDir | Out-Null
-            $now = $last; $Id = '20260928-2200'; $NoUpload = $noUpload; $Dev = $dev; $SiteDir = $site5
+            $now = $last; $Id = '20260928-2200'; $NoUpload = $noUpload; $Dev = $dev; $SiteDir = $site5; $Notes = $notes
             Invoke-Expression $block
             return [pscustomobject]@{ Pointer = $releaseBaseline; Path = $manifestPath; Sha = $manifestSha }
         }
@@ -342,17 +342,21 @@ try {
         Yes 'otherwise it is sent to the site under its sha256' ((Get-BaselineFileSha (Join-Path $site5 "feed\assets\$($r.Sha)")) -eq $r.Sha)
         Yes '  and the feed names it there, with its id and entry count' ($null -ne $r.Pointer -and $r.Pointer.url -eq (Url 'feed' $r.Sha) -and
                                                                       $r.Pointer.sha256 -eq $r.Sha -and $r.Pointer.id -eq '20260928-2200' -and $r.Pointer.entries -eq $last.Count)
+        Yes '  with the release note, which the update card shows once no pack carries it (#1050)' (
+            $null -ne $r.Pointer -and $r.Pointer.PSObject.Properties['notes'] -and $r.Pointer.notes -eq "Keys open their own doors`n- A house key opens the house it is named for.")
         $r = Run-Manifest $false $true
         Yes 'a dev release sends it to /feed-dev/' ($null -ne $r.Pointer -and $r.Pointer.url -eq (Url 'feed-dev' $r.Sha) -and (Test-Path -LiteralPath (Join-Path $site5 "feed-dev\assets\$($r.Sha)")))
+        $r = Run-Manifest $false $false ''
+        Yes 'a release with no note names no notes field' ($null -ne $r.Pointer -and -not $r.Pointer.PSObject.Properties['notes'])
         Remove-Item Function:\Say, Function:\Die
     }
 
     # ---- 6. the real Publish-Update.ps1 ---------------------------------------------
     Write-Host ''; Write-Host 'the real Publish-Update.ps1'
     $fake = Join-Path $T 'repo'
-    foreach ($f in 'scripts\release\Publish-Update.ps1', 'scripts\release\Read-JsonFile.ps1', 'scripts\release\Ship-Rules.ps1', 'scripts\mods\LoadOrder.ps1',
+    foreach ($f in 'scripts\release\Publish-Update.ps1', 'scripts\release\Read-JsonFile.ps1', 'scripts\release\RecordShape.ps1', 'scripts\release\Ship-Rules.ps1', 'scripts\mods\LoadOrder.ps1',
                    'scripts\release\Feed-Store.ps1', 'scripts\release\Release-Baseline.ps1', 'scripts\release\Release-Name.ps1', 'scripts\release\Source-Notice.ps1',
-                   'scripts\release\Dev-News.ps1',
+                   'scripts\release\Dev-News.ps1', 'scripts\deploy\ServerContent.ps1',
                    'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt',
                    'scripts\release\Where.ps1', 'records\client-build.json', 'records\ui-gone.json',
                    'scripts\mods\Generated.ps1', 'records\generated.json') {

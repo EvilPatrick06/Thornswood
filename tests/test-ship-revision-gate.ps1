@@ -51,10 +51,14 @@ try {
 finally { Remove-Item -LiteralPath (Split-Path -Parent $T) -Recurse -Force -ErrorAction SilentlyContinue }
 
 # ---- Test-ShipHeld ---------------------------------------------------------------
-$folder = @($ShipHeldForCollection | Where-Object { ([string]$_.Path).EndsWith('\') })[0]
-$file = @($ShipHeldForCollection | Where-Object { -not ([string]$_.Path).EndsWith('\') })[0]
+# The lines a collection revision settles. The one the content plugin settles
+# (-WhileContentNamesIt) is tests\test-2298-held-board.ps1's.
+$byRevision = @($ShipHeldForCollection | Where-Object { -not [string]$_.ContentModel })
+$folder = @($byRevision | Where-Object { ([string]$_.Path).EndsWith('\') })[0]
+$file = @($byRevision | Where-Object { -not ([string]$_.Path).EndsWith('\') })[0]
 Yes ("the held list has folders and files ({0} entries)" -f $ShipHeldForCollection.Count) ($folder -and $file)
-Yes 'every held entry names its revision and its mod' (@($ShipHeldForCollection | Where-Object { [int]$_.Revision -lt 1 -or -not $_.Mod }).Count -eq 0)
+Yes 'every held entry names its mod and exactly one way out: a revision, or the content plugin naming it' (@($ShipHeldForCollection | Where-Object {
+    -not $_.Mod -or (([int]$_.Revision -ge 1) -eq [bool][string]$_.ContentModel) }).Count -eq 0)
 $inFolder = [string]$folder.Path + 'sub\x.nif'
 $hr = [int]$folder.Revision
 Yes "a file under a held folder is held below revision $hr" (Test-ShipHeld $inFolder ($hr - 1))

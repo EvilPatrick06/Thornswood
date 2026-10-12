@@ -7,6 +7,12 @@
   new copy has checked out beside it, a new copy that does not come up is put
   back automatically, and -PutBack puts the last one back.
 
+  NIGHTLY CLOCK: 600 seconds. Every case runs a deploy script whole, each
+  run 5 to 25 seconds on the VPS runner (10 to 60 on One with Defender busy),
+  so the whole file does not fit the nightly's 300 s clock for one harness:
+  on 12 Oct (run 38204529995) the runner was 93 checks in, every one passing,
+  when 300 s ran out and it was killed (#1273). nightly.yml reads this line.
+
   WHY THIS EXISTS. Issue #446. Measured on 28 September: Deploy-DevGamemode
   stopped the dev server and then copied over it; Deploy-Docs, Install-Voice and
   Install-Bot copied over the running site, voice service and bot and then

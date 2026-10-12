@@ -84,6 +84,7 @@ $makerLines = @(
     'name = "thornslib-%s" % ver'
     'files = {'
     '  "thornslib/__init__.py": init,'
+    '  "thornsmod.py": b"name = 1\n",'
     '  name + ".dist-info/METADATA": meta,'
     '  name + ".dist-info/WHEEL": wheel,'
     '}'
@@ -118,12 +119,28 @@ PipTarget $w1 (Join-Path $rootBot 'py-libs') (Join-Path $work 'req-old.txt')
 PipTarget $w2 (Join-Path $stage 'py-libs') (Join-Path $stage 'requirements.txt')
 
 # The cause and the reset Install-Bot runs, on the stage pip just filled.
-$libFiles = @(Get-ChildItem -LiteralPath (Join-Path $stage 'py-libs') -File -Recurse)
-function Unruled($files) { @($files | Where-Object { -not @((Get-Acl -LiteralPath $_.FullName).Access | Where-Object { $_.IsInherited }).Count }) }
+# What pip renames into py-libs is each top-level entry: a module file
+# (thornsmod.py here, typing_extensions.py on the VPS on 11 Oct) and each
+# package and dist-info folder. Those keep the protected rules of the folder
+# mkdtemp made and inherit nothing from py-libs; a file inside a package folder
+# shows its rules as inherited, but from that protected folder, so the bot's
+# account cannot reach it either. So every entry is read, folders too, and
+# one is outside the folder's rules when its rules are protected or none of
+# them is inherited. Measured on Python 3.12.10 (12 Oct): the four top-level
+# entries protected with three rules of their own, everything under them
+# inherited. Reading files alone, as this did until then, saw only inherited
+# rules and failed on the runner's 3.12 (#1273).
+$libItems = @(Get-ChildItem -LiteralPath (Join-Path $stage 'py-libs') -Recurse -Force)
+function Unruled($items) {
+    @($items | Where-Object {
+        $acl = Get-Acl -LiteralPath $_.FullName
+        $acl.AreAccessRulesProtected -or -not @($acl.Access | Where-Object { $_.IsInherited }).Count
+    })
+}
 $newPy = "$(& $py -c 'import sys; print(sys.version_info >= (3, 12, 4))')".Trim() -eq 'True'
-if ($newPy) { Yes 'pip --target on Python 3.12.4 or later leaves its files outside the folder''s rules' ((Unruled $libFiles).Count -gt 0) }
+if ($newPy) { Yes 'pip --target on Python 3.12.4 or later leaves what it installs outside the folder''s rules' ((Unruled $libItems).Count -gt 0) }
 & icacls (Join-Path $stage 'py-libs') /reset /T /Q | Out-Null
-Yes 'icacls /reset /T puts every py-libs file under the folder''s own rules' ($libFiles.Count -gt 0 -and (Unruled $libFiles).Count -eq 0)
+Yes 'icacls /reset /T puts every py-libs file and folder under the folder''s own rules' ($libItems.Count -gt 0 -and (Unruled $libItems).Count -eq 0)
 
 $botLines = @(
     'import thornslib, sys'

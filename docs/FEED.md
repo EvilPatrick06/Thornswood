@@ -107,6 +107,7 @@ the VPS now, beside the feed the site already serves:
 | `C:\Thornswood-Docs\feed\published.json` | the live baseline | no |
 | `C:\Thornswood-Docs\feed\launchers.txt` | every launcher version the channel has published, oldest first | no |
 | `C:\Thornswood-Docs\feed\releases.txt` | every release the feed has named, oldest first, one tab separated line each: id, channel, launcher, packs, baseline, commit, tag (#444, `Get-FeedStoreReleases`) | no |
+| `C:\Thornswood-Docs\feed\releases.json` | the record of each of the last thirty releases, newest first, which `Rollback-Feed.ps1` goes back to (#442); `"releases"` in version.json until #1050. Received and sent by name beside the feed (`Get-StoreReleases`, `Save-StoreReleases` in `Release-Baseline.ps1`) | no |
 | `C:\Thornswood-Docs\feed\history\<utc stamp>-<name>` | each of those files as it was before it was replaced | no |
 | `C:\Thornswood-Docs\feed\assets\<sha256>` | the downloads | yes |
 
@@ -262,13 +263,14 @@ saved fields that come from elsewhere, as their rows say.
 | `message` | string | Nobody: set by hand in the feed (received, edited and sent with `Feed-Store.ps1`; `FeedNotice.cs:15-20`) | `FeedNotice.From` (`FeedNotice.cs:53-82`) | A bar above Play until a feed without it arrives. Never holds Play on its own. |
 | `maintenance` | string (read as on only for `true`, `1`, `yes`, `on`) | By hand | `FeedNotice.cs:61-68,91-96` | On: Play held, button says CLOSED FOR MAINTENANCE. Absent in the current feeds. |
 | `minLauncher` | string, dotted numbers | `Publish-Update.ps1` on every publish, as the feed's `launcherVersion` (#937) | `FeedNotice.cs:58-77`; the site's `/api/play/pass` | A launcher below it holds Play, and the site refuses it a join pass, so the game server ends its session. The site also refuses a launcher above `launcherVersion`, a number never published. A value that is not digits and dots is ignored by the launcher, so a typo cannot lock everybody out (`FeedNotice.cs:98-120`); the site reads such a value as `launcherVersion`. Updating needs no pass. |
-| `packs` | array | `Publish-Update.ps1:Set-Prop $doc 'packs' $packs` appends; `Repair-Manifest.ps1` removes | `Updater.Pending` (`Updater.cs:360-368`) | See below. |
+| `packs` | array | `Publish-Update.ps1:Set-Prop $doc 'packs' $packs` appended until #1050; `Repair-Manifest.ps1` removes. Since #1050 `[]` on a channel whose minLauncher syncs to the record (the packs gone block, `Test-FeedPacksGone`) | `Updater.Pending` (`Updater.cs:360-368`) | See below, and "When the packs can go". |
 | `optional` | array | `Publish-Pack.ps1:$optional` | Add-ons on the Diagnostics page (`ShellPacks.cs DrawAddons`, #1170); the Mods page's Add-ons tab, which nothing opens | Absent in both feeds today; `scripts/release/optional-packs.txt` lists none. |
 | `clientRuntime` | object | `Publish-Update.ps1:Set-Prop $doc 'clientRuntime'`, only when the fork commit or its source notice changed (`Publish-Update.ps1:PUBLISHED ONLY WHEN IT CHANGES`) | `ClientRuntime.Heal` (`ClientRuntime.cs:261-269`) | Null or no `url`: a missing client file cannot be repaired from it. Same host and sha256 checks as a pack. |
-| `baseline` | object `{ id, sha256, url, entries }` | `Publish-Update.ps1` on every release that sends to the site (the release manifest block, #441); taken out by a `-NoUpload` run | The launcher from #1050 on, which syncs the install to it (`Updater.SyncRecord`, `launcher\app\Sync.cs`; see "Syncing to the release record"). The next `Publish-Update.ps1`, through `Resolve-ReleaseBaseline` (`Release-Baseline.ps1`) | The release record: what that release left installed, every file of ours as `<bytes>:<sha256>`, at `/feed[-dev]/assets/<sha256>`, the same bytes as the store's `published.json`. The next release is diffed against it; a missing or stale store copy is replaced by it, checked by sha256. The launcher reads it apart from the rest of the feed (`RecordRef.FromFeed`), so a `baseline` of any other shape costs that one field and never the whole feed. |
-| `releases` | array, newest first, at most 30, of `{ id, sha256, url, entries, lastPack, to? }` | `Publish-Update.ps1` on every release that names a `baseline` (the release list block, #442); `Rollback-Feed.ps1` adds the one a rollback makes, with `to` naming the release it went back to | No launcher. `Rollback-Feed.ps1` (`Get-FeedReleases`, `Release-Baseline.ps1`) | The record each release published, the same shape as `baseline`, plus `lastPack`, the last pack on the feed once that release was out, whose plugin list is the one it shipped. What a channel can be put back to; a release older than the newest thirty cannot be. The first release after this change starts the list with the `baseline` the feed already named. |
+| `baseline` | object `{ id, sha256, url, entries, notes? }` | `Publish-Update.ps1` on every release that sends to the site (the release manifest block, #441); taken out by a `-NoUpload` run. `notes`, the release note, since #1050: the update card of a launcher that syncs shows it (`Sync.cs RecordDue`), the packs that used to carry it being off the feed | The launcher from #1050 on, which syncs the install to it (`Updater.SyncRecord`, `launcher\app\Sync.cs`; see "Syncing to the release record"). The next `Publish-Update.ps1`, through `Resolve-ReleaseBaseline` (`Release-Baseline.ps1`) | The release record: what that release left installed, every file of ours as `<bytes>:<sha256>`, at `/feed[-dev]/assets/<sha256>`, the same bytes as the store's `published.json`. The next release is diffed against it; a missing or stale store copy is replaced by it, checked by sha256. The launcher reads it apart from the rest of the feed (`RecordRef.FromFeed`), so a `baseline` of any other shape costs that one field and never the whole feed. |
+| `releases` | array, newest first, at most 30, of `{ id, sha256, url, entries, lastPack, to? }` | Gone from the feed since #1050: the list is `releases.json` in the channel's store beside the feed (see "The feed store on the VPS"), written by `Publish-Update.ps1` on every release that names a `baseline` (the release list block, #442) and by `Rollback-Feed.ps1`, with `to` naming the release a rollback went back to. A feed that still carries the field (written before #1050, or by a Ship from a branch without it) is read too, merged by id, and the next write takes it out | No launcher. `Rollback-Feed.ps1`, `Scrub-Feed.ps1`, Ship's release tag check (`Get-StoreReleases`, `Release-Baseline.ps1`; `Read-ReleaseListFile`, `Release-Name.ps1`) | The record each release published, the same shape as `baseline`, plus `lastPack`, the last pack on the feed once that release was out, whose plugin list is the one it shipped ('' once the packs are gone: the record's own `:golden:` entries hold it). What a channel can be put back to; a release older than the newest thirty cannot be. The first release after #442 started the list with the `baseline` the feed already named. |
 | `release` | object `{ id, channel, launcherVersion, packs, baseline, commit, branch, uncommitted, tag }` | `Publish-Update.ps1` on every release (the release record block, #444) | No launcher. Ship, which tags `commit` as `tag` once the feed is out (`Add-ReleaseTag`, `Release-Name.ps1`); the store's `releases.txt` | The release's one name is `id`, the id its packs and its `baseline` carry (`20260928-1630`, dev `20260928-2324-dev`). The rest is what else it is known by: the launcher the feed offers with it (the same across Ships that keep their launcher, #921), the packs it added, its baseline id (empty on a `-NoUpload` run), the commit it was built from and how many tracked files differed from it, and the tag `release/main/<id>` or `release/dev/<id>` (empty when it was not built from a git checkout). `Get-ReleaseDisagreements` says whether they agree, with each other and with `releases`, whose newest entry is the same id ending on its last pack. After a main Ship the dev feed carries main's, `channel` main. `Rollback-Feed.ps1` does not rewrite it yet, so after a rollback it still names the last Ship until the next. |
-| `news` | array, newest first, at most 40 | `Publish-Update.ps1:Set-Prop $doc 'news' $news`; `Publish-Server.ps1:$newsList`. On the dev feed each entry's `channel` is `"dev"` while main has not had it, set by `Dev-News.ps1:Update-DevNewsChannels` | News tab (`Shell.cs:2965-3160`); `Publish-News.ps1` copies it to the site | Cosmetic. |
+| `news` | array, newest first, at most 40 | `Publish-Update.ps1:Set-Prop $doc 'news' $news`; `Publish-Server.ps1:$newsList`. On the dev feed each entry's `channel` is `"dev"` while main has not had it, set by `Dev-News.ps1:Update-DevNewsChannels` | News tab (`Shell.cs:2965-3160`); `Publish-News.ps1` copies it to the site | Cosmetic. Every launcher up to 1.2.3 reads the notes only here, so they stay here until the channel's minLauncher reads `newsFile` (#1050). |
+| `newsFile` | object `{ url, sha256, count }` or absent | Nobody yet: the publisher half of #1050, which writes the notes as one asset at `/feed[-dev]/assets/<sha256>` and empties `news` once the channel's minLauncher reads it | The launcher from #1050 on (`Updater.FillNews`, `launcher\app\FeedNews.cs`): fetched once on the update check's thread, checked (https, the host list, stored under its own sha256, the bytes hash to it), kept in `Profile\news.json`, and its notes put after the ones `news` carries, each note once by date and title. Read apart from the rest of the feed (`NewsRef.FromFeed`), so one of another shape costs only itself | Cosmetic. A file that cannot be had or read leaves the notes `news` carries and one line in launcher.log; the update check goes on. |
 | `mainVersion` | string | `Dev-News.ps1:Set-DevFeedMarks`: the main feed's `launcherVersion`, read off the site, with the DEV marks, on every dev ship (one with nothing new included), after every main ship (`Refresh-DevNews.ps1`), and by `Refresh-DevNews.ps1` run by hand; `""` on a main ship (`Publish-Update.ps1:Set-Prop $doc 'mainVersion' ''`) | Dev News tab header (`Shell.cs:2992-3002`) | Cosmetic. |
 | `serverPassword` | string | Nobody. Every ship deletes it (`Publish-Update.ps1:$doc.PSObject.Properties.Remove('serverPassword')`) | Declared at `Config.cs:497`, read by nothing since 1.0.197 | Must never come back: the feed is public. |
 
@@ -399,31 +401,45 @@ the chain of packs.
 
 ## When the packs can go
 
-Updating is the one place backwards compatibility matters, so the packs stay on
-the feed, and Publish-Update keeps appending them, for every launcher before
-#1050. They can go from a channel from the first Ship after both of these hold:
+Updating is the one place backwards compatibility matters, so the packs stayed
+on the feed, and Publish-Update kept appending them, for every launcher before
+#1050. They go from a channel from the first Ship after both of these hold
+(`Test-FeedPacksGone` and the packs gone block in `Publish-Update.ps1`):
 
-1. the channel's `minLauncher` is at or above the first launcher that syncs to
-   the record, the first one built from a commit with `launcher\app\Sync.cs`:
-   on main, 1.1.103 if the next Bump-Version comes after this merges; on dev,
-   the first dev number Ship gives after this merges (the dev
-   feed is on 1.1.102.7 on 29 Sep, so 1.1.102.8 or above; read it off the dev
-   feed the day it goes out). Publish-Update sets `minLauncher` to the feed's
-   `launcherVersion` on every publish (#937), so this holds from the Ship that
-   first publishes such a launcher;
-2. the record the feed names carries `:record:files`, and its `:gone:` list was
-   started from the packs (that Ship printed "read what N pack(s) took out").
+1. the channel's `minLauncher`, as that Ship writes it, is at or above the
+   first launcher that syncs to the record, the first one built from a commit
+   with `launcher\app\Sync.cs` (854aeeed, 29 Sep). Read off the release tags on
+   12 Oct: main 1.1.103 (`release/main/20261001-180012`), dev 1.1.102.8
+   (`release/dev/20260929-1129-dev`; 1.1.102.7 the release before it had none).
+   They are `$FeedFirstSyncLauncher` in `Release-Baseline.ps1`. Publish-Update
+   sets `minLauncher` to the feed's `launcherVersion` on every publish (#937);
+2. the last record the feed named already carried `:record:files`, so its
+   `:gone:` list was started from the packs (that Ship printed "read what N
+   pack(s) took out") and carries forward what they took out.
 
-From then an installed launcher of any age still updates: it finds no pack,
-is offered the launcher, takes it through the signed self-update (unchanged),
-and the new launcher syncs the install to the record, taking out every file of
-ours a release removed since, from `:gone:`. Nothing an old launcher needs in
-order to update comes from `packs`.
+Both held on 12 Oct: main and dev were on minLauncher 1.2.3, and both records
+(main 20261011-175014, dev 20261011-221215-dev) carry `:record:files` with 342
+and 344 `:gone:` entries. So the first Ship on each channel after #1050's
+change takes the packs off.
 
-What changes then: `packs` becomes `[]` rather than being left out, the shape
-every launcher ever published has read; Publish-Update stops
-appending; and `Rollback-Feed.ps1` stops building a pack, because a record
-whose files are up is the whole rollback. After it, version.json is:
+An installed launcher of any age still updates: one before 1.1.103 (or dev
+1.1.102.8) finds no pack, is offered the launcher, takes it through the signed
+self-update (unchanged), and the new launcher syncs the install to the record,
+taking out every file of ours a release removed since, from `:gone:`. Nothing
+an old launcher needs in order to update comes from `packs`. A launcher from
+1.1.103 on already took no pack: it syncs to the record and marks the packs
+applied unread.
+
+What changes: `packs` is `[]` rather than left out, the shape every launcher
+ever published has read; a release adds no pack (it still builds the zip,
+which Check-Secrets reads, and keeps it in the staging folder unsent);
+`release.packs` is empty and the store's list names no `lastPack`; the
+record's pointer carries the note (`baseline.notes`), which the update card of
+a launcher from #1050 on shows; and `Rollback-Feed.ps1` builds no pack,
+because a record whose files are up is the whole rollback, refusing one whose
+files are not all on the site. A launcher from before the note moved (1.2.3
+and older) shows "Update available, 1 mod update" without the note's text on
+its card; the note is on its News tab as before. After it, version.json is:
 
 ```json
 {
@@ -437,17 +453,20 @@ whose files are up is the whole rollback. After it, version.json is:
   "expectedExeBytes": "...", "newerExeBytes": "...", "depots": [ ... ],
   "clientRuntime": { "url": "...", "sha256": "...", "bytes": 6356315, "forkCommit": "..." },
   "packs": [],
-  "baseline": { "id": "20261001-1200", "sha256": "<sha256>", "url": "https://thornswood.net/feed/assets/<sha256>", "entries": 2583 },
-  "release": { ... }, "releases": [ ... ], "news": [ ... ]
+  "baseline": { "id": "20261001-1200", "sha256": "<sha256>", "url": "https://thornswood.net/feed/assets/<sha256>", "entries": 2583, "notes": "<the release note>" },
+  "release": { ... }, "news": [ ... ]
 }
 ```
 
-Measured on the main feed of 29 Sep (80,452 bytes): `packs` is 43,126 of it,
-`news` 27,862, and `releases` would be about 7,800 once it holds thirty. So
-dropping the packs takes it to about 37 KB; the few hundred bytes #1050 asks
-for also needs the news in a file of its own that the News tab reads and the
-releases list kept only in the VPS store, where Rollback-Feed is its only
-reader. That is the rest of #1050.
+Measured on the live feeds on 12 Oct (read over https): main 95,085 bytes, of
+which `packs` (82) is 47,950, `news` (40) 31,282, `releases` (6) 1,513 and
+`release` 2,826; dev 111,305 bytes, of which `packs` (116) is 66,018, `news`
+(40) 19,980, `releases` (30) 7,921 and `release` 2,840. Taking out `packs` and
+`releases` leaves about 45.6 KB on main and 37.4 KB on dev, most of it the
+news. The few hundred bytes #1050 asks for also needs the news in a file of
+its own that the News tab reads; that waits on a launcher that reads one being
+the minimum on each channel, because every launcher up to 1.2.3 reads the
+news only out of version.json. That is the rest of #1050.
 
 ## Checks on every download
 
@@ -511,9 +530,15 @@ reader. That is the rest of #1050.
   developer's machine; the last dev Ship wins. Its launcher version is main's
   published number plus a fourth part, `.1`, `.2`, past every dev number
   already out (`Ship.ps1:Separate Dev work uses the main version with a fourth number`).
-  A dev Ship of exactly what origin/main holds, with nothing uncommitted,
-  takes main's number itself
-  (`Ship.ps1:The same clean source as Main gets the same version in both feeds`).
+  Main's own launcher takes main's number itself: a dev Ship of exactly what
+  origin/main holds, with nothing uncommitted, whose launcher fingerprint is
+  the `launcherInputs` main's feed recorded for that number, or main's next
+  number before main has shipped it. A clean checkout of origin/main with a
+  launcher change since main's release takes the fourth part like any other,
+  and a case Ship cannot tell stops before anything is built (#2347,
+  `Ship.ps1:Get-DevLauncherLine`). A number either feed already offers with a
+  launcher built from other sources is refused before the build
+  (`Ship.ps1:Assert-DevVersionSelection`).
 - **After a main Ship**, the Dev feed, baseline, release identity and history
   stay unchanged. Dev advances through its own Ship and keeps its own server
   and voice addresses. Publish the same source to both channels when both
@@ -571,6 +596,17 @@ Now it is one command, and it goes the same way as every other update:
   cannot be had it goes out without `:record:files` and those launchers take
   the pack like the rest. `tests\test-record-sync.ps1` proves both kinds land
   on the same files, back and forward.
+- **Once the packs are gone** (the feed's `minLauncher` syncs to the record,
+  "When the packs can go"), a rollback is the record alone: no pack goes on
+  the feed, the plugin list is the `:golden:` entries of the record it goes
+  back to, and the list in the store names no `lastPack`. A record whose files
+  cannot all be had is refused with nothing sent, because no launcher would
+  have anything to take. The zip is still built from what was staged, for
+  Check-Secrets, and not sent. `tests\test-record-sync.ps1` goes back and
+  forward that way too.
+- **Where the list is.** `releases.json` in the channel's store beside the
+  feed since #1050 (it was `releases` in version.json), received and sent
+  with the feed in one step.
 - **Where the bytes come from.** The site's copy of each file beside its record
   (#1050), then the packs already on the site, found by size and sha256 and
   checked again as they are read. A file only the installer ever carried is
@@ -591,7 +627,7 @@ Now it is one command, and it goes the same way as every other update:
   changed how the launcher and the game's own plugins talk to each other,
   putting the files back without the launcher is not enough; ship a fix
   instead.
-- **How far back.** To any release in `releases`, which starts with the first
+- **How far back.** To any release in the store's list, which starts with the first
   Ship after #442 on each channel and holds the newest thirty. A release that
   named no record (every one before #441, and a `-NoUpload` run) is not one.
 - **Safety.** `-DryRun` builds the pack and sends nothing. The pack is checked

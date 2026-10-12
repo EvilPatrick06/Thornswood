@@ -220,7 +220,8 @@ async function until(cond, ms) {
   while (Date.now() < end) { if (cond()) return true; await wait(25); }
   return false;
 }
-const modlog = () => { try { return fs.readFileSync(path.join(PRIV, 'moderation.log'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)); } catch (e) { return []; } };
+// The game's staff log is in for-bot beside private, which the bot reads by a rule on the folder (#2321).
+const modlog = () => { try { return fs.readFileSync(path.join(gameDir, 'for-bot', 'moderation.log'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)); } catch (e) { return []; } };
 
 (async function main() {
   const port = await freePort();

@@ -73,14 +73,21 @@ that driver's stops and fares (`game/ui/thornswood-ride.js`, #1635).
 Ride takes the fare onto the departure hold's ledger and moves you,
 once. A short pack is refused and keeps its gold, and the panel stays
 open with the reason. Walking out of reach of the driver closes it.
-The fares are the table above. Every carriage stop on the list is in
-a different hold, so the 10 for a carriage inside one hold is charged
-once a village stop is added.
+The fares are the table above.
+
+The stops nobody drives from are on the list too: the villages, the
+Hearthfire homes, the Thalmor Embassy, and the small ferry landings
+(Windstad Manor and Frostflow Lighthouse on the coast, Honeyside on
+Lake Honrich, Lakeview Manor and Ilinalta's Deep on Lake Ilinalta,
+Bujold's Retreat and Northshore Landing on Solstheim). Each puts you
+down on the mod's own arrival marker. A village belongs to the hold
+the mod files it under, so Whiterun's carriage takes you to Riverwood
+or Rorikstead for 10, and every other carriage takes you there for 20.
+Nobody drives from one of these, so the ride back starts at a driver.
+Icewater Jetty is not on the list: the mod sails there only for
+somebody who talks their way to Castle Volkihar.
 
 The mod's own conversation still opens on the same press, and it does
 not ask the ledger. The panel waits for it and opens when it closes.
 Its fade does not land: the server refuses a move it did not make and
-puts you back where you were. The stops nobody drives from are not on
-the server's list yet: the villages, the Hearthfire homes, the Thalmor
-Embassy and the small ferry landings. Their positions are not in the
-repo.
+puts you back where you were.

@@ -3807,7 +3807,7 @@
           let off = false;
           try { off = !!r.isDisabled(); } catch (e) { off = false; }
           if (off) { continue; }
-          w.out.push([r.getPositionX(), r.getPositionY(), r.getPositionZ()]);
+          w.out.push([r.getPositionX(), r.getPositionY(), r.getPositionZ(), b.getFormID()]);
         } catch (e) {
           if (onThrew) { onThrew(e); }
         }
@@ -3948,6 +3948,16 @@
     and tools\test-temp.js fails if this list and that file have drifted
     apart, which is the only thing keeping a hand edit here honest.
   */
+  /*
+    A CRAFTING STATION WARMS YOU AND DOES NOT SET YOU ON FIRE (#2259).
+
+    Rows marked 'craft' are the forge, skyforge, smelter, kiln and cooking
+    spit markers, kind "craft" in fires.json. They count for the warmth and
+    never for the catch: using one seats you on it, which read as standing
+    in the coals, and the Whiterun forge gave a bad burn within seconds of
+    sitting down at it. tests/test-temp.js fails if these marks and the
+    table's kinds drift apart, so a rebuild cannot quietly undo it.
+  */
   const FIRE_BASES = [
     ['Skyrim.esm', 0x13b40],   // FXFire01
     ['Skyrim.esm', 0x13b42],   // FXFire02
@@ -3958,22 +3968,22 @@
     ['Skyrim.esm', 0x35f4a],   // FireplaceWood01Burning
     ['Skyrim.esm', 0x42521],   // bwcStatuePuzzleFlame
     ['Skyrim.esm', 0x4318b],   // FXfireWithEmbersLogs01
-    ['Skyrim.esm', 0x48748],   // CraftingBlacksmithForgeSTATIC
+    ['Skyrim.esm', 0x48748, 'craft'],   // CraftingBlacksmithForgeSTATIC
     ['Skyrim.esm', 0x4c5ce],   // GiantCampfire01BurningSnow01
     ['Skyrim.esm', 0x4c5cf],   // GiantCampfire01BurningSnow01B
     ['Skyrim.esm', 0x51577],   // GiantCampfire01Burning
-    ['Skyrim.esm', 0x68adb],   // CraftingCookingFireSpit
+    ['Skyrim.esm', 0x68adb, 'craft'],   // CraftingCookingFireSpit
     ['Skyrim.esm', 0x90ca4],   // Campfire01LandBurning_ReachDirt01
     ['Skyrim.esm', 0x951d8],   // Campfire01LandBurningReachDirt01
-    ['Skyrim.esm', 0x9c6ce],   // CraftingSmelterMarker1
+    ['Skyrim.esm', 0x9c6ce, 'craft'],   // CraftingSmelterMarker1
     ['Skyrim.esm', 0xa9230],   // Campfire01LandBurning_Heavy_SN
     ['Skyrim.esm', 0xaa71c],   // FXfireWithEmbers02Toggle
     ['Skyrim.esm', 0xb6c08],   // Campfire01LandBurningPineForest01
-    ['Skyrim.esm', 0xbbcf1],   // CraftingBlackSmithForgeSkyforge
-    ['Skyrim.esm', 0xbf9e1],   // CraftingBlackSmithForgeWR
+    ['Skyrim.esm', 0xbbcf1, 'craft'],   // CraftingBlackSmithForgeSkyforge
+    ['Skyrim.esm', 0xbf9e1, 'craft'],   // CraftingBlackSmithForgeWR
     ['Skyrim.esm', 0xc2bf1],   // Campfire01LandBurningCoastalBeach01
     ['Skyrim.esm', 0xc6918],   // Campfire01LandBurningFallForestDirt01
-    ['Skyrim.esm', 0xcae0b],   // CraftingBlackSmithForge
+    ['Skyrim.esm', 0xcae0b, 'craft'],   // CraftingBlackSmithForge
     ['Skyrim.esm', 0xcbb23],   // Campfire01LandBurningFrozenMarshDirtSlope01
     ['Skyrim.esm', 0xcbb2f],   // Campfire01LandBurningRocks01
     ['Skyrim.esm', 0xcd823],   // FXfireWithEmbers01_lite
@@ -4012,11 +4022,11 @@
     ['Embers XD.esp', 0x19f73f],   // FXfireWithEmbersLight02
     ['Embers XD.esp', 0x19f741],   // FXfireWithEmbers01_brazier
     // #608 near a forge: these editor ids do not begin with the old craft prefixes.
-    ['North Keep.esp', 0x21152],   // CraftingNKPBlackSmithForge
-    ['Dawnguard.esm', 0xf812],   // DLC1DawnguardCraftingBlackSmithForge
-    ['Dragonborn.esm', 0x3cf6e],   // DLC2CraftingBlackSmithForge
-    ['Dragonborn.esm', 0x2b074],   // DLC2CraftingBlackSmithSkaalForge
-    ['Thornswood-Content.esp', 0x1547e],   // ThornswoodCraftingCharcoalKilnMarker
+    ['North Keep.esp', 0x21152, 'craft'],   // CraftingNKPBlackSmithForge
+    ['Dawnguard.esm', 0xf812, 'craft'],   // DLC1DawnguardCraftingBlackSmithForge
+    ['Dragonborn.esm', 0x3cf6e, 'craft'],   // DLC2CraftingBlackSmithForge
+    ['Dragonborn.esm', 0x2b074, 'craft'],   // DLC2CraftingBlackSmithSkaalForge
+    ['Thornswood-Content.esp', 0x1547e, 'craft'],   // ThornswoodCraftingCharcoalKilnMarker
   ];
   // The plugins the list spans, for the log line when they are resolved.
   const FIRE_FILES = ["Skyrim.esm","Dawnguard.esm","Dragonborn.esm","Embers XD.esm","Embers XD.esp","North Keep.esp","Thornswood-Content.esp"];
@@ -4185,7 +4195,7 @@
         // place it can be read.
         if (base) {
           const id = base.getFormID();
-          if (id) { fireIdOut.push(id); }
+          if (id) { fireIdOut.push(id); if (FIRE_BASES[fireIdAt - 1][2] === 'craft') { fireCraft[id] = true; } }
         }
       } catch (e) {
         if (!fireWhy) { fireWhy = String((e && e.message) || e); }
@@ -4323,6 +4333,25 @@
     fireWalkStep(cell);
   }
 
+  // Runtime ids of the 'craft' rows: warmth only, never the catch (#2259).
+  const fireCraft = {};
+  // The nearest lit fire that is not a crafting station, set by fireDistance.
+  let fireFlame = -1;
+
+  /** The nearest spot in reach, or `best`; fireFlame gets the nearest that is no station. */
+  function fireNearest(px, py, pz, spots, best) {
+    for (let i = 0; i < spots.length; i++) {
+      const dx = spots[i][0] - px;
+      const dy = spots[i][1] - py;
+      const dz = spots[i][2] - pz;
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (dist > FIRE_REACH) { continue; }
+      if (best < 0 || dist < best) { best = dist; }
+      if (!fireCraft[spots[i][3]] && (fireFlame < 0 || dist < fireFlame)) { fireFlame = dist; }
+    }
+    return best;
+  }
+
   /** How far the nearest lit fire is, or -1 when there is none in reach. */
   function fireDistance(px, py, pz, pc) {
     /*
@@ -4335,6 +4364,7 @@
       and it never set anybody on fire. getFurnitureReference is the engine's
       own answer for which station you are at.
     */
+    fireFlame = -1;
     try {
       const furn = pc.getFurnitureReference ? pc.getFurnitureReference() : null;
       if (furn) {
@@ -4343,23 +4373,12 @@
         if (id) {
           const ids = fireIdList();
           for (let f = 0; f < ids.length; f++) {
-            if (ids[f] === id) { return 0; }
+            if (ids[f] === id) { return fireNearest(px, py, pz, fireSpotsHere(pc), 0); }
           }
         }
       }
     } catch (e) { }
-    let best = -1;
-    const spots = fireSpotsHere(pc);
-    for (let i = 0; i < spots.length; i++) {
-      const dx = spots[i][0] - px;
-      const dy = spots[i][1] - py;
-      const dz = spots[i][2] - pz;
-      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-      if (dist > FIRE_REACH) { continue; }
-      if (best < 0 || dist < best) { best = dist; }
-      if (best <= FIRE_INSIDE) { break; }
-    }
-    return best;
+    return fireNearest(px, py, pz, fireSpotsHere(pc), -1);
   }
 
   /*
@@ -4513,6 +4532,7 @@
       night = (hour < 6 || hour >= 20) ? 1 : 0;
     } catch (e) { }
     // Asking is 44 native calls, and nobody in the water is at a fire.
+    fireFlame = -1;
     const fire = swimming ? -1 : fireDistance(px, py, pz, pc);
     placeFire = fire;
 
@@ -4612,7 +4632,7 @@
       DamageActorValue is the engine's own call and goes through everything
       health normally goes through.
     */
-    if (fire >= 0 && fire <= FIRE_INSIDE) {
+    if (fireFlame >= 0 && fireFlame <= FIRE_INSIDE) {
       if (burnUntil < now) { note('you are standing in the fire'); }
       // Refreshed rather than set, so walking out of the coals lets it go
       // within about a second instead of burning for the full catch.
@@ -4828,15 +4848,51 @@
     Right of centre and a little below the crosshair, which is where Skyrim
     puts its own activate prompt and is where an eye already is. Never over
     the crosshair itself: a panel you cannot see past is worse than no panel.
+
+    BENEATH OUR PANELS (#1739). It stood at 2147483400, above every panel
+    (2147483000 to 2147483300), so a panel opened while somebody was under
+    the crosshair had the prompt drawn on top of it. It sits with the key
+    mold line now, under all of them, and it is taken down while any of them
+    is open (see lookCoveredBy).
   */
   const LOOK_CSS =
-    'position:fixed;left:54%;top:46%;z-index:2147483400;pointer-events:none;' +
+    'position:fixed;left:54%;top:46%;z-index:2147482900;pointer-events:none;' +
     'font-family:Georgia,serif;font-size:19px;letter-spacing:.03em;' +
     'background:rgba(12,10,8,.62);border:2px solid rgba(0,0,0,.65);' +
     'border-radius:9px;padding:11px 16px 14px;' +
     'text-shadow:0 2px 4px rgba(0,0,0,.95)';
 
+  /*
+    NEVER OVER A MENU OR A PANEL (#1739). A tester, on dev and main: the
+    panel that names who you look at "doesn't disappear when opening other
+    menus and things, and it gets in the way". The crosshair poll below drew
+    it from two things only, the crosshair and the server's near list, and
+    asked nothing about what else was on screen. Skyrim keeps the same
+    reference under the crosshair while one of its menus is up, so the
+    prompt stayed drawn over the inventory, the magic menu, the map, the
+    Tab menu, a container, a trader's barter, a book, the favourites on Q
+    and every other menu in KEYBOARD_MENUS; and over our own panels (K, P,
+    J, the trade window, a trader's wares, the board, help, the maneuvers,
+    the emote wheel and the rest of CAP_CLOSES) and the chat while it is
+    being typed in, which the page draws beneath it.
+
+    So what is open is part of what it is drawn from: nothing that holds
+    the keyboard (a claim, the same list the focus arbiter keeps) and none
+    of Skyrim's menus that take it. Who is being looked at is still
+    followed while it is down, so the keys and the prompt are right the
+    moment the menu closes.
+  */
+  let lookCover = '';      // what the prompt was last taken down for, for one line each time
+
+  function lookCoveredBy() {
+    for (const k in claims) { if (claims[k]) { return 'the ' + k + ' panel'; } }
+    return busyMenuOpen();
+  }
+
+  // A claim is a variable read, so it is asked every frame and a panel takes
+  // the prompt down in the frame it opens, not on the next poll.
   sp.on('update', guard('crosshair', () => {
+    if (lookingSig && anyClaim()) { drawPrompt(null); }
     const now = Date.now();
     if (now - nearAt < NEAR_EVERY) { return; }
     nearAt = now;
@@ -4864,7 +4920,29 @@
       lookingAt = hex;
       say('looking at ' + row.n + ' (' + hex + ')');
     }
-    drawPrompt(row);
+    const cover = lookCoveredBy();
+    if (cover !== lookCover) {
+      if (cover) { say('look prompt down while ' + cover + ' is open'); }
+      lookCover = cover;
+    }
+    drawPrompt(cover ? null : row);
+  }));
+
+  /*
+    One of Skyrim's menus takes the prompt down the moment it opens, rather
+    than on the next poll, and the menu memory busyMenuOpen keeps for a
+    quarter of a second is let go of, so a "no menu" read just before the
+    menu opened cannot put the prompt back over it. Closing lets go of it
+    too, so the prompt is back on the next poll.
+  */
+  sp.on('menuOpen', guard('look menu', (e) => {
+    if (KEYBOARD_MENUS.indexOf(String((e && e.name) || '')) === -1) { return; }
+    menuCachedAt = 0;
+    drawPrompt(null);
+  }));
+  sp.on('menuClose', guard('look menu closed', (e) => {
+    if (KEYBOARD_MENUS.indexOf(String((e && e.name) || '')) === -1) { return; }
+    menuCachedAt = 0;
   }));
 
   /*
@@ -6738,6 +6816,78 @@
           (probeHookErrors ? ', and threw ' + probeHookErrors + ' times' : ''));
     }
   }));
+
+  /*
+    ------------------------------------------ no bounty for killing an NPC
+
+    Patrick, 11 October (#502): "there should be no bounties at all added
+    when killing NPCs". Guards are people now, and no NPC guard comes back.
+
+    WHERE THE BOUNTY CAME FROM, measured on 12 October. Nothing Thornswood
+    wrote adds one: no line of the gamemode, these plugins or the fork's
+    server calls modCrimeGold or setCrimeGold. It is Skyrim's own crime
+    system, running here in each person's game. Killing or striking an actor
+    whose crime faction tracks crime adds that faction's murder or assault
+    gold to its bounty: 1000 for a kill and 40 for a blow, from the game
+    settings for a faction on Use Defaults, and from the faction's own record
+    for CrimeFactionReach, which carries its own 1000 and 40. So zeroing the
+    two settings would have left Markarth's, and the answer is on each
+    faction instead: its ignore murder and ignore assault flags, which tell
+    the game that killing or striking a member is not a crime against it.
+    Every hold's crime faction, Raven Rock's, the Orcs' and one Dark
+    Brotherhood contract's are the twelve, read out of the load order by
+    scripts\dev\Build-CrimeTable.py (game\data\crime-factions.json says why
+    each is there).
+
+    WHEN. A faction's flags are the game's own record, so they are set once
+    a game is loaded, which is when the world this session plays in starts,
+    and before that nothing can be killed. Each one is read back and the log
+    says how many took it, so the line is a measurement and not a hope.
+  */
+  // ==== KILL_CRIME_FACTIONS, generated ====
+  // One row a faction: its form id in its plugin, the plugin, its editor id.
+  // Generated by scripts\dev\Build-CrimeTable.py; do not hand edit.
+  const KILL_CRIME_FACTIONS = [
+    [0x267e3, "Skyrim.esm", "CrimeFactionEastmarch"],
+    [0x28170, "Skyrim.esm", "CrimeFactionFalkreath"],
+    [0x29db0, "Skyrim.esm", "CrimeFactionHaafingar"],
+    [0x2816d, "Skyrim.esm", "CrimeFactionHjaalmarch"],
+    [0x28713, "Skyrim.esm", "CrimeFactionOrcs"],
+    [0x2816e, "Skyrim.esm", "CrimeFactionPale"],
+    [0x2816c, "Skyrim.esm", "CrimeFactionReach"],
+    [0x2816b, "Skyrim.esm", "CrimeFactionRift"],
+    [0x267ea, "Skyrim.esm", "CrimeFactionWhiterun"],
+    [0x2816f, "Skyrim.esm", "CrimeFactionWinterhold"],
+    [0xe7c27, "Skyrim.esm", "DBCrimeFactionMaro"],
+    [0x18279, "Dragonborn.esm", "DLC2CrimeRavenRockFaction"],
+  ];
+  // ==== end KILL_CRIME_FACTIONS ====
+  const IGNORE_MURDER = 0x80;
+  const IGNORE_ASSAULT = 0x100;
+
+  function noKillBounty() {
+    const took = [], absent = [], refused = [];
+    for (let i = 0; i < KILL_CRIME_FACTIONS.length; i++) {
+      const row = KILL_CRIME_FACTIONS[i];
+      let f = null;
+      try { f = sp.Faction.from(sp.Game.getFormFromFile(row[0], row[1])); } catch (e) { f = null; }
+      if (!f) { absent.push(row[2]); continue; }
+      try {
+        f.setFactionFlag(IGNORE_MURDER);
+        f.setFactionFlag(IGNORE_ASSAULT);
+        if (f.isFactionFlagSet(IGNORE_MURDER) && f.isFactionFlagSet(IGNORE_ASSAULT)) { took.push(row[2]); }
+        else { refused.push(row[2] + ' (the flags did not stay)'); }
+      } catch (e) {
+        refused.push(row[2] + ' (' + e + ')');
+      }
+    }
+    say('no bounty for a kill or a blow: ' + took.length + ' of ' + KILL_CRIME_FACTIONS.length +
+        ' crime factions now ignore murder and assault' +
+        (absent.length ? '; not in this load order: ' + absent.join(', ') : '') +
+        (refused.length ? '; REFUSED: ' + refused.join(', ') : ''));
+  }
+
+  sp.on('loadGame', guard('no kill bounty', noKillBounty));
 
   /*
    * Guards that never stop trying to kill you.
@@ -9537,11 +9687,71 @@
       if (!r || typeof r.key !== 'string' || !/^[a-z]+$/.test(r.key)) { continue; }
       rows.push({ key: r.key, name: String(r.name || r.key), stamina: Number(r.stamina) || 0,
                   cooldown: Number(r.cooldown) || 0, ready: !!r.ready });
+      if (r.key === 'plant') { plantSeen(!!r.on, Number(r.seconds) || 0); }
     }
+    if (!list.some(function (r) { return r && r.key === 'plant'; })) { plantSeen(false, 0); }
     const was = JSON.stringify(maneuverRows);
     maneuverRows = rows;
     if (JSON.stringify(rows) !== was) { maneuversToPage(); }
   }
+
+  /*
+    PLANT: "You are not staggered for 8 seconds" (#1386). The server refuses
+    the staggers it sends itself (Break and Wreck). Every other one, a power
+    attack, a shield bash, a shout, a spell, is played by the game on the
+    person's own machine as the animation event staggerStart on their own
+    character, which passes through Skyrim Platform's sendAnimationEvent
+    hook; skymp5-client's deathService blanks that same event in that same
+    hook to keep staggers off everybody else's characters. So while the
+    view says Plant is on, staggerStart for 0x14, your own character, is
+    blanked and the stagger never starts.
+
+    The view's on turns false when the server's window ends, and the server
+    redraws the view then. If that redraw never arrives (the connection
+    dropped), the row's own length, seconds from the moment on was first
+    seen, is the end: nothing here outlasts the maneuver.
+  */
+  let plantUntil = 0;     // when this machine stops refusing staggers, 0 for not planted
+  let plantRefused = 0;   // staggers refused in this Plant, for the log
+  let plantSaid = 0;
+
+  function plantSeen(on, secs) {
+    const now = Date.now();
+    if (!on) {
+      if (plantUntil) {
+        say('plant: over, ' + plantRefused + ' stagger(s) refused');
+        plantUntil = 0;
+      }
+      return;
+    }
+    if (plantUntil && now < plantUntil) { return; }   // the same Plant, seen again
+    const len = Math.max(0, Math.min(60, secs)) * 1000;
+    if (!len) { return; }
+    plantUntil = now + len;
+    plantRefused = 0;
+    plantSaid = 0;
+    say('plant: no stagger lands on this character for ' + (len / 1000) + ' seconds');
+  }
+
+  try {
+    sp.hooks.sendAnimationEvent.add({
+      enter: function (ctx) {
+        if (!plantUntil || Date.now() >= plantUntil) { return; }
+        ctx.animEventName = '';
+        plantRefused++;
+      },
+      leave: function () { }
+    }, 0x14, 0x14, 'staggerStart');
+  } catch (e) {
+    log('plant: could not hook animation events, so Plant stops only the server\'s own staggers:', e);
+  }
+
+  // One line for each stagger refused, said outside the hook.
+  sp.on('update', guard('plant', () => {
+    if (plantRefused === plantSaid) { return; }
+    plantSaid = plantRefused;
+    say('plant: refused a stagger (' + plantRefused + ' in this Plant)');
+  }));
 
   /* The maneuver key, with the panel shut: a panel up holds the keyboard, and
      then the page hears the key and closes itself. */
@@ -9783,6 +9993,15 @@
     to whoever holds it.
   */
   const PASS_FILE = 'Data/Platform/thornswood-pass.txt';
+  /*
+    The pass's own key (#1320). The launcher leaves it beside the pass, named
+    by the pass's mac, and the client the fork builds answers the game
+    server's login challenge with the pass and a mac over that connection's
+    nonce under this key (skymp5-client, thornswoodLoginProof.ts), read from
+    storage.thornswoodJoinPass. Paired only with the pass it was given for,
+    and never logged.
+  */
+  const PASS_KEY_FILE = 'Data/Platform/thornswood-pass-key.txt';
   const PASS_RESEND_MS = 60000;
   const PASS_READ_MS = 5000;
   let passSent = '';
@@ -9794,6 +10013,10 @@
     passReadAt = now;
     const raw = readText(PASS_FILE).trim();
     if (!/^jp1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(raw)) { return; }
+    const keyLine = readText(PASS_KEY_FILE).trim().split(' ');
+    if (keyLine.length === 2 && keyLine[0] === raw.split('.')[2] && /^[A-Za-z0-9_-]{16,128}$/.test(keyLine[1])) {
+      sp.storage.thornswoodJoinPass = { pass: raw, key: keyLine[1] };
+    }
     if (raw === passSent && now - passSentAt < PASS_RESEND_MS) { return; }
     const first = !passSent;
     passSent = raw;

@@ -291,8 +291,15 @@ function Move-ThornswoodBotRecords([string]$Root) {
 #     moderation.log, which the site writes there for the bot and nothing
 #     else. The rule the bot had on the site's whole data folder before, where
 #     sessions.json and the other records are, is taken off.
-#   each game server's private\moderation.log, read, on that file only,
-#     because private\ also holds door.json and its key.
+#   each game server's for-bot folder, read on it and everything in it
+#     (issue #2321): the gamemode's staff log, moderation.log, which the
+#     bot says in the staff channel. A folder, made here when the server has
+#     none yet, so the log the gamemode makes later takes the rule. Until
+#     #2321 the rule was on private\moderation.log itself, which could only
+#     be given once the gamemode had made the file; the live server had
+#     none, so its first staff action made a file the bot could not open.
+#     That old rule is taken off. private\ stays SYSTEM's and
+#     Administrators' alone: it holds door.json and its key.
 # Writes back only the access rules of an ACL from Get-Acl. Set-Acl can also
 # try to write the audit part, which needs SeSecurityPrivilege: Administrator
 # has it, and the build runner's account does not, so on the runner Set-Acl
@@ -311,7 +318,7 @@ function Set-ThornswoodAclAccess([string]$Path, $Acl) {
 # account Windows cannot look up, and the service's is granted in the tests
 # on a machine that has no such service.
 function Grant-ThornswoodBotAccess {
-  param([string]$Sid, [string]$Root, [string]$WatchRoot, [string]$DocsData, [string[]]$ModLogs = @())
+  param([string]$Sid, [string]$Root, [string]$WatchRoot, [string]$DocsData, [string[]]$ServerRoots = @())
   $tree = [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
   $none = [Security.AccessControl.PropagationFlags]::None
   $bot = New-Object Security.Principal.SecurityIdentifier($Sid)
@@ -423,7 +430,28 @@ function Grant-ThornswoodBotAccess {
     if (Test-Path -LiteralPath $forBot) { Give $forBot 'Read' 'tree' 'the bot''s account read' }
     else { 'not there yet, nothing granted: ' + $forBot + '. Run Deploy-Docs.ps1, whose site makes it, then Install-Bot.ps1 again' }
   }
-  foreach ($m in $ModLogs) { Give $m 'Read' '' 'the bot''s account read' }
+  foreach ($s in $ServerRoots) {
+    if (-not (Test-Path -LiteralPath $s)) { 'no game server at ' + $s + ', so nothing granted there'; continue }
+    $fb = Join-Path $s 'for-bot'
+    if (-not (Test-Path -LiteralPath $fb)) {
+      try { $null = New-Item -ItemType Directory -Force -Path $fb -ErrorAction Stop; 'made ' + $fb + ', where the gamemode writes its staff log' }
+      catch { 'COULD NOT MAKE ' + $fb + ': ' + $_.Exception.Message; continue }
+    }
+    Give $fb 'Read' 'tree' 'the bot''s account read, on the staff log the gamemode writes there and any it makes later,'
+    # The rule from before #2321, on private\moderation.log alone. The bot
+    # reads for-bot now, so nothing of private is left to it.
+    $was = Join-Path $s 'private\moderation.log'
+    if (Test-Path -LiteralPath $was) {
+      try {
+        $acl = Get-Acl -LiteralPath $was
+        if (@($acl.GetAccessRules($true, $false, [Security.Principal.SecurityIdentifier]) | Where-Object { $_.IdentityReference.Value -eq $Sid }).Count) {
+          $acl.PurgeAccessRules($bot)
+          Set-ThornswoodAclAccess $was $acl
+          'took the bot''s account off ' + $was + ', which it no longer reads'
+        }
+      } catch { 'COULD NOT TAKE the bot''s account off ' + $was + ': ' + $_.Exception.Message }
+    }
+  }
 }
 
 # Whether the service's name is a source in the event log yet. Only
@@ -452,7 +480,7 @@ function Install-ThornswoodBotService {
     [string]$Task = 'Thornswood Bot',
     [string]$WatchRoot = 'C:\Thornswood-Watch',
     [string]$DocsData = 'C:\Thornswood-Docs\data',
-    [string[]]$ModLogs = @('C:\Thornswood-Server\private\moderation.log', 'C:\Thornswood-Server-Dev\private\moderation.log')
+    [string[]]$ServerRoots = @('C:\Thornswood-Server', 'C:\Thornswood-Server-Dev')
   )
   # A native program's standard error is a line to read here, not a stop.
   $ErrorActionPreference = 'Continue'
@@ -529,7 +557,7 @@ function Install-ThornswoodBotService {
   } catch { $out += 'no event log source, so exits are in bot.log only: ' + $_.Exception.Message }
 
   $out += @(Move-ThornswoodBotRecords $Root)
-  $out += @(Grant-ThornswoodBotAccess -Sid $sid -Root $Root -WatchRoot $WatchRoot -DocsData $DocsData -ModLogs $ModLogs)
+  $out += @(Grant-ThornswoodBotAccess -Sid $sid -Root $Root -WatchRoot $WatchRoot -DocsData $DocsData -ServerRoots $ServerRoots)
 
   try { Start-Service -Name $Name -ErrorAction Stop; $out += 'started the service ' + $Name }
   catch { return @{ Ok = $false; Lines = $out + @('THE SERVICE DID NOT START: ' + $_.Exception.Message) } }

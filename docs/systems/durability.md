@@ -68,9 +68,9 @@ Worn gear loses 1% of its condition on each hit that reaches it
 - the weapon that blocked it, when the hit was blocked and no shield
   was worn.
 
-A weapon is not worn down when its holder is hit. Patrick was asked
-again on 4 October which piece wears when its holder is hit. Until
-he answers, it is the weapon that lands a hit or blocks one.
+A weapon is not worn down when its holder is hit, only when it lands
+a hit or blocks one (Patrick, 4 October, asked again in plainer
+words: the suggested answer).
 
 At 0%, a piece that is being worn has a 10% chance to break on a hit
 that reaches it, instead of losing 1%. An hour of standing around
@@ -131,17 +131,24 @@ opened. Opening it does not move its day.
 A temper at the grindstone or the armour table is refused, and it is
 not counted as work.
 
-Not yet. The kits reach people with the next release that carries
-the plugin. The recipe table names whose work each kit is, at novice
-for the half in the table above, and the Weapon Kit and the Armor Kit
-burn one Poor Charcoal at the forge (#1622).
-The inventory shows a piece's condition as it was when the piece
-reached the pack, and a change during a session shows after the
-next login, until the engine release that carries the fix for issue
-#1651; from then a change shows at once and a worn piece stays worn.
-The repair panel always has the number.
-The 5% more damage and armour at 120% is not applied, because the
-engine works damage out on its own. A piece that is not at 100%
-cannot be enchanted, because the engine takes a plain piece for an
-enchantment. The grindstone and the armour table still appear in the
-crafting menu.
+Release 1.2.3 (11 October) carries all of it, on the main server and
+in the launcher's files. The kits are in its plugin. The recipe table
+names whose work each kit is, at novice for the half in the table
+above, and the Weapon Kit and the Armor Kit burn one Poor Charcoal at
+the forge (#1622).
+
+A change to a piece's condition shows in its holder's inventory at
+once, in the same session, and a worn piece stays worn: the game
+renames the piece where it lies instead of taking it off and giving it
+back, and the record of what is worn follows the new name (#1651).
+Before 1.2.3 the inventory kept the name a piece had when it reached
+the pack until the next login. The repair panel always has the number.
+
+Not yet:
+
+- The 5% more damage and armour at 120% is not applied, because the
+  engine works damage out on its own.
+- A piece that is not at 100% cannot be enchanted, because the engine
+  takes a plain piece for an enchantment.
+- The grindstone and the armour table still appear in the crafting
+  menu.

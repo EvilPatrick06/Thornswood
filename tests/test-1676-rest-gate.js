@@ -8,14 +8,15 @@
 //
 // Now the needs block answers the line (craftRefusal), and every way of
 // making something asks it before anything is taken: a bench's own menu
-// (mp.onCraft, brews and tempering included), a key cut at a forge, and a
-// kiln burned by pressing it. Both sides of 15 are run.
+// (mp.onCraft, brews and tempering included, and the kiln's charcoal since
+// #2337 took the kiln's press away) and a key cut at a forge. Both sides of
+// 15 are run.
 //
 // The REAL needs block runs over a stand-in mp and a clock turned by hand.
-// mp.onCraft, burnCharcoal and the property block's cutKey are lifted out of
-// the gamemode as they stand and run with small stand-ins for what they call.
-// Since #1733 all three ask one gate, unfitToMake, which asks this block and
-// the injury block; the real one is lifted out too.
+// mp.onCraft and the property block's cutKey are lifted out of the gamemode as
+// they stand and run with small stand-ins for what they call. Since #1733
+// both ask one gate, unfitToMake, which asks this block and the injury block;
+// the real one is lifted out too.
 //
 // Read only.
 'use strict';
@@ -45,12 +46,11 @@ function slice(start, end) {
 
 const needsBlock = slice('// ==== thornswood needs: hunger, thirst and exhaustion ====', '// ==== end thornswood needs ====');
 const onCraftSrc = slice("mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId, effects) {", '\n});\n');
-const kilnSrc = slice('function burnCharcoal(actorId, refrId) {', '\n}\n');
 const cutKeySrc = slice('  function cutKey(actorId, profileId, toProfile, parts) {', '\n  }\n');
 const gateSrc = slice('function unfitToMake(actorId, workbenchId) {', '\n}\n');
-yes('the needs block, the craft gate, mp.onCraft, burnCharcoal and cutKey are in the gamemode',
-    !!needsBlock && !!gateSrc && !!onCraftSrc && !!kilnSrc && !!cutKeySrc);
-if (!needsBlock || !gateSrc || !onCraftSrc || !kilnSrc || !cutKeySrc) { done(); }
+yes('the needs block, the craft gate, mp.onCraft and cutKey are in the gamemode',
+    !!needsBlock && !!gateSrc && !!onCraftSrc && !!cutKeySrc);
+if (!needsBlock || !gateSrc || !onCraftSrc || !cutKeySrc) { done(); }
 
 /* The real craft gate (#1733), over whatever globals the road is given. */
 function gateFor(G) { return new Function('globalThis', gateSrc + '\nreturn unfitToMake;')(G); }
@@ -150,38 +150,6 @@ function craftAt(rest, recipeId, hurtLine) {
   yes('C4 a fit, rested person is not refused by either', hurtOnly.out !== false);
 }
 
-// ------------------------------------------------ a kiln, by pressing it --
-
-function kilnAt(rest) {
-  const took = [];
-  const gave = [];
-  const G = { __thornswoodNeeds: needsAt(rest) };
-  const run = new Function('globalThis', 'halfGate', 'toolGate', 'cooldownLeft', 'KILN_ARMED', 'KILN_ARM_MS',
-    'rankStep', 'takeItem', 'addItem', 'ITEMS', 'stampCooldown', 'creditWork', 'wearTool', 'unfitToMake',
-    kilnSrc + '\nreturn burnCharcoal;')(
-    G,
-    function () { return null; }, function () { return null; }, function () { return 0; },
-    {}, 15000, function () { return 0; },
-    function (id, item, n) { took.push(n); return true; },
-    function (id, item, n) { gave.push(n); return true; },
-    { firewood: 'fw', charcoalT1: 'c1', charcoalT2: 'c2', charcoalT3: 'c3', charcoalT4: 'c4' },
-    function () { }, function () { return null; }, function () { return null; }, gateFor(G));
-  const first = run(ME, 0x77);
-  const second = run(ME, 0x77);
-  return { first: first, second: second, took: took, gave: gave };
-}
-
-{
-  const tired = kilnAt(10);
-  yes('K1 pressing a kiln under 15 is refused with the line, both presses',
-      /too tired to make anything/i.test(tired.first) && /too tired to make anything/i.test(tired.second));
-  yes('K1 and no firewood is taken, no charcoal given', tired.took.length === 0 && tired.gave.length === 0);
-  const rested = kilnAt(15);
-  yes('K2 at 15 the kiln asks, then burns: firewood taken and charcoal given',
-      /Press it again/.test(rested.first) && /kiln yields/.test(rested.second) &&
-      rested.took.length === 1 && rested.gave.length === 1);
-}
-
 // ------------------------------------------------ a key cut at a forge --
 
 function keyAt(rest) {
@@ -218,9 +186,10 @@ function keyAt(rest) {
 {
   const code = gm.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
   const asks = code.match(/needs\.craftRefusal\(actorId\)/g) || [];
-  const roads = [onCraftSrc, kilnSrc, cutKeySrc].filter(function (s) { return /unfitToMake\(actorId, /.test(s); });
-  yes('W1 three crafts ask the gate: a bench\'s menu, a kiln pressed, a key at a forge, all through unfitToMake (#1733)',
-      asks.length === 1 && gateSrc.indexOf('needs.craftRefusal(actorId)') !== -1 && roads.length === 3);
+  const roads = [onCraftSrc, cutKeySrc].filter(function (s) { return /unfitToMake\(actorId, /.test(s); });
+  yes('W1 both crafts ask the gate: a bench\'s menu, the kiln\'s included, and a key at a forge, all through unfitToMake (#1733, #2337)',
+      asks.length === 1 && gateSrc.indexOf('needs.craftRefusal(actorId)') !== -1 && roads.length === 2 &&
+      !/function burnCharcoal\b/.test(code));
   function body(start) {
     const a = code.indexOf(start);
     if (a < 0) { return ''; }
@@ -232,7 +201,6 @@ function keyAt(rest) {
       verbs.every(function (v) { const b = body(v); return !!b && b.indexOf('craftRefusal') === -1; }));
   yes('W3 the gate is asked before anything is taken in each',
       onCraftSrc.indexOf('unfitToMake(') < onCraftSrc.indexOf('recipelessCraft(') &&
-      kilnSrc.indexOf('unfitToMake(') < kilnSrc.indexOf('takeItem(') &&
       cutKeySrc.indexOf('unfitToMake(') < cutKeySrc.indexOf('takeItem('));
 }
 

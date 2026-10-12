@@ -1,7 +1,7 @@
 # NPC population catalogue
 
 Generated from the winning records in the 48-plugin dev load order.
-This is the authored policy prepared for the next dev release; release proof is recorded separately.
+This is the policy release 1.2.3 runs on dev and main; release proof is recorded separately.
 
 14,668 placements inspected; 5,072 retained; 9,596 excluded.
 

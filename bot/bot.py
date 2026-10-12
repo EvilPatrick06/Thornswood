@@ -16,10 +16,13 @@ What it does:
            staff channel, the day it arrives
   Holds    a panel in #choose-your-hold where a Member picks their hold
            and which announcements ping them
-  Testing  #test-tasks is a forum of test tasks, one thread each, tagged Dev
-           or Main (/test-task, or python bot.py --post-task). #known-issues
-           has one post per open GitHub issue labelled Dev Findings or Main
-           Findings, marked Fixed when the issue is closed as completed. The
+  Testing  #known-issues is a forum with one post per open GitHub issue
+           labelled Dev Findings or Main Findings; the post goes when the
+           issue is closed, which is when its fix is on main. #test-tasks is a
+           forum of test tasks: one for each issue closed as fixed (its "Test
+           task:" comment), always tagged Main, because main is where testers
+           test, plus any posted by hand, tagged Dev or Main (/test-task,
+           python bot.py --post-task). The
            channels get there once, by hand, with
            python bot.py --setup-channels [--apply] (the testing channels
            section below)
@@ -2289,14 +2292,16 @@ async def ensure_hold_panel(guild):
 # #test-tasks (dated sessions, Pass/Fail/Skip/Fail-known rows, /live-smoke)
 # is gone, and the testing channels are three things instead:
 #
-#   #test-tasks     a Forum. One thread per test task, from a title and a body
-#                   we give the bot, tagged Dev or Main (/test-task, or
-#                   python bot.py --post-task).
+#   #test-tasks     a Forum. One thread per test task, tagged Dev or Main: the
+#                   bot posts one, tagged Main, for each issue closed as fixed
+#                   (see known issues below), and staff can post one by hand
+#                   (/test-task, or python bot.py --post-task).
 #   #test-findings  what #test-results was, renamed. Nothing else about it moves.
-#   #known-issues   read only, one bot post per open GitHub issue labelled Dev
-#                   Findings or Main Findings: title and status only, no number
-#                   and no link. Fixed when closed as completed, Closed, not
-#                   fixed when closed otherwise, Open again when reopened.
+#   #known-issues   a Forum, read only: one bot post per open GitHub issue
+#                   labelled Dev Findings or Main Findings, title only, no
+#                   number and no link. The post goes when the issue is closed,
+#                   which is when its fix is on main (Patrick, 11 Oct: one
+#                   entry per issue, not one list).
 #
 # THE ONE-TIME SETUP. Getting the server from the old shape to that one is the
 # only channel change the bot makes, and Patrick's explicit exception to the
@@ -2387,7 +2392,10 @@ def known_overwrites(guild, like):
         ow.update(**dict((n, False) for n in ARCHIVE_LOCK))
     if me is not None:
         mine = out.get(me) or discord.PermissionOverwrite()
+        # In a forum, send_messages is making a post and manage_threads is
+        # deleting one: the bot does both as issues come and go.
         mine.update(view_channel=True, send_messages=True,
+                    send_messages_in_threads=True, manage_threads=True,
                     read_message_history=True)
         out[me] = mine
     return out
@@ -2440,8 +2448,11 @@ async def channel_setup(guild, apply=False, path=None):
         return ['%s is there but cannot be read, so nothing was changed. Look '
                 'at it by hand.' % path]
     done = setup_done(guild, path)
-    if done:
+    if done and known_forum_done(guild, path):
         return ['already done on %s, nothing changed' % done]
+    if done:
+        # Set up before #known-issues was a forum: that one step, once.
+        return await known_forum_setup(guild, apply, path)
 
     # 1. #test-tasks becomes a forum.
     tasks = _channel_named(guild, TASKS_NAME, ('forum',))
@@ -2517,33 +2528,118 @@ async def channel_setup(guild, apply=False, path=None):
                 await was.edit(name=FINDINGS_NAME, reason=SETUP_REASON)
             findings = was
 
-    # 3. #known-issues, beside #test-findings, with its overwrites.
-    if _channel_named(guild, KNOWN_NAME) is None:
-        like = findings
-        said.append('%smake #%s in %s with %s' % (
-            verb, KNOWN_NAME,
-            getattr(getattr(like, 'category', None), 'name', 'no category'),
-            ('the %d permission overwrite(s) of #%s'
-             % (len(getattr(like, 'overwrites', {}) or {}), FINDINGS_NAME))
-            if like is not None else 'no overwrites of its own'))
-        said.append('%smake #%s read only: sending and threads off for '
-                    '@everyone and every copied overwrite, the bot keeps send'
-                    % (verb, KNOWN_NAME))
-        if apply:
-            await guild.create_text_channel(
-                KNOWN_NAME,
-                category=getattr(like, 'category', None),
-                overwrites=known_overwrites(guild, like),
-                topic='Known issues the team is working on. Kept by the bot.',
-                reason=SETUP_REASON)
+    # 3. #known-issues, a forum beside #test-findings, with its overwrites.
+    said += await _known_forum_make(guild, findings, apply, verb)
 
     if apply:
         state = _state_read(path) or {}
+        now = _utc_stamp()
         state.setdefault('guilds', {})[str(guild.id)] = {
-            'done': datetime.datetime.now(datetime.timezone.utc)
-                    .strftime('%Y-%m-%dT%H:%M:%SZ'),
+            'done': now, 'known_forum': now,
             'name': getattr(guild, 'name', ''),
         }
+        _state_write(path, state)
+        said.append('recorded in %s, so this never runs again' % path)
+    elif not said:
+        said.append('nothing to change')
+    return said
+
+
+def _utc_stamp():
+    return (datetime.datetime.now(datetime.timezone.utc)
+            .strftime('%Y-%m-%dT%H:%M:%SZ'))
+
+
+def known_forum_done(guild, path=None):
+    """When #known-issues was made a forum on this server, or None."""
+    got = _state_read(path or SETUP_STATE) or {}
+    rec = (got.get('guilds') or {}).get(str(getattr(guild, 'id', '')))
+    return rec.get('known_forum') if isinstance(rec, dict) else None
+
+
+async def _known_forum_make(guild, like, apply, verb):
+    """The #known-issues forum, read only, with the Dev and Main tags, when
+       there is none. One line per change."""
+    said = []
+    if _channel_named(guild, KNOWN_NAME, ('forum',)) is not None:
+        return said
+    said.append('%smake the forum #%s in %s with %s and the tags %s' % (
+        verb, KNOWN_NAME,
+        getattr(getattr(like, 'category', None), 'name', 'no category'),
+        ('the %d permission overwrite(s) of #%s'
+         % (len(getattr(like, 'overwrites', {}) or {}), FINDINGS_NAME))
+        if like is not None else 'no overwrites of its own',
+        ', '.join(TASK_TAGS)))
+    said.append('%smake #%s read only: posting and replies off for @everyone '
+                'and every copied overwrite; the bot alone posts and deletes '
+                'there' % (verb, KNOWN_NAME))
+    if apply:
+        await guild.create_forum(
+            KNOWN_NAME, category=getattr(like, 'category', None),
+            position=(getattr(like, 'position', None) or 0) + 1,
+            overwrites=known_overwrites(guild, like),
+            topic='One post per known issue being worked on. Kept by the bot: '
+                  'a post goes when its fix is on main and becomes a test task.',
+            available_tags=[discord.ForumTag(name=t) for t in TASK_TAGS],
+            reason=SETUP_REASON)
+    return said
+
+
+async def known_forum_setup(guild, apply=False, path=None):
+    """
+    The second one-time step (Patrick, 11 Oct): #known-issues is a forum with
+    one post per known issue, not one channel of messages. On a server whose
+    first setup made a text #known-issues, that channel goes: deleted when
+    every message in it is the bot's own (all it ever held was the bot's
+    list), otherwise renamed known-issues-archive and locked like the tasks
+    archive. Then the forum is made. Recorded as known_forum, so it runs once.
+    """
+    path = path or SETUP_STATE
+    verb = '' if apply else 'would '
+    said = []
+    old = _channel_named(guild, KNOWN_NAME, ('text',))
+    if old is not None:
+        me = getattr(guild, 'me', None)
+        mine_only, n = True, 0
+        async for msg in old.history(limit=1000):
+            n += 1
+            if getattr(msg.author, 'id', None) != getattr(me, 'id', None):
+                mine_only = False
+                break
+        if mine_only:
+            said.append('%sdelete the text #%s: its %d message(s) are all the '
+                        'bot\'s own list' % (verb, KNOWN_NAME, n))
+            if apply:
+                await old.delete(reason=SETUP_REASON)
+        else:
+            archive = KNOWN_NAME + '-archive'
+            said.append('%srename the text #%s to #%s and switch off sending in '
+                        'it (it holds messages that are not the bot\'s, so '
+                        'nothing is deleted)' % (verb, KNOWN_NAME, archive))
+            if apply:
+                await old.edit(name=archive, reason=SETUP_REASON)
+                for t in list((getattr(old, 'overwrites', {}) or {})):
+                    if t == me:
+                        continue
+                    ow = old.overwrites_for(t)
+                    ow.update(**dict((x, False) for x in ARCHIVE_LOCK))
+                    await old.set_permissions(t, overwrite=ow, reason=SETUP_REASON)
+    findings = _channel_named(guild, FINDINGS_NAME)
+    said += await _known_forum_make(guild, findings, apply, verb)
+    tasks = _channel_named(guild, TASKS_NAME, ('forum',))
+    me = getattr(guild, 'me', None)
+    if tasks is not None and me is not None and not tasks.overwrites_for(me).manage_threads:
+        said.append('%slet the bot delete posts in #%s (manage threads, for a '
+                    'test task whose issue is reopened)' % (verb, TASKS_NAME))
+        if apply:
+            ow = tasks.overwrites_for(me)
+            ow.update(view_channel=True, send_messages=True,
+                      send_messages_in_threads=True, manage_threads=True)
+            await tasks.set_permissions(me, overwrite=ow, reason=SETUP_REASON)
+    if apply:
+        state = _state_read(path) or {}
+        rec = state.setdefault('guilds', {}).setdefault(str(guild.id), {})
+        rec['known_forum'] = _utc_stamp()
         _state_write(path, state)
         said.append('recorded in %s, so this never runs again' % path)
     elif not said:
@@ -2637,24 +2733,43 @@ async def test_task_cmd(interaction: discord.Interaction, title: str,
 
 # ---------------------------------------------------------- known issues --
 #
-# One post in #known-issues per open issue on GitHub labelled Dev Findings or
-# Main Findings. The issue number to message id map is kept in
-# known-issues.json in the data folder, written straight after each post, so a
-# restart never posts twice. A post made just before a crash, before its line
-# reached the file, is found again on the next start by reading the channel's
-# recent history for the bot's own posts, by title.
+# Patrick, 11 Oct: the issue board is not where testers look. Two forums are
+# kept from it, automatically, as things are found and fixed:
 #
-# The post is the issue's title and its status, and nothing else: testers
-# have no GitHub, so no number and no link. A post made just before a crash is
-# matched back to its issue by that title.
+#   #known-issues  one post per open issue labelled Dev Findings or Main
+#                  Findings, tagged Dev or Main by its labels (where it was
+#                  found). The post goes the moment its issue is no longer an
+#                  open finding: fixed and closed, closed any other way, or its
+#                  label taken off.
+#   #test-tasks    one post per issue closed as fixed from the day this began
+#                  (see the since stamp below), for testers to check. Its
+#                  title and body are the issue's last comment that starts
+#                  "Test task:" (written by whoever fixed it); a finding with
+#                  no such comment gets its own title and a plain line. An
+#                  issue that is reopened loses its test task, and comes back
+#                  to #known-issues if it is still a finding.
 #
-# Closed as completed (confirmed fixed): the post is struck through and says
-# Fixed. Closed any other way: it says Closed, not fixed. Reopened: it goes
-# back to open. A text channel message cannot be locked, so the edit is the
-# close.
+# When an issue closes (Patrick, 11 Oct): dev is where the team checks that
+# nothing breaks the game, and main is where testers test, since we are in
+# alpha. So a fix people would notice is closed, with its "Test task:"
+# comment, when it reaches main, not when it merges or reaches dev, and every
+# test task the bot posts is tagged Main. A "Server: Dev" or "Server: Main"
+# line under "Test task:", which comments carried before that day, is still
+# read so it never shows in the post, and it changes nothing. A "Server:"
+# line under "Known issue:" still sets that post's tag.
+#
+# Each record holds the form of the post it was made with (TASK_FORM,
+# KNOWN_FORM). When the way a post is written changes, the form goes up by
+# one, and every record of an older form is written again on the next pass,
+# once, even though GitHub says its issue did not change.
+#
+# Posts carry no issue number and no link: testers have no GitHub. The bot
+# remembers which post is which issue in known-issues.json in the data folder,
+# written straight after each post, so a restart never posts twice; a post
+# made just before a crash is found again by its title among the bot's own.
 #
 # GitHub: GITHUB_TOKEN in bot.env.json, a read only token for the issues of
-# KNOWN_ISSUES_REPO. No token means no known issues, said once in the log.
+# KNOWN_ISSUES_REPO. No token means neither forum is kept, said once.
 KNOWN_REPO = os.environ.get('KNOWN_ISSUES_REPO', 'EvilPatrick06/Thornswood').strip()
 KNOWN_LABELS = [l.strip() for l in
                 os.environ.get('KNOWN_ISSUES_LABELS',
@@ -2662,6 +2777,15 @@ KNOWN_LABELS = [l.strip() for l in
                 if l.strip()]
 KNOWN_EVERY = max(60, _int_env('KNOWN_ISSUES_EVERY', 300))
 GITHUB_API = os.environ.get('GITHUB_API', 'https://api.github.com').rstrip('/')
+TASK_MARK = re.compile(r'^\s*test task\s*:\s*(.*)$', re.I)
+KNOWN_MARK = re.compile(r'^\s*known issue\s*:\s*(.*)$', re.I)
+TASK_SERVER = re.compile(r'^\s*server\s*:\s*(dev|main)\s*$', re.I)
+# The one tag a test task from the board carries: testers test on main.
+TASK_TAG = 'Main'
+# The form of the posts each record was made with. 2: test tasks tagged Main
+# whatever their Server line, and both bodies say the fix is on main (11 Oct).
+TASK_FORM = 2
+KNOWN_FORM = 2
 
 
 def _github_get(url):
@@ -2689,11 +2813,32 @@ def github_open_findings(get=None):
             rows = get(url) or []
             for row in rows:
                 if isinstance(row, dict) and 'pull_request' not in row:
-                    row = dict(row, _label=label)
                     out.setdefault(int(row['number']), row)
             if len(rows) < 100:
                 break
             page += 1
+    return out
+
+
+def github_closed_since(since, get=None):
+    """Every issue (not pull request) that is closed and was updated at or
+       after since, an ISO stamp, by number. A close and a new comment both
+       move the update time, so this holds every issue closed since then and
+       every closed issue with a comment since then."""
+    get = get or _github_get
+    out = {}
+    page = 1
+    while True:
+        url = ('%s/repos/%s/issues?state=closed&per_page=100&page=%d'
+               '&sort=updated&direction=desc&since=%s'
+               % (GITHUB_API, KNOWN_REPO, page, urllib.parse.quote(since)))
+        rows = get(url) or []
+        for row in rows:
+            if isinstance(row, dict) and 'pull_request' not in row:
+                out.setdefault(int(row['number']), row)
+        if len(rows) < 100:
+            break
+        page += 1
     return out
 
 
@@ -2702,123 +2847,343 @@ def github_issue(number, get=None):
     return get('%s/repos/%s/issues/%d' % (GITHUB_API, KNOWN_REPO, int(number)))
 
 
-# Title and status only (Patrick, 11 Oct): no issue number and no link,
-# because testers have no GitHub. The post is found again by its title.
-KNOWN_HEAD = re.compile(r'^(?:~~)?\*\*(.+?)\*\*')
-KNOWN_STATUS = {None: 'Open', 'completed': 'Fixed'}
+def github_comments(number, get=None):
+    get = get or _github_get
+    out, page = [], 1
+    while True:
+        rows = get('%s/repos/%s/issues/%d/comments?per_page=100&page=%d'
+                   % (GITHUB_API, KNOWN_REPO, int(number), page)) or []
+        out += [r for r in rows if isinstance(r, dict)]
+        if len(rows) < 100:
+            break
+        page += 1
+    return out
+
+
+def _labels(issue):
+    return [str((l or {}).get('name') if isinstance(l, dict) else l)
+            for l in (issue.get('labels') or [])]
+
+
+def issue_tags(issue, server=None):
+    """The #known-issues tags: Dev, Main or both, from the findings labels;
+       server ('Dev' or 'Main') when a "Known issue:" comment names one; Dev
+       when nothing says. Test tasks do not use this: they are TASK_TAG."""
+    if server:
+        return [server.capitalize()]
+    names = _labels(issue)
+    tags = [t for t in TASK_TAGS if ('%s Findings' % t) in names]
+    return tags or ['Dev']
 
 
 def known_title(issue):
-    return (str(issue.get('title') or '').strip() or 'untitled')[:200].replace('*', '')
+    return (str(issue.get('title') or '').strip() or 'untitled')[:TASK_TITLE_ROOM]
 
 
-def known_text(issue, closed=None):
-    """The post for one issue: its title and its status, nothing else.
-       closed is None (open), 'completed' (Fixed) or another state_reason
-       (Closed, not fixed)."""
-    title = known_title(issue)
-    if closed is None:
-        return '**%s**\nStatus: Open' % title
-    return '~~**%s**~~\nStatus: %s' % (
-        title, 'Fixed' if closed == 'completed' else 'Closed, not fixed')
+def known_body(issue):
+    where = ' and '.join(issue_tags(issue))
+    return ('Known on %s. The team is working on it. This post goes when the '
+            'fix is on main, and then it comes back as a test task.' % where)
 
 
-async def known_issues_once(channel, state, get=None, save=None, me_id=None):
+def _marked(issue, comments, mark):
+    """(title, body, server or None, created_at) from the issue's last comment
+       whose first line matches mark ("Test task:" or "Known issue:"), or
+       None. A first line with nothing after the colon takes the issue's own
+       title."""
+    for c in reversed(comments or []):
+        lines = str(c.get('body') or '').replace('\r\n', '\n').strip().split('\n')
+        m = mark.match(lines[0]) if lines else None
+        if not m:
+            continue
+        title = (m.group(1).strip() or known_title(issue))[:TASK_TITLE_ROOM]
+        rest = lines[1:]
+        server = None
+        if rest and TASK_SERVER.match(rest[0]):
+            server = TASK_SERVER.match(rest[0]).group(1).capitalize()
+            rest = rest[1:]
+        body = '\n'.join(rest).strip()[:TASK_BODY_ROOM]
+        return title, body, server, str(c.get('created_at') or '')
+    return None
+
+
+def test_task_of(issue, comments):
+    """(title, body, created_at) from the last "Test task:" comment, or None.
+       A Server line under it is read so it is not in the body, and then
+       dropped: every test task is on main (Patrick, 11 Oct)."""
+    got = _marked(issue, comments, TASK_MARK)
+    if got is None:
+        return None
+    title, body, _server, created = got
+    return title, body or 'Check this on main.', created
+
+
+def known_of(issue, comments):
+    """(title, body, tags) for the #known-issues post: the last "Known
+       issue:" comment, or the issue's title and a plain line until somebody
+       writes one."""
+    got = _marked(issue, comments, KNOWN_MARK)
+    if got:
+        return got[0], got[1] or known_body(issue), issue_tags(issue, got[2])
+    return known_title(issue), known_body(issue), issue_tags(issue)
+
+
+def _sig(title, body, tags):
+    return '%s\n%s\n%s' % (title, body, ','.join(sorted(tags)))
+
+
+def default_task_body(issue):
+    """The body for a fixed finding nobody wrote a test task for. Its issue
+       closed when the fix reached main, so that is where to check it."""
+    return ('This was fixed and the fix is on main. Check it on main, and say '
+            'in #%s if it still happens.' % FINDINGS_NAME)
+
+
+def task_post_of(issue, comments):
+    """(title, body, tags) for an issue's #test-tasks post, or None when it
+       gets none (not a finding and nobody wrote a test task)."""
+    task = test_task_of(issue, comments)
+    if task is not None:
+        return task[0], task[1], [TASK_TAG]
+    if issue_tags_found(issue):
+        return known_title(issue), default_task_body(issue), [TASK_TAG]
+    return None
+
+
+async def _forum_thread(forum, tid):
+    """The thread by id, or None when it is gone."""
+    guild = getattr(forum, 'guild', None)
+    th = None
+    getter = getattr(guild, 'get_thread', None)
+    if getter is not None:
+        th = getter(int(tid))
+    if th is None and guild is not None:
+        try:
+            th = await guild.fetch_channel(int(tid))
+        except discord.NotFound:
+            return None
+    return th
+
+
+async def _forum_post(forum, title, body, tags, me_id=None):
+    """A post in the forum, tagged; an open post of the bot's with that exact
+       title is handed back rather than made twice. Returns the thread."""
+    for th in list(getattr(forum, 'threads', None) or []):
+        if (str(getattr(th, 'name', '')) == title
+                and not getattr(th, 'archived', False)
+                and (me_id is None or getattr(th, 'owner_id', me_id) == me_id)):
+            return th
+    applied = [t for t in (task_tag_of(forum, x) for x in tags) if t is not None]
+    made = await forum.create_thread(name=title, content=body,
+                                     applied_tags=applied,
+                                     allowed_mentions=discord.AllowedMentions.none(),
+                                     reason='Thornswood known issues and test tasks')
+    return getattr(made, 'thread', made)
+
+
+async def _forum_drop(forum, tid):
+    th = await _forum_thread(forum, tid)
+    if th is not None:
+        await th.delete()
+
+
+async def _forum_edit(forum, tid, title, body, tags):
+    """Brings an existing post to this title, body and tags. False when the
+       post is gone (deleted by hand), so the caller can make it again."""
+    th = await _forum_thread(forum, tid)
+    if th is None:
+        return False
+    applied = [x for x in (task_tag_of(forum, n) for n in tags) if x is not None]
+    await th.edit(name=title, applied_tags=applied)
+    msg = getattr(th, 'starter_message', None)
+    if msg is None:
+        try:
+            msg = await th.fetch_message(th.id)
+        except discord.NotFound:
+            msg = None
+    if msg is not None:
+        await msg.edit(content=body, allowed_mentions=discord.AllowedMentions.none())
+    return True
+
+
+async def known_issues_once(forum, state, get=None, save=None, me_id=None):
     """
-    One pass. state is the dict kept in known-issues.json and is changed in
-    place; the caller writes it. Returns the numbers posted, edited.
+    One pass over #known-issues, a forum. state is the dict kept in
+    known-issues.json, changed in place; the caller writes it. Returns the
+    issue numbers posted, edited and removed.
 
-    With me_id, an open issue the state has no post for is first looked for
-    among the bot's own posts in the channel, by title, so a crash between a
-    post and its save never doubles it.
+    Comments are read only for an issue GitHub says changed since the last
+    pass (its updated_at), or whose record was made with an older form of
+    the post (KNOWN_FORM), so an untouched issue costs nothing.
     """
     loop = asyncio.get_running_loop()
     issues = await loop.run_in_executor(None, github_open_findings, get)
     rec = state.setdefault('issues', {})
-    posted, edited = [], []
-    if me_id is not None and any(str(n) not in rec for n in issues):
-        await known_issues_recover(channel, state, me_id, issues)
-
-    def mark():
-        state['_dirty'] = True
-
+    # Records from before #known-issues was a forum point at messages in a
+    # channel that is gone: they are forgotten, not deleted again.
+    for key, have in list(rec.items()):
+        if have.get('channel_id') != getattr(forum, 'id', None) or 'thread_id' not in have:
+            rec.pop(key, None)
+            state['_dirty'] = True
+    posted, edited, removed = [], [], []
     for num in sorted(issues):
         key = str(num)
-        have = rec.get(key)
         issue = issues[num]
-        if have and have.get('closed'):
-            # Reopened on GitHub: back to an open post.
-            try:
-                msg = await channel.fetch_message(int(have['message_id']))
-                await msg.edit(content=known_text(issue))
-                have['closed'] = None
-                edited.append(num)
-                mark()
-            except discord.NotFound:
-                have = None
-                rec.pop(key, None)
-            except discord.HTTPException:
-                continue
-        if have:
+        have = rec.get(key)
+        if (have and have.get('updated') == issue.get('updated_at')
+                and have.get('form') == KNOWN_FORM):
             continue
-        msg = await channel.send(known_text(issue),
-                                 allowed_mentions=discord.AllowedMentions.none())
-        rec[key] = {'message_id': msg.id, 'channel_id': channel.id,
-                    'closed': None}
-        mark()
+        comments = await loop.run_in_executor(None, github_comments, num, get)
+        title, body, tags = known_of(issue, comments)
+        sig = _sig(title, body, tags)
+        if have:
+            if have.get('sig') != sig:
+                try:
+                    if not await _forum_edit(forum, have['thread_id'], title, body, tags):
+                        have = None
+                        rec.pop(key, None)
+                    else:
+                        edited.append(num)
+                except discord.HTTPException:
+                    continue
+            if have:
+                have.update(sig=sig, updated=issue.get('updated_at'),
+                            form=KNOWN_FORM)
+                state['_dirty'] = True
+                continue
+        th = await _forum_post(forum, title, body, tags, me_id)
+        rec[key] = {'thread_id': th.id, 'channel_id': forum.id, 'sig': sig,
+                    'updated': issue.get('updated_at'), 'form': KNOWN_FORM}
+        state['_dirty'] = True
         if save:
             save(state)      # straight away, so a crash cannot double it
         posted.append(num)
-
     for key, have in list(rec.items()):
-        if int(key) in issues or have.get('closed'):
+        if int(key) in issues:
+            continue
+        try:
+            await _forum_drop(forum, have['thread_id'])
+        except discord.HTTPException:
+            continue
+        rec.pop(key, None)
+        state['_dirty'] = True
+        removed.append(int(key))
+    return posted, edited, removed
+
+
+async def test_tasks_once(forum, state, get=None, save=None, me_id=None, now=None):
+    """
+    One pass over #test-tasks. An issue closed as fixed gets a post when it
+    was closed after state['since'] (set to now on the first pass, so nothing
+    from before this began floods in), or when its latest "Test task:"
+    comment was written after since. Every post is tagged Main (TASK_TAG).
+    A rewritten comment edits the post, and so does a record made with an
+    older form of the post (TASK_FORM), once; an issue that is reopened
+    loses it. Returns the issue numbers posted, edited and removed.
+    """
+    loop = asyncio.get_running_loop()
+    since = state.get('since')
+    if not since:
+        state['since'] = since = now or _utc_stamp()
+        state['_dirty'] = True
+    rec = state.setdefault('tasks', {})
+    closed = await loop.run_in_executor(None, github_closed_since, since, get)
+    posted, edited, removed = [], [], []
+    for num in sorted(closed):
+        key = str(num)
+        issue = closed[num]
+        have = rec.get(key)
+        if (issue.get('state_reason') or 'completed') != 'completed':
+            continue
+        if (have and have.get('updated') == issue.get('updated_at')
+                and have.get('form') == TASK_FORM):
+            continue
+        comments = await loop.run_in_executor(None, github_comments, num, get)
+        task = test_task_of(issue, comments)
+        new_enough = (str(issue.get('closed_at') or '') >= since
+                      or (task is not None and task[2] >= since))
+        if not have and not new_enough:
+            continue
+        post = task_post_of(issue, comments)
+        if post is None:
+            continue        # not a finding and nobody wrote a test task
+        title, body, tags = post
+        sig = _sig(title, body, tags)
+        if have:
+            if have.get('sig') != sig:
+                try:
+                    if await _forum_edit(forum, have['thread_id'], title, body, tags):
+                        edited.append(num)
+                    else:
+                        rec.pop(key, None)     # deleted by hand: confirmed
+                        state['_dirty'] = True
+                        continue
+                except discord.HTTPException:
+                    continue
+            have.update(sig=sig, updated=issue.get('updated_at'), form=TASK_FORM)
+            state['_dirty'] = True
+            continue
+        th = await _forum_post(forum, title, body, tags, me_id)
+        rec[key] = {'thread_id': th.id, 'channel_id': forum.id, 'sig': sig,
+                    'updated': issue.get('updated_at'), 'form': TASK_FORM}
+        state['_dirty'] = True
+        if save:
+            save(state)
+        posted.append(num)
+    for key, have in list(rec.items()):
+        if int(key) in closed:
             continue
         try:
             issue = await loop.run_in_executor(None, github_issue, int(key), get)
         except Exception:
             continue
-        if str(issue.get('state')) != 'closed':
-            continue
-        reason = issue.get('state_reason') or 'completed'
-        try:
-            msg = await channel.fetch_message(int(have['message_id']))
-            await msg.edit(content=known_text(issue, reason))
-        except discord.NotFound:
-            pass
-        except discord.HTTPException:
-            continue
-        have['closed'] = reason
-        mark()
-        edited.append(int(key))
-    return posted, edited
+        if str(issue.get('state')) == 'open':
+            try:
+                await _forum_drop(forum, have['thread_id'])
+            except discord.HTTPException:
+                continue
+            rec.pop(key, None)
+            state['_dirty'] = True
+            removed.append(int(key))
+        elif (have.get('updated') != issue.get('updated_at')
+                or have.get('form') != TASK_FORM):
+            # Closed before since, and changed since the last pass (an adopted
+            # post whose comment was rewritten) or made with an older form of
+            # the post: brought up to date.
+            comments = await loop.run_in_executor(None, github_comments, int(key), get)
+            post = task_post_of(issue, comments)
+            if post is not None:
+                sig = _sig(*post)
+                if have.get('sig') != sig:
+                    try:
+                        if await _forum_edit(forum, have['thread_id'], *post):
+                            edited.append(int(key))
+                    except discord.HTTPException:
+                        continue
+                have['sig'] = sig
+            have['updated'] = issue.get('updated_at')
+            have['form'] = TASK_FORM
+            state['_dirty'] = True
+    return posted, edited, removed
 
 
-async def known_issues_recover(channel, state, me_id, issues, limit=300):
-    """Put back any of the bot's own posts the state file is missing, matched
-       to an open issue by its title, each post to one issue at most."""
-    rec = state.setdefault('issues', {})
-    used = set(int(v.get('message_id', 0)) for v in rec.values())
-    want = {}
-    for num in sorted(issues):
-        if str(num) not in rec:
-            want.setdefault(known_title(issues[num]), []).append(num)
-    if not want:
-        return
-    async for msg in channel.history(limit=limit):
-        if getattr(msg.author, 'id', None) != me_id or msg.id in used:
-            continue
-        content = msg.content or ''
-        m = KNOWN_HEAD.match(content)
-        if not m or not want.get(m.group(1)):
-            continue
-        num = want[m.group(1)].pop(0)
-        rec[str(num)] = {'message_id': msg.id, 'channel_id': channel.id,
-                         'closed': ('completed' if 'Status: Fixed' in content
-                                    else 'not_planned'
-                                    if 'Status: Closed, not fixed' in content
-                                    else None)}
-        used.add(msg.id)
-        state['_dirty'] = True
+def adopt_task(number, thread_id, path=None):
+    """Records a test task post made by hand (--post-task) as issue number's,
+       so later passes edit it and take it down if the issue reopens. Run
+       with the bot stopped: the running bot holds the file in memory."""
+    path = path or KNOWN_STATE
+    state = _state_read(path)
+    if state is None:
+        raise RuntimeError('%s will not read; nothing was changed' % path)
+    state.setdefault('tasks', {})[str(int(number))] = {
+        'thread_id': int(thread_id), 'channel_id': None, 'sig': '', 'updated': ''}
+    _state_write(path, state)
+    return 'issue %d now owns test task post %d' % (int(number), int(thread_id))
+
+
+def issue_tags_found(issue):
+    names = _labels(issue)
+    return any(l in names for l in KNOWN_LABELS)
 
 
 def _known_save(state, path=None):
@@ -2830,8 +3195,8 @@ def _known_save(state, path=None):
 async def watch_known_issues():
     await client.wait_until_ready()
     if not os.environ.get('GITHUB_TOKEN', '').strip():
-        log('known issues: no GITHUB_TOKEN in bot.env.json, so #%s is not kept'
-            % KNOWN_NAME)
+        log('known issues: no GITHUB_TOKEN in bot.env.json, so #%s and #%s '
+            'are not kept' % (KNOWN_NAME, TASKS_NAME))
         return
     state = _state_read(KNOWN_STATE)
     if state is None:
@@ -2839,21 +3204,33 @@ async def watch_known_issues():
             'fixed by hand (posting from empty would double every post)'
             % KNOWN_STATE)
         return
+    said_text = False
     while not client.is_closed():
         try:
-            ch = None
+            known = tasks = None
             for g in client.guilds:
-                ch = _channel_named(g, KNOWN_NAME, ('text',))
-                if ch is not None:
-                    break
-            if ch is not None:
-                posted, edited = await known_issues_once(
-                    ch, state, save=_known_save, me_id=client.user.id)
-                if state.get('_dirty'):
-                    _known_save(state)
-                if posted or edited:
-                    log('known issues: posted %s, edited %s'
-                        % (posted or 'none', edited or 'none'))
+                known = known or _channel_named(g, KNOWN_NAME, ('forum',))
+                tasks = tasks or _channel_named(g, TASKS_NAME, ('forum',))
+                if known is None and not said_text and _channel_named(g, KNOWN_NAME, ('text',)):
+                    log('known issues: #%s is still a text channel. The one-time '
+                        'step (python bot.py --setup-channels --apply) makes it '
+                        'a forum.' % KNOWN_NAME)
+                    said_text = True
+            me = getattr(client.user, 'id', None)
+            if known is not None:
+                posted, edited, removed = await known_issues_once(
+                    known, state, save=_known_save, me_id=me)
+                if posted or edited or removed:
+                    log('known issues: posted %s, edited %s, removed %s'
+                        % (posted or 'none', edited or 'none', removed or 'none'))
+            if tasks is not None:
+                posted, edited, removed = await test_tasks_once(
+                    tasks, state, save=_known_save, me_id=me)
+                if posted or edited or removed:
+                    log('test tasks: posted %s, edited %s, removed %s'
+                        % (posted or 'none', edited or 'none', removed or 'none'))
+            if state.get('_dirty'):
+                _known_save(state)
         except Exception as e:
             # Never the URL with the token, and never the token: the request
             # carries it in a header, which str(e) does not print.
@@ -3352,15 +3729,20 @@ async def watch_reports():
 #
 # What a moderator did in the game (#412): /kick, /freeze, /silence, /warn and
 # the rest. The gamemode appends one JSON line per action to
-# private\moderation.log beside each game server, on this same box, and this
+# for-bot\moderation.log beside each game server, on this same box, and this
 # says each new line once in the staff channel, so the record is outside the
 # game and in front of the rest of staff. A file rather than a request, for the
 # same reason as watch_trouble: no new secret, port or ticket.
+#
+# for-bot, not private (#2321): private is SYSTEM's and Administrators' alone,
+# and a rule on one file in it could only be given once the gamemode had made
+# the file, long after the install that gives it. Install-Bot.ps1 gives the
+# bot's account read on the for-bot folder, which a file made later takes.
 MODERATION_LOGS = [
     ('live', os.environ.get('MODERATION_LOG',
-                            r'C:\Thornswood-Server\private\moderation.log')),
+                            r'C:\Thornswood-Server\for-bot\moderation.log')),
     ('dev', os.environ.get('MODERATION_LOG_DEV',
-                           r'C:\Thornswood-Server-Dev\private\moderation.log')),
+                           r'C:\Thornswood-Server-Dev\for-bot\moderation.log')),
     # Bans and notes made on the hub, which the site writes beside
     # trouble.json. The game's own /ban and /note are in the two above.
     ('site', os.environ.get('MODERATION_LOG_SITE',
@@ -3450,20 +3832,38 @@ def moderation_text(where, row):
 
 def _moderation_lines(path):
     """
-    Every whole line in one moderation.log, [] when there is no file yet (no
-    staff action on that server so far), None when it could not be read. A
-    last line with no line ending is left for the next look, the same as
-    _watch_log_lines.
+    (lines, why). lines is every whole line in one moderation.log, [] when
+    there is no file yet (no staff action on that server so far), None when it
+    could not be read, and then why says what refused it. A last line with no
+    line ending is left for the next look, the same as _watch_log_lines.
     """
     try:
         with open(path, 'rb') as f:
             data = f.read()
     except FileNotFoundError:
-        return []
-    except Exception:
-        return None
+        return [], ''
+    except Exception as e:
+        return None, '%s: %s' % (type(e).__name__, e)
     parts = data.decode('utf-8-sig', errors='replace').split('\n')
-    return [p.rstrip('\r') for p in parts[:-1] if p.strip()]
+    return [p.rstrip('\r') for p in parts[:-1] if p.strip()], ''
+
+
+def _moderation_unreadable(unread, where, path, why):
+    """
+    Say in bot.log when one moderation.log cannot be read, and when it can be
+    again, once each rather than every look (#2321). Until #2321 a refused
+    read was skipped with nothing logged, so a server whose staff log the
+    bot's account could not open said nothing anywhere.
+    """
+    if why and unread.get(where) != why:
+        unread[where] = why
+        log('moderation: cannot read %s (%s), so staff actions on %s are not '
+            'said in the staff channel until it can be. Install-Bot.ps1 gives '
+            'the bot\'s account read on that folder.'
+            % (path, why, 'the site' if where == 'site' else 'the %s server' % where))
+    elif not why and where in unread:
+        del unread[where]
+        log('moderation: %s can be read again' % path)
 
 
 async def watch_moderation():
@@ -3473,21 +3873,24 @@ async def watch_moderation():
     The lines already in each file when this starts are treated as said, as in
     watch_trouble, or every restart of the bot would repeat the history. A
     file that cannot be read is skipped for that look rather than read as
-    empty. Nothing in here may end the loop.
+    empty, and said in bot.log. Nothing in here may end the loop.
     """
     await client.wait_until_ready()
     loop = asyncio.get_running_loop()
     seen = {}
+    unread = {}
     for where, path in MODERATION_LOGS:
-        lines = await loop.run_in_executor(None, _moderation_lines, path)
+        lines, why = await loop.run_in_executor(None, _moderation_lines, path)
         seen[where] = set(lines) if lines is not None else None
+        _moderation_unreadable(unread, where, path, why)
     log('moderation: reading %s every %ds'
         % (', '.join(p for _, p in MODERATION_LOGS), MODERATION_EVERY))
 
     while not client.is_closed():
         try:
             for where, path in MODERATION_LOGS:
-                lines = await loop.run_in_executor(None, _moderation_lines, path)
+                lines, why = await loop.run_in_executor(None, _moderation_lines, path)
+                _moderation_unreadable(unread, where, path, why)
                 if lines is None:
                     continue
                 if seen.get(where) is None:
@@ -3936,6 +4339,7 @@ def run_cli(argv):
 
       --setup-channels [--apply]   the one-time setup, a preview without --apply
       --post-task --title T --body B|--body-file F --tag Dev|Main
+      --adopt-task --issue N --thread ID   (offline; with the bot stopped)
 
     Returns the exit code.
     """
@@ -3950,7 +4354,15 @@ def run_cli(argv):
     ap.add_argument('--body-file')
     ap.add_argument('--tag', choices=list(TASK_TAGS))
     ap.add_argument('--guild', type=int, default=0)
+    ap.add_argument('--adopt-task', action='store_true')
+    ap.add_argument('--issue', type=int)
+    ap.add_argument('--thread', type=int)
     a = ap.parse_args(argv)
+    if a.adopt_task:
+        if not a.issue or not a.thread:
+            ap.error('--adopt-task needs --issue and --thread')
+        print(adopt_task(a.issue, a.thread))
+        return 0
     if a.post_task:
         body = a.body
         if a.body_file:
@@ -3998,7 +4410,8 @@ def run_cli(argv):
 # `python bot.py`, where __name__ is __main__, so this changes nothing about
 # how it runs on the VPS.
 if __name__ == '__main__':
-    if '--setup-channels' in sys.argv or '--post-task' in sys.argv:
+    if ('--setup-channels' in sys.argv or '--post-task' in sys.argv
+            or '--adopt-task' in sys.argv):
         raise SystemExit(run_cli(sys.argv[1:]))
     # One heartbeat before anything can hang, so a bot stuck logging in has
     # this run's pid in the file and the watchdog can say how long it has sat.

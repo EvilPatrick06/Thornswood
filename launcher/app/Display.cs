@@ -193,8 +193,9 @@ namespace Thornswood
     /// needs menu on the screen so it doesnt show and they can do /needs to
     /// find it all". Hidden is NeedsBars=0 in Thornswood.ini; shown is no line
     /// at all, so an install that never opens Settings keeps the bars. The
-    /// needs themselves carry on either way, and the Body page on K says them
-    /// since /needs went (#1631).
+    /// needs themselves carry on either way, and the Body page on K says them.
+    /// /needs went with #1631 and came back as a line of text for somebody
+    /// who hid the bars (Patrick, 11 Oct, #2267).
     /// </summary>
     static class NeedsBars
     {

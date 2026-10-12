@@ -112,7 +112,7 @@ function Test-GameRunning { param([string]$Root) Write-Asked 'Test-GameRunning' 
 '@
 
 $stubBuild = @'
-param([string]$Src, [string]$Root, [string]$OutDir, [switch]$NoPause)
+param([string]$Src, [string]$Root, [string]$OutDir, [switch]$NoPause, [string]$With = 'csc')
 Add-Content -LiteralPath $env:TS_TEST_CALLS -Value ('build|' + $Root + '|' + $OutDir + '|' + [bool]$NoPause)
 if ($env:TS_TEST_BUILD_EXIT -and $env:TS_TEST_BUILD_EXIT -ne '0') { exit ([int]$env:TS_TEST_BUILD_EXIT) }
 $dir = $OutDir
@@ -161,6 +161,8 @@ try {
     }
     $realRepo = $Here
     Copy-Item -LiteralPath (Join-Path $realRepo 'scripts\release\Build-Launcher.ps1') -Destination (Join-Path $fakeRepo 'scripts\release')
+    # Build-Launcher holds the embedded records to RecordShape.ps1 (#2180).
+    foreach ($n in 'RecordShape.ps1', 'Read-JsonFile.ps1') { Copy-Item -LiteralPath (Join-Path $realRepo ('scripts\release\' + $n)) -Destination (Join-Path $fakeRepo 'scripts\release') -Force }
     $haveInstall = Test-Path -LiteralPath (Join-Path $realRepo 'scripts\release\Install-Launcher.ps1')
     if ($haveInstall) { Copy-Item -LiteralPath (Join-Path $realRepo 'scripts\release\Install-Launcher.ps1') -Destination (Join-Path $fakeRepo 'scripts\release') }
     foreach ($f in 'app.ico', 'app-dev.ico', 'ui.xaml', 'logo.png', 'logo-dev.png', 'logo-192.png', 'launcher-header.jpg', 'launcher-header.mp4', 'Thornswood.ini', 'voice-host.html') {
@@ -374,7 +376,7 @@ try {
         Copy-Item -LiteralPath (Join-Path $Here 'scripts\release\Get-ScratchDir.ps1') -Destination $shipTools
         $sb = [scriptblock]::Create(
             'param($Root, $Here) ' +
-            '$ModsOnly = $false; $Dev = $true; $DryRun = $false; $target = "1.0.0"; $current = "1.0.0"; $updaterCs = ""; ' +
+            '$ModsOnly = $false; $Dev = $true; $DryRun = $false; $LauncherWith = "csc"; $target = "1.0.0"; $current = "1.0.0"; $updaterCs = ""; ' +
             'function Say($m, $c) { }; function Head($m) { }; ' +
             'function Die($m) { throw ("DIE: " + $m) }; ' +
             'function Unbump([string]$why) { Add-Content -LiteralPath $env:TS_TEST_CALLS -Value ("unbump|" + $why) }; ' +

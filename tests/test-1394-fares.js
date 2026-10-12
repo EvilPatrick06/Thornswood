@@ -115,6 +115,11 @@ yes('the block runs and registers itself', !!C0 && Array.isArray(C0.STOPS));
 if (C0) {
   const S = C0.STOPS;
   const by = function (key) { return C0.stopByKey(key); };
+  // The stops a driver stands at, and the ones nobody drives from (#1394,
+  // read out of CFTO.esp on 11 Oct: the villages, the Hearthfire homes, the
+  // Thalmor Embassy and the small ferry landings).
+  const D = S.filter(function (s) { return !!s.driver; });
+  const V = S.filter(function (s) { return !s.driver; });
 
   // ------------------------------------------------------------ the list
   const pop = JSON.parse(fs.readFileSync(path.join(REPO_DIR, 'game', 'data', 'npc-population.json'), 'utf8'));
@@ -123,10 +128,10 @@ if (C0) {
     Eastmarch: 'windhelm', Falkreath: 'falkreath', Hjaalmarch: 'morthal', 'the Pale': 'dawnstar',
     Winterhold: 'winterhold', Solstheim: 'ravenrock' };
   yes('every carriage and ferry worker in the population data has a stop, ' + workers.length + ' of them',
-    workers.length === S.length && workers.every(function (n) {
-      return S.some(function (s) { return s.ref === n.ref; });
+    workers.length === D.length && workers.every(function (n) {
+      return D.some(function (s) { return s.ref === n.ref; });
     }));
-  const drift = S.filter(function (s) {
+  const drift = D.filter(function (s) {
     const n = workers.filter(function (w) { return w.ref === s.ref; })[0];
     if (!n) { return true; }
     const close = [0, 1, 2].every(function (i) { return Math.abs(n.pos[i] - s.pos[i]) <= 0.1; });
@@ -136,16 +141,47 @@ if (C0) {
   yes('every stop is its driver as the data has him: base, world, spot, hold and name' +
     (drift.length ? ' (not: ' + drift.map(function (s) { return s.key; }).join(', ') + ')' : ''), drift.length === 0);
   const keys = {}, bases = {};
-  S.forEach(function (s) { keys[s.key] = (keys[s.key] || 0) + 1; bases[s.base] = (bases[s.base] || 0) + 1; });
-  yes('no two stops share a key or a driver', Object.keys(keys).length === S.length && Object.keys(bases).length === S.length);
+  S.forEach(function (s) { keys[s.key] = (keys[s.key] || 0) + 1; });
+  D.forEach(function (s) { bases[s.base] = (bases[s.base] || 0) + 1; });
+  yes('no two stops share a key or a driver', Object.keys(keys).length === S.length && Object.keys(bases).length === D.length);
+
+  // ------------------------------------------------------------ nobody drives from
+  yes('26 stops nobody drives from: 19 by carriage and 7 ferry landings', V.length === 26 &&
+    V.filter(function (s) { return s.line === 'carriage'; }).length === 19);
+  yes('each lands on the mod\'s own marker, and has no driver, base or reference of its own',
+    V.every(function (s) { return /^[0-9a-f]+:CFTO\.esp$/.test(s.marker) && !s.base && !s.ref; }));
+  yes('each has a world and a point', V.every(function (s) {
+    return (s.world === '3c:Skyrim.esm' || s.world === C0.SOLSTHEIM) && s.pos.length === 3 &&
+      s.pos.every(Number.isFinite) && Number.isFinite(s.rot);
+  }));
+  yes('no two of them land on the same marker on the same line', V.every(function (a) {
+    return V.filter(function (b) { return b.line === a.line && b.marker === a.marker; }).length === 1;
+  }));
+  const at = function (key, hold, marker) { const s = by(key); return !!s && !s.driver && s.hold === hold && s.marker === marker; };
+  yes('the mod\'s holds: Riverwood and Rorikstead are Whiterun\'s, Karthwasten the Reach\'s, Nightgate Inn and Heljarchen Hall the Pale\'s',
+    at('carriage:riverwood', 'whiterun', 'b6e4e:CFTO.esp') && at('carriage:rorikstead', 'whiterun', 'b6e55:CFTO.esp') &&
+    at('carriage:karthwasten', 'markarth', 'b6e50:CFTO.esp') && at('carriage:nightgateinn', 'dawnstar', 'b6e59:CFTO.esp') &&
+    at('carriage:heljarchenhall', 'dawnstar', 'cb328:CFTO.esp'));
+  yes('the embassy and Dragon Bridge are under Haafingar\'s carriage, Windstad Manor under Hjaalmarch\'s, Lakeview Manor under Falkreath\'s',
+    at('carriage:thalmorembassy', 'solitude', 'b6e54:CFTO.esp') && at('carriage:dragonbridge', 'solitude', 'b6e53:CFTO.esp') &&
+    at('carriage:windstadmanor', 'morthal', 'cb327:CFTO.esp') && at('carriage:lakeviewmanor', 'falkreath', 'cb326:CFTO.esp'));
+  yes('the landings sit on the water the mod puts them on: Windstad and Frostflow the coast, Honeyside Lake Honrich, Lakeview and Ilinalta\'s Deep Lake Ilinalta, Bujold\'s Retreat and Northshore Solstheim',
+    at('coast:windstadmanor', 'morthal', '14c86:CFTO.esp') && at('coast:frostflowlighthouse', 'winterhold', '38411:CFTO.esp') &&
+    at('honrich:honeyside', 'riften', '14c8e:CFTO.esp') && at('ilinalta:lakeviewmanor', 'falkreath', '14c7e:CFTO.esp') &&
+    at('ilinalta:ilinaltasdeep', 'falkreath', '3840e:CFTO.esp') && at('solstheim:bujoldsretreat', 'ravenrock', '3840d:CFTO.esp') &&
+    at('solstheim:northshorelanding', 'ravenrock', '3840c:CFTO.esp') && by('solstheim:northshorelanding').world === C0.SOLSTHEIM);
+  yes('Riverwood is where the mod\'s marker stands', by('carriage:riverwood').pos.join() === [23877.3, -42735.3, -25.0].join());
+  yes('nobody rides from a stop nobody drives from', V.every(function (v) {
+    return S.every(function (s) { return C0.fare(v, s) === 0; }) && C0.destinations(v).length === 0;
+  }));
   const L0 = ledger(world().mp);
   yes('every stop\'s hold is one of the ten ledgers', S.every(function (s) { return L0.LEDGER_HOLDS.indexOf(s.hold) >= 0; }));
   yes('every stop is on a line the block knows', S.every(function (s) { return !!C0.LINES[s.line]; }));
-  const carriages = S.filter(function (s) { return s.line === 'carriage'; });
+  const carriages = D.filter(function (s) { return s.line === 'carriage'; });
   const nine = ['whiterun', 'solitude', 'riften', 'markarth', 'windhelm', 'falkreath', 'morthal', 'dawnstar', 'winterhold'];
   yes('a carriage in every hold: nine, one in each mainland hold',
     carriages.length === 9 && nine.every(function (h) { return carriages.filter(function (s) { return s.hold === h; }).length === 1; }));
-  const isle = S.filter(function (s) { return s.world === C0.SOLSTHEIM; });
+  const isle = D.filter(function (s) { return s.world === C0.SOLSTHEIM; });
   yes('the stops on Solstheim are the island ferry\'s three and the Northern Maiden\'s Raven Rock, all Raven Rock\'s',
     isle.length === 4 && isle.every(function (s) { return s.hold === 'ravenrock'; }) &&
     isle.filter(function (s) { return s.line === 'solstheim'; }).length === 3 && !!by('maiden:ravenrock') &&
@@ -169,10 +205,15 @@ if (C0) {
     C0.fare(by('solstheim:ravenrock'), by('solstheim:skaalvillage')) === 10 &&
     C0.fare(by('solstheim:telmithryn'), by('solstheim:ravenrock')) === 10 &&
     C0.fare(by('solstheim:skaalvillage'), by('solstheim:telmithryn')) === 10);
-  yes('a carriage to a stop in the same hold is 10, and between holds 20', (function () {
-    const v = Object.assign({}, by('carriage:whiterun'), { key: 'carriage:riverwood', name: 'Riverwood', driver: '' });
-    return C0.fare(by('carriage:whiterun'), v) === 10 && C0.fare(by('carriage:whiterun'), by('carriage:riften')) === 20;
-  })());
+  yes('a carriage to a stop in the same hold is 10, and between holds 20',
+    C0.fare(by('carriage:whiterun'), by('carriage:riverwood')) === 10 &&
+    C0.fare(by('carriage:whiterun'), by('carriage:rorikstead')) === 10 &&
+    C0.fare(by('carriage:whiterun'), by('carriage:karthwasten')) === 20 &&
+    C0.fare(by('carriage:solitude'), by('carriage:thalmorembassy')) === 10 &&
+    C0.fare(by('carriage:whiterun'), by('carriage:riften')) === 20);
+  yes('a ferry to a landing is 10 like any ferry', C0.fare(by('coast:dawnstar'), by('coast:frostflowlighthouse')) === 10 &&
+    C0.fare(by('solstheim:ravenrock'), by('solstheim:northshorelanding')) === 10 &&
+    C0.fare(by('honrich:riften'), by('honrich:honeyside')) === 10);
   yes('a ride off its own line is not on the list',
     C0.fare(by('carriage:whiterun'), by('coast:solitude')) === 0 &&
     C0.fare(by('coast:windhelm'), by('maiden:ravenrock')) === 0);
@@ -180,7 +221,10 @@ if (C0) {
     return C0.destinations(c).every(function (d) { return d.world !== C0.SOLSTHEIM; });
   }));
   yes('a ferryman goes to every other stop on his water',
-    C0.destinations(by('coast:dawnstar')).length === 6 && C0.destinations(by('honrich:riften')).length === 2);
+    C0.destinations(by('coast:dawnstar')).length === 8 && C0.destinations(by('honrich:riften')).length === 3 &&
+    C0.destinations(by('ilinalta:guardianstones')).length === 4 && C0.destinations(by('solstheim:ravenrock')).length === 4);
+  yes('every carriage driver goes to every village and home as well as the other eight holds',
+    carriages.every(function (c) { return C0.destinations(c).length === 27; }));
 
   // ------------------------------------------------------------ riding
   const ME = 0x14, PID = 7;
@@ -273,14 +317,28 @@ if (C0) {
     const fares = (v.stops || []).map(function (s) { return s.name + ' ' + s.fare; });
     yes('/ride alone at a driver opens his panel of stops and fares, and says nothing in the chat', offer === '' &&
       v.open === true && v.driver === 'Bjorlam' && v.what === 'the carriage' && v.from === 'Whiterun' &&
-      fares.indexOf('Solitude 20') >= 0 && fares.indexOf('Winterhold 20') >= 0 && fares.length === 8 &&
+      fares.indexOf('Solitude 20') >= 0 && fares.indexOf('Winterhold 20') >= 0 && fares.length === 27 &&
+      fares.indexOf('Riverwood 10') >= 0 && fares.indexOf('Rorikstead 10') >= 0 && fares.indexOf('Karthwasten 20') >= 0 &&
       !fares.some(function (f) { return /^Whiterun/.test(f); }) && v.ledger === 'Whiterun');
     yes('a stop on another line is refused', /No ride to raven rock/.test(say(r, '/ride raven rock')) &&
-      /No ride to heartwood/.test(say(r, '/ride heartwood')));
-    yes('a stop the list does not have is refused', /No ride to/.test(say(r, '/ride riverwood')) &&
-      /No ride to/.test(say(r, '/ride thalmor embassy')));
+      /No ride to honeyside/.test(say(r, '/ride honeyside')));
+    yes('a stop the list does not have is refused', /No ride to/.test(say(r, '/ride high hrothgar')) &&
+      /No ride to/.test(say(r, '/ride icewater jetty')));
     yes('and none of that took gold or moved anybody', gold(me) === 100 && moves(r).length === 0 && !r.L.funds.whiterun);
     yes('the start of one name is enough', /ride to Markarth/.test(say(r, '/ride mark')));
+  }
+
+  // A village in the same hold.
+  {
+    const r = rig();
+    const me = person(r, by('carriage:whiterun'), 15, 10);
+    const line = say(r, '/ride riverwood');
+    const t = by('carriage:riverwood');
+    yes('Whiterun\'s carriage to Riverwood is 10 onto Whiterun\'s ledger', line === 'You pay the 10 gold fare and ride to Riverwood.' &&
+      r.L.funds.whiterun === 10 && gold(me) === 5);
+    yes('and puts you down on the mod\'s Riverwood marker', moves(r).length === 1 && me.cell === t.world && me.pos.join() === t.pos.join());
+    yes('nobody drives from Riverwood, so there is no ride back from where you landed', /Walk up to a carriage/.test(say(r, '/ride whiterun')) &&
+      gold(me) === 5);
   }
 
   // Solitude's carriage is Solitude's.
@@ -324,7 +382,7 @@ if (C0) {
     yes('a press on somebody who is not a driver says nothing', say(r, '/ride e ' + OTHER.toString(16)) === '');
     const offer = say(r, '/ride e ' + DRIVER.toString(16));
     yes('a press on the driver opens his panel', offer === '' && !!me.view && me.view.open === true &&
-      me.view.driver === 'Bjorlam' && me.view.stops.length === 8);
+      me.view.driver === 'Bjorlam' && me.view.stops.length === 27);
     yes('and then the ride goes from him', /ride to Solitude/.test(say(r, '/ride solitude')) && r.L.funds.whiterun === 20 && gold(me) === 40);
 
     const r2 = rig();
@@ -446,7 +504,7 @@ if (C0) {
   const listSrc = slice(front, '  const RIDE_DRIVER_BASES = [', '\n  ];');
   let list = null;
   try { list = listSrc ? new Function('return ' + listSrc.slice(listSrc.indexOf('['))) () : null; } catch (e) { list = null; }
-  const want = (C0 ? C0.STOPS : []).map(function (s) {
+  const want = (C0 ? C0.STOPS.filter(function (s) { return !!s.driver; }) : []).map(function (s) {
     const bits = s.base.split(':');
     return bits[1] + ':' + parseInt(bits[0], 16);
   }).sort();
