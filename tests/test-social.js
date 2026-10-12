@@ -665,7 +665,10 @@ if (social && trade) {
     // Nothing open: no panel claim and no menu (#1739 hides the prompt under
     // them; test-1739-look-covered.js has those cases).
     'let nearAt=0, lookingAt="", lookingSig="", lookCover=""; const NEAR_EVERY=1; ' +
-    'function anyClaim() { return false; } function lookCoveredBy() { return ""; } ' + FRONT.slice(start,end+8) + '; return function(fn){ fn(); return lookingAt; };');
+    // The game's own prompt, written down per new look (#2473), is
+    // tests\test-2473-look-prompt.js's.
+    'function anyClaim() { return false; } function lookCoveredBy() { return ""; } ' +
+    'function gamePromptSaid() { return ""; } ' + FRONT.slice(start,end+8) + '; return function(fn){ fn(); return lookingAt; };');
   const next = run(sp, (label, fn) => fn, client, () => client.thornswoodNear, row => { prompt=row; }, () => {});
   target = next(update);
   yes('D3: a differently mapped client actor arms the prompt with its server ID', target === 'ff000004' && !!prompt && prompt.n === 'Second');
