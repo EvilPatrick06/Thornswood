@@ -90,6 +90,7 @@ names. No script reads them. `THIRD-PARTY.md` and
 - `creation-clothes-provenance.md`: the client and SkyrimPlatformImpl.dll
   built for the starting clothes in character creation (fork commit
   bd1d80e2, 3 October).
+- `prod-parity.json`: what the VPS should look like (which ports listen where and as which program, each task's account and triggers, the services' accounts, which live files must match which repository file, the TLS margin, environment variables that must not be set) and the differences agreed as intentional, each with its reason. `scripts\vps\Check-ProdParity.ps1` compares the box against it; no secret belongs in it (issue #2165).
 - `merchant-runtime-provenance.md`: the server module built for merchant
   settlement, and why the six client files kept their e6534129 bytes (fork
   commit a247ef27, 4 October).
