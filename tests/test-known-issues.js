@@ -245,26 +245,14 @@ yes('help.md is there', help !== null);
   yes('nothing in it is roadmap work', bad.length === 0);
 }
 
-// ---------------------------------------------------- the hub's own board
-/* The hub keeps its own copy of the table in board.json under "known". Its
+// ---------------------------------------------------- one copy only (#2414)
+/* The hub kept its own copy of this table in board.json under "known". Its
    intro said "Permanent limits of how this server works. None are bugs, none
-   are changing." over the same NPC rows. */
-{
-  const k = board && board.known;
-  yes('board.json has the hub copy of Known Issues', !!(k && k.sections));
-  const intro = String((k && k.intro) || '');
-  const rows = [];
-  ((k && k.sections) || []).forEach(function (s) {
-    const first = (s.columns || [])[0];
-    (s.rows || []).forEach(function (r) {
-      if (first) { rows.push(String((r.cells || {})[first.id] || '')); }
-    });
-  });
-  const onIt = rows.filter(function (row) { return workFor(row).length > 0; });
-  yes('its intro does not promise permanence over roadmap work',
-      !(PROMISE.test(intro) && onIt.length));
-  yes('and says the roadmap has some of it', !onIt.length || /roadmap/i.test(intro));
-}
+   are changing." over the same NPC rows, and after the hub stopped editing
+   boards (#433) nothing showed it or fixed it: it still said NPCs stand
+   still with nobody near after #504. It is gone; tests/test-2414-known-one-copy.js
+   keeps it gone. */
+yes('board.json has no second copy of Known Issues', !(board && board.known));
 
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');

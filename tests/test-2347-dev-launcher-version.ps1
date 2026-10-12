@@ -236,6 +236,21 @@ try {
     Yes ("8 main ships 1.2.4 with dev on 1.2.3.3: " + (Said $r)) (Chose $r '1.2.4' $true)
     $r = Run @{ Dev = $false; Aligned = $true; Current = '1.2.3'; Inputs = $M; Main = "1.2.3|$M"; DevFeed = "1.2.3.3|$D"; Ever = @('1.2.3.3') }
     Yes ("8 a main Ship of 1.2.3 again keeps main's launcher: " + (Said $r)) (Chose $r '1.2.3' $false)
+    # ---- 9. a main Ship cannot sign CI's exe again under main's own number --
+    # The case Publish-Update's old WARNING was still reachable by: main's feed
+    # offers 1.2.3, and a main Ship of 1.2.3 whose launcher sources are not the
+    # ones it was built from would sign CI's exe again and send it as 1.2.3.
+    $r = Run @{ Dev = $false; Aligned = $true; Current = '1.2.3'; Inputs = $D; Main = "1.2.3|$M"; DevFeed = "1.2.3.3|$D"; Ever = @('1.2.3.3') }
+    Yes ("9 a main Ship of 1.2.3 from other launcher sources than main's 1.2.3 stops before the exe is fetched or signed: " + (Said $r)) ($r -is [string] -and $r -like 'STOP.*1.2.3 is already out*Bump-Version*')
+    $r = Run @{ Dev = $false; Aligned = $true; Current = '1.2.3'; Inputs = $M; Main = "1.2.3|$M"; DevFeed = "1.2.3.3|$D"; Ever = @('1.2.3.3'); Rebuild = $true }
+    Yes ("9 -RebuildLauncher from main's own sources goes, since it is the same launcher: " + (Said $r)) (Chose $r '1.2.3' $true)
+    $r = Run @{ Dev = $false; Aligned = $true; Current = '1.2.3'; Inputs = $D; Main = "1.2.3|$M"; DevFeed = "1.2.3.3|$D"; Ever = @('1.2.3.3'); ModsOnly = $true }
+    Yes ("9 -ModsOnly sends no launcher, so it goes: " + (Said $r)) (Chose $r '1.2.3' $false)
+    $r = Run @{ Dev = $false; Aligned = $true; Current = '1.2.3'; Inputs = $D; Main = "1.2.2|$M"; DevFeed = "1.2.2.3|$D"; Ever = @('1.2.2.3') }
+    Yes ("9 main moved to 1.2.3 and not shipped yet goes: " + (Said $r)) (Chose $r '1.2.3' $true)
+    $r = Run @{ Dev = $false; Aligned = $true; Current = '1.2.3'; Inputs = $D; Main = "1.2.3|"; DevFeed = "1.2.3.3|$D"; Ever = @('1.2.3.3') }
+    Yes ("9 a feed launcher with no fingerprint is not known to be this one, so it stops: " + (Said $r)) ($r -is [string] -and $r -like 'STOP.*1.2.3 is already out*')
+    Yes '9 the main check is in the lifted choice, after the dev one' ($region.Contains("if (-not `$Dev -and -not `$ModsOnly) {") -and $region.Contains('Assert-DevVersionSelection $target $current $true @() @($mainNow) $LauncherInputs'))
     Yes '8 main''s 1.2.4 is offered to a launcher on 1.2.3.3' (IsNewer '1.2.4' '1.2.3.3')
     Yes '8 main''s 1.2.3 is never offered over a dev 1.2.3.1' (-not (IsNewer '1.2.3' '1.2.3.1'))
     Yes '8 and a dev 1.2.3.1 is never offered over main''s 1.2.4' (-not (IsNewer '1.2.3.1' '1.2.4'))
