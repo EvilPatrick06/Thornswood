@@ -1773,7 +1773,9 @@
   var BAND_WORDS = { fine: 'fine', weary: 'weary', bad: 'bad', spent: 'spent' };
   var REST_WORDS = {
     sit: 'sitting', campfire: 'sitting by a fire', rough: 'in a bed nobody can lend you',
-    camp: 'in a bed by a fire', inn: 'in a bed you may use', bed: 'in your own bed', bedroll: 'in a bedroll'
+    camp: 'in a bed by a fire', inn: 'in a bed you may use', bed: 'in your own bed', bedroll: 'in a bedroll',
+    // An inn or a temple nobody holds (#2246).
+    common: 'in an inn or temple bed nobody holds', commonfire: 'in an inn or temple bed by a fire'
   };
   var PLACE_WORDS = {
     indoors: 'indoors', outdoors: 'out of doors', rain: 'out in the rain', snow: 'out in the snow',

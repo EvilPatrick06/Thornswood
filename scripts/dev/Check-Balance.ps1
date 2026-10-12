@@ -381,8 +381,9 @@ Head 'The chain: what a recipe asks for against what it is ranked at'
 # two causes, each read off the row itself, or it is a new imbalance nobody
 # has looked at and this script fails on it:
 #   kept         its rank is named outright in RECIPE_RANK, with the reason on
-#                the row. The four charcoal grades: burnCharcoal hands coke to a
-#                master charburner alone, so the menu has to say the same. The
+#                the row. The four charcoal grades: coke is a master
+#                charburner's alone, and the kiln's menu is the only place
+#                charcoal is made since #2337, so the row says it. The
 #                kept smelt rows, novice smith work whatever the ore costs
 #                (#1391, #1400). And the thirteen college book staves, each at
 #                its spell's rank below a master miner's Heart Stone (#1622).

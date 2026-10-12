@@ -269,7 +269,8 @@ async function until(cond, ms) {
   while (Date.now() < end) { if (cond()) return true; await wait(25); }
   return false;
 }
-const modlog = () => { try { return fs.readFileSync(path.join(PRIV, 'moderation.log'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)); } catch (e) { return []; } };
+// The game's staff log is in for-bot beside private, which the bot reads by a rule on the folder (#2321).
+const modlog = () => { try { return fs.readFileSync(path.join(gameDir, 'for-bot', 'moderation.log'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)); } catch (e) { return []; } };
 const hublog = () => { try { return fs.readFileSync(path.join(DATA, 'for-bot', 'moderation.log'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)); } catch (e) { return []; } };
 
 function braceGrab(text, head) {
@@ -672,6 +673,8 @@ async function adminRoleOnly() {
     yes('moderation.log says ban, the character, who did it, until and why',
         log.length && log[log.length - 1].did === 'ban' && log[log.length - 1].who === 2002 &&
         log[log.length - 1].byName === 'Aela' && /until .* UTC: stealing from the market/.test(log[log.length - 1].why));
+    yes('it is in for-bot beside private, and private holds no staff log (#2321)',
+        fs.existsSync(path.join(gameDir, 'for-bot', 'moderation.log')) && !fs.existsSync(path.join(PRIV, 'moderation.log')));
 
     w = loadStaff();
     staffLine(w, '/banaccount Cara 1d alt accounts');

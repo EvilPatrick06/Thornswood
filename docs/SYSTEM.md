@@ -16,7 +16,7 @@ Developer-Guide.md is the long form and the rules.
 | Any developer's machine that can sign | The repo, the SkyMP fork build, `Ship.ps1`, `Publish-*`, `Deploy-*`, `Install-*` | Developers. Any of them may ship dev and main (Developer-Guide.md) |
 | The VPS, 192.135.112.23, Windows, user Administrator | Both game servers, both voice services, the site, Caddy, the bot, the watchdog, the nightly backup | Reached over ssh by the scripts; nobody edits it by hand |
 
-<!-- VPS address: "address" in scripts/vps/vps.json, which the scripts that reach the box over ssh read through `Vps.ps1:Get-ThornswoodVpsAddress`; launcher/app/Config.cs:256 -->
+<!-- VPS address: "address" in scripts/vps/vps.json, which the scripts that reach the box over ssh read through `Vps.ps1:Get-ThornswoodVpsAddress`; `launcher/app/Config.cs:ServerAddress` -->
 
 ## The picture
 
@@ -70,18 +70,18 @@ flowchart LR
 
 The launcher lives at `<drive>:\Thornswood\Launcher\Thornswood.exe` (C: on
 most machines). Everything else hangs off that root, which is the folder above
-the exe (`launcher/app/Paths.cs:42`):
+the exe (`launcher/app/Paths.cs:Path.GetDirectoryName(exeDir)`):
 
 | Folder or file | What it is | From |
 | --- | --- | --- |
-| `Thornswood\Launcher` | The exe, the WebView2 loader, the voice host page | `Paths.cs:53`, `DevBuild.cs:72` |
-| `Thornswood\Game` | Thornswood's own Skyrim, built by the launcher from the Steam copy and what Vortex deployed; big files are hard links, anything rewritten in place is a copy | `Paths.cs:44`, Developer-Guide.md "One Skyrim of its own" |
-| `Thornswood\Profile` | `launcher.log`, `applied.txt` (packs already in), `Packs\*.files` (what each pack wrote), `Default` (reference plugin list), `Keep` | `Paths.cs:54-66` |
-| `Thornswood\config.json` | The launcher's settings. Server address, ports, update repo and branch; several are overwritten from the feed (see FEED.md) | `Paths.cs:66`, `Config.cs:133-147` |
-| `Thornswood-DevBuild\` | The dev build: same exe, `Channel` and `UpdateBranch` set to `dev`, server port 7787, voice port 7789, voice address with `-dev` on the end. Installed from the main launcher's Play page Server card; staff roles only | `DevBuild.cs:26-27,49-52,126-130` |
+| `Thornswood\Launcher` | The exe, the WebView2 loader, the voice host page | `Paths.cs:LauncherDir = Path.Combine(Root, "Launcher")`, `DevBuild.cs:Launcher\\Thornswood.exe` |
+| `Thornswood\Game` | Thornswood's own Skyrim, built by the launcher from the Steam copy and what Vortex deployed; big files are hard links, anything rewritten in place is a copy | `Paths.cs:string own = Path.Combine(Root, "Game")`, Developer-Guide.md "One Skyrim of its own" |
+| `Thornswood\Profile` | `launcher.log`, `applied.txt` (packs already in), `Packs\*.files` (what each pack wrote), `Default` (reference plugin list), `Keep` | `Paths.cs:ProfileDir = Path.Combine(Root, "Profile")`, `Paths.cs:AppliedFile = Path.Combine(ProfileDir, "applied.txt")`, `Paths.cs:PacksDir = Path.Combine(ProfileDir, "Packs")`, `Paths.cs:Golden = Path.Combine(ProfileDir, "Default")` |
+| `Thornswood\config.json` | The launcher's settings. Server address, ports, update repo and branch; several are overwritten from the feed (see FEED.md) | `Paths.cs:CfgFile = Path.Combine(Root, "config.json")`, `Config.cs:ServerAddress`, `Config.cs:ServerPort`, `Config.cs:UpdateBranch`, `Config.cs:UpdateFeedUrl` |
+| `Thornswood-DevBuild\` | The dev build: same exe, `Channel` and `UpdateBranch` set to `dev`, server port 7787, voice port 7789, voice address with `-dev` on the end. Installed from the main launcher's Play page Server card; staff roles only | `DevBuild.cs:DevPort`, `DevBuild.cs:DevVoicePort`, `DevBuild.cs:DevVoiceUrl`, `DevBuild.cs:Root`, `DevBuild.cs:dev.Channel = "dev"`, `DevBuild.cs:dev.UpdateBranch = "dev"` |
 
-With no `Game` folder the launcher reads the Steam copy (`Paths.cs:51`), but
-Play will not start from it (Developer-Guide.md:32).
+With no `Game` folder the launcher reads the Steam copy (`Paths.cs:Game = !Collection ? own : OwnFirst ? Payload : steam`), but
+Play will not start from it (`Developer-Guide.md:The launcher will not Play from the Steam copy itself`).
 
 **Vortex and the Nexus collection.** The mods come from the Nexus collection
 (`collectionUrl` in the feed,
@@ -94,7 +94,7 @@ the Steam copy's game plus exactly the files Vortex's record lists.
 `engine\skymp`, recorded in `records\client-build.json`, and shipped both inside
 packs and as its own asset named in the feed's `clientRuntime`
 (`Publish-Update.ps1:the client runtime, as an asset with an address`,
-`Publish-Update.ps1:Set-Prop $doc 'clientRuntime'`, `ClientRuntime.cs:261-269`).
+`Publish-Update.ps1:Set-Prop $doc 'clientRuntime'`, `ClientRuntime.cs:Heal`).
 
 ## Updates, the installer and the site
 
@@ -119,33 +119,33 @@ packs and as its own asset named in the feed's `clientRuntime`
   on the VPS (`Publish-Installer.ps1:$Root = 'C:/Thornswood-Docs'`,
   `Publish-Installer.ps1:$Root/files/`). The setup program asks the
   site's `/api/payload` for `Thornswood-Setup.zip` (or a leftover stamped tip), its size and
-  sha256 (`site/server.js:2247-2275`); people get it from
-  `https://thornswood.net/downloads` (`server.js:2214-2215`). A dev release
+  sha256 (`site/server.js:route === '/api/payload'`); people get it from
+  `https://thornswood.net/downloads` (`site/server.js:route === '/downloads'`). A dev release
   never touches the installer (`Ship.ps1:dev release, the installer is not touched`).
 - **The site.** `site`, deployed by `Deploy-Docs.ps1` into
   `C:\Thornswood-Docs` (`Deploy-Docs.ps1:$Root = 'C:/Thornswood-Docs'`). Node
-  listens on 3001 (`server.js:34`) and, once `THORNSWOOD_DOCS_LOCAL=1` is set
+  listens on 3001 (`site/server.js:PORT`) and, once `THORNSWOOD_DOCS_LOCAL=1` is set
   by `Setup-Domain.ps1` (`Setup-Domain.ps1:SetEnvironmentVariable('THORNSWOOD_DOCS_LOCAL','1','Machine')`),
-  only on 127.0.0.1 (`server.js:38`). Caddy holds 80 and
+  only on 127.0.0.1 (`site/server.js:BIND`). Caddy holds 80 and
   443 for `thornswood.net` and `www.thornswood.net`, proxies `/voice/*` to
   7778, `/voice-dev/*` to 7789 and everything else to 3001
-  (`scripts/deploy/Caddyfile:40-51`). The live Caddyfile is
-  `C:\Thornswood-Caddy\Caddyfile` (`scripts/deploy/Caddyfile:4-6`). The site does
+  (`scripts/deploy/Caddyfile:handle_path /voice/*`, `scripts/deploy/Caddyfile:handle_path /voice-dev/*`, `scripts/deploy/Caddyfile:reverse_proxy 127.0.0.1:3001`). The live Caddyfile is
+  `C:\Thornswood-Caddy\Caddyfile` (`scripts/deploy/Caddyfile:The live one is C:\Thornswood-Caddy\Caddyfile on the VPS`). The site does
   Discord sign in, the public pages from `data\site\*.md`, news, uploads, the
   admin hub, and the door's lists.
 
 ## The door
 
 No password decides who gets into the game; the server runs in offline mode
-(Developer-Guide.md:279-290). Each game server's `gamemode.js` reads
+(`Developer-Guide.md:offline mode SkyMP lets a client connect as whatever profile id it names`). Each game server's `gamemode.js` reads
 `private\door.json` (the site address and the site's `botKey`, named here by
 location only) and fetches the allowed list every five minutes into
-`private\allowed.json` (`gamemode.js:11270-11276,11392`). The live server
+`private\allowed.json` (`game/gamemode.js:path.join(privDir, 'allowed.json')`, `game/gamemode.js:refresh`). The live server
 asks `https://thornswood.net/api/allowed`; the dev server's `door.json` names
 `https://thornswood.net/dev`, so it asks `/dev/api/allowed`, which lists Owner
-and Dev only (`server.js:2921-2922`, Developer-Guide.md:35). The door turns
+and Dev only (`site/server.js:route === '/dev/api/allowed'`, `site/server.js:The admin roles (access.admin: Owner and Dev unless config.json says`). The door turns
 somebody away only when `allowed.json` says `"enforce": true`
-(`gamemode.js:11008-11010`), which `Set-Door.ps1 -Enforce` sets.
+(`game/gamemode.js:enforce: doc.enforce === true`), which `Set-Door.ps1 -Enforce` sets.
 
 ## Checking the box matches this page
 
@@ -162,10 +162,10 @@ when its check fails, three times an hour at most
 | --- | --- | --- | --- | --- | --- |
 | Game server (live) | `C:\Thornswood-Server` | UDP and TCP 7777, resources TCP 3000 | `Thornswood Server` | `Deploy-Gamemode.ps1` builds it locally, `Deploy-Server.ps1` sends it; a gamemode alone from any machine, onto the server build running, `Deploy-Server.ps1 -GamemodeOnly`; first install `Install-ThornswoodServer.ps1` | `Deploy-Server.ps1:$Root = 'C:/Thornswood-Server'`, `Deploy-Server.ps1:$Task = 'Thornswood Server'`, `Bootstrap-VPS.ps1:$GamePort = 7777`, `Bootstrap-VPS.ps1:$ResourcePort = 3000`, `Install-ThornswoodServer.ps1:$TaskName = 'Thornswood Server'` |
 | Dev game server | `C:\Thornswood-Server-Dev` | UDP and TCP 7787, resources TCP 7788 | `Thornswood Dev Server` | Made once by `vps-dev-instance.ps1` (runs on the VPS); gamemode by `Deploy-DevGamemode.ps1` | `vps-dev-instance.ps1:$Dev = 'C:\Thornswood-Server-Dev'`, `vps-dev-instance.ps1:$devPort = 7787`, `vps-dev-instance.ps1:Port = ($devPort + 1)`, `vps-dev-instance.ps1:Register-ScheduledTask -TaskName 'Thornswood Dev Server'`, `Deploy-DevGamemode.ps1:$Root = 'C:/Thornswood-Server-Dev'` |
-| Voice (live) | `C:\Thornswood-Voice` | TCP 7778 on 127.0.0.1 only, and `/voice` through Caddy | `Thornswood Voice` | `Install-Voice.ps1` | `Install-Voice.ps1:$Root = 'C:\Thornswood-Voice'`, `Install-Voice.ps1:$Port = 7778`, `Install-Voice.ps1:$Bind = '127.0.0.1'`, `Install-Voice.ps1:$TaskName = 'Thornswood Voice'`, `voice-server.js:28` |
-| Dev voice | `C:\Thornswood-Voice-Dev` | TCP 7789 on 127.0.0.1 only, and `/voice-dev` through Caddy | `Thornswood Dev Voice` | Made by `vps-dev-instance.ps1`; `Install-Voice.ps1 -Root C:\Thornswood-Voice-Dev -Port 7789 -TaskName 'Thornswood Dev Voice'` | `vps-dev-instance.ps1:$DevVoice = 'C:\Thornswood-Voice-Dev'`, `vps-dev-instance.ps1:$devVoicePort = 7789`, `vps-dev-instance.ps1:THORNSWOOD_VOICE_BIND=127.0.0.1`, `vps-dev-instance.ps1:Register-ScheduledTask -TaskName 'Thornswood Dev Voice'`, `voice/README.md:57-64` |
-| Site | `C:\Thornswood-Docs` | 127.0.0.1:3001 | `Thornswood Docs` | `Deploy-Docs.ps1`, `-Site` for the public pages | `Deploy-Docs.ps1:$Root = 'C:/Thornswood-Docs'`, `Deploy-Docs.ps1:$Task = 'Thornswood Docs'`, `Deploy-Docs.ps1:$Port = 3001`, `server.js:34-38` |
-| Caddy | `C:\Thornswood-Caddy` | 80, 443 | `Thornswood Web` (at startup and every five minutes) | `Setup-Domain.ps1`, which sends `scripts\deploy\Caddyfile` as the live one on every run without `-TaskOnly` (issue #543) | `Setup-Domain.ps1:$CaddyDir = 'C:/Thornswood-Caddy'`, `Setup-Domain.ps1:Caddyfile written, from scripts\deploy\Caddyfile`, `Setup-Domain.ps1:Register-ScheduledTask -TaskName 'Thornswood Web'`, `Setup-Domain.ps1:New-ScheduledTaskTrigger -AtStartup`, `Setup-Domain.ps1:-RepetitionInterval (New-TimeSpan -Minutes 5)`, `scripts/deploy/Caddyfile:4-7` |
+| Voice (live) | `C:\Thornswood-Voice` | TCP 7778 on 127.0.0.1 only, and `/voice` through Caddy | `Thornswood Voice` | `Install-Voice.ps1` | `Install-Voice.ps1:$Root = 'C:\Thornswood-Voice'`, `Install-Voice.ps1:$Port = 7778`, `Install-Voice.ps1:$Bind = '127.0.0.1'`, `Install-Voice.ps1:$TaskName = 'Thornswood Voice'`, `voice/voice-server.js:BIND` |
+| Dev voice | `C:\Thornswood-Voice-Dev` | TCP 7789 on 127.0.0.1 only, and `/voice-dev` through Caddy | `Thornswood Dev Voice` | Made by `vps-dev-instance.ps1`; `Install-Voice.ps1 -Root C:\Thornswood-Voice-Dev -Port 7789 -TaskName 'Thornswood Dev Voice'` | `vps-dev-instance.ps1:$DevVoice = 'C:\Thornswood-Voice-Dev'`, `vps-dev-instance.ps1:$devVoicePort = 7789`, `vps-dev-instance.ps1:THORNSWOOD_VOICE_BIND=127.0.0.1`, `vps-dev-instance.ps1:Register-ScheduledTask -TaskName 'Thornswood Dev Voice'`, `voice/README.md:the dev one in` |
+| Site | `C:\Thornswood-Docs` | 127.0.0.1:3001 | `Thornswood Docs` | `Deploy-Docs.ps1`, `-Site` for the public pages | `Deploy-Docs.ps1:$Root = 'C:/Thornswood-Docs'`, `Deploy-Docs.ps1:$Task = 'Thornswood Docs'`, `Deploy-Docs.ps1:$Port = 3001`, `site/server.js:PORT`, `site/server.js:BIND` |
+| Caddy | `C:\Thornswood-Caddy` | 80, 443 | `Thornswood Web` (at startup and every five minutes) | `Setup-Domain.ps1`, which sends `scripts\deploy\Caddyfile` as the live one on every run without `-TaskOnly` (issue #543) | `Setup-Domain.ps1:$CaddyDir = 'C:/Thornswood-Caddy'`, `Setup-Domain.ps1:Caddyfile written, from scripts\deploy\Caddyfile`, `Setup-Domain.ps1:Register-ScheduledTask -TaskName 'Thornswood Web'`, `Setup-Domain.ps1:New-ScheduledTaskTrigger -AtStartup`, `Setup-Domain.ps1:-RepetitionInterval (New-TimeSpan -Minutes 5)`, `scripts/deploy/Caddyfile:an edit made on the box by hand is lost the next time it runs` |
 | Discord bot | `C:\Thornswood-Bot` | none | none: the Windows service `ThornswoodBot`, as `NT SERVICE\ThornswoodBot` (issue #465) | `Install-Bot.ps1`, `-CodeOnly` for the code and the card art | `Install-Bot.ps1`, `Bot-Service.ps1`, `BotService.cs` |
 | Watchdog | `C:\Thornswood-Watch` (`watch.ps1`, `watch.log`) | none | `Thornswood Watch`, every five minutes as SYSTEM | `Watch-Services.ps1 -Install` | `Watch-Services.ps1:$Root = 'C:\Thornswood-Watch'`, `Watch-Services.ps1:$Task = 'Thornswood Watch'`, `Watch-Services.ps1:schtasks /create /tn '$Task' /sc minute /mo 5 /ru SYSTEM` |
 | Nightly backup | `C:\Thornswood-Backup` (passphrase in `key.txt`) | none | `Thornswood Backup`, daily at 03:15 | `Install-Backup.ps1`; `Fetch-Backups.ps1` brings them down | `Install-Backup.ps1:$Root = 'C:\Thornswood-Backup'`, `Install-Backup.ps1:$keyFile = Join-Path $Root 'key.txt'`, `Install-Backup.ps1:$TaskName = 'Thornswood Backup'`, `Install-Backup.ps1:$At = '03:15'`, `Install-Backup.ps1:New-ScheduledTaskTrigger -Daily`, `vps-nightly-backup.ps1:$KeyFile = 'C:\Thornswood-Backup\key.txt'` |
@@ -178,11 +178,11 @@ command line for the bot (`Watch-Services.ps1:$checks`,
 which is hung or off Discord for ten minutes is down too, and is restarted by
 its service's name like one whose process is gone (issues #449 and #465,
 `Watch-Services.ps1:BotSilent`, `Watch-Services.ps1:$beatStale = 600`,
-`bot/bot.py:2408-2510`). From outside the box, the bot also pings an uptime
+`bot/bot.py:heartbeat`, `bot/bot.py:beat_write`). From outside the box, the bot also pings an uptime
 monitor every minute while it is on Discord, so a bot or a whole VPS that
 stops is noticed when One is off too: the address is `PING_URL` in
 `bot.env.json`, set by `Install-Bot.ps1 -SetPing`, and `bot/README.md` says
-how to make the check (issue #449, `bot/bot.py:2513-2618`). It also asks the site,
+how to make the check (issue #449, `bot/bot.py:uptime_ping`, `bot/bot.py:PING_URL`). It also asks the site,
 both game servers and both voice servers over HTTP, which it tells about and
 never restarts for, and checks the `Thornswood Backup` task's last result with
 a backup under 26 hours old, every build runner's service, and writes DISK LOW
@@ -194,7 +194,7 @@ it through the webhook in `alerts-webhook.txt` beside it
 (`Watch-Services.ps1:HealthProblem`, `Watch-Services.ps1:$tellOnly`,
 `Watch-Services.ps1:$diskLow = 20`, `Watch-Services.ps1:$diskCritical = 10`,
 `Watch-Services.ps1:Observe`, `Watch-Services.ps1:Deliver`,
-`bot/bot.py:1998-2098`).
+`bot/bot.py:watch_services`, `bot/bot.py:watch_alerts_due`).
 
 What the backup takes: the live server's `world`, `private`, `data`,
 `server-settings.json` and `gamemode.js`, and the same five from
@@ -277,11 +277,11 @@ The harnesses are `tests\test-deploy-swaps.ps1`,
 ## How the pieces talk
 
 - **Launcher to game server:** the SkyMP client connects to `serverAddress` and
-  `serverPort` from the feed, UDP 7777 live or 7787 dev (`Config.cs:256-257`,
-  `DevBuild.cs:26`).
+  `serverPort` from the feed, UDP 7777 live or 7787 dev (`Config.cs:ServerAddress`, `Config.cs:ServerPort`,
+  `DevBuild.cs:DevPort`).
 - **Game server to voice:** `gamemode.js` pushes positions five times a second
   to `127.0.0.1:<thornswoodVoicePort>` from its own `server-settings.json`,
-  falling back to 7778 (`gamemode.js:253-258,10641`,
+  falling back to 7778 (`game/gamemode.js:voicePort`, `game/gamemode.js:path: '/positions'`,
   `Install-Voice.ps1:five times a second, over loopback on the VPS`).
   `Deploy-DevGamemode.ps1` sets 7789 for dev (`Deploy-DevGamemode.ps1:$VoicePort = 7789`).
 - **Launcher to voice:** the voice page holds a WebSocket to `voiceUrl`
@@ -291,9 +291,9 @@ The harnesses are `tests\test-deploy-swaps.ps1`,
   (`Install-Voice.ps1:The audio itself goes straight between people`). The
   page and the game's chat each offer a join token of their own with the
   handshake, minted by the launcher for that one connection (#1337, #1322).
-- **Bot to site:** `/api/ticket` with the site's `botKey` (`bot.py:27,277`).
+- **Bot to site:** `/api/ticket` with the site's `botKey` (`bot/bot.py:KEY`, `bot/bot.py:SITE + '/api/ticket'`).
 - **Game server to site:** the door list (above) and `/api/roster`
-  (`gamemode.js:10900-10906`).
+  (`game/gamemode.js:'/api/roster'`).
 
 ## What runs on a developer's machine
 
@@ -308,7 +308,7 @@ change needs after a merge: Developer-Guide.md, "After a pull request is merged"
 
 ## Where the sources disagree
 
-- `DevBuild.cs:21-22` says both launchers share the one Skyrim, and
-  `DevBuild.cs:92` copies `developer.flag`. Developer-Guide.md:431-435 says the dev
-  build makes its own `<Root>-DevBuild\Game`, and Developer-Guide.md:180-182 says
-  nothing writes `developer.flag` since 25 September.
+None known. The two this section used to list now agree: the dev build
+makes its own `<Root>-DevBuild\Game` (`DevBuild.cs:Each build makes its own Game folder`,
+`Developer-Guide.md:let it make its own game folder`), and nothing copies or
+writes `developer.flag` (`DevBuild.cs:developer.flag is not copied`).

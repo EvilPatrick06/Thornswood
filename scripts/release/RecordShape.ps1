@@ -104,6 +104,10 @@ function Get-ThornswoodRecordProblems {
             elseif ([int64](Get-ThornswoodRecordProp $Doc 'people') -gt 1000) { $out += 'people is over 1000, the engine''s limit' }
             $s = Get-ThornswoodRecordProp $Doc 'staffSeats'
             if ($null -ne $s -and -not (Test-ThornswoodWhole $s 0)) { $out += 'staffSeats is there and not a whole number' }
+            # The most the voice service takes at once (#481); MaxOnline.ps1
+            # holds it to no fewer than the seats.
+            $v = Get-ThornswoodRecordProp $Doc 'voice'
+            if ($null -ne $v -and -not (Test-ThornswoodWhole $v 1)) { $out += 'voice is there and not a whole number above zero' }
         }
         'skyrim-pin' {
             # What Publish-Update writes into version.json and the launcher's

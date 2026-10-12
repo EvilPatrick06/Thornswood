@@ -10,7 +10,7 @@ The JSON files Thornswood's release, deploy, game, site, bot and voice trust, wh
 | --- | --- | --- | --- | --- |
 | `records/server-build.json` | New-ServerBuildRecord.ps1 (Build-Server) | Deploy-Server, Deploy-DevGamemode, Deploy-Gamemode, Export-ServerPayload, Publish-Server, Install-ThornswoodServer (on the box), ServerOrder, Check-ShipReady | High: every server deploy is held to it | **held** (sha256, bytes, source.commit, files map, lightPlugins) |
 | `records/client-build.json` | New-ClientBuildRecord.ps1 | Ship, Sync-Client, Publish-Update, Build-Launcher (into the launcher), launcher ClientRuntime/OwnGame | High: every client and Ship is held to it | **held** (forkCommit, files map) |
-| `records/most-online.json` | by hand | MaxOnline.ps1 (Deploy-Gamemode, Deploy-DevGamemode, Publish-Server, Publish-Update), site | High: the engine's seat count; over 1000 stops the server starting | **held** (people 1 to 1000, staffSeats) |
+| `records/most-online.json` | by hand | MaxOnline.ps1 (Deploy-Gamemode, Deploy-DevGamemode, Publish-Server, Publish-Update, Install-Voice), site | High: the engine's seat count; over 1000 stops the server starting; voice under the seats keeps seated people out of voice and chat | **held** (people 1 to 1000, staffSeats, voice not under the seats) |
 | `records/collection-plugins.json` | New-CollectionPluginRecord.ps1 | CollectionPlugins.ps1 (Deploy-Server, Deploy-DevGamemode -LoadOrder) | High: full deploys refuse on it (#2019) | **held** (version 1 required, plugins rows) |
 | `records/skyrim-pin.json` | by hand | Publish-Update (into version.json), launcher Downgrade/Config | High: the pinned game build | **held** (build, appId, exe sizes, three depots as digit strings; Publish-Update keeps the feed's pin on a problem); Check-Records holds it to skyrim-files' build; test-skyrim-pin.ps1 (agreement) |
 | `records/ui-gone.json` | by hand | Ship-Rules, Build-Launcher, launcher OwnGame | Medium: what every pack deletes | **held** (daedric name to sha256, unused names); Ship-Rules and Build-Launcher stop on a problem |
@@ -26,8 +26,8 @@ The JSON files Thornswood's release, deploy, game, site, bot and voice trust, wh
 | File | Written by | Read by | Risk | Check today |
 | --- | --- | --- | --- | --- |
 | `server-settings.json` (built, and on each server) | Deploy-Gamemode, Export-ServerPayload; ServerSettings.ps1 carries settings on the box | the engine, Deploy-Server, Deploy-DevGamemode, Swap (on the box), site | High: port, load order, seats | named on a local bad read (#2154); box-side reads unchecked |
-| `thornswood-build.json` (build stamp) | BuildStamp.ps1 | Deploy-Server, Deploy-DevGamemode | Medium | named on a bad read (#2154) |
-| `deployed-build.json` | DeployedBuild.ps1 (on the box) | site | Low | none |
+| `thornswood-build.json` (build stamp) | BuildStamp.ps1 | Deploy-Server, Deploy-DevGamemode, Publish-Server (held to the payload's gamemode, #459) | Medium | named on a bad read (#2154) |
+| `deployed-build.json` | DeployedBuild.ps1 (on the box), from Deploy-Server and Publish-Server | site | Low | none |
 | `version.json`, `published.json` (feed store) | Publish-Update, Publish-Server, Rollback-Feed, Scrub-Feed | every launcher, site | High: what every launcher installs | named on a bad read (#2119) |
 | launcher `config.json` | launcher, Set-Server, Set-Collection | launcher, Deploy-Gamemode, Ship-Rules | Medium | named on a bad read; Deploy-Gamemode falls back |
 
@@ -42,8 +42,45 @@ The JSON files Thornswood's release, deploy, game, site, bot and voice trust, wh
 | `news.json`, `page-versions.json` | Publish-News, Set-DevNews, site | site | Low | named on a bad read (#2119) |
 | `online.json`, `roster.json`, `heartbeat.json` | game server, gamemode | site, launcher, Deploy-Server (on the box) | Medium | none |
 | `joins.json`, `commands-synced.json`, `bot.env.json` | bot, Install-Bot | bot | Medium; `bot.env.json` holds a secret and is never in the repository | none |
-| `thornswood-deploy.json` | Install-Bot, Install-Voice | site | Low | none |
+| `thornswood-deploy.json` | Install-Bot, Install-Voice, Deploy-Server, Deploy-DevGamemode, Publish-Server (Artifact.ps1) | site, game servers, Publish-Server -PutBack | Low | a put-back holds it to the gamemode it came back with (#459) |
 
+## Version changes and rollback (#2180, #2176)
+
+How each kind of JSON state takes a format change today, and how it is put back. This is the design #2180 asks for before any data change, and the versioning, atomic write and locking comparison #2176 asks for. Nothing here changes a file or a script.
+
+### What a version change does today
+
+- **Held records** (the eight in `scripts\release\RecordShape.ps1`): each kind lists the versions this checkout understands, and every one is `@(1)` today. Only `collection-plugins.json` must say its version (`MustSay`); the other seven predate a version field and are read as version 1 when it is missing. A record that says a version the checkout does not list is refused with "update the checkout, or the record came from somewhere else". So a version 2 is a two-step change: first a checkout that lists both 1 and 2 goes out, then a writer starts writing 2. Going back is the same steps in reverse.
+- **Committed records with no check** (`steam-build.json`, `update-creation-club.json`, `upstream-not-taken.json`): no version field and no check. A format change is whatever the writer and reader agree on in the same commit.
+- **Built and deployed state, site, bot and voice state**: no version field anywhere. Readers take what is there; a file that will not parse is named on a bad read where the table above says so, and on the site falls back to its empty default (`jsonFile` in `site/server.js` logs it).
+
+### How each is put back
+
+| State | Rollback today |
+| --- | --- |
+| Committed records (`records/*.json`) | Git: revert the commit that changed the record. The writers (New-ServerBuildRecord, New-ClientBuildRecord, New-SkyrimFilesRecord) overwrite the file in the working tree, so an unwanted rewrite is undone with git before it is committed. |
+| `version.json`, `published.json` (feed store) | `Rollback-Feed.ps1` (#442): the feed keeps the last thirty release records, and a rollback builds one ordinary pack from the difference between the current release's record and the one asked for, put on the end of the feed. Putting the channel forward again is the same command pointed at the later release. |
+| Server and service files on the VPS, including `server-settings.json` and the build stamp | `Swap.ps1` (#446): the new files go into `.stage-<stamp>` and are checked there; what they replace goes into `.prev-<stamp>`. A failed rename or a server that does not answer puts the old files back by itself (SWAP ROLLED BACK); `-PutBack` puts the newest `.prev` folder back later, and the record that came back with it is restored. |
+| Site documents (`.md` through `writeDoc`) | One `.bak` copy of the previous text, taken before each write. |
+| Site, bot and voice JSON | No kept copy. A bad write or a bad value is put back by hand or from a box backup. |
+
+### Versioning, atomic writes and locking, compared
+
+| Where | Versioning | Atomic write | Locking or clash check |
+| --- | --- | --- | --- |
+| Held records | Version list per kind in RecordShape.ps1; unknown version refused | No: `[IO.File]::WriteAllText` straight onto the file. A torn write is caught by the next read (`ConvertFrom-ThornswoodJson` names the file) and git holds the last good copy | None needed: one writer, on one machine, then a commit |
+| `version.json`, `published.json` | None | No: `WriteAllText` on the local copy | Yes, a compare before writing (#907): Publish-Update asks the VPS for both again before editing the feed. A changed `published.json` stops the release with nothing written; a changed `version.json` is received again and this release goes on top. The send checks the same two again |
+| `deployed-build.json` | None | Yes: temp file then `Move-Item -Force` (DeployedBuild.ps1) | None |
+| `thornswood-build.json` | None | No: `WriteAllText` (BuildStamp.ps1); on the box it travels inside the swap | Covered by the swap |
+| Site JSON through `putJson` | None | Yes: same-folder temp file then rename, with a copy-then-delete fallback where Windows refuses the rename | One Node process, synchronous read and write. `board.json` adds a revision per board (`_rev`, #2188): a save from an older copy gets 409, a save with no revision 428 |
+| Site JSON written directly (the launcher session log files, the site's own `config.json`) | None | No: `fs.writeFileSync` straight onto the file | None |
+
+### Options for the next change, and the do-nothing case
+
+- **Do nothing.** Held records already refuse a version they do not know, the feed and the VPS already have a tested way back, and the site's main write path is already temp then rename. What stays open is that unchecked site files still read a malformed file as empty (#2186 for `bans.json` and `pk.json`).
+- **Version field on the site's critical files.** The same rule as RecordShape: missing means 1, unknown means refuse at startup. Rollback is the reverse two-step above. It needs a readiness signal so a refused start is seen (slice 4).
+- **Atomic writes for the record writers.** Temp then move, as DeployedBuild.ps1 already does. Low risk; it only matters for a crash mid-write, which git already covers for committed records.
+- **More clash checks.** Extend the board's revision idea to the other files #2188 names (`notes.json`, `inbox.json`, `open-tickets.json`, `trouble.json`). A file lock is not needed while one Node process writes them.
 ## Next slices, in order
 
 1. **Authorization state:** `bans.json` and `pk.json` fail closed on a malformed file (#2186; site lane).

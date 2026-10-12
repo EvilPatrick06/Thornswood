@@ -523,7 +523,10 @@ $gRoot = Join-Path $g 'Thornswood-Bot'
 $gWatch = Join-Path $g 'Thornswood-Watch'
 $gData = Join-Path $g 'Thornswood-Docs\data'
 $gForBot = Join-Path $gData 'for-bot'
-$gMod = Join-Path $g 'Thornswood-Server\private\moderation.log'
+# A game server with private\moderation.log from before #2321, which had the
+# bot's read on that one file, and no for-bot yet.
+$gServer = Join-Path $g 'Thornswood-Server'
+$gMod = Join-Path $gServer 'private\moderation.log'
 foreach ($d in @($gRoot, (Join-Path $gRoot 'service'), (Join-Path $gRoot 'webhooks'), $gWatch, (Join-Path $gData 'session-logs'), $gForBot, (Split-Path -Parent $gMod))) { $null = New-Item -ItemType Directory -Force -Path $d }
 foreach ($f in @((Join-Path $gRoot 'bot.py'), (Join-Path $gRoot 'bot.env.json'), (Join-Path $gRoot 'service\host.json'), (Join-Path $gRoot 'webhooks\news.txt'), (Join-Path $gWatch 'alerts.jsonl'),
                  (Join-Path $gWatch 'alerts-webhook.txt'), (Join-Path $gData 'sessions.json'), (Join-Path $gForBot 'trouble.json'), (Join-Path $gData 'session-logs\one.log'), $gMod,
@@ -546,10 +549,14 @@ $null = New-Item -ItemType Directory -Force -Path (Join-Path $gRoot '__pycache__
 [IO.File]::WriteAllText((Join-Path $gRoot '__pycache__\bot.cpython-312.pyc'), 'x')
 Protect (Join-Path $gRoot 'bot.env.json') @('S-1-5-18', 'S-1-5-32-544', $me)
 Protect (Join-Path $gWatch 'alerts-webhook.txt') @('S-1-5-18', 'S-1-5-32-544', $me)
-$missing = Join-Path $g 'Thornswood-Server-Dev\private\moderation.log'
+$acl = Get-Acl -LiteralPath $gMod
+$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier($sid)), 'Read', 'Allow')))
+Set-Acl -LiteralPath $gMod -AclObject $acl
+# A server folder that is not on this box.
+$missing = Join-Path $g 'Thornswood-Server-Dev'
 $moved = @(Move-ThornswoodBotRecords $gRoot)
 Yes 'the cache the bot''s account wrote beside its code is removed' (-not (Test-Path -LiteralPath (Join-Path $gRoot '__pycache__')) -and ($moved -join ' ') -match '__pycache__')
-$said = @(Grant-ThornswoodBotAccess -Sid $sid -Root $gRoot -WatchRoot $gWatch -DocsData $gData -ModLogs @($gMod, $missing))
+$said = @(Grant-ThornswoodBotAccess -Sid $sid -Root $gRoot -WatchRoot $gWatch -DocsData $gData -ServerRoots @($gServer, $missing))
 Yes 'every grant went on' (@($said | Where-Object { $_ -match '^COULD NOT' }).Count -eq 0)
 # Which one did not, and why, so a red on the build runner says it in the log.
 foreach ($l in @($said | Where-Object { $_ -match '^COULD NOT' })) { Write-Host ('      ' + $l) }
@@ -583,14 +590,28 @@ Yes 'alerts-sent-bot.txt is made when it is not there, and the bot''s account ma
 Yes 'the site''s for-bot folder: read on what the site writes for the bot' ((Rules (Join-Path $gForBot 'trouble.json')).Count -eq 1 -and "$((Rules (Join-Path $gForBot 'trouble.json'))[0].FileSystemRights)" -notmatch 'Modify|Write')
 Yes 'and the bot''s account cannot read sessions.json, or anything else of the site''s' ((Rules (Join-Path $gData 'sessions.json')).Count -eq 0 -and (Rules $gData).Count -eq 0)
 Yes 'nor anything below the site''s data' ((Rules (Join-Path $gData 'session-logs\one.log')).Count -eq 0 -and (Rules (Join-Path $gData 'session-logs')).Count -eq 0)
-Yes 'a game server''s moderation.log: read, on that file only' ((Rules $gMod).Count -eq 1 -and (Rules (Join-Path (Split-Path -Parent $gMod) 'door.json')).Count -eq 0 -and (Rules (Split-Path -Parent $gMod)).Count -eq 0)
-Yes 'one that is not there is said, not made' (($said -join "`n") -match [regex]::Escape('not there yet, nothing granted: ' + $missing) -and -not (Test-Path -LiteralPath $missing))
-$null = @(Grant-ThornswoodBotAccess -Sid $sid -Root $gRoot -WatchRoot $gWatch -DocsData $gData -ModLogs @($gMod))
+# The game servers' staff log (#2321): read on the for-bot folder beside
+# private, made here when the server has none, so a log the gamemode makes
+# after the grant takes the rule; private and door.json never get one.
+$gFb = Join-Path $gServer 'for-bot'
+$x = @(Rules $gFb)
+Yes 'a game server''s for-bot is made when it has none, and said' ((Test-Path -LiteralPath $gFb) -and ($said -join "`n") -match [regex]::Escape('made ' + $gFb))
+Yes 'and the bot''s account may read it and everything in it, and no more' ($x.Count -eq 1 -and "$($x[0].FileSystemRights)" -match '^Read' -and "$($x[0].FileSystemRights)" -notmatch 'Modify|Write|FullControl' -and "$($x[0].InheritanceFlags)" -match 'ContainerInherit' -and "$($x[0].InheritanceFlags)" -match 'ObjectInherit')
+# What the gamemode does at the first staff action, after the install: make
+# the file. It takes the folder's rule, which a rule on one file never could.
+$later = Join-Path $gFb 'moderation.log'
+[IO.File]::AppendAllText($later, '{"did":"warn"}' + "`n")
+$x = @(Rules $later)
+Yes 'a staff log the gamemode makes after the grant takes the bot''s read by itself' ($x.Count -eq 1 -and $x[0].IsInherited -and "$($x[0].FileSystemRights)" -match '^Read' -and "$($x[0].FileSystemRights)" -notmatch 'Modify|Write|FullControl')
+Yes 'and private, door.json and the old moderation.log there give the bot''s account nothing' ((Rules (Split-Path -Parent $gMod)).Count -eq 0 -and (Rules (Join-Path (Split-Path -Parent $gMod) 'door.json')).Count -eq 0 -and (Rules $gMod).Count -eq 0)
+Yes 'the bot''s old rule on private\moderation.log is taken off, and said' (($said -join "`n") -match [regex]::Escape('took the bot''s account off ' + $gMod))
+Yes 'a server folder that is not on the box is said, and nothing is made' (($said -join "`n") -match [regex]::Escape('no game server at ' + $missing) -and -not (Test-Path -LiteralPath $missing))
+$null = @(Grant-ThornswoodBotAccess -Sid $sid -Root $gRoot -WatchRoot $gWatch -DocsData $gData -ServerRoots @($gServer))
 function Own([string]$path) { return @(Rules $path | Where-Object { -not $_.IsInherited }).Count }
-Yes 'given again, nothing is doubled' ((Own $gRoot) -eq 1 -and (Own (Join-Path $gRoot 'data')) -eq 1 -and (Own $gForBot) -eq 1 -and (Own (Join-Path $gRoot 'bot.env.json')) -eq 1 -and (Own $gWatch) -eq 1 -and (Own $sent) -eq 1 -and (Own $gMod) -eq 1)
-$said = @(Grant-ThornswoodBotAccess -Sid $sid -Root $gRoot -WatchRoot '' -DocsData (Join-Path $g 'no-site\data') -ModLogs @())
+Yes 'given again, nothing is doubled' ((Own $gRoot) -eq 1 -and (Own (Join-Path $gRoot 'data')) -eq 1 -and (Own $gForBot) -eq 1 -and (Own (Join-Path $gRoot 'bot.env.json')) -eq 1 -and (Own $gWatch) -eq 1 -and (Own $sent) -eq 1 -and (Own $gFb) -eq 1)
+$said = @(Grant-ThornswoodBotAccess -Sid $sid -Root $gRoot -WatchRoot '' -DocsData (Join-Path $g 'no-site\data') -ServerRoots @())
 $null = New-Item -ItemType Directory -Force -Path (Join-Path $g 'no-forbot\data')
-$said = @(Grant-ThornswoodBotAccess -Sid $sid -Root $gRoot -WatchRoot '' -DocsData (Join-Path $g 'no-forbot\data') -ModLogs @())
+$said = @(Grant-ThornswoodBotAccess -Sid $sid -Root $gRoot -WatchRoot '' -DocsData (Join-Path $g 'no-forbot\data') -ServerRoots @())
 Yes 'a site with no for-bot yet: said, with what to run, and nothing made' (($said -join ' ') -match 'for-bot\. Run Deploy-Docs\.ps1' -and -not (Test-Path -LiteralPath (Join-Path $g 'no-forbot\data\for-bot')))
 
 # -- the records move out of the code folder --------------------------------------
@@ -656,7 +677,7 @@ Yes 'and a file made in it is writable by the account too, which is what bot.log
       Where-Object { "$($_.FileSystemRights)" -match 'Modify' }).Count -eq 1)
 Yes 'and with the folder there it says nothing and leaves its rules alone, since they are the full run''s' (
     @(Repair-ThornswoodBotData -Root $gone -Name 'ThornswoodBot').Count -eq 0 -and (Own (Join-Path $gone 'data')) -eq 1)
-$said = @(Grant-ThornswoodBotAccess -Sid $sid -Root $gRoot -WatchRoot (Join-Path $g 'no-watch-yet') -DocsData '' -ModLogs @())
+$said = @(Grant-ThornswoodBotAccess -Sid $sid -Root $gRoot -WatchRoot (Join-Path $g 'no-watch-yet') -DocsData '' -ServerRoots @())
 Yes 'no watchdog folder yet: said, with what to run' (($said -join ' ') -match 'no-watch-yet\. Run Install-Bot\.ps1 again after Watch-Services\.ps1 -Install')
 
 # ========================================================== the install ===
@@ -735,7 +756,7 @@ function At([string]$rx) { for ($i = 0; $i -lt $script:calls.Count; $i++) { if (
 # -- the first time: the old loop on the box, no service ------------------------
 $script:svc = $null; $script:task = $true; $script:startFails = $false
 $root = InstallBox 'install-first'
-$res = Install-ThornswoodBotService -Name 'ThornswoodBot' -Root $root -Python $goodPy -Source $svcSrc -Task 'Thornswood Bot' -WatchRoot '' -DocsData '' -ModLogs @()
+$res = Install-ThornswoodBotService -Name 'ThornswoodBot' -Root $root -Python $goodPy -Source $svcSrc -Task 'Thornswood Bot' -WatchRoot '' -DocsData '' -ServerRoots @()
 $lines = ($res.Lines -join "`n")
 Yes ('the first install says it worked' + $(if (-not $res.Ok) { ': ' + $lines } else { '' })) ($res.Ok)
 Yes 'the program is built and in place, and no half-built copy is left' ((Test-Path -LiteralPath (Join-Path $root 'service\ThornswoodBotService.exe')) -and -not (Test-Path -LiteralPath (Join-Path $root 'service\ThornswoodBotService.new.exe')))
@@ -761,7 +782,7 @@ Yes 'and the read-back says what it runs as' ($lines -match 'service ThornswoodB
 # -- again, with the service there and running ----------------------------------
 $root2 = $root
 $script:calls = @()
-$res = Install-ThornswoodBotService -Name 'ThornswoodBot' -Root $root2 -Python $goodPy -Source $svcSrc -Task 'Thornswood Bot' -WatchRoot '' -DocsData '' -ModLogs @()
+$res = Install-ThornswoodBotService -Name 'ThornswoodBot' -Root $root2 -Python $goodPy -Source $svcSrc -Task 'Thornswood Bot' -WatchRoot '' -DocsData '' -ServerRoots @()
 Yes 'a second install works too' ($res.Ok)
 Yes 'it stops the running service by name first, then replaces the program' ((At '^Stop-Service ThornswoodBot$') -ge 0 -and (At '^Stop-Service ThornswoodBot$') -lt (At '^sc config'))
 Yes 'and does not make the service twice' (@($script:calls | Where-Object { $_ -match '^New-Service ' }).Count -eq 0)
@@ -770,18 +791,18 @@ Yes 'with no old task left, nothing is unregistered' ((At '^Unregister-Scheduled
 # -- what stops it before anything is touched ------------------------------------
 $script:svc = [pscustomobject]@{ Name = 'ThornswoodBot'; Status = 'Running' }; $script:task = $true
 $root = InstallBox 'install-badpython'
-$res = Install-ThornswoodBotService -Name 'ThornswoodBot' -Root $root -Python $userPy -Source $svcSrc -Task 'Thornswood Bot' -WatchRoot '' -DocsData '' -ModLogs @()
+$res = Install-ThornswoodBotService -Name 'ThornswoodBot' -Root $root -Python $userPy -Source $svcSrc -Task 'Thornswood Bot' -WatchRoot '' -DocsData '' -ServerRoots @()
 Yes 'a python the account cannot read stops it, with nothing stopped or changed' (-not $res.Ok -and ($res.Lines -join ' ') -match 'CANNOT SWITCH: .*installed for one person' -and ($res.Lines -join ' ') -match 'Nothing was stopped or changed' -and
     (At '^Stop-|^Unregister-|^New-Service|^sc |^Start-Service') -lt 0 -and (Test-Path -LiteralPath (Join-Path $root 'run.ps1')))
 $root = InstallBox 'install-badsource'
-$res = Install-ThornswoodBotService -Name 'ThornswoodBot' -Root $root -Python $goodPy -Source $bad -Task 'Thornswood Bot' -WatchRoot '' -DocsData '' -ModLogs @()
+$res = Install-ThornswoodBotService -Name 'ThornswoodBot' -Root $root -Python $goodPy -Source $bad -Task 'Thornswood Bot' -WatchRoot '' -DocsData '' -ServerRoots @()
 Yes 'a program that does not build stops it, with nothing stopped or changed' (-not $res.Ok -and ($res.Lines -join ' ') -match 'DID NOT BUILD\. Nothing was stopped or changed' -and ($res.Lines -join ' ') -match 'error CS' -and
     (At '^Stop-|^Unregister-|^New-Service|^sc |^Start-Service') -lt 0 -and (Test-Path -LiteralPath (Join-Path $root 'run.ps1')))
-$res = Install-ThornswoodBotService -Name 'ThornswoodBot' -Root (Join-Path $tmp 'has space') -Python $goodPy -Source $svcSrc -Task 'Thornswood Bot' -WatchRoot '' -DocsData '' -ModLogs @()
+$res = Install-ThornswoodBotService -Name 'ThornswoodBot' -Root (Join-Path $tmp 'has space') -Python $goodPy -Source $svcSrc -Task 'Thornswood Bot' -WatchRoot '' -DocsData '' -ServerRoots @()
 Yes 'a bot folder with a space in its path is refused, since the program is registered bare' (-not $res.Ok -and ($res.Lines -join ' ') -match 'space in its path')
 $script:startFails = $true
 $root = InstallBox 'install-nostart'
-$res = Install-ThornswoodBotService -Name 'ThornswoodBot' -Root $root -Python $goodPy -Source $svcSrc -Task 'Thornswood Bot' -WatchRoot '' -DocsData '' -ModLogs @()
+$res = Install-ThornswoodBotService -Name 'ThornswoodBot' -Root $root -Python $goodPy -Source $svcSrc -Task 'Thornswood Bot' -WatchRoot '' -DocsData '' -ServerRoots @()
 Yes 'a service that will not start is said, not passed over' (-not $res.Ok -and ($res.Lines -join ' ') -match 'THE SERVICE DID NOT START: The service did not respond')
 $script:startFails = $false
 

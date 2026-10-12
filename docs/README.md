@@ -12,6 +12,7 @@ Developer-Guide.md at the root; the long form is Developer-Guide.md.
 | [JSON-STATE-INVENTORY.md](JSON-STATE-INVENTORY.md) | Every critical JSON file, who writes and reads it, how it is checked, and the four records held to a version and shape (#2180). |
 | [ICONS.md](ICONS.md) | Which icon file is which: Main launcher badge, Dev launcher monogram, site favicon. |
 | [GAMEMODE.md](GAMEMODE.md) | How game/gamemode.js is laid out, where its data lives, how it is deployed and which tests cover it. |
+| [GAMEMODE-SOURCE.md](GAMEMODE-SOURCE.md) | The plan for writing gamemode.js as many source files joined into the one file the server loads (#2181): the loader's limits, who edits it, the options and the stages. |
 | [GAMEMODE-COVERAGE.md](GAMEMODE-COVERAGE.md) | Which test drives each gamemode event handler, plugin, money function and chat word, and the gaps that were filled. |
 | [SYSTEMS.md](SYSTEMS.md) | Thornswood systems. The summary of every system, and a link from each section to the full plan. |
 | [systems/](systems/) | The finished plan for each system, one page each. Where the server is now is the last section of the page. The item lists are [systems/lists](systems/lists/README.md). |
@@ -19,6 +20,7 @@ Developer-Guide.md at the root; the long form is Developer-Guide.md.
 | [../engine/README.md](../engine/README.md) | Building the SkyMP fork: the submodule, the configure line, the build and the records. |
 | [IT-IS-DOWN.md](IT-IS-DOWN.md) | What to do when the server, the site or voice is down. |
 | [RESTORING.md](RESTORING.md) | Bringing the server, the site and the bot back from a backup. |
+| [SERVICE-OBJECTIVES.md](SERVICE-OBJECTIVES.md) | What working means for the site, feed, game servers, voice, bot and backups (#2183): each metric, threshold, the check that measures it, the alert, and the proposed owner. |
 | [MOVING-THE-SERVER.md](MOVING-THE-SERVER.md) | Growing the VPS, or moving everything to a new box. |
 | [DEPLOY-IDENTITIES.md](DEPLOY-IDENTITIES.md) | The VPS access audit (#2182): who can get in and as what today, and a restricted deploy identity design with migration, rollback and the decisions it needs. |
 | [OWNERSHIP.md](OWNERSHIP.md) | Who holds each credential, account and build, and who the second holder is. |
@@ -33,7 +35,7 @@ Developer-Guide.md at the root; the long form is Developer-Guide.md.
 | [JKS-SKYRIM.md](JKS-SKYRIM.md), [GOURMET-FISHING-PATCH.md](GOURMET-FISHING-PATCH.md) | Records of two mod decisions and the patch made for one. |
 | [LIGHT-ORDER-DRIFT.md](LIGHT-ORDER-DRIFT.md) | Every light plugin form id the live and the dev world stored, which plugin each was for, which have drifted with the light order, and the one-time move (#1715). |
 | [NPC-POPULATION.md](NPC-POPULATION.md) | NPC population catalogue from the winning records in the load order. |
-| [NPC-SERVER-ACTIVITY.md](NPC-SERVER-ACTIVITY.md) | Shared NPC activity on dev: who owns placed identities, movement, combat and return. |
+| [NPC-SERVER-ACTIVITY.md](NPC-SERVER-ACTIVITY.md) | Shared NPC activity on dev and main: who owns placed identities, movement, combat and return. |
 | [npc-server-runtime.md](npc-server-runtime.md) | Dev NPC loading and first unattended activity. |
 | [NPC-WORLD-PLAN.md](NPC-WORLD-PLAN.md) | NPC world work: town cut, habitat rules, rates and merchant quests. |
 | [archive](archive) | Dated snapshots, history only. |

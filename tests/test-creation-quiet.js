@@ -429,9 +429,15 @@ if (TELL) {
       /window\.thornswoodNet\.say\(held\.shift\(\)\);/.test(bridge));
   // The panels are somebody pressing a button, which is theirs, so they keep the notice.
   const panels = ['thornswood-journal.js', 'thornswood-party.js', 'thornswood-trade.js'];
+  // Read as every say call the panel makes passing the line and nothing
+  // after it, which is what keeps the notice. Since #2155 (#2135) the
+  // journal calls it through a name of its own (n.say(line), n being
+  // window.thornswoodNet) to compare the queue before and after, so the
+  // whole call is not spelled out the same way in every panel any more.
   yes('3 and the journal, party and trade buttons still say so when they are queued',
       panels.every(function (f) {
-        return /window\.thornswoodNet\.say\(line\);/.test(read(path.join(REPO_DIR, 'game', 'ui', f)));
+        const calls = read(path.join(REPO_DIR, 'game', 'ui', f)).match(/\.say\([^)]*\)/g) || [];
+        return calls.length > 0 && calls.every(function (c) { return c === '.say(line)'; });
       }));
 }
 

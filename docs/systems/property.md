@@ -125,7 +125,9 @@ Your own bed is the best rest on [Exhaustion](exhaustion.md), 80 an
 hour. A bed you are allowed in is 50. Both give the logout fill: log
 out lying in one and you come back rested. A bed or bedroll in a
 building nobody holds, or out on the road, is nobody's to lend: 25 an
-hour, or 45 with a fire in reach, and no logout fill. A bed in a
+hour, or 45 with a fire in reach, and no logout fill. A bed in an inn
+or a temple nobody holds is a place of its own on the server, at those
+same numbers until Patrick sets its own on #2246. A bed in a
 building somebody else holds, who has not let you, is no rest at all.
 Lying down in the bed is how you rest in it, and there is nothing to
 type.

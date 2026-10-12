@@ -284,10 +284,11 @@
 
   THE REVERSE INDEX. ores.json, harvests.json with its four maps and hunts.json
   are all keyed by the base that gets worked and carry the item it hands over.
-  The two stations this server put in the world are in no table at all: the salt
-  quarry and the charcoal kiln are answered in game\gamemode.js, so the items
-  and the ranks are READ out of mineSalt() and burnCharcoal() by
-  ReadStationVerbs below rather than copied into a list here, which is what
+  The verbs this server answers itself are in no table at all: the salt quarry,
+  the chopping blocks, the churn and the farmyard are answered in
+  game\gamemode.js, so the items and the ranks are READ out of mineSalt() and
+  the rest by ReadStationVerbs below rather than copied into a list here (the
+  charcoal kiln was one until #2337 made it a bench), which is what
   stops the index and the server drifting apart in silence. This script needs
   the other direction, item -> rank, and it takes the LOWEST rank any class gets
   that item at: if a novice miner can find iron anywhere in Skyrim then iron
@@ -800,10 +801,11 @@ $PRODUCER_TABLES = @(
 # tables or the chain has a hole in it with nothing saying so.
 #
 # The five tables above are built from the game's own records. The stations are
-# not in the game's records at all: STATIONS.saltQuarry and STATIONS.charcoalKiln
-# are bases this repository's own plugin put in the world, gamemode.js answers
-# them in mineSalt() and burnCharcoal(), and no script writes a json table for
-# either. So the reverse index could not see them.
+# not in the game's records at all: STATIONS.saltQuarry is a base this
+# repository's own plugin put in the world, gamemode.js answers it in
+# mineSalt(), and no script writes a json table for it. So the reverse index
+# could not see it. (STATIONS.charcoalKiln was the second until #2337: the kiln
+# is a bench now and its charcoal is four recipe rows, ranked in RECIPE_RANK.)
 #
 # WHY IT IS READ AND NOT LISTED. Until 21 September this was a hand written list
 # of four descs with the gamemode line quoted in a comment beside each one. That
@@ -816,7 +818,8 @@ $PRODUCER_TABLES = @(
 # saying so rather than quietly dropping a producer.
 #
 # WHAT THE READER LOOKS FOR, and all three shapes were read off the two function
-# bodies on 21 September rather than invented:
+# bodies on 21 September rather than invented (burnCharcoal is gone since
+# #2337; its two shapes stay readable for the next verb that has them):
 #   an ITEMS.<key> under no rank guard          -> novice, the bottom of RANK_LADDER
 #     mineSalt: addItem(actorId, ITEMS.saltPile, randInt(1, 2 + step))
 #   an ITEMS.<key> inside a block guarded by step >= N or rankStep(...) >= N
@@ -835,23 +838,19 @@ $PRODUCER_TABLES = @(
 # Boar Meat rows sat at advanced on the price rule and are novice work by the
 # input rule.
 #
-# THE KILN IS IN THIS LIST NOW AND IT WAS ARGUED OUT OF IT BEFORE. The old
-# comment kept it out on two grounds: it is a profession's verb rather than a
-# class's, and no recipe in the table asks for charcoal of any grade. The first
-# is true and is not a reason: Patrick's sentence is about professions supplying
-# professions, and a Woodworker handing a Smith a sack of coke is exactly the
-# shape of it. The second is measured again every run under the hop below and
-# printed, so if it stays at zero the run says so instead of a comment claiming
-# it. Who it belongs to is the half that runs it, because the grade is the
-# charburner's rank: rankStep(actorId, 'charburner') is the index into the list.
+# THE KILN LEFT THIS LIST ON 12 OCTOBER (#2337). burnCharcoal answered a press
+# on the kiln and was read here as the Charburner's producer of the four
+# grades. The press stood in for four charcoal recipes the plugin did not have
+# yet; it has them now, so the kiln is a bench, the press goes to the engine
+# and opens its menu, and the grades are made there by the rows RECIPE_RANK
+# ranks. No recipe in the table asks for charcoal of any grade, which the hop
+# below measures every run, so the index loses no producer anybody's row reads.
 #
 # The placed hive is a farmer verb. hive() hands over one Honeycomb.
 # Honey, the jar, is still not a row of harvests.json.
 $STATION_VERBS = @(
     @{ Fn = 'mineSalt';     Who = 'miner';
        What = 'the salt quarry, STATIONS.saltQuarry, which is a miner''s verb: classGate(actorId, ''mine'')' },
-    @{ Fn = 'burnCharcoal'; Who = 'woodworker';
-       What = 'the charcoal kiln, STATIONS.charcoalKiln, which is the Charburner half''s: halfGate(actorId, ''charburner'')' },
     # Added 21 September, and it closes the gap this script's own closing
     # paragraph had been printing for days: "A woodcutter's verb and a churn
     # would put Firewood and Butter on a class". Firewood was the fifth largest
@@ -1943,13 +1942,13 @@ $RECIPE_OWNER = [ordered]@{
 
 # NAMED RECIPES WHOSE RANK IS A DECISION RATHER THAN A READING.
 #
-# The charcoal grades. gamemode.js burnCharcoal hands over one of four grades by
-# rankStep(actorId, 'charburner'): Poor Charcoal at novice, Charcoal at advanced,
-# Charcoal Briquette at expert, Coke at master. That ladder is the design and it
-# is in the shipped file. These four COBJ records are the SAME four grades made
-# at the SAME kiln through the crafting menu, so if the rules rank them any
-# other way the server contradicts itself: the verb says a novice gets poor
-# charcoal and the menu lets the same novice make coke.
+# The charcoal grades: Poor Charcoal at novice, Charcoal at advanced, Charcoal
+# Briquette at expert, Coke at master, a grade a Charburner rank. That ladder is
+# the design (docs\systems\professions\woodworker\charburner.md). Until #2337
+# gamemode.js burnCharcoal handed the same ladder out by
+# rankStep(actorId, 'charburner') on a press; since then these four COBJ
+# records at the kiln's menu are the only way charcoal is made, so the rank on
+# each row is all that keeps a novice from making coke.
 #
 # Until 21 September a CTDA on three of them held that line, testing for the
 # woodcutter manuals. The manuals are gone, so the rank on the row has to carry
@@ -1967,10 +1966,10 @@ $RECIPE_OWNER = [ordered]@{
 # automatic rule and BEFORE the empty-rung and standable checks, so it cannot be
 # used to write a ladder with a hole in it.
 $RECIPE_RANK = [ordered]@{
-    'ThornswoodRecipeCharcoalTier1' = @{ Rank = 'novice';   Why = 'the first of the four charcoal grades. burnCharcoal in gamemode.js hands this one to a novice charburner, so the menu says what the verb says.' }
-    'ThornswoodRecipeCharcoalTier2' = @{ Rank = 'advanced'; Why = 'the second charcoal grade, which burnCharcoal hands to an advanced charburner.' }
-    'ThornswoodRecipeCharcoalTier3' = @{ Rank = 'expert';   Why = 'the third charcoal grade, which burnCharcoal hands to an expert charburner.' }
-    'ThornswoodRecipeCharcoalTier4' = @{ Rank = 'master';   Why = 'coke, the last charcoal grade, which burnCharcoal hands to a master charburner alone.' }
+    'ThornswoodRecipeCharcoalTier1' = @{ Rank = 'novice';   Why = 'the first of the four charcoal grades, a novice charburner''s, as the charburner page ranks it.' }
+    'ThornswoodRecipeCharcoalTier2' = @{ Rank = 'advanced'; Why = 'the second charcoal grade, an advanced charburner''s.' }
+    'ThornswoodRecipeCharcoalTier3' = @{ Rank = 'expert';   Why = 'the third charcoal grade, an expert charburner''s.' }
+    'ThornswoodRecipeCharcoalTier4' = @{ Rank = 'master';   Why = 'coke, the last charcoal grade, a master charburner''s alone.' }
     # The poles and the trap, as docs/systems/classes/fisher.md ranks them under
     # "The poles and the trap" (issue #1379). Input cost puts the fine pole on
     # advanced and the master pole on expert, because a steel ingot and a
@@ -4163,7 +4162,7 @@ if ($stationRead.Rows.Count -gt 0) {
     Note ("the server's own stations: {0} item(s) read out of game\gamemode.js, {1} of them the first to name the item" -f `
           $stationRead.Rows.Count, $stationAdded)
 } else {
-    Loud 'nothing was read off the server''s own stations, so the salt quarry and the charcoal kiln hand out items this table believes nobody produces'
+    Loud 'nothing was read off the server''s own stations, so the salt quarry, the chopping blocks and the farmyard hand out items this table believes nobody produces'
 }
 
 $byWho = @{}

@@ -142,6 +142,7 @@ function load(w) {
     readFileSync: function () { throw new Error('not here'); },
     existsSync: function () { return false; },
     appendFileSync: function (p, text) { w.records.push({ path: p, text: text }); },
+    mkdirSync: function (p) { (w.dirs = w.dirs || []).push(p); },
     writeFileSync: function () { }, unlinkSync: function () { }
   };
   const box = {
@@ -237,8 +238,9 @@ if (COMMANDS && STAFF) {
   yes('/warn tells the moderator in their chat', to(got, STAFFER)[0] === 'Warned Bjorn Iron-Hand.');
   yes('and tells Bjorn what for, in his', /^A warning from staff: spamming the market\./.test(to(got, BJORN)[0] || ''));
   const rec = w.records.map(function (r) { return JSON.parse(r.text); });
-  yes('one line in moderation.log, under privDir', w.records.length === 1 &&
-      w.records[0].path === path.join('private', 'moderation.log'));
+  // In for-bot beside private, which the bot reads by a rule on the folder (#2321).
+  yes('one line in moderation.log, in for-bot beside privDir, the folder made first', w.records.length === 1 &&
+      w.records[0].path === path.join('for-bot', 'moderation.log') && (w.dirs || []).indexOf('for-bot') >= 0);
   yes('which says who did what to whom and why', rec[0] && rec[0].did === 'warn' && rec[0].by === STAFFER &&
       rec[0].who === BJORN && rec[0].whoName === 'Bjorn Iron-Hand' && rec[0].why === 'spamming the market' &&
       rec[0].server === 'main');

@@ -299,13 +299,17 @@ try {
         Yes ("  its packs are the ones it added, named by the release ({0})" -f (@($rec.packs) -join ', ')) (
             @($rec.packs).Count -ge 1 -and @($rec.packs | Where-Object { $packIds -notcontains $_ -or ($_ -ne $id -and $_ -notlike "$id-*") }).Count -eq 0)
         Yes ("  its baseline is the release's own record, and the one the feed names ({0})" -f $rec.baseline) ($rec.baseline -eq $id -and $feed.baseline.id -eq $id)
-        $top = if ($feed.PSObject.Properties['releases'] -and @($feed.releases).Count) { @($feed.releases)[0] } else { $null }
+        # The list a rollback reads is the store's releases.json since #1050,
+        # beside the feed and not in it.
+        $storeList = Read-ReleaseListFile (Join-Path $site 'feed\releases.json')
+        $top = if ($null -ne $storeList -and @($storeList).Count) { @($storeList)[0] } else { $null }
         Yes '  and it is the newest of the releases the channel can be put back to, ending on its last pack' (
             $null -ne $top -and [string]$top.id -eq $id -and [string]$top.lastPack -eq [string]@($rec.packs)[-1])
+        Yes '  that list is in the store beside the feed, and the feed carries none' (-not $feed.PSObject.Properties['releases'])
         Yes ("  it names the launcher the feed offers ({0})" -f $rec.launcherVersion) ($rec.launcherVersion -eq '1.1.102' -and $feed.launcherVersion -eq '1.1.102')
         Yes '  the commit it was built from, and the checkout was clean' ($rec.commit -eq $head -and [int]$rec.uncommitted -eq 0)
         Yes ("  and its tag, {0}" -f $rec.tag) ($rec.tag -eq "release/main/$id")
-        $bad = @(Get-ReleaseDisagreements $feed)
+        $bad = @(Get-ReleaseDisagreements $feed $storeList)
         Yes ('  every name agrees' + $(if ($bad.Count) { ': ' + ($bad -join '; ') } else { '' })) ($bad.Count -eq 0)
     }
     $relTxt = Join-Path $site 'feed\releases.txt'

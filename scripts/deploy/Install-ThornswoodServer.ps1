@@ -288,7 +288,9 @@ function TailLog([string]$dir) {
   refuses everybody"), and Patrick hit it on 21 September on the dev server.
   Neither has anything a build ships, so each moves whole, and only into a
   folder that has none: -FreshWorld leaves the world where it was, and a
-  put-back keeps the world the folder it brings back already has.
+  put-back keeps the world the folder it brings back already has. for-bot
+  moves the same way (#2321): the gamemode's staff log, moderation.log,
+  which the bot reads by the rule on that folder, and the rule moves with it.
 
   data does have shipped contents. The gamemode writes runtime state into it
   while people are online, so every file in it that the incoming folder's
@@ -298,12 +300,21 @@ function TailLog([string]$dir) {
   from before that list existed falls back to the old rule, only what it does
   not have.
 
+  Except data\thornswood-deploy.json (#459). It is not runtime state: it is
+  the deploy record of the folder it sits in, the artifact that folder's
+  gamemode came from. Carried, the new folder named the old one's gamemode
+  (30 Sep: e445101a, with 32dea10d installed), and a put-back had the newer
+  folder's record copied over the one that came back. So each folder keeps its
+  own, Publish-Server.ps1 writes the new one once this has said INSTALL OK,
+  and after a put-back the folder that came back is recorded by its own
+  (Restore-ThornswoodServerRecord, Artifact.ps1).
+
   And the logs, entry 220: server.log and thornswood.log sat in the root and
   went with every install, taking the evidence for whatever the server did
   before it. They move across and are rolled, never deleted.
 #>
 function Carry([string]$from, [string]$to, [bool]$skipWorld) {
-    foreach ($name in 'world', 'private') {
+    foreach ($name in 'world', 'private', 'for-bot') {
         if ($name -eq 'world' -and $skipWorld) { Say "the world is left in $from, as -FreshWorld asked" 'Yellow'; continue }
         $a = Join-Path $from $name
         $b = Join-Path $to $name
@@ -327,6 +338,8 @@ function Carry([string]$from, [string]$to, [bool]$skipWorld) {
         $listedA = (Get-Item -LiteralPath $a).FullName
         foreach ($f in @(Get-ChildItem -LiteralPath $listedA -Recurse -File -Force -ErrorAction SilentlyContinue)) {
             $rel = $f.FullName.Substring($listedA.Length).TrimStart('\')
+            # The folder's own deploy record stays with it (#459, above).
+            if ($rel -eq 'thornswood-deploy.json') { continue }
             $dest = Join-Path $b $rel
             if ($shipped) { if ($shipped.Contains($rel)) { continue } }
             elseif (Test-Path -LiteralPath $dest) { continue }
@@ -620,6 +633,11 @@ if (-not (Test-Path -LiteralPath $privDir)) {
     Say 'no roster to restore: this root has never had a private folder.' 'Yellow'
     Say '  /tp will refuse everybody until door.json is put there.' 'Yellow'
 }
+# Where the gamemode writes its staff log for the bot (#2321), made here so
+# the bot's rule is on the folder before the first staff action makes the
+# file, which then takes it. Locked below.
+$forBotDir = Join-Path $Root 'for-bot'
+if (-not (Test-Path -LiteralPath $forBotDir)) { New-Item -ItemType Directory -Path $forBotDir -Force | Out-Null }
 
 <#
   WHO MAY READ THE SERVER'S FOLDERS, issue #1105.
@@ -638,14 +656,21 @@ if (-not (Test-Path -LiteralPath $privDir)) {
       (Deploy-Docs.ps1 -RunAs), and anything else set on purpose. Users,
       Everyone, Authenticated Users and CREATOR OWNER never are.
     private\ takes nothing from the root either: SYSTEM and Administrators
-      only. The bot's read on private\moderation.log is a rule on that file
-      and moves with it (Install-Bot.ps1).
+      only.
+    for-bot\ takes nothing from the root either (#2321): SYSTEM and
+      Administrators, the rules it has by name, and read for the bot's
+      account, NT SERVICE\ThornswoodBot, when the bot's service is on the box,
+      on the folder and so on the staff log the gamemode makes in it later.
+      Install-Bot.ps1 gives the same rule; given here too, so a server that
+      has had no bot install since #2321 does not start a staff log the bot
+      cannot open.
     what it replaced, <root>.prev-<stamp> or .undone-<stamp>, is locked the
       same way, since it holds the old settings and data.
 
   tests\test-server-acl.ps1 runs this on scratch folders and reads it back.
 #>
-function Lock-ServerDir([string]$dir, [string]$from) {
+# $readers: SIDs given read on the folder and everything in it (the bot's, on for-bot).
+function Lock-ServerDir([string]$dir, [string]$from, [string[]]$readers = @()) {
     $broad = @('S-1-1-0', 'S-1-5-11', 'S-1-5-32-545', 'S-1-3-0')
     $tree = [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
     $carried = @()
@@ -663,6 +688,10 @@ function Lock-ServerDir([string]$dir, [string]$from) {
         $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(
             (New-Object Security.Principal.SecurityIdentifier($s)), 'FullControl', $tree, 'None', 'Allow')))
     }
+    foreach ($s in @($readers | Where-Object { $_ })) {
+        $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(
+            (New-Object Security.Principal.SecurityIdentifier($s)), 'Read', $tree, 'None', 'Allow')))
+    }
     # Writes back only the access rules. Set-Acl can also try to write the audit
     # part, which needs a privilege the build runner's account does not have
     # (issue #1120, Set-ThornswoodAclAccess in Bot-Service.ps1).
@@ -672,17 +701,26 @@ function Lock-ServerDir([string]$dir, [string]$from) {
         else { [IO.FileSystemAclExtensions]::SetAccessControl([IO.FileInfo]$item, [Security.AccessControl.FileSecurity]$acl) }
     } else { $item.SetAccessControl($acl) }
 }
-function Lock-ServerRoot([string]$dir, [string]$from) {
+function Lock-ServerRoot([string]$dir, [string]$from, [string]$botSid = '') {
     try {
         Lock-ServerDir $dir $from
         $d = Join-Path $dir 'data'
         if (Test-Path -LiteralPath $d) { Lock-ServerDir $d $(if ($from) { Join-Path $from 'data' } else { '' }) }
         $p = Join-Path $dir 'private'
         if (Test-Path -LiteralPath $p) { Lock-ServerDir $p '' }
+        $fb = Join-Path $dir 'for-bot'
+        if (Test-Path -LiteralPath $fb) { Lock-ServerDir $fb '' @($botSid) }
         Say "locked $dir to SYSTEM and Administrators, with the rules it had by name; private is theirs alone" 'Cyan'
+        if ((Test-Path -LiteralPath $fb) -and $botSid) { Say "the bot's account may read $fb, where the gamemode writes its staff log" 'Cyan' }
     } catch { Say "COULD NOT LOCK ${dir}: $($_.Exception.Message)" 'Red' }
 }
-Lock-ServerRoot $Root $(if ($hadRoot) { $aside } else { '' })
+# The bot's account, when its service is on this box, for for-bot (#2321).
+$botSid = ''
+if (Get-Service -Name 'ThornswoodBot' -ErrorAction SilentlyContinue) {
+    try { $botSid = (New-Object Security.Principal.NTAccount('NT SERVICE\ThornswoodBot')).Translate([Security.Principal.SecurityIdentifier]).Value }
+    catch { Say "the bot's service is here but its account could not be looked up ($($_.Exception.Message)), so for-bot has no rule for it: run .\scripts\deploy\Install-Bot.ps1 once" 'Yellow' }
+} else { Say "no bot service on this box, so nothing reads for-bot yet" 'DarkGray' }
+Lock-ServerRoot $Root $(if ($hadRoot) { $aside } else { '' }) $botSid
 if ($hadRoot -and (Test-Path -LiteralPath $aside)) { Lock-ServerRoot $aside '' }
 # The site reads server.log and data here (Deploy-Docs.ps1). Once the Users
 # rule is gone it reads them only through its own rule, which a box whose

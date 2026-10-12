@@ -52,6 +52,8 @@ const HELPERS = [
   src.slice(src.indexOf('const PASS_MS'), src.indexOf('\n', src.indexOf('const PASS_MS'))),
   grab('function b64u('), grab('function makePass('), grab('function versionParts('),
   grab('function versionCompare('),
+  // The pass's own key, for the login's challenge (#1320).
+  grab('function passLoginKey('),
   src.slice(src.indexOf('const feedLaunchersSeen'), src.indexOf('\n', src.indexOf('const feedLaunchersSeen'))),
   grab('function feedLaunchers('),
   grab('async function hasLeft('), grab('async function departed('),
@@ -87,12 +89,18 @@ const VECTOR = {
 };
 const VECTOR_PASS = 'jp1.eyJwIjo3MDAsInMiOiJkZXYiLCJ2IjoiMS4xLjEwMi4zIiwiZCI6IjExMSIsImkiOjE3OTAwMDAwMDAwMDAsIngiOjE3OTAwMDA2MDAwMDB9.OfS3TF2v5kDiiBwbLyy-VZHHSTv3YE4Zd0bOnAGove8';
 
-const lib = new Function('crypto', 'fs', 'path', 'ROOT', HELPERS.slice(0, 7).join('\n') +
-  '\nreturn { PASS_MS: PASS_MS, makePass: makePass, versionParts: versionParts, versionCompare: versionCompare, feedLaunchers: feedLaunchers };');
+const lib = new Function('crypto', 'fs', 'path', 'ROOT', HELPERS.slice(0, 8).join('\n') +
+  '\nreturn { PASS_MS: PASS_MS, makePass: makePass, versionParts: versionParts, versionCompare: versionCompare, feedLaunchers: feedLaunchers, passLoginKey: passLoginKey };');
 const FEEDROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-pass-'));
 const L = lib(crypto, fs, path, FEEDROOT);
 
 yes('makePass writes the shared pass exactly', L.makePass(KEY, VECTOR) === VECTOR_PASS);
+// The shared pass's own key, written out in full. tests\test-join-pass-game.js
+// holds the same value, so the site and the game server derive one key from
+// one pass (#1320).
+const VECTOR_LOGIN_KEY = 'Wh9OwaY7Rg7e4duCPpNl3c_DZb9RfUB0FUT9Pphs9L4';
+yes('passLoginKey derives the shared pass\'s own key exactly (#1320)', L.passLoginKey(KEY, VECTOR_PASS) === VECTOR_LOGIN_KEY);
+yes('another pass has another key', L.passLoginKey(KEY, VECTOR_PASS.slice(0, -1) + 'A') !== VECTOR_LOGIN_KEY);
 yes('a pass lives ten minutes', L.PASS_MS === 600000);
 yes('1.1.102 is below 1.1.102.1', L.versionCompare(L.versionParts('1.1.102'), L.versionParts('1.1.102.1')) < 0);
 yes('1.1.102.0 is 1.1.102', L.versionCompare(L.versionParts('1.1.102.0'), L.versionParts('1.1.102')) === 0);
@@ -170,6 +178,8 @@ async function main() {
       !!got && got.p === 700 && got.s === 'dev' && got.v === '1.1.102.3' && got.d === '111');
   yes('the pass runs out ten minutes after it was issued', !!got && got.x - got.i === 600000 &&
       Math.abs(got.i - Date.now()) < 5000 && r.obj.until === got.x);
+  yes('the pass comes with its own key for the login\'s challenge, derived from that pass (#1320)',
+      !!r.obj && r.obj.key === L.passLoginKey(KEY, r.obj.pass) && /^[A-Za-z0-9_-]{43}$/.test(r.obj.key));
 
   r = await ask({ body: { ticket: '111', profileId: 700, version: '1.1.102' }, linked: MINE });
   yes('no channel is the main server', r.code === 200 && readPass(r.obj.pass).s === 'main');

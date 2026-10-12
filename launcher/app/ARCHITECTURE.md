@@ -63,7 +63,9 @@ the part to check first.
 ### What the exe is
 
 `scripts\release\Build-Launcher.ps1` compiles every `launcher\app\*.cs` with the .NET
-Framework 4 csc (C# 5 only) into `<Root>\Launcher\Thornswood.exe`. It embeds,
+Framework 4 csc (so C# 5, until the build moves to MSBuild, #498) into
+`<Root>\Launcher\Thornswood.exe`. `launcher\app\Thornswood.csproj` builds the same exe with
+MSBuild (`Build-Launcher.ps1 -With msbuild`). It embeds,
 as resources: `launcher\ui.xaml`, the emblem, header art and video, the WebView2
 DLLs, `launcher\voice-host.html`, the `Thornswood.ini` template from
 `launcher`, and `records\client-build.json`. The update system publishes
@@ -188,7 +190,7 @@ after the three are ticked.
 and written by Save, which encrypts the update token with Windows' DPAPI and
 locks the file to this Windows account. The server address, port, collection
 link, voice port and update repository in it are facts about the server, not
-settings: `ShellUpdate.cs:97 OnVersionDoc()` overwrites them from version.json on
+settings: `ShellUpdate.cs:100 OnVersionDoc()` overwrites them from version.json on
 every update check. So is the Skyrim build pin (the exe size the checks look
 for and the depots the Downgrade button asks Steam for), taken through
 `Downgrade.AdoptPin()` when the feed carries it; the numbers compiled into
@@ -211,16 +213,24 @@ ones that differ are fetched from beside the record (resumed with a Range
 request, each checked against its sha256) into `Profile\Sync`, then put in
 place, the plugin list settled, what the record says is gone taken out, and
 the release written into `Profile\release.txt` (docs\FEED.md, "Syncing to the
-release record").
+release record"). Once every launcher the feed lets in syncs, the feed's
+`packs` is empty (docs\FEED.md, "When the packs can go"), and the update card
+shows the note the record's pointer carries (`baseline.notes`, read by
+`RecordRef.FromFeed` in Config.cs) rather than the last pack's.
+FeedNews.cs is the News tab's half (#1050): when the feed
+names its notes as a file of their own (`newsFile`, an asset under its sha256),
+`FillNews()` fetches it once, checks it, keeps it in `Profile\news.json`, and
+puts its notes after the ones the feed carries, on the update check's own
+thread in `ShellUpdate.cs CheckUpdatesBackground`.
 `Updater.cs:1177 SelfUpdate()` writes `Launcher\Thornswood.exe.new` and a
 script in the temp folder, `thornswood-update-<process id>.cmd`, that swaps it in once
 this process has gone and keeps the old one until the new one has started
 (see SelfSwap below). `Version` at the top of the file is the launcher's
 version, moved by `scripts\release\Bump-Version.ps1` before a Ship. In the launcher,
 `ShellUpdate.cs:28 CheckUpdatesBackground()` asks, `OnVersionDoc` decides,
-`ShellUpdate.cs:369 RunUpdate()` installs, and `ShellUpdate.cs:48 CheckFailed()` keeps
+`ShellUpdate.cs:372 RunUpdate()` installs, and `ShellUpdate.cs:51 CheckFailed()` keeps
 Play shut and asks again every thirty seconds when the source does not answer.
-Every document that was read also goes to `ShellUpdate.cs:77 ShowNotice()`, which
+Every document that was read also goes to `ShellUpdate.cs:80 ShowNotice()`, which
 asks FeedNotice what the bar above Play says and whether Play is held.
 
 **PlayProgress and PlayBar** (Progress.cs, painted by ShellProgress.cs).
@@ -388,7 +398,12 @@ when `Signature.MicrosoftRefusal` says Microsoft signed it (#1330).
 **OwnGame** (OwnGame.cs, OwnGameShare.cs, OwnGameKinds.cs and OwnGameClean.cs, with
 ShellOwnGame.cs for its card and offer). `<Root>\Game` itself. `OwnGame.cs:718 Make()` builds it in
 `<Root>\Game.new` and moves it into place; `OwnGame.cs:844 Refresh()` brings it
-up to date with Vortex. Once made, the folder needs nothing from the Steam copy
+up to date with Vortex. A refresh walks every file Vortex deployed and every
+file on record, except when Vortex has not deployed since and only the rules
+moved: then it looks only at the paths the new rules are about
+(RulesScope and RuleTouches in OwnGame.cs, which every new rule
+number joins) and carries the rest of the record forward (#2210). Its log line
+says which it did and how long it took. Once made, the folder needs nothing from the Steam copy
 (#1218): a refresh takes only the files Vortex's record lists, the game's own
 files are the folder's own copies, and nothing writes into the Steam copy, so
 it can be on any build and modded freely. Skyrim's archives are shared with the
@@ -649,10 +664,12 @@ empty stand-ins where parked plugins were.
 the person picks (`Chars.cs:592 ReadChoice()`); a new id is written into
 `profiles.txt` (`Chars.cs:617 Chose()`), handed to voice and checked in with
 the site. The same tick keeps a join pass for the character picked
-(`JoinPass.cs:67 Tick()`, #937): fetched from the site when they pick and
-every minute after (a pass proves one session, #1320), and left in `Game\Data\Platform	hornswood-pass.txt`
+(`JoinPass.cs:82 Tick()`, #937): fetched from the site when they pick and
+every minute after (a pass proves one session, #1320), and left in `Game\Data\Platform\thornswood-pass.txt`
 for the front plugin to hand the game server, which ends a session without
-one. Nothing in this loop writes the client settings: a write to that
+one. The pass's own key goes beside it in `thornswood-pass-key.txt`, named by
+the pass's mac, for the client to prove the pass on its own connection when
+the game server challenges the login (#1320). Nothing in this loop writes the client settings: a write to that
 file reloads every plugin in the running game.
 `Shell.cs:2565 CheckUpdatesInPlay` looks for a release every thirty seconds
 and, four and a half minutes after first seeing one, closes the game so it can

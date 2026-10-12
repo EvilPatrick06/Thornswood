@@ -130,12 +130,17 @@ const YOU = 0xff000002;
 {
   const r = rig();
   const N = r.N.NEEDS;
+  // NEEDS.away since #2246: a row for each kind of rest; the ones that fill
+  // are the beds that count. tests/test-2246-rest-places.js has the rest.
+  const fills = Object.keys(N.away).filter(function (k) { return N.away[k].rest > 0; });
   yes('A0 the beds that count are your own bed and a bed you are allowed in',
-      JSON.stringify(N.sleptIn) === JSON.stringify({ bed: true, inn: true }));
+      fills.sort().join(',') === 'bed,inn');
   yes('A0 a night away is 8 hours of the game clock, 24 real minutes at twenty to one',
       N.sleptFor === 24 * MIN && N.sleptFor * 20 === 8 * HOUR);
   yes('A0 the fill is rest to 100 and 25 on hunger and thirst, as the page says',
-      N.sleptRest === 100 && N.sleptAlso === 25);
+      ['bed', 'inn'].every(function (k) {
+        return N.away[k].rest === 100 && N.away[k].food === 25 && N.away[k].drink === 25;
+      }));
 }
 
 /* Tired, lying down in kind, logged out, away for the time, back, and the

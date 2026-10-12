@@ -3,13 +3,14 @@ test-moderation.py
 
 The staff action watcher in bot.py (#412): what a moderator does in the game
 (/kick, /freeze, /silence, /warn and the rest) is said in the staff channel,
-once, from private\\moderation.log beside each game server.
+once, from for-bot\\moderation.log beside each game server (#2321).
 
 Checked: what is already in the files when the bot starts is treated as said;
 a new line is said once and says which server; a line still being written is
 left for the next look; a line that is not an action says nothing; a flood is
-one line; a file that cannot be read is skipped rather than read as empty;
-nothing typed in the game can ping anybody.
+one line; a file that cannot be read is skipped rather than read as empty,
+and said in bot.log once, and again once it can be read (#2321); nothing
+typed in the game can ping anybody.
 
 The real bot module is imported and the real coroutine is run over real
 files in a temp folder. Only the Discord send, the client and the sleep are
@@ -82,12 +83,16 @@ def put(path, lines, tail=''):
         f.write(''.join(l + '\n' for l in lines) + tail)
 
 
+LOGGED = []
+
+
 def drive(steps):
     """Run watch_moderation; before each sleep, apply the next step (a
     function). Returns what was said before each sleep."""
     said = []
     ticks = []
     state = {'i': 0}
+    del LOGGED[:]
 
     async def fake_say(text):
         said.append(text)
@@ -100,18 +105,19 @@ def drive(steps):
         steps[state['i']]()
         state['i'] += 1
 
-    keep = (bot.MODERATION_LOGS, bot.report_say, bot.client, bot.asyncio)
+    keep = (bot.MODERATION_LOGS, bot.report_say, bot.client, bot.asyncio, bot.log)
     bot.MODERATION_LOGS = [('live', LIVE), ('dev', DEV)]
     bot.report_say = fake_say
     bot.client = FakeClient()
     bot.asyncio = AsyncioShim(on_sleep)
+    bot.log = lambda *a: LOGGED.append(' '.join(str(x) for x in a))
     try:
         try:
             asyncio.run(bot.watch_moderation())
         except Stop:
             pass
     finally:
-        (bot.MODERATION_LOGS, bot.report_say, bot.client, bot.asyncio) = keep
+        (bot.MODERATION_LOGS, bot.report_say, bot.client, bot.asyncio, bot.log) = keep
     return ticks
 
 
@@ -252,11 +258,42 @@ try:
     yes('M9 on_ready starts it', 'asyncio.create_task(watch_moderation())' in src)
     yes('M9 it speaks through report_say', 'report_say(' in inspect.getsource(bot.watch_moderation))
     logs = dict(bot.MODERATION_LOGS)
-    yes('M9 by default it reads both game servers\' private folders and the site\'s data folder',
+    yes('M9 by default it reads both game servers\' for-bot folders and the site\'s, never private (#2321)',
         [w for w, _ in bot.MODERATION_LOGS] == ['live', 'dev', 'site']
-        and logs['live'].endswith(os.path.join('private', 'moderation.log'))
-        and logs['dev'].endswith(os.path.join('private', 'moderation.log'))
-        and os.path.dirname(logs['site']) == os.path.dirname(bot.TROUBLE_FILE))
+        and logs['live'] == r'C:\Thornswood-Server\for-bot\moderation.log'
+        and logs['dev'] == r'C:\Thornswood-Server-Dev\for-bot\moderation.log'
+        and os.path.dirname(logs['site']) == os.path.dirname(bot.TROUBLE_FILE)
+        and not any('private' in p.lower() for p in logs.values()))
+
+    # M13: a file that cannot be read is said in bot.log, once, naming it and
+    # why, and once more when it can be read again; nothing is said in the
+    # channel for it (#2321). A folder where the file should be is a read that
+    # is refused, on Windows and elsewhere, as the bot's account is refused a
+    # file it has no rule on. What is in it when it first opens cannot be told
+    # from history, so it is taken as said, as at start (M1); a line after that
+    # is said.
+    put(LIVE, old)
+    if os.path.exists(DEV):
+        os.remove(DEV)
+    os.makedirs(DEV)
+
+    def opens():
+        os.rmdir(DEV)
+        put(DEV, [row('warn', why='before the bot could read it', n=20)])
+    ticks = drive([lambda: None, lambda: None, opens,
+                   lambda: put(DEV, [row('warn', why='before the bot could read it', n=20),
+                                     row('kick', why='after', n=21)]),
+                   lambda: None])
+    said = [s for t in ticks for s in t]
+    refused = [l for l in LOGGED if 'cannot read' in l]
+    yes('M13 a moderation.log that cannot be read is a line in bot.log, naming it and why',
+        len(refused) == 1 and DEV in refused[0] and 'the dev server' in refused[0] and 'Error' in refused[0])
+    yes('M13 said once, not at every look', len(refused) == 1)
+    yes('M13 and once more when it can be read', len([l for l in LOGGED if 'can be read again' in l and DEV in l]) == 1)
+    yes('M13 nothing is said in the channel while it cannot be read, and a line after it opens is',
+        len(said) == 1 and 'removed Bjorn' in said[0] and said[0].startswith('**Staff on the dev server:**'))
+    if os.path.isdir(DEV):
+        os.rmdir(DEV)
 finally:
     shutil.rmtree(WORK, ignore_errors=True)
 

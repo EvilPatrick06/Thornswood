@@ -92,7 +92,9 @@ try {
     foreach ($d in 'scripts\dev', 'scripts\release', 'scripts\vps', 'records') { New-Item -ItemType Directory -Force -Path (Join-Path $tree $d) | Out-Null }
     Copy-Item -LiteralPath $install -Destination (Join-Path $tree 'scripts\dev')
     Copy-Item -LiteralPath $sync -Destination (Join-Path $tree 'scripts\release')
-    foreach ($f in 'Where.ps1', 'where.js') {
+    # Sync-Client holds the record to RecordShape.ps1 (#2180, since #2271),
+    # which reads it through Read-JsonFile.ps1, so both go in beside it.
+    foreach ($f in 'Where.ps1', 'where.js', 'RecordShape.ps1', 'Read-JsonFile.ps1') {
         $p = Join-Path $Repo "scripts\release\$f"
         if (Test-Path -LiteralPath $p) { Copy-Item -LiteralPath $p -Destination (Join-Path $tree 'scripts\release') }
     }
@@ -118,7 +120,7 @@ try {
     $extraRel = 'Data\Platform\Plugins\not-in-the-record.js'
     New-Item -ItemType Directory -Force -Path (Split-Path (Join-Path $good $extraRel) -Parent) | Out-Null
     [IO.File]::WriteAllText((Join-Path $good $extraRel), 'somebody else''s client')
-    $rec = [ordered]@{ recordedUtc = '2026-09-29T00:00:00Z'; forkCommit = 'test'; forkBranch = 'test'; files = $files }
+    $rec = [ordered]@{ recordedUtc = '2026-09-29T00:00:00Z'; forkCommit = '0123456789abcdef0123456789abcdef01234567'; forkBranch = 'test'; files = $files }
     [IO.File]::WriteAllText((Join-Path $tree 'records\client-build.json'), ($rec | ConvertTo-Json -Depth 5), (New-Object Text.UTF8Encoding($false)))
 
     $bad = Join-Path $tmp 'build-bad'

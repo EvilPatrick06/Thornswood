@@ -47,6 +47,19 @@ namespace Thornswood
         }
 
         /// <summary>
+        /// The pass's own key (#1320), for the game's client to prove the pass
+        /// on its own connection: the pass's mac, a space, then the key, so the
+        /// front plugin pairs a key only with the pass it was given for. Its own
+        /// file, so a front plugin that knows nothing of it reads the pass file
+        /// exactly as before. Straight in Data\Platform, which no release
+        /// carries (Ship-Rules.ps1, one machine's own files by kind).
+        /// </summary>
+        static string KeyPath
+        {
+            get { return Path.Combine(Paths.Game, "Data\\Platform\\thornswood-pass-key.txt"); }
+        }
+
+        /// <summary>
         /// A new Play: nothing from the last session is sent for this one.
         /// </summary>
         public static void Forget()
@@ -54,6 +67,8 @@ namespace Thornswood
             lock (gate) { profile = 0; due = DateTime.MinValue; gotFor = 0; lastWhy = ""; }
             try { if (File.Exists(FilePath)) File.Delete(FilePath); }
             catch (Exception ex) { Swallow.Note("JoinPass.Forget", ex); }
+            try { if (File.Exists(KeyPath)) File.Delete(KeyPath); }
+            catch (Exception ex) { Swallow.Note("JoinPass.Forget, key", ex); }
         }
 
         /// <summary>A character was picked at the menu: a pass for it, now.</summary>
@@ -80,7 +95,8 @@ namespace Thornswood
         {
             string why = "";
             string pass = "";
-            try { pass = Discord.Pass(id, out why); }
+            string key = "";
+            try { pass = Discord.Pass(id, out key, out why); }
             catch (Exception ex) { why = "Could not ask thornswood.net for a join pass: " + ex.Message; }
 
             string line = null;
@@ -96,6 +112,11 @@ namespace Thornswood
                     try
                     {
                         Directory.CreateDirectory(Path.GetDirectoryName(FilePath));
+                        // The key first, named by the pass it belongs to, so
+                        // the front plugin never pairs a new pass with an old
+                        // key or the other way round (#1320).
+                        if (key.Length > 0) File.WriteAllText(KeyPath, pass.Substring(pass.LastIndexOf('.') + 1) + " " + key);
+                        else if (File.Exists(KeyPath)) File.Delete(KeyPath);
                         File.WriteAllText(FilePath, pass);
                     }
                     catch (Exception ex)

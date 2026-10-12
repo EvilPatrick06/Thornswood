@@ -23,17 +23,16 @@ Report one of these only if it does something this table does not describe.
 
 ## What is decided about NPCs
 
-There are going to be fewer of them. The ones who stay are the traders you
-buy from and sell to, and the people who work the carriages and ferries.
-Every other NPC is to be taken out or remade for Thornswood. The roadmap
-lists this under **Thinning the crowd** and
-**NPCs with their own work**, and neither has a date. Until then, this table
-is how NPCs behave. Report one of these only if it does something this table
-does not describe.
+The cast has been cut. The traders you buy from and sell to stay, and so do
+the people who work the carriages and ferries. Wildlife, bandit camps and
+dungeon enemies stay where they belong. Guards, courts, priests, townsfolk and
+named creatures were taken out. The server now runs the NPCs that are left, so
+they keep moving when nobody is nearby. The roadmap lists what comes next under
+**NPCs with their own work**. Report an NPC only if it does something
+this table does not describe.
 
 | Behaviour | Reason |
 |---|---|
-| NPCs stand still when nobody is nearby | SkyMP has no server side AI. An NPC is simulated by a nearby machine or not at all |
 | NPC behaviour differs between people near the same enemy | Hosting changes every 2 seconds, so whoever is simulating decides the outcome |
 
 ## What the collection took out

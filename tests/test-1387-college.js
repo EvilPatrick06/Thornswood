@@ -14,6 +14,10 @@
 //   is refused by the server, which puts the body back down.
 //   Restoration strain matches the page: 25% more each cast inside 30
 //   seconds, the fifth refused for 20 seconds at the weary cold recovery.
+//   Withered matches the page: five potions or ten restoration casts in an
+//   hour, 30 real minutes at 80% of max health and magicka, kept over a
+//   relog and a restart, and over when the 30 minutes are (the cooked meal
+//   that also clears it waits for #1382).
 //
 // Traps: the two-spell cap and the tome gates are the ones already there,
 // and there is no second spell list. The refusal of Dead Thrall is the
@@ -524,8 +528,105 @@ person(srv, OUT, 13, 'smith', 'platewright', function (s) {
       !/return false/.test(src.slice(castAt, src.indexOf('\n  });', castAt))));
   yes('F5: the effects reach the client on the map it already applies, on top of the tree, the needs and the maneuvers',
       /view\.effects = withCollege\(actorId, view\.effects\);/.test(CHARACTER));
-  yes('F5: withered is not claimed: it waits for a cooked meal (#1382), and the page says so',
-      /Withered/.test(page.potions) && /withered/i.test(page.potions.slice(page.potions.indexOf('## Where this is'))));
+}
+
+// ------------------------------------------------------------ W. withered --
+{
+  srv = server(store);
+  const WI = 0xff000120, WI2 = 0xff000121;
+  person(srv, WI, 61, 'mage', ['destruction', 'restoration']);
+  person(srv, WI2, 62, 'mage', ['destruction', 'restoration']);
+  const MOST = { health: 100, magicka: 150 };
+  const KINDS = { 0x3eadd: 'potion', 0x3a5a4: 'poison', 0x64b3f: 'food', 0x34c5e: 'ale' };
+  function plug(s2) {
+    // The two blocks withered asks, at call time: the engine's most (the
+    // maneuvers block) and what a thing swallowed is (the needs block).
+    s2.ctx.__thornswoodManeuvers = { engineMost: function (id, av) { return MOST[av] || 0; } };
+    s2.ctx.__thornswoodNeeds = { kindOf: function (b) { return KINDS[b] || ''; } };
+  }
+  plug(srv);
+  const W = srv.CO.WITHERED;
+  const t0 = srv.now();
+  const MIN = 60000;
+  const panel = function (id) { const st = JSON.parse(store[id].thornswoodCharacter); return (st.panel && st.panel.effects) || {}; };
+  const before = panel(WI);
+  const h0 = before.health || 0, m0 = before.magicka || 0;
+
+  yes('W0: the numbers are the page\'s: five potions or ten restoration casts in an hour, 30 minutes, 80%',
+      W.potions === 5 && W.casts === 10 && W.hour === 60 && W.minutes === 30 && W.share === 0.8 &&
+      /Five potions in an hour, or ten restoration casts in an hour, sets\s+withered for 30 real minutes\. Max health and max magicka are 80% of\s+what they were\./.test(page.potions));
+
+  for (let i = 0; i < 4; i++) { srv.at(t0 + i * 10 * MIN); srv.CO.drank(WI, 0x3eadd); }
+  yes('W1: four potions in an hour are four potions', !srv.CO.isWithered(WI) && !srv.CO.effects(WI));
+  srv.said.length = 0;
+  srv.at(t0 + 50 * MIN); srv.CO.drank(WI, 0x3eadd);
+  const e1 = srv.CO.effects(WI, undefined, { health: h0, magicka: m0 });
+  yes('W1: the fifth inside the hour withers them, and they are told (' + srv.told(WI).join(' ') + ')',
+      srv.CO.isWithered(WI) && /You are withered: five potions in an hour/.test(srv.told(WI)[0]));
+  yes('W1: a fifth of max health and max magicka comes off: the engine\'s most and what the map already adds (' + JSON.stringify(e1) + ')',
+      !!e1 && e1.health === -Math.round((MOST.health + h0) * 0.2 * 100) / 100 &&
+      e1.magicka === -Math.round((MOST.magicka + m0) * 0.2 * 100) / 100);
+  yes('W1: and it is on the panel\'s map, the one the client applies',
+      panel(WI).health === h0 + e1.health && panel(WI).magicka === m0 + e1.magicka);
+  yes('W1: stamina is not touched', panel(WI).stamina === before.stamina);
+
+  // Over a relog and a restart: a second server over the same store.
+  srv.at(t0 + 70 * MIN);
+  srv = server(store, { clock: t0 + 70 * MIN });
+  plug(srv);
+  yes('W2: a restart does not end it: the end is on the character', srv.CO.isWithered(WI));
+  srv.C.arrival(WI);
+  yes('W2: arriving again, the map still carries it', panel(WI).health === h0 + e1.health);
+  srv.at(t0 + 50 * MIN + 30 * MIN - 1); srv.tick();
+  yes('W2: still withered a moment before the 30 minutes are up', srv.CO.isWithered(WI));
+  srv.said.length = 0;
+  srv.at(t0 + 50 * MIN + 30 * MIN + 60); srv.tick();
+  yes('W2: then it passes on its own, armed at arrival, and the map is written again without it (' + srv.told(WI).join(' ') + ')',
+      !srv.CO.isWithered(WI) && !srv.CO.effects(WI) && (panel(WI).health || 0) === h0 &&
+      /The withering has passed/.test(srv.told(WI)[0]));
+
+  // Five potions over more than an hour are not five in an hour.
+  const t1 = srv.now() + MIN;
+  for (let i = 0; i < 5; i++) { srv.at(t1 + i * 15 * MIN); srv.CO.drank(WI2, 0x3eadd); }
+  yes('W3: five potions an hour and more apart do not wither', !srv.CO.isWithered(WI2));
+  const t2 = srv.now() + 2 * 60 * MIN;
+  srv.at(t2);
+  [0x64b3f, 0x34c5e, 0x3a5a4, 0x64b3f, 0x34c5e, 0x3a5a4].forEach(function (b) { srv.CO.drank(WI2, b); });
+  yes('W3: food, ale and a poison are not potions', !srv.CO.isWithered(WI2));
+  for (let i = 0; i < 5; i++) { srv.CO.drank(WI2, 0xff00a001 + i); }
+  yes('W3: a potion somebody brewed, a form only their game has, is a potion', srv.CO.isWithered(WI2));
+  store[NPC] = { profileId: JSON.stringify(-1) };
+  for (let i = 0; i < 6; i++) { srv.CO.drank(NPC, 0x3eadd); }
+  yes('W3: an NPC a client hosts is the world\'s, not withered', !srv.CO.isWithered(NPC));
+
+  // Ten restoration casts in an hour, with the strain's windows between them.
+  srv = server(store, { clock: t2 + 3 * 60 * MIN });
+  plug(srv);
+  const WI3 = 0xff000122;
+  person(srv, WI3, 63, 'mage', ['destruction', 'restoration']);
+  const t3 = srv.now();
+  for (let i = 0; i < 9; i++) { srv.at(t3 + i * 5 * MIN); srv.CO.cast(WI3, { type: 'espm', desc: HEALING }); srv.CO.cast(WI3, { type: 'espm', desc: FLAMES }); }
+  yes('W4: nine restoration casts in an hour, and destruction between them, are not withered', !srv.CO.isWithered(WI3));
+  srv.said.length = 0;
+  srv.at(t3 + 50 * MIN); srv.CO.cast(WI3, { type: 'espm', desc: HANDS });
+  yes('W4: the tenth withers them (' + srv.told(WI3).join(' ') + ')',
+      srv.CO.isWithered(WI3) && /ten restoration spells in an hour/.test(srv.told(WI3).join(' ')));
+
+  // The wiring.
+  const eatAt = src.indexOf("mp.onEatItem = guard('onEatItem'");
+  const eat = src.slice(eatAt, src.indexOf('\n  });', eatAt));
+  yes('W5: there is one onEatItem handler, and it hands every drink to the college block on its own, never answering false',
+      (src.match(/mp\.onEatItem =/g) || []).length === 1 &&
+      /var college = g\.__thornswoodCollege;\s*if \(college && college\.drank\) \{\s*try \{ college\.drank\(actorId, Number\(baseId\) \|\| 0\); \}/.test(eat) &&
+      !/return false/.test(eat));
+  yes('W5: the needs block says what a thing swallowed is, and the maneuvers block what the engine\'s most is',
+      /kindOf: foodKind/.test(src) && /engineMost: engineMost/.test(src) &&
+      /health: \{ race: 36, npc: 20, floorAtZero: true \}/.test(src) && /magicka: \{ race: 40, npc: 4, floorAtZero: false \}/.test(src) &&
+      /stamina: \{ race: 44, npc: 6, floorAtZero: true \}/.test(src));
+  yes('W5: the college gets the map so far, so withered is a share of it',
+      /var add = co\.effects\(actorId, undefined, base\);/.test(CHARACTER));
+  yes('W6: the page says withered is in the server, and that the cooked meal clear waits for food',
+      /Withered is in the server/.test(page.potions) && /#1382|cooked meal/.test(page.potions.slice(page.potions.indexOf('## Where this is'))));
 }
 
 // ------------------------------------------------------------ G. the pages --

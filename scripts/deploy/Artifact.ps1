@@ -4,8 +4,9 @@
   What a deploy sends, built from a commit rather than copied off a working
   tree, and what the box keeps to say which commit each part runs. Issue #459.
   Dot-sourced by Deploy-Docs.ps1 (site), Install-Voice.ps1 (voice),
-  Install-Bot.ps1 (bot), Deploy-DevGamemode.ps1 and Deploy-Server.ps1
-  (gamemode), and by Publish-Server.ps1 for the refusal below.
+  Install-Bot.ps1 (bot), Deploy-DevGamemode.ps1, Deploy-Server.ps1 and
+  Publish-Server.ps1 (gamemode). Publish-Server records through
+  Set-ThornswoodServerRecord and Restore-ThornswoodServerRecord, near the end.
 
   THE ARTIFACT. New-ThornswoodArtifact reads the named paths out of the
   repository's HEAD commit (git's own bytes, so line endings and file dates on
@@ -625,4 +626,150 @@ Add-Content -LiteralPath '$($store.Replace('/', '\'))\history.log' -Value '$line
     Write-Host ('  the box records ' + $rec.part + ' as ' + $rec.name) -ForegroundColor DarkGray
   }
   return $rec
+}
+
+<#
+  A FULL SERVER PUBLISH RECORDS THE SAME WAY (#459). Publish-Server.ps1 does
+  not swap files inside the root the way Deploy-Server.ps1 does: the installer
+  swaps the whole folder and keeps the old one beside it as
+  <root>.prev-<stamp>, and it does not carry data\thornswood-deploy.json from
+  one folder to the next, because that file describes the folder it is in.
+  Until 11 Oct a full publish wrote no record at all, so the new folder went
+  on naming the gamemode the old one ran (measured 30 Sep: e445101a, with
+  32dea10d installed).
+
+  Once the installer has said INSTALL OK, which is the new server answering on
+  both its ports, and the artifact is in the store (Send-ThornswoodArtifact),
+  Set-ThornswoodServerRecord asks the box to hold what the root now runs to
+  that artifact: gamemode.js must be the artifact's own bytes, and the root's
+  thornswood-build.json must describe that gamemode.js. Either one wrong, and
+  nothing is recorded and the box says SERVER NOT RECORDED and why. Otherwise
+  the record goes beside it (data\, where the server serves it) and into
+  current\<part>.json, with a line in history.log, the same record
+  Set-ThornswoodArtifactCurrent writes. It names the commit the gamemode came
+  from; the engine's own commit is in the root's server-build.json, which
+  DeployedBuild.ps1 reads for the site, so the two stay apart.
+
+  After a put-back, Restore-ThornswoodServerRecord: the folder that came back
+  has its own record in data\. It becomes current only when the store's record
+  of the artifact it names lists the gamemode.js that came back with it. A
+  folder with no record, or one whose record does not describe its gamemode.js
+  (a folder installed before 11 Oct holds the record the folder before it
+  had), is recorded as an older copy with no commit, as Restore-SwapRecord
+  does for a put-back inside the root.
+#>
+function Get-ThornswoodServerRecordScript {
+  param(
+    [Parameter(Mandatory = $true)][string]$Root,
+    [Parameter(Mandatory = $true)][string]$Name,
+    [Parameter(Mandatory = $true)][string]$GamemodeSha,
+    [Parameter(Mandatory = $true)][string]$RecordJson,
+    [Parameter(Mandatory = $true)][string]$Line,
+    [string]$Store = $script:ThornswoodDeployStore
+  )
+  $q = { param($s) "'" + ([string]$s).Replace("'", "''") + "'" }
+  $rootWin = $Root.Replace('/', '\').TrimEnd('\')
+  $storeWin = $Store.Replace('/', '\').TrimEnd('\')
+  $cur = $storeWin + '\current\' + (Get-ThornswoodArtifactPart $Root) + '.json'
+  return @"
+`$r = $(& $q $rootWin)
+`$want = $(& $q $GamemodeSha.ToLowerInvariant())
+`$gm = Join-Path `$r 'gamemode.js'
+`$why = ''
+if (-not (Test-Path -LiteralPath `$gm)) { `$why = 'there is no gamemode.js in ' + `$r }
+elseif ((Get-FileHash -LiteralPath `$gm -Algorithm SHA256).Hash.ToLowerInvariant() -ne `$want) { `$why = 'the gamemode.js in ' + `$r + ' is not the one in ' + $(& $q $Name) }
+else {
+  `$s = `$null
+  try { `$s = ([IO.File]::ReadAllText((Join-Path `$r 'thornswood-build.json')) -replace '^\uFEFF', '') | ConvertFrom-Json } catch { `$s = `$null }
+  if (-not `$s -or [string]`$s.gamemodeSha256 -ne `$want) { `$why = 'the thornswood-build.json in ' + `$r + ' does not describe that gamemode.js' }
+}
+if (`$why) { 'SERVER NOT RECORDED: ' + `$why }
+else {
+  `$e = New-Object Text.UTF8Encoding `$false
+  `$j = $(& $q $RecordJson)
+  `$cur = $(& $q $cur)
+  New-Item -ItemType Directory -Force -Path (Join-Path `$r 'data'), (Split-Path -Parent `$cur) | Out-Null
+  [IO.File]::WriteAllText((Join-Path `$r 'data\thornswood-deploy.json'), `$j, `$e)
+  [IO.File]::WriteAllText(`$cur, `$j, `$e)
+  Add-Content -LiteralPath $(& $q ($storeWin + '\history.log')) -Value $(& $q $Line)
+  'SERVER RECORDED ' + $(& $q $Name)
+}
+"@
+}
+
+function Set-ThornswoodServerRecord {
+  param(
+    [Parameter(Mandatory = $true)]$Artifact,
+    [Parameter(Mandatory = $true)][string]$Target,
+    [string[]]$SshArgs = @(),
+    [Parameter(Mandatory = $true)][string]$Root,
+    [string]$Store = $script:ThornswoodDeployStore
+  )
+  $gmSha = ''
+  foreach ($f in @($Artifact.Record.files)) { if ([string]$f.path -eq 'game/gamemode.js') { $gmSha = [string]$f.sha256 } }
+  if ($gmSha -notmatch '^[0-9a-fA-F]{64}$') { return @('SERVER NOT RECORDED: ' + $Artifact.Name + ' lists no game/gamemode.js') }
+  $rec = New-ThornswoodDeployRecord $Artifact $Root
+  $json = ConvertTo-Json -InputObject $rec -Depth 4
+  $line = $rec.deployedUtc + ' ' + $rec.part + ' ' + $rec.name + ' from ' + $rec.from
+  $said = @(Invoke-ThornswoodArtifactRemote $Target $SshArgs (Get-ThornswoodServerRecordScript -Root $Root -Name $Artifact.Name -GamemodeSha $gmSha -RecordJson $json -Line $line -Store $Store))
+  if (@($said | Where-Object { "$_" -like 'SERVER RECORDED *' }).Count) { Write-Host ('  the box records ' + $rec.part + ' as ' + $rec.name) -ForegroundColor DarkGray }
+  return $said
+}
+
+function Get-ThornswoodServerRestoreScript {
+  param(
+    [Parameter(Mandatory = $true)][string]$Root,
+    [Parameter(Mandatory = $true)][string]$At,
+    [string]$From = [string]$env:COMPUTERNAME,
+    [string]$Store = $script:ThornswoodDeployStore
+  )
+  $q = { param($s) "'" + ([string]$s).Replace("'", "''") + "'" }
+  $rootWin = $Root.Replace('/', '\').TrimEnd('\')
+  $storeWin = $Store.Replace('/', '\').TrimEnd('\')
+  $part = Get-ThornswoodArtifactPart $Root
+  return @"
+$(Get-ThornswoodLockedFolderScript $storeWin)
+`$r = $(& $q $rootWin)
+`$b = Join-Path `$r 'data\thornswood-deploy.json'
+`$st = $(& $q $storeWin)
+`$cur = Join-Path `$st $(& $q ('current\' + $part + '.json'))
+`$sha = ''
+if (Test-Path -LiteralPath (Join-Path `$r 'gamemode.js')) { `$sha = (Get-FileHash -LiteralPath (Join-Path `$r 'gamemode.js') -Algorithm SHA256).Hash.ToLowerInvariant() }
+`$name = 'an older copy kept before deploys were recorded'
+`$ok = `$false
+if (Test-Path -LiteralPath `$b) {
+  `$name = 'an older copy its record does not describe'
+  try {
+    `$n = [string](([IO.File]::ReadAllText(`$b) -replace '^\uFEFF', '') | ConvertFrom-Json).name
+    if (`$n -match '^gamemode-[0-9a-f]{12}-[0-9a-f]{16}\.zip$') {
+      `$a = ([IO.File]::ReadAllText((Join-Path `$st ('gamemode\' + `$n.Replace('.zip', '.json')))) -replace '^\uFEFF', '') | ConvertFrom-Json
+      if (`$sha -and @(`$a.files | Where-Object { `$_.path -eq 'game/gamemode.js' -and `$_.sha256 -eq `$sha }).Count -eq 1) { `$ok = `$true; `$name = `$n }
+    }
+  } catch { `$ok = `$false }
+}
+New-Item -ItemType Directory -Force -Path (Split-Path -Parent `$cur), (Join-Path `$r 'data') | Out-Null
+if (`$ok) { Copy-Item -LiteralPath `$b -Destination `$cur -Force }
+else {
+  `$j = ConvertTo-Json -InputObject ([ordered]@{ part = $(& $q $part); component = 'gamemode'; name = `$name; commit = ''; putBack = `$true; root = $(& $q $Root.Replace('\', '/').TrimEnd('/')); deployedUtc = $(& $q $At); from = $(& $q $From) })
+  `$e = New-Object Text.UTF8Encoding `$false
+  [IO.File]::WriteAllText(`$b, `$j, `$e)
+  [IO.File]::WriteAllText(`$cur, `$j, `$e)
+}
+Add-Content -LiteralPath (Join-Path `$st 'history.log') -Value ($(& $q ($At + ' ' + $part + ' put back to ')) + `$name)
+'SERVER RECORDED ' + `$name
+"@
+}
+
+function Restore-ThornswoodServerRecord {
+  param(
+    [Parameter(Mandatory = $true)][string]$Target,
+    [string[]]$SshArgs = @(),
+    [Parameter(Mandatory = $true)][string]$Root,
+    [string]$Store = $script:ThornswoodDeployStore
+  )
+  $at = [DateTime]::UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", [Globalization.CultureInfo]::InvariantCulture)
+  $said = @(Invoke-ThornswoodArtifactRemote $Target $SshArgs (Get-ThornswoodServerRestoreScript -Root $Root -At $at -Store $Store))
+  $r = @($said | Where-Object { "$_" -like 'SERVER RECORDED *' })
+  if ($r.Count) { Write-Host ('  the box records ' + (Get-ThornswoodArtifactPart $Root) + ' as ' + ([string]$r[0]).Substring(16)) -ForegroundColor DarkGray }
+  return $said
 }

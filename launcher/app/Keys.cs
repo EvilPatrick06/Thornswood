@@ -505,7 +505,7 @@ namespace Thornswood
                      "Hands the keyboard to the chat box and puts the cursor in it. Escape gives it back to the game. Nothing in Skyrim uses Enter while you are playing, which is why it is here.",
                      ThornIni, "ChatKey", 28));
             l.Add(Dx("command", "ThornsWood", "Type a command",
-                     "Opens the chat with a slash already typed, for what is still typed there: /stuck, /helpme and /report, how a line is said (/me, /do, /w, /s, /y and /ooc), /roll, and staff and dev commands. The game's skill tree, also on this key, stays shut.",
+                     "Opens the chat with a slash already typed, for what is still typed there: /stuck, /helpme and /report, how a line is said (/me, /do, /w, /s, /y and /ooc), /roll, /needs for the needs bars as text, and staff and dev commands. The game's skill tree, also on this key, stays shut.",
                      ThornIni, "CommandKey", 53));
             // The help panel (#1633): what /help used to say, as the keys and
             // panels it is now, opened without the chat. F7: every letter is
