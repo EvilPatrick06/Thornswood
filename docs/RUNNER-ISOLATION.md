@@ -16,7 +16,7 @@ queued for Claude. The one decision only Patrick can make is in section 6.
 | Where | The same Windows VPS that runs both game servers, both voice services, the site, Caddy, the bot, the watchdog and the nightly backup (docs\SYSTEM.md) |
 | Accounts | `thornswood-runner`, `-runner2`, `-runner3`, `-runner4`: local users in Users and their GitHub runner groups, not in Administrators. Each runs its `actions.runner.*` service |
 | Runner folders | Locked by `scripts\deploy\Install-Runner.ps1` to SYSTEM, Administrators and the runner's account, with nothing inherited from C:\ |
-| Production folders | Locked by `scripts\vps\Lock-VpsFolders.ps1`; since #2106 the runner accounts may write crash dumps to `C:\Thornswood-Dumps` but not read them |
+| Production folders | Locked by `scripts\vps\Lock-VpsFolders.ps1`; the runner accounts may write crash dumps to `C:\Thornswood-Dumps` but not read them |
 | Repository | Private. Three collaborators can push |
 | Fork pull requests | Do not run workflows, get no write token and no secrets (`fork-pr-workflows-private-repos` all false) |
 | Default workflow token | read; each workflow also sets its own `permissions` (build: contents read; nightly: contents read, issues write, pull-requests read; release: contents write, on a `v*` tag or by hand; drop-claims: issues write) |
