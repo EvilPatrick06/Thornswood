@@ -2998,10 +2998,13 @@ function swing(actorId, anim, lands, opts) {
   }
   // One timer per person, not one per strike: a miner working a seam sets this
   // again every swing, and the last one is the one that clears.
-  SWING_CLEAR[actorId] = setTimeout(function () {
-    if (o.alive && !o.alive()) return;
+  const cleanupTimer = setTimeout(function () {
+    if (SWING_CLEAR[actorId] !== cleanupTimer) return;
+    var valid = !o.alive || o.alive();
+    if (SWING_CLEAR[actorId] !== cleanupTimer) return;
     delete SWING_CLEAR[actorId];
     delete SWING_IN_AIR[actorId];
+    if (!valid) return;
     /*
       A spent swing rather than null. The script above throws it away on
       either, but this property has only ever held an object and a property
@@ -3011,6 +3014,7 @@ function swing(actorId, anim, lands, opts) {
     */
     try { mp.set(actorId, SWING_PROPERTY, { anim: '', at: 0 }); } catch (e) { }
   }, SWING_MS + 1000);
+  SWING_CLEAR[actorId] = cleanupTimer;
   if (lands) { setTimeout(guard('swingLands', lands), SWING_LAND_MS); }
 }
 /*
@@ -3020,17 +3024,26 @@ function swing(actorId, anim, lands, opts) {
   end that reused the last one would be read as the swing it is ending.
 */
 function swingEnd(actorId, tool) {
+  var runtime;
+  try { runtime = mp.getActorRuntimeIdentity(actorId); } catch (e) { }
   if (SWING_CLEAR[actorId]) { clearTimeout(SWING_CLEAR[actorId]); delete SWING_CLEAR[actorId]; }
   delete SWING_IN_AIR[actorId];
+  // And cleared behind it, so nothing replays at the next login.
+  const cleanupTimer = setTimeout(function () {
+    if (SWING_CLEAR[actorId] !== cleanupTimer) return;
+    var current;
+    try { current = mp.getActorRuntimeIdentity(actorId); } catch (e) { }
+    if (SWING_CLEAR[actorId] !== cleanupTimer) return;
+    delete SWING_CLEAR[actorId];
+    if (!runtime || current !== runtime) return;
+    try { mp.set(actorId, SWING_PROPERTY, { anim: '', at: 0 }); } catch (e) { }
+  }, 1500);
+  SWING_CLEAR[actorId] = cleanupTimer;
   try {
     mp.set(actorId, SWING_PROPERTY,
            { anim: '', end: true, stop: SWING_STOP, free: SWING_FREE,
              tool: Number(tool) || 0, at: Date.now() });
   } catch (e) { }
-  // And cleared behind it, so nothing replays at the next login.
-  setTimeout(function () {
-    try { mp.set(actorId, SWING_PROPERTY, { anim: '', at: 0 }); } catch (e) { }
-  }, 1500);
 }
 
 const SWING_QUIET = {};
@@ -3340,6 +3353,14 @@ function mineOre(actorId, refrId, baseDesc) {
   if (!isVein(baseDesc)) return null;
   const seam = ORES_BY_BASE[baseDesc];
 
+  // Rare work owns its identity and record before class/tool callbacks run.
+  const rareQuests = globalThis.__thornswoodQuests;
+  const onePlace = ORE_ONE_PLACE.indexOf(seam.name) !== -1;
+  if (onePlace || (rareQuests && rareQuests.isRareSeam && rareQuests.isRareSeam(seam))) {
+    if (rareQuests && rareQuests.mineRare) { return rareQuests.mineRare(actorId, refrId, seam); }
+    return 'This place is shut.';
+  }
+
   // The class first, and before the cooldown, the same ordering mineSalt and
   // harvest() settled on and for the same reason: somebody who is not a miner
   // is never going to work this seam, and 'it needs 14 more seconds' tells
@@ -3353,13 +3374,6 @@ function mineOre(actorId, refrId, baseDesc) {
   // do something about today.
   const tool = toolGate(actorId, 'miner');
   if (tool) return tool;
-
-  const rareQuests = globalThis.__thornswoodQuests;
-  const onePlace = ORE_ONE_PLACE.indexOf(seam.name) !== -1;
-  if (onePlace || (rareQuests && rareQuests.isRareSeam && rareQuests.isRareSeam(seam))) {
-    if (rareQuests && rareQuests.mineRare) { return rareQuests.mineRare(actorId, refrId, seam); }
-    return 'This place is shut.';
-  }
 
   const step = rankStep(actorId, 'miner');
   const pair = (seam.yield && seam.yield[step]) || [0, 0];
@@ -64415,8 +64429,10 @@ function createMerchantTrading(deps) {
 
   function sessionIdentity(human) {
     if (!human || !human.isHuman || !Number.isSafeInteger(human.profileId) || human.profileId<=0 ||
-        typeof human.desc!=='string' || !human.desc || !Number.isSafeInteger(human.lifeGeneration) || human.lifeGeneration<0) return null;
-    return JSON.stringify([human.desc,human.profileId,human.lifeGeneration]);
+        typeof human.desc!=='string' || !human.desc || !Number.isSafeInteger(human.lifeGeneration) || human.lifeGeneration<0 ||
+        typeof human.runtimeIdentity!=='string' || !/^[1-9][0-9]{0,19}$/.test(human.runtimeIdentity) ||
+        human.runtimeIdentity.length===20 && human.runtimeIdentity>'18446744073709551615') return null;
+    return JSON.stringify([human.desc,human.profileId,human.lifeGeneration,human.runtimeIdentity]);
   }
 
   function questView(actorId) {
@@ -64573,21 +64589,32 @@ function createMerchantTrading(deps) {
       sessions.delete(profileId);
       return fail('Press E on a guild trader with this character.', {open:false});
     }
-    var again = inReach(actorId, merchantId);
-    if (!again.ok) {
+    var originalSession = sessions.get(profileId), quests, heldQuest;
+    function refuseSession(text) {
+      if (sessions.get(profileId)!==originalSession) return fail(text);
       sessions.delete(profileId);
-      return fail(again.reason, { open: false });
-    }
-    if (!authed(profileId, again.human)) return fail('That request is not yours.');
-    if (sessionIdentity(again.human)!==sessions.get(profileId).identity) {
-      sessions.delete(profileId);
-      return fail('Press E on a guild trader with this character.', {open:false});
+      return fail(text, {open:false});
     }
     if (verb === 'quest') {
-      var quests = typeof deps.quests==='function' && deps.quests();
-      if (!quests) return fail('Quest work is unavailable.');
+      quests = typeof deps.quests==='function' && deps.quests();
+      if (!quests || typeof quests.capture!=='function') return fail('Quest work is unavailable.');
+      heldQuest = quests.capture(actorId);
+      if (!heldQuest) return fail('Quest work is unavailable.');
+    }
+    var again = inReach(actorId, merchantId);
+    if (!again.ok) {
+      return refuseSession(again.reason);
+    }
+    if (!authed(profileId, again.human)) return fail('That request is not yours.');
+    var reachedIdentity=sessionIdentity(again.human);
+    var currentIdentity=sessionIdentity(world.actor(actorId));
+    if (!active || sessions.get(profileId)!==originalSession ||
+        reachedIdentity!==originalSession.identity || currentIdentity!==originalSession.identity) {
+      return refuseSession('Press E on a guild trader with this character.');
+    }
+    if (verb === 'quest') {
       if (parts.length<4 || parts.length>5) return fail('Choose the work in the trader panel.');
-      var result=quests.act(actorId,String(parts[2]),String(parts[3]),parts[4],merchantId);
+      var result=quests.act(actorId,String(parts[2]),String(parts[3]),parts[4],merchantId,heldQuest);
       var reasons={class:'This work takes a different class.',rank:'This work takes a higher rank.',
         cooldown:'This work is still resting.',open:'You already hold this work.',gem:'Choose a gem first.',
         short:'You have not drawn enough to turn this work in.',none:'You do not hold this work.',
@@ -64778,6 +64805,7 @@ function installMerchantTrading(env) {
           cell: cell,
           desc: mp.getDescFromId(id),
           lifeGeneration: ai && ai.lifeGeneration,
+          runtimeIdentity: mp.getActorRuntimeIdentity(id),
           profileId: ai && ai.profileId || 0,
           isHuman: !!(ai && ai.isHuman)
         };
@@ -65011,8 +65039,8 @@ try {
       A map in this process was emptied by every restart: a scarce quest open
       at the time was gone while what it had drawn stayed in the pack, so
       twelve ebony out of Raven Rock Mine were kept with nothing left to put
-      them back, and every cooldown came back at once. deps.load and deps.save
-      read and write one record on the character, { v, open, cool }. The server
+      them back, and every cooldown came back at once. deps.load and deps.commit
+      read one record on the character, { v, open, cool }. The server
       keeps it in the character's change form beside the pack and saves that
       form whole, so no save holds the goods without the quest that drew them.
       Nothing else holds it, so what the server enforces is what a restart
@@ -65022,7 +65050,7 @@ try {
       No intermediate save can close a quest without its reward, or count a
       draw without its goods. There is no compensating add, take or reopen.
     */
-    if (typeof deps.load !== 'function' || typeof deps.save !== 'function' ||
+    if (typeof deps.load !== 'function' ||
         typeof deps.commit !== 'function' || typeof deps.identity !== 'function') {
       throw new Error('the custom quests have nowhere on the character to keep them');
     }
@@ -65043,13 +65071,14 @@ try {
 
     function own(o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); }
     function whole(n) {
-      n = Number(n);
+      n = typeof n==='number' || typeof n==='string' ? Number(n) : 0;
       return (n > 0 && Math.floor(n) === n) ? n : 0;
     }
     /*
-      One person's quests off the character, rebuilt field by field rather
-      than trusted whole: a quest the tables no longer have, a count that is
-      not a whole number and a cooldown that has run out are left off. Nothing
+      One person's working quest view, read field by field rather than
+      trusted whole. Unknown entries and expired cooldowns stay outside that
+      view, but remain in the saved record. An unrelated action must preserve
+      them and any malformed fields awaiting explicit recovery. Nothing
       there yet is nothing open and nothing waiting. A read that throws, or a
       value that is there and is not this record, is null: every step refuses
       and nothing is written over it, because writing would hand back every
@@ -65057,14 +65086,22 @@ try {
     */
     function questsOf(actor) {
       if (!active || deps.available && !deps.available()) return null;
-      var raw;
-      try { raw = deps.load(actor); } catch (e) {
+      var raw,owner;
+      try {
+        owner=deps.identity(actor);
+        if(!owner)return null;
+        raw=deps.load(actor);
+        if(deps.identity(actor)!==owner)return null;
+      } catch (e) {
         note('could not read the quests of', actor + ':', e);
         return null;
       }
-      var out = { open: {}, cool: {}, expected: raw === undefined ? null : raw };
+      var out = { open: {}, cool: {}, owner:owner, expected: raw === undefined ? null : raw,
+        before: {open: {}, cool: {}} };
       if (raw === undefined || raw === null) return out;
-      if (typeof raw !== 'object' || raw.v !== 1) {
+      if (typeof raw !== 'object' || Array.isArray(raw) || raw.v !== 1 ||
+          ['open','cool'].some(function(key){return own(raw,key) &&
+            (!raw[key] || typeof raw[key] !== 'object' || Array.isArray(raw[key]));})) {
         note('the quests on', actor, 'are not a quest record, so nothing is written over them');
         return null;
       }
@@ -65082,18 +65119,37 @@ try {
       var cool = (raw.cool && typeof raw.cool === 'object') ? raw.cool : {};
       var t = deps.now();
       Object.keys(cool).forEach(function (id) {
-        var until = Number(cool[id]) || 0;
-        if (own(byId, id) && until > t) out.cool[id] = until;
+        if (!own(byId,id)) return;
+        var until = whole(cool[id]);
+        if (until > t) out.cool[id] = until;
       });
+      out.before = JSON.parse(JSON.stringify({open: out.open, cool: out.cool}));
       return out;
+    }
+    // Apply only edits made to the working view, never its read normalization.
+    // This keeps newer quest fields and unrelated damaged records verbatim.
+    function recordEdits(raw, before, after) {
+      var next = JSON.parse(JSON.stringify(raw || {}));
+      Object.keys(before).forEach(function(key){
+        if (!own(after,key)) delete next[key];
+      });
+      Object.keys(after).forEach(function(key){
+        if (JSON.stringify(before[key]) === JSON.stringify(after[key])) return;
+        var left=before[key], right=after[key], original=next[key];
+        if (left && right && typeof left==='object' && typeof right==='object' &&
+            !Array.isArray(left) && !Array.isArray(right)) {
+          next[key]=recordEdits(original && typeof original==='object' && !Array.isArray(original) ? original : {},left,right);
+        } else next[key]=right;
+      });
+      return next;
     }
     function keep(actor, b, changes) {
       try {
-        if (!active || deps.available && !deps.available()) return false;
-        var next = { v: 1, open: b.open, cool: b.cool };
-        if (changes) return deps.commit(actor, b.expected, next, changes).ok === true;
-        deps.save(actor, next);
-        return true;
+        if (!active || deps.available && !deps.available() || deps.identity(actor)!==b.owner) return false;
+        var next = recordEdits(b.expected || {v:1,open:{},cool:{}}, b.before, {open: b.open, cool: b.cool});
+        next.v = 1;
+        if(deps.identity(actor)!==b.owner)return false;
+        return deps.commit(actor, b.expected, next, changes || []).ok === true;
       } catch (e) {
         note('could not write the quests of', actor + ', so nothing changed:', e);
         return false;
@@ -65134,10 +65190,10 @@ try {
         })
       };
     }
-    function offer(actor, id, opts) {
+    function offer(actor, id, opts, held) {
       var row = byId[id];
       if (!row) return { ok: false, why: 'unknown' };
-      var b = questsOf(actor);
+      var b = held || questsOf(actor);
       if (!b) return { ok: false, why: 'unread' };
       if (b.open[id]) return { ok: false, why: 'open' };
       if ((b.cool[id] || 0) > deps.now()) return { ok: false, why: 'cooldown' };
@@ -65173,8 +65229,8 @@ try {
       if (open.drawn >= row.holds) return 'This place has nothing left until you turn the work in.';
       return null;
     }
-    function giveRare(actor, refrId, seam) {
-      var b = questsOf(actor);
+    function giveRare(actor, refrId, seam, held) {
+      var b = held || questsOf(actor);
       var shut = rareShut(actor, refrId, seam, b);
       if (shut) return { ok: false, text: shut };
       var id = RARE[seam.name];
@@ -65186,6 +65242,8 @@ try {
       return { ok: true, text: open.drawn >= row.holds ? 'That is all this place will give you.' : '' };
     }
     function mineRare(actor, refrId, seam) {
+      var held=questsOf(actor),original=held && held.owner;
+      if(!original)return UNREAD;
       var classGateFn = deps.classGate || classGate;
       var toolGateFn = deps.toolGate || toolGate;
       var miningFn = deps.mining || mining;
@@ -65202,26 +65260,30 @@ try {
       if (refused) return refused;
       var tool = toolGateFn(actor, 'miner');
       if (tool) return tool;
-      var shut = rareShut(actor, refrId, seam, questsOf(actor));
+      var shut = rareShut(actor, refrId, seam, held);
       if (shut) return shut;
+      if(deps.identity(actor)!==original)return UNREAD;
       if (deps.ready && !deps.ready(actor)) return 'Quest work is waiting on a saved inventory change.';
-      if (miningFn(actor)) { stopMiningFn(actor); return 'You put the pick down.'; }
+      if (deps.identity(actor)!==original || !active || deps.available && !deps.available()) return UNREAD;
+      var wasMining = miningFn(actor);
+      if (deps.identity(actor)!==original || !active || deps.available && !deps.available()) return UNREAD;
+      if (wasMining) { stopMiningFn(actor); return 'You put the pick down.'; }
       if (swingingFn(actor)) return '';
       var pick = toolIdFn(actor, 'miner');
-      var original = deps.identity(actor);
-      if (!original) return UNREAD;
+      if(deps.identity(actor)!==original)return UNREAD;
       swingFn(actor, anim, function () {
         if (!active || deps.identity(actor) !== original) return;
-        var result = giveRare(actor, refrId, seam);
+        var result = giveRare(actor, refrId, seam, held);
         if (result.text) { notifyFn(actor, result.text); sayFn(actor, result.text); }
         if (!result.ok || !active || deps.available && !deps.available() || deps.identity(actor) !== original) return;
         try { creditFn(actor, 'mine'); } catch (e) {}
+        if (!active || deps.available && !deps.available() || deps.identity(actor)!==original) return;
         try { wearFn(actor, 'miner'); } catch (e) {}
       }, { tool: pick, alive: function(){return active && (!deps.available || deps.available()) && deps.identity(actor) === original;} });
       return '';
     }
-    function walkAway(actor, id) {
-      var b = questsOf(actor);
+    function walkAway(actor, id, held) {
+      var b = held || questsOf(actor);
       if (!b) return { ok: false, why: 'unread' };
       var open = b.open[id];
       if (!open) return { ok: false, why: 'none' };
@@ -65230,9 +65292,9 @@ try {
       if (!keep(actor, b, changes)) return { ok: false, why: 'unwritten' };
       return { ok: true };
     }
-    function turnIn(actor, id, traderRef) {
+    function turnIn(actor, id, traderRef, held) {
       var row = byId[id];
-      var b = row ? questsOf(actor) : null;
+      var b = row ? held || questsOf(actor) : null;
       if (row && !b) return { ok: false, why: 'unread' };
       var open = row && b.open[id];
       if (!row || !open) return { ok: false, why: 'none' };
@@ -65283,8 +65345,8 @@ try {
       if (counted && !keep(killer, b)) return { ok: false, why: 'unwritten' };
       return { ok: true };
     }
-    function noteContainer(actor, ref, cell) {
-      var held = questsOf(actor);
+    function noteContainer(actor, ref, cell, held) {
+      held = held || questsOf(actor);
       if (!held) return null;
       var said = null;
       SCENE.forEach(function (row) {
@@ -65332,13 +65394,16 @@ try {
           canAbandon:ready && !!open};
       });
     }
-    function act(actor, verb, id, gem, traderRef) {
+    function act(actor, verb, id, gem, traderRef, held) {
       var row = byId[id];
       if (!row || !row.scarce || !bound(row)) return {ok:false,why:'unbound'};
+      held=held || questsOf(actor);
+      if(!held)return {ok:false,why:'unread'};
       if (!active || deps.ready && !deps.ready(actor)) return {ok:false,why:'unavailable'};
-      if (verb === 'take') return offer(actor,id,{gem:gem});
-      if (verb === 'return') return turnIn(actor,id,traderRef);
-      if (verb === 'abandon') return walkAway(actor,id);
+      if(deps.identity(actor)!==held.owner)return {ok:false,why:'identity'};
+      if (verb === 'take') return offer(actor,id,{gem:gem},held);
+      if (verb === 'return') return turnIn(actor,id,traderRef,held);
+      if (verb === 'abandon') return walkAway(actor,id,held);
       return {ok:false,why:'unknown'};
     }
     function speak(actor, refrId) {
@@ -65354,13 +65419,13 @@ try {
       });
       if (!retrieval) return null;
       var cell = deps.cellOf ? (deps.cellOf(refrId) || '') : '';
-      return noteContainer(actor, refrId, cell);
+      return noteContainer(actor, refrId, cell, held);
     }
     return {
       lineup: lineup, offer: offer, bindPlace: bindPlace, walkAway: walkAway,
       turnIn: turnIn, noteKill: noteKill, noteContainer: noteContainer,
       mineRare: mineRare, isRareSeam: function (seam) { return !!RARE[seam && seam.name]; },
-      onActivate: onActivate, speak: speak, describe: describe, act: act,
+      onActivate: onActivate, speak: speak, describe: describe, act: act, capture: questsOf,
       shutdown: function () { active = false; }
     };
   }
@@ -65392,7 +65457,6 @@ try {
         now: function () { return Date.now(); },
         goldDesc: globalThis.__thornswoodDungeonLoot && globalThis.__thornswoodDungeonLoot.GOLD_DESC,
         load: function (actor) { return mp.get(actor, QUEST_PROPERTY); },
-        save: function (actor, rec) { mp.set(actor, QUEST_PROPERTY, rec); },
         log: function () {
           var a = Array.prototype.slice.call(arguments);
           a.unshift('custom quests:');
