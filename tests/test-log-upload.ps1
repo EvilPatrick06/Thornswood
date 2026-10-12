@@ -85,11 +85,13 @@ foreach ($k in $want.Keys) {
 }
 
 $name = 'LiftedDiscord' + [Guid]::NewGuid().ToString('N').Substring(0, 8)
-# ReadLogTail's cap, and Swallow.Note, which CrashLogText reports to: the
-# launcher's own, stood in for here.
+# ReadLogTail's cap, Swallow.Note, which CrashLogText reports to, and
+# CrashDump.Beside, the snapshot beside a crash log (test-crash-snapshot.ps1
+# holds the real one): the launcher's own, stood in for here.
 $code = "using System;`nusing System.Globalization;`nusing System.IO;`nusing System.Text;`n" +
         "using System.Text.RegularExpressions;`n" +
         "static class Swallow { public static void Note(string where, Exception e) { } }`n" +
+        "static class CrashDump { public static string Beside(string l) { string d = Path.ChangeExtension(l, `".dmp`"); return File.Exists(d) ? d : null; } }`n" +
         "public static class $name`n{`nconst int LogTailBytes = 192 * 1024;`n" +
         ($parts -join "`n") + "`n}`n"
 $T = $null

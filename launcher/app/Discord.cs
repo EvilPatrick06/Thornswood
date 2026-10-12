@@ -974,15 +974,16 @@ namespace Thornswood
         {
             if (string.IsNullOrEmpty(path)) return "";
             long bytes = -1;
-            string dump = Path.ChangeExtension(path, ".dmp");
+            // The snapshot beside it, by CrashDump's own rule; only its size is read, and it is never sent.
+            string dump = CrashDump.Beside(path);
             long dumpBytes = -1;
             try
             {
                 if (File.Exists(path)) bytes = new FileInfo(path).Length;
-                if (File.Exists(dump)) dumpBytes = new FileInfo(dump).Length;
+                if (dump != null) dumpBytes = new FileInfo(dump).Length;
             }
             catch (Exception ex) { Swallow.Note("Discord.CrashLogText", ex); }
-            string head = CrashLogHead(Path.GetFileName(path), bytes, Path.GetFileName(dump), dumpBytes);
+            string head = CrashLogHead(Path.GetFileName(path), bytes, dump == null ? "" : Path.GetFileName(dump), dumpBytes);
             string tail = bytes > 0 ? ReadLogTail(path) : "";
             return head + "\n" + tail;
         }
