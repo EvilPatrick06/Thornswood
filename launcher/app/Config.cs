@@ -653,6 +653,13 @@ namespace Thornswood
         /// </summary>
         public RecordRef record;
 
+        /// <summary>
+        /// The news as a file of its own, "newsFile" (#1050, FeedNews.cs).
+        /// Read apart like the record, for the same reason. Null when there is
+        /// none.
+        /// </summary>
+        public NewsRef newsRef;
+
         public static VersionDoc Parse(byte[] raw)
         {
             // A UTF-8 byte order mark is not JSON. The serializer stops on it and
@@ -663,8 +670,50 @@ namespace Thornswood
             VersionDoc doc;
             using (var ms = new MemoryStream(raw, at, raw.Length - at))
                 doc = (VersionDoc)new DataContractJsonSerializer(typeof(VersionDoc)).ReadObject(ms);
-            if (doc != null) doc.record = RecordRef.FromFeed(raw, at);
+            if (doc != null)
+            {
+                doc.record = RecordRef.FromFeed(raw, at);
+                doc.newsRef = NewsRef.FromFeed(raw, at);
+            }
             return doc;
+        }
+    }
+
+    /// <summary>
+    /// The feed's "newsFile" (#1050): { url, sha256, count }, a JSON list of
+    /// notes stored under its own sha256 beside every other asset. Read apart
+    /// from the serializer, so a newsFile of any other shape costs the news
+    /// file and never the feed.
+    /// </summary>
+    public class NewsRef
+    {
+        public string url = "";
+        public string sha256 = "";
+
+        /// <summary>The feed's "newsFile", or null when it names none this
+        /// launcher can use. Never throws.</summary>
+        public static NewsRef FromFeed(byte[] raw, int at)
+        {
+            try
+            {
+                var root = Json.Parse(Encoding.UTF8.GetString(raw, at, raw.Length - at)) as Dictionary<string, object>;
+                if (root == null) return null;
+                object b;
+                if (!root.TryGetValue("newsFile", out b)) return null;
+                var o = b as Dictionary<string, object>;
+                if (o == null) return null;
+                var r = new NewsRef();
+                r.sha256 = Json.Str(o, "sha256").ToLowerInvariant();
+                r.url = Json.Str(o, "url").Trim();
+                if (!RecordRef.IsSha(r.sha256) || r.url.Length == 0) return null;
+                return r;
+            }
+            catch (Exception)
+            {
+                // A feed whose "newsFile" cannot be read has none: the News
+                // tab shows the notes the feed itself carries.
+                return null;
+            }
         }
     }
 

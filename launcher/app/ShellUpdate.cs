@@ -31,6 +31,9 @@ namespace Thornswood
             {
                 VersionDoc v = Updater.Check(cfg);
                 if (v == null) { win.Dispatcher.BeginInvoke(new Action(delegate { CheckFailed("the update source had nothing to say"); })); return; }
+                // The news file the feed names, if any, here on the check's own
+                // thread, so the News tab has it (#1050, FeedNews.cs). Never throws.
+                Updater.FillNews(cfg, v);
                 win.Dispatcher.BeginInvoke(new Action(delegate { OnVersionDoc(v, loud); }));
             }
             catch (Exception ex)
