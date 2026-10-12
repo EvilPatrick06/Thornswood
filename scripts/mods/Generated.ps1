@@ -151,6 +151,10 @@ function Get-GeneratedBuildList([string]$Path) {
     $doc = $null
     try { $doc = ([IO.File]::ReadAllText($Path) -replace '^\uFEFF', '') | ConvertFrom-Json }
     catch { throw ("$Path is not valid JSON: " + $_.Exception.Message) }
+    # RecordShape.ps1 (#2180): a version this checkout does not know stops here.
+    . (Join-Path $PSScriptRoot '..\release\RecordShape.ps1')
+    $shape = @(Get-ThornswoodRecordProblems -Doc $doc -Kind generated)
+    if ($shape.Count) { throw ("$Path is not a generated build list this checkout can trust: " + ($shape -join '; ')) }
     $patches = @()
     if ($doc.PSObject.Properties['pandora'] -and $doc.pandora.PSObject.Properties['patches']) { $patches = @($doc.pandora.patches | ForEach-Object { [string]$_ }) }
     foreach ($p in $patches) {
