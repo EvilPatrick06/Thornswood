@@ -50284,7 +50284,7 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
   */
   function findThing(want) {
     var idx = buildThings();
-    var w = String(want).replace(/[\u2018\u2019`]/g, "'").replace(/\s+/g, ' ').trim();
+    var w = String(want).replace(/[\u2018\u2019`]/g, "'").replace(/\s+/g, ' ').trim().toLowerCase();
     var hit = findIn(idx, w, 'items');
     if (!hit.desc && /s$/.test(w)) {
       var one = findIn(idx, w.replace(/(es|s)$/, ''), 'items');
@@ -64613,6 +64613,7 @@ function createMerchantTrading(deps) {
   var now = deps.now || function () { return Date.now(); };
   var reach = deps.reach == null ? REACH : deps.reach;
   var sessions = new Map();
+  var viewOwners = new WeakMap();
   var sessionSerial = 0;
   var settlement = SETTLEMENT.createSettlement({purses:purses,transfer:transfer,world:deps.namespace || purses.namespace,log:deps.log,now:now});
   var active = true;
@@ -64705,21 +64706,81 @@ function createMerchantTrading(deps) {
     return Math.max(stamps[key] || 0, stamps[itemName.toLowerCase()] || 0);
   }
 
-  function viewFor(merchantId, state, place, actorId, profileId, note) {
+  function ownsSession(actorId, profileId, session) {
+    var identity = sessionIdentity(world.actor(actorId));
+    return active && sessions.get(profileId) === session && session && identity === session.identity;
+  }
+
+  function closedView(actorId, profileId, session) {
+    if (!session) return null;
+    if (sessions.get(profileId)===session) sessions.delete(profileId);
+    var view={open:false};
+    viewOwners.set(view,{actorId:actorId,profileId:profileId,session:undefined,identity:session.identity});
+    return view;
+  }
+
+  function matchesViewOwner(actorId, view) {
+    var owner=view && viewOwners.get(view);
+    return active && (!owner || owner.actorId===actorId && sessions.get(owner.profileId)===owner.session);
+  }
+
+  function isCurrentView(actorId, view) {
+    var owner = view && viewOwners.get(view);
+    // Legacy callers can publish their own notices. Controller-produced views
+    // retain their owner until the actual property write, including closures.
+    if (!owner) return active;
+    if (owner.actorId !== actorId) return false;
+    if (view.open === false) {
+      var identity=sessionIdentity(world.actor(actorId));
+      return matchesViewOwner(actorId,view) && identity===owner.identity;
+    }
+    return ownsSession(actorId, owner.profileId, owner.session);
+  }
+
+  function viewFor(merchantId, state, place, actorId, profileId, note, owner) {
+    var viewSession = owner ? owner.session : sessions.get(profileId);
+    var viewIdentity = owner ? owner.identity : (viewSession && viewSession.identity);
     var catalog = prices.catalog ? prices.catalog(place.bookHold) : [];
     var offers = [];
+    var counts = Object.create(null), packReady = true;
+    if (settlement.available()) {
+      try {
+        SETTLEMENT.inventory(transfer.inventory(actorId)).entries.forEach(function (entry) {
+          counts[entry.baseId] = (counts[entry.baseId] || 0) + entry.count;
+        });
+      } catch (error) { packReady = false; }
+    }
+    var canTrade = packReady && !state.pending && settlement.canInventoryMutation(actorId);
+    var quotedBuy = false, carriedBuy = false, seen = Object.create(null);
     for (var i = 0; i < catalog.length; i++) {
       var row = catalog[i];
-      var held = (state.stock || []).find(function (entry) { return String(entry.name || '').toLowerCase() === String(row.name).toLowerCase(); });
+      var resolved = deps.resolve ? deps.resolve(row.name) : null;
+      if (!resolved || resolved.error || !resolved.baseId || resolved.baseId === GOLD_BASE) continue;
+      var name = row.name, key = String(resolved.name || name).toLowerCase();
+      var priceKey = String(name).toLowerCase();
+      if (seen[priceKey]) continue;
+      seen[priceKey] = true;
+      // Price books key their submitted labels. The resolved canonical name
+      // identifies inventory and shelf goods, not a different price row.
+      var price = prices.quote(place.bookHold, name) || {buy:null,sell:null};
+      var buy = Number.isInteger(price.buy) && price.buy >= 0 && price.buy <= MAX_GOLD ? price.buy : null;
+      var sell = Number.isInteger(price.sell) && price.sell >= 0 && price.sell <= MAX_GOLD ? price.sell : null;
+      var carried = counts[resolved.baseId] || 0;
+      if (buy !== null) quotedBuy = true;
+      if (buy !== null && carried > 0) carriedBuy = true;
+      var held = (state.stock || []).find(function (entry) { return String(entry.name || '').toLowerCase() === key; });
       var count = 0;
       var stock = state.stock || [];
       for (var s = 0; s < stock.length; s++) {
-        if (String(stock[s].name || '').toLowerCase() === String(row.name).toLowerCase()) count += stock[s].count;
+        if (String(stock[s].name || '').toLowerCase() === key) count += stock[s].count;
       }
       offers.push({
-        name: row.name,
-        buy: row.buy,
-        sell: row.sell,
+        name: name,
+        canonicalName: resolved.name || name,
+        buy: buy,
+        sell: sell,
+        carried: carried,
+        maxSell: canTrade && buy !== null ? Math.min(carried, MAX_COUNT, buy === 0 ? MAX_COUNT : Math.floor(state.purse / buy)) : 0,
         stock: count,
         baseId: held ? held.baseId : null
       });
@@ -64731,46 +64792,78 @@ function createMerchantTrading(deps) {
     for (var k = 0; k < offers.length; k++) {
       if (offers[k].buy == null) continue;
       var pay = offers[k].buy * SUPPLY_COUNT;
-      var last = owns ? lastSupply(state, supplyKey(human, offers[k].name), offers[k].name) : 0;
-      var ready = !!owns && !state.pending && state.purse >= pay && (!last || at - last >= SUPPLY_WAIT);
-      supply.push({ name: offers[k].name, pay: pay, count: SUPPLY_COUNT, ready: ready });
+      var last = owns ? lastSupply(state, supplyKey(human, offers[k].canonicalName), offers[k].canonicalName) : 0;
+      var ready = !!owns && canTrade && state.purse >= pay && (!last || at - last >= SUPPLY_WAIT);
+      supply.push({ name: offers[k].name, pay: pay, unit: offers[k].buy, count: SUPPLY_COUNT, ready: ready });
     }
     var view = {
       open: true,
       transfer: settlement.available(),
+      canTrade: canTrade,
       trader: place.name || 'Trader',
       place: place.locationName || '',
       hold: place.bookHold,
       purse: state.purse,
       offers: offers,
+      sellReason: offers.some(function (offer) { return offer.maxSell > 0; }) ? '' :
+        !settlement.available() ? 'Trading is unavailable. Nothing has moved.' :
+        !packReady ? 'Your pack could not be read. Nothing has moved.' :
+        state.pending ? 'This trader is finishing another trade.' :
+        !canTrade ? 'Your inventory is waiting for its saved trade.' :
+        !quotedBuy ? 'This trader has no submitted buy prices.' :
+        !carriedBuy ? 'You are not carrying anything this trader buys.' :
+        'This trader cannot afford the goods you are carrying.',
       supply: supply,
       quests: questView(actorId,merchantId),
       note: note || (settlement.available()
         ? ''
         : 'Buying and selling wait on the native transfer. Nothing has moved.')
     };
-    var session=sessions.get(profileId);
-    if (session && session.actorId===actorId) view.sessionId=session.id;
+    var currentIdentity = viewIdentity ? sessionIdentity(world.actor(actorId)) : null;
+    if (!active || sessions.get(profileId) !== viewSession || viewIdentity && currentIdentity !== viewIdentity) return null;
+    if (viewSession && viewSession.actorId===actorId) view.sessionId=viewSession.id;
+    viewOwners.set(view,{actorId:actorId,profileId:profileId,session:viewSession});
     return view;
+  }
+
+  function viewKey(view) {
+    var copy = Object.assign({}, view);
+    delete copy.at;
+    delete copy.note;
+    return JSON.stringify(copy);
   }
 
   function recover() {
     if (!active) return [];
-    var changed = settlement.tick(), views = [];
-    sessions.forEach(function (session, profileId) {
+    settlement.tick();
+    var views = [];
+    Array.from(sessions.entries()).forEach(function (entry) {
+      var profileId=entry[0],session=entry[1];
+      if (!active || sessions.get(profileId)!==session) return;
       var reached=inReach(session.actorId,session.merchantId);
+      if (!active || sessions.get(profileId)!==session) return;
       if (!reached.ok || !authed(profileId,reached.human) || sessionIdentity(reached.human)!==session.identity) {
-        sessions.delete(profileId); views.push({actorId:session.actorId,view:{open:false}}); return;
+        sessions.delete(profileId);
+        var closed=closedView(session.actorId,profileId,session);
+        views.push({actorId:session.actorId,view:closed}); return;
       }
-      var quests=JSON.stringify(questView(session.actorId,session.merchantId));
-      if (changed.indexOf(session.merchantId) < 0 && quests===session.quests) return;
       var state = purses.read(session.merchantId), place = state && placeOf(state.reference);
       if (state && place) {
-        var view=viewFor(session.merchantId,state,place,session.actorId,profileId);
+        var view=viewFor(session.merchantId,state,place,session.actorId,profileId,session.note,{session:session,identity:session.identity});
+        var current = sessionIdentity(world.actor(session.actorId));
+        if (!active || sessions.get(profileId) !== session) return;
+        if (current !== session.identity) {
+          sessions.delete(profileId);
+          var closed=closedView(session.actorId,profileId,session);
+          views.push({actorId:session.actorId,view:closed}); return;
+        }
+        if (!view) return;
+        if (session.view === viewKey(view)) return;
         views.push({actorId:session.actorId,view:view});
       }
     });
-    return views;
+    return views.filter(function(result){return isCurrentView(result.actorId,result.view);})
+      .filter(function(result){return matchesViewOwner(result.actorId,result.view);});
   }
 
   function sessionMerchant(profileId) {
@@ -64785,6 +64878,7 @@ function createMerchantTrading(deps) {
     var actorId = ctx && ctx.actorId;
     var verb = String(parts[1] || '').toLowerCase();
     if (!profileId || !actorId) return fail('You are not in the world yet.');
+    var requestSession = sessions.get(profileId);
     if (verb === 'join' || verb === 'dues' || verb === 'fee') {
       return fail('People cannot join the Merchant\'s Guild.');
     }
@@ -64796,11 +64890,12 @@ function createMerchantTrading(deps) {
       if (!pressed || (typeof deps.isTrader === 'function' && !deps.isTrader(pressed))) {
         return { text: '', view: null };
       }
+      if (!active || sessions.get(profileId)!==requestSession) return {text:'',view:null};
       return command({ actorId: actorId, profileId: profileId, parts: ['/merchant', pressed.toString(16)] });
     }
     if (verb === 'close') {
       sessions.delete(profileId);
-      return { text: 'You step back from the trader.', view: { open: false } };
+      return { text: 'You step back from the trader.', view: closedView(actorId,profileId,requestSession) };
     }
     if (verb === 'refresh') {
       var openId = sessionMerchant(profileId);
@@ -64814,22 +64909,29 @@ function createMerchantTrading(deps) {
       if (!token) return fail('Press E on a guild trader.');
       merchantId = parseInt(token, 16);
       if (!merchantId) return fail('That is not a guild trader.');
+      var prior = requestSession;
       var reached = inReach(actorId, merchantId);
-      if (!reached.ok) return fail(reached.reason, { open: false });
+      if (!active || sessions.get(profileId)!==prior) return fail('This character is unavailable.');
+      if (!reached.ok) return fail(reached.reason, closedView(actorId,profileId,prior));
       if (!authed(profileId, reached.human)) return fail('That request is not yours.');
       var identity=sessionIdentity(reached.human);
-      if (!identity) return fail('This character is unavailable.', {open:false});
+      if (!identity) return fail('This character is unavailable.', closedView(actorId,profileId,prior));
       var state = purses.prepare(merchantId);
+      if (!active || sessions.get(profileId)!==prior) return fail('This character is unavailable.');
       if (!state) return fail('That is not a guild trader.');
       var place = placeOf(state.reference);
       if (!place || !place.bookHold) {
-        return fail('This trader has no hold price list.', { open: false });
+        return fail('This trader has no hold price list.', closedView(actorId,profileId,prior));
       }
-      var prior = sessions.get(profileId);
       var repeat = prior && prior.merchantId === merchantId && (now() - prior.at) < 3000;
-      var opened = viewFor(merchantId, state, place, actorId, profileId);
+      var opened = viewFor(merchantId, state, place, actorId, profileId,undefined,{session:prior,identity:identity});
+      if (!opened) return {text:'',view:null};
       opened.sessionId=identity+':'+now()+':'+(++sessionSerial);
-      sessions.set(profileId, { id:opened.sessionId, merchantId: merchantId, actorId:actorId, identity:identity, quests:JSON.stringify(opened.quests), at: now() });
+      var nextSession={ id:opened.sessionId, merchantId: merchantId, actorId:actorId, identity:identity, quests:JSON.stringify(opened.quests), view:viewKey(opened), at: now() };
+      var current = sessionIdentity(world.actor(actorId));
+      if (!active || sessions.get(profileId) !== prior || current !== identity) return {text:'',view:null};
+      sessions.set(profileId,nextSession);
+      viewOwners.set(opened,{actorId:actorId,profileId:profileId,session:nextSession});
       return {
         text: repeat ? '' : (opened.transfer
           ? ('Trading with ' + opened.trader + ' in ' + opened.place + '. Purse ' + opened.purse + '.')
@@ -64842,13 +64944,13 @@ function createMerchantTrading(deps) {
     if (!merchantId) return fail('Press E on a guild trader.');
     if (sessions.get(profileId).actorId !== actorId) {
       sessions.delete(profileId);
-      return fail('Press E on a guild trader with this character.', {open:false});
+      return fail('Press E on a guild trader with this character.', closedView(actorId,profileId,requestSession));
     }
     var originalSession = sessions.get(profileId), quests, heldQuest;
     function refuseSession(text) {
       if (sessions.get(profileId)!==originalSession) return fail(text);
       sessions.delete(profileId);
-      return fail(text, {open:false});
+      return fail(text, closedView(actorId,profileId,originalSession));
     }
     if (verb === 'quest') {
       quests = typeof deps.quests==='function' && deps.quests();
@@ -64878,23 +64980,35 @@ function createMerchantTrading(deps) {
       var text=result.ok ? (parts[2]==='take'?'You take the work.':parts[2]==='return'?'The work is turned in.':'You give back what you drew and leave the work.') :
         reasons[result.why] || 'The work could not be changed.';
       var questState=purses.prepare(merchantId),questPlace=questState && placeOf(questState.reference);
-      return fail(text,questState && questPlace ? viewFor(merchantId,questState,questPlace,actorId,profileId,text) : {open:false});
+      if (!ownsSession(actorId,profileId,originalSession)) return {text:'',view:null};
+      var questResponse=questState && questPlace ? viewFor(merchantId,questState,questPlace,actorId,profileId,text,{session:originalSession,identity:originalSession.identity}) : closedView(actorId,profileId,originalSession);
+      return questResponse && isCurrentView(actorId,questResponse) ? fail(text,questResponse) : {text:'',view:null};
     }
     if (verb === 'buy' || verb === 'sell' || verb === 'supply') {
-      return trade(actorId, profileId, merchantId, verb, parts.slice(2));
+      return trade(actorId, profileId, merchantId, verb, parts.slice(2), originalSession);
     }
     return fail('Use the trader panel to buy, sell, or turn in supplies.');
   }
 
   function parseCountAndName(bits, fixedCount) {
-    if (fixedCount) return { count: fixedCount, name: bits.join(' ').trim() };
+    if (fixedCount) return parseCountAndName([String(fixedCount)].concat(bits),0);
     if (!bits.length) return null;
     var count = Number(bits[0]);
     if (!Number.isInteger(count) || count < 1 || count > MAX_COUNT) return null;
-    return { count: count, name: bits.slice(1).join(' ').trim() };
+    var quoted = /^@[0-9]+$/.test(String(bits[1] || ''));
+    var unit = quoted ? Number(bits[1].slice(1)) : null;
+    if (quoted && (!Number.isInteger(unit) || unit < 0 || unit > MAX_GOLD)) return null;
+    return { count: count, name: bits.slice(quoted ? 2 : 1).join(' ').trim(), quoted:quoted, unit:unit };
   }
 
-  function trade(actorId, profileId, merchantId, verb, bits) {
+  function trade(actorId, profileId, merchantId, verb, bits, originalSession) {
+    function responseView(state,note) {
+      return viewFor(merchantId,state,place,actorId,profileId,note,{session:originalSession,identity:originalSession.identity});
+    }
+    function response(text,state,note) {
+      var view=responseView(state,note);
+      return view && isCurrentView(actorId,view) ? fail(text,view) : {text:'',view:null};
+    }
     var state = purses.prepare(merchantId);
     if (!state) return fail('That is not a guild trader.');
     if (state.pending) return fail('This trader has a transfer waiting.');
@@ -64907,18 +65021,22 @@ function createMerchantTrading(deps) {
       return fail((resolved && resolved.error) || 'That item is not known.');
     }
     var itemName = resolved.name || asked.name;
-    var price = prices.quote(place.bookHold, itemName) || { buy: null, sell: null };
+    var price = prices.quote(place.bookHold, asked.name) || { buy: null, sell: null };
     var unit = verb === 'buy' ? price.sell : price.buy;
     if (unit == null) {
       return fail(verb === 'buy' ? 'No trader sells that.' : 'No trader buys that.');
     }
     if (!Number.isInteger(unit) || unit < 0 || unit > MAX_GOLD) return fail('That price cannot be verified.');
+    if (asked.quoted && asked.unit !== unit) {
+      var changedPrice = 'The price changed. Check the new quote before trading.';
+      return response(changedPrice,state,changedPrice);
+    }
     var gold = unit * asked.count;
     if (!Number.isInteger(gold) || gold < 0 || gold > MAX_GOLD) return fail('That price cannot be verified.');
     var npcBuys = verb !== 'buy';
     var completedSupplyKey = null;
     if (verb === 'supply') {
-      if (!settlement.available()) return fail('Buying and selling wait on the native transfer. Nothing was taken.', viewFor(merchantId, state, place, actorId, profileId));
+      if (!settlement.available()) return response('Buying and selling wait on the native transfer. Nothing was taken.',state);
       var human = transfer.identity(actorId);
       if (!human || !human.desc || human.profileId !== profileId) return fail('That request is not yours.');
       completedSupplyKey = supplyKey(human, itemName);
@@ -64929,16 +65047,18 @@ function createMerchantTrading(deps) {
     if (!npcBuys && gold > 0 && world.carry(actorId, GOLD_BASE) < gold) return fail('You cannot pay.');
     if (npcBuys && world.carry(actorId, resolved.baseId) < asked.count) return fail('You are not carrying that.');
     if (!settlement.available()) {
-      return fail('Buying and selling wait on the native transfer. Nothing was taken.', viewFor(merchantId, state, place, actorId, profileId));
+      return response('Buying and selling wait on the native transfer. Nothing was taken.',state);
     }
     var nextPurse = npcBuys ? state.purse - gold : state.purse + gold;
     if (nextPurse < 0 || nextPurse > MAX_GOLD) return fail('That price cannot be verified.');
     var moved;
     try {
+      if (!ownsSession(actorId,profileId,originalSession)) return fail('The offer changed. Choose the trade again.');
       // Capture every trade's authenticated native character before a save
       // can publish a projection or reenter another request.
       var tradingHuman = transfer.identity(actorId);
       if (!tradingHuman || tradingHuman.profileId !== profileId) return fail('That request is not yours.');
+      if (!ownsSession(actorId,profileId,originalSession)) return {text:'',view:null};
       try {
         state = settlement.pruneSupplyHistory(merchantId, state, SUPPLY_WAIT);
       } catch (error) {
@@ -64961,6 +65081,7 @@ function createMerchantTrading(deps) {
       }
       var nextSupply = JSON.parse(JSON.stringify(state.supply || {}));
       if (verb === 'supply') nextSupply[completedSupplyKey] = now();
+      if (!ownsSession(actorId,profileId,originalSession)) return fail('The offer changed. Choose the trade again.');
       moved = settlement.begin({merchantId:merchantId,humanId:actorId,profileId:profileId,
         previous:state,expected:expected,debit:outgoing.inventory,credit:credit,kind:verb,
         next:{purse:nextPurse,stock:stock,supply:nextSupply}});
@@ -64968,11 +65089,11 @@ function createMerchantTrading(deps) {
       return fail(settlement.available() ? String(error.message || error) : 'Trading is unavailable. The saved transfer is retained.');
     }
     var current = purses.prepare(merchantId);
-    if (!moved.done) return fail(moved.reason, viewFor(merchantId, current, place, actorId, profileId, moved.reason));
+    if (!moved.done) return response(moved.reason,current,moved.reason);
     var said = npcBuys
       ? ('Sold ' + asked.count + ' ' + itemName + ' for ' + gold + '. Purse ' + current.purse + '.')
       : ('Bought ' + asked.count + ' ' + itemName + ' for ' + gold + '. Purse ' + current.purse + '.');
-    return {text:said,view:viewFor(merchantId, current, place, actorId, profileId)};
+    return response(said,current);
   }
 
   function activate(actorId, merchantId) {
@@ -64987,9 +65108,14 @@ function createMerchantTrading(deps) {
   }
 
   return {
+    isCurrentView:isCurrentView,
     acknowledgeView: function(actorId,view) {
       sessions.forEach(function(session){
-        if(session.actorId===actorId && session.id===view.sessionId)session.quests=JSON.stringify(view.quests);
+        if(session.actorId===actorId && session.id===view.sessionId) {
+          session.quests=JSON.stringify(view.quests);
+          session.view=viewKey(view);
+          session.note=view.note;
+        }
       });
     },
     command: command,
@@ -65117,6 +65243,7 @@ function installMerchantTrading(env) {
   trading.push = function (actorId, view) {
     var payload = JSON.parse(JSON.stringify(view || { open: false }));
     payload.at = Date.now();
+    if (!trading.isCurrentView(actorId,view)) return;
     try { mp.set(actorId, property, payload); }
     catch (e) { trading.shutdown(); log('merchant panel publication failed; controller revoked: ' + e); throw e; }
     trading.acknowledgeView(actorId,payload);

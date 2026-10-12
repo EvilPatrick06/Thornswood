@@ -1,8 +1,8 @@
 'use strict';
 // Local browser fixture for the actual CEF trader panel. No game/server writes.
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path');
-const base={open:true,sessionId:'fixture-1',transfer:true,trader:'Guild trader',place:'Whiterun',purse:250,
-  offers:[{name:'Iron Ingot',buy:3,sell:5,stock:4}],supply:[],quests:[
+const base={open:true,sessionId:'fixture-1',transfer:true,canTrade:true,sellReason:'',trader:'Guild trader',place:'Whiterun',purse:250,
+  offers:[{name:'Iron Ingot',buy:3,sell:5,stock:4,carried:8,maxSell:8}],supply:[],quests:[
     {id:'ebony',name:'The ebony',who:'Miner, master',ask:4,holds:12,hours:24,state:'available',drawn:0,
       gems:[],locations:'Raven Rock Mine',canTake:true,canReturn:false,canAbandon:false},
     {id:'gem',name:'A gem',who:'Miner, master',ask:2,holds:6,hours:24,state:'available',drawn:0,
@@ -17,6 +17,12 @@ const panel=path.join(__dirname,'../../game/ui/thornswood-merchant.js');
 http.createServer((req,res)=>{
   if(req.url==='/merchant.js'){res.setHeader('Content-Type','text/javascript');res.end(fs.readFileSync(panel));return;}
   const data=JSON.parse(JSON.stringify(base));
+  if(new URL(req.url,'http://localhost').searchParams.get('scenario')==='supply') {
+    data.supply=[{name:'Iron Ingot',pay:15,unit:3,count:5,ready:true}];
+  }
+  if(new URL(req.url,'http://localhost').searchParams.get('scenario')==='empty-purse') {
+    data.purse=0;data.offers[0].maxSell=0;data.sellReason='This trader cannot afford the goods you are carrying.';
+  }
   if(new URL(req.url,'http://localhost').searchParams.get('scenario')==='open') {
     Object.assign(data.quests[0],{state:'open',drawn:6,canTake:false,canReturn:true,canAbandon:true});
     Object.assign(data.quests[1],{state:'open',drawn:1,gem:'Ruby',canTake:false,canReturn:false,canAbandon:true});
