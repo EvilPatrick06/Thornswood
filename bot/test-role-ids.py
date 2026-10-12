@@ -3,11 +3,11 @@ test-role-ids.py
 
 Discord permission roles are matched by ID when a token is all digits, and by
 name (case-insensitive) otherwise. STAFF_ROLES, CREATOR_ROLES, MEMBER_ROLE and
-LIVE_SMOKE_ADMIN_ROLES all share that contract so a rename does not silently
-break tickets, holds or Live smoke (#1355).
+TEST_TASK_ROLES (LIVE_SMOKE_ADMIN_ROLES before 11 Oct) all share that contract
+so a rename does not silently break tickets, holds or test tasks (#1355).
 
 Defaults stay the current role names so older harnesses that read STAFF,
-CREATOR, MEMBER_ROLE and LIVE_SMOKE_ADMIN still pass with an unmigrated
+CREATOR, MEMBER_ROLE and TASK_ROLE_NAMES still pass with an unmigrated
 bot.env.json.
 
 The real bot module is imported. _role_tokens and _role_hit are driven with
@@ -22,7 +22,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 # Force the documented defaults so this file does not inherit a VPS env.
-for _k in ('STAFF_ROLES', 'CREATOR_ROLES', 'MEMBER_ROLE', 'LIVE_SMOKE_ADMIN_ROLES'):
+for _k in ('STAFF_ROLES', 'CREATOR_ROLES', 'MEMBER_ROLE', 'LIVE_SMOKE_ADMIN_ROLES',
+           'TEST_TASK_ROLES'):
     os.environ.pop(_k, None)
 
 # bot.py refuses to load without one, and never uses it unless client.run is
@@ -107,22 +108,30 @@ yes('MEMBER_ROLE digit token matches role.id (rename-safe)',
     bot._role_hit(Role(555, 'WasMember'), mid_ids, mid_names)
     and mid_ids == {555} and mid_names == set())
 
-# ------------------------------------------------- LIVE_SMOKE_ADMIN_ROLES --
+# ------------------------------------------------------- TEST_TASK_ROLES --
 
-yes('LIVE_SMOKE_ADMIN_ROLES defaults stay Owner,Dev,Lead Gamemaster,Lead GM',
-    bot.LIVE_SMOKE_ADMIN_NAMES == ['Owner', 'Dev', 'Lead Gamemaster', 'Lead GM']
-    and set(bot.LIVE_SMOKE_ADMIN) == {
-        'owner', 'dev', 'lead gamemaster', 'lead gm'})
-ls_ids, ls_names = bot._role_tokens(bot.LIVE_SMOKE_ADMIN_NAMES)
-yes('LIVE_SMOKE_ADMIN name tokens match Lead GM / Lead Gamemaster',
+yes('TEST_TASK_ROLES defaults to Owner,Dev,Lead Gamemaster,Lead GM',
+    bot.TASK_ROLE_NAMES == ['Owner', 'Dev', 'Lead Gamemaster', 'Lead GM'])
+ls_ids, ls_names = bot._role_tokens(bot.TASK_ROLE_NAMES)
+yes('TEST_TASK_ROLES name tokens match Lead GM / Lead Gamemaster',
     bot._role_hit(Role(1, 'Lead GM'), ls_ids, ls_names)
     and bot._role_hit(Role(2, 'lead gamemaster'), ls_ids, ls_names)
     and ls_ids == set())
 ls_id_ids, ls_id_names = bot._role_tokens(['999001', 'Dev'])
-yes('LIVE_SMOKE_ADMIN digit token matches role.id; name token still matches',
+yes('TEST_TASK_ROLES digit token matches role.id; name token still matches',
     bot._role_hit(Role(999001, 'WasLead'), ls_id_ids, ls_id_names)
     and bot._role_hit(Role(3, 'Dev'), ls_id_ids, ls_id_names)
     and ls_id_ids == {999001} and ls_id_names == {'dev'})
+
+# An unmigrated bot.env.json with LIVE_SMOKE_ADMIN_ROLES keeps its role ids.
+import subprocess  # noqa: E402
+env = dict(os.environ, LIVE_SMOKE_ADMIN_ROLES='111,222')
+env.pop('TEST_TASK_ROLES', None)
+got = subprocess.run([sys.executable, '-c',
+                      'import bot; print(",".join(bot.TASK_ROLE_NAMES))'],
+                     cwd=HERE, env=env, capture_output=True, text=True)
+yes('an old LIVE_SMOKE_ADMIN_ROLES is read when TEST_TASK_ROLES is not set',
+    got.stdout.strip().splitlines()[-1:] == ['111,222'])
 
 print('')
 print('%d passed, %d failed' % (len(PASS), len(FAIL)))

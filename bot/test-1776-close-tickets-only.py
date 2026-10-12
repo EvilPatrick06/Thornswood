@@ -179,9 +179,9 @@ def run(way, channel, who=STAFF):
 
 
 # ------------------------------------------------- 1. not a ticket, refused --
-smoke = bot.LIVE_SMOKE_CHANNEL[0]
+tasks = bot.TASKS_NAME
 NOT_TICKETS = [
-    ('a Live smoke session thread', lambda: Thread('Live smoke 5 Oct', Channel(smoke))),
+    ('a #test-tasks forum thread', lambda: Thread('Test the ferry', Channel(tasks))),
     ('a #tales post', lambda: Thread('The bandit at the bridge', Channel('tales'))),
     ('a thread in #general', lambda: Thread('anything', Channel('general'))),
     ('a thread off the staff ticket record channel (%s)' % bot.TICKET_LOG[0],
@@ -211,7 +211,7 @@ for label, way in WAYS:
 
 # Somebody who is not staff, in a thread that is not a ticket: refused, and
 # with nothing done either way.
-thread = Thread('Live smoke 5 Oct', Channel(smoke))
+thread = Thread('Test the ferry', Channel(tasks))
 ask = run(by_command, thread, Person(['Member'], uid=501))
 yes('somebody who is not staff is refused in a thread that is not a ticket',
     len(ask.response.said) == 1 and ask.response.said[0][1] is True

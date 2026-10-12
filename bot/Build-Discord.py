@@ -76,17 +76,14 @@ import sys
 #   Manage Threads            a ticket thread is private and not invitable, so
 #                             only a moderator can add people to it, and Close
 #                             locks it
-#   Create Public Threads     the Live smoke session thread under #test-tasks,
-#                             which the marks live in and nothing else reads
+#   Create Public Threads     threads the bot opens (the Live smoke session
+#                             thread until 11 Oct; forum posts need only Send)
 #   Create Private Threads    one per ticket
-#   Send Messages in Threads  writes the ticket into its thread, and the Live
-#                             smoke items into the session thread
+#   Send Messages in Threads  writes the ticket into its thread
 #
 # Left out on purpose: Administrator, Manage Server, Manage Webhooks, Manage
 # Messages, Pin Messages and Embed Links, which only the build uses or
 # nothing uses. Interaction replies and direct messages need no permission.
-# The Live smoke template pin is tried and shrugged off when Discord refuses
-# it, rather than asking for Manage Messages to get it.
 RUN_BITS = (
     ('Manage Channels',           4),
     ('View Channel',             10),
@@ -422,9 +419,13 @@ PLAN = [
  ]),
  # #test-these was deleted in the channel cleanup and is NOT renamed into this
  # one: it is in RETIRED below so a re-run does not bring it back. Test-Tasks
- # is a new channel, decided on 1 October, and the bot keeps the living Live
- # smoke checklist in it (bot.py, the live smoke section). Discord lower cases
- # a text channel name itself, so this is #test-tasks on the server.
+ # was a text channel from 1 October holding the Live smoke checklist. Since
+ # Patrick's card of 11 October it is a forum of test tasks, one thread each,
+ # tagged Dev or Main (bot.py, the testing channels section), #test-results is
+ # #test-findings, and #known-issues is new. The bot's one-time
+ # `python bot.py --setup-channels --apply` moves an existing server across;
+ # these lines are what a fresh server is made with. The old text channel is
+ # kept as test-tasks-archive, never made and never pruned.
  #
 # WHY THAT ONE HAS extra_roles AND THE OTHER TWO DO NOT.
 # Patrick locked who may start, reset and refresh a Live smoke session on
@@ -437,12 +438,14 @@ PLAN = [
 # channel gets them: test-results and play-testing are pathfind for the same
 # people they always were, and nothing else moves.
  ('Testing', [
-   dict(kind='forum', name='test-results', key='RESULTS', mode='pathfind',
+   dict(kind='forum', name='test-findings', key='RESULTS', mode='pathfind',
         topic='Pass, fail, and what went wrong.'),
-   dict(kind='text',  name='Test-Tasks',   key='TESTS',   mode='pathfind',
+   dict(kind='forum', name='Test-Tasks',   key='TESTS',   mode='pathfind',
         extra_roles=('Lead Gamemaster', 'Lead GM'),
-        topic='The living Live smoke checklist. Staff start a dated session '
-              'and you mark your own rows in its thread.'),
+        topic='One thread per test task, tagged Dev or Main.'),
+   dict(kind='text',  name='known-issues', key='KNOWN',   mode='pathfind',
+        topic='Known issues the team is working on. Kept by the bot.'),
+   dict(kind='text',  name='test-tasks-archive', mode='pathfind', make=False),
    dict(kind='voice', name='play-testing', mode='pathfind'),
  ]),
  ('Staff', [
@@ -477,7 +480,9 @@ made, kept, failed = [], [], []
 # rather than worked out, so moving one somewhere else does not save it.
 RETIRED = [
     'tech-help', 'looking-for-group', 'off-topic', 'downloads',
-    'known-issues', 'links-and-credits',
+    # known-issues was retired here once, and came back on 11 October as the
+    # bot's list of open findings (Testing above), so it is not in this list.
+    'links-and-credits',
     'Small Table', 'The Longhouse', 'Away',
     # #media does the job of both of these, and the bot channel was never used.
     'screenshots', 'clips', 'bot-commands',
@@ -501,6 +506,7 @@ RETIRED = [
 KEEP = (
     'general-chat', 'welcome-travelers', 'server-progression-and-economy',
     'play-testing', 'dev-test-results', 'test-results', 'test-tasks',
+    'test-findings', 'test-tasks-archive', 'known-issues',
 )
 
 

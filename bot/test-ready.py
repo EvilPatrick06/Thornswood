@@ -306,12 +306,9 @@ try:
     # start will write down are the ones a person sees in the picker.
     real = bot._command_names()
     yes('the real tree names /close', 'close' in real)
-    yes('and the live smoke group', 'live-smoke' in real)
-    yes('AND EACH OF ITS SUBCOMMANDS, report among them, so the deploy that '
-        'added one would have synced',
-        [n for n in real if n.startswith('live-smoke ')]
-        == ['live-smoke refresh', 'live-smoke report', 'live-smoke reset',
-            'live-smoke start'])
+    yes('and /test-task', 'test-task' in real)
+    yes('and the Live smoke group is gone, every subcommand with it (11 Oct)',
+        not [n for n in real if n.startswith('live-smoke')])
 
     # ------------------------------------- the views are not in on_ready --
     src = open(os.path.join(HERE, 'bot.py'), encoding='utf-8').read()
