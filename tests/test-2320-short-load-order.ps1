@@ -113,10 +113,13 @@ try {
     # ======================================================== 3. the installer
     Write-Host ''
     Write-Host 'Install-ThornswoodServer.ps1, by Windows PowerShell 5.1'
-    $tools = Join-Path $T 'tools'
+    # The installer and the files it dot-sources from beside it, the way the
+    # box holds them. Not named tools: that folder is retired, and
+    # test-tools-retired.ps1 refuses any code that builds a path into it.
+    $installer = Join-Path $T 'installer'
     foreach ($f in 'Install-ThornswoodServer.ps1', 'ServerSettings.ps1', 'ServerBuild.ps1', 'ServerReadyWait.ps1') {
-        New-Item -ItemType Directory -Force -Path $tools | Out-Null
-        Copy-Item -LiteralPath (Join-Path $repo "scripts\deploy\$f") -Destination (Join-Path $tools $f)
+        New-Item -ItemType Directory -Force -Path $installer | Out-Null
+        Copy-Item -LiteralPath (Join-Path $repo "scripts\deploy\$f") -Destination (Join-Path $installer $f)
     }
     $ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
     function New-Payload([string]$name, [string[]]$order) {
@@ -127,7 +130,7 @@ try {
         return $z
     }
     function Install([string]$zip, [string]$root, [string[]]$more = @()) {
-        $a = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $tools 'Install-ThornswoodServer.ps1'),
+        $a = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $installer 'Install-ThornswoodServer.ps1'),
                '-Zip', $zip, '-Root', $root, '-NoTask', '-AllowGamingPc') + $more
         $eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
         # A module path from PowerShell 7 makes 5.1 load 7's modules and fail; the box has 5.1's own.
