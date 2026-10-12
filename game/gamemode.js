@@ -54159,8 +54159,16 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       soup: { food: 15, drink: 10 },
       ingredient: { food: 15 },
       prepared: { food: 15 },
-      drugs: { food: 15 }
+      drugs: { food: 15, drug: true }
     },
+    /*
+      THE DRUG (#1382). docs/systems/exhaustion.md, A stimulant: "Skooma holds
+      the drain at zero for 10 minutes, then costs 30 rest and 10 hunger. A
+      second dose inside the window does not stack. It refreshes the clock and
+      adds the crash again." All six drugs on the approved list
+      (issuecomment-6127545395) take it. Real minutes.
+    */
+    drug: { holdMinutes: 10, crashRest: 30, crashFood: 10 },
     /*
       ALE, AND IT GETS WORSE WITH EVERY ONE.
 
@@ -54329,6 +54337,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       resting: String(v.resting || ''),
       worked: Number(v.worked) || 0,
       place: String(v.place || ''),
+      // A drug's window and the crashes it owes (#1382), kept across reads.
+      drugUntil: Number(v.drugUntil) || 0,
+      drugCrash: Number(v.drugCrash) || 0,
       /*
         THE REST OF WHAT THE CLIENT REPORTS, AND LEAVING IT OUT COST AN HOUR.
 
@@ -54477,8 +54488,22 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       arrived(), below, and the beds' first sight of them gets them up.
     */
     var gain = arriving ? 0 : restingGain(actorId, n);
-    n.rest = gone ? awayDrain(n.rest, restRate * share * hours, floor)
-                  : clamp(n.rest + (gain - restRate * share) * hours);
+    /*
+      A DRUG HOLDS THE REST DRAIN AT ZERO while its window lasts (#1382), for
+      the part of this stretch before drugUntil. Resting still gains.
+    */
+    var held = 0;
+    if (n.drugUntil > n.at) { held = Math.min(hours, (Math.min(now, n.drugUntil) - n.at) / 3600000); }
+    var drained = Math.max(0, hours - held);
+    n.rest = gone ? awayDrain(n.rest, restRate * share * drained, floor)
+                  : clamp(n.rest + gain * hours - restRate * share * drained);
+    // The window over: the crash, once for every dose that added one.
+    if (n.drugCrash > 0 && now >= n.drugUntil) {
+      n.rest = clamp(n.rest - NEEDS.drug.crashRest * n.drugCrash);
+      n.food = clamp(n.food - NEEDS.drug.crashFood * n.drugCrash);
+      n.drugCrash = 0;
+      n.drugUntil = 0;
+    }
 
     /*
       Temperature moves TOWARD where you are, rather than only falling.
@@ -54878,6 +54903,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
         var hurtF = g.__thornswoodHurt;
         try { if (hurtF && hurtF.exposed) { hurtF.exposed(actorId, 'food', row.sick); } } catch (eSick) { }
       }
+      if (row.drug) { dosed(actorId); }
       return said;
     }
     if (kind !== 'ale') { return ate(actorId, kind === 'drink' ? 'drink' : 'food'); }
@@ -55427,6 +55453,18 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     }
     write(actorId, n);
     return crossed(actorId, was, n);
+  }
+
+  /*
+    A drug went down (#1382): the window starts again from now, and one more
+    crash is owed when it ends. See NEEDS.drug.
+  */
+  function dosed(actorId) {
+    var n = settle(actorId);
+    var now = Date.now();
+    n.drugUntil = now + NEEDS.drug.holdMinutes * 60000;
+    n.drugCrash = (Number(n.drugCrash) || 0) + 1;
+    write(actorId, n);
   }
 
   /** Sitting down, or getting up. kind is '' to stop. */
