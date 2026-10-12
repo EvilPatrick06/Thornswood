@@ -1,7 +1,7 @@
 // test-lock-keypress.js
 //
 // #615 leftovers: /lock is a key press logged as /lock, and after a lock
-// everybody online hears that the building is locked.
+// the people near the door hear that the building is locked (#2256).
 //
 // Since #1637 the same key claims, locks or unlocks the door just opened, as
 // its line says, and cuts a key at a forge; it sends the word and the id
@@ -36,12 +36,19 @@ yes('the key handler runs lockPress for LOCK_KEY', /e\.code === LOCK_KEY && lock
 const setAt = GM.indexOf('function setLock(actorId, profileId, toProfile, on)');
 const setBody = setAt >= 0 ? GM.slice(setAt, setAt + 2200) : '';
 yes('setLock is in the gamemode', setAt >= 0);
+// Since #2281 (#2256) both lines come from lockLine, and the others told are
+// the people near enough to see the door (LOCK_HEARD), not every profile
+// online. tests/test-2256-locked-for-everyone.js drives who hears it.
+const lineAt = GM.indexOf('function lockLine(building, on, mine)');
+const lineBody = lineAt >= 0 ? GM.slice(lineAt, lineAt + 600) : '';
 yes('setLock still tells the locker You lock / You unlock',
-    /toProfile\(profileId, 'You ' \+ \(on \? 'lock' : 'unlock'\)/.test(setBody));
-yes('setLock tells every other online profile the building is locked or unlocked',
-    /is ' \+ \(on \? 'locked' : 'unlocked'\)/.test(setBody) &&
-    /onlinePlayers/.test(setBody) &&
-    /opid === profileId/.test(setBody));
+    /toProfile\(profileId, lockLine\(building, on, true\)\)/.test(setBody) &&
+    /mine \? 'You lock '/.test(lineBody) && /mine \? 'You unlock '/.test(lineBody));
+yes('setLock tells the other online profiles near the door the building is locked or unlocked',
+    /is locked for everyone now/.test(lineBody) && /is open to everyone now/.test(lineBody) &&
+    /var said = lockLine\(building, on, false\)/.test(setBody) &&
+    /onlinePlayers/.test(setBody) && /LOCK_HEARD/.test(setBody) &&
+    /opid === profileId/.test(setBody) && /toProfile\(opid, said\)/.test(setBody));
 
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');

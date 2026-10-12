@@ -166,8 +166,22 @@ function world(ownedIds) {
                       'WEAR_PROPERTY', 'thornswoodWear', 'DRESS_TRIES', 'DRESS_EVERY']) {
     yes('no ' + gone + ' left in the gamemode', !new RegExp('\\b' + gone + '\\b').test(code));
   }
-  yes('the equipment record is written in one place, dressNewCharacter',
-    (code.match(/mp\.set\([^,]+, 'equipment'/g) || []).length === 1);
+  // Two writes, each in the one function named for it: dressNewCharacter
+  // dresses a new character, and since #2145 (#1651) durability's setRecord
+  // renames a worn piece in the record when the pack renames it, changing
+  // nothing worn (EquipmentBinding::Set in the fork). Any third write, or
+  // either one moving out of its function, is a dress ask coming back.
+  const writers = [];
+  const writeAt = /mp\.set\([^,]+, 'equipment'/g;
+  for (let m = writeAt.exec(code); m; m = writeAt.exec(code)) {
+    const before = code.slice(0, m.index);
+    const named = [];
+    const fnAt = /function (\w+)\(|(\w+): function \(/g;
+    for (let f = fnAt.exec(before); f; f = fnAt.exec(before)) { named.push(f[1] || f[2]); }
+    writers.push(named[named.length - 1]);
+  }
+  yes('the equipment record is written in two places, dressNewCharacter and the rename in setRecord',
+    writers.length === 2 && writers[0] === 'dressNewCharacter' && writers[1] === 'setRecord');
   const front = fs.readFileSync(path.join(__dirname, '..', 'game', 'plugins', 'thornswood-front.js'), 'utf8')
     .split(CR).join('').replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
   yes('and the front plugin does not put the shift on by itself',
