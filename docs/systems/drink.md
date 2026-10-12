@@ -54,6 +54,6 @@ the boil. Well water and Frostreach ice water are safe without boiling
 the load order (scripts/dev/Build-WellTable.py), within 400 units, and
 once you fill at one it is done for you for one in-game day (72 real
 minutes); other wells still work. A bottle the server never saw filled,
-like one bought at an inn, is safe. Filling and boiling are /water fill
-and /water boil, for the needs panel's buttons to send; the buttons are
-not built yet. Every other non-ale drink is 20.
+like one bought at an inn, is safe. Filling and boiling are the Fill water and
+Boil water buttons on the Body page of K, which send /water fill and
+/water boil; typing those works too. Every other non-ale drink is 20.
