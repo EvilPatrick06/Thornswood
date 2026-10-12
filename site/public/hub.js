@@ -23,12 +23,16 @@ var S = {
 
 var ROUTES = {
   '/hub':'home',
-  '/uploads':'uploads', '/linked':'linked', '/sessions':'sessions', '/inbox':'inbox'
+  '/uploads':'uploads', '/linked':'linked', '/sessions':'sessions', '/inbox':'inbox',
+  '/hub/known':'known'
 };
 var PATHS = {};
 Object.keys(ROUTES).forEach(function (u) { PATHS[ROUTES[u]] = u; });
 
-var BOARDKEYS = []; /* hub no longer edits issue boards (#433 trim) */
+/* The hub stopped editing the issue boards in #433. Known Issues is the one
+   board it edits (#2414): the public /known page is written from it, so it is
+   the only copy of that text there is. */
+var BOARDKEYS = ['known'];
 var isBoard = function (k) { return BOARDKEYS.indexOf(k) >= 0; };
 
 var ABOUT = {
@@ -37,14 +41,18 @@ var ABOUT = {
   linked:      'Everybody who has linked a Discord account to a copy of the game.',
   sessions:    'One card a person, newest first by when they last played. ' +
                'Open one for every session they have had, with its logs and ' +
-               'what they said in it.'
+               'what they said in it.',
+  known:       'The public Known Issues page at /known is written from this board, ' +
+               'and nowhere else. Click a cell, the intro or a section\'s note to change it. ' +
+               'Tick a row once it is fixed and it leaves the page.'
 };
 
-/* Hub trimmed (#433): Gallery, Sessions, Linked Accounts, Inbox only.
-   Issue boards and other work pages left the hub. No site theme/appearance prefs. */
+/* Hub trimmed (#433): Gallery, Sessions, Linked Accounts, Inbox, and since
+   #2414 the Known Issues board. Other issue boards and work pages left the
+   hub. No site theme/appearance prefs. */
 var GROUPS = [
   { label:'',     keys:['home'] },
-  { label:'Hub',  keys:['uploads','sessions','linked','inbox'] }
+  { label:'Hub',  keys:['uploads','sessions','linked','inbox','known'] }
 ];
 
 var el = function (id) { return document.getElementById(id); };
@@ -1572,7 +1580,7 @@ function drawHome() {
     '<div class="hero">' +
       '<img src="/logo.png" alt="Thornswood">' +
       '<div><h1>Hub</h1>' +
-      '<div class="sub">Gallery, sessions, linked accounts, and the report inbox. ' +
+      '<div class="sub">Gallery, sessions, linked accounts, the report inbox, and the Known Issues page. ' +
       'The public site is at <a href="/">thornswood.net</a>.</div></div>' +
     '</div>' +
     '<div class="rule"></div>';
@@ -1581,7 +1589,7 @@ function drawHome() {
   // a Gamemaster lands on a home page with Gallery on it and nothing else.
   if (inHub()) {
     out += '<div class="cards">' +
-      card('uploads') + card('sessions') + card('linked') + card('inbox') +
+      card('uploads') + card('sessions') + card('linked') + card('inbox') + card('known') +
       '</div>';
   } else {
     out += '<p class="lede">Signing in with Discord opens the hub.</p>' +
@@ -1671,7 +1679,12 @@ function drawBoard() {
       (k !== 'archive' ? '<button class="btn small" id="archall">Archive everything ticked</button>' : '')
     : '', !!b.intro);
 
-  if (b.intro) out += '<div class="doc doc-intro">' + marked.parse(b.intro) + '</div>';
+  /* The intro and each section's note are markdown, and an admin edits them
+     in place like a cell (#2414): the Known Issues page is written from this
+     board, so its prose has to be editable here or it has no editor at all. */
+  if (b.intro) out += '<div class="doc doc-intro"' + (admin ? ' data-intro="1" title="Click to change"' : '') + '>' +
+    marked.parse(b.intro) + '</div>';
+  else if (admin) out += '<div class="doc doc-intro empty-note" data-intro="1">Add an intro</div>';
 
   if (!b.sections.length) {
     out += '<div class="empty">Nothing here yet.' +
@@ -1691,7 +1704,14 @@ function drawBoard() {
           '<button class="btn small" data-delsec="' + sec.id + '">Remove section</button>' +
         '</div>' : '') +
       '</div>';
-    if (sec.note) out += '<p class="secnote">' + esc(sec.note) + '</p>';
+    if (sec.note) out += '<div class="secnote mdc"' + (admin ? ' data-note="' + sec.id + '" title="Click to change"' : '') + '>' +
+      marked.parse(sec.note) + '</div>';
+    else if (admin) out += '<div class="secnote empty-note" data-note="' + sec.id + '">Add a note</div>';
+
+    /* A section of prose alone (a note and no columns) has no table to draw,
+       and the adder below needs a first column to type into. Add column
+       gives it one. */
+    if (!cols.length) { out += '</div>'; return; }
 
     out += '<div class="tablewrap' + (admin ? '' : ' ro') + '"><table class="board"><thead><tr>' +
       '<th class="tick"></th>';
@@ -1760,6 +1780,17 @@ function wireBoard(k) {
     if (!n) { saidNow('nothing is ticked'); return; }
     saveBoard(k); saveBoard('archive'); draw();
   };
+
+  var intro = page.querySelector('[data-intro]');
+  if (intro) intro.onclick = function () {
+    openText(k, intro, b.intro || '', function (v) { b.intro = v; });
+  };
+  each(page, '[data-note]', function (div) {
+    div.onclick = function () {
+      var sec = sectionOf(k, div.dataset.note); if (!sec) return;
+      openText(k, div, sec.note || '', function (v) { sec.note = v; });
+    };
+  });
 
   each(page, '[data-secname]', function (h) {
     h.onblur = function () {
@@ -1913,6 +1944,32 @@ function openCell(k, td) {
       var nxt = tds[i + (e.shiftKey ? -1 : 1)];
       if (nxt) openCell(k, nxt);
     }
+  };
+}
+
+/* A board's intro or a section's note becomes a box (#2414). Paragraphs are
+   the point of these, so Enter is a new line here, not the end: clicking away
+   saves, Escape puts back what was there. */
+function openText(k, holder, was, put) {
+  if (holder.querySelector('textarea')) return;
+  var ta = document.createElement('textarea');
+  ta.className = 'notebox';
+  ta.value = was;
+  holder.onclick = null;
+  holder.innerHTML = '';
+  holder.appendChild(ta);
+  var grow = function () { ta.style.height = 'auto'; ta.style.height = (ta.scrollHeight + 2) + 'px'; };
+  grow();
+  ta.oninput = grow;
+  ta.focus();
+  var close = function (commit) {
+    var v = commit ? ta.value.replace(/\s+$/, '') : was;
+    if (commit && v !== was) { put(v); saveBoard(k); }
+    draw();
+  };
+  ta.onblur = function () { close(true); };
+  ta.onkeydown = function (e) {
+    if (e.key === 'Escape') { e.preventDefault(); ta.onblur = null; close(false); }
   };
 }
 

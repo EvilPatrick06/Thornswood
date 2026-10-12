@@ -17,10 +17,14 @@
                                the browser, so this is safe
     .\Deploy-Docs.ps1 -Boards  also board.json, which DOES overwrite anything
                                typed into a board on the site
+    .\Deploy-Docs.ps1 -Board known
+                               replaces just the named board inside the live
+                               board.json with the repo's, .bak first, and
+                               leaves every other board as it was typed
     .\Deploy-Docs.ps1 -SeedDocs
                                flattens every document with the repo copy.
                                First install only. Takes a .bak of each first.
-    .\Deploy-Docs.ps1 -Docs help,known
+    .\Deploy-Docs.ps1 -Docs help
                                replaces just the named documents with the
                                repo copy, .bak first. For a page rewritten
                                here on purpose, when -SeedDocs is too much.
@@ -78,11 +82,18 @@ param(
   # Just the boards. -SeedDocs would also flatten every markdown document up
   # there, which is too big a hammer when only the runbook moved.
   [switch]$Boards,
+  # One board out of board.json, by its key (known), put in place of the
+  # live one while every other board stays exactly as typed on the site
+  # (#2414). -Boards flattens them all, which is why the Known Issues board
+  # could not be seeded with it. The live board.json goes to .bak first, and
+  # the board's revision moves on, so a hub page still open on the old copy
+  # is told to reload rather than saving over the new one.
+  [string[]]$Board,
   # Just the public pages under data\site. Those are not editable in the
   # browser, so pushing them overwrites nobody's work. This is what you want
   # nine times out of ten when the wording on the public site changed.
   [switch]$Site,
-  # Named documents under data, by name with or without .md: help, known.
+  # Named documents under data, by name with or without .md: help, tests.
   # Only those are replaced, each after a .bak of the live copy, so a page
   # rewritten in the repo can go up without -SeedDocs flattening the rest.
   [string[]]$Docs,
@@ -125,8 +136,11 @@ if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $App  = Join-Path $Here '..\..\site'
 
 if (-not (Test-Path -LiteralPath $App)) { throw "not found: $App" }
-if ($PutBack -and ($Password -or $SeedDocs -or $Boards -or $Site -or $Docs -or $RunAs)) {
-  throw '-PutBack puts the last app back and sends nothing else, so it takes none of -Password, -SeedDocs, -Boards, -Site, -Docs or -RunAs.'
+if ($PutBack -and ($Password -or $SeedDocs -or $Boards -or $Board -or $Site -or $Docs -or $RunAs)) {
+  throw '-PutBack puts the last app back and sends nothing else, so it takes none of -Password, -SeedDocs, -Boards, -Board, -Site, -Docs or -RunAs.'
+}
+if ($Board -and ($Boards -or $SeedDocs)) {
+  throw '-Board replaces one board and keeps the rest; -Boards and -SeedDocs replace all of board.json. Use one of them.'
 }
 
 # Asked before anything is sent, so a deploy never stops halfway for it.
@@ -162,6 +176,19 @@ foreach ($d in @($Docs)) {
   $n = if ($d -match '[.](md|json)$') { $d } else { "$d.md" }
   if (-not (Test-Path -LiteralPath (Join-Path $App "data/$n"))) { throw "no such document in the repo: data/$n" }
   $docNames += $n
+}
+
+# -Board names have to be boards the repo's board.json has, for the same
+# reason, and only the plain names a board key is made of.
+$boardNames = @()
+if ($Board) {
+  $repoBoards = Get-Content -Raw -LiteralPath (Join-Path $App 'data/board.json') | ConvertFrom-Json
+  foreach ($b in @($Board)) {
+    if (-not $b) { continue }
+    if ($b -notmatch '^[a-z]+$') { throw "-Board takes a board's key, such as known: $b" }
+    if (-not ($repoBoards.PSObject.Properties.Name -contains $b)) { throw "no board named $b in the repo's data/board.json" }
+    $boardNames += $b
+  }
 }
 
 # What goes up is the site artifact (issue #459, Artifact.ps1): server.js,
@@ -326,7 +353,7 @@ Get-ChildItem (Join-Path $App 'data/site') -Filter *.md -EA SilentlyContinue | F
 # is missing goes, unless -SeedDocs says to overwrite the lot.
 Write-Host ''
 Write-Host 'Documents...'
-if ($SeedDocs -or $Boards -or $docNames.Count) {
+if ($SeedDocs -or $Boards -or $docNames.Count -or $boardNames.Count) {
   # Every document on the VPS goes to .bak first. Both of these have thrown
   # away an evening of edits before now: -SeedDocs flattens the lot, -Boards
   # flattens board.json, and a board is the thing most likely to have been
@@ -360,6 +387,45 @@ Get-ChildItem (Join-Path $App 'data') | Where-Object { $_.Extension -in '.md','.
   }
 if (-not $sent) {
   Write-Host '  all present, nothing overwritten (use -SeedDocs to replace them)'
+}
+# -Board: the named boards go into the live board.json in place of what is
+# there, and nothing else in it moves (#2414). The repo's board.json goes up
+# beside it, node on the box (the site's own) swaps the named keys and moves
+# each one's _rev on, and the result replaces the file in one rename. The
+# .bak above holds what was there.
+if ($boardNames.Count) {
+  Push (Join-Path $App 'data/board.json') "$Root/data/board.json.from-repo"
+  $boardOut = @(Remote @"
+`$node = (Get-Command node -EA SilentlyContinue).Source
+if (-not `$node) { 'BOARD NOT REPLACED: node is not on this machine'; return }
+`$js = Join-Path `$env:TEMP ('ts-board-' + [guid]::NewGuid().ToString('N') + '.js')
+Set-Content -LiteralPath `$js -Encoding ASCII -Value @'
+var fs = require('fs');
+var a = process.argv.slice(2), live = a[0], repo = a[1], names = a.slice(2);
+function read(f) { return JSON.parse(fs.readFileSync(f, 'utf8').replace(/^﻿/, '')); }
+var L = read(live), R = read(repo);
+var rev = (L._rev && typeof L._rev === 'object') ? L._rev : {};
+L._rev = rev;
+for (var i = 0; i < names.length; i++) {
+  var n = names[i];
+  if (!R[n] || typeof R[n] !== 'object') { console.log('BOARD NOT REPLACED: the repo has no board ' + n); process.exit(1); }
+  L[n] = R[n];
+  rev[n] = (typeof rev[n] === 'number' ? rev[n] : 0) + 1;
+  console.log('BOARD REPLACED ' + n + ', now at revision ' + rev[n]);
+}
+fs.writeFileSync(live + '.new', JSON.stringify(L, null, 2) + '\n', 'utf8');
+fs.renameSync(live + '.new', live);
+'@
+& `$node `$js '$rootWin\data\board.json' '$rootWin\data\board.json.from-repo' $($boardNames -join ' ')
+Remove-Item -LiteralPath `$js, '$rootWin\data\board.json.from-repo' -Force -EA SilentlyContinue
+"@ | Where-Object { $_ -is [string] } | ForEach-Object { "$_".Trim() })
+  $boardOut | ForEach-Object { Write-Host "  $_" }
+  if (@($boardOut | Where-Object { $_ -like 'BOARD REPLACED *' }).Count -ne $boardNames.Count) {
+    Write-Host ''
+    Write-Host '  THE BOARD WAS NOT REPLACED. The live board.json is as it was (board.json.bak has it too).' -ForegroundColor Red
+    Write-Host '  The lines above say why. Nothing after this step was done.' -ForegroundColor Red
+    exit 1
+  }
 }
 if ($Boards -and -not $SeedDocs) {
   Write-Host ''

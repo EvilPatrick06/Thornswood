@@ -201,10 +201,14 @@ yes('no script outside Ship-Rules.ps1 acts on the mod' + (scriptHits.length ? ':
     scriptHits.length === 0);
 
 // ---- what people read ---------------------------------------------------------
-for (const page of ['help.md', 'known.md']) {
-  const p = path.join(ROOT, 'site', 'data', page);
-  yes('site' + BS + 'data' + BS + page + ' no longer describes Start On Save as part of the build',
+{
+  const p = path.join(ROOT, 'site', 'data', 'help.md');
+  yes('site' + BS + 'data' + BS + 'help.md no longer describes Start On Save as part of the build',
       fs.existsSync(p) && !/Start ?On ?Save/i.test(read(p)));
+  // Known Issues is the known board, written out the way /known writes it (#2414).
+  const known = require('./fixtures/known-page').knownPage(ROOT);
+  yes('the Known Issues page no longer describes Start On Save as part of the build',
+      known !== null && !/Start ?On ?Save/i.test(known));
 }
 
 // ---- this machine -------------------------------------------------------------
