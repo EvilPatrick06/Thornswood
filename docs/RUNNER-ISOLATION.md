@@ -44,7 +44,9 @@ queued for Claude. The one decision only Patrick can make is in section 6.
    everything but GitHub; the VPS runners have no such rules.
 6. CI to release: release.yml runs on the same runners with contents write,
    only on a `v*` tag push or by hand. Its output is checked by SHA256SUMS
-   and signed off the box (docs\SIGNED-RELEASES.md).
+   and signed on One today; decided (Patrick, 11 Oct 2026) to sign in
+   release.yml on GitHub's runner through a federated Azure identity
+   limited to `v*` tags (docs\SIGNED-RELEASES.md section 8).
 
 ## 3. Findings
 

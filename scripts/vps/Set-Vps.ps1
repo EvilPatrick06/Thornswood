@@ -206,7 +206,9 @@ Say '  The repo is pointed at the new box. Three things are not, and they are' '
 Say '  the three that people actually connect through.' 'DarkGray'
 Write-Host ''
 Say '  1. This machine and everyone else, in one go:' 'White'
-Say '       .\scripts\ops\Set-Server.ps1 -Address ' -NoNewline 'Gray'
+# Say has no -NoNewline (a stray one went to $args and split this line in
+# two, issue #1086), so the command and its address are one Write-Host pair.
+Write-Host '       .\scripts\ops\Set-Server.ps1 -Address ' -NoNewline -ForegroundColor Gray
 Write-Host $Address -ForegroundColor Green
 Say '     Run it once the new box is up and answering, not before. It checks.' 'DarkGray'
 Write-Host ''
