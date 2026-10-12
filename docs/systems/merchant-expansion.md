@@ -78,6 +78,19 @@ synchronous mutation locks the namespace through its durable save and
 native projection; nested mutation or replacement is refused explicitly.
 Each commit starts from the controller's latest document, so another
 merchant's saved change survives an older prepared offer.
+Before recovery, trade admission, supply-history cleanup or another inventory
+writer proceeds, settlement checks the whole pending list. Merchant references,
+transaction identities, humans and receipts must be exclusive; each saved intent
+must match its world, merchant and current debit or credit state. An invalid
+list stops settlement without deleting records or changing inventory, including
+malformed non-null intents. Runtime human descriptions use the native local
+hexadecimal form; numeric aliases share the same reservation. Debit recovery
+checks the original preceding receipt as well as the debit and final receipts.
+Legacy intents without a supply map compare as an empty map throughout recovery;
+invalid maps are rejected. Recovery applies only merchant snapshot fields,
+preserving unrelated saved state.
+This identity/state check does not yet prove conservation of every saved
+goods and gold transfer; that remains a separate retirement prerequisite.
 Without an explicit history manifest, the current active roster remains the
 manifest. This support alone does not cut the current 249 traders. Before
 activating retirement, validate writer ownership, pending-intent uniqueness,
@@ -88,6 +101,7 @@ open quests must remain recoverable during catalogue changes.
 
 Local checks include `node tests/test-merchant-trading.js`,
 `node tests/test-merchant-settlement.js`,
+`node tests/test-merchant-pending-preflight.js`,
 `node tests/test-merchant-deployment.js` and
 `node scripts/dev/Build-MerchantGamemode.js --check`.
 No game playtests or operational steps are performed by Codex. Changes

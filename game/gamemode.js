@@ -62816,7 +62816,7 @@ function createNpcMerchantPurses(api,data,storage) {
     const pending=[];
     for(const [id,identity] of catalogue) {
       const state=ledger.entries[identity.reference];
-      if(state && state.pending) pending.push({merchantId:id,reference:identity.reference,state:JSON.parse(JSON.stringify(state))});
+      if(state && state.pending!==undefined && state.pending!==null) pending.push({merchantId:id,reference:identity.reference,state:JSON.parse(JSON.stringify(state))});
     }
     return pending;
   }
@@ -63999,6 +63999,17 @@ var MAX_INTENT_BYTES = 512 * 1024;
 var MAX_COUNT = 2147483647;
 function copy(value) { return JSON.parse(JSON.stringify(value)); }
 function equal(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+function merchantSnapshot(value, compact) {
+  if(!value || typeof value!=='object' || Array.isArray(value)) throw new Error('Pending merchant snapshot cannot be verified.');
+  var supply=value.supply===undefined ? {} : value.supply;
+  if(!supply || typeof supply!=='object' || Array.isArray(supply) ||
+      (!compact || value.purse!==undefined || value.stock!==undefined) &&
+      (!Number.isInteger(value.purse) || value.purse<0 || value.purse>MAX_COUNT || !Array.isArray(value.stock) ||
+        !value.stock.every(function(row) {return row && Number.isInteger(row.baseId) && row.baseId>0 && row.baseId<=0xffffffff &&
+          row.baseId!==15 && Number.isInteger(row.count) && row.count>0 && row.count<=MAX_COUNT;})))
+    throw new Error('Pending merchant snapshot cannot be verified.');
+  return {purse:value.purse,stock:value.stock,supply:supply};
+}
 function bounded(value, limit) {
   if (Buffer.byteLength(JSON.stringify(value), 'utf8') > limit) throw new Error('The trade is too large.');
   return value;
@@ -64072,8 +64083,32 @@ function createSettlement(deps) {
       typeof purses.pendingRecords === 'function' && typeof purses.read === 'function' &&
       !!transfer && typeof transfer.validate==='function' && transfer.available();
   }
-  function records() { return purses.pendingRecords(); }
-  function humanKey(human) { return human && human.desc && human.profileId > 0 ? human.desc + ':' + human.profileId : ''; }
+  function humanKey(human) {
+    if(!human || typeof human.desc!=='string' || !Number.isSafeInteger(human.profileId) || human.profileId<=0 || human.profileId>MAX_COUNT) return '';
+    // FormDesc emits local hex alone for runtime humans and hex:plugin for
+    // placed forms. Compare numeric ids so leading zeros cannot split a lock.
+    var parts=/^([0-9a-f]{1,6})(?::([^:\/\\\x00-\x1f\x7f]+\.(?:esm|esp|esl)))?$/i.exec(human.desc);
+    return parts ? JSON.stringify([parseInt(parts[1],16),(parts[2] || '').toLowerCase(),human.profileId]) : '';
+  }
+  function records() {
+    try {
+      var all=purses.pendingRecords(), merchants=new Set(), references=new Set(), transactions=new Set(), humans=new Set(), receipts=new Set();
+      if(!Array.isArray(all) || all.length>MAX_PENDING) throw new Error('Pending merchant records cannot be verified.');
+      all.forEach(function(record) {
+        var state=record && record.state, pending=state && state.pending;
+        if(!record || !state || !Number.isInteger(record.merchantId) || record.merchantId<=0 || record.merchantId>0xffffffff ||
+            record.reference!==state.reference || !valid(pending,state)) throw new Error('Pending merchant records cannot be verified.');
+        var previous=merchantSnapshot(pending.previous,pending.phase==='credit'), next=merchantSnapshot(pending.next);
+        if(!equal(merchantSnapshot(state),pending.phase==='debit'?previous:next)) throw new Error('Pending merchant records cannot be verified.');
+        [[merchants,record.merchantId],[references,record.reference],[transactions,pending.id],[humans,humanKey(pending.human)],
+          [receipts,pending.debitReceipt],[receipts,pending.finalReceipt]].forEach(function(pair) {
+          if(pair[0].has(pair[1])) throw new Error('Pending merchant records cannot be verified.');
+          pair[0].add(pair[1]);
+        });
+      });
+      return all;
+    } catch(error) {active=false;throw error;}
+  }
   function admitted(human, reference, reserveCapacity) {
     var pending = records(), key = humanKey(human);
     if (!key || reserveCapacity!==false && pending.length >= MAX_PENDING) return false;
@@ -64101,21 +64136,24 @@ function createSettlement(deps) {
     return equal(human, pending.human) ? id : 0;
   }
   function valid(pending, state) {
-    return pending && pending.version === 2 && pending.world === world &&
+    return state && pending && pending.version === 2 && pending.world === world &&
       pending.reference === state.reference && pending.base === state.base &&
-      typeof pending.id === 'string' && humanKey(pending.human) &&
+      typeof pending.id === 'string' && pending.id.length>0 && humanKey(pending.human) &&
+      ['buy','sell','supply'].indexOf(pending.kind)>=0 &&
       (pending.phase === 'debit' || pending.phase === 'credit') &&
       Number.isSafeInteger(pending.sequence) && pending.sequence > 0 && pending.sequence < Number.MAX_SAFE_INTEGER &&
       pending.debitReceipt === receiptAt(pending.human, pending.sequence) &&
-      pending.finalReceipt === receiptAt(pending.human, pending.sequence + 1);
+      pending.finalReceipt === receiptAt(pending.human, pending.sequence + 1) &&
+      (pending.phase==='credit' && pending.expectedReceipt===undefined ||
+        pending.expectedReceipt===(pending.sequence===1?'null':receiptAt(pending.human,pending.sequence-1)));
   }
   function commitMerchant(id, state) {
     var pending = state.pending;
-    if (!equal({purse:state.purse,stock:state.stock,supply:state.supply || {}}, pending.previous)) return null;
+    if (!equal(merchantSnapshot(state), merchantSnapshot(pending.previous))) return null;
     return save(id, state, creditState(state), pending.id);
   }
   function creditState(state) {
-    var next = Object.assign({}, copy(state), copy(state.pending.next));
+    var next = Object.assign({}, copy(state), merchantSnapshot(copy(state.pending.next)));
     next.pending.phase = 'credit';
     // Saved debit is conclusive. Its original snapshots are no longer read
     // in this phase; retaining them would crowd out the recovery snapshots.
@@ -64129,6 +64167,7 @@ function createSettlement(deps) {
     if (!available() || busy) return null;
     busy = true;
     try {
+      records();
       var current = purses.read(id);
       if (!current || current.pending || !equal(current, state)) return null;
       var next = copy(current), changed = false, at = now();
@@ -64170,7 +64209,7 @@ function createSettlement(deps) {
     if (!active) return false;
     if (live === pending.finalReceipt) {
       if (pending.phase !== 'credit' || saved !== pending.finalReceipt ||
-          !equal({purse:state.purse,stock:state.stock,supply:state.supply || {}}, pending.next)) return false;
+          !equal(merchantSnapshot(state), merchantSnapshot(pending.next))) return false;
       return complete(id, state);
     }
     if (pending.phase === 'debit') {
@@ -64267,7 +64306,7 @@ function createSettlement(deps) {
         catch (error) { report(offer.merchantId,error); if (!active) throw error; }
       }
       var after = active && purses.read(offer.merchantId);
-      var cancelled = after && !after.pending && equal({purse:after.purse,stock:after.stock,supply:after.supply || {}},pending.previous);
+      var cancelled = after && !after.pending && equal(merchantSnapshot(after),merchantSnapshot(pending.previous));
       return {accepted:!cancelled,done:done && !cancelled,reason:cancelled ? 'Your inventory changed. Choose the trade again.' : done ? '' : 'The transfer is waiting on the save.'};
     } finally { busy = false; }
   }
