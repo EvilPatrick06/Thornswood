@@ -92,6 +92,22 @@ class Thread(object):
         if forum is not None:
             forum.guild.threads[self.id] = self
 
+    async def edit(self, name=None, applied_tags=None, **k):
+        self.forum.guild.calls.append(('edit_thread', self.forum.name, name))
+        if name is not None:
+            self.name = name
+        if applied_tags is not None:
+            self.applied_tags = applied_tags
+
+    @property
+    def starter_message(self):
+        th = self
+
+        class Starter(object):
+            async def edit(self, content=None, **k):
+                th.content = content
+        return Starter()
+
     async def delete(self):
         self.forum.guild.calls.append(('delete_thread', self.forum.name, self.name))
         self.forum.threads.remove(self)
@@ -456,10 +472,15 @@ ISSUES = {}
 COMMENTS = {}
 
 
+UPD = [0]
+
+
 def issue(num, title, label, state='open', reason=None, pr=False,
           closed_at=None):
+    UPD[0] += 1
     row = {'number': num, 'title': title, 'state': state,
            'state_reason': reason, 'closed_at': closed_at,
+           'updated_at': '2026-10-12T06:%02d:%02dZ' % divmod(UPD[0], 60),
            'html_url': 'https://github.com/EvilPatrick06/Thornswood/issues/%d' % num,
            'labels': [{'name': l} for l in label]}
     if pr:
@@ -495,7 +516,7 @@ issue(12, 'A PR', ['Dev Findings'], pr=True)
 issue(13, 'Unlabelled', ['bug'])
 st = {'issues': {'99': {'message_id': 5, 'channel_id': 1234, 'closed': None}}}
 saves = []
-posted, removed = run(bot.known_issues_once(kf, st, gh,
+posted, edited, removed = run(bot.known_issues_once(kf, st, gh,
                       save=lambda s: saves.append(len(s['issues'])), me_id=me.id))
 yes('one forum POST per open labelled issue, never for a pull request or an '
     'unlabelled issue, one only for an issue with both labels',
@@ -508,16 +529,16 @@ yes('  with no issue number and no link in the post',
 yes('  saved straight after each post', saves == [1, 2])
 yes('  and a record from the old text channel is forgotten, not acted on',
     '99' not in st['issues'] and removed == [])
-posted, removed = run(bot.known_issues_once(kf, st, gh, me_id=me.id))
+posted, edited, removed = run(bot.known_issues_once(kf, st, gh, me_id=me.id))
 yes('a second pass posts and removes nothing', posted == [] and removed == []
     and len(kf.threads) == 2)
 path = os.path.join(TMP, 'known-issues.json')
 bot._known_save(dict(st, _dirty=True), path)
-posted, _ = run(bot.known_issues_once(kf, bot._state_read(path), gh, me_id=me.id))
+posted, _, _ = run(bot.known_issues_once(kf, bot._state_read(path), gh, me_id=me.id))
 yes('after a restart, read back from the file, nothing is posted again',
     posted == [] and len(kf.threads) == 2)
 st3 = {'issues': {'10': st['issues']['10']}}
-posted, _ = run(bot.known_issues_once(kf, st3, gh, me_id=me.id))
+posted, _, _ = run(bot.known_issues_once(kf, st3, gh, me_id=me.id))
 yes('a post that never reached the file is found again by its title, not doubled',
     posted == [11] and len(kf.threads) == 2
     and st3['issues']['11']['thread_id'] == st['issues']['11']['thread_id'])
@@ -525,12 +546,12 @@ yes('a post that never reached the file is found again by its title, not doubled
 issue(10, 'Ferry sinks', ['Dev Findings'], state='closed', reason='completed',
       closed_at='2026-10-12T05:00:00Z')
 issue(11, 'Gold resets', ['bug'])
-posted, removed = run(bot.known_issues_once(kf, st, gh, me_id=me.id))
+posted, edited, removed = run(bot.known_issues_once(kf, st, gh, me_id=me.id))
 yes('fixed and closed, or the findings label taken off: the post is DELETED',
     sorted(removed) == [10, 11] and kf.threads == []
     and [c for c in g.calls if c[0] == 'delete_thread'])
 issue(10, 'Ferry sinks', ['Dev Findings'])
-posted, removed = run(bot.known_issues_once(kf, st, gh, me_id=me.id))
+posted, edited, removed = run(bot.known_issues_once(kf, st, gh, me_id=me.id))
 yes('reopened as a finding: a post again', posted == [10] and len(kf.threads) == 1)
 
 
@@ -539,7 +560,7 @@ ISSUES.clear()
 tst = {}
 issue(30, 'Old fix', ['Dev Findings'], state='closed', reason='completed',
       closed_at='2026-10-01T00:00:00Z')
-posted, removed = run(bot.test_tasks_once(tf, tst, gh, me_id=me.id,
+posted, edited, removed = run(bot.test_tasks_once(tf, tst, gh, me_id=me.id,
                                          now='2026-10-12T04:00:00Z'))
 yes('the first pass only sets the start: nothing closed before it is posted',
     posted == [] and tst['since'] == '2026-10-12T04:00:00Z' and tf.threads == [])
@@ -557,7 +578,7 @@ issue(34, 'Will not do', ['Dev Findings'], state='closed', reason='not_planned',
 issue(35, 'Launcher fix', ['area: Launcher'], state='closed', reason='completed',
       closed_at='2026-10-12T05:04:00Z')
 COMMENTS[35] = [{'body': 'test task: Open the server list\nIt opens on your server.'}]
-posted, removed = run(bot.test_tasks_once(tf, tst, gh, me_id=me.id))
+posted, edited, removed = run(bot.test_tasks_once(tf, tst, gh, me_id=me.id))
 by = dict((th.name, th) for th in tf.threads)
 yes('a fixed issue becomes a test task post, titled and written from its '
     '"Test task:" comment, tagged by the Server line',
@@ -574,12 +595,94 @@ yes('  any fixed issue with a "Test task:" comment is posted, finding or not',
 yes('  but not a fixed issue with neither, and not one closed as not planned',
     'Tooling only' not in by and 'Will not do' not in by
     and sorted(posted) == [31, 32, 35])
-posted, removed = run(bot.test_tasks_once(tf, tst, gh, me_id=me.id))
+posted, edited, removed = run(bot.test_tasks_once(tf, tst, gh, me_id=me.id))
 yes('a second pass posts nothing twice', posted == [] and len(tf.threads) == 3)
 issue(32, 'Gold resets', ['Main Findings'])
-posted, removed = run(bot.test_tasks_once(tf, tst, gh, me_id=me.id))
+posted, edited, removed = run(bot.test_tasks_once(tf, tst, gh, me_id=me.id))
 yes('a reopened issue loses its test task post',
     removed == [32] and 'Gold resets' not in [th.name for th in tf.threads])
+
+
+# ----------------------------- 6. written for testers, and kept up to date --
+ISSUES.clear()
+COMMENTS.clear()
+g, tasks, results, play, staff = server()
+run(bot.channel_setup(g, apply=True, path=os.path.join(TMP, 'written.json')))
+kf = bot._channel_named(g, 'known-issues', ('forum',))
+tf = bot._channel_named(g, 'test-tasks', ('forum',))
+issue(40, 'Smith', ['Main Findings'])
+COMMENTS[40] = [{'body': 'Known issue: Forge tells you to wait for ever\n'
+                         'At a forge the bar fills and never finishes.\nLeave and come back.',
+                 'created_at': '2026-10-12T06:00:00Z'}]
+issue(41, 'Bare title', ['Dev Findings'])
+st = {}
+posted, edited, removed = run(bot.known_issues_once(kf, st, gh, me_id=me.id))
+by = dict((th.name, th) for th in kf.threads)
+yes('a "Known issue:" comment gives the post its short title and its body, '
+    'tagged by the label',
+    'Forge tells you to wait for ever' in by
+    and by['Forge tells you to wait for ever'].content
+    == 'At a forge the bar fills and never finishes.\nLeave and come back.'
+    and [x.name for x in by['Forge tells you to wait for ever'].applied_tags] == ['Main'])
+yes('  an issue with none still gets a post, from its own title, until one is written',
+    'Bare title' in by)
+before = len([u for u in ASKED if u.endswith('/comments') or '/comments?' in u])
+posted, edited, removed = run(bot.known_issues_once(kf, st, gh, me_id=me.id))
+after = len([u for u in ASKED if u.endswith('/comments') or '/comments?' in u])
+yes('an issue GitHub says did not change is not read again (no comment calls)',
+    after == before and posted == edited == removed == [])
+COMMENTS[41] = [{'body': 'Known issue: Doors stick shut in Riften\nServer: Dev\n'
+                         'Some Riften doors will not open.', 'created_at': '2026-10-12T06:01:00Z'}]
+issue(41, 'Bare title', ['Dev Findings'])
+posted, edited, removed = run(bot.known_issues_once(kf, st, gh, me_id=me.id))
+yes('a comment written later EDITS the same post: new title and body, no second post',
+    edited == [41] and posted == [] and len(kf.threads) == 2
+    and 'Doors stick shut in Riften' in [th.name for th in kf.threads]
+    and 'Bare title' not in [th.name for th in kf.threads])
+
+tst = {}
+run(bot.test_tasks_once(tf, tst, gh, me_id=me.id, now='2026-10-12T05:00:00Z'))
+issue(50, 'Old one', ['area: Launcher'], state='closed', reason='completed',
+      closed_at='2026-10-11T20:00:00Z')
+COMMENTS[50] = [{'body': 'Test task: Server list opens on yours\nOpen the launcher.',
+                 'created_at': '2026-10-12T05:30:00Z'}]
+issue(51, 'Ferry sinks at the dock', ['Dev Findings'], state='closed',
+      reason='completed', closed_at='2026-10-12T05:10:00Z')
+COMMENTS[51] = [{'body': 'Test task:\nServer: Dev\nRide the ferry.',
+                 'created_at': '2026-10-12T05:11:00Z'}]
+posted, edited, removed = run(bot.test_tasks_once(tf, tst, gh, me_id=me.id))
+names = [th.name for th in tf.threads]
+yes('a closed issue whose "Test task:" comment was written after the start gets '
+    'a post, however long ago it closed',
+    50 in posted and 'Server list opens on yours' in names)
+yes('  and "Test task:" with nothing after it takes the issue\'s own title',
+    51 in posted and 'Ferry sinks at the dock' in names)
+COMMENTS[51].append({'body': 'Test task: Ferry crossing works\nServer: Main\n'
+                             '1. Board the ferry.\nWhat should happen: you arrive.',
+                     'created_at': '2026-10-12T06:30:00Z'})
+issue(51, 'Ferry sinks at the dock', ['Dev Findings'], state='closed',
+      reason='completed', closed_at='2026-10-12T05:10:00Z')
+posted, edited, removed = run(bot.test_tasks_once(tf, tst, gh, me_id=me.id))
+th51 = [th for th in tf.threads if th.name == 'Ferry crossing works']
+yes('a rewritten "Test task:" comment EDITS its post: title, body and tag',
+    edited == [51] and posted == [] and len(th51) == 1
+    and th51[0].content == '1. Board the ferry.\nWhat should happen: you arrive.'
+    and [x.name for x in th51[0].applied_tags] == ['Main'])
+
+# A post made by hand (--post-task) is adopted, then brought up to date.
+made = run(tf.create_thread(name='Long hand title', content='old', applied_tags=[]))
+kpath = os.path.join(TMP, 'adopt.json')
+bot._state_write(kpath, dict(tst))
+said = bot.adopt_task(60, made.id, path=kpath)
+issue(60, 'Hand posted', ['Dev Findings'], state='closed', reason='completed',
+      closed_at='2026-10-11T21:00:00Z')
+COMMENTS[60] = [{'body': 'Test task: Short and clear\nDo the thing.',
+                 'created_at': '2026-10-11T21:00:00Z'}]
+st5 = bot._state_read(kpath)
+posted, edited, removed = run(bot.test_tasks_once(tf, st5, gh, me_id=me.id))
+yes('an adopted hand post belongs to its issue and is edited to its test task',
+    'now owns test task post' in said and 60 in edited
+    and made.name == 'Short and clear' and made.content == 'Do the thing.')
 
 
 saved_token = os.environ.pop('GITHUB_TOKEN', None)

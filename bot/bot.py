@@ -2429,7 +2429,8 @@ KNOWN_LABELS = [l.strip() for l in
                 if l.strip()]
 KNOWN_EVERY = max(60, _int_env('KNOWN_ISSUES_EVERY', 300))
 GITHUB_API = os.environ.get('GITHUB_API', 'https://api.github.com').rstrip('/')
-TASK_MARK = re.compile(r'^\s*test task\s*:\s*(.+)$', re.I)
+TASK_MARK = re.compile(r'^\s*test task\s*:\s*(.*)$', re.I)
+KNOWN_MARK = re.compile(r'^\s*known issue\s*:\s*(.*)$', re.I)
 TASK_SERVER = re.compile(r'^\s*server\s*:\s*(dev|main)\s*$', re.I)
 
 
@@ -2466,8 +2467,10 @@ def github_open_findings(get=None):
 
 
 def github_closed_since(since, get=None):
-    """Every issue (not pull request) closed at or after since, an ISO stamp,
-       by number. Asked by update time, which a close always moves."""
+    """Every issue (not pull request) that is closed and was updated at or
+       after since, an ISO stamp, by number. A close and a new comment both
+       move the update time, so this holds every issue closed since then and
+       every closed issue with a comment since then."""
     get = get or _github_get
     out = {}
     page = 1
@@ -2477,8 +2480,7 @@ def github_closed_since(since, get=None):
                % (GITHUB_API, KNOWN_REPO, page, urllib.parse.quote(since)))
         rows = get(url) or []
         for row in rows:
-            if (isinstance(row, dict) and 'pull_request' not in row
-                    and str(row.get('closed_at') or '') >= since):
+            if isinstance(row, dict) and 'pull_request' not in row:
                 out.setdefault(int(row['number']), row)
         if len(rows) < 100:
             break
@@ -2528,24 +2530,47 @@ def known_body(issue):
     return 'Known on %s. The team is working on it; this post goes when it is fixed.' % where
 
 
-def test_task_of(issue, comments):
-    """(title, body, server or None) from the issue's last comment that starts
-       "Test task:", or None when it has none."""
+def _marked(issue, comments, mark):
+    """(title, body, server or None, created_at) from the issue's last comment
+       whose first line matches mark ("Test task:" or "Known issue:"), or
+       None. A first line with nothing after the colon takes the issue's own
+       title."""
     for c in reversed(comments or []):
         lines = str(c.get('body') or '').replace('\r\n', '\n').strip().split('\n')
-        m = TASK_MARK.match(lines[0]) if lines else None
+        m = mark.match(lines[0]) if lines else None
         if not m:
             continue
-        title = m.group(1).strip()[:TASK_TITLE_ROOM]
+        title = (m.group(1).strip() or known_title(issue))[:TASK_TITLE_ROOM]
         rest = lines[1:]
         server = None
         if rest and TASK_SERVER.match(rest[0]):
             server = TASK_SERVER.match(rest[0]).group(1).capitalize()
             rest = rest[1:]
         body = '\n'.join(rest).strip()[:TASK_BODY_ROOM]
-        if title:
-            return title, body or ('Check this on %s.' % (server or 'Dev')), server
+        return title, body, server, str(c.get('created_at') or '')
     return None
+
+
+def test_task_of(issue, comments):
+    """(title, body, server, created_at) from the last "Test task:" comment."""
+    got = _marked(issue, comments, TASK_MARK)
+    if got and not got[1]:
+        got = (got[0], 'Check this on %s.' % (got[2] or 'Dev'), got[2], got[3])
+    return got
+
+
+def known_of(issue, comments):
+    """(title, body, tags) for the #known-issues post: the last "Known
+       issue:" comment, or the issue's title and a plain line until somebody
+       writes one."""
+    got = _marked(issue, comments, KNOWN_MARK)
+    if got:
+        return got[0], got[1] or known_body(issue), issue_tags(issue, got[2])
+    return known_title(issue), known_body(issue), issue_tags(issue)
+
+
+def _sig(title, body, tags):
+    return '%s\n%s\n%s' % (title, body, ','.join(sorted(tags)))
 
 
 def default_task_body(issue):
@@ -2591,11 +2616,33 @@ async def _forum_drop(forum, tid):
         await th.delete()
 
 
+async def _forum_edit(forum, tid, title, body, tags):
+    """Brings an existing post to this title, body and tags. False when the
+       post is gone (deleted by hand), so the caller can make it again."""
+    th = await _forum_thread(forum, tid)
+    if th is None:
+        return False
+    applied = [x for x in (task_tag_of(forum, n) for n in tags) if x is not None]
+    await th.edit(name=title, applied_tags=applied)
+    msg = getattr(th, 'starter_message', None)
+    if msg is None:
+        try:
+            msg = await th.fetch_message(th.id)
+        except discord.NotFound:
+            msg = None
+    if msg is not None:
+        await msg.edit(content=body, allowed_mentions=discord.AllowedMentions.none())
+    return True
+
+
 async def known_issues_once(forum, state, get=None, save=None, me_id=None):
     """
     One pass over #known-issues, a forum. state is the dict kept in
     known-issues.json, changed in place; the caller writes it. Returns the
-    issue numbers posted and removed.
+    issue numbers posted, edited and removed.
+
+    Comments are read only for an issue GitHub says changed since the last
+    pass (its updated_at), so an untouched issue costs nothing.
     """
     loop = asyncio.get_running_loop()
     issues = await loop.run_in_executor(None, github_open_findings, get)
@@ -2606,15 +2653,33 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None):
         if have.get('channel_id') != getattr(forum, 'id', None) or 'thread_id' not in have:
             rec.pop(key, None)
             state['_dirty'] = True
-    posted, removed = [], []
+    posted, edited, removed = [], [], []
     for num in sorted(issues):
         key = str(num)
-        if key in rec:
-            continue
         issue = issues[num]
-        th = await _forum_post(forum, known_title(issue), known_body(issue),
-                               issue_tags(issue), me_id)
-        rec[key] = {'thread_id': th.id, 'channel_id': forum.id}
+        have = rec.get(key)
+        if have and have.get('updated') == issue.get('updated_at'):
+            continue
+        comments = await loop.run_in_executor(None, github_comments, num, get)
+        title, body, tags = known_of(issue, comments)
+        sig = _sig(title, body, tags)
+        if have:
+            if have.get('sig') != sig:
+                try:
+                    if not await _forum_edit(forum, have['thread_id'], title, body, tags):
+                        have = None
+                        rec.pop(key, None)
+                    else:
+                        edited.append(num)
+                except discord.HTTPException:
+                    continue
+            if have:
+                have.update(sig=sig, updated=issue.get('updated_at'))
+                state['_dirty'] = True
+                continue
+        th = await _forum_post(forum, title, body, tags, me_id)
+        rec[key] = {'thread_id': th.id, 'channel_id': forum.id, 'sig': sig,
+                    'updated': issue.get('updated_at')}
         state['_dirty'] = True
         if save:
             save(state)      # straight away, so a crash cannot double it
@@ -2629,15 +2694,17 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None):
         rec.pop(key, None)
         state['_dirty'] = True
         removed.append(int(key))
-    return posted, removed
+    return posted, edited, removed
 
 
 async def test_tasks_once(forum, state, get=None, save=None, me_id=None, now=None):
     """
-    One pass over #test-tasks: a post for each issue closed as fixed since
-    state['since'] (set to now on the first pass, so nothing from before this
-    began is posted), and a post taken down when its issue is reopened.
-    Returns the issue numbers posted and removed.
+    One pass over #test-tasks. An issue closed as fixed gets a post when it
+    was closed after state['since'] (set to now on the first pass, so nothing
+    from before this began floods in), or when its latest "Test task:"
+    comment was written after since. A rewritten comment edits the post; an
+    issue that is reopened loses it. Returns the issue numbers posted,
+    edited and removed.
     """
     loop = asyncio.get_running_loop()
     since = state.get('since')
@@ -2646,19 +2713,46 @@ async def test_tasks_once(forum, state, get=None, save=None, me_id=None, now=Non
         state['_dirty'] = True
     rec = state.setdefault('tasks', {})
     closed = await loop.run_in_executor(None, github_closed_since, since, get)
-    posted, removed = [], []
+    posted, edited, removed = [], [], []
     for num in sorted(closed):
         key = str(num)
         issue = closed[num]
-        if key in rec or (issue.get('state_reason') or 'completed') != 'completed':
+        have = rec.get(key)
+        if (issue.get('state_reason') or 'completed') != 'completed':
+            continue
+        if have and have.get('updated') == issue.get('updated_at'):
             continue
         comments = await loop.run_in_executor(None, github_comments, num, get)
         task = test_task_of(issue, comments)
+        new_enough = (str(issue.get('closed_at') or '') >= since
+                      or (task is not None and task[3] >= since))
+        if not have and not new_enough:
+            continue
         if task is None and not issue_tags_found(issue):
             continue        # not a finding and nobody wrote a test task
-        title, body, server = task or (known_title(issue), default_task_body(issue), None)
-        th = await _forum_post(forum, title, body, issue_tags(issue, server), me_id)
-        rec[key] = {'thread_id': th.id, 'channel_id': forum.id}
+        if task is None:
+            title, body, server = known_title(issue), default_task_body(issue), None
+        else:
+            title, body, server = task[0], task[1], task[2]
+        tags = issue_tags(issue, server)
+        sig = _sig(title, body, tags)
+        if have:
+            if have.get('sig') != sig:
+                try:
+                    if await _forum_edit(forum, have['thread_id'], title, body, tags):
+                        edited.append(num)
+                    else:
+                        rec.pop(key, None)     # deleted by hand: confirmed
+                        state['_dirty'] = True
+                        continue
+                except discord.HTTPException:
+                    continue
+            have.update(sig=sig, updated=issue.get('updated_at'))
+            state['_dirty'] = True
+            continue
+        th = await _forum_post(forum, title, body, tags, me_id)
+        rec[key] = {'thread_id': th.id, 'channel_id': forum.id, 'sig': sig,
+                    'updated': issue.get('updated_at')}
         state['_dirty'] = True
         if save:
             save(state)
@@ -2670,16 +2764,46 @@ async def test_tasks_once(forum, state, get=None, save=None, me_id=None, now=Non
             issue = await loop.run_in_executor(None, github_issue, int(key), get)
         except Exception:
             continue
-        if str(issue.get('state')) != 'open':
-            continue
-        try:
-            await _forum_drop(forum, have['thread_id'])
-        except discord.HTTPException:
-            continue
-        rec.pop(key, None)
-        state['_dirty'] = True
-        removed.append(int(key))
-    return posted, removed
+        if str(issue.get('state')) == 'open':
+            try:
+                await _forum_drop(forum, have['thread_id'])
+            except discord.HTTPException:
+                continue
+            rec.pop(key, None)
+            state['_dirty'] = True
+            removed.append(int(key))
+        elif have.get('updated') != issue.get('updated_at'):
+            # Closed before since and changed since the last pass (an adopted
+            # post whose comment was rewritten): brought up to date.
+            comments = await loop.run_in_executor(None, github_comments, int(key), get)
+            task = test_task_of(issue, comments)
+            if task is not None:
+                tags = issue_tags(issue, task[2])
+                sig = _sig(task[0], task[1], tags)
+                if have.get('sig') != sig:
+                    try:
+                        if await _forum_edit(forum, have['thread_id'], task[0], task[1], tags):
+                            edited.append(int(key))
+                    except discord.HTTPException:
+                        continue
+                have['sig'] = sig
+            have['updated'] = issue.get('updated_at')
+            state['_dirty'] = True
+    return posted, edited, removed
+
+
+def adopt_task(number, thread_id, path=None):
+    """Records a test task post made by hand (--post-task) as issue number's,
+       so later passes edit it and take it down if the issue reopens. Run
+       with the bot stopped: the running bot holds the file in memory."""
+    path = path or KNOWN_STATE
+    state = _state_read(path)
+    if state is None:
+        raise RuntimeError('%s will not read; nothing was changed' % path)
+    state.setdefault('tasks', {})[str(int(number))] = {
+        'thread_id': int(thread_id), 'channel_id': None, 'sig': '', 'updated': ''}
+    _state_write(path, state)
+    return 'issue %d now owns test task post %d' % (int(number), int(thread_id))
 
 
 def issue_tags_found(issue):
@@ -2719,17 +2843,17 @@ async def watch_known_issues():
                     said_text = True
             me = getattr(client.user, 'id', None)
             if known is not None:
-                posted, removed = await known_issues_once(
+                posted, edited, removed = await known_issues_once(
                     known, state, save=_known_save, me_id=me)
-                if posted or removed:
-                    log('known issues: posted %s, removed %s'
-                        % (posted or 'none', removed or 'none'))
+                if posted or edited or removed:
+                    log('known issues: posted %s, edited %s, removed %s'
+                        % (posted or 'none', edited or 'none', removed or 'none'))
             if tasks is not None:
-                posted, removed = await test_tasks_once(
+                posted, edited, removed = await test_tasks_once(
                     tasks, state, save=_known_save, me_id=me)
-                if posted or removed:
-                    log('test tasks: posted %s, removed %s'
-                        % (posted or 'none', removed or 'none'))
+                if posted or edited or removed:
+                    log('test tasks: posted %s, edited %s, removed %s'
+                        % (posted or 'none', edited or 'none', removed or 'none'))
             if state.get('_dirty'):
                 _known_save(state)
         except Exception as e:
@@ -3809,6 +3933,7 @@ def run_cli(argv):
 
       --setup-channels [--apply]   the one-time setup, a preview without --apply
       --post-task --title T --body B|--body-file F --tag Dev|Main
+      --adopt-task --issue N --thread ID   (offline; with the bot stopped)
 
     Returns the exit code.
     """
@@ -3823,7 +3948,15 @@ def run_cli(argv):
     ap.add_argument('--body-file')
     ap.add_argument('--tag', choices=list(TASK_TAGS))
     ap.add_argument('--guild', type=int, default=0)
+    ap.add_argument('--adopt-task', action='store_true')
+    ap.add_argument('--issue', type=int)
+    ap.add_argument('--thread', type=int)
     a = ap.parse_args(argv)
+    if a.adopt_task:
+        if not a.issue or not a.thread:
+            ap.error('--adopt-task needs --issue and --thread')
+        print(adopt_task(a.issue, a.thread))
+        return 0
     if a.post_task:
         body = a.body
         if a.body_file:
@@ -3871,7 +4004,8 @@ def run_cli(argv):
 # `python bot.py`, where __name__ is __main__, so this changes nothing about
 # how it runs on the VPS.
 if __name__ == '__main__':
-    if '--setup-channels' in sys.argv or '--post-task' in sys.argv:
+    if ('--setup-channels' in sys.argv or '--post-task' in sys.argv
+            or '--adopt-task' in sys.argv):
         raise SystemExit(run_cli(sys.argv[1:]))
     # One heartbeat before anything can hang, so a bot stuck logging in has
     # this run's pid in the file and the watchdog can say how long it has sat.
