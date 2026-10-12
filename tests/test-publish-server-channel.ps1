@@ -13,7 +13,8 @@
 
   HOW. The real Publish-Server.ps1 and Export-ServerPayload.ps1 run in a child
   PowerShell against a scratch build, with ssh and scp stand-ins first on PATH
-  (they write down what they were asked and say INSTALL OK), and a listener on
+  (they write down what they were asked and say INSTALL OK, that the store
+  holds the gamemode artifact, and SERVER RECORDED), and a listener on
   this machine standing in for the resources port the run probes afterwards,
   on a port from the system that it holds for the whole run (#1728):
 
@@ -39,6 +40,11 @@
        (#1222): refused on either channel before anything is sent; a dev zip
        says thornswoodServer dev, and a live export of one that says dev is
        refused; ServerSettings.ps1 goes up beside the installer
+    8. the gamemode and its stamp (#459): the payload carries the gamemode
+       artifact's gamemode.js and a stamp made for the channel, the build's
+       own folder gets no stamp, the artifact's record goes to the box's
+       store once the install answers, and a -SkipBuild zip whose gamemode is
+       not the artifact's is refused before anything is sent
 
   Run under whichever PowerShell runs this file, so running it under both
   checks both. Nothing here connects to the VPS.
@@ -149,6 +155,25 @@ function Read-Zip([string]$path) {
         return [pscustomobject]@{ Port = [string]$j.port; Voice = [string]$j.thornswoodVoicePort; Name = [string]$j.name; Bom = $bom; Rec = $rec; Server = $server }
     } finally { $z.Dispose() }
 }
+# The zip's gamemode.js hash and its stamp (#459).
+function Read-Stamp([string]$path) {
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $z = [IO.Compression.ZipFile]::OpenRead($path)
+    try {
+        $gm = ''; $stamp = $null
+        foreach ($e in $z.Entries) {
+            $n = $e.FullName.Replace('\', '/')
+            if ($n -eq 'gamemode.js') {
+                $st = $e.Open(); $h = [Security.Cryptography.SHA256]::Create()
+                try { $gm = (-join ($h.ComputeHash($st) | ForEach-Object { $_.ToString('x2') })) } finally { $st.Dispose(); $h.Dispose() }
+            } elseif ($n -eq 'thornswood-build.json') {
+                $rr = New-Object IO.StreamReader($e.Open())
+                try { $stamp = ($rr.ReadToEnd() -replace '^\uFEFF', '') | ConvertFrom-Json } finally { $rr.Dispose() }
+            }
+        }
+        return [pscustomobject]@{ Gm = $gm; Stamp = $stamp }
+    } finally { $z.Dispose() }
+}
 function Run([string]$script, [string[]]$more) {
     if (Test-Path -LiteralPath $log) { Remove-Item -LiteralPath $log -Force }
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
@@ -179,6 +204,11 @@ try {
     Write-ServerFile 'data/manifest.json' '{ "written": "by the server, while it ran here" }'
     Write-Binary 'the recorded binary'
     $recSum = Write-Record
+    # The gamemode artifact a publish from this checkout builds (#459): the
+    # stand-in box says its store holds it, and what it records.
+    $art = & { Set-StrictMode -Off; . (Join-Path $repo 'scripts\deploy\Artifact.ps1'); New-ThornswoodArtifact -Component gamemode -RepoDir $repo -Paths 'game/gamemode.js' }
+    $artGm = (Get-FileHash -LiteralPath (Join-Path $art.Folder 'game\gamemode.js') -Algorithm SHA256).Hash.ToLowerInvariant()
+    $env:TS_PUB_HAS = $art.Sha256
     # PowerShell scripts rather than .cmd files: a .cmd runs through cmd.exe,
     # which splits an unquoted argument at an ampersand, and a temp folder can
     # have one in its path. The real ssh and scp are programs and take it whole.
@@ -186,7 +216,7 @@ try {
     # and the dev door script's (#1336, which a dev publish now stops without).
     foreach ($n in 'ssh', 'scp') {
         [IO.File]::WriteAllText((Join-Path $bin ($n + '.ps1')),
-            "[IO.File]::AppendAllText(`$env:TS_PUB_CALLS, ('$n ' + (`$args -join ' ') + [Environment]::NewLine))`r`n'INSTALL OK'`r`n'DOOR CARRIED'`r`nexit 0`r`n")
+            "[IO.File]::AppendAllText(`$env:TS_PUB_CALLS, ('$n ' + (`$args -join ' ') + [Environment]::NewLine))`r`n'INSTALL OK'`r`n'DOOR CARRIED'`r`n('HAS ' + `$env:TS_PUB_HAS)`r`n'SERVER RECORDED stand-in'`r`nexit 0`r`n")
     }
     $env:PATH = $bin + ';' + $oldPath
     $env:TS_PUB_CALLS = $log
@@ -231,6 +261,12 @@ try {
     Yes '  byte for byte where a channel is concerned' (($ports -join '|') -eq '7777|Thornswood|7778')
     $b = [IO.File]::ReadAllBytes($settings)
     Yes '  and no byte order mark was written into it' (-not ($b.Length -ge 3 -and $b[0] -eq 0xEF -and $b[1] -eq 0xBB))
+    $st = Read-Stamp $zip
+    Yes '  and the zip carries the artifact''s gamemode.js, with a stamp naming it for dev (#459)' (
+        $st.Gm -eq $artGm -and $null -ne $st.Stamp -and [string]$st.Stamp.gamemodeSha256 -eq $artGm -and [string]$st.Stamp.channel -eq 'dev')
+    Yes '  and the build''s own folder was given no stamp' (-not (Test-Path -LiteralPath (Join-Path $dist 'thornswood-build.json')))
+    Yes '  and once the install answered, the artifact''s record went to the box''s store' (
+        @($r.Calls | Where-Object { $_ -match ('^scp .*C:/Thornswood-Deploys/gamemode/' + [regex]::Escape($art.Name.Replace('.zip', '.json'))) }).Count -eq 1)
 
     # ---- 2. the live publish straight after -----------------------------------------
     Write-Host ''; Write-Host 'a live publish after it'
@@ -354,10 +390,24 @@ try {
         Yes ("a $ch publish of a build whose npcSettings has a default key is refused, nothing sent (exit {0})" -f $r.Code) $ok; Tail $r $ok
     }
     Write-Live
+
+    # ---- 8. a gamemode that is not the artifact's (#459) ----------------------------------
+    Write-Host ''; Write-Host 'a -SkipBuild zip whose gamemode is not the artifact''s'
+    [IO.File]::WriteAllText((Join-Path $dist 'gamemode.js'), '// a gamemode from an older commit', $utf8)
+    $x = Run $export @('-Dist', $dist, '-Zip', $zip, '-OutDir', (Join-Path $T 'out\_payload'), '-Record', $record, '-Channel', 'dev')
+    $r = Publish @('-Channel', 'dev', '-SkipBuild')
+    $ok = $x.Code -eq 0 -and $r.Code -ne 0 -and (Sent $r) -eq 0 -and $r.Out -match 'gamemode\.js is not game\\gamemode\.js at'
+    Yes ("is refused before it is sent, since the box would say it runs another gamemode (exit {0})" -f $r.Code) $ok; Tail $r $ok
+    $r = Publish @('-Channel', 'dev')
+    $ok = $r.Code -eq 0 -and (Sent $r) -eq 1 -and (Read-Stamp $zip).Gm -eq $artGm
+    Yes ("  and a publish that builds puts the artifact's gamemode back in and goes (exit {0})" -f $r.Code) $ok; Tail $r $ok
+    $r = Publish @('-Channel', 'main', '-SkipBuild')
+    $ok = $r.Code -ne 0 -and (Sent $r) -eq 0
+    Yes ("  and that dev zip, its stamp for dev, does not go to live (exit {0})" -f $r.Code) $ok; Tail $r $ok
 }
 finally {
     foreach ($l in $listeners) { try { $l.Stop() } catch { } }
-    $env:PATH = $oldPath; $env:TS_PUB_CALLS = $oldCalls
+    $env:PATH = $oldPath; $env:TS_PUB_CALLS = $oldCalls; Remove-Item Env:\TS_PUB_HAS -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $T -Recurse -Force -ErrorAction SilentlyContinue
 }
 Done

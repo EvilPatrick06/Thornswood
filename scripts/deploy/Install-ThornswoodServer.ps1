@@ -298,6 +298,15 @@ function TailLog([string]$dir) {
   from before that list existed falls back to the old rule, only what it does
   not have.
 
+  Except data\thornswood-deploy.json (#459). It is not runtime state: it is
+  the deploy record of the folder it sits in, the artifact that folder's
+  gamemode came from. Carried, the new folder named the old one's gamemode
+  (30 Sep: e445101a, with 32dea10d installed), and a put-back had the newer
+  folder's record copied over the one that came back. So each folder keeps its
+  own, Publish-Server.ps1 writes the new one once this has said INSTALL OK,
+  and after a put-back the folder that came back is recorded by its own
+  (Restore-ThornswoodServerRecord, Artifact.ps1).
+
   And the logs, entry 220: server.log and thornswood.log sat in the root and
   went with every install, taking the evidence for whatever the server did
   before it. They move across and are rolled, never deleted.
@@ -327,6 +336,8 @@ function Carry([string]$from, [string]$to, [bool]$skipWorld) {
         $listedA = (Get-Item -LiteralPath $a).FullName
         foreach ($f in @(Get-ChildItem -LiteralPath $listedA -Recurse -File -Force -ErrorAction SilentlyContinue)) {
             $rel = $f.FullName.Substring($listedA.Length).TrimStart('\')
+            # The folder's own deploy record stays with it (#459, above).
+            if ($rel -eq 'thornswood-deploy.json') { continue }
             $dest = Join-Path $b $rel
             if ($shipped) { if ($shipped.Contains($rel)) { continue } }
             elseif (Test-Path -LiteralPath $dest) { continue }

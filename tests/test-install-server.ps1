@@ -57,6 +57,15 @@
       with -RequirePass on it is INSTALL OK with the switch set and read
       back; a first install of a payload with none is refused, and goes in
       with -RequirePass off. The payloads here carry a switch otherwise.
+    - issue #459: a Publish-Server that answered records what the box runs
+      (the gamemode artifact in the store, data\thornswood-deploy.json and
+      the store's current record, and the engine in the site's
+      deployed-build.json, #2303); a refused one records nothing; the old
+      folder keeps its own record rather than handing it to the new one; and
+      -PutBack records the folder that came back by its own record. The
+      Publish-Server payloads carry this checkout's gamemode artifact and a
+      stamp for the channel, as Export-ServerPayload.ps1 makes them, so they
+      are told apart by what they ship into data.
 
   Connects to nothing but 127.0.0.1.
 #>
@@ -419,14 +428,27 @@ function RecordText([string]$Binary, [string]$Js = $stubJs) {
 # A payload as Export-ServerPayload makes one: the load order written out in
 # full under the root it is for, and every server file with its record.
 # -RecordFor and -RecordJs make a record of another binary or JavaScript half.
+# -GamemodeFrom copies a gamemode in (the artifact's, for Publish-Server, #459)
+# and -StampFor writes the build stamp naming it for that channel; both default
+# to what the Publish-Server runs below set.
+$script:PayloadGamemodeFrom = ''
+$script:PayloadStampFor = ''
 function Payload {
     param([string]$Gamemode = '// v2', [string[]]$Order = @('Skyrim.esm', 'A.esp'), [string[]]$Carry = @('Skyrim.esm', 'A.esp'),
           [string]$Binary = 'binary v2', [string]$RecordFor = '', [string]$RecordJs = '', [string]$Shipped = 'shipped v2', [int]$Port = $P,
-          [string]$ForRoot = $root, [hashtable]$Settings = @{}, [switch]$NoRecord, [string]$Stray = '', [string]$Js = '', [switch]$NoPass)
+          [string]$ForRoot = $root, [hashtable]$Settings = @{}, [switch]$NoRecord, [string]$Stray = '', [string]$Js = '', [switch]$NoPass,
+          [string]$GamemodeFrom = $script:PayloadGamemodeFrom, [string]$StampFor = $script:PayloadStampFor)
     $script:zipN++
     $dir = Join-Path $work ('payload-' + $script:zipN)
     foreach ($n in $Carry) { Put (Join-Path $dir ('plugins\' + $n)) ('plugin ' + $n) }
-    Put (Join-Path $dir 'gamemode.js') $Gamemode
+    if ($GamemodeFrom) {
+        $null = [IO.Directory]::CreateDirectory($dir)
+        Copy-Item -LiteralPath $GamemodeFrom -Destination (Join-Path $dir 'gamemode.js') -Force
+    } else { Put (Join-Path $dir 'gamemode.js') $Gamemode }
+    if ($StampFor) {
+        Put (Join-Path $dir 'thornswood-build.json') (([ordered]@{ channel = $StampFor; commit = 'harness'; gamemodeMatchesCommit = $true
+                                                                  gamemodeSha256 = (Sha (Join-Path $dir 'gamemode.js')) }) | ConvertTo-Json)
+    }
     if (-not $Js) { $Js = $stubJs }
     Put (Join-Path $dir 'dist_back\skymp5-server.js') $Js
     Put (Join-Path $dir 'scam_native.node') $Binary
@@ -790,8 +812,13 @@ try {
         # names on C:\ land in the scratch folder, so the live root its door
         # seed reads private\door.json from is the scratch one, $root, with
         # the made-up door written above (#1905).
+        # The deploy store, the site's folder and the scripts Send-Script.ps1
+        # sends by file land there too (#459), so nothing here reaches the
+        # box's own C:\Thornswood-Deploys or C:\Thornswood-Docs, which on the
+        # VPS are real.
         function MapFar([string]$s) {
-            foreach ($p in 'C:\thornswood-server.zip', 'C:\Install-ThornswoodServer.ps1', 'C:\ServerSettings.ps1', 'C:\ServerBuild.ps1', 'C:\ServerReadyWait.ps1', 'C:\Roll-Log.ps1', 'C:\Thornswood-Server\') {
+            foreach ($p in 'C:\thornswood-server.zip', 'C:\Install-ThornswoodServer.ps1', 'C:\ServerSettings.ps1', 'C:\ServerBuild.ps1', 'C:\ServerReadyWait.ps1', 'C:\Roll-Log.ps1', 'C:\Thornswood-Server\',
+                           'C:\Thornswood-Deploys', 'C:\Thornswood-Docs', 'C:\Windows\Temp\thornswood-remote-') {
                 $to = Join-Path $global:TsBox.Box $p.Substring(3)
                 $s = $s.Replace($p, $to).Replace($p.Replace('\', '/'), $to)
             }
@@ -829,10 +856,27 @@ try {
             if ($global:TsScpFail -and $m.Groups[1].Value -match $global:TsScpFail) { return }
             $to = MapFar $m.Groups[1].Value
             if ($to -eq $m.Groups[1].Value) { return }
-            Copy-Item -LiteralPath $src -Destination $to -Force
+            # A script Send-Script.ps1 sends by file names the box's folders
+            # inside it, so it lands with them mapped, the same as one sent on
+            # the command line.
+            if ($to -like '*\Windows\Temp\thornswood-remote-*.ps1') {
+                [IO.File]::WriteAllText($to, (MapFar ([IO.File]::ReadAllText($src))), (New-Object Text.UTF8Encoding($true)))
+            } else { Copy-Item -LiteralPath $src -Destination $to -Force }
             $global:LASTEXITCODE = 0
         }
         $global:TsSshSeen = New-Object Collections.Generic.List[string]
+        $null = [IO.Directory]::CreateDirectory((Join-Path $box 'Windows\Temp'))
+        # A site on the stand-in box, so the deployed build is written (#2303).
+        Put (Join-Path $box 'Thornswood-Docs\server.js') '// the site'
+        $deploys = Join-Path $box 'Thornswood-Deploys'
+        $siteBuild = Join-Path $box 'Thornswood-Docs\data\deployed-build.json'
+        # The gamemode artifact this checkout makes, which Publish-Server
+        # builds and holds the payload to (#459).
+        $art = & { . (Join-Path $Here 'scripts\deploy\Artifact.ps1'); New-ThornswoodArtifact -Component gamemode -RepoDir $Here -Paths 'game/gamemode.js' }
+        $artGm = Join-Path $art.Folder 'game\gamemode.js'
+        $script:PayloadGamemodeFrom = $artGm
+        $script:PayloadStampFor = 'dev'
+        function Rec([string]$p) { $t = Get $p; if ($null -eq $t) { return $null }; return ($t | ConvertFrom-Json) }
         # The build record the payloads' binary is held to (#1214): Payload's
         # default binary.
         $recordFile = Join-Path $work 'server-build.json'
@@ -858,11 +902,23 @@ try {
             return ($d.key -eq $liveDoor.key -and $d.passKey -eq $liveDoor.passKey -and $d.site -eq ($liveDoor.site + '/dev'))
         }
 
-        $code = Publish (Payload -Port $D -ForRoot $devRoot -Gamemode '// dev v1') @()
+        $code = Publish (Payload -Port $D -ForRoot $devRoot -Shipped 'shipped dev v1') @()
         $failed = $script:fail
         Yes 'Publish-Server puts a first dev server up and exits 0' ($code -eq 0 -and (WaitUp $D))
         Yes '  and says DOOR CARRIED' (@($script:lastOut | ForEach-Object { $_.Trim() }) -contains 'DOOR CARRIED')
         Yes '  and the dev door.json has the live key and join pass key, and the live site ending in /dev' (DevDoorOk)
+        $devCur = Join-Path $deploys 'current\thornswood-server-dev.json'
+        $devBeside = Join-Path $devRoot 'data\thornswood-deploy.json'
+        $c1 = Rec $devCur
+        Yes '  and the box records it (#459): the store''s current record names the gamemode artifact and its commit' (
+            $c1 -and $c1.name -eq $art.Name -and $c1.commit -eq $art.Commit -and $c1.part -eq 'thornswood-server-dev')
+        Yes '    and the same record is beside it, in data, where the server serves it' ((Get $devBeside) -eq (Get $devCur))
+        Yes '    and the artifact is in the store, as it was built' (
+            (Test-Path -LiteralPath (Join-Path $deploys ('gamemode\' + $art.Name))) -and (Sha (Join-Path $deploys ('gamemode\' + $art.Name))) -eq $art.Sha256)
+        Yes '    and history.log has the publish' ((Get (Join-Path $deploys 'history.log')) -match [regex]::Escape('thornswood-server-dev ' + $art.Name))
+        $sb = Rec $siteBuild
+        Yes '    and the site''s deployed-build.json names the engine dev runs (#2303)' ($sb -and $sb.dev.commit -eq 'abcdef0123456789abcdef0123456789abcdef01')
+        $rec1 = Get $devCur
         if ($script:fail -gt $failed) { Show }
         # The dev server's own switches, the ones dev rollout 6 lost (#1222).
         $devOwn = SettingsOf $devRoot
@@ -886,6 +942,7 @@ try {
         Yes '  and it was not: the same process, the root as it was' (((Owner $D) -eq $devPid) -and ((Tree $devRoot) -eq $devBefore))
         Yes '  and nothing it sent the box before the installer stops anything' (
             @($global:TsSshSeen | Where-Object { $_ -match 'EncodedCommand' }).Count -eq 0)
+        Yes '  and the box''s record is the one before it (#459)' ((Get $devCur) -eq $rec1 -and (Get $devBeside) -eq $rec1)
         if ($script:fail -gt $failed) { Show }
 
         $global:TsScpFail = 'thornswood-server\.zip'
@@ -914,11 +971,18 @@ try {
             @($global:TsSshSeen | Where-Object { $_ -match '-File' }).Count -eq 0 -and ((Owner $D) -eq $devPid) -and ((Tree $devRoot) -eq $devBefore))
         if ($script:fail -gt $failed) { Show }
 
-        $code = Publish (Payload -Port $D -ForRoot $devRoot -Gamemode '// dev v2' -Settings $build -Order @('Skyrim.esm', 'A.esp', 'B.esp') -Carry @('Skyrim.esm', 'A.esp', 'B.esp')) @()
+        # A second apart at least, so the two records differ in when.
+        Start-Sleep -Milliseconds 1100
+        $code = Publish (Payload -Port $D -ForRoot $devRoot -Shipped 'shipped dev v2' -Settings $build -Order @('Skyrim.esm', 'A.esp', 'B.esp') -Carry @('Skyrim.esm', 'A.esp', 'B.esp')) @()
         $failed = $script:fail
         $devAfter = SettingsOf $devRoot
-        Yes 'Publish-Server with a good payload exits 0 and the new gamemode answers' (
-            $code -eq 0 -and (Get (Join-Path $devRoot 'gamemode.js')) -eq '// dev v2' -and (WaitUp $D))
+        Yes 'Publish-Server with a good payload exits 0 and the new folder answers' (
+            $code -eq 0 -and (Get (Join-Path $devRoot 'data\shipped.txt')) -eq 'shipped dev v2' -and (WaitUp $D))
+        $rec2 = Get $devCur
+        $devPrev = @(Get-ChildItem -LiteralPath $box -Directory -Force | Where-Object { $_.Name -like 'Thornswood-Server-Dev.prev-*' } | Sort-Object Name -Descending | Select-Object -First 1)
+        Yes '  and the box records the new publish, beside it and in the store (#459)' ($rec2 -and $rec2 -ne $rec1 -and (Get $devBeside) -eq $rec2)
+        Yes '  and the old folder kept its own record, not handed to the new one' (
+            $devPrev.Count -eq 1 -and (Get (Join-Path $devPrev[0].FullName 'data\thornswood-deploy.json')) -eq $rec1)
         Yes ('  and the dev server keeps every one of its own settings (#1222): ' + ((Carried $devOwn $devAfter) -join ', ')) (
             (Carried $devOwn $devAfter).Count -eq 0 -and $devAfter.thornswoodServer -eq 'dev' -and $devAfter.thornswoodLoadOrderRefuse -eq $true -and
             $devAfter.thornswoodRequirePass -eq $false -and $devAfter.name -eq 'Thornswood Dev' -and (Js $devAfter.npcSettings) -eq '{}')
@@ -929,9 +993,11 @@ try {
 
         $code = Publish '' @('PutBack')
         $failed = $script:fail
-        Yes 'Publish-Server -PutBack exits 0 and the previous gamemode answers again' (
-            $code -eq 0 -and (Get (Join-Path $devRoot 'gamemode.js')) -eq '// dev v1' -and (WaitUp $D))
+        Yes 'Publish-Server -PutBack exits 0 and the previous folder answers again' (
+            $code -eq 0 -and (Get (Join-Path $devRoot 'data\shipped.txt')) -eq 'shipped dev v1' -and (WaitUp $D))
         Yes '  with the dev server''s own settings still' ((Carried $devOwn (SettingsOf $devRoot)).Count -eq 0)
+        Yes '  and the box records the folder that came back by its own record (#459)' ((Get $devCur) -eq $rec1 -and (Get $devBeside) -eq $rec1)
+        Yes '    and history.log says it was put back to it' ((Get (Join-Path $deploys 'history.log')) -match [regex]::Escape('thornswood-server-dev put back to ' + $art.Name))
         if ($script:fail -gt $failed) { Show }
     }
 
@@ -942,9 +1008,14 @@ try {
     Yes ("a game port from the system for the live Publish-Server runs, {0}, and {1} above it, both free" -f $L, ($L + 1)) ($L -gt 0)
     if ($L -gt 0 -and $D -gt 0) {
         $liveRoot = Join-Path $box 'Live\Thornswood-Server'
-        $code = Publish (Payload -Port $L -ForRoot $liveRoot -Gamemode '// live v1') @() 'main' $liveRoot ($TaskPrefix + ' Live') $L
+        $script:PayloadStampFor = 'main'
+        $code = Publish (Payload -Port $L -ForRoot $liveRoot -Shipped 'shipped live v1') @() 'main' $liveRoot ($TaskPrefix + ' Live') $L
         $failed = $script:fail
         Yes 'Publish-Server -Channel main puts a first live server up and exits 0' ($code -eq 0 -and (WaitUp $L))
+        $lc = Rec (Join-Path $deploys 'current\thornswood-server.json')
+        Yes '  and the box records it as the live server''s (#459)' ($lc -and $lc.name -eq $art.Name -and $lc.part -eq 'thornswood-server')
+        $sb = Rec $siteBuild
+        Yes '  and the site''s deployed-build.json names live, keeping dev (#2303)' ($sb -and $sb.live.commit -eq 'abcdef0123456789abcdef0123456789abcdef01' -and $sb.dev.commit -eq 'abcdef0123456789abcdef0123456789abcdef01')
         if ($script:fail -gt $failed) { Show }
         $liveOwn = SettingsOf $liveRoot
         foreach ($kv in @(@('name', 'Thornswood'), @('thornswoodServer', 'main'), @('thornswoodLoadOrderRefuse', $true),
@@ -954,12 +1025,12 @@ try {
         }
         Put (Join-Path $liveRoot 'server-settings.json') ($liveOwn | ConvertTo-Json -Depth 8)
         $liveOwn = SettingsOf $liveRoot
-        $code = Publish (Payload -Port $L -ForRoot $liveRoot -Gamemode '// live v2' -Settings @{ name = 'Thornswood Test'
+        $code = Publish (Payload -Port $L -ForRoot $liveRoot -Shipped 'shipped live v2' -Settings @{ name = 'Thornswood Test'
                          npcSettings = @{ default = @{ spawnInInterior = $true } }; thornswoodRequirePass = $false }) @() 'main' $liveRoot ($TaskPrefix + ' Live') $L
         $failed = $script:fail
         $liveAfter = SettingsOf $liveRoot
-        Yes 'a live publish over it exits 0 and the new gamemode answers' (
-            $code -eq 0 -and (Get (Join-Path $liveRoot 'gamemode.js')) -eq '// live v2' -and (WaitUp $L))
+        Yes 'a live publish over it exits 0 and the new folder answers' (
+            $code -eq 0 -and (Get (Join-Path $liveRoot 'data\shipped.txt')) -eq 'shipped live v2' -and (WaitUp $L))
         Yes ('  and the live server keeps every one of its own settings: ' + ((Carried $liveOwn $liveAfter) -join ', ')) (
             (Carried $liveOwn $liveAfter).Count -eq 0 -and $liveAfter.thornswoodServer -eq 'main' -and $liveAfter.thornswoodRequirePass -eq $true -and
             $liveAfter.thornswoodLoadOrderRefuse -eq $true -and (Js $liveAfter.npcSettings) -eq '{}' -and @($liveAfter.thornswoodDevs).Count -eq 1)
