@@ -2794,6 +2794,10 @@ const SWING_STOP = 'IdleChairExitStart';
 /** The graph's unconditional reset. See the note on SWING_PROPERTY. */
 const SWING_FREE = 'IdleForceDefaultState';
 
+/* How long a sheathe is given before the swing starts (#2245). Skyrim's own
+   sheathe takes about two thirds of a second; one second covers a slow one. */
+const SWING_SHEATHE_MS = 1000;
+
 /*
   Run on the person's own machine EVERY FRAME for as long as SWING_PROPERTY
   holds a value. Not on change: see the note on the property, which is where
@@ -2882,6 +2886,21 @@ function swingScript() {
       was never equipped is a no-op, but we still need to know: the end
       path only puts it back when isEquipped was true here (#611).
     */
+    /*
+      #2245: A DRAWN WEAPON FIRST GOES AWAY, AND THE SWING WAITS FOR IT.
+
+      Skyrim does not play an idle like IdlePickaxeEnter on somebody with a
+      weapon out. Unequipping the drawn pick (below) leaves them with fists
+      raised, which is still drawn, so the animation was silently refused
+      while the server's strikes went on paying ore: "mining with the pickaxe
+      already out skips the animation and gives ore on click". So a drawn
+      weapon is sheathed, and the rest of the start runs once the sheathe has
+      had SWING_SHEATHE_MS, and only if no newer message (an end, or another
+      start) has arrived meanwhile.
+    */
+    '    var go = function () {',
+    '      if (st.thornswoodSwingAt !== v.at) { return; }',
+    '      try {',
     '    if (v.tool) {',
     '      try {',
     '        var it = sp.Form.from(sp.Game.getFormEx(v.tool));',
@@ -2916,6 +2935,15 @@ function swingScript() {
 
     '      } catch (e) { }',
     '    });',
+    '      } catch (e) { }',
+    '    };',
+    '    var drawn = false;',
+    '    try {',
+    '      var ad = sp.Actor.from(pc);',
+    '      drawn = !!(ad && ad.isWeaponDrawn());',
+    '      if (drawn) { ad.sheatheWeapon(); }',
+    '    } catch (e) { drawn = false; }',
+    '    if (drawn) { sp.Utility.wait(' + (SWING_SHEATHE_MS / 1000) + ').then(go); } else { go(); }',
     '  } catch (e) { }',
     '})();'
   ].join('\n');
