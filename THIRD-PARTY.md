@@ -322,8 +322,8 @@ collection and Vortex's staging folder on the shipping machine:
   Block and no editor id or script named for another server (#400). Its
   header's description still says where the records came from: "Crafting and
   gathering content salvaged from Keizaal Online. Stations, salt, ore, charcoal
-  kilns, the skill manuals and their recipes." Both release plugins below
-  carry the same description. Until 12 October this
+  kilns, the skill manuals and their recipes." The release plugin below
+  carries the same description. Until 12 October this
   section gave the 1.1 file as read on 24 September, 141,234 bytes, sha256
   `3b3ecb3bda4b97e312df10a61191cdd2949286007ab03a948b323d4a749af2ae`.
 - `SKSE\Plugins\SkyrimSoulsRE.ini`: Skyrim Souls RE's own settings file (mod
@@ -351,35 +351,43 @@ was at the commit the release was built from, into Thornswood's own game
 folder in place of the collection's (How it reaches people). The launcher
 refuses Play while a copy differs from the one its server holds, and a Ship
 whose plugin changed stops until that channel's server holds the same file
-(#2308). Read on 12 October from the feeds, the release tags, the dev and main
-game folders on the shipping machine, both servers' manifests (the size and
-crc32 each lists match the file below) and the servers' own copies:
+(#2308). Both channels carry the same plugin. Read on 12 October from the
+feeds, the release tags, the dev and main game folders on the shipping machine,
+both servers' manifests (the size and crc32 each lists match the file below)
+and the servers' own copies:
 
 | Channel | Release | Built from | Bytes | sha256 | Records |
 |---|---|---|---|---|---|
-| main | every main release from `20261005-125929` (5 October 12:59 PM) to `20261011-175014` (launcher 1.2.3, 11 October 5:50 PM); the live server has held it since 1:00 PM on 5 October | `4eebb138` to `7cece557` | 146,446 | `b34abac05c6341087d7df35b095c52b7c8b79b9c6bb5f527cea607e653667e91` | 415 |
-| dev | every dev release from `20261012-004958-dev` (12 October 12:49 AM) to `20261012-080945-dev`; the dev server has held it since 12:43 AM | `9ec48194` to `13f88fcc` | 146,941 | `d05679e76d8dc930b236ebd906274a4c26b7959228d5ebca727cf5800469bf31` | 419 |
+| main | every main release from the first of 12 October, the one after `20261011-175014`; the live server holds the same file | `f8527daa` or later | 146,941 | `d05679e76d8dc930b236ebd906274a4c26b7959228d5ebca727cf5800469bf31` | 419 |
+| dev | every dev release from `20261012-004958-dev` (12 October 12:49 AM); the dev server has held it since 12:43 AM | `9ec48194` on | 146,941 | `d05679e76d8dc930b236ebd906274a4c26b7959228d5ebca727cf5800469bf31` | 419 |
 
-The repository has held the 146,941-byte file since `f8527daa` (#2336). The
-main releases were built before that.
+The repository has held this file since `f8527daa` (#2336). Before it, every
+main release from `20261005-125929` (5 October 12:59 PM) to `20261011-175014`
+(11 October 5:50 PM), built from `4eebb138` to `7cece557`, carried a
+146,446-byte plugin, sha256
+`b34abac05c6341087d7df35b095c52b7c8b79b9c6bb5f527cea607e653667e91`, 415
+records, which the live server held from 1:00 PM on 5 October. It was the
+plugin below without the four HearthFires records, and with the key and the
+key mold as they were in the base.
 
-How each differs from the collection's 141,023-byte base, record by record. All
-three name the same five masters, and neither release plugin removes a record
-of the base:
+How the release plugin differs from the collection's 141,023-byte base, record
+by record. Both name the same five masters, and the release plugin removes no
+record of the base. It adds 37 records and changes two:
 
-- The main plugin is the base, unchanged, and 33 records more. Five override Skyrim.esm's
-  Dwarven scrap smelting recipes (`RecipeIngotDwarvenScrapBent`,
-  `RecipeIngotDwarvenScrapLarge`, `RecipeIngotDwarvenScrapLarge02`,
-  `RecipeIngotDwarvenScrapLarge03`, `RecipeIngotDwarvenScrapPlateMetalSmall`),
-  which collapses the scrap smelts to one (#613). Fourteen are fishing: three
-  poles and a fish trap with their four recipes, and six catches (#1379).
-  Six are the weapon, armor and sewing kits and their recipes (#1384). Eight
-  are the bandage, splint, poultice and remedy and their recipes (#1383).
-- The dev plugin is the main plugin and four records more, overrides of
-  HearthFires.esm's house part recipes (`BYOHRecipeFittings`,
-  `BYOHRecipeNails`, `BYOHRecipeHinge`, `BYOHRecipeLock`, #2258), and two
-  records of the base changed, the key and the key mold (`ThornswoodMiscKey`,
-  `ThornswoodMiscKeyMold`), which got their own meshes (#2255).
+- Five override Skyrim.esm's Dwarven scrap smelting recipes
+  (`RecipeIngotDwarvenScrapBent`, `RecipeIngotDwarvenScrapLarge`,
+  `RecipeIngotDwarvenScrapLarge02`, `RecipeIngotDwarvenScrapLarge03`,
+  `RecipeIngotDwarvenScrapPlateMetalSmall`), which collapses the scrap smelts
+  to one (#613).
+- Fourteen are fishing: three poles and a fish trap with their four recipes,
+  and six catches (#1379).
+- Six are the weapon, armor and sewing kits and their recipes (#1384).
+- Eight are the bandage, splint, poultice and remedy and their recipes (#1383).
+- Four override HearthFires.esm's house part recipes (`BYOHRecipeFittings`,
+  `BYOHRecipeNails`, `BYOHRecipeHinge`, `BYOHRecipeLock`, #2258).
+- Two records of the base changed, the key and the key mold
+  (`ThornswoodMiscKey`, `ThornswoodMiscKeyMold`), which got their own meshes
+  (#2255).
 
 ## Shipped today with no licence this file can name
 
