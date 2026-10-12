@@ -82,12 +82,12 @@
 
   The two dev ones are here because the box has been watching them since 16
   September and this file did not know. vps-dev-instance.ps1, which runs ON
-  the VPS, appends them to the installed watch.ps1 in place. So the copy up
-  there watched six things, the copy here watched four, and -Install would
-  have written the shorter list over the longer one and taken the dev server
-  and dev voice off the watchdog with nothing said. That script checks for
-  'Thornswood Dev Server' before it patches, so with them here it now finds
-  its work already done and says so.
+  the VPS, used to append them to the installed watch.ps1 in place. So the
+  copy up there watched six things, the copy here watched four, and -Install
+  would have written the shorter list over the longer one and taken the dev
+  server and dev voice off the watchdog with nothing said. This list is the
+  one place they live now: vps-dev-instance.ps1 writes nothing into watch.ps1
+  and only says whether the installed one has them (issue #1106).
 
   The game's own traffic is UDP on 7777 and there is nothing to connect to, so
   3000 stands in for it. They are the same process, so if one is gone both are.
