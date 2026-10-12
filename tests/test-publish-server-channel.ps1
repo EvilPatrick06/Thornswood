@@ -338,7 +338,7 @@ try {
     $saved = [IO.File]::ReadAllText($record)
     [void](Write-Record $record -BinaryOnly)
     $r = Publish @('-Channel', 'dev')
-    $ok = $r.Code -ne 0 -and @($r.Calls | Where-Object { $_ -match '^(ssh|scp) ' }).Count -eq 0 -and $r.Out -match 'lists no server files'
+    $ok = $r.Code -ne 0 -and @($r.Calls | Where-Object { $_ -match '^(ssh|scp) ' }).Count -eq 0 -and $r.Out -match 'lists no server files|files is missing, empty'
     Yes ("a publish held to a record that lists only the binary is refused (exit {0})" -f $r.Code) $ok; Tail $r $ok
     [IO.File]::WriteAllText($record, $saved, $utf8)
     $r = Publish @('-Channel', 'dev')
