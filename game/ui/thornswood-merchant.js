@@ -96,14 +96,18 @@
         return gem + ': ' + quest.locations[gem];
       }).join('; ');
       if (quest.gem && quest.locations && typeof quest.locations === 'object') location = quest.locations[quest.gem] || location;
-      var status = quest.state === 'open' ? ('Drawn ' + quest.drawn + ' of ' + quest.holds + (quest.gem ? ', ' + quest.gem : '')) :
-        quest.state === 'cooldown' ? ('Returns in ' + quest.waitMinutes + ' minutes') : quest.state === 'locked' ? ('Requires ' + quest.who) : 'Available';
+      var status = quest.state === 'open' ? (quest.kind==='kill' ? 'Defeated '+quest.kills+' of '+quest.count :
+        'Drawn ' + quest.drawn + ' of ' + quest.holds + (quest.gem ? ', ' + quest.gem : '')) :
+        quest.state === 'cooldown' ? ('Returns in ' + quest.waitMinutes + ' minutes') : quest.state === 'locked' ? ('Requires ' + quest.who) :
+        quest.state==='unavailable' ? 'This work is unavailable.' : 'Available';
+      var terms=quest.kind==='kill' ? 'Defeat '+quest.count+' at this place. Reward '+quest.gold+' gold. Return to a guild trader in this hold. Returns after '+quest.hours+' hours.' :
+        'Draw up to '+quest.holds+', return '+quest.ask+' to finish, and keep the rest. Returns after '+quest.hours+' hours.';
       body += '<div class="line"><div class="quest-copy"><strong>' + esc(quest.name) + '</strong>' +
-        '<p>' + esc(location) + '</p><p>Draw up to ' + esc(quest.holds) + ', return ' + esc(quest.ask) +
-        ' to finish, and keep the rest. Returns after ' + esc(quest.hours) + ' hours.</p><p>' + esc(status) + '</p></div>';
+        '<p>' + esc(location) + '</p><p>'+esc(terms)+'</p><p>' + esc(status) + '</p>'+
+        (quest.recovery ? '<p>Leave this older work before taking it again. Its progress could not be verified.</p>' : '')+'</div>';
       if (quest.state === 'open') {
         body += '<button data-quest="' + esc(quest.id) + '" data-action="return"' + (quest.canReturn ? '' : ' disabled') + '>Turn in work</button>' +
-          '<button data-quest="' + esc(quest.id) + '" data-action="abandon"' + (quest.canAbandon ? '' : ' disabled') + '>Give back and leave</button>';
+          '<button data-quest="' + esc(quest.id) + '" data-action="abandon"' + (quest.canAbandon ? '' : ' disabled') + '>'+(quest.kind==='kill'?'Leave work':'Give back and leave')+'</button>';
       } else {
         var gems = quest.gems || [], chosen = gemChoices[quest.id] || '';
         if (gems.length) {

@@ -312,8 +312,9 @@ function liftFn(name) {
   function town(locked) {
     const claims = {};
     claims[HOUSE] = { by: HOLDER, name: 'Holder', locked: locked };
+    // No jail in this town: the cells (#502) are tests/test-502-jail-cells.js.
     return new Function('BUILDING_BY_DOOR', 'WAY_OUT', 'claims', 'holderOf', 'holdsKey',
-      'holdsDeed', 'idOf',
+      'holdsDeed', 'idOf', 'jailHoldOf', 'cellLists',
       'var doorIndex = null;\n' + parts.filter(Boolean).join('\n') +
       '\nreturn { shutFor: shutFor, mayPass: mayPass,' +
       ' wayOut: typeof wayOut === "function" ? wayOut : null };')(
@@ -321,7 +322,9 @@ function liftFn(name) {
       function (b) { return claims[b] || null; },
       function (actorId, b) { return actorId === 0x111 && b === HOUSE; },
       function () { return false; },
-      function (d) { return ID[d] || 0; });
+      function (d) { return ID[d] || 0; },
+      function () { return null; },
+      function () { });
   }
   function ids(list) { return list.slice().sort(function (x, y) { return x - y; }).join(','); }
   function same(list, want) {

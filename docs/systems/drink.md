@@ -44,6 +44,7 @@ not a new station.
 ## Where this is
 
 The ale curve, the 45 minutes, and the chat line that says which drink
-it was are in the server. The damage help, the sway, and the hangover
-are not. Water is not yet tagged by where you filled it. Every
+it was are in the server, and so are the damage help of the first two
+and the hangover, which a night in a bed ends. The sway is not, and a
+remedy does not yet end a hangover. Water is not yet tagged by where you filled it. Every
 non-ale drink is 20.

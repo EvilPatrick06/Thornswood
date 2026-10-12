@@ -4,10 +4,13 @@
   How many people a Thornswood server holds at once: read from the one place
   it is written, records\most-online.json, and put into server-settings.json.
   Dot-sourced by Deploy-Gamemode.ps1 (the live server, through the built
-  server's settings), Deploy-DevGamemode.ps1 (the dev server, in place),
-  Publish-Server.ps1 (the settings it packs), Publish-Update.ps1 (the
-  feed's maxOnline) and Install-Voice.ps1 (the voice service's own number,
-  voice, which goes on its command line as THORNSWOOD_VOICE_MOST).
+  server's settings), Deploy-DevGamemode.ps1 (the dev server, in place,
+  -Channel dev), Publish-Server.ps1 (the settings it packs, for its
+  -Channel), Publish-Update.ps1 (the feed's maxOnline, the channel's seats)
+  and Install-Voice.ps1 (the voice service's own number, voice, which goes
+  on its command line as THORNSWOOD_VOICE_MOST; dev's for
+  C:\Thornswood-Voice-Dev). Main and dev each have their own numbers since
+  12 Oct (Get-MostOnline below).
 
   WHY, issue #481: "Nothing anywhere limits how many people can connect, and
   the only number that looks like a limit is decoration." Patrick, 28 Sep:
@@ -38,7 +41,7 @@
 $MostOnlineRecord = Join-Path $PSScriptRoot '..\..\records\most-online.json'
 
 <#
-  The number, the engine's seats and where they came from.
+  The number, the engine's seats and where they came from, for one channel.
 
   Value is 0 when there is no number to take, and Why says which way it was
   missing. The caller then leaves both keys as the server has them. Throws on
@@ -46,11 +49,27 @@ $MostOnlineRecord = Join-Path $PSScriptRoot '..\..\records\most-online.json'
   (skymp5-server/cpp/CMakeLists.txt:46), and Networking.cpp:148 throws
   "Current slots limit is 1000" at start above it, so a bigger number written
   here is a server that does not come up. Stopping the deploy is better.
+
+  EACH CHANNEL ITS OWN NUMBERS. Patrick, 12 Oct: "change dev to of 5 awake
+  cap both voice and in game to 5 for the dev server". The record's own
+  people, staffSeats and voice are main's (the live server, its voice and
+  the main feed). Its "dev" object holds the same three keys for the dev
+  server, dev voice and the dev feed, read with -Channel dev. A record with no
+  dev object gives dev main's numbers, which is how both servers were run
+  before 12 Oct, and Note says so. Every rule below holds for each channel on
+  its own: the engine's ceiling, and voice never fewer than that channel's
+  seats.
+
+  Seats is what the world holds at once, the people and the staff seats
+  together, and is the number people are shown ("N of 30 awake"; Patrick,
+  12 Oct: "the real cap is 30 but 25 for people with non staff roles I still
+  want it to say of 30 awake tho"). Value is the door's number, past which
+  only the Discord staff roles get in.
 #>
-function Get-MostOnline([string]$Path = '') {
+function Get-MostOnline([string]$Path = '', [ValidateSet('main', 'dev')][string]$Channel = 'main') {
     $ceiling = 1000
     if (-not $Path) { $Path = $MostOnlineRecord }
-    $r = [pscustomobject]@{ Value = 0; Staff = 0; Seats = 0; Voice = 0; From = $Path; Why = '' }
+    $r = [pscustomobject]@{ Value = 0; Staff = 0; Seats = 0; Voice = 0; From = $Path; Why = ''; Channel = $Channel; Note = '' }
     if (-not $Path -or -not (Test-Path -LiteralPath $Path)) { $r.Why = 'there is no most-online.json there'; return $r }
     $doc = $null
     try {
@@ -67,23 +86,39 @@ function Get-MostOnline([string]$Path = '') {
     # out. Stop the deploy, naming the file (RecordShape.ps1, #2180).
     $newer = @(Get-ThornswoodRecordProblems -Doc $doc -Kind most-online | Where-Object { $_ -like 'it is version*' })
     if ($newer.Count) { throw ("{0}: {1}" -f $Path, $newer[0]) }
-    if ($null -eq $doc -or $doc.PSObject.Properties.Name -notcontains 'people') {
-        $r.Why = 'it has no people'
+    # Which object the numbers come from: the record itself for main, its dev
+    # object for dev when there is one.
+    $nums = $doc
+    $where = $Path
+    $its = 'its'
+    if ($Channel -eq 'dev' -and $null -ne $doc -and $doc.PSObject.Properties.Name -contains 'dev') {
+        $nums = $doc.dev
+        $where = $Path + ', its dev numbers,'
+        $its = 'its dev'
+        if ($nums -isnot [System.Management.Automation.PSCustomObject]) {
+            $r.Why = 'its dev is not an object of people, staffSeats and voice'
+            return $r
+        }
+    } elseif ($Channel -eq 'dev') {
+        $r.Note = 'the record has no dev numbers, so dev takes main''s'
+    }
+    if ($null -eq $nums -or $nums.PSObject.Properties.Name -notcontains 'people') {
+        $r.Why = $(if ($its -eq 'its') { 'it has no people' } else { 'its dev has no people' })
         return $r
     }
     $n = 0
-    [void][int]::TryParse([string]$doc.people, [ref]$n)
+    [void][int]::TryParse([string]$nums.people, [ref]$n)
     if ($n -le 0) {
-        $r.Why = 'its people is not a whole number above zero'
+        $r.Why = $its + ' people is not a whole number above zero'
         return $r
     }
     $staff = 0
-    if ($doc.PSObject.Properties.Name -contains 'staffSeats') {
-        [void][int]::TryParse([string]$doc.staffSeats, [ref]$staff)
+    if ($nums.PSObject.Properties.Name -contains 'staffSeats') {
+        [void][int]::TryParse([string]$nums.staffSeats, [ref]$staff)
         if ($staff -lt 0) { $staff = 0 }
     }
     if ($n + $staff -gt $ceiling) {
-        throw ("{0} asks for {1} people and {2} staff seats, {3} in all. The engine seats at most {4} and will not start above it. Nothing was written." -f $Path, $n, $staff, ($n + $staff), $ceiling)
+        throw ("{0} asks for {1} people and {2} staff seats, {3} in all. The engine seats at most {4} and will not start above it. Nothing was written." -f $where, $n, $staff, ($n + $staff), $ceiling)
     }
     $r.Value = $n
     $r.Staff = $staff
@@ -92,11 +127,11 @@ function Get-MostOnline([string]$Path = '') {
     # person seated holds a socket to and every person waiting in line at the
     # menu as well, so it is never fewer than the seats. 0 when the record
     # has none, and Install-Voice.ps1 then leaves the service uncapped.
-    if ($doc.PSObject.Properties.Name -contains 'voice') {
+    if ($nums.PSObject.Properties.Name -contains 'voice') {
         $v = 0
-        [void][int]::TryParse([string]$doc.voice, [ref]$v)
+        [void][int]::TryParse([string]$nums.voice, [ref]$v)
         if ($v -lt $r.Seats) {
-            throw ("{0} gives voice {1}, fewer than the {2} seats ({3} people and {4} for staff roles), so somebody seated could be kept out of voice and chat. Nothing was written." -f $Path, $doc.voice, $r.Seats, $n, $staff)
+            throw ("{0} gives voice {1}, fewer than the {2} seats ({3} people and {4} for staff roles), so somebody seated could be kept out of voice and chat. Nothing was written." -f $where, $nums.voice, $r.Seats, $n, $staff)
         }
         $r.Voice = $v
     }
