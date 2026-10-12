@@ -188,6 +188,10 @@ const RECORDS = {};
 RECORDS[NORD] = { type: 'RACE', fields: [{ type: 'DATA', data: raceData(50) }] };
 RECORDS[PERSON_BASE] = { type: 'NPC_', fields: [{ type: 'ACBS', data: acbs(50) }] };
 const mpB = {
+  getNpcAIState: function(id) {
+    const a=world.actors.get(id);
+    return a ? {isHuman:a.pid>0,profileId:a.pid,lifeGeneration:a.life || 0,runtimeLifeIdentity:String(1+(a.body || 0))} : null;
+  },
   get: function (id, prop) {
     if (id === 0 && prop === 'onlinePlayers') {
       return Array.from(world.actors.keys()).filter(function (k) { return world.actors.get(k).pid > 0; });
@@ -234,6 +238,7 @@ const mpB = {
 const states = new Map();
 const party = { leader: 1, members: [] };
 const boxB = {
+  MERCHANT_TRADING: require('../game/quest-transactions'),
   console: { log: function () { } },
   Buffer: Buffer,
   mp: mpB,

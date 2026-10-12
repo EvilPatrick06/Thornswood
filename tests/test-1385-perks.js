@@ -96,6 +96,15 @@ RECORDS[0x21a72] = { type: 'GMST', fields: [{ type: 'DATA', data: floatBytes(0.1
 RECORDS[RACE] = { type: 'RACE', fields: [{ type: 'DATA', data: floatBytes(3, 88, 128) }] };
 
 const mpFake = {
+  getActorRuntimeIdentity: function(id) {
+    const a=world.actors.get(id);
+    if (!a) throw new Error('no actor');
+    return String(1+(a.runtime || 0));
+  },
+  getNpcAIState: function(id) {
+    const a=world.actors.get(id);
+    return a ? {isHuman:a.pid>0,profileId:a.pid,lifeGeneration:a.life || 0,runtimeLifeIdentity:String(1+(a.body || 0))} : null;
+  },
   get: function (id, prop) {
     if (id === 0 && prop === 'onlinePlayers') {
       return Array.from(world.actors.keys()).filter(function (k) { return world.actors.get(k).pid > 0; });
@@ -155,6 +164,7 @@ const mpFake = {
 const states = new Map();
 function makeBox() {
   const box = {
+    MERCHANT_TRADING: require('../game/merchant-trading'),
     console: { log: function () {} },
     mp: mpFake,
     guard: function (n, fn) { return fn; },
@@ -367,7 +377,9 @@ if (!mpFake.getNpcAIState) {
 }
 function replaced(id, how) {
   const a = world.actors.get(id);
-  if (how === 'life') { a.life = (a.life || 0) + 1; } else { a.desc = 'other' + id.toString(16) + ':run'; }
+  if (how === 'life') { a.life = (a.life || 0) + 1; }
+  else if (how === 'body') { a.body = (a.body || 0) + 1; }
+  else { a.desc = 'other' + id.toString(16) + ':run'; }
   // Its health is what the engine left at the ID, as in the issue: the
   // queued effect is all that could still move it.
 }
@@ -377,7 +389,7 @@ function restored(id) { const a = world.actors.get(id); delete a.desc; }
   states.set(by, filled(['might']));
   const PERSON = actor(0xff000061);
   for (const [name, target] of [['person', PERSON], ['creature', WOLF]]) {
-    for (const how of ['life', 'desc']) {
+    for (const how of ['life', 'desc', 'body']) {
       heal(target);
       strike(by, target, 0.2, SWORD, { power: true });
       replaced(target, how);
@@ -389,11 +401,13 @@ function restored(id) { const a = world.actors.get(id); delete a.desc; }
     strike(by, target, 0.2, SWORD, { power: true });
     settle();
     yes('T2 on the same ' + name + ' it still lands: 0.2 becomes 0.25', health(target) === 0.75);
-    heal(target); world.actors.get(target).p.health = 0.22;
-    strike(by, target, 0.2, SWORD, { power: true });
-    settle();
-    replaced(target, 'life');
-    yes('T3 the fallback killer of a ' + name + ' is not named for a replacement life', K.killerOf(target) === 0);
+    for (const how of ['life','body']) {
+      heal(target); world.actors.get(target).p.health = 0.22;
+      strike(by, target, 0.2, SWORD, { power: true });
+      settle();
+      replaced(target, how);
+      yes('T3 the fallback killer of a ' + name + ' is not named for a replacement '+how, K.killerOf(target) === 0);
+    }
     heal(target); world.actors.get(target).p.health = 0.22;
     strike(by, target, 0.2, SWORD, { power: true });
     settle();
@@ -725,6 +739,24 @@ yes('the log says it once a cast', logged('Leyline Attunement') === 1);
   yes('and the day it spent is still spent', /^Font of Magic comes back in \d+ hours$/.test(K.use(RUN, states.get(RUN), 'fontofmagic').why));
 }
 
+// A queued bonus belongs to the character who caused the engine hit.
+for (const field of ['pid','life','runtime']) {
+  const by=actor(0xff000040+['pid','life','runtime'].indexOf(field));
+  states.set(by,filled(['might']));
+  heal(WOLF);
+  strike(by,WOLF,0.2,SWORD,{power:true});
+  world.actors.get(by)[field]=(world.actors.get(by)[field] || 0)+1;
+  settle();
+  yes('perk damage refuses attacker '+field+' replacement before flush',health(WOLF)===0.8);
+}
+for (const field of ['life','runtime']) {
+  const by=actor(0xff000044+['life','runtime'].indexOf(field));
+  states.set(by,filled(['might']));
+  heal(WOLF); world.actors.get(WOLF).p.health=0.22;
+  strike(by,WOLF,0.2,SWORD,{power:true}); settle();
+  world.actors.get(by)[field]=1;
+  yes('perk fallback does not name a replacement character after '+field,K.killerOf(WOLF)===0);
+}
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
