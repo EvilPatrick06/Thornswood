@@ -345,8 +345,10 @@ below that still have no licence this file can name.
   `Data\Platform` only what Ship-Rules.ps1 names as Thornswood's ships
   (Test-ShipNotOurs). The files of four Nexus mods the collection does not have
   yet (male face morphs, fitted hoods and robes, children's clothes, a mesh
-  fix) and the message board Thornswood-Content.esp places still ship until
-  collection revision 2 carries them (docs\COLLECTION-REVISION-2.md), and 140
+  fix) shipped until collection revision 2 carried them
+  (docs\COLLECTION-REVISION-2.md). The message board Thornswood-Content.esp
+  places ships for as long as that plugin names it, since no revision carries
+  it (#2298), and 140
   outfit meshes built in BodySlide on another machine ship as ours for now,
   until Thornswood builds them itself from the collection's BodySlide projects
   (#1259, `scripts\release\built-until-1259.txt`). Packs
