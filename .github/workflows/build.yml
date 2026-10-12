@@ -393,6 +393,7 @@ jobs:
                  'test-launcher-help.js', 'test-classes-page.js',
                  'test-tester-checklist.js',
                  'test-1389-lists.js',
+                 'test-1382-food-groups.js',
                  'test-1590-hunter-lists.js',
                  'test-1390-embassy.js',
                  'test-1603-beds.js',
