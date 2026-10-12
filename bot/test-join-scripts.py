@@ -27,6 +27,7 @@ writes pointed at a temporary one and -Plain, and opens the zip it makes.
 
 Never connects to anything.
 """
+import _pyguard  # noqa: F401  (first: Python 3.10 or newer, #2276)
 import asyncio
 import datetime
 import io
