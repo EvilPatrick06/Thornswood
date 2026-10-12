@@ -125,7 +125,8 @@ These stay commands. How to run each one, with examples:
 | `/hurt <person> [what]` | Staff | A cut, a bite, a break or a disease for a scene, an agreed loss written down after a yes given out of character, or what somebody carries (#1383) | The staff block's `command`, which hands it to `staff` in the injury and disease block | The staff block's header; [Injury](injury.md) |
 | `/restart`, `/shutdown` | Nobody | Answers that restarts are not run from chat | `gamemode.js:45207` | Nowhere |
 | `/close` (Discord), and the Close ticket button | Staff: the bot's `STAFF_ROLES` (Owner, Dev, Gamemaster, Moderator, Loremaster), by id or name; Manage Threads alone is not staff (#1342) | Closes a ticket, and only in a ticket's own thread; anywhere else it says it only works inside a ticket (#1776) | `close_here`, `is_ticket_thread` and `is_staff` in `bot/bot.py` | Discord's own command list |
-| `/live-smoke start`, `reset`, `refresh`, `report` (Discord) | Owner, Dev and Lead Gamemaster | The Live smoke checklist in #test-tasks | `bot/bot.py:2565` | Discord's own command list |
+| `/test-task` (Discord) | Owner, Dev and Lead Gamemaster (`TEST_TASK_ROLES`) | One thread in the #test-tasks forum, tagged Dev or Main | `test_task_cmd` and `post_test_task` in `bot/bot.py` | Discord's own command list |
+| `python bot.py --setup-channels [--apply]` (VPS, by hand) | Whoever runs it on the VPS | The one-time testing channel setup: #test-tasks to a forum, #test-results to #test-findings, #known-issues made; a preview without `--apply`, never twice | `channel_setup` in `bot/bot.py` | `data\channel-setup.json` |
 
 ## Lines the game sends itself
 

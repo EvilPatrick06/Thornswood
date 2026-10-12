@@ -3807,7 +3807,7 @@
           let off = false;
           try { off = !!r.isDisabled(); } catch (e) { off = false; }
           if (off) { continue; }
-          w.out.push([r.getPositionX(), r.getPositionY(), r.getPositionZ()]);
+          w.out.push([r.getPositionX(), r.getPositionY(), r.getPositionZ(), b.getFormID()]);
         } catch (e) {
           if (onThrew) { onThrew(e); }
         }
@@ -3948,6 +3948,16 @@
     and tools\test-temp.js fails if this list and that file have drifted
     apart, which is the only thing keeping a hand edit here honest.
   */
+  /*
+    A CRAFTING STATION WARMS YOU AND DOES NOT SET YOU ON FIRE (#2259).
+
+    Rows marked 'craft' are the forge, skyforge, smelter, kiln and cooking
+    spit markers, kind "craft" in fires.json. They count for the warmth and
+    never for the catch: using one seats you on it, which read as standing
+    in the coals, and the Whiterun forge gave a bad burn within seconds of
+    sitting down at it. tests/test-temp.js fails if these marks and the
+    table's kinds drift apart, so a rebuild cannot quietly undo it.
+  */
   const FIRE_BASES = [
     ['Skyrim.esm', 0x13b40],   // FXFire01
     ['Skyrim.esm', 0x13b42],   // FXFire02
@@ -3958,22 +3968,22 @@
     ['Skyrim.esm', 0x35f4a],   // FireplaceWood01Burning
     ['Skyrim.esm', 0x42521],   // bwcStatuePuzzleFlame
     ['Skyrim.esm', 0x4318b],   // FXfireWithEmbersLogs01
-    ['Skyrim.esm', 0x48748],   // CraftingBlacksmithForgeSTATIC
+    ['Skyrim.esm', 0x48748, 'craft'],   // CraftingBlacksmithForgeSTATIC
     ['Skyrim.esm', 0x4c5ce],   // GiantCampfire01BurningSnow01
     ['Skyrim.esm', 0x4c5cf],   // GiantCampfire01BurningSnow01B
     ['Skyrim.esm', 0x51577],   // GiantCampfire01Burning
-    ['Skyrim.esm', 0x68adb],   // CraftingCookingFireSpit
+    ['Skyrim.esm', 0x68adb, 'craft'],   // CraftingCookingFireSpit
     ['Skyrim.esm', 0x90ca4],   // Campfire01LandBurning_ReachDirt01
     ['Skyrim.esm', 0x951d8],   // Campfire01LandBurningReachDirt01
-    ['Skyrim.esm', 0x9c6ce],   // CraftingSmelterMarker1
+    ['Skyrim.esm', 0x9c6ce, 'craft'],   // CraftingSmelterMarker1
     ['Skyrim.esm', 0xa9230],   // Campfire01LandBurning_Heavy_SN
     ['Skyrim.esm', 0xaa71c],   // FXfireWithEmbers02Toggle
     ['Skyrim.esm', 0xb6c08],   // Campfire01LandBurningPineForest01
-    ['Skyrim.esm', 0xbbcf1],   // CraftingBlackSmithForgeSkyforge
-    ['Skyrim.esm', 0xbf9e1],   // CraftingBlackSmithForgeWR
+    ['Skyrim.esm', 0xbbcf1, 'craft'],   // CraftingBlackSmithForgeSkyforge
+    ['Skyrim.esm', 0xbf9e1, 'craft'],   // CraftingBlackSmithForgeWR
     ['Skyrim.esm', 0xc2bf1],   // Campfire01LandBurningCoastalBeach01
     ['Skyrim.esm', 0xc6918],   // Campfire01LandBurningFallForestDirt01
-    ['Skyrim.esm', 0xcae0b],   // CraftingBlackSmithForge
+    ['Skyrim.esm', 0xcae0b, 'craft'],   // CraftingBlackSmithForge
     ['Skyrim.esm', 0xcbb23],   // Campfire01LandBurningFrozenMarshDirtSlope01
     ['Skyrim.esm', 0xcbb2f],   // Campfire01LandBurningRocks01
     ['Skyrim.esm', 0xcd823],   // FXfireWithEmbers01_lite
@@ -4012,11 +4022,11 @@
     ['Embers XD.esp', 0x19f73f],   // FXfireWithEmbersLight02
     ['Embers XD.esp', 0x19f741],   // FXfireWithEmbers01_brazier
     // #608 near a forge: these editor ids do not begin with the old craft prefixes.
-    ['North Keep.esp', 0x21152],   // CraftingNKPBlackSmithForge
-    ['Dawnguard.esm', 0xf812],   // DLC1DawnguardCraftingBlackSmithForge
-    ['Dragonborn.esm', 0x3cf6e],   // DLC2CraftingBlackSmithForge
-    ['Dragonborn.esm', 0x2b074],   // DLC2CraftingBlackSmithSkaalForge
-    ['Thornswood-Content.esp', 0x1547e],   // ThornswoodCraftingCharcoalKilnMarker
+    ['North Keep.esp', 0x21152, 'craft'],   // CraftingNKPBlackSmithForge
+    ['Dawnguard.esm', 0xf812, 'craft'],   // DLC1DawnguardCraftingBlackSmithForge
+    ['Dragonborn.esm', 0x3cf6e, 'craft'],   // DLC2CraftingBlackSmithForge
+    ['Dragonborn.esm', 0x2b074, 'craft'],   // DLC2CraftingBlackSmithSkaalForge
+    ['Thornswood-Content.esp', 0x1547e, 'craft'],   // ThornswoodCraftingCharcoalKilnMarker
   ];
   // The plugins the list spans, for the log line when they are resolved.
   const FIRE_FILES = ["Skyrim.esm","Dawnguard.esm","Dragonborn.esm","Embers XD.esm","Embers XD.esp","North Keep.esp","Thornswood-Content.esp"];
@@ -4185,7 +4195,7 @@
         // place it can be read.
         if (base) {
           const id = base.getFormID();
-          if (id) { fireIdOut.push(id); }
+          if (id) { fireIdOut.push(id); if (FIRE_BASES[fireIdAt - 1][2] === 'craft') { fireCraft[id] = true; } }
         }
       } catch (e) {
         if (!fireWhy) { fireWhy = String((e && e.message) || e); }
@@ -4323,6 +4333,25 @@
     fireWalkStep(cell);
   }
 
+  // Runtime ids of the 'craft' rows: warmth only, never the catch (#2259).
+  const fireCraft = {};
+  // The nearest lit fire that is not a crafting station, set by fireDistance.
+  let fireFlame = -1;
+
+  /** The nearest spot in reach, or `best`; fireFlame gets the nearest that is no station. */
+  function fireNearest(px, py, pz, spots, best) {
+    for (let i = 0; i < spots.length; i++) {
+      const dx = spots[i][0] - px;
+      const dy = spots[i][1] - py;
+      const dz = spots[i][2] - pz;
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (dist > FIRE_REACH) { continue; }
+      if (best < 0 || dist < best) { best = dist; }
+      if (!fireCraft[spots[i][3]] && (fireFlame < 0 || dist < fireFlame)) { fireFlame = dist; }
+    }
+    return best;
+  }
+
   /** How far the nearest lit fire is, or -1 when there is none in reach. */
   function fireDistance(px, py, pz, pc) {
     /*
@@ -4335,6 +4364,7 @@
       and it never set anybody on fire. getFurnitureReference is the engine's
       own answer for which station you are at.
     */
+    fireFlame = -1;
     try {
       const furn = pc.getFurnitureReference ? pc.getFurnitureReference() : null;
       if (furn) {
@@ -4343,23 +4373,12 @@
         if (id) {
           const ids = fireIdList();
           for (let f = 0; f < ids.length; f++) {
-            if (ids[f] === id) { return 0; }
+            if (ids[f] === id) { return fireNearest(px, py, pz, fireSpotsHere(pc), 0); }
           }
         }
       }
     } catch (e) { }
-    let best = -1;
-    const spots = fireSpotsHere(pc);
-    for (let i = 0; i < spots.length; i++) {
-      const dx = spots[i][0] - px;
-      const dy = spots[i][1] - py;
-      const dz = spots[i][2] - pz;
-      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-      if (dist > FIRE_REACH) { continue; }
-      if (best < 0 || dist < best) { best = dist; }
-      if (best <= FIRE_INSIDE) { break; }
-    }
-    return best;
+    return fireNearest(px, py, pz, fireSpotsHere(pc), -1);
   }
 
   /*
@@ -4513,6 +4532,7 @@
       night = (hour < 6 || hour >= 20) ? 1 : 0;
     } catch (e) { }
     // Asking is 44 native calls, and nobody in the water is at a fire.
+    fireFlame = -1;
     const fire = swimming ? -1 : fireDistance(px, py, pz, pc);
     placeFire = fire;
 
@@ -4612,7 +4632,7 @@
       DamageActorValue is the engine's own call and goes through everything
       health normally goes through.
     */
-    if (fire >= 0 && fire <= FIRE_INSIDE) {
+    if (fireFlame >= 0 && fireFlame <= FIRE_INSIDE) {
       if (burnUntil < now) { note('you are standing in the fire'); }
       // Refreshed rather than set, so walking out of the coals lets it go
       // within about a second instead of burning for the full catch.

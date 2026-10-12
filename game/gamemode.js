@@ -2794,6 +2794,10 @@ const SWING_STOP = 'IdleChairExitStart';
 /** The graph's unconditional reset. See the note on SWING_PROPERTY. */
 const SWING_FREE = 'IdleForceDefaultState';
 
+/* How long a sheathe is given before the swing starts (#2245). Skyrim's own
+   sheathe takes about two thirds of a second; one second covers a slow one. */
+const SWING_SHEATHE_MS = 1000;
+
 /*
   Run on the person's own machine EVERY FRAME for as long as SWING_PROPERTY
   holds a value. Not on change: see the note on the property, which is where
@@ -2882,6 +2886,21 @@ function swingScript() {
       was never equipped is a no-op, but we still need to know: the end
       path only puts it back when isEquipped was true here (#611).
     */
+    /*
+      #2245: A DRAWN WEAPON FIRST GOES AWAY, AND THE SWING WAITS FOR IT.
+
+      Skyrim does not play an idle like IdlePickaxeEnter on somebody with a
+      weapon out. Unequipping the drawn pick (below) leaves them with fists
+      raised, which is still drawn, so the animation was silently refused
+      while the server's strikes went on paying ore: "mining with the pickaxe
+      already out skips the animation and gives ore on click". So a drawn
+      weapon is sheathed, and the rest of the start runs once the sheathe has
+      had SWING_SHEATHE_MS, and only if no newer message (an end, or another
+      start) has arrived meanwhile.
+    */
+    '    var go = function () {',
+    '      if (st.thornswoodSwingAt !== v.at) { return; }',
+    '      try {',
     '    if (v.tool) {',
     '      try {',
     '        var it = sp.Form.from(sp.Game.getFormEx(v.tool));',
@@ -2916,6 +2935,15 @@ function swingScript() {
 
     '      } catch (e) { }',
     '    });',
+    '      } catch (e) { }',
+    '    };',
+    '    var drawn = false;',
+    '    try {',
+    '      var ad = sp.Actor.from(pc);',
+    '      drawn = !!(ad && ad.isWeaponDrawn());',
+    '      if (drawn) { ad.sheatheWeapon(); }',
+    '    } catch (e) { drawn = false; }',
+    '    if (drawn) { sp.Utility.wait(' + (SWING_SHEATHE_MS / 1000) + ').then(go); } else { go(); }',
     '  } catch (e) { }',
     '})();'
   ].join('\n');
@@ -35265,7 +35293,17 @@ log('gamemode loaded:',
     PROPERTY: PLOT_PROPERTY,
     activate: press, command: command, giveSeeds: giveSeeds,
     readPlot: readPlot, claimCovering: claimCovering, groundOf: groundOf,
-    farmOf: farmOf
+    farmOf: farmOf,
+    // For the property block's /claim (#2250): is this id a crop plot, and is
+    // there one in reach, so a word that is not about a field stays with it.
+    isPlotId: function (raw) {
+      raw = String(raw || '');
+      if (!/^[0-9a-f]{1,8}$/i.test(raw)) { return false; }
+      var base = '';
+      try { base = String(mp.get(parseInt(raw, 16), 'baseDesc') || ''); } catch (e) { return false; }
+      return P.has(CROPS, base);
+    },
+    plotNear: function (actorId) { return !!nearestPlot(actorId); }
   };
   flog('ready,', Object.keys(CROPS).length, 'crops and', Object.keys(claims).length, 'claims');
 })();
@@ -35950,6 +35988,36 @@ log('gamemode loaded:',
     return true;
   }
 
+  /*
+    /claim WHEN THEY ARE NOT AT A DOOR THE SERVER KNOWS (#2250).
+
+    Everything that was not a door just opened used to go to farming, and
+    farming's first question is the farmer gate. So /claim at a door the table
+    does not know, or at a known door more than a minute after opening it,
+    answered "Only a farmer can bring a crop in" to anybody who is not a
+    farmer. Farming keeps every /claim that is about a field: one naming a crop
+    plot, or a bare one with a plot in reach. The rest is answered here, about
+    doors, and claims nothing.
+  */
+  function claimAway(parts, actorId, profileId, toProfile) {
+    var F = g.__thornswoodFarming;
+    var raw = (parts && parts[1]) ? String(parts[1]) : '';
+    if (!F || typeof F.isPlotId !== 'function' || typeof F.plotNear !== 'function') { return false; }
+    if (raw ? F.isPlotId(raw) : F.plotNear(actorId)) { return false; }
+    var building = raw ? doorOfId(raw) : null;
+    if (building) {
+      toProfile(profileId, 'Open the door of ' + nameOf(building) + ' again and press the key ' +
+                           'straight away. The server only takes the door you have just opened.');
+    } else if (raw) {
+      toProfile(profileId, 'That door does not belong to a building anybody can hold, so there ' +
+                           'is nothing to claim at it.');
+    } else {
+      toProfile(profileId, 'Open the door of the building you mean first. That is how ' +
+                           'the server knows which one it is.');
+    }
+    return true;
+  }
+
   function claim(actorId, profileId, toProfile) {
     var building = here(actorId);
     if (!building) {
@@ -36345,24 +36413,44 @@ log('gamemode loaded:',
     save();
     pushAll();
     plog(nameOf(building), on ? 'locked' : 'unlocked', 'by', held.name);
-    toProfile(profileId, 'You ' + (on ? 'lock' : 'unlock') + ' ' + nameOf(building) + '.' +
-              (on ? ' Anybody without a key will have to pick it.' : ''));
+    toProfile(profileId, lockLine(building, on, true));
     /*
-      #615: after locking, say so for you and everyone so you and others know
-      it is for sure locked. pushAll already sends the shut list; this is the
-      spoken line. The locker already heard the You-line above.
+      #615 and #2256: after locking, say so plainly, for you and everyone, so
+      nobody wonders whether it is locked only for them. It is: the lock is the
+      building's, not the holder's view of it. pushAll already sends the shut
+      list; this is the spoken line.
+
+      To the people standing near enough to see the door (LOCK_HEARD), not to
+      the whole server: before #2256 every lock in Skyrim was announced to
+      every player online.
     */
-    var said = nameOf(building) + ' is ' + (on ? 'locked' : 'unlocked') + '.';
+    var said = lockLine(building, on, false);
     var online = [];
     try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { online = []; }
     for (var oi = 0; oi < online.length; oi++) {
       var oid = online[oi];
+      if (oid === actorId) { continue; }
+      var far = distanceTo(actorId, oid);
+      if (far < 0 || far > LOCK_HEARD) { continue; }
       var opid = 0;
       try { opid = Number(mp.get(oid, 'profileId')) || 0; } catch (e) { opid = 0; }
       if (!opid || opid === profileId) { continue; }
       toProfile(opid, said);
     }
     return true;
+  }
+
+  /* About thirty metres at seventy units to the metre: the street in front of the door. */
+  var LOCK_HEARD = 2000;
+
+  /** What a lock or an unlock says, to whoever turned it (mine) or to the people near it (#2256). */
+  function lockLine(building, on, mine) {
+    var name = nameOf(building);
+    if (on) {
+      return (mine ? 'You lock ' + name + '. ' : '') + name + ' is locked for everyone now. ' +
+             'Only a key to it or its deed opens it; anybody else has to pick the lock.';
+    }
+    return (mine ? 'You unlock ' + name + '. ' : '') + name + ' is open to everyone now.';
   }
 
   /*
@@ -39633,14 +39721,15 @@ log('gamemode loaded:',
       // Only when they are actually at a door. Otherwise this is farming's word
       // and farming answers it, which is what keeps /claim meaning one thing in
       // a field and another on a doorstep without either of them guessing.
-      if (!here(actorId)) { return false; }
       // And the lock key names what it was pressed at (#1636): a plot's id is
       // farming's even a minute after a door, so a farmer who walks out of
       // the house to a field claims the field and not the house.
-      if (parts && parts[1] && !doorOfId(parts[1])) { return false; }
-      claim(actorId, profileId, toProfile);
-      doorLine(actorId, profileId);
-      return true;
+      if (here(actorId) && !(parts && parts[1] && !doorOfId(parts[1]))) {
+        claim(actorId, profileId, toProfile);
+        doorLine(actorId, profileId);
+        return true;
+      }
+      return claimAway(parts, actorId, profileId, toProfile);
     }
     if (word === '/jarl') { return jarlCmd(parts, actorId, profileId, toProfile); }
     if (word === '/steward') { return stewardCmd(parts, actorId, profileId, toProfile); }
@@ -47502,7 +47591,21 @@ mp.onReadBook = guard('onReadBook', function (actorId, bookBaseId) {
     notify(actorId, r.line);
     say(actorId, r.line);
   }
-  if (r && r.refused) { return false; }
+  if (r && r.refused) {
+    /*
+      A REFUSED TOME IS HANDED BACK TO THE READER'S PACK ON SCREEN (#2261).
+      false keeps the tome on the server (the engine spends it only when a
+      spell was learned), but the reader's own Skyrim has already taken it
+      out of their inventory the moment they read it, and nothing told it
+      otherwise: Ataxayk was refused, kept the tome on the server and saw it
+      gone. So the pack is sent again as the server has it, now and once
+      more after the client has finished its own read.
+    */
+    var back = function () { try { mp.set(actorId, 'inventory', mp.get(actorId, 'inventory')); } catch (e) { } };
+    back();
+    try { setTimeout(back, 750); } catch (e) { }
+    return false;
+  }
 });
 // ==== end thornswood staff spells ====
 
@@ -56078,14 +56181,34 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   var fires = g.__thornswoodHurtFires;
   var FIRE_GAP_MS = 6000;  // the needs block lets go of a silent client after three of its beats
 
+  /*
+    A FIRE NOBODY PUT OUT STILL BURNT (#2260). The burn used to be written
+    only when the client said /burn 0, so logging out while alight, or a
+    client that went quiet, sent no 0 and left no burn. Now a fire silent past
+    FIRE_GAP_MS is settled at its last report: by the next /burn, and by the
+    hurt tick for somebody who never came back to send one.
+  */
   function burning(actorId, on, now) {
     now = now || Date.now();
     var f = has(fires, actorId) ? fires[actorId] : null;
     if (on) {
-      if (!f || (now - f.last) > FIRE_GAP_MS) { fires[actorId] = { from: now, last: now }; }
+      if (f && (now - f.last) > FIRE_GAP_MS) { settleFire(actorId, f.last); f = null; }
+      if (!f) { fires[actorId] = { from: now, last: now }; }
       else { f.last = now; }
       return '';
     }
+    if (!f) { return ''; }
+    return settleFire(actorId, (now - f.last) > FIRE_GAP_MS ? f.last : now);
+  }
+  /* Fires gone quiet, settled at their last report. Run from the hurt tick. */
+  function settleQuietFires(now) {
+    now = now || Date.now();
+    for (var k in fires) {
+      if (has(fires, k) && (now - fires[k].last) > FIRE_GAP_MS) { settleFire(Number(k), fires[k].last); }
+    }
+  }
+  function settleFire(actorId, now) {
+    var f = has(fires, actorId) ? fires[actorId] : null;
     if (!f) { return ''; }
     delete fires[actorId];
     var seconds = Math.max(1, Math.round((now - f.from) / 1000));
@@ -57006,7 +57129,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   });
 
   if (g.__thornswoodHurtTimer) { try { clearInterval(g.__thornswoodHurtTimer); } catch (e) { } }
-  g.__thornswoodHurtTimer = setInterval(guard('hurtTick', tick), TICK_MS);
+  g.__thornswoodHurtTimer = setInterval(guard('hurtTick', function () { settleQuietFires(); tick(); }), TICK_MS);
   if (g.__thornswoodBleedTimer) { try { clearInterval(g.__thornswoodBleedTimer); } catch (e) { } }
   g.__thornswoodBleedTimer = setInterval(guard('bleedTick', bleedTick), BLEED_MS);
 
@@ -57016,7 +57139,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     CHILL_AFTER_MIN: CHILL_AFTER_MIN,
     read: read, write: write, step: step, tick: tick, bleedTick: bleedTick, bleedRate: bleedRate,
     stageOf: stageOf, lines: lines, chanceFor: chanceFor,
-    forNeeds: forNeeds, burntWear: burntWear, wound: wound, burning: burning,
+    forNeeds: forNeeds, burntWear: burntWear, wound: wound, burning: burning, settleQuietFires: settleQuietFires,
     healed: healed, cast: cast, hit: hit, swallowed: swallowed, rite: rite,
     exposed: exposed, craftRefusal: craftRefusal, died: died, scarOf: scarOf, staff: staff,
     BITERS: BITERS, TREAT: TREAT, TREAT_REACH: TREAT_REACH,

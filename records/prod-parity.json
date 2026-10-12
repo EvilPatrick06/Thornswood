@@ -1,0 +1,153 @@
+{
+  "about": "What the VPS should look like, read off the repository (docs/SYSTEM.md, scripts/deploy/Caddyfile, site/server.js, voice/README.md, the Install scripts). scripts/vps/Check-ProdParity.ps1 compares Get-ProdFacts.ps1 output against it. Issue #2165. No secret belongs here.",
+  "listeners": [
+    {
+      "proto": "tcp",
+      "port": 443,
+      "bind": "public",
+      "process": "caddy",
+      "why": "Caddyfile, the one door"
+    },
+    {
+      "proto": "tcp",
+      "port": 80,
+      "bind": "public",
+      "process": "caddy",
+      "why": "Caddy, certificate challenge and redirect"
+    },
+    {
+      "proto": "tcp",
+      "port": 22,
+      "bind": "public",
+      "process": "sshd",
+      "why": "docs/DEPLOY-IDENTITIES.md"
+    },
+    {
+      "proto": "tcp",
+      "port": 3001,
+      "bind": "loopback",
+      "process": "node",
+      "why": "site/server.js, loopback unless asked (#2185)"
+    },
+    {
+      "proto": "tcp",
+      "port": 7778,
+      "bind": "loopback",
+      "process": "node",
+      "why": "voice live, loopback since #1304"
+    },
+    {
+      "proto": "tcp",
+      "port": 7789,
+      "bind": "loopback",
+      "process": "node",
+      "why": "voice dev, loopback since #1304"
+    },
+    {
+      "proto": "udp",
+      "port": 7777,
+      "bind": "public",
+      "process": "*",
+      "why": "live game server"
+    },
+    {
+      "proto": "tcp",
+      "port": 3000,
+      "bind": "any",
+      "process": "*",
+      "why": "live resources"
+    },
+    {
+      "proto": "udp",
+      "port": 7787,
+      "bind": "public",
+      "process": "*",
+      "why": "dev game server"
+    },
+    {
+      "proto": "tcp",
+      "port": 7788,
+      "bind": "any",
+      "process": "*",
+      "why": "dev resources"
+    }
+  ],
+  "tasks": [
+    {
+      "name": "Thornswood Server",
+      "user": "SYSTEM"
+    },
+    {
+      "name": "Thornswood Dev Server",
+      "user": "SYSTEM"
+    },
+    {
+      "name": "Thornswood Voice",
+      "user": "SYSTEM"
+    },
+    {
+      "name": "Thornswood Dev Voice",
+      "user": "SYSTEM"
+    },
+    {
+      "name": "Thornswood Docs",
+      "user": "LOCAL SERVICE"
+    },
+    {
+      "name": "Thornswood Web",
+      "user": "SYSTEM",
+      "triggers": [
+        "Boot"
+      ]
+    },
+    {
+      "name": "Thornswood Watch",
+      "user": "SYSTEM"
+    },
+    {
+      "name": "Thornswood Backup",
+      "user": "SYSTEM",
+      "triggers": [
+        "Daily"
+      ]
+    }
+  ],
+  "services": [
+    {
+      "name": "sshd",
+      "account": "LocalSystem"
+    },
+    {
+      "name": "ThornswoodBot",
+      "account": "NT SERVICE\\ThornswoodBot"
+    },
+    {
+      "name": "actions.runner.*",
+      "account": ".\\thornswood-runner*"
+    }
+  ],
+  "files": [
+    {
+      "live": "C:\\Thornswood-Caddy\\Caddyfile",
+      "repo": "scripts/deploy/Caddyfile"
+    },
+    {
+      "live": "C:\\Thornswood-Docs\\server.js",
+      "repo": "site/server.js"
+    },
+    {
+      "live": "C:\\Thornswood-Voice\\voice-server.js",
+      "repo": "voice/voice-server.js"
+    },
+    {
+      "live": "C:\\Thornswood-Voice-Dev\\voice-server.js",
+      "repo": "voice/voice-server.js"
+    }
+  ],
+  "envMustBeAbsent": [
+    "THORNSWOOD_DOCS_EXPOSE",
+    "THORNSWOOD_VOICE_AUTH"
+  ],
+  "certMinDays": 14,
+  "intentional": []
+}

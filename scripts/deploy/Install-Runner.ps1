@@ -14,6 +14,9 @@
                                                     take off the old priority watchers
       .\scripts\deploy\Install-Runner.ps1 -OffBox      a pull request runner on THIS machine,
                                                     not the VPS (#1306), run elevated
+      .\scripts\deploy\Install-Runner.ps1 -NetworkOnly -Number 4 -AllowHost pypi.org
+                                                    the outbound firewall rules alone for
+                                                    the fourth VPS runner's account (#2161)
 
   OFF THE BOX (-OffBox, issue #1306). build.yml sends a pull request to the
   label thornswood-pr, which no runner on the VPS carries, so code nobody has
@@ -40,7 +43,20 @@
   tests\test-runner-offbox.ps1 can read them without touching an ACL, a
   service, an account or GitHub.
 
-  WHAT A PULL REQUEST JOB MAY REACH (-OffBox only). Two guards, put on by the
+  NETWORK ONLY (-NetworkOnly, issue #2161). Patrick decided on 11 October 2026
+  that the VPS runner accounts get the same outbound limit as an off-box
+  runner. -NetworkOnly puts on THE NETWORK guard below and nothing else, for
+  the one account -Number (or -Account) names: no account, service, runner,
+  folder lock, read deny or Defender setting is touched, and no runner job is
+  stopped. Without -OffBox it goes to the VPS over ssh like -Lock; with
+  -OffBox it is this machine. It is the one mode that may name an account
+  carrying the VPS label (full -OffBox still refuses it). -NetworkOnly -Status
+  counts the rules, -NetworkOnly -Remove takes only that group off (the
+  rollback), and -DryRunTo writes the script instead, as everywhere else.
+  Fetch the lists again now and then the same way (run it again).
+
+  WHAT A PULL REQUEST JOB MAY REACH (-OffBox, or -NetworkOnly for the network
+  alone). Two guards, put on by the
   install and by -OffBox -Lock, taken off by -OffBox -Remove, shown by -Status
   and written out by -DryRunTo like everything else:
     - THE NETWORK. Outbound block rules in Windows Firewall, in a group of
@@ -174,9 +190,12 @@ param(
   [switch]$Lock,
   # A pull request runner on this machine rather than the VPS (#1306).
   [switch]$OffBox,
+  # The outbound firewall rules alone for one runner account (#2161, NETWORK
+  # ONLY above). With -Status or -Remove, those rules alone.
+  [switch]$NetworkOnly,
   # Folders the runner's account is shut out of as well as C:\Thornswood*.
   [string[]]$AlsoDeny = @(),
-  # -OffBox only: host names a pull request job may reach besides GitHub,
+  # -OffBox or -NetworkOnly: host names a job may reach besides GitHub,
   # resolved to addresses when it runs (WHAT A PULL REQUEST JOB MAY REACH).
   [string[]]$AllowHost = @(),
   # -OffBox only: let Defender skip the runner's folder as it does on the VPS.
@@ -217,7 +236,7 @@ if ($OffBox) {
   if (-not $PSBoundParameters.ContainsKey('RunnerName')) { $RunnerName = 'thornswood-pr-' + $env:COMPUTERNAME.ToLower() + $(if ($n) { '-' + $n } else { '' }) }
   if (-not $PSBoundParameters.ContainsKey('Label'))      { $Label = 'thornswood-pr' }
   $liveFilter = 'Thornswood*'
-  if ($Label -match 'thornswood-vps') { Write-Host 'STOP. -OffBox never takes the VPS label: build.yml would send it main and release builds.' -ForegroundColor Red; exit 1 }
+  if ($Label -match 'thornswood-vps' -and -not $NetworkOnly) { Write-Host 'STOP. -OffBox never takes the VPS label: build.yml would send it main and release builds.' -ForegroundColor Red; exit 1 }
 }
 # The list the scripts below are given, as PowerShell source.
 $alsoDenyList = '@(' + ((@($AlsoDeny | Where-Object { $_ }) | ForEach-Object { "'" + $_.Replace("'", "''") + "'" }) -join ', ') + ')'
@@ -235,6 +254,7 @@ $ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
 $tools = @('ssh', 'scp', 'gh')
 if ($OffBox) { $tools = @('gh') }
 if ($DryRunTo) { $tools = @() }
+if ($NetworkOnly -and $Lock) { Write-Host 'STOP. -NetworkOnly and -Lock are two different jobs: run them one at a time.' -ForegroundColor Red; exit 1 }
 if ($OffBox -and -not $DryRunTo) {
   $me = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
   if (-not $me.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { Die '-OffBox makes an account, a service and folder rules on this machine, so it needs PowerShell run as administrator.' }
@@ -436,7 +456,7 @@ function Set-RunnerFirewall([string]$acct, [string]$group, [string[]]$blocks, [i
   $sid = $(if ($acct.StartsWith('*')) { $acct.Substring(1) } else { (New-Object Security.Principal.NTAccount($acct)).Translate([Security.Principal.SecurityIdentifier]).Value })
   if (-not @($blocks).Count) { throw 'there is no address list to block, so the firewall was left as it was' }
   @(Get-NetFirewallRule -Group $group -EA SilentlyContinue) | ForEach-Object { Remove-NetFirewallRule -Name $_.Name }
-  $why = 'Install-Runner.ps1 -OffBox (#1306): a pull request job reaches GitHub and nothing else. -OffBox -Remove takes it off.'
+  $why = 'Install-Runner.ps1 (#1306, #2161): this account reaches GitHub, loopback and the -AllowHost names only. -NetworkOnly -Remove takes it off.'
   $n = 0
   for ($i = 0; $i -lt $blocks.Count; $i += $per) {
     $n++
@@ -491,6 +511,8 @@ function Get-GuardScript([string]$mode, [string[]]$blocks = @()) {
   $list = '@(' + ((@($blocks) | ForEach-Object { "'" + $_ + "'" }) -join ', ') + ')'
   $head = $guardLib + "`n`$grdAcct = '" + $Account.Replace("'", "''") + "'`n`$grdGroup = '" + $guardGroup.Replace("'", "''") + "'`n"
   if ($mode -eq 'status') { return $head + 'Get-RunnerFirewall $grdGroup' }
+  if ($mode -eq 'network-remove') { return $head + "Remove-RunnerFirewall `$grdGroup`n" }
+  if ($mode -eq 'network') { return $head + "`$grdBlocks = " + $list + "`nSet-RunnerFirewall `$grdAcct `$grdGroup `$grdBlocks`n" }
   if ($mode -eq 'remove') { return $head + "Remove-RunnerFirewall `$grdGroup`nOpen-RunnerReads `$grdAcct (Get-RunnerReadDenies `$grdAcct)`n" }
   return $head + "`$grdBlocks = " + $list + "`nSet-RunnerFirewall `$grdAcct `$grdGroup `$grdBlocks`nClose-RunnerReads `$grdAcct (Get-RunnerReadDenies `$grdAcct)`n"
 }
@@ -536,6 +558,31 @@ foreach ($svc in $services) {
 }
 if ($bad) { exit 1 }
 '@
+
+# ------------------------------------------------------------ network only --
+# The header's NETWORK ONLY: the firewall group for one account, nothing else.
+if ($NetworkOnly) {
+  if ($Status) {
+    Head ('Outbound rules for ' + $Account + ' on ' + $where)
+    Remote (Get-GuardScript 'status') | ForEach-Object { Say "  $_" }
+    Done
+  }
+  if ($Remove) {
+    Head ('Outbound rules for ' + $Account + ' on ' + $where + ', taken off')
+    $said = @(Remote (Get-GuardScript 'network-remove'))
+    $code = $LASTEXITCODE
+    $said | ForEach-Object { Say "  $_" }
+    if ($code -ne 0) { Die "the rules may not all be off (exit $code); the lines above say which." }
+    Done
+  }
+  Head ('What ' + $Account + ' may reach from ' + $where)
+  try { $blocks = @(Get-GuardBlocks) } catch { Die ('no firewall rule was changed: ' + $_.Exception.Message) }
+  $said = @(Remote (Get-GuardScript 'network' $blocks))
+  $code = $LASTEXITCODE
+  $said | ForEach-Object { Say "  $_" }
+  if ($code -ne 0) { Die "the firewall rules did not go on (exit $code); the lines above say which. Nothing else was changed." }
+  Done
+}
 
 # ------------------------------------------------------------------ status --
 if ($Status) {

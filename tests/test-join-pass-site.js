@@ -133,6 +133,8 @@ async function ask(o) {
       return fallback;
     },
     LINKED: 'linked.json', BANS: 'bans.json', PK: 'pk.json',
+    // standing() reads bans through bansNow() since #2186.
+    bansNow: function () { return { table: clone(o.bans || {}), broken: '' }; }, BANS_BROKEN_WHY: '',
     crypto: crypto, fs: fs, path: path, ROOT: FEEDROOT,
     console: { log: function () { }, error: function () { } },
     sendJson: null

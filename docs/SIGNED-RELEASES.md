@@ -2,8 +2,8 @@
 
 Status: DESIGN AND PILOT. Nothing in the live release path changes with this
 document. release.yml, Ship, Publish-Installer, the feed and every checksum
-check stay exactly as they are. Open questions only Patrick can decide are
-at the end, under "Decisions needed".
+check stay exactly as they are. Patrick's answers are at the end, under
+"Decisions".
 
 This does not claim reproducible builds. release.yml itself says
 byte-identical local and runner builds are impossible with the Framework 4
@@ -54,7 +54,7 @@ an exe and checked by the same `Signature.cs`, and it carries a list of
 hashes. A plain JSON manifest signed as a detached PKCS#7 by the same profile
 is the fallback if catalogs prove awkward to build on the runner. A separate
 key (minisign, Sigstore keyless) is listed as an alternative under
-"Decisions needed", not proposed.
+"Decisions", not proposed (still pending).
 
 The manifest also carries the provenance: source commit, engine/skymp pin,
 tag, release id, runner name, the hashes of `client-build.json` and
@@ -86,7 +86,7 @@ durable identity, and installed launchers refuse it, so recovery is the
 documented two-step identity add. That only works while the old profile can
 still sign the bridging launcher. If the old profile is gone first, every
 installed launcher must be updated by hand (new installer). This is the main
-recovery risk and why "Decisions needed" asks about a second identity.
+recovery risk and why "Decisions" covers a second identity (not for now).
 
 Revocation. Microsoft can revoke a certificate; a timestamped signature made
 before the revocation date stays valid, later ones fail WinVerifyTrust. To
@@ -171,17 +171,15 @@ Not yet done: signing and verifying from a second, clean machine. One is the
 machine that already ships. That run is queued in the vault
 (`claude-queue\2163-signed-releases.md`).
 
-## 8. Decisions needed (Patrick)
+## 8. Decisions (Patrick, 11 Oct 2026)
 
-1. Key custody for non-PE artifacts: catalog signed by ThornswoodRelease
-   (proposed, one identity), or a separate key such as minisign or Sigstore
-   keyless (second custody to own).
-2. Where release signing happens: keep signing on a person's machine after
-   download (today), or give the VPS runner a federated Azure identity with
-   the signer role so release.yml signs. The second puts signing rights on
-   the shared runners, which also run pull request builds.
-3. A second durable identity (a second profile or second validated
-   identity) pinned in `Signature.Identities` now, so losing ThornswoodRelease
-   does not strand every installed launcher.
-4. Who besides Patrick holds Certificate Profile Signer.
-5. When phase D enforcement starts, and on which `minLauncher`.
+1. Key custody for non-PE artifacts: undecided. The catalog signed by
+   ThornswoodRelease (section 2) is the default design, marked PENDING until
+   Patrick confirms it.
+2. Where release signing happens: on the VPS build machine.
+3. Second durable identity: not for now. The recovery risk in section 3
+   stays accepted.
+4. Signers holding Certificate Profile Signer on ThornswoodRelease: Patrick,
+   Djinn and Four.
+5. Main builds are always signed. Dev builds stay unsigned to save signing
+   quota. Phase D timing and its `minLauncher` are still open.
