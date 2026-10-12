@@ -19,8 +19,14 @@ This holds:
      title.
   4. Known issues: one post per open labelled issue, never a second, not
      after a restart and not after a crash between a post and its save;
-     closed as completed is struck through and Fixed, closed otherwise says
-     so, reopened goes back.
+     closed or unlabelled, its post is deleted; reopened, it is back.
+  5. Test tasks from the board: one post per issue closed as fixed, always
+     tagged Main whatever "Server:" line its "Test task:" comment carries
+     (Patrick, 11 Oct: an issue closes when its fix is on main, where testers
+     test), the Server line never in the body, the plain bodies saying main.
+  6. Posts made with an older form (TASK_FORM, KNOWN_FORM) are written again
+     once after the bot is updated, though GitHub says nothing changed, and
+     after that an unchanged issue is not read again.
 
 The real bot module is imported. Discord and GitHub are stand-ins that
 count what is asked of them. Never connects to anything.
@@ -499,7 +505,9 @@ def gh(url):
     if '/issues/' in path:
         return ISSUES[int(path.rsplit('/', 1)[1])]
     if 'state=closed' in url:
-        return [r for r in ISSUES.values() if r['state'] == 'closed']
+        since = bot.urllib.parse.unquote(url.split('since=')[1].split('&')[0])
+        return [r for r in ISSUES.values() if r['state'] == 'closed'
+                and r['updated_at'] >= since]
     label = bot.urllib.parse.unquote(url.split('labels=')[1])
     return [r for r in ISSUES.values() if r['state'] == 'open'
             and label in [l['name'] for l in r['labels']]]
@@ -567,9 +575,9 @@ yes('the first pass only sets the start: nothing closed before it is posted',
 issue(31, 'Ferry sinks', ['Dev Findings'], state='closed', reason='completed',
       closed_at='2026-10-12T05:00:00Z')
 COMMENTS[31] = [{'body': 'Fixed in the gamemode.'},
-                {'body': 'Test task: Ride the ferry to Solstheim\nServer: Main\n'
+                {'body': 'Test task: Ride the ferry to Solstheim\nServer: Dev\n'
                          'Board at Windhelm and ride across.\nYou arrive dry.'}]
-issue(32, 'Gold resets', ['Main Findings'], state='closed', reason='completed',
+issue(32, 'Gold resets', ['Dev Findings'], state='closed', reason='completed',
       closed_at='2026-10-12T05:01:00Z')
 issue(33, 'Tooling only', ['area: Release'], state='closed', reason='completed',
       closed_at='2026-10-12T05:02:00Z')
@@ -581,17 +589,23 @@ COMMENTS[35] = [{'body': 'test task: Open the server list\nIt opens on your serv
 posted, edited, removed = run(bot.test_tasks_once(tf, tst, gh, me_id=me.id))
 by = dict((th.name, th) for th in tf.threads)
 yes('a fixed issue becomes a test task post, titled and written from its '
-    '"Test task:" comment, tagged by the Server line',
+    '"Test task:" comment, tagged Main even though its Server line says Dev, '
+    'and the Server line is not in the body',
     'Ride the ferry to Solstheim' in by
     and by['Ride the ferry to Solstheim'].content
     == 'Board at Windhelm and ride across.\nYou arrive dry.'
     and [x.name for x in by['Ride the ferry to Solstheim'].applied_tags] == ['Main'])
-yes('  a fixed finding with no such comment gets its own title and a plain line, '
-    'tagged by its label',
-    'Gold resets' in by and by['Gold resets'].content.startswith('This was fixed.')
+yes('  a fixed finding with no such comment gets its own title and a plain line '
+    'that says to check it on main, tagged Main though it was found on Dev',
+    'Gold resets' in by and by['Gold resets'].content.startswith('This was fixed')
+    and 'Check it on main' in by['Gold resets'].content
     and [x.name for x in by['Gold resets'].applied_tags] == ['Main'])
-yes('  any fixed issue with a "Test task:" comment is posted, finding or not',
-    'Open the server list' in by)
+yes('  any fixed issue with a "Test task:" comment is posted, finding or not, '
+    'tagged Main with no Server line at all',
+    'Open the server list' in by
+    and [x.name for x in by['Open the server list'].applied_tags] == ['Main'])
+yes('  every test task the bot posted carries the one tag Main',
+    all([x.name for x in th.applied_tags] == ['Main'] for th in tf.threads))
 yes('  but not a fixed issue with neither, and not one closed as not planned',
     'Tooling only' not in by and 'Will not do' not in by
     and sorted(posted) == [31, 32, 35])
@@ -657,6 +671,11 @@ yes('a closed issue whose "Test task:" comment was written after the start gets 
     50 in posted and 'Server list opens on yours' in names)
 yes('  and "Test task:" with nothing after it takes the issue\'s own title',
     51 in posted and 'Ferry sinks at the dock' in names)
+th51 = [th for th in tf.threads if th.name == 'Ferry sinks at the dock']
+yes('  its "Server: Dev" line is read and dropped: the body is only what '
+    'follows it, and the tag is Main',
+    len(th51) == 1 and th51[0].content == 'Ride the ferry.'
+    and [x.name for x in th51[0].applied_tags] == ['Main'])
 COMMENTS[51].append({'body': 'Test task: Ferry crossing works\nServer: Main\n'
                              '1. Board the ferry.\nWhat should happen: you arrive.',
                      'created_at': '2026-10-12T06:30:00Z'})
@@ -682,7 +701,122 @@ st5 = bot._state_read(kpath)
 posted, edited, removed = run(bot.test_tasks_once(tf, st5, gh, me_id=me.id))
 yes('an adopted hand post belongs to its issue and is edited to its test task',
     'now owns test task post' in said and 60 in edited
-    and made.name == 'Short and clear' and made.content == 'Do the thing.')
+    and made.name == 'Short and clear' and made.content == 'Do the thing.'
+    and [x.name for x in made.applied_tags] == ['Main'])
+
+
+# ------------------------------- 7. what the plain bodies say, under main --
+nobody = {'title': 'Ferry', 'labels': [{'name': 'Dev Findings'}]}
+yes('the plain test task body says the fix is on main and to check it there',
+    'on main' in bot.default_task_body(nobody)
+    and 'Check it on main' in bot.default_task_body(nobody)
+    and 'dev' not in bot.default_task_body(nobody).lower())
+yes('a "Test task:" comment with no body gets "Check this on main."',
+    bot.test_task_of(nobody, [{'body': 'Test task: Ferry\nServer: Dev',
+                               'created_at': 'x'}])
+    == ('Ferry', 'Check this on main.', 'x'))
+yes('the plain known issue body says it goes when the fix is on main, and '
+    'still names where it was found',
+    bot.known_body(nobody).startswith('Known on Dev.')
+    and 'fix is on main' in bot.known_body(nobody))
+yes('known issues keep their Dev and Main tags: by label, or by a "Server:" '
+    'line under "Known issue:"',
+    bot.known_of(nobody, [])[2] == ['Dev']
+    and bot.known_of(nobody, [{'body': 'Known issue: X\nServer: Main\nY'}])[2]
+    == ['Main'])
+
+
+# ------------------------- 8. posts of an older form are written again --
+# Records written by the bot before TASK_FORM and KNOWN_FORM: no form in
+# them, posts tagged and worded the old way, and GitHub says nothing changed.
+ISSUES.clear()
+COMMENTS.clear()
+g, tasks, results, play, staff = server()
+run(bot.channel_setup(g, apply=True, path=os.path.join(TMP, 'form.json')))
+kf = bot._channel_named(g, 'known-issues', ('forum',))
+tf = bot._channel_named(g, 'test-tasks', ('forum',))
+
+
+def tag(forum, name):
+    return [bot.task_tag_of(forum, name)]
+
+
+issue(70, 'Doors stick', ['Dev Findings'], state='closed', reason='completed',
+      closed_at='2026-10-12T05:20:00Z')
+COMMENTS[70] = [{'body': 'Test task: Riften doors open\nServer: Dev\nOpen a door.',
+                 'created_at': '2026-10-12T05:21:00Z'}]
+issue(71, 'Gold resets', ['Dev Findings'], state='closed', reason='completed',
+      closed_at='2026-10-12T05:22:00Z')
+issue(72, 'Old close', ['area: Launcher'], state='closed', reason='completed',
+      closed_at='2026-10-11T20:00:00Z')
+COMMENTS[72] = [{'body': 'Test task: List opens\nServer: Dev\nOpen it.',
+                 'created_at': '2026-10-11T20:00:00Z'}]
+ISSUES[72]['updated_at'] = '2026-10-11T20:00:00Z'   # untouched since the start
+issue(73, 'Smith', ['Dev Findings'])
+issue(74, 'Forge', ['Main Findings'])
+COMMENTS[74] = [{'body': 'Known issue: Forge waits for ever\nIt never finishes.'}]
+old_known = 'Known on Dev. The team is working on it; this post goes when it is fixed.'
+th70 = run(tf.create_thread(name='Riften doors open', content='Open a door.',
+                            applied_tags=tag(tf, 'Dev')))
+th71 = run(tf.create_thread(name='Gold resets', applied_tags=tag(tf, 'Dev'),
+                            content='This was fixed. Check it on Dev, and say in '
+                                    '#test-findings if it still happens.'))
+th72 = run(tf.create_thread(name='List opens', content='Open it.',
+                            applied_tags=tag(tf, 'Dev')))
+th73 = run(kf.create_thread(name='Smith', content=old_known,
+                            applied_tags=tag(kf, 'Dev')))
+th74 = run(kf.create_thread(name='Forge waits for ever', content='It never finishes.',
+                            applied_tags=tag(kf, 'Main')))
+
+
+def old(th, num, tags):
+    return {'thread_id': th.id, 'channel_id': th.forum.id,
+            'sig': bot._sig(th.name, th.content, tags),
+            'updated': ISSUES[num]['updated_at']}
+
+
+fst = {'since': '2026-10-12T05:00:00Z',
+       'tasks': {'70': old(th70, 70, ['Dev']), '71': old(th71, 71, ['Dev']),
+                 '72': old(th72, 72, ['Dev'])},
+       'issues': {'73': old(th73, 73, ['Dev']), '74': old(th74, 74, ['Main'])}}
+fpath = os.path.join(TMP, 'form-state.json')
+bot._known_save(dict(fst, _dirty=True), fpath)
+fst = bot._state_read(fpath)
+posted, edited, removed = run(bot.test_tasks_once(tf, fst, gh, me_id=me.id))
+yes('after the update, a test task posted tagged Dev is EDITED to Main on the '
+    'next pass, though its issue did not change, and nothing is posted twice',
+    sorted(edited) == [70, 71, 72] and posted == [] and removed == []
+    and len(tf.threads) == 3
+    and all([x.name for x in th.applied_tags] == ['Main'] for th in (th70, th71, th72)))
+yes('  the plain body is rewritten to say main; a written body is kept as it was',
+    'Check it on main' in th71.content and th70.content == 'Open a door.'
+    and th72.content == 'Open it.')
+yes('  including a post whose issue closed before the start (adopted)',
+    72 in edited)
+yes('  and every record now holds the new form',
+    all(r.get('form') == bot.TASK_FORM for r in fst['tasks'].values()))
+posted, edited, removed = run(bot.known_issues_once(kf, fst, gh, me_id=me.id))
+yes('a known issue with the old plain line is EDITED to the new one, once, '
+    'and keeps its Dev tag',
+    edited == [73] and posted == [] and removed == [] and len(kf.threads) == 2
+    and 'fix is on main' in th73.content
+    and [x.name for x in th73.applied_tags] == ['Dev'])
+yes('  a known issue with a written body is not edited, but its record takes '
+    'the new form',
+    th74.content == 'It never finishes.'
+    and [x.name for x in th74.applied_tags] == ['Main']
+    and all(r.get('form') == bot.KNOWN_FORM for r in fst['issues'].values()))
+bot._known_save(dict(fst, _dirty=True), fpath)
+fst = bot._state_read(fpath)
+before = len([u for u in ASKED if '/comments' in u])
+calls = len(g.calls)
+t_out = run(bot.test_tasks_once(tf, fst, gh, me_id=me.id))
+k_out = run(bot.known_issues_once(kf, fst, gh, me_id=me.id))
+after = len([u for u in ASKED if '/comments' in u])
+yes('once rewritten and read back after a restart, the next passes read no '
+    'comments and change nothing: the rewrite happens once, not every pass',
+    after == before and len(g.calls) == calls
+    and t_out == ([], [], []) and k_out == ([], [], []))
 
 
 saved_token = os.environ.pop('GITHUB_TOKEN', None)
