@@ -75,6 +75,21 @@ read it (issue #440, phase 8):
   #1791). `tests\test-fork-upstream.js` is red every night upstream `main`
   has a commit `thornswood/engine-changes` lacks that is not listed here.
   No script writes this one: it is changed by hand in a pull request.
+- `papyrus-events.json`: the fork's Papyrus event list, both halves (issue
+  #503). The client half is what the blocker in skyrim-platform's
+  FridaHooks.cpp lets through on each person's machine: the event names
+  and the script names that free an object. The server half is the event
+  names the server's own Papyrus machine is sent, that it attaches scripts
+  only to placed references, the scripts its storage can load (built in,
+  data\scripts, and the archives the "archives" setting names, which no
+  deploy script writes), and what InitScripts drops. `readAt` is the fork
+  commit it was read at. `node scripts\dev\PapyrusEventList.js --write`
+  writes it from the fork at the pin; `scripts\dev\Audit-PapyrusEvents.py`
+  judges the load order against it. `tests\test-papyrus-event-list.js`
+  holds it to the rest of this repository on every pull request, and the
+  nightly fetches the fork and reads it against the pin. The check is the
+  list, not the commit: a pin moved over fork work that leaves the list
+  alone passes, and one that changes it fails there, naming what changed.
 - `signing\`: the code signing setup, with its own README. On since
   27 September: Ship refuses a launcher that is not signed (Developer-Guide.md).
 
