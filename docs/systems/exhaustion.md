@@ -114,8 +114,8 @@ block knows.
 Sleeping on open ground, an hour on a seat with no roof over you and
 no fire in reach, starts a chill. See [Disease](disease.md).
 The craft gate is asked at every bench's own menu, brews, enchanting
-and tempering included, at a key cut at a forge, and at a kiln burned
-by pressing it, before anything is taken, and the line says your Rest
+and tempering included, the kiln's charcoal too, and at a key cut at a
+forge, before anything is taken, and the line says your Rest
 is under 15. The same check asks first whether you are too sick or too
 hurt to work (see [Injury](injury.md)), and when you are, that line is
 the one said. It has not been extended to mining or chopping, and this
