@@ -1,0 +1,107 @@
+{
+ "builtBy": "scripts/dev/Build-CrimeTable.py",
+ "factions": {
+  "18279:Dragonborn.esm": {
+   "assault": 40,
+   "edid": "DLC2CrimeRavenRockFaction",
+   "flags": "0x1040",
+   "from": "Dragonborn.esm",
+   "murder": 1000,
+   "useDefaults": true
+  },
+  "267e3:Skyrim.esm": {
+   "assault": 40,
+   "edid": "CrimeFactionEastmarch",
+   "flags": "0x1040",
+   "from": "Skyrim.esm",
+   "murder": 1000,
+   "useDefaults": true
+  },
+  "267ea:Skyrim.esm": {
+   "assault": 40,
+   "edid": "CrimeFactionWhiterun",
+   "flags": "0x9040",
+   "from": "Skyrim.esm",
+   "murder": 1000,
+   "useDefaults": true
+  },
+  "2816b:Skyrim.esm": {
+   "assault": 40,
+   "edid": "CrimeFactionRift",
+   "flags": "0x9040",
+   "from": "Skyrim.esm",
+   "murder": 1000,
+   "useDefaults": true
+  },
+  "2816c:Skyrim.esm": {
+   "assault": 40,
+   "edid": "CrimeFactionReach",
+   "flags": "0x8040",
+   "from": "Skyrim.esm",
+   "murder": 1000,
+   "useDefaults": false
+  },
+  "2816d:Skyrim.esm": {
+   "assault": 40,
+   "edid": "CrimeFactionHjaalmarch",
+   "flags": "0x9040",
+   "from": "Skyrim.esm",
+   "murder": 1000,
+   "useDefaults": true
+  },
+  "2816e:Skyrim.esm": {
+   "assault": 40,
+   "edid": "CrimeFactionPale",
+   "flags": "0x1040",
+   "from": "Skyrim.esm",
+   "murder": 1000,
+   "useDefaults": true
+  },
+  "2816f:Skyrim.esm": {
+   "assault": 40,
+   "edid": "CrimeFactionWinterhold",
+   "flags": "0x9040",
+   "from": "Skyrim.esm",
+   "murder": 1000,
+   "useDefaults": true
+  },
+  "28170:Skyrim.esm": {
+   "assault": 40,
+   "edid": "CrimeFactionFalkreath",
+   "flags": "0x9040",
+   "from": "Skyrim.esm",
+   "murder": 1000,
+   "useDefaults": true
+  },
+  "28713:Skyrim.esm": {
+   "assault": 40,
+   "edid": "CrimeFactionOrcs",
+   "flags": "0x1040",
+   "from": "Skyrim.esm",
+   "murder": 1000,
+   "useDefaults": true
+  },
+  "29db0:Skyrim.esm": {
+   "assault": 40,
+   "edid": "CrimeFactionHaafingar",
+   "flags": "0x9040",
+   "from": "Skyrim.esm",
+   "murder": 1000,
+   "useDefaults": true
+  },
+  "e7c27:Skyrim.esm": {
+   "assault": 40,
+   "edid": "DBCrimeFactionMaro",
+   "flags": "0x1041",
+   "from": "Skyrim.esm",
+   "murder": 1000,
+   "useDefaults": true
+  }
+ },
+ "readFrom": "101 active plugins, the five masters then C:\\Thornswood\\Profile\\Default\\plugins.txt",
+ "settings": {
+  "iCrimeGoldAttack": 40,
+  "iCrimeGoldMurder": 1000
+ },
+ "whatIsListed": "every faction that tracks crime and in which killing or striking a member adds a bounty: murder or assault gold above 0 that the faction does not ignore, the game settings standing in for a faction on Use Defaults."
+}
