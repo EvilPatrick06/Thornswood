@@ -37581,7 +37581,9 @@ log('gamemode loaded:',
   /** What one notice holds on its ledger: an open letter's or haul's pay, or a haul's owed gold. */
   function noticeHolds(x) {
     if (!x || !(x.letter || x.haul)) { return 0; }
-    var owed = x.haul ? (Math.floor(Number(x.owed)) || 0) : 0;
+    // Owed: a haul's gold, or a letter's 15 a guard sent back (#502), held
+    // for somebody who was away.
+    var owed = Math.floor(Number(x.owed)) || 0;
     if (owed > 0) { return owed; }
     if (x.down) { return 0; }
     var pay = Math.floor(Number(x.pay)) || 0;
@@ -38865,6 +38867,8 @@ log('gamemode loaded:',
       the wall, which unpin lets them do.
     */
     var steward = here && isSteward(profileId, actorId);
+    // A guard of this board's hold takes down any post on it (#502).
+    var guard = here && isGuard(profileId, hold);
     var dests = [];
     var arrivals = [];
     if (here) {
@@ -38910,6 +38914,7 @@ log('gamemode loaded:',
       jobs: mine,
       submit: submit,
       steward: steward,
+      guard: guard,
       dests: dests,
       arrivals: arrivals
     };
@@ -39396,6 +39401,9 @@ log('gamemode loaded:',
       as the poster's own /unpin before anybody has taken it.
     */
     var stewardHaul = !!n.haul && isSteward(profileId, actorId);
+    if (n.by !== profileId && !stewardHaul && isGuard(profileId, hold)) {
+      return guardTakedown(hold, at, n, actorId, profileId, toProfile);
+    }
     if (n.by !== profileId && !stewardHaul) {
       toProfile(profileId, 'That is not yours to take down.');
       return true;
@@ -39429,6 +39437,56 @@ log('gamemode loaded:',
     }
     plog(n.name, 'took down', n.job ? 'a job' : 'a notice', 'in', hold + ':', n.text);
     toProfile(profileId, 'You take it down. The fee stays with ' + hold + '.');
+    refreshPanel(actorId);
+    return true;
+  }
+
+  /*
+    A GUARD TAKES A POST DOWN (#502). Patrick, 11 October: guards have "the
+    ability to remove posts from a notice board ... only within their own
+    hold". unpin sends a guard of the board's hold here for any post on it
+    that is not their own; a guard of another hold, at this board, is
+    anybody. The fee stays with the hold, as it does when a poster takes
+    their own down. Gold the post holds goes back to its poster, the way a
+    steward's take down of a haul sends the pay back: a haul through
+    cancelHaul, a letter's 15 through handHaul, held for them while they are
+    away. Whoever had taken it is told it is off their list.
+  */
+  function guardTakedown(hold, at, n, actorId, profileId, toProfile) {
+    if (n.haul) {
+      return cancelHaul(hold, at, n, 'guard', actorId, profileId, toProfile);
+    }
+    var back = 0, owed = false;
+    if (n.letter) {
+      var pay = Math.floor(Number(n.pay)) || 0;
+      if (pay > 0) {
+        var r = handHaul(hold, n, Number(n.by), pay,
+                         'a letter for ' + (n.to || 'somebody') + ' taken down by a guard, the pay back to ' +
+                         (n.name || 'its sender'), 'letter');
+        if (r.why) {
+          toProfile(profileId, 'That did not work: ' + r.why + ' The letter is still up.');
+          return true;
+        }
+        back = pay;
+        owed = r.owed;
+      }
+    }
+    takedown(hold, at, profileId);
+    var kind = n.letter ? 'letter' : (n.job ? 'job' : 'notice');
+    var fee = 'The fee stays with ' + hold + '.';
+    // A letter's words are sealed, and the log does not record them either.
+    plog('law: a guard of', hold, '(' + personName(actorId) + ', profile ' + profileId + ') took down',
+         (n.name || 'somebody') + '\'s', kind, at + 1, 'in', hold + (n.letter ? '' : ': ' + (n.text || '')));
+    toProfile(profileId, 'You take ' + (n.name || 'somebody') + '\'s ' + kind + ' down.' +
+              (back ? ' The ' + back + ' gold for the courier goes back to them' +
+                      (owed ? ' when they are next in the world' : '') + '.' : '') + ' ' + fee);
+    if (onlineActorOf(Number(n.by))) {
+      toProfile(n.by, 'A guard took your ' + kind + ' in ' + hold + ' down.' +
+                (back && !owed ? ' The ' + back + ' gold for the courier is back in your pack.' : '') + ' ' + fee);
+    }
+    if (n.taken && Number(n.taken) !== Number(profileId) && onlineActorOf(Number(n.taken))) {
+      toProfile(n.taken, 'The ' + kind + ' in ' + hold + ' you took was taken down by a guard. It is off your list.');
+    }
     refreshPanel(actorId);
     return true;
   }
@@ -39913,27 +39971,31 @@ log('gamemode loaded:',
       var list = notices[hold] || [];
       for (var j = 0; j < list.length; j++) {
         var n = list[j];
-        var owed = (n && n.haul) ? (Math.floor(Number(n.owed)) || 0) : 0;
+        var owed = (n && (n.haul || n.letter)) ? (Math.floor(Number(n.owed)) || 0) : 0;
         if (!(owed > 0) || !here[Number(n.owedTo)]) { continue; }
         var to = here[Number(n.owedTo)];
         var why = mayWithdraw(hold, owed, n);
         if (why) {
           if (!haulShort[hold + ':' + j]) {
             haulShort[hold + ':' + j] = true;
-            plog('haul', j + 1, 'in', hold, 'owes', owed, 'and cannot pay it:', why);
+            plog(n.letter ? 'letter' : 'haul', j + 1, 'in', hold, 'owes', owed, 'and cannot pay it:', why);
           }
           continue;
         }
         if (!payOut(to, owed)) { continue; }
-        withdraw(hold, owed, 'haul ' + (j + 1) + ' to ' + n.dest + ', held for somebody who was away', n);
+        withdraw(hold, owed, (n.letter ? 'letter ' + (j + 1) + ' for ' + (n.to || 'somebody')
+                                        : 'haul ' + (j + 1) + ' to ' + n.dest) + ', held for somebody who was away', n);
         n.owed = 0;
         save();
-        var line = n.owedFor === 'hauled'
+        var line = n.owedFor === 'letter'
+          ? 'While you were away, a guard took your letter for ' + (n.to || 'somebody') + ' in ' + hold +
+            ' down. The ' + owed + ' gold for the courier is back in your pack. The fee stays with ' + hold + '.'
+          : n.owedFor === 'hauled'
           ? 'While you were away, your haul to ' + n.dest + ' was confirmed. ' + owed + ' gold is in your pack.' +
             ((Number(n.kept) || 0) ? ' The company kept ' + n.kept + '.' : '')
           : 'While you were away, your haul to ' + n.dest + ' came down. The ' + owed +
             ' gold pay is back in your pack. The fee stays with ' + hold + '.';
-        plog('handed', owed, 'gold of a haul in', hold, 'to', personName(to));
+        plog('handed', owed, 'gold of a', n.letter ? 'letter' : 'haul', 'in', hold, 'to', personName(to));
         try { notify(to, line); } catch (e2) { }
         try { say(to, line); } catch (e3) { }
       }
@@ -39969,7 +40031,8 @@ log('gamemode loaded:',
     takedown(hold, at, profileId);
     var later = owed ? ' when they are next in the world' : '';
     var fee = 'The fee stays with ' + hold + '.';
-    plog(how === 'drop' ? (n.takenName || 'the hauler') + ' dropped' : (how === 'own' ? n.name : 'a steward') + ' took down',
+    var office = how === 'guard' ? 'a guard' : 'a steward';
+    plog(how === 'drop' ? (n.takenName || 'the hauler') + ' dropped' : (how === 'own' ? n.name : office) + ' took down',
          'a haul to', n.dest, 'in', hold, 'and', pay, owed ? 'is held for' : 'went back to', n.name);
     if (how === 'own') {
       toProfile(profileId, 'You take the haul down. The ' + pay + ' gold pay comes back to you. ' + fee);
@@ -39984,12 +40047,12 @@ log('gamemode loaded:',
       toProfile(profileId, 'You take ' + n.name + '\'s haul to ' + n.dest + ' down. The ' + pay +
                 ' gold pay goes back to them' + later + '. ' + fee);
       if (!owed) {
-        toProfile(n.by, 'A steward took your haul to ' + n.dest + ' down. The ' + pay +
+        toProfile(n.by, (how === 'guard' ? 'A guard' : 'A steward') + ' took your haul to ' + n.dest + ' down. The ' + pay +
                   ' gold pay is back in your pack. ' + fee);
       }
     }
     if (how !== 'drop' && n.taken && Number(n.taken) !== Number(profileId)) {
-      toProfile(n.taken, 'The haul to ' + n.dest + ' you took was taken down by a steward. It is off your list.');
+      toProfile(n.taken, 'The haul to ' + n.dest + ' you took was taken down by ' + office + '. It is off your list.');
     }
     refreshPanel(actorId);
     return true;
