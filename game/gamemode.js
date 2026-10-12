@@ -47603,7 +47603,21 @@ mp.onReadBook = guard('onReadBook', function (actorId, bookBaseId) {
     notify(actorId, r.line);
     say(actorId, r.line);
   }
-  if (r && r.refused) { return false; }
+  if (r && r.refused) {
+    /*
+      A REFUSED TOME IS HANDED BACK TO THE READER'S PACK ON SCREEN (#2261).
+      false keeps the tome on the server (the engine spends it only when a
+      spell was learned), but the reader's own Skyrim has already taken it
+      out of their inventory the moment they read it, and nothing told it
+      otherwise: Ataxayk was refused, kept the tome on the server and saw it
+      gone. So the pack is sent again as the server has it, now and once
+      more after the client has finished its own read.
+    */
+    var back = function () { try { mp.set(actorId, 'inventory', mp.get(actorId, 'inventory')); } catch (e) { } };
+    back();
+    try { setTimeout(back, 750); } catch (e) { }
+    return false;
+  }
 });
 // ==== end thornswood staff spells ====
 
