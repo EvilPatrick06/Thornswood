@@ -84,6 +84,11 @@ if (-not (Test-Path -LiteralPath $Game))   { Stop-Here "game folder not found: $
 $recText = "$(Get-Content -LiteralPath $Record -Raw)"
 if (-not $recText.Trim([char]0xFEFF, ' ', [char]9, [char]13, [char]10)) { Stop-Here "$Record is empty. Run .\scripts\release\New-ClientBuildRecord.ps1 after building the client." }
 try { $rec = $recText | ConvertFrom-Json } catch { Stop-Here ("$Record is not valid JSON: " + $_.Exception.Message) }
+# RecordShape.ps1 (#2180): a version this checkout does not know, or a missing
+# field, stops here before a file is copied.
+. (Join-Path $PSScriptRoot 'RecordShape.ps1')
+$recBad = @(Get-ThornswoodRecordProblems -Doc $rec -Kind client-build)
+if ($recBad.Count) { Stop-Here ("$Record is not a client-build record this checkout can trust: " + ($recBad -join '; ')) }
 $files = @($rec.files.PSObject.Properties.Name)
 if (-not $files.Count) { Stop-Here 'the record names no files' }
 

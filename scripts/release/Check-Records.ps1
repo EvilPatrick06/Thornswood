@@ -33,3 +33,6 @@ foreach ($kind in @($script:ThornswoodRecordKinds.Keys)) {
 }
 if ($bad) { Write-Host "$bad record(s) cannot be trusted." -ForegroundColor Red; exit 1 }
 Write-Host 'Every high-risk record reads at a known version with the fields its readers need.'
+# Said out loud: a caller that dot-runs this reads $LASTEXITCODE, which is
+# otherwise whatever native command ran last (the build check's first run).
+exit 0

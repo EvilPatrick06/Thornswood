@@ -575,7 +575,10 @@ $recordPath = Join-Path $Here '..\..\records\server-build.json'
 if (-not (Test-Path -LiteralPath $recordPath)) {
   throw 'there is no records\server-build.json, so nothing says which build these server files are. Nothing was sent and the server was not touched.'
 }
-$rec = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $recordPath -Raw) $recordPath
+# RecordShape.ps1 (#2180): the record must be a version this checkout knows,
+# with the fields read below, or the deploy stops here, before anything is sent.
+. (Join-Path $Here '..\release\RecordShape.ps1')
+$rec = Read-ThornswoodRecord -Path $recordPath -Kind server-build
 $serverFiles = @()
 if ($GamemodeOnly) {
   # No server file goes, so there is none here to hold to the record. The

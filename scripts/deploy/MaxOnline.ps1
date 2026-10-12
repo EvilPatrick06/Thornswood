@@ -33,6 +33,7 @@
 #>
 
 . (Join-Path $PSScriptRoot '..\release\Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
+. (Join-Path $PSScriptRoot '..\release\RecordShape.ps1')   # #2180: a version this checkout knows
 $MostOnlineRecord = Join-Path $PSScriptRoot '..\..\records\most-online.json'
 
 <#
@@ -60,6 +61,11 @@ function Get-MostOnline([string]$Path = '') {
         $r.Why = 'it does not read as JSON (' + $_.Exception.Message + ')'
         return $r
     }
+    # A version this checkout does not know is not "no number": it is a record
+    # from somewhere newer, and guessing at it is how a wrong seat count goes
+    # out. Stop the deploy, naming the file (RecordShape.ps1, #2180).
+    $newer = @(Get-ThornswoodRecordProblems -Doc $doc -Kind most-online | Where-Object { $_ -like 'it is version*' })
+    if ($newer.Count) { throw ("{0}: {1}" -f $Path, $newer[0]) }
     if ($null -eq $doc -or $doc.PSObject.Properties.Name -notcontains 'people') {
         $r.Why = 'it has no people'
         return $r
