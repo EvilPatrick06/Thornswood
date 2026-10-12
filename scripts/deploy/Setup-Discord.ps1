@@ -66,13 +66,28 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 $app = Join-Path $Here '..\..\bot\Build-Discord.py'
 if (-not (Test-Path -LiteralPath $app)) { throw "not found: $app" }
 
-$py = (Get-Command python -EA SilentlyContinue).Source
-if (-not $py) { $py = (Get-Command py -EA SilentlyContinue).Source }
-if (-not $py) { throw 'Python is not on PATH.' }
+# The bot's Python is 3.12. Plain python is whichever is first on PATH, which
+# on a PC with more than one can be too old (on One it is 3.9, #2276), so the
+# py launcher's 3.12 comes first, then python if it is 3.10 or newer.
+$py = $null
+$pyArgs = @()
+$launcher = (Get-Command py -EA SilentlyContinue).Source
+if ($launcher) {
+  & $launcher -3.12 -c 'import sys' 2>$null
+  if ($LASTEXITCODE -eq 0) { $py = $launcher; $pyArgs = @('-3.12') }
+}
+if (-not $py) {
+  $plain = (Get-Command python -EA SilentlyContinue).Source
+  if ($plain) {
+    & $plain -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' 2>$null
+    if ($LASTEXITCODE -eq 0) { $py = $plain }
+  }
+}
+if (-not $py) { throw 'No Python 3.10 or newer found. Install Python 3.12 (py -3.12 should run it).' }
 
 if (-not $SkipInstall) {
   Write-Host 'Making sure discord.py is here...'
-  & $py -m pip install -q -U discord.py
+  & $py @pyArgs -m pip install -q -U discord.py
   if ($LASTEXITCODE -ne 0) { throw 'pip could not install discord.py' }
   Write-Host '  ready'
 }
@@ -109,7 +124,7 @@ if ($Posts) {
 }
 
 try {
-  & $py $app
+  & $py @pyArgs $app
   $code = $LASTEXITCODE
 } finally {
   $env:DISCORD_TOKEN = $null

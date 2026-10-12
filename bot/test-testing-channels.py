@@ -31,6 +31,7 @@ This holds:
 The real bot module is imported. Discord and GitHub are stand-ins that
 count what is asked of them. Never connects to anything.
 """
+import _pyguard  # noqa: F401  (first: Python 3.10 or newer, #2276)
 import asyncio
 import json
 import os

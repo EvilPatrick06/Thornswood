@@ -20,6 +20,7 @@ The background half runs the real card.render and the real make-join-card.py.
 
 Read only. Never connects to anything.
 """
+import _pyguard  # noqa: F401  (first: Python 3.10 or newer, #2276)
 import asyncio
 import io
 import json
@@ -290,7 +291,7 @@ sends = re.search(r"foreach \(\$f in ([^)]*)\)", install)
 listed = re.findall(r"'([^']+)'", sends.group(1)) if sends else None
 yes('I1 the code Install-Bot sends is a fixed list, and the record is not '
     'on it (got %r)' % (listed,),
-    listed == ['bot.py', 'card.py', 'dev-channel.txt', 'requirements.txt']
+    listed == ['bot.py', '_pyguard.py', 'card.py', 'dev-channel.txt', 'requirements.txt']
     and 'joins.json' not in (listed or []))
 
 dests = []
