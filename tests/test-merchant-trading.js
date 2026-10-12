@@ -111,6 +111,7 @@ assert.equal(opened.view.transfer, true);
 assert.equal(opened.view.offers[0].stock, 0);
 const questCalls=[];
 box.deps.quests=()=>({describe:()=>[{id:'ebony',name:'The ebony'}],
+  capture:()=>({owner:'held-session'}),
   act:(...args)=>{questCalls.push(args);return {ok:true};}});
 assert.equal(open(box.api).view.quests[0].id,'ebony');
 assert.equal(box.api.command({actorId:10,profileId:9,parts:['/merchant','quest','take','ebony']}).view,null);
@@ -120,7 +121,7 @@ box.api.command({actorId:11,profileId:7,parts:['/merchant','quest','take','ebony
 assert.equal(questCalls.length,0,'a replacement actor cannot reuse the old session');
 open(box.api);
 box.api.command({actorId:10,profileId:7,parts:['/merchant','quest','take','gem','Ruby']});
-assert.deepEqual(questCalls.pop(),[10,'take','gem','Ruby',1]);
+assert.deepEqual(questCalls.pop(),[10,'take','gem','Ruby',1,{owner:'held-session'}]);
 box.world.actors[10].lifeGeneration=1;
 box.api.command({actorId:10,profileId:7,parts:['/merchant','quest','take','ebony']});
 assert.equal(questCalls.length,0,'an earlier life cannot reuse a merchant session');
@@ -146,6 +147,7 @@ box.world.actors[10].pos=[0,0,0];open(box.api);
   box.api.command({actorId:10,profileId:7,parts:['/merchant','quest','abandon','ebony']});
   assert.equal(questCalls.length,0,'a merchant location callback cannot redirect an old panel into a replacement session');
   box.world.actor=actor;
+  open(box.api);
 }
 
 const cooldownPanel=service({on:true},250);
@@ -162,6 +164,7 @@ cooldownPanel.api.acknowledgeView(10,refreshedWork[0].view);
 assert.equal(cooldownPanel.api.recover().length,0,'a refreshed quest is not sent repeatedly');
 let takenWork=false;
 cooldownPanel.deps.quests=()=>({describe:()=>[{id:'ebony',state:takenWork?'open':'available'}],
+  capture:()=>({owner:'held-session'}),
   act:()=>{takenWork=true;return {ok:true};}});
 open(cooldownPanel.api);
 const takenView=cooldownPanel.api.command({actorId:10,profileId:7,parts:['/merchant','quest','take','ebony']}).view;

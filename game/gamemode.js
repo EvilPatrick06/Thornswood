@@ -2972,9 +2972,11 @@ function swing(actorId, anim, lands, opts) {
   // again every swing, and the last one is the one that clears.
   const cleanupTimer = setTimeout(function () {
     if (SWING_CLEAR[actorId] !== cleanupTimer) return;
+    var valid = !o.alive || o.alive();
+    if (SWING_CLEAR[actorId] !== cleanupTimer) return;
     delete SWING_CLEAR[actorId];
     delete SWING_IN_AIR[actorId];
-    if (o.alive && !o.alive()) return;
+    if (!valid) return;
     /*
       A spent swing rather than null. The script above throws it away on
       either, but this property has only ever held an object and a property
@@ -2994,6 +2996,8 @@ function swing(actorId, anim, lands, opts) {
   end that reused the last one would be read as the swing it is ending.
 */
 function swingEnd(actorId, tool) {
+  var runtime;
+  try { runtime = mp.getActorRuntimeIdentity(actorId); } catch (e) { }
   if (SWING_CLEAR[actorId]) { clearTimeout(SWING_CLEAR[actorId]); delete SWING_CLEAR[actorId]; }
   delete SWING_IN_AIR[actorId];
   try {
@@ -3002,9 +3006,16 @@ function swingEnd(actorId, tool) {
              tool: Number(tool) || 0, at: Date.now() });
   } catch (e) { }
   // And cleared behind it, so nothing replays at the next login.
-  setTimeout(function () {
+  const cleanupTimer = setTimeout(function () {
+    if (SWING_CLEAR[actorId] !== cleanupTimer) return;
+    var current;
+    try { current = mp.getActorRuntimeIdentity(actorId); } catch (e) { }
+    if (SWING_CLEAR[actorId] !== cleanupTimer) return;
+    delete SWING_CLEAR[actorId];
+    if (!runtime || current !== runtime) return;
     try { mp.set(actorId, SWING_PROPERTY, { anim: '', at: 0 }); } catch (e) { }
   }, 1500);
+  SWING_CLEAR[actorId] = cleanupTimer;
 }
 
 const SWING_QUIET = {};
@@ -63562,21 +63573,28 @@ function createMerchantTrading(deps) {
       sessions.delete(profileId);
       return fail('Press E on a guild trader with this character.', {open:false});
     }
+    var originalSession = sessions.get(profileId), quests, heldQuest;
+    if (verb === 'quest') {
+      quests = typeof deps.quests==='function' && deps.quests();
+      if (!quests || typeof quests.capture!=='function') return fail('Quest work is unavailable.');
+      heldQuest = quests.capture(actorId);
+      if (!heldQuest) return fail('Quest work is unavailable.');
+    }
     var again = inReach(actorId, merchantId);
     if (!again.ok) {
       sessions.delete(profileId);
       return fail(again.reason, { open: false });
     }
     if (!authed(profileId, again.human)) return fail('That request is not yours.');
-    if (sessionIdentity(again.human)!==sessions.get(profileId).identity) {
+    if (!active || sessions.get(profileId)!==originalSession ||
+        sessionIdentity(again.human)!==originalSession.identity ||
+        sessionIdentity(world.actor(actorId))!==originalSession.identity) {
       sessions.delete(profileId);
       return fail('Press E on a guild trader with this character.', {open:false});
     }
     if (verb === 'quest') {
-      var quests = typeof deps.quests==='function' && deps.quests();
-      if (!quests) return fail('Quest work is unavailable.');
       if (parts.length<4 || parts.length>5) return fail('Choose the work in the trader panel.');
-      var result=quests.act(actorId,String(parts[2]),String(parts[3]),parts[4],merchantId);
+      var result=quests.act(actorId,String(parts[2]),String(parts[3]),parts[4],merchantId,heldQuest);
       var reasons={class:'This work takes a different class.',rank:'This work takes a higher rank.',
         cooldown:'This work is still resting.',open:'You already hold this work.',gem:'Choose a gem first.',
         short:'You have not drawn enough to turn this work in.',none:'You do not hold this work.',
@@ -64226,7 +64244,10 @@ try {
       if (shut) return shut;
       if(deps.identity(actor)!==original)return UNREAD;
       if (deps.ready && !deps.ready(actor)) return 'Quest work is waiting on a saved inventory change.';
-      if (miningFn(actor)) { stopMiningFn(actor); return 'You put the pick down.'; }
+      if (!active || deps.available && !deps.available() || deps.identity(actor)!==original) return UNREAD;
+      var wasMining = miningFn(actor);
+      if (!active || deps.available && !deps.available() || deps.identity(actor)!==original) return UNREAD;
+      if (wasMining) { stopMiningFn(actor); return 'You put the pick down.'; }
       if (swingingFn(actor)) return '';
       var pick = toolIdFn(actor, 'miner');
       if(deps.identity(actor)!==original)return UNREAD;
@@ -64353,10 +64374,10 @@ try {
           canAbandon:ready && !!open};
       });
     }
-    function act(actor, verb, id, gem, traderRef) {
+    function act(actor, verb, id, gem, traderRef, held) {
       var row = byId[id];
       if (!row || !row.scarce || !bound(row)) return {ok:false,why:'unbound'};
-      var held=questsOf(actor);
+      held=held || questsOf(actor);
       if(!held)return {ok:false,why:'unread'};
       if (!active || deps.ready && !deps.ready(actor)) return {ok:false,why:'unavailable'};
       if(deps.identity(actor)!==held.owner)return {ok:false,why:'identity'};
@@ -64384,7 +64405,7 @@ try {
       lineup: lineup, offer: offer, bindPlace: bindPlace, walkAway: walkAway,
       turnIn: turnIn, noteKill: noteKill, noteContainer: noteContainer,
       mineRare: mineRare, isRareSeam: function (seam) { return !!RARE[seam && seam.name]; },
-      onActivate: onActivate, speak: speak, describe: describe, act: act,
+      onActivate: onActivate, speak: speak, describe: describe, act: act, capture: questsOf,
       shutdown: function () { active = false; }
     };
   }
