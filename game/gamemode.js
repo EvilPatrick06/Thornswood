@@ -35251,7 +35251,17 @@ log('gamemode loaded:',
     PROPERTY: PLOT_PROPERTY,
     activate: press, command: command, giveSeeds: giveSeeds,
     readPlot: readPlot, claimCovering: claimCovering, groundOf: groundOf,
-    farmOf: farmOf
+    farmOf: farmOf,
+    // For the property block's /claim (#2250): is this id a crop plot, and is
+    // there one in reach, so a word that is not about a field stays with it.
+    isPlotId: function (raw) {
+      raw = String(raw || '');
+      if (!/^[0-9a-f]{1,8}$/i.test(raw)) { return false; }
+      var base = '';
+      try { base = String(mp.get(parseInt(raw, 16), 'baseDesc') || ''); } catch (e) { return false; }
+      return P.has(CROPS, base);
+    },
+    plotNear: function (actorId) { return !!nearestPlot(actorId); }
   };
   flog('ready,', Object.keys(CROPS).length, 'crops and', Object.keys(claims).length, 'claims');
 })();
@@ -35932,6 +35942,36 @@ log('gamemode loaded:',
     } catch (e) {
       plog('could not hand over the deed:', e);
       return false;
+    }
+    return true;
+  }
+
+  /*
+    /claim WHEN THEY ARE NOT AT A DOOR THE SERVER KNOWS (#2250).
+
+    Everything that was not a door just opened used to go to farming, and
+    farming's first question is the farmer gate. So /claim at a door the table
+    does not know, or at a known door more than a minute after opening it,
+    answered "Only a farmer can bring a crop in" to anybody who is not a
+    farmer. Farming keeps every /claim that is about a field: one naming a crop
+    plot, or a bare one with a plot in reach. The rest is answered here, about
+    doors, and claims nothing.
+  */
+  function claimAway(parts, actorId, profileId, toProfile) {
+    var F = g.__thornswoodFarming;
+    var raw = (parts && parts[1]) ? String(parts[1]) : '';
+    if (!F || typeof F.isPlotId !== 'function' || typeof F.plotNear !== 'function') { return false; }
+    if (raw ? F.isPlotId(raw) : F.plotNear(actorId)) { return false; }
+    var building = raw ? doorOfId(raw) : null;
+    if (building) {
+      toProfile(profileId, 'Open the door of ' + nameOf(building) + ' again and press the key ' +
+                           'straight away. The server only takes the door you have just opened.');
+    } else if (raw) {
+      toProfile(profileId, 'That door does not belong to a building anybody can hold, so there ' +
+                           'is nothing to claim at it.');
+    } else {
+      toProfile(profileId, 'Open the door of the building you mean first. That is how ' +
+                           'the server knows which one it is.');
     }
     return true;
   }
@@ -39619,14 +39659,15 @@ log('gamemode loaded:',
       // Only when they are actually at a door. Otherwise this is farming's word
       // and farming answers it, which is what keeps /claim meaning one thing in
       // a field and another on a doorstep without either of them guessing.
-      if (!here(actorId)) { return false; }
       // And the lock key names what it was pressed at (#1636): a plot's id is
       // farming's even a minute after a door, so a farmer who walks out of
       // the house to a field claims the field and not the house.
-      if (parts && parts[1] && !doorOfId(parts[1])) { return false; }
-      claim(actorId, profileId, toProfile);
-      doorLine(actorId, profileId);
-      return true;
+      if (here(actorId) && !(parts && parts[1] && !doorOfId(parts[1]))) {
+        claim(actorId, profileId, toProfile);
+        doorLine(actorId, profileId);
+        return true;
+      }
+      return claimAway(parts, actorId, profileId, toProfile);
     }
     if (word === '/jarl') { return jarlCmd(parts, actorId, profileId, toProfile); }
     if (word === '/steward') { return stewardCmd(parts, actorId, profileId, toProfile); }
