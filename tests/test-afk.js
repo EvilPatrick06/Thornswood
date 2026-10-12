@@ -302,7 +302,10 @@ yes('the idle block follows the seats block in gamemode.js', sa >= 0 && ia > sa 
 if (!(sa >= 0 && ia > sa && sb > ia)) done();
 const blocks = src.slice(sa, sb);
 const ACTOR = 0xff000000;
-const PRIV = fs.mkdtempSync(path.join(os.tmpdir(), 'afk-'));
+// private in a scratch folder of its own, so the staff log lands in for-bot beside it (#2321).
+const SCRATCH = fs.mkdtempSync(path.join(os.tmpdir(), 'afk-'));
+const PRIV = path.join(SCRATCH, 'private');
+fs.mkdirSync(PRIV, { recursive: true });
 
 function server(settings) {
   // asking: the profiles whose menus say "/line" every 10 seconds, as the front does while it waits.
@@ -381,7 +384,7 @@ function server(settings) {
   r.moved = function (pid, n) { const w = r.where[pid] || (r.where[pid] = { pos: [0, 0, 0], rot: [0, 0, 0] }); w.pos[0] += (n || 100); };
   r.staffLog = function () {
     try {
-      return fs.readFileSync(path.join(PRIV, 'moderation.log'), 'utf8').split('\n').filter(Boolean).map(function (l) { return JSON.parse(l); });
+      return fs.readFileSync(path.join(SCRATCH, 'for-bot', 'moderation.log'), 'utf8').split('\n').filter(Boolean).map(function (l) { return JSON.parse(l); });
     } catch (e) { return []; }
   };
   return r;
@@ -565,5 +568,5 @@ yes('Choose another character shows the slots and keeps the place', />Choose ano
 yes('the page words are clean', clean((page.match(/var AWAY_WORDS = [\s\S]*?;\n/) || [''])[0]) &&
     clean((page.match(/function chooseOther[\s\S]*?\n  \}\n/) || [''])[0]));
 
-try { fs.rmSync(PRIV, { recursive: true, force: true }); } catch (e) { }
+try { fs.rmSync(SCRATCH, { recursive: true, force: true }); } catch (e) { }
 done();

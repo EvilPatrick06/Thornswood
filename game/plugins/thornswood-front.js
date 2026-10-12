@@ -4848,15 +4848,51 @@
     Right of centre and a little below the crosshair, which is where Skyrim
     puts its own activate prompt and is where an eye already is. Never over
     the crosshair itself: a panel you cannot see past is worse than no panel.
+
+    BENEATH OUR PANELS (#1739). It stood at 2147483400, above every panel
+    (2147483000 to 2147483300), so a panel opened while somebody was under
+    the crosshair had the prompt drawn on top of it. It sits with the key
+    mold line now, under all of them, and it is taken down while any of them
+    is open (see lookCoveredBy).
   */
   const LOOK_CSS =
-    'position:fixed;left:54%;top:46%;z-index:2147483400;pointer-events:none;' +
+    'position:fixed;left:54%;top:46%;z-index:2147482900;pointer-events:none;' +
     'font-family:Georgia,serif;font-size:19px;letter-spacing:.03em;' +
     'background:rgba(12,10,8,.62);border:2px solid rgba(0,0,0,.65);' +
     'border-radius:9px;padding:11px 16px 14px;' +
     'text-shadow:0 2px 4px rgba(0,0,0,.95)';
 
+  /*
+    NEVER OVER A MENU OR A PANEL (#1739). A tester, on dev and main: the
+    panel that names who you look at "doesn't disappear when opening other
+    menus and things, and it gets in the way". The crosshair poll below drew
+    it from two things only, the crosshair and the server's near list, and
+    asked nothing about what else was on screen. Skyrim keeps the same
+    reference under the crosshair while one of its menus is up, so the
+    prompt stayed drawn over the inventory, the magic menu, the map, the
+    Tab menu, a container, a trader's barter, a book, the favourites on Q
+    and every other menu in KEYBOARD_MENUS; and over our own panels (K, P,
+    J, the trade window, a trader's wares, the board, help, the maneuvers,
+    the emote wheel and the rest of CAP_CLOSES) and the chat while it is
+    being typed in, which the page draws beneath it.
+
+    So what is open is part of what it is drawn from: nothing that holds
+    the keyboard (a claim, the same list the focus arbiter keeps) and none
+    of Skyrim's menus that take it. Who is being looked at is still
+    followed while it is down, so the keys and the prompt are right the
+    moment the menu closes.
+  */
+  let lookCover = '';      // what the prompt was last taken down for, for one line each time
+
+  function lookCoveredBy() {
+    for (const k in claims) { if (claims[k]) { return 'the ' + k + ' panel'; } }
+    return busyMenuOpen();
+  }
+
+  // A claim is a variable read, so it is asked every frame and a panel takes
+  // the prompt down in the frame it opens, not on the next poll.
   sp.on('update', guard('crosshair', () => {
+    if (lookingSig && anyClaim()) { drawPrompt(null); }
     const now = Date.now();
     if (now - nearAt < NEAR_EVERY) { return; }
     nearAt = now;
@@ -4884,7 +4920,29 @@
       lookingAt = hex;
       say('looking at ' + row.n + ' (' + hex + ')');
     }
-    drawPrompt(row);
+    const cover = lookCoveredBy();
+    if (cover !== lookCover) {
+      if (cover) { say('look prompt down while ' + cover + ' is open'); }
+      lookCover = cover;
+    }
+    drawPrompt(cover ? null : row);
+  }));
+
+  /*
+    One of Skyrim's menus takes the prompt down the moment it opens, rather
+    than on the next poll, and the menu memory busyMenuOpen keeps for a
+    quarter of a second is let go of, so a "no menu" read just before the
+    menu opened cannot put the prompt back over it. Closing lets go of it
+    too, so the prompt is back on the next poll.
+  */
+  sp.on('menuOpen', guard('look menu', (e) => {
+    if (KEYBOARD_MENUS.indexOf(String((e && e.name) || '')) === -1) { return; }
+    menuCachedAt = 0;
+    drawPrompt(null);
+  }));
+  sp.on('menuClose', guard('look menu closed', (e) => {
+    if (KEYBOARD_MENUS.indexOf(String((e && e.name) || '')) === -1) { return; }
+    menuCachedAt = 0;
   }));
 
   /*
@@ -6760,93 +6818,76 @@
   }));
 
   /*
-   * Guards that never stop trying to kill you.
-   *
-   * A bounty is not what makes a guard murderous. Arrest dialogue, the pay a
-   * fine or go to jail choice, is what a guard offers somebody with a bounty.
-   * What turns that off is the crime faction's player enemy flag, which is set
-   * when you resist arrest or fight back, and from then on they attack on
-   * sight and never speak to you again.
-   *
-   * In a single player game that flag is cleared by dying, because dying means
-   * loading a save made before any of it happened. Nobody here ever loads a
-   * save. So the flag is set once, survives death, survives respawn, survives
-   * logging out, and the hold is hostile forever.
-   *
-   * So it is cleared by hand on respawn. The bounty is deliberately left
-   * alone: the crime happened and should still cost something. What comes back
-   * is the guard's willingness to arrest instead of swing, which is what dying
-   * is supposed to buy.
-   *
-   * Every hold they might belong to is covered rather than just the current
-   * one, because the guards chasing you across a border belong to the hold you
-   * offended, not the one you died in.
-   */
-  let wasDead = false;
+    ------------------------------------------ no bounty for killing an NPC
 
-  function calmTheGuards() {
-    let pc = null;
-    try { pc = sp.Game.getPlayer(); } catch (e) { return; }
-    if (!pc) return;
+    Patrick, 11 October (#502): "there should be no bounties at all added
+    when killing NPCs". Guards are people now, and no NPC guard comes back.
 
-    let cleared = 0;
-    const seen = {};
+    WHERE THE BOUNTY CAME FROM, measured on 12 October. Nothing Thornswood
+    wrote adds one: no line of the gamemode, these plugins or the fork's
+    server calls modCrimeGold or setCrimeGold. It is Skyrim's own crime
+    system, running here in each person's game. Killing or striking an actor
+    whose crime faction tracks crime adds that faction's murder or assault
+    gold to its bounty: 1000 for a kill and 40 for a blow, from the game
+    settings for a faction on Use Defaults, and from the faction's own record
+    for CrimeFactionReach, which carries its own 1000 and 40. So zeroing the
+    two settings would have left Markarth's, and the answer is on each
+    faction instead: its ignore murder and ignore assault flags, which tell
+    the game that killing or striking a member is not a crime against it.
+    Every hold's crime faction, Raven Rock's, the Orcs' and one Dark
+    Brotherhood contract's are the twelve, read out of the load order by
+    scripts\dev\Build-CrimeTable.py (game\data\crime-factions.json says why
+    each is there).
 
-    function forgive(faction) {
-      if (!faction) return;
+    WHEN. A faction's flags are the game's own record, so they are set once
+    a game is loaded, which is when the world this session plays in starts,
+    and before that nothing can be killed. Each one is read back and the log
+    says how many took it, so the line is a measurement and not a hope.
+  */
+  // ==== KILL_CRIME_FACTIONS, generated ====
+  // One row a faction: its form id in its plugin, the plugin, its editor id.
+  // Generated by scripts\dev\Build-CrimeTable.py; do not hand edit.
+  const KILL_CRIME_FACTIONS = [
+    [0x267e3, "Skyrim.esm", "CrimeFactionEastmarch"],
+    [0x28170, "Skyrim.esm", "CrimeFactionFalkreath"],
+    [0x29db0, "Skyrim.esm", "CrimeFactionHaafingar"],
+    [0x2816d, "Skyrim.esm", "CrimeFactionHjaalmarch"],
+    [0x28713, "Skyrim.esm", "CrimeFactionOrcs"],
+    [0x2816e, "Skyrim.esm", "CrimeFactionPale"],
+    [0x2816c, "Skyrim.esm", "CrimeFactionReach"],
+    [0x2816b, "Skyrim.esm", "CrimeFactionRift"],
+    [0x267ea, "Skyrim.esm", "CrimeFactionWhiterun"],
+    [0x2816f, "Skyrim.esm", "CrimeFactionWinterhold"],
+    [0xe7c27, "Skyrim.esm", "DBCrimeFactionMaro"],
+    [0x18279, "Dragonborn.esm", "DLC2CrimeRavenRockFaction"],
+  ];
+  // ==== end KILL_CRIME_FACTIONS ====
+  const IGNORE_MURDER = 0x80;
+  const IGNORE_ASSAULT = 0x100;
+
+  function noKillBounty() {
+    const took = [], absent = [], refused = [];
+    for (let i = 0; i < KILL_CRIME_FACTIONS.length; i++) {
+      const row = KILL_CRIME_FACTIONS[i];
+      let f = null;
+      try { f = sp.Faction.from(sp.Game.getFormFromFile(row[0], row[1])); } catch (e) { f = null; }
+      if (!f) { absent.push(row[2]); continue; }
       try {
-        const id = faction.getFormID();
-        if (seen[id]) return;
-        seen[id] = true;
-        faction.setPlayerEnemy(false);
-        cleared++;
-      } catch (e) { }
-    }
-
-    // Stop whatever is in progress first, or they simply re-enter combat and
-    // set it again a second later.
-    try { pc.stopCombatAlarm(); } catch (e) { }
-    try { pc.stopCombat(); } catch (e) { }
-
-    try { forgive(pc.getCrimeFaction()); } catch (e) { }
-
-    /*
-      Whoever is actually nearby, because the faction that matters is the one
-      whose guards are swinging, not the one whose land this is. There is no
-      way to list actors, so this samples: findRandomActor a few dozen times
-      covers everything in range long before it runs out of tries.
-    */
-    try {
-      const x = pc.getPositionX(), y = pc.getPositionY(), z = pc.getPositionZ();
-      for (let i = 0; i < 40; i++) {
-        const ac = sp.Game.findRandomActor(x, y, z, 8192);
-        if (!ac || ac.getFormID() === 0x14) continue;
-        try { ac.stopCombatAlarm(); } catch (e) { }
-        try { ac.stopCombat(); } catch (e) { }
-        try { forgive(ac.getCrimeFaction()); } catch (e) { }
+        f.setFactionFlag(IGNORE_MURDER);
+        f.setFactionFlag(IGNORE_ASSAULT);
+        if (f.isFactionFlagSet(IGNORE_MURDER) && f.isFactionFlagSet(IGNORE_ASSAULT)) { took.push(row[2]); }
+        else { refused.push(row[2] + ' (the flags did not stay)'); }
+      } catch (e) {
+        refused.push(row[2] + ' (' + e + ')');
       }
-    } catch (e) { }
-
-    say('died and came back: cleared the resisted arrest flag on ' + cleared +
-        (cleared === 1 ? ' crime faction' : ' crime factions') +
-        '. Bounties are untouched, so guards will offer the fine again.');
+    }
+    say('no bounty for a kill or a blow: ' + took.length + ' of ' + KILL_CRIME_FACTIONS.length +
+        ' crime factions now ignore murder and assault' +
+        (absent.length ? '; not in this load order: ' + absent.join(', ') : '') +
+        (refused.length ? '; REFUSED: ' + refused.join(', ') : ''));
   }
 
-  sp.on('update', guard('guards', () => {
-    let dead = false;
-    try {
-      const pc = sp.Game.getPlayer();
-      if (!pc) return;
-      dead = !!pc.isDead();
-    } catch (e) { return; }
-
-    if (dead) { wasDead = true; return; }
-    if (!wasDead) { return; }
-
-    // Alive again after being dead. Once, on the edge.
-    wasDead = false;
-    calmTheGuards();
-  }));
+  sp.on('loadGame', guard('no kill bounty', noKillBounty));
 
   /*
     ------------------------------------------------- the town gates
@@ -9557,11 +9598,71 @@
       if (!r || typeof r.key !== 'string' || !/^[a-z]+$/.test(r.key)) { continue; }
       rows.push({ key: r.key, name: String(r.name || r.key), stamina: Number(r.stamina) || 0,
                   cooldown: Number(r.cooldown) || 0, ready: !!r.ready });
+      if (r.key === 'plant') { plantSeen(!!r.on, Number(r.seconds) || 0); }
     }
+    if (!list.some(function (r) { return r && r.key === 'plant'; })) { plantSeen(false, 0); }
     const was = JSON.stringify(maneuverRows);
     maneuverRows = rows;
     if (JSON.stringify(rows) !== was) { maneuversToPage(); }
   }
+
+  /*
+    PLANT: "You are not staggered for 8 seconds" (#1386). The server refuses
+    the staggers it sends itself (Break and Wreck). Every other one, a power
+    attack, a shield bash, a shout, a spell, is played by the game on the
+    person's own machine as the animation event staggerStart on their own
+    character, which passes through Skyrim Platform's sendAnimationEvent
+    hook; skymp5-client's deathService blanks that same event in that same
+    hook to keep staggers off everybody else's characters. So while the
+    view says Plant is on, staggerStart for 0x14, your own character, is
+    blanked and the stagger never starts.
+
+    The view's on turns false when the server's window ends, and the server
+    redraws the view then. If that redraw never arrives (the connection
+    dropped), the row's own length, seconds from the moment on was first
+    seen, is the end: nothing here outlasts the maneuver.
+  */
+  let plantUntil = 0;     // when this machine stops refusing staggers, 0 for not planted
+  let plantRefused = 0;   // staggers refused in this Plant, for the log
+  let plantSaid = 0;
+
+  function plantSeen(on, secs) {
+    const now = Date.now();
+    if (!on) {
+      if (plantUntil) {
+        say('plant: over, ' + plantRefused + ' stagger(s) refused');
+        plantUntil = 0;
+      }
+      return;
+    }
+    if (plantUntil && now < plantUntil) { return; }   // the same Plant, seen again
+    const len = Math.max(0, Math.min(60, secs)) * 1000;
+    if (!len) { return; }
+    plantUntil = now + len;
+    plantRefused = 0;
+    plantSaid = 0;
+    say('plant: no stagger lands on this character for ' + (len / 1000) + ' seconds');
+  }
+
+  try {
+    sp.hooks.sendAnimationEvent.add({
+      enter: function (ctx) {
+        if (!plantUntil || Date.now() >= plantUntil) { return; }
+        ctx.animEventName = '';
+        plantRefused++;
+      },
+      leave: function () { }
+    }, 0x14, 0x14, 'staggerStart');
+  } catch (e) {
+    log('plant: could not hook animation events, so Plant stops only the server\'s own staggers:', e);
+  }
+
+  // One line for each stagger refused, said outside the hook.
+  sp.on('update', guard('plant', () => {
+    if (plantRefused === plantSaid) { return; }
+    plantSaid = plantRefused;
+    say('plant: refused a stagger (' + plantRefused + ' in this Plant)');
+  }));
 
   /* The maneuver key, with the panel shut: a panel up holds the keyboard, and
      then the page hears the key and closes itself. */
@@ -9803,6 +9904,15 @@
     to whoever holds it.
   */
   const PASS_FILE = 'Data/Platform/thornswood-pass.txt';
+  /*
+    The pass's own key (#1320). The launcher leaves it beside the pass, named
+    by the pass's mac, and the client the fork builds answers the game
+    server's login challenge with the pass and a mac over that connection's
+    nonce under this key (skymp5-client, thornswoodLoginProof.ts), read from
+    storage.thornswoodJoinPass. Paired only with the pass it was given for,
+    and never logged.
+  */
+  const PASS_KEY_FILE = 'Data/Platform/thornswood-pass-key.txt';
   const PASS_RESEND_MS = 60000;
   const PASS_READ_MS = 5000;
   let passSent = '';
@@ -9814,6 +9924,10 @@
     passReadAt = now;
     const raw = readText(PASS_FILE).trim();
     if (!/^jp1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(raw)) { return; }
+    const keyLine = readText(PASS_KEY_FILE).trim().split(' ');
+    if (keyLine.length === 2 && keyLine[0] === raw.split('.')[2] && /^[A-Za-z0-9_-]{16,128}$/.test(keyLine[1])) {
+      sp.storage.thornswoodJoinPass = { pass: raw, key: keyLine[1] };
+    }
     if (raw === passSent && now - passSentAt < PASS_RESEND_MS) { return; }
     const first = !passSent;
     passSent = raw;

@@ -3897,80 +3897,29 @@ function disableBlocksOff() {
 disableBlocksOff();
 
 /*
-  Who has been told what a kiln will cost them, and when. See burnCharcoal.
+  THE KILN IS A BENCH, AND A PRESS ON IT IS THE ENGINE'S (#2337).
+
+  Until 12 Oct a press on the charcoal kiln was answered here by a function
+  that burned three firewood into one grade of charcoal on a second press
+  inside fifteen seconds. It was written on 21 September because the kiln's
+  crafting menu had nothing in it, and its own comment said so: four charcoal
+  recipe records "would turn this into an ordinary bench with an ordinary menu
+  and delete" it, which was "the right end state". Patrick's report that day
+  was "it's making charcoal automatically instantly upon opening the kiln and
+  not when you click to make it".
+
+  The plugin carries those four recipes now, and the Tool Handle and the
+  Splint, all six on the kiln's keyword. So the press answer had become the
+  fault: onActivate answered every kiln press with a line and false, which
+  skips ProcessActivateNormal, the engine step that seats a person at a FURN
+  and opens its menu for them; and on the client, where furniture is not
+  blocked, opening the menu twice inside the window burned three firewood
+  nobody asked to spend. Nothing here answers a kiln press now. benchGate
+  still refuses it to anybody who is not a woodworker, and the menu's rows go
+  through mp.onCraft like every other bench: the half and rank on each row,
+  the fit-to-make gate, and the work counted. tests/test-2337-kiln-menu.js
+  holds it.
 */
-const KILN_ARMED = {};
-const KILN_ARM_MS = 15000;
-
-function burnCharcoal(actorId, refrId) {
-  const half = halfGate(actorId, 'charburner', 'novice',
-    'A kiln is a charburner\'s. Only a woodworker who took Charburner can run one, ' +
-    'and a woodwright gets the plain grade. Ask one.');
-  if (half) return half;
-
-  // The woodcutter's axe, and it is asked for under the profession rather than
-  // the half: both halves of the Woodworker are woodworkers, a woodwright runs
-  // a kiln at the plain grade, and neither of them does it without an axe.
-  const tool = toolGate(actorId, 'woodworker');
-  if (tool) return tool;
-
-  // Too sick, too hurt or too tired to burn anything: the gate every way of
-  // making something asks (unfitToMake, #1733), at the kiln pressed.
-  const unfit = unfitToMake(actorId, refrId);
-  if (unfit) return unfit;
-
-  const wait = cooldownLeft(actorId, refrId);
-  if (wait > 0) return 'The kiln is still burning. ' + wait + ' seconds.';
-
-  const cost = 3;
-
-  /*
-    A PRESS IS NOT A DECISION, AND THIS ONE WAS SPENDING FIREWOOD LIKE ONE.
-
-    Patrick, 21 September: "it's making charcoal automatically instantly upon
-    opening the kiln and not when you click to make it".
-
-    Every other verb in this file answers a press that can only mean one thing.
-    A seam is struck, a block is chopped, a plot is sown, and if you did not
-    want it you would not have walked up to it. A kiln is different because it
-    SPENDS something: three firewood, out of a pack you are carrying for
-    something else, for a grade of charcoal you may not have wanted yet. Walking
-    past one and pressing it took them.
-
-    WHY IT IS NOT A MENU, and this is the honest part. The kiln is a bench, it
-    has a keyword, and BENCH_ACCESS gates it, so the crafting menu does open.
-    There is nothing in it: charcoalT1 to T4 appear exactly twice in this whole
-    file, in ITEMS and in this function, and no COBJ anywhere makes them. A
-    proper menu needs four recipe records in Thornswood-Content.esp, which is
-    Creation Kit work and its own entry.
-
-    SO IT ASKS. The first press says what it will cost and what it will make.
-    The second press within the window does it. That is still a press rather
-    than a chat word, it cannot happen by accident, and it needs no new records.
-    The window is deliberately short: this is a confirmation, not a state, and
-    somebody who walked off and came back should be asked again.
-  */
-  var armed = KILN_ARMED[actorId];
-  if (!armed || armed.refrId !== refrId || (Date.now() - armed.at) > KILN_ARM_MS) {
-    KILN_ARMED[actorId] = { refrId: refrId, at: Date.now() };
-    const willBe = ['charcoalT1', 'charcoalT2', 'charcoalT3', 'charcoalT4']
-      [rankStep(actorId, 'charburner')] || 'charcoalT1';
-    return 'The kiln will take ' + cost + ' firewood and give you ' +
-           willBe.replace('charcoalT', 'grade ') + ' charcoal. Press it again to burn.';
-  }
-  delete KILN_ARMED[actorId];
-
-  if (!takeItem(actorId, ITEMS.firewood, cost)) {
-    return 'The kiln needs ' + cost + ' firewood.';
-  }
-  const grade = ['charcoalT1', 'charcoalT2', 'charcoalT3', 'charcoalT4'][rankStep(actorId, 'charburner')] || 'charcoalT1';
-  addItem(actorId, ITEMS[grade], 1);
-  stampCooldown(actorId, refrId);
-  const rank = creditWork(actorId, 'charburner');
-  const worn = wearTool(actorId, 'woodworker');
-  return 'The kiln yields ' + grade.replace('charcoalT', 'grade ') + ' charcoal.' +
-         (rank ? ' ' + rank : '') + (worn ? ' ' + worn : '');
-}
 
 // ---------------------------------------------------------------------------
 // character creation
@@ -8458,9 +8407,9 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     all, so it goes on to the engine and the crafting menu opens the way it
     always has.
 
-    Our own kiln is both a bench and a station, and this is the right order for
-    it: a woodwright is allowed the kiln's novice grade by the sister half rule,
-    so the gate lets them through and burnCharcoal below grades it.
+    Our own kiln is a bench like the rest (#2337): a woodwright is allowed the
+    kiln's novice rows by the sister half rule, so the gate lets them through,
+    the menu opens, and mp.onCraft grades each row they make.
   */
   const shut = benchGate(casterRefrId, baseDesc);
   if (shut) {
@@ -8623,7 +8572,6 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
 
   let message = null;
   if (baseDesc === STATIONS.saltQuarry) message = mineSalt(casterRefrId, refrId);
-  else if (baseDesc === STATIONS.charcoalKiln) message = burnCharcoal(casterRefrId, refrId);
   // The four chopping blocks. Before the STATIONS branches would not matter,
   // because these are not ours, but before the FURN fallthrough further down
   // very much does: a chopping block is a FURN, and a FURN that reaches
@@ -8839,7 +8787,6 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
   }
   try {
     add(STATIONS.saltQuarry);
-    add(STATIONS.charcoalKiln);
     for (var shrine in SHRINES) { add(shrine); }
     for (var handPlant in HARVESTS) { add(handPlant); }
     // Every farm crop as well. A crop base missing from this list is pressed
@@ -27895,9 +27842,9 @@ const KEY_NAME_DELAY = 250;
 /*
   FIT TO MAKE ANYTHING (#1733): the one gate every way of making something
   asks, before anything is taken. Today that is a bench's own menu
-  (mp.onCraft, brews, enchanting and tempering included), a kiln burned by
-  pressing it (burnCharcoal) and a key cut at a forge (cutKey in the
-  property block). It asks two blocks, in this order:
+  (mp.onCraft, brews, enchanting and tempering included, and the kiln's
+  charcoal since #2337) and a key cut at a forge (cutKey in the property
+  block). It asks two blocks, in this order:
 
     too sick or too hurt (#1383)  the injury and disease block: a disease
                                   gone bad refuses every craft, and a broken
@@ -30535,10 +30482,69 @@ log('gamemode loaded:',
   function held(pid, now) { return requiring() && !shown(pid, now); }
   function trusts(pid, now) { return !requiring() || proven(pid, now); }
 
+  /*
+    THE LOGIN PROVES THE PASS ON ITS OWN CONNECTION (#1320), watched only.
+
+    The pass reaches this block over the relay's socket, which names a profile
+    and nothing else, so this block cannot tie a pass to the game connection
+    that holds the character. The fork's login (skymp5-server,
+    thornswoodLogin.ts) can: with mp.onThornswoodLogin set, it sends every
+    offline login a fresh nonce, and a client of that engine answers with the
+    pass and HMAC-SHA256 of "jlp1." + nonce under the pass's own key. The site
+    gives the launcher that key over https beside the pass (passLoginKey in
+    site/server.js: HMAC-SHA256 of "jpk1." and the pass's mac, keyed on
+    passKey), so it never travels on the game's port, and a pass and mac seen
+    on the wire prove nothing on another connection, whose nonce is another.
+
+    WATCHED ONLY, ON PURPOSE. A launcher and an engine that answer are not on
+    everybody's machine yet, and a client that does not know the challenge
+    never answers. So the login hands over the profile asked for, exactly as
+    before, and the proof, when one comes, is checked and logged: good, or
+    why not. Nothing is refused here. Waiting for a good proof, and handing
+    over the pass's profile rather than the one asked for, is the next step,
+    once main's launcher and engine carry all of it and these lines show a
+    good proof for every login; it is written out on #1320.
+
+    loginProof(e, now) is what that step will ask: { ok, p } or { why }.
+  */
+  function loginProof(e, now) {
+    var key = passKey(now);
+    if (!e || !e.proof) { return { why: 'no proof' }; }
+    var r = readPass(e.proof.pass, key, now, serverName());
+    if (!r.ok) { return { why: r.why, p: r.p }; }
+    var own = b64u(crypto.createHmac('sha256', key).update('jpk1.' + r.id).digest());
+    var want = Buffer.from(b64u(crypto.createHmac('sha256', own).update('jlp1.' + String(e.nonce)).digest()));
+    var got = Buffer.from(String(e.proof.mac || ''));
+    if (want.length !== got.length || !crypto.timingSafeEqual(want, got)) {
+      return { why: 'a mac that does not check out for this connection', p: r.p };
+    }
+    if (r.p !== Number(e.profileId)) {
+      return { ok: true, p: r.p, why: 'a pass for profile ' + r.p + ', logged in as ' + e.profileId };
+    }
+    return { ok: true, p: r.p };
+  }
+
+  function onLogin(e) {
+    var now = Date.now();
+    var asked = Number(e && e.profileId) || 0;
+    if (!e || !e.proof) {
+      console.log('[thornswood] login of profile ' + asked + ' on user ' + (e && e.userId) +
+                  ' challenged; handed over as asked (watching, #1320)');
+      return asked;
+    }
+    var v = loginProof(e, now);
+    console.log('[thornswood] login proof from profile ' + asked + ' on user ' + e.userId + ': ' +
+                (v.ok ? (v.why ? 'good, but ' + v.why : 'good') : v.why) + ' (watching, nothing refused)');
+    return -1;
+  }
+  // Set again on every load, so a hot reload's hook is this one. An engine
+  // older than the fork's login challenge never calls it.
+  mp.onThornswoodLogin = onLogin;
+
   g.__thornswoodJoinPass = { take: take, sweep: sweep, readPass: readPass,
                              grace: GRACE_MS, sentence: SENTENCE, waiting: WAITING,
                              shown: shown, proven: proven, held: held, trusts: trusts,
-                             requiring: requiring };
+                             requiring: requiring, loginProof: loginProof, onLogin: onLogin };
 
   /*
     The one question every other block asks, safe to call before this block
@@ -31274,15 +31280,23 @@ log('gamemode loaded:',
     try { return mp.getServerSettings() || {}; } catch (e) { return {}; }
   }
 
-  /* The staff log: one line in moderation.log, which the Discord bot says in the staff channel. */
+  /*
+    The staff log: one line in moderation.log, which the Discord bot says in
+    the staff channel. It goes in for-bot beside private (forBotDir when the
+    settings name one), because the bot reads it by a rule on that folder,
+    which a file made later takes; private is SYSTEM's and Administrators'
+    alone (#2321).
+  */
   function record(pid, name, why) {
     var fs = null, path = null;
     try { fs = require('fs'); path = require('path'); } catch (e) { return; }
     var s = settings();
     var row = { at: new Date().toISOString(), server: String(s.thornswoodServer || '').trim().toLowerCase() || 'main',
                 did: 'idle', by: pid, byName: name, who: pid, whoName: name, why: String(why || '').slice(0, 300) };
+    var dir = String(s.forBotDir || path.join(path.dirname(String(s.privDir || 'private')), 'for-bot'));
     try {
-      fs.appendFileSync(path.join(String(s.privDir || 'private'), 'moderation.log'), JSON.stringify(row) + '\n');
+      fs.mkdirSync(dir, { recursive: true });
+      fs.appendFileSync(path.join(dir, 'moderation.log'), JSON.stringify(row) + '\n');
     } catch (e) {
       console.log('[thornswood] idle: could not write moderation.log, so the staff channel will not hear of it: ' + e);
     }
@@ -37601,7 +37615,93 @@ log('gamemode loaded:',
   /* Every kind of rest this hands the needs block, and 'bedroll', the kind
      #1392 handed out, so somebody still resting at it is got up the same way. */
   var REST_KINDS = { sit: true, rough: true, campfire: true, camp: true, inn: true, bed: true,
-                     bedroll: true };
+                     common: true, commonfire: true, bedroll: true };
+
+  /*
+    AN INN OR A TEMPLE NOBODY HOLDS (#2246).
+
+    Djinn, #dev-test-results, 26 Sep: survival starts too harsh, and where
+    somebody rests or logs out should decide how much comes back: an inn or a
+    temple the most, out in the wild the least. Until this, a bed in an inn
+    nobody holds was "a bed nobody can lend you", the same 25 an hour as a
+    bedroll on the road, and no logout fill. Every new character arrives in
+    one of nine inns (CHARGEN), and none of those is held unless a person
+    claimed it, so that was every new character's first night.
+
+    So the beds now know an inn or a temple when they see one, and hand the
+    needs block two kinds of their own: common, a bed there, and commonfire,
+    the same bed with a fire in reach. What each is worth, awake and at a
+    logout, is NEEDS.recover and NEEDS.away in the needs block, the one table
+    of the balance. Until Patrick picks the numbers on #2246 they are the
+    rough and camp numbers they always were, so nobody's rest changes.
+
+    WHAT AN INN OR A TEMPLE IS, read off the game's own records the way a
+    bed is (bedKind): the room's CELL names its location (XLCN), and the
+    location carries LocTypeInn or LocTypeTemple. Asked once per room through
+    mp.lookupEspmRecordById and kept. Measured against the load order on
+    11 Oct (Build-WakeTable.js's reader over every plugin switched on): 33
+    rooms are inns and 17 are temples, every one of the nine arrival inns
+    among them. A house the game sells as a home is not an inn, whatever
+    else it carries: Riften's Honeyside has LocTypeInn as well as
+    LocTypePlayerHouse. A held building is never this: its holder decides
+    who sleeps there, as before.
+  */
+  var REST_PLACE_KEYWORDS = { LocTypeInn: 'inn', LocTypeTemple: 'temple' };
+  var NOT_REST_PLACE_KEYWORDS = { LocTypePlayerHouse: true };
+  var restPlaces = {};
+
+  function u32At(b, at) {
+    if (!b || b.length < at + 4) { return 0; }
+    return ((b[at] | (b[at + 1] << 8) | (b[at + 2] << 16)) + b[at + 3] * 0x1000000) || 0;
+  }
+
+  function recordField(rec, type) {
+    var fields = (rec && rec.fields) || [];
+    for (var i = 0; i < fields.length; i++) {
+      if (fields[i] && String(fields[i].type) === type) { return fields[i].data || null; }
+    }
+    return null;
+  }
+
+  function editorIdOf(rec) {
+    var edid = rec ? textOf(rec.editorId) : '';
+    return (edid || textOf(recordField(rec, 'EDID'))).replace(/\0+$/, '');
+  }
+
+  function globalFrom(res, local) {
+    if (!local) { return 0; }
+    if (!res || typeof res.toGlobalRecordId !== 'function') { return 0; }
+    try { return Number(res.toGlobalRecordId(local)) || 0; } catch (e) { return 0; }
+  }
+
+  /* 'inn', 'temple', or '' for any other room or a worldspace, by the room's
+     own records. An answer the engine could not give is '', the road. */
+  function restPlaceOf(cellDesc) {
+    cellDesc = String(cellDesc || '');
+    if (!cellDesc) { return ''; }
+    if (bedHas(restPlaces, cellDesc)) { return restPlaces[cellDesc]; }
+    var place = '';
+    try {
+      var cres = mp.lookupEspmRecordById(idOf(cellDesc));
+      var cell = cres && cres.record;
+      if (cell && String(cell.type) === 'CELL') {
+        var loc = globalFrom(cres, u32At(recordField(cell, 'XLCN'), 0));
+        var lres = loc ? mp.lookupEspmRecordById(loc) : null;
+        var kw = (lres && lres.record) ? recordField(lres.record, 'KWDA') : null;
+        var found = '';
+        for (var k = 0; kw && k + 4 <= kw.length; k += 4) {
+          var kres = mp.lookupEspmRecordById(globalFrom(lres, u32At(kw, k)));
+          var word = editorIdOf(kres && kres.record);
+          if (bedHas(NOT_REST_PLACE_KEYWORDS, word)) { found = ''; break; }
+          if (!found && bedHas(REST_PLACE_KEYWORDS, word)) { found = REST_PLACE_KEYWORDS[word]; }
+        }
+        place = found;
+      }
+    } catch (e) { place = ''; }
+    restPlaces[cellDesc] = place;
+    if (place) { plog('rest place:', cellDesc, 'is', place === 'inn' ? 'an inn' : 'a temple'); }
+    return place;
+  }
 
   function bedHas(o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); }
 
@@ -37761,10 +37861,14 @@ log('gamemode loaded:',
     return !!cell && (bedHas(BUILDING_NAME, cell) || bedHas(claims, cell));
   }
 
+  /* The room or worldspace a bed stands in. */
+  function bedCell(refrId) {
+    try { return String(mp.get(refrId, 'worldOrCellDesc') || ''); } catch (e) { return ''; }
+  }
+
   /* The building a bed stands in, which is its cell when that is one. */
   function bedBuilding(refrId) {
-    var cell = '';
-    try { cell = String(mp.get(refrId, 'worldOrCellDesc') || ''); } catch (e) { cell = ''; }
+    var cell = bedCell(refrId);
     return isBuilding(cell) ? cell : '';
   }
 
@@ -37812,9 +37916,13 @@ log('gamemode loaded:',
   function bedVerdict(actorId, profileId, ref) {
     var building = bedBuilding(ref);
     var held = building ? holderOf(building) : null;
-    var out = { building: building, held: held, kind: '', line: '', guest: null };
+    var out = { building: building, held: held, kind: '', line: '', guest: null, place: '' };
     if (!held) {
-      out.kind = fireNear(actorId) ? 'camp' : 'rough';
+      // An inn or a temple nobody holds is its own kind (#2246); see
+      // restPlaceOf. Anywhere else nobody holds is the road.
+      out.place = restPlaceOf(bedCell(ref));
+      var fire = fireNear(actorId);
+      out.kind = out.place ? (fire ? 'commonfire' : 'common') : (fire ? 'camp' : 'rough');
       return out;
     }
     if (profileId && held.by === profileId) {
@@ -38176,6 +38284,8 @@ log('gamemode loaded:',
     touched: bedTouched, rest: bedRest, off: bedOff, tick: bedTick,
     sleepHere: sleepHere, mark: sleepMark, guestsOf: guestsOf,
     kindOf: bedKind, verdict: bedVerdict, book: function () { return bedBook; },
+    // An inn or a temple, by the room's records (#2246).
+    placeOf: restPlaceOf,
     state: bedState, BED_REACH: BED_REACH, NIGHT_MS: NIGHT_MS, BED_EVERY_MS: BED_EVERY_MS
   };
 
@@ -40557,17 +40667,26 @@ log('gamemode loaded:',
   water. Gjalund Salt-Sage is Dragonborn's ship between Windhelm and Raven
   Rock, the Northern Maiden.
 
-  TWO WITH NO FACTION IN THE REPO. Thors is the one carriage driver in
-  Winterhold town, from the mod's fix that "adds a carriage to Winterhold".
-  Rolf is the Dragon Bridge ferryman the same fix added "beneath the bridge,
-  on the Karth River", and the Karth is North Coast water. Both are on the
-  issue to check against their factions in the plugin.
+  THORS AND ROLF, READ IN THE PLUGIN (11 Oct). They were placed from the
+  mod fix's description, so their factions were read out of CFTO.esp to
+  check it. Thors (KmodCarriageDriverWinterhold, 1be45a) is in
+  CrimeFactionWinterhold and in no ferry route, as every carriage driver is.
+  Rolf (KmodFerrymanDragonBridge, 2d4c09) is in KmodFerryRoute1Faction, the
+  North Coast, and CrimeFactionHaafingar. Both rows below already said so.
 
-  WHAT IS NOT HERE. The mod also puts people down where nobody drives from:
-  the villages, the Hearthfire homes, the Thalmor Embassy, the small ferry
-  landings. Landing there needs the mod's own markers, the repo does not have
-  their positions, and so those are not on this list yet. A ride to one is
-  refused before any gold moves.
+  THE STOPS NOBODY DRIVES FROM (11 Oct). The mod puts people down at
+  villages, the Hearthfire homes, the Thalmor Embassy and the small ferry
+  landings, where no driver stands. Each lands on the mod's own marker, read
+  out of CFTO.esp: a carriage destination topic sets KmodCarriageDestination
+  and lands on KmodCarriage<place>Marker, and a ferry topic's script names
+  its DestinationMarker. The hold of a carriage stop is the mod's own: its
+  topics group the villages under the hold whose driver lists them as near
+  (KmodFastTravelCarriageReach and the rest), so a ride from that hold's
+  carriage to one is the 10 for a stop in the same hold. The water of a
+  ferry landing is the topic it sits under (KmodFastTravelFerryTopic to
+  Topic04). Icewater Jetty is not here: the mod sends a ferry there only by a
+  persuasion line to Castle Volkihar. Nobody rides from these stops, because
+  no driver stands at them; a ride back starts at a driver.
 
   THE HOLD IS THE STOP'S, written on the row. It is never worked out from
   where the person came from, so Solitude's carriage is Solitude's whoever
@@ -40695,7 +40814,87 @@ log('gamemode loaded:',
       pos: [141310, 34083.7, -13995.5], rot: 353.4 },
     { key: 'maiden:ravenrock', line: 'maiden', name: 'Raven Rock', hold: 'ravenrock', driver: 'Gjalund Salt-Sage',
       ref: '2582c:Dragonborn.esm', base: '2582b:Dragonborn.esm', world: '800:Dragonborn.esm',
-      pos: [28928.7, 33144.2, 309.9], rot: 73.1 }
+      pos: [28928.7, 33144.2, 309.9], rot: 73.1 },
+    // Where the carriage puts you down and nobody drives from (#1394).
+    { key: 'carriage:darkwatercrossing', line: 'carriage', name: 'Darkwater Crossing', hold: 'windhelm',
+      marker: 'b6e4b:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [120550.3, -34049.0, -9731.4], rot: 108.9 },
+    { key: 'carriage:kynesgrove', line: 'carriage', name: 'Kynesgrove', hold: 'windhelm',
+      marker: 'b6e4c:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [134183.8, 11545.6, -12425.2], rot: 91.7 },
+    { key: 'carriage:mixwatermill', line: 'carriage', name: 'Mixwater Mill', hold: 'windhelm',
+      marker: 'b6e4d:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [107035.5, -6730.4, -12931.2], rot: 51.6 },
+    { key: 'carriage:karthwasten', line: 'carriage', name: 'Karthwasten', hold: 'markarth',
+      marker: 'b6e50:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-130993.1, 39383.7, -6394.7], rot: 268.3 },
+    { key: 'carriage:oldhroldan', line: 'carriage', name: 'Old Hroldan', hold: 'markarth',
+      marker: 'b6e52:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-109633.1, -13019.9, -5908.6], rot: 308.4 },
+    { key: 'carriage:soljundssinkhole', line: 'carriage', name: "Soljund's Sinkhole", hold: 'markarth',
+      marker: 'b6e51:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-115870.9, 5902.0, -5229.6], rot: 308.4 },
+    { key: 'carriage:dragonbridge', line: 'carriage', name: 'Dragon Bridge', hold: 'solitude',
+      marker: 'b6e53:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-100960.0, 81165.4, -12555.3], rot: 337.1 },
+    { key: 'carriage:thalmorembassy', line: 'carriage', name: 'Thalmor Embassy', hold: 'solitude',
+      marker: 'b6e54:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-78863.2, 110918.8, -2576.0], rot: 337.1 },
+    { key: 'carriage:rorikstead', line: 'carriage', name: 'Rorikstead', hold: 'whiterun',
+      marker: 'b6e55:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-82477.9, 5177.2, -4608.1], rot: 314.2 },
+    { key: 'carriage:riverwood', line: 'carriage', name: 'Riverwood', hold: 'whiterun',
+      marker: 'b6e4e:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [23877.3, -42735.3, -25.0], rot: 212.0 },
+    { key: 'carriage:ivarstead', line: 'carriage', name: 'Ivarstead', hold: 'riften',
+      marker: 'b6e56:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [75864.0, -60417.1, 10514.4], rot: 180.0 },
+    { key: 'carriage:shorsstone', line: 'carriage', name: "Shor's Stone", hold: 'riften',
+      marker: 'b6e57:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [163069.5, -62681.1, 7520.0], rot: 22.9 },
+    { key: 'carriage:heartwoodmill', line: 'carriage', name: 'Heartwood Mill', hold: 'riften',
+      marker: 'b6e58:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [130433.1, -95544.9, 10899.3], rot: 67.8 },
+    { key: 'carriage:nightgateinn', line: 'carriage', name: 'Nightgate Inn', hold: 'dawnstar',
+      marker: 'b6e59:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [72671.6, 49446.2, -6221.8], rot: 149.0 },
+    { key: 'carriage:heljarchenhall', line: 'carriage', name: 'Heljarchen Hall', hold: 'dawnstar',
+      marker: 'cb328:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [31136.9, 36138.5, -6951.1], rot: 0.0 },
+    { key: 'carriage:stonehills', line: 'carriage', name: 'Stonehills', hold: 'morthal',
+      marker: 'b6e5a:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-8570.0, 64733.7, -11604.0], rot: 114.6 },
+    { key: 'carriage:windstadmanor', line: 'carriage', name: 'Windstad Manor', hold: 'morthal',
+      marker: 'cb327:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-25235.4, 97694.7, -13407.7], rot: 34.4 },
+    { key: 'carriage:halfmoonmill', line: 'carriage', name: 'Half-Moon Mill', hold: 'falkreath',
+      marker: 'b6e4f:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-42393.2, -60582.3, 877.0], rot: 314.2 },
+    { key: 'carriage:lakeviewmanor', line: 'carriage', name: 'Lakeview Manor', hold: 'falkreath',
+      marker: 'cb326:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-9304.6, -71435.0, 2435.8], rot: 348.0 },
+    // Where a ferry puts you down and nobody drives from (#1394).
+    { key: 'coast:windstadmanor', line: 'coast', name: 'Windstad Manor', hold: 'morthal',
+      marker: '14c86:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-28018.0, 101617.9, -13969.5], rot: 193.8 },
+    { key: 'coast:frostflowlighthouse', line: 'coast', name: 'Frostflow Lighthouse', hold: 'winterhold',
+      marker: '38411:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [56529.5, 102638.0, -13949.2], rot: 159.5 },
+    { key: 'honrich:honeyside', line: 'honrich', name: 'Honeyside', hold: 'riften',
+      marker: '14c8e:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [171196.3, -93246.3, 10688.0], rot: 97.4 },
+    { key: 'ilinalta:lakeviewmanor', line: 'ilinalta', name: 'Lakeview Manor', hold: 'falkreath',
+      marker: '14c7e:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-11349.3, -62756.7, 633.4], rot: 154.7 },
+    { key: 'ilinalta:ilinaltasdeep', line: 'ilinalta', name: "Ilinalta's Deep", hold: 'falkreath',
+      marker: '3840e:CFTO.esp', world: '3c:Skyrim.esm',
+      pos: [-31504.5, -48740.8, 662.0], rot: 68.8 },
+    { key: 'solstheim:bujoldsretreat', line: 'solstheim', name: "Bujold's Retreat", hold: 'ravenrock',
+      marker: '3840d:CFTO.esp', world: '800:Dragonborn.esm',
+      pos: [82535.0, 59126.0, 292.4], rot: 274.1 },
+    { key: 'solstheim:northshorelanding', line: 'solstheim', name: 'Northshore Landing', hold: 'ravenrock',
+      marker: '3840c:CFTO.esp', world: '800:Dragonborn.esm',
+      pos: [21277.0, 91639.9, 305.2], rot: 114.6 }
   ];
 
   var HOLD_NAMES = {
@@ -43030,11 +43229,14 @@ log('gamemode loaded:',
     And restoration strain while it lasts (#1387): the rising cost and the
     20 seconds refused, from the college block, folded in for the same
     reason as the maneuvers and asked at write time for the same reason.
+    Withered too, last, because it is a share of what the rest add up to.
   */
   function withCollege(actorId, base) {
     var co = g.__thornswoodCollege;
     if (!co || !co.effects || !actorId) { return base; }
-    var add = co.effects(actorId);
+    // The map so far goes in: withered takes a fifth of the health and
+    // magicka it already holds (#1387).
+    var add = co.effects(actorId, undefined, base);
     if (!add) { return base; }
     var out = {};
     for (var k in base) {
@@ -44595,10 +44797,18 @@ log('gamemode loaded:',
 
     Somebody still being made is left to the creation hall, which sends
     theirs on its first pass after the settle (beginCreation).
+
+    Withered (#1387) is the one that is kept on the character rather than in
+    memory, because it lasts 30 real minutes: it is in the view while it runs,
+    and its end is armed here, in this process, before the view is worked out.
   */
   function arrival(actorId) {
     var chargen = g.__thornswoodChargen;
     if (chargen && chargen.isChoosing && chargen.isChoosing(actorId)) { return null; }
+    var college = g.__thornswoodCollege;
+    if (college && college.witheredAtLogin) {
+      try { college.witheredAtLogin(actorId); } catch (e) { clog('withered at arrival threw for', actorId.toString(16) + ':', e); }
+    }
     return writeState(actorId, stateOf(actorId));
   }
 
@@ -45519,11 +45729,23 @@ log('gamemode loaded:',
   percentages. Some of the rows are the game's to do on somebody's own machine
   and the server cannot reach them from here. Each start line says which, so
   nobody is told an effect is on when it is not, and the issue lists them:
-    Set     halving what a block costs. The game works that cost out on the
-            blocker's machine. Only the stamina and the clocks are real.
+    Set     halving what a block costs. Only the stamina and the clocks are
+            real. Measured on 11 Oct (#1386): a block costs no stamina here
+            at all. The engine's hit (ActionListener::OnWeaponHit) decides
+            the block and writes health and nothing else, and every other
+            actor on a person's machine deals that machine no damage
+            (skymp5-client formView.ts sets attackDamageMult 0), so the
+            game's own cost, fStaminaBlockDmgMult 0.25 of the damage
+            blocked with fStaminaBlockBase 0 (Skyrim.esm, overridden by
+            nothing in the load order), comes to nothing. There is nothing
+            to halve until blocks cost stamina, which is Patrick's to decide.
     Plant   not being staggered. A stagger is an animation on the machine that
-            animates you; the server refuses the staggers it sends itself
-            (Break and Wreck), and no other.
+            animates you, so the server refuses the staggers it sends itself
+            (Break and Wreck), and the front plugin refuses every other one
+            on the person's own machine while the view says Plant is on
+            (the row's on, below): it blanks staggerStart for your own
+            character, the same hook skymp5-client's deathService uses to
+            keep staggers off other people's characters.
     Cover   20% less damage for one person while you block. Applied here, by
             giving back a fifth of what each hit took. The block is read from
             the animation events the engine is sent (blockStart, blockStop),
@@ -45768,11 +45990,28 @@ log('gamemode loaded:',
     return null;
   }
 
+  /*
+    WHERE EACH MOST IS READ FROM, as GetBaseActorValues.cpp in the fork reads
+    them (RACE.cpp and NPC_.cpp give the bytes): the race's starting value, a
+    float in RACE DATA, plus the base's offset, a short in NPC_ ACBS. A most
+    that comes to nothing is 100, except magicka, which may be 0 and is 100
+    only below it. Health and magicka for withered (#1387, the college block).
+  */
+  var ENGINE_MOST = {
+    health: { race: 36, npc: 20, floorAtZero: true },
+    magicka: { race: 40, npc: 4, floorAtZero: false },
+    stamina: { race: 44, npc: 6, floorAtZero: true }
+  };
+
   /** The engine's own most, the way GetBaseActorValues works it out for a
       person: their race and their base, which for a person is the NPC_ record
       every character is made from (0x7) and carries no template. 0 when the
       records cannot be read. */
-  function engineStamina(actorId) {
+  function engineStamina(actorId) { return engineMost(actorId, 'stamina'); }
+
+  function engineMost(actorId, which) {
+    var at = Object.prototype.hasOwnProperty.call(ENGINE_MOST, which) ? ENGINE_MOST[which] : null;
+    if (!at) { return 0; }
     var raceId = 0, baseId = 0;
     try {
       var r = mp.callPapyrusFunction('method', 'Actor', 'GetRace', selfOf(actorId), []);
@@ -45784,12 +46023,13 @@ log('gamemode loaded:',
     }
     var race = fieldOf(raceId, 'DATA');
     var npc = fieldOf(baseId, 'ACBS');
-    if (!race || race.length < 48 || !npc || npc.length < 8) {
+    if (!race || race.length < 48 || !npc || npc.length < 22) {
       mlog('no RACE DATA or NPC_ ACBS for', actorId.toString(16), '(race', raceId.toString(16) + ', base', baseId.toString(16) + ')');
       return 0;
     }
-    var most = race.readFloatLE(44) + npc.readInt16LE(6);
-    return most > 0 ? most : 100;
+    var most = race.readFloatLE(at.race) + npc.readInt16LE(at.npc);
+    if (at.floorAtZero) { return most > 0 ? most : 100; }
+    return most >= 0 ? most : 100;
   }
 
   /** The person's real most stamina: the engine's, plus what the map the
@@ -45882,14 +46122,27 @@ log('gamemode loaded:',
       var key = ORDER[i];
       if (!mine[key]) { continue; }
       var m = MANEUVERS[key];
-      out.push({ key: key, name: m.name, stamina: m.stamina, cooldown: m.cooldown, ready: !(readyAt(actorId, key) > t) });
+      var row = { key: key, name: m.name, stamina: m.stamina, cooldown: m.cooldown, ready: !(readyAt(actorId, key) > t) };
+      /*
+        PLANT IS ON, for the front plugin, which refuses every stagger on
+        the person's own machine while it is (#1386). on moves twice a use,
+        like ready: the start redraws (push in use) and so does the end
+        (tick). seconds never moves; it is how long the front holds it if
+        the end never reaches it.
+      */
+      if (key === 'plant') {
+        var rec = onOf(actorId, false);
+        row.seconds = m.seconds;
+        if (rec && rec.plant && rec.plant > t) { row.on = true; }
+      }
+      out.push(row);
     }
     return out.length ? out : null;
   }
 
   var STARTED = {
     set: 'Set, for 8 seconds. Halving what a block costs is not in the game yet, so for now this spends the stamina and starts the wait.',
-    plant: 'Plant, for 8 seconds. A Break or a Wreck does not stagger you. Other staggers still land: stopping those is not in the game yet.',
+    plant: 'Plant, for 8 seconds. Nothing staggers you.',
     wall: 'Wall, for 10 seconds. You, and your party within 3 metres of you, take 20% less damage.',
     rush: 'Rush: +4 speed for 5 seconds.',
     heavy: 'Heavy. Your next power attack in the next 8 seconds deals 25% more.',
@@ -46254,7 +46507,12 @@ log('gamemode loaded:',
       if (rec.cover && rec.cover.until <= t) { delete rec.cover; delete ST.block[holder]; }
       var timed = ['set', 'plant', 'wall', 'rush', 'heavy', 'break', 'wreck'];
       for (var i = 0; i < timed.length; i++) {
-        if (rec[timed[i]] && rec[timed[i]] <= t) { delete rec[timed[i]]; }
+        if (rec[timed[i]] && rec[timed[i]] <= t) {
+          delete rec[timed[i]];
+          // The view's on for Plant goes off, so the front stops refusing
+          // staggers the moment the server's window ends. See view.
+          if (timed[i] === 'plant' && onlineOf(holder)) { push(holder); }
+        }
       }
       var left = false;
       for (var f in rec) { if (has(rec, f)) { left = true; break; } }
@@ -46270,7 +46528,7 @@ log('gamemode loaded:',
 
   g.__thornswoodManeuvers = {
     MANEUVERS: MANEUVERS, ORDER: ORDER, WOVEN: WOVEN, wovenArmour: wovenArmour,
-    held: held, takenOn: takenOn, whyNot: whyNot, mostStamina: mostStamina,
+    held: held, takenOn: takenOn, whyNot: whyNot, mostStamina: mostStamina, engineMost: engineMost,
     use: use, effects: effects, view: view, hit: hit, flush: flush, killerOf: killerOf, tick: tick,
     state: ST
   };
@@ -46704,9 +46962,19 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
   (RestorationMod, the value the game's own Fortify Restoration moves,
   'spells cost X% less') goes down by what the page asks, through the
   effects map the client already applies, and while refused it goes down far
-  enough that no magicka pays for a restoration spell. Withered is not here:
-  it needs a cooked meal (#1382) and a share of max health, and the map
-  carries amounts.
+  enough that no magicka pays for a restoration spell.
+
+  WITHERED (potions.md). Five potions in an hour, or ten restoration casts
+  in an hour, sets withered for 30 real minutes: max health and max magicka
+  are 80% of what they were. The map carries amounts, so the fifth taken off
+  is worked out here as an amount: the engine's own most (the maneuvers
+  block reads it off the race and the base, as the engine does) plus what the
+  map already adds or takes off. A fortify from gear or a potion running on
+  the character is not in it, because the server does not see those. The
+  moment it ends is kept on the character, so a relog or a restart does not
+  end it early. Waiting the 30 minutes clears it. The page's other clear, a
+  cooked meal and a bed, waits for the cooked meal (#1382), which the server
+  does not know yet.
 */
 (function () {
   'use strict';
@@ -47097,10 +47365,20 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
     return restoration[key];
   }
 
-  /** What the strain puts on the client's map now, or null. */
-  function effects(actorId, at) {
-    var rec = own(strain, actorId) ? strain[actorId] : null;
+  /** What the strain and withered put on the client's map now, or null.
+      before is the map so far, which withered takes its share of. */
+  function effects(actorId, at, before) {
     var t = at || now();
+    var strained = strainEffects(actorId, t);
+    var withered = witheredEffects(actorId, t, before);
+    if (!strained) { return withered; }
+    if (!withered) { return strained; }
+    for (var k in withered) { if (own(withered, k)) { strained[k] = withered[k]; } }
+    return strained;
+  }
+
+  function strainEffects(actorId, t) {
+    var rec = own(strain, actorId) ? strain[actorId] : null;
     if (!rec) { return null; }
     // A refusal that has run its 20 seconds ends the window with it.
     if (rec.until) {
@@ -47130,6 +47408,8 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
     var id = (spell && spell.desc) ? idOfDesc(spell.desc) : 0;
     if (!actorId || !id || !personOf(actorId) || !isRestoration(id)) { return null; }
     var t = at || now();
+    // Every restoration cast counts towards withered, refused or not.
+    witherCount(actorId, 'cast', t);
     var rec = own(strain, actorId) ? strain[actorId] : null;
     if (rec && rec.until > t) {
       clog(hex(actorId), 'cast', spell.desc, 'while restoration is refused; the cost did not stop it');
@@ -47157,6 +47437,127 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
 
   function guardOf(name, fn) { return (typeof guard === 'function') ? guard(name, fn) : fn; }
 
+  // ------------------------------------------------------------ withered --
+  var WITHERED = {
+    hour: 60,        // minutes the count looks back over
+    potions: 5,      // potions in that hour
+    casts: 10,       // restoration casts in that hour
+    minutes: 30,     // real minutes it lasts
+    share: 0.8       // of max health and max magicka, while it lasts
+  };
+  var WITHERED_PROPERTY = 'thornswoodWithered';
+  var witherTimers = {};   // actorId -> the timer that ends it, in this process
+
+  function witheredRead(actorId) {
+    var rec = null;
+    try { rec = mp.get(actorId, WITHERED_PROPERTY); } catch (e) { rec = null; }
+    if (!rec || typeof rec !== 'object') { rec = {}; }
+    return {
+      drank: Array.isArray(rec.drank) ? rec.drank.filter(isFinite) : [],
+      cast: Array.isArray(rec.cast) ? rec.cast.filter(isFinite) : [],
+      until: Number(rec.until) || 0
+    };
+  }
+
+  function witheredWrite(actorId, rec) {
+    try { mp.set(actorId, WITHERED_PROPERTY, rec); } catch (e) { clog('could not write withered for', hex(actorId) + ':', e); }
+  }
+
+  /** True while this person is withered. */
+  function isWithered(actorId, at) {
+    return witheredRead(actorId).until > (at || now());
+  }
+
+  /* The end of it, on its own clock, and the map written again when it comes. */
+  function armWithered(actorId, until) {
+    if (witherTimers[actorId] && witherTimers[actorId].until === until) { return; }
+    var mine = { until: until };
+    witherTimers[actorId] = mine;
+    setTimeout(guardOf('witheredEnds', function () {
+      if (witherTimers[actorId] !== mine) { return; }
+      delete witherTimers[actorId];
+      if (witheredRead(actorId).until > now()) { return; }
+      clog(hex(actorId), 'is no longer withered');
+      tell(actorId, 'The withering has passed. Your health and magicka are your own again.');
+      push(actorId);
+    }), Math.max(0, until - now()) + 50);
+  }
+
+  /*
+    One potion or one restoration cast, counted against the hour. The fifth
+    potion or the tenth cast inside an hour sets withered for 30 minutes from
+    that moment, and the counts start again from nothing.
+  */
+  function witherCount(actorId, kind, at) {
+    var t = at || now();
+    var rec = witheredRead(actorId);
+    var since = t - WITHERED.hour * 60000;
+    rec.drank = rec.drank.filter(function (x) { return x > since && x <= t; });
+    rec.cast = rec.cast.filter(function (x) { return x > since && x <= t; });
+    rec[kind].push(t);
+    var set = rec.drank.length >= WITHERED.potions || rec.cast.length >= WITHERED.casts;
+    if (set) {
+      rec.until = t + WITHERED.minutes * 60000;
+      rec.drank = [];
+      rec.cast = [];
+    }
+    witheredWrite(actorId, rec);
+    if (set) {
+      clog(hex(actorId), 'is withered for', WITHERED.minutes, 'minutes after', kind === 'drank' ? 'a fifth potion' : 'a tenth restoration cast', 'in an hour');
+      tell(actorId, 'You are withered: ' + (kind === 'drank' ? 'five potions' : 'ten restoration spells') +
+           ' in an hour. For ' + WITHERED.minutes + ' minutes your health and magicka are four fifths of what they were.');
+      armWithered(actorId, rec.until);
+      push(actorId);
+    }
+    return rec;
+  }
+
+  /*
+    A potion drunk, from the one onEatItem handler (the injury block's), which
+    the engine raises once it has checked the pack holds it. Only a person's,
+    and only a potion: the needs block's table says which, and a brewed one is
+    a form only the brewer's game has, above the runtime line, which the
+    needs block counts as a potion too. Food, drink, ale and a poison are not.
+  */
+  function drank(actorId, baseId, at) {
+    var id = Number(actorId) || 0;
+    var base = Number(baseId) || 0;
+    if (!id || !base || !personOf(id)) { return null; }
+    var N = g.__thornswoodNeeds;
+    var kind = (N && N.kindOf) ? N.kindOf(base) : '';
+    if (!kind && base >= 0xff000000) { kind = 'potion'; }
+    if (kind !== 'potion') { return null; }
+    return witherCount(id, 'drank', at);
+  }
+
+  /*
+    What withered takes off, as amounts on the map. before is the map the
+    other blocks have folded so far, which is what "what they were" means
+    here: the engine's most plus the tree, the needs and the rest.
+  */
+  function witheredEffects(actorId, at, before) {
+    if (!isWithered(actorId, at)) { return null; }
+    var M = g.__thornswoodManeuvers;
+    if (!M || !M.engineMost) { clog('withered: the maneuvers block is not loaded, so the most cannot be read'); return null; }
+    var out = {};
+    ['health', 'magicka'].forEach(function (av) {
+      var most = Number(M.engineMost(actorId, av)) || 0;
+      var had = most + ((before && typeof before[av] === 'number') ? before[av] : 0);
+      if (!(most > 0) || !(had > 0)) { return; }
+      out[av] = -Math.round(had * (1 - WITHERED.share) * 100) / 100;
+    });
+    return Object.keys(out).length ? out : null;
+  }
+
+  /*
+    At login: a withering that is still running gets its end armed in this
+    process, so a restart does not leave it on past its 30 minutes.
+  */
+  function witheredAtLogin(actorId) {
+    var rec = witheredRead(actorId);
+    if (rec.until > now()) { armWithered(actorId, rec.until); }
+  }
+
   // ------------------------------------------------------------ register --
   try {
     mp.makeProperty(TAKE_PROPERTY, {
@@ -47175,6 +47576,16 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
     // already made by a previous load; a changed script needs a restart,
     // which a deploy is.
   }
+  try {
+    // The server's own record of withered: nobody's client reads it.
+    mp.makeProperty(WITHERED_PROPERTY, {
+      isVisibleByOwner: false, isVisibleByNeighbors: false,
+      updateOwner: '', updateNeighbor: ''
+    });
+  } catch (e) {
+    // already made by a previous load; a changed script needs a restart,
+    // which a deploy is.
+  }
 
   g.__thornswoodCollege = {
     HALLS: HALLS, OUTSIDE_DOORS: OUTSIDE_DOORS, STRAIN: STRAIN, REANIMATE: REANIMATE,
@@ -47183,6 +47594,8 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
     spellKind: spellKind, offBook: offBook, cleanAtLogin: cleanAtLogin, equipped: equipped,
     reanimates: reanimates, hit: hit,
     isRestoration: isRestoration, cast: cast, effects: effects, strain: strain,
+    WITHERED: WITHERED, WITHERED_PROPERTY: WITHERED_PROPERTY, drank: drank, isWithered: isWithered,
+    witheredAtLogin: witheredAtLogin,
     takeScript: takeScript, laydownScript: laydownScript
   };
   clog('ready');
@@ -48704,6 +49117,12 @@ const WORDS = ['/ooc', '/o',
                '/helpme', '/help-me', '/report',
                // Out of a wedged spot; see the stuck block after it.
                '/stuck',
+               // The four needs bars said as one line of text, for somebody
+               // who hid the bars in the launcher's Settings (#2267). Patrick's
+               // exception to "buttons, not commands", 11 Oct: it is another
+               // view of what the bars and the Body page on K already show.
+               // /need is the same word. See the /needs branch of handle().
+               '/needs', '/need',
                // A carriage or ferry (#1394). E on a driver sends /ride e <id>,
                // and the ride panel's buttons send /ride and the stop (#1635).
                // Never typed, and so deliberately NOT in PLAYER_WORDS. See the
@@ -48778,9 +49197,9 @@ const WORDS = ['/ooc', '/o',
                // of this file; the numbers there are invented and meant to be
                // argued with. /rest is the plugin's, sent when somebody sits
                // or lies down, and never typed (#1603); see bedRest. Not
-               // /needs, /eat, /drink or /bard (#1631): the Body page on K
-               // says what /needs said, eating and drinking is the item (/ate),
-               // and the bard is somebody the server sees playing (bardSeen).
+               // /eat, /drink or /bard (#1631): eating and drinking is the
+               // item (/ate), and the bard is somebody the server sees playing
+               // (bardSeen). /needs is back as a line of text (#2267), above.
                '/rest',
                // The repair panel (#1384): sent by the inventory key and by
                // the panel's buttons, never typed. See the durability block,
@@ -48834,19 +49253,20 @@ const WORDS = ['/ooc', '/o',
   Since #1633, exactly the commands people still type, and nothing else:
   /stuck and the lines that reach staff, /helpme and /report (Patrick,
   4 October, #1682), and the ways of saying a line, /me, /do, /w, /s, /y and
-  /ooc, with /roll (#1639). Everything else anybody does is a key, a prompt
-  or a panel, and the help panel names those. /me, /do, /w, /s and /y are
-  said by the voice service and never reach this server, so they are named
-  here and are not in WORDS. docs/systems/commands.md has the same list.
+  /ooc, with /roll (#1639), and /needs, the needs bars as a line of text
+  for somebody who hid them (Patrick, 11 October, #2267). Everything else
+  anybody does is a key, a prompt or a panel, and the help panel names
+  those. /me, /do, /w, /s and /y are said by the voice service and never
+  reach this server, so they are named here and are not in WORDS. /need is
+  /needs and is not named twice. docs/systems/commands.md has the same list.
 */
 // Not /plot, /plant or /claim: a farm is worked and claimed at the plot, and
 // a building at its door, with the line under the crosshair (#1636, #1637).
 // Not /jarl, /steward, /evict, /box or /rent: the offices' powers are buttons
 // on the Office page of K (#1638), and the board panel says what the box
-// holds. Not /rest: sitting or lying down is how you rest (#1603). Not /needs,
-// /eat, /drink or /bard (#1631): the four bars and the Body page on K show the
-// meters, eating or drinking the item is the meal, and playing an instrument
-// or Sing on the emote wheel is the bard. Not /party: P on somebody asks and
+// holds. Not /rest: sitting or lying down is how you rest (#1603). Not /eat,
+// /drink or /bard (#1631): eating or drinking the item is the meal, and
+// playing an instrument or Sing on the emote wheel is the bard. Not /party: P on somebody asks and
 // the P panel runs the party (#1629). Not /journal or /book: J sends those
 // lines (#1630). Not /friend, /mute, /hidename, /trade, /yes and /no: Y, H and
 // L on the look prompt, the P panel, the trade window and the prompt's Accept
@@ -48856,7 +49276,7 @@ const WORDS = ['/ooc', '/o',
 // /stuck, /helpme and /report are the one thing a person in trouble must be
 // able to find (#414).
 const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
-                      '/me', '/do', '/w', '/s', '/y', '/ooc', '/roll'];
+                      '/me', '/do', '/w', '/s', '/y', '/ooc', '/roll', '/needs'];
 
 // ---------------------------------------------------------------------------
 // A teleport that actually teleports.
@@ -50390,11 +50810,11 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
 
     /*
       WHERE SOMEBODY IS RESTING, AND NOTHING ELSE (#1631). /rest is the
-      plugin's line when somebody sits down, lies down or gets up. /needs,
-      /eat, /drink and /bard are gone: the four bars and the Body page on K
-      show what /needs said, eating or drinking the item is a meal (/ate), and
-      the bard is somebody the server sees playing (bardSeen, in the needs
-      block). Typed, they get the answer every unknown word gets.
+      plugin's line when somebody sits down, lies down or gets up. /eat,
+      /drink and /bard are gone: eating or drinking the item is a meal
+      (/ate), and the bard is somebody the server sees playing (bardSeen, in
+      the needs block). Typed, they get the answer every unknown word gets.
+      /needs went with them and came back on its own (#2267), above.
     */
     if (word === '/rest') {
       var needs = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodNeeds;
@@ -50426,6 +50846,22 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
       }
       var restSaid = beds.rest(actorId, Number(profileId) || 0);
       if (restSaid) { toProfile(profileId, restSaid); }
+      return true;
+    }
+
+    /*
+      THE NEEDS BARS AS TEXT (#2267). Typed, by somebody who hid the bars in
+      the launcher's Settings, or anybody else: Patrick's exception to
+      "buttons, not commands" on 11 Oct, because it is another view of the
+      bars and the Body page on K rather than something done in the world.
+      /need is the same. It reads and says; it changes nothing. See textView
+      in the needs block.
+    */
+    if (word === '/needs' || word === '/need') {
+      var needsSaid = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodNeeds;
+      if (!needsSaid || !needsSaid.textView) { toProfile(profileId, 'That is not running on this server.'); return true; }
+      if (!needCharacter()) { return true; }
+      toProfile(profileId, needsSaid.textView(actorId));
       return true;
     }
 
@@ -53640,38 +54076,65 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
       Which kind somebody gets is the beds' answer in the property block, by
       what the server saw them press, never the word after /rest (#1392, #1607).
+
+      AN INN OR A TEMPLE NOBODY HOLDS IS ITS OWN KIND (#2246): common, and
+      commonfire with a fire in reach (restPlaceOf in the property block).
+      Djinn's ask on #2246 is that resting at an inn or a temple gives back
+      the most and the wild the least; what that is worth is Patrick's to say
+      on #2246, so until he does these are the rough and camp numbers such a
+      bed always had, and nobody's rest changes.
     */
-    recover: { sit: 20, rough: 25, campfire: 35, camp: 45, inn: 50, bed: 80 },
+    recover: { sit: 20, rough: 25, campfire: 35, camp: 45, inn: 50, bed: 80,
+               common: 25, commonfire: 45 },
     bard: 25,
 
     /*
-      Logging out in a bed. Blade: "laying down in a bed in an inn or your home
-      when you log out will give you bonuses when you come back."
+      WHAT THE TIME AWAY DOES, BY WHERE SOMEBODY LOGGED OUT (#1606, #2246).
 
-      Full rest on return, and sleptAlso of the wear taken off the other two
-      as well, because somebody who slept properly did not also starve. It is
-      not a bonus stat: a stat bonus for logging out correctly is a rule about
-      when to play, and this is a rule about where to sleep.
+      One row for each kind of rest they were in when they left, and up for
+      somebody who left on their feet. Each row is four things:
+
+        drain  the share of the ordinary clock the whole time away costs
+               hunger, thirst and rest. 1 is all of it, the same as being
+               awake in the world; 0 would be nothing at all.
+        floor  the time away takes no meter below this. A meter already
+               under it is left where it was. 0 is no floor.
+        rest   after a night away, rest is at least this. 0 gives nothing.
+        food, drink  after a night away, added to hunger and to thirst, on
+               what the time away left.
+
+      Logging out in a bed was Blade's: "laying down in a bed in an inn or
+      your home when you log out will give you bonuses when you come back".
+      Full rest on return and 25 back on hunger and thirst, because somebody
+      who slept properly did not also starve. It is a rule about where to
+      sleep, not a bonus for logging out at a clever hour. Which beds give it
+      was asked on #1606 and built as the suggested answer: your own bed, and
+      a bed you are allowed in (a night the holder gave you, or the
+      building's key or deed carried). A bed or bedroll nobody can lend you is
+      the road, and gives nothing.
+
+      #2246 asks for the rest of this table: logging out should give the
+      most back, an inn or a temple the highest share, the wild the least.
+      The rows are here so that is a change of numbers and nothing else.
+      Until Patrick says on #2246 what they are, they are what they have
+      always been: every row drains in full, and only the two beds fill.
+
+      sleptFor is how long away is a night: 8 hours on the game clock, which
+      runs twenty times real time, so 24 real minutes. Away for less is no
+      night, only the drain. Without it, lying down at home and logging
+      straight back in would put 25 on hunger and thirst every time.
     */
-    sleptRest: 100,
-    sleptAlso: 25,
-    /*
-      WHICH BEDS, AND HOW LONG AWAY (#1606), each asked on that issue and
-      built as the suggested answer.
-
-      The rests that count as a night in a bed: your own bed, and a bed you
-      are allowed in (a night the holder gave you, or the building's key or
-      deed carried). Blade's "a bed in an inn or your home", and the property
-      page before #1603 gave the fill to a bed you own, rent or were allowed
-      to use. A bed or bedroll nobody can lend you is the road, and is not one.
-
-      And how long away is a night: 8 hours on the game clock, which runs
-      twenty times real time, so 24 real minutes. Away for less is the
-      ordinary settle of the time away, at the bed's own rate. Without it,
-      lying down at home and logging straight back in would put 25 on hunger
-      and thirst every time.
-    */
-    sleptIn: { bed: true, inn: true },
+    away: {
+      bed:        { drain: 1, floor: 0, rest: 100, food: 25, drink: 25 },
+      inn:        { drain: 1, floor: 0, rest: 100, food: 25, drink: 25 },
+      common:     { drain: 1, floor: 0, rest: 0, food: 0, drink: 0 },
+      commonfire: { drain: 1, floor: 0, rest: 0, food: 0, drink: 0 },
+      camp:       { drain: 1, floor: 0, rest: 0, food: 0, drink: 0 },
+      rough:      { drain: 1, floor: 0, rest: 0, food: 0, drink: 0 },
+      campfire:   { drain: 1, floor: 0, rest: 0, food: 0, drink: 0 },
+      sit:        { drain: 1, floor: 0, rest: 0, food: 0, drink: 0 },
+      up:         { drain: 1, floor: 0, rest: 0, food: 0, drink: 0 }
+    },
     sleptFor: 24 * 60000,
 
     /*
@@ -53982,8 +54445,18 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     // sane for anything that reads the difference.
     if (hours > 48) { hours = 48; }
 
-    n.food = clamp(n.food - NEEDS.drain.food * hours);
-    n.drink = clamp(n.drink - NEEDS.drain.drink * hours);
+    /*
+      HOW MUCH OF THE CLOCK THE TIME AWAY COSTS, by where they logged out
+      (#2246): NEEDS.away's drain, on an arrival only. 1, the whole clock,
+      everywhere until Patrick says otherwise on #2246.
+    */
+    var gone = arriving ? awayRow(n.resting) : null;
+    var share = gone ? Number(gone.drain) : 1;
+    if (!(share >= 0)) { share = 1; }
+    var floor = gone ? clamp(Number(gone.floor) || 0) : 0;
+
+    n.food = awayDrain(n.food, NEEDS.drain.food * hours * share, floor);
+    n.drink = awayDrain(n.drink, NEEDS.drain.drink * hours * share, floor);
 
     var restRate = NEEDS.drain.rest;
     if (n.worked && (now - n.worked) < NEEDS.workFor) {
@@ -54000,7 +54473,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       arrived(), below, and the beds' first sight of them gets them up.
     */
     var gain = arriving ? 0 : restingGain(actorId, n);
-    n.rest = clamp(n.rest + (gain - restRate) * hours);
+    n.rest = gone ? awayDrain(n.rest, restRate * share * hours, floor)
+                  : clamp(n.rest + (gain - restRate * share) * hours);
 
     /*
       Temperature moves TOWARD where you are, rather than only falling.
@@ -54783,6 +55257,55 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   }
 
   /*
+    THE FOUR BARS AS ONE LINE OF TEXT (#2267), the answer to /needs and
+    /need.
+
+    Patrick, 24 September, when the launcher's Settings got "Show the needs
+    bars on screen": hide them "so it doesnt show and they can do /needs to
+    find it all". #1631 took /needs out on 4 Oct under "buttons, not
+    commands", and on 11 Oct Patrick put it back as an exception to that
+    rule: for somebody who hid the bars and wants a quick text version of
+    them. It is another view of what the bars and the Body page on K already
+    show, so it says the same things the bars say, with the same words: the
+    three meters as a per cent with their band, Temp as its word and number,
+    where the warmth is heading, and where they are resting. The working out
+    of the warmth and what is counted as worn stay on the Body page, which
+    this names. Nothing here moves a meter: view() settles, the way the K
+    panel's read does.
+  */
+  var REST_SAID = {
+    sit: 'sitting', campfire: 'sitting by a fire', rough: 'in a bed nobody can lend you',
+    camp: 'in a bed by a fire', inn: 'in a bed you may use', bed: 'in your own bed',
+    bedroll: 'in a bedroll',
+    // An inn or a temple nobody holds (#2246).
+    common: 'in an inn or temple bed nobody holds', commonfire: 'in an inn or temple bed by a fire'
+  };
+
+  /* The HUD's word for a temperature, the same steps as tempWord in hudScript. */
+  function tempWord(v) {
+    if (v < 15) { return 'Freezing'; }
+    if (v < 30) { return 'Cold'; }
+    if (v < 42) { return 'Chilly'; }
+    if (v <= 58) { return 'Fine'; }
+    if (v <= 70) { return 'Warm'; }
+    if (v <= 85) { return 'Hot'; }
+    return 'Burning';
+  }
+
+  function textView(actorId) {
+    if (inCreation(actorId)) {
+      return 'Your needs start once you leave the hall and arrive in your town.';
+    }
+    var v = view(actorId);
+    var heading = (v.tempTarget > v.temp) ? ', warming toward ' + v.tempTarget
+                : (v.tempTarget < v.temp) ? ', cooling toward ' + v.tempTarget : '';
+    var rest = v.resting ? ' You are resting, ' + (REST_SAID[v.resting] || v.resting) + '.' : '';
+    return 'Hunger ' + v.food + '% (' + v.foodBand + '), Thirst ' + v.drink + '% (' + v.drinkBand +
+           '), Rest ' + v.rest + '% (' + v.restBand + '), Temp ' + tempWord(v.temp) + ' ' + v.temp +
+           heading + '.' + rest + ' The Body page on K says what sets each one.';
+  }
+
+  /*
     Where somebody is standing, as far as temperature cares.
 
     The SERVER CANNOT KNOW THIS. Whether it is snowing on you, whether you are
@@ -54917,8 +55440,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
     Called by settle at somebody's arrival (see here, above settle), on the
     meters it has just brought up to now and with how long they were away.
-    The sleep counted when the meters say they were resting in one of
-    NEEDS.sleptIn when they were last seen, and they were away at least
+    What a night gives is NEEDS.away's row for where they were resting when
+    they were last seen (#2246), and it counts when they were away at least
     NEEDS.sleptFor. Answers the line to say, or ''. n is changed in place and
     settle writes it.
 
@@ -54933,13 +55456,36 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     repository already has it without one.
   */
   function arrived(actorId, n, away) {
-    if (!Object.prototype.hasOwnProperty.call(NEEDS.sleptIn, n.resting) ||
-        !(away >= NEEDS.sleptFor)) { return ''; }
-    n.rest = NEEDS.sleptRest;
-    n.food = clamp(n.food + NEEDS.sleptAlso);
-    n.drink = clamp(n.drink + NEEDS.sleptAlso);
+    if (!(away >= NEEDS.sleptFor)) { return ''; }
+    var row = awayRow(n.resting);
+    var rest = Number(row.rest) || 0, food = Number(row.food) || 0, drink = Number(row.drink) || 0;
+    if (!(rest > 0) && !(food > 0) && !(drink > 0)) { return ''; }
+    if (n.rest < rest) { n.rest = clamp(rest); }
+    n.food = clamp(n.food + food);
+    n.drink = clamp(n.drink + drink);
     n.resting = '';
-    return 'You slept well. You are rested.';
+    return n.rest >= 100 ? 'You slept well. You are rested.' : 'You slept, though not well.';
+  }
+
+  /*
+    A meter after the time away: down by what the clock took, and never under
+    the row's floor unless it was already there (#2246).
+  */
+  function awayDrain(v, took, floor) {
+    var after = clamp(v - took);
+    if (floor > 0 && v > floor && after < floor) { after = floor; }
+    return v <= floor ? clamp(v) : after;
+  }
+
+  /*
+    NEEDS.away's row for a kind of rest, or up for somebody who was resting
+    nowhere. A kind the table does not name (#1392's bedroll) is up: it was
+    never given anything for the time away.
+  */
+  function awayRow(kind) {
+    kind = String(kind || '');
+    if (kind && Object.prototype.hasOwnProperty.call(NEEDS.away, kind)) { return NEEDS.away[kind]; }
+    return NEEDS.away.up;
   }
 
   /** Too tired to make anything. See CRAFT_REST. */
@@ -55163,13 +55709,54 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       198x16, icons 28px, and the padding and gaps to match. The anchor stays
       where it is, because the panel grows up and to the right from the bottom
       left corner and moving it would only push it into the compass.
+
+      ONE STRIP UNDER THE BARS, SIZED BY THE HUD (#2247). Djinn on dev,
+      26 September: "The survival UI box blocks the magicka bar. It needs to
+      be resized and moved." It did: four rows of 22px, about 514 by 193
+      pixels at 1920x1080 from the bottom left corner, and the bars people
+      see sit right there. Measured on 11 Oct from the collection's own
+      files, not guessed:
+
+        TrueHUD's player widget is on and hides the game's own three bars
+        (Data\MCM\Config\TrueHUD\settings.ini: bEnablePlayerWidget 1,
+        bPlayerWidgetHideVanillaBars 1, not combined, bar width 245). Its
+        movie is 1280x720 (TrueHUD.swf's header), shown whole and centred
+        (BSScaleformManager's default, kShowAll), and TrueHUD places each bar
+        at that stage size times the setting (PlayerWidget.cpp LoadConfig,
+        TrueHUD_PlayerWidget.as): magicka from x 84.5 to 329.5 centred on
+        y 676.8, health centred on x 640, stamina ending at x 1195.5, all at
+        y 676.8, and the enchantment charge meter centred on 640, 698.4. A
+        bar's frame is 18 high and its flash 19.2 (LargeBarFrame and
+        LargeBarOutlineFlashTexture in TrueHUD_Assets0.swf), so nothing of
+        the three reaches below y 686.4, and the charge meter starts right
+        of x 570.
+
+        SkyHUD's hudmenu (SkyHUD.bsa, meters locked at the game's places,
+        skyhud.txt) puts the game's own bars higher, between y 610 and 640
+        (magicka x 118 to 411), with nothing of the HUD below 640 on the
+        left. Those are what show if TrueHUD's widget is ever off.
+
+      So the bars are one strip of four in the band below all of that: the
+      stage's y 698 to 718, from x 10 to 550, which is clear of every bar
+      either mod draws and of the charge meter. And every size is in the
+      HUD's own pixels, --ts, which is the screen's height over 720 or its
+      width over 1280, whichever is smaller (that is what kShowAll does), so
+      the strip keeps the same place against the bars at 1280x720, 1080p,
+      1440p, 4K, 16:10 and ultrawide. The row's words stay (Hunger, Thirst,
+      Rest, Temp), smaller: 10 of the HUD's pixels, 15px at 1080p and 20px at
+      1440p. tests\test-hud.js works the strip out at each of those screens
+      against the measured bars.
     */
-    var CSS = 'position:fixed;left:18px;bottom:16px;z-index:2147483500;' +
-              'pointer-events:none;font-family:Georgia,serif;font-size:22px;' +
-              'letter-spacing:.04em;color:#efe4cc;' +
-              'background:rgba(12,10,8,.62);border:2px solid rgba(0,0,0,.65);' +
-              'border-radius:10px;padding:13px 19px 16px;' +
-              'text-shadow:0 2px 4px rgba(0,0,0,.95)';
+    var HUD_PX = 'min(0.078125vw,0.1388889vh)';
+    var CSS = '--ts:' + HUD_PX + ';' +
+              'position:fixed;left:calc(50vw - 630 * var(--ts));bottom:calc(50vh - 358 * var(--ts));' +
+              'width:calc(540 * var(--ts));height:calc(20 * var(--ts));box-sizing:border-box;' +
+              'display:flex;align-items:center;white-space:nowrap;z-index:2147483500;' +
+              'pointer-events:none;font-family:Georgia,serif;font-size:calc(10 * var(--ts));' +
+              'line-height:1;color:#efe4cc;' +
+              'background:rgba(12,10,8,.62);border:calc(1 * var(--ts)) solid rgba(0,0,0,.65);' +
+              'border-radius:calc(4 * var(--ts));padding:0 calc(2 * var(--ts));' +
+              'text-shadow:0 1px 3px rgba(0,0,0,.95)';
     return [
       '(function(){',
       '  try {',
@@ -55233,24 +55820,27 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
         is its own calm colour and a failing one turns red, which reads at a
         glance without making the whole row disappear.
       */
+      // A size in the HUD's own pixels; see the note over CSS.
+      '    function u(n) { return "calc(" + n + " * var(--ts))"; }',
+      // Each word's own width, so the strip is 540 of the HUD's pixels every time.
+      '    var LABEL_W = { food: 34, drink: 30, rest: 22, temp: 26 };',
       '    function row(kind, label, fill, col, readout) {',
       '      var pct = Math.max(0, Math.min(100, Math.round(fill)));',
-      '      var svg = \'<svg width="28" height="28" viewBox="0 0 20 20" fill="none" \' +',
-      '        \'stroke="\' + col + \'" stroke-width="1.7" stroke-linecap="round" \' +',
-      '        \'stroke-linejoin="round" style="vertical-align:middle;margin-right:13px">\' +',
+      '      var svg = \'<svg viewBox="0 0 20 20" fill="none" \' +',
+      '        \'stroke="\' + col + \'" stroke-width="1.9" stroke-linecap="round" \' +',
+      '        \'stroke-linejoin="round" style="width:\' + u(12) + \';height:\' + u(12) + \';flex:none;margin-right:\' + u(3) + \'">\' +',
       '        \'<path d="\' + ICON[kind] + \'"/></svg>\';',
-      '      var track = \'<span style="display:inline-block;width:198px;height:16px;\' +',
-      '        \'background:rgba(0,0,0,.72);border:2px solid rgba(255,255,255,.22);\' +',
-      '        \'border-radius:5px;vertical-align:middle;overflow:hidden">\' +',
+      '      var name = \'<span style="display:inline-block;flex:none;width:\' + u(LABEL_W[kind]) + \';margin-right:\' + u(3) + \'">\' + label + \'</span>\';',
+      '      var track = \'<span style="display:inline-block;flex:none;width:\' + u(36) + \';height:\' + u(5) + \';\' +',
+      '        \'background:rgba(0,0,0,.72);border:\' + u(1) + \' solid rgba(255,255,255,.22);\' +',
+      '        \'border-radius:\' + u(2) + \';box-sizing:border-box;overflow:hidden">\' +',
       '        \'<span style="display:block;height:100%;width:\' + pct + \'%;\' +',
       '        \'background:\' + col + \'"></span></span>\';',
       // Wide enough for the longest readout there is, "Freezing 100", so the
-      // panel does not change width every time the weather does. The three
-      // percentages sit right aligned against the same edge.
-      '      var num = \'<span style="display:inline-block;min-width:148px;text-align:right;\' +',
+      // strip does not change width every time the weather does.
+      '      var num = \'<span style="display:inline-block;flex:none;width:\' + u(kind === "temp" ? 70 : 28) + \';margin-left:\' + u(4) + \';\' +',
       '        \'color:\' + col + \';font-variant-numeric:tabular-nums">\' + readout + \'</span>\';',
-      '      var name = \'<span style="display:inline-block;width:81px">\' + label + \'</span>\';',
-      '      return \'<div style="margin-top:10px;white-space:nowrap">\' +',
+      '      return \'<div style="display:flex;align-items:center;flex:none;margin:0 \' + u(4.5) + \'">\' +',
       '             svg + name + track + num + \'</div>\';',
       '    }',
       '',
@@ -55466,8 +56056,10 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
   g.__thornswoodNeeds = {
     NEEDS: NEEDS, COST: COST, TEMP_COST: TEMP_COST, CRAFT_REST: CRAFT_REST,
-    bandOf: bandOf, tempBand: tempBand, consumed: consumed,
+    bandOf: bandOf, tempBand: tempBand, consumed: consumed, kindOf: foodKind,
     settle: settle, view: view, effects: effects,
+    // The bars as a line of text, for /needs (#2267).
+    textView: textView,
     ate: ate, resting: resting, worked: worked, bard: bard,
     place: place, tooTiredToCraft: tooTiredToCraft, craftRefusal: craftRefusal,
     setBurning: setBurning, catchFire: catchFire,
@@ -57111,6 +57703,11 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   */
   mp.onEatItem = guard('onEatItem', function (actorId, baseId) {
     try { tell(actorId, swallowed(actorId, Number(baseId) || 0)); } catch (e) { hlog('the drink threw:', e); }
+    // Withered (#1387), in the college block, on its own: five potions in an hour.
+    var college = g.__thornswoodCollege;
+    if (college && college.drank) {
+      try { college.drank(actorId, Number(baseId) || 0); } catch (e) { hlog('withered threw:', e); }
+    }
   });
 
   /*
@@ -60067,7 +60664,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       or you move, with a line either way; out of a fight it works at once;
     - it is only for being truly stuck, the rules say so, and misuse can mean
       a warning or a ban from staff. So every use that moves somebody, and
-      every wait a fight cancelled, is written to private/moderation.log, the
+      every wait a fight cancelled, is written to for-bot/moderation.log, the
       staff record #412 built, which the Discord bot says in the staff
       channel: the character, the profile, the Discord account from the join
       pass, where from, where to, and when. The reply says it is logged.
@@ -60403,9 +61000,12 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     for (var k in extra) {
       if (Object.prototype.hasOwnProperty.call(extra, k)) { row[k] = extra[k]; }
     }
+    // In for-bot beside private, which the bot reads by a rule on the folder (#2321).
+    var s = settings();
+    var dir = String(s.forBotDir || path.join(path.dirname(String(s.privDir || 'private')), 'for-bot'));
     try {
-      fs.appendFileSync(path.join(String(settings().privDir || 'private'), 'moderation.log'),
-                        JSON.stringify(row) + '\n');
+      fs.mkdirSync(dir, { recursive: true });
+      fs.appendFileSync(path.join(dir, 'moderation.log'), JSON.stringify(row) + '\n');
     } catch (e) {
       slog('could not write moderation.log, so the staff channel will not hear of it: ' + e);
     }
@@ -60646,7 +61246,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   A person is a name (the start of it is enough while it is unique), the form
   id the crosshair gives, or a profile number. Every one answers the moderator
   in their own chat, tells the person it was done to, writes one line to
-  thornswood.log, and writes one line to private/moderation.log, which the
+  thornswood.log, and writes one line to for-bot/moderation.log, which the
   Discord bot reads and says in the staff channel (bot.py, watch_moderation),
   so there is a record outside the game that a hot reload cannot lose.
 
@@ -60717,8 +61317,12 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   function serverName() {
     return String(settings().thornswoodServer || '').trim().toLowerCase() || 'main';
   }
+  /* In for-bot beside private, which the bot reads by a rule on the folder;
+     private is SYSTEM's and Administrators' alone (#2321). */
   function recordFile() {
-    return path ? path.join(String(settings().privDir || 'private'), 'moderation.log') : '';
+    if (!path) { return ''; }
+    var s = settings();
+    return path.join(String(s.forBotDir || path.join(path.dirname(String(s.privDir || 'private')), 'for-bot')), 'moderation.log');
   }
 
   function tell(pid, text) {
@@ -60819,6 +61423,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
                 why: String(why || '').slice(0, 300) };
     if (minutes) { row.minutes = minutes; }
     try {
+      fs.mkdirSync(path.dirname(recordFile()), { recursive: true });
       fs.appendFileSync(recordFile(), JSON.stringify(row) + '\n');
     } catch (e) {
       log('staff: could not write ' + recordFile() + ', so the staff channel will not hear of it: ' + e);
@@ -62383,32 +62988,43 @@ function createNpcNavigation(api, now, report, ready) {
     if(--bank.remaining!==0) return;
     bank.ready=true;ready(bank);
   }
+  // A triangle's links depend only on its own mesh and the meshes its
+  // external edges lead to, so they are kept once every one of those was
+  // loaded when they were read. Until then a link into a mesh still loading
+  // is missing, and they are read again after the next mesh finishes. Reading
+  // them all again at every finished mesh (#2032) made one background step's
+  // route search reread up to 128 triangles, 20 to 47 ms on One while the
+  // cast was being prepared. Each triangle's corners are read once here.
   function nodeLinks(n) {
-    if(n.linksVersion===geometryVersion) return n.cachedLinks;
-    const bank={meshes:sharedMeshes},links=[];
-    if(!bank.meshes.has(n.mesh)) return links;
+    if(n.cachedLinks && (n.linksComplete || n.linksVersion===geometryVersion)) return n.cachedLinks;
+    const links=[],mesh=sharedMeshes.get(n.mesh);
+    if(!mesh) return links;
+    const points=n.points,edges=n.edges,flags=n.flags;
+    let complete=true;
     for(let e=0;e<3;e++) {
-      const mesh=bank.meshes.get(n.mesh);
-      const external=!!(n.flags&(1<<e));
-      const edge=n.edges[e];
+      const external=!!(flags&(1<<e));
+      const edge=edges[e];
       const ext=external && npcExternal(mesh,edge);
       if(external && (!ext || ext.type!==0)) continue;
-      const targetMesh=external ? bank.meshes.get(ext.mesh) : mesh;
-      const other=targetMesh && npcTriangleAt(targetMesh,external ? ext.index : edge);
-      if(!other || other===n || other.flags&(8|32) || !npcHasGround(other.points)) continue;
-      const p=n.points[e],q=n.points[(e+1)%3];
-      const oe=other.points.findIndex((v,j)=>
-        (distance(v,p)<0.1 && distance(other.points[(j+1)%3],q)<0.1) ||
-        (distance(v,q)<0.1 && distance(other.points[(j+1)%3],p)<0.1));
+      const targetMesh=external ? sharedMeshes.get(ext.mesh) : mesh;
+      if(!targetMesh) {complete=false;continue;}
+      const other=npcTriangleAt(targetMesh,external ? ext.index : edge);
+      if(!other || other===n) continue;
+      const otherFlags=other.flags,corners=other.points;
+      if(otherFlags&(8|32) || !npcHasGround(corners)) continue;
+      const p=points[e],q=points[(e+1)%3];
+      const oe=corners.findIndex((v,j)=>
+        (distance(v,p)<0.1 && distance(corners[(j+1)%3],q)<0.1) ||
+        (distance(v,q)<0.1 && distance(corners[(j+1)%3],p)<0.1));
       if(oe<0) continue;
-      const oext=!!(other.flags&(1<<oe));
-      const om=bank.meshes.get(other.mesh),olink=oext && npcExternal(om,other.edges[oe]);
+      const oext=!!(otherFlags&(1<<oe)),otherEdge=other.edges[oe];
+      const olink=oext && npcExternal(targetMesh,otherEdge);
       const reciprocal=oext ? olink && olink.type===0 && olink.mesh===n.mesh && olink.index===n.index :
-        other.mesh===n.mesh && other.edges[oe]===n.index;
+        other.mesh===n.mesh && otherEdge===n.index;
       if(!reciprocal) continue;
       if(!links.some(l=>l.node===other)) links.push(Object.assign(Object.create(npcPortal),{node:other,source:n,edge:e}));
     }
-    n.linksVersion=geometryVersion;n.cachedLinks=links;return links;
+    n.linksVersion=geometryVersion;n.linksComplete=complete;n.cachedLinks=links;return links;
   }
   // One slice of mesh work, inside the same cost, insertion and time budget.
   function work() {
@@ -62863,12 +63479,21 @@ function startSharedNpcServerRuntime(api, timers, now, report, population) {
               .filter(p=>withinHome(a,p)).sort((p,q)=>distance(q,targetState.pos)-distance(p,targetState.pos));
             if(safe.length) a.path=[safe[0]];else ambient(a);
           }
-        } else if(a.node===tn && distance(a.pos,targetState.pos)<=attackDistance) {
-          a.path=[];
-          if(api.serverNpcAttack(a.id,target)) attacks++;
         } else {
-          a.path=route;
-          while(a.path.length && distance(a.pos,aim(a.path[0]))<0.01) a.path.shift();
+          // Route points the actor already stands on are behind it. With none
+          // left it has arrived beside the target, which reachable above has
+          // put within attack distance. Its triangle need not be the target's:
+          // a destination on the edge the two share is reached without ever
+          // entering the target's triangle, and the engine's 32-bit copy of a
+          // point on that edge can fall just outside the actor's own (#2032:
+          // 526e9 and 526ea stood on an edge middle beside their targets and
+          // neither moved nor attacked for the whole two minutes).
+          const ahead=route.slice();
+          while(ahead.length && distance(a.pos,aim(ahead[0]))<0.01) ahead.shift();
+          if(!ahead.length || a.node===tn && distance(a.pos,targetState.pos)<=attackDistance) {
+            a.path=[];
+            if(api.serverNpcAttack(a.id,target)) attacks++;
+          } else a.path=ahead;
         }
       } else {target=0;targetState=null;}
     }

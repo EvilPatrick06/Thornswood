@@ -415,10 +415,12 @@ yes('only the 200 ms position tick uses the dropping send',
     SRC.split('.sendLossy(').length - 1 === 1 && !!TICK && TICK[0].indexOf('.sendLossy(') !== -1);
 /* And only the roster keeps just its newest while backed: each one is the
    whole room, which is not true of anything else sent. */
-const ANNOUNCE = /function announce\(\) \{[\s\S]*?\n\}/.exec(SRC);
+/* The roster is framed once for the whole room and handed to sendLatest
+   already framed (sendRoster, #2332), so the check reads that function. */
+const ANNOUNCE = /function sendRoster\(\) \{[\s\S]*?\n\}/.exec(SRC);
 yes('only the roster is sent newest-only',
     SRC.split('.sendLatest(').length - 1 === 1 && !!ANNOUNCE &&
-    /\.sendLatest\(\{ t: 'peers'/.test(ANNOUNCE[0]));
+    /frame\(JSON\.stringify\(\{ t: 'peers'/.test(ANNOUNCE[0]) && /\.sendLatest\(once\)/.test(ANNOUNCE[0]));
 
 (async () => {
   const h0 = await ready();

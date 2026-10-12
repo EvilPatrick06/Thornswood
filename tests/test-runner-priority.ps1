@@ -115,11 +115,14 @@ Yes '  and runs it once config.cmd has made the service' ($cfgAt -gt 0 -and $cal
 $all = HereOf 'lockAll'
 Yes '-Lock, and the end of every install, run it too' ($text.Contains('$lockAll = $lockLib + $watcherLib + "`n`$liveFilter = ''') -and $all -match 'Remove-RunnerWatchers')
 Yes '  and count one it could not take off as a failure' ($all -match "-like 'COULD NOT\*'" -and $all -match '\$bad\+\+')
-$removeAt = $text.IndexOf('if ($Remove) {')
-$lockAt = $text.IndexOf('if ($Lock) {')
+# The top-level blocks, at the start of a line: since #2307 -NetworkOnly has
+# its own indented 'if ($Status) {' and 'if ($Remove) {' above them.
+function TopAt([string]$switch) { $m = [regex]::Match($text, '(?m)^if \(\$' + $switch + '\) \{'); if ($m.Success) { $m.Index } else { -1 } }
+$removeAt = TopAt 'Remove'
+$lockAt = TopAt 'Lock'
 $removeBlock = if ($removeAt -ge 0 -and $lockAt -gt $removeAt) { $text.Substring($removeAt, $lockAt - $removeAt) } else { '' }
 Yes '-Remove runs it' ($removeBlock.Contains('$watcherLib') -and $removeBlock.Contains('Remove-RunnerWatchers'))
-$statusAt = $text.IndexOf('if ($Status) {')
+$statusAt = TopAt 'Status'
 $statusBlock = if ($statusAt -ge 0 -and $removeAt -gt $statusAt) { $text.Substring($statusAt, $removeAt - $statusAt) } else { '' }
 Yes '-Status says when a watcher is still there, and takes nothing off' ($statusBlock.Contains('Get-RunnerWatchers') -and -not $statusBlock.Contains('Remove-RunnerWatchers'))
 Yes 'there is no -TaskName any more, since there is no task' ($text -notmatch '\[string\]\$TaskName')

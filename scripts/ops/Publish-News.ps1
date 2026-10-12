@@ -96,8 +96,12 @@ if (-not (Test-Path -LiteralPath $vf)) {
 # A byte order mark is not JSON. ConvertFrom-Json stops on the first character
 # and says something unhelpful about an unexpected token.
 $v = ConvertFrom-ThornswoodJson (Get-Content $vf -Raw) $vf
-$all = @()
-if ($v.news) { $all = @($v.news) }
+# Every note, wherever the feed keeps them: "news", and the news file it names
+# once every launcher it lets in reads one (Feed-News.ps1, #1050), read from the
+# site and checked against its sha256. $env:THORNSWOOD_TEST_SITE_DIR stands in
+# for the site in the tests.
+. (Join-Path $PSScriptRoot '..\release\Feed-News.ps1')
+$all = @(Get-FeedNewsList $v $env:THORNSWOOD_TEST_SITE_DIR)
 
 # --------------------------------------------------------------- cleaning --
 #

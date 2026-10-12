@@ -653,7 +653,11 @@ try {
     # The box's own settings, copied into the stage unchanged by the keep
     # block, check out; and a key that moves on the running server between the
     # copy and the swap puts the old files back, because no key may move.
-    $gmRecordLf = "{`n  `"binary`": `"scam_native.node`",`n  `"source`": { `"commit`": `"1234567890abcdef1234567890abcdef12345678`" }`n}`n"
+    # The shape RecordShape.ps1 holds a server record to since #2180: without
+    # sha256, bytes and files the deploy stopped at the record and none of the
+    # -GamemodeOnly cases below reached the box.
+    $gmBin = 'b' * 64
+    $gmRecordLf = "{`n  `"binary`": `"scam_native.node`",`n  `"sha256`": `"$gmBin`",`n  `"bytes`": 5,`n  `"source`": { `"commit`": `"1234567890abcdef1234567890abcdef12345678`" },`n  `"files`": { `"scam_native.node`": { `"sha256`": `"$gmBin`", `"bytes`": 5 } }`n}`n"
     $gmRecordSum = Get-ThornswoodRecordSum ([Text.Encoding]::ASCII.GetBytes($gmRecordLf))
     Put (Join-Path $root 'server-build.json') $gmRecordLf.Replace("`n", "`r`n")
     $ownSettings = [IO.File]::ReadAllBytes((Join-Path $root 'server-settings.json'))
@@ -895,8 +899,9 @@ function Start-ScheduledTask { [CmdletBinding()] param([string]`$TaskName)
             (WaitUp $P) -and ((Owner $P) -ne $running) -and ((Owner $Q) -eq $otherPid))
         if ($script:fail -gt $failed) { Show }
 
-        # Our plugin now the same size: only the gamemode, the stamp and the
-        # settings go, and the record the box had goes into .prev with them.
+        # Our plugin now the same bytes (size and sha256, #2308): only the
+        # gamemode, the stamp and the settings go, and the record the box had
+        # goes into .prev with them.
         Put (Join-Path $gmRepo 'game\gamemode.js') '// gamemode only, two'
         GmCommit
         $prevsBefore = Prevs
@@ -906,8 +911,8 @@ function Start-ScheduledTask { [CmdletBinding()] param([string]`$TaskName)
         $new = @(Prevs | Where-Object { $prevsBefore -notcontains $_ })
         $kept = @()
         if ($new.Count -eq 1) { $kept = @(Get-ChildItem -LiteralPath $new[0] -Recurse -File -Force | ForEach-Object { $_.FullName.Substring($new[0].Length + 1) } | Sort-Object) }
-        Yes '-GamemodeOnly with our plugin the same size as the box''s sends it not, and swaps only the three' (
-            $r.Ok -and $said -match 'Thornswood-Content\.esp is on the VPS at the same size' -and $said -match 'swapped in 3 file\(s\)' -and
+        Yes '-GamemodeOnly with our plugin the same bytes as the box''s sends it not, and swaps only the three' (
+            $r.Ok -and $said -match 'Thornswood-Content\.esp is on the VPS at the same bytes' -and $said -match 'swapped in 3 file\(s\)' -and
             ($kept -join ',') -eq 'data\thornswood-deploy.json,gamemode.js,server-settings.json,thornswood-build.json' -and
             (Text (Join-Path $root 'gamemode.js')) -eq '// gamemode only, two')
         if ($script:fail -gt $failed) { Show }

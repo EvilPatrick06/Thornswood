@@ -30,6 +30,9 @@ is not going to get done.
   is found, finding it is the work.
 - A pull request that finishes an issue says `Closes #N`; merging it closes
   the issue and moves the card to Done.
+- A fix people would notice says `Refs #N` instead, and its issue stays open
+  until the fix is on main, where testers test. Then it is closed with a
+  comment that starts `Test task:`, which the bot posts to #test-tasks.
 
 The rules behind all of this are in
 [Developer-Guide.md](https://github.com/EvilPatrick06/Thornswood/blob/main/Developer-Guide.md).

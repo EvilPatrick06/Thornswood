@@ -638,11 +638,12 @@ function pageMarkdown(name) {
 
 // The credits page says which engine each server runs. That is a fact of the
 // box, not of the repo, so a hand edit went stale with every deploy (the
-// source-offer test caught 3a32e961 that way). Deploy-Server.ps1 writes
-// data/deployed-build.json after a server deploy (scripts/deploy/
-// DeployedBuild.ps1), and the feeds this site serves carry the client commit.
-// fillCreditsCommits puts both into the page at serve time. The markdown keeps
-// its hand text, which is what goes out when either source is missing.
+// source-offer test caught 3a32e961 that way). Deploy-Server.ps1 and
+// Publish-Server.ps1 write data/deployed-build.json after a server deploy on
+// either channel (scripts/deploy/DeployedBuild.ps1), and the feeds this site
+// serves carry the client commit. fillCreditsCommits puts both into the page
+// at serve time. The markdown keeps its hand text, which names no commit for
+// either server, and is what goes out when neither server is in the record.
 // ==== thornswood credits fill ====
 function fillCreditsCommits(md, deployed, feeds) {
   const FULL = /^[0-9a-f]{40}$/;
@@ -657,20 +658,30 @@ function fillCreditsCommits(md, deployed, feeds) {
   let out = String(md);
   const live = pick('live');
   const dev = pick('dev');
-  if (live && dev) {
+  // Either server alone is enough to say something true (#2303). Until then
+  // a record with only live in it, which is what the box held on 11 Oct after
+  // the dev engine went up through Publish-Server, kept the hand text, and the
+  // hand text named the engine the main server had left behind.
+  if (live || dev) {
     const rec = /built from one commit,\s+\[`[0-9a-f]{7,40}`\]\(https:\/\/github\.com\/EvilPatrick06\/skymp\/tree\/([0-9a-f]{40})\)/.exec(out);
     const recorded = rec ? rec[1] : '';
     let said;
-    if (live === dev) {
+    if (live && dev && live === dev) {
       said = live === recorded ? 'Both servers run it, ' + link(live) + '.'
                                : 'The recorded build has not been deployed yet. Both servers run ' + link(live) + '.';
-    } else {
+    } else if (live && dev) {
       said = (live !== recorded && dev !== recorded ? 'The recorded build has not been deployed yet. ' : '') +
              'The test server runs ' + link(dev) + ' and the main server runs ' + link(live) + '.';
+    } else {
+      // Only the server the record names is spoken for; the other is left
+      // unsaid rather than guessed.
+      const one = live || dev;
+      const who = live ? 'The main server' : 'The test server';
+      said = one === recorded ? who + ' runs it, ' + link(one) + '.' : who + ' runs ' + link(one) + '.';
     }
-    // The hand sentence runs from "then to the main server." to "the earlier
-    // engine ...", whatever it says about which server runs what (#2098).
-    out = out.replace(/(then to the main server\.\s+)((?:(?!\n\s*\n)[\s\S])*?)\[`[0-9a-f]{7,40}`\]\([^)\s]*\),\s+the earlier engine[^.]*\./,
+    // The hand text is the rest of the paragraph after "then to the main
+    // server.", whatever it says (#2098, #2303).
+    out = out.replace(/(then to the main server\.\s+)(?:(?!\n\s*\n)[\s\S])+?(?=\n\s*\n|$)/,
                       function (m, lead) { return lead + said; });
   }
   for (const row of [['Public', 'feed/version.json', 'public'], ['Dev', 'feed-dev/version.json', 'dev']]) {
@@ -2398,7 +2409,7 @@ const PK = path.join(DATA, 'pk.json');
 // Staff notes against a person, keyed the same way as bans. Staff read them.
 const NOTES = path.join(DATA, 'notes.json');
 // What staff did on the hub, one JSON line each, for the bot's staff channel.
-// The game servers write their own (private\moderation.log).
+// The game servers write their own (for-bot\moderation.log beside each, #2321).
 const MODLOG = path.join(FOR_BOT, 'moderation.log');
 const NOTES_KEEP = 200;
 const BAN_MOST_MIN = 10 * 365 * 24 * 60;
@@ -3078,13 +3089,42 @@ function serverRefusal(serverLines, profile) {
   return watched;
 }
 
+/*
+  A CRASH LOG IN THE SET IS A CRASH (#2319). The launcher sends crash.log only
+  when Crash Logger wrote one during this session (CrashLogSince picks it by
+  the session's start), so its being there is the crash, whatever it holds.
+  Until #2319 a session was marked only when a line in some log matched
+  TROUBLE_BAD, and a crash that hung inside the crash handler left an empty
+  log, which the launcher did not send at all: three dev crashes from 29 Sep
+  to 6 Oct reached the site with no crash.log, no colour and no staff alert.
+  The launcher now sends a first line of its own on crash.log naming the
+  log, its size and the snapshot beside it, so an empty one arrives too.
+
+  The line kept with it is the crash's own (the first TROUBLE_BAD line, which
+  for Crash Logger is "Unhandled exception ..."), or the launcher's line when
+  the log has none, which says the log is empty.
+*/
+const CRASH_EMPTY_MARK = 'and it is empty: 0 bytes';
+function crashOf(logs) {
+  const text = String((logs || {})['crash.log'] || '');
+  if (!text.trim()) return null;
+  const empty = text.indexOf(CRASH_EMPTY_MARK) >= 0;
+  const why = empty ? 'the game crashed, and its crash log is empty' : 'the game crashed';
+  const own = scanFor({ 'crash.log': text }, TROUBLE_BAD, 'bad');
+  if (own) return { level: 'bad', why, file: 'crash.log', line: own.line };
+  const first = text.split('\n').map(l => l.trim()).filter(Boolean)[0] || '';
+  return { level: 'bad', why, file: 'crash.log', line: first.slice(0, 300) };
+}
+
 /* Red before yellow: a session that crashed AND complained about its load
    order is a crash, and the crash is the thing worth waking somebody for.
-   Then the server's word on the load order, then the rest. */
+   A crash log first (crashOf, #2319), then the other red lines, then the
+   server's word on the load order, then the rest. */
 function readTrouble(logs, serverLines, profile) {
   const mine = {};
   for (const name of Object.keys(logs || {})) mine[name] = thisSessionOf(name, logs[name]);
-  return scanFor(mine, TROUBLE_BAD, 'bad') ||
+  return crashOf(mine) ||
+         scanFor(mine, TROUBLE_BAD, 'bad') ||
          serverRefusal(serverLines, profile) ||
          scanFor(mine, TROUBLE_WARN, 'warn');
 }
@@ -3127,7 +3167,8 @@ function applyTrouble(row, found) {
   the next change reads them again too; a row already read under these rules
   is left alone. Nothing is said in Discord: these are old sessions.
 */
-const TROUBLE_RULES = 2;
+/* 3: a crash log in the set is a crash (crashOf, #2319). */
+const TROUBLE_RULES = 3;
 function rereadTrouble() {
   try {
     const rows = sessionRows();
@@ -3725,6 +3766,22 @@ function makePass(key, o) {
   const body = b64u(JSON.stringify({ p: o.p, s: o.s, v: o.v, d: o.d, i: o.i, x: o.x }));
   const mac = b64u(crypto.createHmac('sha256', key).update('jp1.' + body).digest());
   return 'jp1.' + body + '.' + mac;
+}
+
+/*
+  THE PASS'S OWN KEY (#1320). The login rides the game's own port, which is not
+  encrypted, so a pass alone in it could be seen and shown again on another
+  connection. With the fork's login challenge (skymp5-server's
+  thornswoodLogin.ts) the game sends each login a fresh nonce, and the client
+  answers with the pass and HMAC-SHA256 of "jlp1." + nonce under this key. The
+  key goes to the launcher here, over https, beside the pass, and never on the
+  game's port; the game server derives the same one from passKey and the pass
+  (the join pass block in gamemode.js). base64url HMAC-SHA256 of "jpk1." and
+  the pass's own mac, keyed on cfg.passKey.
+*/
+function passLoginKey(key, pass) {
+  const mac = String(pass || '').split('.')[2] || '';
+  return b64u(crypto.createHmac('sha256', key).update('jpk1.' + mac).digest());
 }
 
 /* Digits and dots, an optional leading v, nine digits a part at most: the
@@ -6086,7 +6143,7 @@ async function handle(req, res) {
       'Staff have banned that character ' + banUntilText(bar.until) +
       (bar.why ? ': ' + bar.why : '') + '. Pick another character at the menu.' });
     const pass = makePass(cfg.passKey, { p: pid, s: server, v: said, d: String(t.d), i: now, x: now + PASS_MS });
-    return sendJson(res, 200, { ok: true, pass: pass, until: now + PASS_MS, server: server });
+    return sendJson(res, 200, { ok: true, pass: pass, key: passLoginKey(cfg.passKey, pass), until: now + PASS_MS, server: server });
   }
 
   // The same question without asking for the password, for the launcher to

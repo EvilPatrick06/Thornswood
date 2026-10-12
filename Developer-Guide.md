@@ -59,6 +59,7 @@ The outline nests, and the table of contents follows it. A part is a numbered se
       - [Signing, the build check, and the six shared files](#signing-the-build-check-and-the-six-shared-files)
     - [How work moves, the long form](#how-work-moves-the-long-form)
 - [3. How to release to dev](#3-how-to-release-to-dev)
+  - [The content plugin goes to the server first](#the-content-plugin-goes-to-the-server-first)
   - [Say so, then write the note](#say-so-then-write-the-note)
   - [Mark the dev notes again](#mark-the-dev-notes-again)
   - [Put the gamemode on the dev server](#put-the-gamemode-on-the-dev-server)
@@ -66,6 +67,7 @@ The outline nests, and the table of contents follows it. A part is a numbered se
   - [What any developer may do](#what-any-developer-may-do)
 - [4. How to release to main](#4-how-to-release-to-main)
   - [Move the version first](#move-the-version-first)
+  - [The content plugin goes to the live server first](#the-content-plugin-goes-to-the-live-server-first)
   - [Ship main](#ship-main)
   - [Deploy the live pieces the pull request touched](#deploy-the-live-pieces-the-pull-request-touched)
   - [A hotfix](#a-hotfix)
@@ -374,6 +376,39 @@ client from the site instead (Shipping from another machine, below). The
 release webhooks are on the VPS (`scripts\ops\Discord-Hook.ps1`) and every
 Ship reads them from there, so there is nothing to hand over.
 
+The launcher's build is moving to MSBuild (#498, decided by Patrick on
+11 Oct). A dev Ship builds the launcher on the machine that runs it, so
+every machine that Ships needs Visual Studio 2022 Build Tools with the
+MSBuild component and the .NET Framework 4.8.1 targeting pack before the
+switch. Nothing else is downloaded at build time: no .NET SDK, no NuGet. A
+machine with no Build Tools yet, in PowerShell 7 (Windows asks for an
+administrator):
+
+```
+winget install --id Microsoft.VisualStudio.2022.BuildTools -e --accept-package-agreements --accept-source-agreements --override "--quiet --wait --norestart --add Microsoft.VisualStudio.Workload.MSBuildTools --add Microsoft.Net.Component.4.8.1.TargetingPack"
+```
+
+A machine that already has Build Tools, for the engine above, adds the one
+component to the install it has:
+
+```
+& "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\setup.exe" modify --installPath "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\BuildTools" --add Microsoft.Net.Component.4.8.1.TargetingPack --quiet --norestart
+```
+
+Visual Studio 2022 or newer itself, any edition, with the ".NET desktop
+development" workload, is just as good (GitHub's runner builds it with Visual
+Studio 18). Then, from `Thornswood-Repo`:
+
+```
+.\scripts\release\Find-MSBuild.ps1 -Report
+.\scripts\release\Build-Launcher.ps1 -With msbuild -Root $env:TEMP\msbuild-try -NoPause
+```
+
+The first names MSBuild.exe and the 4.8.1 reference assemblies, or says
+which is missing. The second builds both exes into a scratch folder and
+ends with Done. Until the switch Ship still builds with the in-box csc, and
+`Setup-ShipMachine.ps1 -Check` lists MSBuild as "later", not as a gap.
+
 The pack baseline lives on the VPS beside the feed, and every Ship receives it
 first, so there is nothing to pull. If the VPS has none for a channel, Ship
 stops with "No baseline yet". To rebuild a baseline by hand:
@@ -667,7 +702,7 @@ Closes #123
 gh pr create --title "Short title" --body $body
 ```
 
-The title says what changed. The body says how you tested it. If the work finishes an issue, put `Closes #123` in the body. The pull request targets `main`.
+The title says what changed. The body says how you tested it. If the work finishes an issue, put `Closes #123` in the body. A fix people would notice says `Refs #123` instead, because its issue is closed with a `Test task:` comment when the fix reaches main ([Everything we need to do goes on the board](#everything-we-need-to-do-goes-on-the-board)). The pull request targets `main`.
 
 Run the test that covers your change before you open the pull request.
 
@@ -738,8 +773,9 @@ What you run after the merge depends on what the pull request touched. A dev rel
 #### What this is
 
 Thornswood: a modded co-op Skyrim roleplay server on SkyMP, in alpha and
-open by application. This repo is the launcher (launcher\app, C# 5, WPF, built with the
-.NET Framework 4 csc), the game plugins (game\plugins, Skyrim Platform
+open by application. This repo is the launcher (launcher\app, C# and WPF on the
+.NET Framework, built with the .NET Framework 4 csc and so C# 5 until the build
+moves to MSBuild, #498), the game plugins (game\plugins, Skyrim Platform
 JavaScript), the site (site, node), the Discord bot (bot,
 Python) and every script that ships or runs it. Owner: Patrick (EvilPatrick06).
 
@@ -875,9 +911,10 @@ commands stay commands. So do `/stuck` and the lines that reach staff,
 4 Oct: "change it to except the /stuck and the ones for getting help
 from GMs"). So do the ways of saying a line, `/me`, `/do`, `/w`, `/s`,
 `/y` and `/ooc`, and `/roll`, with no buttons for them (Patrick, 4 Oct:
-"Allow those commands and don't do buttons"). Never add another chat
-command for people. A panel may send the server a line, but no person
-is told to type it and help text never lists it. [docs/SYSTEMS.md](docs/SYSTEMS.md), "Buttons, not
+"Allow those commands and don't do buttons"). So does `/needs`, the
+needs bars as a line of text for somebody who hid them (Patrick,
+11 Oct, #2267). Never add another chat command for people. A panel
+may send the server a line, but no person is told to type it and help text never lists it. [docs/SYSTEMS.md](docs/SYSTEMS.md), "Buttons, not
 commands", is the rule and what counts as a button;
 [docs/systems/commands.md](docs/systems/commands.md) lists every command
 there is today and the issue that converts each one that does not stay.
@@ -917,6 +954,18 @@ How to use it:
 - A pull request that finishes an issue says `Closes #N`, so merging closes
   it and the board moves it to Done. Say in the pull request, or in #staff-general,
   which issues moved.
+- A fix people would notice is the exception: its pull request says `Refs #N`,
+  and the issue stays open until the fix reaches main (Patrick, 11 Oct: dev
+  is where the team checks that nothing breaks the game, and main is where
+  testers test, since we are in alpha). When it is on main, whoever fixed it
+  writes a comment on the issue whose first line is `Test task: <a title of
+  at most 45 characters>`, then numbered steps in plain English and what
+  should happen, with no issue numbers, links or code, and closes the issue.
+  The bot turns that comment into a post in the #test-tasks forum the moment
+  the issue closes, tagged Main, so closing it when it merges or when it
+  reaches dev sends testers to look for a fix that main does not have. The
+  `Server:` line those comments carried before is no longer needed; the bot
+  reads it and ignores it (`bot\README.md`, Testing).
 
 #### What is not a reason to skip an issue
 
@@ -1025,8 +1074,26 @@ from the board, none of these three puts an issue aside:
   (issue #440), along with the forwarding copies in `tools\`. The files a
   machine kept in `tools\` moved on 29 Sep (signing.json to `records\signing`,
   the setup stub to `out`, the rest to `local`) and the folder is gone.
-- Launcher code is C# 5 only: no string interpolation, no ?., no nameof,
-  no expression bodied members, no out var.
+- The launcher builds with MSBuild from project files, and its code may be
+  newer C# once it does. Decided by Patrick on 11 Oct: option C on #498,
+  switch the build fully, and in his words "also we can lift the C# 5
+  rule". The C# 5 rule was always about the compiler, never the framework
+  (#499): the .NET Framework 4 csc that ships inside Windows, which
+  `scripts\release\Build-Launcher.ps1` still builds every release with,
+  understands nothing newer. So until the switch, launcher code
+  (`launcher\app`, and the setup program in `installer\setup`) still
+  compiles as C# 5: no string interpolation, no ?., no nameof, no
+  expression bodied members, no out var.
+  `launcher\app\Thornswood.csproj` and `installer\setup\Setup.csproj`
+  already build the same two exes with MSBuild
+  (`Build-Launcher.ps1 -With msbuild`, held to the csc build by
+  `tests\test-498-msbuild.ps1` in every build check). The switch makes that
+  the only build and, in the same pull request, moves `LangVersion` to the
+  newest the Build Tools compiler offers for .NET Framework 4.8.1, once
+  every machine that builds the launcher has MSBuild; #498 says which do not
+  yet. C# inside PowerShell scripts (`Add-Type`, which Windows PowerShell
+  5.1 compiles with the Framework compiler, as in
+  `scripts\dev\Check-Secrets.ps1`) stays C# 5 after the switch too.
 - Every change goes out as one complete release: launcher, game files and
   server together, never a half.
 
@@ -1218,8 +1285,9 @@ The short form of the rules. The same decisions, with the dates they were made, 
   paths, the architecture page and three launcher harnesses, issue #875, and
   the new-box runbook read against its scripts, issue #454),
   the launcher window, the count of
-  silent catches in the launcher, and the launcher compiles with the .NET
-  Framework csc). Red means the branch would stop Ship at the build step;
+  silent catches in the launcher, the launcher compiles with the .NET
+  Framework csc, and on GitHub's runner the launcher built with MSBuild
+  from its project files matches that build, issue #498). Red means the branch would stop Ship at the build step;
   fix that, and merge once it is green, you are confident in the change, and you have said so in
   #staff-general. Run the test harnesses your change touches yourself. All
   ~410 of them (tests/, bot, and voice), and a look for stray pull requests
@@ -1277,8 +1345,8 @@ this is the long form.
   when you take it. A main Ship preserves the Dev feed and baseline.
 - **Settled design is a proposal first.** Where the game runs from (its own
   folder, see One Skyrim of its own), Keep and Hold for Data\Platform, the
-  client built from the fork and recorded, C# 5 only, one complete release at
-  a time: changing any of these starts as a few lines in #staff-general, agreed by the
+  client built from the fork and recorded, the launcher build (MSBuild, and
+  C# 5 until the switch to it, #498), one complete release at a time: changing any of these starts as a few lines in #staff-general, agreed by the
   team before code. Editing `Shell.cs`, `Checks.cs`, `Keep.cs`, `Hold.cs`,
   `Updater.cs` or `Publish-Update.ps1` gets a line in #staff-general too; every
   machine touches them.
@@ -1317,6 +1385,19 @@ this is the long form.
 Everything goes to the dev build first, including a small change. A dev release can run from any branch on any developer's machine. There is one dev feed and one dev server, and the last dev Ship wins. Say what you are about to publish in #staff-general first.
 
 The machine that runs `Ship.ps1` still has to sign the build. [Setting up a machine](#setting-up-a-machine) and [Shipping from another machine](#shipping-from-another-machine) are how a PC gets there.
+
+### The content plugin goes to the server first
+
+The server gets the content plugin first, then the Ship. When `game\content\Thornswood-Content.esp` changed since the last dev release, put it on the dev server before you Ship, with the note the dev updates channel gets:
+
+```powershell
+.\scripts\deploy\Deploy-DevGamemode.ps1 -LoadOrder -Note "The forge takes the new ores
+- Iron and silver ore smelt at every forge."
+```
+
+`-LoadOrder` keeps the dev server's own load order and sends every plugin it names that the server does not hold at the same bytes: the content plugin from your checkout, the others from the collection. It needs no server build, so it runs from the fresh checkout the deploy asks for. `-Dist <a built dist\server folder>` also writes that build's load order over the dev one.
+
+Ship asks the dev server which content plugin it holds, by size and sha256. When this release would send clients another one, Ship stops before it publishes, posts or tells the server anything, and names the command above. On 11 Oct a dev Ship sent a new content plugin while the dev server still had the old one, and for eight minutes every dev client that updated held a plugin the server did not (#2308).
 
 ### Say so, then write the note
 
@@ -1379,7 +1460,7 @@ The machine that runs `Ship.ps1` still has to sign the build. `records\signing\s
 | Live gamemode | `.\scripts\deploy\Deploy-Server.ps1 -GamemodeOnly`, from any machine, needs no server build | Live server |
 | Live server build, or the live settings Deploy-Gamemode writes | `.\scripts\deploy\Deploy-Gamemode.ps1`, then `.\scripts\deploy\Deploy-Server.ps1`, from a machine with the fork built | Live server |
 
-`Deploy-Server.ps1 -GamemodeOnly` sends the committed `game\gamemode.js`, its build stamp, and `game\content\Thornswood-Content.esp` when its size is not the live server's copy's. The live server keeps its own settings, and no setting may change. Before anything is sent it asks the live server which server build it runs, and refuses unless that is the build `records\server-build.json` names at your commit. A gamemode that needs a new server build, or a change to the live settings (the load order, the NPC, gear, reloot and damage settings, the join pass and the role lists), goes the full way, from a machine with the build. `-PutBack` puts back what either one replaced. Decided by Patrick on 5 Oct, #1089: any machine may put a gamemode live this way.
+`Deploy-Server.ps1 -GamemodeOnly` sends the committed `game\gamemode.js`, its build stamp, and `game\content\Thornswood-Content.esp` when the live server's copy is not the same size and sha256. The live server keeps its own settings, and no setting may change. Before anything is sent it asks the live server which server build it runs, and refuses unless that is the build `records\server-build.json` names at your commit. A gamemode that needs a new server build, or a change to the live settings (the load order, the NPC, gear, reloot and damage settings, the join pass and the role lists), goes the full way, from a machine with the build. `-PutBack` puts back what either one replaced. Decided by Patrick on 5 Oct, #1089: any machine may put a gamemode live this way.
 
 A dev release can run from any branch on any developer's machine. A main release runs from `main` after `git pull`, with a clean tree that matches GitHub. The note shape is in [Say so, then write the note](#say-so-then-write-the-note). The command for each file is in [After a pull request is merged](#after-a-pull-request-is-merged). The restart warning is in [How a release goes out](#how-a-release-goes-out).
 
@@ -1406,6 +1487,16 @@ git switch main
 git pull
 .\scripts\release\Bump-Version.ps1
 ```
+
+### The content plugin goes to the live server first
+
+When `game\content\Thornswood-Content.esp` changed since the last main release, the live server gets it before the Ship, from `main` after `git pull`:
+
+```powershell
+.\scripts\deploy\Deploy-Server.ps1 -GamemodeOnly
+```
+
+It sends the committed gamemode and the content plugin whenever the live server's copy is not the same size and sha256. A main Ship asks the live server the same question and stops, with nothing published, posted or told to a server, while the answer is another plugin.
 
 ### Ship main
 
@@ -1574,7 +1665,7 @@ repository folder. Any developer may.
 
 1. `git checkout main`, then `git pull`. Ship.ps1 refuses a main release
    that is behind origin, so the pull comes first.
-2. Then one command for each part the pull request touched. The note on a Ship is the one in [Say so, then write the note](#say-so-then-write-the-note). A pull request that touches several of these gets every one of them, in the same sitting, so nothing goes out half done.
+2. Then one command for each part the pull request touched. The note on a Ship is the one in [Say so, then write the note](#say-so-then-write-the-note). A pull request that touches several of these gets every one of them, in the same sitting, so nothing goes out half done. When it changed `game\content\Thornswood-Content.esp`, the server command goes before the Ship: `Deploy-DevGamemode.ps1 -LoadOrder` for dev, `Deploy-Server.ps1 -GamemodeOnly` for live ([The content plugin goes to the server first](#the-content-plugin-goes-to-the-server-first)).
 
 | You changed | Run |
 | --- | --- |
@@ -1621,7 +1712,7 @@ release, launcher, game files and server together, are in How work moves.
 | Source repo | github.com/EvilPatrick06/Thornswood (private), clone at `C:\Users\<you>\Downloads\Thornswood-Repo` | Launcher source, plugins, site, bot, every script |
 | Feed store | On the VPS beside the feed the site serves: `C:\Thornswood-Docs\feed\{version.json, published.json, launchers.txt, history\}` and the same under `feed-dev`. Each machine's working copy is `%LOCALAPPDATA%\Thornswood\feed\main` and `\dev` | `version.json` (the feed, served at `/feed[-dev]/version.json`), `published.json` (the pack baseline), every launcher version the channel published, and each replaced file, none of those three served. Ship receives and sends them through `scripts\release\Feed-Store.ps1` (#907). Until then they were the `Thornswood-Releases` GitHub repository and its two clones |
 | Downloads | On the VPS, `C:\Thornswood-Docs\feed\assets` and `feed-dev\assets`, served at `https://thornswood.net/feed[-dev]/assets/<sha256>` | Every pack, launcher exe and client runtime a feed names, one file per sha256, one folder per channel (`docs\FEED.md` "Downloads come from the site") |
-| Launcher | `launcher\app\*.cs` + `launcher\ui.xaml`, built by `scripts\release\Build-Launcher.ps1` with the .NET Framework 4 csc, C# 5 only | WPF app at `<drive>:\Thornswood\Launcher\Thornswood.exe` (C: on most machines); profile, config and packs under that folder. The scripts find the install on whichever fixed drive holds it; `-Root` overrides |
+| Launcher | `launcher\app\*.cs` + `launcher\ui.xaml`, built by `scripts\release\Build-Launcher.ps1` with the .NET Framework 4 csc, so C# 5, until the build moves to MSBuild and `launcher\app\Thornswood.csproj` (#498) | WPF app at `<drive>:\Thornswood\Launcher\Thornswood.exe` (C: on most machines); profile, config and packs under that folder. The scripts find the install on whichever fixed drive holds it; `-Root` overrides |
 | Dev build | `<drive>:\Thornswood-DevBuild`, beside the main install, put there by the main launcher's Play page Server dropdown | Same exe, `config.json` says `Channel: dev`, `UpdateBranch: dev`, port 7787, voice 7789. Staff roles only (Owner, Dev, Gamemaster, Moderator, Loremaster) |
 | Game | `<Root>\Game`, Thornswood's own folder, which the launcher builds from the Steam copy of Skyrim Special Edition and what Vortex deployed from the Nexus collection (see One Skyrim of its own) | The launcher will not Play from the Steam copy itself. Thornswood's own loose files live in `Data\Platform` (plugins in `Plugins\thornswood-*.js`, page in `UI\`) and `Data\SKSE\Plugins\Thornswood.ini` |
 | Plugins | `game\plugins\thornswood-{front,emotes,mark,voice}.js`, UI in `game\ui` | Skyrim Platform JavaScript. Idle unless the client points at our server and the launcher left a fresh session note |
@@ -2347,7 +2438,7 @@ The bot scripts need Python 3 with `discord.py` and `Pillow`. [Setting up a mach
 
 #### The .NET Framework
 
-Launcher code is C# 5, built with the .NET Framework 4 compiler. The window is `launcher\ui.xaml`. How the launcher starts is `launcher\app\ARCHITECTURE.md`. The six shared files in `launcher\app` are named in [D. Visual Studio Code](#d-visual-studio-code).
+Launcher code is C#, built today with the .NET Framework 4 compiler that ships inside Windows, which stops at C# 5. The build is moving to MSBuild and `launcher\app\Thornswood.csproj` (#498); newer C# is allowed from that switch, by Patrick's decision of 11 Oct, and C# inside PowerShell scripts stays C# 5. The window is `launcher\ui.xaml`. How the launcher starts is `launcher\app\ARCHITECTURE.md`. The six shared files in `launcher\app` are named in [D. Visual Studio Code](#d-visual-studio-code).
 
 #### SkyMP
 
@@ -2528,7 +2619,7 @@ A staff command also needs the chat to have proved who you are. When it has not,
 
 A person, wherever these say `<person>`, is their name or the start of it while only one name starts that way, the form id the crosshair gives, or their profile number. A profile number reaches somebody who has left, for a ban, a note or `/unsilence`.
 
-Each staff command answers you in your chat, tells the person it was done to, writes a line to `thornswood.log`, and writes a line to `private\moderation.log`, which the bot says in the staff channel.
+Each staff command answers you in your chat, tells the person it was done to, writes a line to `thornswood.log`, and writes a line to `for-bot\moderation.log` beside the server, which the bot says in the staff channel.
 
 #### For yourself
 

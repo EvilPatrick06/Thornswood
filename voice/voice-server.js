@@ -60,7 +60,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1-tls-only-1-ice-socket-1-no-page-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1-tls-only-1-ice-socket-1-no-page-1-most-1-roster-once-1';
 
 // ==== thornswood deploy record ====
 // Which commit this copy came from (#459): Install-Voice.ps1 leaves the deploy
@@ -725,8 +725,11 @@ setInterval(() => {
 
   The roster sits between the two (sendLatest). Every join and every leave
   sends the whole room to everybody, so when a room fills at once, as it does
-  when the service restarts and every page reconnects, each socket is sent a
+  when the service restarts and every page reconnects, each socket was sent a
   roster per arrival: about 1.3 MB for the first in at two hundred people.
+  Since #2332 the joins and leaves of one turn of the event loop share one
+  roster (sendRoster), which is most of a storm; this still keeps what a
+  slow reader is owed to one.
   Queued in full, that tripped the ceiling below for anybody slow to read,
   and those closed sockets would reconnect into another burst. On
   24 September test-cull.js, whose two hundred sockets join together, had 42
@@ -847,22 +850,27 @@ class Sock {
     message sent to it, whichever comes first. Unlike a position it is never
     dropped, because the next roster only comes when somebody joins or
     leaves. See the note over QUEUE_CEILING.
+
+    It takes the roster already framed, because the same bytes go to every
+    socket in the room and are made once (sendRoster, #2332).
   */
-  sendLatest(obj) {
+  sendLatest(framed) {
     if (this.closed) return;
     if (this.backed) {
       if (this.latest) skippedRosters++;
-      this.latest = obj;
+      this.latest = framed;
       return;
     }
-    this.send(obj);
+    this.flushLatest();
+    if (this.closed) return;
+    try { this.write(framed); } catch (e) { this.close(); }
   }
 
   flushLatest() {
     if (!this.latest || this.closed) return;
-    const obj = this.latest;
+    const framed = this.latest;
     this.latest = null;
-    try { this.write(frame(JSON.stringify(obj))); } catch (e) { this.close(); }
+    try { this.write(framed); } catch (e) { this.close(); }
   }
 
   close() {
@@ -1074,10 +1082,47 @@ function roster() {
   sent the one its connection was opened with, which had run out for most of
   a session, and from then on was handed STUN only. /ice now reads no token.
 */
+/*
+  ONE ROSTER FOR EVERYTHING THAT CHANGED THE ROOM IN ONE TURN (#2332).
+
+  announce() used to send the roster to every socket the moment anybody
+  joined or left, and stringified it once per socket. When the service
+  restarts every page comes back at once, so letting N people in cost N
+  rosters to each of N sockets, each the size of the room: N squared
+  messages, and N cubed bytes and stringify work. Measured on One on 11 Oct
+  with voice/load-voice.js, two sockets a person: 100 people held the one
+  node thread for up to 2.4 s at a time, 200 took 20 s to get in, and 400
+  never did.
+
+  A roster says only who is in the room now; a page reconciles its
+  connections against the whole list each time (onPeers in
+  launcher/voice-host.html, reconcile in game/ui/thornswood-voice.js), so a
+  roster that is replaced before it is sent loses nothing. So announce()
+  only marks the roster as due, and it is sent once, after every join and
+  leave this turn of the event loop has handled (setImmediate runs after the
+  I/O callbacks of the turn that queued it, with no timer in between). A
+  storm of joins that arrives together is one roster to each socket, not one
+  per arrival, and the message is stringified and framed once for the whole
+  room. Nothing on the wire changes shape: the same { t: 'peers', peers,
+  iceServers } a page always had, after its welcome, as before.
+
+  The order #1869 depends on still holds. Every socket is written the same
+  roster in one loop, so a newcomer's roster and the roster naming them to
+  everybody else go out together, before the newcomer can have read theirs
+  and sent anyone an offer. A socket that is backed keeps only the newest,
+  as before (sendLatest), and send() writes it ahead of anything later.
+*/
+let rosterDue = false;
 function announce() {
-  const list = roster();
-  const ice = iceServers();
-  for (const [, p] of peers) p.ws.sendLatest({ t: 'peers', peers: list, iceServers: ice });
+  if (rosterDue) return;
+  rosterDue = true;
+  setImmediate(sendRoster);
+}
+function sendRoster() {
+  rosterDue = false;
+  if (peers.size === 0) return;
+  const once = frame(JSON.stringify({ t: 'peers', peers: roster(), iceServers: iceServers() }));
+  for (const [, p] of peers) p.ws.sendLatest(once);
 }
 
 /*
@@ -1443,6 +1488,54 @@ function doorWait(door, req, now) {
   door.seen.set(key, list);
   return 0;
 }
+/*
+  HOW MANY PEOPLE THE SERVICE TAKES AT ONCE (#481).
+
+  The game server seats so many (records\most-online.json, people and the
+  staff seats over it) and nothing here counted at all, so the one service
+  every person in the world holds a socket to, and every person waiting in
+  line at the menu as well, took everybody who came. The issue's words: cap
+  one without the other and it only moves where it breaks.
+
+  THORNSWOOD_VOICE_MOST is the most PEOPLE, not sockets: a person holds one
+  socket for the launcher's voice page and one for the game's chat, and a
+  reconnect can overlap the socket it replaces until that one is let go, so
+  each of those counts once, by the profile its join token proved. A profile
+  that already holds a socket is always let in, so nobody in the room loses
+  their second page or a reconnect to a full room. Install-Voice.ps1 sets it
+  from records\most-online.json (voice). Unset or 0 is no cap, which is how
+  this ran until now.
+
+  Past it, a new profile's socket is opened, told in one chat line why, and
+  closed with 1013, "try again later", rather than refused at the handshake:
+  a browser never shows a page why a handshake failed, and the game's chat
+  draws a line from the service, so the person reads the reason where they
+  would have talked. Both pages then try again on their own backoff (two
+  seconds to a minute, and one to thirty), each try with a token of its own.
+  The token it came with is spent, as every token is on its handshake. The
+  log says it once a minute at most, and /health counts the refusals.
+*/
+function wholeOrZero(v) {
+  const n = Number(String(v == null ? '' : v).trim());
+  return (Number.isInteger(n) && n > 0) ? n : 0;
+}
+const MOST = wholeOrZero(process.env.THORNSWOOD_VOICE_MOST);
+const heldBy = new Map();     // profileId -> sockets open for it
+let refusedFull = 0;          // sockets turned away for numbers, for /health
+let fullSaidAt = 0;
+const FULL_LINE = 'Voice and chat are full: ' + MOST + ' people are connected, the most they take at once. ' +
+                  'This tries again by itself.';
+
+function holdFor(profileId) { heldBy.set(profileId, (heldBy.get(profileId) || 0) + 1); }
+function letGoFor(profileId) {
+  const n = (heldBy.get(profileId) || 0) - 1;
+  if (n > 0) heldBy.set(profileId, n); else heldBy.delete(profileId);
+}
+/* Whether this profile's socket is past the number. */
+function overMost(profileId) {
+  return MOST > 0 && !heldBy.has(profileId) && heldBy.size >= MOST;
+}
+
 // Places whose minute is over are forgotten.
 setInterval(() => {
   const cut = Date.now() - 60000;
@@ -2068,6 +2161,7 @@ const server = http.createServer((req, res) => {
                             turn: TURN_URL ? (TURN_SECRET ? 'ephemeral' : (TURN_USER ? 'static' : 'MISCONFIGURED')) : 'none',
                             chatRange: CHAT_RANGE,
                             peers: peers.size, tracked: positions.size,
+                            most: MOST, people: heldBy.size, refusedFull: refusedFull,
                             queuedCommands: commands.length,
                             backed: backed, largestQueueBytes: largestQueue,
                             droppedPositions: droppedPositions,
@@ -2236,7 +2330,28 @@ server.on('upgrade', (req, socket, head) => {
     'Sec-WebSocket-Accept: ' + accept(key) + '\r\n' +
     'Sec-WebSocket-Protocol: ' + PROTOCOL + '\r\n\r\n');
 
+  // Past the most people at once (#481): told why, then closed; see MOST.
+  if (overMost(proven)) {
+    refusedFull++;
+    if (Date.now() - fullSaidAt > 60000) {
+      fullSaidAt = Date.now();
+      console.log('[voice] full: ' + heldBy.size + ' people are connected, the most this service takes ' +
+                  '(THORNSWOOD_VOICE_MOST), so profile ' + proven + ' was told and closed (' +
+                  refusedFull + ' turned away so far)');
+    }
+    socket.on('error', () => { });
+    const why = Buffer.from('full', 'utf8');
+    try {
+      socket.write(frame(JSON.stringify({ t: 'chat', from: 0, profileId: 0, name: 'Thornswood', text: FULL_LINE, at: Date.now() })));
+      socket.end(Buffer.concat([Buffer.from([0x88, 2 + why.length, 0x03, 0xf5]), why]));   // FIN+close, 1013 try again later
+    } catch (e) {
+      try { socket.destroy(); } catch (x) { }
+    }
+    return;
+  }
+
   const ws = new Sock(socket);
+  holdFor(proven);
   let myId = 0;
   // When this connection was last told the command queue is full.
   let refusedAt = 0;
@@ -2528,6 +2643,7 @@ server.on('upgrade', (req, socket, head) => {
   };
 
   ws.onclose = () => {
+    letGoFor(proven);
     if (!myId) return;
     const me = peers.get(myId);
     peers.delete(myId);

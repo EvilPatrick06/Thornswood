@@ -174,8 +174,11 @@ function Get-ReleaseRecord($doc) {
 
 # Every way the feed's names for its release disagree with each other, one
 # sentence each. None means the release id, its packs, its baseline record,
-# the launcher it offers and its tag all name the same release.
-function Get-ReleaseDisagreements($doc) {
+# the launcher it offers and its tag all name the same release. $Releases is
+# the channel's list of releases as the store keeps it since #1050
+# (releases.json, Read-ReleaseListFile); left out, the "releases" the feed
+# still carries, if any.
+function Get-ReleaseDisagreements($doc, $Releases = $null) {
     $bad = @()
     $r = Get-ReleaseRecord $doc
     if ($null -eq $r) { return @('the feed names no release') }
@@ -207,8 +210,11 @@ function Get-ReleaseDisagreements($doc) {
     # The feed's list of releases a channel can be put back to (#442) names
     # this one first, by the same id, ending on its last pack, once it has
     # sent its record. A -NoUpload run sends none and adds nothing to it.
-    if ($base -and $doc.PSObject.Properties['releases'] -and $null -ne $doc.releases -and @($doc.releases).Count) {
-        $top = @($doc.releases)[0]
+    $rels = @()
+    if ($null -ne $Releases) { $rels = @($Releases | Where-Object { $null -ne $_ }) }
+    elseif ($doc.PSObject.Properties['releases'] -and $null -ne $doc.releases) { $rels = @($doc.releases | Where-Object { $null -ne $_ }) }
+    if ($base -and $rels.Count) {
+        $top = $rels[0]
         $topId = Get-ReleaseField $top 'id'
         if ($topId -ne $id) { $bad += "release $id is not the newest in the feed's releases, which starts with $topId" }
         elseif ($packs.Count -and (Get-ReleaseField $top 'lastPack') -ne $packs[$packs.Count - 1]) {
@@ -221,6 +227,17 @@ function Get-ReleaseDisagreements($doc) {
     $want = if ($commit) { Get-ReleaseTagName $ch $id } else { '' }
     if ($tag -ne $want) { $bad += "release $id names tag '$tag' and its tag is '$want'" }
     return $bad
+}
+
+# The list of releases the store keeps beside a feed (releases.json, #1050),
+# newest first, or $null when there is no such file. Throws on a file that is
+# not JSON, rather than reading it as no list.
+function Read-ReleaseListFile([string]$Path) {
+    if (-not $Path -or -not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $null }
+    $text = ([IO.File]::ReadAllText($Path)).TrimStart([char]0xFEFF)
+    if (-not $text.Trim()) { return ,@() }
+    $o = $text | ConvertFrom-Json
+    return ,@($o | Where-Object { $null -ne $_ })
 }
 
 # The annotated tag's message: the release, then everything it is known by.
@@ -260,7 +277,10 @@ function Add-ReleaseTag([string]$RepoDir, [string]$VersionFile, [string]$Publish
         $o.Why = "the publisher sent release $PublishedId and the feed here names release '$id', so nothing is tagged"
         return $o
     }
-    $bad = @(Get-ReleaseDisagreements $doc)
+    $list = $null
+    try { $list = Read-ReleaseListFile (Join-Path (Split-Path -Parent $VersionFile) 'releases.json') }
+    catch { $o.Why = "could not read the releases list beside $VersionFile, so nothing is tagged: $($_.Exception.Message)"; return $o }
+    $bad = @(Get-ReleaseDisagreements $doc $list)
     if ($bad.Count) { $o.Why = ('the feed''s names for release ' + $id + ' disagree, so nothing is tagged: ' + ($bad -join '; ')); return $o }
     $o.Commit = Get-ReleaseField $r 'commit'
     $o.Tag = Get-ReleaseField $r 'tag'

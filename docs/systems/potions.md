@@ -41,8 +41,17 @@ kept in memory, so a restart ends it, and when you come back into the
 world the server sends your K panel as it stands at that moment, so
 none of it is left on you (issue #1642).
 
-The diminishing potions and withered are not in the server. Potions
-currently stack as the game allows, plus thirst. Withered waits for
-the cooked meal on [Food](food.md), and its 80% of max health and
-magicka needs the client to apply a share, where what the server sends
-today is amounts.
+Withered is in the server. The server hears every potion a person
+drinks from their pack, a brewed one included, and every restoration
+spell they cast, and keeps the hour's count and the end of a withering
+on the character, so a relog or a restart does not end it early. The
+fifth of max health and magicka it takes off is worked out from the
+character's own most, what the race and the skill tree give, less what
+hunger, thirst and the rest take off. A fortify from gear or a potion
+running on you is not in that most, because the server cannot see it.
+Waiting the 30 minutes clears it. Eating a cooked meal and resting in a
+bed does not clear it yet: the server does not know a cooked meal from
+any other until the meals on [Food](food.md) are in it.
+
+The diminishing potions are not in the server. Potions currently stack
+as the game allows, plus thirst.

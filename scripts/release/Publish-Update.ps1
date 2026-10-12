@@ -151,12 +151,18 @@ if ($Dev -and -not (Test-Path (Join-Path $Root 'Launcher'))) {
 . (Join-Path $Here 'Release-Name.ps1')
 # Which dev notes main has not had: the DEV marks and mainVersion (Dev-News.ps1).
 . (Join-Path $Here 'Dev-News.ps1')
+# Which content plugin the channel's server holds (#2308, ServerContent.ps1).
+. (Join-Path $Here '..\deploy\ServerContent.ps1')
+# Where the notes are kept, in the feed or as a file of their own (#1050).
+. (Join-Path $Here 'Feed-News.ps1')
 if (-not $ReleaseDir) { $ReleaseDir = Get-FeedStoreDir $Channel }
 if (-not (Test-Path -LiteralPath $ReleaseDir)) { New-Item -ItemType Directory -Path $ReleaseDir -Force | Out-Null }
 $haveLocal = (Test-Path -LiteralPath (Join-Path $ReleaseDir 'version.json')) -and (Test-Path -LiteralPath (Join-Path $ReleaseDir 'published.json'))
 if (-not $NoPush -or -not $haveLocal) {
     Write-Host "  receiving the $Channel feed and baseline from the VPS into $ReleaseDir" -ForegroundColor DarkGray
-    try { [void](Receive-FeedStore $Channel $ReleaseDir -SiteDir $SiteDir) }
+    # And the list of releases a rollback can go back to, kept beside them
+    # since #1050 rather than in the feed (Release-Baseline.ps1).
+    try { [void](Receive-FeedStore $Channel $ReleaseDir @('version.json', 'published.json', $FeedReleasesFile) -SiteDir $SiteDir) }
     catch { Die ("Could not receive the $Channel feed and baseline from the VPS, so nothing was built: " + $_.Exception.Message) }
 } else {
     Write-Host "  -NoPush: using the feed and baseline last received into $ReleaseDir" -ForegroundColor DarkGray
@@ -967,6 +973,39 @@ if (-not $changed.Count -and -not $realRemoved -and -not $profileChanged.Count -
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }; exit 2
 }
 
+# ==== thornswood content on the server first ====
+# THE SERVER GETS THE CONTENT PLUGIN FIRST, THEN THE SHIP (#2308).
+#
+# On 11 Oct dev 20261011-221215-dev sent clients a new Thornswood-Content.esp
+# (146,381 bytes), and Ship went on to post it, tell the dev server to restart
+# and push its tag, while the dev server still had the old one (146,446 bytes):
+# for eight minutes every dev client that updated held a plugin the server it
+# joined did not. Nothing here asked what the server held.
+#
+# So a release whose content plugin is not the one this channel's last release
+# carried (the baseline the diff above read, so "changes the plugin" is the
+# same question the pack answers) asks the channel's server which one it
+# holds, and goes on only when that is the same size and sha256. Anything else
+# stops here, before anything is packed, sent, posted or told to a server, and
+# names the command that sends the plugin there. A box that does not answer is
+# a refusal too. ServerContent.ps1 says why the box is read over ssh rather
+# than through the server's manifest. A dry run (-NoUpload -NoPush) asks the
+# same and stops the same, so it says what the real Ship would do.
+$contentChanged = @($changed | Where-Object { $_ -ieq $ThornswoodContentRel })
+if ($contentChanged.Count) {
+    Head 'The content plugin on the server'
+    $contentEntry = [string]$now[$contentChanged[0]]
+    $contentBox = $null
+    try { $contentBox = Read-ThornswoodServerContent -Channel $Channel }
+    catch { $contentBox = [pscustomobject]@{ Answered = $false; Bytes = [int64]-1; Sha = ''; Order = @(); OrderRead = $false; Said = @($_.Exception.Message) } }
+    $contentProblem = Get-ThornswoodContentShipProblem $Channel $contentEntry $contentBox
+    if ($contentProblem) {
+        Die ('Nothing was published, posted or told to a server: ' + $contentProblem)
+    }
+    Say ("  the {0} server already holds this release's {1} ({2:N0} bytes, the same sha256)" -f $Channel, $ThornswoodContentPlugin, $contentBox.Bytes) 'Green'
+}
+# ==== end thornswood content on the server first ====
+
 # The feed as received, for the ids it already uses (#1057).
 $feedNow = if (Test-Path -LiteralPath $VersionFile) { ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($VersionFile)) $VersionFile } else { $null }
 if (-not $Id) {
@@ -1134,6 +1173,32 @@ if ($Launcher) {
     Say "  launcher $launcherVersion" 'Green'
 }
 
+# ==== thornswood packs gone ====
+# tests\test-record-sync.ps1 runs the real publisher through this, and
+# tests\test-feed-rules.ps1 runs the feed append block with what it decides.
+#
+# THE PACKS COME OFF THE FEED ONCE NO LAUNCHER ALLOWED IN NEEDS ONE (#1050).
+# Every launcher from the first one with Sync.cs syncs the install to the
+# record file by file and never replays a pack (Release-Baseline.ps1,
+# $FeedFirstSyncLauncher, says which numbers and how they were read). The feed
+# lets in nothing below minLauncher, which this publish sets to the launcher
+# the feed offers (the min launcher block). So when that is at or above the
+# first syncing launcher on this channel, and the last record already had all
+# its files on the site (so its :gone: list, started from the packs, carries
+# what they took out), this release adds no pack and the feed's "packs" goes
+# to []: measured 12 Oct, 47,950 of main's 95,085 bytes and 66,018 of dev's
+# 111,305. An older launcher still updates: with no pack waiting it is offered
+# the launcher, takes it through the signed self-update, and the new one syncs.
+# The pack is still built, because Check-Secrets reads what this release
+# changed out of it, and it stays in the staging folder; it is not sent.
+$minAfter = if ($Launcher -and $launcherVersion) { $launcherVersion } elseif ($null -ne $feedNow -and $feedNow.PSObject.Properties['launcherVersion']) { [string]$feedNow.launcherVersion } else { '' }
+$packsGone = (Test-FeedPacksGone $Channel $minAfter) -and $prev.ContainsKey($RecordFilesKey)
+if ($packsGone) {
+    Say ("  no pack goes on the feed: every launcher let in (from {0}) syncs to the record file by file, the first on {1} being {2}" -f
+         $minAfter, $Channel, $FeedFirstSyncLauncher[$(if ($Dev) { 'dev' } else { 'main' })]) 'DarkGray'
+}
+# ==== end thornswood packs gone ====
+
 # ------------------------------------------------------------ upload
 $doc = ConvertFrom-ThornswoodJson (Get-Content $VersionFile -Raw) $VersionFile
 
@@ -1269,7 +1334,9 @@ if (-not $NoUpload) {
     # one way bytes reach the site, .part then rename, skipping any already up.
     Head 'Sending to the site'
     $siteFiles = @()
-    foreach ($c in $chunks) { $siteFiles += $c.Path }
+    # No pack once the packs are off the feed (the packs gone block): nothing
+    # would name it.
+    if (-not $packsGone) { foreach ($c in $chunks) { $siteFiles += $c.Path } }
     $exeSite = ''
     if ($Launcher -and (Test-Path -LiteralPath $exePath)) {
         $siteFiles += $exePath
@@ -1290,13 +1357,13 @@ if (-not $NoUpload) {
                  'Check the ssh key with scripts\vps\Setup-SshKey.ps1 -Test, then run Ship again.')
         }
     }
-    foreach ($c in $chunks) { $c.Url = Get-HostFeedAssetUrl $c.Sha -Dev:$Dev }
+    if (-not $packsGone) { foreach ($c in $chunks) { $c.Url = Get-HostFeedAssetUrl $c.Sha -Dev:$Dev } }
     if ($clientRel) { $clientRel.url = Get-HostFeedAssetUrl $clientRel.sha256 -Dev:$Dev }
     if ($exeSite) { $exeUrl = Get-HostFeedAssetUrl $exeSite -Dev:$Dev }
     if ($Launcher -and -not $exeUrl) {
         Die 'The launcher was not found to send, so version.json has not been touched and the feed still points at the last launcher that went up.'
     }
-    if ($chunks.Count) { Say "  $($chunks.Count) pack asset$(if ($chunks.Count -eq 1) { '' } else { 's' }) on the site" 'Green' }
+    if ($chunks.Count -and -not $packsGone) { Say "  $($chunks.Count) pack asset$(if ($chunks.Count -eq 1) { '' } else { 's' }) on the site" 'Green' }
     if ($clientRel) { Say '  client runtime on the site' 'Green' }
     if ($exeUrl) { Say '  launcher on the site' 'Green' }
     # ==== end thornswood site upload ====
@@ -1525,7 +1592,9 @@ if (-not $NoUpload) {
         Die ('The record of what this release installs did not reach the site, so version.json has not been touched. ' +
              'Check the ssh key with scripts\vps\Setup-SshKey.ps1 -Test, then run Ship again.')
     }
-    $releaseBaseline = New-FeedBaselinePointer $Id $manifestSha (Get-HostFeedAssetUrl $manifestSha -Dev:$Dev) $now.Count
+    # With the note, which a launcher shows on its update card once no pack
+    # carries it (Sync.cs RecordDue, the packs gone block).
+    $releaseBaseline = New-FeedBaselinePointer $Id $manifestSha (Get-HostFeedAssetUrl $manifestSha -Dev:$Dev) $now.Count $Notes
     Say '  what this release installs is on the site' 'Green'
 }
 # ==== end thornswood release manifest ====
@@ -1545,7 +1614,7 @@ if (-not $NoUpload) {
 # The send at the end checks the same two again, in the same step that
 # replaces the file on the VPS.
 if (-not $NoPush) {
-    try { $nowThere = Get-FeedStoreThere $Channel -SiteDir $SiteDir }
+    try { $nowThere = Get-FeedStoreThere $Channel @('version.json', 'published.json', $FeedReleasesFile) -SiteDir $SiteDir }
     catch { Die ("Could not ask the VPS for the $Channel feed before editing it, so nothing was written: " + $_.Exception.Message) }
     $wasRead = Read-FeedStoreRead $ReleaseDir
     if ($null -eq $wasRead) { $wasRead = @{} }
@@ -1553,9 +1622,12 @@ if (-not $NoPush) {
         Die ("Another Ship published on the $Channel channel while this one was building: the baseline on the VPS is not the one this run started from. " +
              'Nothing was written to the feed. Run Ship again; it starts from that release.')
     }
-    if ([string]$nowThere['version.json'] -ne [string]$wasRead['version.json']) {
-        Say '  the feed changed on the VPS since this run read it; received again, and this release goes on top' 'Yellow'
-        try { [void](Receive-FeedStore $Channel $ReleaseDir @('version.json') -SiteDir $SiteDir) }
+    # The feed, and the store's list of releases (a rollback writes both),
+    # received again when either moved, and this release goes on top of them.
+    $again = @(@('version.json', $FeedReleasesFile) | Where-Object { [string]$nowThere[$_] -ne [string]$wasRead[$_] })
+    if ($again.Count) {
+        Say ('  ' + ($again -join ' and ') + ' changed on the VPS since this run read it; received again, and this release goes on top') 'Yellow'
+        try { [void](Receive-FeedStore $Channel $ReleaseDir $again -SiteDir $SiteDir) }
         catch { Die ("Could not receive the $Channel feed again, so nothing was written: " + $_.Exception.Message) }
         $doc = ConvertFrom-ThornswoodJson (Get-Content $VersionFile -Raw) $VersionFile
     }
@@ -1603,7 +1675,16 @@ if ($stale.Count) {
     foreach ($why in @($stale | ForEach-Object { $_.Why } | Sort-Object -Unique)) { Say "    $why" 'Yellow' }
     Say ("  .\scripts\release\Repair-Manifest.ps1{0} -DryRun lists them, and without -DryRun takes them out and pushes." -f $(if ($Dev) { ' -Channel dev' } else { '' })) 'Yellow'
 }
-if ($chunks.Count) {
+if ($packsGone) {
+    # The packs gone block says why. [] rather than no field: the shape every
+    # launcher ever published reads. Said each time, with what went.
+    $wasOn = 0
+    if ($doc.PSObject.Properties['packs'] -and $doc.packs) { $wasOn = @($doc.packs | Where-Object { $null -ne $_ }).Count }
+    Set-Prop $doc 'packs' @()
+    if ($wasOn) { Say ("  the {0} pack(s) on the feed came off it: every launcher let in syncs to the record" -f $wasOn) 'Green' }
+    else { Say '  the feed carries no packs' 'DarkGray' }
+}
+elseif ($chunks.Count) {
     $packs = @()
     if ($doc.PSObject.Properties['packs'] -and $doc.packs) { $packs = @($doc.packs) }
     # Every new pack must download from the repository launchers read this
@@ -1650,9 +1731,12 @@ if ($clientRel -and $clientRel.url) {
 # first, with the last pack on the feed once it was out, and
 # Rollback-Feed.ps1 puts the channel back to any of them. Before "baseline"
 # moves, so a feed that names one and no list yet starts the list with it.
+#
+# Kept in the store beside the feed since #1050 ($FeedReleasesFile, sent with
+# version.json at the end), not in the feed: no launcher reads it.
 if ($releaseBaseline) {
-    $releaseList = @(Add-FeedRelease $doc $releaseBaseline (Get-FeedLastPackId $doc) $lastPackBefore '')
-    Say ("  the feed names {0} release(s) this channel can be put back to (Rollback-Feed.ps1 -List)" -f $releaseList.Count) 'DarkGray'
+    $releaseList = @(Add-FeedRelease $doc $releaseBaseline (Get-FeedLastPackId $doc) $lastPackBefore '' -Dir $ReleaseDir)
+    Say ("  the store names {0} release(s) this channel can be put back to (Rollback-Feed.ps1 -List)" -f $releaseList.Count) 'DarkGray'
 }
 # ==== end thornswood release list ====
 # What this release leaves installed (the release manifest block), which the
@@ -1918,8 +2002,14 @@ try {
 # The launcher's News page reads this. Without it the page sits empty however
 # many releases go out, because the notes were only ever going into the GitHub
 # release body, which nobody playing the game ever sees.
-$news = @()
-if ($doc.PSObject.Properties['news'] -and $doc.news) { $news = @($doc.news) }
+#
+# Every note the feed has, wherever it keeps them (Feed-News.ps1, #1050): in
+# "news", or, once the channel's minLauncher reads it, the news file it names.
+# Held whole in "news" in memory from here, so the DEV marks below see every
+# note, and put back the way the channel keeps them just before the feed is
+# written (the news out block).
+try { $news = @(Open-FeedNewsList $doc (Get-FeedStoreSiteDir $SiteDir) $SiteUrl) }
+catch { Die ("The notes the feed already has could not be read, so nothing was written: " + $_.Exception.Message) }
 
 # A note can be a headline on its own, or a headline followed by lines. Any
 # line starting with - or * becomes its own bullet on the News page, which is
@@ -2076,7 +2166,7 @@ if ($Dev) {
         Say "  could not read main's feed, so the dev marks were left alone: $($_.Exception.Message)" 'Yellow'
     }
     if ($null -ne $mainDoc) {
-        $marks = Set-DevFeedMarks $doc $mainDoc $RepoDir
+        $marks = Set-DevFeedMarks $doc $mainDoc $RepoDir $SiteDir $SiteUrl
         Say ("  {0} note{1} marked dev, the ones main has not had" -f $marks.Marked, $(if ($marks.Marked -eq 1) { '' } else { 's' })) 'DarkGray'
         if ($marks.MainVersion) { Say "  main is on $($marks.MainVersion), this one is on $launcherVersion" 'DarkGray' }
     } else {
@@ -2102,11 +2192,28 @@ if ($Dev) {
 # which Ship tags as release/<channel>/<id> once the feed is out.
 $relSource = Get-ReleaseSource $RepoDir
 $relBaseline = if ($releaseBaseline) { [string]$releaseBaseline.id } else { '' }
-$relRecord = New-ReleaseRecord $Id $Channel (Val $doc 'launcherVersion') @($chunks | ForEach-Object { [string]$_.Id }) `
+$relPacks = @(if (-not $packsGone) { $chunks | ForEach-Object { [string]$_.Id } })
+$relRecord = New-ReleaseRecord $Id $Channel (Val $doc 'launcherVersion') $relPacks `
     $relBaseline $relSource.Commit $relSource.Branch $relSource.Uncommitted @($script:ShipUiHashedWritten)
 Set-Prop $doc 'release' $relRecord
 Say ("  release {0}{1}" -f $Id, $(if ($relRecord.commit) { ', built from ' + $relRecord.commit.Substring(0, 12) } else { ', not from a git checkout' })) 'Green'
 # ==== end thornswood release record ====
+
+# ==== thornswood news out ====
+# THE NOTES GO WHERE THE CHANNEL KEEPS THEM (#1050, Feed-News.ps1): in "news"
+# while any launcher let in reads only that, and from the first minLauncher
+# that reads the news file (1.2.4) as one asset named as "newsFile", sent to
+# the site before the feed names it, with "news" left []. minLauncher is the
+# one this publish writes (the min launcher block). A dry run (-NoUpload
+# -NoPush) writes the file here and sends nothing, like the rest of it; a run
+# that sends the feed but uploads nothing keeps the notes in "news", so the
+# feed never names a file the site does not hold.
+$newsMin = if ($NoUpload -and -not $NoPush) { '' } else { Val $doc 'minLauncher' }
+try {
+    $newsWhere = Set-FeedNewsList $doc @($doc.news) $Channel $newsMin (Join-Path $DistDir ('news-' + $Id)) $SiteDir -NoSend:$NoUpload
+    if ($newsWhere -eq 'file') { Say ("  the {0} notes are one file on the site, named in the feed (every launcher let in reads it)" -f @($news).Count) 'Green' }
+} catch { Die ($_.Exception.Message + ' Run Ship again.') }
+# ==== end thornswood news out ====
 
 # Set-Content -Encoding UTF8 writes a byte order mark on Windows PowerShell,
 # and a BOM is not JSON. The launcher's reader stops on it and reports an
@@ -2125,7 +2232,9 @@ Say ("  release {0}{1}" -f $Id, $(if ($relRecord.commit) { ', built from ' + $re
 # -DryRun passes): nothing went to the site, so every url is empty by design,
 # and this feed goes nowhere. It used to stop every dry run of a real change
 # with exit 1 and advice about the ssh key (#1056).
-$blank = @($chunks | Where-Object { -not $_.Url })
+# Only the packs the feed names: once the packs are gone (the packs gone block)
+# none is sent or named, so none has a url, by design.
+$blank = @($chunks | Where-Object { -not $packsGone -and -not $_.Url })
 if ($blank.Count -and $NoUpload -and $NoPush) {
     Say ("  -NoUpload: {0} pack(s) have no url, because nothing was uploaded; this feed is not sent" -f $blank.Count) 'DarkGray'
 }
@@ -2290,7 +2399,11 @@ $pushFailed = $null
 if (-not $NoPush) {
     Head 'Sending the feed'
     try {
-        $sentFeed = Send-FeedStore $Channel $ReleaseDir @('version.json') -SiteDir $SiteDir
+        # The store's list of releases goes in the same step as the feed
+        # (Release-Baseline.ps1, #1050), when there is one here to send.
+        $feedFiles = @('version.json')
+        if (Test-Path -LiteralPath (Join-Path $ReleaseDir $FeedReleasesFile) -PathType Leaf) { $feedFiles += $FeedReleasesFile }
+        $sentFeed = Send-FeedStore $Channel $ReleaseDir $feedFiles -SiteDir $SiteDir
         if (@($sentFeed.Sent).Count) { Say "  version.json for $Id is on the VPS, and the site serves it" 'Green' }
         else { Say '  version.json on the VPS already matched this one' 'DarkGray' }
     } catch {

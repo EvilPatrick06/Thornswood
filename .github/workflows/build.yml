@@ -1,7 +1,9 @@
 # Every pull request and every push to main gets the checks a release starts
 # with: do all the PowerShell scripts parse, does every game script parse,
 # does the bot parse, do the test harnesses still pass, and does the launcher
-# compile with the .NET Framework 4 csc (C# 5). A red mark here means the
+# compile with the .NET Framework 4 csc (so C# 5, until #498 moves the build
+# to MSBuild; on GitHub's runner the MSBuild build is held to it, the step
+# "Build the launcher with MSBuild too, and compare"). A red mark here means the
 # branch would stop Ship.ps1; a green one means it is worth a person's time
 # to read. It builds only; nothing is published.
 #
@@ -370,6 +372,7 @@ jobs:
                  'test-chat-log.js',
                  'test-2260-burn-relog.js',
                  'test-2259-forge-burn.js',
+                 'test-2337-kiln-menu.js',
                  'test-1306-pr-workflow.js',
                  'test-2261-tome-refused.js',
                  'test-1383-treatments.js',
@@ -398,7 +401,8 @@ jobs:
                  'test-1588-tools-50.js',
                  'test-1741-encoding.js',
                  'test-1634-apprentice-gui.js',
-                 'test-1637-door-gui.js', 'test-2250-claim-door.js', 'test-2256-locked-for-everyone.js', 'test-2245-drawn-pick.js', 'test-item-names.js', 'test-2255-key-mold-models.js',
+                 'test-1637-door-gui.js', 'test-2250-claim-door.js', 'test-2256-locked-for-everyone.js', 'test-2245-drawn-pick.js', 'test-item-names.js', 'test-2255-key-mold-models.js', 'test-2258-house-parts-hidden.js', 'test-2298-held-board.ps1',
+                 'test-502-kill-bounty.js',
                  'test-1636-farm-gui.js',
                  'test-1394-fares.js',
                  'test-1635-ride-panel.js',
@@ -434,7 +438,9 @@ jobs:
                  'test-1640-jarl-word.js',
                  'test-1638-office.js',
                  'test-1631-needs-gui.js',
+                 'test-2267-needs-text.js',
                  'test-1764-away-no-rest.js',
+                 'test-2246-rest-places.js',
                  'test-1633-help-panel.js',
                  'test-1642-effects-restart.js',
                  'test-1730-forced-panel.js',
@@ -478,14 +484,15 @@ jobs:
                  'test-1180-own-plugins.js',
                  'test-1885-manifest-order.js',
                  'test-1075-script-citations.js',
+                 'test-1397-npc-docs-live.js',
                  'test-table-install.js',
                  'test-secrets-fail-closed.js',
                  'test-our-key-menus.js', 'test-slash-key.js', 'test-social-keys.js', 'test-server-pick-order.ps1',
-                 'test-2037-journal-new.js', 'test-2135-journal-press.js', 'test-social.js', 'test-2157-reconfigure.ps1', 'test-2210-links-attributes.ps1',
+                 'test-2037-journal-new.js', 'test-2135-journal-press.js', 'test-social.js', 'test-2157-reconfigure.ps1', 'test-2210-links-attributes.ps1', 'test-2210-refresh-scope.ps1',
                  'test-site-auth.js',
                  'test-site-route-gaps.js', 'test-2215-play-pressed-by.ps1',
                  'test-docs-pwfile.ps1',
-                 'test-site-credits-fill.js', 'test-deployed-build.ps1',
+                 'test-site-credits-fill.js', 'test-deployed-build.ps1', 'test-459-publish-record.ps1',
                  'test-site-headers.js', 'test-generated-source-chain.ps1',
                  'test-site-render.js', 'test-site-discovery.js',
                  'test-home-status.js', 'test-seats.js', 'test-age-gate.js', 'test-download-hash.js', 'test-2233-inuse-image.ps1',
@@ -498,11 +505,15 @@ jobs:
                  'test-backup-restore.ps1', 'test-backup-streaming.ps1', 'test-fetch-verify-all.ps1', 'test-2199-zip-policy.ps1',
                  'test-content-release.ps1',
                  'test-cooldown-sweep.js', 'test-voice-moved-clients.js',
-                 'test-release-parity.ps1', 'test-dev-version.ps1', 'test-ship-launcher-reuse.ps1',
+                 'test-release-parity.ps1', 'test-dev-version.ps1', 'test-ship-launcher-reuse.ps1', 'test-2347-dev-launcher-version.ps1',
                  'test-server-stage-directories.ps1',
                  'test-dev-settings-keys.ps1',
                  'test-dev-gamemode-notes.ps1',
                  'test-2076-dev-build-check.ps1',
+                 'test-2308-content-before-ship.ps1',
+                 'test-1050-news-out.ps1',
+                 'test-2309-loadorder-fresh.ps1',
+                 'test-459-publish-dist.ps1',
                  'test-1929-dev-gamemode-note.ps1',
                  'test-1938-server-ready-wait.ps1',
                  'test-1955-ship-stack-note.ps1',
@@ -747,6 +758,22 @@ jobs:
           if (Test-Path out\setup-stub.exe) { $built += (Resolve-Path out\setup-stub.exe).Path }
           .\scripts\dev\Check-Secrets.ps1 -Binary $built
           exit $LASTEXITCODE
+
+      - name: Build the launcher with MSBuild too, and compare
+        if: runner.environment == 'github-hosted'
+        shell: pwsh
+        run: |
+          # Issue #498 (Patrick's option C, 11 Oct): the launcher moves to
+          # MSBuild and launcher\app\Thornswood.csproj. Until the switch the
+          # step above is the build that ships, and this holds the project
+          # files to it: both ways, both exes, the same resources, references,
+          # types, file details, icon and manifest. GitHub's image has Visual
+          # Studio (windows-2025-vs2026, Visual Studio 18 Enterprise, on
+          # 12 Oct); the VPS runners have no MSBuild (12 Oct), so the
+          # fallback job leaves this step out, and the nightly runs the same
+          # harness there with the builds said SKIP.
+          & pwsh -NoProfile -File tests\test-498-msbuild.ps1 -RequireMSBuild -Scratch (Join-Path $env:RUNNER_TEMP 'msbuild-498')
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error file=tests/test-498-msbuild.ps1::the MSBuild build does not make the same launcher as the csc build, see the lines above'; exit 1 }
 
       - name: Keep the exe from this build
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

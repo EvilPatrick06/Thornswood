@@ -98,10 +98,12 @@ stay in their proper encounters.
 The embassy's 20 are people on a roll, not actors. See
 [The Imperial Embassy](embassy.md).
 
-Guards of a hold, when they are remade, are the hold's. A Thalmor
-marker is a reason to start a fight. They do not need a bounty
-number the server does not have. There is no crime gold and no
-stolen tag the server tracks. Theft is the rule on the site: take
+There are no NPC guards. A hold's guards are people in a guard role,
+an office the hold sets ([Offices](offices.md)); Patrick decided on
+11 October that guards are people and no NPC guard comes back (#502).
+A Thalmor marker is a reason to start a fight. No bounty is added for
+killing an NPC: there is no crime gold and no stolen tag the server
+tracks. Theft is the rule on the site: take
 something, take a good thing, leave the rest.
 
 ## Where this is
@@ -111,10 +113,19 @@ encounters and wildlife in natural habitats, cut town fillers, limit city
 animals, and implement merchant quests. The earlier instruction to remove
 bandit camps is superseded. Guild sites are recorded and can move later.
 
-Dev currently runs the first authored inn routine. The broader shared
-controller, population catalogue, habitat limits, difficulty tiers, stock
-controls and merchant quests are being implemented and verified. They
-are not described as shipped until a complete dev release contains them.
+Release 1.2.3 runs the population cut on both dev and main: the shared
+controller, population catalogue, habitat limits and difficulty tiers are live.
+Guards, courts, priests, town fillers and named creatures are not placed.
+Stock controls and merchant quests are still being implemented and verified.
+
+No bounty for a kill (#502): the bounty was Skyrim's own crime system in
+each person's game, and nothing of ours added one. Once a game is loaded,
+the front plugin tells the twelve crime factions in which a kill or a blow
+costs gold (every hold's, Raven Rock's, the Orcs' and one Dark Brotherhood
+contract's) that killing or striking a member is not a crime against them.
+The list is read out of the load order by `scripts\dev\Build-CrimeTable.py`
+into `game\data\crime-factions.json`. Theft, pickpocketing and trespass
+still add a bounty in the game; that waits on Patrick's answer on #502.
 See [Shared NPC activity](../NPC-SERVER-ACTIVITY.md) for verification.
 The [population catalogue](../NPC-POPULATION.md) lists authored counts, locations,
 caps and return times. Its coordinate files and the server policy come from the

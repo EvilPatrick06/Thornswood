@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The launcher as an MSBuild project (issue #498, Patrick's option C, 11 Oct).
+
+  Classic format, not SDK style, so the MSBuild in Visual Studio 2022 Build
+  Tools builds it with nothing downloaded: no .NET SDK and no NuGet restore.
+  It makes the same Thornswood.exe that scripts\release\Build-Launcher.ps1
+  makes with the .NET Framework csc: the same sources, the same references,
+  the same resources under the same names, the same win32 icon, the same
+  stamped manifest and the same file details. tests\test-498-msbuild.ps1
+  builds it both ways and compares the two exes.
+
+  Build it (from the repository folder, in PowerShell 7):
+    $msb = .\scripts\release\Find-MSBuild.ps1
+    & $msb launcher\app\Thornswood.csproj -nologo -p:OutDir=<folder>\
+  or with  .\scripts\release\Build-Launcher.ps1 -With msbuild
+
+  WHAT IS LEFT AS THE CSC BUILD HAS IT, ON PURPOSE. Each of these would change
+  how the exe runs, not only how it is built, so each is its own change:
+  - No TargetFrameworkAttribute (GenerateTargetFrameworkAttribute false). The
+    csc build has none, so the runtime applies the compatibility defaults of
+    an app that names no framework. Naming 4.8.1 would turn on every
+    AppContext switch default 4.6 to 4.8.1 changed (TLS defaults, WPF input
+    and layout fixes) on every machine at once.
+  - HighEntropyVA off and SubsystemVersion 4.00, the csc defaults. MSBuild's
+    own are on and 6.00.
+  - LangVersion 5. The in-box csc understands nothing newer, and it still
+    builds every release until the switch (#498). Patrick lifted the C# 5
+    rule on 11 Oct; it moves off 5 in the same change as the switch.
+
+  Nothing goes beside the exe. The update system publishes one file, so the
+  WebView2 DLLs are referenced with Private false (never copied) and travel
+  inside the exe as resources, the same as the csc build.
+-->
+<Project ToolsVersion="Current" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <!-- Build scratch under out\, which git ignores, never beside the sources:
+         launcher\app\*.cs is read by the csc build and by the harnesses. -->
+    <ThornswoodRepo>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\'))</ThornswoodRepo>
+    <BaseIntermediateOutputPath>$(ThornswoodRepo)out\obj\launcher\</BaseIntermediateOutputPath>
+  </PropertyGroup>
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
+    <Platform Condition="'$(Platform)' == ''">AnyCPU</Platform>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>Thornswood</AssemblyName>
+    <RootNamespace>Thornswood</RootNamespace>
+    <TargetFrameworkVersion>v4.8.1</TargetFrameworkVersion>
+    <LangVersion>5</LangVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <Optimize>true</Optimize>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>pdbonly</DebugType>
+    <NoConfig>true</NoConfig>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+    <HighEntropyVA>false</HighEntropyVA>
+    <SubsystemVersion>4.00</SubsystemVersion>
+    <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <OutDir Condition="'$(OutDir)' == ''">$(ThornswoodRepo)out\launcher\</OutDir>
+    <OutputPath>$(OutDir)</OutputPath>
+    <ApplicationIcon>..\app.ico</ApplicationIcon>
+    <ApplicationManifest>$(BaseIntermediateOutputPath)Thornswood.stamped.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <!-- The version is Updater.cs's Version, the one the updater compares, read
+       the way Build-Launcher.ps1 reads it, so the file details and the
+       manifest identity cannot drift from it. -->
+  <PropertyGroup>
+    <ThornswoodVersionLine>$([System.Text.RegularExpressions.Regex]::Match($([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)Updater.cs')), 'Version\s*=\s*"[0-9.]+"'))</ThornswoodVersionLine>
+    <ThornswoodVersion>$([System.Text.RegularExpressions.Regex]::Replace('$(ThornswoodVersionLine)', '[^0-9.]', ''))</ThornswoodVersion>
+    <ThornswoodVersion Condition="'$(ThornswoodVersion)' == ''">1.0.0</ThornswoodVersion>
+    <ThornswoodVersionFour>$(ThornswoodVersion)</ThornswoodVersionFour>
+    <ThornswoodVersionFour Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(ThornswoodVersionFour)', '^[0-9]+$'))">$(ThornswoodVersionFour).0</ThornswoodVersionFour>
+    <ThornswoodVersionFour Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(ThornswoodVersionFour)', '^[0-9]+\.[0-9]+$'))">$(ThornswoodVersionFour).0</ThornswoodVersionFour>
+    <ThornswoodVersionFour Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(ThornswoodVersionFour)', '^[0-9]+\.[0-9]+\.[0-9]+$'))">$(ThornswoodVersionFour).0</ThornswoodVersionFour>
+    <ThornswoodInfoFile>$(BaseIntermediateOutputPath)ThornswoodInfo.cs</ThornswoodInfoFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The same assemblies Build-Launcher.ps1 hands csc, by name. mscorlib
+         and System.Core come in by themselves. -->
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Security" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+    <Reference Include="PresentationFramework" />
+    <Reference Include="PresentationCore" />
+    <Reference Include="WindowsBase" />
+    <Reference Include="System.Xaml" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="Microsoft.Web.WebView2.Core">
+      <HintPath>..\lib\webview2\Microsoft.Web.WebView2.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Microsoft.Web.WebView2.Wpf">
+      <HintPath>..\lib\webview2\Microsoft.Web.WebView2.Wpf.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="*.cs" />
+    <Compile Include="$(ThornswoodInfoFile)" />
+  </ItemGroup>
+
+  <!-- Every resource under the name the code asks for. Build-Launcher.ps1
+       embeds the same list; tests\test-498-msbuild.ps1 compares the names
+       and the bytes of both exes. -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\ui.xaml"><LogicalName>ui.xaml</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\logo.png"><LogicalName>logo.png</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\logo-dev.png"><LogicalName>logo-dev.png</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\launcher-header.jpg"><LogicalName>launcher-header.jpg</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\launcher-header.mp4"><LogicalName>launcher-header.mp4</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\app.ico"><LogicalName>app.ico</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\app-dev.ico"><LogicalName>app-dev.ico</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\lib\webview2\Microsoft.Web.WebView2.Core.dll"><LogicalName>Microsoft.Web.WebView2.Core.dll</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\lib\webview2\Microsoft.Web.WebView2.Wpf.dll"><LogicalName>Microsoft.Web.WebView2.Wpf.dll</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\lib\webview2\WebView2Loader.dll"><LogicalName>WebView2Loader.dll</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\voice-host.html"><LogicalName>voice-host.html</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\Thornswood.ini"><LogicalName>Thornswood.ini</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\..\records\client-build.json"><LogicalName>client-build.json</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\..\records\skyrim-files.json"><LogicalName>skyrim-files.json</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="..\..\records\ui-gone.json"><LogicalName>ui-gone.json</LogicalName></EmbeddedResource>
+  </ItemGroup>
+
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+
+  <!-- A resource that is missing stops the build by name, as Build-Launcher.ps1
+       does, rather than leaving MSBuild's own error about a file. -->
+  <Target Name="ThornswoodCheckInputs" BeforeTargets="BeforeBuild">
+    <Error Condition="!Exists('%(EmbeddedResource.FullPath)')" Text="%(EmbeddedResource.Identity) is not in the repository folder where it should be. Every resource is tracked, so the path is wrong; nothing was built." />
+    <Error Condition="!Exists('%(Reference.HintPath)') And '%(Reference.HintPath)' != ''" Text="WebView2 is missing from launcher\lib\webview2: %(Reference.HintPath)" />
+    <Error Condition="'$(ThornswoodVersionLine)' == ''" Text="Updater.cs has no Version = &quot;...&quot; line, so the exe would carry no version." />
+  </Target>
+
+  <!-- What Windows shows (Explorer's Description, Task Manager, properties):
+       the same attributes Build-Launcher.ps1 writes, generated on every build
+       so the version cannot drift from Updater.cs. -->
+  <Target Name="ThornswoodInfo" BeforeTargets="CoreCompile" DependsOnTargets="ThornswoodCheckInputs">
+    <ItemGroup>
+      <ThornswoodInfoLine Include="// Written by Thornswood.csproj on every build. Editing it does nothing." />
+      <ThornswoodInfoLine Include="[assembly: System.Reflection.AssemblyTitle(&quot;Thornswood&quot;)]" />
+      <ThornswoodInfoLine Include="[assembly: System.Reflection.AssemblyDescription(&quot;Thornswood launcher&quot;)]" />
+      <ThornswoodInfoLine Include="[assembly: System.Reflection.AssemblyProduct(&quot;Thornswood&quot;)]" />
+      <ThornswoodInfoLine Include="[assembly: System.Reflection.AssemblyCompany(&quot;Thornswood&quot;)]" />
+      <ThornswoodInfoLine Include="[assembly: System.Reflection.AssemblyCopyright(&quot;Thornswood&quot;)]" />
+      <ThornswoodInfoLine Include="[assembly: System.Reflection.AssemblyVersion(&quot;$(ThornswoodVersionFour)&quot;)]" />
+      <ThornswoodInfoLine Include="[assembly: System.Reflection.AssemblyFileVersion(&quot;$(ThornswoodVersionFour)&quot;)]" />
+      <ThornswoodInfoLine Include="[assembly: System.Reflection.AssemblyInformationalVersion(&quot;$(ThornswoodVersion)&quot;)]" />
+      <ThornswoodInfoLine Include="[assembly: System.Runtime.InteropServices.ComVisible(false)]" />
+    </ItemGroup>
+    <WriteLinesToFile File="$(ThornswoodInfoFile)" Lines="@(ThornswoodInfoLine)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+  </Target>
+
+  <!-- The application manifest (issue #463) with this build's four part
+       version in assemblyIdentity, as Build-Launcher.ps1 stamps it. -->
+  <Target Name="ThornswoodManifest" BeforeTargets="ResolveKeySource;PrepareForBuild" DependsOnTargets="ThornswoodCheckInputs">
+    <Copy SourceFiles="$(MSBuildThisFileDirectory)Thornswood.manifest" DestinationFiles="$(ApplicationManifest)" />
+    <XmlPoke XmlInputPath="$(ApplicationManifest)" Query="/asm:assembly/asm:assemblyIdentity/@version" Value="$(ThornswoodVersionFour)" Namespaces="&lt;Namespace Prefix='asm' Uri='urn:schemas-microsoft-com:asm.v1' /&gt;" />
+  </Target>
+</Project>

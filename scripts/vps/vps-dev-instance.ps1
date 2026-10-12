@@ -2,9 +2,10 @@
 #
 # Runs ON the VPS. Makes the dev game server and the dev voice server beside
 # the live ones, from copies of the live installs, on their own ports, with
-# their own scheduled tasks, firewall rules and watchdog entries. Nothing
-# about the live instances is touched. Safe to run again: every step checks
-# before it acts.
+# their own scheduled tasks and firewall rules. Nothing about the live
+# instances is touched. Safe to run again: every step checks before it acts.
+# The watchdog's dev checks come with Watch-Services.ps1 -Install, not from
+# here.
 #
 #   live game server   C:\Thornswood-Server       UDP/TCP 7777, resources TCP 3000
 #   dev game server    C:\Thornswood-Server-Dev   UDP/TCP 7787, resources TCP 7788 (the server picks port+1 itself)
@@ -34,7 +35,7 @@
 #   Deploy-Docs.ps1 gives the site its read on dev's server.log and chat.
 #
 #   -FilesOnly   the copies, the folders' rules and the run file, and no task,
-#                firewall rule or watchdog entry. tests\test-dev-instance.ps1
+#                firewall rule or watchdog line. tests\test-dev-instance.ps1
 #                runs it against scratch folders.
 param(
     [switch]$Start,
@@ -200,17 +201,14 @@ if (Get-NetFirewallRule -DisplayName 'Thornswood Dev Voice' -ErrorAction Silentl
 }
 
 # ---------------------------------------------------------------- watchdog
+# The dev checks are in Watch-Services.ps1's own list, and its -Install is
+# what puts them on the box. This only says whether the installed watcher
+# has them; it writes nothing into it (issue #1106).
 $watch = 'C:\Thornswood-Watch\watch.ps1'
-if (Test-Path $watch) {
-    $w = Get-Content $watch -Raw
-    if ($w -notmatch 'Thornswood Dev Server') {
-        $anchor = "  @{ Name = 'bot';     Task = 'Thornswood Bot';    Port = 0    }"
-        if ($w.Contains($anchor)) {
-            $w = $w.Replace($anchor, "  @{ Name = 'bot';     Task = 'Thornswood Bot';    Port = 0    },`r`n  @{ Name = 'dev game';  Task = 'Thornswood Dev Server'; Port = $($devPort + 1) },`r`n  @{ Name = 'dev voice'; Task = 'Thornswood Dev Voice';  Port = $devVoicePort }")
-            [IO.File]::WriteAllText($watch, $w, (New-Object Text.UTF8Encoding($false)))
-            Say '  watchdog now watches the dev server and dev voice'
-        } else { Say '  watchdog: could not find the checks list, left alone' }
-    } else { Say '  watchdog already knows the dev services' }
+if ((Test-Path $watch) -and ((Get-Content $watch -Raw) -match 'Thornswood Dev Server')) {
+    Say '  watchdog already watches the dev server and dev voice'
+} else {
+    Say '  watchdog: run .\scripts\vps\Watch-Services.ps1 -Install from your machine to put the dev checks on the box'
 }
 
 if ($Start) {
