@@ -13,7 +13,10 @@
 # The harnesses were all written to be run by hand and none of them had ever
 # run here: 236 checks across twelve files, sitting in the repo going stale.
 #
-# WHERE IT RUNS. On the VPS, since 25 September: GitHub's own runners were
+# WHERE IT RUNS NOW (#1306, 11 October): GitHub's hosted Windows runner by
+# default, the VPS only as a fallback; see the jobs below. The history:
+#
+# WHERE IT RAN. On the VPS, from 25 September: GitHub's own runners were
 # blocked on billing and every run failed in seconds, and Patrick chose a
 # runner on the box over paying for minutes (issue #437).
 # scripts\deploy\Install-Runner.ps1 puts it there, as its own local account that is
@@ -24,8 +27,12 @@
 # the queue reached an hour when the lanes opened pull requests in bursts.
 # Install-Runner.ps1 -Number <n> puts each one after the first beside it with
 # the same label, so a check goes to whichever is free.
-# Safe because the repository is private: nobody outside the team can open a
-# pull request that runs code on the box.
+# NOT PULL REQUESTS, since 11 October (#1306, Patrick's option C; #2161): a
+# pull request runs these same steps on GitHub's hosted Windows runner, in
+# build-pr.yml, which scripts\dev\Build-PrWorkflow.js generates from this
+# file. Only a push to main, already merged, and a manual run use the box.
+# Change a step here, then run  node scripts/dev/Build-PrWorkflow.js;
+# tests\test-1306-pr-workflow.js fails while the two differ.
 #
 # WHY THE ACTIONS ARE PINNED. Every action is named by a full length commit
 # SHA, with the tag it was on in a comment at the end of the line, the same as
@@ -61,10 +68,15 @@
 # once this is green and it has been said in #staff-general.
 name: Build check
 on:
-  pull_request:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      runner:
+        description: 'hosted (GitHub, the default) or vps (the box, the fallback)'
+        type: choice
+        options: [hosted, vps]
+        default: hosted
 permissions:
   contents: read
 # One run per branch at a time. A newer push cancels the run it replaces, so
@@ -73,13 +85,41 @@ concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  launcher:
-    name: Launcher builds
+  # WHERE IT RUNS, since 11 October (#1306, Patrick's final call on #2161):
+  # GitHub's hosted windows-latest is the default, in the job "launcher"
+  # at the end of this file. This job is the VPS FALLBACK. It runs only
+  # for a trusted event (this file has no pull_request trigger: a pull
+  # request builds in build-pr.yml, hosted only), and only when
+  #   - the repository variable BUILD_RUNNER is vps (hosted minutes ran out,
+  #     or GitHub is down: Settings, Variables, BUILD_RUNNER = vps), or
+  #   - a manual run asked for runner: vps, or
+  #   - the hosted job failed. A quota or billing stop fails it before any
+  #     step runs, and this picks the build up on the box. A real red fails
+  #     here too, so a broken main shows red twice; that is the price of not
+  #     telling a quota stop from a test failure.
+  # The steps are the hosted job's own, by the YAML anchor checks, so the two
+  # can never test different things.
+  launcher-vps:
+    name: Launcher builds (VPS fallback)
+    needs: launcher
+    if: ${{ always() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}
     runs-on: [self-hosted, Windows, thornswood-vps]
-    # About two minutes on the VPS. Past this it is stuck, not slow.
+    # About fifteen minutes on the VPS. Past this it is stuck, not slow.
     timeout-minutes: 20
-    steps:
+    steps: &checks
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # The hosted image ships whatever node and python it has this month;
+      # these are pinned so a check means the same thing as on the VPS, which
+      # has its own and skips them.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: runner.environment == 'github-hosted'
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        if: runner.environment == 'github-hosted'
+        with:
+          python-version: '3.12'
 
       - name: Scan the tree for secrets
         shell: pwsh
@@ -330,6 +370,7 @@ jobs:
                  'test-chat-log.js',
                  'test-2260-burn-relog.js',
                  'test-2259-forge-burn.js',
+                 'test-1306-pr-workflow.js',
                  'test-2261-tome-refused.js',
                  'test-1383-treatments.js',
                  'test-1384-condition.js',
@@ -717,3 +758,15 @@ jobs:
       # No pdb artifact (#1356 / #462): the pdb carries absolute build-machine
       # source paths. Packs and the installer already skip *.pdb. Keep the exe
       # above; leave the pdb on the runner only.
+
+  # The default: GitHub's hosted Windows runner (#1306). Skipped when
+  # BUILD_RUNNER is vps or a manual run asked for the box, and then the
+  # fallback above runs instead.
+  launcher:
+    name: Launcher builds
+    if: ${{ vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}
+    runs-on: windows-latest
+    # The hosted runner has two cores: the harness step alone took over
+    # eighteen minutes on it, so it gets an hour.
+    timeout-minutes: 60
+    steps: *checks
