@@ -28,6 +28,7 @@ own overwrite last.
 Read only. Never connects to anything and never writes beside the code: the
 news webhook the builder saves is pointed at a temporary folder.
 """
+import _pyguard  # noqa: F401  (first: Python 3.10 or newer, #2276)
 import asyncio
 import contextlib
 import importlib.util
