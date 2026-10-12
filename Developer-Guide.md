@@ -667,7 +667,7 @@ Closes #123
 gh pr create --title "Short title" --body $body
 ```
 
-The title says what changed. The body says how you tested it. If the work finishes an issue, put `Closes #123` in the body. The pull request targets `main`.
+The title says what changed. The body says how you tested it. If the work finishes an issue, put `Closes #123` in the body. A fix people would notice says `Refs #123` instead, because its issue is closed with a `Test task:` comment when the fix reaches main ([Everything we need to do goes on the board](#everything-we-need-to-do-goes-on-the-board)). The pull request targets `main`.
 
 Run the test that covers your change before you open the pull request.
 
@@ -917,6 +917,18 @@ How to use it:
 - A pull request that finishes an issue says `Closes #N`, so merging closes
   it and the board moves it to Done. Say in the pull request, or in #staff-general,
   which issues moved.
+- A fix people would notice is the exception: its pull request says `Refs #N`,
+  and the issue stays open until the fix reaches main (Patrick, 11 Oct: dev
+  is where the team checks that nothing breaks the game, and main is where
+  testers test, since we are in alpha). When it is on main, whoever fixed it
+  writes a comment on the issue whose first line is `Test task: <a title of
+  at most 45 characters>`, then numbered steps in plain English and what
+  should happen, with no issue numbers, links or code, and closes the issue.
+  The bot turns that comment into a post in the #test-tasks forum the moment
+  the issue closes, tagged Main, so closing it when it merges or when it
+  reaches dev sends testers to look for a fix that main does not have. The
+  `Server:` line those comments carried before is no longer needed; the bot
+  reads it and ignores it (`bot\README.md`, Testing).
 
 #### What is not a reason to skip an issue
 
