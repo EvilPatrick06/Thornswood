@@ -24,6 +24,16 @@
   on the machine, matched by name whichever folder it ran from, before csc had
   even started. That was To Do List entry 243: "A build produces files in an
   output folder and does not kill processes or write to the Desktop."
+
+  TWO WAYS TO BUILD, UNTIL THE SWITCH (issue #498, Patrick's option C,
+  11 Oct). -With csc, the default, is the in-box compiler as above. -With
+  msbuild builds launcher\app\Thornswood.csproj and installer\setup\Setup.csproj
+  with the MSBuild of Visual Studio 2022 or its Build Tools
+  (Find-MSBuild.ps1 says whether this machine has it). Both make the same two
+  exes, with the same checks before and the same signing after;
+  tests\test-498-msbuild.ps1 builds both ways and compares them. The switch
+  makes msbuild the only way, once every machine that builds the launcher has
+  MSBuild; #498 says which still do not.
 #>
 [CmdletBinding()]
 param(
@@ -33,7 +43,18 @@ param(
     # Install-Launcher put the exe in place, so csc never meets a launcher that
     # is still running from the install.
     [string]$OutDir,
-    [switch]$NoPause
+    [switch]$NoPause,
+    # csc (the in-box compiler, the default) or msbuild (the two project files).
+    [ValidateSet('csc', 'msbuild')]
+    [string]$With = 'csc',
+    # Where the setup program goes, out\setup-stub.exe unless told otherwise.
+    # tests\test-498-msbuild.ps1 builds into scratch so a comparison never
+    # replaces the stub a clone's packaging copies from.
+    [string]$StubOut,
+    # Leaves both exes unsigned even on a machine with records\signing\signing.json.
+    # For a comparison build that never ships, so it spends no signing; Ship
+    # never passes it, and Ship and Publish-Installer refuse an unsigned exe.
+    [switch]$NoSign
 )
 
 Set-StrictMode -Version Latest
@@ -269,6 +290,10 @@ if (-not $hasInfo) {
     Say '  a source file already sets the assembly details, leaving them alone' 'DarkGray'
 }
 
+# From here to the signing is the build itself, csc's way or MSBuild's
+# (-With). The csc half is left at the margin it always had, so the switch
+# (#498) is the deletion of this one block and nothing else moves.
+if ($With -eq 'csc') {
 # ------------------------------------------------------------ compile
 Head 'Compiling'
 # /noconfig: csc otherwise reads its own csc.rsp and adds System, System.Core,
@@ -411,6 +436,7 @@ Head 'Setup stub'
 $stubDir = Join-Path $Here '..\..\out'
 New-Item -ItemType Directory -Force -Path $stubDir | Out-Null
 $stub = Join-Path $stubDir 'setup-stub.exe'
+if ($StubOut) { $stub = $StubOut; New-Item -ItemType Directory -Force -Path (Split-Path -Parent $stub) | Out-Null }
 $stubNew = Join-Path $env:TEMP 'Thornswood-Setup.exe'
 if (Test-Path $stubNew) { Remove-Item $stubNew -Force }
 $stubArgs = @('/noconfig', '/nologo', '/target:winexe', '/platform:anycpu', '/optimize+', '/debug:pdbonly',
@@ -467,6 +493,64 @@ else {
         Say ("  setup-stub.pdb  {0:n0} KB (shipping machine only)" -f ((Get-Item $stubPdb).Length / 1KB)) 'DarkGray'
     }
 }
+} else {
+# ------------------------------------------------------------ MSBuild
+# The same two exes from the two project files. What goes into each (sources,
+# references, resources, icon, stamped manifest, file details) is written in
+# the project files themselves, so this half is only the two build lines and
+# the setup program's move onto setup-stub.exe.
+Head 'Compiling with MSBuild'
+. (Join-Path $Here 'Find-MSBuild.ps1') -Load
+$found = Find-ThornswoodMSBuild
+if (-not $found.MSBuild) { Die 'MSBuild was not found on this machine. -With msbuild needs Visual Studio 2022 or its Build Tools with the MSBuild component; Developer-Guide.md "Setting up a machine" has the install line. -With csc still builds.' }
+if (-not $found.RefAssemblies) { Die 'The .NET Framework 4.8.1 reference assemblies are not on this machine. They are the Build Tools component Microsoft.Net.Component.4.8.1.TargetingPack; Developer-Guide.md "Setting up a machine" has the install line.' }
+Say "  $($found.MSBuild)" 'DarkGray'
+$proj = Join-Path $Src 'Thornswood.csproj'
+$stubProj = Join-Path $Here '..\..\installer\setup\Setup.csproj'
+foreach ($p in @($proj, $stubProj)) {
+    if (-not (Test-Path -LiteralPath $p)) { Die "$([IO.Path]::GetFileName($p)) is not at $p. It is in the repository, so the path is wrong; nothing was built." }
+}
+# -nr:false: without it MSBuild leaves its worker processes running after the
+# build, holding files under out\obj, and a runner names them as left behind.
+$msbArgs = @('-nologo', '-v:minimal', '-nr:false', '-p:Configuration=Release')
+$old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+& $found.MSBuild (Resolve-Path -LiteralPath $proj).Path @msbArgs ('-p:OutDir=' + $outDir.TrimEnd('\') + '\')
+$rc = $LASTEXITCODE
+$ErrorActionPreference = $old
+if ($rc -ne 0 -or -not (Test-Path $exe)) { Die "MSBuild exited with $rc" }
+Say ("  Thornswood.exe  {0:n0} KB" -f ((Get-Item $exe).Length / 1KB)) 'Green'
+
+Head 'Setup stub'
+# Built under the name it ships as (the project's AssemblyName is
+# Thornswood-Setup, for OriginalFilename), into a scratch folder, then moved
+# onto setup-stub.exe; a failed build leaves the last working copy, as above.
+$stub = Join-Path (Join-Path $Here '..\..\out') 'setup-stub.exe'
+if ($StubOut) { $stub = $StubOut }
+New-Item -ItemType Directory -Force -Path (Split-Path -Parent $stub) | Out-Null
+$stubBuild = Join-Path $env:TEMP 'ThornswoodSetupBuild'
+if (Test-Path -LiteralPath $stubBuild) { Remove-Item -LiteralPath $stubBuild -Recurse -Force }
+$old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+& $found.MSBuild (Resolve-Path -LiteralPath $stubProj).Path @msbArgs ('-p:OutDir=' + $stubBuild + '\')
+$rc2 = $LASTEXITCODE
+$ErrorActionPreference = $old
+$stubNew = Join-Path $stubBuild 'Thornswood-Setup.exe'
+if ($rc2 -ne 0 -or -not (Test-Path -LiteralPath $stubNew)) {
+    Write-Host ''
+    Say "  MSBuild exited with $rc2. The installer program did NOT build." 'Red'
+    if (Test-Path $stub) {
+        Die 'setup-stub.exe did not rebuild. The last working copy is still here, but a release must not ship on a failed stub build. Fix the compile error above and run Build-Launcher again.'
+    } else {
+        Die 'There is no setup-stub.exe at all. A package built now would have no installer in it. Fix the compile error above and run Build-Launcher again.'
+    }
+}
+if (Test-Path $stub) { Remove-Item $stub -Force }
+Move-Item -LiteralPath $stubNew -Destination $stub
+Say ("  setup-stub.exe  {0:n0} KB" -f ((Get-Item $stub).Length / 1KB)) 'Green'
+$stubPdb = [IO.Path]::ChangeExtension($stub, '.pdb')
+if (Test-Path -LiteralPath $stubPdb) { Remove-Item -LiteralPath $stubPdb -Force }
+Move-Item -LiteralPath ([IO.Path]::ChangeExtension($stubNew, '.pdb')) -Destination $stubPdb
+Remove-Item -LiteralPath $stubBuild -Recurse -Force
+}
 
 # ------------------------------------------------------------ signing
 #
@@ -485,7 +569,9 @@ else {
 # Sign-Artifact.ps1 for what that file holds, and Bootstrap.cs:112-121 for why
 # any of this matters.
 $signer = Join-Path $Here 'Sign-Artifact.ps1'
-if (Test-Path -LiteralPath $signer) {
+if ($NoSign) {
+    Say '  not signing: -NoSign, a comparison build that never ships' 'DarkGray'
+} elseif (Test-Path -LiteralPath $signer) {
     Head 'Signing'
     & $signer -Path $exe
     if ($LASTEXITCODE -ne 0) { Die 'Signing failed. Nothing was published.' }

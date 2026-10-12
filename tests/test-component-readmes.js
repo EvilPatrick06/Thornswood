@@ -330,9 +330,10 @@ SIX.forEach(function (d) {
   const held = files('installer/setup').filter(function (f) { return f !== 'README.md'; });
   // Setup.manifest since issue #463: the setup program's own application
   // manifest (per-monitor DPI, asInvoker), embedded by Build-Launcher.ps1.
-  yes('installer' + BS + 'setup: holds the two files its README says, Bootstrap.cs and Setup.manifest (' + held.join(', ') + ')',
-      held.length === 2 && held.indexOf('Bootstrap.cs') >= 0 && held.indexOf('Setup.manifest') >= 0 &&
-      t.indexOf('`Bootstrap.cs`') >= 0 && t.indexOf('`Setup.manifest`') >= 0);
+  // Setup.csproj since issue #498: the same program as an MSBuild project.
+  yes('installer' + BS + 'setup: holds the three files its README says, Bootstrap.cs, Setup.manifest and Setup.csproj (' + held.join(', ') + ')',
+      held.length === 3 && held.indexOf('Bootstrap.cs') >= 0 && held.indexOf('Setup.manifest') >= 0 && held.indexOf('Setup.csproj') >= 0 &&
+      t.indexOf('`Bootstrap.cs`') >= 0 && t.indexOf('`Setup.manifest`') >= 0 && t.indexOf('`Setup.csproj`') >= 0);
   yes('installer' + BS + 'setup: Build-Launcher.ps1 compiles Bootstrap.cs by name into setup-stub.exe',
       bl.indexOf("'.." + BS + ".." + BS + "installer" + BS + "setup" + BS + "Bootstrap.cs'") >= 0 && bl.indexOf("setup-stub.exe'") >= 0 &&
       t.indexOf('setup-stub.exe') >= 0);

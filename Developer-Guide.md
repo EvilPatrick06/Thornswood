@@ -376,6 +376,39 @@ client from the site instead (Shipping from another machine, below). The
 release webhooks are on the VPS (`scripts\ops\Discord-Hook.ps1`) and every
 Ship reads them from there, so there is nothing to hand over.
 
+The launcher's build is moving to MSBuild (#498, decided by Patrick on
+11 Oct). A dev Ship builds the launcher on the machine that runs it, so
+every machine that Ships needs Visual Studio 2022 Build Tools with the
+MSBuild component and the .NET Framework 4.8.1 targeting pack before the
+switch. Nothing else is downloaded at build time: no .NET SDK, no NuGet. A
+machine with no Build Tools yet, in PowerShell 7 (Windows asks for an
+administrator):
+
+```
+winget install --id Microsoft.VisualStudio.2022.BuildTools -e --accept-package-agreements --accept-source-agreements --override "--quiet --wait --norestart --add Microsoft.VisualStudio.Workload.MSBuildTools --add Microsoft.Net.Component.4.8.1.TargetingPack"
+```
+
+A machine that already has Build Tools, for the engine above, adds the one
+component to the install it has:
+
+```
+& "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\setup.exe" modify --installPath "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\BuildTools" --add Microsoft.Net.Component.4.8.1.TargetingPack --quiet --norestart
+```
+
+Visual Studio 2022 or newer itself, any edition, with the ".NET desktop
+development" workload, is just as good (GitHub's runner builds it with Visual
+Studio 18). Then, from `Thornswood-Repo`:
+
+```
+.\scripts\release\Find-MSBuild.ps1 -Report
+.\scripts\release\Build-Launcher.ps1 -With msbuild -Root $env:TEMP\msbuild-try -NoPause
+```
+
+The first names MSBuild.exe and the 4.8.1 reference assemblies, or says
+which is missing. The second builds both exes into a scratch folder and
+ends with Done. Until the switch Ship still builds with the in-box csc, and
+`Setup-ShipMachine.ps1 -Check` lists MSBuild as "later", not as a gap.
+
 The pack baseline lives on the VPS beside the feed, and every Ship receives it
 first, so there is nothing to pull. If the VPS has none for a channel, Ship
 stops with "No baseline yet". To rebuild a baseline by hand:
@@ -740,8 +773,9 @@ What you run after the merge depends on what the pull request touched. A dev rel
 #### What this is
 
 Thornswood: a modded co-op Skyrim roleplay server on SkyMP, in alpha and
-open by application. This repo is the launcher (launcher\app, C# 5, WPF, built with the
-.NET Framework 4 csc), the game plugins (game\plugins, Skyrim Platform
+open by application. This repo is the launcher (launcher\app, C# and WPF on the
+.NET Framework, built with the .NET Framework 4 csc and so C# 5 until the build
+moves to MSBuild, #498), the game plugins (game\plugins, Skyrim Platform
 JavaScript), the site (site, node), the Discord bot (bot,
 Python) and every script that ships or runs it. Owner: Patrick (EvilPatrick06).
 
@@ -1040,8 +1074,26 @@ from the board, none of these three puts an issue aside:
   (issue #440), along with the forwarding copies in `tools\`. The files a
   machine kept in `tools\` moved on 29 Sep (signing.json to `records\signing`,
   the setup stub to `out`, the rest to `local`) and the folder is gone.
-- Launcher code is C# 5 only: no string interpolation, no ?., no nameof,
-  no expression bodied members, no out var.
+- The launcher builds with MSBuild from project files, and its code may be
+  newer C# once it does. Decided by Patrick on 11 Oct: option C on #498,
+  switch the build fully, and in his words "also we can lift the C# 5
+  rule". The C# 5 rule was always about the compiler, never the framework
+  (#499): the .NET Framework 4 csc that ships inside Windows, which
+  `scripts\release\Build-Launcher.ps1` still builds every release with,
+  understands nothing newer. So until the switch, launcher code
+  (`launcher\app`, and the setup program in `installer\setup`) still
+  compiles as C# 5: no string interpolation, no ?., no nameof, no
+  expression bodied members, no out var.
+  `launcher\app\Thornswood.csproj` and `installer\setup\Setup.csproj`
+  already build the same two exes with MSBuild
+  (`Build-Launcher.ps1 -With msbuild`, held to the csc build by
+  `tests\test-498-msbuild.ps1` in every build check). The switch makes that
+  the only build and, in the same pull request, moves `LangVersion` to the
+  newest the Build Tools compiler offers for .NET Framework 4.8.1, once
+  every machine that builds the launcher has MSBuild; #498 says which do not
+  yet. C# inside PowerShell scripts (`Add-Type`, which Windows PowerShell
+  5.1 compiles with the Framework compiler, as in
+  `scripts\dev\Check-Secrets.ps1`) stays C# 5 after the switch too.
 - Every change goes out as one complete release: launcher, game files and
   server together, never a half.
 
@@ -1233,8 +1285,9 @@ The short form of the rules. The same decisions, with the dates they were made, 
   paths, the architecture page and three launcher harnesses, issue #875, and
   the new-box runbook read against its scripts, issue #454),
   the launcher window, the count of
-  silent catches in the launcher, and the launcher compiles with the .NET
-  Framework csc). Red means the branch would stop Ship at the build step;
+  silent catches in the launcher, the launcher compiles with the .NET
+  Framework csc, and on GitHub's runner the launcher built with MSBuild
+  from its project files matches that build, issue #498). Red means the branch would stop Ship at the build step;
   fix that, and merge once it is green, you are confident in the change, and you have said so in
   #staff-general. Run the test harnesses your change touches yourself. All
   ~410 of them (tests/, bot, and voice), and a look for stray pull requests
@@ -1292,8 +1345,8 @@ this is the long form.
   when you take it. A main Ship preserves the Dev feed and baseline.
 - **Settled design is a proposal first.** Where the game runs from (its own
   folder, see One Skyrim of its own), Keep and Hold for Data\Platform, the
-  client built from the fork and recorded, C# 5 only, one complete release at
-  a time: changing any of these starts as a few lines in #staff-general, agreed by the
+  client built from the fork and recorded, the launcher build (MSBuild, and
+  C# 5 until the switch to it, #498), one complete release at a time: changing any of these starts as a few lines in #staff-general, agreed by the
   team before code. Editing `Shell.cs`, `Checks.cs`, `Keep.cs`, `Hold.cs`,
   `Updater.cs` or `Publish-Update.ps1` gets a line in #staff-general too; every
   machine touches them.
@@ -1659,7 +1712,7 @@ release, launcher, game files and server together, are in How work moves.
 | Source repo | github.com/EvilPatrick06/Thornswood (private), clone at `C:\Users\<you>\Downloads\Thornswood-Repo` | Launcher source, plugins, site, bot, every script |
 | Feed store | On the VPS beside the feed the site serves: `C:\Thornswood-Docs\feed\{version.json, published.json, launchers.txt, history\}` and the same under `feed-dev`. Each machine's working copy is `%LOCALAPPDATA%\Thornswood\feed\main` and `\dev` | `version.json` (the feed, served at `/feed[-dev]/version.json`), `published.json` (the pack baseline), every launcher version the channel published, and each replaced file, none of those three served. Ship receives and sends them through `scripts\release\Feed-Store.ps1` (#907). Until then they were the `Thornswood-Releases` GitHub repository and its two clones |
 | Downloads | On the VPS, `C:\Thornswood-Docs\feed\assets` and `feed-dev\assets`, served at `https://thornswood.net/feed[-dev]/assets/<sha256>` | Every pack, launcher exe and client runtime a feed names, one file per sha256, one folder per channel (`docs\FEED.md` "Downloads come from the site") |
-| Launcher | `launcher\app\*.cs` + `launcher\ui.xaml`, built by `scripts\release\Build-Launcher.ps1` with the .NET Framework 4 csc, C# 5 only | WPF app at `<drive>:\Thornswood\Launcher\Thornswood.exe` (C: on most machines); profile, config and packs under that folder. The scripts find the install on whichever fixed drive holds it; `-Root` overrides |
+| Launcher | `launcher\app\*.cs` + `launcher\ui.xaml`, built by `scripts\release\Build-Launcher.ps1` with the .NET Framework 4 csc, so C# 5, until the build moves to MSBuild and `launcher\app\Thornswood.csproj` (#498) | WPF app at `<drive>:\Thornswood\Launcher\Thornswood.exe` (C: on most machines); profile, config and packs under that folder. The scripts find the install on whichever fixed drive holds it; `-Root` overrides |
 | Dev build | `<drive>:\Thornswood-DevBuild`, beside the main install, put there by the main launcher's Play page Server dropdown | Same exe, `config.json` says `Channel: dev`, `UpdateBranch: dev`, port 7787, voice 7789. Staff roles only (Owner, Dev, Gamemaster, Moderator, Loremaster) |
 | Game | `<Root>\Game`, Thornswood's own folder, which the launcher builds from the Steam copy of Skyrim Special Edition and what Vortex deployed from the Nexus collection (see One Skyrim of its own) | The launcher will not Play from the Steam copy itself. Thornswood's own loose files live in `Data\Platform` (plugins in `Plugins\thornswood-*.js`, page in `UI\`) and `Data\SKSE\Plugins\Thornswood.ini` |
 | Plugins | `game\plugins\thornswood-{front,emotes,mark,voice}.js`, UI in `game\ui` | Skyrim Platform JavaScript. Idle unless the client points at our server and the launcher left a fresh session note |
@@ -2385,7 +2438,7 @@ The bot scripts need Python 3 with `discord.py` and `Pillow`. [Setting up a mach
 
 #### The .NET Framework
 
-Launcher code is C# 5, built with the .NET Framework 4 compiler. The window is `launcher\ui.xaml`. How the launcher starts is `launcher\app\ARCHITECTURE.md`. The six shared files in `launcher\app` are named in [D. Visual Studio Code](#d-visual-studio-code).
+Launcher code is C#, built today with the .NET Framework 4 compiler that ships inside Windows, which stops at C# 5. The build is moving to MSBuild and `launcher\app\Thornswood.csproj` (#498); newer C# is allowed from that switch, by Patrick's decision of 11 Oct, and C# inside PowerShell scripts stays C# 5. The window is `launcher\ui.xaml`. How the launcher starts is `launcher\app\ARCHITECTURE.md`. The six shared files in `launcher\app` are named in [D. Visual Studio Code](#d-visual-studio-code).
 
 #### SkyMP
 
