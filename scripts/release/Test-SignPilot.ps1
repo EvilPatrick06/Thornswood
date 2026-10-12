@@ -43,6 +43,13 @@ param(
     [string]$ExpectedSigner
 )
 
+# PowerShell 7 cannot write an exe with Add-Type, so this runs under Windows PowerShell.
+if ($PSVersionTable.PSEdition -eq 'Core') {
+    $fwd = @('-Out', $Out); if ($Sign) { $fwd += '-Sign' }; if ($Verify) { $fwd += '-Verify' }
+    if ($ConfigPath) { $fwd += @('-ConfigPath', $ConfigPath) }; if ($ExpectedSigner) { $fwd += @('-ExpectedSigner', $ExpectedSigner) }
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath @fwd
+    exit $LASTEXITCODE
+}
 $ErrorActionPreference = 'Stop'
 $Repo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 . (Join-Path $PSScriptRoot 'Assert-PublishSigned.ps1')
