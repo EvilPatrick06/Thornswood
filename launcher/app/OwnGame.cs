@@ -680,8 +680,67 @@ namespace Thornswood
         ///    assets in records\ui-gone.json stay out either way. Once a
         ///    list exists, only names on it are ours. See Foreign, issue
         ///    #1318.
+        ///
+        /// Every number from 14 on also gets a line in RuleTouches below.
         /// </summary>
         const int Rules = 16;
+
+        /// <summary>
+        /// What each rule from 14 on can decide differently, as the start of
+        /// every path it is about (#2210). A folder Vortex has not deployed
+        /// into since it was last brought up to date, and which is behind only
+        /// on these rules, looks again at the files under these paths and
+        /// carries every other line of its record forward as it is: the
+        /// launcher update that brought the new rule does not cost a walk of
+        /// all thirty thousand files.
+        ///
+        /// When Rules goes up, add its number here. A rule that can decide
+        /// anything anywhere gets null, and so does a missing number: either
+        /// one walks the whole folder, which is always right, only slower.
+        /// 13 and older are not here, so a folder from before the three kinds
+        /// (#1232) is walked whole.
+        /// </summary>
+        static readonly Dictionary<int, string[]> RuleTouches = new Dictionary<int, string[]>
+        {
+            { 14, new string[] { "Data\\ElysiumEstateSSE.esp" } },
+            { 15, new string[] { "Data\\Platform\\UI\\" } },
+            { 16, new string[] { "Data\\Platform\\UI\\" } },
+        };
+
+        /// <summary>
+        /// The paths a refresh has to look at when the folder's record is on
+        /// <paramref name="recorded"/> and only the rules moved since, or null
+        /// when it has to look at everything.
+        /// </summary>
+        static string[] RulesScope(long recorded)
+        {
+            if (recorded < 0 || recorded >= Rules) return null;
+            var paths = new List<string>();
+            for (long n = recorded + 1; n <= Rules; n++)
+            {
+                string[] touches;
+                if (!RuleTouches.TryGetValue((int)n, out touches) || touches == null) return null;
+                foreach (string p in touches)
+                    if (!paths.Contains(p)) paths.Add(p);
+            }
+            return paths.Count == 0 ? null : paths.ToArray();
+        }
+
+        /// <summary>True when <paramref name="rel"/> is one a refresh looks at: all of them when there is no scope.</summary>
+        static bool InScope(string rel, string[] scope)
+        {
+            if (scope == null) return true;
+            foreach (string p in scope)
+                if (rel.StartsWith(p, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
+
+        /// <summary>The path a line of left-out.txt is about: what comes before "  (".</summary>
+        static string LeftRel(string line)
+        {
+            int at = line.IndexOf("  (", StringComparison.Ordinal);
+            return at < 0 ? line.Trim() : line.Substring(0, at);
+        }
 
         public static bool NeedsRefresh(Config cfg)
         {
@@ -893,6 +952,31 @@ namespace Thornswood
 
             string why = WhyNot(cfg, src);
             if (why != null) throw new Exception(why);
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+
+            // Vortex has not deployed since and only the rules moved: look at
+            // the paths the new rules are about and carry the rest of the
+            // record forward (RuleTouches). Null walks everything.
+            string[] scope = null;
+            if (!KindsDue() && Recorded("deployment") != 0 && DeploymentStamp(src) == Recorded("deployment"))
+                scope = RulesScope(Recorded("rules"));
+            // What the last refresh left out outside those paths stays on the
+            // list, since nothing there is looked at again. Read before
+            // anything changes, so a list that cannot be read stops the
+            // refresh with the folder as it was.
+            var leftBefore = new List<string>();
+            if (scope != null && File.Exists(LeftOutFile))
+            {
+                string[] before;
+                try { before = File.ReadAllLines(LeftOutFile); }
+                catch (Exception ex)
+                {
+                    throw new Exception("The list of what was left out of Thornswood's folder last time, " + LeftOutFile +
+                                        ", could not be read (" + ex.Message.TrimEnd('.') + "), so nothing was changed.");
+                }
+                foreach (string line in before)
+                    if (line.Trim().Length > 0 && !InScope(LeftRel(line), scope)) leftBefore.Add(line);
+            }
 
             Dictionary<string, Rec> old = ReadFiles();
             HashSet<string> deployed = Deployed(src);
@@ -910,7 +994,7 @@ namespace Thornswood
             var left = new List<string>();
             // Vortex's files and nothing else (#1218). The game itself is the
             // folder's own since it was made; it is carried forward below.
-            List<Found> all = Vortex(src, left);
+            List<Found> all = Vortex(src, left, scope);
 
             var lines = new List<string>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -947,23 +1031,32 @@ namespace Thornswood
                     // undid Fix's light-flag Separates on plugins such as
                     // CBBE.esp (copy, ESL set, then Bring it up to date from
                     // Vortex replaced it with Vortex's unflagged staging).
+                    //
+                    // The file is asked how many names it has once, and again
+                    // only after one of those two changed it (#2210): this
+                    // used to ask up to three times for every unchanged file,
+                    // and at 0.2 ms an ask that was most of a refresh.
                     try
                     {
-                        if (MustCopy(f.Rel, deployed) && Links(dest) > 1)
+                        bool must = MustCopy(f.Rel, deployed);
+                        int names = Links(dest);
+                        if (must && names > 1)
                         {
                             Separate(dest);
-                            if (Links(dest) <= 1) separated++;
+                            names = Links(dest);
+                            if (names <= 1) separated++;
                         }
-                        else if (!MustCopy(f.Rel, deployed) && origin == 'V' && Links(dest) <= 1
+                        else if (!must && origin == 'V' && names <= 1
                                  && f.Rel.StartsWith("Data\\Platform\\Distribution\\", StringComparison.OrdinalIgnoreCase))
                         {
                             bool nowLink;
                             DropName(dest);
                             Place(f.From, dest, false, out nowLink);
                             if (nowLink) relinked++;
+                            names = Links(dest);
                         }
                         // Same answer as the old-record loop: link count now.
-                        kind = Links(dest) > 1 ? 'L' : 'C';
+                        kind = names > 1 ? 'L' : 'C';
                     }
                     catch { /* unreadable right now: left as it was */ }
                     lines.Add(kind + "|" + origin + "|" + f.Size + "|" + f.Ticks + "|" + f.Rel);
@@ -1019,6 +1112,12 @@ namespace Thornswood
             foreach (KeyValuePair<string, Rec> kv in old)
             {
                 if (seen.Contains(kv.Key)) continue;
+                // Outside what the new rules are about: as it was (RuleTouches).
+                if (!InScope(kv.Key, scope))
+                {
+                    lines.Add(kv.Value.Kind + "|" + kv.Value.Origin + "|" + kv.Value.Size + "|" + kv.Value.Ticks + "|" + kv.Key);
+                    continue;
+                }
                 bool mine = owned.Contains(kv.Key);
                 if (mine || (kv.Value.Origin != 'V' && !UnwantedCreation(kv.Key) && !Parked(kv.Key)))
                 {
@@ -1060,14 +1159,18 @@ namespace Thornswood
                         // Thornswood's own too (T): one a pack wrote that the
                         // folder still shares with the Steam copy, such as the
                         // behavior files, is written in place there by Nemesis.
-                        if (origin != 'V' && !IsArchive(kv.Key))
+                        // Asked once, and again only after a Separate (#2210).
+                        int names = Links(at);
+                        if (origin != 'V' && !IsArchive(kv.Key) && names > 1)
                         {
-                            if (Links(at) > 1) { Separate(at); if (Links(at) <= 1) separatedGame++; }
+                            Separate(at);
+                            names = Links(at);
+                            if (names <= 1) separatedGame++;
                         }
                         // What the disk holds, not what an older record said:
                         // eighteen archives on the shipping machine were on
                         // record as linked and were copies (#1217).
-                        kind = Links(at) > 1 ? 'L' : 'C';
+                        kind = names > 1 ? 'L' : 'C';
                         lines.Add(kind + "|" + origin + "|" + kv.Value.Size + "|" + kv.Value.Ticks + "|" + kv.Key);
                     }
                     catch (Exception ex)
@@ -1119,6 +1222,14 @@ namespace Thornswood
                 catch (Exception ex) { Swallow.Note("OwnGame.Refresh, drop Bethesda tool", ex); }
             }
 
+            // What was left out outside the new rules' paths was not looked at
+            // again, so its lines stay as the last refresh wrote them.
+            if (scope != null)
+            {
+                leftBefore.AddRange(left);
+                left = leftBefore;
+            }
+
             File.WriteAllLines(FilesList, lines.ToArray());
             File.WriteAllLines(LeftOutFile, left.ToArray());
             // Sorted into the three kinds only when every record was here and
@@ -1139,16 +1250,32 @@ namespace Thornswood
                 own += " " + unsorted.ToString("n0") + (unsorted == 1 ? " file" : " files") + " in Thornswood's folder came in from the Steam copy and " + (unsorted == 1 ? "is" : "are") +
                        " not Skyrim's own or Vortex's. Whether " + (unsorted == 1 ? "it is" : "they are") + " Thornswood's is known once the launcher has checked this install against its release, " +
                        "and the next start after that takes out any that are not.";
-            if (separated > 0) own += " " + separated.ToString("n0") + " animation file(s) it shared with the Steam copy are its own copies now.";
+            // These used to say the files were shared "with the Steam copy".
+            // Measured on One (#2210), the other name was another folder's: the
+            // dev install's game folder that Vortex deployed into, and a
+            // release folder made by hard linking the main install's.
+            if (separated > 0) own += " " + separated.ToString("n0") + " of Vortex's file(s) that it keeps as copies of its own had another name, in Vortex's mods folder or another folder, and are its own copies again.";
             if (relinked > 0) own += " " + relinked.ToString("n0") + " Distribution redistributable(s) it held as its own copies are hard links now.";
-            if (separatedGame > 0) own += " " + separatedGame.ToString("n0") + " of the game's own file(s) it shared with the Steam copy are its own copies now, so nothing done to the Steam copy reaches them.";
+            if (separatedGame > 0) own += " " + separatedGame.ToString("n0") + " of the game's own and Thornswood's file(s) had another name, in the Steam copy or another folder, and are its own copies again, so nothing done there reaches them.";
             string shared = Share(GameFor(src), say);
             if (shared != null) own += " " + shared;
+            // What was looked at and how long it took, so the log says what a
+            // refresh cost (#2210).
+            string cost = " It took " + Seconds(clock.Elapsed) + (scope != null
+                ? ", looking only at " + string.Join(" and ", scope) + ", because Vortex has not deployed since the last time and only the rules about those changed."
+                : ", looking at every file Vortex deployed and every file on record.");
             if (added + changed + removed + byHand.Count == 0)
-                return "Thornswood's own Skyrim folder already matches what Vortex has deployed." + own;
+                return "Thornswood's own Skyrim folder already matches what Vortex has deployed." + own + cost;
             return "Thornswood's own Skyrim folder is up to date with Vortex: " + added.ToString("n0") + " new, " +
                    changed.ToString("n0") + " changed, " + removed.ToString("n0") + " taken out" +
-                   (copyBytes > 0 ? ", " + Mb(copyBytes) + " copied" : "") + "." + own;
+                   (copyBytes > 0 ? ", " + Mb(copyBytes) + " copied" : "") + "." + own + cost;
+        }
+
+        static string Seconds(TimeSpan t)
+        {
+            int s = (int)Math.Round(t.TotalSeconds);
+            if (s < 1) return "less than a second";
+            return s == 1 ? "1 second" : s.ToString("n0") + " seconds";
         }
 
         /// <summary>
@@ -2495,15 +2622,19 @@ namespace Thornswood
         /// copy's own game is read, so the Steam copy can be on any build, and
         /// mods the person put into it by hand stay out of Thornswood.
         /// </summary>
-        static List<Found> Vortex(string src, List<string> left)
+        static List<Found> Vortex(string src, List<string> left, string[] scope)
         {
             bool apart = !SameFolder(GameFor(src), src);
             Record rec = Staged(src);
-            left.AddRange(rec.Refused);
+            foreach (string r in rec.Refused)
+                if (InScope(LeftRel(r), scope)) left.Add(r);
             HashSet<string> deployed = Deployed(src);
             var l = new List<Found>();
             foreach (string rel in deployed)
             {
+                // Outside the paths the new rules are about (RuleTouches): not
+                // read at all, and carried forward by the caller.
+                if (!InScope(rel, scope)) continue;
                 string from = FromVortex(src, rel, apart, rec, deployed);
                 if (from == null)
                 {
