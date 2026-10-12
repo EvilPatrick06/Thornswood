@@ -18,13 +18,30 @@ out of the collection. Neither can be decided without knowing which events the
 collection's scripts wait on, and nothing in this repo had ever read a .pex.
 This does.
 
-THE RULE, as the fork has it. skymp5-client's BlockPapyrusEventsService turns
-the blocker on at the first tick. skyrim-platform's FridaHooks.cpp:43-72, on
-thornswood/engine-changes, hooks the VM's SendEvent and blanks the event name
-unless it is exactly OnUpdate, or unless one of the scripts attached to the
-same object is named SKI_ something (SkyUI; four characters compared with
-case) or defaultDisableHavokOnLoad (compared without). The entry's first plan
-pointed at Patch-Client.ps1, which is gone; the rule is in the fork's source.
+THE RULE is the fork's, and it is records\\papyrus-events.json, which
+scripts\\dev\\PapyrusEventList.js reads out of the fork and
+tests\\test-papyrus-event-list.js holds to the fork at its pin (issue #503).
+This keeps no copy of it. A script fires only where both halves let it:
+
+  On each person's machine. skymp5-client turns the blocker on, and
+  skyrim-platform's FridaHooks.cpp (OnSendEventEnter) blanks every event name
+  but the ones the record lets through (OnUpdate at 1afaf2ef), unless a script
+  on the same object carries one of the exempt names (SKI_ something, compared
+  with case, and defaultDisableHavokOnLoad, without). A script that runs there
+  runs on that one machine.
+
+  On the server. Its own Papyrus machine attaches a script only to a placed
+  reference (the reference's record and its base record), only when its
+  storage holds the script (the built in scripts, data\\scripts and any
+  archive the "archives" setting names) and nothing drops it by name, and
+  sends it only the event names the record lists. Quests, aliases, dialogue,
+  packages, perks, scenes and magic effects get nothing there. One rule this
+  does not apply, and the report says so: with disableVanillaScriptsInExterior
+  on, a reference below 05000000 in an exterior keeps only Sweet* scripts.
+
+Each plugin gets a verdict on each half ("status" for the machine, "server"
+for the server), and "firesNowhere" when it has scripts and neither half runs
+any of them.
 
 WHAT COUNTS AS AN EVENT. A .pex does not mark an event as different from a
 function, so this takes the game's own word for it. A native script declares
@@ -88,6 +105,7 @@ import json
 import os
 import struct
 import sys
+import textwrap
 import zlib
 from collections import defaultdict
 
@@ -95,12 +113,21 @@ import bsa
 
 MASTERS = ['Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm']
 
-# FridaHooks.cpp:44, the one event name the blocker lets through.
-ALLOWED = 'onupdate'
-# FridaHooks.cpp:56-66. The SkyUI test compares four characters with case; the
-# other is stricmp.
-EXEMPT_PREFIX = 'SKI_'
-EXEMPT_NAME = 'defaultdisablehavokonload'
+# The fork's event list, both halves, is records\papyrus-events.json, which
+# scripts\dev\PapyrusEventList.js reads out of the fork and
+# tests\test-papyrus-event-list.js holds to the fork at the pin (#503). This
+# keeps no copy of it.
+RECORD = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'records', 'papyrus-events.json')
+
+# The game's own timer event, which only arrives after a registration. This is
+# how Papyrus works, not part of the fork's list.
+TIMER_EVENT = 'onupdate'
+
+# Records the server never attaches a script to: it attaches only to a placed
+# reference, from the reference's record and its base record (the record's
+# attachesTo, "references"). Quests and their aliases, dialogue, packages,
+# perks, scenes and magic effects are not references or the base of one.
+NOT_ON_A_REFERENCE = {'QUST', 'INFO', 'PACK', 'PERK', 'SCEN', 'MGEF'}
 
 IMPLICIT_EVENTS = {'oninit': 'OnInit'}
 NOT_EVENTS = {'onbeginstate', 'onendstate'}
@@ -122,6 +149,50 @@ PEX_MAGIC = 0xFA57C0DE
 
 STATUS_ORDER = ['works', 'partial', 'timer never starts', 'dead',
                 'fragments only', 'no events', 'records only']
+SERVER_ORDER = ['fires', 'loaded, never sent', 'not loaded', 'not on a reference', 'records only']
+
+
+class Rule(object):
+    """The fork's list out of the record, in the shape the audit asks it."""
+
+    def __init__(self, record):
+        c, s = record['client'], record['server']
+        loads = s['loads']
+        if s.get('attachesTo') != 'references':
+            raise ValueError('the record says the server attaches scripts to %r, and this only knows references'
+                             % s.get('attachesTo'))
+        self.read_at = record.get('readAt', '')
+        self.blocker_on = bool(c['blockerOn'])
+        self.lets_through = {n.lower() for n in c['letsThrough']}
+        self.exempt_prefixes = list(c['exemptPrefixes'])
+        self.prefix_keeps_case = c['exemptPrefixCase'] == 'kept'
+        self.exempt_names = list(c['exemptNames'])
+        self.names_ignore_case = c['exemptNameCase'] == 'ignored'
+        self.sends = {n.lower(): n for n in s['sends']}
+        self.server_scripts = {n.lower() for n in loads['builtIn'] + loads['dataScripts']}
+        self.archives = list(loads.get('archives') or [])
+        self.drops = {n.lower() for n in s.get('dropsByName') or []}
+        self.exterior = s.get('exterior') or {}
+        self.record = record
+
+    def passes(self, event_key):
+        """Whether the client lets this event (lower case) through."""
+        return not self.blocker_on or event_key in self.lets_through
+
+    def frees(self, real_name):
+        """Whether a script of this name on an object frees every event there."""
+        for p in self.exempt_prefixes:
+            if real_name.startswith(p) if self.prefix_keeps_case else real_name.lower().startswith(p.lower()):
+                return True
+        for n in self.exempt_names:
+            if (real_name.lower() == n.lower()) if self.names_ignore_case else real_name == n:
+                return True
+        return False
+
+
+def load_rule(path):
+    with io.open(path, encoding='utf-8') as fh:
+        return Rule(json.load(fh))
 
 
 # ---------------------------------------------------------------------------
@@ -588,7 +659,7 @@ class Scripts(object):
         out = {'name': chain[0]['name'], 'events': events,
                'source': self.index[key][0], 'extends': chain[0]['parent'],
                'registersOthers': any(fn['outside'] & TIMER_CALLS for fn in funcs.values())}
-        if ALLOWED in events:
+        if TIMER_EVENT in events:
             # Every function from which a registration can be reached through
             # the script's calls to itself, found by growing the set until it
             # stops growing.
@@ -600,27 +671,47 @@ class Scripts(object):
                     if f not in reach and fn['calls'] & reach:
                         reach.add(f)
                         grew = True
-            out['starters'] = sorted(events[f] for f in reach if f in events and f != ALLOWED)
+            out['starters'] = sorted(events[f] for f in reach if f in events and f != TIMER_EVENT)
             out['calledIn'] = sorted(funcs[f]['name'] for f in reach
                                      if f not in events and f in self.called_from_outside)
         self.cache[key] = out
         return out
 
 
-def exempt(name, scripts):
-    """FridaHooks.cpp:56-66, on the name the .pex gives itself when it is
+def exempt(name, scripts, rule):
+    """The record's exemptions, on the name the .pex gives itself when it is
     there, since that is the name the VM carries."""
     got = scripts.parsed.get(name.lower())
     real = got['name'] if got else name
-    return real.startswith(EXEMPT_PREFIX) or real.lower() == EXEMPT_NAME
+    return rule.frees(real)
+
+
+def server_storage(rule, data_dir, stats):
+    """Every script name, in lower case, the server's script storage holds by
+    the record: the built in scripts, data\\scripts, and the scripts in each
+    archive the "archives" setting names, read here from the same Data folder
+    (the server's copy of an archive is the same file)."""
+    names = set(rule.server_scripts)
+    for archive in rule.archives:
+        path = archive if os.path.isabs(archive) else os.path.join(data_dir, archive)
+        try:
+            files = bsa.read(path, 'scripts')
+        except (OSError, ValueError, struct.error, zlib.error, IndexError) as exc:
+            stats['unreadable server archives'].append('%s: %s' % (archive, exc))
+            continue
+        for p in files:
+            if p.endswith('.pex'):
+                names.add(p.split('/')[-1][:-4])
+    return names
 
 
 # ---------------------------------------------------------------------------
 # The audit
 
-def audit(data_dir, plugins_txt):
+def audit(data_dir, plugins_txt, rule):
     stats = defaultdict(int)
     stats['unreadable archives'] = []
+    stats['unreadable server archives'] = []
     order, missing = load_order(data_dir, plugins_txt)
 
     # Every scripted record and alias, and every plugin that defined it after,
@@ -659,6 +750,7 @@ def audit(data_dir, plugins_txt):
 
     index = script_index(data_dir, order, stats)
     scripts = Scripts(index)
+    on_server = server_storage(rule, data_dir, stats)
 
     # Credit each script on each record to the plugin that first put it there,
     # following the run of overrides back from the one that wins.
@@ -667,7 +759,7 @@ def audit(data_dir, plugins_txt):
         last_idx, last = chain[-1]
         if not last:
             continue
-        free = any(exempt(n, scripts) for n in last) if k[2] != 'fragment' else False
+        free = any(exempt(n, scripts, rule) for n in last) if k[2] != 'fragment' else False
         for name in last:
             who = last_idx
             for j in range(len(chain) - 2, -1, -1):
@@ -677,10 +769,11 @@ def audit(data_dir, plugins_txt):
                     break
             credited[who].append((k, name, free))
 
-    plugins, events = [], {}
+    plugins, events, if_loaded = [], {}, {}
     for idx, plugin in enumerate(order):
         rows = credited.get(idx, [])
         per_script, fragments, quiet, absent, unread = {}, 0, 0, set(), set()
+        server = {'fires': {}, 'loadedNeverSent': set(), 'notLoaded': set(), 'notOnAReference': 0}
         # Whether anything this plugin attaches, fragments included, starts a
         # timer on something other than itself. QuickLootIE's load alias does,
         # GetOwningQuest().RegisterForSingleUpdate(), and that is the only way
@@ -690,6 +783,23 @@ def audit(data_dir, plugins_txt):
             got = scripts.handles(name)
             if got is not None and got['registersOthers']:
                 starts_others = True
+            # The server half: a script runs there only on a reference, only
+            # when the server's storage has it and nothing drops it by name,
+            # and only on an event the server sends.
+            if k[2] != 'record' or kinds[k] in NOT_ON_A_REFERENCE:
+                server['notOnAReference'] += 1
+            else:
+                sent = sorted(rule.sends[e] for e in (got['events'] if got else {}) if e in rule.sends)
+                for e in sent:
+                    slot = if_loaded.setdefault(e, {'plugins': set(), 'scripts': set()})
+                    slot['plugins'].add(plugin)
+                    slot['scripts'].add((plugin, got['name'].lower()))
+                if name.lower() not in on_server or name.lower() in rule.drops:
+                    server['notLoaded'].add(name)
+                elif sent:
+                    server['fires'].setdefault(got['name'], set()).update(sent)
+                else:
+                    server['loadedNeverSent'].add(name)
             if k[2] == 'fragment':
                 fragments += 1
                 continue
@@ -717,7 +827,7 @@ def audit(data_dir, plugins_txt):
                 row['exempt'] += 1
             row['on'].add(kinds[k] + (' alias' if k[2] == 'alias' else ''))
             for key, ev in got['events'].items():
-                if free or key == ALLOWED:
+                if free or rule.passes(key):
                     row['alive'].add(ev)
                 else:
                     row['blocked'].add(ev)
@@ -729,7 +839,9 @@ def audit(data_dir, plugins_txt):
         live, blocked, stuck = False, False, False
         for row in per_script.values():
             if ('timerStartsFrom' in row and row['exempt'] == 0 and not starts_others
-                    and row['timerStartsFrom'] and not row['timerCalledInBy']):
+                    and rule.passes(TIMER_EVENT) and row['timerStartsFrom']
+                    and not any(rule.passes(s.lower()) for s in row['timerStartsFrom'])
+                    and not row['timerCalledInBy']):
                 row['timerNeverStarts'] = True
                 stuck = True
             elif row['alive']:
@@ -755,8 +867,26 @@ def audit(data_dir, plugins_txt):
             status = 'timer never starts'
         else:
             status = 'dead'
+        if not rows:
+            server_status = 'records only'
+        elif server['fires']:
+            server_status = 'fires'
+        elif server['loadedNeverSent']:
+            server_status = 'loaded, never sent'
+        elif server['notLoaded']:
+            server_status = 'not loaded'
+        else:
+            server_status = 'not on a reference'
         plugins.append({
             'plugin': plugin, 'master': plugin in MASTERS, 'status': status,
+            'server': {
+                'status': server_status,
+                'fires': {n: sorted(v) for n, v in sorted(server['fires'].items())},
+                'loadedNeverSent': sorted(server['loadedNeverSent']),
+                'notLoaded': sorted(server['notLoaded']),
+                'notOnAReference': server['notOnAReference'],
+            },
+            'firesNowhere': bool(rows) and status not in ('works', 'partial') and server_status != 'fires',
             'scripts': per_script, 'fragments': fragments,
             'attachedWithoutEvents': quiet,
             'missingScripts': sorted(absent),
@@ -766,10 +896,10 @@ def audit(data_dir, plugins_txt):
 
     return {
         'rule': {
-            'source': 'skyrim-platform/src/platform_se/skyrim_platform/FridaHooks.cpp:43-72 '
-                      'on thornswood/engine-changes',
-            'allowed': 'OnUpdate',
-            'exemptWhenTheObjectCarries': 'a script named SKI_*, or defaultDisableHavokOnLoad',
+            'record': 'records/papyrus-events.json',
+            'readAt': rule.read_at,
+            'client': rule.record['client'],
+            'server': rule.record['server'],
         },
         'loadOrder': order,
         'missingPlugins': missing,
@@ -785,6 +915,7 @@ def audit(data_dir, plugins_txt):
             'unreadablePlugins': stats['unreadable plugins'],
         },
         'unreadableArchives': stats['unreadable archives'],
+        'unreadableServerArchives': stats['unreadable server archives'],
         'unreadableScripts': scripts.bad,
         'eventNames': {scripts.events[k]: scripts.declared_in[k] for k in scripts.events},
         'plugins': plugins,
@@ -792,15 +923,34 @@ def audit(data_dir, plugins_txt):
             e: {'plugins': sorted(v['plugins']), 'scripts': v['scripts']}
             for e, v in sorted(events.items(), key=lambda kv: (-len(kv[1]['plugins']), kv[0]))
         },
+        'serverSentEventsIfLoaded': {
+            e: {'plugins': sorted(v['plugins']), 'scripts': len(v['scripts'])}
+            for e, v in sorted(if_loaded.items(), key=lambda kv: (-len(kv[1]['plugins']), kv[0]))
+        },
     }
 
 
 def report(result, out=sys.stdout):
     c = result['counts']
     w = out.write
-    w('Papyrus events under Thornswood\n')
-    w('  The rule: every event except OnUpdate is blanked, unless a SKI_ script\n')
-    w('  or defaultDisableHavokOnLoad shares the object. %s\n' % result['rule']['source'])
+    rc, rs = result['rule']['client'], result['rule']['server']
+    w('Papyrus events under Thornswood, by %s (the fork at %s)\n'
+      % (result['rule']['record'], (result['rule']['readAt'] or '?')[:8]))
+    if rc['blockerOn']:
+        w('  Each person\'s machine: every event but %s is blanked, unless a script\n'
+          '  named %s shares the object.\n'
+          '  What runs there runs on that one machine only.\n'
+          % (', '.join(rc['letsThrough']),
+             ' or '.join([p + '*' for p in rc['exemptPrefixes']] + rc['exemptNames'])))
+    else:
+        w('  Each person\'s machine: the blocker is off, every event reaches its script.\n')
+    loads = rs['loads']
+    w('  The server: attaches scripts only to placed references, and only the ones\n'
+      '  its storage holds (%d built in; data\\scripts: %s; archives: %s).\n'
+      '%s\n'
+      % (len(loads['builtIn']), ', '.join(loads['dataScripts']) or 'none',
+         ', '.join(loads['archives']) or 'none set',
+         textwrap.fill('It sends ' + ', '.join(rs['sends']) + '.', 76, initial_indent='  ', subsequent_indent='  ')))
     w('  %d plugins. %d scripts read, %d unreadable. %d loose and %d in archives,\n'
       '  a loose one winning over an archived one of the same name.\n'
       % (c['plugins'], c['scriptsRead'], c['scriptsUnreadable'], c['looseScripts'],
@@ -810,6 +960,8 @@ def report(result, out=sys.stdout):
         w('  NOT IN DATA, skipped: %s\n' % ', '.join(result['missingPlugins']))
     for a in result['unreadableArchives']:
         w('  COULD NOT READ %s\n' % a)
+    for a in result['unreadableServerArchives']:
+        w('  COULD NOT READ the server archive %s\n' % a)
     if c['unreadableVmads'] or c['unreadableRecords']:
         w('  %d VMADs and %d compressed records could not be read.\n'
           % (c['unreadableVmads'], c['unreadableRecords']))
@@ -817,9 +969,25 @@ def report(result, out=sys.stdout):
     groups = defaultdict(list)
     for p in result['plugins']:
         groups[p['status']].append(p)
-    w('\nBy plugin\n')
+    w('\nBy plugin, on each person\'s machine\n')
     for s in STATUS_ORDER:
         w('  %-20s %3d\n' % (s, len(groups[s])))
+    by_server = defaultdict(list)
+    for p in result['plugins']:
+        by_server[p['server']['status']].append(p)
+    w('\nBy plugin, on the server\n')
+    for s in SERVER_ORDER:
+        w('  %-20s %3d\n' % (s, len(by_server[s])))
+    if rs['exterior'].get('on'):
+        w('  (and on a reference below %s in an exterior, only %s* scripts)\n'
+          % (rs['exterior']['formIdBelow'], rs['exterior']['keepsPrefix']))
+    for p in by_server['fires']:
+        w('  fires: %s  %s\n' % (p['plugin'], _short('%s (%s)' % (n, ', '.join(e))
+                                                    for n, e in p['server']['fires'].items())))
+    nowhere = [p['plugin'] for p in result['plugins'] if p['firesNowhere']]
+    w('\nScripted, and nothing fires on either half: %d\n' % len(nowhere))
+    if nowhere:
+        w(_lines(nowhere))
 
     for s in ('dead', 'timer never starts', 'partial'):
         if not groups[s]:
@@ -855,6 +1023,25 @@ def report(result, out=sys.stdout):
     if more > 0:
         w('  and %d more, in the JSON\n' % more)
 
+    w('\nScripts on references that wait on an event the server sends, were they loaded there\n')
+    for e, v in result['serverSentEventsIfLoaded'].items():
+        w('  %-32s %3d plugins  %4d scripts\n' % (e, len(v['plugins']), v['scripts']))
+
+
+def _lines(names, width=76):
+    """Names joined by commas, two spaces in, a line break between names
+    and never inside one."""
+    out, line = [], ''
+    for i, n in enumerate(names):
+        piece = n + (',' if i < len(names) - 1 else '')
+        if line and len(line) + 1 + len(piece) > width:
+            out.append(line)
+            line = ''
+        line = (line + ' ' + piece) if line else '  ' + piece
+    if line:
+        out.append(line)
+    return ''.join(x + '\n' for x in out)
+
 
 def _short(names, n=8):
     names = list(names)
@@ -868,6 +1055,7 @@ def main():
     ap.add_argument('--data', default=r'C:\Thornswood\Game\Data')
     ap.add_argument('--plugins', default=r'C:\Thornswood\Profile\Default\plugins.txt')
     ap.add_argument('--json', help='also write the full result here')
+    ap.add_argument('--record', default=RECORD, help='the fork\'s event list, records/papyrus-events.json')
     args = ap.parse_args()
 
     if not os.path.isdir(args.data):
@@ -876,7 +1064,12 @@ def main():
     if not os.path.isfile(args.plugins):
         print('STOP. %s is not there.' % args.plugins)
         return 1
-    result = audit(args.data, args.plugins)
+    try:
+        rule = load_rule(args.record)
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        print('STOP. %s is not a readable event list: %s' % (args.record, exc))
+        return 1
+    result = audit(args.data, args.plugins, rule)
     report(result)
     if args.json:
         with io.open(args.json, 'w', encoding='utf-8') as fh:
