@@ -54191,7 +54191,15 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
         sober   how long a drink hangs about, in real minutes, before it
                 stops counting toward the next one
     */
-    ale: { drink: 30, rest: -8, food: -6, worse: 0.6, less: 0.25, sober: 45 },
+    ale: { drink: 30, rest: -8, food: -6, worse: 0.6, less: 0.25, sober: 45,
+      /*
+        THE HELP AND THE HANGOVER (#1382), docs/systems/drink.md: "The first
+        two also give +0.05 melee damage for 5 real minutes. The third and
+        after do not." And: "If you drank three or more and log out without a
+        bed, the next time you are in the world before you have slept you are
+        hung over: rest is treated as weary even if the meter is higher".
+      */
+      help: 0.05, helpMinutes: 5, helpThrough: 2, hangoverFrom: 3 },
 
     /*
       The bands, and what each one costs.
@@ -54367,7 +54375,10 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       // When the last wet place was left, and what that place was worth
       // with its water, so the 3 minutes of wet survive a read (#1382).
       wetFrom: Number(v.wetFrom) || 0,
-      wetPlace: (typeof v.wetPlace === 'number') ? v.wetPlace : null
+      wetPlace: (typeof v.wetPlace === 'number') ? v.wetPlace : null,
+      // The first two ales' damage help, and a hangover (#1382).
+      aleHelpUntil: Number(v.aleHelpUntil) || 0,
+      hangover: !!v.hangover
     };
   }
 
@@ -54531,7 +54542,13 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     if (k > 0) { n.temp = clamp(n.temp + (target - n.temp) * k); }
 
     // A night in a bed, on top of the time away settled above (#1606).
+    // Three ales or more still counting when they left (#1382).
+    var leftDrunk = arriving && (Number(n.ale) || 0) >= NEEDS.ale.hangoverFrom &&
+      typeof n.aleAt === 'number' && (n.at - n.aleAt) <= NEEDS.ale.sober * 60000;
     var slept = arriving ? arrived(actorId, n, away) : '';
+    // A night in a bed ends a hangover; leaving drunk without one starts it.
+    if (slept) { n.hangover = false; }
+    else if (leftDrunk) { n.hangover = true; n.ale = 0; }
 
     n.at = now;
     write(actorId, n);
@@ -54898,7 +54915,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     n.food = clamp(n.food + (NEEDS.ale.food * worse));
     n.ale = had + 1;
     n.aleAt = now;
+    if (had < NEEDS.ale.helpThrough) { n.aleHelpUntil = now + NEEDS.ale.helpMinutes * 60000; }
     write(actorId, n);
+    if (had < NEEDS.ale.helpThrough) { pushEffects(actorId); }
 
     var words = ['You drink it down. It goes well.',
                  'The second one is going down easier than it should.',
@@ -55248,7 +55267,10 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     }
     var meters = ['food', 'drink', 'rest'];
     for (var i = 0; i < meters.length; i++) {
-      add(COST[meters[i]][atLeast(bandOf(n[meters[i]]), floors[meters[i]])] || {});
+      var floor = floors[meters[i]];
+      // A hangover reads rest as weary at the least (#1382).
+      if (meters[i] === 'rest' && n.hangover) { floor = atLeast('weary', floor); }
+      add(COST[meters[i]][atLeast(bandOf(n[meters[i]]), floor)] || {});
     }
     // And temperature, which is read as a distance from comfort in either
     // direction rather than as a level. See TEMP_COST. A chill is the cold
@@ -55261,6 +55283,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       if (floors.cold) { add(TEMP_COST.cold[floors.cold] || {}); }
     }
     add(hurt.add || {});
+    // The first two ales: +0.05 melee damage for 5 minutes (#1382).
+    if (n.aleHelpUntil && Date.now() < n.aleHelpUntil) { add({ attackDamageMult: NEEDS.ale.help }); }
     return out;
   }
 
@@ -55701,6 +55725,12 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
         var was = { food: bandOf(before.food), drink: bandOf(before.drink),
                     rest: bandOf(before.rest), temp: tempBand(before.temp).name };
         var n = settle(who, Date.now());
+        // The ale help running out changes the character, not a band (#1382).
+        if (n.aleHelpUntil && Date.now() >= n.aleHelpUntil) {
+          n.aleHelpUntil = 0;
+          write(who, n);
+          pushEffects(who);
+        }
         var line = crossed(who, was, n);
         if (line) {
           try { notify(who, line); } catch (e) { }
@@ -56137,7 +56167,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     // The bard the server sees playing (#1631).
     playing: playing, bardSeen: bardSeen,
     // The meters as last settled, without settling them again (#1383).
-    read: read
+    read: read,
+    // One pass of the minute tick, for the harnesses (#1382).
+    tick: tick
   };
 
   nlog('ready: food empties in', Math.round(100 / NEEDS.drain.food) + 'h,',
