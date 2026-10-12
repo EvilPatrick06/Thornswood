@@ -495,6 +495,28 @@ if (HURT_SRC && P && WARRIOR_KILL) {
     yes('the second clears the chill', t.ok && !r.rec(me).ills.length && r.has(me, 'remedy') === 0);
   }
   {
+    // A hangover is the remedy's too (#1382, drink.md): asked of the needs
+    // block, which owns it. A stand-in here; the needs half is
+    // test-1382-ale-help-hangover.js.
+    const r = rig();
+    const me = r.person(0x20);
+    const hung = {}; hung[me] = true; let sobered = 0;
+    r.G.__thornswoodNeeds = {
+      hungOver: function (id) { return !!hung[id]; },
+      soberUp: function (id) { if (!hung[id]) { return false; } hung[id] = false; sobered++; return true; }
+    };
+    yes('a hangover alone is something to tend: the H line and Tend their wounds',
+        r.H.careOf(me) === true && (r.H.careChanged(me), r.props[me].thornswoodHurt.care === 1));
+    r.give(me, 'remedy', 2);
+    let t = r.H.treat(me, me, 'remedy');
+    yes('a remedy ends a hangover with nothing else to treat, and is used',
+        t.ok && !hung[me] && sobered === 1 && r.has(me, 'remedy') === 1 && /clears the hangover/.test(t.line));
+    t = r.H.treat(me, me, 'remedy');
+    yes('with the hangover gone and nothing else, the remedy is refused and kept',
+        !t.ok && r.has(me, 'remedy') === 1 && sobered === 1);
+    yes('and with it gone there is nothing to tend', r.H.careOf(me) === false && (r.H.careChanged(me), r.props[me].thornswoodHurt.care === 0));
+  }
+  {
     const r = rig();
     const me = r.person(0x20);
     const doc = r.person(0x22, 'Danica');
