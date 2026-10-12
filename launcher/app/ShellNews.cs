@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -11,10 +12,76 @@ namespace Thornswood
     {
         static StackPanel newsList;
 
+        // What main is on, for the dev header (#2434). The header used to name
+        // mainVersion out of the dev feed as it was at the launcher's last
+        // update check (pendingDoc), so a dev launcher open since before a main
+        // Ship named the old main for as long as it stayed open: Patrick, 12
+        // Oct, "dev says main is on 1.2.3 even tho it's on 1.2.4". Now the tab
+        // asks main's own feed when it is shown (Updater.MainLauncherVersion,
+        // MainVersion.cs), and the dev feed's copy is the answer only while
+        // main's feed has not answered, or could not be read.
+        //
+        // All four are only touched on the window's thread. newsHead is the
+        // header line, so an answer can be put in without rebuilding the list
+        // under somebody who has a note's files open.
+        static TextBlock newsHead;
+        static string mainLive = "";
+        static bool mainReading;
+        static bool mainFailSaid;
+
+        static string DevHeadText()
+        {
+            string mine = (pendingDoc != null && pendingDoc.launcherVersion != null) ? pendingDoc.launcherVersion : "";
+            string on = mine.Length == 0 ? "This is the dev build." : "This is the dev build, on " + mine + ".";
+            if (mainLive.Length > 0) return on + " Main is on " + mainLive + ".";
+            string fed = (pendingDoc != null && pendingDoc.mainVersion != null) ? pendingDoc.mainVersion : "";
+            if (fed.Length == 0) return on;
+            return on + " Main was on " + fed + " when the launcher last checked for updates.";
+        }
+
+        static void ReadMainVersion()
+        {
+            if (mainReading) return;
+            mainReading = true;
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                string got = null, why = null;
+                try { got = Updater.MainLauncherVersion(cfg); }
+                catch (Exception ex) { why = ex.Message; }
+                win.Dispatcher.BeginInvoke(new Action(delegate { MainVersionRead(got, why); }));
+            });
+        }
+
+        /// <summary>
+        /// The answer from main's feed, on the window's thread. A read that
+        /// failed puts the header back on the dev feed's copy, worded as what
+        /// it is, and says why once a session in launcher.log.
+        /// </summary>
+        static void MainVersionRead(string got, string why)
+        {
+            mainReading = false;
+            if (got != null)
+            {
+                mainLive = got;
+            }
+            else
+            {
+                mainLive = "";
+                if (!mainFailSaid)
+                {
+                    mainFailSaid = true;
+                    LogOnly("The News tab could not read what main is on from " + Updater.MainFeed + " (" + why +
+                            "), so it names what the dev feed said at the last update check. This is said once a session.");
+                }
+            }
+            if (newsHead != null) newsHead.Text = DevHeadText();
+        }
+
         // ------------------------------------------------------------- news
         static void BuildNews()
         {
             newsList.Children.Clear();
+            newsHead = null;
             NewsItem[] items = (pendingDoc != null && pendingDoc.news != null) ? pendingDoc.news : new NewsItem[0];
 
             if (items.Length == 0)
@@ -39,18 +106,20 @@ namespace Thornswood
 
             if (cfg.IsDev)
             {
-                string mine = (pendingDoc != null) ? pendingDoc.launcherVersion : "";
-                string theirs = (pendingDoc != null) ? pendingDoc.mainVersion : "";
-
                 var head = new StackPanel();
 
                 var ht = new TextBlock();
-                ht.Text = string.IsNullOrEmpty(theirs)
-                    ? "This is the dev build."
-                    : "This is the dev build, on " + mine + ". Main is on " + theirs + ".";
+                ht.Text = DevHeadText();
                 ht.FontSize = 13.5; ht.FontWeight = FontWeights.SemiBold;
                 ht.Foreground = Res("Ink"); ht.TextWrapping = TextWrapping.Wrap;
                 head.Children.Add(ht);
+                newsHead = ht;
+
+                // Main's version from main's own feed, each time the tab is
+                // shown (#2434). BuildNews also runs when a check lands and
+                // after a theme change; the read goes out only while the tab is
+                // the page in front of somebody.
+                if (pages != null && pages[PageNews].Visibility == Visibility.Visible) ReadMainVersion();
 
                 var hb = new TextBlock();
                 if (ahead == 0)

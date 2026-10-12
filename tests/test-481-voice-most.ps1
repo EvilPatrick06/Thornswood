@@ -18,6 +18,9 @@
        THORNSWOOD_VOICE_MOST; with no number nothing is added, so the line is
        the one every install sent before. The name it sets is the name the
        service reads.
+    4. Each voice service its own number (Patrick, 12 Oct: dev voice at most
+       5). Install-Voice.ps1 into C:\Thornswood-Voice-Dev takes the record's
+       dev voice, held to dev's own seats; any other folder takes main's.
 
   Read only apart from files under its own temp folder. Never connects to
   anything.
@@ -66,6 +69,14 @@ Yes 'no record at all still gives Voice 0, not an error' ($got.Voice -eq 0 -and 
 
 $real = Get-MostOnline
 Yes ('the real record has a voice number ({0}) and it is not under its own seats ({1})' -f $real.Voice, $real.Seats) ($real.Voice -gt 0 -and $real.Voice -ge $real.Seats)
+$realDev = Get-MostOnline -Channel dev
+Yes ('dev voice is 5, its own seats 5 (got {0} and {1})' -f $realDev.Voice, $realDev.Seats) ($realDev.Voice -eq 5 -and $realDev.Seats -eq 5)
+$got = Get-MostOnline (Record '{ "dev": { "people": 5, "staffSeats": 0, "voice": 5 }, "people": 25, "staffSeats": 5, "voice": 60 }') -Channel dev
+Yes 'dev voice comes from the dev object, beside dev''s seats' ($got.Voice -eq 5 -and $got.Seats -eq 5)
+$got = Get-MostOnline (Record '{ "dev": { "people": 5 }, "people": 25, "staffSeats": 5, "voice": 60 }') -Channel dev
+Yes 'a dev object with no voice leaves dev voice uncapped, never main''s 60' ($got.Voice -eq 0 -and $got.Seats -eq 5)
+$why = Refusal { Get-MostOnline (Record '{ "dev": { "people": 5, "staffSeats": 1, "voice": 5 }, "people": 25 }') -Channel dev }
+Yes 'dev voice under dev''s seats stops, naming both numbers' ($why -match 'voice 5, fewer than the 6 seats' -and $why -match 'its dev numbers')
 
 # ---- 2. RecordShape.ps1 ---------------------------------------------------
 . (Join-Path $RepoDir 'scripts\release\RecordShape.ps1')
@@ -75,6 +86,8 @@ Yes 'record shape: no voice reads clean' ((Problems '{ "people": 25 }').Count -e
 Yes 'record shape: voice 0 is refused' ((Problems '{ "people": 25, "voice": 0 }') -match 'voice is there and not a whole number above zero')
 Yes 'record shape: voice "60", a string, is refused' ((Problems '{ "people": 25, "voice": "60" }') -match 'voice is there')
 Yes 'record shape: voice 60.5 is refused' ((Problems '{ "people": 25, "voice": 60.5 }') -match 'voice is there')
+Yes 'record shape: a whole dev voice reads clean' ((Problems '{ "dev": { "people": 5, "voice": 5 }, "people": 25 }').Count -eq 0)
+Yes 'record shape: dev voice 0 is refused, named as dev''s' ((Problems '{ "dev": { "people": 5, "voice": 0 }, "people": 25 }') -match 'dev\.voice is there and not a whole number above zero')
 
 # ---- 3. Install-Voice.ps1 -------------------------------------------------
 $install = Join-Path $RepoDir 'scripts\deploy\Install-Voice.ps1'
@@ -84,8 +97,22 @@ $tokens = $null; $errors = $null
 [void][System.Management.Automation.Language.Parser]::ParseFile($install, [ref]$tokens, [ref]$errors)
 Yes 'Install-Voice.ps1 parses' ($errors.Count -eq 0)
 Yes 'it reads the record through MaxOnline.ps1' ($src.Contains(". (Join-Path `$Here 'MaxOnline.ps1')") -and $src.Contains('$mostGot = Get-MostOnline'))
-Yes 'a record it cannot take stops the install before anything is sent' ($src.Contains('try { $mostGot = Get-MostOnline } catch { Die $_.Exception.Message }') -and
+Yes 'a record it cannot take stops the install before anything is sent' ($src.Contains('try { $mostGot = Get-MostOnline -Channel $voiceChannel } catch { Die $_.Exception.Message }') -and
     $src.IndexOf('$mostGot = Get-MostOnline') -lt $src.IndexOf('Send-ThornswoodArtifact'))
+
+# ---- 4. which voice takes which numbers -----------------------------------
+$pick = [regex]::Match($src, '(?m)^\$voiceChannel = .*$')
+Yes 'Install-Voice.ps1 picks the channel from the folder it installs into' ($pick.Success -and $pick.Index -lt $src.IndexOf('$mostGot = Get-MostOnline'))
+if ($pick.Success) {
+    function ChannelFor([string]$Root) { . ([scriptblock]::Create($pick.Value)); return $voiceChannel }
+    Yes 'C:\Thornswood-Voice-Dev is dev' ((ChannelFor 'C:\Thornswood-Voice-Dev') -eq 'dev')
+    Yes 'with a trailing slash too, in any case' ((ChannelFor 'c:\thornswood-voice-dev\') -eq 'dev')
+    Yes 'C:\Thornswood-Voice, the default, is main' ((ChannelFor 'C:\Thornswood-Voice') -eq 'main')
+    Yes 'and the default -Root is the live folder' ($src -match "\[string\]\`$Root\s*=\s*'C:\\Thornswood-Voice',")
+    $devVoice = Get-MostOnline -Channel (ChannelFor 'C:\Thornswood-Voice-Dev')
+    $liveVoice = Get-MostOnline -Channel (ChannelFor 'C:\Thornswood-Voice')
+    Yes ('so dev voice is started with 5 ({0}) and live with main''s ({1}, unchanged)' -f $devVoice.Voice, $liveVoice.Voice) ($devVoice.Voice -eq 5 -and $liveVoice.Voice -eq $real.Voice)
+}
 Yes 'the number becomes THORNSWOOD_VOICE_MOST, as a whole number' ($src.Contains('$mostSet = "set THORNSWOOD_VOICE_MOST=$([int]$mostGot.Voice)&& "'))
 
 $remote = [regex]::Match($src, '(?s)\$remote = @"\r?\n(.*?)\r?\n"@')

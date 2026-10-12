@@ -389,12 +389,14 @@ Write-Host ('  build stamp: ' + (Format-ThornswoodBuildStamp $buildStamp))
 
 # How many the dev server holds at once, read here so a number the engine
 # would refuse stops this while the dev server is still up. MaxOnline.ps1 says
-# where it lives (records\most-online.json) and why.
+# where it lives (records\most-online.json) and why. The dev server's own
+# numbers, its dev object (Patrick, 12 Oct: 5 at once on dev).
 . (Join-Path $Here 'MaxOnline.ps1')
-$got = Get-MostOnline
+$got = Get-MostOnline -Channel dev
 $maxOnline = $got.Value
 $seats = $got.Seats
-if ($maxOnline -gt 0) { Write-Host ('  most online: {0}, engine seats {1} ({2} over it for staff roles), from {3}' -f $maxOnline, $seats, $got.Staff, $got.From) }
+if ($got.Note) { Write-Host ('  most online: ' + $got.Note) -ForegroundColor Yellow }
+if ($maxOnline -gt 0) { Write-Host ('  most online on dev: {0}, engine seats {1} ({2} over it for staff roles), from {3}' -f $maxOnline, $seats, $got.Staff, $got.From) }
 else { Write-Host ('  most online: {0} gave no number ({1}), so the dev server keeps the one it has' -f $got.From, $got.Why) -ForegroundColor Yellow }
 
 # --------------------------------------------------------- the load order ---
@@ -854,7 +856,7 @@ Copy-Item -LiteralPath '$rootWin\server-settings.json' -Destination '$stageWin\s
   # AND HOW MANY IT HOLDS AT ONCE, #481. thornswoodMostOnline is the number the
   # gamemode turns people away past, and maxPlayers, the engine's own slot
   # count, is set that plus the staff seats, both from records\most-online.json
-  # read above. With no number both are left as the box has them and that does
+  # read above, its dev numbers. With no number both are left as the box has them and that does
   # not count as a reason to rewrite.
   #
   # AND NO "default" KEY IN npcSettings, added 28 September for issue #879. The

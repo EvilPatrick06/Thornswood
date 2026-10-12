@@ -16,6 +16,7 @@ The real bot module is imported and the real coroutine is run over real
 files in a temp folder. Only the Discord send, the client and the sleep are
 replaced. Read only. Never connects to anything.
 """
+import _pyguard  # noqa: F401  (first: Python 3.10 or newer, #2276)
 import asyncio
 import inspect
 import json

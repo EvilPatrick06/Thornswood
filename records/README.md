@@ -64,10 +64,15 @@ read it (issue #440, phase 8):
   (`staffSeats`), with Patrick's decisions in its `note` (issue #481), and
   the most people the voice service takes at once (`voice`), never fewer than
   the two together, since everybody seated and everybody waiting in line at
-  the menu holds a socket to it.
+  the menu holds a socket to it. Those are main's. Its `dev` object holds the
+  same three for the dev server and dev voice (Patrick, 12 Oct: 5, 0 and 5),
+  and a record without one gives dev main's numbers.
   `scripts\deploy\MaxOnline.ps1` reads it for Deploy-Gamemode,
-  Deploy-DevGamemode, Publish-Server, Publish-Update and Install-Voice, and `site\server.js`
-  reads `people` when the site runs from the repository. No script writes
+  Deploy-DevGamemode (dev), Publish-Server and Publish-Update (each for its
+  channel) and Install-Voice (dev for `C:\Thornswood-Voice-Dev`), and
+  `site\server.js` reads `people` and `staffSeats` when the site runs from
+  the repository. What people are shown, the M of "N of M awake", is the
+  seats, people and staffSeats together: 30 on main, 5 on dev. No script writes
   this one: it is changed by hand in a pull request, then each server is
   deployed and a Ship carries it to the feed.
 - `upstream-not-taken.json`: the upstream SkyMP commits the fork is not

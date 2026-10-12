@@ -3050,6 +3050,107 @@
     handsLine(name);
   }));
 
+  /*
+    WHAT THE CHARACTER IS LEFT IN AFTER A MINING SPELL (#2244).
+
+    A measurement, not a fix. After a spell with the pickaxe only in the pack,
+    the character cannot jump, sprint or use a forge until a pickaxe is
+    equipped and taken off again. The spell ends with IdleChairExitStart and
+    IdleForceDefaultState (swingScript in the gamemode), and those do not
+    clear whatever holds them; the equip does. #2289 cycled the pick to clear
+    it, which is a band-aid and was reverted (#2306). Nothing has said what
+    the state is.
+
+    So this writes the character's state as lines in this log: when a mining
+    spell ends, again half a second and three seconds later, and again after
+    the next equip or unequip, which is what frees them. Each line has the sit
+    state, whether a weapon is out, the hand types, and the behaviour graph
+    variables that gate jumping, sprinting and furniture. Every animation
+    event in the five seconds after the end is written down too, once each.
+    Comparing the stuck lines with the line after the equip names the
+    variable that changed, and the event that clears it can then be sent
+    instead. It changes nothing in play.
+  */
+  const AFTER_BOOLS = ['bAnimationDriven', 'bMotionDriven', 'bIsSynced', 'bAllowRotation',
+    'bInJumpState', 'IsEquipping', 'IsUnequipping', 'IsAttacking', 'IsSprinting', 'bSprintOK',
+    'bEquipOk', 'bAnimObjectLoaded', 'bHeadTrackSpine', 'bInFurnitureState', 'IsInFurniture',
+    'bWantCastLeft', 'bWantCastRight', 'Is1HM', 'IsShouting', 'IsStaggering', 'IsBlocking'];
+  const AFTER_INTS = ['iState', 'iFurnitureState', 'iSyncIdleLocomotion', 'iRightHandType',
+    'iLeftHandType', 'iWantBlock', 'iGetUpType'];
+  const AFTER_EVENTS_MS = 5000;
+  let afterPick = false;         // a pickaxe idle started and has not ended
+  let afterAsked = [];           // [label, when] to read on a later frame
+  let afterEnded = 0;            // when the last mining spell ended, 0 for none
+  let afterWaitEquip = false;    // a line is still owed for the next equip
+  const afterEvents = {};
+
+  function afterLine(label) {
+    const pc = sp.Game.getPlayer();
+    if (!pc) { return; }
+    const part = (name, read) => {
+      let v;
+      try { v = read(); } catch (e) { v = 'threw'; }
+      return name + ' ' + v;
+    };
+    const parts = [
+      part('sit', () => pc.getSitState()),
+      part('sleep', () => pc.getSleepState()),
+      part('weapon out', () => (pc.isWeaponDrawn() ? 'yes' : 'no')),
+      part('right type', () => pc.getEquippedItemType(1)),
+      part('left type', () => pc.getEquippedItemType(0))
+    ];
+    AFTER_BOOLS.forEach((n) => parts.push(part(n, () => (pc.getAnimationVariableBool(n) ? 1 : 0))));
+    AFTER_INTS.forEach((n) => parts.push(part(n, () => pc.getAnimationVariableInt(n))));
+    parts.push(part('Speed', () => Math.round(pc.getAnimationVariableFloat('Speed'))));
+    say('after mining, ' + label + ': ' + parts.join(', '));
+  }
+
+  try {
+    sp.hooks.sendAnimationEvent.add({
+      enter: (ctx) => {
+        try {
+          const name = String(ctx.animEventName || '');
+          if (!name) { return; }
+          const now = Date.now();
+          if (MINE_START.test(name)) { afterPick = true; return; }
+          if (/^idlechairexitstart$/i.test(name) && afterPick) {
+            afterPick = false;
+            afterEnded = now;
+            afterWaitEquip = true;
+            afterAsked.push(['at the end (' + name + ')', now], ['0.5 s later', now + 500], ['3 s later', now + 3000]);
+            return;
+          }
+          if (afterEnded && now - afterEnded < AFTER_EVENTS_MS && !afterEvents[name]) {
+            afterEvents[name] = true;
+            say('after mining: ' + name + ' sent ' + (now - afterEnded) + 'ms after the end');
+          }
+        } catch (err) { /* a hook must not throw into the game; this only notes a name */ }
+      },
+      leave() { }
+    }, 0x14, 0x14);
+  } catch (e) {
+    say('could not watch the state after mining: ' + e);
+  }
+
+  sp.on('equip', guard('after mining equip', () => {
+    if (!afterWaitEquip) { return; }
+    afterWaitEquip = false;
+    afterAsked.push(['after the next equip', Date.now() + 200]);
+  }));
+  sp.on('unequip', guard('after mining unequip', () => {
+    if (!afterEnded || afterWaitEquip) { return; }
+    afterAsked.push(['after the next unequip', Date.now() + 200]);
+    afterEnded = 0;
+  }));
+
+  sp.on('update', guard('after mining', () => {
+    if (!afterAsked.length) { return; }
+    const now = Date.now();
+    const due = afterAsked.filter((a) => a[1] <= now);
+    if (!due.length) { return; }
+    afterAsked = afterAsked.filter((a) => a[1] > now);
+    due.forEach((a) => afterLine(a[0]));
+  }));
   sp.on('containerChanged', guard('picks', (e) => {
     if (!e) { return; }
 
