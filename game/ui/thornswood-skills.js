@@ -1830,30 +1830,6 @@
     });
     wrap.appendChild(card);
 
-    /*
-      WATER (#1382). Patrick via Smeagle, 12 Oct: Fill water and Boil water
-      are buttons here, and send what /water fill and /water boil send. The
-      server decides everything: whether there is water or a well where you
-      stand, whether you carry an empty bottle, whether a fire is in reach,
-      and what the water is. It answers in the chat.
-    */
-    var water = el('div', 'card');
-    water.appendChild(el('div', 'name', 'Water'));
-    water.appendChild(el('div', 'desc',
-      'Fill an empty bottle at a well or standing in water. Well water and Frostreach ice water are clean. ' +
-      'River, lake, sea and standing water make you ill unless boiled: stand by a fire for a minute.'));
-    var wrow = el('div', 'guest');
-    var fill = el('span', 'act', 'Fill water');
-    fill.title = 'Fill an empty bottle from the well or water you are standing at';
-    fill.onclick = function (ev) { ev.stopPropagation(); officeSay('/water fill'); };
-    var boil = el('span', 'act', 'Boil water');
-    boil.title = 'Boil the water you carry, at a fire';
-    boil.onclick = function (ev) { ev.stopPropagation(); officeSay('/water boil'); };
-    wrow.appendChild(fill);
-    wrow.appendChild(boil);
-    water.appendChild(wrow);
-    wrap.appendChild(water);
-
     var again = el('div', 'card');
     var line = el('div', 'guest');
     line.appendChild(el('span', 'who', 'These are the server\'s numbers from when K opened.'));

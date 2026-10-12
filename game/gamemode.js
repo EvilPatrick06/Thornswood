@@ -8379,6 +8379,24 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     return;
   }
 
+  /*
+    WATER (#1382). A well activator with an empty bottle fills it; a cooking
+    spot starts boiling any unboiled water carried. It answers nothing to the
+    engine, so the press goes on down the chain and the cooking menu opens as
+    it always has. Boiling is not cooking, so it is asked before the bench gate.
+  */
+  try {
+    var needsW = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodNeeds;
+    if (needsW && needsW.activatedWater) {
+      var refDescW = '';
+      try { refDescW = mp.getDescFromId(refrId); } catch (eW) { refDescW = ''; }
+      var kwW = (typeof BENCH_BY_BASE !== 'undefined' && BENCH_BY_BASE &&
+                 Object.prototype.hasOwnProperty.call(BENCH_BY_BASE, baseDesc)) ? BENCH_BY_BASE[baseDesc] : '';
+      var wLine = needsW.activatedWater(casterRefrId, refDescW, baseDesc, kwW);
+      if (wLine) { notify(casterRefrId, wLine); say(casterRefrId, wLine); }
+    }
+  } catch (eWater) { }
+
   // The placed hive is the farmer's. hive() answers it: one Honeycomb,
   // ten minutes, one piece of work, no rank gate. A gatherer is told it
   // is farm work, and the engine does not hand the comb over.
@@ -49115,9 +49133,6 @@ const WORDS = ['/ooc', '/o',
                // Never typed, and so deliberately NOT in PLAYER_WORDS. See the
                // carriages block.
                '/ride',
-               // Filling a bottle and boiling it (#1382). Not in PLAYER_WORDS:
-               // the needs panel's buttons are meant to send it.
-               '/water',
                // The embassy roll and the Thalmor remnant roll, written by an
                // admin (#1390). See the embassy and remnant block.
                '/embassy', '/remnant',
@@ -50323,25 +50338,6 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
       the base id travels rather than an amount: a client that could name its
       own number could fill its meters by saying so.
     */
-    /*
-      COLLECTING AND BOILING WATER (#1382). /water fill at a well or standing
-      in water, with an empty bottle; /water boil at a fire. The server
-      decides what the water is; the client only says which.
-    */
-    if (word === '/water') {
-      var needsWater = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodNeeds;
-      if (needsWater && actorId) {
-        try {
-          var how = String(parts[1] || '').toLowerCase();
-          var wline = how === 'boil' ? needsWater.boilWater(actorId)
-            : how === 'fill' ? needsWater.fillWater(actorId)
-            : 'Fill a bottle at a well or in water, then boil it at a fire.';
-          if (wline) { toProfile(profileId, wline); }
-        } catch (e) { }
-      }
-      return true;
-    }
-
     if (word === '/ate') {
       var needsAte = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodNeeds;
       if (needsAte && actorId) {
@@ -54194,21 +54190,30 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     // your favour.
     waterOrder: ['standing', 'sea', 'river', 'ice', 'well', 'boiled'],
     unboiled: ['standing', 'sea', 'river'],
-    // drink.md: "Boiling is a cook fire, a minute at it." The client reports
-    // only how far the nearest fire is, so any fire in warmth reach is it.
+    // drink.md: "Boiling is a cook fire, a minute at it." Leaving the fire
+    // before the minute is up, as the client reports it, loses the boil.
     boilSeconds: 60,
     // An empty wine bottle fills; a bottle of water is what it fills into.
     waterItems: { empty: 'f2012:Skyrim.esm', full: '13f598:WindhelmSSE.esp' },
     /*
-      THE WELLS. WELLS is scripts\dev\Build-WellTable.py's list of every
-      placed vanilla well, out of the load order. Close enough to fill is the
-      gathering reach, the same 400 a forager stands within (withinResourceReach).
-      Patrick, 12 Oct 2026: once somebody fills at a well, that well is done
-      for THEM for one in-game day. The game clock runs twenty times real
-      time, so a day is 72 real minutes. This is the one number to change.
+      THE WELLS (Patrick, 12 Oct 2026): activating a well with an empty bottle
+      fills it, at the game's own activation range. Every placed vanilla well
+      is a STAT, and a static raises no activation, so nothing reaches the
+      server from one (#1382, issuecomment-6129142274). wellActivators is the
+      list of activator bases the content plugin puts on each well (WELLS,
+      scripts\dev\Build-WellTable.py, has where they go). It is EMPTY
+      until those activators exist; nothing fills from a well before then.
+      Once somebody fills at a well, that well is done for THEM for one
+      in-game day. The game clock runs twenty times real time, so a day is
+      72 real minutes. This is the one number to change.
     */
-    wellReach: 400,
+    wellActivators: [],
     wellCooldownMinutes: 72,
+    // Boiling is activating a cooking spot (Patrick, 12 Oct 2026): the
+    // workbench keyword the cooking recipes are made at, CraftingCookpot,
+    // as BENCH_BY_BASE names it. A plain campfire is a static or a light and
+    // raises no activation.
+    cookKeyword: 'a5cb3:Skyrim.esm',
     /*
       ALE, AND IT GETS WORSE WITH EVERY ONE.
 
@@ -54404,6 +54409,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       // wells this person has filled at lately (#1382).
       water: waterHeld(v.water),
       boilFrom: (typeof v.boilFrom === 'number') ? v.boilFrom : null,
+      boilFire: !!v.boilFire,
       wellAt: wellsUsed(v.wellAt)
     };
   }
@@ -55468,39 +55474,6 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   }
   function isWaterItem(baseId) { return !!baseId && baseId === waterId('full'); }
 
-  // The well somebody is standing at, as its row number, or -1.
-  function wellHere(actorId) {
-    var rows = null;
-    try { rows = (typeof WELLS !== 'undefined' && WELLS && WELLS.items) ? WELLS.items : null; } catch (e) { rows = null; }
-    if (!rows || !rows.length) { return -1; }
-    var desc = '', pos = null;
-    try { desc = String(mp.get(actorId, 'worldOrCellDesc') || ''); pos = mp.get(actorId, 'pos'); } catch (e) { return -1; }
-    if (!desc || !pos) { return -1; }
-    var best = -1, bestD = NEEDS.wellReach * NEEDS.wellReach;
-    for (var i = 0; i < rows.length; i++) {
-      var r = rows[i];
-      if (r[0] !== desc) { continue; }
-      var dx = r[1] - pos[0], dy = r[2] - pos[1], dz = r[3] - pos[2];
-      var d = dx * dx + dy * dy + dz * dz;
-      if (d <= bestD) { best = i; bestD = d; }
-    }
-    return best;
-  }
-
-  // The water somebody is standing in, as a row of waterSource, or ''.
-  function waterHere(actorId, n) {
-    if (!n || (n.place !== 'water' && n.place !== 'shallow')) { return ''; }
-    var desc = '';
-    try { desc = String(mp.get(actorId, 'worldOrCellDesc') || ''); } catch (e) { return ''; }
-    if (!desc) { return ''; }
-    var cls = '';
-    try {
-      if (typeof WATERS !== 'undefined' && WATERS && WATERS.items) { cls = WATERS.items[desc] || ''; }
-    } catch (e) { cls = ''; }
-    if (!cls) { cls = 'deep'; }
-    return waterOwn(NEEDS.waterClass, cls) ? NEEDS.waterClass[cls] : '';
-  }
-
   function nearFire(n) {
     var d = Number(n && n.fire);
     return isFinite(d) && d >= 0 && d < (NEEDS.fire.reach || 1);
@@ -55513,55 +55486,59 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   }
 
   /*
-    Fill one empty bottle from where somebody stands: a well first, because a
-    well beside a stream is still a well, then the water they are in.
+    Fill one empty bottle at a well somebody activated. wellKey is the
+    activated reference, so the cooldown is per well and per person.
   */
-  function fillWater(actorId) {
+  function fillAtWell(actorId, wellKey) {
     var n = settle(actorId);
-    var src = '', well = wellHere(actorId);
-    if (well >= 0) {
-      if (waterOwn(n.wellAt, String(well))) {
-        var left = Math.ceil((n.wellAt[String(well)] + NEEDS.wellCooldownMinutes * 60000 - Date.now()) / 60000);
-        return 'You have drawn from this well today. Try another well, or wait ' +
-               left + (left === 1 ? ' minute.' : ' minutes.');
-      }
-      src = 'well';
-    } else {
-      src = waterHere(actorId, n);
+    if (waterOwn(n.wellAt, wellKey)) {
+      var left = Math.ceil((n.wellAt[wellKey] + NEEDS.wellCooldownMinutes * 60000 - Date.now()) / 60000);
+      return 'You have drawn from this well today. Try another well, or wait ' +
+             left + (left === 1 ? ' minute.' : ' minutes.');
     }
-    if (!src) { return 'There is no water here to fill a bottle from.'; }
     var empty = waterId('empty'), full = waterId('full');
-    if (!empty || !full) { return 'The bottles are not in this load order.'; }
+    if (!empty || !full) { return ''; }
     if (typeof takeItemById !== 'function' || !takeItemById(actorId, empty, 1)) {
-      return 'You need an empty bottle to fill.';
+      return 'You need an empty bottle to draw water.';
     }
     if (typeof addItem !== 'function' || !addItem(actorId, NEEDS.waterItems.full, 1)) {
       if (typeof addItem === 'function') { addItem(actorId, NEEDS.waterItems.empty, 1); }
       return 'The bottle would not fill.';
     }
-    n.water[src] = (n.water[src] || 0) + 1;
-    if (src === 'well') { n.wellAt[String(well)] = Date.now(); }
+    n.water.well = (n.water.well || 0) + 1;
+    n.wellAt[wellKey] = Date.now();
     write(actorId, n);
-    if (src === 'well' || src === 'ice') { return 'You fill a bottle. The water is clean.'; }
-    return 'You fill a bottle. Boil it at a fire before you drink it.';
+    return 'You fill a bottle at the well. The water is clean.';
   }
 
-  function boilWater(actorId) {
-    var n = settle(actorId);
-    if (!unboiledHeld(n)) { return 'You have no water that needs boiling.'; }
-    if (!nearFire(n)) { return 'You need to be at a fire to boil water.'; }
-    if (typeof n.boilFrom === 'number') { return 'The water is already over the fire.'; }
-    n.boilFrom = Date.now();
-    write(actorId, n);
-    return 'You set the water over the fire. Stay by it for a minute.';
+  /*
+    Something was activated (mp.onActivate). A well activator fills a bottle;
+    a cooking spot starts boiling whatever unboiled water is carried. Answers
+    a line, or '' when this press is none of the water's business. Never
+    refuses anything: the cooking menu opens the way it always has.
+  */
+  function activatedWater(actorId, refrDesc, baseDesc, benchKeyword) {
+    if (baseDesc && NEEDS.wellActivators.indexOf(baseDesc) !== -1) {
+      return fillAtWell(actorId, String(refrDesc || baseDesc));
+    }
+    if (benchKeyword && benchKeyword === NEEDS.cookKeyword) {
+      var n = settle(actorId);
+      if (!unboiledHeld(n) || typeof n.boilFrom === 'number') { return ''; }
+      n.boilFrom = Date.now();
+      n.boilFire = nearFire(n);
+      write(actorId, n);
+      return 'You set your water over the fire. Stay by it for a minute.';
+    }
+    return '';
   }
 
   // A boil under way: done after a minute at the fire, lost if they left it.
   // Writes and answers a line when something changed, or ''.
   function boilCheck(actorId, n) {
     if (typeof n.boilFrom !== 'number') { return ''; }
-    if (!nearFire(n)) {
+    if (n.boilFire && !nearFire(n)) {
       n.boilFrom = null;
+      n.boilFire = false;
       write(actorId, n);
       return 'You left the fire, and the water did not boil.';
     }
@@ -55570,6 +55547,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     for (var i = 0; i < NEEDS.unboiled.length; i++) { delete n.water[NEEDS.unboiled[i]]; }
     if (moved) { n.water.boiled = (n.water.boiled || 0) + moved; }
     n.boilFrom = null;
+    n.boilFire = false;
     write(actorId, n);
     return 'The water has boiled. It is safe to drink.';
   }
@@ -56294,8 +56272,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   g.__thornswoodNeeds = {
     NEEDS: NEEDS, COST: COST, TEMP_COST: TEMP_COST, CRAFT_REST: CRAFT_REST,
     bandOf: bandOf, tempBand: tempBand, consumed: consumed, kindOf: foodKind,
-    // Collecting and boiling water (#1382), sent as /water fill and /water boil.
-    fillWater: fillWater, boilWater: boilWater, drankWater: drankWater,
+    // Water at a well and over a cooking fire, from mp.onActivate (#1382).
+    activatedWater: activatedWater, drankWater: drankWater,
     settle: settle, view: view, effects: effects,
     // The bars as a line of text, for /needs (#2267).
     textView: textView,

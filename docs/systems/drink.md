@@ -45,15 +45,4 @@ not a new station.
 
 The ale curve, the 45 minutes, and the chat line that says which drink
 it was are in the server. The damage help, the sway, and the hangover
-are not. Water is tagged by where you filled it. An empty wine bottle fills at a
-well or standing in water; the server keeps where each bottle came from,
-and drinking takes the worst you carry first. A minute by a fire boils
-every unboiled bottle you carry, and leaving the fire before then loses
-the boil. Well water and Frostreach ice water are safe without boiling
-(Patrick, 12 Oct 2026). A well is any of the 30 vanilla wells placed in
-the load order (scripts/dev/Build-WellTable.py), within 400 units, and
-once you fill at one it is done for you for one in-game day (72 real
-minutes); other wells still work. A bottle the server never saw filled,
-like one bought at an inn, is safe. Filling and boiling are the Fill water and
-Boil water buttons on the Body page of K, which send /water fill and
-/water boil; typing those works too. Every other non-ale drink is 20.
+are not. Water is tagged by where you filled it, and it is done in the world, never by a command. Activating a well with an empty wine bottle fills it, at the game's normal activation range. The vanilla wells are statics and raise no activation, so this waits on activators the content plugin places at the 30 wells in the load order (scripts/dev/Build-WellTable.py has where); until then NEEDS.wellActivators is empty and no well fills. Water you stand in does not fill: no server hook sees it. Once you fill at a well it is done for you for one in-game day (72 real minutes); other wells still work. The server keeps where each bottle came from, and drinking takes the worst you carry first. Activating a cooking spot (the CraftingCookpot bench) while carrying unboiled water starts a boil; a minute later it is boiled, and leaving the fire before then loses the boil. The cooking menu still opens. Well water and Frostreach ice water are safe without boiling (Patrick, 12 Oct 2026). A bottle the server never saw filled, like one bought at an inn, is safe. Every other non-ale drink is 20.
