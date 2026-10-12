@@ -11,7 +11,9 @@ issue that turns it into buttons, except `/stuck`, `/helpme` and
 `/report`, which stay commands (Patrick, later on 4 Oct: "change it to
 except the /stuck and the ones for getting help from GMs"), and the
 ways of saying a line and `/roll`, which stay commands with no buttons
-(Patrick, 4 Oct, #1639: "Allow those commands and don't do buttons").
+(Patrick, 4 Oct, #1639: "Allow those commands and don't do buttons"),
+and `/needs`, the needs bars as a line of text for somebody who hid them
+(Patrick, 11 Oct, #2267).
 The umbrella is #1620.
 
 File and line numbers are main at 9b5a667 on 4 Oct. They move as the
@@ -31,7 +33,7 @@ Two lists in that block decide what people are told. `WORDS` is every
 word the server answers. `PLAYER_WORDS` is the words named to everybody,
 and since #1633 it is exactly the commands that stay, the rows below that
 say so: `/stuck`, `/helpme`, `/report`, `/me`, `/do`, `/w`, `/s`, `/y`,
-`/ooc` and `/roll`. `helpLine` reads it: the answer to `/help` and
+`/ooc`, `/roll` and `/needs`. `helpLine` reads it: the answer to `/help` and
 `/commands`, and the end of the reply to a word the server does not know,
 "No command called ... Help is a panel: F7 opens it ... Typed in the
 chat: ...". In the tables below, "the list" means `PLAYER_WORDS`.
@@ -74,7 +76,7 @@ and help text never lists it.
 | `/journal` and its verbs | Anybody | Journals, pages and sharing them | `journalCommand` in the chat commands block | Nowhere. [Journals](journal.md) names J and its buttons | J sends every verb. Out of the list, the pages and the server's own lines. | #1630 |
 | `/book` and its verbs | Anybody; founding needs the Business Owner or Faction Owner role, or Dev | Group books: found, invite, leave, roles, prices | The `/book` branch of `handle`, then the books block's `command` | Nowhere. [Factions](factions.md) names J and its buttons | J sends every verb: Invite names the person in front of you when J opens, and each role's permissions are buttons. The board panel submits a price list. The invite reads as one on the P prompt (#1591). Out of the list, `/help people`, the pages and the server's own lines. | #1630 |
 | `/rest sit`, `campfire`, `inn`, `up` | Anybody | Where you are resting, for the rest meter | `bedRest` in the property block's beds | Nowhere. [Exhaustion](exhaustion.md) names sitting, lying down and the wheel's Sit | Sitting down sends `/rest sit`, lying down `/rest bed` and getting up `/rest up`, and the server answers by the furniture it saw pressed, whatever the word (#1603). Sit on the emote wheel sends nothing: the server reads the last animation the game sent for the person, and the wheel's Sit is a seat on the ground (#1631). Out of the list, `/help living` and the Help page. | #1631 |
-| `/needs` | Nobody | Gone (#1631). The meters, the warmth with its working out and what is counted as worn are the Body page on K | `view` in the needs block, put on the K panel by `writeState` in the character block | Nowhere. [Temperature](temperature.md) and `site/data/known.md` name the Body page. The launcher's line on hiding the bars still names it (`launcher/app/Shell.cs`, which takes a line in #staff-general first) | The four bars, and the Body page on K, with Read again. Out of the list, the help and the pages. | #1631 |
+| `/needs`, `/need` | Anybody | The four needs bars as one line of text: Hunger, Thirst and Rest as a per cent with their band, Temp as its word and number and where it is heading, and where you are resting. It changes nothing | The `/needs` branch of `handle`, then `textView` in the needs block | The list; the help panel's Living; Help page "You will get hungry, thirsty and cold"; the Settings line under "Show the needs bars on screen"; the Controls row for / and `Thornswood.ini` | Stays a command, and the help names it (Patrick, 11 Oct, #2267): it is another view of the bars and the Body page on K, for somebody who hid the bars. It went with #1631 and came back on its own. | #2267 |
 | `/eat`, `/drink`, `/drink ale` | Nobody | Gone (#1631). They gave food or drink with no item | None | Nowhere | Eating or drinking the item, which the front plugin reports as `/ate`. Said on #1382. | #1631 |
 | `/bard` | Nobody | Gone (#1631). The bard is somebody the server sees playing | `playing` and `bardSeen` in the needs block | Nowhere. [Exhaustion](exhaustion.md), [Emotes](emotes.md) and [People beside you](people.md) name the wheel | Lute, Flute or Drum on the emote wheel with that instrument in the pack, or Sing (Patrick, 4 Oct), read from the last animation the game sent for the person. | #1631 |
 | `/helpme <what>`, `/help-me`, `/report <name> <what>` | Anybody | Reaches staff; reports somebody to staff | The `/helpme` branch of `handle`, then the asking staff block's `ask` | The list; the help panel's Getting help; Help page "Getting staff"; `site/data/site/privacy.md` | Stays a command, and the help names it (Patrick, 4 Oct). | None |

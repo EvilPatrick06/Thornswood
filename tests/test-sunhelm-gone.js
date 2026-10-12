@@ -153,7 +153,9 @@ yes('it sends nobody to an MCM, which went with SunHelm', !/\bMCM\b/.test(body))
 // Where the needs are shown, checked against the thing that draws them.
 // /needs went with #1631 (nothing people do is typed, Patrick, 4 Oct): the
 // numbers behind the bars are the Body page on K, which the K panel draws
-// from the needs block's own view, put on the panel by writeState.
+// from the needs block's own view, put on the panel by writeState. It came
+// back on 11 Oct as the bars in a line of text for somebody who hid them
+// (#2267), one of the words everybody is told, so the item may name it.
 const SKILLS = read(['game', 'ui', 'thornswood-skills.js']);
 const bodyPage = /sections\.push\('body'\)/.test(SKILLS) && /function drawNeeds\(\)/.test(SKILLS) &&
     /view\.body = N\.view\(actorId\)/.test(GM);
@@ -167,9 +169,12 @@ body.replace(/(^|\s)(\/[a-z]+)\b/g, function (all, pre, w) {
 const untold = slashes.filter(function (w) { return playerWords.indexOf("'" + w + "'") < 0; });
 yes('every command it names (' + (slashes.join(' ') || 'none') + ') is one everybody is told about, not only a playtester' +
     (untold.length ? ': not ' + untold.join(', ') : ''), untold.length === 0);
-yes('it tells nobody to type /needs, /eat, /drink or /bard, which the gamemode no longer answers (#1631)',
-    !/\/(needs|eat|drink|bard)\b/.test(body) &&
-    !/'\/(needs|eat|drink|bard)'/.test(playerWords) && !/word === '\/(needs|eat|drink|bard)'/.test(GM));
+yes('it tells nobody to type /eat, /drink or /bard, which the gamemode no longer answers (#1631)',
+    !/\/(eat|drink|bard)\b/.test(body) &&
+    !/'\/(eat|drink|bard)'/.test(playerWords) && !/word === '\/(eat|drink|bard)'/.test(GM));
+yes('and /needs, when it names it, is answered and on the list everybody is told (#2267)',
+    !/\/needs\b/.test(body) ||
+    (/'\/needs'/.test(playerWords) && /word === '\/needs'/.test(GM)));
 
 // Each claim about the bars is checked only if the item makes it, and has to
 // be true of hudScript when it does.

@@ -78,8 +78,9 @@ function arrayOf(name) {
   try { return m ? new Function('return ' + m[1])() : null; } catch (e) { return null; }
 }
 
-// The commands that stay, as Patrick decided them on 4 October.
-const STAY = ['/stuck', '/helpme', '/report', '/me', '/do', '/w', '/s', '/y', '/ooc', '/roll'];
+// The commands that stay, as Patrick decided them on 4 October, and /needs,
+// the needs bars as text, on 11 October (#2267).
+const STAY = ['/stuck', '/helpme', '/report', '/me', '/do', '/w', '/s', '/y', '/ooc', '/roll', '/needs'];
 const PLAYER_WORDS = arrayOf('PLAYER_WORDS') || [];
 const WORDS = arrayOf('WORDS') || [];
 
@@ -508,7 +509,8 @@ attempt('F', function () {
   const slash = /Dx\("command", "ThornsWood", "Type a command",\s*"([^"]*)"/.exec(keysCs);
   yes('F2 the Controls row for / says what is still typed there, and that the rest is staff\'s and dev\'s',
       !!slash && /staff and dev commands/.test(slash[1]) && /\/stuck, \/helpme and \/report/.test(slash[1]));
-  yes('F2 and so does Thornswood.ini', /^; \/ooc\), \/roll, and staff and dev commands\./m.test(ini));
+  yes('F2 and so does Thornswood.ini', /^; \/ooc\), \/roll, \/needs for the needs bars as text, and staff and dev$/m.test(ini) &&
+      /^; commands\. The game's skill tree/m.test(ini));
 
   // docs/systems/commands.md, row by row: a row says "The list" where
   // people are told exactly when it stays a command.

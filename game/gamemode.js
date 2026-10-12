@@ -48813,6 +48813,12 @@ const WORDS = ['/ooc', '/o',
                '/helpme', '/help-me', '/report',
                // Out of a wedged spot; see the stuck block after it.
                '/stuck',
+               // The four needs bars said as one line of text, for somebody
+               // who hid the bars in the launcher's Settings (#2267). Patrick's
+               // exception to "buttons, not commands", 11 Oct: it is another
+               // view of what the bars and the Body page on K already show.
+               // /need is the same word. See the /needs branch of handle().
+               '/needs', '/need',
                // A carriage or ferry (#1394). E on a driver sends /ride e <id>,
                // and the ride panel's buttons send /ride and the stop (#1635).
                // Never typed, and so deliberately NOT in PLAYER_WORDS. See the
@@ -48887,9 +48893,9 @@ const WORDS = ['/ooc', '/o',
                // of this file; the numbers there are invented and meant to be
                // argued with. /rest is the plugin's, sent when somebody sits
                // or lies down, and never typed (#1603); see bedRest. Not
-               // /needs, /eat, /drink or /bard (#1631): the Body page on K
-               // says what /needs said, eating and drinking is the item (/ate),
-               // and the bard is somebody the server sees playing (bardSeen).
+               // /eat, /drink or /bard (#1631): eating and drinking is the
+               // item (/ate), and the bard is somebody the server sees playing
+               // (bardSeen). /needs is back as a line of text (#2267), above.
                '/rest',
                // The repair panel (#1384): sent by the inventory key and by
                // the panel's buttons, never typed. See the durability block,
@@ -48943,19 +48949,20 @@ const WORDS = ['/ooc', '/o',
   Since #1633, exactly the commands people still type, and nothing else:
   /stuck and the lines that reach staff, /helpme and /report (Patrick,
   4 October, #1682), and the ways of saying a line, /me, /do, /w, /s, /y and
-  /ooc, with /roll (#1639). Everything else anybody does is a key, a prompt
-  or a panel, and the help panel names those. /me, /do, /w, /s and /y are
-  said by the voice service and never reach this server, so they are named
-  here and are not in WORDS. docs/systems/commands.md has the same list.
+  /ooc, with /roll (#1639), and /needs, the needs bars as a line of text
+  for somebody who hid them (Patrick, 11 October, #2267). Everything else
+  anybody does is a key, a prompt or a panel, and the help panel names
+  those. /me, /do, /w, /s and /y are said by the voice service and never
+  reach this server, so they are named here and are not in WORDS. /need is
+  /needs and is not named twice. docs/systems/commands.md has the same list.
 */
 // Not /plot, /plant or /claim: a farm is worked and claimed at the plot, and
 // a building at its door, with the line under the crosshair (#1636, #1637).
 // Not /jarl, /steward, /evict, /box or /rent: the offices' powers are buttons
 // on the Office page of K (#1638), and the board panel says what the box
-// holds. Not /rest: sitting or lying down is how you rest (#1603). Not /needs,
-// /eat, /drink or /bard (#1631): the four bars and the Body page on K show the
-// meters, eating or drinking the item is the meal, and playing an instrument
-// or Sing on the emote wheel is the bard. Not /party: P on somebody asks and
+// holds. Not /rest: sitting or lying down is how you rest (#1603). Not /eat,
+// /drink or /bard (#1631): eating or drinking the item is the meal, and
+// playing an instrument or Sing on the emote wheel is the bard. Not /party: P on somebody asks and
 // the P panel runs the party (#1629). Not /journal or /book: J sends those
 // lines (#1630). Not /friend, /mute, /hidename, /trade, /yes and /no: Y, H and
 // L on the look prompt, the P panel, the trade window and the prompt's Accept
@@ -48965,7 +48972,7 @@ const WORDS = ['/ooc', '/o',
 // /stuck, /helpme and /report are the one thing a person in trouble must be
 // able to find (#414).
 const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
-                      '/me', '/do', '/w', '/s', '/y', '/ooc', '/roll'];
+                      '/me', '/do', '/w', '/s', '/y', '/ooc', '/roll', '/needs'];
 
 // ---------------------------------------------------------------------------
 // A teleport that actually teleports.
@@ -50499,11 +50506,11 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
 
     /*
       WHERE SOMEBODY IS RESTING, AND NOTHING ELSE (#1631). /rest is the
-      plugin's line when somebody sits down, lies down or gets up. /needs,
-      /eat, /drink and /bard are gone: the four bars and the Body page on K
-      show what /needs said, eating or drinking the item is a meal (/ate), and
-      the bard is somebody the server sees playing (bardSeen, in the needs
-      block). Typed, they get the answer every unknown word gets.
+      plugin's line when somebody sits down, lies down or gets up. /eat,
+      /drink and /bard are gone: eating or drinking the item is a meal
+      (/ate), and the bard is somebody the server sees playing (bardSeen, in
+      the needs block). Typed, they get the answer every unknown word gets.
+      /needs went with them and came back on its own (#2267), above.
     */
     if (word === '/rest') {
       var needs = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodNeeds;
@@ -50535,6 +50542,22 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
       }
       var restSaid = beds.rest(actorId, Number(profileId) || 0);
       if (restSaid) { toProfile(profileId, restSaid); }
+      return true;
+    }
+
+    /*
+      THE NEEDS BARS AS TEXT (#2267). Typed, by somebody who hid the bars in
+      the launcher's Settings, or anybody else: Patrick's exception to
+      "buttons, not commands" on 11 Oct, because it is another view of the
+      bars and the Body page on K rather than something done in the world.
+      /need is the same. It reads and says; it changes nothing. See textView
+      in the needs block.
+    */
+    if (word === '/needs' || word === '/need') {
+      var needsSaid = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodNeeds;
+      if (!needsSaid || !needsSaid.textView) { toProfile(profileId, 'That is not running on this server.'); return true; }
+      if (!needCharacter()) { return true; }
+      toProfile(profileId, needsSaid.textView(actorId));
       return true;
     }
 
@@ -54892,6 +54915,53 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   }
 
   /*
+    THE FOUR BARS AS ONE LINE OF TEXT (#2267), the answer to /needs and
+    /need.
+
+    Patrick, 24 September, when the launcher's Settings got "Show the needs
+    bars on screen": hide them "so it doesnt show and they can do /needs to
+    find it all". #1631 took /needs out on 4 Oct under "buttons, not
+    commands", and on 11 Oct Patrick put it back as an exception to that
+    rule: for somebody who hid the bars and wants a quick text version of
+    them. It is another view of what the bars and the Body page on K already
+    show, so it says the same things the bars say, with the same words: the
+    three meters as a per cent with their band, Temp as its word and number,
+    where the warmth is heading, and where they are resting. The working out
+    of the warmth and what is counted as worn stay on the Body page, which
+    this names. Nothing here moves a meter: view() settles, the way the K
+    panel's read does.
+  */
+  var REST_SAID = {
+    sit: 'sitting', campfire: 'sitting by a fire', rough: 'in a bed nobody can lend you',
+    camp: 'in a bed by a fire', inn: 'in a bed you may use', bed: 'in your own bed',
+    bedroll: 'in a bedroll'
+  };
+
+  /* The HUD's word for a temperature, the same steps as tempWord in hudScript. */
+  function tempWord(v) {
+    if (v < 15) { return 'Freezing'; }
+    if (v < 30) { return 'Cold'; }
+    if (v < 42) { return 'Chilly'; }
+    if (v <= 58) { return 'Fine'; }
+    if (v <= 70) { return 'Warm'; }
+    if (v <= 85) { return 'Hot'; }
+    return 'Burning';
+  }
+
+  function textView(actorId) {
+    if (inCreation(actorId)) {
+      return 'Your needs start once you leave the hall and arrive in your town.';
+    }
+    var v = view(actorId);
+    var heading = (v.tempTarget > v.temp) ? ', warming toward ' + v.tempTarget
+                : (v.tempTarget < v.temp) ? ', cooling toward ' + v.tempTarget : '';
+    var rest = v.resting ? ' You are resting, ' + (REST_SAID[v.resting] || v.resting) + '.' : '';
+    return 'Hunger ' + v.food + '% (' + v.foodBand + '), Thirst ' + v.drink + '% (' + v.drinkBand +
+           '), Rest ' + v.rest + '% (' + v.restBand + '), Temp ' + tempWord(v.temp) + ' ' + v.temp +
+           heading + '.' + rest + ' The Body page on K says what sets each one.';
+  }
+
+  /*
     Where somebody is standing, as far as temperature cares.
 
     The SERVER CANNOT KNOW THIS. Whether it is snowing on you, whether you are
@@ -55577,6 +55647,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     NEEDS: NEEDS, COST: COST, TEMP_COST: TEMP_COST, CRAFT_REST: CRAFT_REST,
     bandOf: bandOf, tempBand: tempBand, consumed: consumed,
     settle: settle, view: view, effects: effects,
+    // The bars as a line of text, for /needs (#2267).
+    textView: textView,
     ate: ate, resting: resting, worked: worked, bard: bard,
     place: place, tooTiredToCraft: tooTiredToCraft, craftRefusal: craftRefusal,
     setBurning: setBurning, catchFire: catchFire,
