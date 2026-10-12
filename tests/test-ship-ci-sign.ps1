@@ -3,8 +3,9 @@
 
   A main Ship signs the launcher CI built, or stops. Issue #921.
 
-  release.yml builds Thornswood.exe on the VPS runner, which holds no signing
-  certificate, so every v<version> draft carries an unsigned exe. On 27 Sep
+  release.yml built Thornswood.exe on the VPS runner, which holds no signing
+  certificate, so every v<version> draft carried an unsigned exe. Since #2163
+  the hosted job signs it on a v tag; the VPS fallback's draft is still unsigned. On 27 Sep
   20260927-1633 put that exe on Main as 1.1.101, unsigned, and every launcher
   from dev 1.1.101.17 on refuses an unsigned update. Ship now signs the
   verified download with Sign-Artifact.ps1 -Required and reads it back against
