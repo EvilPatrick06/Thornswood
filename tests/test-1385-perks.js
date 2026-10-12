@@ -620,8 +620,14 @@ yes('the log says it once a cast', logged('Leyline Attunement') === 1);
     K.spendLine(filled(['vitality']), 'vitality') ===
     'Vitality is full. Cheat Death: Once a day, the blow that would kill you leaves you at 1 health. ' +
     'That is not in the game yet: the engine ends you the moment health reaches nothing, before the server is asked.');
-  yes('the point that fills Resilience says Unshakeable is not in the game yet',
-    /^Resilience is full\. Unshakeable: .* not in the game yet/.test(K.spendLine(filled(['resilience']), 'resilience')));
+  yes('the point that fills Resilience names Unshakeable as the page says it, and no longer says it is not in the game',
+    K.spendLine(filled(['resilience']), 'resilience') === 'Resilience is full. Unshakeable: Nothing staggers you while you block.');
+  yes('so do Endurance and Agility: Tireless and the whole of Windwalker are in, on the person\'s own machine',
+    K.spendLine(filled(['endurance']), 'endurance') === 'Endurance is full. Tireless: Running and swinging cost half stamina.' &&
+    K.spendLine(filled(['agility']), 'agility') === 'Agility is full. Windwalker: +4 speed, and a fall deals no damage.');
+  yes('the point that fills Burden still says Pack Mule is not in the game yet',
+    /^Burden is full\. Pack Mule: Being overloaded does not slow you\. That is not in the game yet/.test(K.spendLine(filled(['burden']), 'burden')) &&
+    K.PERKS.packmule.none === true && !K.PERKS.unshakeable.none && !K.PERKS.tireless.none);
   const two = P.fresh(); two.tree = { might: 2 };
   yes('any other point says nothing more than the panel', K.spendLine(two, 'might') === '');
   states.set(AIM, filled(['precision', 'capacity']));
@@ -757,6 +763,125 @@ for (const field of ['life','runtime']) {
   world.actors.get(by)[field]=1;
   yes('perk fallback does not name a replacement character after '+field,K.killerOf(WOLF)===0);
 }
+
+// ---------------------------- the perks that happen on the person's machine --
+/*
+  Unshakeable, Tireless and Windwalker's fall are the game's own, on the
+  person's own machine, so the front plugin does them from the K panel's
+  view: the real block between its markers, over a fake skyrimPlatform with
+  the game settings Skyrim.esm sets (read out of it on 12 Oct), a hook list
+  and a frame. FRONT=<path> runs it on another copy of the plugin.
+*/
+{
+  const FR = fs.readFileSync(process.env.FRONT || path.join(root, 'game', 'plugins', 'thornswood-front.js'), 'utf8').replace(/\r/g, '');
+  const block = slice(FR, '  // >>> machine perks: begin >>>', '  // <<< machine perks: end <<<');
+  yes('the front plugin has the block for the perks on the person\'s own machine', !!block);
+  yes('and the K panel\'s view reaches it, beside the tree and the maneuver rows',
+    /treeFromView\(what\.slice\(12\)\);\n\s+maneuversFromView\(what\.slice\(12\)\);\n\s+perksFromView\(what\.slice\(12\)\);/.test(FR));
+  yes('the view the server sends carries the perks held', /\n      perks: P\.perks\(s\),\n/.test(gm));
+
+  const GAME = { fJumpFallHeightMult: 0.1, fJumpFallHeightMin: 600, fJumpFallHeightMultNPC: 0.1,
+                 fSprintStaminaDrainMult: 7, fStaminaAttackWeaponBase: 20, fStaminaAttackWeaponMult: 1 };
+  function front(settings, storage) {
+    const g = { settings: settings, storage: storage, hooks: [], updates: [], said: [], sets: [], blocking: false };
+    const sp = {
+      storage: storage,
+      hooks: { sendAnimationEvent: { add: function (h, from, to, pattern) { g.hooks.push({ h: h, from: from, to: to, pattern: pattern }); } } },
+      on: function (ev, fn) { if (ev === 'update') { g.updates.push(fn); } },
+      Game: {
+        getGameSettingFloat: function (n) { return Object.prototype.hasOwnProperty.call(settings, n) ? settings[n] : 0; },
+        setGameSettingFloat: function (n, v) { settings[n] = v; g.sets.push(n + '=' + v); },
+        getPlayer: function () { return { getAnimationVariableBool: function (n) { return n === 'IsBlocking' && g.blocking; } }; }
+      }
+    };
+    const api = new Function('sp', 'guard', 'say', 'log',
+      block + '\nreturn { fromView: perksFromView };')(
+      sp, function (n, fn) { return fn; }, function (t) { g.said.push(String(t)); },
+      function () { g.said.push(Array.prototype.slice.call(arguments).join(' ')); });
+    g.view = function (perks) { api.fromView(JSON.stringify({ v: 1, panel: perks === undefined ? { tree: {} } : { perks: perks } })); };
+    g.frame = function () { g.updates.forEach(function (f) { f(); }); };
+    g.stagger = function () {
+      const ctx = { animEventName: 'staggerStart', selfId: 0x14 };
+      g.hooks[0].h.enter(ctx);
+      g.frame();
+      return ctx.animEventName;
+    };
+    return g;
+  }
+  if (block) {
+    const settings = Object.assign({}, GAME);
+    const storage = {};
+    const f = front(settings, storage);
+    yes('Unshakeable hooks staggerStart on your own character and nobody else\'s',
+      f.hooks.length === 1 && f.hooks[0].from === 0x14 && f.hooks[0].to === 0x14 && f.hooks[0].pattern === 'staggerStart');
+    f.frame();
+    yes('before any view says what is held, no game setting is touched', f.sets.length === 0);
+    f.blocking = true; f.frame();
+    yes('and a stagger plays, block or not', f.stagger() === 'staggerStart');
+
+    f.view(['trollsblood', 'unshakeable']); f.frame();
+    f.blocking = false; f.frame();
+    yes('holding Unshakeable with the block down, a stagger plays', f.stagger() === 'staggerStart' &&
+      f.said.some(function (l) { return /unshakeable: a stagger played with the block down \(1 so far\)/.test(l); }));
+    f.blocking = true; f.frame();
+    yes('with the block up, a stagger is refused', f.stagger() === '');
+    yes('and the log says so', f.said.some(function (l) { return /unshakeable: refused a stagger while blocking \(1 so far\)/.test(l); }));
+    yes('Unshakeable changes no game setting', f.sets.length === 0);
+    f.view(['trollsblood']); f.frame();
+    yes('once the view stops listing it, a stagger plays with the block up', f.stagger() === 'staggerStart');
+
+    f.view(['windwalker']); f.frame();
+    yes('Windwalker: the fall\'s multiplier is 0, so a fall comes to nothing', settings.fJumpFallHeightMult === 0 &&
+      f.sets.join(',') === 'fJumpFallHeightMult=0');
+    yes('and only your own character\'s: the NPC set and the rest of the fall stay the game\'s',
+      settings.fJumpFallHeightMultNPC === 0.1 && settings.fJumpFallHeightMin === 600);
+    yes('the change is a line in the log, with the game\'s own value',
+      f.said.some(function (l) { return l === 'perks: fJumpFallHeightMult 0, from the game\'s 0.1'; }));
+    f.view(['windwalker']); f.frame();
+    yes('the same list again writes nothing', f.sets.length === 1);
+    f.view(undefined); f.frame();
+    yes('a view with no perks list changes nothing', f.sets.length === 1 && settings.fJumpFallHeightMult === 0);
+
+    f.view(['windwalker', 'tireless']); f.frame();
+    yes('Tireless: a sprint and a power attack cost half, from the game\'s own 7, 20 and 1',
+      settings.fSprintStaminaDrainMult === 3.5 && settings.fStaminaAttackWeaponBase === 10 &&
+      settings.fStaminaAttackWeaponMult === 0.5 && settings.fJumpFallHeightMult === 0);
+
+    // A plugin reload in the same game: the settings are still this file's,
+    // and the game's own are what the storage kept.
+    const again = front(settings, storage);
+    again.view(['windwalker']); again.frame();
+    yes('after a reload, dropping Tireless puts the game\'s own back, not this file\'s half',
+      settings.fSprintStaminaDrainMult === 7 && settings.fStaminaAttackWeaponBase === 20 &&
+      settings.fStaminaAttackWeaponMult === 1 && settings.fJumpFallHeightMult === 0);
+    again.view([]); again.frame();
+    yes('and a character who holds none of them has every setting the game\'s own',
+      Object.keys(GAME).every(function (k) { return settings[k] === GAME[k]; }));
+
+    const keys = /const PERK_SETTINGS = \{([\s\S]*?)\n  \};/.exec(block);
+    yes('the page\'s table of game settings is the block\'s, at the same share',
+      !!keys && /\| Windwalker, the fall \| `fJumpFallHeightMult` \| 0\.1 \| 0, so a fall comes to nothing \|/.test(page) &&
+      /\| Tireless, a sprint \| `fSprintStaminaDrainMult` \| 7 \| half \|/.test(page) &&
+      /\| Tireless, a power attack \| `fStaminaAttackWeaponBase` and `fStaminaAttackWeaponMult` \| 20 and 1 \| half of each \|/.test(page) &&
+      /windwalker: \{ fJumpFallHeightMult: 0 \}/.test(keys[1]) &&
+      /tireless: \{ fSprintStaminaDrainMult: 0\.5, fStaminaAttackWeaponBase: 0\.5, fStaminaAttackWeaponMult: 0\.5 \}/.test(keys[1]) &&
+      !/packmule/.test(keys[1]));
+  }
+  yes('the K panel says the three are in, and Pack Mule is not',
+    panel.indexOf("perk: 'Unshakeable: nothing staggers you while you block.' }") !== -1 &&
+    panel.indexOf("perk: 'Tireless: running and swinging cost half stamina.' }") !== -1 &&
+    panel.indexOf("perk: 'Windwalker: +4 speed, and a fall deals no damage.' }") !== -1 &&
+    panel.indexOf("perk: 'Pack Mule: being overloaded does not slow you. Not in the game yet.' }") !== -1);
+  const where = {};
+  page.split('\n').forEach(function (line) {
+    const c = line.split('|').slice(1, -1).map(function (x) { return x.trim(); });
+    if (c.length === 3 && Object.prototype.hasOwnProperty.call(K.PERKS, c[0].toLowerCase().replace(/[^a-z]/g, ''))) { where[c[0]] = c; }
+  });
+  yes('the page\'s "Where this is" says Unshakeable, Tireless and Windwalker fire, and Pack Mule does not',
+    /^Yes/.test(where.Unshakeable[1]) && where.Unshakeable[2] === '' && /^Yes/.test(where.Tireless[1]) && where.Tireless[2] === '' &&
+    /^Yes/.test(where.Windwalker[1]) && where.Windwalker[2] === '' && where['Pack Mule'][1] === 'No');
+}
+
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
