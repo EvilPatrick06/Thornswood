@@ -39,7 +39,7 @@
 #>
 [CmdletBinding()]
 param(
-  [string]$History = (Join-Path $PSScriptRoot 'disk-history.jsonl'),
+  [Parameter(Mandatory)][string]$History,
   [switch]$Record,
   [string]$Drive = 'C',
   [double]$FreeBytes = -1,
