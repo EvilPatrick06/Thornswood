@@ -2760,7 +2760,12 @@ function noteSignIn(req, me, st, back) {
       roles: Array.isArray(st.roles) ? st.roles.slice(0, 12) : [],
       ip: requestAddr(req)
     });
-    putJson(ATTEMPTS, freshSignIns(rows, Date.now()));
+    // A write that fails leaves rows past thirty days in the file, so it is
+    // said rather than dropped (#2354): the count, never what they hold.
+    const kept = freshSignIns(rows, Date.now());
+    if (!putJson(ATTEMPTS, kept)) {
+      retentionSay('signin', { event: 'write-failed', rows: rows.length, kept: kept.length });
+    }
   } catch (e) { }
 }
 
@@ -2934,22 +2939,54 @@ function putSessionLogs(key, who, logs) {
   on a public server that is weeks. A row marked kept is never pruned, so
   anything an argument rests on can be held indefinitely by marking it.
 */
+/*
+  A LOG SET THAT WILL NOT GO IS SAID (#2354). Each delete that fails used to
+  be caught and dropped, and the whole prune was wrapped twice more, so a set
+  past SLOG_DAYS that would not delete stayed with nothing said, against what
+  site/data/site/privacy.md promises. Now each failure is one line in the
+  site's log, the file's name and the error code and never what it holds,
+  the same shape the voice service's chat days use (#2191), and the answer
+  says how many went and which would not, for the harness.
+*/
+function retentionSay(what, o) {
+  try { console.error('[thornswood-docs] ' + what + '-retention ' + JSON.stringify(o)); } catch (e) { }
+}
 function pruneSessionLogs() {
+  const out = { deleted: 0, failed: [] };
+  let names;
   try {
-    if (!fs.existsSync(SLOGS)) return;
-    const cutoff = Date.now() - SLOG_DAYS * 86400000;
-    const held = new Set(sessionRows().filter(r => r && r.keep).map(r => String(r.session)));
-    for (const f of fs.readdirSync(SLOGS)) {
-      if (!f.endsWith('.json')) continue;
-      const key = f.slice(0, -5);
-      if (held.has(key)) continue;
-      const full = path.join(SLOGS, f);
-      let at = 0;
-      try { at = Number((JSON.parse(fs.readFileSync(full, 'utf8')) || {}).at) || 0; } catch (e) { at = 0; }
-      if (!at) { try { at = fs.statSync(full).mtimeMs; } catch (e) { at = Date.now(); } }
-      if (at < cutoff) { try { fs.unlinkSync(full); } catch (e) { } }
+    if (!fs.existsSync(SLOGS)) return out;
+    names = fs.readdirSync(SLOGS);
+  } catch (e) {
+    out.error = (e && e.code) || 'unknown';
+    retentionSay('session-log', { event: 'prune-failed', code: out.error });
+    return out;
+  }
+  const cutoff = Date.now() - SLOG_DAYS * 86400000;
+  const held = new Set(sessionRows().filter(r => r && r.keep).map(r => String(r.session)));
+  for (const f of names) {
+    if (!f.endsWith('.json')) continue;
+    const key = f.slice(0, -5);
+    if (held.has(key)) continue;
+    const full = path.join(SLOGS, f);
+    // When the set was saved: its own stamp, else the file's time. A set
+    // whose time cannot be read either way is not aged, because a guess
+    // that deletes evidence is the wrong way to be wrong.
+    let at = 0;
+    try { at = Number((JSON.parse(fs.readFileSync(full, 'utf8')) || {}).at) || 0; } catch (e) { at = 0; }
+    if (!at) { try { at = fs.statSync(full).mtimeMs; } catch (e) { at = Date.now(); } }
+    if (at >= cutoff) continue;
+    try {
+      fs.unlinkSync(full);
+      out.deleted++;
+    } catch (e) {
+      const code = (e && e.code) || 'unknown';
+      out.failed.push({ file: f, code: code });
+      retentionSay('session-log', { event: 'delete-failed', file: f, code: code,
+                                    daysPastRetention: Math.floor((cutoff - at) / 86400000) });
     }
-  } catch (e) { }
+  }
+  return out;
 }
 
 /*
@@ -4314,7 +4351,9 @@ async function handle(req, res) {
     if (!w.admin) return sendJson(res, 403, { error: 'admins only' });
     const rows = jsonFile(ATTEMPTS, []);
     const live = freshSignIns(rows, Date.now());
-    if (Array.isArray(rows) && live.length !== rows.length) { putJson(ATTEMPTS, live); }
+    if (Array.isArray(rows) && live.length !== rows.length && !putJson(ATTEMPTS, live)) {
+      retentionSay('signin', { event: 'write-failed', rows: rows.length, kept: live.length });
+    }
     return sendJson(res, 200, { signins: live });
   }
 
@@ -5644,7 +5683,8 @@ async function handle(req, res) {
       }
     }
     if (!putSessions(rows)) return sendJson(res, 500, { ok: false, why: 'could not save' });
-    if (ending) { try { pruneSessionLogs(); } catch (e) { } }
+    // pruneSessionLogs says its own failures and never throws (#2354).
+    if (ending) pruneSessionLogs();
     return sendJson(res, 200, { ok: true });
   }
 
