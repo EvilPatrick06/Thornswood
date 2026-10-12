@@ -587,9 +587,12 @@ function Get-LauncherDrift([string]$repoDir, [string]$tag) {
     } finally { $ErrorActionPreference = $old }
 }
 
-# THE EXE CI BUILT IS NOT SIGNED, issue #921. release.yml compiles on the VPS
-# runner, which holds no signing certificate, so Sign-Artifact.ps1 there says
-# "not signing" and every v<version> draft carries an unsigned Thornswood.exe.
+# THE EXE CI BUILT MAY NOT BE SIGNED, issue #921. release.yml's VPS job
+# compiles on a runner that holds no signing certificate, so its v<version>
+# draft carries an unsigned Thornswood.exe, and until #2163's switch-over
+# every release is built there. release.yml's hosted job signs the exe on a
+# v tag, and such a draft passes through here untouched ("already signed by
+# us" below).
 # 20260927-1633 put exactly that on Main as 1.1.101 (sha256 38d4cd5d...), an
 # hour before the publish sign gate existed. Since then the gate refuses it,
 # which is safe but means no main Ship can go out at all.
