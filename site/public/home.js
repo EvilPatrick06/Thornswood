@@ -1012,13 +1012,16 @@ request('/api/public?galleryLimit=24', { credentials:'same-origin' })
         } else {
           /* N of the most the world holds (#481). The site sends the number
              even when the server has not said it, from records\most-online.json.
-             Staff seats over it are not counted: it is N of 25, never 27 of 25.
+             It is every seat, the staff seats too (Patrick, 12 Oct: "of 30"),
+             so full can come before N reaches it: the seats past the door's
+             number are kept for the staff roles, and the page says so.
              And how many wait at the menu when anybody does. */
           var most = d.status.max > 0 ? d.status.max : 0;
           var seen = most ? Math.min(n, most) : n;
           var waiting = d.status.line > 0 ? d.status.line : 0;
           if (most && (n >= most || d.status.full === true)) {
             t.textContent = 'The world is full, ' + seen + ' of ' + most + ' people are in it' +
+              (n < most ? ' and the rest of the seats are kept for staff' : '') +
               (waiting ? ', ' + waiting + ' waiting for a seat' : '');
           } else if (most) {
             t.textContent = seen + ' of ' + most + ' people in the world';

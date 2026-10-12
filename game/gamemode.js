@@ -28308,9 +28308,19 @@ log('gamemode loaded:',
       // serves, and rewriting it twice a second for no reason is churn nobody
       // asked for.
       // And the most the world holds at once (#481), so the launcher and the
-      // site say "N of 25" from the server's own number.
+      // site say "N of M" from the server's own number. M is every seat, the
+      // staff seats too, not the number the door turns people away past:
+      // Patrick, 12 Oct, "the real cap is 30 but 25 for people with non staff
+      // roles I still want it to say of 30 awake tho". So 30 on main and 5 on
+      // dev, which has no staff seats over its 5. Whether somebody picking
+      // now would wait is full, below, which the seats block works out.
       var max = 0;
-      try { max = Number((mp.getServerSettings() || {}).thornswoodMostOnline) || 0; } catch (e) { max = 0; }
+      try {
+        var seatsApi = globalThis.__thornswoodSeats;
+        var settingsNow = mp.getServerSettings() || {};
+        var capNow = seatsApi ? seatsApi.cap(settingsNow) : 0;
+        max = capNow ? capNow + seatsApi.staffSeats(settingsNow) : 0;
+      } catch (e) { max = 0; }
       // And how many wait at the menu, and whether somebody picking now would
       // wait too, from the seats block (#481): the menu reads full to decide
       // between joining and taking a place in line, the site to say so.
