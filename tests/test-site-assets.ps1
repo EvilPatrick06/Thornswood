@@ -415,13 +415,15 @@ http.createServer((req, res) => {
     Yes 'the urls move after the feed is checked again on the VPS and before packs are added' ($iPull -ge 0 -and $iMove -gt $iPull -and $iAppend -gt $iMove)
 
     # The upload block with what Publish-Update has by then.
-    function Run-Upload($chunksIn, [bool]$launcherIn, [string]$exeIn, $clientIn, [string]$siteDirIn) {
+    function Run-Upload($chunksIn, [bool]$launcherIn, [string]$exeIn, $clientIn, [string]$siteDirIn, [bool]$goneIn = $false) {
         $script:said = @()
         function Say($m, $c = 'Gray') { $script:said += [string]$m }
         function Head($m) { $script:said += [string]$m }
         function Die($m) { throw ('DIE ' + $m) }
         $Here = Join-Path $repo 'scripts\release'
         $Dev = $false
+        # What the packs gone block decided (#1050).
+        $packsGone = $goneIn
         $chunks = $chunksIn; $Launcher = $launcherIn; $exePath = $exeIn; $clientRel = $clientIn; $SiteDir = $siteDirIn
         $exeUrl = ''
         try { Invoke-Expression $up } catch { return [pscustomobject]@{ R = $_.Exception.Message } }
@@ -441,6 +443,14 @@ http.createServer((req, res) => {
     Yes '  and nothing went to GitHub' (-not (($script:said -join "`n") -match 'gh release'))
     $res = Run-Upload @([pscustomobject]@{ Id = 'N2'; Path = (Join-Path $work 'pub\missing.zip'); Sha = ('f' * 64); Url = '' }) $false '' $null $pubSite
     Yes '  an asset that does not land stops it before version.json' ($res.R -like 'DIE *version.json has not been touched*')
+    # Once the packs are off the feed (#1050) the pack is not sent: nothing names it.
+    $pk3 = Join-Path $work 'pub\pack-N3.zip'; $pk3Sha = Put $pk3 'new pack N3, kept here'
+    $ex3 = Join-Path $work 'pub\Thornswood3.exe'; $ex3Sha = Put $ex3 'newer launcher'
+    $goneSite = Join-Path $work 'gonesite'
+    $res = Run-Upload @([pscustomobject]@{ Id = 'N3'; Path = $pk3; Sha = $pk3Sha; Url = '' }) $true $ex3 $null $goneSite $true
+    Yes ("with the packs gone the upload block runs ({0})" -f $res.R) ($res.R -eq 'ok')
+    Yes '  and the launcher goes to the site, the pack does not and has no url' (
+        (Test-Path (Join-Path $goneSite "feed\assets\$ex3Sha")) -and -not (Test-Path (Join-Path $goneSite "feed\assets\$pk3Sha")) -and -not $res.Chunks[0].Url)
 
     # The move block with a pulled feed and the scratch site to ask.
     function Run-Move($docIn, [bool]$devIn, [bool]$noUploadIn) {
