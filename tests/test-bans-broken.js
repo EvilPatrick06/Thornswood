@@ -65,6 +65,29 @@ function cookieFor(id, name) {
   return 'twa=' + encodeURIComponent(id + '|' + name + '|' + at + '|' + sig);
 }
 
+/* Waits for this run's own "[thornswood-docs] listening on ...:port" line
+   (#1727), so nothing is asked of a port something else took in between. */
+function listening(srv, port) {
+  return new Promise((ok, bad) => {
+    let out = '';
+    const said = (d) => { out += d; const m = /\[thornswood-docs\] listening on \S+:(\d+)/.exec(out); if (m && Number(m[1]) === port) { end(null); } };
+    const more = (d) => { out += d; };
+    const gone = (code) => end(new Error((/EADDRINUSE/.test(out) ? 'something else already holds port ' + port + ', so ' : '') +
+                                         'the site stopped (exit ' + code + ') before it was listening. It printed:\n' + out));
+    const late = setTimeout(() => end(new Error('the site did not say it was listening on ' + port + ' within fifteen seconds. It printed:\n' + out)), 15000);
+    function end(err) {
+      clearTimeout(late);
+      srv.stdout.removeListener('data', said);
+      srv.stderr.removeListener('data', more);
+      srv.removeListener('close', gone);
+      if (err) { bad(err); } else { ok(); }
+    }
+    srv.stdout.on('data', said);
+    srv.stderr.on('data', more);
+    srv.on('close', gone);
+  });
+}
+
 (async function main() {
   const port = await freePort();
   let log = '';
@@ -75,10 +98,8 @@ function cookieFor(id, name) {
   site.stdout.on('data', (d) => { log += d; });
   site.stderr.on('data', (d) => { log += d; });
   try {
-    const up = await new Promise((ok) => {
-      const t = setInterval(() => { const m = /\[thornswood-docs\] listening on \S+:(\d+)/.exec(log); if (m && Number(m[1]) === port) { clearInterval(t); ok(true); } }, 100);
-      setTimeout(() => { clearInterval(t); ok(false); }, 15000);
-    });
+    let up = false;
+    try { await listening(site, port); up = true; } catch (e) { log += '\n' + e.message; }
     yes('the scratch site starts', up);
     const K = { 'X-Thornswood-Key': KEY };
     const staffC = { Cookie: cookieFor(STAFF_D, 'Aela') };
