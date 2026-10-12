@@ -20,17 +20,20 @@ const data={keep:[['1:Skyrim.esm','a:Skyrim.esm',null,null,null,null,'trader'],
 let ledger={version:1,entries:{'1:Skyrim.esm':null}};
 const storage={load:()=>JSON.parse(JSON.stringify(ledger)),save:next=>{ledger=JSON.parse(JSON.stringify(next));}};
 function make(){return ctx.createNpcMerchantPurses(api,data,storage);}
-const service=make();
+let service=make();
 const initial=service.prepare(1);
 assert.equal(initial.purse,250);assert.equal(initial.stock.length,0);
 assert.equal(writes.length,1);
 assert.equal(service.prepare(1).purse,250);assert.equal(writes.length,1,'repeated admission does not hand out another purse');
 ledger.entries['1:Skyrim.esm'].purse=0;
 saved.get('1:thornswoodMerchant').purse=0;
-assert.equal(make().prepare(1).purse,0,'a new service retains a depleted saved purse');
+const retiredService=service;service=make();
+assert.throws(()=>retiredService.prepare(1),/unavailable/,'a replaced controller is revoked');
+assert.equal(service.prepare(1).purse,0,'a new service retains a depleted saved purse');
 assert.equal(writes.length,1,'restart does not top up the purse');
 saved.set('1:thornswoodMerchant',null);
-assert.equal(make().prepare(1).purse,0,'a missing native save restores the authoritative depleted balance');
+service=make();
+assert.equal(service.prepare(1).purse,0,'a missing native save restores the authoritative depleted balance');
 assert.equal(ledger.entries['1:Skyrim.esm'].purse,0);
 assert.equal(writes.length,2,'restoring the projection is not another grant');
 assert.equal(service.prepare(2),null,'an enemy never gets a merchant purse');
