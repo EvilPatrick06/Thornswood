@@ -57,6 +57,22 @@
   sets it on the server in that publish (off lets a session act until its
   pass arrives); without it the running server keeps its own.
 
+  THE BUILD IT PACKS (#459; the same defect #2309 found in
+  Deploy-DevGamemode -LoadOrder). A publish packs a built server: the binary
+  and the rest the fork builds, from an engine build's dist\server. -Dist
+  names it. Left out, it is this checkout's own engine build (Where.ps1
+  ServerDist), never another folder. This script runs only from a clean
+  checkout at origin (#2118), which on the shipping machine is a fresh
+  worktree with no engine build, so there -Dist is how the build is named:
+      .\scripts\release\Publish-Server.ps1 -Channel dev -Dist <the build's dist\server>
+  With no built server at -Dist it stops before anything is copied, built or
+  sent, and says so. Whatever -Dist names, its server files are held to
+  records\server-build.json before anything leaves (Export-ServerPayload and
+  the zip read below), so a build of another engine commit is refused. The
+  publish copies the commit's gamemode.js into that build and sets how many
+  it holds in its server-settings.json, as it always has; the build is
+  otherwise read, not changed.
+
   It also writes a line into the launcher's News page and pushes it.
 
   A server change ships nothing. The gamemode runs on the VPS, so there is no
@@ -97,8 +113,13 @@ param(
     [switch]$NoPush,
     [string]$VpsHost  = '',
     [string]$VpsUser  = '',
-    [string]$Dist     = (& (Join-Path $PSScriptRoot 'Where.ps1') ServerDist),
-    [string]$Zip      = (& (Join-Path $PSScriptRoot 'Where.ps1') ServerZip),
+    # The built server this packs (an engine build's dist\server). Left out,
+    # this checkout's own engine build, and a publish stops before anything
+    # when that is not there (THE BUILD IT PACKS in the header). Never another
+    # folder by default.
+    [string]$Dist     = '',
+    # Where the payload zip is made. Left out, this checkout's out folder.
+    [string]$Zip      = '',
     [string]$VpsRoot,
     [string]$TaskName,
     [switch]$FreshWorld,
@@ -162,6 +183,12 @@ if ($IsDev) {
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+# Resolved here, not as the parameters' defaults: 5.1 leaves $PSScriptRoot
+# empty in an advanced script's defaults (#2229). $DistGiven says whether the
+# person named the build, for the refusal below.
+$DistGiven = [bool]$Dist
+if (-not $Dist) { $Dist = & (Join-Path $Here 'Where.ps1') ServerDist }
+if (-not $Zip)  { $Zip  = & (Join-Path $Here 'Where.ps1') ServerZip }
 . (Join-Path $Here '..\vps\Vps.ps1')
 if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
@@ -297,6 +324,34 @@ if ($PutBack) {
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
     exit 0
 }
+
+# ------------------------------------------------------- the build it packs ---
+# THE BUILD IT PACKS (#459, the same defect as #2309). See the header. A
+# publish packs a built server, so with none at $Dist it stops here, before
+# the gamemode is copied, the settings are read or anything is built or sent,
+# and says how to name one. Until 12 Oct a missing build skipped the gamemode
+# copy and the start point check without a word and stopped later inside
+# Export-ServerPayload with "server dist not found", which named neither
+# -Dist nor the build the record wants.
+$recCommit = ''
+try { $recCommit = [string](([IO.File]::ReadAllText($Record) | ConvertFrom-Json).source.commit) } catch { }
+$recShort = if ($recCommit.Length -ge 8) { $recCommit.Substring(0, 8) } else { 'the one it names' }
+$distWhy = ''
+if (-not (Test-Path -LiteralPath $Dist -PathType Container)) { $distWhy = "there is no built server at $Dist" }
+elseif (-not (Test-Path -LiteralPath (Join-Path $Dist 'server-settings.json'))) { $distWhy = "$Dist holds no server-settings.json, so it is not a built server" }
+if ($distWhy) {
+    $nl = [Environment]::NewLine
+    if ($DistGiven) {
+        Die ($distWhy + '. -Dist names the engine build''s dist\server to pack. Nothing was built or sent.')
+    }
+    Die ($distWhy + ', which is this checkout''s own engine build. A publish packs a built server, and a fresh checkout has none: the' + $nl +
+         'deploy guard lets this run only from a clean checkout at origin (#2118), and the engine is built in another folder.' + $nl +
+         'Name that build:' + $nl +
+         '    .\scripts\release\Publish-Server.ps1 -Channel ' + $Channel + ' -Dist <the engine build''s dist\server>' + $nl +
+         'Its server files must be the build records\server-build.json names (engine ' + $recShort + '); that is checked before anything is sent.' + $nl +
+         'Nothing was built or sent.')
+}
+Say ('{0,-22} {1}' -f 'built server', $Dist) 'DarkGray'
 
 # ------------------------------------------------------------- gamemode ------
 # The gamemode is edited in game\ and packaged from dist\server. Those are two
