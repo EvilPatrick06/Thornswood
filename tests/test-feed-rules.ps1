@@ -171,11 +171,13 @@ function Val($o, [string]$k) {
 
 # Runs the block with Say collected and Die turned into an exception, which is
 # what stopping the script before version.json is written amounts to here.
-function Run-Append($doc, $chunks, [bool]$Dev) {
+function Run-Append($doc, $chunks, [bool]$Dev, [bool]$Gone = $false) {
     $script:said = @()
     function Say($m, $c = 'Gray') { $script:said += [string]$m }
     function Die($m) { throw ('DIE ' + $m) }
     $Notes = 'test notes'
+    # What the packs gone block decided (#1050); tests\test-record-sync.ps1 drives that block.
+    $packsGone = $Gone
     if (-not $block) { return 'no block' }
     try { Invoke-Expression $block; return 'ok' }
     catch { return $_.Exception.Message }
@@ -238,6 +240,17 @@ Yes 'and takes a pack on the site' (($r -eq 'ok') -and ((Ids $doc.packs) -eq 'N1
 $doc = Feed
 $r = Run-Append $doc @() $false
 Yes 'a release with no packs still warns and adds nothing' (($r -eq 'ok') -and ((Ids $doc.packs) -eq 'old1,old2,new1') -and (($script:said -join "`n") -like '*2 pack(s)*'))
+
+# Once every launcher let in syncs to the record (#1050), the feed carries none.
+$doc = [pscustomobject]@{ launcherVersion = '1.2.3'; packs = @((P 'a' ('https://thornswood.net/feed/assets/' + ('2' * 64))), (P 'b' ('https://thornswood.net/feed/assets/' + ('3' * 64)))) }
+$r = Run-Append $doc @((Chunk 'N1' ('https://thornswood.net/feed/assets/' + ('1' * 64)))) $false $true
+Yes 'with the packs gone, the feed''s packs become an empty list and this release adds none' (($r -eq 'ok') -and $doc.PSObject.Properties['packs'] -and @($doc.packs).Count -eq 0)
+Yes '  and it says how many came off' (($script:said -join "`n") -like '*the 2 pack(s) on the feed came off it*')
+$doc = [pscustomobject]@{ launcherVersion = '1.2.3' }
+$r = Run-Append $doc @() $false $true
+Yes '  a feed with no packs field gets an empty one, the shape every launcher reads' (($r -eq 'ok') -and $doc.PSObject.Properties['packs'] -and @($doc.packs).Count -eq 0)
+$json = ($doc | ConvertTo-Json -Depth 6)
+Yes '  and it is written as [], not left out or null' ($json -match '"packs":\s*\[\s*\]')
 
 # ------------------------------------------------------------ GitHub browser addresses
 # A feed that still names updateRepo (main until its next Ship after #907)
