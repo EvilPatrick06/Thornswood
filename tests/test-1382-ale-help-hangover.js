@@ -64,7 +64,9 @@ function rig(startAt) {
   api.__set = function (id, n) { Fake.set(id, 'x', n); };
   api.hurt = [];
   api.online = online;
-  g.__thornswoodHurt = { exposed: function (id, kind, source) { api.hurt.push([id, kind, source]); return false; } };
+  api.cared = [];
+  g.__thornswoodHurt = { exposed: function (id, kind, source) { api.hurt.push([id, kind, source]); return false; },
+    careChanged: function (id) { api.cared.push(id); } };
   return api;
 }
 
@@ -118,6 +120,15 @@ if (block !== null && smoke) {
     const hung = r.effects(ME, r.read(ME));
     const weary = r.effects(ME, Object.assign(r.read(ME), { hangover: false, rest: 40 }));
     yes('rest is read as weary while the meter is full', JSON.stringify(hung) === JSON.stringify(weary) && JSON.stringify(hung) !== JSON.stringify(sober));
+    // A physicker's remedy ends it (drink.md), through soberUp, which the
+    // wounds panel calls; the rest of the remedy is test-1383-treatments.js.
+    yes('hungOver says so', r.hungOver(ME) === true);
+    yes('the injury block is told a hangover started, so the remedy can be offered', r.cared.length === 1 && r.cared[0] === ME);
+    const unhung = r.effects(ME, Object.assign(r.read(ME), { hangover: false }));
+    yes('soberUp clears the hangover and says it did', r.soberUp(ME) === true && r.read(ME).hangover === false && r.hungOver(ME) === false);
+    yes('and rest is read from the meter again', JSON.stringify(r.effects(ME, r.read(ME))) === JSON.stringify(unhung) && JSON.stringify(unhung) !== JSON.stringify(hung));
+    yes('and the injury block is told it ended', r.cared.length === 2);
+    yes('soberUp with no hangover does nothing', r.soberUp(ME) === false);
   }
   {
     const r = rigAle();

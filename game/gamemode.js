@@ -55039,11 +55039,15 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       typeof n.aleAt === 'number' && (n.at - n.aleAt) <= NEEDS.ale.sober * 60000;
     var slept = arriving ? arrived(actorId, n, away) : '';
     // A night in a bed ends a hangover; leaving drunk without one starts it.
+    var hungBefore = !!n.hangover;
     if (slept) { n.hangover = false; }
     else if (leftDrunk) { n.hangover = true; n.ale = 0; }
 
     n.at = now;
     write(actorId, n);
+    // A hangover starting or ending changes what there is to tend (#1382).
+    // It changes what the character pays as well (effects reads it).
+    if (hungBefore !== !!n.hangover) { pushEffects(actorId); hangoverCare(actorId); }
     if (slept) {
       /*
         Up, in the beds' book as well, so the property block does not go on
@@ -56191,6 +56195,33 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     write(actorId, n);
   }
 
+  /*
+    A REMEDY ENDS A HANGOVER (#1382). docs/systems/drink.md: hung over "until
+    you sleep or drink a remedy an alchemist made". The remedy an alchemist
+    makes is the Physicker's Remedy, used from the wounds panel, so the
+    panel asks here whether there is a hangover to clear and clears it.
+  */
+  function hungOver(actorId) {
+    var n = read(actorId);
+    return !!(n && n.hangover);
+  }
+
+  function soberUp(actorId) {
+    var n = settle(actorId);
+    if (!n.hangover) { return false; }
+    n.hangover = false;
+    write(actorId, n);
+    pushEffects(actorId);
+    hangoverCare(actorId);
+    return true;
+  }
+
+  /* The injury block's line and look prompt row, for a hangover (careOf). */
+  function hangoverCare(actorId) {
+    var hurtC = g.__thornswoodHurt;
+    if (hurtC && hurtC.careChanged) { hurtC.careChanged(actorId); }
+  }
+
   /** Sitting down, or getting up. kind is '' to stop. */
   function resting(actorId, kind) {
     var n = settle(actorId);
@@ -56885,7 +56916,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     // The meters as last settled, without settling them again (#1383).
     read: read,
     // One pass of the minute tick, for the harnesses (#1382).
-    tick: tick
+    tick: tick,
+    // The hangover, for the physicker's remedy in the wounds panel (#1382).
+    hungOver: hungOver, soberUp: soberUp
   };
 
   nlog('ready: food empties in', Math.round(100 / NEEDS.drain.food) + 'h,',
@@ -57149,7 +57182,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     rec.show = lines(rec, Date.now());
     // Whether anybody could tend something here: the inventory's line and
     // the look prompt's row are offered only then (#1383).
-    rec.care = needsCare(rec) ? 1 : 0;
+    rec.care = (needsCare(rec) || hungOver(actorId)) ? 1 : 0;
     try { mp.set(actorId, HURT_PROPERTY, rec); return true; }
     catch (e) { hlog('could not write', actorId.toString(16) + ':', e); return false; }
   }
@@ -58107,7 +58140,19 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     }
     return false;
   }
-  function careOf(actorId) { return needsCare(read(actorId)); }
+  function careOf(actorId) { return needsCare(read(actorId)) || hungOver(actorId); }
+  /*
+    A hangover is something to tend (#1382): a physicker's remedy ends it
+    (docs/systems/drink.md), and the remedy is given from this panel, so the
+    inventory's line and the look prompt's row are offered for it too. The
+    needs block owns the hangover and says when it starts or ends (care).
+  */
+  function hungOver(actorId) {
+    var needsH = g.__thornswoodNeeds;
+    return !!(needsH && needsH.hungOver && needsH.hungOver(actorId));
+  }
+  /* The needs block's word that a hangover started or ended: care again. */
+  function careChanged(actorId) { write(actorId, read(actorId)); }
 
   /* How many of one treatment the pack holds. */
   function carried(actorId, what) {
@@ -58196,11 +58241,15 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     if (what === 'remedy') {
       var wr = firstWound(rec, function (w) { return cutOrBite(w) && bandageHelps(w); },
                           function (w) { return w.bleed; });
-      if (!rec.ills.length && !wr) { return { why: 'There is no sickness and no open cut for a remedy.' }; }
+      // A hangover is the remedy's too (#1382, docs/systems/drink.md).
+      var needsR = g.__thornswoodNeeds;
+      var hung = hungOver(targetId);
+      if (!rec.ills.length && !wr && !hung) { return { why: 'There is no sickness, no open cut and no hangover for a remedy.' }; }
       if (carried(doerId, 'remedy') < 1) { return { why: 'You carry no remedy. ' + TREAT.remedy.maker }; }
       return { item: 'remedy', apply: function () {
         var did = [];
         if (wr) { wr.bleed = false; wr.bandage = true; did.push('closes the ' + wordFor(wr)); }
+        if (hung && needsR.soberUp(targetId)) { did.push('clears the hangover'); }
         var gone = null;
         for (var i = 0; i < rec.ills.length; i++) {
           if (rec.ills[i].k === 'fever') {
@@ -58559,7 +58608,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     exposed: exposed, craftRefusal: craftRefusal, died: died, scarOf: scarOf, staff: staff,
     BITERS: BITERS, TREAT: TREAT, TREAT_REACH: TREAT_REACH,
     weaponKind: weaponKind, woundFrom: woundFrom, bitingRaces: bitingRaces, blow: blow, landed: landed,
-    needsCare: needsCare, careOf: careOf, plan: plan, treat: treat, viewFor: viewFor, panel: panel
+    needsCare: needsCare, careOf: careOf, careChanged: careChanged, plan: plan, treat: treat, viewFor: viewFor, panel: panel
   };
 
   hlog('ready: wounds and the five diseases, every', TICK_MS / 1000, 'seconds, and the bleed every second');
