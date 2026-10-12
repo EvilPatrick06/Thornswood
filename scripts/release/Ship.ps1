@@ -237,6 +237,8 @@
 
 .PARAMETER AllowStaleCheckout
     Go ahead from a checkout that is not exactly origin/main and clean, with a loud warning (#2118). Without it the script refuses a stale or dirty checkout before it sends anything.
+.PARAMETER LauncherWith
+    Which build makes a dev release's launcher: csc, the in-box compiler and the default, or msbuild, launcher\app\Thornswood.csproj, to try the MSBuild launcher on dev before the switch (#498). A main release takes the exe CI built and refuses msbuild.
 .EXAMPLE
   .\scripts\release\Ship.ps1 -Channel dev "The map marker points at the right door now"
 
