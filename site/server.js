@@ -2377,7 +2377,8 @@ function accountBanned(st) {
 }
 /* Every profile an active ban covers, with why and until, for the door. */
 function activeBans(now) {
-  const table = bansNow().table;
+  const readB = bansNow();
+  const table = readB.table;
   const linked = jsonFile(LINKED, {});
   const out = [];
   for (const k of Object.keys(table || {})) {
@@ -2392,6 +2393,8 @@ function activeBans(now) {
     if (set.size) out.push({ profiles: Array.from(set), why: String(b.why || ''), until: Number(b.until) || 0,
                              scope: k.indexOf('p:') === 0 ? 'character' : 'account' });
   }
+  // Carried on the list, not sent: the door reads it to let nobody in (#2186).
+  if (readB.broken) Object.defineProperty(out, 'broken', { value: readB.broken });
   return out;
 }
 /* A ban, made or replaced. The account's standing is asked again at once. */
@@ -5802,7 +5805,7 @@ async function handle(req, res) {
     out.bans = activeBans(Date.now());
     // A broken ban list lets nobody through the door (#2186): every list is
     // emptied and the door is told why.
-    if (readBans().broken) {
+    if (out.bans.broken) {
       out.bansBroken = true;
       for (const k of ['profiles', 'devProfiles', 'adminProfiles', 'jarlProfiles', 'staffRoleProfiles', 'failedProfiles']) {
         if (Array.isArray(out[k])) out[k] = [];
