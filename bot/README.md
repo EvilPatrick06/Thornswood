@@ -70,7 +70,9 @@ until somebody decides otherwise.
 One general. A second one only ever splits the same conversation in half. It
 was `#general` until it was renamed, and the topic on it is written by hand,
 so the builder leaves the topic alone. `#welcome-travelers` is where the join
-cards go, and the server's system channel points at it.
+cards go, and the server's system channel points at it. The card is a file, so
+the builder gives the bot Attach Files in that channel's overwrite for the bot,
+beside seeing, posting and reading back, which is all it gets elsewhere (#2341).
 
 `#game-rules` sits here rather than in In Character, because that is where it
 was moved to. It carries the nine in-world rules, read out of the "In the

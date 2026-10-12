@@ -63,6 +63,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Script.ps1')
 . (Join-Path $Here '..\vps\Send-Secret.ps1')
+. (Join-Path $Here 'SiteConfigSet.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 
@@ -110,20 +111,21 @@ Write-Host ''
 Write-Host 'Handing it to the site...'
 # The password goes on ssh's standard input, never in the script or on a
 # command line on either machine (Send-Secret.ps1, issue #451).
+#
+# Only serverPassword changes in config.json, through the same block
+# Deploy-Docs -Password uses (SiteConfigSet.ps1). Until #2317 this had its own
+# copy: it read with Get-Content, which on the box's Windows PowerShell 5.1
+# misreads a file with no byte order mark, inside try { } catch { }, so a file
+# that was there and did not parse left an empty table, and {"serverPassword"}
+# was written over the whole file, the Discord secret, the bot token, botKey
+# and the cookie secret with it. Now such a file is left as it is, nothing is
+# written, and the site is not restarted either, because the block returns.
 Invoke-ThornswoodSecretRemote -Target "$User@$Vps" -SshArgs $ssh -Secret $newPassword -Script @"
 `$ErrorActionPreference = 'Stop'
 `$pw = `$ThornswoodSecret; `$ThornswoodSecret = `$null
 if (-not `$pw) { 'NOTHING ARRIVED on standard input. Nothing written, the password is unchanged.'; return }
-`$f = '$docsWin\config.json'
-`$cfg = @{}
-if (Test-Path `$f) {
-  try { (Get-Content `$f -Raw | ConvertFrom-Json).PSObject.Properties |
-        ForEach-Object { `$cfg[`$_.Name] = `$_.Value } } catch { }
-}
-`$cfg['serverPassword'] = `$pw
-# No byte order mark. Node refuses to parse a file that starts with one.
-[IO.File]::WriteAllText(`$f, (`$cfg | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding(`$false)))
-'site config written'
+$(Get-ThornswoodSiteConfigSet -ConfigPath "$docsWin\config.json" -Key 'serverPassword' -What 'server password')
+`$pw = `$null
 
 Get-CimInstance Win32_Process |
   Where-Object { `$_.Name -eq 'node.exe' -and `$_.CommandLine -like '*Thornswood-Docs*' } |

@@ -99,11 +99,12 @@ try {
     $env:THORNSWOOD_TEST_SERVER_DIR = $box
 
     . (Join-Path $repo 'scripts\release\Read-JsonFile.ps1')
-    function Plan([bool]$loadOrder, [string]$distArg) {
+    function Plan([bool]$loadOrder, [string]$distArg, [string[]]$dropArg = @()) {
         # The variables the script has by the time it reaches the block.
         $Here = Join-Path $fresh 'scripts\deploy'
         $LoadOrder = $loadOrder
         $Dist = $distArg
+        $DropPlugins = $dropArg
         $Root = $box
         $User = 'Administrator'
         $Vps = '127.0.0.1'
@@ -169,6 +170,17 @@ try {
     Yes '  and the build''s order goes up as the list that rewrites the dev one' ($p.FarOrder -match '^C:/Windows/Temp/thornswood-dev-loadorder-[0-9a-f]{32}\.txt$' -and $p.OrderText -eq "Skyrim.esm`nUpdate.esm`nThornswood-Content.esp`n")
     $p = Plan $true (Join-Path $Scratch 'no-build-here')
     Yes '-Dist naming no build is refused, saying to leave it out' ($p.Thrown -match '-Dist names no built server' -and $p.Thrown -match 'Leave -Dist out')
+    # A build whose order leaves out a plugin the dev server loads (#2320):
+    # on 5 Oct a fresh build carried only the five base masters.
+    $short = Join-Path $Scratch 'short\dist\server'
+    Put (Join-Path $short 'server-settings.json') '{"port":7777,"loadOrder":["c:/steam/Data/Skyrim.esm"]}'
+    $p = Plan $true $short
+    Yes 'a build''s order that drops a plugin the dev server loads is refused before anything goes (#2320)' (
+        $p.Thrown -match 'leaves out 1 of the 2' -and $p.Thrown -match 'Thornswood-Content\.esp' -and $p.Thrown -match '-DropPlugins' -and $p.Send.Count -eq 0 -and $p.FarOrder -eq '')
+    $p = Plan $true $short @('Thornswood-Content.esp')
+    Yes '  and goes through when -DropPlugins names it' ($p.Thrown -eq '' -and $p.OrderText -eq "Skyrim.esm`n")
+    $p = Plan $true '' @('Thornswood-Content.esp')
+    Yes '  -DropPlugins without -Dist is refused: the dev server''s own order drops nothing' ($p.Thrown -match '-DropPlugins goes with -Dist')
 
     # ---- 4. the script ------------------------------------------------------------------------
     Write-Host ''; Write-Host 'the script'
