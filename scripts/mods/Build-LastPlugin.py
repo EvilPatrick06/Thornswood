@@ -67,11 +67,13 @@ WHAT IT PUTS IN THE PLUGIN
 WHY NOT IN Thornswood-Content.esp
 
   A copied cell has to be the record that wins at the copy's place in the load
-  order, or it undoes the cell edits of the plugins before it. 1,457 cells and
-  53 worldspaces hold the cut actors, and their winners are 49 different
-  plugins; Thornswood-Content.esp has the five base masters and nothing else,
-  and loads before 52 plugins that edit the same records. At the end of the
-  load order every copy is the winner, exactly. So everything is here.
+  order, or it undoes the cell edits of the plugins before it. Measured
+  12 October: the 1,212 cells holding the actors this switches off have 47
+  different winning plugins. 163 of those cells are won by a mod that loads
+  before Thornswood-Content.esp, whose edits a copy there could not carry with
+  its five base masters, and 429 by one of the 50 plugins that load after it.
+  At the end of the load order every copy is the winner, exactly. So
+  everything is here.
 
 WHY IT IS LIGHT (ESL FLAGGED)
 
