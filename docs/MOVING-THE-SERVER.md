@@ -321,7 +321,11 @@ repository folder, as docs\RESTORING.md "The box is gone" says.
 21. **Where it posts when the bot is down:**
     `.\scripts\vps\Watch-Services.ps1 -SetWebhook`. It asks for the webhook at
     a prompt and posts a test message in the staff channel.
-22. **The load record:** `.\scripts\vps\Watch-Load.ps1 -Install`.
+22. **The load record:** `.\scripts\vps\Watch-Load.ps1 -Install`. **The disk
+    forecast:** `.\scripts\vps\Forecast-Storage.ps1 -Install`, one sample a
+    day as the task `Thornswood Disk History`. Copy the old box's
+    `C:\Thornswood-Watch\disk-history.jsonl` across first if it can still be
+    read, so the forecast does not start again from nothing.
 23. **The nightly backup, and one now:**
     `.\scripts\deploy\Install-Backup.ps1 -RunNow`. The box already has this
     machine's passphrase from step 13; on a box without one, Install-Backup

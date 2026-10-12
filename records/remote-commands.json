@@ -12,8 +12,8 @@
                     "admin":  "needs Administrator: install, service, task registration, ACL, firewall, keys, secrets, or work outside the gate verbs",
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
-    "scriptCount":  52,
-    "callCount":  227,
+    "scriptCount":  53,
+    "callCount":  230,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -1661,6 +1661,33 @@
                       "does":  "downloads backups",
                       "class":  "admin",
                       "reason":  "backups carry every secret"
+                  },
+                  {
+                      "script":  "scripts/vps/Forecast-Storage.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "n":  1,
+                      "does":  "takes the Thornswood Disk History task off (-Remove)",
+                      "class":  "admin",
+                      "reason":  "sends schtasks /delete"
+                  },
+                  {
+                      "script":  "scripts/vps/Forecast-Storage.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "n":  2,
+                      "does":  "writes forecast-storage.ps1 into C:\\Thornswood-Watch and registers the daily SYSTEM task (-Install)",
+                      "class":  "admin",
+                      "reason":  "sends LockedFolderScript and schtasks /create as SYSTEM"
+                  },
+                  {
+                      "script":  "scripts/vps/Forecast-Storage.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "n":  3,
+                      "does":  "reads the task and runs the forecast without -Record (-Status)",
+                      "class":  "read-status",
+                      "reason":  "reads the task, the history and the free space only"
                   },
                   {
                       "script":  "scripts/vps/Get-Logs.ps1",
