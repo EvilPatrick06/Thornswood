@@ -434,7 +434,7 @@ jobs:
                  'test-join-outage.js', 'test-join-pass-site.js', 'test-open-switch.js', 'test-component-readmes.js',
                  'test-site-front-resilience.js', 'test-site-upload-guard.js',
                  'test-report-limits.js', 'test-site-hangs.js',
-                 'test-site-oauth-gaps.js', 'test-site-escaping.js', 'test-2185-site-bind.js', 'test-2193-hero-video.js', 'test-2187-signin-addr.js', 'test-2192-age-expiry.js', 'test-2189-log-rotation.js', 'test-2188-board-revision.js', 'test-swap-helpers.ps1',
+                 'test-site-oauth-gaps.js', 'test-site-escaping.js', 'test-2185-site-bind.js', 'test-2193-hero-video.js', 'test-2187-signin-addr.js', 'test-2192-age-expiry.js', 'test-2189-log-rotation.js', 'test-2188-board-revision.js', 'test-2235-dev-ship-guard.ps1', 'test-swap-helpers.ps1',
                  'test-backup-restore.ps1', 'test-backup-streaming.ps1',
                  'test-content-release.ps1',
                  'test-cooldown-sweep.js', 'test-voice-moved-clients.js',

@@ -314,9 +314,14 @@ param(
 . (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
 # A stale or dirty checkout sends old or unlanded code; refuse it (#2118).
-# -AnyBranch: the Git section below already holds a main release to main
-# (or a hotfix/ branch), and a dev release may ship any pushed branch.
-if (-not $DryRun) { . (Join-Path $PSScriptRoot '..\deploy\Fresh-Checkout.ps1'); Assert-FreshCheckout -RepoDir (Join-Path $PSScriptRoot '..\..') -What 'Ship' -AnyBranch -AllowStale:$AllowStaleCheckout }
+# The branch rule is Test-FreshAnyBranch, the same question Publish-Update
+# asks after the build (#2235): a dev release may ship any pushed branch, a
+# main release main or a hotfix/ branch, so the two can never disagree halfway.
+if (-not $DryRun) {
+    . (Join-Path $PSScriptRoot '..\deploy\Fresh-Checkout.ps1')
+    $freshRepo = Join-Path $PSScriptRoot '..\..'
+    Assert-FreshCheckout -RepoDir $freshRepo -What 'Ship' -AnyBranch:(Test-FreshAnyBranch -RepoDir $freshRepo -Channel $Channel) -AllowStale:$AllowStaleCheckout
+}
 
 
 # The launcher, Thornswood.exe in the launcher folder.
@@ -1592,6 +1597,9 @@ if ($MoveServer) { $pubArgs['MoveServer'] = $true }
 if ($AcceptSize) { $pubArgs['AcceptSize'] = $true }
 if (-not $ModsOnly) { $pubArgs['Launcher'] = $true; $pubArgs['LauncherInputs'] = $LauncherInputs }
 if ($Dev) { $pubArgs['Channel'] = 'dev'; $pubArgs['VersionOverride'] = $target }
+# -AllowStaleCheckout was Ship's alone, so Publish-Update refused what Ship had
+# already been told to let through (#2235).
+if ($AllowStaleCheckout) { $pubArgs['AllowStaleCheckout'] = $true }
 # A dry run has to leave nothing behind, and NoUpload plus NoPush is not that.
 #
 # Those two stop the release LEAVING the machine. They do not stop the
