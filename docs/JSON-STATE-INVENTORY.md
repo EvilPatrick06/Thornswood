@@ -26,8 +26,8 @@ The JSON files Thornswood's release, deploy, game, site, bot and voice trust, wh
 | File | Written by | Read by | Risk | Check today |
 | --- | --- | --- | --- | --- |
 | `server-settings.json` (built, and on each server) | Deploy-Gamemode, Export-ServerPayload; ServerSettings.ps1 carries settings on the box | the engine, Deploy-Server, Deploy-DevGamemode, Swap (on the box), site | High: port, load order, seats | named on a local bad read (#2154); box-side reads unchecked |
-| `thornswood-build.json` (build stamp) | BuildStamp.ps1 | Deploy-Server, Deploy-DevGamemode | Medium | named on a bad read (#2154) |
-| `deployed-build.json` | DeployedBuild.ps1 (on the box) | site | Low | none |
+| `thornswood-build.json` (build stamp) | BuildStamp.ps1 | Deploy-Server, Deploy-DevGamemode, Publish-Server (held to the payload's gamemode, #459) | Medium | named on a bad read (#2154) |
+| `deployed-build.json` | DeployedBuild.ps1 (on the box), from Deploy-Server and Publish-Server | site | Low | none |
 | `version.json`, `published.json` (feed store) | Publish-Update, Publish-Server, Rollback-Feed, Scrub-Feed | every launcher, site | High: what every launcher installs | named on a bad read (#2119) |
 | launcher `config.json` | launcher, Set-Server, Set-Collection | launcher, Deploy-Gamemode, Ship-Rules | Medium | named on a bad read; Deploy-Gamemode falls back |
 
@@ -42,7 +42,7 @@ The JSON files Thornswood's release, deploy, game, site, bot and voice trust, wh
 | `news.json`, `page-versions.json` | Publish-News, Set-DevNews, site | site | Low | named on a bad read (#2119) |
 | `online.json`, `roster.json`, `heartbeat.json` | game server, gamemode | site, launcher, Deploy-Server (on the box) | Medium | none |
 | `joins.json`, `commands-synced.json`, `bot.env.json` | bot, Install-Bot | bot | Medium; `bot.env.json` holds a secret and is never in the repository | none |
-| `thornswood-deploy.json` | Install-Bot, Install-Voice | site | Low | none |
+| `thornswood-deploy.json` | Install-Bot, Install-Voice, Deploy-Server, Deploy-DevGamemode, Publish-Server (Artifact.ps1) | site, game servers, Publish-Server -PutBack | Low | a put-back holds it to the gamemode it came back with (#459) |
 
 ## Next slices, in order
 

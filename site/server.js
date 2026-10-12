@@ -638,11 +638,12 @@ function pageMarkdown(name) {
 
 // The credits page says which engine each server runs. That is a fact of the
 // box, not of the repo, so a hand edit went stale with every deploy (the
-// source-offer test caught 3a32e961 that way). Deploy-Server.ps1 writes
-// data/deployed-build.json after a server deploy (scripts/deploy/
-// DeployedBuild.ps1), and the feeds this site serves carry the client commit.
-// fillCreditsCommits puts both into the page at serve time. The markdown keeps
-// its hand text, which is what goes out when either source is missing.
+// source-offer test caught 3a32e961 that way). Deploy-Server.ps1 and
+// Publish-Server.ps1 write data/deployed-build.json after a server deploy on
+// either channel (scripts/deploy/DeployedBuild.ps1), and the feeds this site
+// serves carry the client commit. fillCreditsCommits puts both into the page
+// at serve time. The markdown keeps its hand text, which names no commit for
+// either server, and is what goes out when neither server is in the record.
 // ==== thornswood credits fill ====
 function fillCreditsCommits(md, deployed, feeds) {
   const FULL = /^[0-9a-f]{40}$/;
@@ -657,20 +658,30 @@ function fillCreditsCommits(md, deployed, feeds) {
   let out = String(md);
   const live = pick('live');
   const dev = pick('dev');
-  if (live && dev) {
+  // Either server alone is enough to say something true (#2303). Until then
+  // a record with only live in it, which is what the box held on 11 Oct after
+  // the dev engine went up through Publish-Server, kept the hand text, and the
+  // hand text named the engine the main server had left behind.
+  if (live || dev) {
     const rec = /built from one commit,\s+\[`[0-9a-f]{7,40}`\]\(https:\/\/github\.com\/EvilPatrick06\/skymp\/tree\/([0-9a-f]{40})\)/.exec(out);
     const recorded = rec ? rec[1] : '';
     let said;
-    if (live === dev) {
+    if (live && dev && live === dev) {
       said = live === recorded ? 'Both servers run it, ' + link(live) + '.'
                                : 'The recorded build has not been deployed yet. Both servers run ' + link(live) + '.';
-    } else {
+    } else if (live && dev) {
       said = (live !== recorded && dev !== recorded ? 'The recorded build has not been deployed yet. ' : '') +
              'The test server runs ' + link(dev) + ' and the main server runs ' + link(live) + '.';
+    } else {
+      // Only the server the record names is spoken for; the other is left
+      // unsaid rather than guessed.
+      const one = live || dev;
+      const who = live ? 'The main server' : 'The test server';
+      said = one === recorded ? who + ' runs it, ' + link(one) + '.' : who + ' runs ' + link(one) + '.';
     }
-    // The hand sentence runs from "then to the main server." to "the earlier
-    // engine ...", whatever it says about which server runs what (#2098).
-    out = out.replace(/(then to the main server\.\s+)((?:(?!\n\s*\n)[\s\S])*?)\[`[0-9a-f]{7,40}`\]\([^)\s]*\),\s+the earlier engine[^.]*\./,
+    // The hand text is the rest of the paragraph after "then to the main
+    // server.", whatever it says (#2098, #2303).
+    out = out.replace(/(then to the main server\.\s+)(?:(?!\n\s*\n)[\s\S])+?(?=\n\s*\n|$)/,
                       function (m, lead) { return lead + said; });
   }
   for (const row of [['Public', 'feed/version.json', 'public'], ['Dev', 'feed-dev/version.json', 'dev']]) {
