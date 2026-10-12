@@ -19,6 +19,7 @@ Developer-Guide.md at the root; the long form is Developer-Guide.md.
 | [../engine/README.md](../engine/README.md) | Building the SkyMP fork: the submodule, the configure line, the build and the records. |
 | [IT-IS-DOWN.md](IT-IS-DOWN.md) | What to do when the server, the site or voice is down. |
 | [RESTORING.md](RESTORING.md) | Bringing the server, the site and the bot back from a backup. |
+| [SERVICE-OBJECTIVES.md](SERVICE-OBJECTIVES.md) | What working means for the site, feed, game servers, voice, bot and backups (#2183): each metric, threshold, the check that measures it, the alert, and the proposed owner. |
 | [MOVING-THE-SERVER.md](MOVING-THE-SERVER.md) | Growing the VPS, or moving everything to a new box. |
 | [DEPLOY-IDENTITIES.md](DEPLOY-IDENTITIES.md) | The VPS access audit (#2182): who can get in and as what today, and a restricted deploy identity design with migration, rollback and the decisions it needs. |
 | [OWNERSHIP.md](OWNERSHIP.md) | Who holds each credential, account and build, and who the second holder is. |
