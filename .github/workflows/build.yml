@@ -330,6 +330,7 @@ jobs:
                  'test-chat-log.js',
                  'test-2260-burn-relog.js',
                  'test-2259-forge-burn.js',
+                 'test-2261-tome-refused.js',
                  'test-1383-treatments.js',
                  'test-1384-condition.js',
                  'test-1385-perks.js',

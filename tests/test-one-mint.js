@@ -330,6 +330,7 @@ const WRITERS = {
   'outer/giveShift': [1, 'the shift, out of CHARGEN.shift'],
   'outer/giveItems': [1, 'descriptor pairs, and nothing calls it (checked below)'],
   'outer/packAsServerHasIt': [1, 'the take limit sends back the pack the server already holds, so it adds nothing'],
+  'staff spells/(top)': [1, 'a refused spell tome sends back the pack the server already holds (#2261), so it adds nothing'],
   'property/giveDeed': [1, 'one deed, DEED'],
   'property/giveNamed': [1, 'one named key or mold, KEY or MOLD'],
   'property/takeBlankMold': [1, 'only takes a mold away'],
