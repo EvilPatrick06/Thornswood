@@ -43,6 +43,7 @@ recipe does not yet become a burnt item. There is no timing minigame.
 ## Where this is
 
 The table that marks food, drink, ale, potion and poison is in the
-server, and an unknown edible is 15 hunger. Raw, burnt, cooked, feast,
-the 8 seconds, the full-stomach sickness and the soup's thirst are not.
-Every meal is the same 15 until those states exist.
+server, and an unknown edible is 15 hunger. The 8 seconds and the
+full-stomach sickness are in it too. Raw, burnt, cooked, feast and the
+soup's thirst are not, because the food table does not yet say which state
+a food is. Every meal is the same 15 until it does.

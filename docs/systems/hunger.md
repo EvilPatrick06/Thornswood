@@ -44,9 +44,9 @@ The bed has to be a bed. See [Property](property.md) and
 ## Where this is
 
 The clock, the four bands, the 15, the ale cost and the 25 from a bed
-are in the server. The cold multipliers are not. Hunger does not yet
-speed up in the snow. Food states are not on the meal. "Full" does not
-yet sicken you.
+are in the server. So are the cold multipliers, and a meal at 90 or above
+starts food sickness instead of raising the meter. Food states are not on
+the meal.
 
 A bed counts only when the server saw the person press it and they are
 still beside it. Lying down tells the server by itself, and nobody
