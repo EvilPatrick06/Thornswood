@@ -45098,9 +45098,11 @@ log('gamemode loaded:',
                        seconds: the signs and the 15 seconds /stuck reads.
     Devastating Blow   A power attack takes a quarter again of what it took,
                        measured the way the maneuvers measure a Heavy blow.
-    Unshakeable        NOT HERE. A block that staggers you is an animation on
-                       your own machine. The server sends no such stagger and
-                       cannot stop one. It needs the client plugin.
+    Unshakeable        Nothing staggers you while you block. A stagger is an
+                       animation on your own machine, so the front plugin
+                       refuses it there (thornswood-front.js, the filled
+                       perks on this machine), and the maneuvers block's
+                       staggerOf refuses the server's own Break and Wreck.
     Purified Blood     The game's own disease and poison resistance, through
                        the tree's totals (TUNING.perkApplies). A disease the
                        server itself gives asks holds(actorId, 'purifiedblood').
@@ -45127,14 +45129,18 @@ log('gamemode loaded:',
                        effects() below and withPerks in the character block.
                        So the game never takes the magicka at all, and a spell
                        you could not have afforded can be cast.
-    Tireless           NOT HERE. What running and a swing cost is worked out
-                       on your own machine. It needs the client plugin.
+    Tireless           What a sprint and a power attack cost is the game's
+                       own sum on your own machine, so the front plugin holds
+                       those game settings at half there. Running and a plain
+                       swing cost nothing in this game.
     Second Wind        Stamina that reaches nothing fills, once every 5
                        minutes.
-    Windwalker         +4 speed, through the tree's totals. The fall half is
-                       NOT HERE: a fall is taken on your own machine.
-    Pack Mule          NOT HERE. Being slowed by weight is the game's own, on
-                       your machine. It needs the client plugin.
+    Windwalker         +4 speed, through the tree's totals. The fall is the
+                       game's own sum on your own machine, so the front plugin
+                       holds its multiplier at nothing there.
+    Pack Mule          NOT IN THE GAME YET. Being overloaded makes the game
+                       walk you, on your own machine, and no game setting
+                       changes that. What it should be is Patrick's (#1385).
     Lethal Aim         An arrow or a bolt takes what it would have taken
                        against half the armour: the engine's own armour sum
                        (TES5DamageFormula, worn ARMO and their enchantments),
@@ -45197,9 +45203,8 @@ log('gamemode loaded:',
                          say: 'During a fight, health returns at 2 a second.' },
     devastatingblow:   { name: 'Devastating Blow', skill: 'might', more: 0.25,
                          say: 'A power attack deals 25% more.' },
-    unshakeable:       { name: 'Unshakeable', skill: 'resilience', none: true,
-                         say: 'A block cannot stagger you.',
-                         not: 'That is not in the game yet: the stagger is played on your own machine, where the server cannot stop it.' },
+    unshakeable:       { name: 'Unshakeable', skill: 'resilience',
+                         say: 'Nothing staggers you while you block.' },
     purifiedblood:     { name: 'Purified Blood', skill: 'toughness',
                          say: 'Disease does not take. Poison deals 25%.' },
     archmagesvessel:   { name: 'Archmage\'s Vessel', skill: 'capacity', every: DAY, below: 0.1, to: 0.5,
@@ -45213,14 +45218,12 @@ log('gamemode loaded:',
                          say: '20% of the magicka in a spell that hits you is added to yours.' },
     fontofmagic:       { name: 'Font of Magic', skill: 'efficiency', every: DAY, seconds: 15, costOff: 100,
                          say: 'Once a day, 15 seconds where a spell costs nothing. Press Use beside it on the K panel to start it.' },
-    tireless:          { name: 'Tireless', skill: 'endurance', none: true,
-                         say: 'Running and swinging cost half stamina.',
-                         not: 'That is not in the game yet: what running and a swing cost is worked out on your own machine.' },
+    tireless:          { name: 'Tireless', skill: 'endurance',
+                         say: 'Running and swinging cost half stamina.' },
     secondwind:        { name: 'Second Wind', skill: 'vigor', every: 5 * MINUTE,
                          say: 'When stamina hits 0 it fills, once every 5 minutes.' },
     windwalker:        { name: 'Windwalker', skill: 'agility',
-                         say: '+4 speed, and a fall deals no damage.',
-                         not: 'The speed is yours. A fall still hurts for now: it is taken on your own machine.' },
+                         say: '+4 speed, and a fall deals no damage.' },
     packmule:          { name: 'Pack Mule', skill: 'burden', none: true,
                          say: 'Being overloaded does not slow you.',
                          not: 'That is not in the game yet: the slowing is the game\'s own, on your machine.' },
@@ -45934,7 +45937,7 @@ log('gamemode loaded:',
     PERKS: PERKS, ORDER: ORDER, PROPERTY: PERK_PROPERTY, CRIT_LINE: CRIT_LINE, FIGHT_MS: FIGHT_MS,
     holds: holds, cheatDeath: cheatDeath, hit: hit, flush: flush, killerOf: killerOf, tick: tick,
     use: use, clocks: clocks, spendLine: spendLine, effects: effects, armourOf: armourOf,
-    lethalExtra: lethalExtra, readyAt: readyAt, state: ST
+    lethalExtra: lethalExtra, readyAt: readyAt, fired: fired, state: ST
   };
   console.log('[thornswood perks] ready: ' + ORDER.length + ' perks');
 })();
@@ -46675,17 +46678,41 @@ log('gamemode loaded:',
     names, and only when that actor is somebody's own character
     (SpSnippet::Execute returns for anything else). A person hit by Break or
     Wreck staggers in their own game; a creature does not yet. Plant refuses
-    this stagger.
+    this stagger, and so does Unshakeable while the person blocks (#1385).
   */
   function staggerOf(target) {
     if (!personOf(target) || deadOf(target)) { return; }
     var rec = onOf(target, false);
     if (rec && rec.plant && rec.plant > now()) { return; }
+    if (unshaken(target)) { return; }
     try {
       mp.callPapyrusFunction('global', 'Debug', 'SendAnimationEvent', null, [selfOf(target), 'staggerStart']);
     } catch (e) {
       mlog('could not stagger', target.toString(16) + ':', e);
     }
+  }
+
+  /*
+    UNSHAKEABLE (#1385): nothing staggers somebody who holds it while they
+    block. The block is the IsBlocking their own game sends with every
+    movement (skymp5-client movementGet.ts, kept by the engine in
+    ActionListener's movement handler), asked through the engine's own
+    ObjectReference.GetAnimationVariableBool. The front plugin refuses every
+    other stagger on that person's own machine the same way.
+  */
+  function unshaken(target) {
+    var pk = g.__thornswoodPerks;
+    if (!pk || !pk.holds || !pk.holds(target, 'unshakeable')) { return false; }
+    try {
+      if (!mp.callPapyrusFunction('method', 'ObjectReference', 'GetAnimationVariableBool',
+                                  selfOf(target), ['IsBlocking'])) { return false; }
+    } catch (e) {
+      mlog('could not ask whether', target.toString(16), 'blocks:', e);
+      return false;
+    }
+    // The perks block's own line, "perks: Unshakeable fired for <actor>".
+    if (pk.fired) { pk.fired(target, 'unshakeable', '(a Break or Wreck, while blocking)'); }
+    return true;
   }
 
   function flush() {

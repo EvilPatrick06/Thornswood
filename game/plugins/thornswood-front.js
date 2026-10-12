@@ -9372,6 +9372,7 @@
       skillsCreatingFrom(what.slice(12));
       treeFromView(what.slice(12));
       maneuversFromView(what.slice(12));
+      perksFromView(what.slice(12));
       return;
     }
     if (what.indexOf('skills:effects ') === 0) { treeFromMap(what.slice(15)); return; }
@@ -9653,6 +9654,187 @@
   }));
 
   // <<< tree apply: end <<<
+
+  // ------------------------------------ what a filled perk does on this machine --
+  /*
+    THE FILLED PERKS THAT HAPPEN ON THE PERSON'S OWN MACHINE (#1385).
+
+    docs/systems/skill-tree.md is the table. The server fires every perk it
+    can reach (the skill perks block in game/gamemode.js). These three
+    happen where it cannot: what a stagger, a sprint, a power attack and a
+    fall do to you is worked out by the game on your own machine, and the
+    health and stamina that leaves is what skymp5-client sends the server
+    (sendInputsService.ts, a change of values the server takes as it comes,
+    ActionListener::OnChangeValues).
+
+    WHICH ARE HELD comes off the K panel's view, the same view the tree hand
+    and the maneuver rows read (skills:view): its perks, the server's own
+    list (P.perks over the tree, forPanel in the character block). A view
+    with no list says nothing about perks and changes nothing here.
+
+    UNSHAKEABLE, "nothing staggers you while you are blocking"
+    (site/data/site/classes.md, the Resilience row). A stagger is the
+    animation event staggerStart on your own character, 0x14: the same event
+    Plant refuses below, and skymp5-client's deathService refuses on
+    everybody else's characters, in the same sendAnimationEvent hook. While
+    Unshakeable is held and your block is up it is blanked, so the game
+    never starts it. AnimationSource sends only an event that played, so
+    nobody else sees it either: the fork's #57 plays a stagger that came
+    over the network, and this one never goes out. Script functions cannot
+    be called inside a hook, so whether the block is up is the game's own
+    IsBlocking read once a frame in update, the variable skymp5-client reads
+    every frame to send your block to the server (movementGet.ts), the same
+    way its own combat service hands sprint and stamina to its hooks. The
+    server refuses its own Break and Wreck on a blocking holder the same
+    way (staggerOf in the maneuvers block).
+
+    WINDWALKER, the fall. Fall damage is the game's own sum, from three game
+    settings that are the person's own character's: fJumpFallHeightMin,
+    fJumpFallHeightMult and fJumpFallHeightExponent. Everybody else has a
+    set of their own, the same names ending in NPC. Both sets were read out
+    of Skyrim.esm on 12 Oct and nothing in the load order overrides either.
+    So fJumpFallHeightMult is 0 while Windwalker is held: the sum comes to
+    nothing however far the fall, for this character and nobody else.
+
+    TIRELESS. Running costs nothing in this game and neither does a plain
+    swing. A sprint and a power attack do, and both are the game's own sums
+    from game settings (Skyrim.esm, overridden by nothing in the load order;
+    skymp5-server's attack costs are SweetPie's only, and this server does
+    not load SweetPie): fSprintStaminaDrainMult for a sprint, and
+    fStaminaAttackWeaponBase plus fStaminaAttackWeaponMult times the
+    weapon's weight for a power attack. Each is held at half while Tireless
+    is held. These have no second set for everybody else, so an NPC this
+    machine runs pays half as well; #1385 says so for Patrick.
+
+    PACK MULE IS NOT HERE. Being overloaded makes the game walk you, and no
+    game setting changes that; #1385 has it for Patrick.
+
+    SET FROM THE GAME'S OWN VALUE, NOT FROM A NUMBER WRITTEN HERE. What a
+    setting read before this file first touched it is kept in sp.storage,
+    which outlives a plugin reload in the same game, so a reload never takes
+    this file's own write for the game's. A perk not held puts the game's
+    own value back. Each change is one line in the log.
+
+    The block between the markers is lifted out by tests/test-1385-perks.js,
+    which drives it against a fake skyrimPlatform.
+  */
+  // >>> machine perks: begin >>>
+
+  /* perk -> { game setting: the share of the game's own value it is held at }. */
+  const PERK_SETTINGS = {
+    windwalker: { fJumpFallHeightMult: 0 },
+    tireless: { fSprintStaminaDrainMult: 0.5, fStaminaAttackWeaponBase: 0.5, fStaminaAttackWeaponMult: 0.5 }
+  };
+
+  let perksHeld = {};               // perk -> true, the view's list
+  let perksSig = null;              // that list as text, null until a view has said
+  let perksDirty = false;           // the settings have not caught up with perksHeld yet
+  let unshakeableBlocking = false;  // IsBlocking at the last frame, read only while Unshakeable is held
+  let unshakeableRefused = 0;       // staggers refused while blocking, for the log
+  let unshakeableOpen = 0;          // staggers that played with the block down, for the log
+  let unshakeableSaid = 0;
+  let unshakeableOpenSaid = 0;
+
+  /* The whole panel view, as treeFromView takes it. Only its perks are read. */
+  function perksFromView(json) {
+    let v = null;
+    try { v = JSON.parse(String(json)); } catch (e) { return; }
+    if (!v || typeof v !== 'object') { return; }
+    const view = (v.panel && typeof v.panel === 'object') ? v.panel : v;
+    if (!Array.isArray(view.perks)) { return; }
+    const held = {};
+    for (let i = 0; i < view.perks.length; i++) {
+      const k = view.perks[i];
+      if (typeof k === 'string' && /^[a-z]+$/.test(k)) { held[k] = true; }
+    }
+    const sig = Object.keys(held).sort().join(',');
+    if (sig === perksSig) { return; }
+    perksSig = sig;
+    perksHeld = held;
+    perksDirty = true;
+    if (!held.unshakeable) { unshakeableBlocking = false; }
+  }
+
+  function perkNatural() {
+    let kept = null;
+    try { kept = sp.storage.thornswoodPerkNatural; } catch (e) { kept = null; }
+    if (!kept || typeof kept !== 'object') {
+      kept = {};
+      try { sp.storage.thornswoodPerkNatural = kept; } catch (e) { }
+    }
+    return kept;
+  }
+
+  /* Every setting a perk touches: the game's own value times the share of
+     each perk held that names it. Only in update, where the calls work. */
+  function perkSettingsNow() {
+    const natural = perkNatural();
+    const share = {};
+    for (const key in PERK_SETTINGS) {
+      for (const name in PERK_SETTINGS[key]) {
+        if (!Object.prototype.hasOwnProperty.call(share, name)) { share[name] = 1; }
+        if (perksHeld[key]) { share[name] *= PERK_SETTINGS[key][name]; }
+      }
+    }
+    const said = [];
+    for (const name in share) {
+      try {
+        if (typeof natural[name] !== 'number') {
+          const was = Number(sp.Game.getGameSettingFloat(name));
+          if (!isFinite(was)) { log('perks: the game has no number for', name + ', leaving it alone'); continue; }
+          natural[name] = was;
+        }
+        const want = natural[name] * share[name];
+        if (Number(sp.Game.getGameSettingFloat(name)) === want) { continue; }
+        sp.Game.setGameSettingFloat(name, want);
+        said.push(name + ' ' + want + (share[name] === 1 ? ', the game\'s own' : ', from the game\'s ' + natural[name]));
+      } catch (e) {
+        /* Said once and not retried: the next view that changes what is
+           held comes through here again. */
+        log('perks: could not set', name + ':', e);
+      }
+    }
+    if (said.length) { log('perks: ' + said.join('; ')); }
+  }
+
+  try {
+    sp.hooks.sendAnimationEvent.add({
+      enter: function (ctx) {
+        if (!perksHeld.unshakeable) { return; }
+        if (!unshakeableBlocking) { unshakeableOpen++; return; }
+        ctx.animEventName = '';
+        unshakeableRefused++;
+      },
+      leave: function () { }
+    }, 0x14, 0x14, 'staggerStart');
+  } catch (e) {
+    log('unshakeable: could not hook animation events, so Unshakeable stops only the server\'s own staggers:', e);
+  }
+
+  sp.on('update', guard('perks', () => {
+    if (perksDirty) {
+      perksDirty = false;
+      perkSettingsNow();
+    }
+    if (perksHeld.unshakeable) {
+      let pc = null;
+      try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
+      let up = false;
+      if (pc) { try { up = !!pc.getAnimationVariableBool('IsBlocking'); } catch (e) { up = false; } }
+      unshakeableBlocking = up;
+    }
+    // One line for each stagger, said outside the hook.
+    if (unshakeableRefused !== unshakeableSaid) {
+      unshakeableSaid = unshakeableRefused;
+      say('unshakeable: refused a stagger while blocking (' + unshakeableRefused + ' so far)');
+    }
+    if (unshakeableOpen !== unshakeableOpenSaid) {
+      unshakeableOpenSaid = unshakeableOpen;
+      say('unshakeable: a stagger played with the block down (' + unshakeableOpen + ' so far)');
+    }
+  }));
+
+  // <<< machine perks: end <<<
 
   // ------------------------------------------------- a warrior's maneuvers --
   /*
