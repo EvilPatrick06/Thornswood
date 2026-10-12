@@ -34,7 +34,7 @@ jobs:
   launcher-vps:
     name: Launcher builds (VPS fallback)
     needs: launcher
-    if: ${{ always() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' && github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ !cancelled() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: [self-hosted, Windows, thornswood-vps]
     # About fifteen minutes on the VPS. Past this it is stuck, not slow.
     timeout-minutes: 20
@@ -442,7 +442,7 @@ jobs:
                  'test-backup-restore.ps1', 'test-backup-streaming.ps1', 'test-fetch-verify-all.ps1', 'test-2199-zip-policy.ps1',
                  'test-content-release.ps1',
                  'test-cooldown-sweep.js', 'test-voice-moved-clients.js',
-                 'test-release-parity.ps1', 'test-dev-version.ps1', 'test-ship-launcher-reuse.ps1', 'test-2347-dev-launcher-version.ps1',
+                 'test-release-parity.ps1', 'test-dev-version.ps1', 'test-ship-launcher-reuse.ps1', 'test-2347-dev-launcher-version.ps1', 'test-2347-publish-launcher-number.ps1',
                  'test-2401-legacy-dev-marks.ps1',
                  'test-server-stage-directories.ps1',
                  'test-dev-settings-keys.ps1',
