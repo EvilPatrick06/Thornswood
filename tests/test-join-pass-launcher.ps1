@@ -89,9 +89,9 @@ if ($a -ge 0 -and $b -gt $a) {
 
 # ---- the launcher asks for a pass and hands it to the game -----------------
 $discord = Read-Text (Join-Path $app 'Discord.cs')
-$passAt = $discord.IndexOf('public static string Pass(int profileId, out string why)')
+$passAt = $discord.IndexOf('public static string Pass(int profileId, out string key, out string why)')
 Yes 'Discord.Pass is in Discord.cs' ($passAt -gt 0)
-$passSrc = if ($passAt -gt 0) { Lift $discord 'public static string Pass(int profileId, out string why)' } else { '' }
+$passSrc = if ($passAt -gt 0) { Lift $discord 'public static string Pass(int profileId, out string key, out string why)' } else { '' }
 Yes 'it posts to the site''s /api/play/pass' ($passSrc -match 'PostJson\(Site \+ "/api/play/pass"')
 Yes 'with the Discord ticket, the character, the channel and this launcher''s version' (
     $passSrc -match '\\"ticket\\"' -and $passSrc -match '\\"profileId\\"' -and
@@ -99,6 +99,9 @@ Yes 'with the Discord ticket, the character, the channel and this launcher''s ve
 Yes 'an unlinked copy asks nothing and says why' ($passSrc -match 'if \(!Linked\)[\s\S]{0,120}return "";')
 Yes 'only a 200 carrying a pass of the jp1 shape is taken' ($passSrc -match 'code == 200' -and $passSrc -match '\^jp1\\\\\.\[A-Za-z0-9_-\]\+\\\\\.\[A-Za-z0-9_-\]\+\$')
 Yes 'a refusal hands back the site''s own sentence' ($passSrc -match 'why = Field\(reply, "message"\);')
+Yes 'the pass''s own key is taken only beside a pass, and only in its shape (#1320)' (
+    $passSrc -match 'string k = Field\(reply, "key"\);' -and $passSrc -match '\^\[A-Za-z0-9_-\]\{16,128\}\$"\)\) key = k;' -and
+    $passSrc -match 'key = "";')
 Yes 'a log sent from this machine has any join pass taken out (Scrub)' ($discord -match '\\bjp1\\\.\[A-Za-z0-9_-\]\{8,\}\\\.\[A-Za-z0-9_-\]\{8,\}", "jp1\.\[join pass removed\]"')
 
 $jp = Read-Text (Join-Path $app 'JoinPass.cs')
@@ -111,6 +114,14 @@ Yes 'the pass is never in a line it says or logs: it is only ever written to its
     $jp -notmatch '\+\s*pass\b' -and $jp -notmatch '\bpass\s*\+' -and $jp -notmatch 'say\(pass' -and
     @([regex]::Matches($jp, '[(,]\s*pass\s*\)')).Count -eq 1 -and $jp -match 'File\.WriteAllText\(FilePath, pass\)')
 Yes 'Forget deletes the last session''s pass' ($jp -match 'public static void Forget\(\)[\s\S]{0,300}File\.Delete\(FilePath\)')
+Yes 'and its key' ($jp -match 'public static void Forget\(\)[\s\S]{0,500}File\.Delete\(KeyPath\)')
+Yes 'the key goes straight in Data\Platform, which no release carries (#1320)' ($jp -match 'Path\.Combine\(Paths\.Game, "Data\\\\Platform\\\\thornswood-pass-key\.txt"\)')
+$keyAt = $jp.IndexOf('File.WriteAllText(KeyPath')
+$passWriteAt = $jp.IndexOf('File.WriteAllText(FilePath, pass)')
+Yes 'the key is written before the pass, named by the pass''s mac, so the front plugin never pairs a key with another pass' (
+    $keyAt -gt 0 -and $passWriteAt -gt $keyAt -and $jp -match 'File\.WriteAllText\(KeyPath, pass\.Substring\(pass\.LastIndexOf\(''\.''\) \+ 1\) \+ " " \+ key\)')
+Yes 'a site with no key leaves no old key behind' ($jp -match 'else if \(File\.Exists\(KeyPath\)\) File\.Delete\(KeyPath\);')
+Yes 'the key is never in a line it says or logs' ($jp -notmatch 'say\([^)]*key' -and $jp -notmatch 'Note\([^)]*\bkey\b\s*\)')
 
 $chars = Read-Text (Join-Path $app 'ShellChars.cs')
 $poll = Lift $chars 'static void PollChoice()'

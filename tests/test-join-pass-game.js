@@ -302,9 +302,13 @@ yes('the voice service writes /joinpass to the chat log without the pass',
   const f = { sent: [], logged: [], file: '', now: T0, handler: null };
   const box = {
     Date: { now: function () { return f.now; } },
-    sp: { on: function (ev, fn) { if (ev === 'update') f.handler = fn; } },
+    sp: { on: function (ev, fn) { if (ev === 'update') f.handler = fn; }, storage: {} },
     guard: function (name, fn) { return fn; },
-    readText: function (p) { return p === 'Data/Platform/thornswood-pass.txt' ? f.file : ''; },
+    readText: function (p) {
+      if (p === 'Data/Platform/thornswood-pass.txt') { return f.file; }
+      if (p === 'Data/Platform/thornswood-pass-key.txt') { return f.key || ''; }
+      return '';
+    },
     tellServer: function (line) { f.sent.push(line); },
     log: function () { f.logged.push(Array.prototype.join.call(arguments, ' ')); }
   };
@@ -327,6 +331,65 @@ yes('the voice service writes /joinpass to the chat log without the pass',
   f.now += 5000; f.file = p2; f.handler();
   yes('a renewed pass goes at once', f.sent.length === 3 && f.sent[2] === '/joinpass ' + p2);
   yes('the pass is never written to its log', !f.logged.some(function (s) { return s.indexOf('jp1.') >= 0; }) && f.logged.length === 1);
+
+  // The pass's own key, for the fork's login challenge (#1320).
+  const st = box.sp.storage;
+  yes('no key file: nothing is put in storage for the login', st.thornswoodJoinPass === undefined);
+  const K2 = 'k2-the-key-the-site-gave-with-p2';
+  f.now += 5000; f.key = p1.split('.')[2] + ' ' + K2; f.handler();
+  yes('a key named for another pass is not paired with this one', st.thornswoodJoinPass === undefined);
+  f.now += 5000; f.key = p2.split('.')[2] + ' ' + K2 + '\r\n'; f.handler();
+  yes('the key named for this pass goes in storage beside it',
+      !!st.thornswoodJoinPass && st.thornswoodJoinPass.pass === p2 && st.thornswoodJoinPass.key === K2);
+  yes('and the key is never written to the log', !f.logged.some(function (s) { return s.indexOf(K2) >= 0; }));
+}
+
+// ------------------------------------------------------------ the login's proof (#1320)
+// The fork's offline login (skymp5-server, thornswoodLogin.ts) asks
+// mp.onThornswoodLogin: at the login with no proof, and again with the pass and
+// the mac the client made over this connection's nonce, under the pass's own
+// key. Watched only: the login is handed over as asked and the proof is logged.
+{
+  door({ site: 'https://thornswood.net/dev', key: 'door-key', passKey: KEY });
+  const r = rig({ thornswoodServer: 'dev', thornswoodRequirePass: true });
+  const hook = r.box.mp.onThornswoodLogin;
+  yes('the block sets mp.onThornswoodLogin for the fork\'s login', typeof hook === 'function');
+  // The shared pass's own key, the value tests\test-join-pass-site.js checks
+  // passLoginKey in site\server.js derives.
+  const VECTOR_LOGIN_KEY = 'Wh9OwaY7Rg7e4duCPpNl3c_DZb9RfUB0FUT9Pphs9L4';
+  const ownKey = function (p) { return b64u(crypto.createHmac('sha256', KEY).update('jpk1.' + p.split('.')[2]).digest()); };
+  yes('the pass\'s own key is the one the site derives for the shared pass', ownKey(VECTOR_PASS) === VECTOR_LOGIN_KEY);
+  const macOf = function (k, n) { return b64u(crypto.createHmac('sha256', k).update('jlp1.' + n).digest()); };
+  const N1 = 'nonce-of-connection-one-aaaa';
+  const N2 = 'nonce-of-connection-two-bbbb';
+  const now = Date.now();
+  const p = mint({ p: 700, s: 'dev', i: now, x: now + 600000 });
+
+  yes('at the login, with no proof, the profile asked for is handed over (watching)',
+      hook({ userId: 7, profileId: 700, nonce: N1, proof: null }) === 700);
+  yes('and the log says it was challenged', r.logged.some(function (s) { return /login of profile 700 on user 7 challenged/.test(s); }));
+
+  const good = { userId: 7, profileId: 700, nonce: N1, proof: { pass: p, mac: macOf(ownKey(p), N1) } };
+  yes('a good proof waits for nothing more: the character was handed over at the login', hook(good) === -1);
+  yes('and is logged as good', r.logged.some(function (s) { return /login proof from profile 700 on user 7: good \(watching/.test(s); }));
+  yes('loginProof says good, for the pass\'s profile', r.jp.loginProof(good, now).ok === true && r.jp.loginProof(good, now).p === 700);
+
+  const replay = { userId: 8, profileId: 700, nonce: N2, proof: good.proof };
+  yes('the same pass and mac on another connection does not check out',
+      r.jp.loginProof(replay, now).ok !== true && /does not check out for this connection/.test(r.jp.loginProof(replay, now).why));
+  const guessed = { userId: 8, profileId: 700, nonce: N2, proof: { pass: p, mac: macOf('a-guess-at-the-key', N2) } };
+  yes('the pass with a guessed key does not check out', r.jp.loginProof(guessed, now).ok !== true);
+  const old = mint({ p: 700, s: 'dev', i: now - 700000, x: now - 100000 });
+  yes('an expired pass is refused for that', /expired/.test(r.jp.loginProof({ userId: 7, profileId: 700, nonce: N1, proof: { pass: old, mac: macOf(ownKey(old), N1) } }, now).why));
+  const forged = mint({ p: 700, s: 'dev', i: now, x: now + 600000 }, 'another-key');
+  yes('a pass signed with another key is refused for that',
+      /signature/.test(r.jp.loginProof({ userId: 7, profileId: 700, nonce: N1, proof: { pass: forged, mac: 'x' } }, now).why));
+  const theirs = { userId: 7, profileId: 816507994, nonce: N1, proof: { pass: p, mac: macOf(ownKey(p), N1) } };
+  const v = r.jp.loginProof(theirs, now);
+  yes('a good proof for another profile than the one asked for names the pass\'s profile', v.ok === true && v.p === 700 && /logged in as 816507994/.test(v.why));
+  yes('nothing is refused and nobody is kicked while watching', hook(theirs) === -1 && r.kicked.length === 0);
+  yes('neither the pass nor the key is ever written to the log',
+      !r.logged.some(function (s) { return s.indexOf('jp1.') >= 0 || s.indexOf(ownKey(p)) >= 0; }));
 }
 
 try { fs.rmSync(PRIV, { recursive: true, force: true }); } catch (e) { }

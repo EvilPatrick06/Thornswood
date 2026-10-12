@@ -9921,6 +9921,15 @@
     to whoever holds it.
   */
   const PASS_FILE = 'Data/Platform/thornswood-pass.txt';
+  /*
+    The pass's own key (#1320). The launcher leaves it beside the pass, named
+    by the pass's mac, and the client the fork builds answers the game
+    server's login challenge with the pass and a mac over that connection's
+    nonce under this key (skymp5-client, thornswoodLoginProof.ts), read from
+    storage.thornswoodJoinPass. Paired only with the pass it was given for,
+    and never logged.
+  */
+  const PASS_KEY_FILE = 'Data/Platform/thornswood-pass-key.txt';
   const PASS_RESEND_MS = 60000;
   const PASS_READ_MS = 5000;
   let passSent = '';
@@ -9932,6 +9941,10 @@
     passReadAt = now;
     const raw = readText(PASS_FILE).trim();
     if (!/^jp1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(raw)) { return; }
+    const keyLine = readText(PASS_KEY_FILE).trim().split(' ');
+    if (keyLine.length === 2 && keyLine[0] === raw.split('.')[2] && /^[A-Za-z0-9_-]{16,128}$/.test(keyLine[1])) {
+      sp.storage.thornswoodJoinPass = { pass: raw, key: keyLine[1] };
+    }
     if (raw === passSent && now - passSentAt < PASS_RESEND_MS) { return; }
     const first = !passSent;
     passSent = raw;
