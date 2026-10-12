@@ -114,7 +114,10 @@ const needs = (nA >= 0 && nB > nA) ? GM.slice(nA, nB) : '';
 yes('the needs block is in the gamemode', needs.length > 1000);
 
 const hA = GM.indexOf('function hudScript()');
-const hud = hA >= 0 ? GM.slice(hA, hA + 12000) : '';
+// To the end of the function, which grew past a fixed 12,000 characters
+// when #2247 wrote down where the HUD bars are measured from.
+const hEnd = hA >= 0 ? GM.indexOf("].join('\\n');", hA) : -1;
+const hud = hA >= 0 ? GM.slice(hA, hEnd > hA ? hEnd : hA + 12000) : '';
 yes('the HUD script is in the gamemode', hud.length > 0);
 
 const pA = GM.indexOf('const PLAYER_WORDS = [');
@@ -183,7 +186,7 @@ hud.replace(/row\("(\w+)", "(\w+)"/g, function (all, key, label) { HUD_ROWS.push
 yes('the HUD draws its bars by name, ' + HUD_ROWS.join(', '), HUD_ROWS.length >= 4);
 if (/bottom left/i.test(body)) {
   yes('it says the bars are bottom left, and the HUD is anchored bottom left',
-      /position:fixed;left:\d+px;bottom:\d+px/.test(hud));
+      /position:fixed;left:[^;]+;bottom:[^;]+;/.test(hud));
 }
 const COUNT = { two: 2, three: 3, four: 4, five: 5, six: 6 };
 const counted = /\b(two|three|four|five|six) bars\b/i.exec(body);
@@ -278,7 +281,7 @@ yes('and points at the Body page on K, which the K panel draws (#1631)',
     /Body page on K/.test(shRow) && bodyPage && shRow.indexOf('/needs') < 0);
 if (/bottom left/i.test(shRow)) {
   yes('it says the bars are bottom left, and the HUD is anchored bottom left',
-      /position:fixed;left:\d+px;bottom:\d+px/.test(hud));
+      /position:fixed;left:[^;]+;bottom:[^;]+;/.test(hud));
 }
 const shCount = /\b(two|three|four|five|six) bars\b/i.exec(shRow);
 if (shCount) {
