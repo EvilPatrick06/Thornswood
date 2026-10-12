@@ -83,6 +83,20 @@ try {
         T ($x.Out -notmatch 'RISK  workflow build\.yml runs on' -and $x.Report -match '\| workflow \| build\.yml runs on \|[^\n]*\| ok \|') 'the real build.yml runs no pull request on the production runners, and the check says ok'
     }
     T ($x.Out -notmatch 'RISK  workflow (nightly|release|drop-claims)\.yml runs on') 'nightly, release and drop-claims stay on the VPS and are not risks (no pull request trigger)'
+    T ($x.Out -notmatch 'RISK  workflow build-pr\.yml runs on' -and $x.Report -match '\| workflow \| build-pr\.yml runs on \|[^\n]*same-repository pull requests only[^\n]*\| ok \|') 'the real build-pr.yml falls back to the VPS for same-repository pull requests only, and the check says ok (Patrick, 12 Oct 2026)'
+
+    # A pull request on the production label without the same-repository
+    # condition is a risk; with it, it is not.
+    $wfPr = Join-Path $scratch 'wfpr'; New-Item -ItemType Directory -Path $wfPr | Out-Null
+    Set-Content (Join-Path $wfPr 'build-pr.yml') "on:`n  pull_request:`npermissions:`n  contents: read`njobs:`n  a:`n    runs-on: [self-hosted, Windows, thornswood-vps]`n"
+    $x = Run (Facts) $wfPr
+    T ($x.Out -match 'RISK  workflow build-pr\.yml runs on') 'a pull request job on the production label with no same-repository condition is a risk'
+    Set-Content (Join-Path $wfPr 'build-pr.yml') "on:`n  pull_request:`npermissions:`n  contents: read`njobs:`n  a:`n    if: `${{ github.event.pull_request.head.repo.full_name == github.repository }}`n    runs-on: [self-hosted, Windows, thornswood-vps]`n"
+    $x = Run (Facts) $wfPr
+    T ($x.Out -notmatch 'RISK  workflow build-pr\.yml runs on') 'the same job limited to this repository is not'
+    Set-Content (Join-Path $wfPr 'build-pr.yml') "on:`n  pull_request_target:`npermissions:`n  contents: read`njobs:`n  a:`n    if: `${{ github.event.pull_request.head.repo.full_name == github.repository }}`n    runs-on: [self-hosted, Windows, thornswood-vps]`n"
+    $x = Run (Facts) $wfPr
+    T ($x.Out -match 'RISK  workflow build-pr\.yml runs on') 'pull_request_target on the production label stays a risk, condition or not'
     $rec0 = Get-Content (Join-Path $repo 'records\runner-isolation.json') -Raw | ConvertFrom-Json
     T ([string]$rec0.decision -match 'GitHub-hosted' -and [string]$rec0.decision -match '11 Oct 2026' -and [string]$rec0.decision -match 'outbound' -and [string]$rec0.decision -notmatch 'residual') 'the record carries the decision'
 

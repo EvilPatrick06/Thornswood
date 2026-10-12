@@ -168,6 +168,11 @@ param(
   # The committed gamemode alone, with no server build on this machine
   # (#1089). See GAMEMODE ONLY in the header.
   [switch]$GamemodeOnly,
+  # The plugins the live server loads that the build's load order may leave
+  # out, each by its file name (#2320). Left off, the carry on the box refuses
+  # an order that drops any plugin the live server loads (ServerSettings.ps1,
+  # Test-ThornswoodLoadOrderDrop). A full deploy's, like the switches above.
+  [string[]]$DropPlugins = @(),
     # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
     [switch]$AllowStaleCheckout
 )
@@ -442,6 +447,9 @@ if ($GamemodeOnly -and $asked.Count) {
   Write-Host '  -GamemodeOnly sets no setting: the live server keeps its own, and no key may move.' -ForegroundColor Red
   Write-Host '  -RequirePass, -Devs and -Playtesters go with a full deploy, from a machine with the server build.' -ForegroundColor Yellow
   throw '-GamemodeOnly was given -RequirePass, -Devs or -Playtesters. Nothing was sent and the server was not touched.'
+}
+if (@($DropPlugins).Count -and ($PutBack -or $GamemodeOnly)) {
+  throw '-DropPlugins goes with a full deploy, whose build carries a load order: -PutBack and -GamemodeOnly send none. Nothing was sent and the server was not touched.'
 }
 if ($PutBack) { Invoke-PutBack }
 
@@ -926,7 +934,8 @@ if ($GamemodeOnly) {
 } else {
   $liveKeys = @($ThornswoodGamemodeKeys + @($asked.Keys))
   $carryScript = [IO.File]::ReadAllText((Join-Path $Here 'ServerSettings.ps1')) + "`r`n" +
-                 (SwapVars $Root $Task $stageName $prevName $Wait $hashes $liveKeys) + (Get-ThornswoodAskedLine $asked) + $settingsCarryBlock
+                 (SwapVars $Root $Task $stageName $prevName $Wait $hashes $liveKeys) + (Get-ThornswoodAskedLine $asked) +
+                 (Get-ThornswoodDropLine $DropPlugins) + $settingsCarryBlock
 }
 $carryOut = @(Remote $carryScript | ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })
 $carried = @($carryOut | Where-Object { $_ -match '^CARRIED [0-9a-f]{64}$' })
