@@ -8459,6 +8459,24 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
           shuts them in. Somebody pressing the inside half of a front door, or
           the door up out of a cellar, is already in. See WAY_OUT.
         */
+        /*
+          A CELL A GUARD LOCKED (#502), refused the same way: the cell is
+          locked in this person's game unless the client half did not run.
+          A cell door is a way out of the jail building, so the building's
+          check below never looks at it.
+        */
+        if (prop.jailHoldOf && prop.jailHoldOf(doorDesc)) {
+          let cpid = 0;
+          try { cpid = Number(mp.get(casterRefrId, 'profileId')) || 0; } catch (e) { cpid = 0; }
+          if (!prop.mayPassCell(casterRefrId, cpid, doorDesc)) {
+            const no = 'The cell is locked, and only a guard of this hold opens it.';
+            notify(casterRefrId, no);
+            say(casterRefrId, no);
+            log(casterRefrId.toString(16), 'was refused a locked cell door', doorDesc,
+                '(the client lock did not run)');
+            return false;
+          }
+        }
         const shutTo = prop.buildingOf(doorDesc);
         if (shutTo && prop.mayPass && !(prop.wayOut && prop.wayOut(doorDesc))) {
           let pid = 0;
@@ -28304,9 +28322,19 @@ log('gamemode loaded:',
       // serves, and rewriting it twice a second for no reason is churn nobody
       // asked for.
       // And the most the world holds at once (#481), so the launcher and the
-      // site say "N of 25" from the server's own number.
+      // site say "N of M" from the server's own number. M is every seat, the
+      // staff seats too, not the number the door turns people away past:
+      // Patrick, 12 Oct, "the real cap is 30 but 25 for people with non staff
+      // roles I still want it to say of 30 awake tho". So 30 on main and 5 on
+      // dev, which has no staff seats over its 5. Whether somebody picking
+      // now would wait is full, below, which the seats block works out.
       var max = 0;
-      try { max = Number((mp.getServerSettings() || {}).thornswoodMostOnline) || 0; } catch (e) { max = 0; }
+      try {
+        var seatsApi = globalThis.__thornswoodSeats;
+        var settingsNow = mp.getServerSettings() || {};
+        var capNow = seatsApi ? seatsApi.cap(settingsNow) : 0;
+        max = capNow ? capNow + seatsApi.staffSeats(settingsNow) : 0;
+      } catch (e) { max = 0; }
       // And how many wait at the menu, and whether somebody picking now would
       // wait too, from the seats block (#481): the menu reads full to decide
       // between joining and taking a place in line, the site to say so.
@@ -35681,6 +35709,219 @@ log('gamemode loaded:',
   }
 
   /*
+    ------------------------------------------------------- guards and cells
+
+    #502. Patrick, 11 October: "jail cells should be usable by guards and
+    guards should have jail cell access and the ability to remove posts from
+    a notice board for all of these only wiithin their own hold tho", and
+    "guards will be players no NPC guards". So a guard is a person in a
+    guard's office, of one hold, and every power below is checked against
+    that hold.
+
+    A HOLD is the town key the boards and the ledgers use (LEDGER_HOLDS):
+    whiterun, solitude, riften, markarth, windhelm, falkreath, morthal,
+    dawnstar, winterhold, ravenrock. A jail's hold comes from the world: the
+    hold's crime faction names its jail marker, and the jail is the room
+    holding the door that leads to it (scripts\dev\Build-JailTable.py, which
+    writes JAIL_CELLS below and game\data\jails.json).
+
+    THE REGISTER is law.json beside property.json, in the private folder:
+    each guard by profile with their hold, and every cell door a guard has
+    turned, locked or not. Kept apart from property.json because none of it
+    is property: a cell is the hold's, whoever claims the building it is in.
+
+    WHO NAMES A GUARD IS NOT DECIDED YET. It is written out for Patrick on
+    #502. Until it is, nothing writes a guard into the register, nobody is
+    one, and every check below answers no, so nothing in the world changes.
+
+    A CELL IS THE ONE LOCK THAT SHUTS PEOPLE IN. Every other lock here keeps
+    people out and never shuts them in (shutFor, WAY_OUT); a cell door is a
+    way out of the jail building, so a claim's lock never turns on one. A
+    jail is for shutting somebody in, which is what Patrick asked for, so
+    the cells have their own lock, and only a guard of the hold turns it.
+    The two halves are the house lock's: the doors shut to a person are
+    pushed to their game, which locks them there and keeps lockpicking, and
+    a press on a shut cell that reaches the server anyway is refused
+    (mayPassCell, in onActivate). A guard of the hold always has every cell
+    of their hold open in their own game. A cell no guard has turned is as
+    the game ships it, and the server pushes nothing for it.
+  */
+  // ==== JAIL_CELLS, generated ====
+  // Generated by scripts\dev\Build-JailTable.py from the load order; do not
+  // hand edit. JAIL_DOOR: every door inside a hold's jail, to the hold.
+  // JAIL_NAME: each hold's jail, by name. JAIL_SHUT: the doors the game
+  // ships locked, which is what a cell is until a guard turns it.
+  var JAIL_DOOR = {"105fbb:Skyrim.esm":"windhelm","105fbc:Skyrim.esm":"windhelm","105fd2:Skyrim.esm":"windhelm","105fd3:Skyrim.esm":"windhelm","10cff3:Skyrim.esm":"winterhold","10cff7:Skyrim.esm":"winterhold","10cffc:Skyrim.esm":"winterhold","19b09:Dragonborn.esm":"ravenrock","337d2:Dragonborn.esm":"ravenrock","37b19:Dragonborn.esm":"ravenrock","40fa0:Skyrim.esm":"riften","5e91e:Skyrim.esm":"solitude","5e91f:Skyrim.esm":"solitude","5e920:Skyrim.esm":"solitude","5e921:Skyrim.esm":"solitude","5e922:Skyrim.esm":"solitude","5e923:Skyrim.esm":"solitude","5e924:Skyrim.esm":"solitude","65c5c:Skyrim.esm":"riften","7e095:Skyrim.esm":"solitude","7e0b3:Skyrim.esm":"solitude","7e0b4:Skyrim.esm":"solitude","8d449:Skyrim.esm":"windhelm","9dc35:Skyrim.esm":"whiterun","9dc6e:Skyrim.esm":"whiterun","a577d:Skyrim.esm":"whiterun","a7614:Skyrim.esm":"whiterun","a7615:Skyrim.esm":"whiterun","a7616:Skyrim.esm":"whiterun","a7617:Skyrim.esm":"whiterun","a7618:Skyrim.esm":"whiterun","a8b64:Skyrim.esm":"riften","a8b6d:Skyrim.esm":"riften","a8c15:Skyrim.esm":"riften","a8e43:Skyrim.esm":"riften","a8e46:Skyrim.esm":"riften","a8e4a:Skyrim.esm":"riften","a8e4e:Skyrim.esm":"riften","a8e52:Skyrim.esm":"riften","a8e56:Skyrim.esm":"riften","a8e58:Skyrim.esm":"riften","a8e59:Skyrim.esm":"riften","a8f38:Skyrim.esm":"riften","ab46a:Skyrim.esm":"riften","bf4d4:Skyrim.esm":"markarth","bf4e0:Skyrim.esm":"markarth","c5a3b:Skyrim.esm":"markarth","c845b:Skyrim.esm":"solitude","d3141:Skyrim.esm":"windhelm","d61e5:Skyrim.esm":"windhelm","dc537:Skyrim.esm":"markarth","dcc9c:Skyrim.esm":"whiterun","e7e6e:Skyrim.esm":"markarth","e8217:Skyrim.esm":"riften","ec3e0:Skyrim.esm":"riften","ec3e2:Skyrim.esm":"solitude","ec564:Skyrim.esm":"dawnstar","ec565:Skyrim.esm":"morthal","ef434:Skyrim.esm":"falkreath","ef4ab:Skyrim.esm":"solitude"};
+  var JAIL_NAME = {"dawnstar":"Dawnstar Jail","falkreath":"Falkreath Jail","markarth":"Cidhna Mine","morthal":"Morthal Jail","ravenrock":"The Bulwark Jail","riften":"Riften Jail","solitude":"Castle Dour Dungeon","whiterun":"Dragonsreach Dungeon","windhelm":"Windhelm Barracks","winterhold":"The Chill"};
+  var JAIL_SHUT = {"105fbb:Skyrim.esm":1,"105fbc:Skyrim.esm":1,"10cff3:Skyrim.esm":1,"10cff7:Skyrim.esm":1,"10cffc:Skyrim.esm":1,"19b09:Dragonborn.esm":1,"337d2:Dragonborn.esm":1,"5e91e:Skyrim.esm":1,"5e91f:Skyrim.esm":1,"5e920:Skyrim.esm":1,"5e921:Skyrim.esm":1,"5e922:Skyrim.esm":1,"5e923:Skyrim.esm":1,"5e924:Skyrim.esm":1,"65c5c:Skyrim.esm":1,"8d449:Skyrim.esm":1,"9dc35:Skyrim.esm":1,"9dc6e:Skyrim.esm":1,"a577d:Skyrim.esm":1,"a7614:Skyrim.esm":1,"a7615:Skyrim.esm":1,"a7617:Skyrim.esm":1,"a7618:Skyrim.esm":1,"a8e43:Skyrim.esm":1,"a8e46:Skyrim.esm":1,"a8e4a:Skyrim.esm":1,"a8e52:Skyrim.esm":1,"a8e56:Skyrim.esm":1,"a8e58:Skyrim.esm":1,"a8e59:Skyrim.esm":1,"bf4d4:Skyrim.esm":1,"bf4e0:Skyrim.esm":1,"c5a3b:Skyrim.esm":1,"d3141:Skyrim.esm":1,"dc537:Skyrim.esm":1,"e7e6e:Skyrim.esm":1,"ec564:Skyrim.esm":1,"ec565:Skyrim.esm":1,"ef434:Skyrim.esm":1};
+  // ==== end JAIL_CELLS ====
+
+  function lawPath() {
+    var path = require('path');
+    return path.join(path.dirname(registerPath()), 'law.json');
+  }
+
+  /*
+    The register off disk, rebuilt field by field the way load() rebuilds a
+    claim: a guard is a profile above 0 with one of the ten holds, and a cell
+    is a door in JAIL_DOOR with a yes or a no. Anything else is dropped and
+    counted, never trusted.
+  */
+  function loadLaw() {
+    var out = { guards: {}, cells: {} };
+    var raw = null;
+    try { raw = JSON.parse(require('fs').readFileSync(lawPath(), 'utf8')); }
+    catch (e) { return out; }
+    var dropped = 0;
+    var gs = (raw && raw.guards && typeof raw.guards === 'object') ? raw.guards : {};
+    for (var k in gs) {
+      if (!Object.prototype.hasOwnProperty.call(gs, k)) { continue; }
+      var pid = Number(k) || 0;
+      var hold = String(gs[k] || '');
+      if (pid > 0 && Object.prototype.hasOwnProperty.call(JAIL_NAME, hold)) { out.guards[pid] = hold; }
+      else { dropped++; }
+    }
+    var cs = (raw && raw.cells && typeof raw.cells === 'object') ? raw.cells : {};
+    for (var d in cs) {
+      if (!Object.prototype.hasOwnProperty.call(cs, d)) { continue; }
+      if (Object.prototype.hasOwnProperty.call(JAIL_DOOR, d)) { out.cells[d] = cs[d] === true; }
+      else { dropped++; }
+    }
+    if (dropped) { plog('law: dropped', dropped, 'row(s) that were not a guard or a cell'); }
+    plog('law: read', Object.keys(out.guards).length, 'guard(s) and', Object.keys(out.cells).length,
+         'cell door(s) a guard has turned');
+    return out;
+  }
+
+  function saveLaw() {
+    try {
+      var fs = require('fs');
+      try { fs.mkdirSync(require('path').dirname(lawPath()), { recursive: true }); } catch (e) { }
+      fs.writeFileSync(lawPath(), JSON.stringify({ guards: law.guards, cells: law.cells }, null, 1));
+    } catch (e) {
+      plog('law: could not write the register:', e);
+    }
+  }
+
+  var law = loadLaw();
+
+  /** A guard of exactly this hold. */
+  function isGuard(profileId, hold) {
+    var pid = Number(profileId) || 0;
+    if (!pid || !hold) { return false; }
+    return Object.prototype.hasOwnProperty.call(law.guards, pid) && law.guards[pid] === String(hold);
+  }
+
+  /** The hold this profile guards, or ''. */
+  function guardHoldOf(profileId) {
+    var pid = Number(profileId) || 0;
+    return (pid && Object.prototype.hasOwnProperty.call(law.guards, pid)) ? law.guards[pid] : '';
+  }
+
+  /** The hold whose jail this door is in, or null. */
+  function jailHoldOf(doorDesc) {
+    var d = String(doorDesc || '');
+    return Object.prototype.hasOwnProperty.call(JAIL_DOOR, d) ? JAIL_DOOR[d] : null;
+  }
+
+  /** Whether a cell door is locked: as a guard last left it, or as the game ships it. */
+  function cellLocked(doorDesc) {
+    var d = String(doorDesc || '');
+    if (Object.prototype.hasOwnProperty.call(law.cells, d)) { return law.cells[d] === true; }
+    return Object.prototype.hasOwnProperty.call(JAIL_SHUT, d);
+  }
+
+  /*
+    May this person go through this cell door. A guard of its hold always
+    may. A cell no guard has turned is the game's, and the server does not
+    refuse what it never locked. Otherwise it is whatever a guard left it.
+  */
+  function mayPassCell(actorId, profileId, doorDesc) {
+    var hold = jailHoldOf(doorDesc);
+    if (!hold) { return true; }
+    if (isGuard(profileId, hold)) { return true; }
+    var d = String(doorDesc);
+    if (!Object.prototype.hasOwnProperty.call(law.cells, d)) { return true; }
+    return law.cells[d] !== true;
+  }
+
+  /*
+    The cells, onto one person's shut and open lists. A guard of the hold
+    gets every cell of it open. Anybody else gets the cells a guard has
+    turned, as they were left; the rest stay as the game ships them.
+  */
+  function cellLists(profileId, shut, open) {
+    for (var d in JAIL_DOOR) {
+      if (!Object.prototype.hasOwnProperty.call(JAIL_DOOR, d)) { continue; }
+      var id = idOf(d);
+      if (!id) { continue; }
+      if (isGuard(profileId, JAIL_DOOR[d])) { open.push(id); continue; }
+      if (!Object.prototype.hasOwnProperty.call(law.cells, d)) { continue; }
+      (law.cells[d] === true ? shut : open).push(id);
+    }
+  }
+
+  /** The cell door a key press names, by the form id the crosshair gives, or null. */
+  function cellOfId(raw) {
+    raw = String(raw || '');
+    if (!/^[0-9a-f]{1,8}$/i.test(raw)) { return null; }
+    var desc = '';
+    try { desc = String(mp.getDescFromId(parseInt(raw, 16)) || ''); } catch (e) { desc = ''; }
+    return (desc && jailHoldOf(desc)) ? desc : null;
+  }
+
+  /*
+    A guard locks or unlocks a cell (#502). The lock key at a cell door,
+    while the cell door is the door they just opened, the way a house is
+    locked at its door: /lock or /unlock with the door's id, which nobody is
+    told to type. Only a guard of the jail's hold.
+  */
+  function lockCell(actorId, profileId, toProfile, on, doorDesc) {
+    var hold = jailHoldOf(doorDesc);
+    var v = null;
+    try { v = mp.get(actorId, DOOR_PROPERTY); } catch (e) { v = null; }
+    if (!hold || !v || typeof v !== 'object' || String(v.door || '') !== doorDesc ||
+        (Date.now() - (Number(v.at) || 0)) > DOOR_MEMORY_MS) {
+      toProfile(profileId, 'Open the cell door you mean first.');
+      return true;
+    }
+    if (!isGuard(profileId, hold)) {
+      var mine = guardHoldOf(profileId);
+      toProfile(profileId, mine
+        ? 'That cell is in ' + JAIL_NAME[hold] + '. A guard keeps the cells of their own hold.'
+        : 'A cell is a guard\'s to lock.');
+      return true;
+    }
+    if (cellLocked(doorDesc) === !!on) {
+      toProfile(profileId, 'The cell is already ' + (on ? 'locked' : 'unlocked') + '.');
+      return true;
+    }
+    law.cells[doorDesc] = !!on;
+    saveLaw();
+    pushAll();
+    var who = personName(actorId);
+    plog('law: a guard of', hold, '(' + who + ', profile ' + profileId + ')', on ? 'locked' : 'unlocked',
+         'cell door', doorDesc, 'in', JAIL_NAME[hold]);
+    toProfile(profileId, on
+      ? 'You lock the cell. Only a guard of this hold opens it now; anybody else has to pick the lock.'
+      : 'You unlock the cell. It opens for anybody now.');
+    var said = on ? 'The cell door is locked.' : 'The cell door is unlocked.';
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e2) { online = []; }
+    for (var i = 0; i < online.length; i++) {
+      var oid = online[i];
+      if (oid === actorId) { continue; }
+      var far = distanceTo(actorId, oid);
+      if (far < 0 || far > LOCK_HEARD) { continue; }
+      var opid = 0;
+      try { opid = Number(mp.get(oid, 'profileId')) || 0; } catch (e3) { opid = 0; }
+      if (!opid || opid === Number(profileId)) { continue; }
+      toProfile(opid, said);
+    }
+    return true;
+  }
+
+  /*
     Who holds this building, or null.
 
     THE LAPSE IS ANSWERED HERE rather than by a timer, which is the same choice
@@ -35924,7 +36165,20 @@ log('gamemode loaded:',
     var building = (since < DOOR_MEMORY_MS && v.door) ? buildingOf(String(v.door)) : null;
     doorLineStamp = Math.max(doorLineStamp + 1, Date.now());
     var line = { at: doorLineStamp, x: '', n: '', d: [], left: 0 };
-    if (building) {
+    /*
+      A CELL DOOR, FOR A GUARD OF ITS HOLD (#502): the key locks or unlocks
+      that one cell, and only it is under the line. Anybody else at a cell
+      door is at a door of the jail building, as before.
+    */
+    var cellDoor = (since < DOOR_MEMORY_MS && v.door) ? String(v.door) : '';
+    var cellHold = cellDoor ? jailHoldOf(cellDoor) : null;
+    if (cellHold && isGuard(profileId, cellHold)) {
+      line.x = cellLocked(cellDoor) ? 'unlock' : 'lock';
+      line.n = 'the cell';
+      line.left = DOOR_MEMORY_MS - since;
+      var cid = idOf(cellDoor);
+      if (cid) { line.d.push((cid >>> 0).toString(16)); }
+    } else if (building) {
       var held = holderOf(building);
       // The embassy is held by its office, not by a claim, so its doors offer
       // nothing to claim (#1390); claim() refuses the line if it comes anyway.
@@ -36342,10 +36596,14 @@ log('gamemode loaded:',
       var pass = mayPass(actorId, profileId, b);
       for (var i = 0; i < doors.length; i++) {
         var id = idOf(doors[i]);
-        if (!id) { continue; }
+        // A cell door stands in the jail building and is a way out of it, so
+        // a claim on the jail would open it for everybody. It is the cell
+        // lock's, below (#502).
+        if (!id || jailHoldOf(doors[i])) { continue; }
         (pass || wayOut(doors[i]) ? open : shut).push(id);
       }
     }
+    cellLists(profileId, shut, open);
     return { shut: shut, open: open };
   }
 
@@ -39819,6 +40077,13 @@ log('gamemode loaded:',
       one that is true now, whatever this one did.
     */
     if (word === '/lock' || word === '/unlock') {
+      // At a cell door the key turns the cell's lock (#502), not the jail's.
+      var cellAt = cellOfId(parts && parts[1]);
+      if (cellAt) {
+        lockCell(actorId, profileId, toProfile, word === '/lock', cellAt);
+        doorLine(actorId, profileId);
+        return true;
+      }
       setLock(actorId, profileId, toProfile, word === '/lock');
       doorLine(actorId, profileId);
       return true;
@@ -40143,6 +40408,9 @@ log('gamemode loaded:',
     DOOR_PROPERTY: DOOR_PROPERTY,
     claims: function () { return claims; },
     isJarl: isJarl, isSteward: isSteward, officeView: officeView,
+    isGuard: isGuard, guardHoldOf: guardHoldOf, jailHoldOf: jailHoldOf, cellLocked: cellLocked,
+    mayPassCell: mayPassCell, lockCell: lockCell,
+    guards: function () { return Object.assign({}, law.guards); },
     touchedBox: touchedBox, putIn: putIn, holdOfBox: holdOfBox,
     deposit: deposit, takeGold: takeGold, LEDGER_HOLDS: LEDGER_HOLDS,
     withdraw: withdraw, mayWithdraw: mayWithdraw, heldOn: heldOn,

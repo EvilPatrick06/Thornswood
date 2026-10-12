@@ -252,7 +252,7 @@ saved fields that come from elsewhere, as their rows say.
 | `launcherSha256` | string, 64 hex | `Publish-Update.ps1:Set-Prop $doc 'launcherSha256' $nowSha` | `Updater.Download` (`Updater.cs:436-448`) | Empty: download refused. Mismatch: file deleted, update fails. |
 | `serverAddress` | string | `Publish-Update.ps1:@('ServerAddress', 'serverAddress')` from config `ServerAddress`; `Set-Server.ps1:@('serverAddress', $Address)`. Not `Set-Vps.ps1`, which moves the launcher's built-in address and leaves the feed to `Set-Server.ps1` (`Set-Vps.ps1:What it does NOT do, because Set-Server.ps1 already does it properly`) | `Shell.cs:4548` | Saved. A change stops Ship unless `-MoveServer` (`Publish-Update.ps1:-not $MoveServer -and -not $Dev`); the dev channel skips that check. Wrong: everybody connects to the wrong box. |
 | `serverPort` | string | as above, `ServerPort` | `Shell.cs:4550` | Saved. Must be a string; the launcher field is a string. |
-| `maxOnline` | number | `Publish-Update.ps1`, from `records\most-online.json` by way of `scripts\deploy\MaxOnline.ps1` (#481) | `ShellUpdate.cs:120` | Saved when above 0. Written as a number because a quoted `"25"` reads as 0. The Play page prefers the number the running server announces as `max` in its `online.json` (`Online.cs`). |
+| `maxOnline` | number | `Publish-Update.ps1`, from `records\most-online.json` by way of `scripts\deploy\MaxOnline.ps1` (#481): the channel's seats, people and staff seats together (30 on main, 5 on dev from its `dev` numbers; Patrick, 12 Oct) | `ShellUpdate.cs:120` | Saved when above 0. Written as a number because a quoted `"30"` reads as 0. It is the M of "N of M awake". The Play page prefers the number the running server announces as `max` in its `online.json` (`Online.cs`), which is the same seats. |
 | `collectionUrl` | string | `Set-Collection.ps1:$doc.collectionUrl = $Url` only; Ship carries it forward untouched | `Shell.cs:4549` | Saved. Where the Collection button sends people. |
 | `collectionRevision` | number | `Publish-Update.ps1:Set-Prop $doc 'collectionRevision' $rev`, read off the shipping machine's Vortex | `Shell.cs:4564`, then `Shell.cs:4814-4860` | Not saved. 0 or missing: the launcher says nothing about the collection being behind or ahead. Wrong: tells people to reinstall a collection that is fine. |
 | `updateRepo` | string `owner/name` | Nobody since #907: `Publish-Update.ps1` takes it out of the feed | `Feed-Rules.ps1` only (a feed that still names one keeps its GitHub pack urls legal until its next Ship) | Launchers from #907 on ignore it. Older ones save it and ask that repository, via the GitHub Contents API, when the site does not answer; once it is deleted that answers 404 and they ask the site again. |
@@ -542,7 +542,11 @@ open for its few hundred bytes.
   and a case Ship cannot tell stops before anything is built (#2347,
   `Ship.ps1:Get-DevLauncherLine`). A number either feed already offers with a
   launcher built from other sources is refused before the build
-  (`Ship.ps1:Assert-DevVersionSelection`).
+  (`Ship.ps1:Assert-DevVersionSelection`). A main Ship asks the same of
+  main's feed before it fetches or signs the exe CI built, and the publisher
+  refuses the case itself before anything is sent, and again before the feed
+  is written, rather than warning once the launcher is out
+  (`Publish-Update.ps1:Get-LauncherNumberRefusal`).
 - **After a main Ship**, the Dev feed, baseline, release identity and history
   stay unchanged. Dev advances through its own Ship and keeps its own server
   and voice addresses. Publish the same source to both channels when both

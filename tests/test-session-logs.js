@@ -70,7 +70,7 @@ function sessionRows() { return ROWS; }
 
 eval([
   grab('slogFile'), grab('slogTrim'), grab('putSessionLogs'),
-  grab('pruneSessionLogs'), grab('serverLogSlice')
+  grab('retentionSay'), grab('pruneSessionLogs'), grab('serverLogSlice')
 ].join('\n'));
 
 let pass = 0, fail = 0;
@@ -133,13 +133,39 @@ age('keep1111keep1111', SLOG_DAYS + 5);
    have deleted both; under this one only age decides, and a row marked kept
    is held whatever its age. */
 ROWS = [{ session: 'keep1111keep1111', who: '333', keep: true }];
-pruneSessionLogs();
+/* A set past its time that cannot be deleted (#2354). A folder with a set's
+   name is a real failure on every system: it cannot be read as a set, so its
+   own time ages it, and unlink refuses a folder. It used to be caught and
+   dropped with nothing said. */
+const STUCK = path.join(SLOGS, 'stuck111stuck111.json');
+fs.mkdirSync(path.join(STUCK, 'inside'), { recursive: true });
+const longAgo = new Date(Date.now() - (SLOG_DAYS + 9) * 86400000);
+fs.utimesSync(STUCK, longAgo, longAgo);
+const errLines = [];
+const realError = console.error;
+console.error = (line) => { errLines.push(String(line)); };
+let pruned;
+try { pruned = pruneSessionLogs(); } finally { console.error = realError; }
 yes('an old set with nothing holding it is pruned',
     !fs.existsSync(slogFile('old11111old11111')));
 yes('an old set on a row marked kept survives, because it is evidence',
     fs.existsSync(slogFile('keep1111keep1111')));
 yes('a recent set survives even though it is not in the rolling list',
     fs.existsSync(slogFile(K)));
+const stuckLine = errLines.filter((l) => l.indexOf('session-log-retention') >= 0);
+let stuckDoc = null;
+try { stuckDoc = JSON.parse(stuckLine[0].slice(stuckLine[0].indexOf('{'))); } catch (e) { }
+yes('a set past its time that will not delete is said in one log line (' + (stuckLine[0] || 'nothing said') + ')',
+    stuckLine.length === 1 && !!stuckDoc && stuckDoc.event === 'delete-failed' &&
+    stuckDoc.file === 'stuck111stuck111.json' && typeof stuckDoc.code === 'string' && stuckDoc.code.length > 0 &&
+    stuckDoc.daysPastRetention >= 8);
+yes('the line names the file and the error, never what it holds',
+    !!stuckDoc && Object.keys(stuckDoc).sort().join(',') === 'code,daysPastRetention,event,file');
+yes('and the prune answers how many went and which would not, rather than nothing',
+    !!pruned && pruned.deleted === 1 && pruned.failed.length === 1 && pruned.failed[0].file === 'stuck111stuck111.json');
+fs.rmSync(STUCK, { recursive: true, force: true });
+yes('pruning cannot throw into the session end that calls it, so the call is no longer wrapped',
+    /\n    if \(ending\) pruneSessionLogs\(\);\r?\n/.test(src) && !/catch \(e\) \{ \}\s*\}\s*$/.test(grab('pruneSessionLogs')));
 
 // ---- the server log slice --------------------------------------------------
 fs.writeFileSync(SERVER_LOGS.main,
