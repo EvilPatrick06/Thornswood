@@ -73,7 +73,7 @@ function Reset-World {
   $script:online = $true
   $script:site = 200
   $script:feed = 200
-  $script:feedBody = '{"launcherVersion":"1.1.102","launcherUrl":"https://thornswood.net/feed/assets/abc","packs":[{"id":"1"}]}'
+  $script:feedBody = '{"launcherVersion":"1.2.4","launcherUrl":"https://thornswood.net/feed/assets/abc","packs":[],"baseline":{"id":"20261012-115531"}}'
   $script:launcher = 206
   $script:certEnd = $script:clock.ToUniversalTime().AddDays(60)
   $script:certProblems = 'None'
@@ -270,6 +270,12 @@ try {
   $feedDef = @($S.Feeds)[0]
   $script:feedBody = '<html>not a feed</html>'
   Yes 'a feed that is not a feed is wrong' ((Check-Feed $S $feedDef).Bad -and (Check-Feed $S $feedDef).Why -match 'not with a feed')
+  Reset-World
+  Yes 'a feed with no packs but a release record is right (#1050: feeds carry no packs)' (-not (Check-Feed $S $feedDef).Bad -and (Check-Feed $S $feedDef).Line -match 'release 20261012-115531')
+  $script:feedBody = '{"launcherVersion":"1.2.4","launcherUrl":"https://thornswood.net/feed/assets/abc","packs":[]}'
+  Yes 'a feed with no release record is wrong' ((Check-Feed $S $feedDef).Bad -and (Check-Feed $S $feedDef).Why -match 'no release record')
+  $script:feedBody = '{"launcherVersion":"1.2.4","packs":[],"baseline":{"id":"20261012-115531"}}'
+  Yes 'a feed with no launcherUrl is wrong' ((Check-Feed $S $feedDef).Bad -and (Check-Feed $S $feedDef).Why -match 'no launcherUrl')
   Reset-World; $script:feed = 502
   Yes 'a feed answering 502 is wrong' ((Check-Feed $S $feedDef).Why -match 'HTTP 502')
   Reset-World; $script:launcher = 404
