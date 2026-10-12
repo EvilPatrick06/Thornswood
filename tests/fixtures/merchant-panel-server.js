@@ -21,6 +21,14 @@ http.createServer((req,res)=>{
     Object.assign(data.quests[0],{state:'open',drawn:6,canTake:false,canReturn:true,canAbandon:true});
     Object.assign(data.quests[1],{state:'open',drawn:1,gem:'Ruby',canTake:false,canReturn:false,canAbandon:true});
   }
+  if(new URL(req.url,'http://localhost').searchParams.get('scenario')==='kills') {
+    data.quests=[
+      {id:'wolf',name:'A wolf',kind:'kill',count:1,kills:0,gold:25,hours:3,state:'available',locations:'White River Watch',canTake:true},
+      {id:'camp',name:'The camp',kind:'kill',count:3,kills:2,gold:45,hours:6,state:'open',locations:'Halted Stream Camp',canReturn:false,canAbandon:true},
+      {id:'giant',name:'A giant',kind:'kill',count:1,kills:1,gold:100,hours:18,state:'open',locations:'Bleakwind Basin',canReturn:true,canAbandon:true},
+      {id:'bear',name:'A bear',kind:'kill',count:1,kills:0,gold:50,hours:8,state:'open',locations:'Pinepeak Cavern',canReturn:false,canAbandon:true,recovery:true}
+    ];
+  }
   res.setHeader('Content-Type','text/html');
   res.end('<!doctype html><html lang="en"><meta charset="utf-8"><title>Merchant panel fixture</title>'+
     '<body style="margin:0;background:#302820"><div style="position:fixed;top:0;left:0;color:white;z-index:2147483500"><output id="commands"></output>'+

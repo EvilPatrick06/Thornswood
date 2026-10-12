@@ -73,7 +73,8 @@ profile already in is always let in. Past it a new person's socket is sent one
 chat line saying voice and chat are full, then closed with 1013, and the pages
 try again on their own backoff; `/health` gives `most`, `people` and
 `refusedFull`. Unset or 0 is no cap. Install-Voice.ps1 sets it from `voice` in
-`records\most-online.json`, which is never fewer than the world's seats,
+`records\most-online.json` (its `dev` object's for `C:\Thornswood-Voice-Dev`),
+which is never fewer than that server's seats,
 because everybody seated and everybody waiting in line at the menu holds a
 socket here. `test-most.js` covers it. `load-voice.js` is not a harness: it
 plays an evening at a copy of the service with no people (two sockets each, a

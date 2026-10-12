@@ -94,6 +94,17 @@ if (N && NEEDS && NEEDS.drug) {
   yes('a second dose refreshes the clock: still held 16 minutes in', Math.abs(store[B].rest - restB) < 1e-9 && store[B].drugCrash === 2);
   clock.now += 3 * 60000; N.settle(B);
   yes('and adds the crash again: 60 rest when it ends', Math.abs(store[B].rest - (restB - 60 - rate * 1 / 60)) < 0.01);
+
+  // A drug is a meal on the food page's 8 seconds (#1382): one swallowed
+  // inside them does nothing, so it starts no window and owes no crash.
+  const C = person();
+  N.consumed(C, idOf('65c98:Skyrim.esm'));   // Bread
+  clock.now += 3000;
+  N.consumed(C, idOf('57a7a:Skyrim.esm'));   // Skooma inside the 8 seconds
+  yes('a drug inside the 8 seconds of a meal does nothing', !store[C].drugUntil && !store[C].drugCrash);
+  clock.now += 6000;
+  N.consumed(C, idOf('57a7a:Skyrim.esm'));   // after them
+  yes('after the 8 seconds it takes', store[C].drugCrash === 1 && store[C].drugUntil > clock.now);
 }
 
 console.log(pass + ' passed, ' + fail + ' failed');

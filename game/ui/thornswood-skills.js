@@ -250,7 +250,7 @@
             { key: 'vitality', name: 'Vitality', desc: 'Most health', perk: 'Cheat Death: once a day, the blow that would kill you leaves you at 1 health. Not in the game yet.' },
             { key: 'fortitude', name: 'Fortitude', desc: 'Regeneration', perk: 'Troll’s Blood: during a fight, health returns at 2 a second.' },
             { key: 'might', name: 'Might', desc: 'Melee damage', perk: 'Devastating Blow: a power attack deals 25% more.' },
-            { key: 'resilience', name: 'Resilience', desc: 'Armour', perk: 'Unshakeable: a block cannot stagger you. Not in the game yet.' },
+            { key: 'resilience', name: 'Resilience', desc: 'Armour', perk: 'Unshakeable: nothing staggers you while you block.' },
             { key: 'toughness', name: 'Toughness', desc: 'Poison and disease', perk: 'Purified Blood: disease does not take, and poison deals 25%.' }] },
         { key: 'magicka', name: 'Magicka', subs: [
             { key: 'capacity', name: 'Capacity', desc: 'Most magicka', perk: 'Archmage’s Vessel: drop below a tenth of magicka and it returns to half, once a day.' },
@@ -259,9 +259,9 @@
             { key: 'ward', name: 'Ward', desc: 'Magic resistance', perk: 'Spellbreaker: 20% of the magicka in a spell that hits you is added to yours.' },
             { key: 'efficiency', name: 'Efficiency', desc: 'Cost, in the schools you hold', perk: 'Font of Magic: once a day, 15 seconds where a spell costs nothing. Use starts it.' }] },
         { key: 'stamina', name: 'Stamina', subs: [
-            { key: 'endurance', name: 'Endurance', desc: 'Most stamina', perk: 'Tireless: running and swinging cost half stamina. Not in the game yet.' },
+            { key: 'endurance', name: 'Endurance', desc: 'Most stamina', perk: 'Tireless: running and swinging cost half stamina.' },
             { key: 'vigor', name: 'Vigor', desc: 'Regeneration', perk: 'Second Wind: when stamina hits 0 it fills, once every 5 minutes.' },
-            { key: 'agility', name: 'Agility', desc: 'Speed', perk: 'Windwalker: +4 speed. A fall still hurts for now.' },
+            { key: 'agility', name: 'Agility', desc: 'Speed', perk: 'Windwalker: +4 speed, and a fall deals no damage.' },
             { key: 'burden', name: 'Burden', desc: 'Carry weight', perk: 'Pack Mule: being overloaded does not slow you. Not in the game yet.' },
             { key: 'precision', name: 'Precision', desc: 'Critical chance, which the game ignores', perk: 'Lethal Aim: an arrow ignores half the armour it hits.' }] }
       ]

@@ -99,6 +99,32 @@ if (ok) {
   yes('a jug of milk is a drink, 20 thirst', e.drink === 20 && e.food === 0);
   e = eat('2844d3:Triumvirate - Mage Archetypes.esp'); // Goodberry
   yes('Goodberry is a potion: a mouthful, not a meal', e.food === 0 && e.drink === 5);
+
+  // One meal, all of it (#1382): a meal refused inside the 8 seconds gives
+  // nothing, so neither a soup's thirst nor raw meat's risk, and a meal on a
+  // full stomach is the full stomach's sickness and nothing else.
+  {
+    const id = who++;
+    const n = N.fresh(); n.at = Date.now(); n.food = 30; n.drink = 30; r.store[id] = n;
+    N.consumed(id, idOf('722bd:Skyrim.esm'));   // Venison Chop, 25
+    r.fouled.length = 0;
+    const before = { food: r.store[id].food, drink: r.store[id].drink };
+    N.consumed(id, idOf('f431d:Skyrim.esm'));   // Venison Stew inside the 8 seconds
+    yes('a stew inside the 8 seconds adds no hunger and no thirst',
+      Math.round(r.store[id].food) === Math.round(before.food) && Math.round(r.store[id].drink) === Math.round(before.drink));
+    N.consumed(id, idOf('669a2:Skyrim.esm'));   // raw Venison inside the 8 seconds
+    yes('raw meat inside the 8 seconds does not ask the disease block', r.fouled.length === 0);
+  }
+  {
+    const id = who++;
+    const n = N.fresh(); n.at = Date.now(); n.food = 95; n.drink = 30; r.store[id] = n;
+    r.fouled.length = 0;
+    N.consumed(id, idOf('f431d:Skyrim.esm'));   // Venison Stew on a full stomach
+    yes('a stew on a full stomach adds no hunger and no thirst',
+      Math.round(r.store[id].food) === 95 && Math.round(r.store[id].drink) === 30);
+    yes('and starts the full stomach sickness, not a second roll',
+      r.fouled.length === 1 && r.fouled[0][0] === 'food' && r.fouled[0][1] === 'full');
+  }
 }
 
 console.log(pass + ' passed, ' + fail + ' failed');
