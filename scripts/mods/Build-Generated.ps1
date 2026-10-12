@@ -296,17 +296,58 @@ function Assert-NoWriteThrough($changed, [string]$who) {
 
 # ------------------------------------------------------------ in use
 # Anything run from the install: its Skyrim, script extender, launcher, or
-# the tools themselves. A game or launcher whose path cannot be read counts as
-# in use, because which folder it has open cannot be told.
+# the tools themselves.
+#
+# A game or launcher whose path cannot be read is another account's process.
+# Until 11 Oct every one of those counted as in use, because which folder it
+# had open could not be told. On the VPS four build runners are four accounts,
+# and the harness starts a stand-in SkyrimSE.exe, so one runner's stand-in
+# stopped another runner's build of a folder it never touched (#2233). Which
+# folder it has open can be told, from the folder's side: a running program's
+# file cannot be opened for writing (Windows answers with a sharing
+# violation), whoever runs it. So such a process counts only when one of this
+# install's own programs is running.
+function Test-ImageRunning([string]$path) {
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $false }
+    try {
+        $fs = [IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::ReadWrite)
+        $fs.Dispose()
+        return $false
+    } catch {
+        $e = $_.Exception
+        while ($e -and $e -isnot [IO.IOException] -and $e.InnerException) { $e = $e.InnerException }
+        # ERROR_SHARING_VIOLATION (32): the image is mapped by a running process.
+        return ($e -is [IO.IOException] -and ($e.HResult -band 0xFFFF) -eq 32)
+    }
+}
+function Get-RunningInstallImages([string]$root) {
+    $running = @()
+    foreach ($dir in @((Join-Path $root 'Game'), (Join-Path $root 'Launcher'))) {
+        if (-not (Test-Path -LiteralPath $dir -PathType Container)) { continue }
+        foreach ($f in @(Get-ChildItem -LiteralPath $dir -Filter '*.exe' -File -ErrorAction SilentlyContinue)) {
+            if (Test-ImageRunning $f.FullName) { $running += $f.FullName }
+        }
+    }
+    return , $running
+}
 function Get-FolderUsers([string]$root) {
     $prefix = $root.TrimEnd('\') + '\'
     $users = @()
+    $unreadable = @()
     foreach ($p in @(Get-CimInstance Win32_Process -ErrorAction Stop)) {
         $exe = [string]$p.ExecutablePath
         if ($exe) {
             if ($exe.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) { $users += ($p.Name + ' (' + $p.ProcessId + ', ' + $exe + ')') }
         } elseif ($p.Name -match '^(SkyrimSE|skse64_loader|Thornswood|Thornswood Dev)\.exe$') {
-            $users += ($p.Name + ' (' + $p.ProcessId + ', whose folder Windows does not say)')
+            $unreadable += $p
+        }
+    }
+    if ($unreadable.Count) {
+        $images = Get-RunningInstallImages $root
+        if ($images.Count) {
+            foreach ($p in $unreadable) {
+                $users += ($p.Name + ' (' + $p.ProcessId + ', another account''s, while ' + (($images | ForEach-Object { Split-Path -Leaf $_ }) -join ', ') + ' from this folder is running)')
+            }
         }
     }
     return , $users
