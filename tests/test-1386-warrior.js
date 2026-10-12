@@ -374,6 +374,15 @@ RECORDS[ZERO_RACE] = { type: 'RACE', fields: [{ type: 'DATA', data: raceData(0) 
 RECORDS[ZERO_BASE] = { type: 'NPC_', fields: [{ type: 'ACBS', data: acbs(0) }] };
 const effectsMaps = new Map();
 const mpFake = {
+  getActorRuntimeIdentity: function(id) {
+    const a=world.actors.get(id);
+    if (!a) throw new Error('no actor');
+    return String(1+(a.runtime || 0));
+  },
+  getNpcAIState: function(id) {
+    const a=world.actors.get(id);
+    return a ? {isHuman:a.pid>0,profileId:a.pid,lifeGeneration:a.life || 0,runtimeLifeIdentity:String(1+(a.body || 0))} : null;
+  },
   get: function (id, prop) {
     if (id === 0 && prop === 'onlinePlayers') {
       return Array.from(world.actors.keys()).filter(function (k) { return world.actors.get(k).pid > 0; });
@@ -419,6 +428,7 @@ const mpFake = {
 const states = new Map();
 const party = { leader: 1, members: [] };
 const box = {
+  MERCHANT_TRADING: require('../game/merchant-trading'),
   console: { log: function () {} },
   Buffer: Buffer,
   mp: mpFake,
@@ -687,7 +697,9 @@ if (!mpFake.getNpcAIState) {
 }
 function replaced(id, how) {
   const a = world.actors.get(id);
-  if (how === 'life') { a.life = (a.life || 0) + 1; } else { a.desc = 'other' + id.toString(16) + ':run'; }
+  if (how === 'life') { a.life = (a.life || 0) + 1; }
+  else if (how === 'body') { a.body = (a.body || 0) + 1; }
+  else { a.desc = 'other' + id.toString(16) + ':run'; }
   // Its health is what the engine left at the ID, as in the issue: the
   // queued effect is all that could still move it.
 }
@@ -695,7 +707,7 @@ function restored(id) { const a = world.actors.get(id); delete a.desc; }
 {
   const PERSON = actor(0xff000062, { pos: [9000, 100, 0] });
   for (const [name, target] of [['person', PERSON], ['creature', WOLF]]) {
-    for (const how of ['life', 'desc']) {
+    for (const how of ['life', 'desc', 'body']) {
       later(200000);
       const by = actor(0xff000063, { pos: [9000, 0, 0] });
       states.set(by, warrior('berserker', 'master'));
@@ -719,12 +731,14 @@ function restored(id) { const a = world.actors.get(id); delete a.desc; }
     strike(by, target, 0.2, { power: true });
     settle();
     yes('T2 on the same ' + name + ' it still lands: 0.2 becomes 0.3', health(target) === 0.7);
-    later(200000);
-    world.actors.get(by).p.stamina = 1; M.use(by, 'wreck'); heal(target); world.actors.get(target).p.health = 0.22;
-    strike(by, target, 0.2, { power: true });
-    settle();
-    replaced(target, 'life');
-    yes('T3 the fallback killer of a ' + name + ' is not named for a replacement life', M.killerOf(target) === 0);
+    for (const how of ['life','body']) {
+      later(200000);
+      world.actors.get(by).p.stamina = 1; M.use(by, 'wreck'); heal(target); world.actors.get(target).p.health = 0.22;
+      strike(by, target, 0.2, { power: true });
+      settle();
+      replaced(target, how);
+      yes('T3 the fallback killer of a ' + name + ' is not named for a replacement '+how, M.killerOf(target) === 0);
+    }
     later(200000);
     world.actors.get(by).p.stamina = 1; M.use(by, 'wreck'); heal(target); world.actors.get(target).p.health = 0.22;
     strike(by, target, 0.2, { power: true });
@@ -733,7 +747,7 @@ function restored(id) { const a = world.actors.get(id); delete a.desc; }
     heal(target);
   }
   // A Wall's reduction is the defender's, and stays with the defender's life.
-  for (const how of ['life', 'desc']) {
+  for (const how of ['life', 'desc', 'body']) {
     later(200000);
     const wall = actor(0xff000065, { pos: [9000, 0, 0] });
     states.set(wall, warrior('bulwark', 'master'));
@@ -1157,6 +1171,51 @@ const keysCs = fs.readFileSync(path.join(root, 'launcher', 'app', 'Keys.cs'), 'u
   yes('and clears its wait, as the page says', /Rush \(15 stamina, ready\)/.test(M2.use(RUSHER, '')));
 }
 
+for (const field of ['pid', 'life', 'runtime', 'unreadable']) {
+  later(200000);
+  const defender = actor(0xff000050);
+  const by = actor(0xff000051);
+  states.set(defender, warrior('bulwark', 'master'));
+  M.use(defender, 'wall');
+  const readIdentity = mpFake.getNpcAIState;
+  if (field === 'unreadable') {
+    mpFake.getNpcAIState = function (id) { return id === by ? null : readIdentity(id); };
+  }
+  strike(by, defender, 0.5, {});
+  if (field !== 'unreadable') { world.actors.get(by)[field] = (world.actors.get(by)[field] || 0) + 1; }
+  settle();
+  mpFake.getNpcAIState = readIdentity;
+  yes('Wall remains on the defender when attacker identity is ' + field, health(defender) === 0.6);
+}
+
+for (const field of ['pid','life','runtime']) {
+  const by=actor(0xff000040+['pid','life','runtime'].indexOf(field));
+  states.set(by,warrior('berserker','master'));
+  yes('Wreck is armed before the '+field+' damage regression',/^Wreck/.test(M.use(by,'wreck')));heal(WOLF);
+  strike(by,WOLF,0.2,{power:true});
+  world.actors.get(by)[field]=(world.actors.get(by)[field] || 0)+1;
+  settle();
+  yes('maneuver damage refuses attacker '+field+' replacement before flush',health(WOLF)===0.8);
+}
+for (const field of ['life','runtime']) {
+  const by=actor(0xff000044+['life','runtime'].indexOf(field));
+  states.set(by,warrior('berserker','master'));
+  yes('Wreck is armed before the '+field+' fallback regression',/^Wreck/.test(M.use(by,'wreck')));
+  heal(WOLF);world.actors.get(WOLF).p.health=0.22;
+  strike(by,WOLF,0.2,{power:true}); settle();
+  world.actors.get(by)[field]=1;
+  yes('maneuver fallback does not name a replacement character after '+field,M.killerOf(WOLF)===0);
+}
+{
+  const by=actor(0xff000033);
+  states.set(by,warrior('berserker','master'));
+  yes('Heavy is armed before the runtime rearm regression',/^Heavy/.test(M.use(by,'heavy')));heal(WOLF);
+  strike(by,WOLF,0,{power:true});
+  world.actors.get(by).runtime=1;
+  settle();
+  strike(by,WOLF,0.2,{power:true});settle();
+  yes('a discarded old-session hit cannot rearm Heavy for the new session',health(WOLF)===0.8);
+}
 // ----------------------------------------- Plant on the person's own machine --
 /*
   #1386. "You are not staggered for 8 seconds." The server refuses the
