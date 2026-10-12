@@ -683,6 +683,49 @@ settle();
 yes('a Wreck half again that takes health to nothing kills', world.actors.get(WOLF).dead === true && health(WOLF) === 0);
 yes('and mp.onDeath is told whose blow it was', M.killerOf(WOLF) === BER && M.killerOf(WOLF) === 0);
 
+// Unshakeable (#1385): nothing staggers its holder while they block, the
+// server's own Break and Wreck included. The block is the IsBlocking their
+// own game sends with every movement, asked of the engine.
+{
+  const fired = [];
+  const asked = [];
+  box.__thornswoodPerks = {
+    holds: function (id, key) { return key === 'unshakeable' && id === STRANGER; },
+    fired: function (id, key, more) { fired.push(key + ' ' + id.toString(16) + ' ' + more); }
+  };
+  const was = mpFake.callPapyrusFunction;
+  mpFake.callPapyrusFunction = function (type, cls, fn, self, args) {
+    if (fn === 'GetAnimationVariableBool') {
+      asked.push(cls + '.' + fn + ' ' + args[0]);
+      return !!world.actors.get(parseInt(self.desc, 16)).blocking;
+    }
+    return was.apply(this, arguments);
+  };
+  const breakOn = function (target) {
+    later(200000);
+    world.actors.get(BER).p.stamina = 1;
+    M.use(BER, 'break');
+    const before = world.staggers.length;
+    strike(BER, target, 0.1, {});
+    settle();
+    heal(target);
+    return world.staggers.length - before;
+  };
+  world.actors.get(STRANGER).blocking = true;
+  yes('a Break on somebody who holds Unshakeable and is blocking sends no stagger', breakOn(STRANGER) === 0);
+  yes('the engine was asked for IsBlocking, and the perks block logs it fired',
+    asked.indexOf('ObjectReference.GetAnimationVariableBool IsBlocking') !== -1 &&
+    fired.length === 1 && /^unshakeable ff000004 \(a Break or Wreck, while blocking\)$/.test(fired[0]));
+  world.actors.get(STRANGER).blocking = false;
+  yes('with the block down the Break staggers them', breakOn(STRANGER) === 1 && fired.length === 1);
+  world.actors.get(FRIEND).blocking = true;
+  yes('somebody blocking who does not hold Unshakeable is staggered', breakOn(FRIEND) === 1);
+  delete box.__thornswoodPerks;
+  mpFake.callPapyrusFunction = was;
+  world.actors.get(STRANGER).blocking = false;
+  world.actors.get(FRIEND).blocking = false;
+}
+
 // ------------------------------------------- a replaced target (#2069) --
 // A queued Wreck, a Wall's reduction and a stagger belong to the body they
 // were queued on. A new life or another descriptor at the same ID before the
