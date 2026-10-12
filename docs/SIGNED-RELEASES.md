@@ -1,14 +1,16 @@
 # Signed releases and artifact provenance (issue #2163)
 
-Status: DESIGN AND PILOT. Nothing in the live release path changes with this
-document. release.yml, Ship, Publish-Installer, the feed and every checksum
-check stay exactly as they are. Patrick's answers are at the end, under
-"Decisions".
+Status: DESIGN AND PILOT, with the release.yml move under way (#2163, #498).
+release.yml builds on GitHub's hosted Windows runner with MSBuild and signs
+the launcher there; Ship, Publish-Installer, the feed and every checksum
+check stay as they are. Patrick's answers are at the end, under
+"Decisions", and none is pending.
 
-This does not claim reproducible builds. release.yml itself says
-byte-identical local and runner builds are impossible with the Framework 4
-csc (it stamps a build time and a fresh MVID), and nobody has measured
-otherwise. Provenance here means "this signed file came from this commit,
+This does not claim reproducible builds. Byte-identical local and runner
+builds are impossible with the Framework 4 csc (it stamps a build time and a
+fresh MVID). MSBuild with `-p:Deterministic=true` gave two byte-identical
+rebuilds on One (#498), but release.yml does not set it and nobody has
+measured runner against local. Provenance here means "this signed file came from this commit,
 this runner and these records", recorded and signed, not "anyone can rebuild
 the same bytes".
 
@@ -30,11 +32,12 @@ What is NOT covered today, which is what this issue is about:
   sha256 the feed names, and the feed is protected only by https and by who
   can write `C:\Thornswood-Docs\feed` over ssh. Whoever can write the feed
   can change both a pack and its hash.
-- release.yml does not sign yet. The runner's exe is signed later on One, so
-  the draft release on GitHub holds unsigned bytes and a `SHA256SUMS` for
-  them, and the published file has a different hash from the draft's.
-  Decided (section 8): signing moves into release.yml on GitHub's runner,
-  through a federated Azure identity, which ends this gap.
+- Until the release.yml move (#2163) lands and Patrick's Azure side is set
+  up, the runner's exe is signed later on One, so the draft release holds
+  unsigned bytes and a `SHA256SUMS` for them, and the published file has a
+  different hash from the draft's. Decided (section 8): release.yml signs on
+  GitHub's runner through a federated Azure identity, which ends this gap.
+  A draft from the VPS fallback job is still unsigned and says so in its notes.
 - Nothing ties source commit, engine pin, runner, records and artifact hashes
   together in one signed statement.
 
@@ -55,8 +58,8 @@ second key exists to lose, leak or rotate. A catalog is signed exactly like
 an exe and checked by the same `Signature.cs`, and it carries a list of
 hashes. A plain JSON manifest signed as a detached PKCS#7 by the same profile
 is the fallback if catalogs prove awkward to build on the runner. A separate
-key (minisign, Sigstore keyless) is listed as an alternative under
-"Decisions", not proposed (still pending).
+key (minisign, Sigstore keyless) was the alternative; Patrick kept the
+catalog (section 8, decision 1).
 
 The manifest also carries the provenance: source commit, engine/skymp pin,
 tag, release id, runner name, the hashes of `client-build.json` and
@@ -148,7 +151,8 @@ the sha256 and keeps the sha256 check.
 - Draft promotion. Today the draft's `SHA256SUMS` describes the UNSIGNED
   runner exe, and signing on One changes the bytes. With signing in
   release.yml (section 8) the runner builds and signs in one job, the draft
-  carries the signed exe and stub with a `SHA256SUMS` of the signed files,
+  carries the signed exe (the stub stays unsigned until Package signs the
+  finished Setup, section 8) with a `SHA256SUMS` of the signed files,
   and the manifest is signed in the same job, so the draft's hashes and the
   published hashes are the same and "this runner built and signed Y from
   this commit" is one signed statement. Promoting a draft is a person's act
@@ -183,23 +187,36 @@ Not yet done: signing and verifying away from One. With section 8 decision 2
 that proof is a signed draft from release.yml, not a second hand-run
 machine; the vault note (`claude-queue\2163-signed-releases.md`) says so.
 
-## 8. Decisions (Patrick, 11 Oct 2026)
+## 8. Decisions (Patrick)
 
-1. Key custody for non-PE artifacts: undecided. The catalog signed by
-   ThornswoodRelease (section 2) is the default design, marked PENDING until
-   Patrick confirms it.
-2. Where release signing happens: on GitHub's runner, in release.yml, through
-   Azure Artifact Signing with a federated (OIDC) identity limited to
-   release.yml on `v*` tags. Patrick's final call, relayed by Smeagle; it
-   replaces the earlier "VPS build machine" answer. The draft carries the
-   signed exe and stub and a `SHA256SUMS` of the signed files; the manifest
-   is signed in the same job; Ship stops signing the launcher on One. Pull
-   request jobs never get the identity. The Azure side is Patrick's; the
-   workflow and script change belongs to whoever owns that move, not this
-   document.
-3. Second durable identity: not for now. The recovery risk in section 3
-   stays accepted.
+Answered 11 Oct 2026 and settled 12 Oct 2026, 11:11 AM MT (Patrick's
+decisions relayed by Smeagle; recorded on #2163). None is pending.
+
+1. Key custody for non-PE artifacts: the default design, a Windows catalog
+   signed by ThornswoodRelease (section 2). Decided 12 Oct; no separate key.
+2. Where release signing happens: on GitHub's hosted Windows runner, in
+   release.yml, through Azure Artifact Signing with a federated (OIDC)
+   identity limited to release.yml on `v*` tags (the `release` environment).
+   It replaces the earlier "VPS build machine" answer. The same change moves
+   release.yml to the hosted runner and makes #498's MSBuild switch for the
+   release build, one switchover, not two. The VPS stays the backup for every
+   GitHub runner build: release.yml's fallback job runs there the way
+   build.yml's does (BUILD_RUNNER = vps, a manual run asking for the box, or
+   the hosted job failing), with the in-box csc and unsigned until the VPS
+   has MSBuild and a signing path (#498), and Ship signs that draft on
+   download as before (#921). The draft from the hosted job carries the
+   signed launcher and a `SHA256SUMS` of the signed files. setup-stub.exe
+   stays unsigned on purpose: Package signs the finished Setup after the
+   OneFile attach, and a pre-signed stub cannot be signed again. Pull request
+   jobs never get the identity. The Azure side (the app registration, its
+   federated credential for the `release` environment, and the Certificate
+   Profile Signer role on ThornswoodRelease) is Patrick's to set up.
+3. Second durable identity: still not for now. The recovery risk in section
+   3 stays accepted.
 4. Signers holding Certificate Profile Signer on ThornswoodRelease: Patrick,
    Djinn and Four.
 5. Main builds are always signed. Dev builds stay unsigned to save signing
-   quota. Phase D timing and its `minLauncher` are still open.
+   quota. Phase D runs only after Claude's signing pilot verifies on a clean
+   machine (a signed draft from release.yml, checked with
+   `Test-SignPilot.ps1 -Verify` style checks away from One), and its
+   `minLauncher` is set to the first signed launcher.
