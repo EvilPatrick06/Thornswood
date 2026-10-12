@@ -45,10 +45,20 @@
    * a room does.
    */
   var MODES = {
-    whisper: { ref: 1.5, max: 7,  gain: 0.8, label: 'Whisper' },
-    local:   { ref: 4,   max: 30, gain: 1.0, label: 'Local' },
-    yell:    { ref: 9,   max: 85, gain: 1.3, label: 'Yell' }
+    whisper: { ref: 1.5, max: 7,  gain: 0.8, label: 'Whisper', colour: '#9ec7f2' },
+    local:   { ref: 4,   max: 30, gain: 1.0, label: 'Local',   colour: '#ffffff' },
+    yell:    { ref: 9,   max: 85, gain: 1.3, label: 'Yell',    colour: '#edad38' }
   };
+  /*
+    colour is what the microphone at the bottom of the screen turns while you
+    speak at that distance (#2474, Patrick, 12 Oct: "the one on your screen
+    should change colors based on the mode you are speaking in"). They are
+    the speaking mark's colours above other people's heads, MARK_COLOUR in
+    thornswood-front.js written as hex (0.62,0.78,0.95 is 9e c7 f2; 0.93,
+    0.68,0.22 is ed ad 38), and the ones docs/systems/voice.md gives:
+    whisper pale blue, ordinary white, yell amber. So the colour you see on
+    yourself is the colour everybody in range sees over you.
+  */
   var MODE_ORDER = ['whisper', 'local', 'yell'];
   var myMode = 'local';
 
@@ -321,7 +331,7 @@
       usable = !!mic && !micError;
     }
 
-    var colour = live ? '#8fbf6e'          // going out
+    var colour = live ? modeOf(myMode).colour   // going out, at this distance
                : usable ? '#cdc6b8'        // ready, nothing being sent
                : '#8d857a';                // cannot speak at all
     var word = usable ? modeOf(myMode).label.toUpperCase() : 'LISTENING ONLY';
