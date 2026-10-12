@@ -1805,9 +1805,11 @@
     }
     meter('Hunger', v.food, v.foodBand, 'Eating something from your pack fills it.');
     meter('Thirst', v.drink, v.drinkBand, 'Drinking something from your pack fills it.');
-    meter('Rest', v.rest, v.restBand, v.resting
+    meter('Rest', v.rest, v.restBand, (v.resting
       ? 'Resting now, ' + (REST_WORDS[v.resting] || v.resting) + '.'
-      : 'Not resting. Sit down or lie down and it fills.');
+      : 'Not resting. Sit down or lie down and it fills.') +
+      // What logging out here would do (#2246), the server's own words.
+      (v.away ? ' ' + String(v.away) : ''));
 
     var t = Number(v.temp) || 0, to = Number(v.tempTarget) || 0;
     var card = el('div', 'card' + (v.tempBand && v.tempBand !== 'fine' ? '' : ' mine'));

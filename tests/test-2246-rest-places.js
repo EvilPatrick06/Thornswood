@@ -4,8 +4,7 @@
 // should decide how much comes back (Djinn, #dev-test-results, 26 Sep): an
 // inn or a temple the most, out in the wild the least.
 //
-// The numbers are Patrick's to choose on #2246. What is built is everything
-// that does not depend on them:
+// The hooks came first (#2363):
 //
 //   - the beds know an inn or a temple nobody holds, read off the room's own
 //     records (CELL XLCN, the location's LocTypeInn or LocTypeTemple, never
@@ -15,11 +14,15 @@
 //     somebody on their feet: how much of the clock the time away costs, and
 //     what a night away gives back to rest, hunger and thirst.
 //
-// Until Patrick picks the numbers, they are the ones that were already there,
-// so nobody's rest changes: common is rough's 25, commonfire camp's 45, and
-// only your own bed and a bed you are allowed in fill at a logout. This
-// harness holds both halves: that the hooks are wired and move with the
-// table, and that the table is today's numbers.
+// Then Patrick's numbers, 12 Oct 2026 on #2246, the recommended table: nothing
+// drains while away in a bed indoors (your own, one you are allowed in, an inn
+// or temple bed nobody holds); anywhere else the time away costs half the
+// clock and takes no meter below 25; a night in an inn or temple bed gives
+// full rest and 15 on hunger and thirst; a night on a bedroll or a bed on the
+// road leaves rest at least 50; resting awake in an inn or temple bed is 40 an
+// hour (45 by a fire); the clock stays. This harness holds the hooks, the
+// table, and walks a new character through a first hour and a night away in
+// each place, through the real beds and the real needs block (F below).
 //
 // The needs block and the property block are run as they stand, over a
 // stand-in mp, a clock turned by hand and an online list this file controls.
@@ -277,12 +280,14 @@ function verdict(p, ref) { return inDir(function () { return beds.verdict(p.a, p
       /common: true, commonfire: true/.test(propBlock));
 }
 
-// ======================================== N. the numbers, as they are today
+// ================================== N. the numbers, Patrick's of 12 Oct 2026
 const N = needs.NEEDS;
 {
-  yes('N1 an inn or temple bed is worth what such a bed always was: common is rough\'s 25, commonfire camp\'s 45',
-      N.recover.common === N.recover.rough && N.recover.commonfire === N.recover.camp &&
-      N.recover.rough === 25 && N.recover.camp === 45);
+  yes('N1 resting awake in an inn or temple bed nobody holds is 40 an hour, 45 by a fire',
+      N.recover.common === 40 && N.recover.commonfire === 45);
+  yes('N1 above a bedroll on the road, under a bed you are allowed in and your own',
+      N.recover.rough < N.recover.common && N.recover.common < N.recover.inn && N.recover.inn < N.recover.bed &&
+      N.recover.commonfire <= N.recover.inn);
   const kinds = Object.keys(N.recover).concat(['up']);
   const rows = kinds.filter(function (k) {
     const r = N.away[k];
@@ -291,13 +296,22 @@ const N = needs.NEEDS;
   });
   yes('N2 NEEDS.away has a row for every kind of rest and for somebody on their feet (' + rows.length + ' of ' + kinds.length + ')',
       rows.length === kinds.length);
-  yes('N3 today every row costs the whole clock while away, with no floor',
-      kinds.every(function (k) { return N.away[k].drain === 1 && N.away[k].floor === 0; }));
-  const fills = kinds.filter(function (k) { return N.away[k].rest || N.away[k].food || N.away[k].drink; });
-  yes('N3 and only your own bed and a bed you are allowed in fill at a logout (' + fills.join(', ') + ')',
-      fills.join(',') === 'inn,bed' || fills.join(',') === 'bed,inn');
-  yes('N3 that fill is rest to 100 and 25 on hunger and thirst, as exhaustion.md says',
+  const INDOORS = ['bed', 'inn', 'common', 'commonfire'];
+  const ELSEWHERE = ['camp', 'rough', 'campfire', 'sit', 'up'];
+  yes('N3 nothing drains while away in a bed indoors: your own, one you are allowed in, an inn or temple bed',
+      INDOORS.every(function (k) { return N.away[k].drain === 0 && N.away[k].floor === 0; }));
+  yes('N3 anywhere else the time away costs half the clock and takes no meter below 25',
+      ELSEWHERE.every(function (k) { return N.away[k].drain === 0.5 && N.away[k].floor === 25; }));
+  yes('N3 a night in your own bed or one you are allowed in: rest to 100 and 25 on hunger and thirst, as before',
       ['bed', 'inn'].every(function (k) { return N.away[k].rest === 100 && N.away[k].food === 25 && N.away[k].drink === 25; }));
+  yes('N3 a night in an inn or temple bed nobody holds: rest to 100 and 15 on hunger and thirst',
+      ['common', 'commonfire'].every(function (k) { return N.away[k].rest === 100 && N.away[k].food === 15 && N.away[k].drink === 15; }));
+  yes('N3 a night on a bedroll or a bed on the road: rest at least 50, nothing on hunger or thirst',
+      ['camp', 'rough'].every(function (k) { return N.away[k].rest === 50 && N.away[k].food === 0 && N.away[k].drink === 0; }));
+  yes('N3 a seat or your feet: nothing',
+      ['campfire', 'sit', 'up'].every(function (k) { return N.away[k].rest === 0 && N.away[k].food === 0 && N.away[k].drink === 0; }));
+  yes('N6 the clock stays as Patrick set it on 23 Sep: 2.5 times the old shape',
+      near(N.drain.food, 2.5 * 100 / 6) && near(N.drain.drink, 2.5 * 100 / 3) && near(N.drain.rest, 2.5 * 100 / 20));
   yes('N4 a night away is still 24 real minutes', N.sleptFor === 24 * MIN);
   yes('N5 the old three numbers are gone, so nothing reads two tables',
       !('sleptIn' in N) && !('sleptRest' in N) && !('sleptAlso' in N));
@@ -325,12 +339,15 @@ function near(a, b) { return Math.abs(a - b) < 1e-9; }
 {
   const common = logout('common', 9 * HOUR);
   const rough = logout('rough', 9 * HOUR);
-  yes('L1 today a night logged out in an inn bed nobody holds is the same as one on the road',
-      near(common.n.food, rough.n.food) && near(common.n.drink, rough.n.drink) && near(common.n.rest, rough.n.rest) &&
-      common.n.food === 0 && common.n.drink === 0);
+  yes('L1 a night logged out in an inn bed nobody holds gives more back than one on the road',
+      common.n.food > rough.n.food && common.n.drink > rough.n.drink && common.n.rest > rough.n.rest);
+  yes('L1 the inn bed: nothing drained, then rest 100 and 15 on hunger and thirst (' +
+      [common.n.food, common.n.drink, common.n.rest].map(function (v) { return v.toFixed(1); }).join(', ') + ')',
+      near(common.n.food, Math.min(100, common.was.food + 15)) && near(common.n.drink, Math.min(100, common.was.drink + 15)) &&
+      common.n.rest === 100 && common.n.resting === '');
   const bed = logout('bed', 9 * HOUR);
-  yes('L1 and your own bed still fills: rest 100, 25 on what hunger and thirst were left',
-      bed.n.rest === 100 && bed.n.food === 25 && bed.n.drink === 25);
+  yes('L1 and your own bed: nothing drained, rest 100, 25 on hunger and thirst',
+      bed.n.rest === 100 && near(bed.n.food, Math.min(100, bed.was.food + 25)) && near(bed.n.drink, Math.min(100, bed.was.drink + 25)));
 
   // The hooks move with the table and nothing else: Patrick's numbers are a
   // change of numbers. A made-up row, put back afterwards.
@@ -374,6 +391,100 @@ function near(a, b) { return Math.abs(a - b) < 1e-9; }
       near(r1 - r0, (N.recover.common - N.drain.rest) * 0.5));
 }
 
+// ============ F. a new character's first hour and first night, in each place
+//
+// The walk on #2246, through the real beds: a new character arrives full,
+// eats and drinks nothing for their first hour, lies down where the beds
+// say (the kind is the beds' verdict on that bed for that person, never a
+// word typed), logs out, and comes back after an 8 hour night. Before
+// Patrick's numbers every one of these but the two beds came back at 0, 0, 0.
+const NEW = 0xff000a0a;
+function firstHour() {
+  delete needs.store[NEW];
+  refs[NEW] = { worldOrCellDesc: INN, pos: [0, 0, 0] };
+  if (online.indexOf(NEW) === -1) { online.push(NEW); }
+  needs.settle(NEW);                       // arrives fresh, in an inn
+  clock.t += HOUR;
+  return needs.settle(NEW);
+}
+function nightIn(kind, awayMs) {
+  firstHour();
+  if (kind) { needs.resting(NEW, kind); }
+  const was = needs.read(NEW);
+  online = online.filter(function (a) { return a !== NEW; });
+  needs.tick();
+  clock.t += awayMs;
+  online.push(NEW);
+  return { was: was, n: needs.settle(NEW) };
+}
+function r1(v) { return Math.round(v * 10) / 10; }
+{
+  const h = firstHour();
+  yes('F1 the first hour awake with nothing eaten is the clock alone: Hunger 58.3, Thirst 16.7, Rest 87.5 (' +
+      [h.food, h.drink, h.rest].map(r1).join(', ') + ')',
+      r1(h.food) === 58.3 && r1(h.drink) === 16.7 && r1(h.rest) === 87.5);
+
+  // The kinds, as the beds hand them out.
+  fireAt(EVE, null);
+  const innKind = verdict(EVE, INN_BED).kind, templeKind = verdict(EVE, TEMPLE_BED).kind;
+  const roadKind = verdict(EVE, ROAD_BED).kind;
+  fireAt(EVE, 120);
+  const innFireKind = verdict(EVE, INN_BED).kind, campKind = verdict(EVE, ROAD_BED).kind;
+  fireAt(EVE, null);
+  const ownKind = verdict(HULDA, HELD_BED).kind, keyKind = verdict(CAROL, HELD_BED).kind;
+  yes('F2 the beds hand out the kinds the walk uses',
+      innKind === 'common' && templeKind === 'common' && innFireKind === 'commonfire' && roadKind === 'rough' &&
+      campKind === 'camp' && ownKind === 'bed' && keyKind === 'inn');
+
+  const NIGHT = 8 * HOUR;
+  const walk = [
+    ['in your own bed', ownKind, 83.3, 41.7, 100],
+    ['in a bed you are allowed in, by its key', keyKind, 83.3, 41.7, 100],
+    ['in the arrival inn\'s bed, nobody holding it', innKind, 73.3, 31.7, 100],
+    ['in a temple bed nobody holds', templeKind, 73.3, 31.7, 100],
+    ['in the inn bed by its fire', innFireKind, 73.3, 31.7, 100],
+    // Hunger falls half the clock to the floor; thirst was already under 25
+    // and stays; rest falls to 37.5 and the night lifts it to 50.
+    ['in a bed on the road', roadKind, 25, 16.7, 50],
+    ['on a bedroll by a campfire', campKind, 25, 16.7, 50],
+    ['on a seat', 'sit', 25, 16.7, 37.5],
+    ['on a seat by a fire', 'campfire', 25, 16.7, 37.5],
+    ['on their feet', '', 25, 16.7, 37.5]
+  ];
+  walk.forEach(function (w) {
+    const t = nightIn(w[1], NIGHT);
+    const got = [t.n.food, t.n.drink, t.n.rest].map(r1);
+    yes('F3 a night away ' + w[0] + ' comes back at Hunger ' + w[2] + ', Thirst ' + w[3] + ', Rest ' + w[4] +
+        ' (' + got.join(', ') + ')',
+        got[0] === w[2] && got[1] === w[3] && got[2] === w[4]);
+  });
+
+  // Nobody comes back spent from being away: every place leaves every
+  // meter at or above where the first hour left it, or at 25.
+  const spent = walk.filter(function (w) {
+    const t = nightIn(w[1], 48 * HOUR);
+    return t.n.food < Math.min(25, t.was.food) - 1e-9 || t.n.drink < Math.min(25, t.was.drink) - 1e-9 ||
+           t.n.rest < Math.min(25, t.was.rest) - 1e-9;
+  });
+  yes('F4 two days away anywhere, no meter the first hour left above 25 comes back under it (' +
+      spent.map(function (w) { return w[0]; }).join(', ') + ')', spent.length === 0);
+
+  // Resting awake, the first hour spent lying down instead: the recover
+  // table, less the clock's rest drain.
+  const awake = [['common', 40], ['commonfire', 45], ['rough', 25], ['inn', 50], ['bed', 80]];
+  awake.forEach(function (a) {
+    delete needs.store[NEW];
+    needs.settle(NEW);
+    needs.store[NEW].rest = 20;
+    needs.resting(NEW, a[0]);
+    const r0 = needs.settle(NEW).rest;
+    clock.t += HOUR;
+    const r1v = needs.settle(NEW).rest;
+    yes('F5 an hour awake in ' + a[0] + ' gains ' + a[1] + ' less the clock\'s ' + N.drain.rest + ' (' +
+        (r1v - r0).toFixed(2) + ')', near(r1v - r0, a[1] - N.drain.rest));
+  });
+}
+
 // ================================================ W. the words for them
 {
   const skills = read('game', 'ui', 'thornswood-skills.js');
@@ -388,8 +499,34 @@ function near(a, b) { return Math.abs(a - b) < 1e-9; }
   try { said = new Function('return ' + restSaid[1])(); } catch (e) { said = null; }
   yes('W1 and /needs says them the same way', !!said && said.common === words.common && said.commonfire === words.commonfire);
   const ex = read('docs', 'systems', 'exhaustion.md');
-  yes('W2 exhaustion.md says an inn or temple bed nobody holds is its own place, on today\'s numbers, and why (#2246)',
-      /inn or a temple nobody holds/.test(ex) && /#2246/.test(ex));
+  yes('W2 exhaustion.md says an inn or temple bed nobody holds is its own place, at 40, and why (#2246)',
+      /inn or a temple nobody holds/.test(ex) && /#2246/.test(ex) && /\| An inn or temple bed nobody holds \| 40 \|/.test(ex));
+  yes('W2 and has the logout table, by place',
+      /\| Where you logged out \|/.test(ex) && /half/.test(ex) && /never under 25|below 25/.test(ex));
+  const prop = read('docs', 'systems', 'property.md');
+  yes('W2 property.md no longer says the inn or temple numbers wait on Patrick',
+      !/until Patrick sets its own on #2246/.test(prop) && /inn\s+or\s+a\s+temple/.test(prop));
+
+  // The Body page says what logging out where you are would do, in the
+  // server's words, worked out from the same NEEDS.away row.
+  yes('W3 the Body page shows the server\'s words for a logout under Rest',
+      /v\.away \? ' ' \+ String\(v\.away\)/.test(skills));
+  yes('W3 an inn or temple bed: nothing runs down, and a night gives full rest and 15 back',
+      needs.awayWords('common') === 'Log out now and nothing runs down while you are away. ' +
+      'Away 24 minutes or more and rest is full and 15 goes back on hunger and thirst when you come back.');
+  yes('W3 a bed on the road: half the pace, never below 25, and rest at least 50 after a night',
+      needs.awayWords('rough') === 'Log out now and hunger, thirst and rest fall at half the pace while you are away, ' +
+      'and the time away takes none of them below 25. Away 24 minutes or more and rest is at least 50 when you come back.');
+  yes('W3 on your feet: half the pace, never below 25, and nothing more',
+      needs.awayWords('') === 'Log out now and hunger, thirst and rest fall at half the pace while you are away, ' +
+      'and the time away takes none of them below 25.');
+  delete needs.store[NEW];
+  needs.settle(NEW);
+  needs.resting(NEW, 'common');
+  yes('W3 and the view the K panel reads carries them', needs.view(NEW).away === needs.awayWords('common'));
+  const help = read('game', 'ui', 'thornswood-help.js');
+  yes('W4 the help panel\'s Living page says where to log out (#2246)',
+      /inn or temple bed/.test(help) && /log out/i.test(help) && /half/.test(help));
 }
 
 done();

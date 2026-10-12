@@ -375,11 +375,13 @@ function up(p) { return rest(p, 'up'); }
 
 {
   const r = needs.NEEDS.recover;
-  // common and commonfire are an inn or a temple nobody holds (#2246), at the
-  // rough and camp numbers until Patrick sets theirs on #2246.
-  yes('L1 the rates are Patrick\'s ladder: seat 20, rough 25, campfire 35, camp 45, inn 50, own bed 80',
+  // common and commonfire are an inn or a temple nobody holds (#2246):
+  // Patrick, 12 Oct 2026, 40 an hour and 45 by a fire.
+  yes('L1 the rates are Patrick\'s ladder: seat 20, rough 25, campfire 35, camp 45, inn 50, own bed 80, inn or temple 40 (45 by a fire)',
       JSON.stringify(r) === JSON.stringify({ sit: 20, rough: 25, campfire: 35, camp: 45, inn: 50, bed: 80,
-                                             common: 25, commonfire: 45 }));
+                                             common: 40, commonfire: 45 }));
+  yes('L1 an inn or temple bed nobody holds sits above the road and under a bed you are allowed in',
+      r.rough < r.common && r.common < r.inn && r.commonfire <= r.inn);
   yes('L1 and each rung is above the one under it',
       r.sit < r.rough && r.rough < r.campfire && r.campfire < r.camp && r.camp < r.inn && r.inn < r.bed);
 }
