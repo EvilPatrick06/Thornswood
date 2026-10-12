@@ -2150,9 +2150,10 @@ if ($repeat) {
 # The rule is Update-DevNewsChannels in Dev-News.ps1, the one place it lives
 # since 6 Oct, because a dev publish with nothing new and a main Ship mark the
 # dev feed by it too (Set-DevFeedMarks, Update-DevFeedMarks). Main's fresh
-# release record proves which source commits have shipped; historical notes
-# use the preceding clean Dev release as their source; headline changes
-# therefore cannot leave completed work marked Dev-only.
+# release record proves which source commits have shipped; a note from before
+# sourceCommit is proved by the dev release it came with, found by its tag
+# (#2401); headline changes therefore cannot leave completed work marked
+# Dev-only.
 if ($Dev) {
     # Main's feed as the site serves it, read fresh on every dev publish, so
     # mainVersion and the news marks are what main has published, not whatever

@@ -441,6 +441,7 @@ jobs:
                  'test-content-release.ps1',
                  'test-cooldown-sweep.js', 'test-voice-moved-clients.js',
                  'test-release-parity.ps1', 'test-dev-version.ps1', 'test-ship-launcher-reuse.ps1', 'test-2347-dev-launcher-version.ps1',
+                 'test-2401-legacy-dev-marks.ps1',
                  'test-server-stage-directories.ps1',
                  'test-dev-settings-keys.ps1',
                  'test-dev-gamemode-notes.ps1',
