@@ -933,8 +933,11 @@ const PAGES = {
 */
 /*
   And the most the world holds at once (#481): the gamemode writes the
-  server's own number into the same file as max, so the page says "3 of 25"
-  and /api/play/join can say the world is full before the game starts.
+  server's own number into the same file as max, so the page says "3 of 30"
+  and /api/play/join can say the world is full before the game starts. max
+  is every seat, the staff seats too (Patrick, 12 Oct: "the real cap is 30
+  but 25 for people with non staff roles I still want it to say of 30
+  awake"); full says whether somebody without a staff role would wait.
 */
 /*
   And how many wait at the menu for a seat (line), and whether somebody
@@ -979,19 +982,23 @@ setInterval(pollGame, 10000).unref?.();
 function seatsFull(st) {
   return !!(st && st.up && (st.full === true || (st.max > 0 && st.online >= st.max)));
 }
-function worldFull(max) {
-  return 'Thornswood is full right now: ' + max + ' people are in the world, the most it holds ' +
-    'at once during the alpha. Pick your character anyway: you will wait at the menu with your ' +
+function worldFull(online) {
+  // The people in the world now, not max: max counts the staff seats, which
+  // somebody told to wait cannot take, so "30 are in the world" at 25 is wrong.
+  return 'Thornswood is full right now' + (online > 0 ? ': ' + online + ' people are in the world, the most it holds' : '') +
+    ' at once during the alpha. Pick your character anyway: you will wait at the menu with your ' +
     'place in line on screen, and join by yourself when a seat frees.';
 }
 
 /*
   The most the world holds, for the home page and /api/public, when the
   server has not said (#481). Patrick, 29 Sep: "I still want it to say N of
-  25 anyway". records\most-online.json is the one place the number lives:
-  read here when the site runs from the repository, and otherwise the main
-  feed's maxOnline, which Publish-Update.ps1 writes from that same file and
-  which the site on the VPS already serves. The server's own max still wins.
+  25 anyway"; 12 Oct, it is every seat, the staff seats too, "of 30".
+  records\most-online.json is the one place the number lives: read here
+  when the site runs from the repository (main's people and staffSeats), and
+  otherwise the main feed's maxOnline, which Publish-Update.ps1 writes from
+  that same file as the same seats and which the site on the VPS already
+  serves. The server's own max still wins.
 */
 const MOST_ONLINE_RECORD = path.join(ROOT, '..', 'records', 'most-online.json');
 let mostOnlineSeen = { file: '', mtime: -1, size: -1, v: 0 };
@@ -1006,7 +1013,9 @@ function mostOnlineFallback() {
     let v = 0;
     try {
       const doc = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^﻿/, '')) || {};
-      const n = Number(file === MOST_ONLINE_RECORD ? doc.people : doc.maxOnline);
+      const n = file === MOST_ONLINE_RECORD
+        ? Number(doc.people) + (Number(doc.staffSeats) > 0 ? Number(doc.staffSeats) : 0)
+        : Number(doc.maxOnline);
       if (n > 0 && Math.floor(n) === n) v = n;
     } catch (e) { v = 0; }
     mostOnlineSeen = { file, mtime: st.mtimeMs, size: st.size, v };
@@ -5659,7 +5668,7 @@ async function handle(req, res) {
       claimed: claimed,
       // The world is full: in, but there may be a wait at the menu (#481).
       wait: wait,
-      message: wait ? worldFull(gameStatus.max || mostOnlineFallback()) : '',
+      message: wait ? worldFull(gameStatus.online) : '',
       online: gameStatus.online,
       max: gameStatus.max || mostOnlineFallback(),
       line: gameStatus.line

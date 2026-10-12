@@ -27,7 +27,8 @@
                             every form id resolves against their order
       startPoints           a form id, whose file index is that order's
       thornswoodMostOnline  how many it holds, and the engine's seats over it
-      maxPlayers            for staff, from records\most-online.json, which
+      maxPlayers            for staff, from records\most-online.json (the
+                            channel's own numbers), which
                             Publish-Server holds to the commit and every deploy
                             writes the same (#481)
 

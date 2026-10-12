@@ -1,4 +1,10 @@
 {
+  "dev": {
+    "people": 5,
+    "staffSeats": 0,
+    "voice": 5,
+    "note": "The dev server's own numbers, and dev voice's, which the dev feed shows as of 5 awake. Patrick, 12 Oct: cap the dev server at 5, in the game and in voice. All 5 are ordinary seats with none kept over them for staff, because only the staff roles get into dev at all, so staff seats there would only raise the cap past 5. Voice holds no more than the 5 seated, so a sixth person is told voice and chat are full and tries again by itself, and cannot take a place in the line at the game's menu, which is kept over voice, until somebody leaves. The numbers outside this object are main's."
+  },
   "people": 25,
   "staffSeats": 5,
   "voice": 30,
