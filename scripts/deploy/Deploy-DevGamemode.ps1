@@ -18,9 +18,16 @@
                                    restart, tail the log
 
     .\Deploy-DevGamemode.ps1 -LoadOrder
-                                   the same, and first bring the dev server's
-                                   load order and plugins up to what the built
-                                   server has
+                                   the same, and first send every plugin the
+                                   dev server's own load order names that it
+                                   does not hold at these bytes: our content
+                                   plugin from this checkout, the rest from
+                                   the collection (see WHERE THE ORDER COMES
+                                   FROM below)
+
+    .\Deploy-DevGamemode.ps1 -LoadOrder -Dist <built server folder>
+                                   the same, with the load order a server
+                                   build names, written over the dev one
 
     .\Deploy-DevGamemode.ps1 -LoadOrderRefuse on
                                    the same, and end a session whose plugins
@@ -130,17 +137,49 @@
   same day; the repo has been on 141,234 since. Four things for the launcher to
   find, and Play refused before the game ever started.
 
-  -LoadOrder sends the plugins the built server's load order names and rewrites
-  the dev loadOrder to match, and nothing else about the dev settings is
-  touched: the port, the name and the voice port stay the dev ones, which is
-  the whole reason Deploy-Server.ps1 is refused here. The list goes up as a
-  file rather than inside the settings block, so the dev settings file is
-  edited in place the way everything else here edits it.
+  -LoadOrder sends the plugins the load order names that the box does not
+  hold at these bytes. With -Dist it rewrites the dev loadOrder to that
+  build's, and nothing else about the dev settings is touched: the port, the
+  name and the voice port stay the dev ones, which is the whole reason
+  Deploy-Server.ps1 is refused here. That list goes up as a file rather than
+  inside the settings block, so the dev settings file is edited in place the
+  way everything else here edits it. Without -Dist the order is the dev
+  server's own and is left as it is (WHERE THE ORDER COMES FROM, below).
 
   Our own plugin comes from the repo and not from a game folder, for the reason
   written out at length in Deploy-Server.ps1: there have been four copies of
   Thornswood-Content.esp on this machine at three different sizes, and the game
-  folder is not the one that is authoritative.
+  folder is not the one that is authoritative. It goes up whenever its sha256
+  is not the box's, not only its size (#2308): Ship refuses a release whose
+  content plugin the server does not hold byte for byte (ServerContent.ps1),
+  and a plugin edited to the same length would otherwise be one this run left
+  behind and Ship then refused, with no way past either.
+
+  WHERE THE ORDER COMES FROM (#2309). This script runs only from a clean
+  checkout at origin (#2118), which on the shipping machine is a fresh
+  worktree, and a fresh worktree has no engine build. Until 11 Oct -LoadOrder
+  read the order from the built server's server-settings.json under
+  Where.ps1 ServerDist inside the checkout, so it could never run from the one
+  place the guard lets it: at 10:13 PM and 10:16 PM that day it stopped with
+  "-LoadOrder needs the built server's settings", and the run that went out
+  had -Dist pointed at another folder's build by hand.
+
+  The order is the server's own. Deploy-Gamemode.ps1, which writes every
+  server build's load order, keeps the order the server already runs and only
+  puts a new plugin on the end, because the world keys every saved form on a
+  plugin's place in it; Publish-Server.ps1 -Channel dev then installs that
+  order on the dev box with the plugins it names (ServerSettings.ps1,
+  loadOrder is a release key). So the dev box's own server-settings.json is
+  the order the installed server build carries, and it is there for any
+  checkout to read. -LoadOrder reads it there, in the same call that reads
+  which content plugin the box holds, sends the plugins it names that the box
+  does not hold at these bytes, and leaves the order as it is.
+
+  A new order is made by a server build, on the machine that has one, and
+  goes out with it (Publish-Server.ps1 -Channel dev). -Dist <that build's
+  dist\server> is the way to send only its order and plugins: then the order
+  is read from that build and written over the dev one, as -LoadOrder did
+  before. Nothing names a build folder by default any more.
 #>
 [CmdletBinding()]
 param(
@@ -175,8 +214,10 @@ param(
   # keeps what it has.
   [ValidateSet('', 'on', 'off')]
   [string]$Npcs = '',
-  # Where Deploy-Gamemode.ps1 leaves the built server. Its server-settings.json
-  # is the one authority on what the load order is and in what order.
+  # A built server (Deploy-Gamemode.ps1's dist\server) whose load order
+  # -LoadOrder writes over the dev one. Left out, -LoadOrder keeps the order
+  # the dev server already has and reads it off the box (WHERE THE ORDER COMES
+  # FROM in the header, #2309); no build folder is assumed.
   [string]$Dist = '',
   # Where the other plugins live on this machine. Ours is taken from the repo
   # instead; see the header.
@@ -215,8 +256,6 @@ $ErrorActionPreference = 'Stop'
 $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# Resolved here, not as the parameter's default: 5.1 leaves $PSScriptRoot empty in an advanced script's defaults (#2229).
-if (-not $Dist) { $Dist = & (Join-Path $Here '..\release\Where.ps1') ServerDist }
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Script.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
@@ -365,13 +404,34 @@ $changed       = @()
 $orderFile     = ''
 
 if ($LoadOrder) {
-  $settingsSrc = Join-Path $Dist 'server-settings.json'
-  if (-not (Test-Path -LiteralPath $settingsSrc)) {
-    throw "-LoadOrder needs the built server's settings at $settingsSrc. Run Deploy-Gamemode.ps1 -Vortex first."
+  # ==== thornswood dev load order source ====
+  # The dev server's own load order and the content plugin it holds, in one
+  # read of the box (ServerContent.ps1). WHERE THE ORDER COMES FROM in the
+  # header says why the order is the box's unless -Dist names a build.
+  . (Join-Path $Here 'ServerContent.ps1')
+  $boxContent = Read-ThornswoodServerContent -Channel dev -Root $Root -Target "$User@$Vps" -SshArgs $ssh
+  if (-not $boxContent.Answered) {
+    throw ("the dev server did not say what it holds (it answered: " + ((@($boxContent.Said | Where-Object { $_ }) | Select-Object -Last 3) -join ' | ') +
+           "), so there is no telling which plugins it needs. Nothing was sent and the dev server was not touched.")
   }
-  $built = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $settingsSrc -Raw) $settingsSrc
-  if (-not $built.loadOrder) { throw "$settingsSrc has no loadOrder" }
-  $pluginNames = @($built.loadOrder | ForEach-Object { [IO.Path]::GetFileName($_) })
+  if ($Dist) {
+    $settingsSrc = Join-Path $Dist 'server-settings.json'
+    if (-not (Test-Path -LiteralPath $settingsSrc)) {
+      throw "-Dist names no built server: there is no $settingsSrc. Leave -Dist out to keep the dev server's own load order. Nothing was sent."
+    }
+    $built = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $settingsSrc -Raw) $settingsSrc
+    if (-not $built.loadOrder) { throw "$settingsSrc has no loadOrder" }
+    $pluginNames = @($built.loadOrder | ForEach-Object { [IO.Path]::GetFileName(([string]$_).Replace('/', '\')) })
+    Write-Host ('  load order from the build at {0}, written over the dev server''s' -f $Dist) -ForegroundColor DarkGray
+  } else {
+    if (-not $boxContent.OrderRead) {
+      throw ("the dev server's server-settings.json gave no load order, so there is nothing to send plugins for. " +
+             'A server publish puts one there: .\scripts\release\Publish-Server.ps1 -Channel dev. Nothing was sent.')
+    }
+    $pluginNames = @($boxContent.Order)
+    Write-Host ('  load order: the dev server''s own, {0} plugins, kept as it is' -f $pluginNames.Count) -ForegroundColor DarkGray
+  }
+  # ==== end thornswood dev load order source ====
   $ours = Join-Path $Here '..\..\game\content\Thornswood-Content.esp'
 
   # Name and size, the same question Deploy-Server.ps1 asks of the live box and
@@ -408,6 +468,17 @@ if ($LoadOrder) {
     # one outcome worse than it being stale.
     if (-not (Test-Path -LiteralPath $local)) { continue }
     $localLen = (Get-Item -LiteralPath $local).Length
+    if ($local -eq $ours) {
+      # Ours by sha256 as well as size (#2308): Ship holds a release to the
+      # server's copy byte for byte, so this has to send it on the same test.
+      $mine = Get-ThornswoodLocalContent $ours
+      if (-not (Test-ThornswoodContentSame $boxContent $mine.Bytes $mine.Sha)) {
+        $sendPlugins += $local
+        $changed += ('{0}  {1:N0} -> {2:N0} bytes, sha256 {3} -> {4}' -f $n, $boxContent.Bytes, $mine.Bytes,
+                     $(if ($boxContent.Sha) { $boxContent.Sha.Substring(0, 12) } else { 'none' }), $mine.Sha.Substring(0, 12))
+      }
+      continue
+    }
     if ($localLen -ne $thereSize[$n]) {
       $sendPlugins += $local
       $changed += ('{0}  {1:N0} -> {2:N0} bytes' -f $n, $thereSize[$n], $localLen)
@@ -431,9 +502,11 @@ if ($LoadOrder) {
     foreach ($p in $sendPlugins) { Write-Host ('    ' + (Split-Path $p -Leaf)) -ForegroundColor Yellow }
     foreach ($c in $changed) { Write-Host ('    changed: ' + $c) -ForegroundColor Yellow }
   } else {
-    Write-Host '  every plugin the load order names is on the dev server at the same size' -ForegroundColor DarkGray
+    Write-Host '  every plugin the load order names is on the dev server at the same bytes' -ForegroundColor DarkGray
   }
 
+  # Only a build's order goes up to be written over the dev one (-Dist). The
+  # dev server's own order needs no list: it stays as it is.
   # The list goes up as a file of its own. Putting 57 paths inside the settings
   # block below would add some 4,000 characters to something that is base64 of
   # UTF-16 on a command line, which is the length problem Remote() exists to
@@ -441,10 +514,12 @@ if ($LoadOrder) {
   # written from a local build, which is the rule this script is built on.
   # A name of its own each run, here and on the box, so two deploys at once
   # cannot read or remove each other's list (#1070).
-  $orderName = 'thornswood-dev-loadorder-' + [Guid]::NewGuid().ToString('N') + '.txt'
-  $orderFile = Join-Path $env:TEMP $orderName
-  [IO.File]::WriteAllText($orderFile, (($pluginNames -join "`n") + "`n"), (New-Object Text.UTF8Encoding($false)))
-  $farOrder = 'C:/Windows/Temp/' + $orderName
+  if ($Dist) {
+    $orderName = 'thornswood-dev-loadorder-' + [Guid]::NewGuid().ToString('N') + '.txt'
+    $orderFile = Join-Path $env:TEMP $orderName
+    [IO.File]::WriteAllText($orderFile, (($pluginNames -join "`n") + "`n"), (New-Object Text.UTF8Encoding($false)))
+    $farOrder = 'C:/Windows/Temp/' + $orderName
+  }
 }
 
 # ------------------------------------------------------------ the warning ---
@@ -693,7 +768,7 @@ Copy-Item -LiteralPath '$rootWin\server-settings.json' -Destination '$stageWin\s
     if ($LASTEXITCODE -ne 0) { throw "scp failed for $rel. The dev server has not been touched." }
     Write-Host "  $rel"
   }
-  if ($LoadOrder) {
+  if ($orderFile) {
     Invoke-ThornswoodNative { & scp @ssh $orderFile "$User@${Vps}:$farOrder" }
     $sentOrder = $LASTEXITCODE
     Remove-Item -LiteralPath $orderFile -Force -ErrorAction SilentlyContinue
