@@ -149,7 +149,8 @@
       if (row.job && !row.taken && !row.mine) {
         out += '<button class="go" data-do="take" data-n="' + esc(row.n) + '">Take</button>';
       }
-      if ((row.mine && !(row.job && row.taken)) || (row.haul && b.steward)) {
+      // A guard of this hold takes down any post on its board (#502).
+      if ((row.mine && !(row.job && row.taken)) || (row.haul && b.steward) || b.guard) {
         out += '<button data-do="unpin" data-n="' + esc(row.n) + '">Take down</button>';
       }
       if (row.held) {
