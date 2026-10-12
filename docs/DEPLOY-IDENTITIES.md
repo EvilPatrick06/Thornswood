@@ -4,7 +4,7 @@ Status: AUDIT AND DESIGN ONLY. Nothing on the box was changed to write this:
 no key was added, removed or rotated, no access was disabled, no account or
 task was created, and nothing was tried against production. Every fact in
 section 1 was read on the box over ssh, read-only, on 11 Oct 2026. Decisions
-only Patrick can make are in section 7.
+Patrick made are in section 7.
 
 ## 1. What access looks like now (evidence)
 
@@ -113,15 +113,22 @@ developer laptop key is a full box compromise with no narrower blast radius.
 The likelihood is low today (password login is off, keys are ed25519), the
 impact is total, and four of the five keys showed no use in the sampled log.
 
-## 7. Decisions needed (Patrick)
+## 7. Decisions (Patrick, 11 Oct 2026)
 
-1. Whose are the three keys commented `thornswood`, and should the
-   `claude-session-2026-09-16` and `zayde-thornswood` keys stay?
-2. Restrict port 22 by address (home addresses can change; the provider
-   console is the fallback), or rely on keys plus `from=` only?
-3. `cloudbase-init` is an enabled local admin. Keep it (the provider may use
-   it for password resets) or disable it after asking the provider?
-4. Go ahead with the deploy identity and gate (section 3), dev first?
+1. Keys. Who owns the three keys commented `thornswood` is unknown; they stay
+   for now. The `claude-session-2026-09-16` and `zayde-thornswood` keys are
+   to be removed. Claude removes them, and only after the provider's hosting
+   console login is confirmed working.
+2. Port 22. Yes, restrict the inbound rules on 22 to known addresses. Same
+   condition: only after the console login check.
+3. `cloudbase-init`. Undecided. Left as it is (enabled local admin); revisit
+   later.
+4. Deploy identity and gate. Undecided. The design in section 3 stays ready,
+   but `thornswood-deploy` and the gate are not created.
+
+Order on the box (Claude only, from the vault note): confirm the console
+login, save `administrators_authorized_keys`, remove the two keys, then
+narrow port 22. No lane makes any of these changes.
 
 ## Later, not in this issue
 
