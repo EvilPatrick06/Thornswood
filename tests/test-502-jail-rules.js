@@ -1,0 +1,389 @@
+'use strict';
+/*
+  test-502-jail-rules.js
+
+  #502. Patrick, 12 October: jails can be claimed by the Jarl only, and the
+  rest of the jail rules as written on the issue: no timer, release by that
+  hold's guards, lockpicking allowed, the game's jail keys open nothing,
+  /stuck does not move someone out of a locked cell, dying in a cell wakes
+  at a temple.
+
+  The real property block runs over a pretend engine with the real door,
+  building and jail tables, a Jarl of Whiterun, a Jarl of Riften, a guard of
+  Whiterun and a prisoner. The real spoils block, the real stuck block and
+  the real respawn resolver run beside it. It checks:
+    - the tables: each hold's jail building and the keys the game made for
+      the cells, and game/data/jails.json saying the same;
+    - the claim: only the Jarl of the jail's hold is offered it, may make it,
+      or takes it by presenting its deed; a house anywhere is as it was;
+    - the keys: a jail key on the floor or dropped is left where it lies, one
+      in a chest is taken out with the swords, any other key is untouched;
+    - /stuck: refused in a jail where a guard has a cell locked, for anybody
+      but that hold's guards, and nowhere else;
+    - a death in any of the ten jails wakes on consecrated ground outside it;
+    - no timer: nothing in the cells' code unlocks by itself.
+*/
+const REPO_DIR = require('path').join(__dirname, '..');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const vm = require('vm');
+const CR = String.fromCharCode(13);
+const read = function (p) { return fs.readFileSync(p, 'utf8').split(CR).join(''); };
+const gm = read(process.env.GM || path.join(REPO_DIR, 'game', 'gamemode.js'));
+let pass = 0, fail = 0;
+function yes(what, cond) {
+  if (cond) { pass++; console.log('PASS  ' + what); }
+  else { fail++; console.log('FAIL  ' + what); }
+}
+function done() {
+  console.log('');
+  console.log(pass + ' passed, ' + fail + ' failed');
+  process.exit(fail ? 1 : 0);
+}
+function slice(src, start, end) {
+  const a = src.indexOf(start);
+  if (a < 0) { return null; }
+  const b = src.indexOf(end, a + start.length);
+  return b < 0 ? null : src.slice(a, b + end.length);
+}
+function table(kind, name) {
+  const head = '\n' + kind + ' ' + name + ' = ';
+  const a = gm.indexOf(head);
+  if (a < 0) { return null; }
+  const b = gm.indexOf(';\n', a + head.length);
+  try { return JSON.parse(gm.slice(a + head.length, b)); } catch (e) { return null; }
+}
+
+const propBlock = slice(gm, '// ==== thornswood property ====', '// ==== end thornswood property ====');
+const spoilsBlock = slice(gm, '// ==== thornswood spoils ====', '// ==== end thornswood spoils ====');
+const stuckBlock = slice(gm, '// ==== thornswood stuck ====', '// ==== end thornswood stuck ====');
+yes('the property, spoils and stuck blocks are in the gamemode', !!propBlock && !!spoilsBlock && !!stuckBlock);
+if (!propBlock || !spoilsBlock || !stuckBlock) { done(); }
+
+// ------------------------------------------------------------ the tables
+const BUILDING_BY_DOOR = table('const', 'BUILDING_BY_DOOR');
+const BUILDING_NAME = table('const', 'BUILDING_NAME');
+const WAY_OUT = table('const', 'WAY_OUT');
+const JAIL_DOOR = table('  var', 'JAIL_DOOR');
+const JAIL_NAME = table('  var', 'JAIL_NAME');
+const JAIL_BUILDING = table('  var', 'JAIL_BUILDING');
+const JAIL_KEY = table('  var', 'JAIL_KEY');
+const DATA = table('const', 'DATA');
+yes('the jail building and jail key tables are in the generated block', !!JAIL_BUILDING && !!JAIL_KEY && !!DATA);
+if (!JAIL_BUILDING || !JAIL_KEY || !JAIL_DOOR || !BUILDING_BY_DOOR) { done(); }
+const HOLDS10 = ['whiterun', 'solitude', 'riften', 'markarth', 'windhelm',
+                 'falkreath', 'morthal', 'dawnstar', 'winterhold', 'ravenrock'];
+const byHold = {};
+Object.keys(JAIL_BUILDING).forEach(function (b) { byHold[JAIL_BUILDING[b]] = b; });
+yes('T1 each of the ten holds has one jail building', Object.keys(JAIL_BUILDING).length === 10 &&
+    HOLDS10.every(function (h) { return !!byHold[h]; }));
+yes('T2 each is the building its cells stand in, under the jail\'s own name', HOLDS10.every(function (h) {
+  return BUILDING_NAME[byHold[h]] === JAIL_NAME[h] && Object.keys(JAIL_DOOR).every(function (d) {
+    return JAIL_DOOR[d] !== h || BUILDING_BY_DOOR[d] === byHold[h];
+  });
+}));
+let jails = null;
+try { jails = JSON.parse(read(path.join(REPO_DIR, 'game', 'data', 'jails.json'))); } catch (e) { jails = null; }
+const keysJson = {};
+const cellsJson = {};
+if (jails && jails.jails) {
+  Object.keys(jails.jails).forEach(function (h) {
+    cellsJson[jails.jails[h].cell] = h;
+    const ds = jails.jails[h].doors || {};
+    Object.keys(ds).forEach(function (d) { if (ds[d].lock && ds[d].lock.key) { keysJson[ds[d].lock.key] = h; } });
+  });
+}
+yes('T3 game/data/jails.json names the same buildings', JSON.stringify(Object.keys(cellsJson).sort()) ===
+    JSON.stringify(Object.keys(JAIL_BUILDING).sort()) &&
+    Object.keys(cellsJson).every(function (c) { return cellsJson[c] === JAIL_BUILDING[c]; }));
+yes('T4 and every key a cell door\'s lock names is a jail key, to its hold (' + Object.keys(JAIL_KEY).length + ')',
+    Object.keys(keysJson).length > 0 && JSON.stringify(Object.keys(keysJson).sort()) === JSON.stringify(Object.keys(JAIL_KEY).sort()) &&
+    Object.keys(keysJson).every(function (k) { return keysJson[k] === JAIL_KEY[k]; }));
+yes('T5 Whiterun\'s own jail key is among them', JAIL_KEY['5aec4:Skyrim.esm'] === 'whiterun');
+
+// ============================================================== the server
+const clock = { t: Date.UTC(2026, 9, 12, 20, 0, 0) };
+class FakeDate extends Date { static now() { return clock.t; } }
+const PLUGIN_BASE = { 'skyrim.esm': 0, 'dragonborn.esm': 0x04000000, 'thornswood-content.esp': 0x05000000 };
+function idOf(desc) {
+  const m = /^([0-9a-f]+):(.+)$/i.exec(String(desc || ''));
+  if (!m || !Object.prototype.hasOwnProperty.call(PLUGIN_BASE, m[2].toLowerCase())) { return 0; }
+  return parseInt(m[1], 16) + PLUGIN_BASE[m[2].toLowerCase()];
+}
+function descOf(id) {
+  if (id >= 0x05000000 && id < 0x06000000) { return (id - 0x05000000).toString(16) + ':Thornswood-Content.esp'; }
+  if (id >= 0x04000000 && id < 0x05000000) { return (id - 0x04000000).toString(16) + ':Dragonborn.esm'; }
+  return id.toString(16) + ':Skyrim.esm';
+}
+
+const JAIL = byHold.whiterun;                       // Dragonsreach Dungeon
+const FRONT = Object.keys(BUILDING_BY_DOOR).filter(function (d) {
+  return BUILDING_BY_DOOR[d] === JAIL && !JAIL_DOOR[d];
+})[0];                                              // a door into it that is not a cell
+const CELL = Object.keys(JAIL_DOOR).filter(function (d) { return JAIL_DOOR[d] === 'whiterun'; })[0];
+const HOUSE = 'house';
+const HOUSE_DOOR = Object.keys(BUILDING_BY_DOOR).filter(function (d) {
+  return !JAIL_BUILDING[BUILDING_BY_DOOR[d]] && !JAIL_DOOR[d] && !WAY_OUT[d];
+})[0];
+yes('the test has a door into Dragonsreach Dungeon that is not a cell, a cell, and a house door',
+    !!FRONT && !!CELL && !!HOUSE_DOOR);
+
+const JARL_W = { a: 0xff000501, pid: 501, name: 'Balgruuf', hold: 'whiterun' };
+const JARL_R = { a: 0xff000502, pid: 502, name: 'Laila', hold: 'riften' };
+const GUARD_W = { a: 0xff000503, pid: 503, name: 'Hrongar' };
+const PRISONER = { a: 0xff000504, pid: 504, name: 'Lucan' };
+const PEOPLE = [JARL_W, JARL_R, GUARD_W, PRISONER];
+
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-502-rules-'));
+fs.writeFileSync(path.join(dir, 'server-settings.json'), JSON.stringify({ dataDir: 'data', privDir: 'private' }));
+fs.mkdirSync(path.join(dir, 'private'));
+fs.writeFileSync(path.join(dir, 'private', 'law.json'), JSON.stringify({ guards: { '503': 'whiterun' }, cells: {} }));
+function inDir(f) {
+  const was = process.cwd();
+  process.chdir(dir);
+  try { return f(); } finally { process.chdir(was); }
+}
+
+const refs = {};
+PEOPLE.forEach(function (p) {
+  refs[p.a] = { profileId: p.pid, appearance: { name: p.name }, worldOrCellDesc: JAIL,
+                pos: [100, 100, 0], angle: [0, 0, 0], inventory: { entries: [] } };
+});
+const online = PEOPLE.map(function (p) { return p.a; });
+const logged = [];
+const mp = {
+  makeProperty: function () { },
+  get: function (id, key) {
+    if (id === 0 && key === 'onlinePlayers') { return online.slice(); }
+    if (!refs[id]) { throw new Error('no reference ' + id); }
+    const v = refs[id][key];
+    return (v && typeof v === 'object') ? JSON.parse(JSON.stringify(v)) : v;
+  },
+  set: function (id, key, v) {
+    if (!refs[id]) { refs[id] = {}; }
+    refs[id][key] = JSON.parse(JSON.stringify(v));
+  },
+  getDescFromId: function (id) { return descOf(id); },
+  lookupEspmRecordById: function (id) {
+    const kind = kinds[id];
+    return kind ? { record: { type: kind } } : null;
+  },
+  getNeighborsByPosition: function () { return []; },
+  getServerSettings: function () { return { privDir: 'private', thornswoodServer: 'dev' }; }
+};
+const kinds = {};
+const states = {};
+states[JARL_W.a] = { office: 'jarl', officeHold: 'whiterun' };
+states[JARL_R.a] = { office: 'jarl', officeHold: 'riften' };
+const said = [];
+const box = {
+  console: { log: function () { logged.push(Array.prototype.join.call(arguments, ' ')); } },
+  require: require, mp: mp, Date: FakeDate,
+  BUILDING_BY_DOOR: Object.assign({}, BUILDING_BY_DOOR, { [HOUSE_DOOR]: HOUSE }),
+  BUILDING_NAME: Object.assign({}, BUILDING_NAME, { [HOUSE]: 'Breezehome' }), WAY_OUT: WAY_OUT,
+  BENCH_BY_BASE: {}, idOf: idOf,
+  notify: function () { }, say: function (a, m) { said.push([a, m]); },
+  guard: function (n, f) { return f; },
+  setInterval: function () { return 1; }, clearInterval: function () { },
+  setTimeout: function () { return 0; },
+  log: function () { logged.push(Array.prototype.join.call(arguments, ' ')); },
+  __thornswoodIsJarl: function (pid) { return pid === JARL_W.pid || pid === JARL_R.pid; },
+  __thornswoodCharacter: {
+    stateOf: function (aid) { return states[aid] || { prof: 'cook', office: null }; },
+    writeState: function () { }
+  }
+};
+box.globalThis = box;
+inDir(function () { vm.runInNewContext(propBlock, box, { filename: 'gamemode.js property' }); });
+const W = box.__thornswoodProperty;
+yes('the property block runs and publishes the jail rules', !!W && typeof W.mayHold === 'function' &&
+    typeof W.lockedJailHere === 'function' && typeof W.jailKeyHold === 'function' && !!W.JAIL_KEY);
+if (!W) { done(); }
+
+function open(p, door) { inDir(function () { W.touched(p.a, door); }); }
+function lineOf(p) { return refs[p.a].thornswoodDoorLine || null; }
+function word(p, w, args) {
+  const by = {};
+  let handled = null;
+  inDir(function () {
+    handled = W.command(w, [w].concat(args || []), p.a, p.pid, function (pid, m) { (by[pid] = by[pid] || []).push(m); });
+  });
+  return { handled: handled, mine: (by[p.pid] || []).join(' ') };
+}
+function claimOf(b) { return W.claims()[b] || null; }
+
+// ---------------------------------------------------------- C. the claim
+yes('C1 Dragonsreach Dungeon is Whiterun\'s jail, and a house is no jail',
+    W.jailOfBuilding(JAIL) === 'whiterun' && W.jailOfBuilding(HOUSE) === null);
+open(PRISONER, FRONT);
+let ln = lineOf(PRISONER);
+yes('C2 at the jail\'s door somebody who is not its Jarl is offered no claim', !!ln && ln.x === '');
+let r = word(PRISONER, '/claim');
+yes('C3 and a claim that comes anyway is refused, and says whose it is: "' + r.mine + '"',
+    !claimOf(JAIL) && r.mine === 'Dragonsreach Dungeon is Whiterun\'s jail. Only the Jarl of Whiterun claims it.');
+open(JARL_R, FRONT);
+r = word(JARL_R, '/claim');
+yes('C4 so is the Jarl of another hold: "' + r.mine + '"', !claimOf(JAIL) && lineOf(JARL_R).x === '' &&
+    /Only the Jarl of Whiterun claims it/.test(r.mine));
+open(GUARD_W, FRONT);
+r = word(GUARD_W, '/claim');
+yes('C5 and a guard of the hold', !claimOf(JAIL) && lineOf(GUARD_W).x === '');
+open(JARL_W, FRONT);
+ln = lineOf(JARL_W);
+yes('C6 the Jarl of Whiterun is offered it', !!ln && ln.x === 'claim');
+r = word(JARL_W, '/claim');
+yes('C7 and claims it, and gets its deed: "' + r.mine.slice(0, 60) + '"',
+    !!claimOf(JAIL) && claimOf(JAIL).by === JARL_W.pid && /^You claim Dragonsreach Dungeon\./.test(r.mine));
+// The deed passes to somebody else's pack and is presented at the door.
+const deed = refs[JARL_W.a].inventory.entries.filter(function (e) { return /^Deed to Dragonsreach Dungeon$/.test(e.name); })[0];
+yes('C8 the deed is in the Jarl\'s pack', !!deed);
+if (deed) {
+  refs[PRISONER.a].inventory.entries.push(JSON.parse(JSON.stringify(deed)));
+  refs[JARL_R.a].inventory.entries.push(JSON.parse(JSON.stringify(deed)));
+}
+open(PRISONER, FRONT);
+open(JARL_R, FRONT);
+yes('C9 the jail\'s deed presented at its door by anybody but its Jarl claims nothing',
+    claimOf(JAIL).by === JARL_W.pid && !logged.some(function (l) { return /presented the deed at Dragonsreach/.test(l); }));
+// A house is the same as ever: anybody claims it.
+open(PRISONER, HOUSE_DOOR);
+r = word(PRISONER, '/claim');
+yes('C10 a house is claimed by anybody, as before', !!claimOf(HOUSE) && claimOf(HOUSE).by === PRISONER.pid);
+
+// ------------------------------------- F. every office, read in one place
+const ow = W.officeOf(JARL_W.pid, JARL_W.a), og = W.officeOf(GUARD_W.pid, GUARD_W.a), op = W.officeOf(PRISONER.pid, PRISONER.a);
+yes('F1 officeOf says the Jarl of Whiterun is a Jarl of Whiterun and a steward, and no guard',
+    ow.jarl === true && ow.jarlOf === 'whiterun' && ow.steward === true && ow.guardOf === '');
+yes('F2 a guard of Whiterun is that and nothing else; somebody with no office has none',
+    og.jarl === false && og.jarlOf === '' && og.steward === false && og.guardOf === 'whiterun' &&
+    !op.jarl && !op.jarlOf && !op.steward && !op.guardOf);
+const outside = gm.replace(propBlock, '');
+yes('F3 no block outside the property block reads the law register or the Jarl\'s hold itself',
+    !/law\.guards|officeHold|law\.json/.test(outside));
+
+// ----------------------------------------- R. no timer, release by its guards
+const law = slice(propBlock, '  function lockCell(', '\n  }\n') || '';
+yes('R1 nothing in the cell lock runs on a clock: no timer and no release by itself',
+    !/setTimeout|setInterval/.test(law) && !/setTimeout|setInterval/.test(slice(propBlock, '  function cellLists(', '\n  }\n') || ''));
+open(GUARD_W, CELL);
+r = word(GUARD_W, '/lock', [(idOf(CELL) >>> 0).toString(16)]);
+const lockedNow = W.cellLocked(CELL);
+r = word(GUARD_W, '/unlock', [(idOf(CELL) >>> 0).toString(16)]);
+yes('R2 a guard of the hold locks and releases (' + r.mine + ')', lockedNow === true && W.cellLocked(CELL) === false);
+open(JARL_W, CELL);
+r = word(JARL_W, '/lock', [(idOf(CELL) >>> 0).toString(16)]);
+yes('R3 the Jarl, who is no guard, does not turn a cell', W.cellLocked(CELL) === false && /A cell is a guard's to lock/.test(r.mine));
+
+// ------------------------------------------------------------- S. /stuck
+const told = [];
+const stuckMp = {
+  get: function (id, key) {
+    if (key === 'isDead') { return false; }
+    if (key === 'percentages') { return { health: 1 }; }
+    return mp.get(id, key);
+  },
+  set: function (id, key, v) { mp.set(id, key, v); },
+  getServerSettings: mp.getServerSettings
+};
+const fakeFs = { appendFileSync: function () { }, mkdirSync: function () { } };
+const sbox = {
+  mp: stuckMp, Date: FakeDate, DATA: DATA, console: { log: function () { } },
+  require: function (n) { return n === 'fs' ? fakeFs : require(n); },
+  log: function () { }, guard: function (n, f) { return f; },
+  setInterval: function () { return 1; }, clearInterval: function () { },
+  __thornswoodProperty: W,
+  __thornswoodToProfile: function (pid, m) { told.push([pid, m]); }
+};
+sbox.globalThis = sbox;
+vm.runInNewContext(stuckBlock, sbox, { filename: 'gamemode.js stuck' });
+const stuck = sbox.__thornswoodStuck;
+function useStuck(p) {
+  told.length = 0;
+  delete refs[p.a].locationalData;
+  stuck.state.used = {};
+  stuck.command(p.pid, p.a, clock.t);
+  return { told: told.filter(function (t) { return t[0] === p.pid; }).map(function (t) { return t[1]; }).join(' '),
+           moved: !!refs[p.a].locationalData };
+}
+let s = useStuck(PRISONER);
+yes('S1 in a jail with no cell locked by a guard, /stuck works as anywhere (' + s.told.slice(0, 50) + ')', s.moved);
+open(GUARD_W, CELL);
+word(GUARD_W, '/lock', [(idOf(CELL) >>> 0).toString(16)]);
+refs[PRISONER.a].worldOrCellDesc = JAIL;
+s = useStuck(PRISONER);
+yes('S2 once a guard has a cell locked there, it does not move the prisoner, and says why: "' + s.told + '"',
+    !s.moved && /A guard has a cell locked here in Dragonsreach Dungeon, so \/stuck does not move anybody out of the jail/.test(s.told) &&
+    /\/helpme reaches staff/.test(s.told));
+refs[JARL_R.a].worldOrCellDesc = JAIL;
+s = useStuck(JARL_R);
+yes('S3 nor anybody else in the jail who is not a guard of the hold', !s.moved);
+refs[GUARD_W.a].worldOrCellDesc = JAIL;
+s = useStuck(GUARD_W);
+yes('S4 a guard of the hold still can', s.moved);
+refs[PRISONER.a].worldOrCellDesc = byHold.riften;
+s = useStuck(PRISONER);
+yes('S5 in another hold\'s jail, where no cell is locked, it works', s.moved);
+refs[PRISONER.a].worldOrCellDesc = '3c:Skyrim.esm';
+s = useStuck(PRISONER);
+yes('S6 outdoors it works as ever', s.moved);
+
+// ---------------------------------------------------------------- K. keys
+const KEY_W = idOf('5aec4:Skyrim.esm');   // WhiterunJailKey
+const KEY_HOUSE = idOf('1234:Skyrim.esm');
+const SWORD = idOf('12eb7:Skyrim.esm');
+const CHEST = 0x000a0001;
+Object.keys(JAIL_KEY).forEach(function (k) { kinds[idOf(k)] = 'KEYM'; });
+kinds[KEY_HOUSE] = 'KEYM';
+kinds[SWORD] = 'WEAP';
+kinds[0x0000000f] = 'MISC';
+kinds[idOf('c2cdb:Skyrim.esm')] = 'CONT';
+refs[CHEST] = { inventory: { entries: [{ baseId: KEY_W, count: 1 }, { baseId: SWORD, count: 1 }, { baseId: KEY_HOUSE, count: 1 }] } };
+const kbox = {
+  mp: mp, idOf: idOf, TOOLS: {}, console: { log: function () { } },
+  setTimeout: function () { return 0; }, __thornswoodProperty: W
+};
+kbox.globalThis = kbox;
+vm.runInNewContext(spoilsBlock, kbox, { filename: 'gamemode.js spoils' });
+const spoils = kbox.__thornswoodSpoils;
+yes('K1 the spoils block knows every jail key and no other key',
+    Object.keys(JAIL_KEY).every(function (k) { return spoils.isJailKey(idOf(k)); }) && !spoils.isJailKey(KEY_HOUSE));
+const floor = spoils.activate(PRISONER.a, 0x000f1228, '5aec4:Skyrim.esm');
+yes('K2 a jail key lying where the game put it is left there, and the person is told why: "' + floor + '"',
+    floor === 'That key belonged to the old jail. The cells answer to the hold\'s guards now, so it stays where it lies.');
+yes('K3 so is one somebody dropped', !!spoils.activate(PRISONER.a, 0xff00a001, '5aec4:Skyrim.esm'));
+yes('K4 any other key comes up off the floor as before', spoils.activate(PRISONER.a, 0x000f2000, '1234:Skyrim.esm') === null);
+spoils.strip(CHEST);
+const left = refs[CHEST].inventory.entries.map(function (e) { return e.baseId; });
+yes('K5 a chest gives up its jail key with the sword, and keeps the other key',
+    left.length === 1 && left[0] === KEY_HOUSE);
+const onAct = slice(gm, '  const spoils = globalThis.__thornswoodSpoils;', '\n  }\n');
+yes('K6 onActivate asks the spoils block before anything else answers a press, so the refusal ends it',
+    !!onAct && /return false;/.test(onAct) && gm.indexOf(onAct) < gm.indexOf('const quests = globalThis.__thornswoodQuests;'));
+
+// ------------------------------------------------------------- D. a death
+const arrivalSrc = (function () {
+  const a = gm.indexOf('\nfunction dist2(');
+  const b = a < 0 ? -1 : gm.indexOf('\nfunction ensureProperties(', a);
+  return a < 0 || b < 0 ? null : gm.slice(a, b);
+}());
+yes('D0 the respawn resolver is sliced out of the gamemode', !!arrivalSrc);
+if (arrivalSrc) {
+  const resolve = new Function('DATA', 'WORLDSPACES', 'PREFER_SLOT', 'FALLBACK_DESTINATION', 'mp', 'log',
+    arrivalSrc + '\nreturn resolveArrival;')(DATA, new Set(DATA.worldspaces), 'temple', 'whiterun', null, function () { });
+  const where = [];
+  const ok = HOLDS10.every(function (h) {
+    const a = resolve({ desc: byHold[h], pos: [0, 0, 0] });
+    where.push(h + ' ' + (a && a.cell));
+    return !!a && !JAIL_BUILDING[a.desc] && (a.slot === 'temple' || a.slot === 'hallOfTheDead') && a.reason !== 'fallback';
+  });
+  yes('D1 a death in any of the ten jails wakes in a temple or a hall of the dead, out of the jail (' +
+      where.join(', ') + ')', ok);
+  const own = HOLDS10.filter(function (h) {
+    const a = resolve({ desc: byHold[h], pos: [0, 0, 0] });
+    return a && a.reason === 'own-ground' && a.slot === 'temple';
+  });
+  yes('D2 the six holds with a temple of their own wake there', own.length === 6);
+}
+
+done();
