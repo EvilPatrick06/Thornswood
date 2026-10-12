@@ -37605,7 +37605,9 @@ log('gamemode loaded:',
   /** What one notice holds on its ledger: an open letter's or haul's pay, or a haul's owed gold. */
   function noticeHolds(x) {
     if (!x || !(x.letter || x.haul)) { return 0; }
-    var owed = x.haul ? (Math.floor(Number(x.owed)) || 0) : 0;
+    // Owed: a haul's gold, or a letter's 15 a guard sent back (#502), held
+    // for somebody who was away.
+    var owed = Math.floor(Number(x.owed)) || 0;
     if (owed > 0) { return owed; }
     if (x.down) { return 0; }
     var pay = Math.floor(Number(x.pay)) || 0;
@@ -38889,6 +38891,8 @@ log('gamemode loaded:',
       the wall, which unpin lets them do.
     */
     var steward = here && isSteward(profileId, actorId);
+    // A guard of this board's hold takes down any post on it (#502).
+    var guard = here && isGuard(profileId, hold);
     var dests = [];
     var arrivals = [];
     if (here) {
@@ -38934,6 +38938,7 @@ log('gamemode loaded:',
       jobs: mine,
       submit: submit,
       steward: steward,
+      guard: guard,
       dests: dests,
       arrivals: arrivals
     };
@@ -39420,6 +39425,9 @@ log('gamemode loaded:',
       as the poster's own /unpin before anybody has taken it.
     */
     var stewardHaul = !!n.haul && isSteward(profileId, actorId);
+    if (n.by !== profileId && !stewardHaul && isGuard(profileId, hold)) {
+      return guardTakedown(hold, at, n, actorId, profileId, toProfile);
+    }
     if (n.by !== profileId && !stewardHaul) {
       toProfile(profileId, 'That is not yours to take down.');
       return true;
@@ -39453,6 +39461,56 @@ log('gamemode loaded:',
     }
     plog(n.name, 'took down', n.job ? 'a job' : 'a notice', 'in', hold + ':', n.text);
     toProfile(profileId, 'You take it down. The fee stays with ' + hold + '.');
+    refreshPanel(actorId);
+    return true;
+  }
+
+  /*
+    A GUARD TAKES A POST DOWN (#502). Patrick, 11 October: guards have "the
+    ability to remove posts from a notice board ... only within their own
+    hold". unpin sends a guard of the board's hold here for any post on it
+    that is not their own; a guard of another hold, at this board, is
+    anybody. The fee stays with the hold, as it does when a poster takes
+    their own down. Gold the post holds goes back to its poster, the way a
+    steward's take down of a haul sends the pay back: a haul through
+    cancelHaul, a letter's 15 through handHaul, held for them while they are
+    away. Whoever had taken it is told it is off their list.
+  */
+  function guardTakedown(hold, at, n, actorId, profileId, toProfile) {
+    if (n.haul) {
+      return cancelHaul(hold, at, n, 'guard', actorId, profileId, toProfile);
+    }
+    var back = 0, owed = false;
+    if (n.letter) {
+      var pay = Math.floor(Number(n.pay)) || 0;
+      if (pay > 0) {
+        var r = handHaul(hold, n, Number(n.by), pay,
+                         'a letter for ' + (n.to || 'somebody') + ' taken down by a guard, the pay back to ' +
+                         (n.name || 'its sender'), 'letter');
+        if (r.why) {
+          toProfile(profileId, 'That did not work: ' + r.why + ' The letter is still up.');
+          return true;
+        }
+        back = pay;
+        owed = r.owed;
+      }
+    }
+    takedown(hold, at, profileId);
+    var kind = n.letter ? 'letter' : (n.job ? 'job' : 'notice');
+    var fee = 'The fee stays with ' + hold + '.';
+    // A letter's words are sealed, and the log does not record them either.
+    plog('law: a guard of', hold, '(' + personName(actorId) + ', profile ' + profileId + ') took down',
+         (n.name || 'somebody') + '\'s', kind, at + 1, 'in', hold + (n.letter ? '' : ': ' + (n.text || '')));
+    toProfile(profileId, 'You take ' + (n.name || 'somebody') + '\'s ' + kind + ' down.' +
+              (back ? ' The ' + back + ' gold for the courier goes back to them' +
+                      (owed ? ' when they are next in the world' : '') + '.' : '') + ' ' + fee);
+    if (onlineActorOf(Number(n.by))) {
+      toProfile(n.by, 'A guard took your ' + kind + ' in ' + hold + ' down.' +
+                (back && !owed ? ' The ' + back + ' gold for the courier is back in your pack.' : '') + ' ' + fee);
+    }
+    if (n.taken && Number(n.taken) !== Number(profileId) && onlineActorOf(Number(n.taken))) {
+      toProfile(n.taken, 'The ' + kind + ' in ' + hold + ' you took was taken down by a guard. It is off your list.');
+    }
     refreshPanel(actorId);
     return true;
   }
@@ -39937,27 +39995,31 @@ log('gamemode loaded:',
       var list = notices[hold] || [];
       for (var j = 0; j < list.length; j++) {
         var n = list[j];
-        var owed = (n && n.haul) ? (Math.floor(Number(n.owed)) || 0) : 0;
+        var owed = (n && (n.haul || n.letter)) ? (Math.floor(Number(n.owed)) || 0) : 0;
         if (!(owed > 0) || !here[Number(n.owedTo)]) { continue; }
         var to = here[Number(n.owedTo)];
         var why = mayWithdraw(hold, owed, n);
         if (why) {
           if (!haulShort[hold + ':' + j]) {
             haulShort[hold + ':' + j] = true;
-            plog('haul', j + 1, 'in', hold, 'owes', owed, 'and cannot pay it:', why);
+            plog(n.letter ? 'letter' : 'haul', j + 1, 'in', hold, 'owes', owed, 'and cannot pay it:', why);
           }
           continue;
         }
         if (!payOut(to, owed)) { continue; }
-        withdraw(hold, owed, 'haul ' + (j + 1) + ' to ' + n.dest + ', held for somebody who was away', n);
+        withdraw(hold, owed, (n.letter ? 'letter ' + (j + 1) + ' for ' + (n.to || 'somebody')
+                                        : 'haul ' + (j + 1) + ' to ' + n.dest) + ', held for somebody who was away', n);
         n.owed = 0;
         save();
-        var line = n.owedFor === 'hauled'
+        var line = n.owedFor === 'letter'
+          ? 'While you were away, a guard took your letter for ' + (n.to || 'somebody') + ' in ' + hold +
+            ' down. The ' + owed + ' gold for the courier is back in your pack. The fee stays with ' + hold + '.'
+          : n.owedFor === 'hauled'
           ? 'While you were away, your haul to ' + n.dest + ' was confirmed. ' + owed + ' gold is in your pack.' +
             ((Number(n.kept) || 0) ? ' The company kept ' + n.kept + '.' : '')
           : 'While you were away, your haul to ' + n.dest + ' came down. The ' + owed +
             ' gold pay is back in your pack. The fee stays with ' + hold + '.';
-        plog('handed', owed, 'gold of a haul in', hold, 'to', personName(to));
+        plog('handed', owed, 'gold of a', n.letter ? 'letter' : 'haul', 'in', hold, 'to', personName(to));
         try { notify(to, line); } catch (e2) { }
         try { say(to, line); } catch (e3) { }
       }
@@ -39993,7 +40055,8 @@ log('gamemode loaded:',
     takedown(hold, at, profileId);
     var later = owed ? ' when they are next in the world' : '';
     var fee = 'The fee stays with ' + hold + '.';
-    plog(how === 'drop' ? (n.takenName || 'the hauler') + ' dropped' : (how === 'own' ? n.name : 'a steward') + ' took down',
+    var office = how === 'guard' ? 'a guard' : 'a steward';
+    plog(how === 'drop' ? (n.takenName || 'the hauler') + ' dropped' : (how === 'own' ? n.name : office) + ' took down',
          'a haul to', n.dest, 'in', hold, 'and', pay, owed ? 'is held for' : 'went back to', n.name);
     if (how === 'own') {
       toProfile(profileId, 'You take the haul down. The ' + pay + ' gold pay comes back to you. ' + fee);
@@ -40008,12 +40071,12 @@ log('gamemode loaded:',
       toProfile(profileId, 'You take ' + n.name + '\'s haul to ' + n.dest + ' down. The ' + pay +
                 ' gold pay goes back to them' + later + '. ' + fee);
       if (!owed) {
-        toProfile(n.by, 'A steward took your haul to ' + n.dest + ' down. The ' + pay +
+        toProfile(n.by, (how === 'guard' ? 'A guard' : 'A steward') + ' took your haul to ' + n.dest + ' down. The ' + pay +
                   ' gold pay is back in your pack. ' + fee);
       }
     }
     if (how !== 'drop' && n.taken && Number(n.taken) !== Number(profileId)) {
-      toProfile(n.taken, 'The haul to ' + n.dest + ' you took was taken down by a steward. It is off your list.');
+      toProfile(n.taken, 'The haul to ' + n.dest + ' you took was taken down by ' + office + '. It is off your list.');
     }
     refreshPanel(actorId);
     return true;
@@ -45122,9 +45185,11 @@ log('gamemode loaded:',
                        seconds: the signs and the 15 seconds /stuck reads.
     Devastating Blow   A power attack takes a quarter again of what it took,
                        measured the way the maneuvers measure a Heavy blow.
-    Unshakeable        NOT HERE. A block that staggers you is an animation on
-                       your own machine. The server sends no such stagger and
-                       cannot stop one. It needs the client plugin.
+    Unshakeable        Nothing staggers you while you block. A stagger is an
+                       animation on your own machine, so the front plugin
+                       refuses it there (thornswood-front.js, the filled
+                       perks on this machine), and the maneuvers block's
+                       staggerOf refuses the server's own Break and Wreck.
     Purified Blood     The game's own disease and poison resistance, through
                        the tree's totals (TUNING.perkApplies). A disease the
                        server itself gives asks holds(actorId, 'purifiedblood').
@@ -45151,14 +45216,18 @@ log('gamemode loaded:',
                        effects() below and withPerks in the character block.
                        So the game never takes the magicka at all, and a spell
                        you could not have afforded can be cast.
-    Tireless           NOT HERE. What running and a swing cost is worked out
-                       on your own machine. It needs the client plugin.
+    Tireless           What a sprint and a power attack cost is the game's
+                       own sum on your own machine, so the front plugin holds
+                       those game settings at half there. Running and a plain
+                       swing cost nothing in this game.
     Second Wind        Stamina that reaches nothing fills, once every 5
                        minutes.
-    Windwalker         +4 speed, through the tree's totals. The fall half is
-                       NOT HERE: a fall is taken on your own machine.
-    Pack Mule          NOT HERE. Being slowed by weight is the game's own, on
-                       your machine. It needs the client plugin.
+    Windwalker         +4 speed, through the tree's totals. The fall is the
+                       game's own sum on your own machine, so the front plugin
+                       holds its multiplier at nothing there.
+    Pack Mule          NOT IN THE GAME YET. Being overloaded makes the game
+                       walk you, on your own machine, and no game setting
+                       changes that. What it should be is Patrick's (#1385).
     Lethal Aim         An arrow or a bolt takes what it would have taken
                        against half the armour: the engine's own armour sum
                        (TES5DamageFormula, worn ARMO and their enchantments),
@@ -45221,9 +45290,8 @@ log('gamemode loaded:',
                          say: 'During a fight, health returns at 2 a second.' },
     devastatingblow:   { name: 'Devastating Blow', skill: 'might', more: 0.25,
                          say: 'A power attack deals 25% more.' },
-    unshakeable:       { name: 'Unshakeable', skill: 'resilience', none: true,
-                         say: 'A block cannot stagger you.',
-                         not: 'That is not in the game yet: the stagger is played on your own machine, where the server cannot stop it.' },
+    unshakeable:       { name: 'Unshakeable', skill: 'resilience',
+                         say: 'Nothing staggers you while you block.' },
     purifiedblood:     { name: 'Purified Blood', skill: 'toughness',
                          say: 'Disease does not take. Poison deals 25%.' },
     archmagesvessel:   { name: 'Archmage\'s Vessel', skill: 'capacity', every: DAY, below: 0.1, to: 0.5,
@@ -45237,14 +45305,12 @@ log('gamemode loaded:',
                          say: '20% of the magicka in a spell that hits you is added to yours.' },
     fontofmagic:       { name: 'Font of Magic', skill: 'efficiency', every: DAY, seconds: 15, costOff: 100,
                          say: 'Once a day, 15 seconds where a spell costs nothing. Press Use beside it on the K panel to start it.' },
-    tireless:          { name: 'Tireless', skill: 'endurance', none: true,
-                         say: 'Running and swinging cost half stamina.',
-                         not: 'That is not in the game yet: what running and a swing cost is worked out on your own machine.' },
+    tireless:          { name: 'Tireless', skill: 'endurance',
+                         say: 'Running and swinging cost half stamina.' },
     secondwind:        { name: 'Second Wind', skill: 'vigor', every: 5 * MINUTE,
                          say: 'When stamina hits 0 it fills, once every 5 minutes.' },
     windwalker:        { name: 'Windwalker', skill: 'agility',
-                         say: '+4 speed, and a fall deals no damage.',
-                         not: 'The speed is yours. A fall still hurts for now: it is taken on your own machine.' },
+                         say: '+4 speed, and a fall deals no damage.' },
     packmule:          { name: 'Pack Mule', skill: 'burden', none: true,
                          say: 'Being overloaded does not slow you.',
                          not: 'That is not in the game yet: the slowing is the game\'s own, on your machine.' },
@@ -45958,7 +46024,7 @@ log('gamemode loaded:',
     PERKS: PERKS, ORDER: ORDER, PROPERTY: PERK_PROPERTY, CRIT_LINE: CRIT_LINE, FIGHT_MS: FIGHT_MS,
     holds: holds, cheatDeath: cheatDeath, hit: hit, flush: flush, killerOf: killerOf, tick: tick,
     use: use, clocks: clocks, spendLine: spendLine, effects: effects, armourOf: armourOf,
-    lethalExtra: lethalExtra, readyAt: readyAt, state: ST
+    lethalExtra: lethalExtra, readyAt: readyAt, fired: fired, state: ST
   };
   console.log('[thornswood perks] ready: ' + ORDER.length + ' perks');
 })();
@@ -46699,17 +46765,41 @@ log('gamemode loaded:',
     names, and only when that actor is somebody's own character
     (SpSnippet::Execute returns for anything else). A person hit by Break or
     Wreck staggers in their own game; a creature does not yet. Plant refuses
-    this stagger.
+    this stagger, and so does Unshakeable while the person blocks (#1385).
   */
   function staggerOf(target) {
     if (!personOf(target) || deadOf(target)) { return; }
     var rec = onOf(target, false);
     if (rec && rec.plant && rec.plant > now()) { return; }
+    if (unshaken(target)) { return; }
     try {
       mp.callPapyrusFunction('global', 'Debug', 'SendAnimationEvent', null, [selfOf(target), 'staggerStart']);
     } catch (e) {
       mlog('could not stagger', target.toString(16) + ':', e);
     }
+  }
+
+  /*
+    UNSHAKEABLE (#1385): nothing staggers somebody who holds it while they
+    block. The block is the IsBlocking their own game sends with every
+    movement (skymp5-client movementGet.ts, kept by the engine in
+    ActionListener's movement handler), asked through the engine's own
+    ObjectReference.GetAnimationVariableBool. The front plugin refuses every
+    other stagger on that person's own machine the same way.
+  */
+  function unshaken(target) {
+    var pk = g.__thornswoodPerks;
+    if (!pk || !pk.holds || !pk.holds(target, 'unshakeable')) { return false; }
+    try {
+      if (!mp.callPapyrusFunction('method', 'ObjectReference', 'GetAnimationVariableBool',
+                                  selfOf(target), ['IsBlocking'])) { return false; }
+    } catch (e) {
+      mlog('could not ask whether', target.toString(16), 'blocks:', e);
+      return false;
+    }
+    // The perks block's own line, "perks: Unshakeable fired for <actor>".
+    if (pk.fired) { pk.fired(target, 'unshakeable', '(a Break or Wreck, while blocking)'); }
+    return true;
   }
 
   function flush() {

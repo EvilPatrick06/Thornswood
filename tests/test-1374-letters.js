@@ -164,6 +164,9 @@ function boot(reg, w, opts) {
     'function save() { reg.funds = JSON.parse(JSON.stringify(funds)); ' +
     'reg.notices = JSON.parse(JSON.stringify(notices)); reg.boards = JSON.parse(JSON.stringify(boards)); }',
     'function refreshPanel() { }',
+    // Nobody guards these boards; a guard's take down (#502) is
+    // tests/test-502-guard-board.js.
+    'function isGuard() { return false; }',
     // Every word the property block answers that is not a board's.
     ['deeds', 'setLock', 'mold', 'moldHere', 'cutKey', 'here', 'claim', 'jarlCmd', 'stewardCmd',
      'evict', 'boxCmd', 'rentCmd'].map(function (n) { return 'function ' + n + '() { return true; }'; }).join('\n')
