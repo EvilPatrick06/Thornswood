@@ -2862,6 +2862,28 @@ function swingScript() {
     '          if (back) { pc.equipItem(back, false, true); }',
     '        } catch (e) { }',
     '      }',
+    /*
+      #2244: AND A PICK THAT WAS ONLY IN THE PACK IS CYCLED, ON AND OFF.
+
+      After a spell the player could not jump, sprint or use a forge until
+      they equipped the pickaxe again, and equipping it was the one thing that
+      freed them. The restore above already does that for a pick that was
+      worn; a pick that lived only in the pack got nothing, and the graph was
+      left in the furniture state the two exit events did not clear. So that
+      pick is equipped and taken straight off again, silently, which is the
+      same reset with nothing left in their hands. Only when it is really in
+      the pack: equipItem on an item somebody does not carry would hand them
+      one.
+    */
+    '      if (!restore && v.tool) {',
+    '        try {',
+    '          var cyc = sp.Form.from(sp.Game.getFormEx(v.tool));',
+    '          if (cyc && pc.getItemCount(cyc) > 0) {',
+    '            pc.equipItem(cyc, false, true);',
+    '            pc.unequipItem(cyc, false, true);',
+    '          }',
+    '        } catch (e) { }',
+    '      }',
     '      return;',
     '    }',
     '    if (!v.anim) { return; }',
