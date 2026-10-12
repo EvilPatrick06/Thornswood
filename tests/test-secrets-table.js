@@ -128,7 +128,8 @@ yes('gamemode.js still reads no join password', gamemode.length > 0 && !/sPasswo
 yes('the site still reads no serverPassword, so the value Rotate-ServerPassword writes has no reader',
     site.length > 0 && !/serverPassword/.test(site));
 yes('Rotate-ServerPassword.ps1 still writes serverPassword into the site config the row names',
-    /\$cfg\['serverPassword'\]/.test(rotate) && /nothing to write/.test(rotate));
+    /Get-ThornswoodSiteConfigSet -ConfigPath "\$docsWin\\config\.json" -Key 'serverPassword'/.test(rotate) &&
+    /\$cfg\['\$Key'\] = `\$pw/.test(read('scripts/deploy/SiteConfigSet.ps1')) && /nothing to write/.test(rotate));
 yes('the voice service still reads no secret.txt', voice.length > 0 && !/'secret\.txt'/.test(voice));
 yes('the section records that a launcher older than 1.0.197 keeps what version.json gave it',
     /1\.0\.197/.test(section) && /older than 1\.0\.197/.test(rotate));
