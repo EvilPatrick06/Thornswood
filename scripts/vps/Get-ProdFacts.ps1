@@ -41,6 +41,16 @@ function ConvertTo-TaskFact($Task) {
     }
 }
 
+# A config file's meaning without its comments: drop blank lines and lines
+# that are only a comment, trim line ends, hash what is left. Check-ProdParity
+# uses the same function on the repository copy, so a comment header written
+# in one place and not the other is not drift (#2165).
+function Get-ConfigBodyHash([string]$Text) {
+    $keep = @(($Text -split "\r?\n") | ForEach-Object { $_.TrimEnd() } | Where-Object { $_.Trim() -ne '' -and -not $_.TrimStart().StartsWith('#') })
+    $sha = [Security.Cryptography.SHA256]::Create()
+    return -join ($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes(($keep -join "`n"))) | ForEach-Object { $_.ToString('x2') })
+}
+
 # Key names and value types only. A value never leaves this function.
 function ConvertTo-SettingShape($Json) {
     $out = [ordered]@{}
@@ -66,6 +76,10 @@ function Get-ProdFacts {
     foreach ($f in 'C:\Thornswood-Caddy\Caddyfile', 'C:\Thornswood-Docs\server.js', 'C:\Thornswood-Voice\voice-server.js', 'C:\Thornswood-Voice-Dev\voice-server.js') {
         $files[$f] = if (Test-Path -LiteralPath $f) { (Get-FileHash -LiteralPath $f -Algorithm SHA256).Hash.ToLower() } else { '' }
     }
+    $fileBodies = [ordered]@{}
+    foreach ($f in 'C:\Thornswood-Caddy\Caddyfile') {
+        $fileBodies[$f] = if (Test-Path -LiteralPath $f) { Get-ConfigBodyHash (Get-Content -LiteralPath $f -Raw) } else { '' }
+    }
     $certs = @()
     foreach ($root in "$env:SystemRoot\System32\config\systemprofile\AppData\Roaming\Caddy\certificates", 'C:\Thornswood-Caddy\data\caddy\certificates') {
         Get-ChildItem -LiteralPath $root -Recurse -Filter *.crt | ForEach-Object {
@@ -86,7 +100,7 @@ function Get-ProdFacts {
     $envNames = @([Environment]::GetEnvironmentVariables('Machine').Keys | Where-Object { $_ -like 'THORNSWOOD_*' } | Sort-Object)
     [ordered]@{
         takenUtc = (Get-Date).ToUniversalTime().ToString('o'); host = $env:COMPUTERNAME
-        listeners = $listen; tasks = $tasks; services = $svcs; files = $files
+        listeners = $listen; tasks = $tasks; services = $svcs; files = $files; fileBodies = $fileBodies
         certs = $certs; versions = $versions; settings = $settings; machineEnvNames = $envNames
     }
 }
