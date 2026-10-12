@@ -752,7 +752,8 @@ function chatFileName(row) {
 function chatText(chat) {
   return (chat || []).map(function (l) {
     return new Date(l.at).toLocaleString() +
-      (l.kind === 'command' ? '  [command]' : '') +
+      // A key or a panel sent it, nobody typed it (#2251).
+      (l.kind === 'command' ? (l.via === 'press' ? '  [key press]' : '  [command]') : '') +
       (l.proven ? '' : '  [unproven]') +
       (l.mode ? '  [' + l.mode + ']' : '') +
       '  ' + (l.name || '(no name)') + ': ' + (l.text || '');
@@ -1045,7 +1046,7 @@ function drawLogs(box, sid, d) {
           (l.proven ? '' : '<div class="said"><span class="pill fail">unproven</span></div>') +
         '</div></td>' +
         '<td data-label="Said"><div class="cell">' +
-          (l.kind === 'command' ? '<span class="pill warn">command</span> ' : '') +
+          (l.kind === 'command' ? (l.via === 'press' ? '<span class="pill">key press</span> ' : '<span class="pill warn">command</span> ') : '') +
           esc(l.text || '') +
           (l.mode ? '<div class="said">' + esc(l.mode) + '</div>' : '') +
         '</div></td>' +
