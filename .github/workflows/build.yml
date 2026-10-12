@@ -104,7 +104,7 @@ jobs:
   launcher-vps:
     name: Launcher builds (VPS fallback)
     needs: launcher
-    if: ${{ always() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}
+    if: ${{ !cancelled() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}
     runs-on: [self-hosted, Windows, thornswood-vps]
     # About fifteen minutes on the VPS. Past this it is stuck, not slow.
     timeout-minutes: 20
@@ -406,7 +406,7 @@ jobs:
                  'test-1588-tools-50.js',
                  'test-1741-encoding.js',
                  'test-1634-apprentice-gui.js',
-                 'test-1637-door-gui.js', 'test-2250-claim-door.js', 'test-2256-locked-for-everyone.js', 'test-2245-drawn-pick.js', 'test-item-names.js', 'test-2255-key-mold-models.js', 'test-2258-house-parts-hidden.js', 'test-2298-held-board.ps1',
+                 'test-1637-door-gui.js', 'test-2250-claim-door.js', 'test-2256-locked-for-everyone.js', 'test-2245-drawn-pick.js', 'test-2244-after-mining-measure.js', 'test-item-names.js', 'test-2255-key-mold-models.js', 'test-2258-house-parts-hidden.js', 'test-2298-held-board.ps1',
                  'test-502-kill-bounty.js',
                  'test-1636-farm-gui.js',
                  'test-1394-fares.js',
@@ -502,7 +502,7 @@ jobs:
                  'test-site-render.js', 'test-site-discovery.js',
                  'test-home-status.js', 'test-seats.js', 'test-age-gate.js', 'test-download-hash.js', 'test-2233-inuse-image.ps1',
                  'test-download-button.js', 'test-gallery-ux.js', 'test-gallery.js', 'test-site-local.js',
-                 'test-session-cards.js', 'test-staff-bans.js', 'test-hub-staff-gallery.js', 'test-known-issues.js',
+                 'test-session-cards.js', 'test-staff-bans.js', 'test-hub-staff-gallery.js', 'test-known-issues.js', 'test-2414-known-one-copy.js',
                  'test-join-outage.js', 'test-join-pass-site.js', 'test-open-switch.js', 'test-component-readmes.js',
                  'test-site-front-resilience.js', 'test-site-upload-guard.js',
                  'test-report-limits.js', 'test-site-hangs.js',
@@ -510,7 +510,7 @@ jobs:
                  'test-backup-restore.ps1', 'test-backup-streaming.ps1', 'test-fetch-verify-all.ps1', 'test-2199-zip-policy.ps1',
                  'test-content-release.ps1',
                  'test-cooldown-sweep.js', 'test-voice-moved-clients.js',
-                 'test-release-parity.ps1', 'test-dev-version.ps1', 'test-ship-launcher-reuse.ps1', 'test-2347-dev-launcher-version.ps1',
+                 'test-release-parity.ps1', 'test-dev-version.ps1', 'test-ship-launcher-reuse.ps1', 'test-2347-dev-launcher-version.ps1', 'test-2347-publish-launcher-number.ps1',
                  'test-2401-legacy-dev-marks.ps1',
                  'test-server-stage-directories.ps1',
                  'test-dev-settings-keys.ps1',
