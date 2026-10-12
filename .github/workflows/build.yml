@@ -321,6 +321,10 @@ jobs:
           # worldspace the server has it in, from the list the server sends;
           # tests\test-1597-board-objects.js runs the plugin's board code on a
           # pretend game. Under a second.
+          # Issue #503: tests/test-papyrus-event-list.js holds the fork's Papyrus
+          # event list, records/papyrus-events.json, to the rest of this
+          # repository and proves its reader on a small fork it makes. The
+          # fork itself is read against the record in the nightly. A second.
           # $six is a historical name: the gate list grew well past six (#1368).
           # Issue #1589: a line here with no comma after it ends the list, and
           # every name below it only prints itself. test-gate-list.ps1 parses
@@ -375,6 +379,7 @@ jobs:
                  'test-2337-kiln-menu.js',
                  'test-1306-pr-workflow.js',
                  'test-2261-tome-refused.js',
+                 'test-papyrus-event-list.js',
                  'test-1383-treatments.js',
                  'test-1384-condition.js',
                  'test-1385-perks.js',
@@ -491,7 +496,7 @@ jobs:
                  'test-2037-journal-new.js', 'test-2135-journal-press.js', 'test-social.js', 'test-2157-reconfigure.ps1', 'test-2210-links-attributes.ps1', 'test-2210-refresh-scope.ps1',
                  'test-site-auth.js',
                  'test-site-route-gaps.js', 'test-2215-play-pressed-by.ps1',
-                 'test-docs-pwfile.ps1',
+                 'test-docs-pwfile.ps1', 'test-docs-password.ps1', 'test-2317-rotate-config.ps1',
                  'test-site-credits-fill.js', 'test-deployed-build.ps1', 'test-459-publish-record.ps1',
                  'test-site-headers.js', 'test-generated-source-chain.ps1',
                  'test-site-render.js', 'test-site-discovery.js',
@@ -514,6 +519,7 @@ jobs:
                  'test-1050-news-out.ps1',
                  'test-2309-loadorder-fresh.ps1',
                  'test-459-publish-dist.ps1',
+                 'test-2320-short-load-order.ps1',
                  'test-1929-dev-gamemode-note.ps1',
                  'test-1938-server-ready-wait.ps1',
                  'test-1955-ship-stack-note.ps1',

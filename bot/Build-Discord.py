@@ -380,7 +380,8 @@ PLAN = [
    dict(kind='text',  name='media',       key='MEDIA',    mode='open',
         topic='Screenshots and clips. Talk about one in a thread under it.'),
    # Where the join cards go, and what the server's system channel points at.
-   dict(kind='text',  name='welcome-travelers', mode='open'),
+   # JOIN gives the bot Attach Files here as well (JOIN_BOT_NEEDS, #2341).
+   dict(kind='text',  name='welcome-travelers', key='JOIN', mode='open'),
    dict(kind='text',  name='game-rules',  key='GAMERULES', mode='membersread',
         topic='How roleplay works here. Nine rules, and what we let slide.',
         post=C.GAME_RULES),
@@ -551,8 +552,26 @@ TICKET_BOT_NEEDS = BOT_NEEDS + ('create_private_threads',
 TALK_NEEDS = ('view_channel', 'send_messages', 'read_message_history')
 
 
+# And one more in the channel the join cards go to (#2341). The card is a
+# picture sent as a file (bot.py, on_member_join), the one thing the bot
+# attaches anywhere, and posting a file needs Attach Files in that channel.
+# The three above were all this channel's overwrite named, so once
+# Administrator came off the bot's role (#455) the card depended on the
+# role's server-wide bits and the channel's @everyone overwrite both letting
+# it through. On 12 Oct the bot's start said it could not post there:
+# "the bot is missing Attach Files there". Naming it in the bot's own
+# overwrite, which Discord applies last, makes the channel give it whatever
+# the role or @everyone say, the way the ticket channel's thread bits do.
+JOIN_BOT_NEEDS = BOT_NEEDS + ('attach_files',)
+
+
 def bot_needs(spec):
-    return TICKET_BOT_NEEDS if spec.get('key') == 'TICKETS' else BOT_NEEDS
+    key = spec.get('key')
+    if key == 'TICKETS':
+        return TICKET_BOT_NEEDS
+    if key == 'JOIN':
+        return JOIN_BOT_NEEDS
+    return BOT_NEEDS
 
 
 def with_bot(guild, out, needs=BOT_NEEDS):
@@ -589,8 +608,16 @@ async def keep_bot(ch, needs=BOT_NEEDS):
        on it. Only the ones it needs are set, anything else already on it
        stays as it is, and a channel that already has all of them is not written
        to at all, so running this again after Administrator is gone changes
-       nothing and asks Discord for nothing."""
-    if ch is None or not shuts_out(ch, needs):
+       nothing and asks Discord for nothing.
+
+       A channel PLAN names more needs for than the three (the ticket
+       channel, the join channel) is touched whether or not @everyone is shut
+       out: those bits are the channel's own job, and the bot's role holding
+       them server wide is not something a build can see while it still has
+       Administrator (#2341)."""
+    if ch is None:
+        return
+    if tuple(needs) == BOT_NEEDS and not shuts_out(ch, needs):
         return
     me = getattr(getattr(ch, 'guild', None), 'me', None)
     if me is None:
