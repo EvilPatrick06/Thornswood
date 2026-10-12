@@ -1890,6 +1890,11 @@ if (Test-Path $cfgPath) {
 $pinPath = Join-Path $PSScriptRoot '..\..\records\skyrim-pin.json'
 try {
     $pin = (Get-Content -LiteralPath $pinPath -Raw).TrimStart([char]0xFEFF) | ConvertFrom-Json
+    # RecordShape.ps1 (#2180): a pin at a version this checkout does not know,
+    # or short of a field, is not written into the feed; the feed keeps its pin.
+    . (Join-Path $PSScriptRoot 'RecordShape.ps1')
+    $pinShape = @(Get-ThornswoodRecordProblems -Doc $pin -Kind skyrim-pin)
+    if ($pinShape.Count) { throw ('it is not a skyrim-pin record this checkout can trust: ' + ($pinShape -join '; ')) }
     $pinExe = [long](Val $pin 'expectedExeBytes')
     $pinNewer = [long](Val $pin 'newerExeBytes')
     $pinDepots = @()
