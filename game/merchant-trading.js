@@ -311,21 +311,28 @@ function createMerchantTrading(deps) {
       sessions.delete(profileId);
       return fail('Press E on a guild trader with this character.', {open:false});
     }
+    var originalSession = sessions.get(profileId), quests, heldQuest;
+    if (verb === 'quest') {
+      quests = typeof deps.quests==='function' && deps.quests();
+      if (!quests || typeof quests.capture!=='function') return fail('Quest work is unavailable.');
+      heldQuest = quests.capture(actorId);
+      if (!heldQuest) return fail('Quest work is unavailable.');
+    }
     var again = inReach(actorId, merchantId);
     if (!again.ok) {
       sessions.delete(profileId);
       return fail(again.reason, { open: false });
     }
     if (!authed(profileId, again.human)) return fail('That request is not yours.');
-    if (sessionIdentity(again.human)!==sessions.get(profileId).identity) {
+    if (!active || sessions.get(profileId)!==originalSession ||
+        sessionIdentity(again.human)!==originalSession.identity ||
+        sessionIdentity(world.actor(actorId))!==originalSession.identity) {
       sessions.delete(profileId);
       return fail('Press E on a guild trader with this character.', {open:false});
     }
     if (verb === 'quest') {
-      var quests = typeof deps.quests==='function' && deps.quests();
-      if (!quests) return fail('Quest work is unavailable.');
       if (parts.length<4 || parts.length>5) return fail('Choose the work in the trader panel.');
-      var result=quests.act(actorId,String(parts[2]),String(parts[3]),parts[4],merchantId);
+      var result=quests.act(actorId,String(parts[2]),String(parts[3]),parts[4],merchantId,heldQuest);
       var reasons={class:'This work takes a different class.',rank:'This work takes a higher rank.',
         cooldown:'This work is still resting.',open:'You already hold this work.',gem:'Choose a gem first.',
         short:'You have not drawn enough to turn this work in.',none:'You do not hold this work.',

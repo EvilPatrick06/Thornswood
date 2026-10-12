@@ -258,15 +258,21 @@ if (block !== null) {
         page.indexOf("net('/book submit ") !== -1);
     yes('the list is left at the board, not from the journal',
         journal.indexOf('Submit at the box') === -1);
+    // #1597: the click and the object no longer hold a copy of the nine
+    // spots, which had no cell. They learn every board from the server, cell
+    // and all; tests/test-1597-board-objects.js runs that.
     const sites = rig(null).sites;
-    let missing = '';
+    let copied = '';
     for (const h in sites) {
       const p = sites[h].pos;
-      if (front.indexOf(String(p[0])) === -1 || front.indexOf(String(p[1])) === -1) {
-        missing += ' ' + h;
+      if (front.indexOf(String(p[0])) !== -1 && front.indexOf(String(p[1])) !== -1) {
+        copied += ' ' + h;
       }
     }
-    yes('the click knows the nine spots' + missing, missing === '');
+    yes('the click keeps no copy of the nine spots of its own' + copied, copied === '');
+    yes('it learns every board, with its cell, from what the server sends',
+        /row\.cell = bh\.cell;/.test(src) && page.indexOf("tell('spots ' + said)") !== -1 &&
+        front.indexOf("what.indexOf('board:spots ') === 0") !== -1);
   }
 }
 

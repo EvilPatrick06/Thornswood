@@ -2,7 +2,7 @@
 
 What Thornswood keeps about you, why, and how to have it deleted.
 
-Last changed: 4 October 2026.
+Last changed: 11 October 2026.
 
 Thornswood is a free fan project run by two people. It is not a company. This
 page is written plainly rather than legally, and it is meant to be the whole
@@ -103,7 +103,9 @@ both are served from here now.
 ## How long it is kept
 
 - **Sign-in records**, which are the only thing here holding your address, are
-  deleted after 30 days. That is enforced by the site rather than promised:
+  deleted after 30 days. The address is the one your connection reached the
+  site from, as our own front door saw it, not anything your browser claims
+  about itself. That is enforced by the site rather than promised:
   old rows go whenever the log is written or read.
 - **Session records and chat** are kept for 365 days, then dropped. The site
   prunes session logs after that window (a session marked kept is never
@@ -161,7 +163,7 @@ These cookies make the site and the age gate work. They are not advertising and 
 - **twa**. Signed Discord identity cookie for signed-in accounts, lasting up to 30 days. HttpOnly. Staff permissions are checked from roles, not granted by the cookie alone. Cleared on sign-out.
 - **twst_***. One-use security cookies for a Discord sign-in, lasting ten minutes and scoped to `/auth/discord`. HttpOnly. Cleared when sign-in returns.
 - **tw**. Fallback member-password cookie when Discord sign-in is not configured, lasting up to one year. HttpOnly. Ignored when Discord is configured; cleared on sign-out.
-- **tw-age-18**. Records that this browser stated eighteen or older. The cookie lasts one year. The localStorage copy has no automatic expiry. Not HttpOnly. Clearing site storage means the gate asks again. This is not verified age.
+- **tw-age-18**. Records that this browser stated eighteen or older. The cookie and the localStorage copy both last one year, and both ask again if the gate's wording changes what you agreed to. Not HttpOnly. Clearing site storage means the gate asks again. This is not verified age.
 
 Sign-in cookies use SameSite=Lax and Secure when served over HTTPS. See the
 [cookie policy](/cookies) for their purposes and how to clear them.

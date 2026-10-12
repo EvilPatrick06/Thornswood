@@ -310,6 +310,19 @@ What goes up with it: `bot.py`, `card.py`, the channel ids, the card artwork,
 from beside itself for the live smoke. A file the bot reads and this list does
 not name is a file that is only ever on main, never on the box.
 
+Nothing else stays in the bot's folder (#1184). It holds what that list sends
+and what is the bot's own: `bot.env.json`, `thornswood-deploy.json` (the
+record of what runs there), `data`, `service`, `webhooks`, `py-libs`, and,
+until a full run moves them into `data` or takes them off, the log, the
+records and the old loop's `run.ps1` and `roll-log.ps1` from before the
+service. Every run moves anything else there aside into `.prev-<stamp>`, with
+the code it replaced, and names each one; `Get-ThornswoodBotOwned` in
+`scripts\vps\Bot-Service.ps1` is that rule. `-PutBack` puts them back with
+that code, and they leave the box with that `.prev` folder two deploys later.
+So a file copied in by hand, `backfill.py` or `redraw.py` for a run of it,
+is copied from the repository for that run, and the next install moves it
+aside, rather than sitting on the bot's import path from then on.
+
 The bot's log is `C:\Thornswood-Bot\data\bot.log`: in the data folder under
 the bot's folder, the one folder its account writes, rather than beside the
 code where it used to be. Every `-CodeOnly` run leaves that file on the box,

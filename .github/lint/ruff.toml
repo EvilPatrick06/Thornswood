@@ -1,0 +1,9 @@
+# ruff config for the build check's step "Lint (warnings only)", issue #1343.
+# ruff's own default rules (pyflakes plus the pycodestyle errors), no style
+# rules. The step runs it with --exit-zero, so findings never fail the build.
+# The blocking check ("Check the Python names what exists") is separate and
+# keeps its own four rule groups.
+target-version = "py39"
+
+[lint]
+select = ["E4", "E7", "E9", "F"]

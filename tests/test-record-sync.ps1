@@ -39,6 +39,10 @@
 #>
 [CmdletBinding()]
 param()
+# Scripts this runs whole go to a stand-in box, so the freshness guard lets them be (#2118).
+$env:THORNSWOOD_HARNESS = '1'
+# Publish-Update takes no -Vps; its box here is this machine's stand-in.
+$env:THORNSWOOD_VPS = '127.0.0.1'
 
 $ErrorActionPreference = 'Stop'
 if ($PSVersionTable.PSEdition -eq 'Core') {
@@ -286,7 +290,7 @@ Set-Build 'Data\Platform\UI\thornswood-keep.txt' 'the same the whole time'
 # The collection's, which no release carries.
 $f = Join-Path $pub 'Game\Data\collection.esp'; [IO.File]::WriteAllText($f, 'from Vortex', $ascii)
 
-# A pack from before any record, already on the feed: it took Data\Platform\UI\ancient.esp out.
+# A pack from before any record, already on the feed: it took Data\Platform\UI\thornswood-ancient.esp out.
 function New-Zip([string]$path, [hashtable]$files, [string[]]$deletes) {
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $path) | Out-Null
     $z = [IO.Compression.ZipFile]::Open($path, 'Create')
@@ -296,7 +300,7 @@ function New-Zip([string]$path, [hashtable]$files, [string[]]$deletes) {
     } finally { $z.Dispose() }
 }
 $ancientZip = Join-Path $T 'ancient.zip'
-New-Zip $ancientZip @{ 'Data\Platform\UI\thornswood-filler.txt' = 'a file an old pack wrote' } @('Data\Platform\UI\ancient.esp')
+New-Zip $ancientZip @{ 'Data\Platform\UI\thornswood-filler.txt' = 'a file an old pack wrote' } @('Data\Platform\UI\thornswood-ancient.esp')
 $ancientSha = Get-BaselineFileSha $ancientZip
 Copy-Item -LiteralPath $ancientZip -Destination (Join-Path $feedDir "assets\$ancientSha")
 Set-Build 'Data\Platform\UI\thornswood-filler.txt' 'a file an old pack wrote'
@@ -368,7 +372,7 @@ $z = [IO.Compression.ZipFile]::OpenRead($packZip)
 try { $e = $z.GetEntry('profile/plugins.txt'); $s = $e.Open(); try { $packList = Get-BaselineStreamSha $s } finally { $s.Dispose() } } finally { $z.Dispose() }
 Yes '  it carries the plugin list as the pack carries it' ($m1.ContainsKey(':golden:plugins.txt') -and ([string]$m1[':golden:plugins.txt']).EndsWith(':' + $packList) -and $m1.ContainsKey(':golden:loadorder.txt'))
 Yes '  the file the release dropped is gone' ([string]$m1[':gone:Data\Platform\UI\thornswood-old.esp'] -eq 'removed')
-Yes '  and so is the one a pack took out before any record, read off that pack''s delete.txt' ([string]$m1[':gone:Data\Platform\UI\ancient.esp'] -eq 'removed')
+Yes '  and so is the one a pack took out before any record, read off that pack''s delete.txt' ([string]$m1[':gone:Data\Platform\UI\thornswood-ancient.esp'] -eq 'removed')
 Yes '  the packs are still on the feed, for launchers that replay them' (@($d1.packs).Count -eq 2 -and [string]@($d1.packs)[-1].id -eq $R1)
 
 Set-Build 'Data\Platform\Plugins\thornswood-ui.js' 'ui, second release'
@@ -381,7 +385,7 @@ Yes 'the third release goes out' (Release $R3 'The third release of the test')
 $d3 = Feed
 Yes '  every release''s record says its files are up, and the gone list carries forward' (
     [string]$records[$R2][':record:files'] -eq '1' -and [string]$records[$R3][':record:files'] -eq '1' -and
-    [string]$records[$R3][':gone:Data\Platform\UI\thornswood-old.esp'] -eq 'removed' -and [string]$records[$R3][':gone:Data\Platform\UI\ancient.esp'] -eq 'removed')
+    [string]$records[$R3][':gone:Data\Platform\UI\thornswood-old.esp'] -eq 'removed' -and [string]$records[$R3][':gone:Data\Platform\UI\thornswood-ancient.esp'] -eq 'removed')
 Yes ("  the feed still lists the packs ({0}) beside the record" -f @($d3.packs).Count) (@($d3.packs).Count -eq 4)
 
 # ---- the launcher reads it ----------------------------------------------------
@@ -538,13 +542,13 @@ Yes ("an empty install syncs to the second release by its record in the feed's l
 Yes 'one release behind, it downloads only the two files the third release changed' ((Test-Lands $one $records[$R3]) -and (Fetched) -eq 2)
 
 # Several behind: as the installer left it, and it never took the old pack that
-# removed Data\Platform\UI\ancient.esp.
+# removed Data\Platform\UI\thornswood-ancient.esp.
 $several = @{}; foreach ($k in $installerFiles.Keys) { $several[$k] = $installerFiles[$k] }
-$several['Data\Platform\UI\ancient.esp'] = 'an old plugin an old pack took out'
+$several['Data\Platform\UI\thornswood-ancient.esp'] = 'an old plugin an old pack took out'
 $sev = New-Install 'several-behind' $several @()
 [void](Update-New $sev)
 Yes 'several releases behind, it lands on the third release' (Test-Lands $sev $records[$R3])
-Yes '  having taken out what the first release dropped and what the old pack took out' ((Said '^removed Data\\Platform\\UI\\thornswood-old\.esp') -and (Said '^removed Data\\Platform\\UI\\ancient\.esp'))
+Yes '  having taken out what the first release dropped and what the old pack took out' ((Said '^removed Data\\Platform\\UI\\thornswood-old\.esp') -and (Said '^removed Data\\Platform\\UI\\thornswood-ancient\.esp'))
 
 # A file Vortex deploys now is the collection's, not ours, whatever a record says.
 $vx = New-Install 'vortex' $installerFiles $ids

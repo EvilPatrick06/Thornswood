@@ -596,7 +596,7 @@ Yes 'a site with no for-bot yet: said, with what to run, and nothing made' (($sa
 # -- the records move out of the code folder --------------------------------------
 $mv = Join-Path $g 'move-records'
 $null = New-Item -ItemType Directory -Force -Path (Join-Path $mv 'data')
-foreach ($n in 'joins.json', 'open-tickets.json', 'commands-synced.json', 'heartbeat.json', 'bot.log', 'bot.log.1', 'bot.py') { [IO.File]::WriteAllText((Join-Path $mv $n), ('old ' + $n)) }
+foreach ($n in 'joins.json', 'open-tickets.json', 'commands-synced.json', 'heartbeat.json', 'bot.log', 'bot.log.1', 'bot.log.20260916-1535.old', 'bot.py') { [IO.File]::WriteAllText((Join-Path $mv $n), ('old ' + $n)) }
 [IO.File]::WriteAllText((Join-Path $mv 'data\heartbeat.json'), 'newer')
 $said = @(Move-ThornswoodBotRecords $mv)
 Yes 'joins.json, open tickets, the command stamp and the logs move into data' (
@@ -605,6 +605,23 @@ Yes 'joins.json, open tickets, the command stamp and the logs move into data' (
     -not (Test-Path -LiteralPath (Join-Path $mv 'joins.json')) -and -not (Test-Path -LiteralPath (Join-Path $mv 'bot.log')))
 Yes 'one already in data is kept, and the old one beside the code goes' (((Get-Content -LiteralPath (Join-Path $mv 'data\heartbeat.json') -Raw) -eq 'newer') -and -not (Test-Path -LiteralPath (Join-Path $mv 'heartbeat.json')))
 Yes 'the code is not touched' (Test-Path -LiteralPath (Join-Path $mv 'bot.py'))
+# A log somebody renamed by hand to keep it is a log too (#1184): the swap
+# leaves it beside the code as the bot's own, so the full run moves it into
+# data rather than leaving it there for ever. A log is never removed.
+Yes 'a log renamed by hand moves into data with the rest' (
+    ((Get-Content -LiteralPath (Join-Path $mv 'data\bot.log.20260916-1535.old') -Raw) -eq 'old bot.log.20260916-1535.old') -and
+    -not (Test-Path -LiteralPath (Join-Path $mv 'bot.log.20260916-1535.old')))
+# What the swap leaves in the bot's folder besides the code it sends (#1184).
+# The things the full run moves or takes off later are in it by the same
+# lists those use, so the two cannot drift apart.
+$owned = @(Get-ThornswoodBotOwned)
+Yes 'what the bot owns besides its code: its settings, its record, data, service, webhooks, py-libs' (
+    -not @('bot.env.json', 'thornswood-deploy.json', 'data', 'service', 'webhooks', 'py-libs' | Where-Object { $owned -notcontains $_ }).Count)
+Yes '  and the old loop''s files and the records and logs from before #1104, by the lists the full run uses' (
+    -not @(@(Get-ThornswoodBotLoopFiles) + @(Get-ThornswoodBotRecordNames) | Where-Object { $owned -notcontains $_ }).Count -and
+    @(Get-ThornswoodBotLoopFiles).Count -eq 2 -and @('bot.log', 'bot.log.1', 'bot.log.20260916-1535.old' | Where-Object { $n = $_; @($owned | Where-Object { $n -like $_ }).Count }).Count -eq 3)
+Yes '  and no code: bot.py, card.py, assets and a stray sample.py are none of its own' (
+    -not @('bot.py', 'card.py', 'assets', 'sample.py', 'backfill.py' | Where-Object { $n = $_; @($owned | Where-Object { $n -like $_ }).Count }).Count)
 Yes 'the log is read from data from then on' ((Get-ThornswoodBotLog $mv) -eq (Join-Path $mv 'data\bot.log'))
 $old = Join-Path $g 'old-layout'
 $null = New-Item -ItemType Directory -Force -Path $old

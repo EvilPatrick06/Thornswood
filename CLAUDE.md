@@ -18,6 +18,28 @@ it belongs to, before the session ends (Developer-Guide.md says where the board
 is and how its order works). Saying it in a reply is not recording it: a
 reply is gone when the window closes. Say in the reply which issues moved.
 
+## Picking issues to work
+
+Decided by Patrick on 11 Oct: needing his decision, needing the VPS, and
+waiting on a date are not reasons to leave an issue out of a pick.
+Developer-Guide.md "What is not a reason to skip an issue" is the rule. For a
+Claude: a decision goes to him written out in full in the same reply (what is
+wrong, what was measured, each option, a recommendation), not as a terse
+picker; and a date in an issue is checked against what really waits on it
+before it is trusted.
+
+## The runs the lanes leave
+
+Decided by Patrick on 11 Oct: the lanes only commit, push and merge, and a
+Claude runs every Ship, deploy, install, live server and Vortex step for them.
+Each lane writes one note per change in the vault's `wiki/claude-queue/`
+(Developer-Guide.md, the lanes paragraph). At the start of a session on the
+shipping machine, list that folder and run each note: dev ones when they are
+ready, a Main Ship or a live server run when Patrick says so. Afterwards put
+what ran, when, what it printed and the health check on the issue and in
+`wiki/status.md`, and delete the note. A note that cannot run keeps the
+reason written into it.
+
 ## What a Claude here does itself and what the person does
 
 Read anything. Run git status, diff, log, fetch, the read only scripts
@@ -75,15 +97,23 @@ band-aids" is the rule for everybody. For a Claude it also means:
 
 Decided by Patrick on 4 Oct: never add a chat command for something people do in the world, only for staff and dev. `/stuck`, the lines that reach staff (`/helpme`, `/report`), the ways of saying a line (`/me`, `/do`, `/w`, `/s`, `/y`, `/ooc`) and `/roll` stay commands with no buttons, and help text names them; docs\SYSTEMS.md "Buttons, not commands" is the rule and what counts as a button.
 
-### Every reply ends with the commands, in order, and what each one is for
+### What the person must decide or run opens the reply, one whole item each
 
-Asked for by Patrick on 19 Sep, after four pushes went out and not one pull
-request was created, because the commands in the reply were missing a
-`git checkout` and nobody could tell from reading them.
+Changed by Patrick on 11 Oct, after a reply put "your decisions" and a block of
+commands at the end, lumped together and missing pieces: "stop doing that
+were you will have a my decision report and commands for me to run and 1. not
+do it at the end 2. not group it all together 3. Not give me all the commands
+and info I need". So a reply that needs something from the person starts with
+it, before the report of what was done. Each decision and each run is its own
+numbered item that stands alone: what it is, what was measured, the options
+and what each does with a recommendation, and every command that item needs,
+so nothing has to be pieced together from elsewhere in the reply.
 
-So a reply that leaves anything for a person to run ends with a block of the
-exact commands, in the order they are run, each with a line saying what it
-does and what it should print when it worked. No "then open a pull request",
+The commands themselves, asked for by Patrick on 19 Sep, after four pushes
+went out and not one pull request was created, because the commands in the
+reply were missing a `git checkout` and nobody could tell from reading them:
+inside its item, the exact commands, in the order they are run, each with a
+line saying what it does and what it should print when it worked. No "then open a pull request",
 no "deploy it": the literal line, copy and paste, from whatever directory the
 reply says to start in. If a command needs a different directory, the `cd` is
 one of the commands. If one of them is Patrick's rather than the person's
@@ -131,6 +161,9 @@ worktrees in the shared clone and read a session-start snapshot as the truth.
   branch. Before deleting a worktree or branch you did not make, check no
   running process names its folder and its pull request merged over an hour
   ago; lanes may be mid-run in it.
+- Never `git stash` in the shared clone (#992: 244 orphaned stashes were
+  found there, archived as `refs/stash-archive/*`). Park work on a branch
+  in your own worktree instead; a stash there is invisible to every other lane.
 - Leave nothing stale (Patrick, 5 Oct: "we need rules ... not to leave stale
   worktrees, branches, or PRs local or on GitHub it's messy work"). The
   moment a pull request of yours merges or is closed, its worktree, local

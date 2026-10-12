@@ -32,6 +32,7 @@
   read the number the running server announces in online.json.
 #>
 
+. (Join-Path $PSScriptRoot '..\release\Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 $MostOnlineRecord = Join-Path $PSScriptRoot '..\..\records\most-online.json'
 
 <#
@@ -54,9 +55,9 @@ function Get-MostOnline([string]$Path = '') {
         $raw = [IO.File]::ReadAllBytes($Path)
         $skip = 0
         if ($raw.Length -ge 3 -and $raw[0] -eq 0xEF -and $raw[1] -eq 0xBB -and $raw[2] -eq 0xBF) { $skip = 3 }
-        $doc = [Text.Encoding]::UTF8.GetString($raw, $skip, $raw.Length - $skip) | ConvertFrom-Json
+        $doc = ConvertFrom-ThornswoodJson ([Text.Encoding]::UTF8.GetString($raw, $skip, $raw.Length - $skip)) $Path
     } catch {
-        $r.Why = 'it does not read as JSON'
+        $r.Why = 'it does not read as JSON (' + $_.Exception.Message + ')'
         return $r
     }
     if ($null -eq $doc -or $doc.PSObject.Properties.Name -notcontains 'people') {

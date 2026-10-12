@@ -177,7 +177,7 @@ param(
   [string]$Npcs = '',
   # Where Deploy-Gamemode.ps1 leaves the built server. Its server-settings.json
   # is the one authority on what the load order is and in what order.
-  [string]$Dist = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') ServerDist),
+  [string]$Dist = '',
   # Where the other plugins live on this machine. Ours is taken from the repo
   # instead; see the header.
   [string]$Data = 'C:\Thornswood\Game\Data',
@@ -203,18 +203,26 @@ param(
   # parameter named only (#1929). With none set, PowerShell numbered them in
   # the order above, so a bare note bound to -Vps: on 5 Oct the refusal's own
   # example became the VPS address and the script refused again.
-  [Parameter(Position = 0)][string]$Note = ''
+  [Parameter(Position = 0)][string]$Note = '',
+    # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
+    [switch]$AllowStaleCheckout
 )
+
+# A stale or dirty checkout sends old or unlanded code; refuse it (#2118).
+. (Join-Path $PSScriptRoot '..\deploy\Fresh-Checkout.ps1'); Assert-FreshCheckout -RepoDir (Join-Path $PSScriptRoot '..\..') -What 'Deploy-DevGamemode' -Target $Vps -AnyBranch -AllowStale:$AllowStaleCheckout
 
 $ErrorActionPreference = 'Stop'
 $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+# Resolved here, not as the parameter's default: 5.1 leaves $PSScriptRoot empty in an advanced script's defaults (#2229).
+if (-not $Dist) { $Dist = & (Join-Path $Here '..\release\Where.ps1') ServerDist }
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Script.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 . (Join-Path $Here 'Swap.ps1')
+. (Join-Path $Here '..\release\Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 if (-not $PSBoundParameters.ContainsKey('Wait')) {
   $Wait = Get-ThornswoodServerReadyWait
 }
@@ -258,11 +266,14 @@ if (-not (Test-Path -LiteralPath $Gamemode)) { throw "There is no gamemode at $G
 # of people it holds (records\most-online.json) and, with -LoadOrder, our
 # plugin (#1121). There used to be a -Gamemode to send a file from anywhere;
 # that was a way round the commit, so it is gone.
-# -PutBack builds and sends nothing.
+# -PutBack builds and sends nothing. records\server-build.json is read below as
+# the record of the server build this commit's gamemode is written for
+# (#2076), so it is held to the commit too: an uncommitted record would be
+# compared with the box in place of the one the commit holds (#2132).
 . (Join-Path $Here 'Artifact.ps1')
 $artifact = $null
 if (-not $PutBack) {
-$alsoSends = @('records/most-online.json')
+$alsoSends = @('records/most-online.json', 'records/server-build.json')
 if ($LoadOrder) { $alsoSends += 'game/content/Thornswood-Content.esp' }
 $artifact = New-ThornswoodArtifact -Component gamemode -RepoDir (Join-Path $Here '..\..') -Paths 'game/gamemode.js' -AlsoSends $alsoSends
 Write-Host ('  artifact ' + (Format-ThornswoodArtifact $artifact))
@@ -279,6 +290,34 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) { throw 'node is not 
 & node --check $Gamemode
 if ($LASTEXITCODE -ne 0) { throw 'gamemode.js does not parse. Nothing was sent.' }
 Write-Host '  gamemode.js parses'
+
+# THE ENGINE THIS GAMEMODE IS WRITTEN FOR (#2076). A gamemode goes onto the
+# server build its commit records, the comparison Deploy-Server -GamemodeOnly
+# makes for live (#1089). Asked before the artifact leaves this machine, so a
+# refusal sends nothing and stops nothing. -PutBack sends no gamemode.
+. (Join-Path $Here 'ServerBuild.ps1')
+$devRecordPath = Join-Path $Here '..\..\records\server-build.json'
+if (-not (Test-Path -LiteralPath $devRecordPath)) { throw 'there is no records\server-build.json, so nothing says which server build this gamemode is written for. Nothing was sent.' }
+$devRecordSum = Get-ThornswoodRecordSum ([IO.File]::ReadAllBytes($devRecordPath))
+$devRecordCommit = [string]((ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $devRecordPath -Raw) $devRecordPath).source.commit)
+$devBoxSaid = @(Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script ($ThornswoodRecordSumText + "`r`n" + @"
+`$rp = '$($Root.Replace('/', '\').Replace("'", "''"))\server-build.json'
+if (Test-Path -LiteralPath `$rp) {
+  'RECORD ' + (Get-ThornswoodRecordSum ([IO.File]::ReadAllBytes(`$rp)))
+  try { 'RECORDCOMMIT ' + [string](([IO.File]::ReadAllText(`$rp) | ConvertFrom-Json).source.commit) } catch { }
+} else { 'RECORD none' }
+"@) | ForEach-Object { "$_".Trim() })
+$devBoxSum = ''; $devBoxCommit = ''
+foreach ($l in $devBoxSaid) {
+  if ($l -match '^RECORD ([0-9a-f]{64}|none)$') { $devBoxSum = $Matches[1] }
+  elseif ($l -match '^RECORDCOMMIT ([0-9a-f]*)$') { $devBoxCommit = $Matches[1] }
+}
+$devBuildProblem = Get-ThornswoodBoxBuildProblem $devBoxSum $devBoxCommit $devRecordSum $devRecordCommit 'dev server' 'scripts\release\Publish-Server.ps1 -Channel dev'
+if ($devBuildProblem) {
+  Write-Host ('  ' + $devBuildProblem) -ForegroundColor Red
+  throw 'The dev server does not run the server build this gamemode is written for. Nothing was sent and the dev server was not touched.'
+}
+Write-Host ('  the dev server runs the build this commit records, commit ' + $devRecordCommit.Substring(0, [Math]::Min(8, $devRecordCommit.Length)))
 
 Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
 }
@@ -327,7 +366,7 @@ if ($LoadOrder) {
   if (-not (Test-Path -LiteralPath $settingsSrc)) {
     throw "-LoadOrder needs the built server's settings at $settingsSrc. Run Deploy-Gamemode.ps1 -Vortex first."
   }
-  $built = Get-Content -LiteralPath $settingsSrc -Raw | ConvertFrom-Json
+  $built = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $settingsSrc -Raw) $settingsSrc
   if (-not $built.loadOrder) { throw "$settingsSrc has no loadOrder" }
   $pluginNames = @($built.loadOrder | ForEach-Object { [IO.Path]::GetFileName($_) })
   $ours = Join-Path $Here '..\..\game\content\Thornswood-Content.esp'
@@ -372,6 +411,16 @@ if ($LoadOrder) {
     }
   }
 
+  # THE COLLECTION'S BYTES, NOT THIS MACHINE'S (#2019). A plugin goes up when
+  # its size differs from the box's, from whatever -Data holds. On 5 Oct that
+  # sent a 3BBB.esp from another installer choice to both servers and blocked
+  # Play for everybody on the collection. Every plugin about to go, except our
+  # own, has to be the one records\collection-plugins.json holds; a deploy
+  # that would send any other stops here, naming it, with nothing sent. With
+  # no record it stops too: nothing else can say those bytes are the
+  # collection's. Only the plugins about to go are read.
+  . (Join-Path $Here 'CollectionPlugins.ps1')
+  Assert-ThornswoodCollectionPlugins -RecordPath (Join-Path $Here '..\..\records\collection-plugins.json') -Files $sendPlugins -Exempt 'Thornswood-Content.esp' -What 'this deploy'
   Write-Host ''
   Write-Host ('  load order: {0} plugins, paths rewritten to {1}' -f $pluginNames.Count, $remotePlugins) -ForegroundColor DarkGray
   if ($sendPlugins.Count) {
@@ -826,7 +875,7 @@ if (`$orderPath -and (Test-Path `$orderPath)) {
 `$order2 = @(`$(if (`$wantOrder) { `$newOrder } else { @(`$s.loadOrder) }))
 $fullIndexDef
 `$loadsLight = `$false
-try { `$loadsLight = ((Get-Content -LiteralPath '$boxRecord' -Raw | ConvertFrom-Json).lightPlugins -eq `$true) } catch { }
+try { `$loadsLight = ((Get-Content -LiteralPath '$boxRecord' -Raw -ErrorAction Stop | ConvertFrom-Json).lightPlugins -eq `$true) } catch { }
 `$lightOf = @{ $lightTable }
 `$unread = @()
 `$isLight = `$null

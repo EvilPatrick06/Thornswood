@@ -80,6 +80,21 @@ $Depots = [ordered]@{
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 
+# Every robocopy in this script goes through here (#2201). Robocopy's exit
+# code is a set of flags, not a plain error: 0 to 7 mean it copied, skipped or
+# found extras, and 8 or more mean some file or folder could not be copied.
+# Ignoring that left a half copied game folder that looked finished. 0 to 7
+# carry on and the code comes back; 8 and above stop, naming both folders.
+function Invoke-CheckedRobocopy([string]$From, [string]$To, [string[]]$Flags) {
+    & robocopy $From $To @Flags | Out-Null
+    $code = $LASTEXITCODE
+    if ($code -ge 8) {
+        Die ("robocopy could not copy " + $From + " to " + $To + " (robocopy code " + $code + "). " +
+             "Check the disk has room and nothing has those files open, then run this again.")
+    }
+    return $code
+}
+
 # Robocopy run with its mouth shut, and one line of our own that counts.
 #
 # It used to run with the file list on, deliberately, so somebody could see it
@@ -97,8 +112,7 @@ function Copy-Quietly($from, $to, $label, [switch]$Move) {
                '/NFL', '/NDL', '/NC', '/NS', '/NP', '/NJH', '/NJS')
     if ($Move) { $flags += '/MOVE' }
     $clock = [Diagnostics.Stopwatch]::StartNew()
-    & robocopy $from $to @flags | Out-Null
-    $code = $LASTEXITCODE
+    $code = Invoke-CheckedRobocopy $from $to $flags
     Write-Host ("  {0}, {1:mm\:ss}" -f $label, $clock.Elapsed) -ForegroundColor DarkGray
     return $code
 }
@@ -220,14 +234,14 @@ function Get-SteamRoot {
         }
     }
     $c += "${env:ProgramFiles(x86)}\Steam", "$env:ProgramFiles\Steam"
-    $c | Where-Object { $_ -and (Test-Path (Join-Path $_ 'steam.exe')) } | Select-Object -First 1
+    $c | Where-Object { $_ -and (Test-Path -LiteralPath (Join-Path $_ 'steam.exe')) } | Select-Object -First 1
 }
 function Get-Libraries($steam) {
     $r = @($steam)
     $vdf = Join-Path $steam 'steamapps\libraryfolders.vdf'
-    if (Test-Path $vdf) {
+    if (Test-Path -LiteralPath $vdf) {
         foreach ($l in Get-Content -LiteralPath $vdf) {
-            if ($l -match '^\s*"path"\s+"(.+)"') { $p = $Matches[1] -replace '\\\\', '\'; if (Test-Path $p) { $r += $p } }
+            if ($l -match '^\s*"path"\s+"(.+)"') { $p = $Matches[1] -replace '\\\\', '\'; if (Test-Path -LiteralPath $p) { $r += $p } }
         }
     }
     $r | Select-Object -Unique
@@ -243,11 +257,11 @@ $libs = @(if ($steamRoot) { Get-Libraries $steamRoot })
 if (-not $SteamGamePath) {
     foreach ($l in $libs) {
         $g = Join-Path $l 'steamapps\common\Skyrim Special Edition'
-        if (Test-Path (Join-Path $g 'SkyrimSE.exe')) { $SteamGamePath = $g; break }
+        if (Test-Path -LiteralPath (Join-Path $g 'SkyrimSE.exe')) { $SteamGamePath = $g; break }
     }
 }
 if (-not $SteamGamePath) { Die 'Skyrim Special Edition was not found in any Steam library. Install it first.' }
-$SteamGamePath = (Resolve-Path $SteamGamePath).Path
+$SteamGamePath = (Resolve-Path -LiteralPath $SteamGamePath).Path
 Say "  $SteamGamePath" 'Green'
 
 # ---- which shape of install this is --------------------------------------
@@ -444,10 +458,10 @@ foreach ($f in $want) {
 Say '  Archives. This is the slow part, about 15 GB.'
 Say '  The window looks still while it works. That is normal.' 'DarkGray'
 $rc = [Diagnostics.Stopwatch]::StartNew()
-& robocopy $dataSrc $dataDst 'Skyrim - *.bsa' /R:1 /W:1 /MT:8 /NFL /NDL /NC /NS /NP /NJH /NJS | Out-Null
+$null = Invoke-CheckedRobocopy $dataSrc $dataDst @('Skyrim - *.bsa', '/R:1', '/W:1', '/MT:8', '/NFL', '/NDL', '/NC', '/NS', '/NP', '/NJH', '/NJS')
 Write-Host ("  archives copied, {0:mm\:ss}" -f $rc.Elapsed) -ForegroundColor DarkGray
 if (Test-Path (Join-Path $dataSrc 'Video')) {
-    & robocopy (Join-Path $dataSrc 'Video') (Join-Path $dataDst 'Video') /E /R:1 /W:1 /NFL /NDL /NP /NJH /NJS | Out-Null
+    $null = Invoke-CheckedRobocopy (Join-Path $dataSrc 'Video') (Join-Path $dataDst 'Video') @('/E', '/R:1', '/W:1', '/NFL', '/NDL', '/NP', '/NJH', '/NJS')
 }
 $bsaCount = @(Get-ChildItem $dataDst -Filter '*.bsa' -File -EA SilentlyContinue).Count
 if ($bsaCount -lt 15) { Die "Only $bsaCount archives copied. Your Steam copy looks incomplete - verify it in Steam first, then run this again." }
@@ -469,7 +483,7 @@ function Invoke-DepotRepair($reason) {
     function Resolve-Depot($id) {
         foreach ($c in @((Join-Path $content "app_$AppId\depot_$id"), (Join-Path $content "$AppId\$id"),
                          (Join-Path $content "depot_$id"), (Join-Path $content $id))) {
-            if (Test-Path $c) { return $c }
+            if (Test-Path -LiteralPath $c) { return $c }
         }
         $null
     }
@@ -501,7 +515,7 @@ function Invoke-DepotRepair($reason) {
     foreach ($id in $Depots.Keys) {
         $d = Resolve-Depot $id
         Say "  Applying depot $id..."
-        & robocopy $d $GameDir /E /R:1 /W:1 /MT:8 /NFL /NDL /NP /NJH /NJS | Out-Null
+        $null = Invoke-CheckedRobocopy $d $GameDir @('/E', '/R:1', '/W:1', '/MT:8', '/NFL', '/NDL', '/NP', '/NJH', '/NJS')
     }
 
     Say '  Applied' 'Green'
@@ -543,7 +557,7 @@ if (Test-Path $vanillaList) {
         $out = @()
         foreach ($prop in $doc.PSObject.Properties) {
             $f = Join-Path $GameDir $prop.Name
-            if (-not (Test-Path $f)) { continue }
+            if (-not (Test-Path -LiteralPath $f)) { continue }
             if ((Get-Sha256 $f) -ne ([string]$prop.Value).ToLower()) { $out += $prop.Name }
         }
         return $out
@@ -669,7 +683,6 @@ public static class TsLinkCount {
 }
 if ($MadeOwn) { Remove-SharedNames $Payload $GameDir }
 $code = if ($MovePayload) { Copy-Quietly $Payload $GameDir 'installing the mods' -Move } else { Copy-Quietly $Payload $GameDir 'installing the mods' }
-if ($code -ge 8) { Die "robocopy failed with code $code" }
 Say '  Done' 'Green'
 
 # ------------------------------------------------------------- profile

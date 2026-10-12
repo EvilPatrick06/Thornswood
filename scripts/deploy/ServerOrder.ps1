@@ -45,6 +45,8 @@
   Keep it ASCII and Windows PowerShell 5.1.
 #>
 
+. (Join-Path $PSScriptRoot '..\release\Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
+
 $script:ThornswoodBaseMasters = 'Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm'
 
 # Whether the engine a server build record describes loads light plugins.
@@ -54,7 +56,7 @@ $script:ThornswoodBaseMasters = 'Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'He
 function Test-ThornswoodEngineLoadsLight([string]$Record) {
     if (-not $Record) { throw 'no server build record was named, so it is not known whether the engine loads light plugins' }
     if (-not (Test-Path -LiteralPath $Record)) { throw "there is no server build record at $Record, so it is not known whether the engine loads light plugins" }
-    try { $r = [IO.File]::ReadAllText($Record) | ConvertFrom-Json }
+    try { $r = ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($Record)) $Record }
     catch { throw "the server build record at $Record does not read ($($_.Exception.Message)), so it is not known whether the engine loads light plugins" }
     return ($r.PSObject.Properties.Name -contains 'lightPlugins' -and $r.lightPlugins -eq $true)
 }

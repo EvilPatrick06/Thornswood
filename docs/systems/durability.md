@@ -137,7 +137,9 @@ for the half in the table above, and the Weapon Kit and the Armor Kit
 burn one Poor Charcoal at the forge (#1622).
 The inventory shows a piece's condition as it was when the piece
 reached the pack, and a change during a session shows after the
-next login (issue #1651); the repair panel always has the number.
+next login, until the engine release that carries the fix for issue
+#1651; from then a change shows at once and a worn piece stays worn.
+The repair panel always has the number.
 The 5% more damage and armour at 120% is not applied, because the
 engine works damage out on its own. A piece that is not at 100%
 cannot be enchanted, because the engine takes a plain piece for an

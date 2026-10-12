@@ -28,6 +28,8 @@
 #>
 [CmdletBinding()]
 param([string]$ShipPath)
+# Scripts this runs whole go to a stand-in box, so the freshness guard lets them be (#2118).
+$env:THORNSWOOD_HARNESS = '1'
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
@@ -91,6 +93,8 @@ if (-not ($measure -and $gate)) { Done }
 # Die is Ship's own exit; here it throws, so a refusal comes back as its words.
 # Unbump records that it was asked, so the gate putting the version back before
 # it stops is checked the way the real gate calls it.
+# The sections lifted below call ConvertFrom-ThornswoodJson, which their script dot-sources.
+. (Join-Path (Split-Path -Parent $PSScriptRoot) 'scripts\release\Read-JsonFile.ps1')
 $stubs = @'
 function Say($m, $c) { }
 function Head($m) { }

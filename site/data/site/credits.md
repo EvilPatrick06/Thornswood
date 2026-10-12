@@ -35,15 +35,16 @@ with no account.
 
 The server's engine recorded for the next release, `scam_native.node`, is
 built from one commit,
-[`7feb5dc4`](https://github.com/EvilPatrick06/skymp/tree/7feb5dc4cbcef4e040fcd49fa852c33351f8886d).
+[`92848550`](https://github.com/EvilPatrick06/skymp/tree/928485503333b18c2325fc13cbf781d254b19af0).
 That commit starts from
 [SkyMP](https://github.com/skyrim-multiplayer/skymp) at `2849e676`, and
-[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/2849e676...7feb5dc4)
+[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/2849e676...92848550)
 is the difference between the two.
 
 The server's engine goes to our test server first, then to the main server.
-The recorded build has not been deployed yet. Both servers still run
-[`3a32e961`](https://github.com/EvilPatrick06/skymp/tree/3a32e9615d4eae43cc6995cdf2c09c528bc80da6),
+The main server
+still runs
+[`3a32e961`](https://github.com/EvilPatrick06/skymp/tree/3a32e961),
 the earlier engine from release 1.2.0 on 5 October.
 
 The six client files are built from the commit named by the feed a person
@@ -55,7 +56,7 @@ the same public branch:
 | Channel | Feed | The six client files are built from |
 |---|---|---|
 | Public | `feed/version.json` | [`3a32e961`](https://github.com/EvilPatrick06/skymp/tree/3a32e961) |
-| Dev | `feed-dev/version.json` | [`3a32e961`](https://github.com/EvilPatrick06/skymp/tree/3a32e961) |
+| Dev | `feed-dev/version.json` | [`92848550`](https://github.com/EvilPatrick06/skymp/tree/92848550) |
 
 | File | Built from | Licence |
 |---|---|---|

@@ -64,6 +64,7 @@ param(
     # live one is never touched to test anything.
     ,[string]$AppliedFile
 )
+. (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
@@ -119,7 +120,7 @@ function Send-Repaired {
 
 Head 'Reading version.json'
 Say "  $VersionFile" 'DarkGray'
-$doc = Get-Content -LiteralPath $VersionFile -Raw | ConvertFrom-Json
+$doc = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $VersionFile -Raw) $VersionFile
 $packs = @()
 if ($doc.PSObject.Properties['packs'] -and $doc.packs) { $packs = @($doc.packs) }
 Say ("  {0} pack(s)" -f $packs.Count) 'DarkGray'

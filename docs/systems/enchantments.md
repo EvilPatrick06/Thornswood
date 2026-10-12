@@ -77,6 +77,9 @@ from the client names the piece and not its enchantment, so the menu
 still applies whatever Skyrim would. [#1389](https://github.com/EvilPatrick06/Thornswood/issues/1389)
 says what the engine has to pass.
 
-The soul gem table above is not checked. The server does not keep a
-list of learned enchantments, because it is never told about a
-disenchant.
+The soul gem table above is checked ([#1648](https://github.com/EvilPatrick06/Thornswood/issues/1648)):
+the engine hands the gamemode the craft's inputs, and a gem above your
+rank in the half that owns the piece is refused with the gem and the
+piece left in your pack. The size of the gem is what is judged. The
+server does not keep a list of learned enchantments, because it is
+never told about a disenchant.

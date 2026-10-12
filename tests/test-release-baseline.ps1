@@ -37,6 +37,8 @@
   Nothing here connects to anything but 127.0.0.1, and everything it writes is
   in its own temp folder.
 #>
+# Scripts this runs whole go to a stand-in box, so the freshness guard lets them be (#2118).
+$env:THORNSWOOD_HARNESS = '1'
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
@@ -348,7 +350,7 @@ try {
     # ---- 6. the real Publish-Update.ps1 ---------------------------------------------
     Write-Host ''; Write-Host 'the real Publish-Update.ps1'
     $fake = Join-Path $T 'repo'
-    foreach ($f in 'scripts\release\Publish-Update.ps1', 'scripts\release\Ship-Rules.ps1', 'scripts\mods\LoadOrder.ps1',
+    foreach ($f in 'scripts\release\Publish-Update.ps1', 'scripts\release\Read-JsonFile.ps1', 'scripts\release\Ship-Rules.ps1', 'scripts\mods\LoadOrder.ps1',
                    'scripts\release\Feed-Store.ps1', 'scripts\release\Release-Baseline.ps1', 'scripts\release\Release-Name.ps1', 'scripts\release\Source-Notice.ps1',
                    'scripts\release\Dev-News.ps1',
                    'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt',

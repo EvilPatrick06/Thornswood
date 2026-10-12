@@ -10,7 +10,9 @@
 // the rail (#599), so somebody refused landed on a mod browser with no Fix
 // button and no rail button to find it again.
 //
-// This reads launcher\app\Shell.cs and launcher\ui.xaml and holds:
+// This reads launcher\app\ShellPlay.cs (where Play() has lived since #2093
+// moved it out of Shell.cs for #500), launcher\app\Shell.cs (the page
+// constants, the pages array and the rail) and launcher\ui.xaml, and holds:
 //   - the page the refusal opens (ShowPage(PageX) in the refusal block),
 //     followed through the PageX constant and the pages array to its Grid in
 //     ui.xaml, is the Grid that holds BtnScan and BtnFix;
@@ -35,13 +37,14 @@ function yes(what, cond) {
 }
 
 const shell = read('launcher', 'app', 'Shell.cs');
+const play = read('launcher', 'app', 'ShellPlay.cs');
 const xaml = read('launcher', 'ui.xaml');
 
 // ---- the refusal block ------------------------------------------------------
-const start = shell.indexOf('Log("Not launching. " + blockers');
-const stop = start < 0 ? -1 : shell.indexOf('Verify.DeployPersonal', start);
-yes('Shell.cs still has the mod list refusal in Play', start > 0 && stop > start);
-const block = start > 0 && stop > start ? shell.slice(start, stop) : '';
+const start = play.indexOf('Log("Not launching. " + blockers');
+const stop = start < 0 ? -1 : play.indexOf('Verify.DeployPersonal', start);
+yes('ShellPlay.cs still has the mod list refusal in Play', start > 0 && stop > start);
+const block = start > 0 && stop > start ? play.slice(start, stop) : '';
 
 const shows = [];
 block.replace(/ShowPage\((\w+)\)/g, function (m, p) { shows.push(p); return m; });

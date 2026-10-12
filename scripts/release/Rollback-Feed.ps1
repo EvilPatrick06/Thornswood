@@ -86,6 +86,7 @@ param(
     # A folder standing in for C:\Thornswood-Docs. Tests only.
     [string]$SiteDir
 )
+. (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -138,7 +139,7 @@ catch { Die ("Could not receive the $Channel feed from the VPS, so nothing was c
 $VersionFile = Join-Path $ReleaseDir 'version.json'
 $StateFile = Join-Path $ReleaseDir 'published.json'
 if (-not (Test-Path -LiteralPath $VersionFile)) { Die "The VPS has no version.json for the $Channel channel." }
-$doc = (([IO.File]::ReadAllText($VersionFile)) -replace '^\uFEFF', '') | ConvertFrom-Json
+$doc = ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($VersionFile)) $VersionFile
 $cur = $null
 try { $cur = Get-FeedBaselinePointer $doc } catch { Die $_.Exception.Message }
 $releases = @(Get-FeedReleases $doc)
@@ -263,7 +264,7 @@ if ($notThisMachine) { Say ("  left out {0} record entries naming one machine's 
 # record (:src:), because the launcher is not rolled back.
 $clientKeys = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
 if (Test-Path -LiteralPath $clientRecord) {
-    $cb = ((Get-Content -LiteralPath $clientRecord -Raw) -replace '^\uFEFF', '') | ConvertFrom-Json
+    $cb = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $clientRecord -Raw) $clientRecord
     foreach ($n in @($cb.files.PSObject.Properties.Name)) { [void]$clientKeys.Add($n) }
 }
 function Test-StaysWithLauncher([string]$k) { return ($k.StartsWith(':src:') -or $clientKeys.Contains($k)) }

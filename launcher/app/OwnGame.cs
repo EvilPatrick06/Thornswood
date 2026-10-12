@@ -75,6 +75,16 @@ namespace Thornswood
         [DllImport("kernel32.dll", SetLastError = true)]
         static extern bool GetFileInformationByHandle(SafeFileHandle hFile, out FileInfoByHandle info);
 
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        static extern SafeFileHandle CreateFile(string lpFileName, uint dwDesiredAccess, uint dwShareMode,
+            IntPtr lpSecurityAttributes, uint dwCreationDisposition, uint dwFlagsAndAttributes, IntPtr hTemplateFile);
+
+        // Links opens a file for its attributes alone (#2210).
+        const uint FileReadAttributes = 0x80;
+        const uint FileShareAll = 0x7;          // read, write, delete
+        const uint OpenExisting = 3;
+        const uint BackupSemantics = 0x02000000;
+
         // ---------------------------------------------------------------- where
 
         /// <summary>The folder this makes. Paths.Init runs the game from here once it exists.</summary>
@@ -1500,12 +1510,26 @@ namespace Thornswood
             catch (Exception ex) { Swallow.Note("OwnGame.Detach, delete", ex); }
         }
 
+        /// <summary>
+        /// How many names the file has. Asked with a handle that may read the
+        /// file's attributes and nothing else (#2210). Until 11 Oct this opened
+        /// the file for reading, and opening for reading is what the virus
+        /// scanner checks: on One, 12.13 ms a file against 0.20 ms for
+        /// attributes only, over 1,500 files of the game folder, with the same
+        /// count from both on 200 of 200. A refresh asks this of every one of
+        /// some 31,000 files, up to three times each, which is why "Preparing
+        /// the game folder" took four minutes whatever had changed.
+        /// </summary>
         static int Links(string path)
         {
-            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            string p = path.Length >= 260 && !path.StartsWith(@"\\?\") ? @"\\?\" + Path.GetFullPath(path) : path;
+            using (SafeFileHandle h = CreateFile(p, FileReadAttributes, FileShareAll, IntPtr.Zero, OpenExisting, BackupSemantics, IntPtr.Zero))
             {
+                // Missing, refused or held: the same exceptions FileStream threw,
+                // which every caller already catches.
+                if (h.IsInvalid) Marshal.ThrowExceptionForHR(Marshal.GetHRForLastWin32Error());
                 FileInfoByHandle info;
-                if (!GetFileInformationByHandle(fs.SafeFileHandle, out info)) return 1;
+                if (!GetFileInformationByHandle(h, out info)) return 1;
                 return (int)info.NumberOfLinks;
             }
         }
