@@ -55272,13 +55272,54 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       198x16, icons 28px, and the padding and gaps to match. The anchor stays
       where it is, because the panel grows up and to the right from the bottom
       left corner and moving it would only push it into the compass.
+
+      ONE STRIP UNDER THE BARS, SIZED BY THE HUD (#2247). Djinn on dev,
+      26 September: "The survival UI box blocks the magicka bar. It needs to
+      be resized and moved." It did: four rows of 22px, about 514 by 193
+      pixels at 1920x1080 from the bottom left corner, and the bars people
+      see sit right there. Measured on 11 Oct from the collection's own
+      files, not guessed:
+
+        TrueHUD's player widget is on and hides the game's own three bars
+        (Data\MCM\Config\TrueHUD\settings.ini: bEnablePlayerWidget 1,
+        bPlayerWidgetHideVanillaBars 1, not combined, bar width 245). Its
+        movie is 1280x720 (TrueHUD.swf's header), shown whole and centred
+        (BSScaleformManager's default, kShowAll), and TrueHUD places each bar
+        at that stage size times the setting (PlayerWidget.cpp LoadConfig,
+        TrueHUD_PlayerWidget.as): magicka from x 84.5 to 329.5 centred on
+        y 676.8, health centred on x 640, stamina ending at x 1195.5, all at
+        y 676.8, and the enchantment charge meter centred on 640, 698.4. A
+        bar's frame is 18 high and its flash 19.2 (LargeBarFrame and
+        LargeBarOutlineFlashTexture in TrueHUD_Assets0.swf), so nothing of
+        the three reaches below y 686.4, and the charge meter starts right
+        of x 570.
+
+        SkyHUD's hudmenu (SkyHUD.bsa, meters locked at the game's places,
+        skyhud.txt) puts the game's own bars higher, between y 610 and 640
+        (magicka x 118 to 411), with nothing of the HUD below 640 on the
+        left. Those are what show if TrueHUD's widget is ever off.
+
+      So the bars are one strip of four in the band below all of that: the
+      stage's y 698 to 718, from x 10 to 550, which is clear of every bar
+      either mod draws and of the charge meter. And every size is in the
+      HUD's own pixels, --ts, which is the screen's height over 720 or its
+      width over 1280, whichever is smaller (that is what kShowAll does), so
+      the strip keeps the same place against the bars at 1280x720, 1080p,
+      1440p, 4K, 16:10 and ultrawide. The row's words stay (Hunger, Thirst,
+      Rest, Temp), smaller: 10 of the HUD's pixels, 15px at 1080p and 20px at
+      1440p. tests\test-hud.js works the strip out at each of those screens
+      against the measured bars.
     */
-    var CSS = 'position:fixed;left:18px;bottom:16px;z-index:2147483500;' +
-              'pointer-events:none;font-family:Georgia,serif;font-size:22px;' +
-              'letter-spacing:.04em;color:#efe4cc;' +
-              'background:rgba(12,10,8,.62);border:2px solid rgba(0,0,0,.65);' +
-              'border-radius:10px;padding:13px 19px 16px;' +
-              'text-shadow:0 2px 4px rgba(0,0,0,.95)';
+    var HUD_PX = 'min(0.078125vw,0.1388889vh)';
+    var CSS = '--ts:' + HUD_PX + ';' +
+              'position:fixed;left:calc(50vw - 630 * var(--ts));bottom:calc(50vh - 358 * var(--ts));' +
+              'width:calc(540 * var(--ts));height:calc(20 * var(--ts));box-sizing:border-box;' +
+              'display:flex;align-items:center;white-space:nowrap;z-index:2147483500;' +
+              'pointer-events:none;font-family:Georgia,serif;font-size:calc(10 * var(--ts));' +
+              'line-height:1;color:#efe4cc;' +
+              'background:rgba(12,10,8,.62);border:calc(1 * var(--ts)) solid rgba(0,0,0,.65);' +
+              'border-radius:calc(4 * var(--ts));padding:0 calc(2 * var(--ts));' +
+              'text-shadow:0 1px 3px rgba(0,0,0,.95)';
     return [
       '(function(){',
       '  try {',
@@ -55342,24 +55383,27 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
         is its own calm colour and a failing one turns red, which reads at a
         glance without making the whole row disappear.
       */
+      // A size in the HUD's own pixels; see the note over CSS.
+      '    function u(n) { return "calc(" + n + " * var(--ts))"; }',
+      // Each word's own width, so the strip is 540 of the HUD's pixels every time.
+      '    var LABEL_W = { food: 34, drink: 30, rest: 22, temp: 26 };',
       '    function row(kind, label, fill, col, readout) {',
       '      var pct = Math.max(0, Math.min(100, Math.round(fill)));',
-      '      var svg = \'<svg width="28" height="28" viewBox="0 0 20 20" fill="none" \' +',
-      '        \'stroke="\' + col + \'" stroke-width="1.7" stroke-linecap="round" \' +',
-      '        \'stroke-linejoin="round" style="vertical-align:middle;margin-right:13px">\' +',
+      '      var svg = \'<svg viewBox="0 0 20 20" fill="none" \' +',
+      '        \'stroke="\' + col + \'" stroke-width="1.9" stroke-linecap="round" \' +',
+      '        \'stroke-linejoin="round" style="width:\' + u(12) + \';height:\' + u(12) + \';flex:none;margin-right:\' + u(3) + \'">\' +',
       '        \'<path d="\' + ICON[kind] + \'"/></svg>\';',
-      '      var track = \'<span style="display:inline-block;width:198px;height:16px;\' +',
-      '        \'background:rgba(0,0,0,.72);border:2px solid rgba(255,255,255,.22);\' +',
-      '        \'border-radius:5px;vertical-align:middle;overflow:hidden">\' +',
+      '      var name = \'<span style="display:inline-block;flex:none;width:\' + u(LABEL_W[kind]) + \';margin-right:\' + u(3) + \'">\' + label + \'</span>\';',
+      '      var track = \'<span style="display:inline-block;flex:none;width:\' + u(36) + \';height:\' + u(5) + \';\' +',
+      '        \'background:rgba(0,0,0,.72);border:\' + u(1) + \' solid rgba(255,255,255,.22);\' +',
+      '        \'border-radius:\' + u(2) + \';box-sizing:border-box;overflow:hidden">\' +',
       '        \'<span style="display:block;height:100%;width:\' + pct + \'%;\' +',
       '        \'background:\' + col + \'"></span></span>\';',
       // Wide enough for the longest readout there is, "Freezing 100", so the
-      // panel does not change width every time the weather does. The three
-      // percentages sit right aligned against the same edge.
-      '      var num = \'<span style="display:inline-block;min-width:148px;text-align:right;\' +',
+      // strip does not change width every time the weather does.
+      '      var num = \'<span style="display:inline-block;flex:none;width:\' + u(kind === "temp" ? 70 : 28) + \';margin-left:\' + u(4) + \';\' +',
       '        \'color:\' + col + \';font-variant-numeric:tabular-nums">\' + readout + \'</span>\';',
-      '      var name = \'<span style="display:inline-block;width:81px">\' + label + \'</span>\';',
-      '      return \'<div style="margin-top:10px;white-space:nowrap">\' +',
+      '      return \'<div style="display:flex;align-items:center;flex:none;margin:0 \' + u(4.5) + \'">\' +',
       '             svg + name + track + num + \'</div>\';',
       '    }',
       '',
