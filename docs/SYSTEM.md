@@ -147,6 +147,10 @@ and Dev only (`server.js:2921-2922`, Developer-Guide.md:35). The door turns
 somebody away only when `allowed.json` says `"enforce": true`
 (`gamemode.js:11008-11010`), which `Set-Door.ps1 -Enforce` sets.
 
+## Checking the box matches this page
+
+`scripts\vps\Check-ProdParity.ps1 -Collect` runs `Get-ProdFacts.ps1` on the VPS, which only reads, and compares the box with `records\prod-parity.json`: binds, Caddy's live file, task accounts and triggers, services, the live site and voice files, the certificate's days left, and which settings exist. It never records a setting's value, only its name and type, and refuses to write a report holding anything shaped like a secret. Each difference is ok, intentional (the record says why) or review, which a person classes as stale documentation or work for the box (issue #2165). Installer lane owns the script and the record; Claude runs it after every Deploy-Docs, Setup-Domain, Install-Voice or Install-Bot and at least monthly.
+
 ## The VPS services
 
 Every service but the bot is a Windows scheduled task; the bot is a Windows
