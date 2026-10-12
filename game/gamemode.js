@@ -37593,7 +37593,93 @@ log('gamemode loaded:',
   /* Every kind of rest this hands the needs block, and 'bedroll', the kind
      #1392 handed out, so somebody still resting at it is got up the same way. */
   var REST_KINDS = { sit: true, rough: true, campfire: true, camp: true, inn: true, bed: true,
-                     bedroll: true };
+                     common: true, commonfire: true, bedroll: true };
+
+  /*
+    AN INN OR A TEMPLE NOBODY HOLDS (#2246).
+
+    Djinn, #dev-test-results, 26 Sep: survival starts too harsh, and where
+    somebody rests or logs out should decide how much comes back: an inn or a
+    temple the most, out in the wild the least. Until this, a bed in an inn
+    nobody holds was "a bed nobody can lend you", the same 25 an hour as a
+    bedroll on the road, and no logout fill. Every new character arrives in
+    one of nine inns (CHARGEN), and none of those is held unless a person
+    claimed it, so that was every new character's first night.
+
+    So the beds now know an inn or a temple when they see one, and hand the
+    needs block two kinds of their own: common, a bed there, and commonfire,
+    the same bed with a fire in reach. What each is worth, awake and at a
+    logout, is NEEDS.recover and NEEDS.away in the needs block, the one table
+    of the balance. Until Patrick picks the numbers on #2246 they are the
+    rough and camp numbers they always were, so nobody's rest changes.
+
+    WHAT AN INN OR A TEMPLE IS, read off the game's own records the way a
+    bed is (bedKind): the room's CELL names its location (XLCN), and the
+    location carries LocTypeInn or LocTypeTemple. Asked once per room through
+    mp.lookupEspmRecordById and kept. Measured against the load order on
+    11 Oct (Build-WakeTable.js's reader over every plugin switched on): 33
+    rooms are inns and 17 are temples, every one of the nine arrival inns
+    among them. A house the game sells as a home is not an inn, whatever
+    else it carries: Riften's Honeyside has LocTypeInn as well as
+    LocTypePlayerHouse. A held building is never this: its holder decides
+    who sleeps there, as before.
+  */
+  var REST_PLACE_KEYWORDS = { LocTypeInn: 'inn', LocTypeTemple: 'temple' };
+  var NOT_REST_PLACE_KEYWORDS = { LocTypePlayerHouse: true };
+  var restPlaces = {};
+
+  function u32At(b, at) {
+    if (!b || b.length < at + 4) { return 0; }
+    return ((b[at] | (b[at + 1] << 8) | (b[at + 2] << 16)) + b[at + 3] * 0x1000000) || 0;
+  }
+
+  function recordField(rec, type) {
+    var fields = (rec && rec.fields) || [];
+    for (var i = 0; i < fields.length; i++) {
+      if (fields[i] && String(fields[i].type) === type) { return fields[i].data || null; }
+    }
+    return null;
+  }
+
+  function editorIdOf(rec) {
+    var edid = rec ? textOf(rec.editorId) : '';
+    return (edid || textOf(recordField(rec, 'EDID'))).replace(/\0+$/, '');
+  }
+
+  function globalFrom(res, local) {
+    if (!local) { return 0; }
+    if (!res || typeof res.toGlobalRecordId !== 'function') { return 0; }
+    try { return Number(res.toGlobalRecordId(local)) || 0; } catch (e) { return 0; }
+  }
+
+  /* 'inn', 'temple', or '' for any other room or a worldspace, by the room's
+     own records. An answer the engine could not give is '', the road. */
+  function restPlaceOf(cellDesc) {
+    cellDesc = String(cellDesc || '');
+    if (!cellDesc) { return ''; }
+    if (bedHas(restPlaces, cellDesc)) { return restPlaces[cellDesc]; }
+    var place = '';
+    try {
+      var cres = mp.lookupEspmRecordById(idOf(cellDesc));
+      var cell = cres && cres.record;
+      if (cell && String(cell.type) === 'CELL') {
+        var loc = globalFrom(cres, u32At(recordField(cell, 'XLCN'), 0));
+        var lres = loc ? mp.lookupEspmRecordById(loc) : null;
+        var kw = (lres && lres.record) ? recordField(lres.record, 'KWDA') : null;
+        var found = '';
+        for (var k = 0; kw && k + 4 <= kw.length; k += 4) {
+          var kres = mp.lookupEspmRecordById(globalFrom(lres, u32At(kw, k)));
+          var word = editorIdOf(kres && kres.record);
+          if (bedHas(NOT_REST_PLACE_KEYWORDS, word)) { found = ''; break; }
+          if (!found && bedHas(REST_PLACE_KEYWORDS, word)) { found = REST_PLACE_KEYWORDS[word]; }
+        }
+        place = found;
+      }
+    } catch (e) { place = ''; }
+    restPlaces[cellDesc] = place;
+    if (place) { plog('rest place:', cellDesc, 'is', place === 'inn' ? 'an inn' : 'a temple'); }
+    return place;
+  }
 
   function bedHas(o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); }
 
@@ -37753,10 +37839,14 @@ log('gamemode loaded:',
     return !!cell && (bedHas(BUILDING_NAME, cell) || bedHas(claims, cell));
   }
 
+  /* The room or worldspace a bed stands in. */
+  function bedCell(refrId) {
+    try { return String(mp.get(refrId, 'worldOrCellDesc') || ''); } catch (e) { return ''; }
+  }
+
   /* The building a bed stands in, which is its cell when that is one. */
   function bedBuilding(refrId) {
-    var cell = '';
-    try { cell = String(mp.get(refrId, 'worldOrCellDesc') || ''); } catch (e) { cell = ''; }
+    var cell = bedCell(refrId);
     return isBuilding(cell) ? cell : '';
   }
 
@@ -37804,9 +37894,13 @@ log('gamemode loaded:',
   function bedVerdict(actorId, profileId, ref) {
     var building = bedBuilding(ref);
     var held = building ? holderOf(building) : null;
-    var out = { building: building, held: held, kind: '', line: '', guest: null };
+    var out = { building: building, held: held, kind: '', line: '', guest: null, place: '' };
     if (!held) {
-      out.kind = fireNear(actorId) ? 'camp' : 'rough';
+      // An inn or a temple nobody holds is its own kind (#2246); see
+      // restPlaceOf. Anywhere else nobody holds is the road.
+      out.place = restPlaceOf(bedCell(ref));
+      var fire = fireNear(actorId);
+      out.kind = out.place ? (fire ? 'commonfire' : 'common') : (fire ? 'camp' : 'rough');
       return out;
     }
     if (profileId && held.by === profileId) {
@@ -38168,6 +38262,8 @@ log('gamemode loaded:',
     touched: bedTouched, rest: bedRest, off: bedOff, tick: bedTick,
     sleepHere: sleepHere, mark: sleepMark, guestsOf: guestsOf,
     kindOf: bedKind, verdict: bedVerdict, book: function () { return bedBook; },
+    // An inn or a temple, by the room's records (#2246).
+    placeOf: restPlaceOf,
     state: bedState, BED_REACH: BED_REACH, NIGHT_MS: NIGHT_MS, BED_EVERY_MS: BED_EVERY_MS
   };
 
@@ -53962,38 +54058,65 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
       Which kind somebody gets is the beds' answer in the property block, by
       what the server saw them press, never the word after /rest (#1392, #1607).
+
+      AN INN OR A TEMPLE NOBODY HOLDS IS ITS OWN KIND (#2246): common, and
+      commonfire with a fire in reach (restPlaceOf in the property block).
+      Djinn's ask on #2246 is that resting at an inn or a temple gives back
+      the most and the wild the least; what that is worth is Patrick's to say
+      on #2246, so until he does these are the rough and camp numbers such a
+      bed always had, and nobody's rest changes.
     */
-    recover: { sit: 20, rough: 25, campfire: 35, camp: 45, inn: 50, bed: 80 },
+    recover: { sit: 20, rough: 25, campfire: 35, camp: 45, inn: 50, bed: 80,
+               common: 25, commonfire: 45 },
     bard: 25,
 
     /*
-      Logging out in a bed. Blade: "laying down in a bed in an inn or your home
-      when you log out will give you bonuses when you come back."
+      WHAT THE TIME AWAY DOES, BY WHERE SOMEBODY LOGGED OUT (#1606, #2246).
 
-      Full rest on return, and sleptAlso of the wear taken off the other two
-      as well, because somebody who slept properly did not also starve. It is
-      not a bonus stat: a stat bonus for logging out correctly is a rule about
-      when to play, and this is a rule about where to sleep.
+      One row for each kind of rest they were in when they left, and up for
+      somebody who left on their feet. Each row is four things:
+
+        drain  the share of the ordinary clock the whole time away costs
+               hunger, thirst and rest. 1 is all of it, the same as being
+               awake in the world; 0 would be nothing at all.
+        floor  the time away takes no meter below this. A meter already
+               under it is left where it was. 0 is no floor.
+        rest   after a night away, rest is at least this. 0 gives nothing.
+        food, drink  after a night away, added to hunger and to thirst, on
+               what the time away left.
+
+      Logging out in a bed was Blade's: "laying down in a bed in an inn or
+      your home when you log out will give you bonuses when you come back".
+      Full rest on return and 25 back on hunger and thirst, because somebody
+      who slept properly did not also starve. It is a rule about where to
+      sleep, not a bonus for logging out at a clever hour. Which beds give it
+      was asked on #1606 and built as the suggested answer: your own bed, and
+      a bed you are allowed in (a night the holder gave you, or the
+      building's key or deed carried). A bed or bedroll nobody can lend you is
+      the road, and gives nothing.
+
+      #2246 asks for the rest of this table: logging out should give the
+      most back, an inn or a temple the highest share, the wild the least.
+      The rows are here so that is a change of numbers and nothing else.
+      Until Patrick says on #2246 what they are, they are what they have
+      always been: every row drains in full, and only the two beds fill.
+
+      sleptFor is how long away is a night: 8 hours on the game clock, which
+      runs twenty times real time, so 24 real minutes. Away for less is no
+      night, only the drain. Without it, lying down at home and logging
+      straight back in would put 25 on hunger and thirst every time.
     */
-    sleptRest: 100,
-    sleptAlso: 25,
-    /*
-      WHICH BEDS, AND HOW LONG AWAY (#1606), each asked on that issue and
-      built as the suggested answer.
-
-      The rests that count as a night in a bed: your own bed, and a bed you
-      are allowed in (a night the holder gave you, or the building's key or
-      deed carried). Blade's "a bed in an inn or your home", and the property
-      page before #1603 gave the fill to a bed you own, rent or were allowed
-      to use. A bed or bedroll nobody can lend you is the road, and is not one.
-
-      And how long away is a night: 8 hours on the game clock, which runs
-      twenty times real time, so 24 real minutes. Away for less is the
-      ordinary settle of the time away, at the bed's own rate. Without it,
-      lying down at home and logging straight back in would put 25 on hunger
-      and thirst every time.
-    */
-    sleptIn: { bed: true, inn: true },
+    away: {
+      bed:        { drain: 1, floor: 0, rest: 100, food: 25, drink: 25 },
+      inn:        { drain: 1, floor: 0, rest: 100, food: 25, drink: 25 },
+      common:     { drain: 1, floor: 0, rest: 0, food: 0, drink: 0 },
+      commonfire: { drain: 1, floor: 0, rest: 0, food: 0, drink: 0 },
+      camp:       { drain: 1, floor: 0, rest: 0, food: 0, drink: 0 },
+      rough:      { drain: 1, floor: 0, rest: 0, food: 0, drink: 0 },
+      campfire:   { drain: 1, floor: 0, rest: 0, food: 0, drink: 0 },
+      sit:        { drain: 1, floor: 0, rest: 0, food: 0, drink: 0 },
+      up:         { drain: 1, floor: 0, rest: 0, food: 0, drink: 0 }
+    },
     sleptFor: 24 * 60000,
 
     /*
@@ -54304,8 +54427,18 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     // sane for anything that reads the difference.
     if (hours > 48) { hours = 48; }
 
-    n.food = clamp(n.food - NEEDS.drain.food * hours);
-    n.drink = clamp(n.drink - NEEDS.drain.drink * hours);
+    /*
+      HOW MUCH OF THE CLOCK THE TIME AWAY COSTS, by where they logged out
+      (#2246): NEEDS.away's drain, on an arrival only. 1, the whole clock,
+      everywhere until Patrick says otherwise on #2246.
+    */
+    var gone = arriving ? awayRow(n.resting) : null;
+    var share = gone ? Number(gone.drain) : 1;
+    if (!(share >= 0)) { share = 1; }
+    var floor = gone ? clamp(Number(gone.floor) || 0) : 0;
+
+    n.food = awayDrain(n.food, NEEDS.drain.food * hours * share, floor);
+    n.drink = awayDrain(n.drink, NEEDS.drain.drink * hours * share, floor);
 
     var restRate = NEEDS.drain.rest;
     if (n.worked && (now - n.worked) < NEEDS.workFor) {
@@ -54322,7 +54455,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       arrived(), below, and the beds' first sight of them gets them up.
     */
     var gain = arriving ? 0 : restingGain(actorId, n);
-    n.rest = clamp(n.rest + (gain - restRate) * hours);
+    n.rest = gone ? awayDrain(n.rest, restRate * share * hours, floor)
+                  : clamp(n.rest + (gain - restRate * share) * hours);
 
     /*
       Temperature moves TOWARD where you are, rather than only falling.
@@ -55124,7 +55258,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   var REST_SAID = {
     sit: 'sitting', campfire: 'sitting by a fire', rough: 'in a bed nobody can lend you',
     camp: 'in a bed by a fire', inn: 'in a bed you may use', bed: 'in your own bed',
-    bedroll: 'in a bedroll'
+    bedroll: 'in a bedroll',
+    // An inn or a temple nobody holds (#2246).
+    common: 'in an inn or temple bed nobody holds', commonfire: 'in an inn or temple bed by a fire'
   };
 
   /* The HUD's word for a temperature, the same steps as tempWord in hudScript. */
@@ -55286,8 +55422,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
     Called by settle at somebody's arrival (see here, above settle), on the
     meters it has just brought up to now and with how long they were away.
-    The sleep counted when the meters say they were resting in one of
-    NEEDS.sleptIn when they were last seen, and they were away at least
+    What a night gives is NEEDS.away's row for where they were resting when
+    they were last seen (#2246), and it counts when they were away at least
     NEEDS.sleptFor. Answers the line to say, or ''. n is changed in place and
     settle writes it.
 
@@ -55302,13 +55438,36 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     repository already has it without one.
   */
   function arrived(actorId, n, away) {
-    if (!Object.prototype.hasOwnProperty.call(NEEDS.sleptIn, n.resting) ||
-        !(away >= NEEDS.sleptFor)) { return ''; }
-    n.rest = NEEDS.sleptRest;
-    n.food = clamp(n.food + NEEDS.sleptAlso);
-    n.drink = clamp(n.drink + NEEDS.sleptAlso);
+    if (!(away >= NEEDS.sleptFor)) { return ''; }
+    var row = awayRow(n.resting);
+    var rest = Number(row.rest) || 0, food = Number(row.food) || 0, drink = Number(row.drink) || 0;
+    if (!(rest > 0) && !(food > 0) && !(drink > 0)) { return ''; }
+    if (n.rest < rest) { n.rest = clamp(rest); }
+    n.food = clamp(n.food + food);
+    n.drink = clamp(n.drink + drink);
     n.resting = '';
-    return 'You slept well. You are rested.';
+    return n.rest >= 100 ? 'You slept well. You are rested.' : 'You slept, though not well.';
+  }
+
+  /*
+    A meter after the time away: down by what the clock took, and never under
+    the row's floor unless it was already there (#2246).
+  */
+  function awayDrain(v, took, floor) {
+    var after = clamp(v - took);
+    if (floor > 0 && v > floor && after < floor) { after = floor; }
+    return v <= floor ? clamp(v) : after;
+  }
+
+  /*
+    NEEDS.away's row for a kind of rest, or up for somebody who was resting
+    nowhere. A kind the table does not name (#1392's bedroll) is up: it was
+    never given anything for the time away.
+  */
+  function awayRow(kind) {
+    kind = String(kind || '');
+    if (kind && Object.prototype.hasOwnProperty.call(NEEDS.away, kind)) { return NEEDS.away[kind]; }
+    return NEEDS.away.up;
   }
 
   /** Too tired to make anything. See CRAFT_REST. */
