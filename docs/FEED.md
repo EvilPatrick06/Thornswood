@@ -529,9 +529,15 @@ news only out of version.json. That is the rest of #1050.
   developer's machine; the last dev Ship wins. Its launcher version is main's
   published number plus a fourth part, `.1`, `.2`, past every dev number
   already out (`Ship.ps1:Separate Dev work uses the main version with a fourth number`).
-  A dev Ship of exactly what origin/main holds, with nothing uncommitted,
-  takes main's number itself
-  (`Ship.ps1:The same clean source as Main gets the same version in both feeds`).
+  Main's own launcher takes main's number itself: a dev Ship of exactly what
+  origin/main holds, with nothing uncommitted, whose launcher fingerprint is
+  the `launcherInputs` main's feed recorded for that number, or main's next
+  number before main has shipped it. A clean checkout of origin/main with a
+  launcher change since main's release takes the fourth part like any other,
+  and a case Ship cannot tell stops before anything is built (#2347,
+  `Ship.ps1:Get-DevLauncherLine`). A number either feed already offers with a
+  launcher built from other sources is refused before the build
+  (`Ship.ps1:Assert-DevVersionSelection`).
 - **After a main Ship**, the Dev feed, baseline, release identity and history
   stay unchanged. Dev advances through its own Ship and keeps its own server
   and voice addresses. Publish the same source to both channels when both

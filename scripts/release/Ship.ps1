@@ -575,9 +575,114 @@ function Test-LauncherUnchanged($published, [string]$inputs) {
     if ($published.Sha -notmatch '^[0-9a-fA-F]{64}$') { return $false }
     return ($published.Inputs -eq $inputs)
 }
+
+# WHETHER A DEV LAUNCHER IS MAIN'S LAUNCHER, issue #2347. A clean checkout of
+# origin/main used to keep main's number on dev whatever launcher it built,
+# on the belief that clean main is the source main's published launcher came
+# from. That holds the day main ships and stops holding the moment main merges
+# a launcher change, which is the usual state between releases. Dev Ship
+# 20261012-004958-dev, 12 Oct, from clean 9ec48194: main had published 1.2.3
+# from 7cece557 (launcherInputs a5035b57...), #2343 had changed OwnGame.cs
+# since (0b5ba66b...), and the new launcher went to the dev feed as 1.2.3, a
+# number every dev launcher already had, so none of them was offered it.
+#
+# So main's number goes to dev only with main's launcher, judged by the
+# fingerprint main's feed recorded for it, never by where the source came from:
+#   - not a clean checkout of origin/main: a dev number, as it always was;
+#   - main published $current from these same sources: dev carries $current;
+#   - main published $current from other sources: a dev number;
+#   - main published past $current: a dev number, from main's;
+#   - main has not published $current yet (Bump-Version moved it and the main
+#     Ship has not run): this is the source main will ship it from, so dev
+#     carries $current, unless dev already carries $current from other
+#     sources, when it takes a dev number instead;
+#   - main's feed cannot be read at all: it cannot tell, so it refuses, before
+#     anything is built.
+# $mainPub and $devPub are what Get-PublishedLauncher returns. Returns
+# MainEquivalent, Why (one line for the screen) and Refuse ('' or the reason).
+function Get-DevLauncherLine([bool]$aligned, [string]$current, [string]$inputs, $mainPub, $devPub) {
+    function Cmp([string]$a, [string]$b) {
+        $x = @(); $y = @()
+        foreach ($p in ($a -split '\.')) { $k = 0; if ([int]::TryParse($p, [ref]$k)) { $x += $k } }
+        foreach ($p in ($b -split '\.')) { $k = 0; if ([int]::TryParse($p, [ref]$k)) { $y += $k } }
+        for ($i = 0; $i -lt [Math]::Max($x.Count, $y.Count); $i++) {
+            $u = if ($i -lt $x.Count) { $x[$i] } else { 0 }
+            $v = if ($i -lt $y.Count) { $y[$i] } else { 0 }
+            if ($u -ne $v) { return $(if ($u -gt $v) { 1 } else { -1 }) }
+        }
+        return 0
+    }
+    function SameSources($pub) {
+        return ($null -ne $pub -and $pub.Inputs -and $inputs -and ([string]$pub.Inputs -eq $inputs))
+    }
+    $out = [pscustomobject]@{ MainEquivalent = $false; Why = ''; Refuse = '' }
+    if (-not $aligned) {
+        $out.Why = 'not a clean checkout of origin/main, so the launcher takes a dev number'
+        return $out
+    }
+    $mainVer = ''
+    if ($null -ne $mainPub -and $mainPub.Version) { $mainVer = [string]$mainPub.Version }
+    if (-not $mainVer) {
+        $out.Refuse = ("This is a clean checkout of origin/main on $current. Dev carries main's number only with the launcher main " +
+                       "published as $current, and main's feed could not be read, from the site or from the copy last received here, " +
+                       'to tell whether this is that launcher. Nothing was built. Ship again once https://thornswood.net/feed/version.json answers.')
+        return $out
+    }
+    $c = Cmp $mainVer $current
+    if ($c -gt 0) {
+        $out.Why = "main has published $mainVer, past this source's $current, so the launcher takes a dev number"
+        return $out
+    }
+    if ($c -eq 0) {
+        if (SameSources $mainPub) {
+            $out.MainEquivalent = $true
+            $out.Why = "this is the launcher main published as $current, so dev carries $current too"
+        } else {
+            $out.Why = ("main published $current from other launcher sources than these, so this launcher takes a dev number " +
+                        "and every dev launcher on $current is offered it")
+        }
+        return $out
+    }
+    if ($null -ne $devPub -and [string]$devPub.Version -eq $current -and -not (SameSources $devPub)) {
+        $out.Why = "main has not published $current yet and dev already carries $current from other launcher sources, so this takes a dev number"
+        return $out
+    }
+    $out.MainEquivalent = $true
+    $out.Why = "main has not published $current yet and this is the source it will ship it from, so dev carries $current"
+    return $out
+}
+
+# WHETHER A SHIP KEEPS THE LAUNCHER ITS FEED ALREADY HAS (#921, #2347). Only
+# when nothing it is compiled from changed (Test-LauncherUnchanged), and then:
+#   - main keeps it unless a clean main has moved to another number;
+#   - dev, for main's own launcher (Get-DevLauncherLine), only when the dev
+#     feed already carries it under main's number, $current;
+#   - dev, for any other launcher, only when the dev feed's launcher does not
+#     carry a number main has published from other sources. The dev feed's
+#     1.2.3 of 12 Oct is that: kept, it would never reach a dev launcher on
+#     1.2.3, so it is built again under a dev number. A dev launcher with a
+#     fourth number can never be main's, and a three part one is kept only
+#     when main's feed can be read to say so.
+function Test-KeepFeedLauncher($pub, [string]$inputs, [string]$current, [bool]$dev, [bool]$aligned, [bool]$mainEquivalent, $mainPub) {
+    if (-not (Test-LauncherUnchanged $pub $inputs)) { return $false }
+    if (-not $dev) { return (-not $aligned -or $pub.Version -eq $current) }
+    if ($mainEquivalent) { return ([string]$pub.Version -eq $current) }
+    if (@(([string]$pub.Version) -split '\.').Count -ge 4) { return $true }
+    if ($null -eq $mainPub -or -not $mainPub.Version) { return $false }
+    if ([string]$mainPub.Version -ne [string]$pub.Version) { return $true }
+    return ($mainPub.Inputs -and ([string]$mainPub.Inputs -eq [string]$pub.Inputs))
+}
 # ==== end thornswood release launcher ====
 
-function Assert-DevVersionSelection([string]$selected, [string]$current, [bool]$aligned, [string[]]$published) {
+# The dev number a Ship chose, checked before anything is built, signed or sent.
+# $aligned is whether this is main's own launcher (Get-DevLauncherLine), which
+# carries main's number and no other. $launchers are the launchers the main
+# and dev feeds offer now (Get-PublishedLauncher) and $inputs this one's
+# fingerprint: a number either feed already offers with a launcher built from
+# other sources is refused (#2347), because the launcher updates by number
+# alone and nobody on that number would ever be offered this one. Publish-Update
+# used to say so only once the launcher was built, signed and sent.
+function Assert-DevVersionSelection([string]$selected, [string]$current, [bool]$aligned, [string[]]$published, [object[]]$launchers = @(), [string]$inputs = '') {
     if ($aligned -and $selected -ne $current) {
         Die "Main-equivalent source ships $current in both channels. Use a separate branch for a different Dev version."
     }
@@ -590,6 +695,15 @@ function Assert-DevVersionSelection([string]$selected, [string]$current, [bool]$
         if ($text -and (Normalized $text) -gt $candidate) {
             Die "Dev cannot downgrade the published version $text to $selected. Bump Main above the published Dev version before shipping both channels."
         }
+    }
+    foreach ($l in @($launchers)) {
+        if ($null -eq $l -or -not $l.Version) { continue }
+        if ((Normalized ([string]$l.Version)) -ne $candidate) { continue }
+        if ($l.Inputs -and $inputs -and ([string]$l.Inputs -eq $inputs)) { continue }
+        $way = if ($aligned) { 'This is main''s own launcher, which carries main''s number only, so move main past it first with .\scripts\release\Bump-Version.ps1.' }
+               else { 'Ship without -Version so it takes the next dev number.' }
+        Die ("$selected is already out as a launcher built from other sources than these, and a launcher updates by its number alone, " +
+             "so nobody on $selected would ever be offered this one. Nothing was built. $way")
     }
 }
 
@@ -886,11 +1000,25 @@ if (Test-Path -LiteralPath (Join-Path $RepoDir '.git')) {
 # The first Ship after this change finds no fingerprint and builds as before.
 # -RebuildLauncher or -Version builds one anyway.
 $LauncherInputs = Get-LauncherInputHash $RepoDir
+
+# WHETHER THIS IS MAIN'S OWN LAUNCHER, for a dev Ship, issue #2347: it decides
+# whether dev carries main's number or a dev number, and whether the dev feed's
+# launcher can be kept. Worked out from main's feed and the fingerprint, before
+# anything is built, and a case it cannot tell stops here (Get-DevLauncherLine).
+$MainEquivalent = $false
+$MainLauncher = $null
+$devLine = $null
+if ($Dev -and -not $ModsOnly) {
+    $MainLauncher = Get-PublishedLauncher $MainReleaseDir 'main'
+    $devLine = Get-DevLauncherLine $MainSourceAligned $current $LauncherInputs $MainLauncher (Get-PublishedLauncher $ReleaseDir 'dev')
+    if ($devLine.Refuse) { Die $devLine.Refuse }
+    $MainEquivalent = [bool]$devLine.MainEquivalent
+}
+
 if (-not $ModsOnly -and -not $RebuildLauncher -and -not $Version) {
     $feedBranch = if ($Dev) { 'dev' } else { 'main' }
     $pubLauncher = Get-PublishedLauncher $ReleaseDir $feedBranch
-    if ((Test-LauncherUnchanged $pubLauncher $LauncherInputs) -and
-        (-not $MainSourceAligned -or $pubLauncher.Version -eq $current)) {
+    if (Test-KeepFeedLauncher $pubLauncher $LauncherInputs $current $Dev $MainSourceAligned $MainEquivalent $MainLauncher) {
         Head 'The launcher'
         Say ("  nothing it is built from changed since $($pubLauncher.Version) went out, so that one stays: " +
              'no rebuild, no signing, only the packs. -RebuildLauncher to build one anyway.') 'Green'
@@ -917,7 +1045,9 @@ elseif ($Version) {
 }
 elseif ($Dev) {
     # Separate Dev work uses the main version with a fourth number.
-    # Clean Main-equivalent source is aligned below after the history check.
+    # Main's own launcher keeps main's number, below, after the history check;
+    # a clean checkout of origin/main is that only when Get-DevLauncherLine
+    # says so (#2347).
     # Read off the dev feed so it climbs from wherever dev is, and starts
     # again at .1 whenever main has moved on. The launcher compares numbers
     # part by part, so 1.1.36 beats every 1.1.35.x and a promoted main release
@@ -1026,10 +1156,13 @@ elseif ($Dev) {
         Say "  dev has already published $top, so this goes out as $next rather than $target" 'Yellow'
         $target = $next
     }
-    # The same clean source as Main gets the same version in both feeds.
-    # Separate branch builds retain the monotonic fourth number above.
+    # Main's own launcher gets the same version in both feeds. Every other
+    # launcher keeps the climbing fourth number above, a clean checkout of
+    # origin/main included once main has merged a launcher change since its
+    # release: until #2347 that one took main's number too, and on 12 Oct went
+    # out as 1.2.3 to dev launchers already on 1.2.3, so none was offered it.
     # Never downgrade a Dev launcher when promoting: bump Main first.
-    if ($MainSourceAligned) {
+    if ($MainEquivalent) {
         $target = $current
     }
 }
@@ -1059,22 +1192,25 @@ if ($Dev -and -not $ModsOnly) {
     $publishedVersions = @()
     if (-not $Version) { $publishedVersions += @($seen) + @($mainWas) }
     try { $publishedVersions += @(Get-FeedStoreLaunchers 'dev') } catch { Say '  Dev version history could not be read; checking the current feeds' 'Yellow' }
+    $liveLaunchers = @()
     foreach ($ch in 'main', 'dev') {
         $liveLauncher = Get-PublishedLauncher (Get-FeedStoreDir $ch) $ch
-        if ($liveLauncher -and $liveLauncher.Version) { $publishedVersions += $liveLauncher.Version }
+        if ($liveLauncher -and $liveLauncher.Version) { $publishedVersions += $liveLauncher.Version; $liveLaunchers += $liveLauncher }
     }
-    Assert-DevVersionSelection $target $current $MainSourceAligned $publishedVersions
+    Assert-DevVersionSelection $target $current $MainEquivalent $publishedVersions $liveLaunchers $LauncherInputs
 }
 
 if ($target -ne $current) {
     Head 'Version'
     Say "  $current  ->  $target" 'Green'
+    if ($devLine -and $devLine.Why -and -not $ModsOnly) { Say "  $($devLine.Why)" 'DarkGray' }
     $src = $src -replace 'Version\s*=\s*"[^"]+"', ('Version = "' + $target + '"')
     Write-UpdaterCs $src
 }
 else {
     Head 'Version'
     Say "  staying on $current" 'DarkGray'
+    if ($devLine -and $devLine.Why -and -not $ModsOnly) { Say "  $($devLine.Why)" 'DarkGray' }
 }
 
 # A main release ships the exe CI built for v$target, so the launcher on main

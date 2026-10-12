@@ -133,7 +133,7 @@ function Run([string]$branchVersion, [string]$mainFeed, [string]$devFeed, [strin
     $env:THORNSWOOD_TEST_SITE_DIR = $site
     $env:LOCALAPPDATA = $local
     try {
-        $sb = [scriptblock]::Create('$current = $args[0]; $MainSourceAligned = $args[1]; function Say($t, $c) { }; function Die($t) { throw $t };' + $body + '; Assert-DevVersionSelection $target $current $MainSourceAligned (@($seen) + @($mainWas)); return $target')
+        $sb = [scriptblock]::Create('$current = $args[0]; $MainSourceAligned = $args[1]; $MainEquivalent = $args[1]; function Say($t, $c) { }; function Die($t) { throw $t };' + $body + '; Assert-DevVersionSelection $target $current $MainSourceAligned (@($seen) + @($mainWas)); return $target')
         return & $sb $branchVersion $aligned
     }
     finally { $env:THORNSWOOD_TEST_SITE_DIR = $oldSite; $env:LOCALAPPDATA = $oldLocal }
@@ -146,7 +146,9 @@ try {
     Yes 'S1 and a launcher already on 1.1.77 is offered it' (IsNewer $t '1.1.77')
     Yes 'S1 and a launcher on the old 1.1.76 is offered it too' (IsNewer $t '1.1.76')
 
-    # S2: clean Main-equivalent code keeps the same version in both feeds.
+    # S2: main's own launcher keeps the same version in both feeds. The flag
+    #     here stands for Get-DevLauncherLine's answer; which clean checkouts
+    #     of origin/main get it is tests	est-2347-dev-launcher-version.ps1.
     $t = Run '1.1.105' '1.1.105' '1.1.104.1' @('1.1.104.1') '' $true
     Yes "S2 clean Main source aligns Dev on $t" ($t -eq '1.1.105')
     Yes 'S2 an older Dev launcher is offered the aligned version' (IsNewer $t '1.1.104.1')
