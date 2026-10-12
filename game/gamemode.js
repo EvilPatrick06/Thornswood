@@ -54162,6 +54162,15 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     */
     coldDrain: { fine: 1, weary: 1.25, bad: 1.5, spent: 2 },
     /*
+      WET LASTS 3 MINUTES (#1382). docs/systems/temperature.md: "Rain and
+      swimming leave you wet for 3 minutes after you are under a roof or out
+      of the water. The exposure from rain or from the water place fades
+      across those 3 minutes. It does not snap off at the door." The wet
+      places are the ones the client reports for them.
+    */
+    wetMinutes: 3,
+    wetPlaces: { rain: true, water: true, shallow: true },
+    /*
       ALE, AND IT GETS WORSE WITH EVERY ONE.
 
       Patrick, 23 September: "alcohol should make you more hungry and give a
@@ -54354,7 +54363,11 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       aleAt: (typeof v.aleAt === 'number') ? v.aleAt : null,
       // The end of the 8 seconds a meal takes (#1382), so a second meal
       // inside it is still refused after the next read.
-      eatUntil: Number(v.eatUntil) || 0
+      eatUntil: Number(v.eatUntil) || 0,
+      // When the last wet place was left, and what that place was worth
+      // with its water, so the 3 minutes of wet survive a read (#1382).
+      wetFrom: Number(v.wetFrom) || 0,
+      wetPlace: (typeof v.wetPlace === 'number') ? v.wetPlace : null
     };
   }
 
@@ -54564,9 +54577,28 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     catch (e) { return 0; }
   }
 
+  /*
+    What the place is worth, with the wet still on you (#1382). The place
+    alone answered until this, so a roof dried you the moment the client said
+    you were under one. For 3 minutes after leaving the rain or the water,
+    the place moves from what the wet place was worth to what this one is,
+    in a straight line. Only ever colder: walking out of the water onto snow
+    is the snow.
+  */
+  function wetPlaceWorth(n, worth) {
+    if (!n || !n.wetFrom || typeof n.wetPlace !== 'number') { return worth; }
+    if (NEEDS.wetPlaces[n.place]) { return worth; }
+    var span = NEEDS.wetMinutes * 60000;
+    var left = 1 - (Date.now() - n.wetFrom) / span;
+    if (!(left > 0) || n.wetPlace >= worth) { return worth; }
+    if (left > 1) { left = 1; }
+    return worth + (n.wetPlace - worth) * left;
+  }
+
   function warmthTarget(actorId, n) {
     var raw = NEEDS.place[n.place];
     if (typeof raw !== 'number') { raw = NEEDS.comfort; }
+    raw = wetPlaceWorth(n, raw);
     raw = raw + outdoorSeason(n) + weathered(actorId, n) + fireWarmth(n, actorId) + waterKind(actorId, n);
     if (raw < 0) { raw = 0; }
     if (raw > 100) { raw = 100; }
@@ -55367,6 +55399,18 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     if (n.place === kind && n.sky === sky && !!n.night === isNight &&
         !!n.roof === hasRoof && n.high === high && n.fire === away) {
       return '';
+    }
+    /*
+      Leaving the rain or the water starts the 3 minutes of wet, from what
+      that place was worth with its water (#1382). Going back in ends them.
+    */
+    var wasWet = !!NEEDS.wetPlaces[n.place], nowWet = !!NEEDS.wetPlaces[kind];
+    if (wasWet && !nowWet) {
+      n.wetFrom = Date.now();
+      n.wetPlace = NEEDS.place[n.place] + waterKind(actorId, n);
+    } else if (nowWet) {
+      n.wetFrom = 0;
+      n.wetPlace = null;
     }
     n.place = kind;
     n.sky = sky;

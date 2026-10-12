@@ -242,7 +242,6 @@ of 0.5, the settle times, the on-fire damage, the spread, and the Body
 page on K are in the server.
 
 In it: the season shift on an outdoor target, the roll of the sky, the
-master woodworker's 48, the master tailor's 4 degrees, and the cold link
-into hunger and thirst. Not in it: the 3 minutes of wet, the burn
-cutting clothing, and the meal's warmth. A roof dries you the moment
-the client says you are under one.
+master woodworker's 48, the master tailor's 4 degrees, the cold link
+into hunger and thirst, and the 3 minutes of wet. Not in it: the burn
+cutting clothing, and the meal's warmth.
