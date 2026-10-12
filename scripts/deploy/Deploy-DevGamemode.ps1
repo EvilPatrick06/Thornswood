@@ -219,6 +219,10 @@ param(
   # the dev server already has and reads it off the box (WHERE THE ORDER COMES
   # FROM in the header, #2309); no build folder is assumed.
   [string]$Dist = '',
+  # The plugins the dev server loads that the -Dist build's order may leave
+  # out, each by its file name (#2320). Left off, an order from -Dist that
+  # drops any plugin the dev server loads is refused before anything is sent.
+  [string[]]$DropPlugins = @(),
   # Where the other plugins live on this machine. Ours is taken from the repo
   # instead; see the header.
   [string]$Data = 'C:\Thornswood\Game\Data',
@@ -266,6 +270,7 @@ if (-not $PSBoundParameters.ContainsKey('Wait')) {
   $Wait = Get-ThornswoodServerReadyWait
 }
 if ($PutBack -and $LoadOrder) { throw '-PutBack puts the last files back and sends nothing, so it does not take -LoadOrder.' }
+if (@($DropPlugins).Count -and -not ($LoadOrder -and $Dist)) { throw '-DropPlugins goes with -LoadOrder -Dist, the one run here that writes a load order over the dev server''s. Nothing was sent.' }
 if (-not $PutBack) {
   if (-not $Note.Trim()) {
     Write-Host ''
@@ -423,6 +428,14 @@ if ($LoadOrder) {
     if (-not $built.loadOrder) { throw "$settingsSrc has no loadOrder" }
     $pluginNames = @($built.loadOrder | ForEach-Object { [IO.Path]::GetFileName(([string]$_).Replace('/', '\')) })
     Write-Host ('  load order from the build at {0}, written over the dev server''s' -f $Dist) -ForegroundColor DarkGray
+    # Held to the order the dev server runs (#2320): one that leaves out a
+    # plugin it loads is refused unless -DropPlugins names each one.
+    if ($boxContent.OrderRead) {
+      . (Join-Path $Here 'ServerSettings.ps1')
+      $drop = Test-ThornswoodLoadOrderDrop ([pscustomobject]@{ loadOrder = @($boxContent.Order) }) ([pscustomobject]@{ loadOrder = $pluginNames }) $DropPlugins
+      foreach ($l in $drop.Said) { Write-Host ('  ' + $l) -ForegroundColor Yellow }
+      if ($drop.Problem) { throw ($drop.Problem + ' Nothing was sent and the dev server was not touched.') }
+    }
   } else {
     if (-not $boxContent.OrderRead) {
       throw ("the dev server's server-settings.json gave no load order, so there is nothing to send plugins for. " +
