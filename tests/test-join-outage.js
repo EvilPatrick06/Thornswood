@@ -79,6 +79,10 @@ async function discordGet(p) {
 }
 const jsonFile = (f, def) => (f in files ? JSON.parse(JSON.stringify(files[f])) : def);
 const putJson = (f, v) => { files[f] = v; };
+// standing() reads bans through bansNow() since #2186; this stand-in never
+// reports a broken file (tests/test-bans-broken.js runs that on the real site).
+const bansNow = () => ({ table: jsonFile(BANS, {}) || {}, broken: '' });
+const BANS_BROKEN_WHY = '';
 const readTicket = (t) => (String(t || '').startsWith('tk:') ? { d: String(t).slice(3), n: 'From the ticket' } : null);
 const body = async (req) => req.body;
 const sendJson = (res, code, obj) => { res.code = code; res.obj = obj; return res; };
