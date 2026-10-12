@@ -45324,8 +45324,10 @@ log('gamemode loaded:',
     if (kind === 'spell' && heldOf(target, t).spellbreaker) { breakSpell(target, by, idOfForm(source), t); }
 
     if (!by || by === target || !personOf(by)) { return; }
+    var identity = MERCHANT_TRADING.actorIdentity(mp, by);
+    if (!identity) { return; }
     var mine = heldOf(by, t);
-    var e = { before: -1, after: null, by: by, more: 0, overcharge: false, aim: false };
+    var e = { before: -1, after: null, by: by, identity: identity, more: 0, overcharge: false, aim: false };
     if (kind === 'melee' && power && !bash && mine.devastatingblow) { e.more = PERKS.devastatingblow.more; }
     if (kind === 'spell' && mine.overcharge) { e.overcharge = true; }
     if (kind === 'bow' && mine.lethalaim) { e.aim = true; }
@@ -45350,15 +45352,9 @@ log('gamemode loaded:',
     blow whose target was replaced is let go. The attacker's side is #2070's.
   */
   function targetLife(target) {
-    var desc = null, life = null;
-    try { desc = mp.getDescFromId(target) || null; } catch (err) { desc = null; }
-    try {
-      var ai = (typeof mp.getNpcAIState === 'function') ? mp.getNpcAIState(target) : null;
-      if (ai && Number.isSafeInteger(ai.lifeGeneration)) { life = ai.lifeGeneration; }
-    } catch (err2) { life = null; }
-    return JSON.stringify([desc, life]);
+    return MERCHANT_TRADING.targetIdentity(mp, target);
   }
-  function sameTarget(target, life) { return life !== undefined && targetLife(target) === life; }
+  function sameTarget(target, life) { return typeof life === 'string' && targetLife(target) === life; }
 
   function breakSpell(target, by, spellId, t) {
     var info = spellOf(spellId);
@@ -45380,7 +45376,7 @@ log('gamemode loaded:',
     if (next <= 0) {
       next = 0;
       // The engine kills on this write with nobody named; mp.onDeath asks.
-      if (killer) { ST.blow[target] = { by: killer, at: now() }; }
+      if (killer) { ST.blow[target] = { by: killer.by, identity: killer.identity, at: now() }; }
     }
     if (has(ST.blow, target) && next <= 0) { ST.blow[target].target = targetLife(target); }
     var p = pct(target);
@@ -45403,18 +45399,19 @@ log('gamemode loaded:',
       var change = 0, killer = 0;
       for (var i = 0; i < list.length; i++) {
         var e = list[i];
+        if (!e.identity || MERCHANT_TRADING.actorIdentity(mp, e.by) !== e.identity) { continue; }
         var took = e.before - e.after;
         if (!(e.after >= 0) || !(took > 0)) { continue; }
         if (e.more) {
           change -= took * e.more;
-          killer = e.by;
+          killer = e;
           fired(e.by, 'devastatingblow');
         }
         if (e.aim) {
           var extra = lethalExtra(target, took);
           if (extra > 0) {
             change -= extra;
-            killer = e.by;
+            killer = e;
             fired(e.by, 'lethalaim');
           }
         }
@@ -45423,7 +45420,7 @@ log('gamemode loaded:',
           if (n >= PERKS.overcharge.inEvery) {
             n = 0;
             change -= took * PERKS.overcharge.more;
-            killer = e.by;
+            killer = e;
             fired(e.by, 'overcharge');
             tell(e.by, 'Overcharge: that spell lands double.');
           }
@@ -45440,7 +45437,7 @@ log('gamemode loaded:',
     if (!b) { return 0; }
     if (!sameTarget(target, b.target)) { delete ST.blow[target]; return 0; }
     delete ST.blow[target];
-    return (now() - b.at) < 2000 ? b.by : 0;
+    return (now() - b.at) < 2000 && b.identity && MERCHANT_TRADING.actorIdentity(mp, b.by) === b.identity ? b.by : 0;
   }
 
   // -------------------------------------------------------------- the tick --
@@ -46341,8 +46338,9 @@ log('gamemode loaded:',
     // A bulwark's own blocked hit is a block seen.
     if (blocked && has(ST.on, target) && ST.on[target].cover) { ST.block[target] = true; }
 
-    var e = { before: -1, after: null, by: by, more: 0, less: 0, stagger: false, used: [] };
-    var a = (by && has(ST.on, by)) ? ST.on[by] : null;
+    var identity = by ? MERCHANT_TRADING.actorIdentity(mp, by) : null;
+    var e = { before: -1, after: null, by: by, identity: identity, more: 0, less: 0, stagger: false, used: [] };
+    var a = (identity && has(ST.on, by)) ? ST.on[by] : null;
     if (a && !isSpell(source)) {
       if (power && a.wreck && a.wreck > t) {
         e.more = MANEUVERS.wreck.more; e.stagger = true;
@@ -46379,20 +46377,15 @@ log('gamemode loaded:',
     blow whose target was replaced is let go. The attacker's side is #2070's.
   */
   function targetLife(target) {
-    var desc = null, life = null;
-    try { desc = mp.getDescFromId(target) || null; } catch (err) { desc = null; }
-    try {
-      var ai = (typeof mp.getNpcAIState === 'function') ? mp.getNpcAIState(target) : null;
-      if (ai && Number.isSafeInteger(ai.lifeGeneration)) { life = ai.lifeGeneration; }
-    } catch (err2) { life = null; }
-    return JSON.stringify([desc, life]);
+    return MERCHANT_TRADING.targetIdentity(mp, target);
   }
-  function sameTarget(target, life) { return life !== undefined && targetLife(target) === life; }
+  function sameTarget(target, life) { return typeof life === 'string' && targetLife(target) === life; }
 
   /* A blow that took nothing gives back what it would have spent, while its
      window is still open. */
   function rearm(e) {
     if (!e.by || !e.used.length) { return; }
+    if (!e.identity || MERCHANT_TRADING.actorIdentity(mp, e.by) !== e.identity) { return; }
     var rec = onOf(e.by, true);
     for (var i = 0; i < e.used.length; i++) {
       var u = e.used[i];
@@ -46407,7 +46400,7 @@ log('gamemode loaded:',
     if (next <= 0) {
       next = 0;
       // The engine kills on this write with nobody named; mp.onDeath asks.
-      if (killer) { ST.blow[target] = { by: killer, at: now() }; }
+      if (killer) { ST.blow[target] = { by: killer.by, identity: killer.identity, at: now() }; }
     }
     if (has(ST.blow, target) && next <= 0) { ST.blow[target].target = targetLife(target); }
     try {
@@ -46455,7 +46448,10 @@ log('gamemode loaded:',
         var took = e.before - e.after;
         if (!(e.after >= 0) || !(took > 0)) { rearm(e); continue; }
         if (e.less) { change += took * e.less; }
-        if (e.more) { change -= took * e.more; killer = e.by; }
+        // The reduction belongs to the defender, regardless of who now owns
+        // the attacker's ID. Only the attacker's effects need this identity.
+        if (!e.identity || MERCHANT_TRADING.actorIdentity(mp, e.by) !== e.identity) { continue; }
+        if (e.more) { change -= took * e.more; killer = e; }
         if (e.stagger) { stagger = true; }
       }
       if (h > 0 && change !== 0) { setHealth(target, h, change, killer); }
@@ -46469,7 +46465,7 @@ log('gamemode loaded:',
     if (!b) { return 0; }
     if (!sameTarget(target, b.target)) { delete ST.blow[target]; return 0; }
     delete ST.blow[target];
-    return (now() - b.at) < 2000 ? b.by : 0;
+    return (now() - b.at) < 2000 && b.identity && MERCHANT_TRADING.actorIdentity(mp, b.by) === b.identity ? b.by : 0;
   }
 
   // -------------------------------------------------------------- the tick --
@@ -63937,6 +63933,27 @@ function same(a,b) {
   var left=Object.keys(a).sort(),right=Object.keys(b).sort();
   return left.length===right.length && left.every(function(key,i){return key===right[i] && same(a[key],b[key]);});
 }
+function nativeRevision(value) {
+  return typeof value==='string' && value.length>0 && value.length<=20 && value[0]!=='0' &&
+    !/[^0-9]/.test(value) && (value.length<20 || value<='18446744073709551615');
+}
+function targetIdentity(mp,actor) {
+  try {
+    var ai=mp.getNpcAIState(actor),desc=mp.getDescFromId(actor);
+    if(!ai || !Number.isInteger(ai.profileId) || !Number.isSafeInteger(ai.lifeGeneration) ||
+        ai.lifeGeneration<0 || typeof desc!=='string' || !desc || !nativeRevision(ai.runtimeLifeIdentity))return null;
+    return JSON.stringify({desc:desc,profileId:ai.profileId,life:ai.lifeGeneration,body:ai.runtimeLifeIdentity});
+  } catch(error) { return null; }
+}
+function actorIdentity(mp,actor) {
+  try {
+    var ai=mp.getNpcAIState(actor),desc=mp.getDescFromId(actor),runtime=mp.getActorRuntimeIdentity(actor);
+    if(!ai || ai.isHuman!==true || !Number.isInteger(ai.profileId) || ai.profileId<=0 ||
+        !Number.isSafeInteger(ai.lifeGeneration) || ai.lifeGeneration<0 || typeof desc!=='string' || !desc ||
+        !nativeRevision(runtime))return null;
+    return JSON.stringify({desc:desc,profileId:ai.profileId,life:ai.lifeGeneration,runtime:runtime});
+  } catch(error) { return null; }
+}
 function createQuestTransactions(deps) {
   var mp=deps.mp,active=true,property='thornswoodQuests';
   var log=deps.log || function(){};
@@ -63944,24 +63961,21 @@ function createQuestTransactions(deps) {
   function available() {
     return active && typeof deps.withInventoryMutation==='function' && !!mp &&
       ['compareAndSetInventoryAndProperty','getInventoryReceipt','getSavedInventoryReceipt',
-        'get','getIdFromDesc','getDescFromId','getNpcAIState'].every(function(key){return typeof mp[key]==='function';});
+        'get','getIdFromDesc','getDescFromId','getNpcAIState','getActorRuntimeIdentity'].every(function(key){return typeof mp[key]==='function';});
   }
   function identity(actor) {
-    if(!active)return null;
-    var ai=mp.getNpcAIState(actor),desc=mp.getDescFromId(actor);
-    if(!ai || !ai.isHuman || !Number.isInteger(ai.profileId) || ai.profileId<=0 ||
-        !Number.isSafeInteger(ai.lifeGeneration) || ai.lifeGeneration<0 || !desc)return null;
-    return JSON.stringify({desc:desc,profileId:ai.profileId,life:ai.lifeGeneration});
+    return active ? actorIdentity(mp,actor) : null;
   }
   function commit(actor,expectedRecord,nextRecord,changes) {
     if(!available())return {ok:false,why:'unavailable'};
     try {
+      var token=identity(actor);
+      if(!token)return {ok:false,why:'identity'};
       // Match the addon's JSON boundary, including omitted optional fields.
       nextRecord=JSON.parse(JSON.stringify(nextRecord));
       return deps.withInventoryMutation(actor,function(human,stillActive){
         if(!available() || !stillActive())return {ok:false,why:'unavailable'};
-        var token=identity(actor);
-        if(!token)return {ok:false,why:'identity'};
+        if(identity(actor)!==token)return {ok:false,why:'identity'};
         var owner=JSON.parse(token);
         if(owner.desc!==human.desc || owner.profileId!==human.profileId)return {ok:false,why:'identity'};
         var receipt=mp.getInventoryReceipt(actor);
@@ -63986,7 +64000,8 @@ function createQuestTransactions(deps) {
         if(!stillActive() || !available() || identity(actor)!==token)return {ok:false,why:'identity'};
         try {
           var changed=mp.compareAndSetInventoryAndProperty(actor,before,receipt,next,sequence,human.profileId,
-            {name:property,expected:expectedRecord===undefined?null:expectedRecord,replacement:nextRecord,expectedLifeGeneration:owner.life});
+            {name:property,expected:expectedRecord===undefined?null:expectedRecord,replacement:nextRecord,
+              expectedLifeGeneration:owner.life,expectedRuntimeIdentity:owner.runtime});
           return {ok:changed===true,why:changed===true?'':'changed'};
         } catch(error) {
           // Publication can fail after the atomic live edit. Read back that
@@ -64013,7 +64028,7 @@ function createQuestTransactions(deps) {
   }
   return {commit:commit,identity:identity,available:available,shutdown:function(){active=false;}};
 }
-module.exports={createQuestTransactions:createQuestTransactions};
+module.exports={createQuestTransactions:createQuestTransactions,actorIdentity:actorIdentity,targetIdentity:targetIdentity};
 return module.exports;})();
 'use strict';
 
@@ -64606,6 +64621,8 @@ module.exports = {
   createMerchantTrading: createMerchantTrading,
   createNativeMerchantTransfer: createNativeMerchantTransfer,
   createQuestTransactions: QUEST_TRANSFER.createQuestTransactions,
+  actorIdentity: QUEST_TRANSFER.actorIdentity,
+  targetIdentity: QUEST_TRANSFER.targetIdentity,
   installMerchantTrading: installMerchantTrading,
   bookHoldOf: bookHoldOf,
   guildSite: guildSite,
