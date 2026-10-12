@@ -59,6 +59,14 @@ in the chat box, with no buttons for them, and the help in the game,
 the launcher's Help, [Text chat](systems/chat.md) and the site's rules
 name them.
 
+The needs bars as text stay a command too. Decided by Patrick on
+11 Oct (#2267): `/needs` (and `/need`) says the four bars as one line of
+text, for somebody who hid the bars in the launcher's Settings and wants
+a quick look at them. It is another view of what the bars and the Body
+page on K already show, so it is an exception, like the ones above. The
+help in the game, the launcher's Help and the Settings line under the
+bars name it.
+
 A panel or a key may send the server the same line a command used to
 be. The look prompt already sends `/trade` and the id of the person
 under the crosshair. Nobody is told to type that line, and help text
