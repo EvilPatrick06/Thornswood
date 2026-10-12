@@ -162,7 +162,7 @@ function start() {
   }).then(function (d) {
     S.me = d.me || S.me;
     S.titles = d.titles; S.level = d.level || {};
-    S.docs = d.docs || {}; S.boards = d.boards || {};
+    S.docs = d.docs || {}; S.boards = d.boards || {}; S.boardRevs = d.boardRevs || {};
     S.results = d.results || {}; S.files = d.files || [];
     S.uploads = d.uploads || []; S.inbox = d.inbox || [];
     S.linked = d.linked || []; S.invite = d.invite || '';
@@ -178,7 +178,13 @@ function start() {
 
 function refresh() {
   return api('/api/all').then(function (r) { return r.json(); }).then(function (d) {
-    S.docs = d.docs || {}; S.boards = d.boards || {};
+    // A board with a save waiting or on its way keeps its own copy and
+    // number, or the refresh would undo the edit and the save would clash.
+    var boards = d.boards || {}, revs = d.boardRevs || {};
+    Object.keys(S.boards || {}).forEach(function (k) {
+      if (pending[k] || inflight[k]) { boards[k] = S.boards[k]; revs[k] = (S.boardRevs || {})[k]; }
+    });
+    S.docs = d.docs || {}; S.boards = boards; S.boardRevs = revs;
     S.results = d.results || {}; S.files = d.files || [];
     S.uploads = d.uploads || []; S.inbox = d.inbox || [];
     S.linked = d.linked || []; S.sessions = d.sessions || [];
@@ -1595,25 +1601,52 @@ function drawHome() {
   later. Adding is a row that is always sitting at the bottom waiting to be
   typed in, so putting something down is one click and one Enter.
 */
-var pending = {};
+/*
+  Each save says which revision of the board it was made from (#2188), and
+  the server refuses one made from an older copy than it holds, so two people
+  on one board cannot silently overwrite each other. One save per board is on
+  the wire at a time: an edit made while one is out waits for its answer and
+  goes with the new number, so somebody typing quickly never clashes with
+  themselves.
+*/
+var pending = {}, inflight = {}, again = {};
 function saveBoard(k) {
   saidNow('saving');
   clearTimeout(pending[k]);
-  pending[k] = setTimeout(function () {
-    api('/api/board/' + k, {
-      method:'PUT', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(S.boards[k])
-    }).then(function (r) {
-      if (r.ok) { saidNow('saved'); return; }
+  pending[k] = setTimeout(function () { pending[k] = 0; sendBoard(k); }, 500);
+}
+function sendBoard(k) {
+  if (inflight[k]) { again[k] = true; return; }
+  inflight[k] = true;
+  S.boardRevs = S.boardRevs || {};
+  var done = function () {
+    inflight[k] = false;
+    if (again[k]) { again[k] = false; sendBoard(k); }
+  };
+  api('/api/board/' + k, {
+    method:'PUT',
+    headers:{ 'Content-Type':'application/json', 'X-Board-Rev': String(S.boardRevs[k] === undefined ? '' : S.boardRevs[k]) },
+    body: JSON.stringify(S.boards[k])
+  }).then(function (r) {
+    return r.json().catch(function () { return null; }).then(function (j) {
+      if (r.ok) {
+        if (j && typeof j.rev === 'number') S.boardRevs[k] = j.rev;
+        saidNow('saved');
+        return done();
+      }
+      // A clash is not retried: what is on screen is older than what is
+      // saved, and sending it again would be the overwrite this refuses.
+      if (r.status === 409 || r.status === 428) again[k] = false;
       // "did not save" on its own sends somebody looking in the wrong place.
-      // Say which of the three it was.
-      r.json().then(function (j) {
-        saidNow(r.status === 401 ? 'not saved: signed out, reload the page'
-              : r.status === 403 ? 'not saved: you are not an admin here'
-              : 'not saved: ' + (j && j.error ? j.error : r.status));
-      }).catch(function () { saidNow('not saved: ' + r.status); });
-    }).catch(function () { saidNow('not saved: could not reach the server'); });
-  }, 500);
+      // Say which it was.
+      saidNow(r.status === 401 ? 'not saved: signed out, reload the page'
+            : r.status === 403 ? 'not saved: you are not an admin here'
+            : r.status === 409 ? 'not saved: somebody else saved this board since you opened it. Reload to see their change, then make yours again'
+            : r.status === 428 ? 'not saved: this page is older than the board check. Reload, then make your change again'
+            : 'not saved: ' + (j && j.error ? j.error : r.status));
+      done();
+    });
+  }).catch(function () { saidNow('not saved: could not reach the server'); done(); });
 }
 
 var newId = function (p) {
