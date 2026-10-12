@@ -69,15 +69,17 @@ if (-not (Test-Path -LiteralPath $Root)) {
     exit 1
 }
 
-# A game left running holds the very files every step below writes, and the
-# failure it produces says "access denied" rather than "close Skyrim".
-foreach ($n in 'SkyrimSE', 'skse64_loader') {
-    if (Get-Process -Name $n -ErrorAction SilentlyContinue) {
-        Write-Host ''
-        Say "STOP. $n is running. Close the game first, or these files cannot be written." 'Red'
-        if (-not $NoPause) { [void](Read-Host 'Enter to exit') }
-        exit 1
-    }
+# A game left running from this install holds the very files every step below
+# writes, and the failure it produces says "access denied" rather than "close
+# Skyrim". Only a game run from $Root\Game counts: until 12 Oct any SkyrimSE on
+# the machine did, so another Windows account's game, or another build
+# runner's stand-in, stopped this run (#2410). Close-Launcher.ps1 says how.
+. (Join-Path $Here 'Close-Launcher.ps1')
+if (Test-GameRunning -Root $Root) {
+    Write-Host ''
+    Say "STOP. Skyrim is running from $(Join-Path $Root 'Game'). Close the game first, or these files cannot be written." 'Red'
+    if (-not $NoPause) { [void](Read-Host 'Enter to exit') }
+    exit 1
 }
 
 # Run through powershell -File, -Only content,client arrives as one string
