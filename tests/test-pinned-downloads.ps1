@@ -262,14 +262,24 @@ if ($fn.Count -eq 1) {
 # ================================================================ bot ======
 $reqPath = Join-Path $RepoPath 'bot\requirements.txt'
 Yes 'bot\requirements.txt exists' (Test-Path -LiteralPath $reqPath)
+# Since #2190 the file is generated from bot\requirements.in with every
+# library the bot pulls in, each pinned by version AND by sha256: comment
+# lines on top, and each requirement continued over lines ending in "\" with
+# its --hash=sha256: values. So a requirement is read as the whole logical
+# line, and names compare as pip does (discord.py and discord-py are one).
+# tests\test-bot-requirements.ps1 holds the hashes and the installers' flags.
 $req = @()
-if (Test-Path -LiteralPath $reqPath) { $req = @(Get-Content -LiteralPath $reqPath | Where-Object { $_.Trim() }) }
-Yes ('every line of it is one exact == pin' +
-     $(if ($req.Count) { ' (' + ($req -join ', ') + ')' } else { '' })) (
-    $req.Count -gt 0 -and
-    @($req | Where-Object { $_ -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*==[0-9][0-9A-Za-z.]*$' }).Count -eq 0)
+if (Test-Path -LiteralPath $reqPath) {
+    $joined = ([IO.File]::ReadAllText($reqPath).Replace("`r`n", "`n") -replace '\\\n', ' ')
+    $req = @($joined -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') })
+}
+$loose = @($req | Where-Object { $_ -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*==[0-9][0-9A-Za-z.]*(\s+--hash=sha256:[0-9a-f]{64})+$' })
+Yes ('every requirement in it is one exact == pin with its sha256 hashes' +
+     $(if ($loose.Count) { ' (not: ' + (($loose | ForEach-Object { $_.Substring(0, [Math]::Min(60, $_.Length)) }) -join ', ') + ')' } else { '' })) (
+    $req.Count -gt 0 -and $loose.Count -eq 0)
+function Norm-Pip([string]$n) { return ($n.ToLowerInvariant() -replace '[-_.]+', '-') }
 foreach ($lib in 'discord.py', 'pillow', 'certifi') {
-    Yes "  $lib is pinned" (@($req | Where-Object { $_ -like "$lib==*" }).Count -eq 1)
+    Yes "  $lib is pinned" (@($req | Where-Object { $_ -match '^([^=\s]+)==' -and (Norm-Pip $Matches[1]) -eq (Norm-Pip $lib) }).Count -eq 1)
 }
 
 $ibPath = Join-Path $RepoPath 'scripts\deploy\Install-Bot.ps1'
