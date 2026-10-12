@@ -25,8 +25,8 @@
 # one job each on a runner of its own with 45 minutes of its own
 # (scripts\dev\Nightly-Harnesses.ps1 says how they are shared and why that
 # is safe), the rest of the checks in a job beside them, and the board is
-# told in a last job that waits for all of them and runs whichever way they
-# went, a job cancelled at its 45 minutes included.
+# told in a last job that waits for all of them and runs whether they passed
+# or failed, though not when somebody cancels the run.
 name: Nightly checks
 on:
   schedule:
@@ -328,12 +328,18 @@ jobs:
           .\scripts\dev\Nightly-Harnesses.ps1 -Shard ${{ matrix.shard }} -Of 2 -BudgetSeconds 2400
 
   board:
-    # Told last, once every job above has ended, whichever way: a job
-    # cancelled at its 45 minutes is a failed night here too (#2357), where
-    # a step under if: failure() in that job would never have run.
+    # Told last, once every job above has ended, passed or failed (#2357).
+    # !cancelled() rather than always(): a run somebody cancels is not a
+    # failed night, and always() still ran this after a cancel on 12 Oct
+    # (run 38311224396), queued to post a failure, until the run was
+    # force-cancelled. Whether a job stopped at its 45 minutes counts as a
+    # cancel here is not measured; on 28 Sep (run 36401223346) such a run
+    # ended cancelled. So the failed list does not depend on it: each
+    # harness share stops starting harnesses inside its own budget and
+    # prints the list itself.
     name: Put the night on the board
     needs: [nightly, harnesses]
-    if: ${{ always() }}
+    if: ${{ !cancelled() }}
     runs-on: [self-hosted, Windows, thornswood-vps]
     timeout-minutes: 10
     steps:

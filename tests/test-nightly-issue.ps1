@@ -23,9 +23,9 @@
     3. A green night closes the open one with a line naming the run, and a
        green night with none open changes nothing.
     4. nightly.yml runs the script in its last job, which waits for every
-       other job and runs whichever way they went (#2357): -Result failure
-       when any of them did not succeed, a job cancelled at its time
-       included, -Result success only when all of them did, both with the
+       other job and runs whether they passed or failed, but not after a
+       cancel (#2357): -Result failure when any of them did not succeed,
+       -Result success only when all of them did, both with the
        token, the repository and the run, and the old inline step is gone.
   Never connects to anything.
 #>
@@ -149,7 +149,7 @@ $others = @($jobIds | Where-Object { $_ -ne $boardId })
 $boardJob = [regex]::Match($y, '(?s)(?m)^  ' + [regex]::Escape($boardId) + ':\s*$(.*)\z').Groups[1].Value
 $needs = [regex]::Match($boardJob, '(?m)^    needs:\s*\[([^\]]*)\]').Groups[1].Value -split '\s*,\s*' | Where-Object { $_ }
 Yes ("nightly.yml: its last job ($boardId) waits for every other job ($($others -join ', '))") ($others.Count -ge 1 -and (@($others | Where-Object { $needs -notcontains $_ }).Count -eq 0))
-Yes '  and runs whichever way they went, a job cancelled at its time included' ($boardJob -match '(?m)^    if: \$\{\{ always\(\) \}\}\s*$')
+Yes '  and runs whether they passed or failed, but not after somebody cancels the run' ($boardJob -match '(?m)^    if: \$\{\{ !cancelled\(\) \}\}\s*$')
 $failCond = '(?m)^\s+if: \$\{\{ ' + (($others | ForEach-Object { "needs\.$_\.result != 'success'" }) -join ' \|\| ') + ' \}\}\s*$'
 $okCond = '(?m)^\s+if: \$\{\{ ' + (($others | ForEach-Object { "needs\.$_\.result == 'success'" }) -join ' && ') + ' \}\}\s*$'
 $failStep = [regex]::Match($boardJob, '(?s)- name: Put a failure on the board\s+(if: [^\r\n]*)(.*?)(?=\r?\n      - name: |\z)')
