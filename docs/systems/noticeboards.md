@@ -103,6 +103,13 @@ already put up.
 Take down is the poster's. The fee stays with the hold. A job
 somebody has taken stays up until they hand it back.
 
+A guard of the hold takes down any post on its board, taken or not
+(#502). The fee stays with the hold. Gold the post was holding goes back
+to whoever posted it: a letter's 15, a haul's pay. When they are away it
+is held for them and handed over when they are back. Whoever had taken
+it is told it is off their list. At another hold's board a guard is
+anybody. See [Offices](offices.md).
+
 ## Where this is
 
 The board is a panel. Stand at the message board and click it. Notices, jobs,

@@ -53,6 +53,9 @@ Dour Dungeon, Riften Jail, Windhelm Barracks, Cidhna Mine, Falkreath
 Jail, Morthal Jail, Dawnstar Jail, The Chill and The Bulwark Jail.
 Claiming the jail building does not touch its cells.
 
+A guard of a hold also takes down any post on that hold's notice board,
+and on no other hold's board. See [Notice boards](noticeboards.md).
+
 Who names a guard is not decided yet. It is asked on #502, and until it
 is answered nobody is a guard.
 
