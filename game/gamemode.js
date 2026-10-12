@@ -55768,7 +55768,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
         // Full: the meter does not rise, and the meal starts food sickness.
         write(actorId, n);
         var hurt = g.__thornswoodHurt;
-        try { if (hurt && hurt.exposed) { hurt.exposed(actorId, 'food', 'full'); } } catch (eFull) { }
+        if (hurt && hurt.exposed) { hurt.exposed(actorId, 'food', 'full'); }
         return 'You are already full. It sits badly.';
       }
       n.food = clamp(n.food + (Number(amount) || NEEDS.food.def));
