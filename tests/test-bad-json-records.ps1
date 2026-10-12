@@ -78,10 +78,18 @@ try {
     $wh = Join-Path $T 'wh'
     [void][IO.Directory]::CreateDirectory((Join-Path $wh 'scripts\release'))
     [IO.File]::Copy((Join-Path $Repo 'scripts\release\Where.ps1'), (Join-Path $wh 'scripts\release\Where.ps1'))
+    # Where.ps1 throws, and a throw that ends a script is printed in
+    # PowerShell's error view, wrapped at the console's width with a margin
+    # put in at each break. On the nightly runner the scratch path is long
+    # enough that the break fell inside 'is not valid JSON' (#1273), so the
+    # sentence is read from the exception itself, the way the Ship-Rules
+    # case below reads its throw.
+    $whCall = Join-Path $wh 'call.ps1'
+    W $whCall ("`$ErrorActionPreference = 'Stop'`ntry { `$null = & '" + (Join-Path $wh 'scripts\release\Where.ps1').Replace("'", "''") + "' Repo; 'ANSWERED' } catch { 'THREW ' + `$_.Exception.Message; exit 1 }`n")
     foreach ($k in $bad.Keys) {
         W (Join-Path $wh 'layout.json') $bad[$k]
-        $r = Child @((Join-Path $wh 'scripts\release\Where.ps1'), 'Repo')
-        Yes ("Where.ps1: a layout.json that is {0} is named" -f $k) ($r.Out.Contains('layout.json at ' + ((Join-Path $wh 'layout.json') -replace '\s+', ' ') + ' ' + $expect[$k]))
+        $r = Child @($whCall)
+        Yes ("Where.ps1: a layout.json that is {0} is named" -f $k) ($r.Code -ne 0 -and $r.Out.Contains('THREW layout.json at ' + ((Join-Path $wh 'layout.json') -replace '\s+', ' ') + ' ' + $expect[$k]))
     }
 
     # ---- Ship-Rules and records\ui-gone.json ------------------------------------------
