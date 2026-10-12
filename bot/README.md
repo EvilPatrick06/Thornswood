@@ -143,26 +143,43 @@ log.
   and a plain line. No issue number and no link, because testers have no
   GitHub. The post is deleted the moment the issue is no longer an open
   finding: fixed and closed, closed any other way, or its label taken off.
+  Its tag says where it was found and stays Dev or Main as before.
 - `#test-tasks`: one post for each issue closed as fixed from the day this
-  began. Its title and body are the issue's last comment that starts
-  `Test task:`, written by whoever fixed it:
+  began, always tagged Main. Its title and body are the issue's last comment
+  that starts `Test task:`, written by whoever fixed it:
 
-      Test task: <what to try, at most 100 characters>
-      Server: Dev            (optional, Dev or Main)
-      <what to do in the game and what should happen>
+      Test task: <what to try, at most 45 characters>
+      <numbered steps in the game, then what should happen>
 
   `Test task:` with nothing after the colon takes the issue's own title. A
   closed issue also gets a post when its latest `Test task:` comment was
   written after that day, however long ago it closed. A fixed finding with no
   such comment gets its own title and a plain line asking testers to check
-  it; a fixed issue that is neither a finding nor has that comment gets no
-  post. A reopened issue loses its test task and comes
+  it on main; a fixed issue that is neither a finding nor has that comment
+  gets no post. A reopened issue loses its test task and comes
   back to `#known-issues` if it is still a finding. Staff close a test task
   in Discord once it is confirmed.
 
+**When an issue is closed** (Patrick, 11 Oct): dev is where the team checks
+that nothing breaks the game, and main is where testers test, since we are in
+alpha. So a fix people would notice is closed, with its `Test task:` comment,
+when it reaches main, not when its pull request merges or when it reaches
+dev. The bot posts a test task the moment the issue closes, so closing it
+earlier sends testers to look for a fix main does not have. That is why every
+test task from the board is tagged Main. The `Server:` line that comments
+carried until then is no longer needed: a `Server: Dev` or `Server: Main`
+line straight under `Test task:` is still read, so it never shows in the
+post, and it changes nothing. Under `Known issue:` it still sets the tag.
+
 A rewritten `Known issue:` or `Test task:` comment edits its post (title,
 body and tag) on the next pass. Comments are read only for an issue GitHub
-says changed since the last pass. A test task posted by hand with
+says changed since the last pass, or whose record was made with an older
+form of the post: each record in `data\known-issues.json` holds the form it
+was written with (`TASK_FORM` and `KNOWN_FORM` in `bot.py`). When the way a
+post is written changes, that number goes up by one, and on the first pass
+after the bot is updated every older post is written again, once. Form 2
+(11 Oct) is test tasks tagged Main and both plain lines saying main. A test
+task posted by hand with
 `--post-task` can be given to its issue so it is kept up to date too, with
 the bot stopped (the running bot holds the file in memory):
 

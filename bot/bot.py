@@ -18,9 +18,11 @@ What it does:
            and which announcements ping them
   Testing  #known-issues is a forum with one post per open GitHub issue
            labelled Dev Findings or Main Findings; the post goes when the
-           issue is fixed. #test-tasks is a forum of test tasks, tagged Dev or
-           Main: one for each issue closed as fixed (its "Test task:" comment),
-           plus any posted by hand (/test-task, python bot.py --post-task). The
+           issue is closed, which is when its fix is on main. #test-tasks is a
+           forum of test tasks: one for each issue closed as fixed (its "Test
+           task:" comment), always tagged Main, because main is where testers
+           test, plus any posted by hand, tagged Dev or Main (/test-task,
+           python bot.py --post-task). The
            channels get there once, by hand, with
            python bot.py --setup-channels [--apply] (the testing channels
            section below)
@@ -1961,14 +1963,15 @@ async def ensure_hold_panel(guild):
 # is gone, and the testing channels are three things instead:
 #
 #   #test-tasks     a Forum. One thread per test task, tagged Dev or Main: the
-#                   bot posts one for each issue closed as fixed (see known
-#                   issues below), and staff can post one by hand (/test-task,
-#                   or python bot.py --post-task).
+#                   bot posts one, tagged Main, for each issue closed as fixed
+#                   (see known issues below), and staff can post one by hand
+#                   (/test-task, or python bot.py --post-task).
 #   #test-findings  what #test-results was, renamed. Nothing else about it moves.
 #   #known-issues   a Forum, read only: one bot post per open GitHub issue
 #                   labelled Dev Findings or Main Findings, title only, no
-#                   number and no link. The post goes when the issue is fixed
-#                   (Patrick, 11 Oct: one entry per issue, not one list).
+#                   number and no link. The post goes when the issue is closed,
+#                   which is when its fix is on main (Patrick, 11 Oct: one
+#                   entry per issue, not one list).
 #
 # THE ONE-TIME SETUP. Getting the server from the old shape to that one is the
 # only channel change the bot makes, and Patrick's explicit exception to the
@@ -2246,7 +2249,7 @@ async def _known_forum_make(guild, like, apply, verb):
             position=(getattr(like, 'position', None) or 0) + 1,
             overwrites=known_overwrites(guild, like),
             topic='One post per known issue being worked on. Kept by the bot: '
-                  'a post goes when its issue is fixed and becomes a test task.',
+                  'a post goes when its fix is on main and becomes a test task.',
             available_tags=[discord.ForumTag(name=t) for t in TASK_TAGS],
             reason=SETUP_REASON)
     return said
@@ -2404,9 +2407,10 @@ async def test_task_cmd(interaction: discord.Interaction, title: str,
 # kept from it, automatically, as things are found and fixed:
 #
 #   #known-issues  one post per open issue labelled Dev Findings or Main
-#                  Findings, tagged Dev or Main. The post goes the moment its
-#                  issue is no longer an open finding: fixed and closed, closed
-#                  any other way, or its label taken off.
+#                  Findings, tagged Dev or Main by its labels (where it was
+#                  found). The post goes the moment its issue is no longer an
+#                  open finding: fixed and closed, closed any other way, or its
+#                  label taken off.
 #   #test-tasks    one post per issue closed as fixed from the day this began
 #                  (see the since stamp below), for testers to check. Its
 #                  title and body are the issue's last comment that starts
@@ -2414,6 +2418,20 @@ async def test_task_cmd(interaction: discord.Interaction, title: str,
 #                  no such comment gets its own title and a plain line. An
 #                  issue that is reopened loses its test task, and comes back
 #                  to #known-issues if it is still a finding.
+#
+# When an issue closes (Patrick, 11 Oct): dev is where the team checks that
+# nothing breaks the game, and main is where testers test, since we are in
+# alpha. So a fix people would notice is closed, with its "Test task:"
+# comment, when it reaches main, not when it merges or reaches dev, and every
+# test task the bot posts is tagged Main. A "Server: Dev" or "Server: Main"
+# line under "Test task:", which comments carried before that day, is still
+# read so it never shows in the post, and it changes nothing. A "Server:"
+# line under "Known issue:" still sets that post's tag.
+#
+# Each record holds the form of the post it was made with (TASK_FORM,
+# KNOWN_FORM). When the way a post is written changes, the form goes up by
+# one, and every record of an older form is written again on the next pass,
+# once, even though GitHub says its issue did not change.
 #
 # Posts carry no issue number and no link: testers have no GitHub. The bot
 # remembers which post is which issue in known-issues.json in the data folder,
@@ -2432,6 +2450,12 @@ GITHUB_API = os.environ.get('GITHUB_API', 'https://api.github.com').rstrip('/')
 TASK_MARK = re.compile(r'^\s*test task\s*:\s*(.*)$', re.I)
 KNOWN_MARK = re.compile(r'^\s*known issue\s*:\s*(.*)$', re.I)
 TASK_SERVER = re.compile(r'^\s*server\s*:\s*(dev|main)\s*$', re.I)
+# The one tag a test task from the board carries: testers test on main.
+TASK_TAG = 'Main'
+# The form of the posts each record was made with. 2: test tasks tagged Main
+# whatever their Server line, and both bodies say the fix is on main (11 Oct).
+TASK_FORM = 2
+KNOWN_FORM = 2
 
 
 def _github_get(url):
@@ -2512,8 +2536,9 @@ def _labels(issue):
 
 
 def issue_tags(issue, server=None):
-    """Dev, Main or both, from the findings labels; server ('Dev' or 'Main')
-       when a test task names one; Dev when nothing says."""
+    """The #known-issues tags: Dev, Main or both, from the findings labels;
+       server ('Dev' or 'Main') when a "Known issue:" comment names one; Dev
+       when nothing says. Test tasks do not use this: they are TASK_TAG."""
     if server:
         return [server.capitalize()]
     names = _labels(issue)
@@ -2527,7 +2552,8 @@ def known_title(issue):
 
 def known_body(issue):
     where = ' and '.join(issue_tags(issue))
-    return 'Known on %s. The team is working on it; this post goes when it is fixed.' % where
+    return ('Known on %s. The team is working on it. This post goes when the '
+            'fix is on main, and then it comes back as a test task.' % where)
 
 
 def _marked(issue, comments, mark):
@@ -2552,11 +2578,14 @@ def _marked(issue, comments, mark):
 
 
 def test_task_of(issue, comments):
-    """(title, body, server, created_at) from the last "Test task:" comment."""
+    """(title, body, created_at) from the last "Test task:" comment, or None.
+       A Server line under it is read so it is not in the body, and then
+       dropped: every test task is on main (Patrick, 11 Oct)."""
     got = _marked(issue, comments, TASK_MARK)
-    if got and not got[1]:
-        got = (got[0], 'Check this on %s.' % (got[2] or 'Dev'), got[2], got[3])
-    return got
+    if got is None:
+        return None
+    title, body, _server, created = got
+    return title, body or 'Check this on main.', created
 
 
 def known_of(issue, comments):
@@ -2574,9 +2603,21 @@ def _sig(title, body, tags):
 
 
 def default_task_body(issue):
-    where = issue_tags(issue)[0]
-    return ('This was fixed. Check it on %s, and say in #%s if it still happens.'
-            % (where, FINDINGS_NAME))
+    """The body for a fixed finding nobody wrote a test task for. Its issue
+       closed when the fix reached main, so that is where to check it."""
+    return ('This was fixed and the fix is on main. Check it on main, and say '
+            'in #%s if it still happens.' % FINDINGS_NAME)
+
+
+def task_post_of(issue, comments):
+    """(title, body, tags) for an issue's #test-tasks post, or None when it
+       gets none (not a finding and nobody wrote a test task)."""
+    task = test_task_of(issue, comments)
+    if task is not None:
+        return task[0], task[1], [TASK_TAG]
+    if issue_tags_found(issue):
+        return known_title(issue), default_task_body(issue), [TASK_TAG]
+    return None
 
 
 async def _forum_thread(forum, tid):
@@ -2642,7 +2683,8 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None):
     issue numbers posted, edited and removed.
 
     Comments are read only for an issue GitHub says changed since the last
-    pass (its updated_at), so an untouched issue costs nothing.
+    pass (its updated_at), or whose record was made with an older form of
+    the post (KNOWN_FORM), so an untouched issue costs nothing.
     """
     loop = asyncio.get_running_loop()
     issues = await loop.run_in_executor(None, github_open_findings, get)
@@ -2658,7 +2700,8 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None):
         key = str(num)
         issue = issues[num]
         have = rec.get(key)
-        if have and have.get('updated') == issue.get('updated_at'):
+        if (have and have.get('updated') == issue.get('updated_at')
+                and have.get('form') == KNOWN_FORM):
             continue
         comments = await loop.run_in_executor(None, github_comments, num, get)
         title, body, tags = known_of(issue, comments)
@@ -2674,12 +2717,13 @@ async def known_issues_once(forum, state, get=None, save=None, me_id=None):
                 except discord.HTTPException:
                     continue
             if have:
-                have.update(sig=sig, updated=issue.get('updated_at'))
+                have.update(sig=sig, updated=issue.get('updated_at'),
+                            form=KNOWN_FORM)
                 state['_dirty'] = True
                 continue
         th = await _forum_post(forum, title, body, tags, me_id)
         rec[key] = {'thread_id': th.id, 'channel_id': forum.id, 'sig': sig,
-                    'updated': issue.get('updated_at')}
+                    'updated': issue.get('updated_at'), 'form': KNOWN_FORM}
         state['_dirty'] = True
         if save:
             save(state)      # straight away, so a crash cannot double it
@@ -2702,9 +2746,10 @@ async def test_tasks_once(forum, state, get=None, save=None, me_id=None, now=Non
     One pass over #test-tasks. An issue closed as fixed gets a post when it
     was closed after state['since'] (set to now on the first pass, so nothing
     from before this began floods in), or when its latest "Test task:"
-    comment was written after since. A rewritten comment edits the post; an
-    issue that is reopened loses it. Returns the issue numbers posted,
-    edited and removed.
+    comment was written after since. Every post is tagged Main (TASK_TAG).
+    A rewritten comment edits the post, and so does a record made with an
+    older form of the post (TASK_FORM), once; an issue that is reopened
+    loses it. Returns the issue numbers posted, edited and removed.
     """
     loop = asyncio.get_running_loop()
     since = state.get('since')
@@ -2720,21 +2765,19 @@ async def test_tasks_once(forum, state, get=None, save=None, me_id=None, now=Non
         have = rec.get(key)
         if (issue.get('state_reason') or 'completed') != 'completed':
             continue
-        if have and have.get('updated') == issue.get('updated_at'):
+        if (have and have.get('updated') == issue.get('updated_at')
+                and have.get('form') == TASK_FORM):
             continue
         comments = await loop.run_in_executor(None, github_comments, num, get)
         task = test_task_of(issue, comments)
         new_enough = (str(issue.get('closed_at') or '') >= since
-                      or (task is not None and task[3] >= since))
+                      or (task is not None and task[2] >= since))
         if not have and not new_enough:
             continue
-        if task is None and not issue_tags_found(issue):
+        post = task_post_of(issue, comments)
+        if post is None:
             continue        # not a finding and nobody wrote a test task
-        if task is None:
-            title, body, server = known_title(issue), default_task_body(issue), None
-        else:
-            title, body, server = task[0], task[1], task[2]
-        tags = issue_tags(issue, server)
+        title, body, tags = post
         sig = _sig(title, body, tags)
         if have:
             if have.get('sig') != sig:
@@ -2747,12 +2790,12 @@ async def test_tasks_once(forum, state, get=None, save=None, me_id=None, now=Non
                         continue
                 except discord.HTTPException:
                     continue
-            have.update(sig=sig, updated=issue.get('updated_at'))
+            have.update(sig=sig, updated=issue.get('updated_at'), form=TASK_FORM)
             state['_dirty'] = True
             continue
         th = await _forum_post(forum, title, body, tags, me_id)
         rec[key] = {'thread_id': th.id, 'channel_id': forum.id, 'sig': sig,
-                    'updated': issue.get('updated_at')}
+                    'updated': issue.get('updated_at'), 'form': TASK_FORM}
         state['_dirty'] = True
         if save:
             save(state)
@@ -2772,22 +2815,24 @@ async def test_tasks_once(forum, state, get=None, save=None, me_id=None, now=Non
             rec.pop(key, None)
             state['_dirty'] = True
             removed.append(int(key))
-        elif have.get('updated') != issue.get('updated_at'):
-            # Closed before since and changed since the last pass (an adopted
-            # post whose comment was rewritten): brought up to date.
+        elif (have.get('updated') != issue.get('updated_at')
+                or have.get('form') != TASK_FORM):
+            # Closed before since, and changed since the last pass (an adopted
+            # post whose comment was rewritten) or made with an older form of
+            # the post: brought up to date.
             comments = await loop.run_in_executor(None, github_comments, int(key), get)
-            task = test_task_of(issue, comments)
-            if task is not None:
-                tags = issue_tags(issue, task[2])
-                sig = _sig(task[0], task[1], tags)
+            post = task_post_of(issue, comments)
+            if post is not None:
+                sig = _sig(*post)
                 if have.get('sig') != sig:
                     try:
-                        if await _forum_edit(forum, have['thread_id'], task[0], task[1], tags):
+                        if await _forum_edit(forum, have['thread_id'], *post):
                             edited.append(int(key))
                     except discord.HTTPException:
                         continue
                 have['sig'] = sig
             have['updated'] = issue.get('updated_at')
+            have['form'] = TASK_FORM
             state['_dirty'] = True
     return posted, edited, removed
 
