@@ -47,7 +47,8 @@ $script:ThornswoodRecordKinds = [ordered]@{
 function Get-ThornswoodRecordProp($o, [string]$name) {
     if ($null -eq $o -or $o -isnot [psobject]) { return $null }
     $p = $o.PSObject.Properties[$name]
-    if ($p) { return $p.Value }
+    # The comma keeps a list a list, even an empty one, instead of unrolling it.
+    if ($p) { return , $p.Value }
     return $null
 }
 function Test-ThornswoodWhole($v, [int64]$min) {
