@@ -3883,80 +3883,29 @@ function disableBlocksOff() {
 disableBlocksOff();
 
 /*
-  Who has been told what a kiln will cost them, and when. See burnCharcoal.
+  THE KILN IS A BENCH, AND A PRESS ON IT IS THE ENGINE'S (#2337).
+
+  Until 12 Oct a press on the charcoal kiln was answered here by a function
+  that burned three firewood into one grade of charcoal on a second press
+  inside fifteen seconds. It was written on 21 September because the kiln's
+  crafting menu had nothing in it, and its own comment said so: four charcoal
+  recipe records "would turn this into an ordinary bench with an ordinary menu
+  and delete" it, which was "the right end state". Patrick's report that day
+  was "it's making charcoal automatically instantly upon opening the kiln and
+  not when you click to make it".
+
+  The plugin carries those four recipes now, and the Tool Handle and the
+  Splint, all six on the kiln's keyword. So the press answer had become the
+  fault: onActivate answered every kiln press with a line and false, which
+  skips ProcessActivateNormal, the engine step that seats a person at a FURN
+  and opens its menu for them; and on the client, where furniture is not
+  blocked, opening the menu twice inside the window burned three firewood
+  nobody asked to spend. Nothing here answers a kiln press now. benchGate
+  still refuses it to anybody who is not a woodworker, and the menu's rows go
+  through mp.onCraft like every other bench: the half and rank on each row,
+  the fit-to-make gate, and the work counted. tests/test-2337-kiln-menu.js
+  holds it.
 */
-const KILN_ARMED = {};
-const KILN_ARM_MS = 15000;
-
-function burnCharcoal(actorId, refrId) {
-  const half = halfGate(actorId, 'charburner', 'novice',
-    'A kiln is a charburner\'s. Only a woodworker who took Charburner can run one, ' +
-    'and a woodwright gets the plain grade. Ask one.');
-  if (half) return half;
-
-  // The woodcutter's axe, and it is asked for under the profession rather than
-  // the half: both halves of the Woodworker are woodworkers, a woodwright runs
-  // a kiln at the plain grade, and neither of them does it without an axe.
-  const tool = toolGate(actorId, 'woodworker');
-  if (tool) return tool;
-
-  // Too sick, too hurt or too tired to burn anything: the gate every way of
-  // making something asks (unfitToMake, #1733), at the kiln pressed.
-  const unfit = unfitToMake(actorId, refrId);
-  if (unfit) return unfit;
-
-  const wait = cooldownLeft(actorId, refrId);
-  if (wait > 0) return 'The kiln is still burning. ' + wait + ' seconds.';
-
-  const cost = 3;
-
-  /*
-    A PRESS IS NOT A DECISION, AND THIS ONE WAS SPENDING FIREWOOD LIKE ONE.
-
-    Patrick, 21 September: "it's making charcoal automatically instantly upon
-    opening the kiln and not when you click to make it".
-
-    Every other verb in this file answers a press that can only mean one thing.
-    A seam is struck, a block is chopped, a plot is sown, and if you did not
-    want it you would not have walked up to it. A kiln is different because it
-    SPENDS something: three firewood, out of a pack you are carrying for
-    something else, for a grade of charcoal you may not have wanted yet. Walking
-    past one and pressing it took them.
-
-    WHY IT IS NOT A MENU, and this is the honest part. The kiln is a bench, it
-    has a keyword, and BENCH_ACCESS gates it, so the crafting menu does open.
-    There is nothing in it: charcoalT1 to T4 appear exactly twice in this whole
-    file, in ITEMS and in this function, and no COBJ anywhere makes them. A
-    proper menu needs four recipe records in Thornswood-Content.esp, which is
-    Creation Kit work and its own entry.
-
-    SO IT ASKS. The first press says what it will cost and what it will make.
-    The second press within the window does it. That is still a press rather
-    than a chat word, it cannot happen by accident, and it needs no new records.
-    The window is deliberately short: this is a confirmation, not a state, and
-    somebody who walked off and came back should be asked again.
-  */
-  var armed = KILN_ARMED[actorId];
-  if (!armed || armed.refrId !== refrId || (Date.now() - armed.at) > KILN_ARM_MS) {
-    KILN_ARMED[actorId] = { refrId: refrId, at: Date.now() };
-    const willBe = ['charcoalT1', 'charcoalT2', 'charcoalT3', 'charcoalT4']
-      [rankStep(actorId, 'charburner')] || 'charcoalT1';
-    return 'The kiln will take ' + cost + ' firewood and give you ' +
-           willBe.replace('charcoalT', 'grade ') + ' charcoal. Press it again to burn.';
-  }
-  delete KILN_ARMED[actorId];
-
-  if (!takeItem(actorId, ITEMS.firewood, cost)) {
-    return 'The kiln needs ' + cost + ' firewood.';
-  }
-  const grade = ['charcoalT1', 'charcoalT2', 'charcoalT3', 'charcoalT4'][rankStep(actorId, 'charburner')] || 'charcoalT1';
-  addItem(actorId, ITEMS[grade], 1);
-  stampCooldown(actorId, refrId);
-  const rank = creditWork(actorId, 'charburner');
-  const worn = wearTool(actorId, 'woodworker');
-  return 'The kiln yields ' + grade.replace('charcoalT', 'grade ') + ' charcoal.' +
-         (rank ? ' ' + rank : '') + (worn ? ' ' + worn : '');
-}
 
 // ---------------------------------------------------------------------------
 // character creation
@@ -8444,9 +8393,9 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     all, so it goes on to the engine and the crafting menu opens the way it
     always has.
 
-    Our own kiln is both a bench and a station, and this is the right order for
-    it: a woodwright is allowed the kiln's novice grade by the sister half rule,
-    so the gate lets them through and burnCharcoal below grades it.
+    Our own kiln is a bench like the rest (#2337): a woodwright is allowed the
+    kiln's novice rows by the sister half rule, so the gate lets them through,
+    the menu opens, and mp.onCraft grades each row they make.
   */
   const shut = benchGate(casterRefrId, baseDesc);
   if (shut) {
@@ -8609,7 +8558,6 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
 
   let message = null;
   if (baseDesc === STATIONS.saltQuarry) message = mineSalt(casterRefrId, refrId);
-  else if (baseDesc === STATIONS.charcoalKiln) message = burnCharcoal(casterRefrId, refrId);
   // The four chopping blocks. Before the STATIONS branches would not matter,
   // because these are not ours, but before the FURN fallthrough further down
   // very much does: a chopping block is a FURN, and a FURN that reaches
@@ -8825,7 +8773,6 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
   }
   try {
     add(STATIONS.saltQuarry);
-    add(STATIONS.charcoalKiln);
     for (var shrine in SHRINES) { add(shrine); }
     for (var handPlant in HARVESTS) { add(handPlant); }
     // Every farm crop as well. A crop base missing from this list is pressed
@@ -27881,9 +27828,9 @@ const KEY_NAME_DELAY = 250;
 /*
   FIT TO MAKE ANYTHING (#1733): the one gate every way of making something
   asks, before anything is taken. Today that is a bench's own menu
-  (mp.onCraft, brews, enchanting and tempering included), a kiln burned by
-  pressing it (burnCharcoal) and a key cut at a forge (cutKey in the
-  property block). It asks two blocks, in this order:
+  (mp.onCraft, brews, enchanting and tempering included, and the kiln's
+  charcoal since #2337) and a key cut at a forge (cutKey in the property
+  block). It asks two blocks, in this order:
 
     too sick or too hurt (#1383)  the injury and disease block: a disease
                                   gone bad refuses every craft, and a broken
