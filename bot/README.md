@@ -128,20 +128,36 @@ name, Owner, Dev, Lead Gamemaster and Lead GM by default. A `bot.env.json`
 that still carries `LIVE_SMOKE_ADMIN_ROLES` is read for it. A thread already
 open under the same title is handed back rather than made twice.
 
-**Known issues.** `#known-issues` is read only: the setup copies
-`#test-findings`' overwrites and switches sending and threads off for
-@everyone and each of them, and only the bot posts. One post per open issue in
-`EvilPatrick06/Thornswood` labelled Dev Findings or Main Findings, the title
-and its status and nothing else: no issue number and no link, because testers
-have no GitHub. When the issue is closed as completed (confirmed fixed) the
-post is struck through and says Fixed; closed any other way it says Closed, not fixed;
-reopened, it goes back. The bot reads GitHub every five minutes
-(`KNOWN_ISSUES_EVERY`, never under a minute) with `GITHUB_TOKEN` from
-`bot.env.json`, a read only token for that repository's issues. No token, no
-posts, said once in the log. Issue number to message id is kept in
-`data\known-issues.json`, written straight after each post, and before a new
-post the bot's own recent posts in the channel are matched by title, so neither a restart nor a crash
-between a post and its save posts twice.
+**Known issues and test tasks, from the board** (Patrick, 11 Oct: "it is
+supposed to be automatic as we add things and fix things"). Two forums are
+kept from `EvilPatrick06/Thornswood`, every five minutes (`KNOWN_ISSUES_EVERY`,
+never under a minute), with `GITHUB_TOKEN` from `bot.env.json`, a read only
+token for that repository's issues. No token, neither is kept, said once in the
+log.
+
+- `#known-issues`, read only: one post per open issue labelled Dev Findings
+  or Main Findings, titled with the issue's title and tagged Dev or Main. No
+  issue number and no link, because testers have no GitHub. The post is
+  deleted the moment the issue is no longer an open finding: fixed and closed,
+  closed any other way, or its label taken off.
+- `#test-tasks`: one post for each issue closed as fixed from the day this
+  began. Its title and body are the issue's last comment that starts
+  `Test task:`, written by whoever fixed it:
+
+      Test task: <what to try, at most 100 characters>
+      Server: Dev            (optional, Dev or Main)
+      <what to do in the game and what should happen>
+
+  A fixed finding with no such comment gets its own title and a plain line
+  asking testers to check it; a fixed issue that is neither a finding nor has
+  that comment gets no post. A reopened issue loses its test task and comes
+  back to `#known-issues` if it is still a finding. Staff close a test task
+  in Discord once it is confirmed.
+
+Which post is which issue is kept in `data\known-issues.json`, written
+straight after each post, and a post is matched back by its title among the
+bot's own, so neither a restart nor a crash between a post and its save posts
+twice.
 
 **The one-time setup.** Moving a server from the old shape is the only channel
 change the bot makes, Patrick's explicit exception for these three changes. It
@@ -155,8 +171,11 @@ convert a text channel to a forum, so when it refuses, a new forum is made in
 the same category and position with the old channel's permission overwrites,
 and the old channel is renamed `#test-tasks-archive` with sending switched off
 for everyone but the bot. Nothing is deleted. It renames `#test-results` to
-`#test-findings`, and makes `#known-issues` beside it, seen by the same
-people and read only for all but the bot. A finished apply is written to `data\channel-setup.json` and a
+`#test-findings`, and makes the `#known-issues` forum beside it, seen by the
+same people and read only for all but the bot. A server set up before
+`#known-issues` was a forum gets that one step on its next apply: the old text
+channel is deleted when it holds only the bot's own posts (otherwise renamed
+`#known-issues-archive` and locked), and the forum takes the name. A finished apply is written to `data\channel-setup.json` and a
 second run does nothing; an apply that stopped part way does only what is left.
 `test-testing-channels.py` holds all of this.
 
