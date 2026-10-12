@@ -222,6 +222,14 @@ names its notes as a file of their own (`newsFile`, an asset under its sha256),
 `FillNews()` fetches it once, checks it, keeps it in `Profile\news.json`, and
 puts its notes after the ones the feed carries, on the update check's own
 thread in `ShellUpdate.cs CheckUpdatesBackground`.
+On a dev build the News tab's header says what main is on from main's own
+feed (#2434): each time the tab is shown, `ShellNews.cs ReadMainVersion`
+asks `MainVersion.cs MainLauncherVersion()` for main's `launcherVersion` on a
+pool thread, through `CheckUrl` and the shared client, and puts the answer
+into the header line. Only while main's feed has not answered, or could not
+be read, does the header name the dev feed's `mainVersion` from the last
+update check, worded as such. The DEV marks on the notes still come from the
+dev feed.
 `Updater.cs:1177 SelfUpdate()` writes `Launcher\Thornswood.exe.new` and a
 script in the temp folder, `thornswood-update-<process id>.cmd`, that swaps it in once
 this process has gone and keeps the old one until the new one has started
