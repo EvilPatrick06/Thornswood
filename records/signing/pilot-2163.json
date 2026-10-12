@@ -1,0 +1,16 @@
+﻿{
+    "issue":  2163,
+    "artifact":  "pilot.exe (test only, never shipped)",
+    "sourceCommit":  "e975a14c6957a1e1275a8b114f12ebeb6e7a0183",
+    "engineSkymp":  "928485503333b18c2325fc13cbf781d254b19af0",
+    "machine":  "ONE",
+    "signedAtUtc":  "2026-10-11T23:08:39.4639575Z",
+    "unsignedSha256":  "b03475ce7737046bbaad04bd51a14430e015adde314d47f18212e33ddd4c667f",
+    "signedSha256":  "808be55e8387ea12dd359f2d58fe37416527ddeb51c7c136c1fe58823c8d7468",
+    "digest":  "SHA256 file digest, RFC 3161 SHA256 timestamp",
+    "timestampUrl":  "http://timestamp.acs.microsoft.com",
+    "signerMatchesExpectedSigner":  true,
+    "signerIssuer":  "CN=Microsoft ID Verified CS AOC CA 04, O=Microsoft Corporation, C=US",
+    "signerExpires":  "2026-10-13T21:14:42.0000000Z",
+    "timestamper":  "CN=Microsoft Public RSA Time Stamping Authority, OU=nShield TSS ESN:7A00-05E0-D947, OU=Microsoft America Operations, O=Microsoft Corporation, L=Redmond, S=Washington, C=US"
+}

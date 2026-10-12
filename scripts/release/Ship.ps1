@@ -314,9 +314,14 @@ param(
 . (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
 # A stale or dirty checkout sends old or unlanded code; refuse it (#2118).
-# -AnyBranch: the Git section below already holds a main release to main
-# (or a hotfix/ branch), and a dev release may ship any pushed branch.
-if (-not $DryRun) { . (Join-Path $PSScriptRoot '..\deploy\Fresh-Checkout.ps1'); Assert-FreshCheckout -RepoDir (Join-Path $PSScriptRoot '..\..') -What 'Ship' -AnyBranch -AllowStale:$AllowStaleCheckout }
+# The branch rule is Test-FreshAnyBranch, the same question Publish-Update
+# asks after the build (#2235): a dev release may ship any pushed branch, a
+# main release main or a hotfix/ branch, so the two can never disagree halfway.
+if (-not $DryRun) {
+    . (Join-Path $PSScriptRoot '..\deploy\Fresh-Checkout.ps1')
+    $freshRepo = Join-Path $PSScriptRoot '..\..'
+    Assert-FreshCheckout -RepoDir $freshRepo -What 'Ship' -AnyBranch:(Test-FreshAnyBranch -RepoDir $freshRepo -Channel $Channel) -AllowStale:$AllowStaleCheckout
+}
 
 
 # The launcher, Thornswood.exe in the launcher folder.
@@ -596,6 +601,8 @@ $ErrorActionPreference = 'Stop'
 # set. Non-zero means the installer rebuild failed, and the Done section says
 # so again at the end.
 $script:InstallerFailed = 0
+# What the packager threw, when it threw rather than exiting (#2243).
+$script:InstallerWhy = ''
 # What Publish-Discord.ps1 did, read back after it runs. It sets this in the
 # global scope; seeded here so strict mode has something to read either way.
 $global:ThornswoodDiscordResult = ''
@@ -1592,6 +1599,9 @@ if ($MoveServer) { $pubArgs['MoveServer'] = $true }
 if ($AcceptSize) { $pubArgs['AcceptSize'] = $true }
 if (-not $ModsOnly) { $pubArgs['Launcher'] = $true; $pubArgs['LauncherInputs'] = $LauncherInputs }
 if ($Dev) { $pubArgs['Channel'] = 'dev'; $pubArgs['VersionOverride'] = $target }
+# -AllowStaleCheckout was Ship's alone, so Publish-Update refused what Ship had
+# already been told to let through (#2235).
+if ($AllowStaleCheckout) { $pubArgs['AllowStaleCheckout'] = $true }
 # A dry run has to leave nothing behind, and NoUpload plus NoPush is not that.
 #
 # Those two stop the release LEAVING the machine. They do not stop the
@@ -1856,7 +1866,22 @@ elseif ($Package) {
     # on #1213; this keeps the one it has.
     $pkgArgs = @{ Root = $Root; OutDir = $DistDir; NoPause = $true; OneFile = $true }
     if ($ciStub) { $pkgArgs['Stub'] = $ciStub }
-    & (Join-Path $Here 'Package-Thornswood.ps1') @pkgArgs
+    # A THROW IS A FAILED BUILD TOO (#2243). On 11 October a stale generated
+    # files check inside the packager (Assert-ShipGeneratedBodies) threw, and
+    # the throw went straight out of Ship: the remirror, the dev feed's marks,
+    # the news, the Discord post, the restart and the tag never ran, after the
+    # pack was already on the feed. Caught here and given the same treatment
+    # as a non-zero exit below, so the rest of the release still runs.
+    # LASTEXITCODE is cleared first so an earlier native command's code is not
+    # read as the packager's.
+    $global:LASTEXITCODE = 0
+    $pkgThrew = $null
+    try { & (Join-Path $Here 'Package-Thornswood.ps1') @pkgArgs }
+    catch { $pkgThrew = $_ }
+    if ($pkgThrew) {
+        $script:InstallerWhy = [string]$pkgThrew.Exception.Message
+        if ($LASTEXITCODE -eq 0) { $global:LASTEXITCODE = 1 }
+    }
 
     # AND READ WHETHER IT WORKED, which is the same fault as the build step
     # above and entry 118 on the list: Ship called a script and never looked at
@@ -1878,7 +1903,11 @@ elseif ($Package) {
     # left behind and it runs 7z and winget.
     if ($LASTEXITCODE -ne 0) {
         $script:InstallerFailed = $LASTEXITCODE
-        Say "  THE INSTALLER DID NOT BUILD. Package-Thornswood.ps1 exited with $LASTEXITCODE." 'Red'
+        if ($script:InstallerWhy) {
+            Say "  THE INSTALLER DID NOT BUILD. Package-Thornswood.ps1 stopped: $($script:InstallerWhy)" 'Red'
+        } else {
+            Say "  THE INSTALLER DID NOT BUILD. Package-Thornswood.ps1 exited with $LASTEXITCODE." 'Red'
+        }
         Say '  The release itself is already published and is fine. What is not' 'Red'
         Say '  rebuilt is Thornswood-Setup.exe, so anybody installing from scratch' 'Red'
         Say '  sits through this release on first launch.' 'Red'
@@ -2106,6 +2135,7 @@ Head 'Done'
 if ($script:InstallerFailed) {
     Say ("The installer did NOT rebuild (exit $script:InstallerFailed). The release went out " +
          'without it.') 'Red'
+    if ($script:InstallerWhy) { Say ("  It stopped with: " + $script:InstallerWhy) 'Red' }
     Say '  .\scripts\release\Package-Thornswood.ps1 -OneFile' 'Yellow'
     Write-Host ''
 }
