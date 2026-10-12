@@ -2146,6 +2146,9 @@ elseif ($Package) {
     # on #1213; this keeps the one it has.
     $pkgArgs = @{ Root = $Root; OutDir = $DistDir; NoPause = $true; OneFile = $true }
     if ($ciStub) { $pkgArgs['Stub'] = $ciStub }
+    # Ship's -AllowStaleCheckout goes on to the packager (#2436), the same as
+    # to Publish-Update (#2235), or the packager refuses what Ship let past.
+    if ($AllowStaleCheckout) { $pkgArgs['AllowStaleCheckout'] = $true }
     # A THROW IS A FAILED BUILD TOO (#2243). On 11 October a stale generated
     # files check inside the packager (Assert-ShipGeneratedBodies) threw, and
     # the throw went straight out of Ship: the remirror, the dev feed's marks,
