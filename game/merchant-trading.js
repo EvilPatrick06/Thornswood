@@ -589,6 +589,8 @@ module.exports = {
   createMerchantTrading: createMerchantTrading,
   createNativeMerchantTransfer: createNativeMerchantTransfer,
   createQuestTransactions: QUEST_TRANSFER.createQuestTransactions,
+  actorIdentity: QUEST_TRANSFER.actorIdentity,
+  targetIdentity: QUEST_TRANSFER.targetIdentity,
   installMerchantTrading: installMerchantTrading,
   bookHoldOf: bookHoldOf,
   guildSite: guildSite,
