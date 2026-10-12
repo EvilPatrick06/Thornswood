@@ -22,9 +22,11 @@
        to it rather than opening another.
     3. A green night closes the open one with a line naming the run, and a
        green night with none open changes nothing.
-    4. nightly.yml runs the script: -Result failure under if: failure(),
-       -Result success under if: success(), both with the token, the
-       repository and the run, and the old inline step is gone.
+    4. nightly.yml runs the script in its last job, which waits for every
+       other job and runs whichever way they went (#2357): -Result failure
+       when any of them did not succeed, a job cancelled at its time
+       included, -Result success only when all of them did, both with the
+       token, the repository and the run, and the old inline step is gone.
   Never connects to anything.
 #>
 [CmdletBinding()]
@@ -140,13 +142,24 @@ Yes "and the next failed night opens a fresh one ($said)" (@($script:Issues | Wh
 
 # ---- 4. the workflow runs it ----------------------------------------------------
 $y = [IO.File]::ReadAllText((Join-Path $repo '.github\workflows\nightly.yml'))
-$failStep = [regex]::Match($y, '(?s)- name: Put a failure on the board\s+if: failure\(\)(.*?)(?=\r?\n      - name: |\z)')
-$okStep = [regex]::Match($y, '(?s)- name: Close the failure when every check passed\s+if: success\(\)(.*?)(?=\r?\n      - name: |\z)')
-Yes 'nightly.yml: on failure it runs Nightly-Issue.ps1 -Result failure' ($failStep.Success -and $failStep.Groups[1].Value -match [regex]::Escape('.\scripts\dev\Nightly-Issue.ps1 -Result failure'))
-Yes 'nightly.yml: on success it runs Nightly-Issue.ps1 -Result success' ($okStep.Success -and $okStep.Groups[1].Value -match [regex]::Escape('.\scripts\dev\Nightly-Issue.ps1 -Result success'))
+# Every job but the last, by its id, and the last one: the job that tells the board.
+$jobIds = @([regex]::Matches(($y -split '(?m)^jobs:\s*$', 2)[1], '(?m)^  ([A-Za-z0-9_-]+):\s*$') | ForEach-Object { $_.Groups[1].Value })
+$boardId = $(if ($jobIds.Count) { $jobIds[-1] } else { '' })
+$others = @($jobIds | Where-Object { $_ -ne $boardId })
+$boardJob = [regex]::Match($y, '(?s)(?m)^  ' + [regex]::Escape($boardId) + ':\s*$(.*)\z').Groups[1].Value
+$needs = [regex]::Match($boardJob, '(?m)^    needs:\s*\[([^\]]*)\]').Groups[1].Value -split '\s*,\s*' | Where-Object { $_ }
+Yes ("nightly.yml: its last job ($boardId) waits for every other job ($($others -join ', '))") ($others.Count -ge 1 -and (@($others | Where-Object { $needs -notcontains $_ }).Count -eq 0))
+Yes '  and runs whichever way they went, a job cancelled at its time included' ($boardJob -match '(?m)^    if: \$\{\{ always\(\) \}\}\s*$')
+$failCond = '(?m)^\s+if: \$\{\{ ' + (($others | ForEach-Object { "needs\.$_\.result != 'success'" }) -join ' \|\| ') + ' \}\}\s*$'
+$okCond = '(?m)^\s+if: \$\{\{ ' + (($others | ForEach-Object { "needs\.$_\.result == 'success'" }) -join ' && ') + ' \}\}\s*$'
+$failStep = [regex]::Match($boardJob, '(?s)- name: Put a failure on the board\s+(if: [^\r\n]*)(.*?)(?=\r?\n      - name: |\z)')
+$okStep = [regex]::Match($boardJob, '(?s)- name: Close the failure when every check passed\s+(if: [^\r\n]*)(.*?)(?=\r?\n      - name: |\z)')
+Yes 'nightly.yml: when any job did not succeed it runs Nightly-Issue.ps1 -Result failure' ($failStep.Success -and ('    ' + $failStep.Groups[1].Value) -match $failCond -and $failStep.Groups[2].Value -match [regex]::Escape('.\scripts\dev\Nightly-Issue.ps1 -Result failure'))
+Yes 'nightly.yml: only when every job succeeded it runs Nightly-Issue.ps1 -Result success' ($okStep.Success -and ('    ' + $okStep.Groups[1].Value) -match $okCond -and $okStep.Groups[2].Value -match [regex]::Escape('.\scripts\dev\Nightly-Issue.ps1 -Result success'))
+Yes '  and nothing else in the file tells the board' (([regex]::Matches($y, 'Nightly-Issue\.ps1 -Result')).Count -eq 2)
 foreach ($m in @($failStep, $okStep)) {
     if (-not $m.Success) { continue }
-    $v = $m.Groups[1].Value
+    $v = $m.Groups[2].Value
     Yes '  with the token, the repository and the run' ($v -match 'GH_TOKEN: \$\{\{ secrets\.GITHUB_TOKEN \}\}' -and $v -match 'REPO: \$\{\{ github\.repository \}\}' -and $v -match 'RUN: \$\{\{ github\.server_url \}\}')
 }
 Yes '  and the old inline step, first page only, is gone' ($y -notmatch 'Close this once the nightly run is green again')

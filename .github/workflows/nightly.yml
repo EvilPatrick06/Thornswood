@@ -15,9 +15,18 @@
 #
 # Any failure opens an issue on the board, or adds to the one already open,
 # and the first night everything passes closes it (Nightly-Issue.ps1),
-# with a link to the run; the last lines of the harness step name every
+# with a link to the run; the last lines of each harness job name every
 # harness that failed and the ten slowest. Runs at 03:00 Mountain (09:00
 # UTC), when nobody is playing, and by hand from the Actions tab.
+#
+# Three jobs since #2357. On 12 Oct the one job that ran everything used 43
+# of its 45 minutes, nearly all of it the harnesses (692 of them, 2,587 s
+# added up), and they grow by tens a day. So the harnesses run in shares,
+# one job each on a runner of its own with 45 minutes of its own
+# (scripts\dev\Nightly-Harnesses.ps1 says how they are shared and why that
+# is safe), the rest of the checks in a job beside them, and the board is
+# told in a last job that waits for all of them and runs whichever way they
+# went, a job cancelled at its 45 minutes included.
 name: Nightly checks
 on:
   schedule:
@@ -163,135 +172,6 @@ jobs:
           if ($bad) { exit 1 }
           Write-Host 'every bot file parses'
 
-      - name: Install the eslint the lint harness copies
-        if: ${{ !cancelled() }}
-        shell: pwsh
-        run: |
-          # tests\test-eslint-amp-path.ps1 (#1343, #2092) runs build.yml's
-          # eslint lines offline: its npm stand-in copies eslint 9.39.5 out of
-          # %TEMP%\herald-lint, and with nothing there it says SKIP and exits
-          # 2. No runner had that folder, so it failed the first night it was
-          # in the tree (#1273). This is the same pinned install build.yml's
-          # lint step makes, into the folder the harness reads by default.
-          $cache = Join-Path $env:TEMP 'herald-lint'
-          npm install --prefix $cache --no-save --no-audit --no-fund --silent eslint@9.39.5
-          if (-not (Test-Path -LiteralPath (Join-Path $cache 'node_modules\eslint\bin\eslint.js'))) {
-            Write-Host '::error file=tests/test-eslint-amp-path.ps1::could not install eslint 9.39.5, so the lint harness has nothing to copy'
-            exit 1
-          }
-          Write-Host ('eslint 9.39.5 is in ' + $cache)
-
-      - name: Run the test harnesses
-        if: ${{ !cancelled() }}
-        shell: pwsh
-        run: |
-          # Written to be run by hand, and until now never run anywhere else.
-          # A harness that reads this machine's game folder says SKIP for the
-          # parts it cannot measure on a runner and still checks the rest.
-          # ONE AT A TIME, timed. Run in parallel on the VPS on 25 September the
-          # step hung for twenty minutes where one at a time it finished in five
-          # and a half, so it stays serial. Each harness's time is printed, and
-          # the step ends with the ten slowest and the ones that failed.
-          #
-          # AND EACH ONE ON A CLOCK, and printed the moment it ends. On 26 and
-          # 28 September this step ran until the job's 45 minutes were up and
-          # was cancelled with nothing in the log, because every harness's
-          # output was held until all of them had finished, and one never did.
-          # So each runs as its own process with its output in a file, gets
-          # PER_HARNESS seconds, and past that it and everything it started are
-          # killed and it is named as timed out. The rest still run.
-          #
-          # And what a harness leaves running when it ends is killed too, and
-          # named. The runner killed three node processes nobody had stopped
-          # when it cancelled the job, and one of those holding the output
-          # pipe open is enough to keep the old "| Out-String" waiting for ever.
-          $PER_HARNESS = 300
-          # A harness whose own cases take longer than that says so in its
-          # header, with its measured time beside it ("NIGHTLY CLOCK: 600
-          # seconds"), and gets that clock instead, never more than
-          # MAX_CLOCK. The clock is there to catch a harness that hangs, not
-          # to cut off one that is still passing: test-deploy-swaps runs every
-          # deploy script whole against a stand-in box, and on 12 Oct it was
-          # still passing when 300 s ran out (#1273). MAX_CLOCK keeps one
-          # harness from eating the job's 45 minutes.
-          $MAX_CLOCK = 600
-          function Clock-Of($path) {
-            $head = [IO.File]::ReadAllText($path)
-            if ($head.Length -gt 8000) { $head = $head.Substring(0, 8000) }
-            $m = [regex]::Match($head, '(?im)^[\s#/*<]*NIGHTLY CLOCK:\s*(\d+) seconds')
-            if ($m.Success) { [Math]::Min([int]$m.Groups[1].Value, $MAX_CLOCK) } else { $PER_HARNESS }
-          }
-          $tmp = Join-Path $env:RUNNER_TEMP 'harness-out'
-          New-Item -ItemType Directory -Path $tmp -Force | Out-Null
-          # An empty file for stdin: no harness reads it, and one that tried
-          # would otherwise wait on the runner's for ever.
-          $nothing = Join-Path $tmp 'stdin.empty'
-          Set-Content -Path $nothing -Value $null -NoNewline
-          # What a harness left running after it ended: the processes it
-          # started, and theirs, found by parent id and killed. Only ones
-          # started after the harness, so a pid Windows has since handed to
-          # something else is left alone.
-          function Kill-Left($id, $since) {
-            $procs = @(Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId, Name, CreationDate)
-            $mine = @{ $id = $true }; $left = @()
-            do {
-              $more = @($procs | Where-Object { $mine[[int]$_.ParentProcessId] -and -not $mine[[int]$_.ProcessId] -and $_.CreationDate -ge $since })
-              foreach ($q in $more) { $mine[[int]$q.ProcessId] = $true; $left += $q }
-            } while ($more.Count)
-            foreach ($q in $left) { Stop-Process -Id $q.ProcessId -Force -ErrorAction SilentlyContinue }
-            @($left | ForEach-Object { $_.Name })
-          }
-          # Start-Process joins -ArgumentList with spaces and quotes nothing,
-          # so a path is quoted here. $p.Handle is read at once because
-          # without it ExitCode comes back empty once the process is gone.
-          function Run-One($exe, $argList, $name, $path, $clock = $PER_HARNESS) {
-            $file = $name -replace '[\\/]', '_'
-            $o = Join-Path $tmp ($file + '.out'); $e = Join-Path $tmp ($file + '.err')
-            $since = (Get-Date).AddSeconds(-1)
-            $sw = [Diagnostics.Stopwatch]::StartNew()
-            $p = Start-Process -FilePath $exe -ArgumentList $argList -NoNewWindow -PassThru `
-                   -RedirectStandardInput $nothing -RedirectStandardOutput $o -RedirectStandardError $e
-            $null = $p.Handle
-            $timedOut = -not $p.WaitForExit($clock * 1000)
-            if ($timedOut) { & taskkill.exe /T /F /PID $p.Id 2>&1 | Out-Null; $null = $p.WaitForExit(10000) }
-            $code = if ($timedOut) { -1 } else { $p.ExitCode }
-            $secs = [Math]::Round($sw.Elapsed.TotalSeconds, 1)
-            $left = @(Kill-Left $p.Id $since)
-            Write-Host ("--- {0}  ({1}s{2})" -f $name, $secs, $(if ($clock -ne $PER_HARNESS) { ', on a ' + $clock + ' s clock it names' } else { '' }))
-            foreach ($f in $o, $e) { if (Test-Path $f) { $txt = Get-Content -Raw $f; if ($txt) { Write-Host $txt.TrimEnd() } } }
-            if ($timedOut) { Write-Host ("::error file={0}::harness timed out after {1}s and was killed" -f $path, $clock) }
-            elseif ($code -ne 0) { Write-Host ("::error file={0}::harness failed (exit {1})" -f $path, $code) }
-            if ($left.Count) { Write-Host ("::warning file={0}::harness left {1} process(es) running when it ended, now killed: {2}" -f $path, $left.Count, ($left -join ', ')) }
-            [pscustomobject]@{ Name = $name; Path = $path; Code = $code; TimedOut = $timedOut; Secs = $secs }
-          }
-          $all = @(Get-ChildItem tests -File | Where-Object { $_.Name -like 'test-*.js' -or $_.Name -like 'test-*.ps1' } | Sort-Object Name)
-          $results = @(foreach ($t in $all) {
-            $clock = Clock-Of $t.FullName
-            if ($t.Extension -eq '.js') { Run-One 'node' @('"' + $t.FullName + '"') $t.Name $t.FullName $clock }
-            else { Run-One 'pwsh' @('-NoProfile', '-File', ('"' + $t.FullName + '"')) $t.Name $t.FullName $clock }
-          })
-          $failed = @($results | Where-Object { $_.Code -ne 0 } | ForEach-Object { if ($_.TimedOut) { $_.Name + ' (timed out)' } else { $_.Name } })
-          $bad = $failed.Count
-          Write-Host ''
-          Write-Host ('slowest: ' + ((@($results | Sort-Object Secs -Descending | Select-Object -First 10) | ForEach-Object { '{0} {1}s' -f $_.Name, $_.Secs }) -join ', '))
-          Write-Host ('all of them, added up: {0}s' -f [Math]::Round(($results | Measure-Object Secs -Sum).Sum))
-          $voiceFailed = @()
-          # The ones in voice (eleven by 28 September), which run nowhere else. They spawn the
-          # real service in a temp folder and drive it over HTTP, so they need
-          # node and nothing else, and node is already here. Added 23
-          # September: the harness step globbed tools with no -Recurse, so
-          # thirty ran and these five never had.
-          foreach ($t in (Get-ChildItem voice -Filter 'test-*.js' -File | Sort-Object Name)) {
-            $r = Run-One 'node' @('"' + $t.FullName + '"') ('voice/' + $t.Name) $t.FullName
-            if ($r.Code -ne 0) { $bad++; $voiceFailed += ('voice/' + $t.Name + $(if ($r.TimedOut) { ' (timed out)' } else { '' })) }
-          }
-          if ($bad) {
-            Write-Host ''
-            Write-Host ("{0} harness(es) failed: {1}" -f $bad, (($failed + $voiceFailed) -join ', '))
-            exit 1
-          }
-          Write-Host 'every harness passed'
-
       - name: Run the bot harnesses
         if: ${{ !cancelled() }}
         shell: pwsh
@@ -397,8 +277,70 @@ jobs:
           # runs it against a stand-in GitHub.
           .\scripts\dev\Nightly-Stray.ps1 -Run
 
+  harnesses:
+    # The test harnesses, in shares (#2357). One job for each entry under
+    # shard, each on a runner of its own with 45 minutes of its own; another
+    # share is one more number in the list, and Nightly-Harnesses.ps1 is told
+    # how many there are. fail-fast off: one share failing must not cancel
+    # the other, whose list of what failed is half the night's answer.
+    name: Test harnesses (${{ matrix.shard }} of 2)
+    runs-on: [self-hosted, Windows, thornswood-vps]
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install the eslint the lint harness copies
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          # tests\test-eslint-amp-path.ps1 (#1343, #2092) runs build.yml's
+          # eslint lines offline: its npm stand-in copies eslint 9.39.5 out of
+          # %TEMP%\herald-lint, and with nothing there it says SKIP and exits
+          # 2. No runner had that folder, so it failed the first night it was
+          # in the tree (#1273). This is the same pinned install build.yml's
+          # lint step makes, into the folder the harness reads by default.
+          $cache = Join-Path $env:TEMP 'herald-lint'
+          npm install --prefix $cache --no-save --no-audit --no-fund --silent eslint@9.39.5
+          if (-not (Test-Path -LiteralPath (Join-Path $cache 'node_modules\eslint\bin\eslint.js'))) {
+            Write-Host '::error file=tests/test-eslint-amp-path.ps1::could not install eslint 9.39.5, so the lint harness has nothing to copy'
+            exit 1
+          }
+          Write-Host ('eslint 9.39.5 is in ' + $cache)
+
+      - name: Run the test harnesses
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          # Written to be run by hand, and until 25 September never run
+          # anywhere else. A harness that reads this machine's game folder
+          # says SKIP for the parts it cannot measure on a runner and still
+          # checks the rest. One at a time within the share, each on its
+          # clock, each printed the moment it ends, and the step ends with
+          # the ten slowest and every one that failed: the header of
+          # scripts\dev\Nightly-Harnesses.ps1 says why each of those is so.
+          # 2400 of the job's 45 minutes: a harness starts only when its
+          # whole clock still fits, so the list of what failed is printed
+          # before the job could be cancelled.
+          .\scripts\dev\Nightly-Harnesses.ps1 -Shard ${{ matrix.shard }} -Of 2 -BudgetSeconds 2400
+
+  board:
+    # Told last, once every job above has ended, whichever way: a job
+    # cancelled at its 45 minutes is a failed night here too (#2357), where
+    # a step under if: failure() in that job would never have run.
+    name: Put the night on the board
+    needs: [nightly, harnesses]
+    if: ${{ always() }}
+    runs-on: [self-hosted, Windows, thornswood-vps]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
       - name: Put a failure on the board
-        if: failure()
+        if: ${{ needs.nightly.result != 'success' || needs.harnesses.result != 'success' }}
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -408,17 +350,18 @@ jobs:
           # One "Nightly checks failed" issue, never two: added to when one is
           # open (every page read, the oldest kept, any duplicate closed
           # pointing to it), opened when none is. Issues #905 and #1120.
+          Write-Host ('checks: ${{ needs.nightly.result }}, harnesses: ${{ needs.harnesses.result }}')
           .\scripts\dev\Nightly-Issue.ps1 -Result failure
 
       - name: Close the failure when every check passed
-        if: success()
+        if: ${{ needs.nightly.result == 'success' && needs.harnesses.result == 'success' }}
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          # The first night everything above passes, the open "Nightly checks
+          # The first night every job above passes, the open "Nightly checks
           # failed" issue is closed with a line naming this run, so a fixed
           # nightly does not stay on the board as a failure.
           .\scripts\dev\Nightly-Issue.ps1 -Result success
