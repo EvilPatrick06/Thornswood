@@ -3000,11 +3000,6 @@ function swingEnd(actorId, tool) {
   try { runtime = mp.getActorRuntimeIdentity(actorId); } catch (e) { }
   if (SWING_CLEAR[actorId]) { clearTimeout(SWING_CLEAR[actorId]); delete SWING_CLEAR[actorId]; }
   delete SWING_IN_AIR[actorId];
-  try {
-    mp.set(actorId, SWING_PROPERTY,
-           { anim: '', end: true, stop: SWING_STOP, free: SWING_FREE,
-             tool: Number(tool) || 0, at: Date.now() });
-  } catch (e) { }
   // And cleared behind it, so nothing replays at the next login.
   const cleanupTimer = setTimeout(function () {
     if (SWING_CLEAR[actorId] !== cleanupTimer) return;
@@ -3016,6 +3011,11 @@ function swingEnd(actorId, tool) {
     try { mp.set(actorId, SWING_PROPERTY, { anim: '', at: 0 }); } catch (e) { }
   }, 1500);
   SWING_CLEAR[actorId] = cleanupTimer;
+  try {
+    mp.set(actorId, SWING_PROPERTY,
+           { anim: '', end: true, stop: SWING_STOP, free: SWING_FREE,
+             tool: Number(tool) || 0, at: Date.now() });
+  } catch (e) { }
 }
 
 const SWING_QUIET = {};
@@ -63739,6 +63739,11 @@ function createMerchantTrading(deps) {
       return fail('Press E on a guild trader with this character.', {open:false});
     }
     var originalSession = sessions.get(profileId), quests, heldQuest;
+    function refuseSession(text) {
+      if (sessions.get(profileId)!==originalSession) return fail(text);
+      sessions.delete(profileId);
+      return fail(text, {open:false});
+    }
     if (verb === 'quest') {
       quests = typeof deps.quests==='function' && deps.quests();
       if (!quests || typeof quests.capture!=='function') return fail('Quest work is unavailable.');
@@ -63747,15 +63752,14 @@ function createMerchantTrading(deps) {
     }
     var again = inReach(actorId, merchantId);
     if (!again.ok) {
-      sessions.delete(profileId);
-      return fail(again.reason, { open: false });
+      return refuseSession(again.reason);
     }
     if (!authed(profileId, again.human)) return fail('That request is not yours.');
+    var reachedIdentity=sessionIdentity(again.human);
+    var currentIdentity=sessionIdentity(world.actor(actorId));
     if (!active || sessions.get(profileId)!==originalSession ||
-        sessionIdentity(again.human)!==originalSession.identity ||
-        sessionIdentity(world.actor(actorId))!==originalSession.identity) {
-      sessions.delete(profileId);
-      return fail('Press E on a guild trader with this character.', {open:false});
+        reachedIdentity!==originalSession.identity || currentIdentity!==originalSession.identity) {
+      return refuseSession('Press E on a guild trader with this character.');
     }
     if (verb === 'quest') {
       if (parts.length<4 || parts.length>5) return fail('Choose the work in the trader panel.');
@@ -64427,9 +64431,9 @@ try {
       if (shut) return shut;
       if(deps.identity(actor)!==original)return UNREAD;
       if (deps.ready && !deps.ready(actor)) return 'Quest work is waiting on a saved inventory change.';
-      if (!active || deps.available && !deps.available() || deps.identity(actor)!==original) return UNREAD;
+      if (deps.identity(actor)!==original || !active || deps.available && !deps.available()) return UNREAD;
       var wasMining = miningFn(actor);
-      if (!active || deps.available && !deps.available() || deps.identity(actor)!==original) return UNREAD;
+      if (deps.identity(actor)!==original || !active || deps.available && !deps.available()) return UNREAD;
       if (wasMining) { stopMiningFn(actor); return 'You put the pick down.'; }
       if (swingingFn(actor)) return '';
       var pick = toolIdFn(actor, 'miner');

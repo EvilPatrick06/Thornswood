@@ -312,6 +312,11 @@ function createMerchantTrading(deps) {
       return fail('Press E on a guild trader with this character.', {open:false});
     }
     var originalSession = sessions.get(profileId), quests, heldQuest;
+    function refuseSession(text) {
+      if (sessions.get(profileId)!==originalSession) return fail(text);
+      sessions.delete(profileId);
+      return fail(text, {open:false});
+    }
     if (verb === 'quest') {
       quests = typeof deps.quests==='function' && deps.quests();
       if (!quests || typeof quests.capture!=='function') return fail('Quest work is unavailable.');
@@ -320,15 +325,14 @@ function createMerchantTrading(deps) {
     }
     var again = inReach(actorId, merchantId);
     if (!again.ok) {
-      sessions.delete(profileId);
-      return fail(again.reason, { open: false });
+      return refuseSession(again.reason);
     }
     if (!authed(profileId, again.human)) return fail('That request is not yours.');
+    var reachedIdentity=sessionIdentity(again.human);
+    var currentIdentity=sessionIdentity(world.actor(actorId));
     if (!active || sessions.get(profileId)!==originalSession ||
-        sessionIdentity(again.human)!==originalSession.identity ||
-        sessionIdentity(world.actor(actorId))!==originalSession.identity) {
-      sessions.delete(profileId);
-      return fail('Press E on a guild trader with this character.', {open:false});
+        reachedIdentity!==originalSession.identity || currentIdentity!==originalSession.identity) {
+      return refuseSession('Press E on a guild trader with this character.');
     }
     if (verb === 'quest') {
       if (parts.length<4 || parts.length>5) return fail('Choose the work in the trader panel.');
