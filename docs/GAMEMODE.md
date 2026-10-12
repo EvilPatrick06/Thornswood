@@ -6,16 +6,16 @@ is the whole of Thornswood's server side: 64,664 lines and 6 MB in one file on
 table each script writes into it, how it reaches the server, how it talks to
 the plugins, what it keeps on disk, and which tests read it.
 
-References look like `gamemode.js:3618 character creation`: the line and the
-name or banner on it. Lines were read on 25 September at origin/main 044b737.
-They move whenever somebody edits above them, so search for the name when a
-line has moved.
+References look like `gamemode.js:chargenTick` or `gamemode.js:// character creation`:
+the file, a colon, and a name it declares or its own words, never a line
+number (#1075, #2416). Search the file for what follows the colon.
+`tests\test-1075-script-citations.js` fails when a cited name goes away.
 
 ## Why it is one file
 
 `requireTemp()` in skymp5-server copies the file to a temp folder and requires
 the copy, so a relative `require` would look beside the copy and fail. So
-every rule and every table is inlined (`gamemode.js:6` header). The server
+every rule and every table is inlined (`gamemode.js:Loaded by skymp5-server through requireTemp()` header). The server
 watches the file and reloads it on change after `mp.clear()`, so every block
 registers its handlers at load and keeps timers and state on `globalThis`
 (`g.__thornswood*`) so a reload does not lose them or double them.
@@ -25,7 +25,7 @@ file, with the loader's limits read from the fork and the measurements behind
 it, is [GAMEMODE-SOURCE.md](GAMEMODE-SOURCE.md) (#2181).
 
 A handler returns `false` to block an event and anything else to let it
-through. Every handler is wrapped in `guard()` (`gamemode.js:267`), so a throw
+through. Every handler is wrapped in `guard()` (`gamemode.js:guard`), so a throw
 is logged and the event goes on. Form ids cross the boundary as descriptors,
 `"<low 24 bits in hex>:<plugin>"`, never as load order positions.
 
@@ -35,10 +35,10 @@ The file runs top to bottom. The early part is plain functions and the `mp.on*`
 handlers. From line 10459 on, each system is an immediately run function
 between `// ==== thornswood X ====` and `// ==== end thornswood X ====`,
 which publishes its interface on `globalThis`, for example
-`g.__thornswoodProgression` (`gamemode.js:13057`),
-`g.__thornswoodProperty` (`gamemode.js:16789`) and
-`g.__thornswoodSpoils` (`gamemode.js:17230`). A handler defined earlier, such
-as `mp.onActivate` at `gamemode.js:7139`, looks those up when it is called, not
+`g.__thornswoodProgression` (`gamemode.js:g.__thornswoodProgression = {`),
+`g.__thornswoodProperty` (`gamemode.js:g.__thornswoodProperty = {`) and
+`g.__thornswoodSpoils` (`gamemode.js:g.__thornswoodSpoils = {`). A handler defined earlier, such
+as `mp.onActivate` (`gamemode.js:mp.onActivate = guard('onActivate'`), looks those up when it is called, not
 at load, which is why it can reach blocks that sit below it.
 
 ## The map
@@ -76,37 +76,37 @@ at load, which is why it can reach blocks that sit below it.
 
 ## Startup and settings
 
-At load, in file order: the tables at 23-35; the git blob id is logged
-(`gamemode.js:222`); the respawn properties are declared and the chargen timer
-starts (`gamemode.js:5078-5079`); `publishServerBases` writes
-`data\server-bases.json` (`gamemode.js:7458`); `gamemode.js:10454` logs
+At load, in file order: the generated tables at the top; the git blob id is logged
+(`gamemode.js:gamemode.js is git blob`); the respawn properties are declared and the chargen timer
+starts (`gamemode.js:g.__thornswoodChargenTimer = setInterval(guard('chargenTick', chargenTick),`); `publishServerBases` writes
+`data\server-bases.json` (`gamemode.js:publishServerBases`); `gamemode.js:log('gamemode loaded:',` logs
 "gamemode loaded" with cell, station and town counts; then each later block
 runs its own start. The last log line of a load is the list of chat words
-(`gamemode.js:20798`).
+(`gamemode.js:[thornswood] chat commands running:`).
 
 Settings come from `server-settings.json` in the server's own folder, the
-working directory (`gamemode.js:125-127`). The gamemode reads `dataDir`
-(`gamemode.js:116`), `privDir` (`gamemode.js:10678`), `thornswoodVoicePort`
-(`gamemode.js:253`), `thornswoodChargen` (`gamemode.js:3652`),
-`thornswoodAdmins` (`gamemode.js:20300`) and `loadOrder`
-(`gamemode.js:11623`). `Deploy-Gamemode.ps1` writes that file on every deploy
+working directory (`gamemode.js:logPath`). The gamemode reads `dataDir`
+(`gamemode.js:dataDir`), `privDir` (`gamemode.js:privDir`), `thornswoodVoicePort`
+(`gamemode.js:voicePort`), `thornswoodChargen` (`gamemode.js:s.thornswoodChargen === false`),
+`thornswoodAdmins` (`gamemode.js:cfg.thornswoodAdmins`) and `loadOrder`
+(`gamemode.js:Array.isArray(doc.loadOrder)`). `Deploy-Gamemode.ps1` writes that file on every deploy
 (`scripts\deploy\Deploy-Gamemode.ps1:-NotePropertyName dataDir -NotePropertyValue 'data'`).
 
 ## Character creation
 
-`gamemode.js:3618` explains why there is a timer and no menu: SkyMP gives the
-gamemode no connect event. `chargenTick` (`gamemode.js:4365`) runs every
-`CHARGEN_TICK_MS` (`gamemode.js:3687`) and moves each person through the
-stages kept in the actor property `thornswoodChargen` (`gamemode.js:3668`):
+`gamemode.js:// character creation` explains why there is a timer and no menu: SkyMP gives the
+gamemode no connect event. `chargenTick` (`gamemode.js:chargenTick`) runs every
+`CHARGEN_TICK_MS` (`gamemode.js:CHARGEN_TICK_MS`) and moves each person through the
+stages kept in the actor property `thornswoodChargen` (`gamemode.js:CHARGEN_PROPERTY`):
 
-1. `appearance`, set by `beginAppearance` (`gamemode.js:4323`) in the hall
+1. `appearance`, set by `beginAppearance` (`gamemode.js:beginAppearance`) in the hall
    (`HALL` 3833, `sendToHall` 4290), while the face is made.
-2. `choosing`, set by `beginChoosing` (`gamemode.js:3991`): the choice is made
+2. `choosing`, set by `beginChoosing` (`gamemode.js:beginChoosing`): the choice is made
    on K in the character panel.
-3. `done`, set by `arriveAt` (`gamemode.js:4055`), which moves the person to
+3. `done`, set by `arriveAt` (`gamemode.js:arriveAt`), which moves the person to
    the inn of the town they picked (`CHARGEN.towns` as `PASSAGES`, 3893).
 
-An old `arriving` state is folded into `done` (`gamemode.js:4668-4671`).
+An old `arriving` state is folded into `done` (`gamemode.js:if (state.stage === 'arriving') {`).
 `"thornswoodChargen": false` in `server-settings.json` switches the hall off.
 
 A saved character the server cannot read at start (its base form or race not
@@ -128,12 +128,12 @@ check once when it comes online; it is on unless it is `false`.
 
 ## The door
 
-`gamemode.js:10994`. It compares each connection's profile id with
-`private\allowed.json` (`gamemode.js:11059`), fetched from the site with the
-key in `private\door.json` (`gamemode.js:11364`) and refreshed on a timer
-(`gamemode.js:11497-11503`). It turns somebody away only when that file says
+`gamemode.js:no allowed.json, door is off`. It compares each connection's profile id with
+`private\allowed.json` (`gamemode.js:path.join(privDir, 'allowed.json')`), fetched from the site with the
+key in `private\door.json` (`gamemode.js:path.join(privDir, 'door.json')`) and refreshed on a timer
+(`gamemode.js:refresh`). It turns somebody away only when that file says
 `"enforce": true`; otherwise it writes WOULD TURN AWAY in `private\door.log`
-(`gamemode.js:11060`). `scripts\ops\Set-Door.ps1` sets both. Developer-Guide.md,
+(`gamemode.js:WOULD TURN AWAY profile`). `scripts\ops\Set-Door.ps1` sets both. Developer-Guide.md,
 "Who gets into the game", says what it can and cannot keep out.
 
 Turning somebody away (`turnAway`, #1894) is the same as every other end on
@@ -149,14 +149,14 @@ which ends the session with the ban and its reason.
 
 ## Professions, benches and BENCH_ACCESS
 
-The rulebook is `TABLE` in progression (`gamemode.js:12361`). Stations ask
+The rulebook is `TABLE` in progression (`gamemode.js:TABLE`). Stations ask
 `classGate`/`halfGate` early in the file and `gate`/`gateHalf` in the
 character block. A crafting bench is allowed or refused by `benchGate`
-(`gamemode.js:9748`): `BENCH_BY_BASE` turns a furniture base into its bench
+(`gamemode.js:benchGate`): `BENCH_BY_BASE` turns a furniture base into its bench
 keyword, and `BENCH_ACCESS` says for each keyword whether anyone may use it
 and otherwise which profession halves may, from which rank. `craftAnswer`
-(`gamemode.js:9834`) then checks the recipe in `RECIPES_BY_ID`, and
-`raceGate` (`gamemode.js:9718`) the race lock on a people's own dress.
+(`gamemode.js:craftAnswer`) then checks the recipe in `RECIPES_BY_ID`, and
+`raceGate` (`gamemode.js:raceGate`) the race lock on a people's own dress.
 
 ## Spells, tomes and staff spells
 
@@ -187,7 +187,7 @@ The rules are in progression and the three blocks after the character block.
 
 ## Property, offices, rent and gold
 
-The register is `private\property.json` (`registerPath`, `gamemode.js:14529`;
+The register is `private\property.json` (`registerPath`, `gamemode.js:registerPath`;
 `save`, 14591). A claim is made at the door (`touched` 14730, `claim` 14888)
 and carried by the deed (`giveDeed` 14869). Locks and keys start at 14958
 (`lockScript` 15032, `mold` 15284, `cutKey` 15525). A Jarl, the one admin
@@ -202,7 +202,7 @@ world (16820), and a coin purse found in it counts as gold (16961).
 ## Needs
 
 Hunger, thirst and exhaustion, with warmth, in one block. The whole balance
-is `NEEDS` (`gamemode.js:21152`), `COST` (21530) and `TEMP_COST` (21563).
+is `NEEDS` (`gamemode.js:NEEDS`), `COST` (`gamemode.js:COST`) and `TEMP_COST` (`gamemode.js:TEMP_COST`).
 Warmth: `warmthTarget` (21784), `fireWarmth` (21839), `exposure` (21878),
 `weatherRow` (21920) off `WEATHER`, `insulation` (22134) off `WARMTH`. Food
 and drink: `foodKind` (21972) off `FOODS`, `waterKind` (21862) off `WATERS`,
@@ -212,15 +212,15 @@ is `thornswoodNeeds` (21137).
 
 ## Chat and commands
 
-`WORDS` (`gamemode.js:18537`) is every word the server answers, and the list
-at `gamemode.js:18584` is the part everybody is told about. `handle`
-(`gamemode.js:19277`) answers each one. The teleport is here
-(`gamemode.js:18608`), because the client forwards only five console commands
+`WORDS` (`gamemode.js:WORDS`) is every word the server answers, and `PLAYER`
+(`gamemode.js:PLAYER is the subset a person who is not a playtester is told about`) is the part everybody is told about. `handle`
+(`gamemode.js:handle`) answers each one. The teleport is here
+(`gamemode.js:coc does nothing on this server and never did`), because the client forwards only five console commands
 and `coc` is not one of them. Roles are `admins`, `isDev`, `isPlaytester`
-(`gamemode.js:20297-20395`). The restart countdown is 20280-20720: Ship and
+(`gamemode.js:isDev`, `gamemode.js:isPlaytester`). The restart countdown is `gamemode.js:checkRequest`: Ship and
 the Deploy scripts drop `restart.json` in the data folder
-(`gamemode.js:20617`), and the gamemode warns at the marks in `MARKS`
-(20295), on screen at 60 and 30 seconds.
+(`gamemode.js:Request-Restart.ps1 drop restart.json over ssh`), and the gamemode warns at the marks in `MARKS`
+(`gamemode.js:MARKS`), on screen at 60 and 30 seconds.
 
 ## How it talks to the plugins
 
@@ -228,24 +228,24 @@ There is no custom packet. Two paths:
 
 - **Commands in.** A line typed in the game's chat starting with `/` goes up
   the voice socket, and the voice service queues it
-  (`voice\voice-server.js:1488-1527`). Every 1.5 seconds the gamemode
+  (`voice\voice-server.js:GET /commands used to empty this queue in one splice`). Every 1.5 seconds the gamemode
   asks `GET /commands?ack=1` on `127.0.0.1:<voice port>`
-  (`gamemode.js:20746`), runs each one through `dispatch`
-  (`gamemode.js:18798`), which holds a line for a character not yet back in
+  (`gamemode.js:poll`), runs each one through `dispatch`
+  (`gamemode.js:dispatch`), which holds a line for a character not yet back in
   the world, and acknowledges with `POST /commands/ack`. Ids already run are
-  remembered so a command offered twice runs once (`gamemode.js:20716-20744`).
+  remembered so a command offered twice runs once (`gamemode.js:pollSaid`).
 - **Answers and state out.** Chat replies go back through the same service,
-  `POST /say` (`toProfile`, `gamemode.js:18677`). Everything a panel or HUD
+  `POST /say` (`toProfile`, `gamemode.js:toProfile`). Everything a panel or HUD
   draws is an actor property made with `mp.makeProperty`
   (`thornswoodCharacter`, `thornswoodNeeds`, `thornswoodTrade` and the rest),
   which the client scripts in the property read.
 
-The voice feed (`gamemode.js:10459`) posts every position to
+The voice feed (`gamemode.js:path: '/positions'`) posts every position to
 `POST /positions` every 200 ms. `voicePort()` reads the port from
 `server-settings.json`, so the dev server talks to the dev voice service.
 Do not run `scripts\deploy\Add-VoiceFeed.ps1`: it writes the older
 `voice\gamemode-voice.js` over this block, with 7778 written in and no
-party field (`voice\README.md:12-18`).
+party field (`voice\README.md:the dev service, where this file still has 7778 written in`).
 
 ## Where its data lives on the VPS
 
@@ -254,10 +254,10 @@ In the server's folder, `C:\Thornswood-Server` live and
 
 | Folder | What the gamemode keeps there | Served to anybody? |
 |---|---|---|
-| `data` | `online.json`, `manifest.json`, `server-bases.json`, `thornswood-log.json`, `restart.json` | Yes: the resources port (3000 live, 7788 dev) hands out anything under it over plain HTTP (`gamemode.js:55-58`) |
+| `data` | `online.json`, `manifest.json`, `server-bases.json`, `thornswood-log.json`, `restart.json` | Yes: the resources port (3000 live, 7788 dev) hands out anything under it over plain HTTP (`gamemode.js:The resources server hands out anything under data over plain HTTP`) |
 | `private` | `characters.json`, `allowed.json`, `door.json`, `door.log`, `property.json`, `farm-claims.json`, `mod-settings.json` (the first six moved from `data` on 25 September, issue #541, because they carry profile ids; the gamemode carries an old copy across on first load) | No |
 | `world` | Not the gamemode's: SkyMP's changeform database, every reference the server has written to (`scripts\ops\Wipe-Saves.ps1:the changeform database. Every reference the server has ever written to`; `scripts\release\Where.ps1 ChangeForms` names its folder in the server build) | No |
-| the folder itself | `thornswood.log`, rolled at 4 MB with five kept (`gamemode.js:74-108`) | No |
+| the folder itself | `thornswood.log`, rolled at 4 MB with five kept (`gamemode.js:LOG_MAX_BYTES`) | No |
 
 `scripts\ops\Wipe-Saves.ps1` starts the world over by moving `world`,
 `private\characters.json`, `private\property.json` and `private\farm-claims.json` (and the old copies in `data`, for a server still on the older gamemode).
@@ -271,25 +271,25 @@ because each reads the one before.
 
 | In gamemode.js | Script | Json | Where the script installs it |
 |---|---|---|---|
-| `WATERS` line 26 | `Build-WaterTable.js` | `waters.json` | `Build-WaterTable.js:257-272` |
-| `WEATHER` line 27 | `Build-WeatherTable.js` | `weather.json` | `Build-WeatherTable.js:212-218` |
-| `WARMTH` line 28 | `Build-WarmthTable.js` | `warmth.json` | `Build-WarmthTable.js:398-399` |
-| `FOODS` line 29 | `Build-FoodTable.js` | `food.json` | `Build-FoodTable.js:324-335` |
-| `RACES` line 30 | `Build-RaceTable.js` | `races.json` | `Build-RaceTable.js:274-289` |
-| `ORES_BY_BASE` 686-1271 | `Build-OreTable.ps1` | `ores.json` | `Build-OreTable.ps1:// ==== end ORES_BY_BASE ====` |
-| `HARVESTS_BY_BASE` 5341-5454, `FISH_BY_BASE` 5509-5528, `GAME_BY_BASE` 5644-5655, `CROPS_BY_BASE` 5901-5920 | `Build-HarvestTable.ps1` | `harvests.json` | `Build-HarvestTable.ps1:All four installs work on the text of gamemode.js` |
-| `HUNTS_BY_BASE` 6491-6857 | `Build-HuntTable.ps1` | `hunts.json` | `Build-HuntTable.ps1:// ==== end HUNTS_BY_BASE ====` |
-| `RECIPES_BY_ID` 7549-9499 | `Build-RecipeTable.ps1`, which also reads `docs/systems/cut-items.json` for what leaves the open book | `recipes.json` | `Build-RecipeTable.ps1:// ==== end RECIPES_BY_ID ====` |
+| `WATERS` | `Build-WaterTable.js` | `waters.json` | `Build-WaterTable.js:install` |
+| `WEATHER` | `Build-WeatherTable.js` | `weather.json` | `Build-WeatherTable.js:install` |
+| `WARMTH` | `Build-WarmthTable.js` | `warmth.json` | `Build-WarmthTable.js:install` |
+| `FOODS` | `Build-FoodTable.js` | `food.json` | `Build-FoodTable.js:install` |
+| `RACES` | `Build-RaceTable.js` | `races.json` | `Build-RaceTable.js:install` |
+| `ORES_BY_BASE` | `Build-OreTable.ps1` | `ores.json` | `Build-OreTable.ps1:// ==== end ORES_BY_BASE ====` |
+| `HARVESTS_BY_BASE`, `FISH_BY_BASE`, `GAME_BY_BASE`, `CROPS_BY_BASE` | `Build-HarvestTable.ps1` | `harvests.json` | `Build-HarvestTable.ps1:All four installs work on the text of gamemode.js` |
+| `HUNTS_BY_BASE` | `Build-HuntTable.ps1` | `hunts.json` | `Build-HuntTable.ps1:// ==== end HUNTS_BY_BASE ====` |
+| `RECIPES_BY_ID` | `Build-RecipeTable.ps1`, which also reads `docs/systems/cut-items.json` for what leaves the open book | `recipes.json` | `Build-RecipeTable.ps1:// ==== end RECIPES_BY_ID ====` |
 | `STAFF_SPELLS` (staff spells block) | `Build-RecipeTable.ps1`, with each spell's school and rank | none | the STAFF_SPELLS markers |
-| `BUILDING_BY_DOOR` 9575-9582, `BUILDING_NAME` 9584-9590, `WAY_OUT` 9592-9599 | `Build-DoorTable.py` | `doors.json` | `Build-DoorTable.py:450-483` |
-| `BENCH_BY_BASE` 9627-9633, `BENCH_ACCESS` 9635-9736 | `Build-BenchTable.py`, from `recipes.json` | none | `Build-BenchTable.py:362-376` |
-| `SPELL_IDS` 11826-11930 | `Build-SpellTable.ps1` | `spells.json` | `Build-SpellTable.ps1:// ==== end SPELL_IDS ====` |
-| `DATA` 23 | `Install-GamemodeConsts.js` | `data.json` | `Install-GamemodeConsts.js` |
-| `DATA.worldspaces`, inside line 23 | `Build-WorldspaceTable.js`, from the WRLD records of the load order | `data.json` (`worldspaces`) | `Build-WorldspaceTable.js:install`, the list and nothing else of the line |
-| `DATA.ownWorlds` and `DATA.ownWorldDoors`, inside line 23 | `Build-WakeTable.js`, from the doors, rooms and locations of the load order | `data.json` (`ownWorlds`, `ownWorldDoors`) | `Build-WakeTable.js:install`, the two tables and nothing else of the line |
-| `STATIONS` 24 | `Install-GamemodeConsts.js` | `stations.json` | `Install-GamemodeConsts.js` |
-| `ITEMS` 25 | `Install-GamemodeConsts.js` | `items.json` | `Install-GamemodeConsts.js` |
-| `CHARGEN` ~3878 | `Install-GamemodeConsts.js` | `chargen.json` | `Install-GamemodeConsts.js` |
+| `BUILDING_BY_DOOR`, `BUILDING_NAME`, `WAY_OUT` | `Build-DoorTable.py` | `doors.json` | `Build-DoorTable.py:'const BUILDING_BY_DOOR = '` |
+| `BENCH_BY_BASE`, `BENCH_ACCESS` | `Build-BenchTable.py`, from `recipes.json` | none | `Build-BenchTable.py:The blocks are written with the line ending the gamemode already has.` |
+| `SPELL_IDS` | `Build-SpellTable.ps1` | `spells.json` | `Build-SpellTable.ps1:// ==== end SPELL_IDS ====` |
+| `DATA` | `Install-GamemodeConsts.js` | `data.json` | `Install-GamemodeConsts.js` |
+| `DATA.worldspaces`, inside `DATA` | `Build-WorldspaceTable.js`, from the WRLD records of the load order | `data.json` (`worldspaces`) | `Build-WorldspaceTable.js:install`, the list and nothing else of the line |
+| `DATA.ownWorlds` and `DATA.ownWorldDoors`, inside `DATA` | `Build-WakeTable.js`, from the doors, rooms and locations of the load order | `data.json` (`ownWorlds`, `ownWorldDoors`) | `Build-WakeTable.js:install`, the two tables and nothing else of the line |
+| `STATIONS` | `Install-GamemodeConsts.js` | `stations.json` | `Install-GamemodeConsts.js` |
+| `ITEMS` | `Install-GamemodeConsts.js` | `items.json` | `Install-GamemodeConsts.js` |
+| `CHARGEN` | `Install-GamemodeConsts.js` | `chargen.json` | `Install-GamemodeConsts.js` |
 
 `DATA`, `STATIONS`, `ITEMS` (lines 23-25) and `CHARGEN` (around line 3878)
 are installed from checked-in JSON by `scripts\dev\Install-GamemodeConsts.js`
