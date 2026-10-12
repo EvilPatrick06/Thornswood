@@ -456,7 +456,8 @@ with.
   server module's SHA256 is
   `c9031333a2e3e4aafd57393dfc46c2da6dbce56c5efae11da4a26d9610291485`, built
   2026-10-12T09:06:15Z. This is the recorded next release, not a deployment
-  claim. Main and dev run `92848550` (1.2.3, 11 Oct).
+  claim. Main remains on `928485503333b18c2325fc13cbf781d254b19af0`;
+  dev runs that engine too, as reported by Claude on 11 October.
   It goes to the dev server (Publish-Server -Channel dev) and to the dev
   feed's client files (a dev Ship) first.
   Section 13 of the AGPL asks that everybody who connects to a modified server
@@ -491,9 +492,9 @@ client files and the game server module, at the one commit both records name:
 
 https://github.com/EvilPatrick06/skymp/tree/9035ea462e869721191f756a6912270697d7027e
 
-For the earlier engine still deployed on Main:
+For the earlier engine reported deployed on Main and dev:
 
-https://github.com/EvilPatrick06/skymp/tree/3a32e9615d4eae43cc6995cdf2c09c528bc80da6
+https://github.com/EvilPatrick06/skymp/tree/928485503333b18c2325fc13cbf781d254b19af0
 
 It is on the branch `thornswood/engine-changes`, it is public, and the branch
 answered an anonymous request on 24 September. It builds with CMake and
