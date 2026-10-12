@@ -54516,6 +54516,20 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     */
     potion: { def: 5 },
     /*
+      EATING TAKES TIME, AND A FULL STOMACH SICKENS (#1382). docs/systems/
+      food.md: "Eating takes 8 seconds. Another meal in that window does
+      nothing. At 90 hunger or above, another meal does not raise the meter
+      and starts food sickness instead." The sickness is the disease block's
+      exposed(actorId, 'food', 'full'), which owns the chance.
+    */
+    meal: { eatSeconds: 8, fullAt: 90 },
+    /*
+      COLD SPEEDS HUNGER AND THIRST (#1382). docs/systems/hunger.md and
+      thirst.md: while the cold band is weary the clock runs at 1.25, at bad
+      1.5, at spent 2. Heat does not speed it.
+    */
+    coldDrain: { fine: 1, weary: 1.25, bad: 1.5, spent: 2 },
+    /*
       ALE, AND IT GETS WORSE WITH EVERY ONE.
 
       Patrick, 23 September: "alcohol should make you more hungry and give a
@@ -54705,7 +54719,10 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       // The ales lately and when the last went down (#1677). consumed() reads
       // them through settle(), so without them every ale was the first.
       ale: Number(v.ale) || 0,
-      aleAt: (typeof v.aleAt === 'number') ? v.aleAt : null
+      aleAt: (typeof v.aleAt === 'number') ? v.aleAt : null,
+      // The end of the 8 seconds a meal takes (#1382), so a second meal
+      // inside it is still refused after the next read.
+      eatUntil: Number(v.eatUntil) || 0
     };
   }
 
@@ -54813,8 +54830,16 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     if (!(share >= 0)) { share = 1; }
     var floor = gone ? clamp(Number(gone.floor) || 0) : 0;
 
-    n.food = awayDrain(n.food, NEEDS.drain.food * hours * share, floor);
-    n.drink = awayDrain(n.drink, NEEDS.drain.drink * hours * share, floor);
+    /*
+      THE COLD BAND SPEEDS BOTH CLOCKS (#1382), at the band the meter is in
+      as this stretch starts. Not on an arrival: the time away was not spent
+      standing in that cold.
+    */
+    var chillBand = tempBand(n.temp);
+    var chill = (!arriving && chillBand && chillBand.cold)
+      ? (Number(NEEDS.coldDrain[chillBand.name]) || 1) : 1;
+    n.food = awayDrain(n.food, NEEDS.drain.food * hours * share * chill, floor);
+    n.drink = awayDrain(n.drink, NEEDS.drain.drink * hours * share * chill, floor);
 
     var restRate = NEEDS.drain.rest;
     if (n.worked && (now - n.worked) < NEEDS.workFor) {
@@ -55735,6 +55760,17 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     } else if (kind === 'drink') {
       n.drink = clamp(n.drink + (Number(amount) || NEEDS.drink.def));
     } else {
+      // A meal takes 8 seconds, and another inside them does nothing (#1382).
+      var ateAt = Date.now();
+      if (n.eatUntil && ateAt < n.eatUntil) { return ''; }
+      n.eatUntil = ateAt + NEEDS.meal.eatSeconds * 1000;
+      if (n.food >= NEEDS.meal.fullAt) {
+        // Full: the meter does not rise, and the meal starts food sickness.
+        write(actorId, n);
+        var hurt = g.__thornswoodHurt;
+        if (hurt && hurt.exposed) { hurt.exposed(actorId, 'food', 'full'); }
+        return 'You are already full. It sits badly.';
+      }
       n.food = clamp(n.food + (Number(amount) || NEEDS.food.def));
     }
     write(actorId, n);
