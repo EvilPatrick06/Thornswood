@@ -12,6 +12,7 @@ Developer-Guide.md at the root; the long form is Developer-Guide.md.
 | [JSON-STATE-INVENTORY.md](JSON-STATE-INVENTORY.md) | Every critical JSON file, who writes and reads it, how it is checked, and the four records held to a version and shape (#2180). |
 | [ICONS.md](ICONS.md) | Which icon file is which: Main launcher badge, Dev launcher monogram, site favicon. |
 | [GAMEMODE.md](GAMEMODE.md) | How game/gamemode.js is laid out, where its data lives, how it is deployed and which tests cover it. |
+| [GAMEMODE-SOURCE.md](GAMEMODE-SOURCE.md) | The plan for writing gamemode.js as many source files joined into the one file the server loads (#2181): the loader's limits, who edits it, the options and the stages. |
 | [GAMEMODE-COVERAGE.md](GAMEMODE-COVERAGE.md) | Which test drives each gamemode event handler, plugin, money function and chat word, and the gaps that were filled. |
 | [SYSTEMS.md](SYSTEMS.md) | Thornswood systems. The summary of every system, and a link from each section to the full plan. |
 | [systems/](systems/) | The finished plan for each system, one page each. Where the server is now is the last section of the page. The item lists are [systems/lists](systems/lists/README.md). |

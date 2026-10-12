@@ -1,8 +1,8 @@
 # How gamemode.js is put together
 
 This page is for somebody opening `game\gamemode.js` for the first time. It
-is the whole of Thornswood's server side: about 24,000 lines in one file,
-loaded by skymp5-server. It says where each system lives, which generated
+is the whole of Thornswood's server side: 64,664 lines and 6 MB in one file on
+12 October (about 24,000 when this page was written), loaded by skymp5-server. It says where each system lives, which generated
 table each script writes into it, how it reaches the server, how it talks to
 the plugins, what it keeps on disk, and which tests read it.
 
@@ -19,6 +19,10 @@ every rule and every table is inlined (`gamemode.js:6` header). The server
 watches the file and reloads it on change after `mp.clear()`, so every block
 registers its handlers at load and keeps timers and state on `globalThis`
 (`g.__thornswood*`) so a reload does not lose them or double them.
+
+The plan for writing it as many source files that are joined into this one
+file, with the loader's limits read from the fork and the measurements behind
+it, is [GAMEMODE-SOURCE.md](GAMEMODE-SOURCE.md) (#2181).
 
 A handler returns `false` to block an event and anything else to let it
 through. Every handler is wrapped in `guard()` (`gamemode.js:267`), so a throw
