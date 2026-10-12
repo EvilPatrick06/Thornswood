@@ -161,6 +161,20 @@ if (-not (Test-Path -LiteralPath $buildLib)) {
     Finish 'INSTALL REFUSED' 1
 }
 . $buildLib
+# The record contracts (#2180, slice 4): beside this script too, sent with it
+# (Read-JsonFile.ps1 and RecordShape.ps1), or in scripts\release when it runs
+# from a checkout. Without them a broken settings file or record would be read
+# as whatever ConvertFrom-Json made of it, so nothing runs.
+$shapeDir = $here
+if (-not (Test-Path -LiteralPath (Join-Path $here 'RecordShape.ps1'))) { $shapeDir = Join-Path $here '..\release' }
+foreach ($lib in 'Read-JsonFile.ps1', 'RecordShape.ps1') {
+    if (-not (Test-Path -LiteralPath (Join-Path $shapeDir $lib))) {
+        Say "$lib is not beside this installer, so the payload's settings and record could not be held to their shape. Nothing was changed." 'Red'
+        Finish 'INSTALL REFUSED' 1
+    }
+}
+. (Join-Path $shapeDir 'Read-JsonFile.ps1')
+. (Join-Path $shapeDir 'RecordShape.ps1')
 # How long a start may take to answer on both ports (#1938): beside this
 # script too, sent with it. Without it there is no ceiling, so nothing runs.
 $waitLib = Join-Path $here 'ServerReadyWait.ps1'
@@ -411,7 +425,7 @@ if (-not $PutBack) {
         [IO.File]::WriteAllBytes($settingsPath, $bytes[3..($bytes.Length - 1)])
         Say 'took a byte order mark off server-settings.json, node cannot parse one' 'Yellow'
     }
-    try { $s = [IO.File]::ReadAllText($settingsPath) | ConvertFrom-Json } catch { Refuse @("server-settings.json does not parse: $($_.Exception.Message)") }
+    try { $s = Read-ThornswoodRecord -Path $settingsPath -Kind server-settings } catch { Refuse @("the payload's settings cannot be trusted: $($_.Exception.Message)") }
 
     # The running server's own settings, with only the release's keys taken
     # from the payload (#1222, see the header). Written into the stage, so
@@ -489,9 +503,9 @@ if (-not $PutBack) {
         $bad += 'the payload carries no server-build.json, so nothing says its server files are a recorded build'
     } else {
         try {
-            $recObj = [IO.File]::ReadAllText($rec) | ConvertFrom-Json
+            $recObj = Read-ThornswoodRecord -Path $rec -Kind server-build
             $bad += @(Get-ThornswoodServerBuildProblems $recObj (Get-ThornswoodServerFolderSums $stageDir) 'the payload' 'server-build.json')
-        } catch { $bad += "server-build.json does not parse: $($_.Exception.Message)" }
+        } catch { $bad += "the payload's server-build.json cannot be trusted: $($_.Exception.Message)" }
     }
     if ($bad.Count) { Refuse $bad }
     Say ("load order: all {0} plugins present" -f $order.Count) 'Green'

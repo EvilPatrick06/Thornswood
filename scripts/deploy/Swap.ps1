@@ -107,16 +107,17 @@ if (Test-Path -LiteralPath $sp) {
   if ($b.Length -ge 3 -and $b[0] -eq 0xEF -and $b[1] -eq 0xBB -and $b[2] -eq 0xBF) {
     $bad += 'server-settings.json starts with a byte order mark, and node will not parse it'
   }
-  try { $new = [IO.File]::ReadAllText($sp) | ConvertFrom-Json }
-  catch { $bad += ('server-settings.json does not parse: ' + $_.Exception.Message) }
+  try { $new = Read-ThornswoodRecord -Path $sp -Kind server-settings }
+  catch { $bad += ('the staged settings cannot be trusted: ' + $_.Exception.Message) }
 } else { $bad += 'there is no server-settings.json in the stage' }
 # The port it runs on now and the port the new settings name must agree. The
 # stop picks its process by that port and the health check asks it, so a file
 # that moved it would stop one process and then ask about another.
 $now = $null
-try { $now = [IO.File]::ReadAllText((Join-Path $Root 'server-settings.json')) | ConvertFrom-Json } catch { }
+$nowWhy = ''
+try { $now = Read-ThornswoodRecord -Path (Join-Path $Root 'server-settings.json') -Kind server-settings } catch { $nowWhy = $_.Exception.Message }
 if (-not $now) {
-  $bad += ('the settings in ' + $Root + ' cannot be read, so there is no telling which process is this server')
+  $bad += ('the settings in ' + $Root + ' cannot be read, so there is no telling which process is this server: ' + $nowWhy)
 } elseif ($new -and [int]$new.port -ne [int]$now.port) {
   $bad += ('the new settings put this server on port ' + [int]$new.port + ' and it is on ' + [int]$now.port + ' now')
 }
@@ -158,11 +159,11 @@ $forkSent = @($sums.Keys | Where-Object { Test-ThornswoodServerForkFile $_ })
 $rp = Join-Path $stageDir 'server-build.json'
 if ($sums.ContainsKey('server-build.json') -and (Test-Path -LiteralPath $rp)) {
   try {
-    $rec = [IO.File]::ReadAllText($rp) | ConvertFrom-Json
+    $rec = Read-ThornswoodRecord -Path $rp -Kind server-build
     $forkSums = @{}
     foreach ($k in $forkSent) { $forkSums[$k] = $sums[$k] }
     $bad += @(Get-ThornswoodServerBuildProblems $rec $forkSums 'the stage' 'server-build.json')
-  } catch { $bad += ('server-build.json does not parse: ' + $_.Exception.Message) }
+  } catch { $bad += ('the staged server-build.json cannot be trusted: ' + $_.Exception.Message) }
 } elseif ($forkSent.Count) {
   $bad += ('server files came with no server-build.json to hold them to: ' + ($forkSent -join ', '))
 }
@@ -427,6 +428,14 @@ function SwapVars([string]$farRoot, [string]$taskName, [string]$stageName, [stri
 # file beside this one: tests\test-deploy-server-swap.ps1 runs the blocks out
 # of the markers and puts the same text in front itself.
 $checkBlock = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'ServerBuild.ps1')) + "`r`n" + $checkBlock
+# And the record contracts (#2180, slice 4): Read-JsonFile.ps1 and
+# RecordShape.ps1 as text, so the stage's server-build.json and both
+# settings files are held to the same shape on the box as they are here, and
+# a bad one is refused naming the file and the field instead of read as
+# whatever ConvertFrom-Json made of it.
+$ThornswoodRecordShapeText = [IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\release\Read-JsonFile.ps1')) + "`r`n" +
+                             [IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\release\RecordShape.ps1')) + "`r`n"
+$checkBlock = $ThornswoodRecordShapeText + $checkBlock
 
 # ==== put-back pick ====
 #

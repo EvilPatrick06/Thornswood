@@ -399,7 +399,7 @@ $caughtScp = Short-Of (Scps $wasStep6)
 $caughtNames = @($caughtScp | ForEach-Object { ($_ -split ' ')[0] })
 Yes 'the check catches step 6 as it was, which left ServerBuild.ps1 behind' (
     $caughtNames -contains 'ServerBuild.ps1' -and $caughtNames -contains 'ServerReadyWait.ps1' -and
-    $caughtScp.Count -eq 2)
+    $caughtNames -contains 'RecordShape.ps1' -and $caughtScp.Count -eq 3)
 $carries = 0; $short = @()
 foreach ($page in $pages.Keys) {
     $sc = Scps $pages[$page]

@@ -29,7 +29,12 @@
   records, and tests\test-record-shapes.ps1 holds it.
   Works on Windows PowerShell 5.1 and PowerShell 7.
 #>
-. (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')
+# Slice 4 (#2180): the box has no checkout, so the scripts that run there get
+# this file's text with Read-JsonFile.ps1's in front of it ($ThornswoodRecordShapeText
+# in Swap.ps1), or the two files beside them (Install-ThornswoodServer.ps1,
+# sent by Publish-Server.ps1). Either way ConvertFrom-ThornswoodJson is
+# already defined, and only a reader that has not loaded it loads it here.
+if (-not (Get-Command ConvertFrom-ThornswoodJson -EA SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Read-JsonFile.ps1') }
 
 # Which versions each kind is understood at, and whether the file must say so.
 $script:ThornswoodRecordKinds = [ordered]@{
@@ -42,6 +47,9 @@ $script:ThornswoodRecordKinds = [ordered]@{
     'skyrim-files'       = @{ File = 'records\skyrim-files.json';       Versions = @(1); MustSay = $false }
     'ui-gone'            = @{ File = 'records\ui-gone.json';            Versions = @(1); MustSay = $false }
     'generated'          = @{ File = 'records\generated.json';          Versions = @(1); MustSay = $false }
+    # Slice 4 (#2180): a server's own settings, read on the box. No committed
+    # file (File is $null, so Check-Records skips it): each server keeps its own.
+    'server-settings'    = @{ File = $null;                             Versions = @(1); MustSay = $false }
 }
 
 function Get-ThornswoodRecordProp($o, [string]$name) {
@@ -163,6 +171,20 @@ function Get-ThornswoodRecordProblems {
                 $sl = Get-ThornswoodRecordProp $bod 'sliders'
                 if ($null -ne $sl -and ($sl -isnot [psobject] -or $sl -is [array] -or $sl -is [string])) { $out += 'bodyslide.sliders is there and not a map' }
             }
+        }
+        'server-settings' {
+            # What the box-side scripts read before they stop or start
+            # anything: the port picks the process and the health check, and
+            # dataDir and privDir say where the world is. skymp itself reads
+            # the rest, and a broken key there is the server's to report.
+            $port = Get-ThornswoodRecordProp $Doc 'port'
+            if (-not (Test-ThornswoodWhole $port 1) -or [int64]$port -gt 65535) { $out += 'port is missing or not a whole number from 1 to 65535' }
+            foreach ($k in 'dataDir', 'privDir') {
+                $v = Get-ThornswoodRecordProp $Doc $k
+                if ($null -ne $v -and (-not ($v -is [string]) -or -not $v.Trim())) { $out += "$k is there and not a folder name" }
+            }
+            $lo = Get-ThornswoodRecordProp $Doc 'loadOrder'
+            if ($null -ne $lo -and ($lo -isnot [array] -or @($lo | Where-Object { -not ($_ -is [string]) -or -not $_.Trim() }).Count)) { $out += 'loadOrder is there and not a list of plugin paths' }
         }
         'collection-plugins' {
             $rows = Get-ThornswoodRecordProp $Doc 'plugins'
