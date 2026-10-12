@@ -38,6 +38,24 @@ A steward does not grant a quest. Guild traders do. See
 [Custom quests](quests.md). The rare mine is one of those quests,
 and the seam is on [Miner](classes/miner.md).
 
+## Guards
+
+A guard is a person in a guard's office, of one hold. There are no NPC
+guards (Patrick, 11 October, #502). A guard of a hold has the cells of
+that hold's jail, and no other hold's: in their own game every cell
+there is open to them, and at a cell door the lock key locks or unlocks
+that cell for everybody else. A cell a guard has locked opens for that
+hold's guards only; anybody else has to pick the lock. A cell no guard
+has turned is as the game ships it.
+
+Each hold's jail is read from the world: Dragonsreach Dungeon, Castle
+Dour Dungeon, Riften Jail, Windhelm Barracks, Cidhna Mine, Falkreath
+Jail, Morthal Jail, Dawnstar Jail, The Chill and The Bulwark Jail.
+Claiming the jail building does not touch its cells.
+
+Who names a guard is not decided yet. It is asked on #502, and until it
+is answered nobody is a guard.
+
 ## Ambassador
 
 One, for the embassy in Solitude. Keeps the roll of 20, of whom 6 may
@@ -64,8 +82,9 @@ titles may do, how many people hold one, and what they are paid. The
 pay is gold that already exists. A hold does not mint it.
 
 Housecarl, thane, captain, priest, and a guard are that list. The
-server does not set their number, their pay, or their powers. A guard
-is not a bounty and is not staff.
+server does not set their number or their pay, and it sets no powers
+for any of them but a guard's, above. A guard is not a bounty and is not
+staff.
 
 Jarl and steward stay the offices the server already runs. A hold does
 not turn eviction, rent, the box or the board off.
@@ -93,5 +112,8 @@ minute, with the ten holds to make it that hold's box; and the ten
 boards, each moved to where the steward stands. Evict and moving a
 board ask for a second press. The server checks every press again and
 answers in the chat. Housecarl, thane, captain, and priest are the public
-rules and no command. Ambassador and Archmage of the College are this
+rules and no command. A guard's cells are in the server (#502): the
+register of guards and the cells they turned is `private\law.json`, and
+the jails are `game\data\jails.json`, read out of the load order by
+`scripts\dev\Build-JailTable.py`. Ambassador and Archmage of the College are this
 plan and no command.
