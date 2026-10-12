@@ -151,13 +151,15 @@ function createMerchantTrading(deps) {
 
   function sessionIdentity(human) {
     if (!human || !human.isHuman || !Number.isSafeInteger(human.profileId) || human.profileId<=0 ||
-        typeof human.desc!=='string' || !human.desc || !Number.isSafeInteger(human.lifeGeneration) || human.lifeGeneration<0) return null;
-    return JSON.stringify([human.desc,human.profileId,human.lifeGeneration]);
+        typeof human.desc!=='string' || !human.desc || !Number.isSafeInteger(human.lifeGeneration) || human.lifeGeneration<0 ||
+        typeof human.runtimeIdentity!=='string' || !/^[1-9][0-9]{0,19}$/.test(human.runtimeIdentity) ||
+        human.runtimeIdentity.length===20 && human.runtimeIdentity>'18446744073709551615') return null;
+    return JSON.stringify([human.desc,human.profileId,human.lifeGeneration,human.runtimeIdentity]);
   }
 
-  function questView(actorId) {
+  function questView(actorId,merchantId) {
     var quests=typeof deps.quests==='function' && deps.quests();
-    return quests ? quests.describe(actorId) : [];
+    return quests ? quests.describe(actorId,merchantId) : [];
   }
 
   function supplyKey(human, itemName) {
@@ -209,7 +211,7 @@ function createMerchantTrading(deps) {
       purse: state.purse,
       offers: offers,
       supply: supply,
-      quests: questView(actorId),
+      quests: questView(actorId,merchantId),
       note: note || (settlement.available()
         ? ''
         : 'Buying and selling wait on the native transfer. Nothing has moved.')
@@ -227,7 +229,7 @@ function createMerchantTrading(deps) {
       if (!reached.ok || !authed(profileId,reached.human) || sessionIdentity(reached.human)!==session.identity) {
         sessions.delete(profileId); views.push({actorId:session.actorId,view:{open:false}}); return;
       }
-      var quests=JSON.stringify(questView(session.actorId));
+      var quests=JSON.stringify(questView(session.actorId,session.merchantId));
       if (changed.indexOf(session.merchantId) < 0 && quests===session.quests) return;
       var state = purses.read(session.merchantId), place = state && placeOf(state.reference);
       if (state && place) {
@@ -309,21 +311,32 @@ function createMerchantTrading(deps) {
       sessions.delete(profileId);
       return fail('Press E on a guild trader with this character.', {open:false});
     }
-    var again = inReach(actorId, merchantId);
-    if (!again.ok) {
+    var originalSession = sessions.get(profileId), quests, heldQuest;
+    function refuseSession(text) {
+      if (sessions.get(profileId)!==originalSession) return fail(text);
       sessions.delete(profileId);
-      return fail(again.reason, { open: false });
-    }
-    if (!authed(profileId, again.human)) return fail('That request is not yours.');
-    if (sessionIdentity(again.human)!==sessions.get(profileId).identity) {
-      sessions.delete(profileId);
-      return fail('Press E on a guild trader with this character.', {open:false});
+      return fail(text, {open:false});
     }
     if (verb === 'quest') {
-      var quests = typeof deps.quests==='function' && deps.quests();
-      if (!quests) return fail('Quest work is unavailable.');
+      quests = typeof deps.quests==='function' && deps.quests();
+      if (!quests || typeof quests.capture!=='function') return fail('Quest work is unavailable.');
+      heldQuest = quests.capture(actorId);
+      if (!heldQuest) return fail('Quest work is unavailable.');
+    }
+    var again = inReach(actorId, merchantId);
+    if (!again.ok) {
+      return refuseSession(again.reason);
+    }
+    if (!authed(profileId, again.human)) return fail('That request is not yours.');
+    var reachedIdentity=sessionIdentity(again.human);
+    var currentIdentity=sessionIdentity(world.actor(actorId));
+    if (!active || sessions.get(profileId)!==originalSession ||
+        reachedIdentity!==originalSession.identity || currentIdentity!==originalSession.identity) {
+      return refuseSession('Press E on a guild trader with this character.');
+    }
+    if (verb === 'quest') {
       if (parts.length<4 || parts.length>5) return fail('Choose the work in the trader panel.');
-      var result=quests.act(actorId,String(parts[2]),String(parts[3]),parts[4],merchantId);
+      var result=quests.act(actorId,String(parts[2]),String(parts[3]),parts[4],merchantId,heldQuest);
       var reasons={class:'This work takes a different class.',rank:'This work takes a higher rank.',
         cooldown:'This work is still resting.',open:'You already hold this work.',gem:'Choose a gem first.',
         short:'You have not drawn enough to turn this work in.',none:'You do not hold this work.',
@@ -452,6 +465,10 @@ function createMerchantTrading(deps) {
     nativeReady: function () { return settlement.available(); },
     withQuestInventoryMutation: function(actorId,change) {return settlement.withInventoryMutation(actorId,change);},
     questReady: function(actorId) {return settlement.canInventoryMutation(actorId);},
+    questHold: function(merchantId) {
+      var state=active && purses.read(merchantId),place=state && placeOf(state.reference);
+      return place && place.hold || '';
+    },
     shutdown: function () { active=false; sessions.clear(); settlement.shutdown(); },
     REACH: REACH,
     SUPPLY_COUNT: SUPPLY_COUNT,
@@ -514,6 +531,7 @@ function installMerchantTrading(env) {
           cell: cell,
           desc: mp.getDescFromId(id),
           lifeGeneration: ai && ai.lifeGeneration,
+          runtimeIdentity: mp.getActorRuntimeIdentity(id),
           profileId: ai && ai.profileId || 0,
           isHuman: !!(ai && ai.isHuman)
         };

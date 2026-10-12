@@ -27,6 +27,9 @@ const oresJson = JSON.parse(fs.readFileSync(path.join(REPO_DIR, 'game', 'data', 
 const buildOre = fs.readFileSync(path.join(REPO_DIR, 'scripts', 'dev', 'Build-OreTable.ps1'), 'utf8');
 const questPage = fs.readFileSync(path.join(REPO_DIR, 'docs', 'systems', 'quests.md'), 'utf8').split(CR).join('');
 const mineBuildings = JSON.parse(fs.readFileSync(path.join(REPO_DIR, 'game', 'data', 'mine-buildings.json'), 'utf8'));
+const population = require('../game/data/npc-population.json');
+const compactPopulation = {keep: population.npcs.filter(r => r.keep).map(r =>
+  [r.ref,r.base,r.world||r.cell,r.pos,r.leash,r.returnMinutes,r.role,r.habitat,r.tier,r.cap,r.populationBucket,0,r.species])};
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -424,7 +427,10 @@ if (ORES && qBlock2) {
   const ctx = { console: console, Map: Map, Set: Set, Math: Math, Number: Number, String: String,
     Buffer: Buffer, JSON: JSON, Object: Object, Array: Array, RegExp: RegExp, Error: Error,
     Date: { now: function () { return clock.now; } },
-    MERCHANT_TRADING: {createQuestTransactions: function () {
+    NPC_POPULATION_DATA: compactPopulation,
+    raceEdidOf: function () { throw new Error('The rare-mine fixture must not query a kill target.'); },
+    MERCHANT_TRADING: {createKillContracts: require('../game/kill-contracts').createKillContracts,
+      createQuestTransactions: function () {
       return {available: function () {return true;}, identity: function (a) {return 'actor:'+a;}, shutdown: function () {},
         commit: function (a, expected, next, changes) {
           const pack=Object.assign({},inv);

@@ -27,6 +27,13 @@
        number as nothing to change.
     6. Publish-Server.ps1's block, lifted by text and run against a scratch
        build, writes both keys into what it packs, before the zip is made.
+    7. Each channel its own numbers (Patrick, 12 Oct: dev at most 5, in the
+       game and in voice, "of 5 awake"; main stays 25 and 5, shown "of 30").
+       Get-MostOnline -Channel dev reads the record's dev object, a record
+       without one gives dev main's numbers and says so, and each channel is
+       held to the engine's ceiling and to voice never under its own seats.
+       Deploy-DevGamemode reads dev's, Publish-Server and Publish-Update the
+       channel they are run for, and the feed's maxOnline is the seats.
 
   Nothing here reaches the VPS or reads a real config.json. Read only apart
   from files under its own temp folder.
@@ -146,6 +153,44 @@ Yes ("with no path it reads records\most-online.json (got {0})" -f $real.From) (
     [IO.Path]::GetFullPath($real.From) -eq [IO.Path]::GetFullPath((Join-Path $RepoDir 'records\most-online.json')))
 Yes ("the record says 25 people at once (got {0})" -f $real.Value) ($real.Value -eq 25)
 Yes ("and seats staff over it: engine seats {0}" -f $real.Seats) ($real.Seats -gt 25 -and $real.Seats -le 1000)
+Yes ("main is 25 and 5, 30 seats, unchanged by dev's numbers (got {0} and {1})" -f $real.Value, $real.Staff) ($real.Value -eq 25 -and $real.Staff -eq 5 -and $real.Seats -eq 30 -and $real.Channel -eq 'main' -and -not $real.Note)
+$realDev = Get-MostOnline -Channel dev
+Yes ("dev reads its own: 5 people, no staff seats, 5 seats, voice 5 (got {0}, {1}, {2}, {3})" -f $realDev.Value, $realDev.Staff, $realDev.Seats, $realDev.Voice) (
+    $realDev.Value -eq 5 -and $realDev.Staff -eq 0 -and $realDev.Seats -eq 5 -and $realDev.Voice -eq 5 -and $realDev.Channel -eq 'dev' -and -not $realDev.Note)
+
+# ---- 7. each channel its own numbers ----------------------------------------
+$both = New-Record 'both' '{"dev":{"people":5,"staffSeats":0,"voice":5},"people":25,"staffSeats":5,"voice":60}' $false
+$m = Get-MostOnline $both
+$d = Get-MostOnline $both -Channel dev
+Yes 'with a dev object, main still reads the record''s own numbers' ($m.Value -eq 25 -and $m.Seats -eq 30 -and $m.Voice -eq 60)
+Yes 'and dev reads its dev object' ($d.Value -eq 5 -and $d.Staff -eq 0 -and $d.Seats -eq 5 -and $d.Voice -eq 5 -and $d.From -eq $both)
+$noDev = New-Record 'nodev' '{"people":25,"staffSeats":5,"voice":60}' $false
+$d = Get-MostOnline $noDev -Channel dev
+Yes 'with no dev object, dev takes main''s numbers, as before 12 Oct' ($d.Value -eq 25 -and $d.Seats -eq 30 -and $d.Voice -eq 60)
+Yes 'and says so' ([string]$d.Note -match 'no dev numbers')
+foreach ($bad in @(
+        @('dev a number',   '{"dev":5,"people":25}',                  'its dev is not an object'),
+        @('dev a list',     '{"dev":[5],"people":25}',                'its dev is not an object'),
+        @('dev no people',  '{"dev":{"voice":5},"people":25}',        'its dev has no people'),
+        @('dev people 0',   '{"dev":{"people":0},"people":25}',       'its dev people is not a whole number above zero'))) {
+    $d = Get-MostOnline (New-Record ('bad-' + ($bad[0] -replace ' ', '-')) $bad[1] $false) -Channel dev
+    Yes ("{0}: dev gives no number, and says why ({1})" -f $bad[0], $d.Why) ($d.Value -eq 0 -and $d.Seats -eq 0 -and $d.Why -match [regex]::Escape($bad[2]))
+}
+$threw = $null
+try { [void](Get-MostOnline (New-Record 'dev-voice-low' '{"dev":{"people":5,"staffSeats":0,"voice":4},"people":25,"staffSeats":5,"voice":60}' $false) -Channel dev) } catch { $threw = $_.Exception.Message }
+Yes 'dev voice under dev''s seats is refused, naming the dev numbers' ($null -ne $threw -and $threw -match 'its dev numbers' -and $threw -match 'fewer than the 5 seats')
+$threw = $null
+try { $m = Get-MostOnline (New-Record 'dev-voice-low-main' '{"dev":{"people":5,"staffSeats":0,"voice":4},"people":25,"staffSeats":5,"voice":60}' $false) } catch { $threw = $_.Exception.Message }
+Yes 'and main reads on, its own numbers held to its own seats' ($null -eq $threw -and $m.Voice -eq 60)
+$threw = $null
+try { [void](Get-MostOnline (New-Record 'main-voice-low' '{"dev":{"people":5,"voice":5},"people":25,"staffSeats":5,"voice":29}' $false) -Channel dev) } catch { $threw = $_.Exception.Message }
+Yes 'main''s voice under main''s seats does not stop dev, which has its own' ($null -eq $threw)
+$threw = $null
+try { [void](Get-MostOnline (New-Record 'dev-over' '{"dev":{"people":995,"staffSeats":10},"people":25}' $false) -Channel dev) } catch { $threw = $_.Exception.Message }
+Yes 'dev over the engine''s 1000 is refused too' ($null -ne $threw -and $threw.Contains('1000'))
+$threw = $null
+try { [void](Get-MostOnline $both -Channel live) } catch { $threw = $_.Exception.Message }
+Yes 'a channel that is neither main nor dev is refused' ($null -ne $threw)
 
 # ---- 2. Set-MaxPlayers on its own -------------------------------------------
 $g35 = [pscustomobject]@{ Value = 25; Staff = 10; Seats = 35; From = 'x'; Why = '' }
@@ -166,8 +211,9 @@ Yes 'it adds both keys when the file had neither' ($s.maxPlayers -eq 35 -and $s.
 # ---- 3. the feed reads the same record --------------------------------------
 $pu = Get-Content -LiteralPath (Join-Path $RepoDir 'scripts\release\Publish-Update.ps1') -Raw
 Yes 'Publish-Update.ps1 dot-sources MaxOnline.ps1 for the feed''s number' ($pu.Contains(". (Join-Path `$PSScriptRoot '..\deploy\MaxOnline.ps1')"))
-Yes 'and announces Get-MostOnline''s number as maxOnline' ($pu.Contains('$mo = (Get-MostOnline).Value') -and
+Yes 'and announces the channel''s seats as maxOnline, the M of "N of M awake"' ($pu.Contains('$mo = (Get-MostOnline -Channel $Channel).Seats') -and
     $pu.Contains("if (`$mo -gt 0) { Set-Prop `$doc 'maxOnline' `$mo }"))
+Yes 'which is 30 on main and 5 on dev' ((Get-MostOnline -Channel main).Seats -eq 30 -and (Get-MostOnline -Channel dev).Seats -eq 5)
 Yes 'and no longer reads MaxOnline out of the launcher''s config.json' (-not $pu.Contains('$cfg.MaxOnline'))
 
 # ---- 4. Deploy-Gamemode.ps1 --------------------------------------------------
@@ -222,6 +268,7 @@ $dd = Get-Content -LiteralPath (Join-Path $RepoDir 'scripts\deploy\Deploy-DevGam
 $read = $dd.IndexOf('Get-MostOnline')
 $stop = $dd.IndexOf("Write-Host 'Stopping the dev server...'")
 Yes 'Deploy-DevGamemode.ps1 dot-sources MaxOnline.ps1' ($dd.Contains("Join-Path `$Here 'MaxOnline.ps1'"))
+Yes 'and reads the dev numbers, never main''s' ($dd.Contains('$got = Get-MostOnline -Channel dev') -and -not ($dd -match 'Get-MostOnline\s*\r?\n'))
 Yes 'it reads the number before the dev server is stopped' ($read -ge 0 -and $stop -gt $read)
 Yes 'and has no launcher root to read it from any more' (-not $dd.Contains('LauncherRoot'))
 
@@ -292,6 +339,10 @@ if ($open -ge 0 -and $close -gt $marker) {
     $out = Invoke-Remote $dev 30 40
     Yes 'a new number moves both' ([int](Read-Dev $dev).thornswoodMostOnline -eq 30 -and [int](Read-Dev $dev).maxPlayers -eq 40)
 
+    $out = Invoke-Remote $dev $realDev.Value $realDev.Seats
+    Yes 'dev''s own numbers: 5, and engine seats 5 with none over it' ([int](Read-Dev $dev).thornswoodMostOnline -eq 5 -and [int](Read-Dev $dev).maxPlayers -eq 5)
+    Yes 'and says so' (($out -join "`n").Contains('to 5, engine seats from 40 to 5'))
+
     Seed-Dev $dev $true
     $out = Invoke-Remote $dev 0 0
     Yes 'with no number the dev server keeps its 100' ([int](Read-Dev $dev).maxPlayers -eq 100)
@@ -310,7 +361,7 @@ if ($open -ge 0 -and $close -gt $marker) {
 
 # ---- 6. Publish-Server.ps1 ----------------------------------------------------
 $pubs = Get-Content -LiteralPath (Join-Path $RepoDir 'scripts\release\Publish-Server.ps1') -Raw
-$capAt = $pubs.IndexOf('$mostOnline = Get-MostOnline')
+$capAt = $pubs.IndexOf('$mostOnline = Get-MostOnline -Channel $Channel')
 $ifAt = -1
 if ($capAt -ge 0) { $ifAt = $pubs.LastIndexOf('if (Test-Path -LiteralPath $settingsPath) {', $capAt) }
 $capBlock = $null
@@ -322,6 +373,7 @@ if ($null -ne $capBlock) {
     $pdist = Join-Path $tmp 'pub-dist'
     New-Item -ItemType Directory -Force -Path $pdist | Out-Null
     $settingsPath = Join-Path $pdist 'server-settings.json'
+    $Channel = 'main'
     [IO.File]::WriteAllText($settingsPath, '{"port":7777,"name":"Thornswood","maxPlayers":100,"keepMe":"yes"}', $utf8)
     $ok = $true
     # The block dot-sources MaxOnline.ps1 from beside itself; here that is $helper.
@@ -336,6 +388,14 @@ if ($null -ne $capBlock) {
     $before = [IO.File]::ReadAllText($settingsPath)
     . $sb 6>$null
     Yes 'and leaves the file untouched when nothing moved' ([IO.File]::ReadAllText($settingsPath) -eq $before)
+
+    # -Channel dev packs dev's numbers.
+    $Channel = 'dev'
+    [IO.File]::WriteAllText($settingsPath, '{"port":7787,"name":"Thornswood Dev","thornswoodMostOnline":25,"maxPlayers":30}', $utf8)
+    $ok = $true
+    try { . $sb 6>$null } catch { $ok = $false; Write-Host ("      " + $_.Exception.Message) }
+    $w = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
+    Yes 'Publish-Server -Channel dev packs dev''s 5, engine seats 5' ($ok -and [int]$w.thornswoodMostOnline -eq 5 -and [int]$w.maxPlayers -eq 5 -and [int]$w.port -eq 7787)
 }
 
 Done

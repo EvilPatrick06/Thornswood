@@ -16,6 +16,18 @@ const REPO_DIR = require('path').join(__dirname, '..');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const population = require('../game/data/npc-population.json');
+const compactPopulation={keep:population.npcs.filter(r=>r.keep).map(r=>
+  [r.ref,r.base,r.world||r.cell,r.pos,r.leash,r.returnMinutes,r.role,r.habitat,r.tier,r.cap,r.populationBucket,0,r.species])};
+const npcStates={}, npcIds={};
+compactPopulation.keep.forEach((r,i)=>{
+  const id=i+5000;npcIds[r[0]]=id;npcStates[id]={ref:r[0],base:r[1],world:r[2],pos:r[3].slice(),
+    race:r[12]==='sabre-cat'?'SabreCatRace':r[12]+'Race',
+    profileId:-1,isHuman:false,isDead:false,isServerControlled:true,lifeGeneration:0,runtimeLifeIdentity:'100'};
+});
+for(const [id,ref] of [[31,'50533'],[32,'50549'],[33,'5054a'],[41,'86a88']]) {
+  npcStates[id]=npcStates[npcIds[ref+':Skyrim.esm']];npcIds[ref+':Skyrim.esm']=id;
+}
 const CR = String.fromCharCode(13);
 const gm = fs.readFileSync(path.join(REPO_DIR, 'game', 'gamemode.js'), 'utf8').split(CR).join('');
 const questPage = fs.readFileSync(path.join(REPO_DIR, 'docs', 'systems', 'quests.md'), 'utf8').split(CR).join('');
@@ -97,6 +109,8 @@ function boot(into) {
       ctx.__made[name] = opts;
     },
     get: function (id, key) {
+      if(npcStates[id] && key==='baseDesc')return npcStates[id].base;
+      if(npcStates[id] && key==='worldOrCellDesc')return npcStates[id].world;
       if (key === 'locationalData') { return veinCell[id] ? { cellOrWorldDesc: veinCell[id], pos: [0, 0, 0] } : undefined; }
       if (key === PROP && fault.read === 'throw') { throw new Error('the change form could not be read'); }
       if (!forms[id] || !(key in forms[id].props)) { return undefined; }
@@ -107,7 +121,9 @@ function boot(into) {
       if (key === PROP && fault.write) { throw new Error('the write was refused'); }
       form(id).props[key] = JSON.parse(JSON.stringify(v));
     },
-    getDescFromId: function () { return ''; }
+    getDescFromId: function (id) { return npcStates[id] ? npcStates[id].ref : 'human:'+id; },
+    getIdFromDesc: function(ref){return npcIds[ref];},
+    getNpcAIState: function(id){return JSON.parse(JSON.stringify(npcStates[id]));}
   };
   ctx.addItem = function (a, item, n) {
     if (fault.throwAdd.indexOf(item) >= 0) throw new Error('native inventory write failed');
@@ -122,7 +138,10 @@ function boot(into) {
     f.inv[item] -= n;
     return true;
   };
-  ctx.MERCHANT_TRADING = {createQuestTransactions: function () {
+  ctx.NPC_POPULATION_DATA=compactPopulation;
+  ctx.raceEdidOf=id=>npcStates[id].race;
+  ctx.MERCHANT_TRADING = {createKillContracts: require('../game/kill-contracts').createKillContracts,
+    createQuestTransactions: function () {
     return {identity: function (a) {
       if(ctx.__runtimeIdentityApi)return require('../game/quest-transactions').actorIdentity(ctx.__runtimeIdentityApi,a);
       return ctx.__identityToken || 'actor:' + a;
@@ -146,7 +165,8 @@ function boot(into) {
       }
     };
   }};
-  ctx.__thornswoodMerchantTrade={nativeReady:function(){return true;},questReady:function(){return true;}};
+  ctx.__thornswoodMerchantTrade={nativeReady:function(){return true;},questReady:function(){return true;},
+    questHold:function(id){return id===9000?'Whiterun':id===9001?'Eastmarch':'';}};
   ctx.globalThis = ctx;
   ctx.__thornswoodCharacter = { rankOf: function (a, key) { return ranks[a + ':' + key] || ''; } };
   ctx.__thornswoodDungeonLoot = { GOLD_DESC: 'f:Skyrim.esm' };
@@ -210,8 +230,8 @@ yes('a second short of 24 hours, after another restart, it still holds', w.svc.o
 clock.now += 1;
 yes('and at 24 hours the trader can open it again', w.svc.offer(2, 'ebony').ok === true);
 w.svc.walkAway(2, 'ebony');
-yes('a cooldown that has run out is left off the record',
-    !forms[2].props[PROP].cool.ebony);
+yes('an expired cooldown is retained as history without blocking the next offer',
+    forms[2].props[PROP].cool.ebony <= clock.now);
 
 // ------------------------------------------------ the gem they named -----
 yes('a ruby quest', w.svc.offer(3, 'gem', { gem: 'Ruby' }).ok === true);
@@ -225,25 +245,19 @@ w.svc.walkAway(3, 'gem');
 w.svc.bindPlace('camp', { cell: 'camp-1' });
 yes('anyone takes the camp', w.svc.offer(4, 'camp').ok === true);
 const names = { 31: 'Bandit', 32: 'Bandit Outlaw', 33: 'Bandit' };
-function bandit(id) { veinCell[id] = 'camp-1'; return id; }
+function bandit(id) { npcStates[id].isDead=true;return id; }
 // creatureName is the server's own, which reads the record; give the deaths a name by a stub over it.
 function kill(svc, killer, id) { return svc.noteKill(killer, bandit(id)); }
 w.ctx.mp.lookupEspmRecordById = function () { return null; };
-w.ctx.mp.get = (function (get) {
-  return function (id, key) { return key === 'baseDesc' ? names[id] : get(id, key); };
-})(w.ctx.mp.get);
 kill(w.svc, 4, 31); kill(w.svc, 4, 32);
 yes('two of three bandits are counted on the character', forms[4].props[PROP].open.camp.kills === 2);
 w = restart();
 w.svc.bindPlace('camp', { cell: 'camp-1' });
 w.ctx.mp.lookupEspmRecordById = function () { return null; };
-w.ctx.mp.get = (function (get) {
-  return function (id, key) { return key === 'baseDesc' ? names[id] : get(id, key); };
-})(w.ctx.mp.get);
-yes('after a restart the camp is not done', w.svc.turnIn(4, 'camp').why === 'short');
+yes('after a restart the camp is not done', w.svc.turnIn(4, 'camp',9000).why === 'short');
 kill(w.svc, 4, 33);
 yes('the third bandit finishes it and its 45 gold is created once',
-    w.svc.turnIn(4, 'camp').ok === true && have(4, 'f:Skyrim.esm') === 45);
+    w.svc.turnIn(4, 'camp',9000).ok === true && have(4, 'f:Skyrim.esm') === 45);
 w = restart();
 yes('a restart keeps the camp\'s 6 hour cooldown, so its gold cannot be taken again',
     w.svc.offer(4, 'camp').why === 'cooldown' && have(4, 'f:Skyrim.esm') === 45);
@@ -265,9 +279,9 @@ w = restart();
 yes('a record is rebuilt field by field: a count that is not whole reads as none',
     w.svc.offer(5, 'ebony').why === 'open' && w.svc.walkAway(5, 'ebony').ok === true);
 function owns(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
-yes('a quest the tables do not have, and a cooldown that ran out, are left off',
-    !owns(forms[5].props[PROP].open, 'nothere') && !owns(forms[5].props[PROP].open, 'constructor') &&
-    !owns(forms[5].props[PROP].cool, 'nothere') && !owns(forms[5].props[PROP].cool, 'gem') &&
+yes('unknown quest fields and expired cooldowns remain saved outside the working view',
+    owns(forms[5].props[PROP].open, 'nothere') && owns(forms[5].props[PROP].open, 'constructor') &&
+    owns(forms[5].props[PROP].cool, 'nothere') && owns(forms[5].props[PROP].cool, 'gem') &&
     forms[5].props[PROP].cool.stalhrim === clock.now + HOUR);
 
 // --------------------------------------- a record that cannot be read ----
@@ -288,6 +302,10 @@ function unread(value, what) {
 }
 unread('a string', 'a value that is not a record');
 unread({ v: 2, open: {}, cool: {} }, 'a record of another shape');
+unread({v:1,open:[],cool:{}}, 'an array where the open quest map belongs');
+unread({v:1,open:{},cool:'unreadable'}, 'an unreadable cooldown map');
+unread({v:1,open:null,cool:{}}, 'a null open quest map');
+unread({v:1,open:{},cool:null}, 'a null cooldown map');
 {
   forms[7] = { inv: {}, props: {} };
   forms[7].props[PROP] = { v: 1, open: {}, cool: { ebony: clock.now + HOUR } };
@@ -341,24 +359,24 @@ unread({ v: 2, open: {}, cool: {} }, 'a record of another shape');
   w.svc.offer(9, 'wolf');
   names[41] = 'Wolf'; veinCell[41] = 'pad-1';
   w.ctx.mp.lookupEspmRecordById = function () { return null; };
-  w.ctx.mp.get = (function (get) {
-    return function (id, key) { return key === 'baseDesc' ? names[id] : get(id, key); };
-  })(w.ctx.mp.get);
+  npcStates[41].isDead=false; // Newly accepted living body, then a server death.
+  npcStates[41].lifeGeneration++;
+  w.svc.walkAway(9,'wolf');w.svc.offer(9,'wolf');npcStates[41].isDead=true;
   fault.write = true;
   const k = w.svc.noteKill(9, 41);
   fault.write = false;
   yes('a kill that cannot be written is not counted', k.why === 'unwritten' && forms[9].props[PROP].open.wolf.kills === 0);
   w.svc.noteKill(9, 41);
   fault.noAdd = ['f:Skyrim.esm'];
-  const t = w.svc.turnIn(9, 'wolf');
+  const t = w.svc.turnIn(9, 'wolf',9000);
   fault.noAdd = [];
   yes('gold that cannot be handed over leaves the quest open, with no cooldown',
       t.why === 'unwritten' && forms[9].props[PROP].open.wolf.kills === 1 && !forms[9].props[PROP].cool.wolf);
   fault.write = true;
-  const t2 = w.svc.turnIn(9, 'wolf');
+  const t2 = w.svc.turnIn(9, 'wolf',9000);
   fault.write = false;
   yes('a scene turn-in that cannot be written creates no gold', t2.why === 'unwritten' && have(9, 'f:Skyrim.esm') === 0);
-  yes('and written, it pays the 25 once', w.svc.turnIn(9, 'wolf').ok === true && have(9, 'f:Skyrim.esm') === 25);
+  yes('and written, it pays the 25 once', w.svc.turnIn(9, 'wolf',9000).ok === true && have(9, 'f:Skyrim.esm') === 25);
 }
 
 // A native inventory setter can throw instead of returning false. The
@@ -428,6 +446,7 @@ unread({ v: 2, open: {}, cool: {} }, 'a record of another shape');
   let alive=true;ctx.swing(36,'mine',null,{alive:()=>alive});alive=false;
   const count=writes.length;timers.forEach(t=>t.fn());
   yes('the real swing cleanup cannot write after its owner is revoked',writes.length===count);
+  yes('revoked swing cleanup retires its local busy state',!ctx.SWING_IN_AIR[36] && !ctx.SWING_CLEAR[36]);
 }
 {
   w=restart();w.svc.bindPlace('wolf',{cell:'pad-1'});w.svc.offer(34,'wolf');
@@ -475,6 +494,222 @@ yes('the miner page says the same', /kept on the character/.test(mWhere) &&
     /restart of the server keeps them/.test(mWhere) && !/kept in memory/.test(mWhere) &&
     !/restart of the server clears them/.test(mWhere));
 
+// A miner action owns its own quest fields. Other quest metadata can be
+// newer than this controller, or malformed and awaiting explicit recovery.
+{
+  const untouched = { killHistory: {'86a88:Skyrim.esm': 7}, future: {format: 2},
+    wolf: {kills: 'unreadable', credited: ['old-life'], extension: {hold: 'Whiterun'}},
+    unknown: {drawn: 3, itemDesc: 'retained:item'} };
+  forms[50] = {inv:{}, props:{[PROP]:{v:1, open:{wolf:untouched.wolf, futureQuest:untouched.unknown},
+    cool:{futureQuest:clock.now+HOUR},killHistory:untouched.killHistory,future:untouched.future}}};
+  ranks['50:miner']='master';w=restart();
+  function preserved(phase) {
+    const record=forms[50].props[PROP];
+    yes(phase+': opaque root quest state survives', JSON.stringify(record.killHistory)===JSON.stringify(untouched.killHistory) &&
+      JSON.stringify(record.future)===JSON.stringify(untouched.future));
+    yes(phase+': unrelated malformed kill state survives verbatim', JSON.stringify(record.open.wolf)===JSON.stringify(untouched.wolf));
+    yes(phase+': unknown quest and cooldown survive', JSON.stringify(record.open.futureQuest)===JSON.stringify(untouched.unknown) &&
+      record.cool.futureQuest===clock.now+HOUR);
+  }
+  yes('a valid miner offer still opens beside retained quest fields',w.svc.offer(50,'ebony').ok===true);
+  preserved('offer');
+  for(let i=0;i<4;i++)w.svc.mineRare(50,here[0],EBONY);
+  yes('mining still commits four goods beside retained fields',have(50,EBONY.ore)===4);
+  preserved('draw');
+  yes('the miner return still consumes its ask',w.svc.turnIn(50,'ebony').ok===true && have(50,EBONY.ore)===0);
+  preserved('return');
+  w=restart();w.svc.offer(50,'stalhrim');w.svc.walkAway(50,'stalhrim');
+  preserved('abandon after restart');
+}
+{
+  forms[51]={inv:{},props:{[PROP]:{v:1,open:{ebony:{drawn:0,kills:0,itemDesc:null,
+    extension:{source:'future-format'}}},cool:{}}}};
+  ranks['51:miner']='master';w=restart();w.svc.mineRare(51,here[0],EBONY);
+  yes('a draw changes its known counter while retaining extra fields on the same quest',
+    forms[51].props[PROP].open.ebony.drawn===1 && have(51,EBONY.ore)===1 &&
+    forms[51].props[PROP].open.ebony.extension.source==='future-format');
+}
+
+{
+  w=restart();
+  const view=w.svc.describe(70,9000),kills=view.filter(q=>q.kind==='kill');
+  yes('Whiterun traders show only their three authored kill contracts',kills.length===3 &&
+    kills.some(q=>q.id==='wolf'&&q.locations==='White River Watch') && !kills.some(q=>q.id==='bear'));
+  yes('a different hold cannot take a Whiterun contract',w.svc.act(70,'take','wolf',null,9001).why==='hold');
+  npcStates[41].isDead=false;npcStates[41].lifeGeneration++;
+  yes('the authenticated local trader accepts a bound kill contract',w.svc.act(70,'take','wolf',null,9000).ok===true);
+  npcStates[41].isDead=true;
+  yes('the authored body credits a saved quest once',w.svc.noteKill(70,41).ok===true &&
+    forms[70].props[PROP].open.wolf.kills===1 && forms[70].props[PROP].killHistory['86a88:Skyrim.esm']===npcStates[41].lifeGeneration);
+  w=restart();const before=JSON.stringify(forms[70]);
+  yes('duplicate death after restart changes nothing',w.svc.noteKill(70,41).ok===false && JSON.stringify(forms[70])===before);
+  yes('a different hold cannot pay the kill contract',w.svc.turnIn(70,'wolf',9001).why==='hold');
+  yes('the local trader pays exactly the documented gold',w.svc.turnIn(70,'wolf',9000).ok===true && have(70,'f:Skyrim.esm')===25);
+  yes('turn-in retains the consumed body history',forms[70].props[PROP].killHistory['86a88:Skyrim.esm']===npcStates[41].lifeGeneration);
+}
+{
+  ranks['80:miner']='master';w=restart();w.svc.offer(80,'ebony');
+  let entered=false;
+  w.ctx.__thornswoodCharacter.rankOf=function(){
+    if(!entered){entered=true;w.svc.mineRare(80,here[0],EBONY);}
+    return 'master';
+  };
+  const result=w.svc.offer(80,'stalhrim');
+  yes('a metadata offer refuses a snapshot superseded by a nested inventory commit',
+    result.why==='unwritten' && forms[80].props[PROP].open.ebony.drawn===1 &&
+    !forms[80].props[PROP].open.stalhrim && have(80,EBONY.ore)===1);
+}
+{
+  ranks['81:miner']='master';w=restart();w.ctx.__identityToken='old-session';
+  w.ctx.__thornswoodCharacter.rankOf=function(){w.ctx.__identityToken='new-session';return 'master';};
+  const result=w.svc.offer(81,'ebony');
+  yes('a metadata offer cannot cross its actor session during qualification',
+    result.why==='unwritten' && !form(81).props[PROP]);
+}
+
+{
+  ranks['82:miner']='master';w=restart();w.ctx.__identityToken='old';w.svc.offer(82,'ebony');
+  w.ctx.__thornswoodCharacter.rankOf=function(){w.ctx.__identityToken='new';return 'master';};
+  w.svc.mineRare(82,here[0],EBONY);
+  yes('mining qualification cannot adopt a new actor session',have(82,EBONY.ore)===0 && forms[82].props[PROP].open.ebony.drawn===0);
+}
+{
+  w=restart();w.ctx.__identityToken='old';w.svc.offer(83,'satchel');
+  w.svc.bindPlace('satchel',{ref:9800,cell:'satchel-cell',item:'satchel-item'});
+  const get=w.ctx.mp.get;
+  w.ctx.mp.get=function(id,key){
+    if(id===9800 && key==='locationalData'){w.ctx.__identityToken='new';return {cellOrWorldDesc:'satchel-cell'};}
+    return get(id,key);
+  };
+  w.ctx.mp.getDescFromId=function(){return 'satchel-ref';};
+  w.svc.onActivate(83,9800);
+  yes('retrieval activation cannot adopt a new actor session',have(83,'satchel-item')===0 && forms[83].props[PROP].open.satchel.drawn===0);
+}
+
+{
+  ranks['84:miner']='master';w=restart();w.svc.offer(84,'ebony');let finish;
+  w.ctx.swing=(a,anim,done)=>{finish=done;};w.svc.mineRare(84,here[0],EBONY);
+  w.svc.offer(84,'stalhrim');finish();
+  yes('a landing swing cannot adopt a newer quest record',have(84,EBONY.ore)===0);
+}
+{
+  ranks['85:miner']='master';w=restart();w.svc.offer(85,'ebony');
+  const saved=JSON.stringify(forms[85]);
+  w.ctx.__identityToken='old';w.ctx.__thornswoodMerchantTrade.questReady=()=>{w.ctx.__identityToken='new';return true;};
+  w.svc.act(85,'abandon','ebony');
+  yes('trader readiness cannot adopt a replacement character session',JSON.stringify(forms[85])===saved);
+}
+{
+  ranks['86:miner']='master';w=restart();w.svc.offer(86,'ebony');let wear=0;
+  w.ctx.creditWork=()=>{w.ctx.__identityToken='new';};w.ctx.wearTool=()=>wear++;
+  w.svc.mineRare(86,here[0],EBONY);
+  yes('work credit cannot pass tool wear into a replacement session',have(86,EBONY.ore)===1 && wear===0);
+}
+{
+  ranks['87:miner']='master';forms[87]={inv:{},props:{[PROP]:{v:1,open:{wolf:{kills:{toString:null,valueOf:null}}},
+    cool:{futureQuest:{toString:null,valueOf:null}}}}};w=restart();let result;
+  try{result=w.svc.offer(87,'ebony');}catch(error){}
+  yes('unrelated malformed legacy fields cannot throw during a miner offer',result && result.ok===true);
+}
+{
+  ranks['88:miner']='master';w=restart();w.svc.offer(88,'ebony');
+  w.ctx.__identityToken='old';w.ctx.classGate=()=>{w.ctx.__identityToken='new';return null;};
+  w.ctx.isVein=()=>true;w.ctx.ORES_BY_BASE={test:EBONY};w.ctx.ORE_ONE_PLACE=['Ebony Ore'];
+  const start=gm.indexOf('function mineOre(actorId, refrId, baseDesc) {'),end=gm.indexOf('\n}\n',start)+2;
+  vm.runInContext(gm.slice(start,end),w.ctx);w.ctx.mineOre(88,here[0],'test');
+  yes('the outer mining caller cannot replace the session before rare-work capture',have(88,EBONY.ore)===0);
+}
+{
+  ranks['89:miner']='master';w=restart();w.svc.offer(89,'ebony');let stopped=0;
+  w.ctx.__identityToken='old';w.ctx.mining=()=>true;w.ctx.stopMining=()=>stopped++;
+  w.ctx.__thornswoodMerchantTrade.questReady=()=>{w.ctx.__identityToken='new';return true;};
+  w.svc.mineRare(89,here[0],EBONY);
+  yes('readiness cannot stop a replacement session mining spell',stopped===0);
+}
+{
+  const timers=[],writes=[];let runtime='100';
+  const start=gm.indexOf('function swing(actorId, anim, lands, opts) {');
+  const finish=gm.indexOf('\nconst SWING_QUIET',start);
+  const ctx={mp:{set:(...args)=>writes.push(args),getActorRuntimeIdentity:()=>runtime},
+    setTimeout:(fn,ms)=>{timers.push({fn,ms});return timers.length;},clearTimeout(){},
+    guard:(label,fn)=>fn,SWING_PROPERTY:'swing',SWING_STOP:'stop',SWING_FREE:'free',
+    SWING_MS:2500,SWING_LAND_MS:900,SWING_QUIET:{},SWING_IN_AIR:{},SWING_CLEAR:{},log(){}};
+  vm.createContext(ctx);vm.runInContext(gm.slice(start,finish),ctx);
+  ctx.swing(90,'old',null,{alive:()=>{ctx.swing(90,'new',null,{});return true;}});
+  timers[0].fn();
+  yes('a cleanup validation callback cannot erase a newer swing',writes.at(-1)[2].anim==='new');
+  ctx.swingEnd(91,1);const endTimer=timers.at(-1);
+  ctx.swing(91,'new',null,{});const count=writes.length;endTimer.fn();
+  yes('a mining-stop timer cannot erase a newer swing',writes.length===count);
+  ctx.swingEnd(92,1);const revoked=timers.at(-1);runtime='101';const before=writes.length;revoked.fn();
+  yes('a mining-stop timer cannot write into a replacement session',writes.length===before);
+}
+{
+  w=restart();
+  const {createQuestTransactions}=require('../game/quest-transactions');
+  const {createKillContracts}=require('../game/kill-contracts');
+  let record=null,inventory={entries:[{baseId:15,count:40}]};
+  let receipt=JSON.stringify({actor:'ff000060:Skyrim.esm',profile:42,sequence:1}),saved='null',goods=0;
+  const clone=x=>JSON.parse(JSON.stringify(x));
+  const mp={getActorRuntimeIdentity:()=> '100',getNpcAIState:id=>id===96?
+    {isHuman:true,profileId:42,lifeGeneration:0}:npcStates[id],
+    getDescFromId:id=>id===96?'ff000060:Skyrim.esm':npcStates[id].ref,
+    getIdFromDesc:desc=>desc==='f:Skyrim.esm'?15:npcIds[desc],
+    get:(id,key)=>id===96?clone(key==='inventory'?inventory:record):w.ctx.mp.get(id,key),
+    getInventoryReceipt:()=>receipt,getSavedInventoryReceipt:()=>saved,
+    compareAndSetActorProperty(id,profile,change){
+      if(profile!==42 || JSON.stringify(change.expected)!==JSON.stringify(record))return false;
+      record=clone(change.replacement);return true;
+    },
+    compareAndSetInventoryAndProperty(id,before,old,next,sequence,profile,change){
+      if(old!==receipt || JSON.stringify(change.expected)!==JSON.stringify(record))return false;
+      goods++;inventory=clone(next);record=clone(change.replacement);
+      receipt=JSON.stringify({actor:'ff000060:Skyrim.esm',profile,sequence});return true;
+    }};
+  const tx=createQuestTransactions({mp,withInventoryMutation:(id,fn)=>receipt===saved?
+    fn({desc:'ff000060:Skyrim.esm',profileId:42},()=>true):{ok:false,why:'waiting'}});
+  const kills=createKillContracts({mp,population:compactPopulation,raceOf:id=>npcStates[id].race,identity:tx.identity});
+  const svc=w.ctx.__thornswoodCustomQuestsCreate({now:()=>clock.now,goldDesc:'f:Skyrim.esm',
+    load:()=>clone(record),commit:tx.commit,identity:tx.identity,available:tx.available,killContracts:kills,
+    traderHold:()=> 'Whiterun'});
+  for(const ref of kills.rows.find(r=>r.id==='camp').refs) {
+    const state=npcStates[npcIds[ref]];state.isDead=false;state.lifeGeneration++;
+  }
+  yes('a contract opens through the real transaction path while an inventory save is pending',svc.offer(96,'camp').ok===true);
+  for(const id of [31,32,33]){npcStates[id].isDead=true;svc.noteKill(96,id);}
+  yes('three successive authored kills survive the real controller and transaction path',record.open.camp.kills===3);
+  yes('kill progress leaves inventory and its unacknowledged receipt intact',goods===0 && inventory.entries[0].count===40 && saved==='null');
+  yes('the camp reward stays fenced while inventory is unacknowledged',svc.turnIn(96,'camp',9000).ok===false && !!record.open.camp);
+  saved=receipt;
+  yes('acknowledged inventory permits exactly the authored camp reward',svc.turnIn(96,'camp',9000).ok===true && inventory.entries[0].count===85 && goods===1);
+  yes('the completed contract cannot pay twice',svc.turnIn(96,'camp',9000).ok===false && goods===1);
+}
+{
+  ranks['94:miner']='master';w=restart();w.svc.offer(94,'ebony');let armed=false,stopped=0;
+  w.ctx.__runtimeIdentityApi={getNpcAIState:()=>({isHuman:true,profileId:7,lifeGeneration:0}),
+    getDescFromId:()=> 'ff000094:Skyrim.esm',getActorRuntimeIdentity:()=>{
+      if(armed){armed=false;w.svc.shutdown();}return '100';}};
+  w.ctx.mining=()=>{armed=true;return true;};w.ctx.stopMining=()=>stopped++;
+  w.svc.mineRare(94,here[0],EBONY);
+  yes('an identity callback shutdown cannot stop replacement mining',stopped===0);
+}
+{
+  const timers=[],writes=[];let publish=false;
+  const start=gm.indexOf('function swing(actorId, anim, lands, opts) {');
+  const finish=gm.indexOf('\nconst SWING_QUIET',start);
+  const ctx={mp:{set:(...args)=>{writes.push(args);if(publish && args[2].end){publish=false;ctx.swing(95,'new',null,{});}},
+    getActorRuntimeIdentity:()=> '100'},
+    setTimeout:(fn,ms)=>{timers.push({fn,ms});return timers.length;},clearTimeout(){},
+    guard:(label,fn)=>fn,SWING_PROPERTY:'swing',SWING_STOP:'stop',SWING_FREE:'free',
+    SWING_MS:2500,SWING_LAND_MS:900,SWING_QUIET:{},SWING_IN_AIR:{},SWING_CLEAR:{},log(){}};
+  vm.createContext(ctx);vm.runInContext(gm.slice(start,finish),ctx);
+  publish=true;ctx.swingEnd(95,1);
+  const before=writes.length;
+  timers.filter(t=>t.ms===1500).forEach(t=>t.fn());
+  yes('a swing-end publication cannot clear a newer animation',writes.length===before);
+  timers.filter(t=>t.ms===3500).forEach(t=>t.fn());
+  yes('the newer swing keeps its cleanup lease after swing-end publication',!ctx.SWING_IN_AIR[95]);
+}
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

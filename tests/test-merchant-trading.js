@@ -33,7 +33,7 @@ function worldOf(native) {
   const live=new Map(),saved=new Map();
   return {
     actors, inv, records,
-    actor(id) { return actors[id] ? {desc:id.toString(16)+':Skyrim.esm',lifeGeneration:0,...actors[id]} : null; },
+    actor(id) { return actors[id] ? {desc:id.toString(16)+':Skyrim.esm',lifeGeneration:0,runtimeIdentity:'100',...actors[id]} : null; },
     carry(id, baseId) { return (inv[id] && inv[id][baseId]) || 0; },
     save() { for (const [id,receipt] of live) saved.set(id,receipt); },
     transfer: {
@@ -109,10 +109,14 @@ assert.equal(opened.view.open, true);
 assert.equal(opened.view.purse, 250);
 assert.equal(opened.view.transfer, true);
 assert.equal(opened.view.offers[0].stock, 0);
-const questCalls=[];
-box.deps.quests=()=>({describe:()=>[{id:'ebony',name:'The ebony'}],
+const questCalls=[],described=[];
+box.deps.quests=()=>({describe:(...args)=>{described.push(args);return [{id:'ebony',name:'The ebony'}];},
+  capture:()=>({owner:'held-session'}),
   act:(...args)=>{questCalls.push(args);return {ok:true};}});
 assert.equal(open(box.api).view.quests[0].id,'ebony');
+assert.deepEqual(described.pop(),[10,1],'quest view receives the authenticated merchant');
+assert.equal(box.api.questHold(1),'Whiterun');
+assert.equal(box.api.questHold(900),'','unknown merchant has no offering hold');
 assert.equal(box.api.command({actorId:10,profileId:9,parts:['/merchant','quest','take','ebony']}).view,null);
 assert.equal(questCalls.length,0,'forged quest profile cannot reach the controller');
 box.world.actors[11]={...box.world.actors[10]};
@@ -120,10 +124,14 @@ box.api.command({actorId:11,profileId:7,parts:['/merchant','quest','take','ebony
 assert.equal(questCalls.length,0,'a replacement actor cannot reuse the old session');
 open(box.api);
 box.api.command({actorId:10,profileId:7,parts:['/merchant','quest','take','gem','Ruby']});
-assert.deepEqual(questCalls.pop(),[10,'take','gem','Ruby',1]);
+assert.deepEqual(questCalls.pop(),[10,'take','gem','Ruby',1,{owner:'held-session'}]);
 box.world.actors[10].lifeGeneration=1;
 box.api.command({actorId:10,profileId:7,parts:['/merchant','quest','take','ebony']});
 assert.equal(questCalls.length,0,'an earlier life cannot reuse a merchant session');
+open(box.api);
+box.world.actors[10].runtimeIdentity='101';
+box.api.command({actorId:10,profileId:7,parts:['/merchant','quest','take','ebony']});
+assert.equal(questCalls.length,0,'a new native session cannot reuse an old merchant panel');
 open(box.api);
 box.world.actors[10].desc='new:Skyrim.esm';
 box.api.command({actorId:10,profileId:7,parts:['/merchant','quest','take','ebony']});
@@ -133,8 +141,37 @@ box.world.actors[10].pos=[900,0,0];
 box.api.command({actorId:10,profileId:7,parts:['/merchant','quest','take','ebony']});
 assert.equal(questCalls.length,0,'out-of-reach quest action cannot reach the controller');
 box.world.actors[10].pos=[0,0,0];open(box.api);
+{
+  const actor=box.world.actor;
+  box.world.actor=function(id) {
+    if(id===1)box.world.actors[10].runtimeIdentity='102';
+    return actor(id);
+  };
+  box.api.command({actorId:10,profileId:7,parts:['/merchant','quest','abandon','ebony']});
+  assert.equal(questCalls.length,0,'a merchant location callback cannot redirect an old panel into a replacement session');
+  box.world.actor=actor;
+  open(box.api);
+}
 
 const cooldownPanel=service({on:true},250);
+for (const during of ['reach','final']) {
+  const nested=service({on:true},250), calls=[];
+  nested.deps.quests=()=>({describe:()=>[],capture:()=>({}),act:()=>{calls.push(1);return {ok:true};}});
+  open(nested.api);
+  const lookup=nested.world.actor;let fired=false,reads=0;
+  nested.world.actor=function(id) {
+    if(!fired && (during==='reach'?id===1:id===10 && ++reads===2)) {
+      fired=true;open(nested.api);
+    }
+    return lookup(id);
+  };
+  const refused=nested.api.command({actorId:10,profileId:7,parts:['/merchant','quest','take','ebony']});
+  assert.equal(calls.length,0,'a '+during+' callback cannot redirect an old command into a replacement panel');
+  assert.equal(refused.view,null,'a refused old command cannot close the replacement panel');
+  nested.world.actor=lookup;
+  nested.api.command({actorId:10,profileId:7,parts:['/merchant','quest','take','ebony']});
+  assert.equal(calls.length,1,'the new panel keeps its command ownership after '+during);
+}
 let cooling=true;
 cooldownPanel.deps.quests=()=>({describe:()=>[{id:'ebony',state:cooling?'cooldown':'available',canTake:!cooling}]});
 open(cooldownPanel.api);
@@ -148,6 +185,7 @@ cooldownPanel.api.acknowledgeView(10,refreshedWork[0].view);
 assert.equal(cooldownPanel.api.recover().length,0,'a refreshed quest is not sent repeatedly');
 let takenWork=false;
 cooldownPanel.deps.quests=()=>({describe:()=>[{id:'ebony',state:takenWork?'open':'available'}],
+  capture:()=>({owner:'held-session'}),
   act:()=>{takenWork=true;return {ok:true};}});
 open(cooldownPanel.api);
 const takenView=cooldownPanel.api.command({actorId:10,profileId:7,parts:['/merchant','quest','take','ebony']}).view;
