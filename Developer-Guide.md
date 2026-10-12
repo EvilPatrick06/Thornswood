@@ -2720,4 +2720,4 @@ Not from the chat: `/restart` and `/shutdown` answer that restarts are not run f
 | Command | Who | What it does |
 | --- | --- | --- |
 | `/close [why]` | Staff, in a ticket: the bot's `STAFF_ROLES`, by id or name, never Manage Threads alone (#1342) | Closes the ticket |
-| `/test-task title body` | Owner, Dev and Lead Gamemaster (`TEST_TASK_ROLES`) | Posts one thread in the #test-tasks forum, tagged Main: every test task is Main only, by hand or from the board (#2276). The Live smoke checklist and `/live-smoke` were taken out on 11 October |
+| `/test-task title body [tag]` | Owner, Dev and Lead Gamemaster (`TEST_TASK_ROLES`) | Posts one thread: tagged Main (the default) in the #test-tasks forum, for testers on main, or tagged Dev in the staff-only #dev-test-tasks, for something someone on dev has to measure (Patrick, 12 Oct). The Live smoke checklist and `/live-smoke` were taken out on 11 October |

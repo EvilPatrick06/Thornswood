@@ -508,29 +508,57 @@ yes('  tagged Main by default (#2276: Main only)',
 th2, said = run(bot.post_test_task(g, 'Buy a house', 'In Whiterun.', 'main'))
 yes('a Main task gets the Main tag (any case)',
     [t.name for t in th2.applied_tags] == ['Main'])
-no, said = run(bot.post_test_task(g, 'Fish in Riften', 'At the docks.', 'Dev'))
-yes('#2276: a hand post tagged Dev is refused, nothing is posted',
-    no is None and 'Main only' in said and len(forum.threads) == 2
-    and not [x for x in forum.threads if x.name == 'Fish in Riften'])
+tpath = os.path.join(TMP, 'tasks.json')
+dforum = bot.dev_tasks_forum(g, tpath)
+dv, said = run(bot.post_test_task(g, 'Fish in Riften', 'At the docks.', 'Dev',
+                                  path=tpath))
+yes('a hand post tagged Dev goes to #dev-test-tasks (found by its recorded '
+    'id), tagged Dev, and not to #test-tasks (Patrick, 12 Oct, on #2276)',
+    dv is not None and dforum is not None and dv in dforum.threads
+    and [t.name for t in dv.applied_tags] == ['Dev']
+    and not [x for x in forum.threads if x.name == 'Fish in Riften']
+    and len(forum.threads) == 2)
+dforum.name = 'renamed-by-hand'
+dv2, said = run(bot.post_test_task(g, 'Fish in Riften', 'Again.', 'dev', path=tpath))
+yes('  the same title again (any case of Dev, the forum renamed) is not a '
+    'second thread', dv2 is dv and len(dforum.threads) == 1
+    and said.startswith('Already'))
 again, said = run(bot.post_test_task(g, 'Ride the ferry to Solstheim', 'x'))
 yes('the same title again is not a second thread',
     again is th and len(forum.threads) == 2 and said.startswith('Already'))
 no, said = run(bot.post_test_task(g, 'x', 'y', 'Live'))
-yes('a tag that is not Main is refused', no is None and 'Main only' in said)
+yes('a tag that is not Main or Dev is refused, and nothing is posted',
+    no is None and 'Main' in said and 'Dev' in said
+    and len(forum.threads) == 2 and len(dforum.threads) == 1)
 no, said = run(bot.post_test_task(g, 'x' * 101, 'y'))
 yes('a title Discord would refuse is refused first', no is None)
 g2, *_ = server()
 no, said = run(bot.post_test_task(g2, 'x', 'y'))
 yes('before the setup, it says #test-tasks is not a forum yet',
     no is None and 'not a forum yet' in said)
+no, said = run(bot.post_test_task(g2, 'x', 'y', 'Dev',
+                                  path=os.path.join(TMP, 'never.json')))
+yes('  and a Dev one says #dev-test-tasks is not made yet, nothing posted',
+    no is None and 'dev-test-tasks is not made yet' in said)
 import inspect as _insp  # noqa: E402
-_params = list(_insp.signature(bot.test_task_cmd.callback).parameters)
-yes('#2276: /test-task has no tag option, so it cannot post to Dev (%s)'
-    % _params, 'tag' not in _params)
+_sig_cmd = _insp.signature(bot.test_task_cmd.callback)
+yes('/test-task has a tag option, Main or Dev, Main when left out (%s)'
+    % list(_sig_cmd.parameters),
+    'tag' in _sig_cmd.parameters
+    and _sig_cmd.parameters['tag'].default == 'Main'
+    and set(getattr(_sig_cmd.parameters['tag'].annotation, '__args__', ()))
+    == {'Main', 'Dev'})
+_tag_param = [p for p in bot.test_task_cmd.parameters if p.name == 'tag']
+yes('  Discord gets it as an optional choice of Main and Dev, every text in '
+    'the limits Discord sets',
+    len(_tag_param) == 1 and not _tag_param[0].required
+    and sorted(c.value for c in _tag_param[0].choices) == ['Dev', 'Main']
+    and len(bot.test_task_cmd.description) <= 100
+    and all(len(p.description) <= 100 for p in bot.test_task_cmd.parameters))
 _src = _insp.getsource(bot)
-yes('#2276: --post-task --tag takes Main only, Main by default',
-    "ap.add_argument('--tag', choices=[TASK_POST_TAG], default=TASK_POST_TAG)" in _src
-    and bot.TASK_POST_TAG == 'Main')
+yes('--post-task --tag takes Main or Dev, Main by default',
+    "ap.add_argument('--tag', choices=list(HAND_TAGS), default=TASK_POST_TAG)" in _src
+    and bot.TASK_POST_TAG == 'Main' and set(bot.HAND_TAGS) == {'Main', 'Dev'})
 
 
 # --------------------------------------------------- 4. known issues --
@@ -1211,12 +1239,16 @@ dp = both()[1][0]
 yes('  and a new Server: Dev test task on it is a dev post again', dp == [81]
     and 'Ferry lag again on dev' in names(df))
 
-no, said = run(bot.post_test_task(g, 'Measure on dev', 'x', 'Dev'))
+hd, said = run(bot.post_test_task(g, 'Measure on dev', 'x', 'Dev',
+                                  path=os.path.join(TMP, 'devpass.json')))
 th, said2 = run(bot.post_test_task(g, 'By hand', 'Do it on main.'))
-yes('/test-task by hand is still Main only: a Dev one is refused and nothing '
-    'reaches #dev-test-tasks; a Main one lands in #test-tasks, tagged Main',
-    no is None and 'Main only' in said and 'Measure on dev' not in names(df)
-    and th in tf.threads and [x.name for x in th.applied_tags] == ['Main'])
+out = both()
+yes('a hand post tagged Dev lands in #dev-test-tasks and one tagged Main in '
+    '#test-tasks, and the passes from the board leave both alone',
+    hd in df.threads and [x.name for x in hd.applied_tags] == ['Dev']
+    and 'Measure on dev' not in names(tf)
+    and th in tf.threads and [x.name for x in th.applied_tags] == ['Main']
+    and out == (([], [], []), ([], [], [])))
 
 import importlib.util  # noqa: E402
 _spec = importlib.util.spec_from_file_location(

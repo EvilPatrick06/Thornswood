@@ -119,12 +119,15 @@ it back. Until 11 October `#test-tasks` carried the Live smoke checklist
 (dated sessions with Pass, Fail, Skip and Fail-known rows, `/live-smoke`).
 Patrick's card of that day took all of it out.
 
-**Test tasks.** One thread per test task, from a title and a body, with the
-forum's Main tag on it. Every test task is Main only, by hand or from the
-board (Patrick, #2276): testers test on main.
+**Test tasks.** One thread per test task, from a title and a body, tagged
+Main or Dev. Main, the default, goes to `#test-tasks` for testers on main;
+Dev goes to the staff-only `#dev-test-tasks` (below), for something someone
+on dev has to measure. `#test-tasks` itself only ever holds Main (Patrick,
+#2276). On 12 Oct Patrick gave hand posts the Dev choice back, now that Dev
+has a forum of its own; #2413 had made them Main only.
 
-    /test-task title body         in Discord: Owner, Dev and Lead Gamemaster
-    python bot.py --env-file C:\Thornswood-Bot\bot.env.json --post-task --title "..." --body-file task.txt
+    /test-task title body [tag]   in Discord: Owner, Dev and Lead Gamemaster; tag is Main (default) or Dev
+    python bot.py --env-file C:\Thornswood-Bot\bot.env.json --post-task --title "..." --body-file task.txt [--tag Dev]
 
 Who may post is `TEST_TASK_ROLES` in `bot.env.json`, by role id (preferred) or
 name, Owner, Dev, Lead Gamemaster and Lead GM by default. A `bot.env.json`
@@ -173,7 +176,8 @@ log.
   test task still says `Server: Dev` gets no `#test-tasks` post from it.
   Every other test task is Main, because testers play on main in the alpha.
   The post is deleted when it goes, so what was measured belongs on the
-  issue.
+  issue. A Dev test task posted by hand (`/test-task` with the tag Dev) also
+  lands here; it belongs to no issue, so the bot leaves it for staff to close.
 
 **When an issue is closed** (Patrick, 11 Oct): dev is where the team checks
 that nothing breaks the game, and main is where testers test, since we are in

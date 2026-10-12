@@ -21,10 +21,11 @@ What it does:
            issue is closed, which is when its fix is on main. #test-tasks is a
            forum of test tasks: one for each issue closed as fixed (its "Test
            task:" comment), always tagged Main, because main is where testers
-           test, plus any posted by hand, tagged Main (/test-task,
+           test, plus any posted by hand tagged Main (/test-task,
            python bot.py --post-task). #dev-test-tasks, a staff only forum
            in Staff, holds the test tasks whose comment says "Server: Dev":
-           a measurement someone on dev has to take, open issue or closed.
+           a measurement someone on dev has to take, open issue or closed,
+           and any posted by hand tagged Dev.
            The channels get there once, by hand, with
            python bot.py --setup-channels [--apply] (the testing channels
            section below)
@@ -1973,7 +1974,7 @@ async def ensure_hold_panel(guild):
 #   #test-tasks     a Forum. One thread per test task, tagged Main: the
 #                   bot posts one, tagged Main, for each issue closed as fixed
 #                   (see known issues below), and staff can post one by hand
-#                   (/test-task, or python bot.py --post-task).
+#                   (/test-task, or python bot.py --post-task), tagged Main.
 #   #test-findings  what #test-results was, renamed. Nothing else about it moves.
 #   #known-issues   a Forum, read only: one bot post per open GitHub issue
 #                   labelled Dev Findings or Main Findings, title only, no
@@ -1982,8 +1983,10 @@ async def ensure_hold_panel(guild):
 #                   entry per issue, not one list).
 #   #dev-test-tasks a Forum in Staff, staff only (Patrick, 12 Oct): the test
 #                   tasks someone on dev has to measure, from comments that
-#                   say "Server: Dev" (see known issues below). Most go to
-#                   #test-tasks, because testers play on main in the alpha.
+#                   say "Server: Dev" (see known issues below), and staff
+#                   can post one by hand (/test-task with the tag Dev, or
+#                   --post-task --tag Dev). Most go to #test-tasks, because
+#                   testers play on main in the alpha.
 #
 # THE ONE-TIME SETUP. Getting the server from the old shape to that one is the
 # only channel change the bot makes, and Patrick's explicit exception to the
@@ -2032,10 +2035,14 @@ DEV_TOPIC = ('Test tasks someone on dev has to measure, from the board. Kept '
 FORUM_BOT_NEEDS = ('view_channel', 'send_messages', 'send_messages_in_threads',
                    'manage_threads', 'read_message_history')
 TASK_TAGS = ('Dev', 'Main')
-# The only tag a test task is posted with, automatic or by hand (Patrick,
-# 12 Oct, #2276 option B): testers test on main, so #test-tasks is Main only.
-# The forum keeps its Dev tag for older threads; nothing new gets it.
+# The tags a test task posted by hand may carry, and the forum each goes to
+# (Patrick, 12 Oct, on #2276, reversing the Main only hand posts of #2413):
+# Main, the default, to #test-tasks for testers on main; Dev to the staff
+# #dev-test-tasks, for something someone on dev has to measure. #test-tasks
+# itself is Main only: it keeps its Dev tag for older threads, nothing new
+# gets it.
 TASK_POST_TAG = 'Main'
+HAND_TAGS = ('Main', 'Dev')
 SETUP_STATE = os.path.join(DATA_DIR, 'channel-setup.json')
 KNOWN_STATE = os.path.join(DATA_DIR, 'known-issues.json')
 SETUP_REASON = 'Thornswood channel setup (one time, Patrick 11 Oct)'
@@ -2506,20 +2513,23 @@ def task_tag_of(forum, tag):
     return None
 
 
-async def post_test_task(guild, title, body, tag=TASK_POST_TAG):
+async def post_test_task(guild, title, body, tag=TASK_POST_TAG, path=None):
     """
-    One thread in the #test-tasks forum, titled and tagged Main. Every
-    test task is Main only (#2276); a Dev tag, or any other, is refused.
+    One thread, titled and tagged: Main (the default) in the #test-tasks
+    forum, Dev in #dev-test-tasks, found by the id the one-time setup
+    recorded (path, channel-setup.json). Any other tag is refused.
 
     Returns (thread or None, what to say). A thread already open under that
-    exact title is not made twice; the existing one is handed back.
+    exact title in that forum is not made twice; the existing one is handed
+    back.
     """
     title = str(title or '').strip()
     body = str(body or '').strip()
-    want = str(tag or '').strip().capitalize()
-    if want != TASK_POST_TAG:
-        return None, ('Test tasks are Main only (testers test on main), '
-                      'not %r.' % tag)
+    want = str(tag or TASK_POST_TAG).strip().capitalize()
+    if want not in HAND_TAGS:
+        return None, ('A test task is Main (for testers, in #%s) or Dev (for '
+                      'staff on dev, in #%s), not %r.'
+                      % (TASKS_NAME, DEV_TASKS_NAME, tag))
     if not title or not body:
         return None, 'A test task needs a title and a body.'
     if len(title) > TASK_TITLE_ROOM:
@@ -2528,15 +2538,23 @@ async def post_test_task(guild, title, body, tag=TASK_POST_TAG):
     if len(body) > TASK_BODY_ROOM:
         return None, 'That body is %d characters; Discord takes %d.' % (
             len(body), TASK_BODY_ROOM)
-    forum = _channel_named(guild, TASKS_NAME, ('forum',))
-    if forum is None:
-        return None, ('#%s is not a forum yet. The one-time setup '
-                      '(python bot.py --setup-channels --apply) makes it one.'
-                      % TASKS_NAME)
+    if want == 'Dev':
+        name = DEV_TASKS_NAME
+        forum = dev_tasks_forum(guild, path)
+        if forum is None:
+            return None, ('#%s is not made yet. The one-time setup (python '
+                          'bot.py --setup-channels --apply) makes it.' % name)
+    else:
+        name = TASKS_NAME
+        forum = _channel_named(guild, TASKS_NAME, ('forum',))
+        if forum is None:
+            return None, ('#%s is not a forum yet. The one-time setup '
+                          '(python bot.py --setup-channels --apply) makes it one.'
+                          % TASKS_NAME)
     t = task_tag_of(forum, want)
     if t is None:
         return None, ('#%s has no %s tag. The one-time setup adds it.'
-                      % (TASKS_NAME, want))
+                      % (name, want))
     for th in list(getattr(forum, 'threads', None) or []):
         if (str(getattr(th, 'name', '')) == title
                 and not getattr(th, 'archived', False)):
@@ -2549,12 +2567,15 @@ async def post_test_task(guild, title, body, tag=TASK_POST_TAG):
 
 
 @tree.command(name='test-task',
-              description='Post a test task in #test-tasks, tagged Main. '
-                          'Owner, Dev and Lead Gamemaster only.')
+              description='Post a test task: Main for testers (#test-tasks), '
+                          'Dev for staff on dev. Owner, Dev, Lead GM.')
 @discord.app_commands.describe(title='The thread title.',
-                               body='What to test, as the first post.')
+                               body='What to test, as the first post.',
+                               tag='Main (the default): testers on main, in '
+                                   '#test-tasks. Dev: staff on dev, in '
+                                   '#dev-test-tasks.')
 async def test_task_cmd(interaction: discord.Interaction, title: str,
-                        body: str):
+                        body: str, tag: typing.Literal['Main', 'Dev'] = 'Main'):
     if interaction.guild is None:
         await _say(interaction, 'This one works in the server.')
         return
@@ -2564,11 +2585,12 @@ async def test_task_cmd(interaction: discord.Interaction, title: str,
         return
     await interaction.response.defer(ephemeral=True, thinking=True)
     try:
-        _, said = await post_test_task(interaction.guild, title, body)
+        _, said = await post_test_task(interaction.guild, title, body, tag)
     except discord.HTTPException as e:
         log('test task: Discord refused a post: %s' % getattr(e, 'text', e))
         said = ('That did not go through. In #%s the bot needs View Channel, '
-                'Send Messages and Create Posts.' % TASKS_NAME)
+                'Send Messages and Create Posts.'
+                % (DEV_TASKS_NAME if tag == 'Dev' else TASKS_NAME))
     await interaction.followup.send(said, ephemeral=True)
 
 
@@ -4351,7 +4373,7 @@ def run_cli(argv):
     bot's watchers, panels or command sync, and closes when it is done:
 
       --setup-channels [--apply]   the one-time setup, a preview without --apply
-      --post-task --title T --body B|--body-file F [--tag Main]
+      --post-task --title T --body B|--body-file F [--tag Main|Dev]
       --adopt-task --issue N --thread ID   (offline; with the bot stopped)
 
     Returns the exit code.
@@ -4365,7 +4387,7 @@ def run_cli(argv):
     ap.add_argument('--title')
     ap.add_argument('--body')
     ap.add_argument('--body-file')
-    ap.add_argument('--tag', choices=[TASK_POST_TAG], default=TASK_POST_TAG)
+    ap.add_argument('--tag', choices=list(HAND_TAGS), default=TASK_POST_TAG)
     ap.add_argument('--guild', type=int, default=0)
     ap.add_argument('--adopt-task', action='store_true')
     ap.add_argument('--issue', type=int)
