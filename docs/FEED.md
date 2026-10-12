@@ -542,7 +542,11 @@ open for its few hundred bytes.
   and a case Ship cannot tell stops before anything is built (#2347,
   `Ship.ps1:Get-DevLauncherLine`). A number either feed already offers with a
   launcher built from other sources is refused before the build
-  (`Ship.ps1:Assert-DevVersionSelection`).
+  (`Ship.ps1:Assert-DevVersionSelection`). A main Ship asks the same of
+  main's feed before it fetches or signs the exe CI built, and the publisher
+  refuses the case itself before anything is sent, and again before the feed
+  is written, rather than warning once the launcher is out
+  (`Publish-Update.ps1:Get-LauncherNumberRefusal`).
 - **After a main Ship**, the Dev feed, baseline, release identity and history
   stay unchanged. Dev advances through its own Ship and keeps its own server
   and voice addresses. Publish the same source to both channels when both
