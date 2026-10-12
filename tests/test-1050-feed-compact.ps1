@@ -150,7 +150,7 @@ if ($ParseFeed) {
             $v.launcherVersion -eq '1.2.4' -and $v.minLauncher -eq '1.2.4' -and
             $v.launcherUrl -eq ('https://thornswood.net/feed/assets/' + ('e' * 64)) -and $v.launcherSha256 -eq ('e' * 64))
         Yes '  serverAddress, serverPort, voicePort, voiceUrl, updateFeedUrl, siteUrl' (
-            $v.serverAddress -eq '192.135.112.23' -and $v.serverPort -eq '7777' -and $v.voicePort -eq '7778' -and
+            $v.serverAddress -eq '203.0.113.7' -and $v.serverPort -eq '7777' -and $v.voicePort -eq '7778' -and
             $v.voiceUrl -eq 'https://thornswood.net/voice' -and $v.updateFeedUrl -eq 'https://thornswood.net/feed/version.json' -and
             $v.siteUrl -eq 'https://thornswood.net')
         Yes '  maxOnline and collectionRevision as numbers, the exe sizes as the feed writes them' (
@@ -221,13 +221,14 @@ Yes '  and the check finds a planted indented writer' ($pv -eq 'vf' -and $plante
 Write-Host ''
 Write-Host 'what it writes'
 # The main feed of 12 Oct after 1.2.4, as the old writers read it back, with
-# the release note made harder to keep.
+# the release note made harder to keep, and a documentation address in place
+# of the box's, which only vps.json may carry (test-vps-defaults.ps1).
 $doc = @'
 {
   "launcherVersion": "1.2.4",
   "launcherUrl": "https://thornswood.net/feed/assets/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
   "launcherSha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-  "serverAddress": "192.135.112.23",
+  "serverAddress": "203.0.113.7",
   "serverPort": "7777",
   "message": "",
   "packs": [],
