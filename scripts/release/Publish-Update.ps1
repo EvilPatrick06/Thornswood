@@ -82,7 +82,11 @@ param(
 . (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
 # A stale or dirty checkout sends old or unlanded code; refuse it (#2118).
-. (Join-Path $PSScriptRoot '..\deploy\Fresh-Checkout.ps1'); Assert-FreshCheckout -RepoDir (Join-Path $PSScriptRoot '..\..') -What 'Publish-Update' -AllowStale:$AllowStaleCheckout
+# The branch rule is Ship's own, through Test-FreshAnyBranch (#2235): a dev
+# release may come off any pushed branch, a live one off main or hotfix/.
+. (Join-Path $PSScriptRoot '..\deploy\Fresh-Checkout.ps1')
+$freshRepo = Join-Path $PSScriptRoot '..\..'
+Assert-FreshCheckout -RepoDir $freshRepo -What 'Publish-Update' -AnyBranch:(Test-FreshAnyBranch -RepoDir $freshRepo -Channel $Channel) -AllowStale:$AllowStaleCheckout
 
 
 # The launcher, Thornswood.exe in the launcher folder.
