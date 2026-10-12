@@ -44,7 +44,10 @@ function fixture(){
 }
 for(const boundary of ['save','projection']) {
  const f=fixture(),one=f.first.read(1);let refusal;
- const replace=()=>{try{f.create({...f.storage});}catch(error){refusal=error;}};
+ let adapterReads=0;
+ const replacement={namespace:f.storage.namespace,durable:true,
+  get load(){adapterReads++;return f.storage.load;},get save(){adapterReads++;return f.storage.save;}};
+ const replace=()=>{try{f.create(replacement);}catch(error){refusal=error;}};
  if(boundary==='save') {
   const save=f.storage.save;f.storage.save=function(doc){replace();return save(doc);};
  } else {
@@ -52,6 +55,7 @@ for(const boundary of ['save','projection']) {
  }
  f.first.compareAndCommit(1,0,{...one,purse:188});
  assert.match(String(refusal),/busy/,'replacement cannot split the '+boundary+' boundary');
+ assert.equal(adapterReads,0,'busy replacement invokes no storage method getter');
  assert.equal(f.saved().entries['1:Skyrim.esm'].purse,188);
  assert.equal(f.first.read(1).purse,188);
 }

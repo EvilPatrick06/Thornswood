@@ -62587,7 +62587,7 @@ function npcMerchantManifest(data) {
   return Array.from(entries.values());
 }
 function createNpcMerchantPurses(api,data,storage) {
-  if(!storage || !storage.load || !storage.save) throw new Error('A durable merchant ledger is required');
+  if(!storage) throw new Error('A durable merchant ledger is required');
   const owners=globalThis.__thornswoodMerchantLedgerOwners || (globalThis.__thornswoodMerchantLedgerOwners=new Map());
   const key=storage.namespace || storage;
   const prior=owners.get(key);
@@ -62595,6 +62595,7 @@ function createNpcMerchantPurses(api,data,storage) {
   const lease={busy:true};
   owners.set(key,lease);
   try {
+  if(typeof storage.load!=='function' || typeof storage.save!=='function') throw new Error('A durable merchant ledger is required');
   const property='thornswoodMerchant',catalogue=new Map(),verified=new Set();
   let initialized=0,active=true;
   function assertOwner() {
