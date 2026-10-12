@@ -43,9 +43,11 @@ or the build check goes red.
   Content (mod 192001) and Thornswood Client Runtime (mod 192762). Each has
   its own section below. What the collection provides stays out of the
   installer and the packs (Get-ShipOwnGameCollection in Ship-Rules.ps1), so
-  the collection is the only way these reach anybody, with one exception: a dev
-  pack carries our own `Thornswood-Content.esp` until Nexus has the current
-  one (`$DevShipsOurs` in Publish-Update.ps1).
+  the collection is the only way these reach anybody, with one exception: since
+  3 October every pack and the installer, on both channels, carry our own
+  `Thornswood-Content.esp`, the repository's file at the commit the release is
+  built from, over the collection's copy (`$ShipOursFiles` in Ship-Rules.ps1).
+  The Thornswood Content section says which plugin each channel carries.
 - **The game server** runs on the VPS. Nobody receives a copy, but the AGPL
   still asks for its source to be offered to everybody who connects.
 - **The site**, thornswood.net, hands every visitor's browser the files in
@@ -293,25 +295,99 @@ the source is".
 
 Nexus Mods mod 192001,
 https://www.nexusmods.com/skyrimspecialedition/mods/192001, by EvilPatrick06.
-The rebuilt collection (`7essxf`) carries version 1.2 of this mod. The per-file
-measurements below were last read in Vortex's copy on 24 September against
-version 1.1.0 (file 809365); they have to be re-read on the shipping machine
-once it has the `7essxf` collection installed, since the 1.2 upload changes the
-plugin. Its three files, as read on 24 September:
+Its one main file is version 1.2, Nexus file 811029, an archive of 660,022
+bytes uploaded on 26 September; 1.0 and 1.1 are old files. Collection revision
+2 (`7essxf`, published 3 October) pins that exact file and carries a patch of
+its own for the plugin, `patches\Thornswood Content\Thornswood-Content.esp.diff`
+(207 bytes, bsdiff), which Vortex applies after it installs the mod. Read on
+12 October from the 1.2 archive Vortex downloaded, the installed revision 2
+collection and Vortex's staging folder on the shipping machine:
 
-- `Thornswood-Content.esp`, Thornswood's own plugin, 141,234 bytes, sha256
+| File | Bytes | sha256 |
+|---|---|---|
+| `Thornswood-Content.esp`, as the 1.2 archive has it | 141,442 | `988b6d00e86d9e58b67a0da5f6ea145976a33a4ecee6bc814505fc98b6fcc112` |
+| `Thornswood-Content.esp`, as the collection installs it | 141,023 | `4b004dce782573445381ef013be7e6984c4df09c31a3af7234242f6f2acc7f58` |
+| `SKSE\Plugins\SkyrimSoulsRE.ini` | 7,009 | `a787ecc3e13ec6ca55719ff25e544fa8b5bcee09734e2c19d5cf5defebf3815a` |
+| `SKSE\Plugins\OpenAnimationReplacer.ini` | 1,165 | `328ce7e0412685bb8cab1fa0d81b5bdbf9f805b6d8f3f76e92662ca2b418403c` |
+| `meshes\actors\character\facegendata\facegeom\FishingInSkyrim.esp\00025905.nif` | 286,140 | `5353f567eb73684f48e085e31276db2d33ec5bdbe9cd17d2f1ff264e22f21ba5` |
+| `meshes\actors\character\facegendata\facegeom\FishingInSkyrim.esp\0002a07c.nif` | 247,584 | `82d7309d6997cc6cdc63c396ecc18dde35e7b438dc96b756c66491e29120b0cc` |
+| `textures\actors\character\facegendata\facetint\FishingInSkyrim.esp\00025905.dds` | 1,048,704 | `0fd4584d9f06ffde6d77adbf1037c4143dde3fca2d082473e73c0536ac109d3c` |
+| `textures\actors\character\facegendata\facetint\FishingInSkyrim.esp\0002a07c.dds` | 1,048,704 | `31b0fee7b2aba7d1d6ad26df96995698603a5d021cc35d14fb52a05cfb6b85fb` |
+
+- `Thornswood-Content.esp`, Thornswood's own plugin. The collection's
+  `collection.json` patches only the file whose crc32 is `023593E0`, which is
+  the archive's copy. Applying the patch to that copy gives the 141,023 bytes
+  above exactly, and Vortex's staging copy is the same bytes. That is the
+  collection's base: the plugin #954 rebuilt, 382 records, with no Execution
+  Block and no editor id or script named for another server (#400). Its
+  header's description still says where the records came from: "Crafting and
+  gathering content salvaged from Keizaal Online. Stations, salt, ore, charcoal
+  kilns, the skill manuals and their recipes." The release plugin below
+  carries the same description. Until 12 October this
+  section gave the 1.1 file as read on 24 September, 141,234 bytes, sha256
   `3b3ecb3bda4b97e312df10a61191cdd2949286007ab03a948b323d4a749af2ae`.
-  `game\content\Thornswood-Content.esp` has changed since it was uploaded: it was
-  141,442 bytes on 24 September.
 - `SKSE\Plugins\SkyrimSoulsRE.ini`: Skyrim Souls RE's own settings file (mod
-  27859, in the collection) with one line changed, `bTweenMenu = false`. The
-  rest is as that mod's author wrote it.
+  27859) with one line changed, `bTweenMenu = false`. The rest is as that
+  mod's author wrote it. Revision 2 removed Skyrim Souls RE itself
+  (docs\COLLECTION-REVISION-2.md), so nothing in the collection reads this
+  file now.
 - `SKSE\Plugins\OpenAnimationReplacer.ini`: the settings file Open Animation
   Replacer (mod 92109, in the collection) writes, holding the values Thornswood
   wants.
+- The four face files: the face meshes and face tints the Creation Kit exports
+  for two people Fishing In Skyrim Special Edition (mod 47618, in the
+  collection) adds, Rybek Kupiecski (`FishingVendorPolish`, 00025905) and
+  Lillani (`FISLillani`, 0002A07C). The four are dated 26 September and
+  are made from that mod's records.
 
-Both settings files belong to mods everybody already gets from the collection.
-This file did not read either mod's permissions.
+The settings files and the faces belong with mods that are, or were, in the
+collection. This file did not read those mods' permissions.
+
+### The plugin each channel carries
+
+The game does not run the collection's copy of the plugin. Every pack and the
+installer put the repository's `game\content\Thornswood-Content.esp`, as it
+was at the commit the release was built from, into Thornswood's own game
+folder in place of the collection's (How it reaches people). The launcher
+refuses Play while a copy differs from the one its server holds, and a Ship
+whose plugin changed stops until that channel's server holds the same file
+(#2308). Both channels carry the same plugin. Read on 12 October from the
+feeds, the release tags, the dev and main game folders on the shipping machine,
+both servers' manifests (the size and crc32 each lists match the file below)
+and the servers' own copies:
+
+| Channel | Release | Built from | Bytes | sha256 | Records |
+|---|---|---|---|---|---|
+| main | every main release from `20261012-115531` (launcher 1.2.4, 12 October 11:55 AM); the live server has held it since 11:42 AM | `e34bf423` on | 146,941 | `d05679e76d8dc930b236ebd906274a4c26b7959228d5ebca727cf5800469bf31` | 419 |
+| dev | every dev release from `20261012-004958-dev` (12 October 12:49 AM); the dev server has held it since 12:43 AM | `9ec48194` on | 146,941 | `d05679e76d8dc930b236ebd906274a4c26b7959228d5ebca727cf5800469bf31` | 419 |
+
+The repository has held this file since `f8527daa` (#2336). Before it, every
+main release from `20261005-125929` (5 October 12:59 PM) to `20261011-175014`
+(11 October 5:50 PM), built from `4eebb138` to `7cece557`, carried a
+146,446-byte plugin, sha256
+`b34abac05c6341087d7df35b095c52b7c8b79b9c6bb5f527cea607e653667e91`, 415
+records, which the live server held from 1:00 PM on 5 October. It was the
+plugin below without the four HearthFires records, and with the key and the
+key mold as they were in the base.
+
+How the release plugin differs from the collection's 141,023-byte base, record
+by record. Both name the same five masters, and the release plugin removes no
+record of the base. It adds 37 records and changes two:
+
+- Five override Skyrim.esm's Dwarven scrap smelting recipes
+  (`RecipeIngotDwarvenScrapBent`, `RecipeIngotDwarvenScrapLarge`,
+  `RecipeIngotDwarvenScrapLarge02`, `RecipeIngotDwarvenScrapLarge03`,
+  `RecipeIngotDwarvenScrapPlateMetalSmall`), which collapses the scrap smelts
+  to one (#613).
+- Fourteen are fishing: three poles and a fish trap with their four recipes,
+  and six catches (#1379).
+- Six are the weapon, armor and sewing kits and their recipes (#1384).
+- Eight are the bandage, splint, poultice and remedy and their recipes (#1383).
+- Four override HearthFires.esm's house part recipes (`BYOHRecipeFittings`,
+  `BYOHRecipeNails`, `BYOHRecipeHinge`, `BYOHRecipeLock`, #2258).
+- Two records of the base changed, the key and the key mold
+  (`ThornswoodMiscKey`, `ThornswoodMiscKeyMold`), which got their own meshes
+  (#2255).
 
 ## Shipped today with no licence this file can name
 
