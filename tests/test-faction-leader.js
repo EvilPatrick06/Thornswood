@@ -96,6 +96,31 @@ yes('F8 Faction Leader routing is IDs only; empty list refuses; no staff-log fal
     /Owner role ID/.test(install) &&
     /Lead Gamemaster role ID/.test(install));
 
+yes('F15 Install-Bot keeps existing UPPER_STAFF_ROLES unless -UpperStaffRoles is passed, IDs only',
+    install.indexOf("ContainsKey('UpperStaffRoles')") !== -1 &&
+    install.indexOf("'^[0-9,]*$'") !== -1 &&
+    install.indexOf('WARNING: UPPER_STAFF_ROLES is empty') !== -1 &&
+    install.indexOf('must be role IDs only (digits and commas)') !== -1);
+
+yes('F16 empty UPPER_STAFF_ROLES is a bot-log warning only, never a channel post',
+    /def warn_upper_staff_config\(/.test(bot) &&
+    /UPPER_STAFF_ROLES is empty, so Faction Leader tickets will/.test(bot) &&
+    /match no role/.test(bot) &&
+    /Log only: never a/.test(bot) &&
+    !/await \w+\.send\([^)]*UPPER_STAFF/.test(bot));
+
+yes('F17 /close on Faction Leader threads lets UPPER_STAFF_ROLES IDs through; is_staff is unchanged',
+    /def can_close_ticket\(who, ch\):/.test(bot) &&
+    /def holds_upper_staff\(who\):/.test(bot) &&
+    /is_staff is unchanged/.test(bot) &&
+    /if not can_close_ticket\(interaction\.user, ch\):/.test(bot) &&
+    /The one gate on \/close, the Close ticket button/.test(bot));
+
+yes('F18 a half-written Faction Leader thread is deleted as the opened object, never by name',
+    bot.indexOf('await opened.delete()') !== -1 &&
+    bot.indexOf('forget_ticket(guild, who, opened)') !== -1 &&
+    /never one looked up by name/.test(bot));
+
 yes('F9 submit re-checks a known name; Other is not flagged; there is no seat file',
     /faction_pick_is_known\(picked\)/.test(bot) &&
     /Other is a normal option/.test(bot) &&

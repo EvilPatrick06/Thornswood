@@ -208,7 +208,9 @@ Moderator and Loremaster by default), matched by id or name, and nothing
 else. Faction Leader tickets are pulled to the role IDs in `UPPER_STAFF_ROLES`
 only (Install-Bot `-UpperStaffRoles`: the Owner ID and the Lead Gamemaster
 ID). Names are ignored. Empty or unset refuses the ticket. A future Lead
-role is added there by its ID. The Manage Threads that both of them carry on every channel used to
+role is added there by its ID. `/close` on a Faction Leader thread also
+lets through a member holding one of those IDs; `is_staff` is unchanged,
+so they still wait out the ticket limits. The Manage Threads that both of them carry on every channel used to
 count as staff there, and it no longer does (#1342). `test-staff-gate.py`
 runs every staff and admin command and button as somebody who is not staff
 for it, and fails on any new one whose gate is not written down in it.

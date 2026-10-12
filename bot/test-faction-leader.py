@@ -14,10 +14,13 @@ Holds:
   the staff flag on both Faction Leader and Jarl
   typed Other text out of the pinging opening line and Asking for
   Faction Leader routing to Owner and UPPER_STAFF_ROLES only
+  /close on those threads for UPPER_STAFF_ROLES IDs, without changing is_staff
+  delete of the exact opened thread when a later write fails
 
 Read only. Never connects to anything.
 """
 import asyncio
+import inspect
 import json
 import os
 import shutil
@@ -107,9 +110,22 @@ class Thread(Posts):
         self.archived = False
         self.mention = '<#%d>' % tid
         self.added = []
+        self.deleted = False
+        self.refuse_send = False
+        self.guild = None
 
     async def add_user(self, m):
         self.added.append(m)
+
+    async def send(self, text=None, **kw):
+        if self.refuse_send:
+            raise RuntimeError('cannot write')
+        await Posts.send(self, text, **kw)
+
+    async def delete(self):
+        self.deleted = True
+        if self.guild is not None:
+            self.guild.threads.pop(self.id, None)
 
 
 class Channel(Posts):
@@ -119,6 +135,7 @@ class Channel(Posts):
         self.guild = guild
         self.made = []
         self.refuse_threads = False
+        self.refuse_writes = False
 
     def permissions_for(self, who):
         return Perms(who is self.guild.me)
@@ -129,6 +146,9 @@ class Channel(Posts):
             raise RuntimeError('no private threads today')
         t = Thread(9000 + len(self.made), name)
         t.opened_as = k
+        t.guild = self.guild
+        if self.refuse_writes:
+            t.refuse_send = True
         self.made.append(t)
         self.guild.threads[t.id] = t
         return t
@@ -466,6 +486,122 @@ try:
     yes('and the log says it stayed out of the staff log and the inbox',
         any('was not written to the staff log or the site inbox' in s
             for s in LOGGED))
+
+    n = len(CH.made)
+    CH.refuse_writes = True
+    half = Person(109, 'Hal')
+    failed, _m = send_faction(G, half, 'The Companions', answers=['A', 'B', 'C'])
+    CH.refuse_writes = False
+    left = CH.made[-1]
+    yes('a half-written Faction Leader thread is deleted as the opened object',
+        len(CH.made) == n + 1
+        and left.deleted
+        and left.id not in G.threads
+        and failed.followup.said
+        and failed.followup.said[0][0] == bot.FACTION_THREAD_FAILED)
+    yes('and forgotten from the open-ticket file, by id, not by name',
+        bot._open_tickets().get(bot._ticket_key(G, half)) is None
+        and 'await opened.delete()' in inspect.getsource(bot.TicketModal.on_submit)
+        and 'forget_ticket(guild, who, opened)' in inspect.getsource(
+            bot.TicketModal.on_submit))
+
+    LOGGED[:] = []
+    keep_ids = bot.UPPER_STAFF_IDS
+    bot.UPPER_STAFF_IDS = set()
+    bot.warn_upper_staff_config()
+    empty_src = inspect.getsource(bot.warn_upper_staff_config)
+    yes('empty UPPER_STAFF_ROLES is a startup log warning, never a channel post',
+        any('UPPER_STAFF_ROLES is empty, so Faction Leader tickets will'
+            in s for s in LOGGED)
+        and '.send(' not in empty_src
+        and 'create_task' not in empty_src)
+    LOGGED[:] = []
+    bot.UPPER_STAFF_IDS = {999}
+    bot.warn_upper_staff_config([G])
+    yes('IDs that match no role are a log warning only',
+        any('match no role' in s and 'Faction Leader tickets will be refused'
+            in s for s in LOGGED))
+    LOGGED[:] = []
+    bot.UPPER_STAFF_IDS = {10}
+    bot.warn_upper_staff_config([G])
+    yes('IDs that match a role stay quiet',
+        not any('match no role' in s or 'is empty' in s for s in LOGGED))
+    bot.UPPER_STAFF_IDS = keep_ids
+
+    # /close on Faction Leader threads: UPPER_STAFF_ROLES IDs, not is_staff.
+    class CloseThread(discord.Thread):
+        jump_url = 'https://discord.com/channels/1/2/3'
+        parent = CH
+
+        def __init__(self, name):
+            self.name = name
+            self.edited = []
+
+        async def edit(self, **k):
+            self.edited.append(k)
+
+    class CloseAsk(object):
+        def __init__(self, user, channel):
+            self.guild = G
+            self.user = user
+            self.channel = channel
+            self.response = Response()
+
+    async def _no_book(*_a, **_k):
+        return None
+
+    keep_book = bot.log_channel
+    bot.log_channel = _no_book
+    try:
+        fac = CloseThread('Apply: Faction Leader, Ada')
+        jarl = CloseThread('Apply: Jarl, Ada')
+        lead_role = Role('Lead Gamemaster', [lead], rid=20)
+        G.roles.append(lead_role)
+        bot.UPPER_STAFF_IDS = {10}
+        ask = CloseAsk(lead, fac)
+        asyncio.run(bot.close_here(ask))
+        yes('Lead Gamemaster without an UPPER_STAFF_ROLES id cannot close a '
+            'Faction Leader ticket',
+            ask.response.said
+            and 'Staff close these' in ask.response.said[0][0]
+            and not fac.edited
+            and not bot.is_staff(lead))
+
+        ask = CloseAsk(pat, fac)
+        asyncio.run(bot.close_here(ask))
+        yes('Owner still closes a Faction Leader ticket as staff',
+            ask.response.said
+            and ask.response.said[0][0].startswith('Closed by')
+            and fac.edited and fac.edited[0].get('archived'))
+
+        uma = Person(205, 'Uma', [Role('Lead Something', rid=88)])
+        bot.UPPER_STAFF_IDS = {88}
+        yes('is_staff is unchanged for a role that is only in UPPER_STAFF_ROLES',
+            not bot.is_staff(uma)
+            and list(inspect.signature(bot.is_staff).parameters) == ['who'])
+        fac2 = CloseThread('Apply: Faction Leader, Uma')
+        ask = CloseAsk(uma, fac2)
+        asyncio.run(bot.close_here(ask))
+        yes('a role ID in UPPER_STAFF_ROLES closes a Faction Leader ticket',
+            ask.response.said
+            and ask.response.said[0][0].startswith('Closed by')
+            and fac2.edited and fac2.edited[0].get('archived'))
+
+        ask = CloseAsk(uma, jarl)
+        asyncio.run(bot.close_here(ask))
+        yes('that same person cannot close a Jarl ticket',
+            ask.response.said
+            and 'Staff close these' in ask.response.said[0][0]
+            and not jarl.edited)
+        yes('can_close_ticket is the extra gate, and is_staff is not it',
+            bot.can_close_ticket(uma, fac2)
+            and not bot.can_close_ticket(uma, jarl)
+            and not bot.is_staff(uma)
+            and 'is_staff(who)' in inspect.getsource(bot.can_close_ticket)
+            and 'holds_upper_staff' in inspect.getsource(bot.can_close_ticket))
+    finally:
+        bot.log_channel = keep_book
+        bot.UPPER_STAFF_IDS = keep_ids
 
     # Site inbox still gets the kind as a free string.
     yes('the site copy is kind faction, with the answers in detail',

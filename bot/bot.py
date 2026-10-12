@@ -255,6 +255,26 @@ def ticket_pull_roles(kind, guild):
     return [r for r in getattr(guild, 'roles', None) or [] if _role_hit(r, ids, names)]
 
 
+def warn_upper_staff_config(guilds=None):
+    """
+    Log when Faction Leader routing cannot work. Log only: never a
+    channel, a DM or a ping. Empty is said at process start. IDs that
+    match no role are said once the guilds are known.
+    """
+    if not UPPER_STAFF_IDS:
+        log('UPPER_STAFF_ROLES is empty, so Faction Leader tickets will '
+            'be refused. Set it to the Owner role ID and the Lead '
+            'Gamemaster role ID.')
+        return
+    for g in guilds or ():
+        have = set(getattr(r, 'id', None)
+                   for r in getattr(g, 'roles', None) or [])
+        if not (UPPER_STAFF_IDS & have):
+            log('UPPER_STAFF_ROLES ids %s match no role in "%s", so '
+                'Faction Leader tickets will be refused.'
+                % (sorted(UPPER_STAFF_IDS), getattr(g, 'name', '?')))
+
+
 FACTION_REFUSED = ('This application cannot be opened right now. '
                    'Try again later.')
 FACTION_THREAD_FAILED = ('This application could not be opened. '
@@ -401,10 +421,7 @@ class Thornswood(discord.Client):
         if UPPER_STAFF_IGNORED:
             log('UPPER_STAFF_ROLES is IDs only, ignored names: %s'
                 % ', '.join(UPPER_STAFF_IGNORED))
-        if not UPPER_STAFF_IDS:
-            log('UPPER_STAFF_ROLES is empty, so Faction Leader tickets will '
-                'be refused. Set it to the Owner role ID and the Lead '
-                'Gamemaster role ID.')
+        warn_upper_staff_config()
         self.add_view(TicketPanel())          # so it keeps working after a restart
         self.add_view(TicketTools())          # and so does Close on every old ticket
         self.add_view(HoldPanel())            # and the hold and ping buttons
@@ -1370,6 +1387,17 @@ class TicketModal(discord.ui.Modal):
                 why = 'the thread opened but nothing could be written in it (%s)' % e
                 log('writing the ticket into the thread failed:\n'
                     + traceback.format_exc())
+                # Faction Leader: a half-written private thread that
+                # general staff cannot see, and that we then refuse, is
+                # leftover. Delete this object, the one create_thread
+                # just returned, never one looked up by name.
+                if self.kind == 'faction':
+                    try:
+                        await opened.delete()
+                    except Exception:
+                        log('could not delete the half-written Faction '
+                            'Leader thread:\n' + traceback.format_exc())
+                    forget_ticket(guild, who, opened)
 
         # A ticket nobody can see is the same as no ticket, and a ticket
         # everybody can see is worse. If the thread could not be made, or could
@@ -1601,6 +1629,26 @@ def remember_ticket(guild, who, thread):
             'a second one:\n' % who + traceback.format_exc())
 
 
+def forget_ticket(guild, who, thread):
+    """
+    Drop this thread from the open-ticket file, if it is still the one
+    written. Used when a Faction Leader thread is deleted in the same
+    submit that created it, so the person is not held to a ticket that
+    no longer exists. Matches on the thread's id, never its name.
+    """
+    try:
+        key = _ticket_key(guild, who)
+        have = _open_tickets()
+        if have.get(key) != getattr(thread, 'id', None):
+            return
+        have.pop(key, None)
+        with open(OPEN_TICKETS, 'w') as f:
+            json.dump(have, f)
+    except Exception:
+        log('could not forget the half-written ticket for %s:\n'
+            % who + traceback.format_exc())
+
+
 def ticket_refusal(interaction):
     """
     Why this person cannot open a ticket right now, in words, or None.
@@ -1660,6 +1708,46 @@ def is_ticket_thread(ch):
     return bool(name) and name.lower() in TICKETS
 
 
+def faction_leader_label():
+    for k, lab, _d in KINDS:
+        if k == 'faction':
+            return lab
+    return 'Apply: Faction Leader'
+
+
+def is_faction_leader_thread(ch):
+    """
+    A ticket thread TicketModal opened for Apply: Faction Leader.
+
+    The name starts with that label because that is what on_submit writes.
+    Used only to decide who may /close this kind. is_staff is not changed.
+    """
+    if not is_ticket_thread(ch):
+        return False
+    label = faction_leader_label()
+    name = getattr(ch, 'name', None) or ''
+    return bool(label) and name.startswith(label)
+
+
+def holds_upper_staff(who):
+    """A role whose ID is in UPPER_STAFF_ROLES. Names are ignored."""
+    try:
+        return _who_hits(who, UPPER_STAFF_IDS, set())
+    except Exception:
+        return False
+
+
+def can_close_ticket(who, ch):
+    """
+    Staff close every ticket. On a Faction Leader thread, a member whose
+    role ID is in UPPER_STAFF_ROLES may close it too. is_staff itself is
+    not changed: ticket limits and cooldowns still answer to that.
+    """
+    if is_staff(who):
+        return True
+    return is_faction_leader_thread(ch) and holds_upper_staff(who)
+
+
 async def close_here(interaction, why=None):
     """
     Close the ticket this was used in.
@@ -1678,7 +1766,10 @@ async def close_here(interaction, why=None):
             'This one only works inside a ticket.', ephemeral=True)
         return
 
-    if not is_staff(interaction.user):
+    # is_staff is unchanged and still gates every other ticket, the
+    # one-open-ticket rule and the cooldown. Faction Leader threads
+    # also let through a member whose role ID is in UPPER_STAFF_ROLES.
+    if not can_close_ticket(interaction.user, ch):
         await interaction.response.send_message(
             'Staff close these. Say what you need in here and somebody will.',
             ephemeral=True)
@@ -3796,6 +3887,11 @@ async def on_ready():
         await ensure_panel(g)
         await ensure_hold_panel(g)
     log('watching %d server(s)' % len(client.guilds))
+    # Guilds are known here. Empty was already said in setup_hook. IDs
+    # that match no role can only be seen once the guild's roles are in.
+    # Log only: do not post this to a channel.
+    if UPPER_STAFF_IDS:
+        warn_upper_staff_config(client.guilds)
 
     # Three separate things have to be true for a join card to appear, and
     # when one of them is not, the only symptom is silence. So check all three

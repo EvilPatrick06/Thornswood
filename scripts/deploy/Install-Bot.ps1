@@ -119,6 +119,17 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# IDs only, and only when this run asked. A name, a space or any other
+# character stops here so bot.env.json is not written with something the
+# bot will silently ignore. Leaving the switch off keeps whatever is
+# already on the box.
+if ($PSBoundParameters.ContainsKey('UpperStaffRoles') -and
+    $UpperStaffRoles -notmatch '^[0-9,]*$') {
+  Write-Host ''
+  Write-Host 'STOP. UPPER_STAFF_ROLES must be role IDs only (digits and commas). Nothing was written.' -ForegroundColor Red
+  if (-not $NoPause) { [void](Read-Host 'Enter to exit') }
+  exit 1
+}
 $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
@@ -899,7 +910,11 @@ if ('$KeyMode' -eq 'new' -or -not `$env2['THORNSWOOD_KEY']) {
 `$env2['TICKET_LOG']      = '$TicketLog'
 `$env2['STAFF_ROLES']     = '$StaffRoles'
 `$env2['CREATOR_ROLES']   = '$CreatorRoles'
-`$env2['UPPER_STAFF_ROLES'] = '$UpperStaffRoles'
+# Only when this run passed -UpperStaffRoles. An omitted switch must not
+# wipe a list that is already in bot.env.json.
+if ('$($PSBoundParameters.ContainsKey('UpperStaffRoles'))' -eq 'True') {
+  `$env2['UPPER_STAFF_ROLES'] = '$UpperStaffRoles'
+}
 # Piped, Python writes in the machine's ANSI codepage and PowerShell reads the
 # pipe as OEM. Anything outside plain ASCII, a role name or a channel name with
 # an accent in it, came out of that as a screenful of question marks. Both ends
@@ -934,6 +949,9 @@ catch { 'could not tighten bot.env.json: ' + `$_.Exception.Message }
 'staff:         ' + `$env2['STAFF_ROLES']
 'creator only:  ' + `$env2['CREATOR_ROLES']
 'upper staff:   ' + `$env2['UPPER_STAFF_ROLES']
+if (-not [string]`$env2['UPPER_STAFF_ROLES']) {
+  'WARNING: UPPER_STAFF_ROLES is empty. Faction Leader applications will be refused until it is set to the Owner role ID and the Lead Gamemaster role ID.'
+}
 
 # The same key into the site's config, so it accepts the bot and nobody else.
 # Never over a config.json that is there and does not parse: it is not empty,
