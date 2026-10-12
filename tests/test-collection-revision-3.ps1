@@ -70,6 +70,22 @@ Yes 'the page names this harness' ($doc -match 'tests\\test-collection-revision-
 Yes 'the page tells the person to leave "Skip plugin rules" off' ($doc -match 'Skip\s+plugin rules')
 Yes 'the page has no em dash' (-not $doc.Contains([string][char]0x2014))
 Yes 'the page never says player' (-not ($doc -match '\bplayers?\b'))
+# Patrick's rule of 11 October: Claude alone runs every Vortex app, Publish,
+# Deploy and live step. Every numbered step must name Claude, and no step may
+# name anyone else as the one doing it. "when Patrick asks" is the gate for
+# Main, not an owner, so it is the one mention of Patrick a step may keep.
+$steps = [regex]::Matches($doc, '(?ms)^## (\d+)\.([^\r\n]*)\r?\n(.*?)(?=^## |\z)')
+Yes ("the page has steps 1 to 7 ({0})" -f $steps.Count) ($steps.Count -eq 7)
+foreach ($st in $steps) {
+    $n = $st.Groups[1].Value
+    Yes "step $n names Claude in its heading" ($st.Groups[2].Value -match '\(Claude\b')
+    $text = ($st.Groups[2].Value + "`n" + $st.Groups[3].Value) -replace 'only when Patrick asks', '' -replace 'when Patrick asks', ''
+    $other = [regex]::Matches($text, '\b(Patrick|Smeagle|Wyrd|Anvil|Waystone|Herald|Codex|Gavin|Jin)\b') | ForEach-Object { $_.Value }
+    Yes ("step $n names no one but Claude ({0})" -f (@($other) -join ', ')) (@($other).Count -eq 0)
+}
+Yes 'the page says Claude runs every Vortex, Publish and deploy step' ($doc -match 'Claude alone runs every Vortex')
+Yes 'the page says Main waits for Patrick to ask' ($doc -match 'Main follows (Dev )?only when Patrick asks')
+Yes 'the page sends the run through a claude-queue note' ($doc -match 'claude-queue note')
 Write-Host ''
 Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
 if ($script:fail) { exit 1 }
