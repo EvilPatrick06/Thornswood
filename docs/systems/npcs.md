@@ -98,10 +98,12 @@ stay in their proper encounters.
 The embassy's 20 are people on a roll, not actors. See
 [The Imperial Embassy](embassy.md).
 
-Guards of a hold, when they are remade, are the hold's. A Thalmor
-marker is a reason to start a fight. They do not need a bounty
-number the server does not have. There is no crime gold and no
-stolen tag the server tracks. Theft is the rule on the site: take
+There are no NPC guards. A hold's guards are people in a guard role,
+an office the hold sets ([Offices](offices.md)); Patrick decided on
+11 October that guards are people and no NPC guard comes back (#502).
+A Thalmor marker is a reason to start a fight. No bounty is added for
+killing an NPC: there is no crime gold and no stolen tag the server
+tracks. Theft is the rule on the site: take
 something, take a good thing, leave the rest.
 
 ## Where this is
