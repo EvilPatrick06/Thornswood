@@ -62,7 +62,7 @@ yes('it sends people to the wheel instead: a key, then a search for the three', 
 yes('the rest of the list is still there',
     note.indexOf('Typing in another window') >= 0 &&
     note.indexOf('Mod settings menus reset') >= 0 &&
-    note.indexOf('NPCs stand still') >= 0 &&
+    note.indexOf('NPCs keep moving') >= 0 &&
     note.indexOf('You cannot save') >= 0);
 
 const EM = String.fromCharCode(0x2014);
