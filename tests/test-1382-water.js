@@ -190,5 +190,20 @@ const wm = /^const WORDS = (\[[\s\S]*?\]);$/m.exec(gm), pm = /^const PLAYER_WORD
 yes('/water is a word the server answers, and not one the help lists',
   !!wm && wm[1].indexOf("'/water'") >= 0 && !!pm && pm[1].indexOf("'/water'") < 0);
 
+// The buttons on the Body page (#1382, Patrick via Smeagle, 12 Oct): Fill
+// water and Boil water send what /water fill and /water boil send.
+const UI = fs.readFileSync(path.join(ROOT, 'game', 'ui', 'thornswood-skills.js'), 'utf8').split(CR).join('');
+const needsDraw = (function () {
+  const i = UI.indexOf('  function drawNeeds() {');
+  const j = i < 0 ? -1 : UI.indexOf('\n  }\n', i);
+  return (i >= 0 && j >= 0) ? UI.slice(i, j) : '';
+})();
+yes('the Body page has a Fill water button that sends /water fill',
+  /el\('span', 'act', 'Fill water'\)/.test(needsDraw) && /fill\.onclick = [^\n]*officeSay\('\/water fill'\)/.test(needsDraw));
+yes('and a Boil water button that sends /water boil',
+  /el\('span', 'act', 'Boil water'\)/.test(needsDraw) && /boil\.onclick = [^\n]*officeSay\('\/water boil'\)/.test(needsDraw));
+yes('the buttons send through the chat line every panel uses',
+  /function officeSay\(line\) \{\n\s+if \(window\.thornswoodNet && window\.thornswoodNet\.say\) window\.thornswoodNet\.say\(line\);/.test(UI));
+
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
