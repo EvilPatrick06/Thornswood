@@ -1,14 +1,20 @@
 # Signed releases and artifact provenance (issue #2163)
 
-Status: DESIGN AND PILOT. Nothing in the live release path changes with this
-document. release.yml, Ship, Publish-Installer, the feed and every checksum
-check stay exactly as they are. Patrick's answers are at the end, under
-"Decisions".
+Status: DESIGN AND PILOT, with the release.yml move in and its switch-over
+the last step (#2163, #498). release.yml has a job that builds on GitHub's
+hosted Windows runner with MSBuild and signs the launcher there, and a job
+that checks that signed draft on a second machine. Until the switch-over the
+VPS still builds every release, unsigned, and Ship signs it on One as
+before; the hosted job runs only on a manual run that asks for it (section
+7 says why and what the switch-over waits on). Ship, Publish-Installer, the
+feed and every checksum check stay as they are. Patrick's answers are at the
+end, under "Decisions", and none is pending.
 
-This does not claim reproducible builds. release.yml itself says
-byte-identical local and runner builds are impossible with the Framework 4
-csc (it stamps a build time and a fresh MVID), and nobody has measured
-otherwise. Provenance here means "this signed file came from this commit,
+This does not claim reproducible builds. Byte-identical local and runner
+builds are impossible with the Framework 4 csc (it stamps a build time and a
+fresh MVID). MSBuild with `-p:Deterministic=true` gave two byte-identical
+rebuilds on One (#498), but release.yml does not set it and nobody has
+measured runner against local. Provenance here means "this signed file came from this commit,
 this runner and these records", recorded and signed, not "anyone can rebuild
 the same bytes".
 
@@ -30,11 +36,12 @@ What is NOT covered today, which is what this issue is about:
   sha256 the feed names, and the feed is protected only by https and by who
   can write `C:\Thornswood-Docs\feed` over ssh. Whoever can write the feed
   can change both a pack and its hash.
-- release.yml does not sign yet. The runner's exe is signed later on One, so
-  the draft release on GitHub holds unsigned bytes and a `SHA256SUMS` for
+- Until the switch-over (section 7), the runner's exe is signed later on
+  One, so the draft release holds unsigned bytes and a `SHA256SUMS` for
   them, and the published file has a different hash from the draft's.
-  Decided (section 8): signing moves into release.yml on GitHub's runner,
-  through a federated Azure identity, which ends this gap.
+  Decided (section 8): release.yml signs on GitHub's runner through a
+  federated Azure identity, which ends this gap. A draft from the VPS job is
+  still unsigned and says so in its notes.
 - Nothing ties source commit, engine pin, runner, records and artifact hashes
   together in one signed statement.
 
@@ -55,8 +62,8 @@ second key exists to lose, leak or rotate. A catalog is signed exactly like
 an exe and checked by the same `Signature.cs`, and it carries a list of
 hashes. A plain JSON manifest signed as a detached PKCS#7 by the same profile
 is the fallback if catalogs prove awkward to build on the runner. A separate
-key (minisign, Sigstore keyless) is listed as an alternative under
-"Decisions", not proposed (still pending).
+key (minisign, Sigstore keyless) was the alternative; Patrick kept the
+catalog (section 8, decision 1).
 
 The manifest also carries the provenance: source commit, engine/skymp pin,
 tag, release id, runner name, the hashes of `client-build.json` and
@@ -103,19 +110,27 @@ the federated identity's included.
 
 ## 4. Verification points
 
-1. Sign time (`Sign-Artifact.ps1`, in release.yml once signing moves there):
-   reads the signature back, must be Valid; a failure fails the job and no
-   draft gets the file.
-2. Publish (`Assert-PublishSigned.ps1`): Authenticode Valid, Subject has
+1. Sign time (`Sign-Artifact.ps1`, in release.yml's hosted job): reads the
+   signature back, must be Valid; a failure fails the job and no draft gets
+   the file.
+2. A second machine, straight after (release.yml's `verify` job): a VPS
+   runner with no signing setup downloads the signed draft by asset id and
+   runs `scripts\release\Test-ReleaseFiles.ps1 -RequireSigned`: each file
+   against `SHA256SUMS`, the publish gate and `Signature.cs` on the
+   launcher, and a one byte change refused by both. Red means do not ship
+   that draft.
+3. Publish (`Assert-PublishSigned.ps1`): Authenticode Valid, Subject has
    ExpectedSigner, `Signature.cs` passes. Unchanged.
-3. Ship download of the runner's draft: `SHA256SUMS` first (kept), then the
-   Authenticode check of the already signed exe and stub, then in phase B the
+4. Ship download of the runner's draft: `SHA256SUMS` first (kept), then the
+   Authenticode check of the already signed exe, then in phase B the
    draft's manifest signature. Once release.yml signs, `SHA256SUMS` describes
    the signed files.
-4. Launcher self update: sha256 from the feed, then `Signature.cs` (today).
-5. Launcher pack and runtime download: sha256 from the feed (today), plus the
+5. Launcher self update: sha256 from the feed, then `Signature.cs` (today).
+6. Launcher pack and runtime download: sha256 from the feed (today), plus the
    manifest signature and listing (phase C).
-6. Independent check by anyone: `Test-SignPilot.ps1 -Verify` style, no sign in.
+7. Independent check by anyone, no sign in: `Test-SignPilot.ps1 -Verify` for
+   the pilot's test exe, and `Test-ReleaseFiles.ps1 -Dir <folder>
+   -RequireSigned` for a real draft's three files.
 
 ## 5. Migration and enforcement
 
@@ -148,7 +163,8 @@ the sha256 and keeps the sha256 check.
 - Draft promotion. Today the draft's `SHA256SUMS` describes the UNSIGNED
   runner exe, and signing on One changes the bytes. With signing in
   release.yml (section 8) the runner builds and signs in one job, the draft
-  carries the signed exe and stub with a `SHA256SUMS` of the signed files,
+  carries the signed exe (the stub stays unsigned until Package signs the
+  finished Setup, section 8) with a `SHA256SUMS` of the signed files,
   and the manifest is signed in the same job, so the draft's hashes and the
   published hashes are the same and "this runner built and signed Y from
   this commit" is one signed statement. Promoting a draft is a person's act
@@ -156,7 +172,15 @@ the sha256 and keeps the sha256 check.
 - Replacement. release.yml deletes and re-uploads same-named assets in a
   draft. After promotion an asset must never be replaced in place: a new
   build is a new release id. The feed serves by sha256, so a replaced file
-  is a different URL and old manifests do not list it.
+  is a different URL and old manifests do not list it. release.yml keeps to
+  that since #2163: it finds a tag's release in the releases list, uploads
+  only into a draft, stops on a published one, and stops when a tag has
+  more than one release. It used to look with `GET /releases/tags/<tag>`,
+  which never returns a draft (measured 12 Oct: 404 for v1.2.4 while
+  release 410844061 was its draft), so every run again for a tag made one
+  more draft, and would have replaced the files of a published release.
+  v1.1.96 has two drafts from the same second. Runs for one tag share one
+  concurrency group, so a tag push and a manual run cannot race.
 - Failed signature. Refuse, never warn, at every point that refuses today:
   Sign-Artifact exits 1 and Ship publishes nothing. In phase C the launcher
   logs and keeps the old version; in phase D it refuses to install and keeps
@@ -180,26 +204,93 @@ verify. A tamper test has to change bytes in the hashed region (the pilot
 uses the DOS stub text). Anyone writing tamper tests later should know that.
 
 Not yet done: signing and verifying away from One. With section 8 decision 2
-that proof is a signed draft from release.yml, not a second hand-run
-machine; the vault note (`claude-queue\2163-signed-releases.md`) says so.
+that proof is a signed draft from release.yml, checked by its `verify` job
+on a VPS runner, not a second hand-run machine.
 
-## 8. Decisions (Patrick, 11 Oct 2026)
+### Where the release.yml move stands, 12 Oct 2026
 
-1. Key custody for non-PE artifacts: undecided. The catalog signed by
-   ThornswoodRelease (section 2) is the default design, marked PENDING until
-   Patrick confirms it.
-2. Where release signing happens: on GitHub's runner, in release.yml, through
-   Azure Artifact Signing with a federated (OIDC) identity limited to
-   release.yml on `v*` tags. Patrick's final call, relayed by Smeagle; it
-   replaces the earlier "VPS build machine" answer. The draft carries the
-   signed exe and stub and a `SHA256SUMS` of the signed files; the manifest
-   is signed in the same job; Ship stops signing the launcher on One. Pull
-   request jobs never get the identity. The Azure side is Patrick's; the
-   workflow and script change belongs to whoever owns that move, not this
-   document.
-3. Second durable identity: not for now. The recovery risk in section 3
-   stays accepted.
+In release.yml since #2163's pull request: the hosted job ("launcher":
+windows-latest, MSBuild, the Azure sign in through the `release`
+environment, `Sign-Artifact.ps1 -Required`, `SHA256SUMS` of the signed
+bytes), the VPS job ("launcher-vps", the same steps by YAML anchor, csc,
+unsigned), the `verify` job, one draft per tag (section 6), and
+`tests\test-release-workflow.ps1`, which says which side of the switch-over
+the file is on.
+
+The Azure side, read on 12 Oct with `az` and the GitHub API (no secret was
+read): the app registration `thornswood-release-github` has one federated
+credential, issuer `https://token.actions.githubusercontent.com`, audience
+`api://AzureADTokenExchange`, subject
+`repo:EvilPatrick06@187923600/Thornswood@1365246621:environment:release`.
+That is the immutable id form, and the repository's OIDC setting has
+`use_immutable_subject` on with that same prefix, so the subject a run on
+the `release` environment presents is the one trusted. Its role is
+Artifact Signing Certificate Profile Signer, given on the signing account
+ThornswoodSigning rather than on the profile; the account has one profile,
+ThornswoodRelease, so today that is the same thing. The `release`
+environment allows tags `v*` only, and the three `AZURE_SIGNING_*`
+repository variables are set.
+
+What a run proved on 12 Oct: the default path, a `v*` tag push and a manual
+run on the box, builds on the VPS as before; a manual run asking for
+`runner: hosted` while GitHub refuses hosted jobs falls back to the VPS; and
+each run for one tag uploads into its one draft. The pull request on #2163
+names the runs.
+
+The switch-over, the last step. It waits on three things, in this order:
+
+1. GitHub's hosted runner starts jobs again (#2393, Patrick's billing).
+2. A pilot: a tag that can never ship (`v0.0.2163-pilot<n>`) on a commit
+   with this release.yml, then
+   `gh workflow run release.yml --ref <tag> -f tag=<tag> -f runner=hosted`.
+   The hosted job's log says "building with msbuild on a github-hosted
+   runner", then the Azure sign in, then "signed by" the ThornswoodRelease
+   certificate; `verify` passes; the draft's notes say signed. Then the
+   pilot's draft and tag are deleted.
+3. A launcher built by MSBuild has been started on dev (#498 step 2, the
+   vault note `claude-queue\498-msbuild-dev-launcher.md`), because after the
+   switch-over every main launcher is built that way.
+
+Then one pull request: in release.yml the hosted job's `if` becomes
+`${{ vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}` and the
+runner input's default becomes `hosted`; the two "until the switch-over"
+checks in `tests\test-release-workflow.ps1` change to match. While
+`BUILD_RUNNER` is `vps` (set 12 Oct for #2393) releases stay on the box even
+after it, so whoever fixes billing and takes `BUILD_RUNNER` off `vps` moves
+pull request builds and releases together.
+
+## 8. Decisions (Patrick)
+
+Answered 11 Oct 2026 and settled 12 Oct 2026, 11:11 AM MT (Patrick's
+decisions relayed by Smeagle; recorded on #2163). None is pending.
+
+1. Key custody for non-PE artifacts: the default design, a Windows catalog
+   signed by ThornswoodRelease (section 2). Decided 12 Oct; no separate key.
+2. Where release signing happens: on GitHub's hosted Windows runner, in
+   release.yml, through Azure Artifact Signing with a federated (OIDC)
+   identity limited to release.yml on `v*` tags (the `release` environment).
+   It replaces the earlier "VPS build machine" answer. The hosted job builds
+   with MSBuild, so moving releases onto it is #498's MSBuild switch for the
+   release build as well, one switchover, not two (section 7 says what it
+   waits on). The VPS stays the backup for every
+   GitHub runner build: release.yml's fallback job runs there the way
+   build.yml's does (BUILD_RUNNER = vps, a manual run asking for the box, or
+   the hosted job failing), with the in-box csc and unsigned until the VPS
+   has MSBuild and a signing path (#498), and Ship signs that draft on
+   download as before (#921). The draft from the hosted job carries the
+   signed launcher and a `SHA256SUMS` of the signed files. setup-stub.exe
+   stays unsigned on purpose: Package signs the finished Setup after the
+   OneFile attach, and a pre-signed stub cannot be signed again. Pull request
+   jobs never get the identity. The Azure side (the app registration, its
+   federated credential for the `release` environment, and the Certificate
+   Profile Signer role on ThornswoodRelease) is Patrick's, and he set it up
+   on 12 Oct (read back in section 7).
+3. Second durable identity: still not for now. The recovery risk in section
+   3 stays accepted.
 4. Signers holding Certificate Profile Signer on ThornswoodRelease: Patrick,
    Djinn and Four.
 5. Main builds are always signed. Dev builds stay unsigned to save signing
-   quota. Phase D timing and its `minLauncher` are still open.
+   quota. Phase D runs only after Claude's signing pilot verifies on a clean
+   machine (a signed draft from release.yml, checked away from One by its
+   `verify` job, `Test-ReleaseFiles.ps1 -RequireSigned`), and its
+   `minLauncher` is set to the first signed launcher.
