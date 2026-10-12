@@ -3089,13 +3089,42 @@ function serverRefusal(serverLines, profile) {
   return watched;
 }
 
+/*
+  A CRASH LOG IN THE SET IS A CRASH (#2319). The launcher sends crash.log only
+  when Crash Logger wrote one during this session (CrashLogSince picks it by
+  the session's start), so its being there is the crash, whatever it holds.
+  Until #2319 a session was marked only when a line in some log matched
+  TROUBLE_BAD, and a crash that hung inside the crash handler left an empty
+  log, which the launcher did not send at all: three dev crashes from 29 Sep
+  to 6 Oct reached the site with no crash.log, no colour and no staff alert.
+  The launcher now sends a first line of its own on crash.log naming the
+  log, its size and the snapshot beside it, so an empty one arrives too.
+
+  The line kept with it is the crash's own (the first TROUBLE_BAD line, which
+  for Crash Logger is "Unhandled exception ..."), or the launcher's line when
+  the log has none, which says the log is empty.
+*/
+const CRASH_EMPTY_MARK = 'and it is empty: 0 bytes';
+function crashOf(logs) {
+  const text = String((logs || {})['crash.log'] || '');
+  if (!text.trim()) return null;
+  const empty = text.indexOf(CRASH_EMPTY_MARK) >= 0;
+  const why = empty ? 'the game crashed, and its crash log is empty' : 'the game crashed';
+  const own = scanFor({ 'crash.log': text }, TROUBLE_BAD, 'bad');
+  if (own) return { level: 'bad', why, file: 'crash.log', line: own.line };
+  const first = text.split('\n').map(l => l.trim()).filter(Boolean)[0] || '';
+  return { level: 'bad', why, file: 'crash.log', line: first.slice(0, 300) };
+}
+
 /* Red before yellow: a session that crashed AND complained about its load
    order is a crash, and the crash is the thing worth waking somebody for.
-   Then the server's word on the load order, then the rest. */
+   A crash log first (crashOf, #2319), then the other red lines, then the
+   server's word on the load order, then the rest. */
 function readTrouble(logs, serverLines, profile) {
   const mine = {};
   for (const name of Object.keys(logs || {})) mine[name] = thisSessionOf(name, logs[name]);
-  return scanFor(mine, TROUBLE_BAD, 'bad') ||
+  return crashOf(mine) ||
+         scanFor(mine, TROUBLE_BAD, 'bad') ||
          serverRefusal(serverLines, profile) ||
          scanFor(mine, TROUBLE_WARN, 'warn');
 }
@@ -3138,7 +3167,8 @@ function applyTrouble(row, found) {
   the next change reads them again too; a row already read under these rules
   is left alone. Nothing is said in Discord: these are old sessions.
 */
-const TROUBLE_RULES = 2;
+/* 3: a crash log in the set is a crash (crashOf, #2319). */
+const TROUBLE_RULES = 3;
 function rereadTrouble() {
   try {
     const rows = sessionRows();

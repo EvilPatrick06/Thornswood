@@ -301,8 +301,8 @@ function grabLine(name) {
   if (!m) throw new Error('site/server.js has no one line const ' + name);
   return m[0];
 }
-eval([grabLine('SESSION_START_MARK'), grab('thisSessionOf'), grab('serverRefusal'),
-      grab('lineAround'), grab('scanFor'), grab('readTrouble')].join('\n'));
+eval([grabLine('SESSION_START_MARK'), grabLine('CRASH_EMPTY_MARK'), grab('thisSessionOf'), grab('serverRefusal'),
+      grab('lineAround'), grab('scanFor'), grab('crashOf'), grab('readTrouble')].join('\n'));
 /* How Shell starts a session in launcher.log, which is where this session's
    part of that log begins (#945). */
 const PLAY = '2026-09-22 09:59:00  Starting the game on launcher 1.1.101.34, pack 20260928-1512-dev, borderless.\n';
@@ -336,6 +336,37 @@ yes('a session that both crashed and had a load order complaint is RED',
     both && both.level === 'bad');
 
 yes('a clean session is neither', readTrouble({ 'launcher.log': PLAY + 'played\nclosed\n' }) === null);
+
+// ---- a crash log in the set is a crash (#2319) -------------------------------
+/*
+  Three dev crashes from 29 Sep to 6 Oct hung inside the crash handler and left
+  Crash Logger's log empty. The launcher did not send an empty log, nothing in
+  the other logs matched a red marker, and none of the three went red or
+  reached the staff channel. The launcher's crash.log now starts with a line
+  of its own (Discord.CrashLogHead; tests\test-log-upload.ps1 sends one through
+  here), so an empty log arrives, and a crash.log in the set is a crash.
+*/
+const EMPTY_HEAD = 'Sent by the launcher: this session crashed. Crash Logger\'s log of it is crash-2026-10-04-17-03-03.log, ' +
+  'and it is empty: 0 bytes when the launcher read it, so nothing of the crash is in it. The full crash snapshot beside it is ' +
+  'crash-2026-10-04-17-03-03.dmp, 3,973,120,000 bytes; it stays on that PC.\n';
+const empty = readTrouble({ 'launcher.log': PLAY + 'The game crashed. Its crash log is crash-2026-10-04-17-03-03.log in C:\\x.\n',
+                            'crash.log': EMPTY_HEAD, 'thornswood-front.log': 'fine\n' });
+yes('a crash whose log is empty is red', !!empty && empty.level === 'bad');
+yes('  and says the crash log is empty', !!empty && empty.why === 'the game crashed, and its crash log is empty');
+yes('  keeping the launcher\'s line, with the log\'s name, its size and the snapshot\'s',
+    !!empty && empty.file === 'crash.log' && /crash-2026-10-04-17-03-03\.log/.test(empty.line) && /0 bytes/.test(empty.line) && /3,973,120,000 bytes/.test(empty.line));
+const full = readTrouble({ 'crash.log': 'Sent by the launcher: this session crashed. Crash Logger\'s log of it is crash-x.log, 45,120 bytes; what it says follows. There is no crash snapshot beside it.\n' +
+                                        'Skyrim SSE v1.6.1170\nCrashLoggerSSE v1-24-0-0\n\nUnhandled exception "EXCEPTION_ACCESS_VIOLATION" at 0x7FF7C52AF7EF\n' });
+yes('a crash with a full log is red too, saying the game crashed', !!full && full.level === 'bad' && full.why === 'the game crashed');
+yes('  keeping the crash\'s own line', !!full && /Unhandled exception "EXCEPTION_ACCESS_VIOLATION"/.test(full.line));
+const odd = readTrouble({ 'crash.log': 'a crash log in a shape no marker knows\n' });
+yes('a crash.log no marker matches is still a crash', !!odd && odd.level === 'bad' && odd.file === 'crash.log');
+yes('a crash.log of nothing but white space is not', readTrouble({ 'crash.log': '  \n\n' }) === null);
+/* launcher.log carries earlier days; a crash from before this session's
+   start is not this one (#945), and neither is the launcher's own crash line. */
+const older = readTrouble({ 'launcher.log': '2026-10-03 21:00:00  The game crashed. Its crash log is crash-2026-10-03-21-00-00.log in C:\\x.\n' +
+                                            'Skyrim has crashed with an older fault\n' + PLAY + 'played\nclosed\n' });
+yes('a crash written in launcher.log before this session started does not mark it', older === null);
 
 // ---- only this session's part of launcher.log (#945) ------------------------
 /*

@@ -72,6 +72,9 @@ $want = [ordered]@{
   PendingSince  = 'static DateTime PendingSince('
   CrashLogSince = 'static string CrashLogSince('
   Scrub         = 'static string Scrub('
+  ReadLogTail   = 'static string ReadLogTail('
+  CrashLogText  = 'static string CrashLogText('
+  CrashLogHead  = 'static string CrashLogHead('
 }
 $have = @{}
 $parts = @()
@@ -82,8 +85,14 @@ foreach ($k in $want.Keys) {
 }
 
 $name = 'LiftedDiscord' + [Guid]::NewGuid().ToString('N').Substring(0, 8)
+# ReadLogTail's cap, Swallow.Note, which CrashLogText reports to, and
+# CrashDump.Beside, the snapshot beside a crash log (test-crash-snapshot.ps1
+# holds the real one): the launcher's own, stood in for here.
 $code = "using System;`nusing System.Globalization;`nusing System.IO;`nusing System.Text;`n" +
-        "using System.Text.RegularExpressions;`npublic static class $name`n{`n" +
+        "using System.Text.RegularExpressions;`n" +
+        "static class Swallow { public static void Note(string where, Exception e) { } }`n" +
+        "static class CrashDump { public static string Beside(string l) { string d = Path.ChangeExtension(l, `".dmp`"); return File.Exists(d) ? d : null; } }`n" +
+        "public static class $name`n{`nconst int LogTailBytes = 192 * 1024;`n" +
         ($parts -join "`n") + "`n}`n"
 $T = $null
 try {
@@ -181,6 +190,73 @@ console.log((o && o.ticket === 'tk1.x.y' ? 'TICKET ' : 'NOTICKET ') +
     Yes 'a folder that is not there finds nothing' ($T::CrashLogSince((Join-Path $root 'no-such'), $start) -ceq '')
   }
 
+  # ---- an empty crash log is still sent (#2319) --------------------------------
+  # Three dev crashes from 29 Sep to 6 Oct hung inside the crash handler and
+  # left Crash Logger's log empty; ReadLogTail gave "" and the set went up
+  # with no crash.log, so the site never marked them.
+  if ($T -and $have.CrashLogText -and $have.CrashLogHead -and $have.ReadLogTail) {
+    $emptyLog = Join-Path $skse 'crash-2026-10-04-17-03-03.log'
+    [IO.File]::WriteAllText($emptyLog, '')
+    $dumpFile = Join-Path $skse 'crash-2026-10-04-17-03-03.dmp'
+    [IO.File]::WriteAllBytes($dumpFile, (New-Object byte[] 4096))
+    $sent = $T::CrashLogText($emptyLog)
+    Yes 'an empty crash log is still something to send' ($sent.Trim().Length -gt 0)
+    Yes '  naming the log, saying it is empty, 0 bytes' ($sent -match 'crash-2026-10-04-17-03-03\.log, and it is empty: 0 bytes')
+    Yes '  and the snapshot beside it, by name and size' ($sent -match 'crash-2026-10-04-17-03-03\.dmp, 4,096 bytes')
+    $fullLog = Join-Path $skse 'crash-2026-10-06-18-03-32.log'
+    $crashText = "Skyrim SSE v1.6.1170`r`nUnhandled exception `"EXCEPTION_ACCESS_VIOLATION`" at 0x7FF7C52AF7EF`r`n"
+    [IO.File]::WriteAllText($fullLog, $crashText)
+    $sent2 = $T::CrashLogText($fullLog)
+    Yes 'a full crash log goes with the same first line, its size, and then the log itself' (
+      $sent2 -match '^Sent by the launcher: this session crashed\.' -and $sent2 -match ('crash-2026-10-06-18-03-32\.log, ' + $crashText.Length + ' bytes') -and
+      $sent2.EndsWith($crashText) -and $sent2 -match 'There is no crash snapshot beside it')
+    Yes 'no crash log is nothing to send' ($T::CrashLogText('') -ceq '')
+
+    # And the site, reading what the launcher sends for the empty one, marks
+    # the session: server.js's own crashOf and readTrouble, lifted by text.
+    $node = Get-Command node -ErrorAction SilentlyContinue
+    if (-not $node) {
+      Write-Host 'SKIP  node is not on this machine, so the site''s reading was not run'
+    } else {
+      $utf8 = New-Object Text.UTF8Encoding($false)
+      $bodyFile = Join-Path $root 'crash-body.json'
+      [IO.File]::WriteAllText($bodyFile, ('{"logs":{"crash.log":"' + $T::Escape($T::Scrub($sent)) + '"}}'), $utf8)
+      $reader = Join-Path $root 'read-crash.js'
+      [IO.File]::WriteAllText($reader, @'
+const fs = require('fs');
+const src = fs.readFileSync(process.argv[2], 'utf8');
+function grab(name) {
+  const at = src.indexOf('function ' + name);
+  const b = src.indexOf('{', at);
+  let d = 0;
+  for (let i = b; i < src.length; i++) {
+    if (src[i] === '{') d++;
+    else if (src[i] === '}') { d--; if (d === 0) return src.slice(at, i + 1); }
+  }
+}
+function list(name) {
+  const at = src.indexOf('const ' + name);
+  const open = src.indexOf('[', at);
+  let d = 0;
+  for (let i = open; i < src.length; i++) {
+    if (src[i] === '[') d++;
+    else if (src[i] === ']') { d--; if (d === 0) return src.slice(open, i + 1); }
+  }
+}
+function line(name) { return src.match(new RegExp('^const ' + name + ' = [^\\n]*;$', 'm'))[0]; }
+const TROUBLE_BAD = eval(list('TROUBLE_BAD'));
+const TROUBLE_WARN = eval(list('TROUBLE_WARN'));
+eval([line('SESSION_START_MARK'), line('CRASH_EMPTY_MARK'), grab('thisSessionOf'), grab('serverRefusal'),
+      grab('lineAround'), grab('scanFor'), grab('crashOf'), grab('readTrouble')].join('\n'));
+const o = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
+const f = readTrouble(o.logs);
+console.log(f ? (f.level + '|' + f.why + '|' + f.line) : 'NONE');
+'@, $utf8)
+      $said = (& $node.Source $reader (Join-Path $Here 'site\server.js') $bodyFile | Out-String).Trim()
+      Yes "the site marks the session red when its crash log was empty ($said)" ($said.StartsWith('bad|the game crashed, and its crash log is empty|'))
+    }
+  }
+
   # ---- what never leaves ----------------------------------------------------
   if ($T -and $have.Scrub) {
     # Made up, in the two shapes: voice-server.js signToken and the site's
@@ -215,7 +291,8 @@ console.log((o && o.ticket === 'tk1.x.y' ? 'TICKET ' : 'NOTICKET ') +
   $at = $src.IndexOf('public static void SessionLogs()')
   $end = if ($at -ge 0) { $src.IndexOf('int code = PostJson(', $at) } else { -1 }
   $body = if ($at -ge 0 -and $end -gt $at) { $src.Substring($at, $end - $at) } else { '' }
-  Yes 'every log goes through Scrub before it is sent' ($body.Contains('Scrub(ReadLogTail('))
+  Yes 'every log goes through Scrub before it is sent, the crash log with the launcher''s line on it (#2319)' (
+    $body.Contains('Scrub(want[i][0] == "crash.log" ? CrashLogText(want[i][1]) : ReadLogTail(want[i][1]))'))
   Yes 'the crash log is picked from the SKSE folder by the session start' `
     ($body.Contains('CrashLogSince(Files.SkseLogDir, PendingSince(PendingFile, session))'))
   Yes 'skyrim-platform.log is read from the SKSE folder' `
