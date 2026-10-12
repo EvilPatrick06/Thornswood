@@ -120,10 +120,11 @@ it back. Until 11 October `#test-tasks` carried the Live smoke checklist
 Patrick's card of that day took all of it out.
 
 **Test tasks.** One thread per test task, from a title and a body, with the
-forum's Dev or Main tag on it:
+forum's Main tag on it. Every test task is Main only, by hand or from the
+board (Patrick, #2276): testers test on main.
 
-    /test-task title body tag     in Discord: Owner, Dev and Lead Gamemaster
-    python bot.py --env-file C:\Thornswood-Bot\bot.env.json --post-task --title "..." --body-file task.txt --tag Dev
+    /test-task title body         in Discord: Owner, Dev and Lead Gamemaster
+    python bot.py --env-file C:\Thornswood-Bot\bot.env.json --post-task --title "..." --body-file task.txt
 
 Who may post is `TEST_TASK_ROLES` in `bot.env.json`, by role id (preferred) or
 name, Owner, Dev, Lead Gamemaster and Lead GM by default. A `bot.env.json`
@@ -306,6 +307,21 @@ accepted. Discord has no default-role setting. Then the person picks a hold.
 `content.py` holds every read only post. Edit it, run `Setup-Discord.ps1`
 again, and the posts are rewritten in place. It deletes what the bot wrote last
 time rather than adding a second copy, so the rules never end up posted twice.
+
+## Running the bot's tests
+
+The bot and its tests need Python 3.10 or newer, and the bot runs on 3.12.
+On a Windows PC with more than one Python installed, plain `python` is
+whichever comes first on PATH (on One that is 3.9), so run them with the
+launcher:
+
+    py -3.12 bot\test-testing-channels.py
+
+With the libraries from `bot\requirements.txt`. On an older Python, bot.py
+and every test stop at once and say so, rather than failing somewhere deep in
+a test (#2276). The check is `_pyguard.py`, imported first by bot.py and by
+every `test-*.py`, and Install-Bot.ps1 sends it with bot.py.
+`test-python-version.py` holds that.
 
 ## Putting a bot change on the VPS
 

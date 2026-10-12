@@ -395,11 +395,39 @@ foreach ($f in $all) {
 $drop = @()
 if ($daily.Count  -gt $KeepDaily)  { $drop += $daily[$KeepDaily..($daily.Count - 1)] }
 if ($weekly.Count -gt $KeepWeekly) { $drop += $weekly[$KeepWeekly..($weekly.Count - 1)] }
+# A copy that will not delete is said, by name and the kind of error, never
+# logged as dropped (#2354). It used to be Remove-Item -EA SilentlyContinue
+# and then "dropped" whatever happened, so a copy past the seven daily and
+# four weekly that site/data/site/privacy.md promises could stay with the log
+# saying it went. The names that would not go are written to
+# retention-failed.txt beside the backups, which Watch-Services.ps1 reads and
+# says, and the task ends non-zero so its last result says so too. The file
+# goes again on the first run where every drop went.
+$stuck = @()
 foreach ($f in $drop) {
-  Remove-Item -LiteralPath $f.FullName -Force -EA SilentlyContinue
-  Note "  dropped   $($f.Name)"
+  try {
+    Remove-Item -LiteralPath $f.FullName -Force -ErrorAction Stop
+    if (Test-Path -LiteralPath $f.FullName) { throw [IO.IOException]::new('still there after the delete') }
+    Note "  dropped   $($f.Name)"
+  } catch {
+    $ex = $_.Exception
+    $kind = $ex.GetType().Name
+    if ($ex.HResult) { $kind += (' 0x{0:X8}' -f $ex.HResult) }
+    $stuck += ($f.Name + '|' + $kind)
+    Note "  NOT DROPPED $($f.Name): $kind. It is past the seven daily and four weekly kept and is still here."
+  }
+}
+$failedList = Join-Path $Out 'retention-failed.txt'
+if ($stuck.Count) {
+  Set-Content -LiteralPath $failedList -Value ($stuck -join "`r`n") -Encoding UTF8
+} elseif (Test-Path -LiteralPath $failedList) {
+  Remove-Item -LiteralPath $failedList -Force -ErrorAction Stop
+  Note '  every copy past retention went this time, so retention-failed.txt is gone'
 }
 Note ("  kept      {0} daily, {1} weekly" -f [Math]::Min($daily.Count, $KeepDaily), [Math]::Min($weekly.Count, $KeepWeekly))
+if ($stuck.Count) {
+  throw ("Retention failed: {0} backup(s) past the seven daily and four weekly would not delete (listed in {1}). Tonight's backup itself was made." -f $stuck.Count, $failedList)
+}
 Note '  done. Fetch-Backups.ps1 on the other machine is what gets these off this box.'
 
 } finally {

@@ -54,12 +54,13 @@ function build(src) {
   const vps = body.indexOf('\n  launcher-vps:\n');
   const dflt = body.indexOf('\n  # The default:');
   if (jobs < 0 || vps < 0 || dflt < vps) { fail('build.yml no longer has the launcher-vps fallback job before the default job'); }
-  const IF = "    if: ${{ always() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}\n";
-  const SAME = "    if: ${{ always() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' && github.event.pull_request.head.repo.full_name == github.repository }}\n";
+  const IF = "    if: ${{ !cancelled() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}\n";
+  const SAME = "    if: ${{ !cancelled() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' && github.event.pull_request.head.repo.full_name == github.repository }}\n";
   const job = body.slice(vps, dflt);
   if (job.indexOf(IF) < 0) { fail('the fallback job no longer has its condition'); }
   body = body.slice(0, vps) + job.replace(IF, SAME) + body.slice(dflt);
   if (code(body).split('runs-on: [self-hosted').length - 1 !== 1) { fail('the VPS label is in more than the fallback job'); }
+  if (code(body).indexOf('always()') >= 0) { fail('a job uses always(), which a newer run cannot cancel'); }
   if (code(body).split('head.repo.full_name == github.repository').length - 1 !== 1) { fail('the fallback lost its same-repository condition'); }
   const head =
     '# GENERATED from build.yml by scripts/dev/Build-PrWorkflow.js. Do not edit:\n' +

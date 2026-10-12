@@ -113,13 +113,27 @@ function Prune {
   for ($i = 7; $i -lt $mine.Count; $i++) {
     $d = [datetime]::ParseExact($mine[$i].Name.Substring(11, 8), 'yyyyMMdd', $null)
     if ($d -lt $cut) {
-      Remove-Item -LiteralPath $mine[$i].FullName -Force -EA SilentlyContinue
-      Say ("  dropped {0}, older than {1} days" -f $mine[$i].Name, $KeepDays) 'DarkGray'
-      $dropped++
+      # Said truthfully (#2354): a copy that will not delete is named with
+      # the kind of error and counted as a failure, so the run ends non-zero
+      # and the task's last result says so. It used to be -EA
+      # SilentlyContinue and then "dropped" whatever happened.
+      try {
+        Remove-Item -LiteralPath $mine[$i].FullName -Force -ErrorAction Stop
+        if (Test-Path -LiteralPath $mine[$i].FullName) { throw [IO.IOException]::new('still there after the delete') }
+        Say ("  dropped {0}, older than {1} days" -f $mine[$i].Name, $KeepDays) 'DarkGray'
+        $dropped++
+      } catch {
+        $ex = $_.Exception
+        $kind = $ex.GetType().Name
+        if ($ex.HResult) { $kind += (' 0x{0:X8}' -f $ex.HResult) }
+        Say ("  NOT DROPPED {0}: {1}. It is older than {2} days and is still here." -f $mine[$i].Name, $kind, $KeepDays) 'Red'
+        $script:pruneFailed++
+      }
     }
   }
   Say ("  kept {0} backup(s) here" -f ($mine.Count - $dropped)) 'DarkGray'
 }
+$script:pruneFailed = 0
 
 # Where they land when -To is not given (WHERE THEY LAND above, 5 October).
 # The copy -Schedule makes has no Where.ps1 beside it and its task always
@@ -173,6 +187,7 @@ if ($PruneOnly) {
   Head "Tidying $To"
   Prune
   if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+  if ($script:pruneFailed) { exit 1 }
   exit 0
 }
 
@@ -220,6 +235,7 @@ if (-not $want.Count) {
   Say "  Everything on the box is already in $To" 'Green'
   Prune
   if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+  if ($script:pruneFailed) { exit 1 }
   exit 0
 }
 
@@ -248,7 +264,7 @@ if ($NoVerify -or -not $got.Count) {
   if ($NoVerify -and $got.Count) { Say ("  -NoVerify: {0} copied and NOT checked" -f $got.Count) 'Yellow' }
   Prune
   if (-not $NoPause) { [void](Read-Host 'Enter to close') }
-  if ($failed) { exit 1 }
+  if ($failed -or $script:pruneFailed) { exit 1 }
   exit 0
 }
 
@@ -286,5 +302,5 @@ Write-Host ''
 Say "  They are in $To" 'DarkGray'
 Say '  Restoring one for real is docs\RESTORING.md.' 'DarkGray'
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
-if ($failed) { exit 1 }
+if ($failed -or $script:pruneFailed) { exit 1 }
 exit 0
