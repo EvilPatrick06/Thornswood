@@ -197,6 +197,21 @@ jobs:
             exit 1
           }
 
+      - name: Check the high-risk records
+        shell: pwsh
+        run: |
+          # Issue #2180. records\server-build.json, client-build.json,
+          # most-online.json and collection-plugins.json must each be a version
+          # this checkout knows, with every field its readers depend on
+          # (scripts\release\RecordShape.ps1). The deploys refuse a record that
+          # is not; this says so at merge instead. Reads four files, under a
+          # second. Fail closed, like the steps above.
+          .\scripts\release\Check-Records.ps1
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::error file=records/server-build.json::a high-risk record is at a version this checkout does not know, or is missing a field its readers need; the lines above say which'
+            exit 1
+          }
+
       - name: Run the harnesses that went red unseen
         shell: pwsh
         run: |

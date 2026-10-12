@@ -116,7 +116,7 @@ function Write-Record([string]$path = $record, [switch]$BinaryOnly) {
         $p = Join-Path $dist ($rel -replace '/', '\')
         $files[$rel] = [ordered]@{ sha256 = (Hash $p).ToLowerInvariant(); bytes = (Get-Item -LiteralPath $p).Length; commit = $forkCommit }
     }
-    $rec = [ordered]@{ binary = 'scam_native.node'; sha256 = $files['scam_native.node'].sha256; source = [ordered]@{ commit = $forkCommit } }
+    $rec = [ordered]@{ binary = 'scam_native.node'; sha256 = $files['scam_native.node'].sha256; bytes = $files['scam_native.node'].bytes; source = [ordered]@{ commit = $forkCommit } }
     if (-not $BinaryOnly) { $rec.files = $files }
     [IO.File]::WriteAllText($path, ($rec | ConvertTo-Json -Depth 5), $utf8)
     return $rec.sha256
