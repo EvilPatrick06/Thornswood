@@ -234,14 +234,117 @@ if ($CheckOnly) {
 }
 
 if (-not $To) { $To = Join-Path (Split-Path -Parent $src) ((Split-Path -Leaf $src) -replace '\.zip(\.enc)?$', '') }
-if (Test-Path -LiteralPath $To) {
+$To = [IO.Path]::GetFullPath($To)
+$toExisted = Test-Path -LiteralPath $To
+if ($toExisted) {
+  if (-not (Test-Path -LiteralPath $To -PathType Container)) { Die "$To is a file, not a folder. Name an empty folder with -To." }
   if (@(Get-ChildItem -LiteralPath $To -Force -EA SilentlyContinue).Count -gt 0) {
     Die "$To already has things in it. Name an empty folder with -To; this will not write over one."
   }
-} else {
-  [void](New-Item -ItemType Directory -Path $To -Force)
 }
-[System.IO.Compression.ZipFile]::ExtractToDirectory($zipPath, $To)
+
+# Issue #2203: nothing at -To is touched until the whole backup has been
+# unpacked and checked somewhere else. It is unpacked into a staging folder
+# beside -To with a name only this run uses, every entry is checked to land
+# inside it, and every file is checked against the zip (same count, same
+# sizes, same SHA-256 as the bytes read back out of it). Then it moves: in one
+# rename when -To was not there, or entry by entry into the empty -To that
+# was. A refusal or a failure removes the staging folder this run made, and
+# any parent folders it made, and nothing else.
+$toParent = Split-Path -Parent $To
+$madeParents = New-Object 'System.Collections.Generic.List[string]'
+$stage = $null
+$published = $false
+function Clear-RestoreStage {
+  if ($script:stageOwned -and $stage -and (Test-Path -LiteralPath $stage)) { Remove-Item -LiteralPath $stage -Recurse -Force -EA SilentlyContinue }
+  if (-not $published) {
+    for ($k = $madeParents.Count - 1; $k -ge 0; $k--) {
+      $d = $madeParents[$k]
+      if ((Test-Path -LiteralPath $d) -and @(Get-ChildItem -LiteralPath $d -Force -EA SilentlyContinue).Count -eq 0) { Remove-Item -LiteralPath $d -Force -EA SilentlyContinue }
+    }
+  }
+}
+$script:stageOwned = $false
+try {
+  # Every entry is checked before anything is made: a name that would land
+  # outside the folder, or a rooted one, refuses the backup.
+  $zf = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
+  try {
+    $probe = Join-Path $toParent ('.restore-probe-' + [Guid]::NewGuid().ToString('N'))
+    $probeRoot = [IO.Path]::GetFullPath($probe).TrimEnd('\') + '\'
+    $want = @{}
+    foreach ($en in @($zf.Entries)) {
+      $name = $en.FullName
+      if ([string]::IsNullOrEmpty($name) -or [IO.Path]::IsPathRooted($name) -or $name -match '^[\\/]' -or $name -match '(^|[\\/])\.\.([\\/]|$)') {
+        throw ("the entry '" + $name + "' would land outside the folder it is unpacked into")
+      }
+      $full = [IO.Path]::GetFullPath((Join-Path $probe $name))
+      if (-not $full.StartsWith($probeRoot, [StringComparison]::OrdinalIgnoreCase)) {
+        throw ("the entry '" + $name + "' would land outside the folder it is unpacked into")
+      }
+      if ($name -notmatch '[\\/]$') { $want[($name -replace '/', '\')] = @{ Length = [long]$en.Length } }
+    }
+  } finally { $zf.Dispose() }
+
+  $cur = $toParent
+  $missing = @()
+  while ($cur -and -not (Test-Path -LiteralPath $cur)) { $missing = @($cur) + $missing; $cur = Split-Path -Parent $cur }
+  foreach ($d in $missing) { [void][IO.Directory]::CreateDirectory($d); $madeParents.Add($d) }
+  $stage = Join-Path $toParent ('.' + (Split-Path -Leaf $To) + '.restore-' + [Guid]::NewGuid().ToString('N'))
+  [void][IO.Directory]::CreateDirectory($stage)
+  $script:stageOwned = $true
+  [System.IO.Compression.ZipFile]::ExtractToDirectory($zipPath, $stage)
+
+  # The staged tree is what will be published, so it is the one checked.
+  $stageRoot = [IO.Path]::GetFullPath($stage).TrimEnd('\') + '\'
+  $got = @(Get-ChildItem -LiteralPath $stage -Recurse -Force -File)
+  if ($got.Count -ne $want.Count) { throw ("unpacked " + $got.Count + " file(s), the zip holds " + $want.Count) }
+  Add-Type -AssemblyName System.IO.Compression
+  $zf = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
+  try {
+    foreach ($f in $got) {
+      $rel = $f.FullName.Substring($stageRoot.Length)
+      if (-not $want.ContainsKey($rel)) { throw ("unpacked a file the zip does not name: " + $rel) }
+      if ([long]$f.Length -ne $want[$rel].Length) { throw ("unpacked " + $rel + " at " + $f.Length + " bytes, the zip says " + $want[$rel].Length) }
+      $en = $zf.GetEntry(($rel -replace '\\', '/'))
+      if ($null -eq $en) { $en = $zf.GetEntry($rel) }
+      if ($null -eq $en) { throw ("unpacked a file the zip does not name: " + $rel) }
+      $sha = [Security.Cryptography.SHA256]::Create()
+      try {
+        $s = $en.Open(); try { $h1 = [BitConverter]::ToString($sha.ComputeHash($s)) } finally { $s.Dispose() }
+        $s = [IO.File]::OpenRead($f.FullName); try { $h2 = [BitConverter]::ToString($sha.ComputeHash($s)) } finally { $s.Dispose() }
+      } finally { $sha.Dispose() }
+      if ($h1 -ne $h2) { throw ("unpacked " + $rel + " does not match the bytes in the zip") }
+    }
+  } finally { $zf.Dispose() }
+  if (Test-Path -LiteralPath $To) {
+    if (-not $toExisted -or @(Get-ChildItem -LiteralPath $To -Force -EA SilentlyContinue).Count -gt 0) {
+      throw ("$To appeared or filled up while this ran; nothing was moved into it")
+    }
+    # Into the empty folder that was there, entry by entry; a move that fails
+    # puts back the ones already moved, so -To is empty again.
+    $moved = New-Object 'System.Collections.Generic.List[string]'
+    try {
+      foreach ($c in @(Get-ChildItem -LiteralPath $stage -Force)) {
+        Move-Item -LiteralPath $c.FullName -Destination (Join-Path $To $c.Name) -ErrorAction Stop
+        $moved.Add($c.Name)
+      }
+    } catch {
+      foreach ($nm in $moved) { Move-Item -LiteralPath (Join-Path $To $nm) -Destination (Join-Path $stage $nm) -Force -EA SilentlyContinue }
+      throw
+    }
+    $published = $true
+  } else {
+    [IO.Directory]::Move($stage, $To)
+    $published = $true
+    $script:stageOwned = $false
+  }
+} catch {
+  $why = $_.Exception.Message
+  Clear-RestoreStage
+  Die ("The backup was not unpacked: " + $why + ". " + $(if ($toExisted) { "$To is as it was." } else { "Nothing was made at $To." }))
+}
+Clear-RestoreStage
 
 Head 'Unpacked'
 Say "  $To" 'Green'
