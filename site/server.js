@@ -2409,7 +2409,7 @@ const PK = path.join(DATA, 'pk.json');
 // Staff notes against a person, keyed the same way as bans. Staff read them.
 const NOTES = path.join(DATA, 'notes.json');
 // What staff did on the hub, one JSON line each, for the bot's staff channel.
-// The game servers write their own (private\moderation.log).
+// The game servers write their own (for-bot\moderation.log beside each, #2321).
 const MODLOG = path.join(FOR_BOT, 'moderation.log');
 const NOTES_KEEP = 200;
 const BAN_MOST_MIN = 10 * 365 * 24 * 60;

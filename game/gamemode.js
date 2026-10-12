@@ -31266,15 +31266,23 @@ log('gamemode loaded:',
     try { return mp.getServerSettings() || {}; } catch (e) { return {}; }
   }
 
-  /* The staff log: one line in moderation.log, which the Discord bot says in the staff channel. */
+  /*
+    The staff log: one line in moderation.log, which the Discord bot says in
+    the staff channel. It goes in for-bot beside private (forBotDir when the
+    settings name one), because the bot reads it by a rule on that folder,
+    which a file made later takes; private is SYSTEM's and Administrators'
+    alone (#2321).
+  */
   function record(pid, name, why) {
     var fs = null, path = null;
     try { fs = require('fs'); path = require('path'); } catch (e) { return; }
     var s = settings();
     var row = { at: new Date().toISOString(), server: String(s.thornswoodServer || '').trim().toLowerCase() || 'main',
                 did: 'idle', by: pid, byName: name, who: pid, whoName: name, why: String(why || '').slice(0, 300) };
+    var dir = String(s.forBotDir || path.join(path.dirname(String(s.privDir || 'private')), 'for-bot'));
     try {
-      fs.appendFileSync(path.join(String(s.privDir || 'private'), 'moderation.log'), JSON.stringify(row) + '\n');
+      fs.mkdirSync(dir, { recursive: true });
+      fs.appendFileSync(path.join(dir, 'moderation.log'), JSON.stringify(row) + '\n');
     } catch (e) {
       console.log('[thornswood] idle: could not write moderation.log, so the staff channel will not hear of it: ' + e);
     }
@@ -60646,7 +60654,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       or you move, with a line either way; out of a fight it works at once;
     - it is only for being truly stuck, the rules say so, and misuse can mean
       a warning or a ban from staff. So every use that moves somebody, and
-      every wait a fight cancelled, is written to private/moderation.log, the
+      every wait a fight cancelled, is written to for-bot/moderation.log, the
       staff record #412 built, which the Discord bot says in the staff
       channel: the character, the profile, the Discord account from the join
       pass, where from, where to, and when. The reply says it is logged.
@@ -60982,9 +60990,12 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     for (var k in extra) {
       if (Object.prototype.hasOwnProperty.call(extra, k)) { row[k] = extra[k]; }
     }
+    // In for-bot beside private, which the bot reads by a rule on the folder (#2321).
+    var s = settings();
+    var dir = String(s.forBotDir || path.join(path.dirname(String(s.privDir || 'private')), 'for-bot'));
     try {
-      fs.appendFileSync(path.join(String(settings().privDir || 'private'), 'moderation.log'),
-                        JSON.stringify(row) + '\n');
+      fs.mkdirSync(dir, { recursive: true });
+      fs.appendFileSync(path.join(dir, 'moderation.log'), JSON.stringify(row) + '\n');
     } catch (e) {
       slog('could not write moderation.log, so the staff channel will not hear of it: ' + e);
     }
@@ -61225,7 +61236,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   A person is a name (the start of it is enough while it is unique), the form
   id the crosshair gives, or a profile number. Every one answers the moderator
   in their own chat, tells the person it was done to, writes one line to
-  thornswood.log, and writes one line to private/moderation.log, which the
+  thornswood.log, and writes one line to for-bot/moderation.log, which the
   Discord bot reads and says in the staff channel (bot.py, watch_moderation),
   so there is a record outside the game that a hot reload cannot lose.
 
@@ -61296,8 +61307,12 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   function serverName() {
     return String(settings().thornswoodServer || '').trim().toLowerCase() || 'main';
   }
+  /* In for-bot beside private, which the bot reads by a rule on the folder;
+     private is SYSTEM's and Administrators' alone (#2321). */
   function recordFile() {
-    return path ? path.join(String(settings().privDir || 'private'), 'moderation.log') : '';
+    if (!path) { return ''; }
+    var s = settings();
+    return path.join(String(s.forBotDir || path.join(path.dirname(String(s.privDir || 'private')), 'for-bot')), 'moderation.log');
   }
 
   function tell(pid, text) {
@@ -61398,6 +61413,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
                 why: String(why || '').slice(0, 300) };
     if (minutes) { row.minutes = minutes; }
     try {
+      fs.mkdirSync(path.dirname(recordFile()), { recursive: true });
       fs.appendFileSync(recordFile(), JSON.stringify(row) + '\n');
     } catch (e) {
       log('staff: could not write ' + recordFile() + ', so the staff channel will not hear of it: ' + e);
