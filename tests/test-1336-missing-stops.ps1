@@ -179,7 +179,8 @@ try {
         $p = Join-Path $dist ($rel -replace '/', '\')
         $files[$rel] = [ordered]@{ sha256 = (Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash.ToLowerInvariant(); bytes = (Get-Item -LiteralPath $p).Length; commit = $commit }
     }
-    Put $record ([ordered]@{ binary = 'scam_native.node'; sha256 = $files['scam_native.node'].sha256; source = [ordered]@{ commit = $commit }; files = $files } | ConvertTo-Json -Depth 5)
+    # bytes as well: Export-ServerPayload holds the record to RecordShape.ps1 (#2180).
+    Put $record ([ordered]@{ binary = 'scam_native.node'; sha256 = $files['scam_native.node'].sha256; bytes = $files['scam_native.node'].bytes; source = [ordered]@{ commit = $commit }; files = $files } | ConvertTo-Json -Depth 5)
     foreach ($n in 'Skyrim.esm', 'A.esp', 'B.esp') { Put (Join-Path $plug $n) ('plugin ' + $n) }
     function Order([string[]]$names) {
         $s = [ordered]@{ name = 'Thornswood'; port = 7777; thornswoodVoicePort = 7778; maxPlayers = 14

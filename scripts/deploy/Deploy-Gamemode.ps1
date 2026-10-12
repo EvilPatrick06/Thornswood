@@ -267,6 +267,10 @@ $serverOrderLib = Join-Path $Here 'ServerOrder.ps1'
 if (-not (Test-Path -LiteralPath $serverOrderLib)) { throw "$serverOrderLib is missing, so the server's load order cannot be written. Nothing was written." }
 . $serverOrderLib
 $serverRecord = [IO.Path]::GetFullPath((Join-Path $Here '..\..\records\server-build.json'))
+# RecordShape.ps1 (#2180): a server record this checkout cannot trust (a version
+# it does not know, a missing field) stops the build here, before it is written.
+. (Join-Path $Here '..\release\RecordShape.ps1')
+if (Test-Path -LiteralPath $serverRecord) { $null = Read-ThornswoodRecord -Path $serverRecord -Kind server-build }
 $loadsLight = (-not $FullLoadOrder) -and (-not $MinimalLoadOrder) -and (Test-ThornswoodEngineLoadsLight $serverRecord)
 
 # How many the server holds at once, read before anything is written, so a
