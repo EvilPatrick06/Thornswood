@@ -32,7 +32,7 @@ function edidRecord(text) {
   return { record: { fields: [{ type: 'EDID', data: data }] } };
 }
 
-function rig(random) {
+function rig(random, seed) {
   const store = {};
   const records = {};
   const given = [];
@@ -40,7 +40,7 @@ function rig(random) {
   let clock = 1000000000000;
   const ids = {};
   let nextId = 0x200;
-  let saved={version:1,entries:{}};
+  let saved=seed ? JSON.parse(JSON.stringify(seed)) : {version:1,entries:{}};
   const storage={load:()=>JSON.parse(JSON.stringify(saved)),save:next=>{saved=JSON.parse(JSON.stringify(next));}};
 
   function idOf(desc) {
@@ -114,6 +114,7 @@ function rig(random) {
     store[id] = { baseDesc: desc };
     records[idOf(desc)] = edidRecord(edid);
   };
+  api.ledger = function () { return JSON.parse(JSON.stringify(saved)); };
   api.mark = function (id) { return (store[id] || {}).thornswoodDungeonLoot || 0; };
   return api;
 }
@@ -245,6 +246,53 @@ if (block) {
   api.putChest(0x100a, 'SackSmall01');
   yes('a sack still does not pay', api.onChest(actor, 0x100a) === null);
   yes('the knapsack keeps its rest like any chest', api.onChest(actor, 0x1003) === null);
+
+  // #510, Patrick 12 Oct: the boss chest at the end of a place pays one
+  // tier above the place. A tier 4 place has nothing above it and stays 4.
+  // The rest is still the place's. Every one of these fails on the gamemode
+  // before the change, where a boss chest paid the place's own tier.
+  const bossRig = rig(function () { return 0; });
+  bossRig.putActor(1, '371de:Skyrim.esm');
+  bossRig.putChest(0x2000, 'TreasDraugrChestBoss');
+  bossRig.putChest(0x2001, 'TreasureChestLarge');
+  const boss1 = bossRig.onChest(1, 0x2000);
+  const plain1 = bossRig.onChest(1, 0x2001);
+  yes('a boss chest in a tier 1 place pays a tier 2 pile',
+    !!boss1 && boss1.tier === 2 && boss1.gold === bossRig.GOLD_SPAN[2][0]);
+  yes('an ordinary chest in the same place still pays tier 1',
+    !!plain1 && plain1.tier === 1 && plain1.gold === bossRig.GOLD_SPAN[1][0]);
+  yes('the boss chest gold goes into the pack', bossRig.given.some(function (g) {
+    return g.desc === 'f:Skyrim.esm' && g.count === bossRig.GOLD_SPAN[2][0];
+  }));
+  bossRig.advance(31 * 60 * 1000);
+  const boss1Again = bossRig.onChest(1, 0x2000);
+  yes('the boss chest keeps the rest of the place, thirty minutes at tier 1, not forty five',
+    !!boss1Again && boss1Again.tier === 2);
+  yes('the paid tier is what the ledger keeps',
+    bossRig.ledger().entries['2000:Skyrim.esm'].tier === 2);
+  const reloaded = rig(function () { return 0; }, bossRig.ledger());
+  reloaded.putActor(1, '371de:Skyrim.esm');
+  reloaded.putChest(0x2002, 'TreasureChestLarge');
+  yes('a ledger holding a boss chest pile still loads after a restart',
+    !!reloaded.onChest(1, 0x2002));
+  yes('the reloaded ledger keeps the boss chest resting',
+    reloaded.onChest(1, 0x2000) === null);
+
+  bossRig.putActor(3, '142f0:Dragonborn.esm');
+  bossRig.putChest(0x2003, 'DLC2TreasRieklingChestBoss');
+  const boss4 = bossRig.onChest(3, 0x2003);
+  yes('a boss chest in a tier 4 place stays a tier 4 pile',
+    !!boss4 && boss4.tier === 4 && boss4.gold === bossRig.GOLD_SPAN[4][0]);
+  bossRig.putChest(0x2004, 'DLC2RR02BossChest');
+  const bossName = bossRig.onChest(1, 0x2004);
+  yes('a chest named BossChest is a boss chest too', !!bossName && bossName.tier === 2);
+  bossRig.putChest(0x2005, 'TreasBanditChestBossEMPTY');
+  const bossEmpty = bossRig.onChest(1, 0x2005);
+  yes('the boss chests Skyrim leaves empty pay the boss pile', !!bossEmpty && bossEmpty.tier === 2);
+  yes('the tier above stops at 4', typeof bossRig.payTierFor === 'function'
+    && bossRig.payTierFor(3, 'TreasFalmerChestBoss') === 4
+    && bossRig.payTierFor(4, 'TreasFalmerChestBoss') === 4
+    && bossRig.payTierFor(2, 'TreasFalmerChest') === 2);
 
   const act = src.slice(src.indexOf('function activate(actorId, refrId, baseDesc)'),
                         src.indexOf('// ------------------------------------------------- where gold comes from --'));
