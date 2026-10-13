@@ -194,7 +194,7 @@ function log(line) {
 const api = {};
 if(populationMode) assert.equal(typeof server.setNpcDifficultyTier,'function','Population acceptance requires the native difficulty tier setter');
 for(const method of ['makeProperty','get','getIdFromDesc','getDescFromId','getLoadedNpcIds',
-  'setNpcPlacementExclusions','getFactionReactions','serverNpcAttack','stopNpcMovement'])
+  'setNpcPlacementExclusions','getFactionReactions','serverNpcAttack','stopNpcMovement','callPapyrusFunction'])
   api[method] = server[method].bind(server);
 if(populationMode) api.setNpcDifficultyTier = server.setNpcDifficultyTier.bind(server);
 api.getLoadedNpcIds = () => {
