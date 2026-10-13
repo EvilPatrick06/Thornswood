@@ -520,7 +520,7 @@ function RecordText([string]$Binary, [string]$Js = $stubJs) {
     $files['scam_native.node'] = [ordered]@{ sha256 = (TextSha $Binary); bytes = 1; commit = $c }
     $files['dist_back/skymp5-server.js'] = [ordered]@{ sha256 = (TextSha $Js); bytes = 1; commit = $c }
     foreach ($k in $forkRest.Keys) { $files[$k] = [ordered]@{ sha256 = (TextSha $forkRest[$k]); bytes = 1; commit = $c } }
-    return ([ordered]@{ binary = 'scam_native.node'; sha256 = (TextSha $Binary); source = [ordered]@{ commit = $c }; files = $files } | ConvertTo-Json -Depth 5)
+    return ([ordered]@{ binary = 'scam_native.node'; sha256 = (TextSha $Binary); bytes = 1; source = [ordered]@{ commit = $c }; files = $files } | ConvertTo-Json -Depth 5)
 }
 # A payload as Export-ServerPayload makes one: the load order written out in
 # full under the root it is for, and every server file with its record.
@@ -915,7 +915,7 @@ try {
         # box's own C:\Thornswood-Deploys or C:\Thornswood-Docs, which on the
         # VPS are real.
         function MapFar([string]$s) {
-            foreach ($p in 'C:\thornswood-server.zip', 'C:\Install-ThornswoodServer.ps1', 'C:\ServerSettings.ps1', 'C:\ServerBuild.ps1', 'C:\ServerReadyWait.ps1', 'C:\Roll-Log.ps1', 'C:\Thornswood-Server\',
+            foreach ($p in 'C:\thornswood-server.zip', 'C:\Install-ThornswoodServer.ps1', 'C:\ServerSettings.ps1', 'C:\ServerBuild.ps1', 'C:\ServerReadyWait.ps1', 'C:\Read-JsonFile.ps1', 'C:\RecordShape.ps1', 'C:\Roll-Log.ps1', 'C:\Thornswood-Server\',
                            'C:\Thornswood-Deploys', 'C:\Thornswood-Docs', 'C:\Windows\Temp\thornswood-remote-') {
                 $to = Join-Path $global:TsBox.Box $p.Substring(3)
                 $s = $s.Replace($p, $to).Replace($p.Replace('\', '/'), $to)
