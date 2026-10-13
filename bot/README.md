@@ -470,7 +470,7 @@ Thornswood, so do not put it in the repository or paste it anywhere.
 
 ## Being told when the bot or the VPS stops, from outside
 
-The watchdog on the VPS tells the staff channel when something there dies,
+The watchdog on the VPS tells #staff-updates when something there dies,
 and One watches the site from outside (issue #448). Neither can say anything
 when the whole VPS is off or cut off while One is off too. So the bot pings an
 outside uptime monitor once a minute while it is on Discord, and when the

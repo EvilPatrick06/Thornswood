@@ -309,9 +309,19 @@ finally:
      bot._watch_lines) = keep
 
 # ------------------------------------------------ nothing but the staff id --
-yes('W6 the channel is an id, taken from dev-channel.txt',
+# #staff-updates (Patrick, 11 Oct), from staff-channel.txt, and never the dev
+# updates channel in dev-channel.txt, where the watchdog spoke until #2501.
+with open(os.path.join(HERE, 'staff-channel.txt')) as f:
+    staff_file = int(f.read().strip())
+with open(os.path.join(HERE, 'dev-channel.txt')) as f:
+    dev_file = int(f.read().strip())
+yes('W6 the channel is an id, taken from staff-channel.txt',
     isinstance(bot.WATCH_ID, int) and bot.WATCH_ID > 0
-    and bot.WATCH_ID == bot._dev_channel_id())
+    and bot.WATCH_ID == bot._staff_channel_id() == staff_file)
+yes('W6 that id is #staff-updates, 1549254991082946570',
+    bot.WATCH_ID == 1549254991082946570)
+yes('W6 AND NOT THE DEV UPDATES CHANNEL, where dev releases are announced',
+    bot.WATCH_ID != dev_file and not hasattr(bot, '_dev_channel_id'))
 
 
 class NoChannel(object):
