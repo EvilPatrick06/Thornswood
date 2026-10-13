@@ -10,7 +10,10 @@ The expanded roster and quest catalogue are not released yet.
 
 Quests this server runs. Papyrus quests do not run, so a vanilla
 quest journal does not open. The offer, the turn-in, and the unlock
-are the server's.
+are the server's. The vanilla quests themselves, and the gate, door and
+arrival talk in them, are stopped from starting in each person's game by
+`Thornswood-Last.esp` (#2468), except the few kept while Patrick decides
+(`game/data/last-plugin-policy.json`).
 
 A trader of that hold's [Merchant's Guild](merchants-guild.md) gives
 them. Staff do not. The traders are the actors

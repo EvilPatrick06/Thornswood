@@ -21,6 +21,15 @@ scripts that build and ship it:
   line in `gamemode.js`; nothing reads them at run time.
 - `content\Thornswood-Content.esp`: our plugin file. People get it through
   the Nexus collection; the dev and live deploys send it to the server.
+- `content\Thornswood-Last.esp`: the light plugin that loads last (#2468).
+  It switches off every placed actor the NPC catalogue cuts and stops every
+  vanilla quest from starting, except the ones
+  `data\last-plugin-policy.json` keeps while Patrick decides. Built only by
+  `scripts\mods\Build-LastPlugin.py` from the installed load order, never in
+  an editor; `data\last-plugin.json` is what it holds, and
+  `tests\test-2468-last-plugin.js` holds the two together. It reaches people
+  and the servers through the Nexus collection, enabled and sorted last, so
+  a rebuild needs a collection revision.
 - `required-data\`: plugins the load order names that Vortex does not yet
   deploy under that exact filename. Go.ps1 and Ship place them into `Data\`.
   Its own README says when to take one out.

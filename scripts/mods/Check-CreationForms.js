@@ -234,10 +234,20 @@ function pluginUses(buf, cc, base, self) {
   start, and all twenty are cut rows (#479, #1413). So in that file a row with keep false may name one,
   and a kept row, or anything else in it, may not. LEFT_OUT_ROWS says which
   list and which rows.
+
+  last-plugin.json (#2468) is the manifest of Thornswood-Last.esp, which stops
+  every vanilla quest from starting. Update.esm's CCHorseArmorDialogueQuest
+  (30b5:Update.esm) is one of them, so its list of stopped quests names it:
+  that is a record written down as kept out, the same as a cut row. The rest
+  of the manifest (the kept quests, the arrival talk) may not name one. A rule's
+  list may sit inside an object, written as a dotted path.
 */
 const DESCRIBE_ONLY = ['WARMTH', 'RACES', 'BUILDING_BY_DOOR', 'BUILDING_NAME'];
 const DESCRIBE_ONLY_FILES = ['warmth.json', 'races.json', 'doors.json', 'harvests.json#unranked', 'hunts.json#skipped'];
-const LEFT_OUT_ROWS = { 'npc-population.json': { list: 'npcs', leftOut: function (row) { return row && row.keep === false; } } };
+const LEFT_OUT_ROWS = {
+  'npc-population.json': { list: 'npcs', leftOut: function (row) { return row && row.keep === false; } },
+  'last-plugin.json': { list: 'quests.stopped', leftOut: function (row) { return !!row; } }
+};
 
 /** The table a line of gamemode.js sits in: the nearest declaration at or above it. */
 function tableAt(lines, i) {
@@ -353,13 +363,17 @@ function rowHits(cc, f, base, text, all, hits) {
     }
   }
   if (!data) { scan(text, false, 1); return; }
-  for (const k of Object.keys(data)) {
-    if (k === rule.list && Array.isArray(data[k])) {
-      data[k].forEach(function (row) { scan(row, rule.leftOut(row), 1); });
-    } else {
-      scan(data[k], false, 1);
+  (function walk(obj, rest) {
+    for (const k of Object.keys(obj)) {
+      if (k === rest[0] && rest.length === 1 && Array.isArray(obj[k])) {
+        obj[k].forEach(function (row) { scan(row, rule.leftOut(row), 1); });
+      } else if (k === rest[0] && rest.length > 1 && obj[k] && typeof obj[k] === 'object' && !Array.isArray(obj[k])) {
+        walk(obj[k], rest.slice(1));
+      } else {
+        scan(obj[k], false, 1);
+      }
     }
-  }
+  })(data, rule.list.split('.'));
 }
 
 /** The enabled names of a plugins.txt, in order. */
