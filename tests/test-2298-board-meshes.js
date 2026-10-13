@@ -12,9 +12,9 @@
 //   2. Every texture they name is one of the vanilla paths the build read, and
 //      nothing in either file is the Missives board's (no olivar, no missive).
 //   3. Each has its own static collision, and none of the board's reaches over
-//      the box where the gamemode places it; the box's covers only the box.
+//      the box where it stands beside the board; the box's covers only the box.
 //   4. Thornswood-Content.esp's board names the new mesh, the drop box is a
-//      container naming its own, and no record names the old mesh.
+//      separate object naming its own, and no record names the old mesh.
 //   5. Go.ps1 writes both meshes and Ship-Rules.ps1 calls both ours.
 //   6. The client opens the board only for E on the board object itself: not
 //      for the box beside it, not for a person, not for nothing under the
@@ -189,7 +189,7 @@ for (const [name, rel] of [['the board', BOARD], ['the drop box', BOX]]) {
   const z = b => (b ? b.toString('latin1').replace(/\0+$/, '') : '');
   const recs = records(esp);
   const board = recs.find(r => r.tag === 'ACTI' && r.fid === 0x0500593B);
-  const box = recs.find(r => r.tag === 'CONT' && r.fid === 0x050154D0);
+  const box = recs.find(r => r.fid === 0x050154D0);
   yes('the board (ACTI 0500593B) names meshes\\thornswood\\noticeboard01.nif',
       !!board && z(sub(board.data, 'EDID')) === 'ThornswoodMessageBoard' &&
       z(sub(board.data, 'MODL')) === 'thornswood\\noticeboard01.nif');
@@ -197,9 +197,12 @@ for (const [name, rel] of [['the board', BOARD], ['the drop box', BOX]]) {
     const o = sub(board.data, 'OBND');
     return o && [0, 1, 2, 3, 4, 5].map(i => o.readInt16LE(2 * i)).join(',') === '-168,-71,0,140,71,246';
   })());
-  yes('the drop box is a container of its own (CONT 050154D0, ThornswoodDropBox) on dropbox01.nif',
+  yes('the drop box is an object of its own (050154D0, ThornswoodDropBox) on dropbox01.nif',
       !!box && z(sub(box.data, 'EDID')) === 'ThornswoodDropBox' && z(sub(box.data, 'MODL')) === 'thornswood\\dropbox01.nif');
-  yes('  and it starts empty', !!box && !sub(box.data, 'CNTO') && !sub(box.data, 'COCT'));
+  // Not a container: a container shows whoever opens it everything in it, and
+  // Patrick's rule is that a person sees only what they put in (#2298).
+  yes('  an activator, so E on it is answered by the box\'s own panel, never a container\'s',
+      !!box && box.tag === 'ACTI');
   yes('no record names the old Missives board any more',
       !recs.some(r => r.data.toString('latin1').toLowerCase().indexOf('missiveboard') >= 0));
 }

@@ -362,11 +362,18 @@ RECIPE_REMEDY = 0x50154C7
 # both meshes, and they ship as ours from game/ours.
 #
 # So the board's MODL moves to the new mesh, its OBND to the new mesh's bounds
-# (the old one's were Missives' board), and the box is a container of its own,
-# ThornswoodDropBox, which the gamemode places beside every board. It is cloned
-# from the one container this plugin already has (OreIngots) for its open and
-# close sounds, and keeps none of its contents: it starts empty, and what goes
-# in and who may take it out is the server's (game/gamemode.js, the drop box).
+# (the old one's were Missives' board), and the box is an activator of its own,
+# ThornswoodDropBox, cloned from the board.
+#
+# WHY AN ACTIVATOR AND NOT A CONTAINER. Patrick, 12 Oct: a person sees only what
+# they put in, gold included, and only the hold's officers see everything. A
+# Skyrim container shows whoever opens it everything in it, and the server sends
+# a container's whole inventory to every client that has it in view. And the
+# server cannot stand a placed container anywhere but the middle of Tamriel:
+# mp.set refuses 'locationalData' for anything but an actor
+# (LocationalDataBinding::Set in the fork, read 12 Oct). So what is in the box
+# is the server's record, the box is drawn by each client beside its board the
+# way the board is, and E on it opens the box's own panel, never a container.
 BOARD = 0x500593B
 BOARD_MODEL = 'thornswood\\noticeboard01.nif'
 BOARD_BOUNDS = (-168, -71, 0, 140, 71, 246)     # the mesh's, rounded outward
@@ -1148,20 +1155,19 @@ def main():
     make_remedy = recipe(RECIPE_REMEDY, 'ThornswoodRecipeRemedy', REMEDY, ALCHEMY_KEYWORD,
                          [(MUDCRAB_CHITIN, 1), (BLUE_MOUNTAIN_FLOWER, 1)])
 
-    # The hold's drop box (#2298): a container of its own, empty, on its own mesh.
-    drop_box = clone(by_edid['OreIngots'], DROP_BOX, 'ThornswoodDropBox', sets={
-        b'OBND': struct.pack('<6h', *DROP_BOX_BOUNDS),
-        b'FULL': zstr('Drop Box'),
-        b'MODL': zstr(DROP_BOX_MODEL),
-        b'DATA': struct.pack('<Bf', 0, 0.0),
-    }, drop=(b'MODT', b'COCT', b'CNTO'))
-    drop_box.flags = 0
     board = next((r for r in records if r.fid == BOARD and r.tag == b'ACTI'), None)
     if board is None or board.compressed or board.editor_id() != 'ThornswoodMessageBoard':
         print('')
         print('STOP. ACTI 0x%07X is not ThornswoodMessageBoard as it should be. '
               'Nothing was written.' % BOARD)
         return 1
+    # The hold's drop box (#2298): an activator of its own on its own mesh,
+    # cloned from the board, so E on it is the box's and never the board's.
+    drop_box = clone(board, DROP_BOX, 'ThornswoodDropBox', sets={
+        b'OBND': struct.pack('<6h', *DROP_BOX_BOUNDS),
+        b'FULL': zstr('Drop Box'),
+        b'MODL': zstr(DROP_BOX_MODEL),
+    }, drop=(b'MODT',))
 
     # The Hearthfire house parts (#2258), overrides of a master's records. One
     # already in this plugin is edited where it is; one that is not is copied
@@ -1251,7 +1257,7 @@ def main():
     for r in house_new:
         print("  COBJ 0x%08X %-30s HearthFires.esm's, never listed: GetItemCount(gold) < 0"
               % (r.fid, r.editor_id()))
-    print('  CONT 0x%07X ThornswoodDropBox             the hold\'s drop box, empty, %s'
+    print('  ACTI 0x%07X ThornswoodDropBox             the hold\'s drop box, %s'
           % (DROP_BOX, DROP_BOX_MODEL))
     print('')
     print('What changes')
