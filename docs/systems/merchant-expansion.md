@@ -18,6 +18,17 @@ Different roles have different tables. Stock stays finite and consists of
 goods bought; purses remain finite. Retiring a trader must preserve saved
 balances, stock and unresolved settlements, without another starting grant.
 
+The controller accepts server-compiled native item IDs for each role's buy,
+sell and supply permissions. A declared role without verified tables refuses
+setup. It copies permissions and reference bindings before interaction, so
+later configuration edits cannot change an open controller's authority.
+Both the panel and submitted actions check the actual resolved item ID;
+stock must also match that ID, rather than its name alone. Supply permission
+is separate from ordinary buying. Saved transfers recover their original
+terms even if their goods are outside a later role's table. The current
+249-trader catalogue has no role assignments: this support does not activate
+the six-trade roster, its display titles or the final item-table data.
+
 The panel has separate selling and buying sections. Selling shows only
 carried items this merchant can buy at its submitted price, within its
 current purse. A failed condition gives a clear reason and no sale rows.

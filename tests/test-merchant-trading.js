@@ -89,7 +89,7 @@ function resolve(name) {
   return null;
 }
 
-function service(native, purse, clock, market) {
+function service(native, purse, clock, market, roleOptions) {
   const world = worldOf(native);
   const purses = memoryPurses([[1, {
     version: 1, reference: '1:Skyrim.esm', base: 'a:Skyrim.esm', purse: purse, stock: [], supply: {}
@@ -101,6 +101,7 @@ function service(native, purse, clock, market) {
     isTrader: function (id) { return id === 1 || id === 2; },
     now: clock || (() => 1_700_000_000_000)
   };
+  Object.assign(deps,roleOptions);
   const api = trading.createMerchantTrading(deps);
   return { api, world, purses, deps };
 }
@@ -108,6 +109,95 @@ function service(native, purse, clock, market) {
 function open(api) {
   return api.command({ actorId: 10, profileId: 7, parts: ['/merchant', '1'] });
 }
+
+function roleConfig(role) {
+  const tables=Object.fromEntries(['Smith','Woodworker','Tailor','Enchanter','Cook','Alchemist']
+    .map(name=>[name,{buy:[100],sell:[100],supply:[100]}]));
+  tables.Tailor={buy:[101],sell:[101],supply:[]};
+  return {roleTables:tables,places:{...places,'1:Skyrim.esm':{...places['1:Skyrim.esm'],role}}};
+}
+function roleAction(box,verb,name='Iron Ingot') {
+  return box.api.command({actorId:10,profileId:7,parts:['/merchant',verb]
+    .concat(verb==='supply'?[]:['1']).concat(name.split(' '))});
+}
+const roleMarket={catalog:prices.catalog,quote(hold,name){return name==='Free Salt'?{buy:1,sell:2}:prices.quote(hold,name);}};
+for(const role of ['Smith','Woodworker','Tailor','Enchanter','Cook','Alchemist']) {
+  const configured=service({on:true},250,undefined,roleMarket,roleConfig(role));
+  const permitted=role==='Tailor'?'Free Salt':'Iron Ingot',refused=role==='Tailor'?'Iron Ingot':'Free Salt';
+  assert.deepEqual(open(configured.api).view.offers.map(row=>row.name),[permitted]);
+  assert.match(roleAction(configured,'sell',refused).text,/does not buy/);
+  configured.api.shutdown();
+}
+const tailor=service({on:true},250,undefined,roleMarket,roleConfig('Tailor'));
+const tailoredView=open(tailor.api).view;
+assert.deepEqual(tailoredView.offers.map(row=>row.name),['Free Salt'],'off-table goods never appear');
+assert.equal(tailoredView.supply.length,0,'buy permission does not imply supply work');
+const roleBefore=JSON.stringify([tailor.world.inv,tailor.purses.read(1)]);
+let roleWrites=0;const roleCommit=tailor.purses.commit;
+tailor.purses.commit=function(...args){roleWrites++;return roleCommit.apply(this,args);};
+for(const verb of ['buy','sell','supply']) assert.match(roleAction(tailor,verb).text,/does not (buy|sell|request)/i);
+assert.equal(roleWrites,0,'forged off-table requests cannot even prune the ledger');
+assert.equal(JSON.stringify([tailor.world.inv,tailor.purses.read(1)]),roleBefore);
+assert.match(roleAction(tailor,'sell','Free Salt').text,/Sold 1/,'the role can buy its permitted goods');
+assert.match(roleAction(tailor,'supply','Free Salt').text,/does not request/,'supply requires its own table');
+const shelf=service({on:true},0,undefined,roleMarket,roleConfig('Tailor'));
+shelf.purses.commit(1,{...shelf.purses.read(1),stock:[{baseId:101,count:2,name:'Free Salt'}]});
+const shelfView=open(shelf.api).view;
+assert.equal(shelfView.offers[0].maxSell,0);assert.equal(shelfView.offers[0].stock,2);
+assert.equal(shelfView.offers[0].sell,2,'an empty purse does not hide permitted stocked goods');
+assert.match(roleAction(shelf,'buy','Free Salt').text,/Bought 1/);
+const wrongShelf=service({on:true},250,undefined,prices,roleConfig('Smith'));
+const foreignStock={baseId:101,count:2,name:'Iron Ingot'};
+wrongShelf.purses.commit(1,{...wrongShelf.purses.read(1),stock:[foreignStock]});
+assert.equal(open(wrongShelf.api).view.offers[0].stock,0,'a matching name cannot advertise a different native item');
+assert.equal(open(wrongShelf.api).view.offers[0].baseId,null);
+wrongShelf.purses.commit(1,{...wrongShelf.purses.read(1),stock:[foreignStock,{baseId:100,count:1,name:'Iron Ingot'}]});
+const correctShelf=open(wrongShelf.api).view.offers[0];
+assert.equal(correctShelf.stock,1);assert.equal(correctShelf.baseId,100,'the shelf exposes only the resolved permitted item');
+assert.match(roleAction(wrongShelf,'buy').text,/Bought 1/);
+assert.deepEqual(wrongShelf.purses.read(1).stock,[foreignStock],'off-table retained goods remain untouched');
+const saleOnly=roleConfig('Smith');saleOnly.roleTables.Smith.buy=[];saleOnly.roleTables.Smith.supply=[];
+const directional=service({on:true},250,undefined,prices,saleOnly);
+assert.equal(open(directional.api).view.offers[0].buy,null,'buy/sell permissions are independent');
+assert.equal(open(directional.api).view.offers[0].sell,5);
+const purchaseOnly=roleConfig('Smith');purchaseOnly.roleTables.Smith.sell=[];
+const purchaser=service({on:true},250,undefined,prices,purchaseOnly);
+assert.equal(open(purchaser.api).view.offers[0].sell,null);
+assert.match(roleAction(purchaser,'buy').text,/does not sell/);
+let roleResolutions=0;const roleResolver=purchaser.deps.resolve;
+purchaser.deps.resolve=name=>{roleResolutions++;return roleResolver(name);};
+open(purchaser.api);assert.equal(roleResolutions,2,'supply permissions use the already resolved offer identity');
+const immutableConfig=roleConfig('Smith'),immutable=service({on:true},250,undefined,roleMarket,immutableConfig);
+immutableConfig.roleTables.Smith.buy.push(101);immutableConfig.places['1:Skyrim.esm'].role='Tailor';
+open(immutable.api);assert.match(roleAction(immutable,'sell','Free Salt').text,/does not buy/,'caller mutation cannot change authority');
+const roleAlias=service({on:true},250,undefined,aliasMarketForRole(),roleConfig('Tailor'));
+function aliasMarketForRole(){return {catalog(){return [{name:'Metal',buy:3,sell:5}];},quote(){return {buy:3,sell:5};}};}
+roleAlias.deps.resolve=name=>name==='Metal'?{baseId:100,name:'Iron Ingot'}:resolve(name);
+assert.equal(open(roleAlias.api).view.offers.length,0);assert.match(roleAction(roleAlias,'sell','Metal').text,/does not buy/);
+for(const alter of [
+  config=>delete config.roleTables,
+  config=>config.places['1:Skyrim.esm'].role='Merchant',
+  config=>config.roleTables.Smith.buy.push(15),
+  config=>config.roleTables.Smith.buy.push(0),
+  config=>config.roleTables.Smith.buy.push(0xff000001),
+  config=>config.roleTables.Smith.buy.push(100),
+  config=>config.roleTables.Smith.buy.push('100'),
+  config=>config.roleTables.Smith.buy.length++,
+  config=>config.roleTables.Smith.supply.push(101),
+  config=>delete config.roleTables.Smith.sell,
+]) {
+  const config=roleConfig('Smith');alter(config);
+  assert.throws(()=>service({on:true},250,undefined,prices,config),/role|table|permission/i);
+}
+const roleLegacyNative={on:true,fail:'stuck'},legacyRole=service(roleLegacyNative,250);
+open(legacyRole.api);roleAction(legacyRole,'sell');
+assert.ok(legacyRole.purses.read(1).pending);
+legacyRole.api.shutdown();roleLegacyNative.fail=undefined;legacyRole.world.save();
+const legacyRecovery=trading.createMerchantTrading({...legacyRole.deps,...roleConfig('Tailor')});
+legacyRecovery.recover();legacyRole.world.save();legacyRecovery.recover();
+assert.equal(legacyRole.purses.read(1).pending,null,'new role restrictions do not strand an original saved trade');
+assert.equal(legacyRole.world.inv[10][15],43);assert.equal(legacyRole.purses.read(1).stock[0].baseId,100);
+legacyRecovery.shutdown();
 
 let native = { on: true };
 let box = service(native, 250);
