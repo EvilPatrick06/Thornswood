@@ -136,7 +136,8 @@ function createMerchantTrading(deps) {
   var viewOwners = new WeakMap();
   var sessionSerial = 0;
   var settlement = SETTLEMENT.createSettlement({purses:purses,transfer:transfer,world:deps.namespace || purses.namespace,log:deps.log,now:now});
-  var active = true;
+  var retirementRequired=deps.retirementRequired===true;
+  var active = deps.suspended !== true && !retirementRequired, closed = false;
 
   function placeOf(reference) {
     return places[reference] || null;
@@ -632,6 +633,7 @@ function createMerchantTrading(deps) {
   }
 
   function activate(actorId, merchantId) {
+    if (!active) return fail('Trading is unavailable.');
     if (typeof deps.isTrader === 'function' && !deps.isTrader(merchantId)) return null;
     var human = world.actor(actorId);
     var profileId = human && Number(human.profileId) || 0;
@@ -656,9 +658,20 @@ function createMerchantTrading(deps) {
     command: command,
     activate: activate,
     recover: recover,
+    retirementReady: function () {
+      var ready=!closed && settlement.canRetire();
+      return !closed && ready;
+    },
+    start: function () {
+      if(closed || !settlement.available()) throw new Error('Trading is unavailable.');
+      if(retirementRequired && !settlement.canRetire()) throw new Error('Legacy work blocks roster activation.');
+      if(closed || !settlement.available()) throw new Error('Trading is unavailable.');
+      active=true;
+      return true;
+    },
     nativeReady: function () { return settlement.available(); },
-    withQuestInventoryMutation: function(actorId,change) {return settlement.withInventoryMutation(actorId,change);},
-    questReady: function(actorId) {return settlement.canInventoryMutation(actorId);},
+    withQuestInventoryMutation: function(actorId,change) {return active ? settlement.withInventoryMutation(actorId,change) : {ok:false,why:'unavailable'};},
+    questReady: function(actorId) {return active && settlement.canInventoryMutation(actorId);},
     questAdmission: function(actorId,merchantId) {
       if (!active) return null;
       // Capture before actor lookup: native callbacks must not supply a new conversation.
@@ -680,7 +693,7 @@ function createMerchantTrading(deps) {
       var state=active && purses.read(merchantId),place=state && placeOf(state.reference);
       return place && place.hold || '';
     },
-    shutdown: function () { active=false; sessions.clear(); settlement.shutdown(); },
+    shutdown: function () { active=false; closed=true; sessions.clear(); settlement.shutdown(); },
     REACH: REACH,
     SUPPLY_COUNT: SUPPLY_COUNT,
     bookHoldOf: bookHoldOf
@@ -760,6 +773,8 @@ function installMerchantTrading(env) {
     },
     places: doc.byRef || {},
     roleTables: env.roleTables,
+    suspended: env.suspended,
+    retirementRequired: env.retirementRequired,
     quests: function () { return g.__thornswoodQuests; },
     resolve: function (name) {
       var fn = g.__thornswoodResolveItem;
@@ -787,12 +802,10 @@ function installMerchantTrading(env) {
     '  } catch (e) { }',
     '})();'
   ].join('\n');
-  try {
-    mp.makeProperty(property, {
+  mp.makeProperty(property, {
       isVisibleByOwner: true, isVisibleByNeighbors: false,
       updateOwner: script, updateNeighbor: ''
-    });
-  } catch (e) {}
+  });
   trading.push = function (actorId, view) {
     var payload = JSON.parse(JSON.stringify(view || { open: false }));
     payload.at = Date.now();
@@ -802,17 +815,35 @@ function installMerchantTrading(env) {
     trading.acknowledgeView(actorId,payload);
   };
   var timers=env.timers || (typeof setTimeout === 'function' && typeof clearTimeout === 'function' ? {setTimeout:setTimeout,clearTimeout:clearTimeout} : null);
-  var alive=true, timer=null;
+  var alive=true, timer=null, started=false;
   var stop=trading.shutdown;
-  trading.shutdown=function () {alive=false; if(timer!==null && timers) timers.clearTimeout(timer); stop();};
+  trading.shutdown=function () {alive=false; if(timer!==null && timers) timers.clearTimeout(timer);timer=null;stop();};
+  function scheduleAdvance() {
+    if(!alive || !timers || timer!==null) return;
+    try {
+      timer=timers.setTimeout(function () {timer=null;if(alive && started) advance();},1000);
+    } catch(error) {trading.shutdown();throw error;}
+  }
   function advance() {
     if(!alive) return;
     try { trading.recover().forEach(function (result) {if(alive) trading.push(result.actorId,result.view);}); }
     catch(error) {log('merchant recover: '+error);}
     // This checks exact save acknowledgements, never elapsed-time settlement.
-    if(alive && trading.nativeReady() && timers) timer=timers.setTimeout(advance,1000);
+    if(alive && trading.nativeReady()) scheduleAdvance();
   }
-  if(trading.nativeReady()) advance();
+  var start=trading.start;
+  trading.start=function () {
+    if(!alive) throw new Error('Trading is unavailable.');
+    start();
+    if(!alive) throw new Error('Trading is unavailable.');
+    if(!started) {started=true;advance();}
+    if(!alive || !trading.nativeReady()) throw new Error('Trading is unavailable.');
+    return true;
+  };
+  if(trading.nativeReady()) {
+    if(env.suspended===true || env.retirementRequired===true) scheduleAdvance();
+    else trading.start();
+  }
   return trading;
 }
 
