@@ -618,8 +618,8 @@ $minNews = if ($doc.PSObject.Properties['minLauncher'] -and [string]$doc.minLaun
 try { [void](Set-FeedNewsList $doc $news $Channel $minNews (Join-Path $WorkDir ('news-' + $Id)) $SiteDir) }
 catch { Die ($_.Exception.Message + ' Run this again.') }
 
-# No byte order mark: the launcher's reader stops on one (Publish-Update.ps1).
-[IO.File]::WriteAllText($VersionFile, ($doc | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))
+# Compact, no byte order mark (Feed-Json.ps1, Write-FeedVersionFile).
+Write-FeedVersionFile $VersionFile $doc
 Copy-Item -LiteralPath $manifestPath -Destination $StateFile -Force
 try { $sent = Send-FeedStore $Channel $ReleaseDir @('version.json', 'published.json', $FeedReleasesFile) -SiteDir $SiteDir }
 catch {

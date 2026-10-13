@@ -143,7 +143,7 @@ if ($MoveToSite) {
         if (-not $NoPause) { [void](Read-Host 'Enter to close') }
         exit 0
     }
-    [IO.File]::WriteAllText($VersionFile, ($doc | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))
+    Write-FeedVersionFile $VersionFile $doc
     Say '  version.json written' 'Green'
     if ($NoPush) {
         Say 'Not pushed, as asked.' 'Yellow'
@@ -197,10 +197,9 @@ if ($DryRun) {
 
 Head 'Repairing'
 $doc.packs = $good
-# WriteAllText rather than Set-Content: Windows PowerShell puts a byte order
-# mark on UTF8 output and a BOM is not JSON, which takes the update check out
-# for everyone at once.
-[IO.File]::WriteAllText($VersionFile, ($doc | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))
+# Compact, no byte order mark (Feed-Json.ps1, Write-FeedVersionFile): a BOM
+# is not JSON, which takes the update check out for everyone at once.
+Write-FeedVersionFile $VersionFile $doc
 Say ("  version.json now lists {0} pack(s)" -f $good.Count) 'Green'
 
 if (Test-Path -LiteralPath $applied) {

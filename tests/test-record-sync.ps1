@@ -711,6 +711,10 @@ $d5 = Feed; $m5 = $records[$R5]
 Yes '  the feed carries packs as an empty list, the shape every launcher reads' ($d5.PSObject.Properties['packs'] -and @($d5.packs).Count -eq 0 -and
     ([IO.File]::ReadAllText((Join-Path $feedDir 'version.json')) -match '"packs":\s*\[\s*\]'))
 Yes '  and minLauncher is 1.2.3' ([string]$d5.minLauncher -eq '1.2.3')
+# The launchers in this harness sync from feeds the publisher wrote, so their
+# passes are also the proof that a launcher reads one written this way.
+Yes '  the publisher writes version.json compact, one line, and its release carries no uiAssets (#1050)' (
+    ([IO.File]::ReadAllText((Join-Path $feedDir 'version.json')) -notmatch '[\r\n]') -and -not $d5.release.PSObject.Properties['uiAssets'])
 Yes '  the release names no pack, and its record says every file is up' (@($d5.release.packs).Count -eq 0 -and [string]$m5[':record:files'] -eq '1' -and
     @((Get-RecordFileShas $m5).Keys | Where-Object { -not (Test-Path -LiteralPath (Join-Path $feedDir "assets\$_")) }).Count -eq 0)
 $zip5 = @(Get-ChildItem -LiteralPath (Join-Path $pub 'dist') -Recurse -File -Filter "pack-$R5.zip")

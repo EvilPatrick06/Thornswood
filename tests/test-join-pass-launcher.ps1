@@ -46,7 +46,7 @@ $a = $pub.IndexOf('# ==== thornswood min launcher ====')
 $b = $pub.IndexOf('# ==== end thornswood min launcher ====')
 Yes 'the minLauncher block is marked in Publish-Update.ps1' ($a -ge 0 -and $b -gt $a)
 $launcherBlock = $pub.IndexOf("Set-Prop `$doc 'launcherVersion' `$launcherVersion")
-$written = $pub.IndexOf('[IO.File]::WriteAllText($VersionFile')
+$written = $pub.IndexOf('Write-FeedVersionFile $VersionFile')
 Yes 'it runs after the launcher is recorded and before version.json is written' ($launcherBlock -gt 0 -and $a -gt $launcherBlock -and $written -gt $b)
 
 function Lift([string]$src, [string]$head) {
