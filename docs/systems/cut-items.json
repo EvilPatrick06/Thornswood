@@ -2,10 +2,10 @@
   "builtFrom": "game/data/recipes.json",
   "note": "References held out of the open craft book. recipes.json is not edited by the script that writes this file.",
   "counts": {
-    "cut": 3321,
+    "cut": 3317,
     "embassy": 15,
     "thalmor": 9,
-    "kept": 593
+    "kept": 597
   },
   "rieklingKept": [
     "Riekling Fur Armour",
@@ -16,7 +16,11 @@
     "Riekling Chief Fur Iron Armour",
     "Riekling Chief Helmet",
     "Riekling Spear",
-    "Riekling Bone Club"
+    "Riekling Bone Club",
+    "Riekling LoinCloth 1",
+    "Riekling LoinCloth 2",
+    "Riekling Cloth Hand Wraps",
+    "Riekling Cloth Foot Wraps"
   ],
   "items": [
     {
@@ -6248,30 +6252,6 @@
       "why": "Extra Riekling copy of someone else's gear, or a spare piece. Not found and not made."
     },
     {
-      "id": "19f91:Playable Rieklings.esp",
-      "name": "Riekling Cloth Foot Wraps",
-      "plugin": "Playable Rieklings.esp",
-      "half": "Platewright",
-      "owner": "Smith",
-      "family": "Armoured boots",
-      "rank": "novice",
-      "fires": true,
-      "disposition": "cut",
-      "why": "Extra Riekling copy of someone else's gear, or a spare piece. Not found and not made."
-    },
-    {
-      "id": "19f90:Playable Rieklings.esp",
-      "name": "Riekling Cloth Hand Wraps",
-      "plugin": "Playable Rieklings.esp",
-      "half": "Platewright",
-      "owner": "Smith",
-      "family": "Gauntlets",
-      "rank": "novice",
-      "fires": true,
-      "disposition": "cut",
-      "why": "Extra Riekling copy of someone else's gear, or a spare piece. Not found and not made."
-    },
-    {
       "id": "bfedc:Playable Rieklings.esp",
       "name": "Riekling Clothes",
       "plugin": "Playable Rieklings.esp",
@@ -6980,32 +6960,8 @@
       "why": "Extra Riekling copy of someone else's gear, or a spare piece. Not found and not made."
     },
     {
-      "id": "19f92:Playable Rieklings.esp",
-      "name": "Riekling LoinCloth 1",
-      "plugin": "Playable Rieklings.esp",
-      "half": "Platewright",
-      "owner": "Smith",
-      "family": "Body armour",
-      "rank": "novice",
-      "fires": true,
-      "disposition": "cut",
-      "why": "Extra Riekling copy of someone else's gear, or a spare piece. Not found and not made."
-    },
-    {
       "id": "babbc:Playable Rieklings.esp",
       "name": "Riekling LoinCloth 1a",
-      "plugin": "Playable Rieklings.esp",
-      "half": "Platewright",
-      "owner": "Smith",
-      "family": "Body armour",
-      "rank": "novice",
-      "fires": true,
-      "disposition": "cut",
-      "why": "Extra Riekling copy of someone else's gear, or a spare piece. Not found and not made."
-    },
-    {
-      "id": "19f94:Playable Rieklings.esp",
-      "name": "Riekling LoinCloth 2",
       "plugin": "Playable Rieklings.esp",
       "half": "Platewright",
       "owner": "Smith",
