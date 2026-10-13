@@ -22,6 +22,8 @@ if (-not $Repo) { $Repo = Join-Path $PSScriptRoot '..\..' }
 $Repo = (Resolve-Path -LiteralPath $Repo).Path
 $bad = 0
 foreach ($kind in @($script:ThornswoodRecordKinds.Keys)) {
+    # A kind with no committed file (server-settings) is each server's own, read on the box.
+    if (-not $script:ThornswoodRecordKinds[$kind].File) { continue }
     $path = Join-Path $Repo $script:ThornswoodRecordKinds[$kind].File
     try {
         $null = Read-ThornswoodRecord -Path $path -Kind $kind
