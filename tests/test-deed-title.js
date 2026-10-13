@@ -33,7 +33,9 @@ function yes(what, cond) {
   else { fail++; console.log('FAIL  ' + what); }
 }
 
-const START = '    if (mine && holdsDeed(actorId, building) && (!held || held.by !== mine)) {';
+// Since #502 the act also asks mayHold: a jail is its hold's Jarl's alone.
+const START = '    if (mine && holdsDeed(actorId, building) && (!held || held.by !== mine) &&\n' +
+              '        mayHold(actorId, mine, building)) {';
 const END = '\n    }\n';
 const a = src.indexOf(START);
 const b = a < 0 ? -1 : src.indexOf(END, a);
@@ -57,7 +59,7 @@ function press(opts) {
 
   const fn = new Function(
     'mine', 'actorId', 'building', 'held', 'claims', 'holdsDeed', 'holderOf',
-    'nameOf', 'groundHere', 'save', 'pushAll', 'plog', 'notify', 'say', 'mp',
+    'nameOf', 'groundHere', 'save', 'pushAll', 'plog', 'notify', 'say', 'mp', 'mayHold',
     block + '\nreturn { moved: false, claims: claims };');
 
   const out = fn(
@@ -70,7 +72,8 @@ function press(opts) {
     function () { logs.push(Array.prototype.join.call(arguments, ' ')); },
     function (id, m) { said.push(m); },
     function (id, m) { said.push(m); },
-    { get: function () { return { name: opts.who || 'Somebody' }; } });
+    { get: function () { return { name: opts.who || 'Somebody' }; } },
+    function () { return opts.mayHold !== false; });
 
   return { claim: claims[HOUSE], said: said, logs: logs };
 }
@@ -90,6 +93,15 @@ if (block !== null) {
         r.said.length > 0 && r.said[0].indexOf('It is yours now') !== -1);
     yes('S1 and told whose it was, because that is the story',
         r.said[0].indexOf('Alice') !== -1);
+  }
+
+  // S1j: A JAIL'S DEED IS PAPER (#502). Patrick, 12 Oct: a jail is claimed
+  //      by the Jarl of its hold alone, so its deed in anybody else's hand
+  //      claims nothing at its door.
+  {
+    const r = press({ mine: BOB, who: 'Bob', hasDeed: true, held: alicesHouse, mayHold: false });
+    yes('S1j a jail\'s deed presented by somebody who may not hold it takes nothing',
+        r.claim && r.claim.by === ALICE && r.said.length === 0);
   }
 
   // S2: THE LOCK SURVIVES THE TRANSFER. A house that was locked stays locked,

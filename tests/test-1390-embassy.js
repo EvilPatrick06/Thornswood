@@ -294,10 +294,11 @@ if (block && RECIPES && ADMIN_ITEMS) {
       const told = [];
       const claims = {};
       const fn = new Function('globalThis', 'here', 'holderOf', 'nameOf', 'mp', 'groundHere', 'claims', 'save', 'pushAll',
-        'giveDeed', 'plog', 'lapseDays', claimSrc + '\nreturn claim;');
+        'giveDeed', 'plog', 'lapseDays', 'mayHold', 'jailOfBuilding', 'HOLD_TOWN', claimSrc + '\nreturn claim;');
       const claim = fn({ __thornswoodEmbassy: E }, function () { return building; }, function () { return null; },
         function (b) { return b; }, { get: function () { return { name: 'Bjorn' }; } }, function () { return null; },
-        claims, function () { }, function () { }, function () { return true; }, function () { }, function () { return 14; });
+        claims, function () { }, function () { }, function () { return true; }, function () { }, function () { return 14; },
+        function () { return true; }, function () { return null; }, {});
       claim(0x14, 50, function (p, line) { told.push(line); });
       return { told: told.join(' '), claims: claims };
     }
@@ -334,12 +335,14 @@ if (block && RECIPES && ADMIN_ITEMS) {
       const said = [];
       const fn = new Function('globalThis', 'buildingOf', 'g', 'mp', 'DOOR_PROPERTY', 'plog', 'push', 'holderOf', 'holdsDeed',
         'groundHere', 'claims', 'save', 'pushAll', 'nameOf', 'notify', 'say', 'refrIdOfDoor',
-        touchedSrc + '\nreturn openedDoor;');
+        // Anybody may hold this building; a jail is #502's, in test-502-jail-rules.js.
+        'mayHold', touchedSrc + '\nreturn openedDoor;');
       const touched = fn({ __thornswoodEmbassy: E }, function () { return building; }, {},
         { get: function (id, p) { return p === 'profileId' ? 50 : { name: 'Thief' }; }, set: function () { } },
         'thornswoodDoor', function () { }, function () { }, function () { return null; }, function () { return true; },
         function () { return null; }, claims, function () { }, function () { }, function (b) { return b; },
-        function (a, l) { said.push(l); }, function (a, l) { said.push(l); }, function () { return 0; });
+        function (a, l) { said.push(l); }, function (a, l) { said.push(l); }, function () { return 0; },
+        function () { return true; });
       touched(0x14, 'door');
       return claims;
     }
@@ -352,13 +355,14 @@ if (block && RECIPES && ADMIN_ITEMS) {
       const fn = new Function('globalThis', 'mp', 'DOOR_PROPERTY', 'DOOR_MEMORY_MS', 'buildingOf', 'holderOf', 'holdsDeed',
         'nameOf', 'doorsOf', 'idOf', 'DOOR_LINE_PROPERTY', 'plog', 'doorLineStamp',
         // No cell door at the embassy (#502).
-        'jailHoldOf', 'isGuard', 'cellLocked', lineSrc + '\nreturn doorLine;');
+        'jailHoldOf', 'isGuard', 'cellLocked', 'mayHold', lineSrc + '\nreturn doorLine;');
       const doorLine = fn({ __thornswoodEmbassy: E },
         { get: function () { return { door: 'door', at: Date.now() }; }, set: function (a, p, v) { line = v; } },
         'thornswoodDoor', 60000, function () { return building; }, function () { return held || null; },
         function () { return false; }, function (b) { return b; }, function () { return ['5cb0:The Great City of Solitude.esp']; },
         function () { return 0x5cb0; }, 'thornswoodDoorLine', function () { }, 0,
-        function () { return null; }, function () { return false; }, function () { return false; });
+        function () { return null; }, function () { return false; }, function () { return false; },
+        function () { return true; });
       doorLine(0x14, 50);
       return line;
     }
