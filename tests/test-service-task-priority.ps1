@@ -3,10 +3,19 @@
 
       pwsh -NoProfile -File .\tests\test-service-task-priority.ps1
 
-  The site, voice and Caddy start at normal priority: normal for the
-  processor, the disk and memory, the same as a service on the box.
+  The site and Caddy start at normal priority: normal for the processor, the
+  disk and memory, the same as a service on the box. Voice starts at high
+  priority for the processor, with the game servers, and normal for the disk
+  and memory.
 
-  WHY. Deploy-Docs.ps1, Install-Voice.ps1 and Setup-Domain.ps1 registered
+  WHY VOICE IS HIGH (#2491). Decided by Patrick on 12 Oct 2026 at about
+  6:20 PM: "we need to fix it so the servers run on high priority". Voice
+  runs with the game servers, above the six build runners, the site, Caddy
+  and the bot. Its task is registered at priority 1, HIGH_PRIORITY_CLASS, and
+  node is started through cmd's start /high, because cmd.exe at High starts
+  node Normal unless asked (measured 12 Oct; tests\test-server-task-priority.ps1).
+
+  WHY NOT BELOW NORMAL. Deploy-Docs.ps1, Install-Voice.ps1 and Setup-Domain.ps1 registered
   their scheduled tasks with no -Priority, so Task Scheduler used its default
   of 7: BelowNormal, I/O priority 1 (low) and memory priority 2, measured on
   the VPS on 5 October for Caddy and the site. In the kernel trace of
@@ -20,22 +29,27 @@
        task on the VPS in a script it sends there, a here-string in the
        installer. That here-string is found, read as the script the box
        runs, its one New-ScheduledTaskSettingsSet found and the -Priority it
-       passes read (none is 7, the default). It must be 4 to 6, the band
-       Microsoft's table starts as NORMAL_PRIORITY_CLASS.
+       passes read (none is 7, the default). For the site and Caddy it must
+       be 4 to 6, the band Microsoft's table starts as NORMAL_PRIORITY_CLASS;
+       for voice 1, HIGH_PRIORITY_CLASS, never 0, realtime, and voice's task
+       command line must start node through start "" /b /wait /high.
     2. On Windows, that call is run for real (it only builds the settings),
        and a task with those settings and a made-up name is registered: for
        SYSTEM as a service when this shell is elevated, which is what all
        three run as on the box (the site may be LOCAL SERVICE, which the
        priority does not depend on), and otherwise for the person running
-       this, logged on interactively. Its action is cmd.exe /c starting a
-       program. The site's task and Caddy's start their program directly,
-       so for them what counts is the process the task starts (cmd.exe
-       here); voice's starts cmd.exe, which starts node, so for voice it is
-       cmd's child. Both are measured for each, and both must be Normal, I/O
-       priority 2 and memory priority 5. The task and its processes are
-       removed again whatever happens. Where a task cannot be registered or
-       does not start for this account (a build runner's service account),
-       this part says SKIP and why.
+       this, logged on interactively. For the site and Caddy its action is
+       cmd.exe /c starting a program: their tasks start their program
+       directly, so what counts is the process the task starts (cmd.exe
+       here). For voice it is voice's own command line, with Windows
+       PowerShell sleeping in place of node and a scratch log and roller:
+       its task starts cmd.exe, which starts node through start /high, so
+       what counts is cmd's child. Both processes are measured for each:
+       Normal, I/O priority 2 and memory priority 5 for the site and Caddy,
+       High, 2 and 5 for voice. The task and its processes are removed again
+       whatever happens. Where a task cannot be registered or does not start
+       for this account (a build runner's service account), this part says
+       SKIP and why.
 
   -DeployDocs, -InstallVoice and -SetupDomain read another copy of each, so
   the same test runs on the ones from before this change:
@@ -45,8 +59,9 @@
 
   Registers and removes one task at a time named Thornswood priority harness
   <guid> (not 'Thornswood Test...', which test-deploy-swaps and
-  test-install-server clear away, #1135) and stops the cmd.exe and Windows
-  PowerShell it started; writes nothing else.
+  test-install-server clear away, #1135), stops the cmd.exe and Windows
+  PowerShell it started, and removes the scratch folder in TEMP that holds
+  voice's log and roller; writes nothing else.
 #>
 [CmdletBinding()]
 param([string]$DeployDocs, [string]$InstallVoice, [string]$SetupDomain)
@@ -79,9 +94,9 @@ function Done {
 # What each task starts, and so which process carries its program: the one the
 # task starts, or that one's child.
 $installers = @(
-    [pscustomobject]@{ Name = 'Deploy-Docs.ps1'; Path = $DeployDocs; Task = 'Thornswood Docs'; Program = 'node, started by the task'; Child = $false }
-    [pscustomobject]@{ Name = 'Install-Voice.ps1'; Path = $InstallVoice; Task = 'Thornswood Voice'; Program = 'node, started by the task''s cmd.exe'; Child = $true }
-    [pscustomobject]@{ Name = 'Setup-Domain.ps1'; Path = $SetupDomain; Task = 'Thornswood Web'; Program = 'caddy.exe, started by the task'; Child = $false }
+    [pscustomobject]@{ Name = 'Deploy-Docs.ps1'; Path = $DeployDocs; Task = 'Thornswood Docs'; Program = 'node, started by the task'; Child = $false; High = $false }
+    [pscustomobject]@{ Name = 'Install-Voice.ps1'; Path = $InstallVoice; Task = 'Thornswood Voice'; Program = 'node, started by the task''s cmd.exe'; Child = $true; High = $true }
+    [pscustomobject]@{ Name = 'Setup-Domain.ps1'; Path = $SetupDomain; Task = 'Thornswood Web'; Program = 'caddy.exe, started by the task'; Child = $false; High = $false }
 )
 
 # ---- 1. read, not run ------------------------------------------------------------
@@ -134,7 +149,21 @@ foreach ($ins in $installers) {
         }
     }
     $ins.Asked = $asked
-    Yes ("  the task's priority is in the normal band 4 to 6 ($asked, $how)") ($asked -is [int] -and $asked -ge 4 -and $asked -le 6)
+    if ($ins.High) {
+        Yes ("  the task's priority is 1, high, never 0, realtime ($asked, $how)") ($asked -is [int] -and $asked -eq 1)
+    } else {
+        Yes ("  the task's priority is in the normal band 4 to 6 ($asked, $how)") ($asked -is [int] -and $asked -ge 4 -and $asked -le 6)
+    }
+    # Voice's task command line, as it is written in the script it sends: the
+    # one $cmd = ('/c ...' -f ...) line, the format string and what fills it.
+    $ins | Add-Member -NotePropertyName Format -NotePropertyValue $null
+    if ($ins.High) {
+        $m = [regex]::Match([IO.File]::ReadAllText($ins.Path), '`\$cmd = \(''(/c "set THORNSWOOD_SITE=[^\r\n]*?)'' -f ([^\r\n]+)\)')
+        Yes '  its task command line is in the script it sends' $m.Success
+        if ($m.Success) { $ins.Format = $m.Groups[1].Value }
+        Yes '  and starts node through start "" /b /wait /high' ($ins.Format -and $ins.Format.Contains('start "" /b /wait /high "{0}" voice-server.js'))
+        Yes '  and hands node''s exit code back as the task''s' ($ins.Format -and $ins.Format.Contains('& call exit %^errorlevel%"'))
+    }
 }
 
 # ---- 2. run, through Task Scheduler ----------------------------------------------
@@ -208,8 +237,22 @@ foreach ($ins in $installers) {
 
     $name = 'Thornswood priority harness ' + [Guid]::NewGuid().ToString('N')
     $mark = [Guid]::NewGuid().ToString('N')
-    $action = New-ScheduledTaskAction -Execute $cmdExe `
-                                      -Argument ('/c ""' + $ps51 + '" -NoProfile -NonInteractive -Command Start-Sleep -Seconds 90 #' + $mark + '"')
+    $sleep = '-NoProfile -NonInteractive -Command Start-Sleep -Seconds 90 #' + $mark
+    $scratch = $null
+    if ($ins.High) {
+        if (-not $ins.Format) { Write-Host '  SKIP  there is no task command line to run'; continue }
+        # Voice's own line: what the outer script fills in at install time,
+        # then a scratch log, an empty roller, and Windows PowerShell for node.
+        $scratch = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-priority-' + $mark)
+        New-Item -ItemType Directory -Force -Path $scratch | Out-Null
+        $rollerAt = Join-Path $scratch 'roll-log.ps1'
+        [IO.File]::WriteAllText($rollerAt, '')
+        $fmt = $ins.Format.Replace('$Site', 'https://site.invalid').Replace('$Port', '7999').Replace('$Bind', '127.0.0.1').Replace('$ChatRange', 'off').Replace('$mostSet', '').Replace('$turnSet', '').Replace('voice-server.js', $sleep)
+        $action = New-ScheduledTaskAction -Execute $cmdExe -Argument ($fmt -f $ps51, (Join-Path $scratch 'voice.log'), $ps51, $rollerAt) -WorkingDirectory $scratch
+    } else {
+        $action = New-ScheduledTaskAction -Execute $cmdExe `
+                                          -Argument ('/c ""' + $ps51 + '" ' + $sleep + '"')
+    }
     $child = $null
     $parent = $null
     $skip = $null
@@ -243,7 +286,11 @@ foreach ($ins in $installers) {
             $second = 'what that process starts'
             if ($ins.Child) { $second += ' (' + $ins.Program + ')' } else { $first += ' (' + $ins.Program + ')' }
             foreach ($m in @(@($first, $up), @($second, $got))) {
-                Yes ('  ' + $m[0] + ' runs at the Normal priority class (BelowNormal at priority 7)') ($m[1].Class -eq 'Normal')
+                if ($ins.High) {
+                    Yes ('  ' + $m[0] + ' runs at the High priority class (Normal at 4, BelowNormal at 7)') ($m[1].Class -eq 'High')
+                } else {
+                    Yes ('  ' + $m[0] + ' runs at the Normal priority class (BelowNormal at priority 7)') ($m[1].Class -eq 'Normal')
+                }
                 Yes ('    with normal I/O priority, 2 (1, low, at priority 7)') ($m[1].Io -eq 2)
                 Yes ('    and normal memory priority, 5 (2 at priority 7)') ($m[1].Memory -eq 5)
             }
@@ -254,11 +301,18 @@ foreach ($ins in $installers) {
         Unregister-ScheduledTask -TaskName $name -Confirm:$false -ErrorAction SilentlyContinue
         if ($child) { Stop-Process -Id ([int]$child.ProcessId) -Force -ErrorAction SilentlyContinue }
         if ($parent) { Stop-Process -Id ([int]$parent.ProcessId) -Force -ErrorAction SilentlyContinue }
+        # Tried a few times: cmd.exe, stopped a moment ago, can still hold
+        # voice.log open, a file another program has open. Checked below.
+        for ($i = 0; $scratch -and $i -lt 20 -and (Test-Path -LiteralPath $scratch); $i++) {
+            Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue
+            if (Test-Path -LiteralPath $scratch) { Start-Sleep -Milliseconds 250 }
+        }
     }
     if ($skip) { Write-Host ('  SKIP  ' + $skip) }
     Yes '  the scratch task is gone again' (-not (Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue))
     if ($child) {
         Yes '    and so are its processes' (-not (Get-Process -Id ([int]$child.ProcessId), ([int]$child.ParentProcessId) -ErrorAction SilentlyContinue))
     }
+    if ($scratch) { Yes '    and its scratch folder' (-not (Test-Path -LiteralPath $scratch)) }
 }
 Done

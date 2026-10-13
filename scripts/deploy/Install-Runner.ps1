@@ -188,9 +188,11 @@
   priority 7 task started went from BelowNormal, I/O 1, memory 2 to Normal,
   1 and 2, measured the same day (tests\test-runner-priority.ps1). The
   install, -Lock and -Remove take every such task off the box and name it;
-  -Status says when one is still there. A build still shares the five cores
-  with the game server, the site, voice and the bot at the same priority as
-  them, never above.
+  -Status says when one is still there. A build shares the box's six cores
+  at Normal with the site, Caddy and the bot, never above them. Since
+  12 Oct 2026 the game servers and voice run High, above every build:
+  Patrick's decision, "we need to fix it so the servers run on high
+  priority" (#2491, Install-ThornswoodServer.ps1 and Install-Voice.ps1).
 
   Safe to run again. An existing runner is replaced, the account keeps its
   name and gets a new password, and the folder denials are made again.

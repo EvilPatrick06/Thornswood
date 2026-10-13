@@ -211,7 +211,9 @@ function RunCommand([string]$cmd) {
 # off is what an install that does not mention it hands over. The roller in
 # front of node came with entry 220, so voice.log is rolled before each start.
 # Auth is on whatever the install is given since #1303: there is no -Auth.
-$before = '/c "set THORNSWOOD_SITE=https://thornswood.net&& set THORNSWOOD_VOICE_PORT=7778&& set THORNSWOOD_VOICE_BIND=0.0.0.0&& set THORNSWOOD_VOICE_AUTH=on&& set THORNSWOOD_CHAT_RANGE=off&& "{2}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{3}" -Path "{1}" & "{0}" voice-server.js >> "{1}" 2>&1"' -f $nodeExe, $logPath, $psExePath, $rollPath
+# node goes through start /high since #2491, so voice runs High, and call
+# exit hands node's exit code back as the task's.
+$before = '/c "set THORNSWOOD_SITE=https://thornswood.net&& set THORNSWOOD_VOICE_PORT=7778&& set THORNSWOOD_VOICE_BIND=0.0.0.0&& set THORNSWOOD_VOICE_AUTH=on&& set THORNSWOOD_CHAT_RANGE=off&& "{2}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{3}" -Path "{1}" & start "" /b /wait /high "{0}" voice-server.js >> "{1}" 2>&1 & call exit %^errorlevel%"' -f $nodeExe, $logPath, $psExePath, $rollPath
 
 $none = CommandFor ''
 Yes 'with no relay the command line is the one every install sent before, to the character' (
