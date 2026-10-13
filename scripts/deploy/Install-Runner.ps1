@@ -899,10 +899,21 @@ if ($OffBox -and "$out" -match 'COULD NOT shut') { Die 'The runner is installed,
 if ("$out" -notmatch 'service Running') { Die 'The runner service is not running. The lines above say where it stopped; .\scripts\deploy\Install-Runner.ps1 -Status shows what is there.' }
 
 Head 'GitHub'
-Start-Sleep -Seconds 10
-$r = (Invoke-Gh api "repos/$Repo/actions/runners" | Out-String) | ConvertFrom-Json
-$mine = @($r.runners | Where-Object { $_.name -eq $RunnerName })
-if (-not $mine.Count) { Die "The service runs but GitHub does not list a runner called $RunnerName yet. Give it a minute and run -Status." }
+# GitHub shows the runner online once its listener has connected, a few
+# seconds after the service starts; how long that takes is on GitHub's side,
+# outside this script, so GitHub is asked every 3 seconds until it says so,
+# for a minute at most. Until #2357 this was a fixed 10 second wait and one
+# ask, and the wait ran in every -DryRunTo too, where the stand-in answers at
+# once: nine of them in tests\test-runner-offbox.ps1, 90 of its 100 seconds
+# in the nightly.
+$askUntil = (Get-Date).AddSeconds(60)
+while ($true) {
+  $r = (Invoke-Gh api "repos/$Repo/actions/runners" | Out-String) | ConvertFrom-Json
+  $mine = @($r.runners | Where-Object { $_.name -eq $RunnerName })
+  if (($mine.Count -and "$($mine[0].status)" -like 'online*') -or (Get-Date) -ge $askUntil) { break }
+  Start-Sleep -Seconds 3
+}
+if (-not $mine.Count) { Die "The service runs but GitHub did not list a runner called $RunnerName within a minute. Run -Status to ask again." }
 Say ('  ' + $mine[0].name + ' is ' + $mine[0].status) 'Green'
 
 # Every runner, this one included, so adding one leaves all of them locked.
