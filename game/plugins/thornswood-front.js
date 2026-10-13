@@ -8226,14 +8226,6 @@
     return best;
   }
 
-  function boardFacing(pc, px, py, spot) {
-    const dx = spot.x - px, dy = spot.y - py;
-    const horiz = Math.sqrt(dx * dx + dy * dy);
-    if (horiz < 1) { return true; }
-    const yaw = pc.getAngleZ() * Math.PI / 180;
-    return (Math.sin(yaw) * dx + Math.cos(yaw) * dy) / horiz > 0.5;
-  }
-
   /*
     A CARRIAGE OR FERRY DRIVER OPENS HIS PANEL (#1394, #1635).
 
@@ -8412,28 +8404,25 @@
     if (!spot) { return false; }
     const dist = boardDist(px, py, pz, spot);
     if (dist > BOARD_REACH) { return false; }
+    /*
+      ONLY THE BOARD ITSELF OPENS THE BOARD (#2298). Patrick, 12 Oct: "when
+      they click on the Notice Board it does the Notice Board and when they
+      click on the dropbox it does just the dropbox". The hold's drop box now
+      stands on a shelf on the board's right post, about 140 from the board's
+      spot, and it is a container the server places, which answers E itself.
+
+      This used to open the board for E on anything within 250 of the spot
+      that was not a person, and for E on nothing at all while facing the
+      spot. Both came in with #1430, whose own comment said why: "THE NOTICE
+      BOARD HAS NO MESH", so there was nothing to aim at. Kept, the first
+      would open the board when somebody pressed E on the box. The
+      board has its own mesh and collision now, so the crosshair finds it,
+      and anything else under the crosshair (the box, Geldis Sadri behind
+      Raven Rock's board, #1374) answers E itself.
+    */
     let ref = null;
     try { ref = sp.Game.getCurrentCrosshairRef(); } catch (err) { ref = null; }
-    if (ref && boardObjectHere(ref)) {
-      /* The object itself. Standing at it is the only other rule. */
-    } else if (ref) {
-      /*
-        SOMEBODY UNDER THE CROSSHAIR IS NOT THE BOARD (#1374). Raven Rock's
-        board starts where its innkeeper, Geldis Sadri, stands, and he is a
-        guild trader: without this, E on him opened the board and never his
-        wares. A person or an NPC answers E themselves.
-      */
-      let type = 0;
-      try { type = ref.getBaseObject().getType(); } catch (err) { type = 0; }
-      if (type === 43) { return false; }
-      let rd = 99999;
-      try {
-        rd = boardDist(ref.getPositionX(), ref.getPositionY(), ref.getPositionZ(), spot);
-      } catch (err) { rd = 99999; }
-      if (rd > 250) { return false; }
-    } else if (!(dist < 180 || boardFacing(pc, px, py, spot))) {
-      return false;
-    }
+    if (!ref || !boardObjectHere(ref)) { return false; }
     T.js('try{window.thornswoodBoard&&window.thornswoodBoard.open();}catch(e){}');
     return true;
   }

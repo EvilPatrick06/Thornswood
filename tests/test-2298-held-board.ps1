@@ -13,8 +13,9 @@
 
   This proves:
     a line with no way out, or with both, cannot be made;
-    the board's line has no revision and is held while the committed plugin
-      names it, at every revision, so it ships;
+    the board's line has no revision, and since the committed plugin names
+      Thornswood's own board (#2298) the old mesh is let go at every
+      revision, while the new board and drop box are ours;
     a plugin that no longer names it lets it go at once, at every revision;
     a model inside a compressed record is still read;
     a missing plugin stops rather than guessing;
@@ -48,13 +49,17 @@ $line = @($ShipHeldForCollection | Where-Object { [string]$_.Path -eq $board })
 Yes 'the board has one held line' ($line.Count -eq 1)
 Yes '  with no revision, because none carries it' ($line.Count -eq 1 -and [int]$line[0].Revision -eq 0)
 Yes '  held while the content plugin names it' ($line.Count -eq 1 -and [string]$line[0].ContentModel -eq 'olivar-messageboard\missiveboardcotnd.nif')
-Yes 'the committed plugin still names the board mesh (its message board, ThornswoodMessageBoard)' (Test-ShipContentNames 'olivar-messageboard\MissiveBoardCOTND.nif')
+# Since #2298 the committed plugin's board is Thornswood's own mesh, so the
+# old one leaves: no longer held at any revision, and somebody else's file.
+Yes 'the committed plugin no longer names the old board mesh' (-not (Test-ShipContentNames 'olivar-messageboard\MissiveBoardCOTND.nif'))
+Yes '  it names Thornswood''s own board, meshes\thornswood\noticeboard01.nif' (Test-ShipContentNames 'thornswood\noticeboard01.nif')
 foreach ($rev in 0, 1, 2, 3, 99) {
-    Yes "so the mesh is held at revision $rev" (Test-ShipHeld $board $rev)
-    Yes "  and ships at revision $rev (not somebody else's file)" (-not (Test-ShipNotOurs $board $rev))
+    Yes "so the old mesh is not held at revision $rev" (-not (Test-ShipHeld $board $rev))
+    Yes "  and does not ship at revision $rev" (Test-ShipNotOurs $board $rev)
 }
-Yes 'any case and either slash' ((Test-ShipHeld $board.ToUpperInvariant() 2) -and (Test-ShipHeld $board.Replace('\', '/') 2))
-Yes 'a file beside it is not held' (-not (Test-ShipHeld 'Data\meshes\olivar-messageboard\other.nif' 2))
+Yes 'the new board and its drop box are ours at every revision' (
+    -not (Test-ShipNotOurs 'Data\meshes\thornswood\noticeboard01.nif' 2) -and -not (Test-ShipNotOurs 'Data\meshes\thornswood\dropbox01.nif' 99))
+Yes 'a file beside the old one is not held' (-not (Test-ShipHeld 'Data\meshes\olivar-messageboard\other.nif' 2))
 
 # ---- plugins built here --------------------------------------------------------
 function Sub([string]$tag, [byte[]]$body) {
@@ -110,6 +115,8 @@ try {
 
     $ShipContentPlugin = $named
     Yes 'a plugin built here that names the mesh holds it at revision 2' ((Test-ShipHeld $board 2) -and -not (Test-ShipNotOurs $board 2))
+    foreach ($rev in 0, 3, 99) { Yes "  and at revision $rev" (Test-ShipHeld $board $rev) }
+    Yes '  in any case and with either slash' ((Test-ShipHeld $board.ToUpperInvariant() 2) -and (Test-ShipHeld $board.Replace('\', '/') 2))
 
     $ShipContentPlugin = $moved
     Yes 'repointed at a mesh the collection installs, the held mesh is let go at revision 0' (-not (Test-ShipHeld $board 0))
