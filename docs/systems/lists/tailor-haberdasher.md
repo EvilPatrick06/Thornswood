@@ -1,14 +1,15 @@
 # Tailor/Haberdasher
 
-Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 168 recipes, 168 of them reach the server. A row the server is not asked about is tempering: the armour table and the grindstone never call the server.
+Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 172 recipes, 172 of them reach the server. A row the server is not asked about is tempering: the armour table and the grindstone never call the server.
 
-By rank: novice 115, advanced 26, expert 10, master 17.
+By rank: novice 119, advanced 26, expert 10, master 17.
 
 | Item | Makes | Rank | Kind | Bench | Asks for | Race | Server asked | Id |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Fine Armguards | 1 | novice | Gloves | MCE_CraftingLoom | 2 Leather Strips, 2 Leather |  | yes | `989:MoreCraftableEquipment.esp` |
 | Gloves | 1 | novice | Gloves | MCE_CraftingLoom | 1 Leather, 1 Thread |  | yes | `978:MoreCraftableEquipment.esp` |
 | Jester's Gloves | 1 | novice | Gloves | MCE_CraftingLoom | 2 Thread |  | yes | `944:MoreCraftableEquipment.esp` |
+| Riekling Cloth Hand Wraps | 1 | novice | Gloves | SmithingForge | 3 Leather Strips | riekling | yes | `19f90:Playable Rieklings.esp` |
 | Shrouded Hand Wraps | 1 | novice | Gloves | MCE_CraftingLoom | 2 Thread |  | yes | `940:MoreCraftableEquipment.esp` |
 | Ulfric's Armguards | 1 | novice | Gloves | MCE_CraftingLoom | 2 Leather Strips, 2 Leather |  | yes | `9df:MoreCraftableEquipment.esp` |
 | Vampire Gloves | 1 | novice | Gloves | MCE_CraftingLoom | 1 Leather, 1 Thread |  | yes | `94d:MoreCraftableEquipment.esp` |
@@ -87,6 +88,8 @@ By rank: novice 115, advanced 26, expert 10, master 17.
 | Noble Clothes | 1 | novice | Robes and body wear | MCE_CraftingLoom | 1 Leather, 5 Thread |  | yes | `984:MoreCraftableEquipment.esp` |
 | Ragged Trousers | 1 | novice | Robes and body wear | MCE_CraftingLoom | 1 Thread |  | yes | `9b6:MoreCraftableEquipment.esp` |
 | Refined Tunic | 1 | novice | Robes and body wear | MCE_CraftingLoom | 1 Leather, 5 Thread |  | yes | `98e:MoreCraftableEquipment.esp` |
+| Riekling LoinCloth 1 | 1 | novice | Robes and body wear | SmithingForge | 2 Leather Strips, 2 Leather | riekling | yes | `19f92:Playable Rieklings.esp` |
+| Riekling LoinCloth 2 | 1 | novice | Robes and body wear | SmithingForge | 2 Leather Strips, 3 Leather | riekling | yes | `19f94:Playable Rieklings.esp` |
 | Roughspun Tunic | 1 | novice | Robes and body wear | MCE_CraftingLoom | 1 Thread |  | yes | `9b8:MoreCraftableEquipment.esp` |
 | Tavern Clothes | 1 | novice | Robes and body wear | MCE_CraftingLoom | 4 Thread |  | yes | `9d2:MoreCraftableEquipment.esp` |
 | Ulfric's Clothes | 1 | novice | Robes and body wear | MCE_CraftingLoom | 1 Leather, 5 Thread |  | yes | `9de:MoreCraftableEquipment.esp` |
@@ -112,6 +115,7 @@ By rank: novice 115, advanced 26, expert 10, master 17.
 | Pleated Shoes | 1 | novice | Shoes and light boots | MCE_CraftingLoom | 2 Leather, 3 Thread |  | yes | `98b:MoreCraftableEquipment.esp` |
 | Ragged Boots | 1 | novice | Shoes and light boots | MCE_CraftingLoom | 1 Thread |  | yes | `922:MoreCraftableEquipment.esp` |
 | Redguard Boots | 1 | novice | Shoes and light boots | MCE_CraftingLoom | 2 Leather, 1 Thread | redguard | yes | `9bd:MoreCraftableEquipment.esp` |
+| Riekling Cloth Foot Wraps | 1 | novice | Shoes and light boots | SmithingForge | 3 Leather Strips | riekling | yes | `19f91:Playable Rieklings.esp` |
 | Shoes | 1 | novice | Shoes and light boots | MCE_CraftingLoom | 1 Leather, 1 Thread |  | yes | `920:MoreCraftableEquipment.esp` |
 | Shoes | 1 | novice | Shoes and light boots | MCE_CraftingLoom | 1 Leather, 1 Thread |  | yes | `926:MoreCraftableEquipment.esp` |
 | Shoes | 1 | novice | Shoes and light boots | MCE_CraftingLoom | 1 Leather, 1 Thread |  | yes | `92b:MoreCraftableEquipment.esp` |

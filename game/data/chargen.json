@@ -9,6 +9,20 @@
    1
   ]
  ],
+ "rieklingShift": [
+  [
+   "19f6c:Playable Rieklings.esp",
+   1
+  ],
+  [
+   "19f69:Playable Rieklings.esp",
+   1
+  ],
+  [
+   "19f68:Playable Rieklings.esp",
+   1
+  ]
+ ],
  "towns": {
   "e80030:Thornswood-Content.esp": {
    "key": "whiterun",

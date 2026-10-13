@@ -328,6 +328,7 @@ const WRITERS = {
   'outer/takeItem': [1, 'only takes things away'],
   'outer/takeItemById': [1, 'only takes things away'],
   'outer/giveShift': [1, 'the shift, out of CHARGEN.shift'],
+  'outer/rieklingShift': [1, 'a new riekling\'s shift taken back and its own three pieces, out of CHARGEN.rieklingShift, put in (#614): armour descriptors, never gold'],
   'outer/giveItems': [1, 'descriptor pairs, and nothing calls it (checked below)'],
   'outer/packAsServerHasIt': [1, 'the take limit sends back the pack the server already holds, so it adds nothing'],
   'staff spells/(top)': [1, 'a refused spell tome sends back the pack the server already holds (#2261), so it adds nothing'],
