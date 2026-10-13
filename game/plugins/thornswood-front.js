@@ -5005,6 +5005,49 @@
     return busyMenuOpen();
   }
 
+  /*
+    WHAT THE GAME ITSELF OFFERS ON A PERSON, said once each time you look at
+    somebody new (#2473). Patrick, 12 Oct: the game's own "Talk to" prompt
+    shows over a person, twice, over the look panel, the adventure menu and
+    the name tags. Two things in this build can draw it, and nothing here
+    says which one is on screen:
+
+      the HUD's own line, the activate text Skyrim gives any actor whose race
+        allows talking to it. The client blocks a person's activation every
+        frame (movementApply.ts blockActivation(true)), which sends the press
+        to scripts instead of the dialogue, and leaves the text standing.
+      Better Third Person Selection, in the collection, which in third person
+        copies that text into a widget of its own drawn at the person, above
+        the head for an actor (its MCM settings.ini: the 3D widget on in
+        third person, fWidgetZOffsetAdditionalNPC), which is where the name
+        tag and the speaking mark are.
+
+    So this writes what the HUD's line holds, whether that mod's menu is up,
+    which camera you are in and whether the activation is blocked. Two
+    sessions, one in each camera, settle which layer is which and whether
+    the two copies are the HUD and that widget, before anything is changed.
+    It reads; it changes nothing.
+  */
+  function gamePromptSaid(ref) {
+    const bits = [];
+    let cam = -1;
+    try { cam = Number(sp.Game.getCameraState()); } catch (e) { cam = -1; }
+    // SKSE's numbers: 0 first person, 8 and 9 the two third person states.
+    bits.push('camera ' + (cam === 0 ? 'first person' : (cam === 8 || cam === 9) ? 'third person' : String(cam)));
+    const read = function (target) {
+      try { return String(sp.Ui.getString('HUD Menu', target) || ''); } catch (e) { return '?'; }
+    };
+    bits.push('the HUD line "' + read('_root.HUDMovieBaseInstance.RolloverText.text') + '"' +
+              ' / "' + read('_root.HUDMovieBaseInstance.RolloverInfoText.text') + '"');
+    let btps = 'unknown';
+    try { btps = sp.Ui.isMenuOpen('BTPS Menu') ? 'up' : 'not up'; } catch (e) { btps = 'unknown'; }
+    bits.push('Better Third Person Selection\'s widget menu ' + btps);
+    let blocked = 'unknown';
+    try { blocked = ref.isActivationBlocked() ? 'yes' : 'no'; } catch (e) { blocked = 'unknown'; }
+    bits.push('activation blocked ' + blocked);
+    return ': ' + bits.join(', ');
+  }
+
   // A claim is a variable read, so it is asked every frame and a panel takes
   // the prompt down in the frame it opens, not on the next poll.
   sp.on('update', guard('crosshair', () => {
@@ -5034,7 +5077,7 @@
 
     if (hex !== lookingAt) {
       lookingAt = hex;
-      say('looking at ' + row.n + ' (' + hex + ')');
+      say('looking at ' + row.n + ' (' + hex + ')' + gamePromptSaid(ref));
     }
     const cover = lookCoveredBy();
     if (cover !== lookCover) {
