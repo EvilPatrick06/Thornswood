@@ -191,15 +191,40 @@ item-only legacy keys keep their compatible saved meaning.
 Without an explicit history manifest, the current active roster remains the
 manifest. This support alone does not cut the current 249 traders. Before
 activating retirement, validate writer ownership, pending-intent uniqueness,
-explicit first-world initialization and reachable legacy quest turn-ins.
+existing saved purse state and reachable legacy quest turn-ins. Activation
+of an already initialized world must refuse null or missing retained purses
+before any initial grant. A genuinely new world requires separate explicit
+initialization; neither existing Main nor Dev is a new world.
 Merchant runtime startup requires its existing private ledger and initialization
 marker. Missing evidence stops service without creating a fresh manifest or
 resetting purses. It checks again before durable writer dispatch, after privacy
 checks and serialization. Recover missing existing-world evidence from its
 original records; do not treat a restart or repair as new-world authorization.
-The explicit offline initializer remains a separate prerequisite. Existing
+The explicit offline initializer remains a prerequisite for a genuinely new world. Existing
 native replacement of a known valid document and dungeon-ledger initialization
 keep their existing behavior.
+
+NPC startup now constructs trading, population policy and shared activity
+in suspended mode. Property registration and initial timer registration
+finish before the native exclusion commit is attempted. The trading service
+cannot interact or recover while suspended, and a required retirement gate
+cannot be bypassed by omitting the suspension option. Genuine legacy work
+still recovers normally under the compatible 249-trader startup.
+
+A failed constructor cancels its owned timers and reaches startup cleanup.
+Each startup owns its local controllers; an older callback cannot stop or
+clear a replacement. Population exclusions have one commit attempt. An
+uncertain native result revokes that policy instead of retrying it. Failure
+after the commit attempt stops the new services; it does not claim to undo
+native exclusions or durable receipt work.
+
+`game/data/merchant-roster.json` records the proposed 60 role bindings and
+all 249 historical identities. Its source validator checks every binding
+before changing any population row. This prerequisite does not import that
+roster into the production generator, change the current 249 traders, or
+change the generated game plugin. Reliable client suppression and gated
+plugin retirement remain required before the actual cut; server exclusions
+alone do not suppress native client copies deterministically.
 Implement quests in complete, source-bound slices with coverage checks for
 all trades, holds, tiers, classes, professions, halves and schools. Legacy
 open quests must remain recoverable during catalogue changes.

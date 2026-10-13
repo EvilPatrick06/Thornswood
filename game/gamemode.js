@@ -63732,6 +63732,10 @@ function npcMerchantManifest(data) {
 }
 function createNpcMerchantPurses(api,data,storage) {
   if(!storage) throw new Error('A durable merchant ledger is required');
+  const retirement=data.merchantRoster!==undefined;
+  if(retirement && (!data.merchantRoster || typeof data.merchantRoster!=='object' ||
+      Object.keys(data.merchantRoster).length!==2 || data.merchantRoster.version!==1 ||
+      data.merchantRoster.worldMode!=='existing')) throw new Error('Invalid existing-world merchant roster');
   const owners=globalThis.__thornswoodMerchantLedgerOwners || (globalThis.__thornswoodMerchantLedgerOwners=new Map());
   const key=storage.namespace || storage;
   const prior=owners.get(key);
@@ -63775,6 +63779,8 @@ function createNpcMerchantPurses(api,data,storage) {
     if(!references.has(reference) || (ledger.entries[reference]!==null && !valid(ledger.entries[reference],references.get(reference))))
       throw new Error('Saved merchant ledger entry cannot be verified');
   }
+  if(retirement && Array.from(references.values()).some(identity=>identity.active && ledger.entries[identity.reference]===null))
+    throw new Error('Existing-world roster activation requires every retained saved purse');
   function prepare(id) {
     return mutate(()=>prepareState(id));
   }
@@ -63881,7 +63887,7 @@ function createNpcMerchantPurses(api,data,storage) {
 // NPC MERCHANT PURSES END
 
 // NPC POPULATION POLICY BEGIN
-function createNpcPopulation(api,data,plugins,merchants) {
+function createNpcPopulation(api,data,plugins,merchants,options) {
   if(data.version!==1 || JSON.stringify(data.plugins)!==JSON.stringify(plugins))
     throw new Error('NPC population catalogue does not match the installed load order');
   const allowed=new Map(),byBase=new Map(),configured=new Map(),counts=new Map();
@@ -63907,8 +63913,20 @@ function createNpcPopulation(api,data,plugins,merchants) {
   }
   api.makeProperty('thornswoodNpcHome',{isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
   api.makeProperty('thornswoodNpcCommanded',{isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
-  api.setNpcPlacementExclusions(excluded);
+  let committed=false,closed=false,attempted=false;
+  function commit() {
+    if(closed) throw new Error('NPC population activation is revoked');
+    if(committed) return true;
+    if(attempted) throw new Error('NPC population commit was already attempted');
+    attempted=true;
+    try {api.setNpcPlacementExclusions(excluded);} catch(error) {closed=true;throw error;}
+    if(closed) throw new Error('NPC population activation is revoked');
+    committed=true;
+    return true;
+  }
+  if(!options || options.suspended!==true) commit();
   function configure(id,state) {
+    if(!committed || closed) return null;
     if(state.isHuman) return null;
     if(configured.has(id)) return configured.get(id).policy;
     let rule=allowed.get(id),home;
@@ -63930,10 +63948,13 @@ function createNpcPopulation(api,data,plugins,merchants) {
         .sort((a,b)=>Math.hypot(...a.row[3].map((v,j)=>v-anchor[j]))-
           Math.hypot(...b.row[3].map((v,j)=>v-anchor[j])))[0];
       if(rule && !rule.commanded && (counts.get(rule.bucket)||0)>=(rule.row[9]||4)) rule=null;
+      if(closed) return null;
       if(rule) {
         home=validHome ? saved.home.slice() : state.pos.slice();
         api.set(id,'thornswoodNpcHome',{home,cell:rule.cell,source:rule.commanded ? 'command' : rule.row[0]});
+        if(closed) return null;
         api.set(id,'spawnPoint',{cellOrWorldDesc:rule.row[2],pos:home,rot:[0,0,0]});
+        if(closed) return null;
       }
     }
     if(!rule) {
@@ -63942,9 +63963,15 @@ function createNpcPopulation(api,data,plugins,merchants) {
       if(id>=0xff000000) {api.set(id,'isDisabled',true);}
       return null;
     }
-    if(rule.row[13]) api.callPapyrusFunction('method','ObjectReference','SetDisplayName',
-      {type:'form',desc:api.getDescFromId(id)},[rule.row[13],true]);
+    if(rule.row[13]) {
+      const desc=api.getDescFromId(id);
+      if(closed) return null;
+      api.callPapyrusFunction('method','ObjectReference','SetDisplayName',
+        {type:'form',desc},[rule.row[13],true]);
+      if(closed) return null;
+    }
     api.set(id,'spawnDelay',rule.row[5]*60);
+    if(closed) return null;
     // row[11]: 1 the race swims and cannot walk, 2 an ambush placement (#2067).
     const flags=rule.row[11] || 0;
     const policy={home:home || rule.row[3].slice(),cell:rule.cell,leash:rule.row[4],
@@ -63956,8 +63983,10 @@ function createNpcPopulation(api,data,plugins,merchants) {
     return policy;
   }
   function afterOwnership(id) {
+    if(!committed || closed) return;
     const entry=configured.get(id);
     if(entry && api.setNpcDifficultyTier) api.setNpcDifficultyTier(id,entry.rule.row[8] || 0);
+    if(closed) return;
     if(entry && merchants) merchants.prepare(id);
   }
   function release(id) {
@@ -63967,14 +63996,15 @@ function createNpcPopulation(api,data,plugins,merchants) {
       configured.delete(id);
     }
   }
-  return {configure,afterOwnership,release,merchantStats:()=>merchants && merchants.stats(),reconcile:ids=>{
+  return {configure,afterOwnership,release,commit,stop:()=>{closed=true;},merchantStats:()=>merchants && merchants.stats(),reconcile:ids=>{
     const live=new Set(ids);
     for(const id of configured.keys()) if(id>=0xff000000 && !live.has(id)) release(id);
   },admit:(id,state)=>{
-    if(!configure(id,state)) return false;
+    if(!configure(id,state) || closed) return false;
     api.setNpcServerControlled(id,true);
+    if(closed) return false;
     afterOwnership(id);
-    return true;
+    return !closed;
   },returnMinutes:id=>{
     const entry=configured.get(id),rule=entry ? entry.rule : allowed.get(id);
     return rule && rule.row[5];
@@ -64533,7 +64563,7 @@ function createNpcNavigation(api, now, report, ready) {
   return {banks,ensureBank,locate,search,nodeLinks,work,pending:()=>meshWork.length,
     meshes:sharedMeshes,cellTiles,tiles,slots,version:()=>geometryVersion};
 }
-function startSharedNpcServerRuntime(api, timers, now, report, population) {
+function startSharedNpcServerRuntime(api, timers, now, report, population, options) {
   const property = 'thornswoodNpcActivity';
   api.makeProperty(property, {isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
   const handles = new Set(), actors = new Map(), order = [], preparing = [], owned = new Set(), unavailable = new Set();
@@ -64545,16 +64575,30 @@ function startSharedNpcServerRuntime(api, timers, now, report, population) {
   // Placed off walkable ground, waiting to be set down on it (#2067): out of
   // everybody's sight, or for an ambush once somebody comes near.
   const held = new Map(), AMBUSH_RANGE = 1024, AMBUSH_STEP = 256;
-  let stopped=false,cursor=0,total=0,loaded=0,backgroundCursor=0,nearCursor=0;
+  let stopped=false,running=!options || options.suspended!==true,cursor=0,total=0,loaded=0,backgroundCursor=0,nearCursor=0;
+  const ready=[];
   let humans=new Map(),near=new Set(),nearOrder=[],moved=0,attacks=0,failed=0,lastReport=now();
   function schedule(fn, delay) {
     if (stopped) return;
-    const callback=()=>{handles.delete(handle); if (!stopped) fn();};
+    const callback=()=>{
+      handles.delete(handle);
+      if(stopped) return;
+      if(!running) {ready.push(fn);return;}
+      fn();
+    };
     callback.npcRuntimeTask=fn.name;
-    const handle = timers.setTimeout(callback,delay);
+    let handle;
+    try {handle = timers.setTimeout(callback,delay);} catch(error) {stop();throw error;}
     handles.add(handle);
   }
-  function stop() { stopped=true; for(const h of handles) timers.clearTimeout(h); handles.clear(); }
+  function stop() { stopped=true;ready.length=0;for(const h of handles) timers.clearTimeout(h);handles.clear(); }
+  function start() {
+    if(stopped) throw new Error('NPC runtime activation is revoked');
+    if(running) return true;
+    running=true;
+    while(ready.length && !stopped) ready.shift()();
+    return !stopped;
+  }
   const distance=(a,b)=>Math.hypot(...a.map((v,i)=>v-b[i]));
   const tile=(cell,p)=>cell+':'+Math.floor(p[0]/512)+':'+Math.floor(p[1]/512);
   function indexActor(a) {
@@ -65036,7 +65080,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population) {
   schedule(preload,0);schedule(prepareTick,10);schedule(meshTick,10);
   schedule(humanTick,0);schedule(backgroundTick,20);schedule(nearTick,100);schedule(searchTick,10);
   if(population) schedule(discover,5000);
-  return {stop,enroll,getHeldIds:()=>[...held.keys(),...searching.map(job=>job.id)],getActorStatus:id=>{const a=actors.get(id);return a && {
+  return {stop,start,enroll,getHeldIds:()=>[...held.keys(),...searching.map(job=>job.id)],getActorStatus:id=>{const a=actors.get(id);return a && {
     mode:a.mode,target:a.target,pos:a.pos.slice(),path:a.path.map(p=>p.slice()),
     triangle:a.node.index,mesh:a.node.mesh,lastUpdate:a.last,paused:!!a.paused};},
     getStatus:()=>({loaded,controlled:owned.size,active:actors.size,unavailable:failed,held:held.size+searching.length,
@@ -65969,7 +66013,8 @@ function createMerchantTrading(deps) {
   var viewOwners = new WeakMap();
   var sessionSerial = 0;
   var settlement = SETTLEMENT.createSettlement({purses:purses,transfer:transfer,world:deps.namespace || purses.namespace,log:deps.log,now:now});
-  var active = true;
+  var retirementRequired=deps.retirementRequired===true;
+  var active = deps.suspended !== true && !retirementRequired, closed = false;
 
   function placeOf(reference) {
     return places[reference] || null;
@@ -66465,6 +66510,7 @@ function createMerchantTrading(deps) {
   }
 
   function activate(actorId, merchantId) {
+    if (!active) return fail('Trading is unavailable.');
     if (typeof deps.isTrader === 'function' && !deps.isTrader(merchantId)) return null;
     var human = world.actor(actorId);
     var profileId = human && Number(human.profileId) || 0;
@@ -66489,9 +66535,20 @@ function createMerchantTrading(deps) {
     command: command,
     activate: activate,
     recover: recover,
+    retirementReady: function () {
+      var ready=!closed && settlement.canRetire();
+      return !closed && ready;
+    },
+    start: function () {
+      if(closed || !settlement.available()) throw new Error('Trading is unavailable.');
+      if(retirementRequired && !settlement.canRetire()) throw new Error('Legacy work blocks roster activation.');
+      if(closed || !settlement.available()) throw new Error('Trading is unavailable.');
+      active=true;
+      return true;
+    },
     nativeReady: function () { return settlement.available(); },
-    withQuestInventoryMutation: function(actorId,change) {return settlement.withInventoryMutation(actorId,change);},
-    questReady: function(actorId) {return settlement.canInventoryMutation(actorId);},
+    withQuestInventoryMutation: function(actorId,change) {return active ? settlement.withInventoryMutation(actorId,change) : {ok:false,why:'unavailable'};},
+    questReady: function(actorId) {return active && settlement.canInventoryMutation(actorId);},
     questAdmission: function(actorId,merchantId) {
       if (!active) return null;
       // Capture before actor lookup: native callbacks must not supply a new conversation.
@@ -66513,7 +66570,7 @@ function createMerchantTrading(deps) {
       var state=active && purses.read(merchantId),place=state && placeOf(state.reference);
       return place && place.hold || '';
     },
-    shutdown: function () { active=false; sessions.clear(); settlement.shutdown(); },
+    shutdown: function () { active=false; closed=true; sessions.clear(); settlement.shutdown(); },
     REACH: REACH,
     SUPPLY_COUNT: SUPPLY_COUNT,
     bookHoldOf: bookHoldOf
@@ -66593,6 +66650,8 @@ function installMerchantTrading(env) {
     },
     places: doc.byRef || {},
     roleTables: env.roleTables,
+    suspended: env.suspended,
+    retirementRequired: env.retirementRequired,
     quests: function () { return g.__thornswoodQuests; },
     resolve: function (name) {
       var fn = g.__thornswoodResolveItem;
@@ -66620,12 +66679,10 @@ function installMerchantTrading(env) {
     '  } catch (e) { }',
     '})();'
   ].join('\n');
-  try {
-    mp.makeProperty(property, {
+  mp.makeProperty(property, {
       isVisibleByOwner: true, isVisibleByNeighbors: false,
       updateOwner: script, updateNeighbor: ''
-    });
-  } catch (e) {}
+  });
   trading.push = function (actorId, view) {
     var payload = JSON.parse(JSON.stringify(view || { open: false }));
     payload.at = Date.now();
@@ -66635,17 +66692,35 @@ function installMerchantTrading(env) {
     trading.acknowledgeView(actorId,payload);
   };
   var timers=env.timers || (typeof setTimeout === 'function' && typeof clearTimeout === 'function' ? {setTimeout:setTimeout,clearTimeout:clearTimeout} : null);
-  var alive=true, timer=null;
+  var alive=true, timer=null, started=false;
   var stop=trading.shutdown;
-  trading.shutdown=function () {alive=false; if(timer!==null && timers) timers.clearTimeout(timer); stop();};
+  trading.shutdown=function () {alive=false; if(timer!==null && timers) timers.clearTimeout(timer);timer=null;stop();};
+  function scheduleAdvance() {
+    if(!alive || !timers || timer!==null) return;
+    try {
+      timer=timers.setTimeout(function () {timer=null;if(alive && started) advance();},1000);
+    } catch(error) {trading.shutdown();throw error;}
+  }
   function advance() {
     if(!alive) return;
     try { trading.recover().forEach(function (result) {if(alive) trading.push(result.actorId,result.view);}); }
     catch(error) {log('merchant recover: '+error);}
     // This checks exact save acknowledgements, never elapsed-time settlement.
-    if(alive && trading.nativeReady() && timers) timer=timers.setTimeout(advance,1000);
+    if(alive && trading.nativeReady()) scheduleAdvance();
   }
-  if(trading.nativeReady()) advance();
+  var start=trading.start;
+  trading.start=function () {
+    if(!alive) throw new Error('Trading is unavailable.');
+    start();
+    if(!alive) throw new Error('Trading is unavailable.');
+    if(!started) {started=true;advance();}
+    if(!alive || !trading.nativeReady()) throw new Error('Trading is unavailable.');
+    return true;
+  };
+  if(trading.nativeReady()) {
+    if(env.suspended===true || env.retirementRequired===true) scheduleAdvance();
+    else trading.start();
+  }
   return trading;
 }
 
@@ -66674,50 +66749,82 @@ return module.exports;
 // MERCHANT TRADING BUNDLE END
 
 // NPC SERVER STARTUP BEGIN
+(function () {
+const owner={};
+globalThis.__thornswoodNpcStartupOwner=owner;
+let merchants=null,trading=null,population=null,runtime=null;
+function current() {
+  if(globalThis.__thornswoodNpcStartupOwner!==owner) throw new Error('NPC startup ownership is revoked');
+}
+function cleanup(key,value,method) {
+  if(value && typeof value[method]==='function') {
+    try {value[method]();} catch(error) {log('NPC startup cleanup failed: '+error);}
+  }
+  if(globalThis[key]===value) globalThis[key]=null;
+}
 try {
-  if (globalThis.__thornswoodMerchantTrade) globalThis.__thornswoodMerchantTrade.shutdown();
-  globalThis.__thornswoodMerchantTrade=null;
-  if (globalThis.__thornswoodNpcRuntime) globalThis.__thornswoodNpcRuntime.stop();
-  globalThis.__thornswoodNpcRuntime=null;
-  globalThis.__thornswoodNpcPopulation=null;
-  if (globalThis.__thornswoodNpcMerchants) globalThis.__thornswoodNpcMerchants.shutdown();
-  globalThis.__thornswoodNpcMerchants=null;
+  for(const [key,method] of [['__thornswoodMerchantTrade','shutdown'],['__thornswoodNpcRuntime','stop'],
+      ['__thornswoodNpcPopulation','stop'],['__thornswoodNpcMerchants','shutdown']]) {
+    const prior=globalThis[key];
+    if(prior && typeof prior[method]==='function') prior[method]();
+    current();
+    if(globalThis[key]===prior) globalThis[key]=null;
+  }
   const cfgNpc = mp.getServerSettings();
+  current();
   if (/^(main|dev)$/i.test(String(cfgNpc.thornswoodServer || 'main'))) {
     // Build the winning-record indexes during startup, before scheduled work.
     mp.prepareNpcLoad();
+    current();
     const plugins=(cfgNpc.loadOrder || []).map(p=>String(p).split(/[\\/]/).pop());
     if(JSON.stringify(NPC_POPULATION_DATA.plugins)!==JSON.stringify(plugins))
       throw new Error('Merchant catalogue does not match the installed load order');
-    globalThis.__thornswoodNpcMerchants=createNpcMerchantPurses(mp,NPC_POPULATION_DATA,
+    const retirement=NPC_POPULATION_DATA.merchantRoster!==undefined;
+    merchants=createNpcMerchantPurses(mp,NPC_POPULATION_DATA,
       createPrivateMerchantLedger(require('fs'),require('path'),cfgNpc,
         npcMerchantManifest(NPC_POPULATION_DATA).map(identity=>identity.reference),
         typeof mp.writePrivateEconomyLedger==='function' ? mp.writePrivateEconomyLedger.bind(mp) : null));
-    try {
-      globalThis.__thornswoodMerchantTrade = MERCHANT_TRADING.installMerchantTrading({
+    current();
+    trading = MERCHANT_TRADING.installMerchantTrading({
         mp: mp,
         g: globalThis,
-        purses: globalThis.__thornswoodNpcMerchants,
+        purses: merchants,
+        suspended: true,
+        retirementRequired: retirement,
         log: function (line) { log(line); }
       });
-    } catch (eTrade) {
-      globalThis.__thornswoodMerchantTrade = null;
-      log('merchant trading did not start: ' + eTrade);
+    function ready() {
+      current();
+      if(!trading.nativeReady() || retirement && !trading.retirementReady())
+        throw new Error('Merchant roster admission is unavailable or legacy work remains');
+      current();
     }
-    globalThis.__thornswoodNpcPopulation=createNpcPopulation(mp,NPC_POPULATION_DATA,plugins,globalThis.__thornswoodNpcMerchants);
-    globalThis.__thornswoodNpcRuntime = startSharedNpcServerRuntime(
-      mp, {setTimeout, clearTimeout}, Date.now, text=>log(text),globalThis.__thornswoodNpcPopulation);
+    ready();
+    population=createNpcPopulation(mp,NPC_POPULATION_DATA,plugins,merchants,{suspended:true});
+    current();
+    runtime = startSharedNpcServerRuntime(
+      mp, {setTimeout, clearTimeout}, Date.now, text=>log(text),population,{suspended:true});
+    ready();
+    // Every fallible constructor and initial timer is staged before this commit attempt.
+    population.commit();
+    current();
+    globalThis.__thornswoodNpcMerchants=merchants;
+    globalThis.__thornswoodMerchantTrade=trading;
+    globalThis.__thornswoodNpcPopulation=population;
+    globalThis.__thornswoodNpcRuntime=runtime;
+    if(runtime.start()!==true) throw new Error('NPC runtime activation is unavailable');
+    current();
+    trading.start();
+    current();
   }
 } catch (e) {
-  if(globalThis.__thornswoodMerchantTrade) globalThis.__thornswoodMerchantTrade.shutdown();
-  globalThis.__thornswoodMerchantTrade=null;
-  if(globalThis.__thornswoodNpcMerchants) globalThis.__thornswoodNpcMerchants.shutdown();
-  if(globalThis.__thornswoodNpcRuntime) globalThis.__thornswoodNpcRuntime.stop();
-  globalThis.__thornswoodNpcMerchants=null;
-  globalThis.__thornswoodNpcPopulation=null;
-  globalThis.__thornswoodNpcRuntime=null;
+  cleanup('__thornswoodMerchantTrade',trading,'shutdown');
+  cleanup('__thornswoodNpcRuntime',runtime,'stop');
+  cleanup('__thornswoodNpcPopulation',population,'stop');
+  cleanup('__thornswoodNpcMerchants',merchants,'shutdown');
   log('NPC server runtime failed to start: ' + e);
 }
+})();
 // NPC SERVER STARTUP END
 
 // ==== thornswood custom quests ====
