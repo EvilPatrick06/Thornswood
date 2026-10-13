@@ -139,7 +139,7 @@ typed on a command line or written on this page.
 | The new box's Administrator password | the hosting provider's panel for the new box | typed once, at Setup-SshKey's prompt, step 4 |
 | The backup passphrase | `Documents\thornswood-backup-key.txt` on One | read there by Restore-Box at step 9, sent as a file by it at step 13 and by Install-Backup at step 23 |
 | The bot token, the Discord client secret, the site's keys, the door key | inside the backup: the site's `config.json`, the bot's `bot.env.json`, each server's `private\door.json` | put back by Restore-Box, step 13; Install-Bot runs with `-NoToken`, so nothing asks for them |
-| The staff channel webhook | Discord: the staff channel, Edit Channel, Integrations, Webhooks, Copy Webhook URL | pasted at Watch-Services' prompt, step 21 |
+| The staff channel webhook | Discord: #staff-updates, Edit Channel, Integrations, Webhooks, Copy Webhook URL | pasted at Watch-Services' prompt, step 21 |
 | Patrick's GitHub sign in | `gh auth login` on One | the build runner's registration, step 24 |
 | The DNS records | Patrick's own Cloudflare login, which he signs in to with GitHub, where thornswood.net is registered | step 18 |
 | Code signing | `records\signing\signing.json` on One and the Azure account behind it | the installer, step 17, and the main Ship, step 29 |
@@ -320,7 +320,8 @@ repository folder, as docs\RESTORING.md "The box is gone" says.
     `.\scripts\vps\Watch-Services.ps1 -Install`.
 21. **Where it posts when the bot is down:**
     `.\scripts\vps\Watch-Services.ps1 -SetWebhook`. It asks for the webhook at
-    a prompt and posts a test message in the staff channel.
+    a prompt, refuses one that does not post in #staff-updates, and posts a
+    test message there.
 22. **The load record:** `.\scripts\vps\Watch-Load.ps1 -Install`. **The disk
     forecast:** `.\scripts\vps\Forecast-Storage.ps1 -Install`, one sample a
     day as the task `Thornswood Disk History`. Copy the old box's

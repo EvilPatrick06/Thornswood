@@ -450,8 +450,9 @@ PLAN = [
    dict(kind='voice', name='play-testing', mode='pathfind'),
  ]),
  ('Staff', [
-   # The staff #news, where the site watcher speaks. Not the public #news in
-   # Information: that one carries the key, and the release webhook with it.
+   # The staff #news. Not the public #news in Information: that one carries
+   # the key, and the release webhook with it. The watchdog does not speak
+   # here; it speaks in #staff-updates (bot.py, staff-channel.txt, #2501).
    dict(kind='announce', name='news',      mode='staff'),
    dict(kind='forum', name='dev-test-results', mode='staff'),
    # The test tasks someone on dev has to measure (Patrick, 12 Oct). Made by
@@ -516,6 +517,11 @@ KEEP = (
     'general-chat', 'welcome-travelers', 'server-progression-and-economy',
     'play-testing', 'dev-test-results', 'test-results', 'test-tasks',
     'test-findings', 'test-tasks-archive', 'known-issues', 'dev-test-tasks',
+    # Where staff status updates go (Patrick, 11 Oct), and where the bot says
+    # the watchdog's messages and the sessions that went wrong, by the id in
+    # staff-channel.txt. Not in PLAN, so without this a run would list it as
+    # no longer in the plan and -Prune would delete it (#2501).
+    'staff-updates',
 )
 
 
@@ -531,8 +537,8 @@ def say(mark, what):
 # the holds, and post in the read only ones: nothing below ever named it.
 # Untick Administrator and the @everyone deny lands on the bot too, since
 # nothing here gives it Member, a staff role or a hold. The trouble alerts
-# in #staff-general and the site watcher in the staff #news (bot.py,
-# _trouble_channel and WATCH_ID) go quiet, the hold panel cannot be posted
+# and the watchdog's messages, both in #staff-updates (bot.py, TROUBLE_ID,
+# WATCH_ID and staff-channel.txt), go quiet, the hold panel cannot be posted
 # in #choose-your-hold, and -Posts can no longer write the rules, welcome,
 # news and faq posts.
 #
