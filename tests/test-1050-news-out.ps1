@@ -167,6 +167,8 @@ try {
         $pu.IndexOf('$marks = Set-DevFeedMarks') -lt $pu.IndexOf('Set-FeedNewsList $doc') -and
         $pu.IndexOf('Set-FeedNewsList $doc') -lt $pu.IndexOf('[IO.File]::WriteAllText($VersionFile'))
     Yes '  with the minLauncher it writes, and nothing sent on a run that uploads nothing' ($pu -match "Val \`$doc 'minLauncher'" -and $pu -match '-NoSend:\$NoUpload')
+    Yes '  and says the launcher number the feed carries next to main''s, which a packs-only dev Ship left blank' (
+        $pu -match "this one is on \`$\(Val \`$doc 'launcherVersion'\)" -and $pu -notmatch 'this one is on \$launcherVersion')
     $rb = $src['scripts\release\Rollback-Feed.ps1']
     Yes 'Rollback-Feed adds its note to the whole list and puts it back before the feed is written' ($rb -match 'Open-FeedNewsList \$doc' -and $rb.IndexOf('Set-FeedNewsList $doc') -gt 0 -and
         $rb.IndexOf('Set-FeedNewsList $doc') -lt $rb.IndexOf('[IO.File]::WriteAllText($VersionFile'))
