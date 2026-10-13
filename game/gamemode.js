@@ -42288,6 +42288,26 @@ log('gamemode loaded:',
   */
   var NOT_SKIP = new RegExp('knapsack', 'ig');
   var NOT_LOOT = new RegExp('burnt|journal', 'ig');
+  /*
+    THE CHEST AT THE END PAYS ONE TIER ABOVE THE PLACE (#510).
+    Decided by Patrick on 12 October 2026: "the 33 boss chests pay one tier
+    higher than the other chests there". Skyrim marks the chest at the end
+    of a place in its name, and only those: measured over the 895
+    containers the dev load order's winning records name, 33 have "boss"
+    in the editor id (TreasDraugrChestBoss, TreasBanditChestBossEMPTY,
+    DLC2TreasRieklingChestBoss, DLC2RR02BossChest, MorvunskarBossChest
+    and the rest), every one of them a chest, and no other container does.
+    The pile (gold, goods, tome, exclusive) is the next tier's. A tier 4
+    place has no tier above it, so its boss chest stays a tier 4 pile.
+    The rest is still the place's, because the rest is how long that
+    place takes to fill again, not what the chest holds.
+  */
+  var BOSS_WORD = new RegExp('boss', 'i');
+  function payTierFor(tier, name) {
+    tier = clampTier(tier);
+    if (!BOSS_WORD.test(String(name || ''))) return tier;
+    return tier < 4 ? tier + 1 : 4;
+  }
 
   var CELLS = {
     '10a8b:dawnguard.esm': 2,
@@ -42832,8 +42852,7 @@ log('gamemode loaded:',
     return '';
   }
 
-  function isLootContainer(baseId) {
-    var name = edidOf(baseId);
+  function isLootContainer(name) {
     if (!name) return false;
     if (SKIP_WORD.test(name.replace(NOT_SKIP, ''))) return false;
     return LOOT_WORD.test(name.replace(NOT_LOOT, ''));
@@ -42873,7 +42892,9 @@ log('gamemode loaded:',
     try { baseDesc = String(mp.get(refrId, 'baseDesc') || ''); } catch (e2) { return null; }
     var baseId = 0;
     try { baseId = idOf(baseDesc); } catch (e3) { return null; }
-    if (!baseId || !isLootContainer(baseId)) return null;
+    if (!baseId) return null;
+    var baseName = edidOf(baseId);
+    if (!isLootContainer(baseName)) return null;
     var now = Date.now();
     var reference='';
     try {reference=mp.getDescFromId(refrId);} catch(error) {return null;}
@@ -42892,7 +42913,7 @@ log('gamemode loaded:',
     }
     var wait = RETURN_MIN[tier] * 60000;
     if (last && (now - last) < wait) return null;
-    var rolled = roll(tier, Math.random);
+    var rolled = roll(payTierFor(tier, baseName), Math.random);
     var next=JSON.parse(JSON.stringify(ledger));
     next.entries[reference]={at:now,actor:actorId,tier:rolled.tier,gold:rolled.gold,items:rolled.items};
     // Reserve durably before touching inventory. An uncertain native write
@@ -42906,7 +42927,8 @@ log('gamemode loaded:',
       try { say(actorId, line); } catch (e6) { /* the pile is already in the pack */ }
     }
     try {
-      console.log('[dungeon] tier ' + tier + ' paid ' + rolled.gold + ' gold from ' + cell);
+      console.log('[dungeon] tier ' + tier + (rolled.tier !== tier ? ' boss chest paid tier ' + rolled.tier + ',' : '') +
+        ' paid ' + rolled.gold + ' gold from ' + cell);
     } catch (e7) { /* logging is not the pay */ }
     return rolled;
   }
@@ -43142,6 +43164,7 @@ log('gamemode loaded:',
     onBody: onBody,
     onStand: onStand,
     tierOf: tierOf,
+    payTierFor: payTierFor,
     ranksFor: ranksFor,
     goodsFor: goodsFor,
     exclusiveFor: exclusiveFor,
