@@ -118,8 +118,8 @@
         'At a door you just opened, a line names ' + k.lock + ': it claims a building nobody ' +
           'holds, and locks or unlocks one you hold. At a crop the same key claims the farm ' +
           'around it.',
-        k.skills + ' lists what you hold and the rent owed. A Jarl or a steward has an ' +
-          'Office page on ' + k.skills + '.',
+        k.skills + ' lists what you hold and the rent owed. A Jarl, a steward or a guard has an ' +
+          'Office page on ' + k.skills + '. The Jarl of a hold names its guards there.',
         'To let somebody sleep in a building you hold, look at them inside it and press ' +
           k.mold + '.',
         'A blank key mold goes into a door\'s lock on ' + k.mold + ', and a smith carrying ' +

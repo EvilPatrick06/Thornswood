@@ -22,8 +22,9 @@ See [Death](death.md).
 
 ## What the server already treats as an office
 
-A Jarl names stewards. The office is on the character, not a Discord
-role by itself. A steward is the only one who evicts, sets rent, names
+A Jarl is Jarl of one hold, chosen when the office is taken, and names
+stewards and that hold's guards. The office is on the character, not a
+Discord role by itself. A steward is the only one who evicts, sets rent, names
 the hold's box, and moves the notice board, and a Jarl counts as a
 steward. All of it is buttons on the Office page of the K panel, and
 nothing is typed. See [Property](property.md) and
@@ -56,8 +57,11 @@ Claiming the jail building does not touch its cells.
 A guard of a hold also takes down any post on that hold's notice board,
 and on no other hold's board. See [Notice boards](noticeboards.md).
 
-Who names a guard is not decided yet. It is asked on #502, and until it
-is answered nobody is a guard.
+The Jarl of a hold names its guards (Patrick, 12 October, #502), with
+Name guard beside a person in the world on the Office page of K, and
+takes the office back with Remove. A Jarl names and removes only their
+own hold's guards, themselves included. A guard keeps one hold, so
+somebody who guards another hold is that hold's Jarl's to remove first.
 
 ## Ambassador
 
@@ -103,8 +107,11 @@ only the payouts on the trading company page leave it.
 
 Jarl and steward are in the server, including eviction, rent, the box,
 and the board. They are the Office page of the K panel, which only a
-character that holds an office or may take one sees. On an account with
-the Discord Jarl role, or an admin's, it offers Take the office. A Jarl
+character that holds an office or may take one sees, and a guard. On an
+account with the Discord Jarl role, or an admin's, it offers the ten
+holds: pressing one twice takes the Jarl office of that hold, which is
+chosen once. A Jarl seated before there was a hold is offered the same
+ten until they choose. A Jarl
 names a steward by picking somebody in the world from a list of names,
 and removes one with Remove beside the name; a steward is kept by
 profile, and the list shows the profile beside the name, so two
@@ -113,8 +120,10 @@ opened in the last minute, who holds it and the rent owed there, with
 Evict, Set rent and No rent; the container they opened in the last
 minute, with the ten holds to make it that hold's box; and the ten
 boards, each moved to where the steward stands. Evict and moving a
-board ask for a second press. The server checks every press again and
-answers in the chat. Housecarl, thane, captain, and priest are the public
+board ask for a second press. The Jarl of a hold sees its guards with
+Remove, and the people in the world who guard no hold with Name guard;
+a guard sees which hold and which jail they keep. The server checks
+every press again and answers in the chat. Housecarl, thane, captain, and priest are the public
 rules and no command. A guard's cells are in the server (#502): the
 register of guards and the cells they turned is `private\law.json`, and
 the jails are `game\data\jails.json`, read out of the load order by
