@@ -78,6 +78,37 @@ synchronous mutation locks the namespace through its durable save and
 native projection; nested mutation or replacement is refused explicitly.
 Each commit starts from the controller's latest document, so another
 merchant's saved change survives an older prepared offer.
+Before recovery, trade admission, supply-history cleanup or another inventory
+writer proceeds, settlement checks the whole pending list. Merchant references,
+transaction identities, humans and receipts must be exclusive; each saved intent
+must match its world, merchant and current debit or credit state. An invalid
+list stops settlement without deleting records or changing inventory, including
+malformed non-null intents. Runtime human descriptions use the native local
+hexadecimal form; numeric aliases share the same reservation. Debit recovery
+checks the original preceding receipt as well as the debit and final receipts.
+Legacy intents without a supply map compare as an empty map throughout recovery;
+invalid maps are rejected. Recovery applies only merchant snapshot fields,
+preserving unrelated saved state.
+Full saved trade snapshots must conserve goods, gold, stock labels and item
+metadata using their original terms. Zero-price transfers remain valid. New
+intents retain fixed-size terms and inventory digests through compaction,
+including the original cooldown-history digest. Compact records validate
+their retained supply transition before recovery or retirement readiness,
+within the same initial and recovery size limits. Recovery attempts must add
+exactly the saved credit to their expected inventory. Supply keys bind to the
+human and the outer item label, separate from the native item's name.
+Legacy intents gain no new summary bytes. Full legacy snapshots are checked
+where available; genuine old compact credit keeps its bounded receipt-based
+recovery because its discarded original deltas cannot be reconstructed.
+The settlement canRetire readiness check refuses any remaining legacy pending
+intent without retained terms. This readiness check still needs integration
+with the explicit roster activation step before a cut; no population change
+is included here. Unresolved legacy transfers retain their records and block
+activation rather than being reset or reissued.
+New intents use format3 and require their retained terms; format2 identifies
+genuine pre-summary legacy work. Dropping terms cannot downgrade a new record.
+Legacy array cooldown keys still require a nonempty item label; original
+item-only legacy keys keep their compatible saved meaning.
 Without an explicit history manifest, the current active roster remains the
 manifest. This support alone does not cut the current 249 traders. Before
 activating retirement, validate writer ownership, pending-intent uniqueness,
@@ -88,6 +119,8 @@ open quests must remain recoverable during catalogue changes.
 
 Local checks include `node tests/test-merchant-trading.js`,
 `node tests/test-merchant-settlement.js`,
+`node tests/test-merchant-pending-preflight.js`,
+`node tests/test-merchant-conservation.js`,
 `node tests/test-merchant-deployment.js` and
 `node scripts/dev/Build-MerchantGamemode.js --check`.
 No game playtests or operational steps are performed by Codex. Changes
