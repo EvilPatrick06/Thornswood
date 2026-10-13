@@ -34,6 +34,7 @@ const data=ctx.catalogue,plugins=installed.loadOrder.map(file=>path.basename(fil
 assert.deepEqual(Array.from(data.plugins),plugins);
 const references=Array.from(data.keep.filter(row=>row[6]==='trader'),row=>row[0]);
 const storage=ctx.createPrivateMerchantLedger(fs,path,{privDir:path.join(fixture,'private'),dataDir},references);
+require('./fixtures/merchant-ledger')(fs,path,path.join(fixture,'private'),references);
 const merchants=ctx.createNpcMerchantPurses(api,data,storage);
 const population=ctx.createNpcPopulation(api,data,plugins,merchants);
 let cursor=0,total=server.prepareNpcLoad(),loaded=0,merchantIds=[];

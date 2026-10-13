@@ -22,6 +22,7 @@ vm.runInContext(source.slice(source.indexOf('// NPC MERCHANT PURSES BEGIN'),sour
   const base=mp.get(merchantId,'baseDesc');
   const data={keep:[['13487:Skyrim.esm',base,null,null,null,null,'trader']]};
   const storage=ctx.createPrivateMerchantLedger(fs,path,settings,['13487:Skyrim.esm'],mp.writePrivateEconomyLedger.bind(mp));
+  require('./fixtures/merchant-ledger')(fs,path,settings.privDir,['13487:Skyrim.esm']);
   const purseApi={}; for(const key of ['makeProperty','getIdFromDesc','getNpcAIState','get','set']) purseApi[key]=mp[key].bind(mp);
   let purses=ctx.createNpcMerchantPurses(purseApi,data,storage); purses.prepare(merchantId);
   const human=mp.createActor(0,mp.get(merchantId,'pos'),0,mp.getIdFromDesc(mp.get(merchantId,'worldOrCellDesc')),7);

@@ -7,6 +7,7 @@ const root=fs.mkdtempSync(path.join(require('node:os').tmpdir(),'tw-dungeon-ledg
 try {
   const settings={privDir:path.join(root,'private'),dataDir:path.join(root,'served')};
   const merchant=ctx.createPrivateMerchantLedger(fs,path,settings,['1:Skyrim.esm']);
+  require('./fixtures/merchant-ledger')(fs,path,settings.privDir,['1:Skyrim.esm']);
   merchant.load();const merchantFile=path.join(settings.privDir,'merchant-ledger.json');
   const merchantBytes=fs.readFileSync(merchantFile,'utf8');
   const storage=ctx.createPrivateEconomyLedger(fs,path,settings,'dungeon-rewards',[]);

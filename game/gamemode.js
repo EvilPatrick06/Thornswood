@@ -62655,9 +62655,14 @@ function createPrivateEconomyLedger(fs,path,settings,name,references,durableWrit
   checkPrivate();
   const file=path.join(dir,name+'-ledger.json'),marker=path.join(dir,name+'-ledger.initialized');
   const checksum=doc=>require('crypto').createHash('sha256').update(JSON.stringify([doc.version,doc.entries])).digest('hex');
+  function requireMerchantEvidence() {
+    if(name==='merchant' && (!fs.existsSync(file) || !fs.existsSync(marker)))
+      throw new Error('Saved merchant ledger or initialization evidence is missing');
+  }
   function save(doc) {
     checkPrivate();
     const bytes=JSON.stringify({version:doc.version,entries:doc.entries,sha256:checksum(doc)});
+    requireMerchantEvidence();
     if(typeof durableWriter==='function') {
       if(durableWriter(name,bytes)!==true) throw new Error('Durable merchant save acknowledgement is missing');
       return true;
@@ -62672,9 +62677,10 @@ function createPrivateEconomyLedger(fs,path,settings,name,references,durableWrit
   }
   function load() {
     checkPrivate();
-    if(!fs.existsSync(file)) {
+    requireMerchantEvidence();
+    if(name!=='merchant' && !fs.existsSync(file)) {
       if(fs.existsSync(marker)) throw new Error('Saved merchant ledger is missing');
-      if(!Array.isArray(references) || (name==='merchant' && !references.length) || new Set(references).size!==references.length)
+      if(!Array.isArray(references) || new Set(references).size!==references.length)
         throw new Error('Merchant initialization manifest is required');
       const entries=Object.create(null);
       for(const reference of references) entries[reference]=null;
@@ -62684,9 +62690,10 @@ function createPrivateEconomyLedger(fs,path,settings,name,references,durableWrit
     if(!doc || typeof doc.sha256!=='string' || doc.sha256!==checksum(doc))
       throw new Error('Saved merchant ledger integrity cannot be verified');
     // Existing documents pass the native path and alias checks before use.
+    requireMerchantEvidence();
     if(typeof durableWriter==='function') save(doc);
     // This marker distinguishes a first deployment from a deleted ledger.
-    if(!fs.existsSync(marker)) {
+    if(name!=='merchant' && !fs.existsSync(marker)) {
       fs.writeFileSync(marker,'1');
       const fd=fs.openSync(marker,'r+');
       try {fs.fsyncSync(fd);} finally {fs.closeSync(fd);}

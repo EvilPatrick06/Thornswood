@@ -17,6 +17,7 @@ try {
     fs.writeFileSync(file+'.tmp',bytes); fs.renameSync(file+'.tmp',file); return true;
   };
   const storage = ctx.createPrivateMerchantLedger(fs, path, settings, ['1:Skyrim.esm'], write);
+  require('./fixtures/merchant-ledger')(fs,path,settings.privDir,['1:Skyrim.esm']);
   const props = new Map();
   const api = {makeProperty() {}, getIdFromDesc: () => 1, getNpcAIState: () => ({isHuman: false}),
     get: (id, key) => key === 'baseDesc' ? 'a:Skyrim.esm' : props.get(id),
