@@ -57,6 +57,7 @@ Yes 'the VPS address comes from scripts\vps\vps.json' ($S.VpsAddress -match '^\d
 Yes 'the certificate line is 14 days' ($S.CertDays -eq 14)
 Yes 'the VPS user comes from scripts\vps\vps.json' ($S.VpsUser -eq 'Administrator')
 Yes 'the watchdog''s folder is Watch-Services.ps1''s own -Root' ($S.WatchRoot -eq 'C:\Thornswood-Watch')
+Yes 'the webhook''s channel is #staff-updates, bot\staff-channel.txt''s id (#2501)' ($S.StaffChannel -eq '1549254991082946570')
 
 # Fixed values from here on, so nothing below depends on what the repository says.
 $S.VpsAddress = '192.0.2.10'
@@ -101,6 +102,7 @@ function Get-Http([string]$url, [string]$method = 'GET', [string]$body = '', [ha
     return @{ Code = $script:sign; Body = $script:signBody; Error = '' }
   }
   if ($url -eq 'https://api.nexusmods.com/v2/graphql') { $script:nexusQuery = $body; return @{ Code = 200; Body = $script:nexus; Error = '' } }
+  if ($url -eq $HookUrl -and $method -eq 'GET') { return @{ Code = $script:hookCode; Body = $script:hookBody; Error = '' } }
   return @{ Code = 0; Body = ''; Error = 'not in the table' }
 }
 function Get-Cert([string]$hostName) { return @{ NotAfter = $script:certEnd; Problems = $script:certProblems; Error = '' } }
@@ -421,6 +423,21 @@ try {
   Yes 'ssh is asked without a prompt, as the VPS user' ($script:sshArgs -contains 'BatchMode=yes' -and $script:sshArgs -contains ('Administrator@' + $S.VpsAddress))
   Yes 'the message text is not on the command line, only on standard input' (-not ((@($script:sshArgs) -join ' ') -match 'Down|Fine since'))
   Remove-Item function:ssh
+
+  # ---- where the webhook posts (#2501) ----------------------------------------------------
+  # Asked of Discord by a GET on the webhook itself, which answers with its
+  # channel_id. -SetWebhook refuses any channel but #staff-updates and -Status
+  # says which it is; both go through Webhook-Channel.
+  $script:hookCode = 200; $script:hookBody = '{"id":"123456","channel_id":"1549254991082946570","name":"Watchdog"}'
+  $wc = Webhook-Channel $HookUrl
+  Yes 'Webhook-Channel: a webhook in #staff-updates says so' ($wc.Channel -eq '1549254991082946570' -and -not $wc.Why)
+  $script:hookBody = '{"id":"123456","channel_id":"1550176792726343700","name":"Watchdog"}'
+  $wc = Webhook-Channel $HookUrl
+  Yes 'Webhook-Channel: one in the dev updates channel names that channel, not #staff-updates' ($wc.Channel -eq '1550176792726343700' -and $wc.Channel -ne $S.StaffChannel)
+  $script:hookCode = 404; $script:hookBody = '{"message":"Unknown Webhook"}'
+  $wc = Webhook-Channel $HookUrl
+  Yes 'Webhook-Channel: a deleted webhook is no channel, and says why' (-not $wc.Channel -and $wc.Why -match '404')
+  Yes 'Webhook-Channel: neither answer holds the address' ((('' + $wc.Why) -notmatch 'SECRETHOOKTOKEN') -and (('' + $wc.Why) -notmatch 'api/webhooks'))
 
   # ---- words and secrets ----------------------------------------------------------------
   $all = (Get-Content -LiteralPath $P.Alerts -Raw) + (Get-Content -LiteralPath $P.Log -Raw)

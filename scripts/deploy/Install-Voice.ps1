@@ -17,6 +17,10 @@
 
       .\Install-Voice.ps1              install and start it
       .\Install-Voice.ps1 -Restart     just restart it
+      .\Install-Voice.ps1 -TaskOnly    register its task again with this
+                                       install's settings and restart it under
+                                       it, sending no file (#2491); the task
+                                       it had goes back if it does not answer
       .\Install-Voice.ps1 -Remove      take it off again
       .\Install-Voice.ps1 -PutBack     the files the last install replaced go
                                        back in, checked; the task is left as is
@@ -59,6 +63,9 @@ param(
     [string]$TurnUrl  = '',
     [string]$TaskName = 'Thornswood Voice',
     [switch]$Restart,
+    # Register the task again with this install's settings and restart the
+    # service under it, sending no file (#2491).
+    [switch]$TaskOnly,
     [switch]$Remove,
     [switch]$NoPause,
     # How long the new service has to answer with the build that was sent
@@ -91,6 +98,10 @@ foreach ($t in 'ssh', 'scp') {
     }
 }
 
+if ($TaskOnly -and ($Remove -or $Restart -or $PutBack)) {
+    Die '-TaskOnly registers the task again and restarts voice under it, so it does not go with -Remove, -Restart or -PutBack. Nothing was sent.'
+}
+
 if ($Remove) {
     Head 'Removing'
     Invoke-ThornswoodNative { & ssh @ssh $target "powershell -NoProfile -Command `"Stop-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue; Unregister-ScheduledTask -TaskName '$TaskName' -Confirm:`$false -EA SilentlyContinue; Remove-NetFirewallRule -DisplayName 'Thornswood Voice' -EA SilentlyContinue; Remove-Item -LiteralPath '$Root' -Recurse -Force -EA SilentlyContinue; 'removed'`"" }
@@ -108,7 +119,7 @@ if ($Remove) {
 # nothing reads.
 . (Join-Path $Here 'Artifact.ps1')
 $artifact = $null
-if (-not $PutBack -and -not $Remove -and -not $Restart) {
+if (-not $PutBack -and -not $Remove -and -not $Restart -and -not $TaskOnly) {
     $artifact = New-ThornswoodArtifact -Component voice -RepoDir (Join-Path $Here '..\..') -Paths 'voice/voice-server.js', 'voice/headlines.js' `
         -AlsoSends 'scripts/vps/Roll-Log.ps1'
     Say ('artifact ' + (Format-ThornswoodArtifact $artifact)) 'DarkGray'
@@ -209,7 +220,7 @@ if (-not $PutBack -and -not $Remove -and -not $Restart) {
 # is sent. The copies below are from its folder. -PutBack builds and sends
 # nothing.
 $src = Join-Path $Here '..\..\voice'
-if (-not $PutBack) {
+if (-not $PutBack -and -not $TaskOnly) {
 Assert-ThornswoodSourceIntegrity -Artifact $artifact -RepoDir (Join-Path $Here '..\..')
 Send-ThornswoodArtifact -Artifact $artifact -Target $target -SshArgs $ssh
 $src = Join-Path $artifact.Folder 'voice'
@@ -256,7 +267,7 @@ $hashes    = [ordered]@{}
   too. See StopIt below.
 #>
 $expectBuild = ''
-if (-not $PutBack) {
+if (-not $PutBack -and -not $TaskOnly) {
     try {
         $m = [regex]::Match((Get-Content -LiteralPath (Join-Path $src 'voice-server.js') -Raw),
                             "const\s+BUILD\s*=\s*'([^']+)'")
@@ -270,7 +281,7 @@ if (-not $PutBack) {
 # is worse than sending nothing, so nothing here sends one. The service's own
 # join tokens are signed with a key it makes for itself in token-key.txt.
 
-if (-not $PutBack) {
+if (-not $PutBack -and -not $TaskOnly) {
     Head 'Staging'
     $send = [ordered]@{}
     $send['voice-server.js'] = Join-Path $src 'voice-server.js'
@@ -348,6 +359,13 @@ if ('$Bind' -eq '127.0.0.1') {
 # sits with the other settings ahead of the roll, so it is set in this cmd
 # before node starts whatever the roll does.
 #
+# node goes through cmd's start /high, so it runs High (#2491, the task's
+# settings below say why): /b keeps it in this cmd's console, so the
+# environment and the redirection to voice.log hold, and /wait keeps the task
+# running until node ends. start leaves cmd's exit code 0 whatever node's
+# was, so call exit %^errorlevel% hands node's back as the task's last
+# result, as before (measured 12 Oct).
+#
 # THORNSWOOD_VOICE_AUTH=on is not read by this voice-server.js, which refuses
 # every join that cannot prove itself (#1303). It stays on the line because
 # -PutBack puts the files the last install replaced back under this same
@@ -355,7 +373,7 @@ if ('$Bind' -eq '127.0.0.1') {
 # without it.
 `$roll = Join-Path '$Root' 'roll-log.ps1'
 `$psExe = Join-Path `$env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-`$cmd = ('/c "set THORNSWOOD_SITE=$Site&& set THORNSWOOD_VOICE_PORT=$Port&& set THORNSWOOD_VOICE_BIND=$Bind&& set THORNSWOOD_VOICE_AUTH=on&& set THORNSWOOD_CHAT_RANGE=$ChatRange&& $mostSet$turnSet"{2}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{3}" -Path "{1}" & "{0}" voice-server.js >> "{1}" 2>&1"' -f `$node.Source, `$log, `$psExe, `$roll)
+`$cmd = ('/c "set THORNSWOOD_SITE=$Site&& set THORNSWOOD_VOICE_PORT=$Port&& set THORNSWOOD_VOICE_BIND=$Bind&& set THORNSWOOD_VOICE_AUTH=on&& set THORNSWOOD_CHAT_RANGE=$ChatRange&& $mostSet$turnSet"{2}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{3}" -Path "{1}" & start "" /b /wait /high "{0}" voice-server.js >> "{1}" 2>&1 & call exit %^errorlevel%"' -f `$node.Source, `$log, `$psExe, `$roll)
 
 # The task as it is now, for the way back: a new install that does not answer
 # gets its old files AND its old settings back.
@@ -479,12 +497,21 @@ function StartIt {
             'the task is back as it was before this install'
         } else {
             `$action = New-ScheduledTaskAction -Execute "`$env:SystemRoot\System32\cmd.exe" -Argument `$cmd -WorkingDirectory '$Root'
-            # Priority 4, normal, not Task Scheduler's default of 7 (#1968):
-            # without it node, started by this task's cmd.exe, inherits
-            # BelowNormal, I/O priority 1 (low) and memory priority 2, which
-            # held the game server's reads back (#1931). 4 gives Normal, 2
-            # and 5. tests\test-service-task-priority.ps1 measures all three.
-            `$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) -Priority 4
+            # Priority 1, high, with node started through start /high
+            # (#2491). Decided by Patrick on 12 Oct 2026 at about 6:20 PM:
+            # "we need to fix it so the servers run on high priority". Voice
+            # runs with the game servers (Install-ThornswoodServer.ps1), above
+            # the six build runners, the site, Caddy and the bot, which are
+            # all Normal. Priority 1 makes this task's cmd.exe High, and a
+            # process started from a High one runs Normal unless it asks for
+            # another class, so node ran Normal at 1 until start /high asked:
+            # measured 12 Oct, node High, I/O priority 2 and memory priority
+            # 5, the same I/O and memory priority as at 4. Never 0, which is
+            # realtime. Never the default of 7 either (#1968): BelowNormal,
+            # I/O priority 1 (low) and memory priority 2, which held the game
+            # server's reads back (#1931). tests\test-service-task-priority.ps1
+            # measures all three.
+            `$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) -Priority 1
             `$principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
             Register-ScheduledTask -TaskName '$TaskName' -Action `$action -Trigger (New-ScheduledTaskTrigger -AtStartup) -Settings `$settings -Principal `$principal | Out-Null
             RemoveStrayTasks
@@ -530,13 +557,58 @@ function Why {
     if (Test-Path -LiteralPath `$log) { Get-Content -LiteralPath `$log -Tail 20 } else { 'nothing was written' }
 }
 
-"@ + $serviceSwapBlock
+"@
+
+<#
+  -TaskOnly (#2491): the task again with this install's settings, and
+  nothing sent. The same StopIt, StartIt, Healthy, Answer and Why as an
+  install, after the same lines above, in place of the swap: what answers
+  now is what must answer again, under the new task, and if it does not, the
+  task it had goes back, exported above exactly as it was, and is started.
+  The last line is TASK OK or TASK ROLLED BACK.
+#>
+$taskOnlyBlock = @'
+$Rolling = $false
+$wantBuild = Build
+StopIt
+StartIt
+if (Healthy) {
+  'PASS: ' + (Answer)
+  foreach ($p in @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -EA SilentlyContinue)) {
+    $up = Get-CimInstance Win32_Process -Filter ("ProcessId=" + $p.ParentProcessId) -EA SilentlyContinue
+    if (-not $up -or $up.CommandLine -notlike ('*' + $log + '*')) { continue }
+    $class = 'unreadable'
+    try { $class = [string](Get-Process -Id $p.ProcessId -EA Stop).PriorityClass } catch { }
+    'node, pid ' + $p.ProcessId + ', runs at ' + $class + ' priority'
+  }
+  'TASK OK'
+  exit 0
+}
+'FAIL: it did not answer within ' + $Wait + ' seconds under the new task'
+Why
+StopIt
+$Rolling = $true
+StartIt
+if (Healthy) { 'the task it had is back and it is answering again: ' + (Answer) }
+else { 'THE TASK IT HAD IS BACK AND IT STILL IS NOT ANSWERING'; Why }
+'TASK ROLLED BACK'
+exit 1
+'@
+
+if ($TaskOnly) {
+    $vars = (ServiceSwapVars $Root 'none' 'none' $Wait ([ordered]@{}) @()) + '$KeepTask = $false' + "`r`n"
+    $taskOut = @(Remote ($vars + $remote + $taskOnlyBlock) | ForEach-Object { Say "  $_"; "$_".Trim() })
+    if ($taskOut -notcontains 'TASK OK') { Die 'voice was not restarted under a new task. The lines above say what is running.' }
+    Say 'registered again, and voice answers under the new task' 'Green'
+    if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+    exit 0
+}
 
 $keepTask = '$KeepTask = $false'
 $pick = ''
 if ($PutBack) { $keepTask = '$KeepTask = $true'; $pick = $putBackPick }
 $vars = (ServiceSwapVars $Root $stageName $prevName $Wait $hashes @()) + $keepTask + "`r`n" + $pick
-$swapOut = @(Remote ($vars + $remote) | ForEach-Object { Say "  $_"; "$_".Trim() })
+$swapOut = @(Remote ($vars + $remote + $serviceSwapBlock) | ForEach-Object { Say "  $_"; "$_".Trim() })
 if (-not (Show-SwapResult $swapOut "$Root\.prev-<stamp>")) { Die 'voice was not swapped in. The lines above say what is running.' }
 
 # ---------------------------------------------------------------- verify ----

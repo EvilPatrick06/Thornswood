@@ -3,21 +3,27 @@
 
       pwsh -NoProfile -File .\tests\test-swap-task-priority.ps1
 
-  A server put up by Deploy-Server or Deploy-DevGamemode starts at normal
-  priority (#2015).
+  A deploy says when the game server's task is not the one the installer
+  makes, and changes nothing in it (#2491).
 
-  WHY. Only Install-ThornswoodServer.ps1 registered the game server's task at
-  priority 4 (#1931, #1967); Swap.ps1's $swapBlock, which both deploys use to
-  start the server, started whatever task the box had. On 5 Oct at 11:47 PM
-  the live server's task was still Task Scheduler's default of 7 after the
-  1.2.0 deploy, and its node ran BelowNormal.
+  WHY. Install-ThornswoodServer.ps1 registers the server's task at priority
+  1 with node started through cmd's start /high, so the server runs High
+  (Patrick, 12 Oct 2026, #2491). Deploy-Server and Deploy-DevGamemode start
+  the server through Swap.ps1's $swapBlock. From 5 Oct (#2015) the block set
+  the task's priority to 4 before each start, repairing tasks an older install
+  had registered at the default of 7; against the installer's task at 1 it
+  would have put the server back to Normal. The installer is the one place the
+  task is made, and Publish-Server.ps1 -TaskOnly registers an old one again,
+  so the block now says so and leaves the task alone.
 
-  HOW. Swap.ps1 is dot-sourced for $swapBlock. Its NormalTask function is read
+  HOW. Swap.ps1 is dot-sourced for $swapBlock. Its TaskShape function is read
   out of it and run against a task registered for the person running this,
-  at the default priority, with $Task set as SwapVars sets it. The task must
-  come back at 4 with its action kept, and a second run must change nothing
-  and say nothing. Every Start-ScheduledTask in the block must come straight
-  after a NormalTask.
+  with $Task and $Root set as SwapVars sets them: once at Task Scheduler's
+  default priority with a plain action, where it must say the task is not the
+  installer's, name the command, and leave the priority and the action as they
+  were; and once at priority 1 with the installer's start /high in its action,
+  where it must say nothing. NormalTask must be gone, and every
+  Start-ScheduledTask in the block must come straight after a TaskShape.
 
   Registers and removes one task named Thornswood swap priority harness <guid>
   (not 'Thornswood Test...', which test-deploy-swaps and test-install-server
@@ -50,12 +56,16 @@ Yes 'Swap.ps1 gives $swapBlock' ([bool]$swapBlock)
 $t = $null; $e = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseInput($swapBlock, [ref]$t, [ref]$e)
 Yes 'the swap block parses' (-not $e -or $e.Count -eq 0)
-$fn = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'NormalTask' }, $true))
-Yes 'it has a NormalTask step' ($fn.Count -eq 1)
+$fn = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'TaskShape' }, $true))
+Yes 'it has a TaskShape step' ($fn.Count -eq 1)
+$old = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'NormalTask' }, $true))
+Yes 'and no NormalTask, which set the task to priority 4 before every start' ($old.Count -eq 0)
+$sets = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] -and $n.GetCommandName() -in 'Set-ScheduledTask', 'Register-ScheduledTask', 'Unregister-ScheduledTask' }, $true))
+Yes ('the swap block changes no task (' + $sets.Count + ' Set-, Register- or Unregister-ScheduledTask)') ($sets.Count -eq 0)
 $lines = @($swapBlock -split "`r?`n" | ForEach-Object { $_.Trim() })
 $starts = @(); for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i] -like 'Start-ScheduledTask -TaskName $Task*') { $starts += $i } }
-Yes ('every start of the task comes straight after NormalTask (' + $starts.Count + ' start(s))') (
-    $starts.Count -ge 2 -and @($starts | Where-Object { $_ -gt 0 -and $lines[$_ - 1] -eq 'NormalTask' }).Count -eq $starts.Count)
+Yes ('every start of the task comes straight after TaskShape (' + $starts.Count + ' start(s))') (
+    $starts.Count -ge 2 -and @($starts | Where-Object { $_ -gt 0 -and $lines[$_ - 1] -eq 'TaskShape' }).Count -eq $starts.Count)
 if ($fn.Count -ne 1) { Done }
 
 $onWindows = [Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT
@@ -64,7 +74,9 @@ Import-Module ScheduledTasks -ErrorAction SilentlyContinue
 if (-not (Get-Module ScheduledTasks)) { Write-Host 'SKIP  the ScheduledTasks module did not load'; Done }
 
 $Task = 'Thornswood swap priority harness ' + [guid]::NewGuid().ToString('N').Substring(0, 8)
+$Root = 'C:\Thornswood-Server-Dev'
 $me = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+$run = [scriptblock]::Create($fn[0].Extent.Text + "`nTaskShape")
 try {
     $a = New-ScheduledTaskAction -Execute "$env:SystemRoot\System32\cmd.exe" -Argument '/c exit 0' -WorkingDirectory $env:TEMP
     $p = New-ScheduledTaskPrincipal -UserId $me -LogonType Interactive
@@ -72,17 +84,22 @@ try {
     $before = Get-ScheduledTask -TaskName $Task
     Yes ('a task registered with no -Priority has Task Scheduler''s default, 7 (' + $before.Settings.Priority + ')') ($before.Settings.Priority -eq 7)
 
-    $run = [scriptblock]::Create($fn[0].Extent.Text + "`nNormalTask")
     $said = @(& $run | ForEach-Object { "$_" })
     $said | ForEach-Object { Write-Host ('      ' + $_) }
     $after = Get-ScheduledTask -TaskName $Task
-    Yes 'NormalTask sets it to 4' ($after.Settings.Priority -eq 4)
-    Yes '  and says so, with what it was' (($said -join ' ') -match 'priority 4 now, not 7')
-    Yes '  and keeps the rest of the task: its action and its restarts' (
-        $after.Actions[0].Execute -eq $before.Actions[0].Execute -and $after.Actions[0].Arguments -eq $before.Actions[0].Arguments -and
-        $after.Settings.RestartCount -eq 999)
+    Yes 'TaskShape says the task is not the installer''s, and why' (
+        ($said -join ' ') -match 'not the one the installer makes' -and ($said -join ' ') -match 'priority is 7, not 1' -and ($said -join ' ') -match 'start /high')
+    Yes '  and names the command that registers it again, for the dev server here' (($said -join ' ') -match 'Publish-Server\.ps1 -TaskOnly -Channel dev')
+    Yes '  and changes nothing: the priority and the action are as they were' (
+        $after.Settings.Priority -eq 7 -and $after.Actions[0].Arguments -eq $before.Actions[0].Arguments -and $after.Settings.RestartCount -eq 999)
+
+    # The installer's shape: priority 1 and node through start /high.
+    Unregister-ScheduledTask -TaskName $Task -Confirm:$false
+    $a = New-ScheduledTaskAction -Execute "$env:SystemRoot\System32\cmd.exe" -Argument '/c "start "" /b /wait /high "node.exe" dist_back/skymp5-server.js >> "server.log" 2>&1 & call exit %^errorlevel%"' -WorkingDirectory $env:TEMP
+    Register-ScheduledTask -TaskName $Task -Action $a -Principal $p -Settings (New-ScheduledTaskSettingsSet -Priority 1) | Out-Null
     $again = @(& $run | ForEach-Object { "$_" })
-    Yes 'run again on a task at 4, it changes nothing and says nothing' ($again.Count -eq 0 -and (Get-ScheduledTask -TaskName $Task).Settings.Priority -eq 4)
+    Yes ('on the installer''s task, priority 1 and start /high, it says nothing (' + ($again -join ' | ') + ')') ($again.Count -eq 0)
+    Yes '  and the task is still at 1' ((Get-ScheduledTask -TaskName $Task).Settings.Priority -eq 1)
 }
 catch {
     Yes ('the harness ran to the end without an error: ' + $_.Exception.Message) $false

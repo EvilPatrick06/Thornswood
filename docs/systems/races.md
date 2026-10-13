@@ -43,6 +43,16 @@ Locked sets, and the race that may make them:
 Every locked recipe is in [lists/race-locks.md](lists/race-locks.md),
 with its profession, half and rank.
 
+## What a riekling wears
+
+Clothes made for the other peoples have no riekling cut: on a riekling
+they are drawn at the size of a person, with the neck in the wrong place.
+Only the riekling pieces from the riekling plugin fit. A new riekling
+starts in a riekling loincloth and cloth hand and foot wraps, and a
+riekling Haberdasher makes those, the second loincloth and the fur cloak.
+The riekling smith makes the fur and chief armour. Decided by Patrick on
+12 October 2026.
+
 ## What does not lock
 
 A material is a smithing tier. Any smith of the right half and rank makes

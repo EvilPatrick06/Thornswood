@@ -137,7 +137,8 @@
           'the person\'s name and what they did, reports somebody to staff and nobody else.',
         '/stuck, when you are wedged in the world, takes you back a few steps or to the ' +
           'nearest temple: once every 5 minutes, a 15 second wait in a fight, and every use ' +
-          'is logged for staff.',
+          'is logged for staff. It does not move anybody out of a jail while a guard has a cell ' +
+          'there locked.',
         'These are typed in the chat: ' + k.chat + ' opens it, or ' + k.command +
           ' with the slash already typed.',
         'The rules are on thornswood.net and in the Discord, and a ticket there reaches ' +

@@ -1,6 +1,6 @@
 # Race locked recipes
 
-Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 36 recipes carry a race. Only the named race can make them. A material named for a people, such as Elven or Orcish or Nordic Carved, is not in this list.
+Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 40 recipes carry a race. Only the named race can make them. A material named for a people, such as Elven or Orcish or Nordic Carved, is not in this list.
 
 
 ## darkelf
@@ -31,11 +31,15 @@ Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 3
 - Riekling Bone Club (novice, Smith/Edgewright, `9e775:Playable Rieklings.esp`)
 - Riekling Chief Fur Iron Armour (novice, Smith/Platewright, `19f97:Playable Rieklings.esp`)
 - Riekling Chief Helmet (novice, Smith/Platewright, `19f9d:Playable Rieklings.esp`)
+- Riekling Cloth Foot Wraps (novice, Tailor/Haberdasher, `19f91:Playable Rieklings.esp`)
+- Riekling Cloth Hand Wraps (novice, Tailor/Haberdasher, `19f90:Playable Rieklings.esp`)
 - Riekling Fur Armour (novice, Smith/Platewright, `19f8c:Playable Rieklings.esp`)
 - Riekling Fur Boots (novice, Smith/Platewright, `19f8d:Playable Rieklings.esp`)
 - Riekling Fur Cloak (novice, Tailor/Haberdasher, `23a0a:Playable Rieklings.esp`)
 - Riekling Fur Gauntlets (novice, Smith/Platewright, `19f8e:Playable Rieklings.esp`)
 - Riekling Horned Helmet (novice, Smith/Platewright, `19f8f:Playable Rieklings.esp`)
+- Riekling LoinCloth 1 (novice, Tailor/Haberdasher, `19f92:Playable Rieklings.esp`)
+- Riekling LoinCloth 2 (novice, Tailor/Haberdasher, `19f94:Playable Rieklings.esp`)
 - Riekling Spear (advanced, Woodworker/Woodwright, `19fb4:Playable Rieklings.esp`)
 - Riekling Spear (advanced, Woodworker/Woodwright, `19fb7:Playable Rieklings.esp`)
 - Riekling Spear (advanced, Woodworker/Woodwright, `19fb8:Playable Rieklings.esp`)

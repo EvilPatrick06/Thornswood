@@ -510,7 +510,6 @@ Put (Join-Path $repo 'voice\headlines.js') "module.exports = {};`n"
 Put (Join-Path $repo 'bot\card.py') 'CARD = 1'
 # Install-Bot packs and sends _pyguard.py beside bot.py since #2421 (Refs #2276).
 Put (Join-Path $repo 'bot\_pyguard.py') 'PYGUARD = 1'
-Put (Join-Path $repo 'bot\dev-channel.txt') '0'
 Put (Join-Path $repo 'bot\requirements.txt') ''
 Put (Join-Path $repo 'bot\staff-channel.txt') '0'
 Put (Join-Path $repo 'bot\assets\join-card.png') 'not really a picture'
@@ -774,6 +773,20 @@ try {
     Yes '  and leaves the task as it was' ((TaskArg ($TaskPrefix + ' Voice')) -eq $taskBefore)
     if ($script:fail -gt $failed) { Show }
 
+    # Issue #2491: -TaskOnly registers the task again with this install's
+    # settings and restarts voice under it, sending and swapping no file.
+    $live = Live $voiceRoot
+    $pidBefore = Listener $voicePort
+    $a = $voice.Clone(); $a['TaskOnly'] = $true
+    $r = Deploy 'Install-Voice.ps1' $a
+    $failed = $script:fail
+    Yes 'Install-Voice -TaskOnly is TASK OK, the same build answering as a new process' (
+        $r.Ok -and $r.Said -match 'TASK OK' -and (WaitFor { ((Build) -eq 'voice-v1') -and ((Listener $voicePort) -ne $pidBefore) }))
+    Yes '  and the task starts node through start /high' ((TaskArg ($TaskPrefix + ' Voice')) -like '*start "" /b /wait /high "*" voice-server.js >> *')
+    Yes '  and reads node back at High' ($r.Said -match 'node, pid \d+, runs at High priority')
+    Yes '  and no file was staged, sent or swapped' (((Live $voiceRoot) -eq $live) -and $r.Said -notmatch 'Staging' -and @(Kept $voiceRoot '.stage-*').Count -eq 0)
+    if ($script:fail -gt $failed) { Show }
+
     # ================================================================ the bot
     $botRoot = Join-Path $box 'Thornswood-Bot'
     # What a full install leaves, and the code only one needs: the files, the
@@ -781,7 +794,7 @@ try {
     # shorter loop than the real one (tests\test-bot-wrapper.ps1 runs that).
     Bot 'bot v1'
     $null = [IO.Directory]::CreateDirectory($botRoot)
-    foreach ($f in 'bot.py', '_pyguard.py', 'card.py', 'dev-channel.txt', 'requirements.txt') { Copy-Item -LiteralPath (Join-Path $repo "bot\$f") -Destination (Join-Path $botRoot $f) -Force }
+    foreach ($f in 'bot.py', '_pyguard.py', 'card.py', 'staff-channel.txt', 'requirements.txt') { Copy-Item -LiteralPath (Join-Path $repo "bot\$f") -Destination (Join-Path $botRoot $f) -Force }
     Put (Join-Path $botRoot 'bot.env.json') '{ "DISCORD_TOKEN": "not a token" }'
     $bq = $botRoot.Replace("'", "''")
     # bot.log in the data folder under the bot's, where the service writes it

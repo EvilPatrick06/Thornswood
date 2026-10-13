@@ -1207,7 +1207,13 @@ $ShipOursFiles = @(
     # were Daedric Online's by their own first lines and are one machine's
     # (#1239); TrueHUD\RP_Bosses.ini is Daedric Online's boss list (#1253), so
     # neither is named here.
-    'Data\Interface\skyhud\skyhud.txt'
+    'Data\Interface\skyhud\skyhud.txt',
+    # The notice board and the hold's drop box, Thornswood's own meshes,
+    # built from vanilla Skyrim pieces by scripts\mods\Build-NoticeBoard.py
+    # (#2298). Every texture they name is the game's own, so only the two
+    # meshes ship. Go.ps1 writes them from game\ours with the four above.
+    'Data\meshes\thornswood\noticeboard01.nif',
+    'Data\meshes\thornswood\dropbox01.nif'
 )
 
 # NEMESIS'S OUTPUT IS OURS, because we generate it from the collection.
@@ -1368,7 +1374,10 @@ $ShipHeldForCollection = @(
     # are not this one's (#1258). No collection revision carries this path, so
     # it ships while the plugin names it, and leaves the release the plugin's
     # board points at a mesh the collection installs or one Thornswood ships
-    # as its own (#2298).
+    # as its own (#2298). Since #2298 the board names Thornswood's own
+    # meshes\thornswood\noticeboard01.nif, so this line holds nothing any
+    # more: the next release lists the old mesh as gone and every launcher
+    # takes it off. It stays so the record of why reads in one place.
     (New-ShipHeld 'Data\meshes\olivar-messageboard\missiveboardcotnd.nif' 'none yet: Thornswood Content must point its board at a mesh the collection installs' -WhileContentNamesIt)
 )
 

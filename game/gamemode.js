@@ -4187,11 +4187,15 @@ const HALL = {
   front doors two units apart, which is the only reason Morthal's and
   Dawnstar's old points looked like one spot.
 */
-const CHARGEN = {"shift":[["1be1a:Skyrim.esm",1],["1be1b:Skyrim.esm",1]],"towns":{"e80030:Thornswood-Content.esp":{"key":"whiterun","town":"Whiterun","arrival":{"cell":"WhiterunBanneredMare","desc":"1605e:Skyrim.esm","pos":[-113.6,-810,69.3],"rot":[0,0,3.7]}},"e80031:Thornswood-Content.esp":{"key":"riften","town":"Riften","arrival":{"cell":"RiftenBeeandBarb","desc":"16bdf:Skyrim.esm","pos":[-150.2,-598.2,64],"rot":[0,0,36.3]}},"e80032:Thornswood-Content.esp":{"key":"solitude","town":"Solitude","arrival":{"cell":"SolitudeWinkingSkeever","desc":"16a0e:Skyrim.esm","pos":[-293.9,-1450.6,0],"rot":[0,0,0]}},"e80033:Thornswood-Content.esp":{"key":"windhelm","town":"Windhelm","arrival":{"cell":"WindhelmCandlehearthHall","desc":"16789:Skyrim.esm","pos":[554.3,-3766.2,64],"rot":[0,0,91.9]}},"e80034:Thornswood-Content.esp":{"key":"markarth","town":"Markarth","arrival":{"cell":"MarkarthSilverBloodInn","desc":"16dfe:Skyrim.esm","pos":[-5588.5,-1925.8,-16.0],"rot":[0,0,180.0]}},"e80035:Thornswood-Content.esp":{"key":"falkreath","town":"Falkreath","arrival":{"cell":"FalkreathDeadMansDrink","desc":"3a184:Skyrim.esm","pos":[670.4,-443.1,0.5],"rot":[0,0,0]}},"e80036:Thornswood-Content.esp":{"key":"morthal","town":"Morthal","arrival":{"cell":"MorthalMoorsideInn","desc":"138ce:Skyrim.esm","pos":[1970.6,-160.2,0],"rot":[0,0,270.9]}},"e80037:Thornswood-Content.esp":{"key":"dawnstar","town":"Dawnstar","arrival":{"cell":"DawnstarWindpeakInn","desc":"13a7f:Skyrim.esm","pos":[1823.2,-534.7,0.5],"rot":[0,0,0]}},"e80038:Thornswood-Content.esp":{"key":"winterhold","town":"Winterhold","arrival":{"cell":"WinterholdTheFrozenHearth","desc":"13814:Skyrim.esm","pos":[1791.6,7.3,0],"rot":[0,0,88]}}}};
+const CHARGEN = {"shift":[["1be1a:Skyrim.esm",1],["1be1b:Skyrim.esm",1]],"rieklingShift":[["19f6c:Playable Rieklings.esp",1],["19f69:Playable Rieklings.esp",1],["19f68:Playable Rieklings.esp",1]],"towns":{"e80030:Thornswood-Content.esp":{"key":"whiterun","town":"Whiterun","arrival":{"cell":"WhiterunBanneredMare","desc":"1605e:Skyrim.esm","pos":[-113.6,-810,69.3],"rot":[0,0,3.7]}},"e80031:Thornswood-Content.esp":{"key":"riften","town":"Riften","arrival":{"cell":"RiftenBeeandBarb","desc":"16bdf:Skyrim.esm","pos":[-150.2,-598.2,64],"rot":[0,0,36.3]}},"e80032:Thornswood-Content.esp":{"key":"solitude","town":"Solitude","arrival":{"cell":"SolitudeWinkingSkeever","desc":"16a0e:Skyrim.esm","pos":[-293.9,-1450.6,0],"rot":[0,0,0]}},"e80033:Thornswood-Content.esp":{"key":"windhelm","town":"Windhelm","arrival":{"cell":"WindhelmCandlehearthHall","desc":"16789:Skyrim.esm","pos":[554.3,-3766.2,64],"rot":[0,0,91.9]}},"e80034:Thornswood-Content.esp":{"key":"markarth","town":"Markarth","arrival":{"cell":"MarkarthSilverBloodInn","desc":"16dfe:Skyrim.esm","pos":[-5588.5,-1925.8,-16],"rot":[0,0,180]}},"e80035:Thornswood-Content.esp":{"key":"falkreath","town":"Falkreath","arrival":{"cell":"FalkreathDeadMansDrink","desc":"3a184:Skyrim.esm","pos":[670.4,-443.1,0.5],"rot":[0,0,0]}},"e80036:Thornswood-Content.esp":{"key":"morthal","town":"Morthal","arrival":{"cell":"MorthalMoorsideInn","desc":"138ce:Skyrim.esm","pos":[1970.6,-160.2,0],"rot":[0,0,270.9]}},"e80037:Thornswood-Content.esp":{"key":"dawnstar","town":"Dawnstar","arrival":{"cell":"DawnstarWindpeakInn","desc":"13a7f:Skyrim.esm","pos":[1823.2,-534.7,0.5],"rot":[0,0,0]}},"e80038:Thornswood-Content.esp":{"key":"winterhold","town":"Winterhold","arrival":{"cell":"WinterholdTheFrozenHearth","desc":"13814:Skyrim.esm","pos":[1791.6,7.3,0],"rot":[0,0,88]}}}};
 
 /* The plain outfit is supplied before a fresh character opens the face menu.
  * Choosing reuses those same owned pieces after the body has settled. */
 const SHIFT = CHARGEN.shift;
+
+/* A riekling's own plain clothes, which a new riekling starts in instead of
+ * the shift. See dressForRace, beside giveShift. */
+const RIEKLING_SHIFT = CHARGEN.rieklingShift || [];
 
 /* Nine towns, each with the inn a new arrival wakes up in. The one table left
  * of the sixteen trades and their kits. The class, the profession and the
@@ -4223,8 +4227,18 @@ function townsForPanel() {
  * The shift goes in the pack at the beginning of appearance creation, and is
  * topped up if it went missing by the time a home is chosen. What is worn is
  * the equipment record, written once by dressNewCharacter below (#1560).
+ *
+ * A riekling gets its own plain clothes instead, once its race is known: see
+ * rieklingShift below (#614). Until the race menu has stored a face there is
+ * no race to read, so the shift goes in as for anybody.
  */
 function giveShift(actorId) {
+  let race = '';
+  try { race = raceOf(actorId); } catch (e) { race = ''; }
+  if (race.indexOf('riekling') !== -1 && RIEKLING_SHIFT.length) {
+    rieklingShift(actorId, race);
+    return;
+  }
   let inv = { entries: [] };
   try { inv = mp.get(actorId, 'inventory') || { entries: [] }; } catch (e) { return; }
   const entries = (inv.entries || []).slice();
@@ -4263,6 +4277,84 @@ function giveShift(actorId) {
   log('chargen', actorId.toString(16), 'shift:', added, 'handed over,',
       (SHIFT.length - added), 'already there,', entries.length,
       'thing(s) in the pack,', wearing, 'worn');
+}
+
+/*
+  ================= A RIEKLING STARTS IN RIEKLING CLOTHES ===================
+
+  Decided by Patrick on 12 October 2026 (#614): "Rieklings get Riekling
+  clothing". The shift is the Belted Tunic and Boots of Skyrim.esm. Their
+  armour addons (FarmerTorso01AA, FarmerBoots01AA) list the ten human and
+  beast races and no Riekling, and both playable Riekling races (Riekling Blue
+  a6746 and Riekling Purple 19f47 of Playable Rieklings.esp) name KhajiitRace
+  as their armour race, so the game drew a riekling in the tunic with the human
+  sized Khajiit model on a riekling skeleton: the neck in the wrong place and
+  the body showing through, again at every door, because a door draws the body
+  again. Measured on the dev load order: of 2,704 armour addons only the 148 in
+  Playable Rieklings.esp fit a playable riekling.
+
+  So a riekling's shift is that mod's own (CHARGEN.rieklingShift): LoinCloth
+  1, the cloth hand wraps and the cloth foot wraps, whose first addons list
+  both playable Riekling races.
+
+  WHY HERE AND NOT IN created(). The race is picked in the race menu, which
+  opens after the engine has handed the new character over, so created() has
+  already dressed it in the shift, and from then on the engine refuses the
+  server's write of what it wears (EquipmentBinding::Set in the fork).
+  giveShift runs again when the face is stored and creation moves on to
+  choosing (beginChoosing), the first moment the race is known. So for a
+  riekling it takes the shift back out of the pack, puts the riekling pieces
+  in, and asks the owner's game once, through Actor.EquipItem, to put each one
+  on: the engine adds the piece if the pack does not hold it and sends that game
+  the equip, and the game reports what it then wears, as it reports any change.
+  Nothing asks twice or watches whether they went on. If the game did not put
+  them on, they are in the pack, where the person puts them on like any other
+  clothes. A second pass (a reconnect while choosing) finds the pieces already
+  in the pack and does nothing.
+
+  Anybody else gets the shift topped up in giveShift, as before.
+*/
+function rieklingShift(actorId, race) {
+  let inv = { entries: [] };
+  try { inv = mp.get(actorId, 'inventory') || { entries: [] }; } catch (e) { return 0; }
+  let entries = (inv.entries || []).map(function (e) { return Object.assign({}, e); });
+  let took = 0;
+  for (const pair of SHIFT) {
+    const baseId = idOf(pair[0]);
+    if (!baseId) { continue; }
+    let left = pair[1];
+    for (const e of entries) {
+      if (left <= 0) { break; }
+      if (e.baseId !== baseId || !(e.count > 0)) { continue; }
+      const n = Math.min(left, e.count);
+      e.count -= n;
+      left -= n;
+      took += n;
+    }
+  }
+  entries = entries.filter(function (e) { return e.count > 0; });
+  const added = [];
+  for (const pair of RIEKLING_SHIFT) {
+    const baseId = idOf(pair[0]);
+    if (!baseId) { continue; }
+    if (entries.some(function (e) { return e.baseId === baseId; })) { continue; }
+    entries.push({ baseId: baseId, count: pair[1], worn: true });
+    added.push(pair[0]);
+  }
+  if (!took && !added.length) { return 0; }
+  mp.set(actorId, 'inventory', { entries: entries });
+  for (const desc of added) {
+    try {
+      mp.callPapyrusFunction('method', 'Actor', 'EquipItem',
+        { type: 'form', desc: mp.getDescFromId(actorId) },
+        [{ type: 'espm', desc: desc }, false, true]);
+    } catch (e) {
+      log('chargen', actorId.toString(16), 'could not ask its game to put on', desc, ':', e);
+    }
+  }
+  log('chargen', actorId.toString(16), 'is a riekling (' + race + '):', took,
+      'piece(s) of the shift taken back,', added.length, 'riekling piece(s) put in the pack and asked on once');
+  return added.length;
 }
 
 /*
@@ -10804,11 +10896,11 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "19f8d:Playable Rieklings.esp": { "out": "19f60:Playable Rieklings.esp", "name": "Riekling Fur Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "riekling", "rank": "novice", "family": "Armoured boots", "open": true },
     "19f8e:Playable Rieklings.esp": { "out": "19f61:Playable Rieklings.esp", "name": "Riekling Fur Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "riekling", "rank": "novice", "family": "Gauntlets", "open": true },
     "19f8f:Playable Rieklings.esp": { "out": "19f62:Playable Rieklings.esp", "name": "Riekling Horned Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "riekling", "rank": "novice", "family": "Helmets", "open": true },
-    "19f90:Playable Rieklings.esp": { "out": "19f69:Playable Rieklings.esp", "name": "Riekling Cloth Hand Wraps", "type": "ARMO", "makes": 1, "owner": "", "half": "", "race": "riekling", "rank": "", "family": "", "nobody": "Cut from the open book. Not found and not made. The reference stays in the cut file." },
-    "19f91:Playable Rieklings.esp": { "out": "19f68:Playable Rieklings.esp", "name": "Riekling Cloth Foot Wraps", "type": "ARMO", "makes": 1, "owner": "", "half": "", "race": "riekling", "rank": "", "family": "", "nobody": "Cut from the open book. Not found and not made. The reference stays in the cut file." },
-    "19f92:Playable Rieklings.esp": { "out": "19f6c:Playable Rieklings.esp", "name": "Riekling LoinCloth 1", "type": "ARMO", "makes": 1, "owner": "", "half": "", "race": "riekling", "rank": "", "family": "", "nobody": "Cut from the open book. Not found and not made. The reference stays in the cut file." },
+    "19f90:Playable Rieklings.esp": { "out": "19f69:Playable Rieklings.esp", "name": "Riekling Cloth Hand Wraps", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "riekling", "rank": "novice", "family": "Gloves", "open": true },
+    "19f91:Playable Rieklings.esp": { "out": "19f68:Playable Rieklings.esp", "name": "Riekling Cloth Foot Wraps", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "riekling", "rank": "novice", "family": "Shoes and light boots", "open": true },
+    "19f92:Playable Rieklings.esp": { "out": "19f6c:Playable Rieklings.esp", "name": "Riekling LoinCloth 1", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "riekling", "rank": "novice", "family": "Robes and body wear", "open": true },
     "19f93:Playable Rieklings.esp": { "out": "19f6d:Playable Rieklings.esp", "name": "Riekling Iron Armour", "type": "ARMO", "makes": 1, "owner": "", "half": "", "race": "riekling", "rank": "", "family": "", "nobody": "Cut from the open book. Not found and not made. The reference stays in the cut file." },
-    "19f94:Playable Rieklings.esp": { "out": "19f6e:Playable Rieklings.esp", "name": "Riekling LoinCloth 2", "type": "ARMO", "makes": 1, "owner": "", "half": "", "race": "riekling", "rank": "", "family": "", "nobody": "Cut from the open book. Not found and not made. The reference stays in the cut file." },
+    "19f94:Playable Rieklings.esp": { "out": "19f6e:Playable Rieklings.esp", "name": "Riekling LoinCloth 2", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "riekling", "rank": "novice", "family": "Robes and body wear", "open": true },
     "19f95:Playable Rieklings.esp": { "out": "19f6f:Playable Rieklings.esp", "name": "Riekling Fur Iron Armour", "type": "ARMO", "makes": 1, "owner": "", "half": "", "race": "riekling", "rank": "", "family": "", "nobody": "Cut from the open book. Not found and not made. The reference stays in the cut file." },
     "19f96:Playable Rieklings.esp": { "out": "19f70:Playable Rieklings.esp", "name": "Riekling Chief Fur Armour", "type": "ARMO", "makes": 1, "owner": "", "half": "", "race": "riekling", "rank": "", "family": "", "nobody": "Cut from the open book. Not found and not made. The reference stays in the cut file." },
     "19f97:Playable Rieklings.esp": { "out": "19f71:Playable Rieklings.esp", "name": "Riekling Chief Fur Iron Armour", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "riekling", "rank": "novice", "family": "Body armour", "open": true },
@@ -26730,10 +26822,10 @@ const CHARCOAL_GRADES = [
 
 // ==== FUEL_BY_RECIPE, generated ====
 /* Built by scripts\dev\Build-FuelTable.js out of game\data\recipes.json. Do not hand edit.
-   332 recipes at a forge, a skyforge or a smelter, out of 3717.
-   179 burn Poor Charcoal, 76 Charcoal, 59 Charcoal Briquette and 18 Coke.
+   336 recipes at a forge, a skyforge or a smelter, out of 3717.
+   183 burn Poor Charcoal, 76 Charcoal, 59 Charcoal Briquette and 18 Coke.
    Recipe desc -> [grade 1 to 4, the metal that asks for it or nothing, the bench]. */
-const FUEL_BY_RECIPE = {"108cf8:Skyrim.esm":[2,"dwarven","forge"],"108cf9:Skyrim.esm":[3,"ebony","forge"],"108cfa:Skyrim.esm":[2,"elven","forge"],"108cfb:Skyrim.esm":[3,"glass","forge"],"108cfc:Skyrim.esm":[2,"orcish","forge"],"10dd28:Skyrim.esm":[2,"dwarven","smelter"],"1548d:Thornswood-Content.esp":[1,"iron","forge"],"1548e:Thornswood-Content.esp":[1,"iron","forge"],"15492:Thornswood-Content.esp":[1,"iron","forge"],"15496:Thornswood-Content.esp":[1,"iron","forge"],"15497:Thornswood-Content.esp":[1,"iron","forge"],"1549c:Thornswood-Content.esp":[1,"","forge"],"1549d:Thornswood-Content.esp":[1,"steel","forge"],"1549e:Thornswood-Content.esp":[2,"elven","forge"],"1549f:Thornswood-Content.esp":[1,"iron","forge"],"154b3:Thornswood-Content.esp":[1,"iron","forge"],"154b4:Thornswood-Content.esp":[1,"iron","forge"],"1838:PlayFluteLuteDrum.esp":[1,"","forge"],"19f8c:Playable Rieklings.esp":[1,"","forge"],"19f8d:Playable Rieklings.esp":[1,"","forge"],"19f8e:Playable Rieklings.esp":[1,"","forge"],"19f8f:Playable Rieklings.esp":[1,"iron","forge"],"19f97:Playable Rieklings.esp":[1,"iron","forge"],"19f9d:Playable Rieklings.esp":[1,"iron","forge"],"19fb4:Playable Rieklings.esp":[1,"steel","forge"],"19fb7:Playable Rieklings.esp":[1,"steel","forge"],"19fb8:Playable Rieklings.esp":[1,"steel","forge"],"1d90:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"214aa:Hothtrooper44_ArmorCompilation.esp":[1,"steel","skyforge"],"22fe:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23062:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23063:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23190:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"23195:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"2319a:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"2319f:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"231a9:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231ae:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231b3:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231b8:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231c6:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231c7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231c8:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231c9:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231ca:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cb:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cc:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cd:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231ce:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cf:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d0:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d1:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d2:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d3:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d4:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d5:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d6:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d8:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d9:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"238fd:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"238fe:Hothtrooper44_ArmorCompilation.esp":[2,"silver","forge"],"23900:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"23907:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23908:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"2390e:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"23918:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23919:Hothtrooper44_ArmorCompilation.esp":[2,"silver","forge"],"23a0a:Playable Rieklings.esp":[1,"","forge"],"286a:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"2b04f:Dragonborn.esm":[1,"iron","forge"],"2b050:Dragonborn.esm":[1,"iron","forge"],"2b051:Dragonborn.esm":[1,"iron","forge"],"2b052:Dragonborn.esm":[1,"","forge"],"2b053:Dragonborn.esm":[1,"iron","forge"],"2b054:Dragonborn.esm":[1,"iron","forge"],"2b055:Dragonborn.esm":[1,"","forge"],"2b056:Dragonborn.esm":[1,"","forge"],"2b057:Dragonborn.esm":[1,"","forge"],"2b058:Dragonborn.esm":[1,"iron","forge"],"2b05a:Dragonborn.esm":[1,"iron","forge"],"2b05b:Dragonborn.esm":[1,"iron","forge"],"2b05c:Dragonborn.esm":[1,"iron","forge"],"2b065:Dragonborn.esm":[3,"nordic","forge"],"2b066:Dragonborn.esm":[3,"nordic","forge"],"2b067:Dragonborn.esm":[3,"nordic","forge"],"2b068:Dragonborn.esm":[3,"nordic","forge"],"2b069:Dragonborn.esm":[3,"nordic","forge"],"2b06a:Dragonborn.esm":[4,"stalhrim","forge"],"2b06c:Dragonborn.esm":[4,"stalhrim","forge"],"2b06d:Dragonborn.esm":[4,"stalhrim","forge"],"2b06e:Dragonborn.esm":[4,"stalhrim","forge"],"2b06f:Dragonborn.esm":[4,"stalhrim","forge"],"2b070:Dragonborn.esm":[4,"stalhrim","forge"],"2b071:Dragonborn.esm":[4,"stalhrim","forge"],"2b072:Dragonborn.esm":[4,"stalhrim","forge"],"2b075:Dragonborn.esm":[4,"stalhrim","forge"],"2b076:Dragonborn.esm":[4,"stalhrim","forge"],"2b077:Dragonborn.esm":[4,"stalhrim","forge"],"2b078:Dragonborn.esm":[4,"stalhrim","forge"],"2b079:Dragonborn.esm":[4,"stalhrim","forge"],"2b07a:Dragonborn.esm":[4,"stalhrim","forge"],"2b07b:Dragonborn.esm":[4,"stalhrim","forge"],"2b07c:Dragonborn.esm":[4,"stalhrim","forge"],"2b07d:Dragonborn.esm":[4,"stalhrim","forge"],"2b07e:Dragonborn.esm":[3,"nordic","forge"],"2b07f:Dragonborn.esm":[3,"nordic","forge"],"2b080:Dragonborn.esm":[3,"nordic","forge"],"2b081:Dragonborn.esm":[3,"nordic","forge"],"2b082:Dragonborn.esm":[3,"nordic","forge"],"2b083:Dragonborn.esm":[3,"nordic","forge"],"2b084:Dragonborn.esm":[3,"nordic","forge"],"2b085:Dragonborn.esm":[3,"nordic","forge"],"2dd7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"2de4:PlayFluteLuteDrum.esp":[1,"","forge"],"2de5:PlayFluteLuteDrum.esp":[1,"","forge"],"372fe:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"372ff:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"37300:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"37301:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"37306:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"37307:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"37308:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"37309:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"3cf53:Dragonborn.esm":[3,"nordic","forge"],"3cf54:Dragonborn.esm":[4,"stalhrim","forge"],"3d2dd:Dragonborn.esm":[1,"iron","forge"],"490d86:Immersive Weapons.esp":[1,"","forge"],"491dc0:Immersive Weapons.esp":[3,"glass","forge"],"491dc4:Immersive Weapons.esp":[3,"glass","forge"],"53b3:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"53b5:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"53b7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"6aa09:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"77100a:Immersive Weapons.esp":[1,"steel","forge"],"82ebf:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"82ec0:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"82ec1:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"82ec2:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"844:MoreCraftableEquipment.esp":[1,"","forge"],"848:MoreCraftableEquipment.esp":[1,"","forge"],"849:MoreCraftableEquipment.esp":[1,"","forge"],"855:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"856:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"857:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"858:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"85f:MoreCraftableEquipment.esp":[1,"steel","forge"],"860:MoreCraftableEquipment.esp":[1,"steel","forge"],"861:MoreCraftableEquipment.esp":[1,"steel","forge"],"863:MoreCraftableEquipment.esp":[1,"steel","forge"],"866:MoreCraftableEquipment.esp":[1,"steel","forge"],"867:MoreCraftableEquipment.esp":[1,"steel","forge"],"868:MoreCraftableEquipment.esp":[1,"iron","forge"],"869:MoreCraftableEquipment.esp":[1,"iron","forge"],"874:MoreCraftableEquipment.esp":[2,"falmer","forge"],"87b:MoreCraftableEquipment.esp":[2,"falmer","forge"],"87c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88d:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88e:MoreCraftableEquipment.esp":[2,"falmer","forge"],"897:MoreCraftableEquipment.esp":[2,"falmer","forge"],"89c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8a9:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8aa:MoreCraftableEquipment.esp":[1,"","forge"],"8ab:MoreCraftableEquipment.esp":[1,"","forge"],"8ac:MoreCraftableEquipment.esp":[1,"","forge"],"8ad:MoreCraftableEquipment.esp":[1,"","forge"],"8d0:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d1:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d2:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d3:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d4:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d5:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d6:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d7:MoreCraftableEquipment.esp":[1,"","forge"],"8d8:MoreCraftableEquipment.esp":[1,"","forge"],"8d9:MoreCraftableEquipment.esp":[1,"","forge"],"8db:MoreCraftableEquipment.esp":[1,"iron","forge"],"8f0:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8f7:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8f8:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8f9:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8fa:MoreCraftableEquipment.esp":[1,"steel","forge"],"8fc:MoreCraftableEquipment.esp":[1,"iron","forge"],"900:MoreCraftableEquipment.esp":[2,"silver","forge"],"901:MoreCraftableEquipment.esp":[2,"silver","forge"],"94185a:Immersive Weapons.esp":[3,"glass","forge"],"9cf:Update.esm":[1,"steel","forge"],"9d0:Update.esm":[1,"steel","forge"],"9d1:Update.esm":[1,"steel","forge"],"9d2:Update.esm":[1,"steel","forge"],"9d3:Update.esm":[1,"steel","forge"],"9e775:Playable Rieklings.esp":[1,"","forge"],"a30c3:Skyrim.esm":[1,"iron","smelter"],"a30cb:Skyrim.esm":[1,"","smelter"],"a30d3:Skyrim.esm":[3,"ebony","smelter"],"a30d4:Skyrim.esm":[1,"","smelter"],"a30d9:Skyrim.esm":[2,"elven","smelter"],"a30da:Skyrim.esm":[3,"glass","smelter"],"a30db:Skyrim.esm":[2,"orcish","smelter"],"a30dc:Skyrim.esm":[1,"","smelter"],"a30dd:Skyrim.esm":[2,"silver","smelter"],"a30e4:Skyrim.esm":[1,"steel","smelter"],"a5cd6:Skyrim.esm":[1,"steel","forge"],"ab72:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab73:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab74:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab75:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"b64f:Dawnguard.esm":[1,"iron","forge"],"b650:Dawnguard.esm":[1,"steel","forge"],"b651:Dawnguard.esm":[3,"ebony","forge"],"b652:Dawnguard.esm":[2,"dwarven","forge"],"b653:Dawnguard.esm":[3,"glass","forge"],"b654:Dawnguard.esm":[2,"orcish","forge"],"b655:Dawnguard.esm":[2,"elven","forge"],"bc99a:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"c74736:Immersive Weapons.esp":[2,"silver","forge"],"c74737:Immersive Weapons.esp":[2,"silver","forge"],"da0c03:Update.esm":[2,"elven","smelter"],"da769:Skyrim.esm":[1,"iron","forge"],"da76a:Skyrim.esm":[1,"iron","forge"],"da76b:Skyrim.esm":[1,"iron","forge"],"da76c:Skyrim.esm":[1,"iron","forge"],"da76d:Skyrim.esm":[1,"iron","forge"],"da76e:Skyrim.esm":[1,"iron","forge"],"da76f:Skyrim.esm":[1,"iron","forge"],"db28e:Skyrim.esm":[1,"","forge"],"db28f:Skyrim.esm":[1,"iron","forge"],"db290:Skyrim.esm":[1,"iron","forge"],"db291:Skyrim.esm":[1,"iron","forge"],"db292:Skyrim.esm":[1,"iron","forge"],"db293:Skyrim.esm":[1,"iron","forge"],"db5d3:Skyrim.esm":[1,"","forge"],"db5d4:Skyrim.esm":[1,"","forge"],"db5d5:Skyrim.esm":[1,"","forge"],"db5d6:Skyrim.esm":[1,"","forge"],"db5d7:Skyrim.esm":[1,"steel","forge"],"db896:Skyrim.esm":[1,"steel","forge"],"db897:Skyrim.esm":[1,"steel","forge"],"db898:Skyrim.esm":[1,"steel","forge"],"db899:Skyrim.esm":[2,"orcish","forge"],"db89a:Skyrim.esm":[2,"orcish","forge"],"db89b:Skyrim.esm":[1,"steel","forge"],"db89c:Skyrim.esm":[2,"orcish","forge"],"db89d:Skyrim.esm":[2,"orcish","forge"],"db89e:Skyrim.esm":[1,"steel","forge"],"db89f:Skyrim.esm":[2,"orcish","forge"],"db8a0:Skyrim.esm":[2,"orcish","forge"],"db8a1:Skyrim.esm":[2,"orcish","forge"],"db8a3:Skyrim.esm":[2,"dwarven","forge"],"db8a4:Skyrim.esm":[2,"dwarven","forge"],"db8a5:Skyrim.esm":[2,"dwarven","forge"],"db8a6:Skyrim.esm":[2,"dwarven","forge"],"db8a7:Skyrim.esm":[2,"dwarven","forge"],"db8a8:Skyrim.esm":[2,"dwarven","forge"],"db8a9:Skyrim.esm":[2,"dwarven","forge"],"db8aa:Skyrim.esm":[2,"elven","forge"],"db8ab:Skyrim.esm":[2,"elven","forge"],"db8ac:Skyrim.esm":[2,"elven","forge"],"db8ad:Skyrim.esm":[2,"elven","forge"],"db8ae:Skyrim.esm":[2,"elven","forge"],"db8af:Skyrim.esm":[2,"elven","forge"],"db8b0:Skyrim.esm":[2,"elven","forge"],"db8b1:Skyrim.esm":[3,"glass","forge"],"db8b2:Skyrim.esm":[3,"glass","forge"],"db8b3:Skyrim.esm":[3,"glass","forge"],"db8b4:Skyrim.esm":[3,"glass","forge"],"db8b5:Skyrim.esm":[3,"glass","forge"],"db8b6:Skyrim.esm":[3,"glass","forge"],"db8b7:Skyrim.esm":[3,"glass","forge"],"db8b8:Skyrim.esm":[3,"ebony","forge"],"db8b9:Skyrim.esm":[3,"ebony","forge"],"db8ba:Skyrim.esm":[3,"ebony","forge"],"db8bb:Skyrim.esm":[3,"ebony","forge"],"db8bc:Skyrim.esm":[3,"ebony","forge"],"db8bd:Skyrim.esm":[3,"ebony","forge"],"db8be:Skyrim.esm":[3,"ebony","forge"],"dc9f5:Skyrim.esm":[1,"steel","forge"],"dc9f6:Skyrim.esm":[1,"steel","forge"],"dc9f7:Skyrim.esm":[1,"steel","forge"],"dc9f8:Skyrim.esm":[1,"steel","forge"],"dc9f9:Skyrim.esm":[1,"steel","forge"],"dc9fa:Skyrim.esm":[2,"elven","forge"],"dc9fb:Skyrim.esm":[2,"elven","forge"],"dc9fc:Skyrim.esm":[2,"elven","forge"],"dc9fd:Skyrim.esm":[2,"elven","forge"],"dc9fe:Skyrim.esm":[2,"elven","forge"],"dc9ff:Skyrim.esm":[1,"iron","forge"],"dca00:Skyrim.esm":[1,"iron","forge"],"dca01:Skyrim.esm":[1,"","forge"],"dca02:Skyrim.esm":[1,"","forge"],"dca03:Skyrim.esm":[1,"","forge"],"dca04:Skyrim.esm":[1,"","forge"],"dca05:Skyrim.esm":[1,"steel","forge"],"dca06:Skyrim.esm":[1,"steel","forge"],"dca07:Skyrim.esm":[1,"steel","forge"],"dca08:Skyrim.esm":[1,"steel","forge"],"dca0e:Skyrim.esm":[3,"glass","forge"],"dca0f:Skyrim.esm":[3,"glass","forge"],"dca10:Skyrim.esm":[3,"glass","forge"],"dca11:Skyrim.esm":[3,"glass","forge"],"dca12:Skyrim.esm":[3,"glass","forge"],"dd975:Skyrim.esm":[1,"steel","forge"],"dd977:Skyrim.esm":[1,"steel","forge"],"dd978:Skyrim.esm":[1,"steel","forge"],"dd979:Skyrim.esm":[2,"dwarven","forge"],"dd97a:Skyrim.esm":[2,"dwarven","forge"],"dd97b:Skyrim.esm":[2,"dwarven","forge"],"dd97c:Skyrim.esm":[2,"dwarven","forge"],"dd97d:Skyrim.esm":[2,"dwarven","forge"],"dd97e:Skyrim.esm":[1,"steel","forge"],"dd97f:Skyrim.esm":[1,"steel","forge"],"dd980:Skyrim.esm":[1,"steel","forge"],"dd981:Skyrim.esm":[1,"steel","forge"],"dd983:Skyrim.esm":[2,"orcish","forge"],"dd984:Skyrim.esm":[2,"orcish","forge"],"dd985:Skyrim.esm":[2,"orcish","forge"],"dd986:Skyrim.esm":[2,"orcish","forge"],"dd987:Skyrim.esm":[2,"orcish","forge"],"dd988:Skyrim.esm":[3,"ebony","forge"],"dd989:Skyrim.esm":[3,"ebony","forge"],"dd98a:Skyrim.esm":[3,"ebony","forge"],"dd98b:Skyrim.esm":[3,"ebony","forge"],"dd98c:Skyrim.esm":[3,"ebony","forge"],"f46cc:Skyrim.esm":[1,"ancient nord","skyforge"],"f46cd:Skyrim.esm":[1,"ancient nord","skyforge"],"f46cf:Skyrim.esm":[1,"ancient nord","skyforge"],"f46d0:Skyrim.esm":[1,"ancient nord","skyforge"],"f6f2a:Skyrim.esm":[1,"steel","forge"],"f74d:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"f813:Dawnguard.esm":[1,"steel","forge"],"f814:Dawnguard.esm":[2,"dwarven","forge"]};
+const FUEL_BY_RECIPE = {"108cf8:Skyrim.esm":[2,"dwarven","forge"],"108cf9:Skyrim.esm":[3,"ebony","forge"],"108cfa:Skyrim.esm":[2,"elven","forge"],"108cfb:Skyrim.esm":[3,"glass","forge"],"108cfc:Skyrim.esm":[2,"orcish","forge"],"10dd28:Skyrim.esm":[2,"dwarven","smelter"],"1548d:Thornswood-Content.esp":[1,"iron","forge"],"1548e:Thornswood-Content.esp":[1,"iron","forge"],"15492:Thornswood-Content.esp":[1,"iron","forge"],"15496:Thornswood-Content.esp":[1,"iron","forge"],"15497:Thornswood-Content.esp":[1,"iron","forge"],"1549c:Thornswood-Content.esp":[1,"","forge"],"1549d:Thornswood-Content.esp":[1,"steel","forge"],"1549e:Thornswood-Content.esp":[2,"elven","forge"],"1549f:Thornswood-Content.esp":[1,"iron","forge"],"154b3:Thornswood-Content.esp":[1,"iron","forge"],"154b4:Thornswood-Content.esp":[1,"iron","forge"],"1838:PlayFluteLuteDrum.esp":[1,"","forge"],"19f8c:Playable Rieklings.esp":[1,"","forge"],"19f8d:Playable Rieklings.esp":[1,"","forge"],"19f8e:Playable Rieklings.esp":[1,"","forge"],"19f8f:Playable Rieklings.esp":[1,"iron","forge"],"19f90:Playable Rieklings.esp":[1,"","forge"],"19f91:Playable Rieklings.esp":[1,"","forge"],"19f92:Playable Rieklings.esp":[1,"","forge"],"19f94:Playable Rieklings.esp":[1,"","forge"],"19f97:Playable Rieklings.esp":[1,"iron","forge"],"19f9d:Playable Rieklings.esp":[1,"iron","forge"],"19fb4:Playable Rieklings.esp":[1,"steel","forge"],"19fb7:Playable Rieklings.esp":[1,"steel","forge"],"19fb8:Playable Rieklings.esp":[1,"steel","forge"],"1d90:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"214aa:Hothtrooper44_ArmorCompilation.esp":[1,"steel","skyforge"],"22fe:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23062:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23063:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23190:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"23195:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"2319a:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"2319f:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"231a9:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231ae:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231b3:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231b8:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231c6:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231c7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231c8:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231c9:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231ca:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cb:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cc:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cd:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231ce:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cf:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d0:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d1:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d2:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d3:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d4:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d5:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d6:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d8:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d9:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"238fd:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"238fe:Hothtrooper44_ArmorCompilation.esp":[2,"silver","forge"],"23900:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"23907:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23908:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"2390e:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"23918:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23919:Hothtrooper44_ArmorCompilation.esp":[2,"silver","forge"],"23a0a:Playable Rieklings.esp":[1,"","forge"],"286a:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"2b04f:Dragonborn.esm":[1,"iron","forge"],"2b050:Dragonborn.esm":[1,"iron","forge"],"2b051:Dragonborn.esm":[1,"iron","forge"],"2b052:Dragonborn.esm":[1,"","forge"],"2b053:Dragonborn.esm":[1,"iron","forge"],"2b054:Dragonborn.esm":[1,"iron","forge"],"2b055:Dragonborn.esm":[1,"","forge"],"2b056:Dragonborn.esm":[1,"","forge"],"2b057:Dragonborn.esm":[1,"","forge"],"2b058:Dragonborn.esm":[1,"iron","forge"],"2b05a:Dragonborn.esm":[1,"iron","forge"],"2b05b:Dragonborn.esm":[1,"iron","forge"],"2b05c:Dragonborn.esm":[1,"iron","forge"],"2b065:Dragonborn.esm":[3,"nordic","forge"],"2b066:Dragonborn.esm":[3,"nordic","forge"],"2b067:Dragonborn.esm":[3,"nordic","forge"],"2b068:Dragonborn.esm":[3,"nordic","forge"],"2b069:Dragonborn.esm":[3,"nordic","forge"],"2b06a:Dragonborn.esm":[4,"stalhrim","forge"],"2b06c:Dragonborn.esm":[4,"stalhrim","forge"],"2b06d:Dragonborn.esm":[4,"stalhrim","forge"],"2b06e:Dragonborn.esm":[4,"stalhrim","forge"],"2b06f:Dragonborn.esm":[4,"stalhrim","forge"],"2b070:Dragonborn.esm":[4,"stalhrim","forge"],"2b071:Dragonborn.esm":[4,"stalhrim","forge"],"2b072:Dragonborn.esm":[4,"stalhrim","forge"],"2b075:Dragonborn.esm":[4,"stalhrim","forge"],"2b076:Dragonborn.esm":[4,"stalhrim","forge"],"2b077:Dragonborn.esm":[4,"stalhrim","forge"],"2b078:Dragonborn.esm":[4,"stalhrim","forge"],"2b079:Dragonborn.esm":[4,"stalhrim","forge"],"2b07a:Dragonborn.esm":[4,"stalhrim","forge"],"2b07b:Dragonborn.esm":[4,"stalhrim","forge"],"2b07c:Dragonborn.esm":[4,"stalhrim","forge"],"2b07d:Dragonborn.esm":[4,"stalhrim","forge"],"2b07e:Dragonborn.esm":[3,"nordic","forge"],"2b07f:Dragonborn.esm":[3,"nordic","forge"],"2b080:Dragonborn.esm":[3,"nordic","forge"],"2b081:Dragonborn.esm":[3,"nordic","forge"],"2b082:Dragonborn.esm":[3,"nordic","forge"],"2b083:Dragonborn.esm":[3,"nordic","forge"],"2b084:Dragonborn.esm":[3,"nordic","forge"],"2b085:Dragonborn.esm":[3,"nordic","forge"],"2dd7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"2de4:PlayFluteLuteDrum.esp":[1,"","forge"],"2de5:PlayFluteLuteDrum.esp":[1,"","forge"],"372fe:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"372ff:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"37300:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"37301:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"37306:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"37307:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"37308:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"37309:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"3cf53:Dragonborn.esm":[3,"nordic","forge"],"3cf54:Dragonborn.esm":[4,"stalhrim","forge"],"3d2dd:Dragonborn.esm":[1,"iron","forge"],"490d86:Immersive Weapons.esp":[1,"","forge"],"491dc0:Immersive Weapons.esp":[3,"glass","forge"],"491dc4:Immersive Weapons.esp":[3,"glass","forge"],"53b3:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"53b5:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"53b7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"6aa09:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"77100a:Immersive Weapons.esp":[1,"steel","forge"],"82ebf:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"82ec0:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"82ec1:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"82ec2:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"844:MoreCraftableEquipment.esp":[1,"","forge"],"848:MoreCraftableEquipment.esp":[1,"","forge"],"849:MoreCraftableEquipment.esp":[1,"","forge"],"855:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"856:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"857:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"858:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"85f:MoreCraftableEquipment.esp":[1,"steel","forge"],"860:MoreCraftableEquipment.esp":[1,"steel","forge"],"861:MoreCraftableEquipment.esp":[1,"steel","forge"],"863:MoreCraftableEquipment.esp":[1,"steel","forge"],"866:MoreCraftableEquipment.esp":[1,"steel","forge"],"867:MoreCraftableEquipment.esp":[1,"steel","forge"],"868:MoreCraftableEquipment.esp":[1,"iron","forge"],"869:MoreCraftableEquipment.esp":[1,"iron","forge"],"874:MoreCraftableEquipment.esp":[2,"falmer","forge"],"87b:MoreCraftableEquipment.esp":[2,"falmer","forge"],"87c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88d:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88e:MoreCraftableEquipment.esp":[2,"falmer","forge"],"897:MoreCraftableEquipment.esp":[2,"falmer","forge"],"89c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8a9:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8aa:MoreCraftableEquipment.esp":[1,"","forge"],"8ab:MoreCraftableEquipment.esp":[1,"","forge"],"8ac:MoreCraftableEquipment.esp":[1,"","forge"],"8ad:MoreCraftableEquipment.esp":[1,"","forge"],"8d0:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d1:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d2:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d3:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d4:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d5:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d6:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d7:MoreCraftableEquipment.esp":[1,"","forge"],"8d8:MoreCraftableEquipment.esp":[1,"","forge"],"8d9:MoreCraftableEquipment.esp":[1,"","forge"],"8db:MoreCraftableEquipment.esp":[1,"iron","forge"],"8f0:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8f7:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8f8:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8f9:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8fa:MoreCraftableEquipment.esp":[1,"steel","forge"],"8fc:MoreCraftableEquipment.esp":[1,"iron","forge"],"900:MoreCraftableEquipment.esp":[2,"silver","forge"],"901:MoreCraftableEquipment.esp":[2,"silver","forge"],"94185a:Immersive Weapons.esp":[3,"glass","forge"],"9cf:Update.esm":[1,"steel","forge"],"9d0:Update.esm":[1,"steel","forge"],"9d1:Update.esm":[1,"steel","forge"],"9d2:Update.esm":[1,"steel","forge"],"9d3:Update.esm":[1,"steel","forge"],"9e775:Playable Rieklings.esp":[1,"","forge"],"a30c3:Skyrim.esm":[1,"iron","smelter"],"a30cb:Skyrim.esm":[1,"","smelter"],"a30d3:Skyrim.esm":[3,"ebony","smelter"],"a30d4:Skyrim.esm":[1,"","smelter"],"a30d9:Skyrim.esm":[2,"elven","smelter"],"a30da:Skyrim.esm":[3,"glass","smelter"],"a30db:Skyrim.esm":[2,"orcish","smelter"],"a30dc:Skyrim.esm":[1,"","smelter"],"a30dd:Skyrim.esm":[2,"silver","smelter"],"a30e4:Skyrim.esm":[1,"steel","smelter"],"a5cd6:Skyrim.esm":[1,"steel","forge"],"ab72:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab73:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab74:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab75:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"b64f:Dawnguard.esm":[1,"iron","forge"],"b650:Dawnguard.esm":[1,"steel","forge"],"b651:Dawnguard.esm":[3,"ebony","forge"],"b652:Dawnguard.esm":[2,"dwarven","forge"],"b653:Dawnguard.esm":[3,"glass","forge"],"b654:Dawnguard.esm":[2,"orcish","forge"],"b655:Dawnguard.esm":[2,"elven","forge"],"bc99a:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"c74736:Immersive Weapons.esp":[2,"silver","forge"],"c74737:Immersive Weapons.esp":[2,"silver","forge"],"da0c03:Update.esm":[2,"elven","smelter"],"da769:Skyrim.esm":[1,"iron","forge"],"da76a:Skyrim.esm":[1,"iron","forge"],"da76b:Skyrim.esm":[1,"iron","forge"],"da76c:Skyrim.esm":[1,"iron","forge"],"da76d:Skyrim.esm":[1,"iron","forge"],"da76e:Skyrim.esm":[1,"iron","forge"],"da76f:Skyrim.esm":[1,"iron","forge"],"db28e:Skyrim.esm":[1,"","forge"],"db28f:Skyrim.esm":[1,"iron","forge"],"db290:Skyrim.esm":[1,"iron","forge"],"db291:Skyrim.esm":[1,"iron","forge"],"db292:Skyrim.esm":[1,"iron","forge"],"db293:Skyrim.esm":[1,"iron","forge"],"db5d3:Skyrim.esm":[1,"","forge"],"db5d4:Skyrim.esm":[1,"","forge"],"db5d5:Skyrim.esm":[1,"","forge"],"db5d6:Skyrim.esm":[1,"","forge"],"db5d7:Skyrim.esm":[1,"steel","forge"],"db896:Skyrim.esm":[1,"steel","forge"],"db897:Skyrim.esm":[1,"steel","forge"],"db898:Skyrim.esm":[1,"steel","forge"],"db899:Skyrim.esm":[2,"orcish","forge"],"db89a:Skyrim.esm":[2,"orcish","forge"],"db89b:Skyrim.esm":[1,"steel","forge"],"db89c:Skyrim.esm":[2,"orcish","forge"],"db89d:Skyrim.esm":[2,"orcish","forge"],"db89e:Skyrim.esm":[1,"steel","forge"],"db89f:Skyrim.esm":[2,"orcish","forge"],"db8a0:Skyrim.esm":[2,"orcish","forge"],"db8a1:Skyrim.esm":[2,"orcish","forge"],"db8a3:Skyrim.esm":[2,"dwarven","forge"],"db8a4:Skyrim.esm":[2,"dwarven","forge"],"db8a5:Skyrim.esm":[2,"dwarven","forge"],"db8a6:Skyrim.esm":[2,"dwarven","forge"],"db8a7:Skyrim.esm":[2,"dwarven","forge"],"db8a8:Skyrim.esm":[2,"dwarven","forge"],"db8a9:Skyrim.esm":[2,"dwarven","forge"],"db8aa:Skyrim.esm":[2,"elven","forge"],"db8ab:Skyrim.esm":[2,"elven","forge"],"db8ac:Skyrim.esm":[2,"elven","forge"],"db8ad:Skyrim.esm":[2,"elven","forge"],"db8ae:Skyrim.esm":[2,"elven","forge"],"db8af:Skyrim.esm":[2,"elven","forge"],"db8b0:Skyrim.esm":[2,"elven","forge"],"db8b1:Skyrim.esm":[3,"glass","forge"],"db8b2:Skyrim.esm":[3,"glass","forge"],"db8b3:Skyrim.esm":[3,"glass","forge"],"db8b4:Skyrim.esm":[3,"glass","forge"],"db8b5:Skyrim.esm":[3,"glass","forge"],"db8b6:Skyrim.esm":[3,"glass","forge"],"db8b7:Skyrim.esm":[3,"glass","forge"],"db8b8:Skyrim.esm":[3,"ebony","forge"],"db8b9:Skyrim.esm":[3,"ebony","forge"],"db8ba:Skyrim.esm":[3,"ebony","forge"],"db8bb:Skyrim.esm":[3,"ebony","forge"],"db8bc:Skyrim.esm":[3,"ebony","forge"],"db8bd:Skyrim.esm":[3,"ebony","forge"],"db8be:Skyrim.esm":[3,"ebony","forge"],"dc9f5:Skyrim.esm":[1,"steel","forge"],"dc9f6:Skyrim.esm":[1,"steel","forge"],"dc9f7:Skyrim.esm":[1,"steel","forge"],"dc9f8:Skyrim.esm":[1,"steel","forge"],"dc9f9:Skyrim.esm":[1,"steel","forge"],"dc9fa:Skyrim.esm":[2,"elven","forge"],"dc9fb:Skyrim.esm":[2,"elven","forge"],"dc9fc:Skyrim.esm":[2,"elven","forge"],"dc9fd:Skyrim.esm":[2,"elven","forge"],"dc9fe:Skyrim.esm":[2,"elven","forge"],"dc9ff:Skyrim.esm":[1,"iron","forge"],"dca00:Skyrim.esm":[1,"iron","forge"],"dca01:Skyrim.esm":[1,"","forge"],"dca02:Skyrim.esm":[1,"","forge"],"dca03:Skyrim.esm":[1,"","forge"],"dca04:Skyrim.esm":[1,"","forge"],"dca05:Skyrim.esm":[1,"steel","forge"],"dca06:Skyrim.esm":[1,"steel","forge"],"dca07:Skyrim.esm":[1,"steel","forge"],"dca08:Skyrim.esm":[1,"steel","forge"],"dca0e:Skyrim.esm":[3,"glass","forge"],"dca0f:Skyrim.esm":[3,"glass","forge"],"dca10:Skyrim.esm":[3,"glass","forge"],"dca11:Skyrim.esm":[3,"glass","forge"],"dca12:Skyrim.esm":[3,"glass","forge"],"dd975:Skyrim.esm":[1,"steel","forge"],"dd977:Skyrim.esm":[1,"steel","forge"],"dd978:Skyrim.esm":[1,"steel","forge"],"dd979:Skyrim.esm":[2,"dwarven","forge"],"dd97a:Skyrim.esm":[2,"dwarven","forge"],"dd97b:Skyrim.esm":[2,"dwarven","forge"],"dd97c:Skyrim.esm":[2,"dwarven","forge"],"dd97d:Skyrim.esm":[2,"dwarven","forge"],"dd97e:Skyrim.esm":[1,"steel","forge"],"dd97f:Skyrim.esm":[1,"steel","forge"],"dd980:Skyrim.esm":[1,"steel","forge"],"dd981:Skyrim.esm":[1,"steel","forge"],"dd983:Skyrim.esm":[2,"orcish","forge"],"dd984:Skyrim.esm":[2,"orcish","forge"],"dd985:Skyrim.esm":[2,"orcish","forge"],"dd986:Skyrim.esm":[2,"orcish","forge"],"dd987:Skyrim.esm":[2,"orcish","forge"],"dd988:Skyrim.esm":[3,"ebony","forge"],"dd989:Skyrim.esm":[3,"ebony","forge"],"dd98a:Skyrim.esm":[3,"ebony","forge"],"dd98b:Skyrim.esm":[3,"ebony","forge"],"dd98c:Skyrim.esm":[3,"ebony","forge"],"f46cc:Skyrim.esm":[1,"ancient nord","skyforge"],"f46cd:Skyrim.esm":[1,"ancient nord","skyforge"],"f46cf:Skyrim.esm":[1,"ancient nord","skyforge"],"f46d0:Skyrim.esm":[1,"ancient nord","skyforge"],"f6f2a:Skyrim.esm":[1,"steel","forge"],"f74d:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"f813:Dawnguard.esm":[1,"steel","forge"],"f814:Dawnguard.esm":[2,"dwarven","forge"]};
 // ==== end FUEL_BY_RECIPE ====
 
 /** The fuel a recipe burns, { grade, metal, bench }, or null when it burns none. */
@@ -35778,9 +35870,13 @@ log('gamemode loaded:',
   // hand edit. JAIL_DOOR: every door inside a hold's jail, to the hold.
   // JAIL_NAME: each hold's jail, by name. JAIL_SHUT: the doors the game
   // ships locked, which is what a cell is until a guard turns it.
+  // JAIL_BUILDING: each jail building, to its hold. JAIL_KEY: every key
+  // the game made for a cell door, to the hold of its jail.
   var JAIL_DOOR = {"105fbb:Skyrim.esm":"windhelm","105fbc:Skyrim.esm":"windhelm","105fd2:Skyrim.esm":"windhelm","105fd3:Skyrim.esm":"windhelm","10cff3:Skyrim.esm":"winterhold","10cff7:Skyrim.esm":"winterhold","10cffc:Skyrim.esm":"winterhold","19b09:Dragonborn.esm":"ravenrock","337d2:Dragonborn.esm":"ravenrock","37b19:Dragonborn.esm":"ravenrock","40fa0:Skyrim.esm":"riften","5e91e:Skyrim.esm":"solitude","5e91f:Skyrim.esm":"solitude","5e920:Skyrim.esm":"solitude","5e921:Skyrim.esm":"solitude","5e922:Skyrim.esm":"solitude","5e923:Skyrim.esm":"solitude","5e924:Skyrim.esm":"solitude","65c5c:Skyrim.esm":"riften","7e095:Skyrim.esm":"solitude","7e0b3:Skyrim.esm":"solitude","7e0b4:Skyrim.esm":"solitude","8d449:Skyrim.esm":"windhelm","9dc35:Skyrim.esm":"whiterun","9dc6e:Skyrim.esm":"whiterun","a577d:Skyrim.esm":"whiterun","a7614:Skyrim.esm":"whiterun","a7615:Skyrim.esm":"whiterun","a7616:Skyrim.esm":"whiterun","a7617:Skyrim.esm":"whiterun","a7618:Skyrim.esm":"whiterun","a8b64:Skyrim.esm":"riften","a8b6d:Skyrim.esm":"riften","a8c15:Skyrim.esm":"riften","a8e43:Skyrim.esm":"riften","a8e46:Skyrim.esm":"riften","a8e4a:Skyrim.esm":"riften","a8e4e:Skyrim.esm":"riften","a8e52:Skyrim.esm":"riften","a8e56:Skyrim.esm":"riften","a8e58:Skyrim.esm":"riften","a8e59:Skyrim.esm":"riften","a8f38:Skyrim.esm":"riften","ab46a:Skyrim.esm":"riften","bf4d4:Skyrim.esm":"markarth","bf4e0:Skyrim.esm":"markarth","c5a3b:Skyrim.esm":"markarth","c845b:Skyrim.esm":"solitude","d3141:Skyrim.esm":"windhelm","d61e5:Skyrim.esm":"windhelm","dc537:Skyrim.esm":"markarth","dcc9c:Skyrim.esm":"whiterun","e7e6e:Skyrim.esm":"markarth","e8217:Skyrim.esm":"riften","ec3e0:Skyrim.esm":"riften","ec3e2:Skyrim.esm":"solitude","ec564:Skyrim.esm":"dawnstar","ec565:Skyrim.esm":"morthal","ef434:Skyrim.esm":"falkreath","ef4ab:Skyrim.esm":"solitude"};
   var JAIL_NAME = {"dawnstar":"Dawnstar Jail","falkreath":"Falkreath Jail","markarth":"Cidhna Mine","morthal":"Morthal Jail","ravenrock":"The Bulwark Jail","riften":"Riften Jail","solitude":"Castle Dour Dungeon","whiterun":"Dragonsreach Dungeon","windhelm":"Windhelm Barracks","winterhold":"The Chill"};
   var JAIL_SHUT = {"105fbb:Skyrim.esm":1,"105fbc:Skyrim.esm":1,"10cff3:Skyrim.esm":1,"10cff7:Skyrim.esm":1,"10cffc:Skyrim.esm":1,"19b09:Dragonborn.esm":1,"337d2:Dragonborn.esm":1,"5e91e:Skyrim.esm":1,"5e91f:Skyrim.esm":1,"5e920:Skyrim.esm":1,"5e921:Skyrim.esm":1,"5e922:Skyrim.esm":1,"5e923:Skyrim.esm":1,"5e924:Skyrim.esm":1,"65c5c:Skyrim.esm":1,"8d449:Skyrim.esm":1,"9dc35:Skyrim.esm":1,"9dc6e:Skyrim.esm":1,"a577d:Skyrim.esm":1,"a7614:Skyrim.esm":1,"a7615:Skyrim.esm":1,"a7617:Skyrim.esm":1,"a7618:Skyrim.esm":1,"a8e43:Skyrim.esm":1,"a8e46:Skyrim.esm":1,"a8e4a:Skyrim.esm":1,"a8e52:Skyrim.esm":1,"a8e56:Skyrim.esm":1,"a8e58:Skyrim.esm":1,"a8e59:Skyrim.esm":1,"bf4d4:Skyrim.esm":1,"bf4e0:Skyrim.esm":1,"c5a3b:Skyrim.esm":1,"d3141:Skyrim.esm":1,"dc537:Skyrim.esm":1,"e7e6e:Skyrim.esm":1,"ec564:Skyrim.esm":1,"ec565:Skyrim.esm":1,"ef434:Skyrim.esm":1};
+  var JAIL_BUILDING = {"16203:Skyrim.esm":"markarth","1677a:Skyrim.esm":"windhelm","19ad8:Dragonborn.esm":"ravenrock","4a376:Skyrim.esm":"whiterun","56e88:Skyrim.esm":"solitude","5d010:Skyrim.esm":"morthal","961ff:Skyrim.esm":"winterhold","a8b23:Skyrim.esm":"riften","eb440:Skyrim.esm":"dawnstar","ef324:Skyrim.esm":"falkreath"};
+  var JAIL_KEY = {"100fa6:Skyrim.esm":"markarth","10480c:Skyrim.esm":"morthal","1ab5d:Skyrim.esm":"markarth","34f97:Dragonborn.esm":"ravenrock","5aec4:Skyrim.esm":"whiterun","612b8:Skyrim.esm":"riften","7e019:Skyrim.esm":"solitude","9da41:Skyrim.esm":"dawnstar","e17a8:Skyrim.esm":"markarth","fb90c:Skyrim.esm":"falkreath","fb90d:Skyrim.esm":"windhelm"};
   // ==== end JAIL_CELLS ====
 
   function lawPath() {
@@ -35880,10 +35976,99 @@ log('gamemode loaded:',
     return officeHoldOf(s);
   }
 
+  /*
+    EVERY OFFICE A PERSON HOLDS, READ IN ONE PLACE. The offices live in three
+    homes: the Jarl office on the character (s.office, s.officeHold), the
+    stewards in property.json, the guards in law.json. Anything outside this
+    block that asks who holds what (a hold's box, a drop box, a court once
+    there is one) asks this, through g.__thornswoodProperty.officeOf, rather
+    than reading any of the three itself, so a rule about who holds an
+    office is written once. The page's officeView is the one exception: it
+    is handed the state by writeState and must not ask for it (see there).
+
+      jarl      true when isJarl says so (an admin counts, #397)
+      jarlOf    the hold of the seated Jarl office, or ''
+      steward   true when isSteward says so (a Jarl counts)
+      guardOf   the hold this profile guards, or ''
+  */
+  function officeOf(profileId, actorId) {
+    return { jarl: isJarl(profileId, actorId), jarlOf: jarlHoldOf(profileId, actorId),
+             steward: isSteward(profileId, actorId), guardOf: guardHoldOf(profileId) };
+  }
+
   /** The hold whose jail this door is in, or null. */
   function jailHoldOf(doorDesc) {
     var d = String(doorDesc || '');
     return Object.prototype.hasOwnProperty.call(JAIL_DOOR, d) ? JAIL_DOOR[d] : null;
+  }
+
+  /*
+    THE REST OF THE JAIL RULES (#502). Patrick, 12 October: jails can be
+    claimed by the Jarl only, and the rest as written on the issue: no timer,
+    release by that hold's guards, lockpicking allowed, the game's jail keys
+    open nothing, /stuck does not move someone out of a locked cell, and
+    dying in a cell wakes at a temple.
+
+    THE JARL ONLY. A jail building (JAIL_BUILDING, read out of the world with
+    the cells) is the Jarl of its hold's to claim, and nobody else's: claim()
+    refuses anybody else, the line under the crosshair offers nobody else the
+    claim, and a deed presented at its door by anybody else is paper. Read as
+    the Jarl of that jail's hold, because the office is of one hold.
+
+    THE GAME'S JAIL KEYS. Each cell door's lock names a key the game made
+    (JAIL_KEY), and a key in somebody's pack opens that lock in their own
+    game, guard or no guard, because the server never sees a press on a
+    locked door. So the keys are not handed out: measured on 12 October, the
+    load order has them on the cut guards and jailors, on two quests that do
+    not run, in two containers in the editor's test cell, and lying on the
+    floor in four places, three of them inside the Morthal, Dawnstar and
+    Riften jails. The spoils block leaves a jail key where it lies and takes
+    it out of a container, the way it does a sword.
+
+    /STUCK. The server knows the room somebody is in and not which side of a
+    cell door they stand, so the rule is kept at the room: in a jail where a
+    guard has a cell locked, /stuck does not move anybody but that hold's
+    guards (lockedJailHere, asked by the stuck block). Everybody else there
+    walks out, or a guard lets them out, or /helpme reaches staff.
+
+    No timer, release by the hold's guards, lockpicking and the temple on
+    death are what the cells and the respawn already do; tests/test-502-jail-rules.js
+    holds each of them.
+  */
+
+  /** The hold whose jail this building is, or null. */
+  function jailOfBuilding(building) {
+    var b = String(building || '');
+    return Object.prototype.hasOwnProperty.call(JAIL_BUILDING, b) ? JAIL_BUILDING[b] : null;
+  }
+
+  /** May this person hold this building: anybody, but a jail is its hold's Jarl's alone. */
+  function mayHold(actorId, profileId, building) {
+    var jh = jailOfBuilding(building);
+    return !jh || jarlHoldOf(profileId, actorId) === jh;
+  }
+
+  /** The hold whose cell door a key the game made opens, or null, by the key's descriptor. */
+  function jailKeyHold(keyDesc) {
+    var k = String(keyDesc || '');
+    return Object.prototype.hasOwnProperty.call(JAIL_KEY, k) ? JAIL_KEY[k] : null;
+  }
+
+  /**
+   * The jail this person stands in, by name, while a guard has one of its
+   * cells locked and they are not a guard of that hold; otherwise null.
+   */
+  function lockedJailHere(actorId, profileId) {
+    var cell = '';
+    try { cell = String(mp.get(actorId, 'worldOrCellDesc') || ''); } catch (e) { cell = ''; }
+    var hold = jailOfBuilding(cell);
+    if (!hold || isGuard(profileId, hold)) { return null; }
+    for (var d in law.cells) {
+      if (Object.prototype.hasOwnProperty.call(law.cells, d) && law.cells[d] === true && JAIL_DOOR[d] === hold) {
+        return JAIL_NAME[hold];
+      }
+    }
+    return null;
   }
 
   /** Whether a cell door is locked: as a guard last left it, or as the game ships it. */
@@ -36129,7 +36314,14 @@ log('gamemode loaded:',
       from their pack because that is how it left. A notification here would
       turn a theft into an alarm system.
     */
-    if (mine && holdsDeed(actorId, building) && (!held || held.by !== mine)) {
+    /*
+      A JAIL'S DEED IS PAPER IN ANY HAND BUT ITS JARL'S (#502): the jail is
+      claimed by the Jarl of its hold alone, and presenting its deed is a
+      claim like any other. The deed still opens the door it names, as a
+      deed does (mayPass).
+    */
+    if (mine && holdsDeed(actorId, building) && (!held || held.by !== mine) &&
+        mayHold(actorId, mine, building)) {
       var was = held ? held.name : null;
       var now2 = Date.now();
       var who2 = 'somebody';
@@ -36246,7 +36438,10 @@ log('gamemode loaded:',
       // nothing to claim (#1390); claim() refuses the line if it comes anyway.
       var accordLine = globalThis.__thornswoodEmbassy;
       if (!held) {
-        if (!(accordLine && accordLine.holds(building))) { line.x = 'claim'; }
+        // A jail offers the claim to the Jarl of its hold alone (#502).
+        if (!(accordLine && accordLine.holds(building)) && mayHold(actorId, profileId, building)) {
+          line.x = 'claim';
+        }
       } else if ((profileId && held.by === profileId) || holdsDeed(actorId, building)) {
         line.x = held.locked ? 'unlock' : 'lock';
       }
@@ -36359,6 +36554,13 @@ log('gamemode loaded:',
     var accordClaim = globalThis.__thornswoodEmbassy;
     if (accordClaim && accordClaim.holds(building)) {
       toProfile(profileId, accordClaim.CLAIM_REFUSED);
+      return true;
+    }
+    // A jail is the Jarl of its hold's alone (#502). See jailOfBuilding.
+    if (!mayHold(actorId, profileId, building)) {
+      var jailTown = HOLD_TOWN[jailOfBuilding(building)];
+      toProfile(profileId, nameOf(building) + ' is ' + jailTown + '\'s jail. Only the Jarl of ' +
+                           jailTown + ' claims it.');
       return true;
     }
     var held = holderOf(building);
@@ -40671,8 +40873,11 @@ log('gamemode loaded:',
     DOOR_PROPERTY: DOOR_PROPERTY,
     claims: function () { return claims; },
     isJarl: isJarl, isSteward: isSteward, officeView: officeView, jarlHoldOf: jarlHoldOf, HOLD_TOWN: HOLD_TOWN,
+    officeOf: officeOf,
     isGuard: isGuard, guardHoldOf: guardHoldOf, jailHoldOf: jailHoldOf, cellLocked: cellLocked,
     mayPassCell: mayPassCell, lockCell: lockCell,
+    jailOfBuilding: jailOfBuilding, mayHold: mayHold, jailKeyHold: jailKeyHold, lockedJailHere: lockedJailHere,
+    JAIL_KEY: JAIL_KEY,
     guards: function () { return Object.assign({}, law.guards); },
     touchedBox: touchedBox, putIn: putIn, holdOfBox: holdOfBox,
     deposit: deposit, takeGold: takeGold, LEDGER_HOLDS: LEDGER_HOLDS,
@@ -41959,6 +42164,33 @@ log('gamemode loaded:',
     return !!cutOutIds[baseId];
   }
 
+  /*
+    THE GAME'S JAIL KEYS (#502). Patrick, 12 October: the game's jail keys
+    open nothing. A key in somebody's pack opens its cell door in their own
+    game whoever locked it, so the world does not hand one out: the property
+    block's JAIL_KEY, read out of the world with the cells, is every key the
+    game made for a cell door. Resolved once every one of them has an id,
+    the way isCutOut waits for the load order.
+  */
+  var jailKeyIds = null;
+  function isJailKey(baseId) {
+    if (!baseId) { return false; }
+    if (!jailKeyIds) {
+      var prop = g.__thornswoodProperty;
+      var table = (prop && prop.JAIL_KEY) || null;
+      if (!table) { return false; }
+      var found = {}, pending = false;
+      for (var k in table) {
+        if (!Object.prototype.hasOwnProperty.call(table, k)) { continue; }
+        var id = idOf(k);
+        if (id) { found[id] = true; } else { pending = true; }
+      }
+      if (pending) { return !!found[baseId]; }
+      jailKeyIds = found;
+    }
+    return !!jailKeyIds[baseId];
+  }
+
   function isSpoil(baseId) {
     if (!baseId) { return false; }
     if (baseId === GOLD) { return true; }
@@ -42017,7 +42249,7 @@ log('gamemode loaded:',
     var keep = [], took = 0;
     for (var i = 0; i < entries.length; i++) {
       var e = entries[i];
-      if (e && isSpoil(e.baseId)) { took++; continue; }
+      if (e && (isSpoil(e.baseId) || isJailKey(e.baseId))) { took++; continue; }
       keep.push(e);
     }
     if (took) {
@@ -42116,6 +42348,15 @@ log('gamemode loaded:',
       return 'That coin purse was put here by the world, not left by a person. Coin comes from ' +
              'people in this world, not off the ground.';
     }
+    /*
+      A jail key, before the dropped-thing test too (#502): a key somebody
+      had and put down still opens a cell in whoever's pack it reaches.
+    */
+    if (isJailKey(baseId)) {
+      slog('jail key: refused', baseDesc, 'at', refrId.toString(16), 'to', actorId.toString(16));
+      return 'That key belonged to the old jail. The cells answer to the hold\'s guards now, ' +
+             'so it stays where it lies.';
+    }
     // Made at runtime rather than placed by a plugin, so somebody put it there.
     if (refrId >= 0xff000000) { return null; }
     if (!isSpoil(baseId)) { return null; }
@@ -42198,7 +42439,7 @@ log('gamemode loaded:',
   ready();
   g.__thornswoodSpoils = {
     purse: purse, PURSE: PURSE, PURSE_PROPERTY: PURSE_PROPERTY,
-    activate: activate, strip: strip, isSpoil: isSpoil, kindOf: kindOf,
+    activate: activate, strip: strip, isSpoil: isSpoil, isJailKey: isJailKey, kindOf: kindOf,
     isTool: isTool, isPurse: isPurse, PURSES: PURSES, alreadyStripped: alreadyStripped,
     SPOIL_TYPES: SPOIL_TYPES, GOLD: GOLD, STRIPPED_PROPERTY: STRIPPED_PROPERTY
   };
@@ -62285,6 +62526,21 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       tell(pid, 'Staff have you frozen in place, so /stuck cannot move you. Wait here and ' +
                 'somebody will talk to you.');
       slog('profile ' + pid + ' refused: frozen by staff');
+      return;
+    }
+    /*
+      A LOCKED CELL IS NOT A WEDGE (#502). Patrick, 12 October: /stuck does
+      not move someone out of a locked cell. The server knows the room and
+      not which side of a cell door somebody stands, so this is kept at the
+      room: in a jail where a guard has a cell locked, it moves nobody but
+      that hold's guards (lockedJailHere in the property block).
+    */
+    var jailProp = g.__thornswoodProperty;
+    var inJail = (jailProp && jailProp.lockedJailHere) ? jailProp.lockedJailHere(actorId, pid) : null;
+    if (inJail) {
+      tell(pid, 'A guard has a cell locked here in ' + inJail + ', so /stuck does not move anybody out ' +
+                'of the jail. Walk out if you can, or ask a guard. /helpme reaches staff if you are truly stuck.');
+      slog('profile ' + pid + ' refused: in ' + inJail + ' while a guard has a cell locked');
       return;
     }
     var w = state.waiting[pid];

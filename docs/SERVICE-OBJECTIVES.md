@@ -37,9 +37,10 @@ Three things watch the services, and one bot posts what they find.
   Discord (issue #449). Whether `PING_URL` is set is not visible from the
   repository.
 - **Where people are told.** The bot reads `alerts.jsonl` every minute and
-  posts each message in the staff channel. When the bot has not posted one
-  within two and a half minutes (`Watch-Services.ps1:$ackWait = 150`),
-  the watchdog posts it through the staff channel webhook. The outside watcher
+  posts each message in #staff-updates, the staff channel, by the id in
+  `bot/staff-channel.txt`. When the bot has not posted one within two and a
+  half minutes (`Watch-Services.ps1:$ackWait = 150`), the watchdog posts it
+  through its webhook, which `-SetWebhook` only accepts in that channel. The outside watcher
   appends its messages to the same file over ssh, and posts through its own
   copy of that webhook when the VPS cannot be reached.
 

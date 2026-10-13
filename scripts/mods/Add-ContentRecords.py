@@ -350,6 +350,37 @@ RECIPE_SPLINT = 0x50154C5
 RECIPE_POULTICE = 0x50154C6
 RECIPE_REMEDY = 0x50154C7
 
+# THE NOTICE BOARD AND THE HOLD'S DROP BOX (#2298).
+#
+# ThornswoodMessageBoard, the activator every board in the world is, named a
+# reworked copy of the board in Missives (Nexus 111375) that came with the other
+# server's records: olivar-messageboard/MissiveBoardCOTND.nif. Patrick, 12 Oct,
+# chose Thornswood's own board built from vanilla pieces, with the hold's drop
+# box on a shelf on its right post, as two objects placed together: "when they
+# click on the Notice Board it does the Notice Board and when they click on the
+# dropbox it does just the dropbox". scripts/mods/Build-NoticeBoard.py builds
+# both meshes, and they ship as ours from game/ours.
+#
+# So the board's MODL moves to the new mesh, its OBND to the new mesh's bounds
+# (the old one's were Missives' board), and the box is an activator of its own,
+# ThornswoodDropBox, cloned from the board.
+#
+# WHY AN ACTIVATOR AND NOT A CONTAINER. Patrick, 12 Oct: a person sees only what
+# they put in, gold included, and only the hold's officers see everything. A
+# Skyrim container shows whoever opens it everything in it, and the server sends
+# a container's whole inventory to every client that has it in view. And the
+# server cannot stand a placed container anywhere but the middle of Tamriel:
+# mp.set refuses 'locationalData' for anything but an actor
+# (LocationalDataBinding::Set in the fork, read 12 Oct). So what is in the box
+# is the server's record, the box is drawn by each client beside its board the
+# way the board is, and E on it opens the box's own panel, never a container.
+BOARD = 0x500593B
+BOARD_MODEL = 'thornswood\\noticeboard01.nif'
+BOARD_BOUNDS = (-168, -71, 0, 140, 71, 246)     # the mesh's, rounded outward
+DROP_BOX = 0x50154D0
+DROP_BOX_MODEL = 'thornswood\\dropbox01.nif'
+DROP_BOX_BOUNDS = (-26, -18, 0, 26, 18, 37)
+
 LEATHER_STRIPS = 0x000800E4
 TUNDRA_COTTON = 0x0003F7F8
 STEEL_INGOT = 0x0005ACE5
@@ -562,6 +593,20 @@ def set_model(rec, model):
         out.append((t, want) if t == b'MODL' else (t, b))
     if not any(t == b'MODL' for t, _ in pairs):
         raise SystemExit('0x%07X has no MODL to set' % rec.fid)
+    if out == pairs:
+        return False
+    rec.data = pack_subrecords(out)
+    return True
+
+
+def set_bounds(rec, bounds):
+    """The record's OBND set to bounds (six whole numbers). True when that changed
+    anything, so a second run is not an edit."""
+    pairs = subrecords(rec.data)
+    want = struct.pack('<6h', *bounds)
+    if not any(t == b'OBND' for t, _ in pairs):
+        raise SystemExit('0x%07X has no OBND to set' % rec.fid)
+    out = [(t, want) if t == b'OBND' else (t, b) for t, b in pairs]
     if out == pairs:
         return False
     rec.data = pack_subrecords(out)
@@ -860,7 +905,8 @@ def main():
                       ('ThornswoodRecipeBandage', RECIPE_BANDAGE),
                       ('ThornswoodRecipeSplint', RECIPE_SPLINT),
                       ('ThornswoodRecipePoultice', RECIPE_POULTICE),
-                      ('ThornswoodRecipeRemedy', RECIPE_REMEDY)):
+                      ('ThornswoodRecipeRemedy', RECIPE_REMEDY),
+                      ('ThornswoodDropBox', DROP_BOX)):
         here_already = name in by_edid
         if here_already and by_edid[name].fid != fid:
             print('')
@@ -1109,6 +1155,20 @@ def main():
     make_remedy = recipe(RECIPE_REMEDY, 'ThornswoodRecipeRemedy', REMEDY, ALCHEMY_KEYWORD,
                          [(MUDCRAB_CHITIN, 1), (BLUE_MOUNTAIN_FLOWER, 1)])
 
+    board = next((r for r in records if r.fid == BOARD and r.tag == b'ACTI'), None)
+    if board is None or board.compressed or board.editor_id() != 'ThornswoodMessageBoard':
+        print('')
+        print('STOP. ACTI 0x%07X is not ThornswoodMessageBoard as it should be. '
+              'Nothing was written.' % BOARD)
+        return 1
+    # The hold's drop box (#2298): an activator of its own on its own mesh,
+    # cloned from the board, so E on it is the box's and never the board's.
+    drop_box = clone(board, DROP_BOX, 'ThornswoodDropBox', sets={
+        b'OBND': struct.pack('<6h', *DROP_BOX_BOUNDS),
+        b'FULL': zstr('Drop Box'),
+        b'MODL': zstr(DROP_BOX_MODEL),
+    }, drop=(b'MODT',))
+
     # The Hearthfire house parts (#2258), overrides of a master's records. One
     # already in this plugin is edited where it is; one that is not is copied
     # in from HearthFires.esm. See the top.
@@ -1197,10 +1257,13 @@ def main():
     for r in house_new:
         print("  COBJ 0x%08X %-30s HearthFires.esm's, never listed: GetItemCount(gold) < 0"
               % (r.fid, r.editor_id()))
+    print('  ACTI 0x%07X ThornswoodDropBox             the hold\'s drop box, %s'
+          % (DROP_BOX, DROP_BOX_MODEL))
     print('')
     print('What changes')
     for r in house_bare:
         print('  COBJ 0x%08X %-30s gains the condition that is never true' % (r.fid, r.editor_id()))
+    print('  ACTI 0x%07X ThornswoodMessageBoard        its mesh is %s' % (BOARD, BOARD_MODEL))
     print('  COBJ 0x%07X ThornswoodRecipeWeaponPickaxe now wants a handle as well as the ingot'
           % cobj_pickaxe.fid)
     print('  COBJ 0x%07X ThornswoodRecipeWeaponAxe     now wants a handle as well as the ingot'
@@ -1234,7 +1297,8 @@ def main():
                          weapon_kit, armor_kit, sewing_kit,
                          make_weapon_kit, make_armor_kit, make_sewing_kit,
                          bandage, splint, poultice, remedy,
-                         make_bandage, make_splint, make_poultice, make_remedy)
+                         make_bandage, make_splint, make_poultice, make_remedy,
+                         drop_box)
              if r.editor_id() not in already] + house_new
     # An edit that has already been made is not made twice. A recipe that already
     # asks for a handle would otherwise gain a second one on every run.
@@ -1256,6 +1320,10 @@ def main():
     for name, model in (('ThornswoodMiscKey', KEY_MODEL), ('ThornswoodMiscKeyMold', MOLD_MODEL)):
         if name in already and set_model(by_edid[name], model):
             edited.add(by_edid[name].fid)
+    # The notice board's own mesh and its bounds (#2298).
+    board_moved = set_model(board, BOARD_MODEL)
+    if set_bounds(board, BOARD_BOUNDS) or board_moved:
+        edited.add(board.fid)
     if not built and not edited and not removing:
         print('')
         print('  Everything this adds is already in the plugin. Nothing was written.')
