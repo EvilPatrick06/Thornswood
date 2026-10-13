@@ -222,6 +222,11 @@ for(const replacement of ['close','replace']) for(const entry of ['act','offer',
       return 'Smith';
     }});
   quest.bindPlace('ebony',{cell:'test'});routed.deps.quests=()=>quest;
+  const forgedHeld=quest.capture(10);forgedHeld.admission=()=>true;
+  if(entry==='act')quest.act(10,'take','ebony',null,1,forgedHeld,()=>true);
+  else if(entry==='offer')quest.offer(10,'ebony',{traderRef:1,admission:()=>true},forgedHeld);
+  else quest.turnIn(10,'ebony',1,forgedHeld);
+  assert.equal(questWrites,0,'direct '+entry+' cannot supply its own panel admission');
   open(routed.api);const before=JSON.stringify(routed.world.inv);armed=true;
   const previousRecord=JSON.stringify(record);
   if(entry==='act')routed.api.command({actorId:10,profileId:7,parts:['/merchant','quest','take','ebony']});

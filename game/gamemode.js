@@ -66555,9 +66555,7 @@ try {
       var role=deps.traderRole(ref);
       return active && (role==='' || typeof role==='string' && role===LEGACY_TRADE[row.id]);
     }
-    function captureAdmission(actor,ref,held,provided) {
-      if(provided!==undefined)return provided;
-      if(held && held.admission!==undefined)return held.admission;
+    function captureAdmission(actor,ref) {
       if(typeof deps.traderRole!=='function')return undefined;
       return typeof deps.traderAdmission==='function' ? deps.traderAdmission(actor,ref) || null : null;
     }
@@ -66727,21 +66725,23 @@ try {
         })
       };
     }
-    function offer(actor, id, opts, held) {
+    function offerWork(actor, id, opts, held) {
       var row = byId[id];
       if (!row) return { ok: false, why: 'unknown' };
-      var admission=captureAdmission(actor,opts && opts.traderRef,held,opts ? opts.admission : undefined);
-      if(!admitted(admission))return {ok:false,why:'session'};
+      if(typeof deps.traderRole==='function' && !boundOffer(row))return {ok:false,why:'unbound'};
       if (!traderFor(row,opts && opts.traderRef)) return {ok:false,why:'role'};
       var b = held || questsOf(actor);
       if (!b) return { ok: false, why: 'unread' };
-      b.admission=admission;
       if (own(b.open,id)) return { ok: false, why: 'open' };
       if ((b.cool[id] || 0) > deps.now()) return { ok: false, why: 'cooldown' };
       var gate = qualify(actor, row);
       if (!gate.ok) return { ok: false, why: gate.why };
       if (row.kind==='kill') {
         if(!kills)return {ok:false,why:'unbound'};
+        if(typeof deps.traderRole==='function') {
+          var source=kills.rows.find(function(r){return r.id===id;});
+          if(!source || !deps.traderHold || deps.traderHold(opts && opts.traderRef)!==source.hold)return {ok:false,why:'hold'};
+        }
         var accepted=kills.take(b,id);
         if(!accepted.ok)return accepted;
         return keep(actor,b,[]) ? {ok:true} : {ok:false,why:'unwritten'};
@@ -66845,15 +66845,30 @@ try {
       if (!keep(actor, b, changes)) return { ok: false, why: 'unwritten' };
       return { ok: true };
     }
-    function turnIn(actor, id, traderRef, held) {
+    function offer(actor,id,opts,held) {
+      if(!byId[id])return {ok:false,why:'unknown'};
+      var admission=captureAdmission(actor,opts && opts.traderRef);
+      if(!admitted(admission))return {ok:false,why:'session'};
+      var b=held || questsOf(actor);
+      if(!b)return {ok:false,why:'unread'};
+      b.admission=admission;
+      return offerWork(actor,id,opts,b);
+    }
+    function turnIn(actor,id,traderRef,held) {
+      if(!byId[id])return {ok:false,why:'none'};
+      var admission=captureAdmission(actor,traderRef);
+      if(!admitted(admission))return {ok:false,why:'session'};
+      var b=held || questsOf(actor);
+      if(!b)return {ok:false,why:'unread'};
+      b.admission=admission;
+      return turnInWork(actor,id,traderRef,b);
+    }
+    function turnInWork(actor, id, traderRef, held) {
       var row = byId[id];
-      var admission=captureAdmission(actor,traderRef,held);
-      if(row && !admitted(admission))return {ok:false,why:'session'};
       var b = row ? held || questsOf(actor) : null;
       if (row && !b) return { ok: false, why: 'unread' };
       var open = row && b.open[id];
       if (!row || !open) return { ok: false, why: 'none' };
-      b.admission=admission;
       if (!traderFor(row,traderRef)) return {ok:false,why:'role'};
       if (!row.scarce && row.kind !== 'retrieval' && row.kind !== 'kill') return { ok: false, why: 'unknown' };
       var changes = [];
@@ -66921,6 +66936,9 @@ try {
       var place = places[row.id];
       return !!place && !!(row.gems ? place.cells && row.gems.every(function(gem){return !!place.cells[gem];}) : place.cell);
     }
+    function boundOffer(row) {
+      return (row.scarce || row.kind==='retrieval') && bound(row) || row.kind==='kill' && !!kills;
+    }
     function describe(actor,traderRef) {
       var held = questsOf(actor);
       if (!held) return [];
@@ -66952,8 +66970,9 @@ try {
     }
     function act(actor, verb, id, gem, traderRef, held, admission) {
       var row = byId[id];
-      if (!row || !(row.scarce && bound(row)) && !(row.kind==='kill' && kills)) return {ok:false,why:'unbound'};
-      admission=captureAdmission(actor,traderRef,held,admission);
+      if (!row || !boundOffer(row)) return {ok:false,why:'unbound'};
+      var origin=admission,current=captureAdmission(actor,traderRef);
+      admission=function(){return admitted(current) && admitted(origin);};
       if(!admitted(admission))return {ok:false,why:'session'};
       held=held || questsOf(actor);
       if(!held)return {ok:false,why:'unread'};
@@ -66966,8 +66985,8 @@ try {
         if(!source || !deps.traderHold || deps.traderHold(traderRef)!==source.hold)return {ok:false,why:'hold'};
       }
       if(admission!==undefined && (typeof admission!=='function' || admission()!==true))return {ok:false,why:'session'};
-      if (verb === 'take') return offer(actor,id,{gem:gem,traderRef:traderRef},held);
-      if (verb === 'return') return turnIn(actor,id,traderRef,held);
+      if (verb === 'take') return offerWork(actor,id,{gem:gem,traderRef:traderRef},held);
+      if (verb === 'return') return turnInWork(actor,id,traderRef,held);
       if (verb === 'abandon') return walkAway(actor,id,held);
       return {ok:false,why:'unknown'};
     }

@@ -245,7 +245,7 @@ w.svc.walkAway(3, 'gem');
 
 // -------------------------------------------------------- scene quests ---
 w.svc.bindPlace('camp', { cell: 'camp-1' });
-yes('anyone takes the camp', w.svc.offer(4, 'camp').ok === true);
+yes('anyone takes the camp', w.svc.offer(4, 'camp',{traderRef:9000}).ok === true);
 const names = { 31: 'Bandit', 32: 'Bandit Outlaw', 33: 'Bandit' };
 function bandit(id) { npcStates[id].isDead=true;return id; }
 // creatureName is the server's own, which reads the record; give the deaths a name by a stub over it.
@@ -262,7 +262,7 @@ yes('the third bandit finishes it and its 45 gold is created once',
     w.svc.turnIn(4, 'camp',9000).ok === true && have(4, 'f:Skyrim.esm') === 45);
 w = restart();
 yes('a restart keeps the camp\'s 6 hour cooldown, so its gold cannot be taken again',
-    w.svc.offer(4, 'camp').why === 'cooldown' && have(4, 'f:Skyrim.esm') === 45);
+    w.svc.offer(4, 'camp',{traderRef:9000}).why === 'cooldown' && have(4, 'f:Skyrim.esm') === 45);
 
 w.svc.bindPlace('satchel', { ref: 'sack-1', cell: 'road-1', item: 'satchel-item' });
 yes('the satchel', w.svc.offer(4, 'satchel').ok === true && w.svc.noteContainer(4, 'sack-1', 'road-1') === 'You take it.');
@@ -358,12 +358,12 @@ unread({v:1,open:{},cool:null}, 'a null cooldown map');
   ranks['9:miner'] = '';
   w = restart();
   w.svc.bindPlace('wolf', { cell: 'pad-1' });
-  w.svc.offer(9, 'wolf');
+  w.svc.offer(9, 'wolf',{traderRef:9000});
   names[41] = 'Wolf'; veinCell[41] = 'pad-1';
   w.ctx.mp.lookupEspmRecordById = function () { return null; };
   npcStates[41].isDead=false; // Newly accepted living body, then a server death.
   npcStates[41].lifeGeneration++;
-  w.svc.walkAway(9,'wolf');w.svc.offer(9,'wolf');npcStates[41].isDead=true;
+  w.svc.walkAway(9,'wolf');w.svc.offer(9,'wolf',{traderRef:9000});npcStates[41].isDead=true;
   fault.write = true;
   const k = w.svc.noteKill(9, 41);
   fault.write = false;
@@ -386,7 +386,7 @@ unread({v:1,open:{},cool:null}, 'a null cooldown map');
 {
   w = restart();
   w.svc.bindPlace('wolf', { cell: 'pad-1' });
-  w.svc.offer(30, 'wolf');
+  w.svc.offer(30, 'wolf',{traderRef:9000});
   forms[30].props[PROP].open.wolf.kills = 1;
   fault.throwAdd = ['f:Skyrim.esm'];
   try { w.svc.turnIn(30, 'wolf'); } catch (error) { /* observe saved state below */ }
@@ -451,7 +451,7 @@ unread({v:1,open:{},cool:null}, 'a null cooldown map');
   yes('revoked swing cleanup retires its local busy state',!ctx.SWING_IN_AIR[36] && !ctx.SWING_CLEAR[36]);
 }
 {
-  w=restart();w.svc.bindPlace('wolf',{cell:'pad-1'});w.svc.offer(34,'wolf');
+  w=restart();w.svc.bindPlace('wolf',{cell:'pad-1'});w.svc.offer(34,'wolf',{traderRef:9000});
   names[41]='Wolf';veinCell[41]='pad-1';
   const saved=JSON.stringify(forms[34]);w.ctx.__revoked=true;
   w.svc.noteKill(34,41);w.svc.offer(34,'ebony');
@@ -576,8 +576,9 @@ yes('the miner page says the same', /kept on the character/.test(mWhere) &&
   yes('mining qualification cannot adopt a new actor session',have(82,EBONY.ore)===0 && forms[82].props[PROP].open.ebony.drawn===0);
 }
 {
-  w=restart();w.ctx.__identityToken='old';w.svc.offer(83,'satchel');
+  w=restart();w.ctx.__identityToken='old';
   w.svc.bindPlace('satchel',{ref:9800,cell:'satchel-cell',item:'satchel-item'});
+  w.svc.offer(83,'satchel',{traderRef:9000});
   const get=w.ctx.mp.get;
   w.ctx.mp.get=function(id,key){
     if(id===9800 && key==='locationalData'){w.ctx.__identityToken='new';return {cellOrWorldDesc:'satchel-cell'};}
@@ -747,6 +748,9 @@ for(const [index,source] of contractRows.entries()) {
   w.ctx.__thornswoodMerchantTrade.questRole=id=>id===9100||id===9102?role:id===9101?'Cook':null;
   w.ctx.__thornswoodMerchantTrade.questHold=id=>id===9102?(source.hold==='Falkreath'?'Whiterun':'Falkreath'):source.hold;
   const before=JSON.stringify(forms[actor]);
+  const newActor=240+index;
+  yes(source.id+': direct offer keeps the original hold restriction',
+    w.svc.offer(newActor,source.id,{traderRef:9102}).why==='hold' && !(forms[newActor] && forms[newActor].props[PROP]));
   yes(source.id+': wrong role, wrong hold and absent trader make no write',
     w.svc.act(actor,'return',source.id,null,9101).why==='role' &&
     w.svc.act(actor,'return',source.id,null,9102).why==='hold' &&
@@ -759,6 +763,8 @@ for(const [index,source] of contractRows.entries()) {
     w.svc.act(actor,'return',source.id,null,9100).ok===false && JSON.stringify(forms[actor])===after && form(actor).props[PROP].retained.unchanged);
 }
 w=restart();ranks['230:miner']='master';
+yes('a roleless live trader cannot open an unbound retrieval quest',
+  w.svc.offer(260,'satchel',{traderRef:9000}).why==='unbound' && !(forms[260] && forms[260].props[PROP]));
 w.ctx.__thornswoodMerchantTrade.questRole=id=>id===9100?'Smith':id===9101?'Enchanter':id===9102?'Tailor':null;
 w.ctx.__thornswoodMerchantTrade.questHold=()=> 'Whiterun';
 yes('a Smith displays three bound mines and its own Whiterun contracts',
