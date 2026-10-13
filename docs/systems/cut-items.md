@@ -14,7 +14,7 @@ An item in this file is not found in the world and not made at a public bench. T
 | embassy | Not found in Skyrim. The embassy roll may craft it. |
 | thalmor | Not found. Someone on the Thalmor remnant roll may craft it. |
 
-Counts in this file: cut 3321, embassy 15, thalmor 9. Rows this pass left in the open book, or on a lock that is not a cut: 593.
+Counts in this file: cut 3317, embassy 15, thalmor 9. Rows this pass left in the open book, or on a lock that is not a cut: 597.
 
 The rules below sorted the recipe table once, before anything was cut. The recipe build (`scripts/dev/Build-RecipeTable.ps1`) reads [cut-items.json](cut-items.json), so the table it writes is already cut, and `scripts/dev/Write-CutItems.js` run on that table writes this page from the list it has instead of sorting the table again.
 
@@ -42,7 +42,7 @@ Cook dishes stay. A second row of the same dish, the two-portion copy, is cut.
 
 Staves stay only when the spell the menu asks for is in the college book. The others are cut. The Aetherial Staff is cut with the Aetherium.
 
-Riekling gear that is a copy of a human suit is cut. What stays is one light fur set, one chief set, a spear, and a bone club. Those stay race locked, and they are company wares: the company may haul them, and a riekling may make them.
+Riekling gear that is a copy of a human suit is cut. What stays is one light fur set, one chief set, a spear, and a bone club, and a riekling's own plain clothes: the two loincloths and the cloth hand and foot wraps, which a new riekling starts in and a tailor makes (Patrick, 12 October 2026). Those stay race locked, and they are company wares: the company may haul them, and a riekling may make them.
 
 Imperial and Penitus pieces are not in the open book. One heavy set and one light set, plus Penitus pieces, are embassy craft. The knight, legate, and captain variants are cut.
 
@@ -65,6 +65,10 @@ Race locked, and company wares. Not cut.
 - Riekling Chief Helmet
 - Riekling Spear
 - Riekling Bone Club
+- Riekling LoinCloth 1
+- Riekling LoinCloth 2
+- Riekling Cloth Hand Wraps
+- Riekling Cloth Foot Wraps
 
 ## Embassy craft
 
@@ -112,7 +116,7 @@ Not found. A person on the remnant roll may make them. Wearing them is still the
 
 Not found and not made. Held here so the reference can come back.
 
-3321 references.
+3317 references.
 
 | Item | Id | Half | Why |
 | --- | --- | --- | --- |
@@ -635,8 +639,6 @@ Not found and not made. Held here so the reference can come back.
 | Riekling Chief Fur Cloak | `659f:Playable Rieklings.esp` | Haberdasher | Extra Riekling copy of someone else's gear, or a spare piece. Not found and not made. |
 | Riekling Chief Grassless Helmet | `19f9e:Playable Rieklings.esp` | Platewright | Extra Riekling copy of someone else's gear, or a spare piece. Not found and not made. |
 | Riekling Claws | `c33c:Playable Rieklings.esp` | Edgewright | Extra Riekling copy of someone else's gear, or a spare piece. Not found and not made. |
-| Riekling Cloth Foot Wraps | `19f91:Playable Rieklings.esp` | Platewright | Extra Riekling copy of someone else's gear, or a spare piece. Not found and not made. |
-| Riekling Cloth Hand Wraps | `19f90:Playable Rieklings.esp` | Platewright | Extra Riekling copy of someone else's gear, or a spare piece. Not found and not made. |
 | Riekling Clothes | `bfedc:Playable Rieklings.esp` | Haberdasher | Extra Riekling copy of someone else's gear, or a spare piece. Not found and not made. |
 | Riekling Clothes | `bfede:Playable Rieklings.esp` | Haberdasher | Extra Riekling copy of someone else's gear, or a spare piece. Not found and not made. |
 | Riekling Clothes | `bfee6:Playable Rieklings.esp` | Haberdasher | Extra Riekling copy of someone else's gear, or a spare piece. Not found and not made. |
@@ -696,9 +698,7 @@ Not found and not made. Held here so the reference can come back.
 | Riekling Iron Banded Armor | `bfe8c:Playable Rieklings.esp` | Platewright | Extra Riekling copy of someone else's gear, or a spare piece. Not found and not made. |
 | Riekling Leather Armor | `bfe90:Playable Rieklings.esp` | Platewright | Extra Riekling copy of someone else's gear, or a spare piece. Not found and not made. |
 | Riekling Leather Bracers | `bfe92:Playable Rieklings.esp` | Platewright | Extra Riekling copy of someone else's gear, or a spare piece. Not found and not made. |
-| Riekling LoinCloth 1 | `19f92:Playable Rieklings.esp` | Platewright | Extra Riekling copy of someone else's gear, or a spare piece. Not found and not made. |
 | Riekling LoinCloth 1a | `babbc:Playable Rieklings.esp` | Platewright | Extra Riekling copy of someone else's gear, or a spare piece. Not found and not made. |
-| Riekling LoinCloth 2 | `19f94:Playable Rieklings.esp` | Platewright | Extra Riekling copy of someone else's gear, or a spare piece. Not found and not made. |
 | Riekling LoinCloth 2a | `babbd:Playable Rieklings.esp` | Platewright | Extra Riekling copy of someone else's gear, or a spare piece. Not found and not made. |
 | Riekling Long Spear | `40e0a:Playable Rieklings.esp` | Woodwright | Extra Riekling copy of someone else's gear, or a spare piece. Not found and not made. |
 | Riekling Miner's Clothes | `bfef5:Playable Rieklings.esp` | Haberdasher | Extra Riekling copy of someone else's gear, or a spare piece. Not found and not made. |
