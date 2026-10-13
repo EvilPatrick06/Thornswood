@@ -65600,7 +65600,7 @@ function createQuestTransactions(deps) {
   function identity(actor) {
     return active ? actorIdentity(mp,actor) : null;
   }
-  function commit(actor,expectedRecord,nextRecord,changes) {
+  function commit(actor,expectedRecord,nextRecord,changes,admission) {
     if(!available())return {ok:false,why:'unavailable'};
     try {
       var token=identity(actor);
@@ -65611,6 +65611,7 @@ function createQuestTransactions(deps) {
       if(changes.length===0) {
         var metadataOwner=JSON.parse(token);
         if(!available() || identity(actor)!==token)return {ok:false,why:'identity'};
+        if(admission!==undefined && (typeof admission!=='function' || admission()!==true))return {ok:false,why:'session'};
         try {
           var committed=mp.compareAndSetActorProperty(actor,metadataOwner.profileId,
             {name:property,expected:expectedRecord===undefined?null:expectedRecord,replacement:nextRecord,
@@ -65656,6 +65657,7 @@ function createQuestTransactions(deps) {
         });
         var nextReceipt=JSON.stringify({actor:human.desc,profile:human.profileId,sequence:sequence});
         if(!stillActive() || !available() || identity(actor)!==token)return {ok:false,why:'identity'};
+        if(admission!==undefined && (typeof admission!=='function' || admission()!==true))return {ok:false,why:'session'};
         try {
           var changed=mp.compareAndSetInventoryAndProperty(actor,before,receipt,next,sequence,human.profileId,
             {name:property,expected:expectedRecord===undefined?null:expectedRecord,replacement:nextRecord,
@@ -65907,6 +65909,7 @@ function createRolePermissions(places, tables) {
       copy.supply.forEach(function (id) {
         if (!copy.buy.has(id)) throw new Error('Role supplies must be permitted purchases.');
       });
+      copy.role=role;
       compiled.set(role,copy);
     });
   }
@@ -65918,11 +65921,17 @@ function createRolePermissions(places, tables) {
     }
     bindings.set(reference,table);
   });
-  return function (reference,direction,baseId) {
+  var permits = function (reference,direction,baseId) {
     if (!bindings.has(reference)) return false;
     var table=bindings.get(reference);
     return table===null || table[direction].has(baseId);
   };
+  permits.roleOf=function (reference) {
+    if (!bindings.has(reference)) return null;
+    var table=bindings.get(reference);
+    return table===null ? '' : table.role;
+  };
+  return permits;
 }
 
 function createNativeMerchantTransfer(mp) {
@@ -66050,9 +66059,13 @@ function createMerchantTrading(deps) {
     return Math.max(stamps[key] || 0, stamps[itemName.toLowerCase()] || 0);
   }
 
+  function sessionCurrent(actorId, profileId, session) {
+    return active && sessions.get(profileId)===session && !!session && session.actorId===actorId;
+  }
+
   function ownsSession(actorId, profileId, session) {
     var identity = sessionIdentity(world.actor(actorId));
-    return active && sessions.get(profileId) === session && session && identity === session.identity;
+    return sessionCurrent(actorId,profileId,session) && identity === session.identity;
   }
 
   function closedView(actorId, profileId, session) {
@@ -66321,16 +66334,18 @@ function createMerchantTrading(deps) {
     }
     if (verb === 'quest') {
       if (parts.length<4 || parts.length>5) return fail('Choose the work in the trader panel.');
-      var result=quests.act(actorId,String(parts[2]),String(parts[3]),parts[4],merchantId,heldQuest);
+      var result=quests.act(actorId,String(parts[2]),String(parts[3]),parts[4],merchantId,heldQuest,
+        function(){return sessionCurrent(actorId,profileId,originalSession);});
       var reasons={class:'This work takes a different class.',rank:'This work takes a higher rank.',
         cooldown:'This work is still resting.',open:'You already hold this work.',gem:'Choose a gem first.',
         short:'You have not drawn enough to turn this work in.',none:'You do not hold this work.',
         unbound:'This work has no appointed place yet.',unwritten:'The work could not be committed just now.',
-        unavailable:'Quest work is unavailable.'};
+        unavailable:'Quest work is unavailable.',role:'This trader does not handle that work.',
+        session:'Choose the work again from the trader.'};
       var text=result.ok ? (parts[2]==='take'?'You take the work.':parts[2]==='return'?'The work is turned in.':'You give back what you drew and leave the work.') :
         reasons[result.why] || 'The work could not be changed.';
-      var questState=purses.prepare(merchantId),questPlace=questState && placeOf(questState.reference);
       if (!ownsSession(actorId,profileId,originalSession)) return {text:'',view:null};
+      var questState=purses.prepare(merchantId),questPlace=questState && placeOf(questState.reference);
       var questResponse=questState && questPlace ? viewFor(merchantId,questState,questPlace,actorId,profileId,text,{session:originalSession,identity:originalSession.identity}) : closedView(actorId,profileId,originalSession);
       return questResponse && isCurrentView(actorId,questResponse) ? fail(text,questResponse) : {text:'',view:null};
     }
@@ -66477,6 +66492,23 @@ function createMerchantTrading(deps) {
     nativeReady: function () { return settlement.available(); },
     withQuestInventoryMutation: function(actorId,change) {return settlement.withInventoryMutation(actorId,change);},
     questReady: function(actorId) {return settlement.canInventoryMutation(actorId);},
+    questAdmission: function(actorId,merchantId) {
+      if (!active) return null;
+      // Capture before actor lookup: native callbacks must not supply a new conversation.
+      var session=null,profileId;
+      sessions.forEach(function(current,key) {
+        if(current.actorId===actorId){session=current;profileId=key;}
+      });
+      if (!session || session.merchantId!==merchantId || !ownsSession(actorId,profileId,session)) return null;
+      // The final transaction admission check must not invoke native callbacks.
+      // Actor identity remains fenced by the quest transaction's native CAS.
+      return function(){return sessionCurrent(actorId,profileId,session);};
+    },
+    questRole: function(merchantId) {
+      if (!active) return null;
+      var state=purses.read(merchantId);
+      return active && state ? permits.roleOf(state.reference) : null;
+    },
     questHold: function(merchantId) {
       var state=active && purses.read(merchantId),place=state && placeOf(state.reference);
       return place && place.hold || '';
@@ -66768,6 +66800,8 @@ try {
   ];
   var byId = {};
   SCARCE.concat(SCENE).forEach(function (row) { byId[row.id] = row; });
+  var LEGACY_TRADE = {ebony:'Smith',gem:'Enchanter',stalhrim:'Smith',heartstone:'Smith',
+    wolf:'Tailor',sabre:'Tailor',camp:'Smith',bear:'Tailor',barrow:'Smith',giant:'Smith'};
 
   function createCustomQuests(deps) {
     deps = deps || {};
@@ -66776,6 +66810,18 @@ try {
     var places = {};
     var rankOf = deps.rankOf || function () { return ''; };
     var kills = deps.killContracts;
+    function traderFor(row,ref) {
+      if (typeof deps.traderRole!=='function') return true;
+      var role=deps.traderRole(ref);
+      return active && (role==='' || typeof role==='string' && role===LEGACY_TRADE[row.id]);
+    }
+    function captureAdmission(actor,ref) {
+      if(typeof deps.traderRole!=='function')return undefined;
+      return typeof deps.traderAdmission==='function' ? deps.traderAdmission(actor,ref) || null : null;
+    }
+    function admitted(guard) {
+      return guard===undefined || typeof guard==='function' && guard()===true;
+    }
     /*
       WHAT EACH PERSON HOLDS IS ON THE CHARACTER (#1621), not in a map here.
       A map in this process was emptied by every restart: a scarce quest open
@@ -66897,7 +66943,8 @@ try {
         var next = recordEdits(b.expected || {v:1,open:{},cool:{}}, b.before, after);
         next.v = 1;
         if(deps.identity(actor)!==b.owner)return false;
-        return deps.commit(actor, b.expected, next, changes || []).ok === true;
+        if(b.admission!==undefined && (typeof b.admission!=='function' || b.admission()!==true))return false;
+        return deps.commit(actor, b.expected, next, changes || [],b.admission).ok === true;
       } catch (e) {
         note('could not write the quests of', actor + ', so nothing changed:', e);
         return false;
@@ -66938,9 +66985,11 @@ try {
         })
       };
     }
-    function offer(actor, id, opts, held) {
+    function offerWork(actor, id, opts, held) {
       var row = byId[id];
       if (!row) return { ok: false, why: 'unknown' };
+      if(typeof deps.traderRole==='function' && !boundOffer(row))return {ok:false,why:'unbound'};
+      if (!traderFor(row,opts && opts.traderRef)) return {ok:false,why:'role'};
       var b = held || questsOf(actor);
       if (!b) return { ok: false, why: 'unread' };
       if (own(b.open,id)) return { ok: false, why: 'open' };
@@ -66949,6 +66998,10 @@ try {
       if (!gate.ok) return { ok: false, why: gate.why };
       if (row.kind==='kill') {
         if(!kills)return {ok:false,why:'unbound'};
+        if(typeof deps.traderRole==='function') {
+          var source=kills.rows.find(function(r){return r.id===id;});
+          if(!source || !deps.traderHold || deps.traderHold(opts && opts.traderRef)!==source.hold)return {ok:false,why:'hold'};
+        }
         var accepted=kills.take(b,id);
         if(!accepted.ok)return accepted;
         return keep(actor,b,[]) ? {ok:true} : {ok:false,why:'unwritten'};
@@ -67052,12 +67105,31 @@ try {
       if (!keep(actor, b, changes)) return { ok: false, why: 'unwritten' };
       return { ok: true };
     }
-    function turnIn(actor, id, traderRef, held) {
+    function offer(actor,id,opts,held) {
+      if(!byId[id])return {ok:false,why:'unknown'};
+      var admission=captureAdmission(actor,opts && opts.traderRef);
+      if(!admitted(admission))return {ok:false,why:'session'};
+      var b=held || questsOf(actor);
+      if(!b)return {ok:false,why:'unread'};
+      b.admission=admission;
+      return offerWork(actor,id,opts,b);
+    }
+    function turnIn(actor,id,traderRef,held) {
+      if(!byId[id])return {ok:false,why:'none'};
+      var admission=captureAdmission(actor,traderRef);
+      if(!admitted(admission))return {ok:false,why:'session'};
+      var b=held || questsOf(actor);
+      if(!b)return {ok:false,why:'unread'};
+      b.admission=admission;
+      return turnInWork(actor,id,traderRef,b);
+    }
+    function turnInWork(actor, id, traderRef, held) {
       var row = byId[id];
       var b = row ? held || questsOf(actor) : null;
       if (row && !b) return { ok: false, why: 'unread' };
       var open = row && b.open[id];
       if (!row || !open) return { ok: false, why: 'none' };
+      if (!traderFor(row,traderRef)) return {ok:false,why:'role'};
       if (!row.scarce && row.kind !== 'retrieval' && row.kind !== 'kill') return { ok: false, why: 'unknown' };
       var changes = [];
       if (row.scarce) {
@@ -67124,11 +67196,14 @@ try {
       var place = places[row.id];
       return !!place && !!(row.gems ? place.cells && row.gems.every(function(gem){return !!place.cells[gem];}) : place.cell);
     }
+    function boundOffer(row) {
+      return (row.scarce || row.kind==='retrieval') && bound(row) || row.kind==='kill' && !!kills;
+    }
     function describe(actor,traderRef) {
       var held = questsOf(actor);
       if (!held) return [];
       var ready = active && (!deps.ready || deps.ready(actor));
-      var offers=SCARCE.filter(bound).map(function(row){
+      var offers=SCARCE.filter(bound).filter(function(row){return traderFor(row,traderRef);}).map(function(row){
         var open = held.open[row.id], gate = qualify(actor,row), until = held.cool[row.id] || 0;
         var state = open ? 'open' : until > deps.now() ? 'cooldown' : gate.ok ? 'available' : 'locked';
         var location = mineNames[row.id] || '';
@@ -67141,7 +67216,7 @@ try {
       });
       var hold=deps.traderHold && deps.traderHold(traderRef);
       if(kills)kills.rows.forEach(function(source){
-        if(source.hold!==hold)return;
+        if(source.hold!==hold || !traderFor(byId[source.id],traderRef))return;
         var row=byId[source.id],hasOpen=own(held.open,row.id),open=held.open[row.id],until=held.cool[row.id] || 0;
         var available=kills.available(row.id),done=hasOpen && kills.ready(held,row.id);
         var count=open && Number.isSafeInteger(open.kills)?open.kills:0;
@@ -67151,21 +67226,27 @@ try {
           recovery:!kills.verified(held,row.id),
           canTake:ready && !hasOpen && !until && available && kills.verified(held,row.id),canReturn:ready && done,canAbandon:ready && hasOpen});
       });
-      return offers;
+      return active ? offers : [];
     }
-    function act(actor, verb, id, gem, traderRef, held) {
+    function act(actor, verb, id, gem, traderRef, held, admission) {
       var row = byId[id];
-      if (!row || !(row.scarce && bound(row)) && !(row.kind==='kill' && kills)) return {ok:false,why:'unbound'};
+      if (!row || !boundOffer(row)) return {ok:false,why:'unbound'};
+      var origin=admission,current=captureAdmission(actor,traderRef);
+      admission=function(){return admitted(origin) && admitted(current);};
+      if(!admitted(admission))return {ok:false,why:'session'};
       held=held || questsOf(actor);
       if(!held)return {ok:false,why:'unread'};
+      held.admission=admission;
       if (!active || deps.ready && !deps.ready(actor)) return {ok:false,why:'unavailable'};
       if(deps.identity(actor)!==held.owner)return {ok:false,why:'identity'};
+      if(!traderFor(row,traderRef))return {ok:false,why:'role'};
       if(row.kind==='kill') {
         var source=kills.rows.find(function(r){return r.id===id;});
         if(!source || !deps.traderHold || deps.traderHold(traderRef)!==source.hold)return {ok:false,why:'hold'};
       }
-      if (verb === 'take') return offer(actor,id,{gem:gem},held);
-      if (verb === 'return') return turnIn(actor,id,traderRef,held);
+      if(admission!==undefined && (typeof admission!=='function' || admission()!==true))return {ok:false,why:'session'};
+      if (verb === 'take') return offerWork(actor,id,{gem:gem,traderRef:traderRef},held);
+      if (verb === 'return') return turnInWork(actor,id,traderRef,held);
       if (verb === 'abandon') return walkAway(actor,id,held);
       return {ok:false,why:'unknown'};
     }
@@ -67264,6 +67345,14 @@ try {
         traderHold: function (ref) {
           var merchants=globalThis.__thornswoodMerchantTrade;
           return merchants ? merchants.questHold(ref) : '';
+        },
+        traderRole: function (ref) {
+          var merchants=globalThis.__thornswoodMerchantTrade;
+          return merchants && typeof merchants.questRole==='function' ? merchants.questRole(ref) : null;
+        },
+        traderAdmission: function (actor,ref) {
+          var merchants=globalThis.__thornswoodMerchantTrade;
+          return merchants && typeof merchants.questAdmission==='function' ? merchants.questAdmission(actor,ref) : null;
         }
       });
       Object.keys(RARE_PLACES).forEach(function (id) {
