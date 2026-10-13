@@ -1306,7 +1306,10 @@ The short form of the rules. The same decisions, with the dates they were made, 
   ~410 of them (tests/, bot, and voice), and a look for stray pull requests
   and branches run every night on the VPS (.github/workflows/nightly.yml,
   03:00 Mountain); a failure there opens an issue on the board, "Nightly
-  checks failed", and whoever broke it fixes it next. It runs on the VPS, on the runners
+  checks failed", and whoever broke it fixes it next. The harnesses run in
+  shares, a job each on a runner of its own with 45 minutes of its own
+  (`scripts\dev\Nightly-Harnesses.ps1`, #2357); a share that runs out of
+  time names the harnesses it did not get to, and the cure is another share. It runs on the VPS, on the runners
   `.\scripts\deploy\Install-Runner.ps1` puts there (issue #437), because
   GitHub's own runners were blocked on billing from 25 Sep. Several since
   4 Oct, so checks run side by side: `-Number 2` and up puts each one after
