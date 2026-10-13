@@ -278,7 +278,7 @@ foreach ($b in $built) {
 if ($doc.PSObject.Properties['optional']) { $doc.optional = $optional }
 else { $doc | Add-Member -NotePropertyName optional -NotePropertyValue $optional }
 
-[IO.File]::WriteAllText($vf, ($doc | ConvertTo-Json -Depth 8), (New-Object Text.UTF8Encoding($false)))
+Write-FeedVersionFile $vf $doc
 
 Remove-Item $work -Recurse -Force -EA SilentlyContinue
 

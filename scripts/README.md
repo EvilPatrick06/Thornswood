@@ -1,6 +1,6 @@
 # The PowerShell scripts
 
-Every `.ps1` under this folder, 195 of them, by area: `release` builds and
+Every `.ps1` under this folder, 196 of them, by area: `release` builds and
 ships, `deploy` puts things on the VPS, `vps` looks after the box, `ops` runs
 the world day to day, `mods` works on the collection and the plugins, `dev`
 is for whoever is changing this repository. `oneoff` holds finished one time
@@ -136,6 +136,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/Dev-News.ps1](release/Dev-News.ps1) | Which notes on the dev feed are marked DEV, worked out from main's feed, and the one place that writes those marks and the dev feed's mainVersion. |
 | [release/EngineJobs.ps1](release/EngineJobs.ps1) | How many projects an engine build compiles at once, and whether a compile that failed ran the machine out of memory. |
 | [release/Export-ServerPayload.ps1](release/Export-ServerPayload.ps1) | Packages everything the VPS needs into one zip. |
+| [release/Feed-Json.ps1](release/Feed-Json.ps1) | The one way a channel's version.json is written (#1050). |
 | [release/Feed-News.ps1](release/Feed-News.ps1) | The notes the launcher's News tab shows, wherever the feed keeps them (#1050). |
 | [release/Feed-Rules.ps1](release/Feed-Rules.ps1) | Which packs on the update feed a launcher can actually download. |
 | [release/Feed-Store.ps1](release/Feed-Store.ps1) | Where each channel's feed, its release baseline and their history are kept, and the only code that reads or writes them there (#907). |

@@ -110,7 +110,7 @@ $wasV = if ($doc.PSObject.Properties.Name -contains 'collectionUrl') { [string]$
 Say ("  was  " + $(if ($wasV) { $wasV } else { '(none)' })) 'DarkGray'
 if ($doc.PSObject.Properties.Name -contains 'collectionUrl') { $doc.collectionUrl = $Url }
 else { $doc | Add-Member -NotePropertyName 'collectionUrl' -NotePropertyValue $Url }
-WriteJson $vFile $doc
+Write-FeedVersionFile $vFile $doc
 Say ("  now  " + $(if ($Url) { $Url } else { '(none)' })) 'Green'
 
 if ($NoPush) {
