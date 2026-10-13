@@ -63214,16 +63214,34 @@ function npcMerchantManifest(data) {
   return Array.from(entries.values());
 }
 function createNpcMerchantPurses(api,data,storage) {
+  if(!storage) throw new Error('A durable merchant ledger is required');
+  const owners=globalThis.__thornswoodMerchantLedgerOwners || (globalThis.__thornswoodMerchantLedgerOwners=new Map());
+  const key=storage.namespace || storage;
+  const prior=owners.get(key);
+  if(prior && prior.busy) throw new Error('Merchant ledger writer is busy');
+  const lease={busy:true};
+  owners.set(key,lease);
+  try {
+  if(typeof storage.load!=='function' || typeof storage.save!=='function') throw new Error('A durable merchant ledger is required');
   const property='thornswoodMerchant',catalogue=new Map(),verified=new Set();
   let initialized=0,active=true;
+  function assertOwner() {
+    if(!active || owners.get(key)!==lease) throw new Error('Merchant purse service is unavailable');
+  }
+  function mutate(fn) {
+    assertOwner();
+    if(lease.busy) throw new Error('Merchant ledger writer is busy');
+    lease.busy=true;
+    try {return fn();} finally {lease.busy=false;}
+  }
   api.makeProperty(property,{isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
   for(const identity of npcMerchantManifest(data)) {
     const id=api.getIdFromDesc(identity.reference);
     if(!Number.isInteger(id) || id<=0 || catalogue.has(id)) throw new Error('Invalid merchant catalogue identity');
     catalogue.set(id,identity);
   }
-  if(!storage || !storage.load || !storage.save) throw new Error('A durable merchant ledger is required');
   let ledger=storage.load();
+  assertOwner();
   function valid(state,identity) {
     return state && state.version===1 && state.reference===identity.reference && state.base===identity.base &&
       (state.revision===undefined || Number.isSafeInteger(state.revision) && state.revision>=0) &&
@@ -63241,7 +63259,10 @@ function createNpcMerchantPurses(api,data,storage) {
       throw new Error('Saved merchant ledger entry cannot be verified');
   }
   function prepare(id) {
-    if(!active) throw new Error('Merchant purse service is unavailable');
+    return mutate(()=>prepareState(id));
+  }
+  function prepareState(id) {
+    assertOwner();
     const identity=catalogue.get(id);
     if(!identity) return null;
     // Retired identities remain private ledger records, never live traders.
@@ -63260,21 +63281,27 @@ function createNpcMerchantPurses(api,data,storage) {
       next.entries[identity.reference]=state;
       // Initialization and balance commit together before the native mirror.
       try {
+        assertOwner();
         const acknowledgement=storage.save(next);
         if(storage.durable===true && acknowledgement!==true) throw new Error('Durable merchant save acknowledgement is missing');
       } catch(error) {active=false;throw error;}
-      if(!active) throw new Error('Merchant purse service is unavailable');
+      assertOwner();
       ledger=next;
       initialized++;
     }
     // Native saves are asynchronous. A lost or older mirror uses the ledger's
     // current balance, including zero; it never creates another grant.
+    assertOwner();
     if(JSON.stringify(projection)!==JSON.stringify(state)) api.set(id,property,JSON.parse(JSON.stringify(state)));
+    assertOwner();
     verified.add(id);
     return JSON.parse(JSON.stringify(state));
   }
   function commit(id, nextState, expectedRevision, requireAcknowledgement) {
-    if(!active) throw new Error('Merchant purse service is unavailable');
+    return mutate(()=>commitState(id,nextState,expectedRevision,requireAcknowledgement));
+  }
+  function commitState(id, nextState, expectedRevision, requireAcknowledgement) {
+    assertOwner();
     const identity=catalogue.get(id);
     if(!identity) throw new Error('That is not a guild trader');
     if(!valid(nextState, identity)) throw new Error('Merchant state cannot be verified');
@@ -63297,6 +63324,7 @@ function createNpcMerchantPurses(api,data,storage) {
     committed.revision=revision+1;
     next.entries[identity.reference]=committed;
     try {
+      assertOwner();
       const acknowledgement=storage.save(next);
       if(requireAcknowledgement && acknowledgement!==true)
         throw new Error('Durable merchant save acknowledgement is missing');
@@ -63306,21 +63334,22 @@ function createNpcMerchantPurses(api,data,storage) {
       active=false;
       throw error;
     }
-    if(!active) throw new Error('Merchant purse service is unavailable');
+    assertOwner();
     ledger=next;
     if(identity.active) api.set(id, property, JSON.parse(JSON.stringify(committed)));
+    assertOwner();
     return JSON.parse(JSON.stringify(committed));
   }
   function compareAndCommit(id, expectedRevision, nextState) {
     return commit(id,nextState,expectedRevision,true);
   }
   function read(id) {
-    if(!active) throw new Error('Merchant purse service is unavailable');
+    assertOwner();
     const identity=catalogue.get(id);
     return identity && ledger.entries[identity.reference] ? JSON.parse(JSON.stringify(ledger.entries[identity.reference])) : null;
   }
   function pendingRecords() {
-    if(!active) throw new Error('Merchant purse service is unavailable');
+    assertOwner();
     const pending=[];
     for(const [id,identity] of catalogue) {
       const state=ledger.entries[identity.reference];
@@ -63330,6 +63359,7 @@ function createNpcMerchantPurses(api,data,storage) {
   }
   const activeCount=Array.from(catalogue.values()).filter(identity=>identity.active).length;
   return {prepare,read,commit,compareAndCommit,pendingRecords,durable:storage.durable===true,namespace:storage.namespace,shutdown:()=>{active=false;},stats:()=>({catalogue:activeCount,retired:catalogue.size-activeCount,verified:verified.size,initialized})};
+  } finally {lease.busy=false;}
 }
 // NPC MERCHANT PURSES END
 
