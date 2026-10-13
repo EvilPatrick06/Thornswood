@@ -123,6 +123,8 @@ function roleAction(box,verb,name='Iron Ingot') {
 const roleMarket={catalog:prices.catalog,quote(hold,name){return name==='Free Salt'?{buy:1,sell:2}:prices.quote(hold,name);}};
 for(const role of ['Smith','Woodworker','Tailor','Enchanter','Cook','Alchemist']) {
   const configured=service({on:true},250,undefined,roleMarket,roleConfig(role));
+  assert.equal(configured.api.questRole(1),role);
+  assert.equal(configured.api.questRole(900),null,'unknown merchants have no quest role');
   const permitted=role==='Tailor'?'Free Salt':'Iron Ingot',refused=role==='Tailor'?'Iron Ingot':'Free Salt';
   assert.deepEqual(open(configured.api).view.offers.map(row=>row.name),[permitted]);
   assert.match(roleAction(configured,'sell',refused).text,/does not buy/);
@@ -169,7 +171,13 @@ purchaser.deps.resolve=name=>{roleResolutions++;return roleResolver(name);};
 open(purchaser.api);assert.equal(roleResolutions,2,'supply permissions use the already resolved offer identity');
 const immutableConfig=roleConfig('Smith'),immutable=service({on:true},250,undefined,roleMarket,immutableConfig);
 immutableConfig.roleTables.Smith.buy.push(101);immutableConfig.places['1:Skyrim.esm'].role='Tailor';
+assert.equal(immutable.api.questRole(1),'Smith','quest routes use the copied role binding');
 open(immutable.api);assert.match(roleAction(immutable,'sell','Free Salt').text,/does not buy/,'caller mutation cannot change authority');
+const capturedAdmission=immutable.api.questAdmission(10,1),originalActor=immutable.world.actor;
+let admissionReads=0;immutable.world.actor=function(id){admissionReads++;return originalActor.call(this,id);};
+assert.equal(capturedAdmission(),true);assert.equal(admissionReads,0,'the final admission predicate invokes no native lookups');
+immutable.world.actor=originalActor;assert.equal(immutable.api.questAdmission(10,2),null,'the conversation must match its trader');
+immutable.api.shutdown();assert.equal(capturedAdmission(),false,'controller revocation invalidates captured admission');
 const roleAlias=service({on:true},250,undefined,aliasMarketForRole(),roleConfig('Tailor'));
 function aliasMarketForRole(){return {catalog(){return [{name:'Metal',buy:3,sell:5}];},quote(){return {buy:3,sell:5};}};}
 roleAlias.deps.resolve=name=>name==='Metal'?{baseId:100,name:'Iron Ingot'}:resolve(name);
@@ -199,6 +207,79 @@ assert.equal(legacyRole.purses.read(1).pending,null,'new role restrictions do no
 assert.equal(legacyRole.world.inv[10][15],43);assert.equal(legacyRole.purses.read(1).stock[0].baseId,100);
 legacyRecovery.shutdown();
 
+const roleQuestContext={log(){},mp:{makeProperty(){}}};
+vm.runInNewContext(mode.slice(mode.indexOf('// ==== thornswood custom quests ===='),
+  mode.indexOf('// ==== end thornswood custom quests ====')),roleQuestContext);
+for(const replacement of ['close','replace']) for(const entry of ['act','offer','return']) {
+  const routed=service({on:true},250,undefined,prices,roleConfig('Smith'));
+  let record=entry==='return'?{v:1,open:{ebony:{drawn:4,kills:0,itemDesc:'ore'}},cool:{}}:null,questWrites=0,armed=false;
+  const quest=roleQuestContext.__thornswoodCustomQuestsCreate({now:()=>1,load:()=>record,
+    identity:()=> 'quest-owner',ready:()=>true,available:()=>true,rankOf:()=> 'master',
+    commit(actor,expected,next,goods,guard) {
+      if(guard && !guard())return {ok:false};questWrites++;record=JSON.parse(JSON.stringify(next));return {ok:true};
+    },traderAdmission:(actor,ref)=>routed.api.questAdmission(actor,ref),traderRole() {
+      if(armed){armed=false;if(replacement==='close')routed.api.command({actorId:10,profileId:7,parts:['/merchant','close']});else open(routed.api);}
+      return 'Smith';
+    }});
+  quest.bindPlace('ebony',{cell:'test'});routed.deps.quests=()=>quest;
+  const forgedHeld=quest.capture(10);forgedHeld.admission=()=>true;
+  if(entry==='act')quest.act(10,'take','ebony',null,1,forgedHeld,()=>true);
+  else if(entry==='offer')quest.offer(10,'ebony',{traderRef:1,admission:()=>true},forgedHeld);
+  else quest.turnIn(10,'ebony',1,forgedHeld);
+  assert.equal(questWrites,0,'direct '+entry+' cannot supply its own panel admission');
+  open(routed.api);const before=JSON.stringify(routed.world.inv);armed=true;
+  const previousRecord=JSON.stringify(record);
+  if(entry==='act')routed.api.command({actorId:10,profileId:7,parts:['/merchant','quest','take','ebony']});
+  else if(entry==='offer')quest.offer(10,'ebony',{traderRef:1});
+  else quest.turnIn(10,'ebony',1);
+  assert.equal(questWrites,0,replacement+' during role lookup cannot mutate quests');
+  assert.equal(JSON.stringify(record),previousRecord);assert.equal(JSON.stringify(routed.world.inv),before);
+  routed.api.shutdown();quest.shutdown();
+}
+
+for(const capture of ['missing','replace']) for(const entry of ['act','offer','return']) {
+  const routed=service({on:true},250,undefined,prices,roleConfig('Smith'));
+  let record=entry==='return'?{v:1,open:{ebony:{drawn:4,kills:0,itemDesc:'ore'}},cool:{}}:null,questWrites=0;
+  const quest=roleQuestContext.__thornswoodCustomQuestsCreate({now:()=>1,load:()=>record,
+    identity:()=> 'quest-owner',ready:()=>true,available:()=>true,rankOf:()=> 'master',
+    commit(actor,expected,next,goods,guard) {
+      if(guard && !guard())return {ok:false};questWrites++;record=JSON.parse(JSON.stringify(next));return {ok:true};
+    },traderAdmission:(actor,ref)=>routed.api.questAdmission(actor,ref),traderRole:()=> 'Smith'});
+  quest.bindPlace('ebony',{cell:'test'});routed.deps.quests=()=>quest;
+  if(capture==='replace')open(routed.api);
+  const beforeRecord=JSON.stringify(record),beforeInventory=JSON.stringify(routed.world.inv),originalActor=routed.world.actor;
+  let armed=true;
+  routed.world.actor=function(id) {
+    if(armed){armed=false;open(routed.api);}
+    return originalActor.call(this,id);
+  };
+  if(entry==='act')quest.act(10,'take','ebony',null,1);
+  else if(entry==='offer')quest.offer(10,'ebony',{traderRef:1});
+  else quest.turnIn(10,'ebony',1);
+  assert.equal(questWrites,0,capture+' panel during admission lookup cannot authorize direct '+entry);
+  assert.equal(JSON.stringify(record),beforeRecord);assert.equal(JSON.stringify(routed.world.inv),beforeInventory);
+  routed.api.shutdown();quest.shutdown();
+}
+{
+  const routed=service({on:true},250,undefined,prices,roleConfig('Smith'));
+  let record=null,questWrites=0,inCommit=false;
+  const quest=roleQuestContext.__thornswoodCustomQuestsCreate({now:()=>1,load:()=>record,
+    identity:()=> 'quest-owner',ready:()=>true,available:()=>true,rankOf:()=> 'master',
+    commit(actor,expected,next,goods,guard) {
+      inCommit=true;
+      if(guard && !guard())return {ok:false};questWrites++;record=JSON.parse(JSON.stringify(next));return {ok:true};
+    },traderAdmission:(actor,ref)=>routed.api.questAdmission(actor,ref),traderRole:()=> 'Smith'});
+  quest.bindPlace('ebony',{cell:'test'});routed.deps.quests=()=>quest;open(routed.api);
+  const originalAdmission=routed.api.questAdmission(10,1),beforeInventory=JSON.stringify(routed.world.inv);
+  const result=quest.act(10,'take','ebony',null,1,undefined,function() {
+    if(inCommit)open(routed.api);
+    return true;
+  });
+  assert.equal(originalAdmission(),false,'the supplied origin callback replaces the original conversation');
+  assert.equal(result.ok,false,'the actual session is checked after a supplied origin callback');
+  assert.equal(questWrites,0);assert.equal(record,null);assert.equal(JSON.stringify(routed.world.inv),beforeInventory);
+  routed.api.shutdown();quest.shutdown();
+}
 let native = { on: true };
 let box = service(native, 250);
 let opened = open(box.api);
@@ -315,7 +396,9 @@ box.api.command({actorId:11,profileId:7,parts:['/merchant','quest','take','ebony
 assert.equal(questCalls.length,0,'a replacement actor cannot reuse the old session');
 open(box.api);
 box.api.command({actorId:10,profileId:7,parts:['/merchant','quest','take','gem','Ruby']});
-assert.deepEqual(questCalls.pop(),[10,'take','gem','Ruby',1,{owner:'held-session'}]);
+const routedQuestArgs=questCalls.pop();
+assert.deepEqual(routedQuestArgs.slice(0,6),[10,'take','gem','Ruby',1,{owner:'held-session'}]);
+assert.equal(typeof routedQuestArgs[6],'function');assert.equal(routedQuestArgs[6](),true);
 box.world.actors[10].lifeGeneration=1;
 box.api.command({actorId:10,profileId:7,parts:['/merchant','quest','take','ebony']});
 assert.equal(questCalls.length,0,'an earlier life cannot reuse a merchant session');

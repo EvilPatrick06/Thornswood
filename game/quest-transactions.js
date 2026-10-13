@@ -39,7 +39,7 @@ function createQuestTransactions(deps) {
   function identity(actor) {
     return active ? actorIdentity(mp,actor) : null;
   }
-  function commit(actor,expectedRecord,nextRecord,changes) {
+  function commit(actor,expectedRecord,nextRecord,changes,admission) {
     if(!available())return {ok:false,why:'unavailable'};
     try {
       var token=identity(actor);
@@ -50,6 +50,7 @@ function createQuestTransactions(deps) {
       if(changes.length===0) {
         var metadataOwner=JSON.parse(token);
         if(!available() || identity(actor)!==token)return {ok:false,why:'identity'};
+        if(admission!==undefined && (typeof admission!=='function' || admission()!==true))return {ok:false,why:'session'};
         try {
           var committed=mp.compareAndSetActorProperty(actor,metadataOwner.profileId,
             {name:property,expected:expectedRecord===undefined?null:expectedRecord,replacement:nextRecord,
@@ -95,6 +96,7 @@ function createQuestTransactions(deps) {
         });
         var nextReceipt=JSON.stringify({actor:human.desc,profile:human.profileId,sequence:sequence});
         if(!stillActive() || !available() || identity(actor)!==token)return {ok:false,why:'identity'};
+        if(admission!==undefined && (typeof admission!=='function' || admission()!==true))return {ok:false,why:'session'};
         try {
           var changed=mp.compareAndSetInventoryAndProperty(actor,before,receipt,next,sequence,human.profileId,
             {name:property,expected:expectedRecord===undefined?null:expectedRecord,replacement:nextRecord,

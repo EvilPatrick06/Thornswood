@@ -432,7 +432,8 @@ if (ORES && qBlock2) {
     MERCHANT_TRADING: {createKillContracts: require('../game/kill-contracts').createKillContracts,
       createQuestTransactions: function () {
       return {available: function () {return true;}, identity: function (a) {return 'actor:'+a;}, shutdown: function () {},
-        commit: function (a, expected, next, changes) {
+        commit: function (a, expected, next, changes, admission) {
+          if(admission!==undefined && admission()!==true)return {ok:false};
           const pack=Object.assign({},inv);
           for (const change of changes) {
             const key=a+'|'+change.item,count=(pack[key]||0)+change.count;
@@ -476,12 +477,19 @@ if (ORES && qBlock2) {
     wearTool: function () { return null; }
   };
   ctx.globalThis = ctx;
-  ctx.__thornswoodMerchantTrade = {questReady: function () {return true;}};
+  let traderOpen=true;
+  ctx.__thornswoodMerchantTrade = {questReady: function () {return true;},
+    questRole: function(ref){return ref===9000?'':null;},
+    questAdmission: function(a,ref){return traderOpen && ref===9000 ? function(){return traderOpen;} : null;}};
   ctx.__thornswoodCharacter = { rankOf: function (a, key) { return ranks[a + ':' + key] || ''; } };
   vm.createContext(ctx);
   vm.runInContext(qBlock2, ctx);
   const svc = ctx.__thornswoodQuests;
   yes('the server starts the quest service', !!svc && !!svc.mineRare && logged.length === 0);
+  traderOpen=false;
+  yes('rare work needs an actual trader conversation before the pack or quests change',
+    svc.offer(99,'ebony',{traderRef:9000}).why==='session' && !props['99|thornswoodQuests']);
+  traderOpen=true;
   const ore = function (seam) { return names[seam] && names[seam].ore; };
   const seamOf = function (seam) { return { name: seam, ore: ore(seam) }; };
   let nextRef = 0x9000;
@@ -493,7 +501,7 @@ if (ORES && qBlock2) {
     const row = ROWS[p.quest];
     const a = actor++;
     ranks[a + ':miner'] = 'master';
-    const opts = p.quest === 'gem' ? { gem: p.seam } : undefined;
+    const opts = p.quest === 'gem' ? { gem: p.seam, traderRef:9000 } : {traderRef:9000};
     const here = [vein(cell), vein(cell)];
     const other = Object.keys(mineBuildings.buildings).filter(function (c) {
       return c !== cell && (mineBuildings.buildings[c].ores[p.seam] || 0) > 0;
@@ -514,7 +522,7 @@ if (ORES && qBlock2) {
         other.concat([outside]).every(function (r) { return svc.mineRare(b, r, seamOf(p.seam)) === 'This place is shut.'; }) &&
         !inv[b + '|' + ore(p.seam)]);
     yes(p.seam + ': turned in, the ask goes and the extra stays',
-        svc.turnIn(a, p.quest).ok === true && inv[a + '|' + ore(p.seam)] === row.holds - row.ask);
+        svc.turnIn(a, p.quest,9000).ok === true && inv[a + '|' + ore(p.seam)] === row.holds - row.ask);
     yes(p.seam + ': then the place is shut to that person',
         svc.mineRare(a, here[0], seamOf(p.seam)) === 'This place is shut.' && svc.offer(a, p.quest, opts).why === 'cooldown');
     yes(p.seam + ': while somebody else holding the quest works it', svc.mineRare(b, here[0], seamOf(p.seam)) === '');
@@ -531,17 +539,17 @@ if (ORES && qBlock2) {
   const tower = cellOfBuilding('Highpoint Tower');
   const g = actor++;
   ranks[g + ':miner'] = 'master';
-  svc.offer(g, 'gem', { gem: 'Ruby' });
+  svc.offer(g, 'gem', { gem: 'Ruby',traderRef:9000 });
   yes('a ruby quest finds the Highpoint Tower rubies shut', svc.mineRare(g, vein(tower), seamOf('Ruby')) === 'This place is shut.');
   yes('and a sapphire vein at the ruby place is not the ruby',
       svc.mineRare(g, vein(cellOfBuilding('White Ridge Sanctum')), seamOf('Sapphire')) === 'This place is shut.');
   svc.walkAway(g, 'gem');
-  svc.offer(g, 'gem', { gem: 'Emerald' });
+  svc.offer(g, 'gem', { gem: 'Emerald',traderRef:9000 });
   yes('an emerald quest finds the Highpoint Tower emerald shut', svc.mineRare(g, vein(tower), seamOf('Emerald')) === 'This place is shut.');
   svc.walkAway(g, 'gem');
   const s = actor++;
   ranks[s + ':miner'] = 'master';
-  svc.offer(s, 'stalhrim');
+  svc.offer(s, 'stalhrim',{traderRef:9000});
   yes('a stalhrim quest finds the stalhrim in Raven Rock Mine shut',
       svc.mineRare(s, vein(cellOfBuilding('Raven Rock Mine')), seamOf('Stalhrim')) === 'This place is shut.');
   yes('a vein the server cannot place answers shut', svc.mineRare(s, 0x7fff, seamOf('Stalhrim')) === 'This place is shut.');
