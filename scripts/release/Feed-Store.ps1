@@ -58,6 +58,9 @@
       Get-FeedStoreLaunchers main|dev    launchers.txt, one version a line
       Get-FeedStoreReleases main|dev     releases.txt, one release a line
       Read-SiteFeed main|dev             the feed as the public reads it
+      Write-FeedVersionFile -Path -Doc   write version.json as every writer
+                                         must: compact, no byte order mark
+                                         (Feed-Json.ps1, dot-sourced here)
       Remove-FeedStoreAssets main|dev -Shas -Expect
                                          delete assets no feed names any more,
                                          refusing if either feed moved (#1152)
@@ -69,6 +72,7 @@
 #>
 
 . (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
+. (Join-Path $PSScriptRoot 'Feed-Json.ps1')       # Write-FeedVersionFile: the one way version.json is written (#1050)
 function Get-FeedStorePrefix([string]$Channel) {
     if ($Channel -eq 'dev') { return 'feed-dev' }
     if ($Channel -eq 'main' -or -not $Channel) { return 'feed' }

@@ -142,9 +142,15 @@ function Get-ReleaseSource([string]$RepoDir) {
 
 # The "release" object Publish-Update writes into version.json. The tag is
 # named only when there is a commit for it to go on.
+#
+# It names the release and nothing it installs. Until #1050 it also carried
+# "uiAssets", the front's hashed file names (#1318): 2,569 of main's 7,789
+# bytes on 12 Oct, read by no launcher, script or page, only by a harness.
+# Those names are Data\Platform\UI\thornswood-ui-assets.txt, a file of the
+# release, so its record already holds them by sha256, and that file is what
+# OwnGame.Foreign reads.
 function New-ReleaseRecord([string]$Id, [string]$Channel, [string]$LauncherVersion, [string[]]$Packs,
-                           [string]$Baseline, [string]$Commit, [string]$Branch, [int]$Uncommitted,
-                           [string[]]$UiAssets = @()) {
+                           [string]$Baseline, [string]$Commit, [string]$Branch, [int]$Uncommitted) {
     $ch = if ($Channel -eq 'dev') { 'dev' } else { 'main' }
     $tag = if ($Commit) { Get-ReleaseTagName $ch $Id } else { '' }
     return [pscustomobject][ordered]@{
@@ -157,7 +163,6 @@ function New-ReleaseRecord([string]$Id, [string]$Channel, [string]$LauncherVersi
         branch          = [string]$Branch
         uncommitted     = $Uncommitted
         tag             = $tag
-        uiAssets        = @(@($UiAssets) | Where-Object { $_ } | ForEach-Object { [string]$_ })
     }
 }
 

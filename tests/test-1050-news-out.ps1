@@ -165,16 +165,16 @@ try {
     Yes 'Publish-Update opens the whole list before it adds a note, and puts it back the channel''s way after the DEV marks and before the feed is written' (
         $pu -match 'Open-FeedNewsList \$doc' -and $pu.IndexOf('Open-FeedNewsList $doc') -lt $pu.IndexOf('$marks = Set-DevFeedMarks') -and
         $pu.IndexOf('$marks = Set-DevFeedMarks') -lt $pu.IndexOf('Set-FeedNewsList $doc') -and
-        $pu.IndexOf('Set-FeedNewsList $doc') -lt $pu.IndexOf('[IO.File]::WriteAllText($VersionFile'))
+        $pu.IndexOf('Set-FeedNewsList $doc') -lt $pu.IndexOf('Write-FeedVersionFile $VersionFile'))
     Yes '  with the minLauncher it writes, and nothing sent on a run that uploads nothing' ($pu -match "Val \`$doc 'minLauncher'" -and $pu -match '-NoSend:\$NoUpload')
     Yes '  and says the launcher number the feed carries next to main''s, which a packs-only dev Ship left blank' (
         $pu -match "this one is on \`$\(Val \`$doc 'launcherVersion'\)" -and $pu -notmatch 'this one is on \$launcherVersion')
     $rb = $src['scripts\release\Rollback-Feed.ps1']
     Yes 'Rollback-Feed adds its note to the whole list and puts it back before the feed is written' ($rb -match 'Open-FeedNewsList \$doc' -and $rb.IndexOf('Set-FeedNewsList $doc') -gt 0 -and
-        $rb.IndexOf('Set-FeedNewsList $doc') -lt $rb.IndexOf('[IO.File]::WriteAllText($VersionFile'))
+        $rb.IndexOf('Set-FeedNewsList $doc') -lt $rb.IndexOf('Write-FeedVersionFile $VersionFile'))
     $ps = $src['scripts\release\Publish-Server.ps1']
     Yes 'Publish-Server''s news entry does the same' ($ps -match 'Open-FeedNewsList \$doc' -and $ps.IndexOf('Set-FeedNewsList $doc') -gt 0 -and
-        $ps.IndexOf('Set-FeedNewsList $doc') -lt $ps.IndexOf('[IO.File]::WriteAllText($VersionFile'))
+        $ps.IndexOf('Set-FeedNewsList $doc') -lt $ps.IndexOf('Write-FeedVersionFile $VersionFile'))
     $dn = $src['scripts\release\Dev-News.ps1']
     Yes 'a dev marks refresh puts the list back the dev feed''s way before it sends' ($dn.IndexOf('Set-FeedNewsList $doc') -gt 0 -and $dn.IndexOf('Set-FeedNewsList $doc') -lt $dn.IndexOf("Send-FeedStore 'dev'"))
     Yes 'Publish-Discord posts the newest note wherever the feed keeps it' ($src['scripts\ops\Publish-Discord.ps1'] -match '\$n = @\(Get-FeedNewsList \$v')
