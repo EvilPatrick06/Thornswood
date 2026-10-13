@@ -2202,7 +2202,10 @@ if ($Dev) {
     if ($null -ne $mainDoc) {
         $marks = Set-DevFeedMarks $doc $mainDoc $RepoDir $SiteDir $SiteUrl
         Say ("  {0} note{1} marked dev, the ones main has not had" -f $marks.Marked, $(if ($marks.Marked -eq 1) { '' } else { 's' })) 'DarkGray'
-        if ($marks.MainVersion) { Say "  main is on $($marks.MainVersion), this one is on $launcherVersion" 'DarkGray' }
+        # The feed's own number, not $launcherVersion: that is set only when a
+        # launcher is sent, so a packs-only dev Ship (#921) printed "this one is
+        # on" and nothing after it (12 Oct, 20261012-180219-dev).
+        if ($marks.MainVersion) { Say "  main is on $($marks.MainVersion), this one is on $(Val $doc 'launcherVersion')" 'DarkGray' }
     } else {
         Say '  the site has no main feed, so the dev marks were left alone' 'Yellow'
     }
