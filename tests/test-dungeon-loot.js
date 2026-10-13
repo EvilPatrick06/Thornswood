@@ -223,6 +223,29 @@ if (block) {
   yes('a chest in a temple that is not a dungeon does not pay', api.onChest(2, 0x1002) === null);
   yes('those three opens handed nothing', api.given.length === mid);
 
+  // #510: the lists match inside a name. "sack" refused every knapsack and
+  // "urn" paid out of burnt corpses (TreasBurntCorpse01) and a journal box.
+  api.putChest(0x1003, 'TreasKnapsack');
+  const knap = api.onChest(actor, 0x1003);
+  yes('a dungeon knapsack pays, though "sack" is on the refused list', knap && knap.gold >= 5);
+
+  api.putChest(0x1004, 'TreasBurntCorpse01');
+  yes('a burnt corpse is not an urn and does not pay', api.onChest(actor, 0x1004) === null);
+  api.putChest(0x1005, 'MQ104BurntCorpse03');
+  yes('nor the burnt corpses of the dragon attack', api.onChest(actor, 0x1005) === null);
+  api.putChest(0x1006, 'EE_JournalsStorage');
+  yes('a journal box is not an urn', api.onChest(actor, 0x1006) === null);
+  api.putChest(0x1007, 'TreasRuinsUrnSmall01');
+  const urn = api.onChest(actor, 0x1007);
+  yes('a real urn still pays', urn && urn.gold >= 5);
+  api.putChest(0x1008, 'DLC2WB01JournalChest');
+  yes('a chest named for a journal is still a chest', !!api.onChest(actor, 0x1008));
+  api.putChest(0x1009, 'NobleChestDrawers01');
+  yes('a chest of drawers is still a dresser', api.onChest(actor, 0x1009) === null);
+  api.putChest(0x100a, 'SackSmall01');
+  yes('a sack still does not pay', api.onChest(actor, 0x100a) === null);
+  yes('the knapsack keeps its rest like any chest', api.onChest(actor, 0x1003) === null);
+
   const act = src.slice(src.indexOf('function activate(actorId, refrId, baseDesc)'),
                         src.indexOf('// ------------------------------------------------- where gold comes from --'));
   yes('opening a container asks the dungeon table',
