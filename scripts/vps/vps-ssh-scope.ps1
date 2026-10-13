@@ -1,0 +1,233 @@
+<#
+.SYNOPSIS
+  Runs ON THE VPS, sent there by Set-SshScope.ps1: limits who may reach ssh on port 22 to a list of addresses, refusing a list that leaves out the machine running it, and arms a ten minute put back.
+
+.DESCRIPTION
+  Do not run this by hand. Set-SshScope.ps1 proves key login works first, from
+  your machine, sends this to C:\Windows\Temp, runs it with Windows
+  PowerShell 5.1, and this file deletes itself when it is done.
+
+  Issue #2182, decision 2 (Patrick, 11 Oct 2026): restrict the inbound rules on
+  port 22 to known addresses, only after the hosting console login is
+  confirmed. In this order, each step saying what it found and what it did:
+
+    the list      every entry an IPv4 or IPv6 address or a range written
+                  address/bits, or the single word Any (back to anywhere).
+                  Anything else stops it.
+    the caller    the address this ssh session comes from, read from
+                  SSH_CLIENT, must be inside the list. A list that leaves it
+                  out would cut this machine off, so it stops.
+    the rules     every enabled inbound Allow rule for TCP on port 22. An
+                  enabled Allow rule for every port that also takes sshd's
+                  traffic (any program, or sshd.exe) would let 22 in from
+                  anywhere whatever the list says, so it stops and names it.
+                  So does finding no rule for 22 at all.
+    the change    the rules' remote addresses are saved to
+                  C:\ProgramData\ssh\ssh-scope-before-<time>.json, a task puts
+                  them back in ten minutes ("Thornswood ssh scope rollback"),
+                  and then each rule's remote address becomes the list.
+                  Set-SshScope.ps1 cancels the task once a new key login from
+                  your machine gets in. A connection already open stays open,
+                  so this answer always gets back.
+
+  Every line of output starts with one word: CHANGED, WOULD (with -DryRun),
+  ALREADY, KEPT, WARN, STOP or DONE. STOP means nothing after it was done, and
+  the exit code is 1.
+
+.PARAMETER From
+  The addresses that may reach port 22, comma separated: 203.0.113.7,
+  198.51.100.0/24, 2001:db8::/48, or Any.
+
+.PARAMETER DryRun
+  Read everything, change nothing, and say WOULD for each change.
+
+.PARAMETER Layer
+  A file that replaces the functions below that touch Windows (the firewall,
+  scheduled tasks, SSH_CLIENT, the save folder). Only tests\test-ssh-scope.ps1
+  passes it, to run this against stand-ins.
+
+.PARAMETER KeepSelf
+  Do not delete this file at the end. The test harness passes it.
+#>
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory = $true)][string]$From,
+    [switch]$DryRun,
+    [string]$Layer = '',
+    [switch]$KeepSelf
+)
+
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+$RollbackTask = 'Thornswood ssh scope rollback'
+$script:changes = 0
+$script:stopped = $false
+
+function Say([string]$word, [string]$what) { Write-Output ($word + ' ' + $what) }
+
+# ---------------------------------------------------------------- the layer ---
+# Everything that touches Windows goes through these, so the harness can put
+# stand-ins in their place with -Layer and run the rest of this for real.
+
+function Get-CallerAddress { return ([string]$env:SSH_CLIENT -split '\s+')[0] }
+function Get-SaveFolder { return (Join-Path $env:ProgramData 'ssh') }
+function Test-IsServer {
+    $pt = 0
+    try { $pt = [int](Get-CimInstance Win32_OperatingSystem).ProductType } catch { $pt = 0 }
+    return ($pt -ne 1)
+}
+
+# Enabled inbound Allow rules as Name, DisplayName, Protocol, Ports, Program
+# and Remote (the remote addresses, 'Any' when open to all).
+function Get-AllowRules {
+    foreach ($r in @(Get-NetFirewallRule -Direction Inbound -Enabled True -Action Allow -ErrorAction SilentlyContinue)) {
+        $pf = $r | Get-NetFirewallPortFilter -ErrorAction SilentlyContinue
+        $af = $r | Get-NetFirewallAddressFilter -ErrorAction SilentlyContinue
+        $ap = $r | Get-NetFirewallApplicationFilter -ErrorAction SilentlyContinue
+        [pscustomobject]@{
+            Name = [string]$r.Name; DisplayName = [string]$r.DisplayName
+            Protocol = [string]$pf.Protocol
+            Ports = @(@($pf.LocalPort) | ForEach-Object { [string]$_ })
+            Program = [string]$ap.Program
+            Remote = @(@($af.RemoteAddress) | ForEach-Object { [string]$_ })
+        }
+    }
+}
+function Set-RuleRemote([string]$Name, [string[]]$Remote) { Set-NetFirewallRule -Name $Name -RemoteAddress $Remote }
+
+# Puts every saved rule's remote addresses back in ten minutes, then removes
+# itself, unless Set-SshScope.ps1 cancels it first.
+function Register-Rollback([string]$Saved) {
+    $cmd = "`$s = Get-Content -Raw -LiteralPath '" + $Saved + "' | ConvertFrom-Json; foreach (`$r in `$s.rules) { Set-NetFirewallRule -Name `$r.name -RemoteAddress @(`$r.remote) }; Unregister-ScheduledTask -TaskName '" + $RollbackTask + "' -Confirm:`$false"
+    $a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -Command "' + $cmd + '"')
+    $t = New-ScheduledTaskTrigger -Once -At ((Get-Date).AddMinutes(10))
+    $p = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+    Register-ScheduledTask -TaskName $RollbackTask -Action $a -Trigger $t -Principal $p -Force | Out-Null
+}
+
+if ($Layer) { . $Layer }
+
+# ---------------------------------------------------------------- addresses ---
+# One entry as a family, its bytes and how many leading bits must match, or
+# $null when it is not an address or address/bits.
+function ConvertTo-Range([string]$Text) {
+    $t = $Text.Trim()
+    $bits = -1
+    if ($t.Contains('/')) {
+        $parts = $t.Split('/')
+        if ($parts.Count -ne 2 -or $parts[1] -notmatch '^\d{1,3}$') { return $null }
+        $t = $parts[0]; $bits = [int]$parts[1]
+    }
+    $ip = $null
+    if (-not [Net.IPAddress]::TryParse($t, [ref]$ip)) { return $null }
+    # An IPv4 entry has to be four numbers, so 10.1 is not taken for 10.0.0.1.
+    if ($ip.AddressFamily -eq [Net.Sockets.AddressFamily]::InterNetwork -and $t -notmatch '^\d{1,3}(\.\d{1,3}){3}$') { return $null }
+    if ($ip.AddressFamily -eq [Net.Sockets.AddressFamily]::InterNetworkV6 -and $ip.IsIPv4MappedToIPv6) { $ip = $ip.MapToIPv4() }
+    $bytes = $ip.GetAddressBytes()
+    $max = $bytes.Length * 8
+    if ($bits -lt 0) { $bits = $max }
+    if ($bits -gt $max) { return $null }
+    return [pscustomobject]@{ Bytes = $bytes; Bits = $bits; Text = $Text.Trim() }
+}
+
+function Test-InRange($Address, $Range) {
+    if ($Address.Bytes.Length -ne $Range.Bytes.Length) { return $false }
+    $left = $Range.Bits
+    for ($i = 0; $i -lt $Address.Bytes.Length -and $left -gt 0; $i++) {
+        $take = [Math]::Min(8, $left)
+        $mask = [byte]((0xFF -shl (8 - $take)) -band 0xFF)
+        if (($Address.Bytes[$i] -band $mask) -ne ($Range.Bytes[$i] -band $mask)) { return $false }
+        $left -= $take
+    }
+    return $true
+}
+
+function Change([string]$what) {
+    $script:changes++
+    if ($DryRun) { Say 'WOULD' $what } else { Say 'CHANGED' $what }
+}
+
+function Invoke-Scope {
+    if (-not $Layer -and -not (Test-IsServer)) { $script:stopped = $true; Say 'STOP' 'this is a workstation, not the VPS. Run Set-SshScope.ps1 on your machine; it sends this to the box.'; return }
+
+    # ---------------------------------------------------------- the list ---
+    $entries = @($From -split '[,\s]+' | Where-Object { $_ })
+    if (-not $entries.Count) { $script:stopped = $true; Say 'STOP' 'the list of addresses is empty. Nothing was changed.'; return }
+    $any = ($entries.Count -eq 1 -and $entries[0] -eq 'Any')
+    $ranges = @()
+    if (-not $any) {
+        foreach ($e in $entries) {
+            if ($e -eq 'Any') { $script:stopped = $true; Say 'STOP' 'Any goes alone, not in a list. Nothing was changed.'; return }
+            $r = ConvertTo-Range $e
+            if (-not $r) { $script:stopped = $true; Say 'STOP' ("'" + $e + "' is not an address or address/bits. Nothing was changed."); return }
+            $ranges += $r
+        }
+    }
+    $want = if ($any) { @('Any') } else { @($ranges | ForEach-Object { $_.Text }) }
+
+    # -------------------------------------------------------- the caller ---
+    $caller = Get-CallerAddress
+    if (-not $any) {
+        $c = if ($caller) { ConvertTo-Range $caller } else { $null }
+        if (-not $c) { $script:stopped = $true; Say 'STOP' 'could not read the address this session comes from (SSH_CLIENT), so the list cannot be checked against it. Nothing was changed.'; return }
+        $inside = @($ranges | Where-Object { Test-InRange $c $_ })
+        if (-not $inside.Count) { $script:stopped = $true; Say 'STOP' ('this session comes from ' + $caller + ', which is not in the list, so the change would cut this machine off. Add it, or run this from a machine in the list. Nothing was changed.'); return }
+        Say 'KEPT' ('this session comes from ' + $caller + ', inside ' + $inside[0].Text)
+    }
+
+    # --------------------------------------------------------- the rules ---
+    $rules = @(Get-AllowRules)
+    $tcp = @($rules | Where-Object { $_.Protocol -eq 'TCP' -or $_.Protocol -eq 'Any' })
+    $for22 = @($tcp | Where-Object { $_.Ports -contains '22' })
+    $wide = @($tcp | Where-Object { ($_.Ports -contains 'Any' -or -not $_.Ports.Count) -and ($_.Program -eq 'Any' -or -not $_.Program -or $_.Program -match '(?i)\\sshd\.exe$') -and ($_.Remote -contains 'Any') })
+    if ($wide.Count -and -not $any) {
+        $script:stopped = $true
+        Say 'STOP' ('these rules allow every port from anywhere, so they let port 22 in whatever the list says: ' + (($wide | ForEach-Object { "'" + $_.DisplayName + "'" }) -join ', ') + '. Decide about them first. Nothing was changed.')
+        return
+    }
+    if (-not $for22.Count) { $script:stopped = $true; Say 'STOP' 'no enabled firewall rule allows port 22, so there is nothing to narrow. Nothing was changed.'; return }
+    # A rule for 22 and other ports cannot be narrowed without narrowing the
+    # others too, which is not this script's call.
+    $shared = @($for22 | Where-Object { @($_.Ports | Where-Object { $_ -ne '22' }).Count })
+    if ($shared.Count) {
+        $script:stopped = $true
+        Say 'STOP' ('these rules allow port 22 together with other ports: ' + (($shared | ForEach-Object { "'" + $_.DisplayName + "' (" + ($_.Ports -join ',') + ')' }) -join ', ') + '. Narrowing them would narrow the others too. Nothing was changed.')
+        return
+    }
+
+    $todo = @()
+    foreach ($r in $for22) {
+        $now = @($r.Remote | Sort-Object)
+        if ((($now | Sort-Object) -join ',') -eq (($want | Sort-Object) -join ',')) { Say 'ALREADY' ("rule '" + $r.DisplayName + "' takes port 22 from " + ($want -join ', ')) }
+        else { $todo += $r }
+    }
+    if (-not $todo.Count) { return }
+
+    # -------------------------------------------------------- the change ---
+    $saved = Join-Path (Get-SaveFolder) ('ssh-scope-before-' + (Get-Date).ToString('yyyyMMdd-HHmmss') + '.json')
+    if (-not $DryRun) {
+        $doc = [ordered]@{ taken = (Get-Date).ToString('o'); rules = @($todo | ForEach-Object { [ordered]@{ name = $_.Name; remote = @($_.Remote) } }) }
+        [IO.File]::WriteAllText($saved, ($doc | ConvertTo-Json -Depth 4), (New-Object Text.UTF8Encoding($false)))
+        Register-Rollback $saved
+    }
+    Change ('saved the rules as they are to ' + $saved)
+    Change ("a task named '" + $RollbackTask + "' puts them back in ten minutes unless Set-SshScope.ps1 cancels it once key login is proven again")
+    foreach ($r in $todo) {
+        if (-not $DryRun) { Set-RuleRemote $r.Name $want }
+        Change ("rule '" + $r.DisplayName + "' takes port 22 from " + ($want -join ', ') + ' (was ' + ($r.Remote -join ', ') + ')')
+    }
+}
+
+try { Invoke-Scope }
+catch {
+    $script:stopped = $true
+    Say 'STOP' ('it failed partway, at: ' + $_.Exception.Message)
+}
+finally {
+    if ($DryRun) { Say 'DONE' ([string]$script:changes + ' change(s) would be made. Nothing was changed.') }
+    elseif ($script:stopped) { Say 'DONE' ([string]$script:changes + ' change(s) made before it stopped.') }
+    else { Say 'DONE' ([string]$script:changes + ' change(s) made.') }
+    if (-not $KeepSelf -and $PSCommandPath) { Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue }
+}
+if ($script:stopped) { exit 1 }
+exit 0

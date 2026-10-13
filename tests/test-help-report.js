@@ -27,8 +27,11 @@
      an unsigned report about a person and the sixth report in an hour are all
      refused.
 
-  4. The bot. If this machine's python has discord.py, the rows the site
-     wrote are handed to bot.report_text, the line the staff channel reads.
+  4. The bot. With the Python the bot runs on (tests\bot-python.js: py -3.12
+     first, then python, each only if it loads the bot's version check and
+     discord.py), the rows the site wrote are handed to bot.report_text, the
+     line the staff channel reads. With none, the bot half is a SKIP line
+     saying why.
 
   Nothing leaves this machine and nothing touches the repository's data
   folder. Scratch files go under THORNSWOOD_TEMP when it is set.
@@ -398,9 +401,12 @@ const inbox = () => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'da
     yes('a problem still needs no account', r2.status === 200 && inbox()[0].kind === 'bug');
 
     // --------------------------------------------------------- 3. the bot --
-    const py = spawnSync('python', ['-c', 'import discord'], { encoding: 'utf8' });
-    if (py.status !== 0) {
-      console.log('SKIP  this python has no discord.py, so the staff channel line is not checked here (bot\\test-reports.py covers it)');
+    // The Python the bot itself runs on, not whichever is first on PATH
+    // (#2437): on One that is 3.9, which bot\_pyguard.py refuses.
+    const py = require('./bot-python').find();
+    if (!py.cmd) {
+      console.log('SKIP  no Python here loads the bot, so the staff channel line is not checked here ' +
+                  '(bot\\test-reports.py covers it): ' + py.why);
     } else {
       const probe = path.join(dir, 'probe.py');
       fs.writeFileSync(probe, [
@@ -412,7 +418,7 @@ const inbox = () => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'da
         'out = [bot.report_text(r) for r in rows if r.get("kind") != "ticket"]',
         'print(json.dumps(out))'
       ].join('\n'));
-      const said = spawnSync('python', [probe], { encoding: 'utf8',
+      const said = spawnSync(py.cmd, py.args.concat([probe]), { encoding: 'utf8',
         env: Object.assign({}, process.env, { BOT_DIR: BOT, INBOX: path.join(dir, 'data', 'for-bot', 'inbox.json'),
                                               PYTHONDONTWRITEBYTECODE: '1' }) });
       let lines = [];

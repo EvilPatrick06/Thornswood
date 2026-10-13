@@ -422,7 +422,7 @@ PLAN = [
  # one: it is in RETIRED below so a re-run does not bring it back. Test-Tasks
  # was a text channel from 1 October holding the Live smoke checklist. Since
  # Patrick's card of 11 October it is a forum of test tasks, one thread each,
- # tagged Dev or Main (bot.py, the testing channels section), #test-results is
+ # tagged Main since #2276 (bot.py, the testing channels section), #test-results is
  # #test-findings, and #known-issues is new. The bot's one-time
  # `python bot.py --setup-channels --apply` moves an existing server across;
  # these lines are what a fresh server is made with. The old text channel is
@@ -443,7 +443,7 @@ PLAN = [
         topic='Pass, fail, and what went wrong.'),
    dict(kind='forum', name='Test-Tasks',   key='TESTS',   mode='pathfind',
         extra_roles=('Lead Gamemaster', 'Lead GM'),
-        topic='One thread per test task, tagged Dev or Main.'),
+        topic='One thread per test task, tagged Main.'),
    dict(kind='text',  name='known-issues', key='KNOWN',   mode='pathfind',
         topic='Known issues the team is working on. Kept by the bot.'),
    dict(kind='text',  name='test-tasks-archive', mode='pathfind', make=False),

@@ -375,4 +375,4 @@ These read `gamemode.js`, most by running one block against a stubbed `mp`.
 | Property and economy | `test-deed-title.js`, `test-locks.js`, `test-key-chain.js`, `test-mold-key.js`, `test-cut-key.js`, `test-offices.js`, `test-coffers.js`, `test-boards.js`, `test-unpin.js`, `test-spoils.js`, `test-one-mint.js` |
 | Needs | `test-needs.js`, `test-temp.js`, `test-food-table.js`, `test-hud.js` |
 | Chat, commands, door | `test-command-ack.js`, `test-held-commands.js`, `test-help.js`, `test-tp.js`, `test-dice.js`, `test-door.js`, `test-allowed-failed.js`, `test-audit-handlers.js` |
-| Social | `test-social.js`, `test-party-markers.js` |
+| Social | `test-social.js`, `test-party-markers.js`, `test-2474-heads.js` |

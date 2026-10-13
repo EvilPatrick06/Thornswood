@@ -6,7 +6,7 @@
 //
 // Entry 299 on the To Do List: "Mod settings menus reset every session,
 // because a character lives on the server and there is no save for a mod to
-// write into". known.md, help.md, tests.md and the board all say it, and the
+// write into". Known Issues, help.md, tests.md and the board all say it, and the
 // fix the entry proposes is a small store on the server, keyed by character,
 // that the front plugin reads back at login.
 //
