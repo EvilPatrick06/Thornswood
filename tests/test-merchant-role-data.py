@@ -152,11 +152,12 @@ class RoleDataTests(unittest.TestCase):
             return tag + struct.pack('<H', len(body)) + body
         def record(tag, body, fid=0, flags=0):
             return struct.pack('<4sIIIIHH', tag, len(body), flags, fid, 0, 44, 0) + body
-        def plugin(flags=0, food_flags=2, extra=b''):
+        def plugin(flags=0, food_flags=2, extra=b'', tag=b'ALCH'):
             header = record(b'TES4', sub(b'MAST', b'Skyrim.esm\0') + sub(b'DATA', bytes(8)))
             body = sub(b'EDID', b'FixtureFood\0') + sub(b'ENIT', struct.pack('<III', 2, food_flags, 0)) + extra
-            item = record(b'ALCH', body, 0x1000, flags)
-            return header + struct.pack('<4sI4siHHHH', b'GRUP', 24 + len(item), b'ALCH', 0, 0, 0, 0, 0) + item
+            item = record(tag, body, 0x1000, flags)
+            # Native files can carry non-item navigation sentinels, not goods.
+            return header + struct.pack('<4sI4siHHHH', b'GRUP', 24 + len(item), b'ALCH', 0, 0, 0, 0, 0) + item + record(b'NAVI', b'', 0xffffffff)
         scratch = ROOT.resolve()
         with tempfile.TemporaryDirectory(prefix='role-data-fixture-', dir=scratch) as folder:
             root = pathlib.Path(folder).resolve()
@@ -185,6 +186,35 @@ class RoleDataTests(unittest.TestCase):
                 path.write_bytes(plugin(flags=32))
                 with self.assertRaisesRegex(ValueError, 'evidence changed'):
                     roles.validate_provenance(payload)
+                path.write_bytes(plugin(tag=b'STAT'))
+                changed = roles.plugin_records(module, path, 'Fixture.esp', 1, order)[0]
+                self.assertEqual(changed['1000:Skyrim.esm']['type'], 'STAT')
+                with self.assertRaises(ValueError):
+                    roles.record_of(changed, '1000:Skyrim.esm')
+                with self.assertRaisesRegex(ValueError, 'evidence changed'):
+                    roles.validate_provenance(payload)
+                path.write_bytes(plugin())
+                later = content / 'Later.esp'
+                later.write_bytes(plugin(extra=sub(b'EDID', b'LaterFood\0')))
+                order.append({'name': 'Later.esp', 'sha256': 'old'})
+                (root / 'game/data/npc-population.json').write_text(json.dumps({'loadOrder': order}))
+                payload['loadOrder'].append(dict(order[-1], repository=True))
+                payload['records'] = roles.plugin_records(module, later, 'Later.esp', 2, order)[0]
+                roles.validate_provenance(payload)
+                later.write_bytes(record(b'TES4', sub(b'MAST', b'Skyrim.esm\0') + sub(b'DATA', bytes(8))))
+                with self.assertRaisesRegex(ValueError, 'disappeared|evidence changed'):
+                    roles.validate_provenance(payload)
+
+    def test_generation_retains_nonselected_direct_cut_evidence(self):
+        f = fixture()
+        f[4]['items'] = [{'id': '3f:Skyrim.esm', 'disposition': 'cut'}]
+        order = [{'name': 'Skyrim.esm', 'sha256': 'source'}]
+        with mock.patch.object(roles, 'reader', return_value=None), \
+                mock.patch.object(roles, 'source_order', return_value=order), \
+                mock.patch.object(roles, 'plugin_records', return_value=(f[5], 'source')):
+            payload = roles.generate(f[:5], ROOT, {})
+        self.assertIn('3f:Skyrim.esm', payload['records'])
+        self.assertTrue(all('3f:Skyrim.esm' not in ids for table in payload['tables'].values() for ids in table.values()))
 
     def test_committed_catalogue_is_inactive_and_exactly_derived(self):
         payload = roles.load(roles.OUT)

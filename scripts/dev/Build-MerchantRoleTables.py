@@ -162,6 +162,7 @@ def validate_envelopes(data):
     if at > len(data):
         raise ValueError('Truncated native plugin header')
     ends = [len(data)]
+    tags = set()
     while at < len(data):
         while len(ends) > 1 and at == ends[-1]:
             ends.pop()
@@ -176,7 +177,9 @@ def validate_envelopes(data):
             ends.append(end)
             at += 24
         else:
+            tags.add(data[at:at + 4])
             at = end
+    return tags
 
 
 def plugin_records(module, path, name, index, order, expected_sha=None):
@@ -184,7 +187,7 @@ def plugin_records(module, path, name, index, order, expected_sha=None):
     actual_sha = hashlib.sha256(plugin.buf).hexdigest()
     if expected_sha is not None and actual_sha != expected_sha:
         raise ValueError('Plugin source pin changed: ' + name)
-    validate_envelopes(plugin.buf)
+    tags = validate_envelopes(plugin.buf)
     canonical = {row['name'].lower(): row['name'] for row in order}
     positions = {row['name'].lower(): i for i, row in enumerate(order)}
     for master in plugin.masters:
@@ -192,17 +195,22 @@ def plugin_records(module, path, name, index, order, expected_sha=None):
             raise ValueError('Missing or late plugin master: ' + master)
     plugin.masters = [canonical[master.lower()] for master in plugin.masters]
     result = {}
-    for entry in plugin.walk({tag.encode('ascii') for tag in ITEM_TYPES}):
+    for entry in plugin.walk(tags):
+        item_type = entry.tag.decode('ascii')
         if entry.fid >> 24 > len(plugin.masters):
-            raise ValueError('Runtime or invalid source form in ' + name)
+            if item_type in ITEM_TYPES:
+                raise ValueError('Runtime or invalid source form in ' + name)
+            continue  # Non-item engine sentinels cannot override a static good.
         owner, local = plugin.gid(entry.fid)
         if not local:
+            continue
+        if item_type not in ITEM_TYPES and entry.fid >> 24 == len(plugin.masters):
             continue
         desc = '%x:%s' % (local, canonical[owner])
         row = {'type': entry.tag.decode('ascii'), 'flags': entry.flags, 'edid': '', 'winner': name}
         if row['type'] == 'ALCH':
             row['food'] = False
-        if not entry.flags & 0x20:
+        if item_type in ITEM_TYPES and not entry.flags & 0x20:
             for tag, body in module.subrecords(plugin.data(entry)):
                 if tag == b'EDID':
                     row['edid'] = body.rstrip(b'\0').decode('ascii')
@@ -234,6 +242,8 @@ def generate(inputs, data, input_hashes):
         records.update(parsed)
     recipes, harvests, hunts, items, cuts = inputs
     needed = {item for item, _ in resources(harvests, hunts, items)}
+    recipe_index = {**recipes.get('refused', {}), **recipes.get('unowned', {}), **recipes['recipes']}
+    needed.update(row['id'] for row in cuts['items'] if row['id'] not in recipe_index)
     for row in recipes['recipes'].values():
         if public(row):
             needed.add(row['out'])
@@ -273,8 +283,8 @@ def validate_provenance(payload):
         if item.split(':', 1)[1] not in positions or row['winner'] not in positions:
             raise ValueError('Unknown winning source: ' + item)
         actual = own_records.get(item)
-        if row['winner'] in own_names and not actual:
-            raise ValueError('A repository-owned item disappeared: ' + item)
+        if row['winner'] in own_names and actual != row:
+            raise ValueError('Repository-owned item evidence changed or disappeared: ' + item)
         if actual and positions[actual['winner']] >= positions[row['winner']] and actual != row:
             raise ValueError('Repository-owned item evidence changed: ' + item)
 
