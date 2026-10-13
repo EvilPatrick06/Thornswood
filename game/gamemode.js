@@ -63355,9 +63355,14 @@ function createPrivateEconomyLedger(fs,path,settings,name,references,durableWrit
   checkPrivate();
   const file=path.join(dir,name+'-ledger.json'),marker=path.join(dir,name+'-ledger.initialized');
   const checksum=doc=>require('crypto').createHash('sha256').update(JSON.stringify([doc.version,doc.entries])).digest('hex');
+  function requireMerchantEvidence() {
+    if(name==='merchant' && (!fs.existsSync(file) || !fs.existsSync(marker)))
+      throw new Error('Saved merchant ledger or initialization evidence is missing');
+  }
   function save(doc) {
     checkPrivate();
     const bytes=JSON.stringify({version:doc.version,entries:doc.entries,sha256:checksum(doc)});
+    requireMerchantEvidence();
     if(typeof durableWriter==='function') {
       if(durableWriter(name,bytes)!==true) throw new Error('Durable merchant save acknowledgement is missing');
       return true;
@@ -63372,9 +63377,10 @@ function createPrivateEconomyLedger(fs,path,settings,name,references,durableWrit
   }
   function load() {
     checkPrivate();
-    if(!fs.existsSync(file)) {
+    requireMerchantEvidence();
+    if(name!=='merchant' && !fs.existsSync(file)) {
       if(fs.existsSync(marker)) throw new Error('Saved merchant ledger is missing');
-      if(!Array.isArray(references) || (name==='merchant' && !references.length) || new Set(references).size!==references.length)
+      if(!Array.isArray(references) || new Set(references).size!==references.length)
         throw new Error('Merchant initialization manifest is required');
       const entries=Object.create(null);
       for(const reference of references) entries[reference]=null;
@@ -63384,9 +63390,10 @@ function createPrivateEconomyLedger(fs,path,settings,name,references,durableWrit
     if(!doc || typeof doc.sha256!=='string' || doc.sha256!==checksum(doc))
       throw new Error('Saved merchant ledger integrity cannot be verified');
     // Existing documents pass the native path and alias checks before use.
+    requireMerchantEvidence();
     if(typeof durableWriter==='function') save(doc);
     // This marker distinguishes a first deployment from a deleted ledger.
-    if(!fs.existsSync(marker)) {
+    if(name!=='merchant' && !fs.existsSync(marker)) {
       fs.writeFileSync(marker,'1');
       const fd=fs.openSync(marker,'r+');
       try {fs.fsyncSync(fd);} finally {fs.closeSync(fd);}
@@ -65562,6 +65569,51 @@ function guildSite(bookHold) {
 var SETTLEMENT = typeof MERCHANT_SETTLEMENT !== 'undefined' ? MERCHANT_SETTLEMENT : require('./merchant-settlement');
 var QUEST_TRANSFER = typeof QUEST_TRANSACTIONS !== 'undefined' ? QUEST_TRANSACTIONS : require('./quest-transactions');
 
+function createRolePermissions(places, tables) {
+  var roles = ['Smith','Woodworker','Tailor','Enchanter','Cook','Alchemist'];
+  var directions = ['buy','sell','supply'], compiled = new Map(), bindings = new Map();
+  if (tables !== undefined) {
+    if (!tables || typeof tables !== 'object' || Array.isArray(tables) ||
+        Object.keys(tables).length !== roles.length || roles.some(function (role) {
+          return !Object.prototype.hasOwnProperty.call(tables, role);
+        })) throw new Error('The six merchant role tables are required.');
+    roles.forEach(function (role) {
+      var table = tables[role], copy = Object.create(null);
+      if (!table || typeof table !== 'object' || Array.isArray(table) || Object.keys(table).length !== 3)
+        throw new Error('Invalid merchant role table.');
+      directions.forEach(function (direction) {
+        var values = table[direction], ids = new Set();
+        if (!Object.prototype.hasOwnProperty.call(table,direction) || !Array.isArray(values))
+          throw new Error('Each role needs buy, sell and supply permissions.');
+        for (var i=0;i<values.length;i++) {
+          var id=values[i];
+          if (!Number.isInteger(id) || id<=0 || id>=0xff000000 || id===GOLD_BASE || ids.has(id))
+            throw new Error('Invalid or duplicate role item permission.');
+          ids.add(id);
+        }
+        copy[direction]=ids;
+      });
+      copy.supply.forEach(function (id) {
+        if (!copy.buy.has(id)) throw new Error('Role supplies must be permitted purchases.');
+      });
+      compiled.set(role,copy);
+    });
+  }
+  Object.keys(places).forEach(function (reference) {
+    var place=places[reference], table=null;
+    if (place && Object.prototype.hasOwnProperty.call(place,'role')) {
+      table=compiled.get(place.role);
+      if (!table) throw new Error('A merchant role requires its verified item tables.');
+    }
+    bindings.set(reference,table);
+  });
+  return function (reference,direction,baseId) {
+    if (!bindings.has(reference)) return false;
+    var table=bindings.get(reference);
+    return table===null || table[direction].has(baseId);
+  };
+}
+
 function createNativeMerchantTransfer(mp) {
   return {
     available: function () {
@@ -65590,6 +65642,7 @@ function createMerchantTrading(deps) {
   var transfer = deps.transfer;
   var world = deps.world;
   var places = deps.places || {};
+  var permits = createRolePermissions(places,deps.roleTables);
   var now = deps.now || function () { return Date.now(); };
   var reach = deps.reach == null ? REACH : deps.reach;
   var sessions = new Map();
@@ -65721,7 +65774,7 @@ function createMerchantTrading(deps) {
     var viewSession = owner ? owner.session : sessions.get(profileId);
     var viewIdentity = owner ? owner.identity : (viewSession && viewSession.identity);
     var catalog = prices.catalog ? prices.catalog(place.bookHold) : [];
-    var offers = [];
+    var offers = [], supplyIds = [];
     var counts = Object.create(null), packReady = true;
     if (settlement.available()) {
       try {
@@ -65736,6 +65789,9 @@ function createMerchantTrading(deps) {
       var row = catalog[i];
       var resolved = deps.resolve ? deps.resolve(row.name) : null;
       if (!resolved || resolved.error || !resolved.baseId || resolved.baseId === GOLD_BASE) continue;
+      var accepts = permits(state.reference,'buy',resolved.baseId);
+      var sells = permits(state.reference,'sell',resolved.baseId);
+      if (!accepts && !sells) continue;
       var name = row.name, key = String(resolved.name || name).toLowerCase();
       var priceKey = String(name).toLowerCase();
       if (seen[priceKey]) continue;
@@ -65743,16 +65799,18 @@ function createMerchantTrading(deps) {
       // Price books key their submitted labels. The resolved canonical name
       // identifies inventory and shelf goods, not a different price row.
       var price = prices.quote(place.bookHold, name) || {buy:null,sell:null};
-      var buy = Number.isInteger(price.buy) && price.buy >= 0 && price.buy <= MAX_GOLD ? price.buy : null;
-      var sell = Number.isInteger(price.sell) && price.sell >= 0 && price.sell <= MAX_GOLD ? price.sell : null;
+      var buy = accepts && Number.isInteger(price.buy) && price.buy >= 0 && price.buy <= MAX_GOLD ? price.buy : null;
+      var sell = sells && Number.isInteger(price.sell) && price.sell >= 0 && price.sell <= MAX_GOLD ? price.sell : null;
       var carried = counts[resolved.baseId] || 0;
       if (buy !== null) quotedBuy = true;
       if (buy !== null && carried > 0) carriedBuy = true;
-      var held = (state.stock || []).find(function (entry) { return String(entry.name || '').toLowerCase() === key; });
+      var held = (state.stock || []).find(function (entry) {
+        return entry.baseId === resolved.baseId && String(entry.name || '').toLowerCase() === key;
+      });
       var count = 0;
       var stock = state.stock || [];
       for (var s = 0; s < stock.length; s++) {
-        if (String(stock[s].name || '').toLowerCase() === key) count += stock[s].count;
+        if (stock[s].baseId === resolved.baseId && String(stock[s].name || '').toLowerCase() === key) count += stock[s].count;
       }
       offers.push({
         name: name,
@@ -65764,13 +65822,14 @@ function createMerchantTrading(deps) {
         stock: count,
         baseId: held ? held.baseId : null
       });
+      supplyIds.push(resolved.baseId);
     }
     var supply = [];
     var human = settlement.available() ? transfer.identity(actorId) : null;
     var owns = human && human.desc && human.profileId === profileId;
     var at = now();
     for (var k = 0; k < offers.length; k++) {
-      if (offers[k].buy == null) continue;
+      if (offers[k].buy == null || !permits(state.reference,'supply',supplyIds[k])) continue;
       var pay = offers[k].buy * SUPPLY_COUNT;
       var last = owns ? lastSupply(state, supplyKey(human, offers[k].canonicalName), offers[k].canonicalName) : 0;
       var ready = !!owns && canTrade && state.purse >= pay && (!last || at - last >= SUPPLY_WAIT);
@@ -66001,6 +66060,9 @@ function createMerchantTrading(deps) {
       return fail((resolved && resolved.error) || 'That item is not known.');
     }
     var itemName = resolved.name || asked.name;
+    var direction = verb==='buy' ? 'sell' : verb==='sell' ? 'buy' : 'supply';
+    if (!permits(state.reference,direction,resolved.baseId))
+      return fail('This trader does not '+(verb==='buy'?'sell':verb==='sell'?'buy':'request')+' that item.');
     var price = prices.quote(place.bookHold, asked.name) || { buy: null, sell: null };
     var unit = verb === 'buy' ? price.sell : price.buy;
     if (unit == null) {
@@ -66187,6 +66249,7 @@ function installMerchantTrading(env) {
       }
     },
     places: doc.byRef || {},
+    roleTables: env.roleTables,
     quests: function () { return g.__thornswoodQuests; },
     resolve: function (name) {
       var fn = g.__thornswoodResolveItem;
