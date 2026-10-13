@@ -18,8 +18,10 @@ number, the level is nothing.
 
 ## The mark above the head
 
-While the microphone is open, a mark sits above the head. The mark
-is not words. The server does not hear words. Words above a head are
+While the microphone is open, a mark sits above the head: a round
+dot that comes up when they press to talk and goes when they let go,
+and that breathes while it is up, the same as the microphone at the
+bottom of your own screen. The mark is not words. The server does not hear words. Words above a head are
 typed, and they are on [Text chat](chat.md).
 
 The color is the distance that voice is set to. Whisper is pale
@@ -35,8 +37,10 @@ is gone at 7 metres, ordinary speech at 30, a yell at 85. Outside
 that, there is no mark. There is no dim mark for someone you cannot
 hear.
 
-You do not see the mark on your own head. The launcher already shows
-you which distance you are on.
+You do not see the mark on your own head. The microphone at the
+bottom of your screen names the distance you are on, and while you
+speak it takes that distance's color: pale blue, white or amber, the
+color everybody in range sees above you.
 
 A voice mute hides the mark as well as the sound. Hiding their name
 does not hide the mark. Turning off their text does not hide it

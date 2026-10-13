@@ -33,16 +33,21 @@
 // cast list. So nothing the page says about NPCs may mention routines,
 // errands, schedules, jobs or quests, or give a date.
 //
-// Set KNOWN to another copy of the page to check that instead, the live one
-// saved to a file for instance. Read only.
+// The page is the known board in site/data/board.json, written out the way
+// /known writes it (#2414). Set KNOWN to a saved copy of the page to check
+// that instead, the live one from /api/page/known for instance. Read only.
 const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
 const path = require('path');
 
-const PAGE = process.env.KNOWN || path.join(REPO_DIR, 'site', 'data', 'known.md');
+const PAGE = process.env.KNOWN || 'the known board in site/data/board.json';
 const CR = String.fromCharCode(13);
 let text = null;
-try { text = fs.readFileSync(PAGE, 'utf8').split(CR).join(''); } catch (e) { text = null; }
+if (process.env.KNOWN) {
+  try { text = fs.readFileSync(PAGE, 'utf8').split(CR).join(''); } catch (e) { text = null; }
+} else {
+  text = require('./fixtures/known-page').knownPage(REPO_DIR);
+}
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -86,7 +91,7 @@ const MONTH = /\b(January|February|March|April|May|June|July|August|September|Oc
 const WHEN = /\b20\d\d\b|\bsoon\b|\bnext (week|month)\b|\bthis (week|month)\b|\bby the end of\b/i;
 function isNpc(row) { return /\bNPCs?\b/.test(row.what); }
 
-yes('known.md is there: ' + PAGE, text !== null);
+yes('the Known Issues page is there: ' + PAGE, text !== null);
 const page = sections(text || '');
 const first = page.list[0] || { heading: '', lead: '', rows: [], text: '' };
 yes('its first table is the group that follows from SkyMP',

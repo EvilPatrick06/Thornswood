@@ -447,7 +447,7 @@ for name in TASK_ROLES:
     guild = Server()                  # no test-tasks forum, so nothing is posted
     ask = Ask(Person([name]), guild, Posted('general'))
     asyncio.run(LEAVES['test-task'].callback(
-        ask, title='x', body='x', tag='Dev'))
+        ask, title='x', body='x'))     # no tag option since #2276: Main only
     yes('%s gets past the test task gate' % name,
         ask.response.said
         and 'is not a forum yet' in ask.response.said[-1][0])

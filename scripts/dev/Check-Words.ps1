@@ -76,9 +76,11 @@ if (-not $Root) { $Root = Split-Path -Parent (Split-Path -Parent $Here) }
 $Root = (Resolve-Path -LiteralPath $Root).Path
 
 # Files that must be there. A missing one is said out loud, not dropped.
+# site/data/board.json because the public Known Issues page is its known
+# board, written out at /known (#2414); the other boards in it are read too.
 $Named = @(
     'README.md', 'SECURITY.md', 'Developer-Guide.md', 'launcher/app/Help.cs', 'launcher/ui.xaml',
-    'bot/content.py', 'site/public/home.html', 'installer/READ ME FIRST.txt'
+    'bot/content.py', 'site/public/home.html', 'installer/READ ME FIRST.txt', 'site/data/board.json'
 )
 # README.md and the component READMEs that tests\test-component-readmes.js reads.
 $NameFiles = @(

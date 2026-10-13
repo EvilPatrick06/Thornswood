@@ -12,8 +12,8 @@
                     "admin":  "needs Administrator: install, service, task registration, ACL, firewall, keys, secrets, or work outside the gate verbs",
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
-    "scriptCount":  52,
-    "callCount":  227,
+    "scriptCount":  54,
+    "callCount":  234,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -1663,6 +1663,33 @@
                       "reason":  "backups carry every secret"
                   },
                   {
+                      "script":  "scripts/vps/Forecast-Storage.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "n":  1,
+                      "does":  "takes the Thornswood Disk History task off (-Remove)",
+                      "class":  "admin",
+                      "reason":  "sends schtasks /delete"
+                  },
+                  {
+                      "script":  "scripts/vps/Forecast-Storage.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "n":  2,
+                      "does":  "writes forecast-storage.ps1 into C:\\Thornswood-Watch and registers the daily SYSTEM task (-Install)",
+                      "class":  "admin",
+                      "reason":  "sends LockedFolderScript and schtasks /create as SYSTEM"
+                  },
+                  {
+                      "script":  "scripts/vps/Forecast-Storage.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "n":  3,
+                      "does":  "reads the task and runs the forecast without -Record (-Status)",
+                      "class":  "read-status",
+                      "reason":  "reads the task, the history and the free space only"
+                  },
+                  {
                       "script":  "scripts/vps/Get-Logs.ps1",
                       "scope":  "Read-Box",
                       "via":  "ssh",
@@ -1922,6 +1949,42 @@
                       "does":  "sends a script with a secret on stdin",
                       "class":  "transport",
                       "reason":  "carries what its caller hands it; each caller is mapped instead"
+                  },
+                  {
+                      "script":  "scripts/vps/Set-SshScope.ps1",
+                      "scope":  "Test-KeyLogin",
+                      "via":  "ssh",
+                      "n":  1,
+                      "does":  "reads files, settings, logs or status",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/vps/Set-SshScope.ps1",
+                      "scope":  "Invoke-Encoded",
+                      "via":  "ssh",
+                      "n":  1,
+                      "does":  "cancels the ssh scope put back task, or reads the port 22 rules back",
+                      "class":  "admin",
+                      "reason":  "unregisters a SYSTEM task"
+                  },
+                  {
+                      "script":  "scripts/vps/Set-SshScope.ps1",
+                      "scope":  "Invoke-Box",
+                      "via":  "scp",
+                      "n":  1,
+                      "does":  "uploads vps-ssh-scope.ps1",
+                      "class":  "admin",
+                      "reason":  "firewall change for port 22"
+                  },
+                  {
+                      "script":  "scripts/vps/Set-SshScope.ps1",
+                      "scope":  "Invoke-Box",
+                      "via":  "ssh",
+                      "n":  1,
+                      "does":  "runs vps-ssh-scope.ps1, which sets the remote addresses of the port 22 rules",
+                      "class":  "admin",
+                      "reason":  "firewall change for port 22"
                   },
                   {
                       "script":  "scripts/vps/Setup-SshKey.ps1",
