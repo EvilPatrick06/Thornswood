@@ -18,7 +18,14 @@ in suitable places: wilderness, caves, dungeons, sewers and encounters
 beside roads. Camps are not removed to make towns smaller.
 
 Specially named animals and enemies are cut too. Their generic species and
-enemy families remain. Named traders and transport workers stay as services.
+enemy families remain. Traders and transport workers stay as services.
+Transport NPCs display their function: nine Coach Drivers, sixteen Ferry
+Operators and two Ship Captains. Their original source names remain in the
+catalogue for reference; server-owned display titles are applied during
+admission and persist for current and later arrivals. Routes, identities and
+population counts stay unchanged. The six-trade guild roster will similarly
+display Smith, Woodworker, Tailor, Enchanter, Cook and Alchemist with its role
+tables; that roster change is a separate prerequisite and is not active here.
 This includes named pets and dungeon bosses whose records lack the Unique flag.
 
 An actor stays in its habitat and home region. Wolves do not roam a city

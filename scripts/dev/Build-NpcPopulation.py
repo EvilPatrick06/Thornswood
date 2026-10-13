@@ -147,6 +147,18 @@ def species_of(race):
     return lower.removesuffix('race') or 'unknown'
 
 
+def transport_title(edid, factions):
+    captain = edid in C.TRANSPORT_BASES
+    identities = [edid.lower()] + [value.lower() for value in factions]
+    ferry = any('ferry' in value for value in identities)
+    carriage = any('carriage' in value for value in identities)
+    if sum([captain, ferry, carriage]) != 1:
+        raise ValueError('Transport role is missing or ambiguous: ' + edid)
+    if captain:
+        return 'Ship Captain'
+    return 'Ferry Operator' if ferry else 'Coach Driver'
+
+
 def classify(context, ref, actor):
     base = actor.get('base')
     habitat, location = habitat_at(context, actor)
@@ -190,7 +202,10 @@ def classify(context, ref, actor):
     if role == 'transport':
         world_name = context.t[b'WRLD'].get(actor.get('world'), {}).get('edid')
         interior = context.cells.get(actor.get('cell'), {}).get('interior')
-        return decide('transport', not interior and world_name not in CITY_WORLDS,
+        keep = not interior and world_name not in CITY_WORLDS
+        if keep:
+            result['displayName'] = transport_title(base_edid, because)
+        return decide('transport', keep,
                       'Authored exterior carriage or ferry stop; city ancestry is not a wall')
     if role == 'guards':
         return decide('cut', False, 'Bethesda town guard; law belongs to people')
@@ -420,7 +435,8 @@ def write_runtime(payload):
                   r['returnMinutes'], r['role'], r['habitat'], r['tier'], r.get('cap'),
                   r.get('populationBucket'),
                   # 1: swims and cannot walk; 2: an ambush placement (#2067).
-                  (1 if r.get('swims') else 0) | (2 if r.get('ambush') else 0), r['species']]
+                  (1 if r.get('swims') else 0) | (2 if r.get('ambush') else 0), r['species']] +
+                 ([r['displayName']] if 'displayName' in r else [])
                  for r in payload['npcs'] if r['keep']]}
     target = HERE.parent.parent / 'game/gamemode.js'
     source = target.read_text(encoding='utf-8')
