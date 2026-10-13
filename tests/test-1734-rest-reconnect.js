@@ -255,8 +255,11 @@ bedTick();
   standBy(EVE, ROAD_BED, 30);
   const since = told.length;
   bedTick();
-  yes('B2 back without a restart, beside the bed, she is up: no rest counted, no fill and no line',
-      needs.read(EVE.a).resting === '' && !held(EVE).lying && linesFor(EVE, since).length === 0);
+  // Since #2246 (Patrick, 12 Oct 2026) a night on a bed on the road leaves
+  // rest at least 50, so that night's line is the one thing she is told.
+  yes('B2 back without a restart, beside the bed, she is up: no rest counted, the road\'s night only, and no other line',
+      needs.read(EVE.a).resting === '' && !held(EVE).lying && needs.read(EVE.a).rest === 50 &&
+      linesFor(EVE, since).every(function (l) { return /You slept, though not well/.test(l); }));
   standBy(EVE, ROAD_BED, 5000);
   tickFor(10000);
   yes('B2 walking off says nothing about a bed she was not in', !linesFor(EVE, since).some(function (l) { return LEFT.test(l); }));

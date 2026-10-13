@@ -42,8 +42,9 @@ with that instrument in your pack, or Sing on the wheel, which needs
 nothing. While you play, and for 5 minutes after, anyone resting in
 that cell recovers rest faster: +25 on top of the place, while you
 are still in the cell. The places themselves are on
-[Exhaustion](exhaustion.md). A seat 20, a seat by a fire 35, a bed
-you may use 50, your own bed 80, per real hour, and the bard adds 25
+[Exhaustion](exhaustion.md). A seat 20, a seat by a fire 35, an inn or
+temple bed nobody holds 40, a bed you may use 50, your own bed 80, per
+real hour, and the bard adds 25
 to whichever of those is running. Patrick, 4 Oct: "instrument emotes
 require the instrument, so if they do an emote with an instrument
 have that count as /bard, and also add a singing emote for people

@@ -9,9 +9,12 @@
 // and the night is counted there, once.
 //
 // Asked on #1606 and built as the suggested answer: your own bed and a bed
-// you are allowed in (inn) count, a bed or bedroll nobody can lend you does
-// not, and the night is at least 24 real minutes away (8 hours on the game
-// clock).
+// you are allowed in (inn) count, and the night is at least 24 real minutes
+// away (8 hours on the game clock). Since #2246 (Patrick, 12 Oct 2026) an
+// inn or temple bed nobody holds fills too, with 15 on hunger and thirst,
+// a bed or bedroll nobody can lend you leaves rest at least 50, and a bed
+// indoors costs nothing for the time away: tests/test-2246-rest-places.js
+// walks every place.
 //
 // Part A runs the REAL needs block over a stand-in mp, a clock turned by hand
 // and an online list this file controls, with the block's own tick. Part B
@@ -132,9 +135,9 @@ const YOU = 0xff000002;
   const N = r.N.NEEDS;
   // NEEDS.away since #2246: a row for each kind of rest; the ones that fill
   // are the beds that count. tests/test-2246-rest-places.js has the rest.
-  const fills = Object.keys(N.away).filter(function (k) { return N.away[k].rest > 0; });
-  yes('A0 the beds that count are your own bed and a bed you are allowed in',
-      fills.sort().join(',') === 'bed,inn');
+  const fills = Object.keys(N.away).filter(function (k) { return N.away[k].rest >= 100; });
+  yes('A0 the beds that fill rest are your own bed, a bed you are allowed in, and an inn or temple bed nobody holds',
+      fills.sort().join(',') === 'bed,common,commonfire,inn');
   yes('A0 a night away is 8 hours of the game clock, 24 real minutes at twenty to one',
       N.sleptFor === 24 * MIN && N.sleptFor * 20 === 8 * HOUR);
   yes('A0 the fill is rest to 100 and 25 on hunger and thirst, as the page says',
@@ -170,10 +173,11 @@ function night(kind, away, first) {
 {
   const t = night('bed', 9 * HOUR);
   const d = t.r.N.NEEDS.drain;
-  const food = Math.max(0, t.was.food - d.food * 9) + 25;
-  const drink = Math.max(0, t.was.drink - d.drink * 9) + 25;
+  const share = t.r.N.NEEDS.away.bed.drain;
+  const food = Math.max(0, t.was.food - d.food * 9 * share) + 25;
+  const drink = Math.max(0, t.was.drink - d.drink * 9 * share) + 25;
   yes('A1 logging out in your own bed and coming back a night later fills rest to 100', t.n.rest === 100);
-  yes('A1 hunger and thirst fell while away, and 25 is put back on each (' +
+  yes('A1 hunger and thirst fell by the bed\'s share of the clock while away (none since #2246), and 25 is put back on each (' +
       t.n.food.toFixed(2) + ', ' + t.n.drink.toFixed(2) + ')',
       Math.abs(t.n.food - food) < 1e-9 && Math.abs(t.n.drink - drink) < 1e-9);
   yes('A1 they are up, not still resting', t.n.resting === '');
@@ -199,7 +203,15 @@ function night(kind, away, first) {
   const t = night('inn', 9 * HOUR);
   yes('A3 a bed you are allowed in (inn) gets the fill', t.n.rest === 100 && t.r.slept(ME) === 1);
 }
-['rough', 'camp', 'sit', 'campfire'].forEach(function (kind) {
+['rough', 'camp'].forEach(function (kind) {
+  // Five hours awake left hunger and thirst under the floor of 25, so they
+  // stay where they were; rest is at least 50 after the night (#2246).
+  const t = night(kind, 9 * HOUR);
+  yes('A3 resting at ' + kind + ' is no full night: not slept well, rest at least 50, nothing on hunger or thirst',
+      t.r.slept(ME) === 0 && t.n.rest === 50 && t.n.food === t.was.food && t.n.drink === t.was.drink &&
+      t.n.resting === '');
+});
+['sit', 'campfire'].forEach(function (kind) {
   const t = night(kind, 9 * HOUR);
   yes('A3 resting at ' + kind + ' gets no fill: no line, and hunger and thirst only fell',
       t.r.slept(ME) === 0 && t.n.food === 0 && t.n.drink === 0 && t.n.resting === kind);
@@ -217,7 +229,7 @@ function night(kind, away, first) {
   const d = s.r.N.NEEDS;
   // #1764: the time away gains no rest, so a minute short of the night is
   // the drain alone, not the bed's rate.
-  const rest = Math.max(0, s.was.rest - d.drain.rest * (N.sleptFor - MIN) / HOUR);
+  const rest = Math.max(0, s.was.rest - d.drain.rest * d.away.bed.drain * (N.sleptFor - MIN) / HOUR);
   yes('A4 away a minute less is no night: no line, and the time away only drained (#1764)',
       s.r.slept(ME) === 0 && Math.abs(s.n.rest - rest) < 1e-6 && s.n.resting === 'bed');
 }
