@@ -334,6 +334,7 @@ jobs:
                  'test-1374-letters.js',
                  'test-1597-board-objects.js',
                  'test-2298-board-meshes.js',
+                 'test-2298-dropbox.js',
                  'test-1380-rare-mines.js',
                  'test-1621-quest-state.js',
                  'test-unpin.js', 'test-coffers.js',

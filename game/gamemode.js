@@ -35751,7 +35751,7 @@ log('gamemode loaded:',
       require('fs').writeFileSync(registerPath(),
         JSON.stringify({ claims: claims, stewards: stewards, boxes: boxes,
                         funds: funds, notices: notices, boards: boards, steps: steps,
-                        masters: masterCut }, null, 1));
+                        masters: masterCut, dropbox: dropbox }, null, 1));
     } catch (e) {
       plog('could not write the register:', e);
     }
@@ -38055,8 +38055,10 @@ log('gamemode loaded:',
       var atBoard = boardHere(actorId);
       var hold = atBoard || (at ? holdOfBox(at) : null);
       if (hold && atBoard) {
-        toProfile(profileId, 'This is ' + hold + '\'s notice board, and its drop box. ' +
-          (Number(funds[hold]) || 0) + ' gold has been paid into it.');
+        // The fees are a record and never in the box (#2298); the box is
+        // on the board's post and answers E itself.
+        toProfile(profileId, 'This is ' + hold + '\'s notice board. Its drop box is on the shelf ' +
+          'on the board\'s post: press E on it.');
         return true;
       }
       toProfile(profileId, hold
@@ -38247,6 +38249,403 @@ log('gamemode loaded:',
     funds[key] = (Number(funds[key]) || 0) - n;
     save();
     plog(n, 'gold off', key + '\'s ledger:', String(reason || 'no reason given'));
+    return true;
+  }
+
+  /*
+    ------------------------------------- THE DROP BOX ON THE BOARD (#2298)
+
+    Patrick, 12 October, every rule below is his:
+      - The box sits on a shelf on the board's right post, and E on it does
+        only the box; E on the board does only the board.
+      - What goes in: gold (rent among it), and the Free Skyrim Trading
+        Company's drop offs, left for somebody who was not there to take
+        them, which a steward hands out. Carriage and ferry fares go in by
+        themselves, as real gold, each time a fare is paid.
+      - Notice and job fees never go in. They leave the world and stay a
+        record (funds, above), so the Court never has money it does not.
+      - Anybody may take back what they put in, rent included: then the rent
+        simply is not paid any more. That hold's officers may take anything.
+      - Every deposit and every take is recorded with the character's name,
+        what, how much and when.
+      - A person sees only what they put in, gold too: only the gold they
+        added, never the box's total. Only the officers see everything, and
+        only they get the Records button: what is in it now, what has left,
+        who added and who took what, and when.
+
+    WHY THE SERVER'S RECORD IS THE BOX, AND NOT A CONTAINER. A Skyrim
+    container shows whoever opens it everything in it, and the server sends a
+    container's whole inventory to every client that has it in view
+    (MpObjectReference::VisitProperties in the fork). And the server cannot
+    stand a placed container anywhere but the middle of Tamriel: mp.set
+    refuses 'locationalData' for anything that is not an actor
+    (LocationalDataBinding::Set). So each client draws the box beside its
+    board, the way it draws the board (#1597), E on it sends /dropbox open,
+    and what is in the box is this record, one copy, never a count beside a
+    chest that can drift from it. The box is at the board: standing at the
+    board's spot is standing at the box (boardHere), as it always was.
+
+    WHO IS AN OFFICER OF A HOLD, AS THE SERVER KNOWS IT TODAY: that hold's
+    Jarl, that hold's guards, and a steward. Stewards are one list for every
+    hold (stewardCmd records no hold), so a steward is an officer at every
+    box; and there is no Court office in the server. Both are written on
+    #2298 as questions.
+
+    Every line here comes from the box's own panel (game/ui/thornswood-box.js)
+    and is never typed (Patrick, 4 Oct: no chat commands for what people do).
+  */
+  var dropbox = loadPart('dropbox', {});
+  var BOX_LOG_KEEP = 500;
+  var BOX_RECORDS_SHOWN = 150;
+  var BOX_FOR_CHARS = 60;
+  var BOX_VIEW_PROPERTY = 'thornswoodBoxView';
+  var boxViewScript = [
+    '(function(){',
+    '  try {',
+    '    var v = ctx.value;',
+    '    if (!v || typeof v !== "object") { return; }',
+    '    var st = ctx.state;',
+    '    if (!st) { return; }',
+    '    if (st.thornswoodBoxAt === v.at) { return; }',
+    '    st.thornswoodBoxAt = v.at;',
+    '    var body = JSON.stringify(v);',
+    '    var src = "(function(){try{" +',
+    '      "var d=" + body + ";window.thornswoodBoxView=d;" +',
+    '      "if(window.thornswoodBox&&window.thornswoodBox.setData){window.thornswoodBox.setData(d);}" +',
+    '      "}catch(e){}})();";',
+    '    try { ctx.sp.browser.executeJavaScript(src); } catch (e) { }',
+    '  } catch (e) { }',
+    '})();'
+  ].join('\n');
+  try {
+    mp.makeProperty(BOX_VIEW_PROPERTY, {
+      isVisibleByOwner: true, isVisibleByNeighbors: false,
+      updateOwner: boxViewScript, updateNeighbor: ''
+    });
+  } catch (e) { /* made by an earlier load. harmless. */ }
+
+  function dropboxOf(hold) {
+    var d = dropbox[hold];
+    if (!d || typeof d !== 'object') { d = dropbox[hold] = {}; }
+    if (!Array.isArray(d.items)) { d.items = []; }
+    if (!Array.isArray(d.log)) { d.log = []; }
+    if (!(Number(d.next) > 0)) { d.next = 1; }
+    return d;
+  }
+
+  function characterName(actorId) {
+    try {
+      var ap = mp.get(actorId, 'appearance');
+      if (ap && ap.name) { return String(ap.name); }
+    } catch (e) { }
+    return 'somebody';
+  }
+
+  /*
+    An item's name for the panel and the record. A stack with a name of its
+    own (a key, a deed) keeps it; gold is gold; anything else is named out of
+    the two generated name tables /give reads, when this file has them.
+  */
+  var boxNames = null;
+  function itemName(entry) {
+    if (entry && typeof entry.name === 'string' && entry.name) { return entry.name; }
+    var base = Number(entry && entry.baseId) || 0;
+    if (base === GOLD_ID) { return 'Gold'; }
+    if (!boxNames) {
+      boxNames = {};
+      var tables = [];
+      if (typeof ITEM_NAMES !== 'undefined') { tables.push(ITEM_NAMES); }
+      if (typeof ADMIN_ITEMS !== 'undefined') { tables.push(ADMIN_ITEMS); }
+      for (var t = 0; t < tables.length; t++) {
+        for (var k in tables[t]) {
+          if (!Object.prototype.hasOwnProperty.call(tables[t], k)) { continue; }
+          var row = tables[t][k];
+          var at = String((row && row[1]) || '').toLowerCase();
+          if (at && !Object.prototype.hasOwnProperty.call(boxNames, at)) { boxNames[at] = row[0]; }
+        }
+      }
+    }
+    var desc = '';
+    try { desc = String(mp.getDescFromId(base) || '').toLowerCase(); } catch (e) { desc = ''; }
+    if (desc && Object.prototype.hasOwnProperty.call(boxNames, desc)) { return boxNames[desc]; }
+    return desc ? 'something (' + desc + ')' : 'something';
+  }
+
+  /*
+    May this person take anything out of this hold's box: its officers.
+    That hold's Jarl and that hold's guards; and a steward Jarl named, from
+    the one list there is (isSteward also counts every Jarl, of any hold, so
+    it is not asked here: a Jarl is an officer of their own hold's box).
+  */
+  function boxOfficer(hold, profileId, actorId) {
+    var pid = Number(profileId) || 0;
+    if (!pid || !hold) { return false; }
+    if (isGuard(pid, hold)) { return true; }
+    if (stewards.indexOf(pid) !== -1) { return true; }
+    return jarlHoldOf(pid, actorId) === hold;
+  }
+
+  function boxLog(hold, row) {
+    var d = dropboxOf(hold);
+    row.at = Date.now();
+    d.log.push(row);
+    if (d.log.length > BOX_LOG_KEEP) { d.log.splice(0, d.log.length - BOX_LOG_KEEP); }
+  }
+
+  /*
+    What the box's panel shows this person. Filtered here, never in the page:
+    somebody who is not an officer is sent their own rows and nothing else,
+    and never the box's total.
+  */
+  function boxView(actorId, profileId, hold, said, withRecords) {
+    var d = dropboxOf(hold);
+    var officer = boxOfficer(hold, profileId, actorId);
+    var rows = [];
+    var mineGold = 0;
+    var allGold = 0;
+    for (var i = 0; i < d.items.length; i++) {
+      var it = d.items[i];
+      var gold = Number(it.baseId) === GOLD_ID ? (Number(it.count) || 0) : 0;
+      allGold += gold;
+      var mine = Number(it.by) === Number(profileId) && Number(it.by) > 0;
+      if (mine) { mineGold += gold; }
+      if (!mine && !officer) { continue; }
+      rows.push({ n: it.n, who: it.name || 'somebody', what: it.what || 'something',
+                  count: Number(it.count) || 0, at: Number(it.at) || 0, forName: it.forName || '',
+                  kind: it.kind || '', mine: mine, gold: !!gold });
+    }
+    var pack = [];
+    var packGold = 0;
+    var inv = null;
+    try { inv = mp.get(actorId, 'inventory'); } catch (e) { inv = null; }
+    var entries = (inv && inv.entries) || [];
+    for (var p = 0; p < entries.length; p++) {
+      var e = entries[p];
+      if (!e) { continue; }
+      if (Number(e.baseId) === GOLD_ID) { packGold += Number(e.count) || 0; continue; }
+      if (e.worn || e.wornLeft) { continue; }
+      pack.push({ slot: p, what: itemName(e), count: Number(e.count) || 0 });
+    }
+    var view = {
+      open: true, hold: hold, where: (boards[hold] && boards[hold].where) || HOLD_TOWN[hold] || hold,
+      officer: officer, rows: rows, mineGold: mineGold, packGold: packGold, pack: pack,
+      said: said || ''
+    };
+    if (officer) {
+      view.allGold = allGold;
+      if (withRecords) {
+        var recs = [];
+        for (var r = d.log.length - 1; r >= 0 && recs.length < BOX_RECORDS_SHOWN; r--) {
+          var l = d.log[r];
+          recs.push({ at: l.at, act: l.act, who: l.whoName || 'somebody', by: l.byName || '',
+                      what: l.what || '', count: l.count, forName: l.forName || '', note: l.note || '' });
+        }
+        view.records = recs;
+      }
+    }
+    return view;
+  }
+
+  var boxShownAt = 0;
+  function showBox(actorId, view) {
+    var payload = JSON.parse(JSON.stringify(view));
+    boxShownAt = Math.max(Date.now(), boxShownAt + 1);
+    payload.at = boxShownAt;
+    try { mp.set(actorId, BOX_VIEW_PROPERTY, payload); } catch (e) {
+      plog('could not send the drop box panel to', Number(actorId).toString(16) + ':', e);
+    }
+  }
+
+  /*
+    Gold in. Rent first, as putting gold in the box always did: what the
+    payer owes on their places is paid down, and the entry remembers how much
+    went to which place, so taking that gold back makes it owed again.
+  */
+  function boxPutGold(hold, actorId, profileId, amount) {
+    var n = Math.floor(Number(amount));
+    if (!(n > 0) || String(n) !== String(amount).trim()) { return 'Say how much gold, as a whole number.'; }
+    if (!takeGold(actorId, n)) { return 'You do not have ' + n + ' gold in one purse.'; }
+    var owed = rentOwedBy(profileId);
+    var left = n;
+    var rent = [];
+    for (var i = 0; i < owed.length && left > 0; i++) {
+      var c = claims[owed[i]];
+      if (!c || !c.rent) { continue; }
+      var due = Number(c.rent.owed) || 0;
+      var take = left >= due ? due : left;
+      if (take <= 0) { continue; }
+      c.rent.owed = due - take;
+      if (c.rent.owed <= 0) { c.rent.owed = 0; c.rent.since = Date.now(); }
+      left -= take;
+      rent.push({ building: owed[i], amount: take });
+    }
+    var d = dropboxOf(hold);
+    var who = characterName(actorId);
+    var item = { n: d.next++, by: profileId, name: who, kind: 'gold', baseId: GOLD_ID, count: n,
+                 what: 'Gold', at: Date.now() };
+    if (rent.length) { item.rent = rent; }
+    d.items.push(item);
+    var paid = n - left;
+    boxLog(hold, { act: 'in', n: item.n, who: profileId, whoName: who, by: profileId, byName: who,
+                   what: 'Gold', count: n, note: paid ? paid + ' of it rent' : '' });
+    save();
+    plog(who, '(profile ' + profileId + ') put', n, 'gold in', hold + '\'s drop box', paid ? '(' + paid + ' of it rent)' : '');
+    return 'You put ' + n + ' gold in the box.' + (paid ? ' ' + paid + ' of it pays your rent.' : '');
+  }
+
+  /*
+    Something left for somebody: a Trading Company drop off for a person who
+    was not there when it came. Only with a name on it, so the steward who
+    hands it out knows whose it is. Worn things are not offered.
+  */
+  function boxLeave(hold, actorId, profileId, slot, count, forName) {
+    var to = String(forName || '').trim().replace(/\s+/g, ' ');
+    if (!to) { return 'Say who it is for.'; }
+    if (to.length > BOX_FOR_CHARS) { return 'That name is too long.'; }
+    var inv = null;
+    try { inv = mp.get(actorId, 'inventory'); } catch (e) { return 'Your pack could not be read.'; }
+    var entries = (inv && inv.entries) || [];
+    var at = Math.floor(Number(slot));
+    var e = (at >= 0 && at < entries.length) ? entries[at] : null;
+    if (!e || Number(e.baseId) === GOLD_ID) { return 'That is not in your pack.'; }
+    if (e.worn || e.wornLeft) { return 'Take it off first.'; }
+    var n = Math.floor(Number(count));
+    if (!(n > 0) || n > (Number(e.count) || 0)) { return 'You do not have that many.'; }
+    var kept = JSON.parse(JSON.stringify(e));
+    delete kept.count; delete kept.worn; delete kept.wornLeft;
+    e.count = (Number(e.count) || 0) - n;
+    if (e.count <= 0) { entries.splice(at, 1); }
+    try { mp.set(actorId, 'inventory', { entries: entries }); } catch (e2) { return 'Your pack could not be written.'; }
+    var d = dropboxOf(hold);
+    var who = characterName(actorId);
+    var what = itemName(kept);
+    var item = { n: d.next++, by: profileId, name: who, kind: 'left', baseId: Number(kept.baseId),
+                 count: n, what: what, entry: kept, forName: to, at: Date.now() };
+    d.items.push(item);
+    boxLog(hold, { act: 'in', n: item.n, who: profileId, whoName: who, by: profileId, byName: who,
+                   what: what, count: n, forName: to });
+    save();
+    plog(who, '(profile ' + profileId + ') left', n, what, 'for', to, 'in', hold + '\'s drop box');
+    return 'You left ' + (n > 1 ? n + ' ' : '') + what + ' in the box for ' + to + '.';
+  }
+
+  /*
+    Something out. What you put in yourself, or anything if you are one of
+    this hold's officers. Your own gold back undoes the rent it paid; an
+    officer taking it leaves the rent paid.
+  */
+  function boxTake(hold, actorId, profileId, num, count) {
+    var d = dropboxOf(hold);
+    var at = -1;
+    for (var i = 0; i < d.items.length; i++) {
+      if (Number(d.items[i].n) === Math.floor(Number(num))) { at = i; break; }
+    }
+    if (at < 0) { return 'That is not in the box.'; }
+    var it = d.items[at];
+    var own = Number(it.by) > 0 && Number(it.by) === Number(profileId);
+    if (!own && !boxOfficer(hold, profileId, actorId)) {
+      return 'That is not yours to take. Only what you put in, unless you are one of this hold\'s officers.';
+    }
+    var have = Number(it.count) || 0;
+    var n = (count === undefined || count === null || count === '') ? have : Math.floor(Number(count));
+    if (!(n > 0) || n > have) { return 'There are not that many.'; }
+    if (Number(it.baseId) === GOLD_ID) {
+      if (!payOut(actorId, n)) { return 'Your pack could not be written.'; }
+    } else {
+      var inv = null;
+      try { inv = mp.get(actorId, 'inventory'); } catch (e) { return 'Your pack could not be read.'; }
+      var entries = (inv && inv.entries) || [];
+      var give = JSON.parse(JSON.stringify(it.entry || { baseId: it.baseId }));
+      give.count = n;
+      entries.push(give);
+      try { mp.set(actorId, 'inventory', { entries: entries }); } catch (e2) { return 'Your pack could not be written.'; }
+    }
+    var back = 0;
+    if (own && Array.isArray(it.rent)) {
+      // The rent this gold paid, owed again, newest place first, never more than was taken.
+      var left = n;
+      for (var r = it.rent.length - 1; r >= 0 && left > 0; r--) {
+        var row = it.rent[r];
+        var amt = Math.min(left, Number(row.amount) || 0);
+        var c = claims[row.building];
+        if (c && c.rent && amt > 0) { c.rent.owed = (Number(c.rent.owed) || 0) + amt; back += amt; }
+        row.amount = (Number(row.amount) || 0) - amt;
+        left -= amt;
+      }
+      it.rent = it.rent.filter(function (x) { return (Number(x.amount) || 0) > 0; });
+    }
+    it.count = have - n;
+    if (it.count <= 0) { d.items.splice(at, 1); }
+    var who = characterName(actorId);
+    boxLog(hold, { act: 'out', n: it.n, who: profileId, whoName: who, by: it.by, byName: it.name || '',
+                   what: it.what || '', count: n, forName: it.forName || '',
+                   note: back ? back + ' of it rent, owed again' : '' });
+    save();
+    plog(who, '(profile ' + profileId + ') took', n, it.what, 'out of', hold + '\'s drop box, put in by', it.name,
+         back ? '(' + back + ' rent owed again)' : '');
+    return 'You took ' + (n > 1 ? n + ' ' : '') + (it.what || 'it') + ' out of the box.' +
+           (back ? ' ' + back + ' gold of rent is owed again.' : '');
+  }
+
+  /*
+    A carriage or ferry fare, into the box of the hold the ride left from,
+    as real gold, by itself (Patrick, 12 Oct). One running row per hold, put
+    in by the hold rather than by a person, so nobody but its officers sees
+    it; each fare is its own line in the record.
+  */
+  function boxFare(hold, amount, reason) {
+    var key = String(hold || '').toLowerCase();
+    var n = Number(amount);
+    if (LEDGER_HOLDS.indexOf(key) < 0) { return false; }
+    if (!Number.isInteger(n) || n <= 0) { return false; }
+    var d = dropboxOf(key);
+    var row = null;
+    for (var i = 0; i < d.items.length; i++) {
+      if (d.items[i].kind === 'fare') { row = d.items[i]; break; }
+    }
+    if (!row) {
+      row = { n: d.next++, by: 0, name: 'Carriage and ferry fares', kind: 'fare', baseId: GOLD_ID,
+              count: 0, what: 'Gold', at: Date.now() };
+      d.items.push(row);
+    }
+    row.count = (Number(row.count) || 0) + n;
+    boxLog(key, { act: 'in', n: row.n, who: 0, whoName: 'A fare', by: 0, byName: 'Carriage and ferry fares',
+                  what: 'Gold', count: n, note: String(reason || '') });
+    save();
+    plog(n, 'gold of fare into', key + '\'s drop box:', String(reason || ''));
+    return true;
+  }
+
+  /*
+    /dropbox open                         what E on the box sends
+    /dropbox gold <amount>                Put in
+    /dropbox leave <slot> <count> <name>  Leave it for somebody
+    /dropbox take <n> [count]             Take out
+    /dropbox records                      an officer's Records
+    Every one answers by drawing the panel again, with what happened in it.
+  */
+  function dropboxCmd(parts, actorId, profileId, toProfile) {
+    var hold = boardHere(actorId);
+    if (!hold) {
+      toProfile(profileId, 'Stand at a hold\'s notice board to use its drop box.');
+      return true;
+    }
+    var sub = (parts && parts.length > 1) ? String(parts[1]).trim().toLowerCase() : 'open';
+    var said = '';
+    var records = false;
+    if (sub === 'gold') {
+      said = boxPutGold(hold, actorId, profileId, parts[2]);
+    } else if (sub === 'leave') {
+      said = boxLeave(hold, actorId, profileId, parts[2], parts[3], (parts.slice(4) || []).join(' '));
+    } else if (sub === 'take') {
+      said = boxTake(hold, actorId, profileId, parts[2], parts[3]);
+    } else if (sub === 'records') {
+      records = boxOfficer(hold, profileId, actorId);
+      if (!records) { said = 'Only this hold\'s officers keep the records.'; }
+    } else if (sub !== 'open') {
+      said = 'The box does not know that.';
+    }
+    showBox(actorId, boxView(actorId, profileId, hold, said, records));
     return true;
   }
 
@@ -40779,6 +41178,7 @@ log('gamemode loaded:',
     if (word === '/guard') { return guardCmd(parts, actorId, profileId, toProfile); }
     if (word === '/evict') { return evict(actorId, profileId, toProfile); }
     if (word === '/box') { return boxCmd(parts, actorId, profileId, toProfile); }
+    if (word === '/dropbox') { return dropboxCmd(parts, actorId, profileId, toProfile); }
     if (word === '/rent') { return rentCmd(parts, actorId, profileId, toProfile); }
     if (word === '/sleephere') { return sleepHere(parts, actorId, profileId, toProfile); }
     if (word === '/notice') { return post(parts, actorId, profileId, toProfile, false); }
@@ -41318,6 +41718,8 @@ log('gamemode loaded:',
     JAIL_KEY: JAIL_KEY,
     guards: function () { return Object.assign({}, law.guards); },
     touchedBox: touchedBox, putIn: putIn, holdOfBox: holdOfBox,
+    dropboxCmd: dropboxCmd, boxView: boxView, boxFare: boxFare, boxOfficer: boxOfficer,
+    dropbox: function () { return dropbox; },
     deposit: deposit, takeGold: takeGold, LEDGER_HOLDS: LEDGER_HOLDS,
     withdraw: withdraw, mayWithdraw: mayWithdraw, heldOn: heldOn,
     haulTenth: haulTenth, haulTick: haulTick, saleCuts: saleCuts, inCompany: inCompany,
@@ -41806,8 +42208,9 @@ log('gamemode loaded:',
   A carriage is 10 to a stop in the same hold and 20 to another hold. 40 is
   only the crossing between the mainland and Solstheim, the Northern Maiden
   between Windhelm and Raven Rock (Patrick, 4 Oct, on #1394). The fare
-  goes onto the ledger of the hold the stop you leave from is in, counted the
-  way a notice fee is counted (deposit, in the property block). A pack that is
+  goes into the drop box of the hold the stop you leave from is in, as real
+  gold, by itself (Patrick, 12 Oct, #2298: boxFare, in the property block);
+  until then it was only counted on that hold's ledger. A pack that is
   short does not move and loses nothing. Fast travel stays off: nothing here
   offers the map, and there is no word that skips the driver.
 
@@ -42308,7 +42711,7 @@ log('gamemode loaded:',
     // amount below 1 would make takeGold add rather than take.
     if (!(price > 0)) { return answer('No ride to ' + wanted + ' from here.', from); }
     var prop = g.__thornswoodProperty;
-    if (!prop || typeof prop.takeGold !== 'function' || typeof prop.deposit !== 'function') {
+    if (!prop || typeof prop.takeGold !== 'function' || typeof prop.boxFare !== 'function') {
       plog('a ride was asked for and the hold ledger is not loaded');
       return answer('The hold\'s ledger is not running on this server, so nobody rides. Say so in the dev channel.', from);
     }
@@ -42337,12 +42740,12 @@ log('gamemode loaded:',
     }
     delete pressedBy[actorId];
     var what = RIDE_LINES[from.line].what;
-    if (!prop.deposit(from.hold, price, 'fare, ' + from.name + ' to ' + to.name + ' by ' + what +
+    if (!prop.boxFare(from.hold, price, from.name + ' to ' + to.name + ' by ' + what +
                       ', profile ' + profileId)) {
-      plog('profile', profileId, 'paid', price, 'at', from.key, 'and', from.hold, 'took no deposit');
+      plog('profile', profileId, 'paid', price, 'at', from.key, 'and', from.hold, 'has no drop box for it');
     }
     plog('profile', profileId, 'rode', what, 'from', from.name, 'to', to.name, 'for', price,
-         'gold, onto', from.hold + '\'s ledger');
+         'gold, into', from.hold + '\'s drop box');
     return answer('You pay the ' + price + ' gold fare and ride to ' + to.name + '.', from, true);
   }
 
@@ -45651,7 +46054,7 @@ log('gamemode loaded:',
     if (word === '/plant' || word === '/claim' || word === '/plot' ||
         word === '/deed' || word === '/deeds' || word === '/lock' ||
         word === '/unlock' || word === '/mold' || word === '/moldhere' || word === '/key' ||
-        word === '/jarl' || word === '/steward' || word === '/guard' || word === '/evict' || word === '/box' ||
+        word === '/jarl' || word === '/steward' || word === '/guard' || word === '/evict' || word === '/box' || word === '/dropbox' ||
         word === '/rent' || word === '/sleephere' || word === '/notice' || word === '/job' ||
         word === '/board' || word === '/take' ||
         word === '/haul' ||
@@ -50465,6 +50868,10 @@ const WORDS = ['/ooc', '/o',
                // A Jarl names a guard of their hold (#502): Name guard and
                // Remove on the Office page send it, never typed.
                '/guard',
+               // The hold's drop box on the board (#2298). E on the box sends
+               // /dropbox open, and its panel's buttons send the rest; never
+               // typed, so NOT in PLAYER_WORDS.
+               '/dropbox',
                // The notice board (#1627). Sent by the board panel's buttons
                // and J's Boards tab, never typed, and so NOT in PLAYER_WORDS:
                // Patrick, 4 October, nothing people do is a chat command. A

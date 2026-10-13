@@ -38,14 +38,35 @@ const depositSrc = slice(gm, '  var LEDGER_HOLDS = [', '\n  }\n');
 yes('the carriages block is in the gamemode', block !== null);
 yes('takeGold and deposit are in the property block', !!takeSrc && !!depositSrc && depositSrc.indexOf('function deposit(') > 0);
 
-/* The real takeGold and deposit, over a ledger the test can read. */
+const boxSrc = ['  function dropboxOf(hold) {', '  function boxLog(hold, row) {',
+                '  function boxFare(hold, amount, reason) {'].map(function (f) { return slice(gm, f, '\n  }\n'); });
+// What each hold's drop box holds of fares (#2298: a fare goes into the box as real gold, not onto the ledger).
+function fareBox(dropbox) {
+  function row(k) {
+    const d = dropbox[k];
+    const r = d && d.items && d.items.filter(function (i) { return i.kind === 'fare'; })[0];
+    return r ? r.count : undefined;
+  }
+  return new Proxy({}, {
+    get: function (t, k) { return typeof k === 'string' ? row(k) : undefined; },
+    ownKeys: function () { return Object.keys(dropbox).filter(function (k) { return row(k) !== undefined; }); },
+    getOwnPropertyDescriptor: function (t, k) {
+      return row(k) === undefined ? undefined : { enumerable: true, configurable: true, value: row(k) };
+    }
+  });
+}
+/* The real takeGold, deposit and boxFare, over a ledger and drop boxes the test can read.
+   funds here is the fares in each hold's box; ledger is the fee ledger, which a fare never touches. */
 function ledger(mp) {
   const funds = {};
+  const dropbox = {};
   const saved = [];
-  const fn = new Function('mp', 'funds', 'save', 'plog', 'GOLD_ID',
-    takeSrc + '\n' + depositSrc + '\nreturn { takeGold: takeGold, deposit: deposit, LEDGER_HOLDS: LEDGER_HOLDS };');
-  const api = fn(mp, funds, function () { saved.push(JSON.stringify(funds)); }, function () { }, GOLD);
-  api.funds = funds;
+  const fn = new Function('mp', 'funds', 'save', 'plog', 'GOLD_ID', 'dropbox', 'BOX_LOG_KEEP',
+    takeSrc + '\n' + depositSrc + '\n' + boxSrc.join('\n') +
+    '\nreturn { takeGold: takeGold, deposit: deposit, boxFare: boxFare, LEDGER_HOLDS: LEDGER_HOLDS };');
+  const api = fn(mp, funds, function () { saved.push(JSON.stringify(dropbox)); }, function () { }, GOLD, dropbox, 500);
+  api.ledger = funds;
+  api.funds = fareBox(dropbox);
   api.saved = saved;
   return api;
 }
@@ -101,7 +122,7 @@ function rig(extraProp) {
     Date: { now: function () { return clock; } }
   };
   box.globalThis = box;
-  box.__thornswoodProperty = Object.assign({ takeGold: L.takeGold, deposit: L.deposit }, extraProp || {});
+  box.__thornswoodProperty = Object.assign({ takeGold: L.takeGold, deposit: L.deposit, boxFare: L.boxFare }, extraProp || {});
   vm.runInNewContext(block, box);
   return { w: w, L: L, C: box.__thornswoodCarriages, box: box };
 }
@@ -262,9 +283,11 @@ if (C0) {
     const line = say(r, '/ride solitude');
     yes('a ride says what it cost and where it went', line === 'You pay the 20 gold fare and ride to Solitude.');
     yes('the fare left the pack', gold(me) === 30);
-    yes('the fare is on the departure hold\'s ledger afterwards', r.L.funds.whiterun === 20 && r.L.saved.length === 1 &&
-      JSON.parse(r.L.saved[0]).whiterun === 20);
-    yes('and on no other ledger', Object.keys(r.L.funds).join() === 'whiterun');
+    // Since #2298 a fare goes into the departure hold's drop box, as real gold.
+    yes('the fare is in the departure hold\'s drop box afterwards, and saved', r.L.funds.whiterun === 20 && r.L.saved.length === 1 &&
+      JSON.parse(r.L.saved[0]).whiterun.items[0].count === 20);
+    yes('and in no other box, and never on the fee ledger', Object.keys(r.L.funds).join() === 'whiterun' &&
+      !r.L.ledger.whiterun);
     yes('the coin was moved, not made: pack and ledger still add to 50', gold(me) + r.L.funds.whiterun === 50);
     const t = by('carriage:solitude');
     yes('one move, onto Solitude\'s carriage stop', moves(r).length === 1 && me.cell === t.world &&
@@ -464,12 +487,19 @@ if (C0) {
   {
     const L = ledger(world().mp);
     yes('deposit takes a whole number onto a known hold, and saves', L.deposit('Whiterun', 20, 'test') === true &&
-      L.funds.whiterun === 20 && L.saved.length === 1);
+      L.ledger.whiterun === 20 && L.saved.length === 1);
     yes('deposit refuses nothing, less than nothing and part of a coin',
       L.deposit('whiterun', 0, 'x') === false && L.deposit('whiterun', -5, 'x') === false &&
-      L.deposit('whiterun', 2.5, 'x') === false && L.deposit('whiterun', 'ten', 'x') === false && L.funds.whiterun === 20);
+      L.deposit('whiterun', 2.5, 'x') === false && L.deposit('whiterun', 'ten', 'x') === false && L.ledger.whiterun === 20);
     yes('deposit refuses a hold that is not one of the ten', L.deposit('__proto__', 5, 'x') === false &&
       L.deposit('', 5, 'x') === false && L.deposit('skyrim', 5, 'x') === false && L.saved.length === 1);
+    // A fare into the box (#2298): the same whole numbers and the same ten holds.
+    yes('boxFare puts a whole number into a known hold\'s box, and saves', L.boxFare('Whiterun', 20, 'test') === true &&
+      L.funds.whiterun === 20 && L.saved.length === 2);
+    yes('boxFare refuses nothing, less than nothing, part of a coin and a hold that is not one of the ten',
+      L.boxFare('whiterun', 0, 'x') === false && L.boxFare('whiterun', 2.5, 'x') === false &&
+      L.boxFare('__proto__', 5, 'x') === false && L.boxFare('skyrim', 5, 'x') === false && L.funds.whiterun === 20);
+    yes('and a fare never touches the fee ledger', L.ledger.whiterun === 20);
   }
 }
 

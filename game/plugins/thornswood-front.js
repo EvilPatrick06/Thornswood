@@ -93,7 +93,7 @@
                     'thornswood-skills.js', 'thornswood-party.js',
                     'thornswood-journal.js', 'thornswood-board.js', 'thornswood-trade.js', 'thornswood-merchant.js',
                     'thornswood-repair.js', 'thornswood-treat.js', 'thornswood-maneuvers.js', 'thornswood-ride.js',
-                    'thornswood-help.js', 'thornswood-afk.js'];
+                    'thornswood-help.js', 'thornswood-afk.js', 'thornswood-box.js'];
   const LOG_FILE = 'Data/Platform/thornswood-front.log';
   const INI = 'Data/SKSE/Plugins/Thornswood.ini';
   const CLIENT_SETTINGS = 'Data/Platform/Plugins/skymp5-client-settings.txt';
@@ -2078,7 +2078,7 @@
     board: 'thornswoodBoard', repair: 'thornswoodRepair', treat: 'thornswoodTreat',
     trade: 'thornswoodTrade', merchant: 'thornswoodMerchant', select: 'thornswoodSelect', wheel: 'thornswoodEmotes',
     afk: 'thornswoodAfk', maneuvers: 'thornswoodManeuvers', ride: 'thornswoodRide',
-    help: 'thornswoodHelp'
+    help: 'thornswoodHelp', box: 'thornswoodBox'
   };
 
   T.claimFocus = function (who, on) {
@@ -8085,6 +8085,18 @@
   const BOARD_REACH = 400;
   const BOARD_LOCAL = 0x593B;
   const BOARD_FILE = 'Thornswood-Content.esp';
+  /*
+    THE HOLD'S DROP BOX, BESIDE EVERY BOARD (#2298). ThornswoodDropBox
+    (local id 0x154D0) stands on the shelf on the board's right post, at
+    BOX_AT in the board's own space (scripts/mods/Build-NoticeBoard.py
+    prints it), turned with the board. It is drawn here the way the board
+    is, because the server cannot stand an object it places anywhere but the
+    middle of Tamriel. What is in it is the server's record; E on it sends
+    /dropbox open and the server answers with the box's own panel.
+  */
+  const BOX_LOCAL = 0x154D0;
+  const BOX_AT = [-134.52, 4.0, 80.0];
+  const boxRefs = {};        // hold -> the box's reference id, beside that board
   let boardSpots = [];       // { hold, cell, x, y, z, face }, the server's
   const boardRefs = {};      // hold -> { id, cell, x, y, z, face }, what was put down
   const boardPlaceIds = {};  // '17ec0:Dragonborn.esm' -> that cell's runtime id
@@ -8106,6 +8118,34 @@
   }
 
   function boardLive(id) { return !!boardRef(id); }
+
+  /* Where the box stands for a board at this spot: BOX_AT turned by the board's facing. */
+  function boxPoint(spot) {
+    const h = (Number(spot.face) || 0) * Math.PI / 180;
+    const c = Math.cos(h), s = Math.sin(h);
+    return { x: spot.x + BOX_AT[0] * c + BOX_AT[1] * s,
+             y: spot.y - BOX_AT[0] * s + BOX_AT[1] * c,
+             z: spot.z + BOX_AT[2] };
+  }
+
+  /* The hold whose drop box this reference is, or ''. */
+  function boxObjectHold(ref) {
+    if (!ref) { return ''; }
+    let id = 0;
+    try { id = ref.getFormID() >>> 0; } catch (e) { return ''; }
+    for (const hold in boxRefs) {
+      if ((boxRefs[hold] >>> 0) === id) { return hold; }
+    }
+    return '';
+  }
+
+  function boxMove(hold, spot) {
+    const ref = boardRef(boxRefs[hold]);
+    if (!ref) { return; }
+    const at = boxPoint(spot);
+    boardQuiet(ref.setPosition(at.x, at.y, at.z));
+    boardQuiet(ref.setAngle(0, 0, spot.face));
+  }
 
   function boardObjectHere(ref) {
     if (!ref) { return false; }
@@ -8152,6 +8192,11 @@
   function boardTakeAway(hold, why) {
     const had = boardRefs[hold];
     delete boardRefs[hold];
+    const box = boardRef(boxRefs[hold]);
+    delete boxRefs[hold];
+    if (box) {
+      try { boardQuiet(box.disable(false)); boardQuiet(box.delete()); } catch (e) { }
+    }
     const ref = had ? boardRef(had.id) : null;
     if (!ref) { return; }
     try {
@@ -8190,6 +8235,7 @@
         boardQuiet(ref.setPosition(spot.x, spot.y, spot.z));
         boardQuiet(ref.setAngle(0, 0, spot.face));
         had.x = spot.x; had.y = spot.y; had.z = spot.z; had.face = spot.face;
+        boxMove(hold, spot);
         say('moved the notice board in ' + hold + ' to where the server has it');
       } catch (e) {
         say('could not move the notice board in ' + hold + ': ' + e);
@@ -8210,10 +8256,16 @@
     if (!base || !pc) { return; }
     const here = boardPlaceHere(pc);
     if (!here) { return; }
+    let boxBase = null;
+    try { boxBase = sp.Game.getFormFromFile(BOX_LOCAL, BOARD_FILE); } catch (e) { boxBase = null; }
     for (let i = 0; i < boardSpots.length; i++) {
       const spot = boardSpots[i];
       const had = boardRefs[spot.hold];
-      if (had && had.cell === spot.cell && boardLive(had.id)) { continue; }
+      // The box goes down with its board, and again if it is gone while the board is not.
+      if (had && had.cell === spot.cell && boardLive(had.id)) {
+        if (boxBase && !boardLive(boxRefs[spot.hold])) { boxPut(pc, boxBase, spot); }
+        continue;
+      }
       if (boardPlaceId(spot.cell) !== here) { continue; }
       let ref = null;
       try { ref = pc.placeAtMe(base, 1, false, false); } catch (e) { ref = null; }
@@ -8225,12 +8277,29 @@
         boardRefs[spot.hold] = { id: ref.getFormID() >>> 0, cell: spot.cell,
                                  x: spot.x, y: spot.y, z: spot.z, face: spot.face };
         say('put the notice board down in ' + spot.hold + ' (' + spot.cell + ')');
+        if (boxBase) { boxPut(pc, boxBase, spot); }
       } catch (e) {
         if (!boardFailSaid[spot.hold]) {
           boardFailSaid[spot.hold] = true;
           say('could not put the notice board down in ' + spot.hold + ': ' + e);
         }
       }
+    }
+  }
+
+  function boxPut(pc, base, spot) {
+    let ref = null;
+    try { ref = pc.placeAtMe(base, 1, false, false); } catch (e) { ref = null; }
+    if (!ref) { return; }
+    try {
+      const at = boxPoint(spot);
+      boardQuiet(ref.setPosition(at.x, at.y, at.z));
+      boardQuiet(ref.setAngle(0, 0, spot.face));
+      boardQuiet(ref.enable(false));
+      boxRefs[spot.hold] = ref.getFormID() >>> 0;
+      say('put the drop box down in ' + spot.hold);
+    } catch (e) {
+      say('could not put the drop box down in ' + spot.hold + ': ' + e);
     }
   }
 
@@ -8458,6 +8527,36 @@
     return true;
   }
 
+  /*
+    E ON THE DROP BOX OPENS THE BOX, AND ONLY THE BOX (#2298). The press is
+    the box's when the crosshair is on a box this client put down and you
+    stand at its board. The server answers /dropbox open with the box's
+    panel, filtered for you.
+  */
+  function boxPress(e) {
+    if (!e || e.userEventName !== 'Activate') { return false; }
+    for (const held in claims) {
+      if (Object.prototype.hasOwnProperty.call(claims, held) && claims[held]) { return false; }
+    }
+    if (busyMenuOpen()) { return false; }
+    let ref = null;
+    try { ref = sp.Game.getCurrentCrosshairRef(); } catch (err) { ref = null; }
+    const hold = boxObjectHold(ref);
+    if (!hold) { return false; }
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (err) { pc = null; }
+    if (!pc) { return false; }
+    let px, py, pz;
+    try {
+      px = pc.getPositionX(); py = pc.getPositionY(); pz = pc.getPositionZ();
+    } catch (err) { return false; }
+    const spot = boardAimSpot(pc, px, py, pz);
+    if (!spot || spot.hold !== hold && spot.hold) { return false; }
+    if (boardDist(px, py, pz, spot) > BOARD_REACH) { return false; }
+    tellServer('/dropbox open');
+    return true;
+  }
+
   sp.on('update', guard('board object', () => { ensureBoards(); }));
 
   sp.on('update', guard('board distance', () => {
@@ -8475,6 +8574,26 @@
     } catch (e) { dist = 99999; }
     if (dist > BOARD_REACH) {
       T.js('try{window.thornswoodBoard&&window.thornswoodBoard.close();}catch(e){}');
+    }
+  }));
+
+  // The drop box's panel closes when you walk away from its board, as the board's does.
+  let boxWatchAt = 0;
+  sp.on('update', guard('box distance', () => {
+    if (!T.hasFocus('box')) { return; }
+    const now = Date.now();
+    if (now - boxWatchAt < 250) { return; }
+    boxWatchAt = now;
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
+    if (!pc) { return; }
+    let dist = 99999;
+    try {
+      const spot = boardAimSpot(pc, pc.getPositionX(), pc.getPositionY(), pc.getPositionZ());
+      if (spot) { dist = boardDist(pc.getPositionX(), pc.getPositionY(), pc.getPositionZ(), spot); }
+    } catch (e) { dist = 99999; }
+    if (dist > BOARD_REACH) {
+      T.js('try{window.thornswoodBox&&window.thornswoodBox.close();}catch(e){}');
     }
   }));
 
@@ -8519,6 +8638,7 @@
     // E on somebody you carry a letter for hands it over (#1595), before the
     // trader's E below takes any press on a person.
     if (deliverPress(e)) return;
+    if (boxPress(e)) return;
     if (boardPress(e)) return;
     if (driverPress(e)) return;
     if (merchantPress(e)) return;
@@ -9475,6 +9595,10 @@
     if (what === 'journal:closed') { T.claimFocus('journal', false); return; }
     if (what === 'board:opened') { T.claimFocus('board', true); return; }
     if (what === 'board:closed') { T.claimFocus('board', false); return; }
+    // The hold's drop box (#2298): its own panel, opened by E on the box.
+    if (what === 'box:opened') { T.claimFocus('box', true); return; }
+    if (what === 'box:closed') { T.claimFocus('box', false); return; }
+    if (what === 'box:ready') { log('the drop box panel is in'); return; }
     if (what.indexOf('board:near ') === 0) {
       const bits = what.slice('board:near '.length).trim().split(/\s+/);
       if (bits[0] === 'none' || bits.length < 3) { boardNear = null; return; }

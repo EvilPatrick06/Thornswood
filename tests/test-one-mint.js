@@ -343,7 +343,9 @@ const WRITERS = {
   'trade/moveById': [2, 'moves a pile from one pack to the other, one write each (section 4)'],
   'trade/saleById': [2, 'a company sale (#1393): the things out of the seller\'s pack and out of the world with the seller\'s share in, and the price less the worker\'s cut out of the worker\'s pack, which is never less than the share; one write each (section 4)'],
   'outer/markWoven': [1, 'names a garment a Master Weaver just made: units split off a plain stack of the same base, so no base is added and the count is the same after (#1398, test-1398-fuel.js)'],
-  'durability/writePack': [1, 'writes back a pack or chest it has just read: a stack renamed for its condition, or a kit or a broken piece taken away. No base is added and no count grows (test-1384-condition.js)']
+  'durability/writePack': [1, 'writes back a pack or chest it has just read: a stack renamed for its condition, or a kit or a broken piece taken away. No base is added and no count grows (test-1384-condition.js)'],
+  'property/boxLeave': [1, 'takes a stack off the pack into the drop box record, and refuses gold, which goes in through takeGold (#2298); it never adds'],
+  'property/boxTake': [1, 'hands back a thing out of the drop box record, which holds only what boxLeave took off a pack; gold comes out through payOut, never more than the row holds, and the row goes down by the same (#2298, test-2298-dropbox.js)']
 };
 
 const writes = {};
@@ -415,9 +417,11 @@ for (const at of Object.keys(WRITERS)) {
     if (body !== null && namesGold.test(body)) { naming.push(at); }
   }
   naming.sort();
-  yes('of the writers, only purse, takeGold, payOut and a company sale name gold' +
+  // The drop box (#2298) names gold only to send it the way it came: boxLeave
+  // refuses it, and boxTake hands a gold row back through payOut.
+  yes('of the writers, only purse, takeGold, payOut, a company sale and the drop box name gold' +
       (naming.length ? ' (' + naming.join(', ') + ')' : ''),
-      naming.join(',') === 'property/payOut,property/takeGold,spoils/purse,trade/saleById');
+      naming.join(',') === 'property/boxLeave,property/boxTake,property/payOut,property/takeGold,spoils/purse,trade/saleById');
 }
 
 {
@@ -493,9 +497,11 @@ for (const at of Object.keys(WRITERS)) {
     caller too (#1392) until #1603: a night is paid in a trade now, and the
     server takes no price for one.
   */
-  yes('its four callers pass the fee, NOTICE_FEE or JOB_FEE, a letter\'s cost, LETTER_FEE and LETTER_PAY, a haul\'s cost, ' +
-      'JOB_FEE and the pay, and a ride\'s fare',
-      callers.slice().sort().join(',') === 'cost,cost,fee,price' &&
+  // And gold put in the drop box (#2298): n, a whole number above nothing, or refused first.
+  yes('its five callers pass the fee, NOTICE_FEE or JOB_FEE, a letter\'s cost, LETTER_FEE and LETTER_PAY, a haul\'s cost, ' +
+      'JOB_FEE and the pay, a ride\'s fare, and gold put in the drop box',
+      callers.slice().sort().join(',') === 'cost,cost,fee,n,price' &&
+      /var n = Math\.floor\(Number\(amount\)\);\s*\n\s*if \(!\(n > 0\)/.test(code) &&
       /\bvar fee = isJob \? JOB_FEE : NOTICE_FEE;/.test(code) &&
       /\bvar cost = LETTER_FEE \+ LETTER_PAY;/.test(code) &&
       /\bvar cost = JOB_FEE \+ pay;/.test(code));
@@ -553,9 +559,11 @@ for (const at of Object.keys(WRITERS)) {
     gives back the cost it has just taken when the ledger would not take it
     (test-1393-company.js).
   */
-  yes('payOut\'s callers are payHeld, the takings #1392 kept for a holder, handed over once (#1603), and the haul (#1393)',
+  // And the drop box (#2298): boxTake hands back gold a row holds, gold a
+  // pack or a fare put in, and takes the row down by the same.
+  yes('payOut\'s callers are payHeld, the takings #1392 kept for a holder, handed over once (#1603), the haul (#1393) and the drop box (#2298)',
       calls.slice().sort().join(',') ===
-      'property/handHaul,property/haulTick,property/payHeld,property/payTakings,property/postHaul');
+      'property/boxTake,property/handHaul,property/haulTick,property/payHeld,property/payTakings,property/postHaul');
 
   /*
     THE LEDGER GOES DOWN ONLY BY A PAYOUT (#1393). Coin comes off a ledger
@@ -728,10 +736,18 @@ function goldDescriptors(text) {
     const refs = function (name) { return (outCode.match(new RegExp('\\b' + name + '\\b', 'g')) || []).length; };
     const build = bodyOf('chat commands/buildThings') || '';
     const beasts = bodyOf('chat commands/buildBeasts') || '';
-    yes('ITEM_NAMES and ADMIN_ITEMS are read by the /give index and nothing else',
-        refs('ITEM_NAMES') === (build.match(/\bITEM_NAMES\b/g) || []).length &&
-        refs('ADMIN_ITEMS') === (build.match(/\bADMIN_ITEMS\b/g) || []).length &&
-        refs('ADMIN_ITEMS') > 0);
+    /*
+      And the drop box's names (#2298): itemName reads the two tables for the
+      name the box's panel and records show, by the record a row already
+      holds. It turns a record into a name, never a name into a thing, and
+      writes nothing.
+    */
+    const names = bodyOf('property/itemName') || '';
+    const inNames = function (name) { return (names.match(new RegExp('\\b' + name + '\\b', 'g')) || []).length; };
+    yes('ITEM_NAMES and ADMIN_ITEMS are read by the /give index, and by the drop box only for a name',
+        refs('ITEM_NAMES') === (build.match(/\bITEM_NAMES\b/g) || []).length + inNames('ITEM_NAMES') &&
+        refs('ADMIN_ITEMS') === (build.match(/\bADMIN_ITEMS\b/g) || []).length + inNames('ADMIN_ITEMS') &&
+        refs('ADMIN_ITEMS') > 0 && !!names && !/\bmp\.set\(|\baddItem\(|\bpayOut\(/.test(names));
     yes('ADMIN_ACTORS is read by the /spawn index and nothing else',
         refs('ADMIN_ACTORS') > 0 && refs('ADMIN_ACTORS') === (beasts.match(/\bADMIN_ACTORS\b/g) || []).length);
     yes('and /give and /spawn still refuse anybody who is not a playtester',

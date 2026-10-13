@@ -311,6 +311,8 @@ const OPEN = {
     p.win.thornswoodBoard.open();
   } },
   'thornswood-ride.js': { name: 'thornswoodRide', open(p) { p.win.thornswoodRide.setData({ open: true, name: 'Horse', stable: 'Whiterun' }); p.win.thornswoodRide.open(); } },
+  // The hold's drop box (#2298): the server's view, with open, opens it.
+  'thornswood-box.js': { name: 'thornswoodBox', open(p) { p.win.thornswoodBox.setData({ open: true, hold: 'whiterun', where: 'Whiterun', rows: [], pack: [], packGold: 5 }); } },
   'thornswood-repair.js': { name: 'thornswoodRepair', open(p) { p.win.thornswoodRepair.setData({ open: true, items: [] }); } },
   'thornswood-treat.js': { name: 'thornswoodTreat', open(p) { p.win.thornswoodTreat.setData({ open: true, needs: [] }); } },
   'thornswood-merchant.js': { name: 'thornswoodMerchant', open(p) { p.win.thornswoodMerchant.setData({ open: true, trader: 'Belethor', offers: [] }); } },
@@ -410,6 +412,7 @@ function escCloses(file, name, more) {
   });
 }
 escCloses('thornswood-board.js', 'board');
+escCloses('thornswood-box.js', 'box');
 escCloses('thornswood-ride.js', 'ride');
 escCloses('thornswood-repair.js', 'repair');
 escCloses('thornswood-treat.js', 'treat');

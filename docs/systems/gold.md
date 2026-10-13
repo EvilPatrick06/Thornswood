@@ -55,9 +55,9 @@ Gold pays, when the system that asks for it exists:
 | A job, including a haul's posting fee | 30 | The hold's ledger |
 | A haul's pay | Whatever was posted | The hold's ledger, then out to the hauler minus the company's tenth |
 | Rent | Whatever the steward set, every 7 real days | That hold's ledger |
-| A carriage | 10 to a stop in the same hold, 20 to another hold | The departure hold's ledger |
-| A ferry | 10, Solstheim's own ferry included | The departure hold's ledger |
-| The crossing to Solstheim, the Northern Maiden between Windhelm and Raven Rock | 40 | The departure hold's ledger |
+| A carriage | 10 to a stop in the same hold, 20 to another hold | The departure hold's drop box, as gold |
+| A ferry | 10, Solstheim's own ferry included | The departure hold's drop box, as gold |
+| The crossing to Solstheim, the Northern Maiden between Windhelm and Raven Rock | 40 | The departure hold's drop box, as gold |
 
 The rows that are not in the server yet are said at the bottom of the
 page they belong to. The amounts are the plan's amounts. The Merchant's
@@ -111,8 +111,10 @@ server. A dungeon chest pays its tier's gold on that place's rest.
 A guild trader's 250 is not. A scene quest creates its gold when it is finished, and that
 gold is not taken from a trader's purse. Rank is not for sale. A weapon, armour or clothing in a chest or
 container in a claimed building loses 5% a day, written when the chest
-is next opened. See [Durability](durability.md). Notice fees, job fees, letter fees, a haul's fee and pay, rent, and
-carriage and ferry fares are counted on the ledger. The payouts are a
+is next opened. See [Durability](durability.md). Notice fees, job fees, letter fees, and a haul's fee and pay are counted
+on the ledger. Carriage and ferry fares, and gold people put in the drop
+box, rent among it, are real gold in the hold's drop box (#2298), which
+the hold's officers take out. The payouts are a
 letter's 15, to the courier on delivery or back to the sender when
 they take it down, and a haul's pay, to the hauler less the company's tenth
 when it is confirmed, or back to the poster when it comes down. A

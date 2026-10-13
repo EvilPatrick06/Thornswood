@@ -33,6 +33,42 @@ Rock's board starts at that town's inn, The Retching Netch, where
 Geldis Sadri stands, until a steward walks it somewhere better. Ten
 boards, one per town in [Creation](creation.md).
 
+## The drop box
+
+The hold's drop box stands on the shelf on the board's right post, an
+iron strongbox with a coin slot (Patrick, 12 Oct, #2298). E on the box
+opens the box's own panel, and only the box: E on the board opens the
+board. You use it standing at the board, within 400 of it. Each client
+draws the box beside its board, and what is in it is the server's own
+record, never a chest's contents.
+
+What goes in:
+
+- Gold. Gold you put in pays what you owe on your rent first.
+- Something left for somebody who was not there to take it, a Free
+  Skyrim Trading Company drop off: you pick it from your pack and name who
+  it is for, and the hold's steward hands it out.
+- Carriage and ferry fares, by themselves, as real gold, each time a fare
+  is paid to a driver or a ferryman of that hold.
+
+Notice, job and letter fees never go in. They leave the world and stay a
+record on the server, the hold's ledger, so the Court never has gold
+that does not exist.
+
+Who sees and takes what:
+
+- Anybody sees only what they put in themselves, gold included: only the
+  gold they added, never the box's total. They may take back what they
+  put in, rent included, and then that rent is owed again.
+- That hold's officers, its Jarl, its guards and a steward, see
+  everything in it and may take anything. Only they get Records: every
+  deposit and every take, by character name, what, how much, and when,
+  newest first. An officer taking gold somebody paid rent with leaves the
+  rent paid.
+
+Nothing about the box is typed. The panel's buttons send the server lines
+nobody is told to type (Patrick, 4 Oct).
+
 ## A notice and a job
 
 Post a notice, on the board's panel, with the words. 20 gold. It is
