@@ -94,7 +94,7 @@ function Update-NightlyIssue {
     }
 
     if ($Result -eq 'failure') {
-        $line = "The nightly checks failed on ${Day}: $Run. The failed step says which check; the harness step's last lines name every harness that failed."
+        $line = "The nightly checks failed on ${Day}: $Run. The failed step says which check; the last lines of each harness job name every harness that failed or did not get to run."
         if ($open.Count) {
             [void](Invoke-NightlyApi 'POST' "issues/$($open[0].number)/comments" @{ body = $line })
             $said += "added to #$($open[0].number)"
