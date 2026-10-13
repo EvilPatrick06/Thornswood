@@ -29,14 +29,22 @@
 
   The messages go into alerts.jsonl beside watch.log, one JSON line each (id,
   at, service, kind, text), and the same sentence goes into watch.log. The
-  bot on this box reads alerts.jsonl every minute and posts each one in the
-  staff channel (watch_services in bot\bot.py), writing its id to
-  alerts-sent-bot.txt. When the bot is not running, or has not posted one
-  within two and a half minutes, this posts it itself through a Discord
-  webhook whose address is in alerts-webhook.txt in this folder on the VPS,
-  and writes its id to alerts-sent-webhook.txt. That file is put there by
-  -SetWebhook or by hand, never committed, never printed, never logged.
-  With no webhook set, a message waits for the bot.
+  bot on this box reads alerts.jsonl every minute and posts each one in
+  #staff-updates, the channel whose id is in bot\staff-channel.txt
+  (watch_services in bot\bot.py), writing its id to alerts-sent-bot.txt.
+  When the bot is not running, or has not posted one within two and a half
+  minutes, this posts it itself through a Discord webhook whose address is in
+  alerts-webhook.txt in this folder on the VPS, and writes its id to
+  alerts-sent-webhook.txt. That file is put there by -SetWebhook, never
+  committed, never printed, never logged. With no webhook set, a message
+  waits for the bot.
+
+  The webhook has to be one made in #staff-updates, or the bot and the
+  webhook say the same outages in two different channels. -SetWebhook asks
+  Discord where a pasted webhook points and refuses any other channel, and
+  the report this prints with no switch says where the one on the box points
+  (#2501: until 12 Oct nothing checked, and the bot itself was saying the
+  watchdog's messages in the dev updates channel).
 
   Anything else on this box that needs to tell staff something (the bot's own
   wrapper, issue #449) appends a line of the same shape to alerts.jsonl and
@@ -109,6 +117,13 @@ param(
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here 'Vps.ps1')
+# #staff-updates, by id, from the file the bot reads (bot\staff-channel.txt):
+# the one channel the watchdog's messages belong in, from the bot or from the
+# webhook. Not a secret. '' when the file is missing or empty.
+$staffFile = Join-Path $Here '..\..\bot\staff-channel.txt'
+$StaffChannel = ''
+if (Test-Path -LiteralPath $staffFile) { $StaffChannel = ("$(Get-Content -LiteralPath $staffFile -Raw)").Trim() }
+if ($StaffChannel -notmatch '^\d{17,20}$') { $StaffChannel = '' }
 . (Join-Path $Here 'Send-Script.ps1')
 . (Join-Path $Here 'Lock-Folder.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
@@ -804,9 +819,30 @@ if (`$LASTEXITCODE -eq 0) { 'the task is gone' } else { 'there was no task calle
 # nowhere. On the box the file is readable by SYSTEM and Administrators only,
 # which keeps the build runner's account away from it.
 $hookRx = '^https://((ptb|canary)\.)?discord(app)?\.com/api/webhooks/\d+/[A-Za-z0-9_-]+$'
+
+# Where a webhook posts, asked of Discord: a GET on the webhook's own address
+# answers with its channel_id, and the address is its own authority, so no
+# token is involved. Channel is '' and Why says why when Discord would not
+# say. Nothing here prints or keeps the address. Set-DevNews.ps1 asks the
+# same way for the dev release webhook.
+function WebhookChannel([string]$url) {
+  $r = @{ Channel = ''; Why = '' }
+  try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+    $o = Invoke-RestMethod -Uri $url -Method Get -TimeoutSec 15 -UseBasicParsing
+    if ($o -and $o.PSObject.Properties['channel_id']) { $r.Channel = [string]$o.channel_id } else { $r.Why = 'Discord answered without a channel' }
+  } catch {
+    $code = 0
+    try { $code = [int]$_.Exception.Response.StatusCode } catch { }
+    $r.Why = $(if ($code -eq 401 -or $code -eq 404) { 'Discord answered ' + $code + ', so that webhook does not exist any more or the address is not whole' } elseif ($code) { 'Discord answered ' + $code } else { 'Discord could not be reached (' + $_.Exception.GetType().Name + ')' })
+  }
+  return $r
+}
+
 if ($SetWebhook) {
   Head 'Where the watchdog posts when the bot is down'
-  Say '  In Discord: the staff channel, Edit Channel, Integrations, Webhooks,' 'DarkGray'
+  if (-not $StaffChannel) { Die "There is no channel id in $staffFile, so the webhook cannot be checked. Nothing was sent." }
+  Say '  In Discord: #staff-updates, Edit Channel, Integrations, Webhooks,' 'DarkGray'
   Say '  New Webhook, then Copy Webhook URL. Paste it below. It is not shown,' 'DarkGray'
   Say '  not printed and not kept on this machine.' 'DarkGray'
   $sec = Read-Host '  Webhook address' -AsSecureString
@@ -814,6 +850,12 @@ if ($SetWebhook) {
   try { $url = ('' + [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)).Trim() }
   finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
   if ($url -notmatch $hookRx) { Die 'That is not a Discord webhook address (https://discord.com/api/webhooks/...). Nothing was sent.' }
+  # Before anything goes to the box: a webhook made in any other channel
+  # would say the outages there while the bot says them in #staff-updates.
+  $where = WebhookChannel $url
+  if (-not $where.Channel) { $url = $null; Die ('Discord would not say where that webhook posts: ' + $where.Why + '. Nothing was sent.') }
+  if ($where.Channel -ne $StaffChannel) { $url = $null; Die ('That webhook posts in channel ' + $where.Channel + ', not #staff-updates (' + $StaffChannel + '). Make it in #staff-updates. Nothing was sent.') }
+  Say ('  Discord says it posts in ' + $where.Channel + ', which is #staff-updates.') 'Green'
 
   $put = @"
 `$ErrorActionPreference = 'Continue'
@@ -891,7 +933,7 @@ if (Test-Path '$Root\alerts-webhook.txt') {
 
   Head 'From now on'
   Say '  Anything that stops gets started again within five minutes.' 'DarkGray'
-  Say '  The staff channel hears once when something goes down and once when it is back.' 'DarkGray'
+  Say '  #staff-updates hears once when something goes down and once when it is back.' 'DarkGray'
   Say '  Run this script with no switches to see what it has been doing.' 'DarkGray'
   Write-Host ''
   if (-not $NoPause) { [void](Read-Host 'Enter to close') }
@@ -957,7 +999,25 @@ if (`$d -and ([double]`$d.Used + `$d.Free) -gt 0) { 'disk      ' + [math]::Round
 else { 'disk      could not be read' }
 `$t = & schtasks /query /tn '$Task' /fo list 2>`$null
 if (`$LASTEXITCODE -eq 0) { 'watcher   installed' } else { 'watcher   NOT installed. Run this with -Install' }
-if (Test-Path '$Root\alerts-webhook.txt') { 'webhook   set' } else { 'webhook   none, so only the bot tells anybody. Run this with -SetWebhook' }
+# Where the webhook posts, asked of Discord on the box (WebhookChannel's
+# question, there): only the channel id comes back, never the address.
+if (Test-Path '$Root\alerts-webhook.txt') {
+  `$w = ''
+  try {
+    `$u = ('' + (Get-Content '$Root\alerts-webhook.txt' -TotalCount 1 -EA Stop)).Trim()
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+    `$o = Invoke-RestMethod -Uri `$u -Method Get -TimeoutSec 15 -UseBasicParsing
+    `$w = '' + `$o.channel_id
+  } catch {
+    `$code = 0
+    try { `$code = [int]`$_.Exception.Response.StatusCode } catch { }
+    'webhook   set, and DISCORD WOULD NOT SAY WHERE IT POSTS: ' + `$(if (`$code) { 'HTTP ' + `$code } else { `$_.Exception.GetType().Name })
+  }
+  `$u = `$null
+  if (`$w -and '$StaffChannel' -and `$w -eq '$StaffChannel') { 'webhook   set, posts in ' + `$w + ', which is #staff-updates' }
+  elseif (`$w -and '$StaffChannel') { 'webhook   set, and posts in ' + `$w + ', NOT #staff-updates ($StaffChannel). Make one there and run this with -SetWebhook' }
+  elseif (`$w) { 'webhook   set, posts in ' + `$w }
+} else { 'webhook   none, so only the bot tells anybody. Run this with -SetWebhook' }
 `$down = @()
 if (Test-Path '$Root\outages.txt') {
   foreach (`$line in (Get-Content '$Root\outages.txt' -EA SilentlyContinue)) {
@@ -969,7 +1029,7 @@ if (`$down.Count) { 'told      DOWN: ' + (`$down -join ', ') } else { 'told     
 "@
 foreach ($l in $out) {
   $c = 'Gray'
-  if ("$l" -match 'DOWN|NOT installed|LOW$|CRITICAL$|OFF DISCORD|Stopped$') { $c = 'Red' }
+  if ("$l" -match 'DOWN|NOT installed|LOW$|CRITICAL$|OFF DISCORD|Stopped$|NOT #staff-updates|WOULD NOT SAY') { $c = 'Red' }
   if ("$l" -match '\bup$|installed$|Running$') { $c = 'Green' }
   Say "  $l" $c
 }
