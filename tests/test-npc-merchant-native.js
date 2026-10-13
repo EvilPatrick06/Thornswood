@@ -29,7 +29,7 @@ for(const marker of ['NPC MERCHANT PURSES','NPC POPULATION POLICY','NPC POPULATI
 vm.runInContext('globalThis.catalogue=NPC_POPULATION_DATA;',ctx);
 const api={};
 for(const method of ['makeProperty','get','set','getIdFromDesc','getNpcAIState',
-  'setNpcPlacementExclusions','setNpcServerControlled','setNpcDifficultyTier']) api[method]=server[method].bind(server);
+  'setNpcPlacementExclusions','setNpcServerControlled','setNpcDifficultyTier','callPapyrusFunction','getDescFromId']) api[method]=server[method].bind(server);
 const data=ctx.catalogue,plugins=installed.loadOrder.map(file=>path.basename(file));
 assert.deepEqual(Array.from(data.plugins),plugins);
 const references=Array.from(data.keep.filter(row=>row[6]==='trader'),row=>row[0]);
