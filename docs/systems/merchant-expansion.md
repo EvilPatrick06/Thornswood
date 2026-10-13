@@ -66,6 +66,31 @@ Scene work pays its authored reward once through the quest transaction.
 New reward totals and repeat cadence must be checked against the economy;
 adding many offers must not create an uncapped new daily gold faucet.
 
+## Existing accepted work
+
+The ten currently bound contracts have retained-trade routes before any old
+trader is retired. Their existing quantities, rewards and cooldowns stay saved;
+these routes do not add new tiers or enable the thirteen unbound contracts.
+
+| Legacy work | Retained trade | Hold rule |
+| --- | --- | --- |
+| Ebony, stalhrim, heart stone | Smith | Existing any-hold mine return |
+| Gem | Enchanter | Existing any-hold mine return |
+| Wolf | Tailor | Whiterun |
+| Sabre cat | Tailor | Eastmarch |
+| Bear | Tailor | the Rift |
+| Camp, giant | Smith | Whiterun |
+| Barrow | Smith | Falkreath |
+
+The panel and submitted quest actions use the same role routes. Direct live
+quest calls also require a captured trader conversation. Its ownership check
+travels through the quest commit and is checked after native lookups, immediately
+before changing the character. Closing or replacing that conversation refuses
+the old action. This check is kept only in the working request, never saved on
+the character. Existing actor identities and inventory receipts remain fenced
+by the native transaction. The current roleless roster keeps its earlier offers
+until the six-trade roster and its item tables are explicitly activated together.
+
 ## Build order and checks
 
 | Part | Responsibility | Requires |

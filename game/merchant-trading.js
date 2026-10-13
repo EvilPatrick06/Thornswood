@@ -76,6 +76,7 @@ function createRolePermissions(places, tables) {
       copy.supply.forEach(function (id) {
         if (!copy.buy.has(id)) throw new Error('Role supplies must be permitted purchases.');
       });
+      copy.role=role;
       compiled.set(role,copy);
     });
   }
@@ -87,11 +88,17 @@ function createRolePermissions(places, tables) {
     }
     bindings.set(reference,table);
   });
-  return function (reference,direction,baseId) {
+  var permits = function (reference,direction,baseId) {
     if (!bindings.has(reference)) return false;
     var table=bindings.get(reference);
     return table===null || table[direction].has(baseId);
   };
+  permits.roleOf=function (reference) {
+    if (!bindings.has(reference)) return null;
+    var table=bindings.get(reference);
+    return table===null ? '' : table.role;
+  };
+  return permits;
 }
 
 function createNativeMerchantTransfer(mp) {
@@ -219,9 +226,13 @@ function createMerchantTrading(deps) {
     return Math.max(stamps[key] || 0, stamps[itemName.toLowerCase()] || 0);
   }
 
+  function sessionCurrent(actorId, profileId, session) {
+    return active && sessions.get(profileId)===session && !!session && session.actorId===actorId;
+  }
+
   function ownsSession(actorId, profileId, session) {
     var identity = sessionIdentity(world.actor(actorId));
-    return active && sessions.get(profileId) === session && session && identity === session.identity;
+    return sessionCurrent(actorId,profileId,session) && identity === session.identity;
   }
 
   function closedView(actorId, profileId, session) {
@@ -490,16 +501,18 @@ function createMerchantTrading(deps) {
     }
     if (verb === 'quest') {
       if (parts.length<4 || parts.length>5) return fail('Choose the work in the trader panel.');
-      var result=quests.act(actorId,String(parts[2]),String(parts[3]),parts[4],merchantId,heldQuest);
+      var result=quests.act(actorId,String(parts[2]),String(parts[3]),parts[4],merchantId,heldQuest,
+        function(){return sessionCurrent(actorId,profileId,originalSession);});
       var reasons={class:'This work takes a different class.',rank:'This work takes a higher rank.',
         cooldown:'This work is still resting.',open:'You already hold this work.',gem:'Choose a gem first.',
         short:'You have not drawn enough to turn this work in.',none:'You do not hold this work.',
         unbound:'This work has no appointed place yet.',unwritten:'The work could not be committed just now.',
-        unavailable:'Quest work is unavailable.'};
+        unavailable:'Quest work is unavailable.',role:'This trader does not handle that work.',
+        session:'Choose the work again from the trader.'};
       var text=result.ok ? (parts[2]==='take'?'You take the work.':parts[2]==='return'?'The work is turned in.':'You give back what you drew and leave the work.') :
         reasons[result.why] || 'The work could not be changed.';
-      var questState=purses.prepare(merchantId),questPlace=questState && placeOf(questState.reference);
       if (!ownsSession(actorId,profileId,originalSession)) return {text:'',view:null};
+      var questState=purses.prepare(merchantId),questPlace=questState && placeOf(questState.reference);
       var questResponse=questState && questPlace ? viewFor(merchantId,questState,questPlace,actorId,profileId,text,{session:originalSession,identity:originalSession.identity}) : closedView(actorId,profileId,originalSession);
       return questResponse && isCurrentView(actorId,questResponse) ? fail(text,questResponse) : {text:'',view:null};
     }
@@ -646,6 +659,19 @@ function createMerchantTrading(deps) {
     nativeReady: function () { return settlement.available(); },
     withQuestInventoryMutation: function(actorId,change) {return settlement.withInventoryMutation(actorId,change);},
     questReady: function(actorId) {return settlement.canInventoryMutation(actorId);},
+    questAdmission: function(actorId,merchantId) {
+      if (!active) return null;
+      var human=world.actor(actorId),profileId=human && human.profileId,session=sessions.get(profileId);
+      if (!session || session.merchantId!==merchantId || !ownsSession(actorId,profileId,session)) return null;
+      // The final transaction admission check must not invoke native callbacks.
+      // Actor identity remains fenced by the quest transaction's native CAS.
+      return function(){return sessionCurrent(actorId,profileId,session);};
+    },
+    questRole: function(merchantId) {
+      if (!active) return null;
+      var state=purses.read(merchantId);
+      return active && state ? permits.roleOf(state.reference) : null;
+    },
     questHold: function(merchantId) {
       var state=active && purses.read(merchantId),place=state && placeOf(state.reference);
       return place && place.hold || '';

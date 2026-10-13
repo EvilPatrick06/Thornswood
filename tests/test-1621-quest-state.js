@@ -166,6 +166,8 @@ function boot(into) {
     };
   }};
   ctx.__thornswoodMerchantTrade={nativeReady:function(){return true;},questReady:function(){return true;},
+    questRole:function(){return '';},
+    questAdmission:function(){return ()=>true;},
     questHold:function(id){return id===9000?'Whiterun':id===9001?'Eastmarch':'';}};
   ctx.globalThis = ctx;
   ctx.__thornswoodCharacter = { rankOf: function (a, key) { return ranks[a + ':' + key] || ''; } };
@@ -710,6 +712,60 @@ yes('the miner page says the same', /kept on the character/.test(mWhere) &&
   timers.filter(t=>t.ms===3500).forEach(t=>t.fn());
   yes('the newer swing keeps its cleanup lease after swing-end publication',!ctx.SWING_IN_AIR[95]);
 }
+// Accepted legacy work must survive retirement of its former interaction point.
+const legacyMines=[
+  {id:'ebony',role:'Smith',name:'Ebony Ore',ore:EBONY.ore,cell:EBONY_CELL},
+  {id:'gem',role:'Enchanter',name:'Ruby',ore:'63b42:Skyrim.esm',cell:RUBY_CELL,gem:'Ruby'},
+  {id:'stalhrim',role:'Smith',name:'Stalhrim',ore:'2b06b:Dragonborn.esm',cell:'142ee:Dragonborn.esm'},
+  {id:'heartstone',role:'Smith',name:'Heart Stone',ore:'17749:Dragonborn.esm',cell:'3929e:Dragonborn.esm'}
+];
+for(const [index,source] of legacyMines.entries()) {
+  const actor=200+index;ranks[actor+':miner']='master';w=restart();
+  yes(source.id+': legacy mine offer opens',w.svc.offer(actor,source.id,{gem:source.gem}).ok===true);
+  const ask=w.svc.lineup().scarce.find(row=>row.id===source.id).ask,ref=vein(source.cell);
+  for(let n=0;n<ask;n++)w.svc.mineRare(actor,ref,{name:source.name,ore:source.ore});
+  form(actor).props[PROP].retained={unchanged:true};w=restart();
+  w.ctx.__thornswoodMerchantTrade.questRole=id=>id===9100?source.role:id===9101?'Cook':null;
+  w.ctx.__thornswoodMerchantTrade.questHold=()=> 'the Rift'; // legacy mines remain any-hold
+  const before=JSON.stringify(forms[actor]);
+  yes(source.id+': retired and wrong-role traders cannot return the work',
+    w.svc.turnIn(actor,source.id,9000).why==='role' && w.svc.turnIn(actor,source.id,9101).why==='role' && JSON.stringify(forms[actor])===before);
+  yes(source.id+': retained role finishes the saved mine after restart',w.svc.act(actor,'return',source.id,null,9100).ok===true);
+  const after=JSON.stringify(forms[actor]);
+  yes(source.id+': duplicate return changes nothing and opaque state remains',
+    w.svc.turnIn(actor,source.id,9100).ok===false && JSON.stringify(forms[actor])===after && form(actor).props[PROP].retained.unchanged);
+}
+const contractRows=require('../game/kill-contracts').createKillContracts({mp:w.ctx.mp,population:compactPopulation,
+  raceOf:id=>npcStates[id].race,identity:actor=>'actor:'+actor}).rows;
+for(const [index,source] of contractRows.entries()) {
+  const actor=210+index,role=['wolf','sabre','bear'].includes(source.id)?'Tailor':'Smith';w=restart();
+  w.ctx.__thornswoodMerchantTrade.questHold=()=>source.hold;
+  for(const ref of source.refs){npcStates[npcIds[ref]].isDead=false;npcStates[npcIds[ref]].lifeGeneration++;}
+  yes(source.id+': legacy contract opens',w.svc.act(actor,'take',source.id,null,9000).ok===true);
+  for(const ref of source.refs.slice(0,source.count)){const id=npcIds[ref];npcStates[id].isDead=true;w.svc.noteKill(actor,id);}
+  form(actor).props[PROP].retained={unchanged:true};w=restart();
+  w.ctx.__thornswoodMerchantTrade.questRole=id=>id===9100||id===9102?role:id===9101?'Cook':null;
+  w.ctx.__thornswoodMerchantTrade.questHold=id=>id===9102?(source.hold==='Falkreath'?'Whiterun':'Falkreath'):source.hold;
+  const before=JSON.stringify(forms[actor]);
+  yes(source.id+': wrong role, wrong hold and absent trader make no write',
+    w.svc.act(actor,'return',source.id,null,9101).why==='role' &&
+    w.svc.act(actor,'return',source.id,null,9102).why==='hold' &&
+    w.svc.turnIn(actor,source.id,9000).why==='role' && JSON.stringify(forms[actor])===before);
+  const reward=w.svc.lineup().scene.find(row=>row.id===source.id).gold;
+  yes(source.id+': retained role pays the original reward after restart',
+    w.svc.act(actor,'return',source.id,null,9100).ok===true && have(actor,'f:Skyrim.esm')===reward);
+  const after=JSON.stringify(forms[actor]);
+  yes(source.id+': another return cannot pay twice or remove saved fields',
+    w.svc.act(actor,'return',source.id,null,9100).ok===false && JSON.stringify(forms[actor])===after && form(actor).props[PROP].retained.unchanged);
+}
+w=restart();ranks['230:miner']='master';
+w.ctx.__thornswoodMerchantTrade.questRole=id=>id===9100?'Smith':id===9101?'Enchanter':id===9102?'Tailor':null;
+w.ctx.__thornswoodMerchantTrade.questHold=()=> 'Whiterun';
+yes('a Smith displays three bound mines and its own Whiterun contracts',
+  w.svc.describe(230,9100).map(row=>row.id).sort().join(',')==='camp,ebony,giant,heartstone,stalhrim');
+yes('an Enchanter displays the bound gem work only',w.svc.describe(230,9101).map(row=>row.id).join(',')==='gem');
+yes('a Tailor displays the local wolf work only',w.svc.describe(230,9102).map(row=>row.id).join(',')==='wolf');
+yes('a direct wrong-role offer cannot bypass the route',w.svc.offer(230,'ebony',{traderRef:9101}).why==='role');
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
