@@ -42,7 +42,12 @@ temperature, not this meter. See [Disease](disease.md).
 
 ## Sleep
 
-A night in a real bed adds 25 thirst when you return.
+Logging out lying in a bed indoors stops the clock while you are away.
+After a night away, your own bed or one you are allowed in adds 25
+thirst, and an inn or temple bed nobody holds adds 15. Anywhere else,
+thirst falls at half its pace while you are away and the time away
+takes it no lower than 25. See [Exhaustion](exhaustion.md), Logging
+out.
 
 ## Where this is
 

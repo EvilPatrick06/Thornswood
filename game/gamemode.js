@@ -37830,6 +37830,8 @@ log('gamemode loaded:',
       a bed or bedroll nobody can lend you                 25      rough
       a seat with a fire in reach                          35      campfire
       a bed or bedroll nobody can lend you, by a fire      45      camp
+      an inn or temple bed nobody holds (#2246)            40      common
+      the same, by a fire                                  45      commonfire
       a bed you are allowed in: a guest, a key, a deed     50      inn
       your own bed                                         80      bed
 
@@ -37954,8 +37956,9 @@ log('gamemode loaded:',
     needs block two kinds of their own: common, a bed there, and commonfire,
     the same bed with a fire in reach. What each is worth, awake and at a
     logout, is NEEDS.recover and NEEDS.away in the needs block, the one table
-    of the balance. Until Patrick picks the numbers on #2246 they are the
-    rough and camp numbers they always were, so nobody's rest changes.
+    of the balance. Patrick's numbers, 12 Oct 2026 on #2246: 40 an hour
+    awake, 45 by a fire, nothing drains while logged out there, and a night
+    away gives full rest and 15 on hunger and thirst.
 
     WHAT AN INN OR A TEMPLE IS, read off the game's own records the way a
     bed is (bedKind): the room's CELL names its location (XLCN), and the
@@ -54672,12 +54675,13 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       AN INN OR A TEMPLE NOBODY HOLDS IS ITS OWN KIND (#2246): common, and
       commonfire with a fire in reach (restPlaceOf in the property block).
       Djinn's ask on #2246 is that resting at an inn or a temple gives back
-      the most and the wild the least; what that is worth is Patrick's to say
-      on #2246, so until he does these are the rough and camp numbers such a
-      bed always had, and nobody's rest changes.
+      more than the wild. Patrick, 12 Oct 2026, on #2246: 40 an hour, and 45
+      by a fire, the road's own number by a fire. Better than a bedroll on
+      the road (25), still under a bed you are allowed in (50) and your own
+      (80), so the #1603 ladder holds.
     */
     recover: { sit: 20, rough: 25, campfire: 35, camp: 45, inn: 50, bed: 80,
-               common: 25, commonfire: 45 },
+               common: 40, commonfire: 45 },
     bard: 25,
 
     /*
@@ -54705,11 +54709,24 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       building's key or deed carried). A bed or bedroll nobody can lend you is
       the road, and gives nothing.
 
-      #2246 asks for the rest of this table: logging out should give the
+      #2246 asked for the rest of this table: logging out should give the
       most back, an inn or a temple the highest share, the wild the least.
-      The rows are here so that is a change of numbers and nothing else.
-      Until Patrick says on #2246 what they are, they are what they have
-      always been: every row drains in full, and only the two beds fill.
+      Measured on #2246 before this: every row drained the whole clock, so a
+      new character who logged out anywhere but a bed of their own and came
+      back after a night found hunger, thirst and rest all at 0, spent on
+      all three, and every new character arrives in an inn nobody holds.
+
+      Patrick, 12 Oct 2026, on #2246, the recommended table:
+        - in a bed indoors, your own, one you are allowed in, or an inn or
+          temple bed nobody holds, nothing drains while you are away;
+        - anywhere else, a bedroll or a bed on the road, a seat, or on your
+          feet, half the clock, and never under 25;
+        - a night away in an inn or temple bed nobody holds gives rest to
+          100 and 15 on hunger and thirst, under your own bed's and a bed
+          you are allowed in's 25;
+        - a night on a bedroll or a bed on the road leaves rest at least 50
+          and nothing on hunger or thirst; a seat or your feet, nothing;
+        - the clock itself (drain, above) stays as he set it on 23 Sep.
 
       sleptFor is how long away is a night: 8 hours on the game clock, which
       runs twenty times real time, so 24 real minutes. Away for less is no
@@ -54717,15 +54734,15 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       straight back in would put 25 on hunger and thirst every time.
     */
     away: {
-      bed:        { drain: 1, floor: 0, rest: 100, food: 25, drink: 25 },
-      inn:        { drain: 1, floor: 0, rest: 100, food: 25, drink: 25 },
-      common:     { drain: 1, floor: 0, rest: 0, food: 0, drink: 0 },
-      commonfire: { drain: 1, floor: 0, rest: 0, food: 0, drink: 0 },
-      camp:       { drain: 1, floor: 0, rest: 0, food: 0, drink: 0 },
-      rough:      { drain: 1, floor: 0, rest: 0, food: 0, drink: 0 },
-      campfire:   { drain: 1, floor: 0, rest: 0, food: 0, drink: 0 },
-      sit:        { drain: 1, floor: 0, rest: 0, food: 0, drink: 0 },
-      up:         { drain: 1, floor: 0, rest: 0, food: 0, drink: 0 }
+      bed:        { drain: 0, floor: 0, rest: 100, food: 25, drink: 25 },
+      inn:        { drain: 0, floor: 0, rest: 100, food: 25, drink: 25 },
+      common:     { drain: 0, floor: 0, rest: 100, food: 15, drink: 15 },
+      commonfire: { drain: 0, floor: 0, rest: 100, food: 15, drink: 15 },
+      camp:       { drain: 0.5, floor: 25, rest: 50, food: 0, drink: 0 },
+      rough:      { drain: 0.5, floor: 25, rest: 50, food: 0, drink: 0 },
+      campfire:   { drain: 0.5, floor: 25, rest: 0, food: 0, drink: 0 },
+      sit:        { drain: 0.5, floor: 25, rest: 0, food: 0, drink: 0 },
+      up:         { drain: 0.5, floor: 25, rest: 0, food: 0, drink: 0 }
     },
     sleptFor: 24 * 60000,
 
@@ -55180,8 +55197,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
 
     /*
       HOW MUCH OF THE CLOCK THE TIME AWAY COSTS, by where they logged out
-      (#2246): NEEDS.away's drain, on an arrival only. 1, the whole clock,
-      everywhere until Patrick says otherwise on #2246.
+      (#2246): NEEDS.away's drain and floor, on an arrival only. Nothing in a
+      bed indoors, half the clock and never under 25 anywhere else.
     */
     var gone = arriving ? awayRow(n.resting) : null;
     var share = gone ? Number(gone.drain) : 1;
@@ -56060,6 +56077,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       // "hot" are different words on a bar and 34 means nothing on its own.
       tempBand: t.name, tempCold: !!t.cold,
       resting: n.resting || '', place: n.place || '',
+      // What logging out where they are now would do (#2246), from the same
+      // NEEDS.away row the arrival reads, so the Body page cannot drift.
+      away: awayWords(n.resting),
       /*
         WHY THE NUMBER IS WHAT IT IS, added 23 September.
 
@@ -56549,6 +56569,39 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     kind = String(kind || '');
     if (kind && Object.prototype.hasOwnProperty.call(NEEDS.away, kind)) { return NEEDS.away[kind]; }
     return NEEDS.away.up;
+  }
+
+  /*
+    What logging out now would do, in words, for the Body page on K (#2246).
+    Worked out from the same NEEDS.away row that settle and arrived read at
+    the arrival, so a change of numbers changes the page with it.
+  */
+  function awayWords(kind) {
+    var row = awayRow(kind);
+    var drain = Number(row.drain), floor = Number(row.floor) || 0;
+    if (!(drain >= 0)) { drain = 1; }
+    var words;
+    if (drain <= 0) {
+      words = 'Log out now and nothing runs down while you are away.';
+    } else {
+      words = 'Log out now and hunger, thirst and rest fall at ' +
+        (drain >= 1 ? 'the full pace' : (drain === 0.5 ? 'half the pace' : Math.round(drain * 100) + ' per cent of the pace')) +
+        ' while you are away' +
+        (floor > 0 ? ', and the time away takes none of them below ' + floor + '.' : '.');
+    }
+    var rest = Number(row.rest) || 0, food = Number(row.food) || 0, drink = Number(row.drink) || 0;
+    var gives = [];
+    if (rest >= 100) { gives.push('rest is full'); } else if (rest > 0) { gives.push('rest is at least ' + rest); }
+    if (food > 0 && food === drink) { gives.push(food + ' goes back on hunger and thirst'); }
+    else {
+      if (food > 0) { gives.push(food + ' goes back on hunger'); }
+      if (drink > 0) { gives.push(drink + ' goes back on thirst'); }
+    }
+    if (gives.length) {
+      words += ' Away ' + Math.round(NEEDS.sleptFor / 60000) + ' minutes or more and ' +
+        gives.join(' and ') + ' when you come back.';
+    }
+    return words;
   }
 
   /** Too tired to make anything. See CRAFT_REST. */
@@ -57142,7 +57195,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     // One pass of the minute tick, for the harnesses (#1382).
     tick: tick,
     // The hangover, for the physicker's remedy in the wounds panel (#1382).
-    hungOver: hungOver, soberUp: soberUp
+    hungOver: hungOver, soberUp: soberUp,
+    // What logging out now would do, in the Body page's words (#2246).
+    awayWords: awayWords
   };
 
   nlog('ready: food empties in', Math.round(100 / NEEDS.drain.food) + 'h,',
