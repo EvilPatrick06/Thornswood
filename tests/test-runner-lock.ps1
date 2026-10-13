@@ -15,6 +15,14 @@
   #1105 locked the server folders, and -Lock puts every runner on the box
   right without replacing any of them.
 
+  CRASH DUMPS (#2127, #2488). Lock-VpsFolders.ps1 gives every runner account
+  write and no read on C:\Thornswood-Dumps (Patrick, 11 October), and until
+  12 October every install and -Lock put a full deny on it for every runner,
+  which beats that write. This pins that Install-Runner leaves exactly the
+  folder Lock-VpsFolders.ps1 names to it, that no other deny is in the
+  script, and, on scratch folders with the real Lock-VpsFolders.ps1, that the
+  lock takes an old deny off, says so, and keeps the write.
+
   HOW. Reads Install-Runner.ps1 for the names -Number gives and for where the
   locks run. Then, on Windows, lifts the real Lock-RunnerRoot and
   Close-RunnerAccount out of the script and runs them on scratch folders
@@ -98,6 +106,31 @@ if ($all) {
     Yes '  only folders under C:\Thornswood-Runner' ($all.Contains("-notlike 'C:\Thornswood-Runner*'"))
     Yes '  and touches no runner: no service stopped, removed or registered' ($all -notmatch '(?i)Stop-Service|Restart-Service|sc\.exe|config\.cmd|Remove-LocalUser|Set-LocalUser')
 }
+# ---- crash dumps (#2127, #2488) ---------------------------------------------------
+# Lock-VpsFolders.ps1 gives every thornswood-runner* account write and no read
+# on one folder, so a build's node crash leaves its dump. Install-Runner must
+# never deny the runners that folder: a deny beats the allow, and until 12
+# October the install and -Lock put one there for every runner.
+$lvfPath = Join-Path $Repo 'scripts\vps\Lock-VpsFolders.ps1'
+$lvf = [IO.File]::ReadAllText($lvfPath)
+$dumpsName = [regex]::Match($lvf, "\`$isDumps = \`$f\.Name -eq '([^']+)'").Groups[1].Value
+Yes ("Lock-VpsFolders.ps1 gives the runner accounts write on one folder (" + $dumpsName + ')') ($dumpsName -and $lvf.Contains('W = $(if ($isDumps) { $dumpWriters }') -and $lvf -match "Name -like 'thornswood-runner\*'")
+$leaveAsg = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] -and "$($n.Left)" -eq '$leaveList' }, $false))
+$onBox = @(); $offBox = @('not run')
+if ($leaveAsg.Count -eq 1) {
+    $src = { param($o) & ([scriptblock]::Create("param(`$OffBox) " + $leaveAsg[0].Extent.Text + "`n`$leaveList")) $o }
+    $onBox = @(& ([scriptblock]::Create((& $src $false))))
+    $offBox = @(& ([scriptblock]::Create((& $src $true))))
+}
+Yes ('on the VPS Install-Runner leaves exactly that folder to Lock-VpsFolders.ps1 (' + ($onBox -join ', ') + ')') ($dumpsName -and $onBox.Count -eq 1 -and $onBox[0] -eq $dumpsName)
+Yes '  off the box (-OffBox) it leaves nothing out' ($offBox.Count -eq 0)
+$calls = @([regex]::Matches($text, '(?m)^[ \t]*Close-RunnerAccount [^\r\n]*') | ForEach-Object { $_.Value.Trim() })
+Yes ('both Close-RunnerAccount calls, the install''s and the lock''s, pass that list (' + $calls.Count + ' found)') ($calls.Count -eq 2 -and @($calls | Where-Object { $_ -match '\$leave(List)?$' }).Count -eq 2)
+$denies = @([regex]::Matches($text, '(?m)^[^\r\n#]*/deny[^\r\n]*') | ForEach-Object { $_.Value.Trim() })
+Yes ('no other folder deny in the script: Close-RunnerAccount''s and the off-box read guard''s only (' + $denies.Count + ' found)') ($denies.Count -eq 2 -and
+    @($denies | Where-Object { $_ -eq '$null = & icacls.exe $d.FullName /deny ($acct + '':(OI)(CI)F'') /C /Q 2>&1' -or $_ -eq '$null = & icacls.exe $p /deny ($acct + '':(OI)(CI)F'') /C /Q 2>&1' }).Count -eq 2)
+if ($all) { Yes '  and -Lock says what Dumps is, once for the box' ($all.Contains("Show-LeftFolders 'C:\' `$leave")) }
+
 if ($lib) {
     Yes 'a runner''s folder takes nothing from C:\' ($lib.Contains('/inheritance:r'))
     Yes '  SYSTEM and Administrators Full Control, its own account Modify' ($lib.Contains("'*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' (`$acct + ':(OI)(CI)M')"))
@@ -145,6 +178,48 @@ if (-not $icacls -or -not $lib) {
         Yes '  and counts the one that was closed anyway' (@($said | Where-Object { $_ -like '*: already shut out of 0 folder(s), and a deny added on 1 that were closed to it anyway' }).Count -eq 1)
         $said = @(Close-RunnerAccount '*S-1-5-7' $own $scratch)
         Yes '  a second run finds both already shut and names nothing' ($said.Count -eq 1 -and $said[0] -eq '*S-1-5-7: already shut out of 2 folder(s)')
+
+        # ---- crash dumps, for real: the real Lock-VpsFolders.ps1 on a scratch
+        # Dumps, then the deny an install before #2488 left, then the lock.
+        $box = Join-Path $scratch 'box'
+        $dumps = Join-Path $box $dumpsName
+        $server = Join-Path $box 'Thornswood-Server'
+        $own2 = Join-Path $box 'Thornswood-Runner9'
+        foreach ($d in $dumps, $server, $own2) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
+        Set-Content -LiteralPath (Join-Path $dumps 'node.exe.1234.dmp') -Value 'stand-in'
+        $ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+        function LockBox {
+            $eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+            try { $o = @(& $ps51 -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $lvfPath -Parent $box -SiteSid none -BotSid none -AllowGamingPc -DumpWriterSids 'S-1-5-7' 2>&1 | ForEach-Object { "$_" }) }
+            finally { $ErrorActionPreference = $eap }
+            return @{ Code = $LASTEXITCODE; Said = ($o -join ' ') }
+        }
+        $lv = LockBox
+        Yes ('Lock-VpsFolders.ps1 locks the scratch Dumps (exit ' + $lv.Code + ')') ($lv.Code -eq 0 -and $lv.Said -match [regex]::Escape('locked ' + $dumps))
+        $writeBit = [int][Security.AccessControl.FileSystemRights]::WriteData
+        $readBit = [int][Security.AccessControl.FileSystemRights]::ReadData
+        $mayWrite = { param($d) @(Rules $d | Where-Object { "$($_.AccessControlType)" -eq 'Allow' -and $_.IdentityReference.Value -eq 'S-1-5-7' -and ([int]$_.FileSystemRights -band $writeBit) -and -not ([int]$_.FileSystemRights -band $readBit) }).Count -ge 1 }
+        Yes '  ANONYMOUS LOGON, standing in for a runner account, may write there and not read' (& $mayWrite $dumps)
+        # What an install before #2488 did. icacls /deny also takes the
+        # account's own allow off the folder, so the write goes with it.
+        $null = & icacls.exe $dumps /deny '*S-1-5-7:(OI)(CI)F' /C /Q 2>&1
+        Yes '  an install before #2488 put a full deny on it (the control)' ((& $deny $dumps) -ge 1 -and (& $deny (Join-Path $dumps 'node.exe.1234.dmp')) -ge 1)
+        Yes '  and that deny took the write away with it' (-not (& $mayWrite $dumps))
+
+        $said = @(Close-RunnerAccount '*S-1-5-7' $own2 $box 'Thornswood-*' @() $onBox)
+        Yes 'Close-RunnerAccount with the VPS list: no deny left on Dumps' ((& $deny $dumps) -eq 0)
+        Yes '  nor on the dump in it' ((& $deny (Join-Path $dumps 'node.exe.1234.dmp')) -eq 0)
+        Yes '  it says it took the old deny off, and that Lock-VpsFolders.ps1 gives the write back' (@($said | Where-Object { $_ -eq ('*S-1-5-7: took off the deny an earlier install put on ' + $dumps + '; that deny also took its write away, so run Lock-VpsFolders.ps1 to give it write and no read there again (#2127, #2488)') }).Count -eq 1)
+        Yes '  every other Thornswood-* folder is still shut' ((& $deny $server) -ge 1 -and (& $deny $own2) -eq 0)
+        $lv = LockBox
+        Yes ('Lock-VpsFolders.ps1 run after it gives the write back (exit ' + $lv.Code + ')') ($lv.Code -eq 0 -and (& $mayWrite $dumps) -and (& $deny $dumps) -eq 0)
+        $said = @(Close-RunnerAccount '*S-1-5-7' $own2 $box 'Thornswood-*' @() $onBox)
+        Yes 'a lock after that puts no deny back, has nothing to take off, and keeps the write' ((& $deny $dumps) -eq 0 -and -not ($said -join ' ' -match 'took off') -and (& $mayWrite $dumps))
+        $said = @(Show-LeftFolders $box $onBox)
+        Yes 'Show-LeftFolders: Dumps locked by Lock-VpsFolders.ps1 is said to be closed to Users' ($said.Count -eq 1 -and $said[0] -like ($dumps + ' is left to Lock-VpsFolders.ps1 (#2127): no deny from here, and Users do not reach it'))
+        $null = & icacls.exe $dumps /grant '*S-1-5-32-545:(OI)(CI)RX' /C /Q 2>&1
+        $said = @(Show-LeftFolders $box $onBox)
+        Yes '  and one Users still reach is named, with what to run' ($said.Count -eq 1 -and $said[0] -like ($dumps + ' is left to Lock-VpsFolders.ps1 (#2127), and USERS STILL REACH IT*Lock-VpsFolders.ps1*'))
     }
     finally {
         Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue

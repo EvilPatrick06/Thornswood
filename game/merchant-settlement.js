@@ -178,7 +178,8 @@ function createSettlement(deps) {
         var labels=Array.from(new Set(moved.map(function(row) {return row.label;})));
         if(labels.length!==1 || owner[2]!==labels[0].toLowerCase()) throw new Error('Merchant supply owner cannot be verified.');
       }
-    } else if(Array.isArray(owner) && (owner.length!==3 || owner[0]!==pending.human.desc || owner[1]!==pending.human.profileId))
+    } else if(Array.isArray(owner) && (owner.length!==3 || owner[0]!==pending.human.desc || owner[1]!==pending.human.profileId ||
+        typeof owner[2]!=='string' || !owner[2]))
       throw new Error('Merchant supply owner cannot be verified.');
   }
   function conservation(pending, fresh) {
@@ -270,7 +271,7 @@ function createSettlement(deps) {
     return equal(human, pending.human) ? id : 0;
   }
   function valid(pending, state) {
-    return state && pending && pending.version === 2 && pending.world === world &&
+    return state && pending && (pending.version===2 && pending.terms===undefined || pending.version===3 && pending.terms!==undefined) && pending.world === world &&
       pending.reference === state.reference && pending.base === state.base &&
       typeof pending.id === 'string' && pending.id.length>0 && humanKey(pending.human) &&
       ['buy','sell','supply'].indexOf(pending.kind)>=0 &&
@@ -356,7 +357,9 @@ function createSettlement(deps) {
           // including after restart. No original inventory restoration is needed.
           return !!save(id, state, Object.assign({}, copy(state), {pending:null}), pending.id);
         }
-        if (!active || !identity(pending)) return false;
+        if (!active) return false;
+        var currentHumanId=identity(pending);
+        if (!active || currentHumanId!==humanId) return false;
         var changed = transfer.cas(humanId, pending.expected, pending.expectedReceipt, pending.debit, pending.sequence, pending.human.profileId);
         if (!active) return false;
         live = transfer.receipt(humanId); saved = transfer.saved(humanId);
@@ -386,7 +389,9 @@ function createSettlement(deps) {
       if (!state || !active) return false;
       pending = state.pending;
     }
-    if (!active || !identity(pending)) return false;
+    if (!active) return false;
+    var currentHumanId=identity(pending);
+    if (!active || currentHumanId!==humanId) return false;
     transfer.cas(humanId, pending.creditAttempt.expected, pending.debitReceipt,
       pending.creditAttempt.replacement, pending.sequence + 1, pending.human.profileId);
     // A notification may throw after CAS changed inventory. The saved intent
@@ -418,7 +423,7 @@ function createSettlement(deps) {
       if (transfer.saved(offer.humanId) !== receipt)
         return {accepted:false,done:false,reason:'Your previous inventory change is waiting on the save.'};
       if (!Number.isSafeInteger(sequence + 1)) throw new Error('Inventory receipt sequence is exhausted.');
-      var pending = {version:2,id:world + ':' + state.reference + ':' + (state.revision || 0),world:world,
+      var pending = {version:3,id:world + ':' + state.reference + ':' + (state.revision || 0),world:world,
         reference:state.reference,base:state.base,human:human,kind:offer.kind,phase:'debit',
         previous:copy(previous),next:copy(offer.next),
         expected:expected,expectedReceipt:receipt,debit:inventory(offer.debit),credit:inventory({entries:offer.credit}).entries,
@@ -491,7 +496,7 @@ function createSettlement(deps) {
   function canRetire() {
     if(!available() || busy) return false;
     busy=true;
-    try {return records().every(function(record) {return record.state.pending.terms!==undefined;});}
+    try {return records().every(function(record) {return record.state.pending.version===3;});}
     finally {busy=false;}
   }
   return {begin:begin,tick:tick,available:available,canRetire:canRetire,pruneSupplyHistory:pruneSupplyHistory,

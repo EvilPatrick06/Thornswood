@@ -235,7 +235,7 @@ yes('and the page says ' + spoken(LAPSE) + ' seconds', says(text, LAPSE, '', ' s
   const f = front;
   yes('names in green: the plugin colours party members\' name tags',
       /name in green above their head/.test(text) &&
-      /sp\.setTextColor\(textId, PARTY_COLOUR\)/.test(f));
+      /party: PARTY_COLOUR/.test(f) && /sp\.setTextColor\(textId, TAG_COLOURS\[colour\]\)/.test(f));
   yes('a map marker you cannot fast travel to',
       /a marker on your map/.test(text) && /cannot fast travel/.test(text) &&
       /ref\.addToMap\(false\)/.test(f));

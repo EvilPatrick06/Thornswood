@@ -125,8 +125,9 @@ function workFor(text) {
 }
 
 // ---------------------------------------------------------- the known page
-const known = read(path.join('data', 'known.md'));
-yes('known.md is there', known !== null);
+// The page is the known board, written out the way /known writes it (#2414).
+const known = require('./fixtures/known-page').knownPage();
+yes('the Known Issues page is there, written from the known board', known !== null);
 const page = sections(known || '');
 const skymp = page.list[0] || { heading: '', lead: '', rows: [] };
 yes('its first table is the group that follows from SkyMP, with its rows',
@@ -246,13 +247,13 @@ yes('help.md is there', help !== null);
 }
 
 // ---------------------------------------------------- one copy only (#2414)
-/* The hub kept its own copy of this table in board.json under "known". Its
-   intro said "Permanent limits of how this server works. None are bugs, none
-   are changing." over the same NPC rows, and after the hub stopped editing
-   boards (#433) nothing showed it or fixed it: it still said NPCs stand
-   still with nobody near after #504. It is gone; tests/test-2414-known-one-copy.js
-   keeps it gone. */
-yes('board.json has no second copy of Known Issues', !(board && board.known));
+/* The text was kept twice, known.md for the page and a known board nothing
+   showed, and the board went stale: its intro said "Permanent limits of how
+   this server works. None are bugs, none are changing." over NPC rows #504
+   made untrue. Patrick, 12 October: the hub board is the one copy. The page
+   above is that board, and tests/test-2414-known-one-copy.js keeps a second
+   copy from coming back. */
+yes('there is no known.md beside the board', read(path.join('data', 'known.md')) === null);
 
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');

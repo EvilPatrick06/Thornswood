@@ -14,8 +14,8 @@
 // gamemode.js opens that panel by itself once the face is made, the character
 // block ends creation the moment a home is picked, and the panel offers
 // "Choose later" for class and profession and never for the home. But the two
-// pages anybody can read without signing in, /known and /help (PUBLIC_DOCS in
-// server.js), still said the opposite:
+// pages anybody can read without signing in, /known and /help (the known board
+// and help.md), still said the opposite:
 //
 //   known.md  "Your profession, half, class and town are chosen in the
 //              launcher before Play, and the hall holds nothing to pick up
@@ -49,7 +49,8 @@ function yes(what, cond) {
 const SRC = process.env.GM || path.join(REPO_DIR, 'game', 'gamemode.js');
 const gm = fs.readFileSync(SRC, 'utf8').split(CR).join('');
 const skills = read(path.join('game', 'ui', 'thornswood-skills.js'));
-const known = read(path.join('site', 'data', 'known.md'));
+// Known Issues is the known board, as /known writes it (#2414).
+const known = require('./fixtures/known-page').knownPage() || '';
 const help = read(path.join('site', 'data', 'help.md'));
 
 /** From a start marker to the first end marker after it, or null. */
@@ -143,7 +144,7 @@ function launcherChooses(s) {
          /\b(chosen|choose|chooses|decided|decides|asks|made|comes? from|picks?|picked)\b/i.test(s);
 }
 
-[['known.md', known], ['help.md', help]].forEach(function (page) {
+[['the Known Issues page', known], ['help.md', help]].forEach(function (page) {
   const wrong = sentences(page[1]).filter(launcherChooses);
   yes(page[0] + ' does not say anything about a new character is chosen in the launcher' +
       (wrong.length ? ': "' + wrong[0] + '"' : ''), wrong.length === 0);

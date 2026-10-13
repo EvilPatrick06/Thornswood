@@ -256,10 +256,13 @@ try {
   fs.readdirSync(path.join(APP, 'data', 'site')).filter(function (f) { return /\.md$/.test(f); })
     .forEach(function (f) { pages.push(path.join(APP, 'data', 'site', f)); });
 } catch (e) { }
-['help.md', 'known.md'].forEach(function (f) { pages.push(path.join(APP, 'data', f)); });
+pages.push(path.join(APP, 'data', 'help.md'));
+// Known Issues is the known board, written out the way /known writes it (#2414).
+const KNOWN_PAGE = require('./fixtures/known-page').knownPage();
+pages.push('known board');
 yes('there are real pages to draw, ' + pages.length + ' of them', pages.length >= 9);
 pages.forEach(function (p) {
-  const raw = read(p);
+  const raw = p === 'known board' ? KNOWN_PAGE : read(p);
   if (raw === null) { yes(path.basename(p) + ' reads', false); return; }
   [false, true].forEach(function (open) {
     const md = forMode(raw, open);
@@ -348,7 +351,7 @@ copy('server.js');
 ['home.html', 'home.js', 'index.html', MARKED, 'fonts.css'].forEach(function (f) { copy(path.join('public', f)); });
 faces.forEach(function (u) { copy(path.join('public', u.slice(5, -1))); });
 fs.readdirSync(path.join(APP, 'data', 'site')).forEach(function (f) { copy(path.join('data', 'site', f)); });
-['help.md', 'known.md'].forEach(function (f) { copy(path.join('data', f)); });
+copy(path.join('data', 'help.md'));
 // Its own config: a secret so nothing is written, and a game port nothing
 // listens on, so it never knocks on a real server on this machine.
 fs.writeFileSync(path.join(work, 'config.json'), JSON.stringify({
@@ -360,7 +363,8 @@ fs.writeFileSync(path.join(work, 'config.json'), JSON.stringify({
 fs.writeFileSync(path.join(work, 'data', 'site', 'terms.md'),
   '# Terms\n\n<img src=x onerror=alert(1)>\n\n[click](javascript:alert(1))\n\nIt costs $1 and $&.\n');
 fs.writeFileSync(path.join(work, 'data', 'board.json'), JSON.stringify({
-  roadmap: { intro: 'Coming **next**. <script>alert(1)</script>', sections: [] }
+  roadmap: { intro: 'Coming **next**. <script>alert(1)</script>', sections: [] },
+  known: JSON.parse(fs.readFileSync(path.join(APP, 'data', 'board.json'), 'utf8')).known
 }));
 
 function freePort() {
@@ -495,6 +499,14 @@ const siteLog = function () { return read(path.join(work, 'site.log')) || ''; };
   yes('/world carries the anchor the footer points at', world.text.indexOf('<a id="accord"></a>') >= 0);
   const help = await get(port, '/help');
   yes('/help comes from the data folder and is drawn too', /<div class="wrap" id="pagebody"><h1>/.test(help.text));
+  // #2414: /known is the known board, written out and drawn, with no known.md anywhere.
+  const known = await get(port, '/known');
+  yes('/known is drawn from the known board', known.status === 200 &&
+      known.text.indexOf('<div class="wrap" id="pagebody"><h1>Known Issues</h1>') >= 0 &&
+      /<table>[\s\S]*Most mod scripts never fire/.test(known.text));
+  let kapi = {};
+  try { kapi = JSON.parse((await get(port, '/api/page/known')).text); } catch (e) { }
+  yes('and /api/page/known hands out the same page the board writes', !!KNOWN_PAGE && kapi.md === KNOWN_PAGE);
 
   const terms = await get(port, '/terms');
   const termsBody = (/<div class="wrap" id="pagebody">([\s\S]*?)<\/div><\/div>/.exec(terms.text) || [])[1] || '';

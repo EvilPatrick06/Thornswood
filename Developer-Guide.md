@@ -1527,7 +1527,7 @@ The gamemode command, then the server command, is the live pair. `-GamemodeOnly`
 
 ### A hotfix
 
-A hotfix is the one live release that does not come off `main`. The branch starts from the tag of the release that is live, carries only the fix and its `Bump-Version.ps1` commit, and is pushed. Ship runs from a checkout of that branch. The dev feed stays as it is. The fix also goes to `main` through its own pull request, or the next main release loses it. The long form is in [How a release goes out](#how-a-release-goes-out).
+A hotfix is the one live release that does not come off `main`. The branch starts from the tag of the release that is live, carries only the fix and its `Bump-Version.ps1` commit, and is pushed. Ship runs from a checkout of that branch. When the installer has to be rebuilt for it, `Package-Thornswood.ps1 -OneFile` runs from the same checkout: it and `Publish-Installer.ps1` accept a clean `hotfix/` branch that matches GitHub by the same rule Ship uses (#2436), with no `-AllowStaleCheckout`. The dev feed stays as it is. The fix also goes to `main` through its own pull request, or the next main release loses it. The long form is in [How a release goes out](#how-a-release-goes-out).
 
 ### How a release goes out
 
@@ -1943,9 +1943,12 @@ it per session and ignores which profile Vortex has on.
 - `lore\`: history and the Accord. `site\data\site\*.md`: the public
   pages (join, rules, classes, world, credits, privacy, terms), also live on
   the site.
-- The site's hub boards (Active Issues, Known Issues, Test These, Suggestions,
-  Archive, the Patrick runbook) are older than the board and are being retired
-  (issue #433); where they disagree with the board, the board is right.
+- The site's hub boards (Active Issues, Test These, Suggestions, Archive, the
+  Patrick runbook) are older than the board and are being retired (issue
+  #433); where they disagree with the board, the board is right. Known
+  Issues is not one of them: it is the public page's only copy, the known
+  board in `site\dataoard.json`, edited in the hub at `/hub/known` and
+  written out at `/known` (decided by Patrick on 12 Oct, issue #2414).
 - `docs\archive`: dated snapshots (HANDOFF, the 17 September audit,
   WORKING-NOTES and the old To Do List), history only.
 
@@ -2708,4 +2711,4 @@ Not from the chat: `/restart` and `/shutdown` answer that restarts are not run f
 | Command | Who | What it does |
 | --- | --- | --- |
 | `/close [why]` | Staff, in a ticket: the bot's `STAFF_ROLES`, by id or name, never Manage Threads alone (#1342) | Closes the ticket |
-| `/test-task title body tag` | Owner, Dev and Lead Gamemaster (`TEST_TASK_ROLES`) | Posts one thread in the #test-tasks forum, tagged Dev or Main. The Live smoke checklist and `/live-smoke` were taken out on 11 October |
+| `/test-task title body` | Owner, Dev and Lead Gamemaster (`TEST_TASK_ROLES`) | Posts one thread in the #test-tasks forum, tagged Main: every test task is Main only, by hand or from the board (#2276). The Live smoke checklist and `/live-smoke` were taken out on 11 October |

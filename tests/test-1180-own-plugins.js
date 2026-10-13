@@ -225,7 +225,7 @@ if (block) {
 {
   const help = read("launcher", "app", "Help.cs");
   const join = read("site", "data", "site", "join.md");
-  const known = read("site", "data", "known.md");
+  const known = require("./fixtures/known-page").knownPage() || "";  // the known board, as /known writes it (#2414)
   const md = read("site", "data", "help.md");
   yes("the launcher's help says Fix fetches only our own plugin and names the Vortex mod for another's",
       /downloads the server's copy of Thornswood's own plugin when its bytes differ, names the mod to update or reinstall in Vortex when another author's plugin differs/.test(help));

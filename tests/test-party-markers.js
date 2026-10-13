@@ -139,14 +139,18 @@ function code(s) {
   const c = code(front);
   yes('the plugin reads the client\'s own table of name tags',
       /sp\.storage\['idTextNickname'\]/.test(c));
-  yes('and colours by the id it finds there', /sp\.setTextColor\(textId, PARTY_COLOUR\)/.test(c));
+  // Run, not read, in tests\test-2474-heads.js: a tag remade after you look
+  // away is coloured too, which the per-person flag here once missed.
+  yes('and colours by the id it finds there',
+      /party: PARTY_COLOUR/.test(c) && /sp\.setTextColor\(textId, TAG_COLOURS\[colour\]\)/.test(c));
 
   /*
     PUTTING IT BACK IS THE HALF THAT MATTERS. A colour that is never removed
     leaves the last party you were in green for the rest of the session, after
     which the colour means nothing at all.
   */
-  yes('and puts it back when they leave', /sp\.setTextColor\(textId, PLAIN_COLOUR\)/.test(c));
+  yes('and puts it back when they leave', /plain: PLAIN_COLOUR/.test(c) &&
+      /const colour = \(hideAll \|\| tagHide\[hex\]\) \? 'hidden' : \(tagParty\[hex\] \? 'party' : 'plain'\);/.test(c));
   yes('the plain colour is the one the client itself uses',
       /PLAIN_COLOUR = \[1, 1, 1, 0\.8\]/.test(c));
   yes('the table is read fresh each pass, because a tag is remade on sight',

@@ -73,7 +73,10 @@ Yes '  asks Resolve-ThornswoodReleaseTag after that and before the build' ($ask 
 Yes '  a manual run takes the tag and expected_sha through env, a tag push its own ref and SHA' ($wf.Contains('INPUT_SHA: ${{ github.event.inputs.expected_sha }}') -and $wf.Contains('$expected = $env:GITHUB_SHA') -and $wf.Contains('expected_sha:'))
 Yes '  stops the run on a refusal and checks out exactly the commit it settled' ($wf.Contains("catch { Write-Host ('::error::' + `$_.Exception.Message); exit 1 }") -and $wf.Contains('git checkout --force --detach $commit') -and $wf.Contains('if ($head -ne $commit)'))
 Yes '  and drafts the release against that commit, not the run''s SHA' ($wf.Contains('target_commitish = $env:RELEASE_COMMIT') -and -not $wf.Contains('target_commitish = $env:GITHUB_SHA') -and $wf.Contains('RELEASE_COMMIT: ${{ steps.tag.outputs.commit }}'))
-$pasted = @($wf -split "`n" | Where-Object { $_.Contains('${{ github.event.inputs') -and $_ -notmatch '^\s+INPUT_[A-Z]+: \$\{\{ github\.event\.inputs\.\w+ \}\}$' })
+# The concurrency group names the tag too (#2163: one group per tag, so a tag
+# push and a manual run for it queue). A group is a name GitHub compares,
+# never script text, so that one line is not a paste; nothing else is let by.
+$pasted = @($wf -split "`n" | Where-Object { $_.Contains('${{ github.event.inputs') -and $_ -notmatch '^\s+INPUT_[A-Z]+: \$\{\{ github\.event\.inputs\.\w+ \}\}$' -and $_ -notmatch '^  group: release-\$\{\{ github\.event\.inputs\.tag \|\| github\.ref_name \}\}$' })
 Yes '  no input is pasted anywhere but an env line' ($pasted.Count -eq 0)
 
 Write-Host ''
