@@ -13,7 +13,7 @@
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
     "scriptCount":  54,
-    "callCount":  234,
+    "callCount":  235,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -344,6 +344,15 @@
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
                       "n":  10,
+                      "does":  "replaces or seeds the named boards in the live data\\board.json from the repo copy, with node, keeping board.json.bak",
+                      "class":  "stage",
+                      "reason":  "writes a file the deploy owns inside the site root; no task, ACL or firewall change"
+                  },
+                  {
+                      "script":  "scripts/deploy/Deploy-Docs.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "n":  11,
                       "does":  "opens or removes the site firewall rule and sets the task account",
                       "class":  "admin",
                       "reason":  "firewall and task principal change on every deploy"
@@ -352,7 +361,7 @@
                       "script":  "scripts/deploy/Deploy-Docs.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
-                      "n":  11,
+                      "n":  12,
                       "does":  "writes or checks a stage folder",
                       "class":  "stage",
                       "reason":  "writes or checks a stage folder or file"
@@ -361,7 +370,7 @@
                       "script":  "scripts/deploy/Deploy-Docs.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
-                      "n":  12,
+                      "n":  13,
                       "does":  "service swap of the site",
                       "class":  "swap",
                       "reason":  "StopIt kills node.exe by pid with Stop-Process as well as stopping the task"
