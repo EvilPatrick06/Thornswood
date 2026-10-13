@@ -72,6 +72,12 @@ The purse controller accepts an explicit `merchantHistory` manifest of
 reference/base pairs for retirement recovery. A retired identity cannot be
 prepared for interaction or receive a starting purse; its existing pending
 transfer can finish against the private ledger without loading its NPC.
+The purse controller has one writer per ledger namespace within the server
+runtime. Replacing it revokes the old controller across all merchants. A
+synchronous mutation locks the namespace through its durable save and
+native projection; nested mutation or replacement is refused explicitly.
+Each commit starts from the controller's latest document, so another
+merchant's saved change survives an older prepared offer.
 Without an explicit history manifest, the current active roster remains the
 manifest. This support alone does not cut the current 249 traders. Before
 activating retirement, validate writer ownership, pending-intent uniqueness,
