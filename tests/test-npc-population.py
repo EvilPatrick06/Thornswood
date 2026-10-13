@@ -120,6 +120,13 @@ class Catalogue:
 
 
 class PopulationTests(unittest.TestCase):
+    def test_descriptive_transport_titles_use_source_role(self):
+        self.assertEqual(self.population.transport_title('KmodCarriageDriverWinterhold', ['KmodFastTravelDialogueFaction']), 'Coach Driver')
+        self.assertEqual(self.population.transport_title('KmodFerrymanDragonBridge', ['KmodFerryRoute1Faction']), 'Ferry Operator')
+        self.assertEqual(self.population.transport_title('DLC2RRGjalundSaltSageWindhelm', []), 'Ship Captain')
+        with self.assertRaises(ValueError):
+            self.population.transport_title('UnclassifiedService', ['KmodFastTravelDialogueFaction'])
+
     def test_authored_corpses_do_not_consume_live_encounter_capacity(self):
         ref, actor = self.catalogue.placement('bandit', 'dungeon')
         actor['startsDead'] = True
