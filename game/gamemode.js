@@ -66494,7 +66494,11 @@ function createMerchantTrading(deps) {
     questReady: function(actorId) {return settlement.canInventoryMutation(actorId);},
     questAdmission: function(actorId,merchantId) {
       if (!active) return null;
-      var human=world.actor(actorId),profileId=human && human.profileId,session=sessions.get(profileId);
+      // Capture before actor lookup: native callbacks must not supply a new conversation.
+      var session=null,profileId;
+      sessions.forEach(function(current,key) {
+        if(current.actorId===actorId){session=current;profileId=key;}
+      });
       if (!session || session.merchantId!==merchantId || !ownsSession(actorId,profileId,session)) return null;
       // The final transaction admission check must not invoke native callbacks.
       // Actor identity remains fenced by the quest transaction's native CAS.

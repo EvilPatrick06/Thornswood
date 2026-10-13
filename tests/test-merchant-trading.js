@@ -237,6 +237,29 @@ for(const replacement of ['close','replace']) for(const entry of ['act','offer',
   routed.api.shutdown();quest.shutdown();
 }
 
+for(const capture of ['missing','replace']) for(const entry of ['act','offer','return']) {
+  const routed=service({on:true},250,undefined,prices,roleConfig('Smith'));
+  let record=entry==='return'?{v:1,open:{ebony:{drawn:4,kills:0,itemDesc:'ore'}},cool:{}}:null,questWrites=0;
+  const quest=roleQuestContext.__thornswoodCustomQuestsCreate({now:()=>1,load:()=>record,
+    identity:()=> 'quest-owner',ready:()=>true,available:()=>true,rankOf:()=> 'master',
+    commit(actor,expected,next,goods,guard) {
+      if(guard && !guard())return {ok:false};questWrites++;record=JSON.parse(JSON.stringify(next));return {ok:true};
+    },traderAdmission:(actor,ref)=>routed.api.questAdmission(actor,ref),traderRole:()=> 'Smith'});
+  quest.bindPlace('ebony',{cell:'test'});routed.deps.quests=()=>quest;
+  if(capture==='replace')open(routed.api);
+  const beforeRecord=JSON.stringify(record),beforeInventory=JSON.stringify(routed.world.inv),originalActor=routed.world.actor;
+  let armed=true;
+  routed.world.actor=function(id) {
+    if(armed){armed=false;open(routed.api);}
+    return originalActor.call(this,id);
+  };
+  if(entry==='act')quest.act(10,'take','ebony',null,1);
+  else if(entry==='offer')quest.offer(10,'ebony',{traderRef:1});
+  else quest.turnIn(10,'ebony',1);
+  assert.equal(questWrites,0,capture+' panel during admission lookup cannot authorize direct '+entry);
+  assert.equal(JSON.stringify(record),beforeRecord);assert.equal(JSON.stringify(routed.world.inv),beforeInventory);
+  routed.api.shutdown();quest.shutdown();
+}
 let native = { on: true };
 let box = service(native, 250);
 let opened = open(box.api);
