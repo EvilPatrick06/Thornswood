@@ -148,13 +148,14 @@ def species_of(race):
 
 
 def transport_title(edid, factions):
-    if edid in C.TRANSPORT_BASES:
-        return 'Ship Captain'
+    captain = edid in C.TRANSPORT_BASES
     identities = [edid.lower()] + [value.lower() for value in factions]
     ferry = any('ferry' in value for value in identities)
     carriage = any('carriage' in value for value in identities)
-    if ferry == carriage:
+    if sum([captain, ferry, carriage]) != 1:
         raise ValueError('Transport role is missing or ambiguous: ' + edid)
+    if captain:
+        return 'Ship Captain'
     return 'Ferry Operator' if ferry else 'Coach Driver'
 
 

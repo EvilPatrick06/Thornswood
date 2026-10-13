@@ -16,6 +16,8 @@ for(const title of ['Coach Driver','Ferry Operator','Ship Captain']) {
  policy.configure(1,state);assert.equal(calls.length,1,'ordinary policy reads do not repeatedly rename the actor');
  assert.ok(policy.configure(0xff000005,state));assert.equal(calls[1][3].desc,'5','a dynamic instance must not rename its authored anchor');
  row[13]='Merchant';assert.throws(()=>ctx.createNpcPopulation(api,data,data.plugins),/title/i);
+ delete row[13];assert.throws(()=>ctx.createNpcPopulation(api,data,data.plugins),/title/i,'every transport needs its descriptive title');
+ row[6]='trader';row[13]='Smith';assert.throws(()=>ctx.createNpcPopulation(api,data,data.plugins),/title/i,'guild titles wait for matching role tables');
 }
 const catalogue=require('../game/data/npc-population.json'),transport=catalogue.npcs.filter(row=>row.keep&&row.role==='transport');
 vm.runInContext(source.slice(source.indexOf('// NPC POPULATION DATA BEGIN'),source.indexOf('// NPC POPULATION DATA END'))+'\nglobalThis.runtime=NPC_POPULATION_DATA;',ctx);

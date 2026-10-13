@@ -63349,8 +63349,8 @@ function createNpcPopulation(api,data,plugins,merchants) {
     if(!Array.isArray(row[3]) || row[3].length!==3 || !row[3].every(Number.isFinite) ||
         !Number.isInteger(row[5]) || row[5]<=0 || row[5]>1440 || !(row[4]>0))
       throw new Error('Invalid NPC catalogue placement');
-    if(row[13]!==undefined && !(row[6]==='transport' && ['Coach Driver','Ferry Operator','Ship Captain'].includes(row[13]) ||
-        row[6]==='trader' && ['Smith','Woodworker','Tailor','Enchanter','Cook','Alchemist'].includes(row[13])))
+    if((row[6]==='transport' || row[13]!==undefined) &&
+        !(row[6]==='transport' && ['Coach Driver','Ferry Operator','Ship Captain'].includes(row[13])))
       throw new Error('Invalid NPC role title');
     const rule={row,id,base,cell,bucket:row[10] || row[0]};
     allowed.set(id,rule);

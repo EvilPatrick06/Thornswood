@@ -124,6 +124,9 @@ class PopulationTests(unittest.TestCase):
         self.assertEqual(self.population.transport_title('KmodCarriageDriverWinterhold', ['KmodFastTravelDialogueFaction']), 'Coach Driver')
         self.assertEqual(self.population.transport_title('KmodFerrymanDragonBridge', ['KmodFerryRoute1Faction']), 'Ferry Operator')
         self.assertEqual(self.population.transport_title('DLC2RRGjalundSaltSageWindhelm', []), 'Ship Captain')
+        for faction in ['DLC1FerrySystemFaction', 'JobCarriageFaction']:
+            with self.assertRaises(ValueError):
+                self.population.transport_title('DLC2RRGjalundSaltSageWindhelm', [faction])
         with self.assertRaises(ValueError):
             self.population.transport_title('UnclassifiedService', ['KmodFastTravelDialogueFaction'])
 
