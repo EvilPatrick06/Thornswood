@@ -494,8 +494,8 @@
     },
     {
       "path": "game/content/Thornswood-Content.esp",
-      "sha256": "d05679e76d8dc930b236ebd906274a4c26b7959228d5ebca727cf5800469bf31",
-      "what": "Thornswood's own plugin, 419 records. Its header's description says its crafting and gathering content was salvaged from Keizaal Online, another server.",
+      "sha256": "b6bb2bf0454f256188da7eac44def4d6ef71af3884cd429e5a23bee817b1be53",
+      "what": "Thornswood's own plugin, 147,040 bytes on 12 Oct (the notice board now names our own mesh and the drop box is a record of its own, #2502). Its header's description says its crafting and gathering content was salvaged from Keizaal Online, another server.",
       "published": "Every pack and the installer on both channels, and Nexus Mods mod 192001 through the collection",
       "source": "Records salvaged from Keizaal Online's plugin (the plugin's own description), rebuilt under #954 and #400, then added to here (#613, #1379, #1383, #1384, #2255, #2258)",
       "creator": "Thornswood, from Keizaal Online's records",
@@ -519,6 +519,34 @@
       "evidence": "Commit f32f3364 (#2482); docs\\NPC-SERVER-ACTIVITY.md; tests\\test-2468-last-plugin.js.",
       "status": "not-published",
       "ask": "Whoever puts it in the load order: list which plugins' records it copies and read their permissions for redistributing overrides, before the first release that carries it."
+    },
+    {
+      "path": "game/ours/Data/meshes/thornswood/noticeboard01.nif",
+      "sha256": "47cfe0f22bdf8db0c66ad059cf77c546aeba972ad694d20e6ad7318630918216",
+      "what": "Thornswood's notice board mesh, 155,907 bytes: Windhelm sign posts, stockade planks, a shack roof, the candle lantern, vanilla notes and a plank shelf, with its own collision.",
+      "published": "Every pack and the installer once released (Ship-Rules.ps1 $ShipOursFiles, Go.ps1)",
+      "source": "Built by scripts\\mods\\Build-NoticeBoard.py from pieces of Skyrim's own meshes, read from the game's archives, with vanilla textures only (#2502)",
+      "creator": "Built here from Bethesda's Skyrim meshes",
+      "licence": "not recorded: the terms under which meshes made from Skyrim's own files may be handed on were not read",
+      "attribution": "not recorded",
+      "approved": "Patrick approved the board concept on 12 Oct (#2298, #2502)",
+      "evidence": "Commit b9923901 (#2502); tests\\test-2298-board-meshes.js.",
+      "status": "unconfirmed",
+      "ask": "Whoever next works #2177: record Bethesda's terms for mods that hand on meshes built from Skyrim's files, which the menu meshes and these two share."
+    },
+    {
+      "path": "game/ours/Data/meshes/thornswood/dropbox01.nif",
+      "sha256": "09d8ae9277b6006017ff82f21fa2081e63f6c2249ffe63300e1e8cffb299241e",
+      "what": "The hold's drop box mesh, 29,665 bytes: the vanilla strongbox scaled up, with a coin slot and an iron lip.",
+      "published": "Every pack and the installer once released (Ship-Rules.ps1 $ShipOursFiles, Go.ps1)",
+      "source": "Built by scripts\\mods\\Build-NoticeBoard.py from pieces of Skyrim's own meshes, read from the game's archives, with vanilla textures only (#2502)",
+      "creator": "Built here from Bethesda's Skyrim meshes",
+      "licence": "not recorded: the terms under which meshes made from Skyrim's own files may be handed on were not read",
+      "attribution": "not recorded",
+      "approved": "Patrick approved the board concept on 12 Oct (#2298, #2502)",
+      "evidence": "Commit b9923901 (#2502); tests\\test-2298-board-meshes.js.",
+      "status": "unconfirmed",
+      "ask": "Whoever next works #2177: record Bethesda's terms for mods that hand on meshes built from Skyrim's files, which the menu meshes and these two share."
     },
     {
       "path": "bot/thornswood-bot-1024.png",
@@ -802,8 +830,8 @@
     },
     {
       "path": "Data\\meshes\\olivar-messageboard\\missiveboardcotnd.nif",
-      "what": "The message board mesh Thornswood-Content.esp places, from the other server's kzolivar records Patrick kept. Its bytes are not the same-named board in Missives (Nexus 111375).",
-      "published": "Dev packs, for as long as the plugin names it (#2298); main never has",
+      "what": "The message board mesh Thornswood-Content.esp used to place, a reworked copy of the Missives board (Nexus 111375) that came with the other server's records. Since #2502 the plugin names game/ours/Data/meshes/thornswood/noticeboard01.nif instead, so the held line holds nothing and the next release lists this mesh as gone.",
+      "published": "Dev packs until #2502; the next release lists it as gone",
       "source": "Another server's files",
       "creator": "not recorded",
       "licence": "None found",
