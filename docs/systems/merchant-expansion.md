@@ -113,6 +113,14 @@ Without an explicit history manifest, the current active roster remains the
 manifest. This support alone does not cut the current 249 traders. Before
 activating retirement, validate writer ownership, pending-intent uniqueness,
 explicit first-world initialization and reachable legacy quest turn-ins.
+Merchant runtime startup requires its existing private ledger and initialization
+marker. Missing evidence stops service without creating a fresh manifest or
+resetting purses. It checks again before durable writer dispatch, after privacy
+checks and serialization. Recover missing existing-world evidence from its
+original records; do not treat a restart or repair as new-world authorization.
+The explicit offline initializer remains a separate prerequisite. Existing
+native replacement of a known valid document and dungeon-ledger initialization
+keep their existing behavior.
 Implement quests in complete, source-bound slices with coverage checks for
 all trades, holds, tiers, classes, professions, halves and schools. Legacy
 open quests must remain recoverable during catalogue changes.
