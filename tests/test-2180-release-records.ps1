@@ -83,7 +83,7 @@ try {
     # ---- Check-Records: pin and file list on different builds
     $fake = Join-Path $tmp 'repo'
     $null = New-Item -ItemType Directory -Path (Join-Path $fake 'records')
-    foreach ($k in @($script:ThornswoodRecordKinds.Keys)) { Copy-Item -LiteralPath (Join-Path $repo $script:ThornswoodRecordKinds[$k].File) -Destination (Join-Path $fake $script:ThornswoodRecordKinds[$k].File) }
+    foreach ($k in @($script:ThornswoodRecordKinds.Keys | Where-Object { $script:ThornswoodRecordKinds[$_].File })) { Copy-Item -LiteralPath (Join-Path $repo $script:ThornswoodRecordKinds[$k].File) -Destination (Join-Path $fake $script:ThornswoodRecordKinds[$k].File) }
     $pinPath = Join-Path $fake 'records\skyrim-pin.json'
     [IO.File]::WriteAllText($pinPath, [IO.File]::ReadAllText($pinPath).Replace('"build": "1.6.1170"', '"build": "1.6.1179"'))
     $out = & pwsh -NoProfile -File (Join-Path $repo 'scripts\release\Check-Records.ps1') -Repo $fake 2>&1

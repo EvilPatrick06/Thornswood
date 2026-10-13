@@ -1,0 +1,22 @@
+{
+  "launcherVersion": "1.4.2",
+  "launcherUrl": "https://thornswood.net/feed/assets/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "launcherSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "serverAddress": "play.example.invalid",
+  "serverPort": "7777",
+  "collectionUrl": "https://example.invalid/collection",
+  "collectionRevision": 12,
+  "maxOnline": 40,
+  "expectedExeBytes": 37157376,
+  "newerExeBytes": "37158400",
+  "depots": [ { "id": "489831", "manifest": "1234" }, { "id": "489832", "manifest": "5678" }, { "id": "489833", "manifest": "9012" } ],
+  "clientRuntime": { "url": "https://thornswood.net/feed/assets/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "bytes": 6598716, "forkCommit": "92848550" },
+  "voiceUrl": null,
+  "message": "",
+  "minLauncher": "1.4.0",
+  "mainVersion": "1.4.2",
+  "packs": [ { "id": "20261011-175014", "url": "https://thornswood.net/feed/assets/cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "notes": "Sample pack" } ],
+  "optional": [],
+  "news": [ { "date": "10-11-2026 5:51 PM", "title": "Sample", "body": "", "details": [ "one", "two" ] } ],
+  "baseline": { "id": "20261011-175014", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "url": "https://thornswood.net/feed/assets/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "entries": 2 }
+}
