@@ -50,7 +50,7 @@ what it does not is under "Checks on every download".
   the site answering is all it needs. A launcher last run before 26 Sep reads
   only GitHub, so once the repository is deleted it finds no feed and has to be
   reinstalled from the site; the Known Issues page (the known board in
-  `site\dataoard.json`, #2414) says so to the person.
+  `site\data\board.json`, #2414) says so to the person.
 
 ### Downloads come from the site (#897)
 
