@@ -507,6 +507,20 @@
       "ask": "Patrick: whether Keizaal Online's makers gave permission for the salvaged records, and where that is kept."
     },
     {
+      "path": "game/content/Thornswood-Last.esp",
+      "sha256": "7457d64514b9cf122e805681732c7f850e41f50dbc6690f6960d3df6a47f44d7",
+      "what": "The light plugin that loads last (#2468): 6,757 cut placed actors overridden initially disabled, with their cells and worldspaces copied exactly from the plugin that wins each, and 2,211 vanilla quests stopped. 5,922,590 bytes. On 12 Oct no release carries it: Ship-Rules.ps1 does not name it and it is not in the servers' load order yet.",
+      "published": "not yet: it ships once it is put in the load order",
+      "source": "Built by scripts\\mods\\Build-LastPlugin.py from the load order's own plugins (Skyrim's and the collection's), as overrides of their records",
+      "creator": "Built here; the records it overrides and copies are those plugins' authors'",
+      "licence": "not recorded: the permissions of the collection plugins whose cell and worldspace records it copies were not read",
+      "attribution": "not recorded",
+      "approved": "not recorded: Patrick decides the 63 quests kept (game\\data\\last-plugin-policy.json)",
+      "evidence": "Commit f32f3364 (#2482); docs\\NPC-SERVER-ACTIVITY.md; tests\\test-2468-last-plugin.js.",
+      "status": "not-published",
+      "ask": "Whoever puts it in the load order: list which plugins' records it copies and read their permissions for redistributing overrides, before the first release that carries it."
+    },
+    {
       "path": "bot/thornswood-bot-1024.png",
       "sha256": "65f7c65fbde95f1c14f8a325cebebb29b4c69515bac3e7e3580e1cd33fe9554e",
       "what": "The Discord bot's avatar, large. Uploaded by hand in the Discord developer portal.",
