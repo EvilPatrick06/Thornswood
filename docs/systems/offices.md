@@ -54,6 +54,23 @@ Dour Dungeon, Riften Jail, Windhelm Barracks, Cidhna Mine, Falkreath
 Jail, Morthal Jail, Dawnstar Jail, The Chill and The Bulwark Jail.
 Claiming the jail building does not touch its cells.
 
+The rest of the jail, as Patrick decided on 12 October (#502):
+
+- Only the Jarl of a hold claims its jail building. Nobody else is
+  offered the claim at its door, and its deed presented by anybody else
+  claims nothing.
+- There is no timer. Whoever is locked in stays until a guard of that
+  hold unlocks the cell, or until they pick the lock, which is allowed.
+- The game's own jail keys open nothing: the world does not hand one
+  out, so none lies on a table and none comes out of a chest.
+- `/stuck` does not move anybody out of a jail while a guard has a cell
+  there locked, apart from that hold's guards. It says so, and `/helpme`
+  still reaches staff.
+- Dying in a cell wakes you out of the jail, where dying anywhere in
+  that hold wakes you: its temple, or for Morthal, Dawnstar, Winterhold
+  and Falkreath, which have none of their own, the nearest temple or
+  hall of the dead ([Death](death.md)).
+
 A guard of a hold also takes down any post on that hold's notice board,
 and on no other hold's board. See [Notice boards](noticeboards.md).
 

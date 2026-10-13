@@ -36,7 +36,11 @@ wins. Cell names come out of the masters' string tables, the way
 Build-DoorTable.py reads them.
 
 WHAT IT WRITES. game\\data\\jails.json, and the JAIL_CELLS block inside the
-property block of game\\gamemode.js.
+property block of game\\gamemode.js: the doors, the jail's name, the doors
+the game ships locked, the jail building itself (Patrick, 12 October: only
+the Jarl of the hold claims it) and the keys the game made for the cell
+doors (the same day: the game's jail keys open nothing, so the world does
+not hand one out).
 
 Usage:
     python scripts/dev/Build-JailTable.py --check
@@ -245,7 +249,7 @@ def main():
     except (OSError, ValueError):
         cell_to_hold = {}
 
-    jails, by_door, names, shut = {}, {}, {}, {}
+    jails, by_door, names, shut, buildings, keys = {}, {}, {}, {}, {}, {}
     print('')
     print('Each hold\'s jail, from its crime faction\'s jail marker')
     for fd, f in sorted(factions.items(), key=lambda kv: kv[1]['edid']):
@@ -276,8 +280,12 @@ def main():
                        'cellEdid': c.get('edid', ''), 'name': name, 'gamemodeHold': held or None,
                        'doors': {d: {'base': doors[d]['base'], 'lock': doors[d]['lock']} for d in in_jail}}
         names[town] = name
+        buildings[jc] = town
         for d in in_jail:
             by_door[d] = town
+            k = (doors[d]['lock'] or {}).get('key')
+            if k:
+                keys[k] = town
         for d in locked:
             shut[d] = 1
         print('  %-10s %-22s %-20s %2d door(s), %2d shipped locked%s'
@@ -287,7 +295,7 @@ def main():
     if absent:
         print('  STOP. no jail found for %s' % ', '.join(absent))
         return 1
-    print('  %d door(s) in all' % len(by_door))
+    print('  %d door(s) in all, %d key(s) the game made for them' % (len(by_door), len(keys)))
 
     if args.check:
         print('')
@@ -320,9 +328,13 @@ def main():
              '  // hand edit. JAIL_DOOR: every door inside a hold\'s jail, to the hold.',
              '  // JAIL_NAME: each hold\'s jail, by name. JAIL_SHUT: the doors the game',
              '  // ships locked, which is what a cell is until a guard turns it.',
+             '  // JAIL_BUILDING: each jail building, to its hold. JAIL_KEY: every key',
+             '  // the game made for a cell door, to the hold of its jail.',
              '  var JAIL_DOOR = ' + json.dumps(by_door, sort_keys=True, separators=(',', ':')) + ';',
              '  var JAIL_NAME = ' + json.dumps(names, sort_keys=True, separators=(',', ':')) + ';',
-             '  var JAIL_SHUT = ' + json.dumps(shut, sort_keys=True, separators=(',', ':')) + ';']
+             '  var JAIL_SHUT = ' + json.dumps(shut, sort_keys=True, separators=(',', ':')) + ';',
+             '  var JAIL_BUILDING = ' + json.dumps(buildings, sort_keys=True, separators=(',', ':')) + ';',
+             '  var JAIL_KEY = ' + json.dumps(keys, sort_keys=True, separators=(',', ':')) + ';']
     text = text[:a] + nl.join(lines) + nl + '  ' + text[b:]
     io.open(args.gamemode, 'w', encoding='utf-8', newline='').write(text)
     print('  wrote %s into the gamemode' % mark)
