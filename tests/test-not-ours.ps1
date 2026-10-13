@@ -145,9 +145,13 @@ foreach ($h in $ShipHeldForCollection) {
     $rel = $(if ($p.EndsWith('\')) { $p + 'x.nif' } else { $p })
     if ([string]$h.ContentModel) {
         # No revision settles it: it ships while the committed plugin names it
-        # (#2298), at every revision. tests\test-2298-held-board.ps1 has the rest.
-        Yes ("{0} ships at every revision while the content plugin names it" -f $rel) (
-            -not (Test-ShipNotOurs $rel 0) -and -not (Test-ShipNotOurs $rel 2) -and -not (Test-ShipNotOurs $rel 99))
+        # (#2298), at every revision, and at none once it does not. Since #2298
+        # the board names Thornswood's own mesh, so the old one ships at none.
+        # tests\test-2298-held-board.ps1 has the rest.
+        $named = Test-ShipContentNames ([string]$h.ContentModel)
+        Yes ("{0} ships at every revision exactly while the content plugin names it (names it: {1})" -f $rel, $named) (
+            ((-not (Test-ShipNotOurs $rel 0)) -eq $named) -and ((-not (Test-ShipNotOurs $rel 2)) -eq $named) -and
+            ((-not (Test-ShipNotOurs $rel 99)) -eq $named))
         continue
     }
     Yes ("{0} ships until revision {1}" -f $rel, $h.Revision) (-not (Test-ShipNotOurs $rel 0) -and -not (Test-ShipNotOurs $rel 1))

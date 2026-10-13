@@ -123,7 +123,7 @@ yes('front.js holds no list of board spots of its own (BOARD_SEEDS is gone)', fr
 
 // ---------------------------------------------------- the plugin puts them down
 const a = front.indexOf('  const BOARD_REACH = 400;');
-const b = a < 0 ? -1 : front.indexOf('  function boardFacing(', a);
+const b = a < 0 ? -1 : front.indexOf('  /*\n    A CARRIAGE OR FERRY DRIVER OPENS HIS PANEL', a);
 const block = b < 0 ? '' : front.slice(a, b);
 yes('the board block is in front.js where this harness lifts it', !!block);
 
