@@ -233,7 +233,8 @@ the world. It does not buy a rank.
 
 [Dungeon loot](systems/dungeon-loot.md). A chest in a dungeon, a cave,
 or a sewer pays gold, ordinary goods, and sometimes a novice or master
-spell tome, from the tier of that place. A few burial goods are found
+spell tome, from the tier of that place. The boss chest at the end
+pays one tier higher. A few burial goods are found
 only this way. A dead body can be searched too, and anything good on
 it is rare.
 
