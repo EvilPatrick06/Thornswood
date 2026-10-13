@@ -44,6 +44,14 @@ function fixture(options={}) {
     calls:()=>calls,mode:m=>mode=m,pending:b=>pending=b,profile:p=>profile=p,runtime:r=>runtime=r,save:()=>saved=receipt};
 }
 const next={v:1,open:{},cool:{wolf:1000}};
+for(const goods of [[],[{item:'f:Skyrim.esm',count:25}]]) {
+  const guarded=fixture(),beforeRecord=guarded.record(),beforeInventory=guarded.inventory();
+  let current=true,reads=0;
+  guarded.mp.getActorRuntimeIdentity=()=>{if(++reads===2)current=false;return '10';};
+  assert.equal(guarded.transfer.commit(10,beforeRecord,next,goods,()=>current).ok,false,
+    'a native identity callback cannot cross a replaced quest panel');
+  assert.equal(guarded.calls(),0);assert.deepEqual(guarded.record(),beforeRecord);assert.deepEqual(guarded.inventory(),beforeInventory);
+}
 let f=fixture();
 assert.equal(f.transfer.commit(10,f.record(),next,[{item:'f:Skyrim.esm',count:25}]).ok,true);
 assert.deepEqual(f.record(),next);assert.equal(f.inventory().entries[0].count,65);
