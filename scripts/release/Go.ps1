@@ -282,8 +282,9 @@ foreach ($pair in $menuPairs) {
 
 # ------------------------------------------------ our own menu files --
 # The main menu with no Bethesda logo, the empty loading spinner, the
-# silent stand-in for the game's theme, and SkyHUD's settings as
-# Thornswood set them. From game\ours, beside game\menu. Each path is
+# silent stand-in for the game's theme, SkyHUD's settings as Thornswood
+# set them, and the notice board's and drop box's meshes. From
+# game\ours, beside game\menu. Each path is
 # the path in the game folder, so the destination is the name itself
 # (Ship-Rules $ShipOursFiles; change the two together). The destination
 # is removed before the copy: in an own game folder these can be hard
@@ -295,7 +296,14 @@ $oursMenuFiles = @(
   'Data\Interface\startmenu.swf',
   'Data\Interface\loadwaitspinner.swf',
   'Data\music\special\mus_maintheme.xwm',
-  'Data\Interface\skyhud\skyhud.txt'
+  'Data\Interface\skyhud\skyhud.txt',
+  # The notice board and the drop box of the hold beside it, the meshes
+  # Thornswood builds from vanilla pieces with scripts\mods\Build-NoticeBoard.py,
+  # issue 2298. The board and drop box of Thornswood-Content.esp name them.
+  # No brackets and no apostrophes in these comments: test-ship-rules.ps1
+  # reads this list up to the first closing bracket, quote by quote.
+  'Data\meshes\thornswood\noticeboard01.nif',
+  'Data\meshes\thornswood\dropbox01.nif'
 )
 foreach ($rel in $oursMenuFiles) {
   $src = Join-Path $oursSrc $rel

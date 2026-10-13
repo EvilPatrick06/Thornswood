@@ -501,10 +501,11 @@ if (missing.length === 0 && fees && seeding && PASSAGES) {
 {
   const front = read('game/plugins/thornswood-front.js');
   const press = slice(front, '  function boardPress(e) {', '\n  }\n') || '';
+  // Since #2298 only the board object itself opens the board, so a person or
+  // an NPC under the crosshair (Geldis Sadri) answers E themselves.
   yes('pressing E on a person or an NPC by a board answers them, so Geldis Sadri still trades',
-      /if \(type === 43\) \{ return false; \}/.test(press) &&
-      press.indexOf('getBaseObject().getType()') !== -1 &&
-      press.indexOf('getBaseObject().getType()') < press.indexOf('rd > 250'));
+      /if \(!ref \|\| !boardObjectHere\(ref\)\) \{ return false; \}/.test(press) &&
+      press.indexOf('rd > 250') === -1);
   const page = read('game/ui/thornswood-board.js');
   yes('the board panel calls a letter a letter', page.indexOf("row.letter ? 'Letter'") !== -1);
 }
