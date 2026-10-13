@@ -184,6 +184,14 @@ jobs:
             exit 1
           }
 
+      - name: Check inactive merchant role data
+        shell: pwsh
+        run: |
+          & python tests/test-merchant-role-data.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & python scripts/dev/Build-MerchantRoleTables.py --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Run the harnesses that went red unseen
         shell: pwsh
         run: |

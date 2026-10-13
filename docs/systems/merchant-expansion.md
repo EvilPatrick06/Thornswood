@@ -37,6 +37,49 @@ cannot buy anything. Quantity controls use the same authenticated settlement
 and receipt checks as the existing transfer. A displayed quote never
 authorizes a stale or forged request.
 
+## Inactive item catalogue
+
+`game/data/merchant-role-tables.json` records the six distinct static item
+tables and the source evidence behind each identity. It is marked inactive
+and is not imported into merchant startup. The active roster remains 249.
+These are permissions, not starting stock or new gold, and a submitted hold
+price is still required before an item can be traded.
+
+| Trade | Buy identities | Sell identities | Supply identities |
+| --- | ---: | ---: | ---: |
+| Smith | 265 | 265 | 40 |
+| Woodworker | 54 | 54 | 16 |
+| Tailor | 271 | 271 | 23 |
+| Enchanter | 408 | 408 | 16 |
+| Cook | 116 | 116 | 53 |
+| Alchemist | 70 | 70 | 68 |
+
+Public work supplies its owning trade's outputs and ingredients. Crafting
+fees never become goods. A cut duplicate smelt does not remove the ingot
+made by the kept smelt; tempering does not establish a new source. Faction
+rolls, removed goods, nonplayable equipment and currency are excluded.
+The explicitly retained playable Riekling company goods stay with their
+owning trade. Wardweaver bases use the same public wearable policy.
+Enchanters also handle the measured ordinary soul gems. Existing enchanted
+item metadata remains part of the original goods, without a new price bonus.
+
+Alchemists accept verified ingredient records from plants, hunting, crops,
+fish and dedicated stations, including eggs, honeycomb and salts, alongside
+their medicine recipes. Additional Cook resource goods require verified
+food records; its public authored outputs and ingredients, including
+cooking materials such as fire paste, retain their owning trade. Unranked sources
+are not imported wholesale, and potion-name text does not classify a good.
+This static catalogue does not implement trading player-created brews.
+
+`python scripts/dev/Build-MerchantRoleTables.py` generates source data from
+the recorded load order and repository-owned plugins. It never writes game
+files or ledger state. `--check` rederives the lists without an installed
+game, checks input source hashes and plugin pins, and reads repository-owned
+item records to verify their winning identity, type, flags and food status.
+An unrelated own-plugin art or quest edit does not change item permission;
+a contributing record change requires regenerated evidence. CI runs the
+derivation and source-evidence regressions before its broader harnesses.
+
 ## Quests
 
 Every NPC has Novice, Advanced, Expert and Master work. Both the trade and
