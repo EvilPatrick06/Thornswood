@@ -349,7 +349,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $Root 'dist_back\skymp5-server.js'))
 Remove-Item -LiteralPath $work -Recurse -Force -EA SilentlyContinue
 Write-Host ''
 Say ("RESTORE OK: {0} character(s), all {1} plugins on disk, in {2}" -f $now.Count, $order.Count, $Root) 'Green'
-Say '  Start it with its scheduled task, or: Set-Location <root>; node dist_back/skymp5-server.js' 'DarkGray'
+Say '  Start it with its scheduled task, Start-ScheduledTask -TaskName <its task>, which runs node High (#2491); node started by hand runs Normal and outside the task' 'DarkGray'
 Say '  and watch thornswood.log until a character connects. docs\RESTORING.md has the rest.' 'DarkGray'
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
 exit 0

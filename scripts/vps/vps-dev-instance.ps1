@@ -151,6 +151,9 @@ if (Test-Path $liveVoice) {
     # as live runs; Install-Voice.ps1 -Root C:\Thornswood-Voice-Dev keeps both.
     # roll-log.ps1 came across with the rest and runs before node opens
     # voice.log, the one moment nothing holds it. See Roll-Log.ps1.
+    # node goes through start /high, so dev voice runs High the way
+    # Install-Voice.ps1 starts it (#2491); the task's own priority, copied
+    # from live voice's, makes only this cmd.exe High.
     $run = Join-Path $devVoice 'run-dev-voice.cmd'
     $psExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
     $lines = @(
@@ -161,7 +164,7 @@ if (Test-Path $liveVoice) {
         'set THORNSWOOD_SITE=https://thornswood.net',
         ('cd /d "{0}"' -f $devVoice),
         ('"{0}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{1}\roll-log.ps1" -Path "{1}\voice.log"' -f $psExe, $devVoice),
-        ('"{0}" voice-server.js >> "{1}\voice.log" 2>&1' -f $node, $devVoice)
+        ('start "" /b /wait /high "{0}" voice-server.js >> "{1}\voice.log" 2>&1' -f $node, $devVoice)
     )
     [IO.File]::WriteAllLines($run, [string[]]$lines, (New-Object Text.ASCIIEncoding))
     Say '  dev voice runs with auth on, on 127.0.0.1 only'

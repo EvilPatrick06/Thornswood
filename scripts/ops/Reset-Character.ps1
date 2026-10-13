@@ -130,7 +130,7 @@ else {
     } else {
         Say "The character was cleared but the server has not come back on ${VpsHost}:3000." 'Red'
         Say "  ssh $target" 'DarkGray'
-        Say "  Set-Location '$VpsRoot'; node dist_back/skymp5-server.js" 'DarkGray'
+        Say "  Start-ScheduledTask -TaskName '$TaskName'   (the task runs node High, #2491; node started by hand does not)" 'DarkGray'
     }
 }
 Write-Host ''

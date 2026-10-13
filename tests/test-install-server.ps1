@@ -37,6 +37,9 @@
     - a good one swaps in, carries the world, the roster, the runtime data and
       the logs across, keeps the old root as .prev and the newest two of them
     - -PutBack puts the newest .prev back and keeps what it took out
+    - issue #2491: -TaskOnly registers the task again over one with no start
+      /high, restarts the server under it with node at High, and changes no
+      file; with a switch that would change one it is INSTALL REFUSED
     - a root that cannot be moved because something holds a file in it is
       INSTALL REFUSED, and the old server is started again
     - -FreshWorld starts with no world and leaves the old one in .prev
@@ -113,8 +116,11 @@ function Done {
 $src = [IO.File]::ReadAllText($installer)
 $iStage = $src.IndexOf('Expand-Archive -LiteralPath $Zip -DestinationPath $stageDir')
 $iCheck = $src.IndexOf('load order does not resolve')
-$iStop  = $src.IndexOf("StopServer `$Root`r`n")
-if ($iStop -lt 0) { $iStop = $src.IndexOf("StopServer `$Root`n") }
+# The swap's stop. -TaskOnly (#2491) stops the server earlier in the file, in
+# a branch that ends before the stage and touches no folder.
+$iSwap  = $src.IndexOf('# ---- the swap')
+$iStop  = if ($iSwap -ge 0) { $src.IndexOf("StopServer `$Root`r`n", $iSwap) } else { -1 }
+if ($iSwap -ge 0 -and $iStop -lt 0) { $iStop = $src.IndexOf("StopServer `$Root`n", $iSwap) }
 Yes 'the installer unpacks into a stage and checks the load order before it stops anything' (
     $iStage -gt 0 -and $iCheck -gt $iStage -and $iStop -gt $iCheck)
 Yes 'and no longer deletes the root' ($src -notmatch 'Remove-Item -LiteralPath \$Root -Recurse')
@@ -727,6 +733,33 @@ try {
         $undone.Count -eq 1 -and (Get (Join-Path $undone[0] 'gamemode.js')) -eq '// v2' -and @(Beside '.prev-*').Count -eq 0)
     if ($script:fail -gt $failed) { Show }
 
+    # ---- -TaskOnly (#2491) -----------------------------------------------------
+    # The task as an install before #2491 registered it, node started by cmd
+    # with no start /high, which is what the box has. -TaskOnly registers the
+    # installer's task again, restarts the server under it and changes no file.
+    $taskFile = Join-Path $tasks ((($TaskPrefix + ' Server') -replace '[^A-Za-z0-9]', '_') + '.json')
+    $tj = [IO.File]::ReadAllText($taskFile) | ConvertFrom-Json
+    $tj.Argument = ([string]$tj.Argument).Replace('start "" /b /wait /high ', '').Replace(' & call exit %^errorlevel%', '')
+    [IO.File]::WriteAllText($taskFile, ($tj | ConvertTo-Json -Depth 4))
+    $gmWas = Get (Join-Path $root 'gamemode.js')
+    $setWas = Get (Join-Path $root 'server-settings.json')
+    $besideWas = @(Beside '.*').Count
+    $running = Owner $P
+    $taskOnly = "& '" + $installer.Replace("'", "''") + "' -Root '" + $root.Replace("'", "''") + "' -TaskName '$TaskPrefix Server' -StartNow -AllowGamingPc -Wait 8 -TaskOnly"
+    $out = RunWrapped ($taskOnly + " -FreshWorld`r`nexit `$LASTEXITCODE`r`n")
+    $failed = $script:fail
+    Yes '-TaskOnly with -FreshWorld is INSTALL REFUSED, and the same server is still answering' (
+        ($out -contains 'INSTALL REFUSED') -and $script:lastCode -ne 0 -and ((Owner $P) -eq $running))
+    Yes '  and the task is left as it was' (([IO.File]::ReadAllText($taskFile) | ConvertFrom-Json).Argument -notlike '*/high*')
+    $out = RunWrapped ($taskOnly + "`r`nexit `$LASTEXITCODE`r`n")
+    Yes '-TaskOnly is INSTALL OK, answering as a new process' (($out -contains 'INSTALL OK') -and (WaitUp $P) -and ((Owner $P) -ne $running))
+    Yes '  and the task starts node through start /high again, and hands its exit code back' (
+        [string](([IO.File]::ReadAllText($taskFile) | ConvertFrom-Json).Argument) -like '*start "" /b /wait /high "*" dist_back/skymp5-server.js >> *2>&1 & call exit %^errorlevel%"')
+    Yes '  and it reads node back at High' (($out -join "`n") -match 'node, pid \d+, runs at High priority')
+    Yes '  and no file of the server changed, and nothing was set beside it' (
+        (Get (Join-Path $root 'gamemode.js')) -eq $gmWas -and (Get (Join-Path $root 'server-settings.json')) -eq $setWas -and @(Beside '.*').Count -eq $besideWas)
+    if ($script:fail -gt $failed) { Show }
+
     # ---- the running server's settings are its own (#1222) ----------------------
     # Dev rollout 6, 29 Sep: a publish put the build's settings over the dev
     # server's, and it came up not marked dev, with no load order refusal, no
@@ -1096,6 +1129,16 @@ try {
         Yes '  with the dev server''s own settings still' ((Carried $devOwn (SettingsOf $devRoot)).Count -eq 0)
         Yes '  and the box records the folder that came back by its own record (#459)' ((Get $devCur) -eq $rec1 -and (Get $devBeside) -eq $rec1)
         Yes '    and history.log says it was put back to it' ((Get (Join-Path $deploys 'history.log')) -match [regex]::Escape('thornswood-server-dev put back to ' + $art.Name))
+        if ($script:fail -gt $failed) { Show }
+
+        # Issue #2491: the task alone, through the same installer.
+        $shippedWas = Get (Join-Path $devRoot 'data\shipped.txt')
+        $curWas = Get $devCur
+        $code = Publish '' @('TaskOnly')
+        $failed = $script:fail
+        Yes 'Publish-Server -TaskOnly exits 0 and the dev server answers under the task again' ($code -eq 0 -and (WaitUp $D))
+        Yes '  having changed no file and no record' ((Get (Join-Path $devRoot 'data\shipped.txt')) -eq $shippedWas -and (Get $devCur) -eq $curWas)
+        Yes '  and node reads back at High' ((@($script:lastOut) -join "`n") -match 'node, pid \d+, runs at High priority')
         if ($script:fail -gt $failed) { Show }
     }
 

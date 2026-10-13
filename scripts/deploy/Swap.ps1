@@ -183,19 +183,27 @@ $ProgressPreference = 'SilentlyContinue'
 $stageDir = Join-Path $Root $Stage
 $prevDir  = Join-Path $Root $Prev
 $log      = Join-Path $Root 'server.log'
-# The task starts the server at priority 4, normal, before every start here
-# (#1931, #2015). Only the installer registered it so, and a server put up by
-# Deploy-Server or Deploy-DevGamemode kept Task Scheduler's default of 7: on
-# 5 Oct 11:47 PM the live server's node ran BelowNormal, with I/O priority 1
-# and memory priority 2, after a deploy of the release that fixed it. Only
-# the priority changes; the task keeps everything else it has.
-function NormalTask {
+# Before every start here: whether the task is the one the installer makes,
+# said and never changed (#2491). Install-ThornswoodServer.ps1 registers it at
+# priority 1 with node started through cmd's start /high, so the server runs
+# High (Patrick, 12 Oct 2026). The installer is the one place the task is
+# made. A task an older install registered is registered again by
+# Publish-Server.ps1 -TaskOnly, which this names; a deploy starts the task the
+# box has. From 5 Oct (#2015) this step set the task's priority to 4 before
+# each start instead, repairing at every deploy the tasks registered before
+# #1967 rather than registering them again, and on a task at 1 it would have
+# put the server back to Normal.
+function TaskShape {
   $t = Get-ScheduledTask -TaskName $Task -EA SilentlyContinue
-  if (-not $t -or $t.Settings.Priority -eq 4) { return }
-  $was = $t.Settings.Priority
-  $t.Settings.Priority = 4
-  try { $t | Set-ScheduledTask -EA Stop | Out-Null; 'the task starts the server at priority 4 now, not ' + $was }
-  catch { 'could not set the task to priority 4: ' + $_.Exception.Message }
+  if (-not $t) { return }
+  $high = @($t.Actions | Where-Object { [string]$_.Arguments -like '*start "" /b /wait /high *' }).Count -gt 0
+  if ($t.Settings.Priority -eq 1 -and $high) { return }
+  $why = @()
+  if ($t.Settings.Priority -ne 1) { $why += ('its priority is ' + $t.Settings.Priority + ', not 1') }
+  if (-not $high) { $why += 'it does not start node through start /high' }
+  $chan = ''
+  if ($Root.TrimEnd('\') -like '*-Dev') { $chan = ' -Channel dev' }
+  'the task ' + $Task + ' is not the one the installer makes (' + ($why -join '; ') + '), so the server will not run High: register it again with .\scripts\release\Publish-Server.ps1 -TaskOnly' + $chan
 }
 $new      = [IO.File]::ReadAllText((Join-Path $stageDir 'server-settings.json')) | ConvertFrom-Json
 # The check has already refused a port that moves, so this is the port the
@@ -356,7 +364,7 @@ if ($moved -and $null -ne $ReleaseKeys -and $placed -contains 'server-settings.j
 
 if ($moved) {
   'swapped in ' + $placed.Count + ' file(s), the ones they replaced are in ' + $prevDir
-  NormalTask
+  TaskShape
   Start-ScheduledTask -TaskName $Task -EA SilentlyContinue
   'started, giving it ' + $Wait + ' seconds to answer on UDP ' + $port + ' and on ' + $resPort
   if (Answering) {
@@ -379,7 +387,7 @@ if ($moved) {
 
 'putting the previous files back'
 PutBack
-NormalTask
+TaskShape
 Start-ScheduledTask -TaskName $Task -EA SilentlyContinue
 if (Answering) { 'the previous files are back and the server is answering on ' + $resPort + ' again' }
 else { 'THE PREVIOUS FILES ARE BACK AND THE SERVER STILL IS NOT ANSWERING on ' + $resPort }

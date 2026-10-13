@@ -49,6 +49,18 @@
   puts the newest back the same checked way (-Channel dev for the dev server),
   and records the folder that came back by its own record (#459).
 
+  THE TASK ALONE (#2491).
+      .\scripts\release\Publish-Server.ps1 -TaskOnly
+  sends the installer and nothing to install, and the installer registers the
+  server's scheduled task again with its own action and settings, stops the
+  server and starts it through the new task (Install-ThornswoodServer.ps1
+  -TaskOnly). No zip, no file in the server's folder, no setting, no record
+  and no news: it is how the box takes a change to the task itself, the
+  priority it starts node at (#2491), without a release. If the server does
+  not answer under the new task, the task it had goes back and is started.
+  -Channel dev for the dev server. It drops whoever is on that server, so
+  look at its online.json first.
+
   THE JOIN PASS SWITCH (#1804). The installer refuses, before anything is
   stopped, a server whose thornswoodRequirePass is neither true nor false,
   because the gamemode reads that as on (#1319), and says so. A first
@@ -137,6 +149,9 @@ param(
     # Put the previous server folder back instead of publishing. Builds and
     # sends nothing but the installer, and writes no news.
     [switch]$PutBack,
+    # Register the server's task again and restart it under it, sending
+    # nothing to install (#2491, THE TASK ALONE in the header).
+    [switch]$TaskOnly,
     # How long the new server has to answer on the box before the previous one
     # goes back. Left off, the shared ceiling in ServerReadyWait.ps1, derived
     # from measured Live and Dev starts (#1938). A start that never answers
@@ -221,6 +236,10 @@ if ($PutBack -and $RequirePass) {
 if ($PutBack -and @($DropPlugins).Count) {
     Die '-PutBack brings back an order the server ran, so it does not take -DropPlugins. Nothing was sent.'
 }
+# The task alone changes no file, setting or world (#2491).
+if ($TaskOnly -and ($PutBack -or $RequirePass -or @($DropPlugins).Count -or $FreshWorld)) {
+    Die '-TaskOnly registers the server''s task again and changes nothing else, so it does not go with -PutBack, -RequirePass, -DropPlugins or -FreshWorld. Nothing was sent.'
+}
 
 $target = "$VpsUser@$VpsHost"
 # Host key checking on (issue #450): ssh talks only to the box whose key
@@ -245,7 +264,7 @@ foreach ($t in 'ssh', 'scp') {
 # What engine each server runs, for the site's credits page (#2303).
 . (Join-Path $Here '..\deploy\DeployedBuild.ps1')
 $committedOnly = @('scripts/deploy/Install-ThornswoodServer.ps1', 'scripts/deploy/ServerSettings.ps1', 'scripts/deploy/ServerBuild.ps1', 'scripts/deploy/ServerReadyWait.ps1', 'scripts/vps/Roll-Log.ps1', 'scripts/release/Read-JsonFile.ps1', 'scripts/release/RecordShape.ps1')
-if (-not $PutBack) { $committedOnly += 'game/gamemode.js', 'records/most-online.json', 'records/server-build.json' }
+if (-not $PutBack -and -not $TaskOnly) { $committedOnly += 'game/gamemode.js', 'records/most-online.json', 'records/server-build.json' }
 try { Assert-ThornswoodCommitted -RepoDir (Join-Path $Here '..\..') -Paths $committedOnly -What 'this publish' }
 catch { Die $_.Exception.Message }
 
@@ -332,9 +351,9 @@ function Save-ServerRecords([switch]$PutBack) {
     $null = Save-ThornswoodDeployedBuild $target $ssh $VpsRoot
 }
 
-# ------------------------------------------------------------- -PutBack -----
-if ($PutBack) {
-    Head 'Putting the previous server back'
+# The installer and the files it loads, sent alone, before a run that
+# sends no zip (-TaskOnly and -PutBack).
+function Send-InstallerOnly {
     Invoke-ThornswoodNative { & scp @ssh $installer "${target}:C:/Install-ThornswoodServer.ps1" }
     if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
     Invoke-ThornswoodNative { & scp @ssh $rollLog "${target}:C:/Roll-Log.ps1" }
@@ -346,6 +365,26 @@ if ($PutBack) {
     Invoke-ThornswoodNative { & scp @ssh $waitLib "${target}:C:/ServerReadyWait.ps1" }
     if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
     Send-ShapeLibs 'Nothing up there was changed.'
+}
+
+# ------------------------------------------------------------- -TaskOnly ----
+# The installer and the files it loads go up, as for a put-back, and it
+# registers the task again and restarts the server under it (#2491). Nothing
+# in the server's folder changes, so there is no record to write.
+if ($TaskOnly) {
+    Head ('Registering the task again: ' + $TaskName)
+    Send-InstallerOnly
+    Invoke-Installer "-Root '$VpsRoot' -TaskName '$TaskName' -StartNow -TaskOnly -Wait $Wait"
+    Say 'the task is registered again and the server answers under it' 'Green'
+    Write-Host ''
+    if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+    exit 0
+}
+
+# ------------------------------------------------------------- -PutBack -----
+if ($PutBack) {
+    Head 'Putting the previous server back'
+    Send-InstallerOnly
     Invoke-Installer "-Root '$VpsRoot' -TaskName '$TaskName' -StartNow -PutBack -Wait $Wait"
     Say 'the previous server is back and answering up there' 'Green'
     Save-ServerRecords -PutBack
