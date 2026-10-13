@@ -204,7 +204,7 @@ def classify(context, ref, actor):
         interior = context.cells.get(actor.get('cell'), {}).get('interior')
         keep = not interior and world_name not in CITY_WORLDS
         if keep:
-            result['displayName'] = transport_title(base_edid, because)
+            result['displayName'] = transport_title(base_edid, members)
         return decide('transport', keep,
                       'Authored exterior carriage or ferry stop; city ancestry is not a wall')
     if role == 'guards':
