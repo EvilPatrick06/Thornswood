@@ -282,6 +282,244 @@
       }
     ]
   },
+  "known": {
+    "intro": "What is limited or broken right now, and why. Worth reading before you report\nsomething, because a lot of what looks like a bug is how a shared Skyrim has\nto work.\n\nNot all of it is permanent. The first group follows from SkyMP itself, and\nnone of it is settled for good. Everything after it is where things stand\ntoday, and some of that is being worked on.",
+    "seeded": "2414",
+    "sections": [
+      {
+        "id": "sk1",
+        "name": "Limits of a shared Skyrim",
+        "note": "These follow from the server owning the world instead of your own machine.\nThis table is being looked at.\nReport one of these only if it does something this table does not describe.",
+        "columns": [
+          {
+            "id": "ck2",
+            "name": "Behaviour"
+          },
+          {
+            "id": "ck3",
+            "name": "Reason"
+          }
+        ],
+        "rows": [
+          {
+            "id": "rk4",
+            "done": false,
+            "cells": {
+              "ck2": "A few mod settings menus still reset every session",
+              "ck3": "Your character lives on the server rather than in a save file, so there is no co-save for a mod to write its settings into. Menus built on MCM Helper, such as TrueHUD and Precision, keep theirs in a file on your machine. The server keeps the settings of Apocalypse, moreHUD, Atlas Map Markers, Skyrim Unbound and chfshVariousActions for each character and puts them back when you come in. QuickLoot, the instrument menu, MCM Recorder and SkyUI's favourite group and unequip options still start from their defaults"
+            },
+            "at": 0,
+            "by": ""
+          },
+          {
+            "id": "rk5",
+            "done": false,
+            "cells": {
+              "ck2": "Most mod scripts never fire",
+              "ck3": "All Papyrus events except OnUpdate are blocked. Records still work, scripted behaviour does not"
+            },
+            "at": 0,
+            "by": ""
+          },
+          {
+            "id": "rk6",
+            "done": false,
+            "cells": {
+              "ck2": "Killmoves and stagger do not show on other people",
+              "ck3": "Those animation events are blanked"
+            },
+            "at": 0,
+            "by": ""
+          },
+          {
+            "id": "rk7",
+            "done": false,
+            "cells": {
+              "ck2": "Fishing in Skyrim's rods, nets and fishing powers do nothing",
+              "ck3": "They run on mod scripts, which never fire here. Fishing is the Fisher's trade instead: press E at salmon, clams, pearl oysters, horker meat and slaughterfish egg nests in the water, no rod needed. See the Classes page"
+            },
+            "at": 0,
+            "by": ""
+          }
+        ]
+      },
+      {
+        "id": "sk8",
+        "name": "What is decided about NPCs",
+        "note": "The cast has been cut. The traders you buy from and sell to stay, and so do\nthe people who work the carriages and ferries. Wildlife, bandit camps and\ndungeon enemies stay where they belong. Guards, courts, priests, townsfolk and\nnamed creatures were taken out. The server now runs the NPCs that are left, so\nthey keep moving when nobody is nearby. The roadmap lists what comes next under\n**NPCs with their own work**. Report an NPC only if it does something\nthis table does not describe.",
+        "columns": [
+          {
+            "id": "ck9",
+            "name": "Behaviour"
+          },
+          {
+            "id": "ck10",
+            "name": "Reason"
+          }
+        ],
+        "rows": [
+          {
+            "id": "rk11",
+            "done": false,
+            "cells": {
+              "ck9": "NPC behaviour differs between people near the same enemy",
+              "ck10": "Hosting changes every 2 seconds, so whoever is simulating decides the outcome"
+            },
+            "at": 0,
+            "by": ""
+          }
+        ]
+      },
+      {
+        "id": "sk12",
+        "name": "What the collection took out",
+        "note": "Revision 5 of the collection, from 22 September, took out four mods that\nworked against the server and a patch that needs one of them, and swapped\nImmersive Armors for a version that does without a script. Each one is named\nby its plugin file as well, because that is what your plugin list shows.\nImmersive Armors, for one, is Hothtrooper44_ArmorCompilation.esp, and a\nsearch for the words Immersive Armors finds nothing.\n\nIf a file marked Out is still in your plugin list, your collection is out of\ndate. Update it in Vortex.",
+        "columns": [
+          {
+            "id": "ck13",
+            "name": "Mod"
+          },
+          {
+            "id": "ck14",
+            "name": "Plugin file"
+          },
+          {
+            "id": "ck15",
+            "name": "Where it stands"
+          }
+        ],
+        "rows": [
+          {
+            "id": "rk16",
+            "done": false,
+            "cells": {
+              "ck13": "SunHelm Survival",
+              "ck14": "SunHelmSurvival.esp",
+              "ck15": "Out. It polled on a timer, the one script type still running, and wrote health, stamina, magicka and carry weight against a server that crops and corrects them. Hunger, thirst, rest and warmth run on the server instead: they are the four bars in the bottom left corner, and the Body page on K gives the numbers"
+            },
+            "at": 0,
+            "by": ""
+          },
+          {
+            "id": "rk17",
+            "done": false,
+            "cells": {
+              "ck13": "SunHelm Diseases",
+              "ck14": "SunHelmDiseases.esp",
+              "ck15": "Out. It did the same as SunHelm Survival, and it depends on SunHelm. Diseases have not been rebuilt on the server"
+            },
+            "at": 0,
+            "by": ""
+          },
+          {
+            "id": "rk18",
+            "done": false,
+            "cells": {
+              "ck13": "Embers XD, SunHelm patch",
+              "ck14": "Embers XD - Patch - SunHelm Survival.esp",
+              "ck15": "Out. It patches SunHelm and cannot load without it. Embers XD itself stays"
+            },
+            "at": 0,
+            "by": ""
+          },
+          {
+            "id": "rk19",
+            "done": false,
+            "cells": {
+              "ck13": "Respawn - Death Overhaul",
+              "ck14": "Respawn - Death Overhaul.esp",
+              "ck15": "Out. It set you essential and ran its own death handler. Death cannot complete on your own machine and the server owns respawn, so it could only fight the server"
+            },
+            "at": 0,
+            "by": ""
+          },
+          {
+            "id": "rk20",
+            "done": false,
+            "cells": {
+              "ck13": "Tavern Games",
+              "ck14": "TavernGames.esp",
+              "ck15": "Out. It created gold on your own machine, which the server does not accept. The games ran and the coin never arrived"
+            },
+            "at": 0,
+            "by": ""
+          },
+          {
+            "id": "rk21",
+            "done": false,
+            "cells": {
+              "ck13": "Immersive Armors",
+              "ck14": "Hothtrooper44_ArmorCompilation.esp, Hothtrooper44_Armor_Ecksstra.esp, AZ_IADistribution.esp",
+              "ck15": "In, as the script free version. The standard one handed out its armour through a script whose settings do not persist here. Immersive Armors - Script Free and Skypatched replaces its plugins and does without that script. The armour itself still comes from Immersive Armors 8.1"
+            },
+            "at": 0,
+            "by": ""
+          }
+        ]
+      },
+      {
+        "id": "sk22",
+        "name": "What the server owns",
+        "note": "Anything a mod changes in this list on your own machine is overwritten or ignored.\n\nPosition and cell. Health, magicka and stamina. Death and respawn, including where. Inventory contents. Equipment. Container contents and open state. Door open state. Harvested state of plants. Actor values.",
+        "columns": [],
+        "rows": []
+      },
+      {
+        "id": "sk23",
+        "name": "Around Play",
+        "note": "",
+        "columns": [
+          {
+            "id": "ck24",
+            "name": "Behaviour"
+          },
+          {
+            "id": "ck25",
+            "name": "Reason"
+          }
+        ],
+        "rows": [
+          {
+            "id": "rk26",
+            "done": false,
+            "cells": {
+              "ck24": "The creation hall is a bare stone room",
+              "ck25": "Nothing in the room itself does anything. Every choice about a new character is on the panel behind K, which opens by itself once your face is made and keeps coming back until you have picked a town"
+            },
+            "at": 0,
+            "by": ""
+          },
+          {
+            "id": "rk27",
+            "done": false,
+            "cells": {
+              "ck24": "You can leave the hall with no class or profession",
+              "ck25": "Only the town you wake up in has to be chosen before you leave. Your class, your profession and the half of it can wait, and are picked later in the world from the same panel on K"
+            },
+            "at": 0,
+            "by": ""
+          },
+          {
+            "id": "rk28",
+            "done": false,
+            "cells": {
+              "ck24": "A launcher last opened before 26 September says it cannot read the update source, or never offers an update",
+              "ck25": "Updates come only from thornswood.net now. A launcher that old still looks for them in the place they used to come from, which has closed, so it cannot find its way to the new one by itself. Take the installer again from the [Downloads](/downloads) page and run it over your install. Your characters live on the server and nothing is lost"
+            },
+            "at": 0,
+            "by": ""
+          }
+        ]
+      },
+      {
+        "id": "sk29",
+        "name": "The load order rule",
+        "note": "The server and every machine must carry the same plugins in the same order with the same bytes. The launcher compares every plugin's size and checksum with the server's list when it starts, and the game runs the same comparison at login. One machine out of step gets LOAD ORDER ERROR and cannot connect.\n\nIf the launcher says a plugin differs, press **Fix**. When it is Thornswood's own plugin, Fix downloads the server's copy and puts it in place, and **Scan** runs the comparison again. When it is another author's mod, the server does not hand it out: Scan and Fix name the mod, and updating the Thornswood collection or reinstalling that mod in Vortex puts it right.\n\nIf the game turns you away with LOAD ORDER ERROR, quit it and press **Scan**, then **Fix**. The launcher compares your order with the server's position by position, names the first place they differ, and Fix puts the server's order into this build's plugin list. That one downloads nothing. Do not play on and do not report anything else from that session: your machine is resolving objects to different things from everybody else's, so whatever you see next is not evidence.\n\nScan also sees the plugins the game loads on its own. Skyrim.ccc names the Creation Club content, and the game loads any of it that is sitting in Data whether or not a list asks for it, which puts everything after it out of step. Those are named too, and Fix moves them aside rather than deleting them.\n\nThis is why mods are added in batches rather than one at a time: every addition moves the load order for everybody at once.",
+        "columns": [],
+        "rows": []
+      }
+    ]
+  },
   "suggestions": {
     "intro": "Requested mods and features. Nothing here is committed.\n\nPaste the Nexus link when suggesting a mod. Whether it can work here depends on how it is built, not what it does.",
     "sections": [
@@ -845,7 +1083,7 @@
             "by": "",
             "cells": {
               "s7a": "**Take the vanilla guards out**",
-              "s7b": "Law is supposed to be people. While Bethesda's guards are standing there nobody has a reason to deal with a person about a bounty.",
+              "s7b": "Law is supposed to be people. While Bethesda's guards are standing there nobody has a reason to deal with a person about what they did.",
               "s7c": "Goes with the wider NPC cut. Guards first, because they are the ones that intercept you."
             }
           },

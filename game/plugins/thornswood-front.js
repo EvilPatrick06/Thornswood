@@ -3082,7 +3082,21 @@
   let afterAsked = [];           // [label, when] to read on a later frame
   let afterEnded = 0;            // when the last mining spell ended, 0 for none
   let afterWaitEquip = false;    // a line is still owed for the next equip
-  const afterEvents = {};
+  let afterEvents = {};          // event names written since the last end, once each
+
+  /*
+    ONLY THE CHARACTER'S OWN EQUIP COUNTS. The game sends equip and unequip
+    for every actor near the camera, so an NPC drawing a sword after the spell
+    used to take the one "after the next equip" line before the person had
+    touched their pickaxe, and the line that should show what the equip
+    changed showed the state they were still stuck in.
+  */
+  function afterMine(e) {
+    try {
+      const pc = sp.Game.getPlayer();
+      return !!(e && e.actor && pc && e.actor.getFormID() === pc.getFormID());
+    } catch (err) { return false; }
+  }
 
   function afterLine(label) {
     const pc = sp.Game.getPlayer();
@@ -3117,6 +3131,7 @@
             afterPick = false;
             afterEnded = now;
             afterWaitEquip = true;
+            afterEvents = {};
             afterAsked.push(['at the end (' + name + ')', now], ['0.5 s later', now + 500], ['3 s later', now + 3000]);
             return;
           }
@@ -3132,13 +3147,13 @@
     say('could not watch the state after mining: ' + e);
   }
 
-  sp.on('equip', guard('after mining equip', () => {
-    if (!afterWaitEquip) { return; }
+  sp.on('equip', guard('after mining equip', (e) => {
+    if (!afterWaitEquip || !afterMine(e)) { return; }
     afterWaitEquip = false;
     afterAsked.push(['after the next equip', Date.now() + 200]);
   }));
-  sp.on('unequip', guard('after mining unequip', () => {
-    if (!afterEnded || afterWaitEquip) { return; }
+  sp.on('unequip', guard('after mining unequip', (e) => {
+    if (!afterEnded || afterWaitEquip || !afterMine(e)) { return; }
     afterAsked.push(['after the next unequip', Date.now() + 200]);
     afterEnded = 0;
   }));
@@ -4990,6 +5005,49 @@
     return busyMenuOpen();
   }
 
+  /*
+    WHAT THE GAME ITSELF OFFERS ON A PERSON, said once each time you look at
+    somebody new (#2473). Patrick, 12 Oct: the game's own "Talk to" prompt
+    shows over a person, twice, over the look panel, the adventure menu and
+    the name tags. Two things in this build can draw it, and nothing here
+    says which one is on screen:
+
+      the HUD's own line, the activate text Skyrim gives any actor whose race
+        allows talking to it. The client blocks a person's activation every
+        frame (movementApply.ts blockActivation(true)), which sends the press
+        to scripts instead of the dialogue, and leaves the text standing.
+      Better Third Person Selection, in the collection, which in third person
+        copies that text into a widget of its own drawn at the person, above
+        the head for an actor (its MCM settings.ini: the 3D widget on in
+        third person, fWidgetZOffsetAdditionalNPC), which is where the name
+        tag and the speaking mark are.
+
+    So this writes what the HUD's line holds, whether that mod's menu is up,
+    which camera you are in and whether the activation is blocked. Two
+    sessions, one in each camera, settle which layer is which and whether
+    the two copies are the HUD and that widget, before anything is changed.
+    It reads; it changes nothing.
+  */
+  function gamePromptSaid(ref) {
+    const bits = [];
+    let cam = -1;
+    try { cam = Number(sp.Game.getCameraState()); } catch (e) { cam = -1; }
+    // SKSE's numbers: 0 first person, 8 and 9 the two third person states.
+    bits.push('camera ' + (cam === 0 ? 'first person' : (cam === 8 || cam === 9) ? 'third person' : String(cam)));
+    const read = function (target) {
+      try { return String(sp.Ui.getString('HUD Menu', target) || ''); } catch (e) { return '?'; }
+    };
+    bits.push('the HUD line "' + read('_root.HUDMovieBaseInstance.RolloverText.text') + '"' +
+              ' / "' + read('_root.HUDMovieBaseInstance.RolloverInfoText.text') + '"');
+    let btps = 'unknown';
+    try { btps = sp.Ui.isMenuOpen('BTPS Menu') ? 'up' : 'not up'; } catch (e) { btps = 'unknown'; }
+    bits.push('Better Third Person Selection\'s widget menu ' + btps);
+    let blocked = 'unknown';
+    try { blocked = ref.isActivationBlocked() ? 'yes' : 'no'; } catch (e) { blocked = 'unknown'; }
+    bits.push('activation blocked ' + blocked);
+    return ': ' + bits.join(', ');
+  }
+
   // A claim is a variable read, so it is asked every frame and a panel takes
   // the prompt down in the frame it opens, not on the next poll.
   sp.on('update', guard('crosshair', () => {
@@ -5019,7 +5077,7 @@
 
     if (hex !== lookingAt) {
       lookingAt = hex;
-      say('looking at ' + row.n + ' (' + hex + ')');
+      say('looking at ' + row.n + ' (' + hex + ')' + gamePromptSaid(ref));
     }
     const cover = lookCoveredBy();
     if (cover !== lookCover) {
@@ -5964,8 +6022,31 @@
   let partyAt = 0;
   let partySaid = '';
   const partyMarks = {};      // form id hex -> the marker reference
-  const partyTinted = {};     // form id hex -> true while its text is green
-  const nameHidden = {};      // form id hex -> true while its text is clear
+  /*
+    WHAT EACH NAME TAG WAS LAST WRITTEN, by the TAG, not by the person (#2474).
+
+    This used to be one flag per person, "this person's name is green", set
+    the first time their tag was coloured and kept until they left the party.
+    But the client throws a tag away and makes a new one, in its own white,
+    every time somebody stops being drawn: they step behind something, walk
+    past 1000 units, sneak, change cell, or you simply turn your back on them
+    (formView.ts removes the tag the moment the head is behind the camera).
+    The flag was still set, so the new tag was never coloured, and a party
+    member's name was green only until the first time you looked away. The
+    same flag shape left a hidden name showing for up to a pass after its tag
+    came back.
+
+    So what is kept is the tag id each person's colour was written into, and
+    the colour written. A tag id the client has not had before is a new tag:
+    it is coloured once, as it appears. A tag that already has the colour it
+    should have is left alone, whatever happens to it. Text ids only grow
+    (TextsCollection.cpp counts up, and only destroyAllTexts, which neither
+    the client nor any plugin here calls, starts them again), so a new tag
+    never reuses an old id.
+  */
+  const tagWrote = {};        // form id hex -> { id: text id, colour: 'party' | 'hidden' | 'plain' }
+  let tagParty = {};          // form id hex -> true: in your party (the server's party list)
+  let tagHide = {};           // form id hex -> true: you hid their name (near list or party row h)
 
   function partyList() {
     try {
@@ -5978,9 +6059,10 @@
     The client's own table of name tags, by form id.
 
     Written by SweetTaffyNicknamesService every time one is created and
-    deleted, which is why this is read fresh each pass rather than kept: a tag
-    is destroyed and remade whenever somebody walks out of sight and back, and
-    a remembered id would then be coloured after it had been thrown away.
+    deleted, which is why this is read fresh each frame rather than kept: a
+    tag is destroyed and remade whenever somebody walks out of sight and back.
+    Keyed by the server's form id (formViewArray.ts passes form.refrId, the id
+    the server sent), the same id the party list and the near list carry.
   */
   function nameTags() {
     try {
@@ -5989,55 +6071,21 @@
     } catch (e) { return null; }
   }
 
-  function colourNames(want) {
-    const tags = nameTags();
-    if (!tags) { return; }
-    for (const hex in want) {
-      if (!Object.prototype.hasOwnProperty.call(want, hex)) { continue; }
-      const id = parseInt(hex, 16);
-      const textId = tags[id];
-      if (textId === undefined || textId === null) { continue; }
-      if (partyTinted[hex]) { continue; }
-      try { sp.setTextColor(textId, PARTY_COLOUR); partyTinted[hex] = true; }
-      catch (e) { }
-    }
-    /*
-      AND PUT IT BACK when somebody leaves. Not doing this leaves the last
-      party you were in written in green for the rest of the session, which is
-      worse than never colouring anything: the colour would stop meaning
-      anything at all.
-    */
-    for (const hex in partyTinted) {
-      if (!Object.prototype.hasOwnProperty.call(partyTinted, hex)) { continue; }
-      if (want[hex]) { continue; }
-      delete partyTinted[hex];
-      const id = parseInt(hex, 16);
-      const textId = tags[id];
-      if (textId === undefined || textId === null) { continue; }
-      try { sp.setTextColor(textId, PLAIN_COLOUR); } catch (e) { }
-    }
-  }
-
   /*
-    A hidden name is the same tag with no ink. Hide every name blanks the
-    whole table. One person is the near list's h flag, or the party row's,
-    for somebody who is in the party and not standing close enough to be
-    near. The marker and the compass strip are left alone. Applied after
-    the green, so a hidden party name stays blank rather than green.
+    Who should be green and who should be blank, from what the server sent.
+    Read on the party tick. A hidden name is the same tag with no ink: Hide
+    every name blanks the whole table, one person is the near list's h flag,
+    or the party row's, for somebody who is in the party and not standing
+    close enough to be near. Hidden wins over green, so a hidden party name
+    stays blank rather than green.
   */
-  function hideNames(want) {
-    const tags = nameTags();
-    if (!tags) { return; }
-    let hideAll = false;
-    try { hideAll = !!globalThis.thornswoodHideAllNames; } catch (e) { hideAll = false; }
-    const near = nearList() || {};
-    const hide = {};
-    if (hideAll) {
-      for (const key in tags) {
-        if (!Object.prototype.hasOwnProperty.call(tags, key)) { continue; }
-        hide[Number(key).toString(16)] = true;
-      }
+  function tagWants(want) {
+    const party = {};
+    for (const hex in want) {
+      if (Object.prototype.hasOwnProperty.call(want, hex)) { party[hex] = true; }
     }
+    const hide = {};
+    const near = nearList() || {};
     for (const hex in near) {
       if (!Object.prototype.hasOwnProperty.call(near, hex)) { continue; }
       if (near[hex] && near[hex].h) { hide[String(hex)] = true; }
@@ -6046,27 +6094,54 @@
       if (!Object.prototype.hasOwnProperty.call(want, hex)) { continue; }
       if (want[hex] && want[hex].h) { hide[String(hex)] = true; }
     }
-    for (const hex in hide) {
-      if (!Object.prototype.hasOwnProperty.call(hide, hex)) { continue; }
-      const id = parseInt(hex, 16);
-      const textId = tags[id];
-      if (textId === undefined || textId === null) { continue; }
-      try { sp.setTextColor(textId, HIDDEN_COLOUR); nameHidden[hex] = true; }
-      catch (e) { }
-    }
-    for (const hex in nameHidden) {
-      if (!Object.prototype.hasOwnProperty.call(nameHidden, hex)) { continue; }
-      if (hide[hex]) { continue; }
-      delete nameHidden[hex];
-      const id = parseInt(hex, 16);
-      const textId = tags[id];
-      if (textId === undefined || textId === null) { continue; }
-      const colour = want[hex] ? PARTY_COLOUR : PLAIN_COLOUR;
-      if (want[hex]) { partyTinted[hex] = true; }
-      else { delete partyTinted[hex]; }
-      try { sp.setTextColor(textId, colour); } catch (e) { }
-    }
+    tagParty = party;
+    tagHide = hide;
   }
+
+  const TAG_COLOURS = { party: PARTY_COLOUR, hidden: HIDDEN_COLOUR, plain: PLAIN_COLOUR };
+  let tagSaid = '';
+
+  /*
+    Every frame, because that is when the client makes a tag: its own update
+    draws a new one in white, and this writes its colour in the same frame or
+    the next, rather than up to a party tick later. Only a tag whose id or
+    wanted colour changed is written, so a frame with nothing new is a read of
+    a small table and no calls at all.
+  */
+  sp.on('update', guard('name tags', () => {
+    const tags = nameTags();
+    if (!tags) { return; }
+    let hideAll = false;
+    try { hideAll = !!globalThis.thornswoodHideAllNames; } catch (e) { hideAll = false; }
+    const seen = {};
+    let wrote = 0;
+    for (const key in tags) {
+      if (!Object.prototype.hasOwnProperty.call(tags, key)) { continue; }
+      const textId = tags[key];
+      if (textId === undefined || textId === null) { continue; }
+      const hex = Number(key).toString(16);
+      seen[hex] = true;
+      const colour = (hideAll || tagHide[hex]) ? 'hidden' : (tagParty[hex] ? 'party' : 'plain');
+      const had = tagWrote[hex];
+      if (had && had.id === textId && had.colour === colour) { continue; }
+      // A brand new tag that should be plain already is: the client made it white.
+      if (colour !== 'plain' || (had && had.id === textId)) {
+        try { sp.setTextColor(textId, TAG_COLOURS[colour]); wrote++; }
+        catch (e) { say('name tag: setTextColor threw for ' + hex + ': ' + e); continue; }
+      }
+      tagWrote[hex] = { id: textId, colour: colour };
+    }
+    // A tag the client threw away is forgotten, so its next one is new.
+    for (const hex in tagWrote) {
+      if (!Object.prototype.hasOwnProperty.call(tagWrote, hex)) { continue; }
+      if (!seen[hex]) { delete tagWrote[hex]; }
+    }
+    if (wrote) {
+      const said = Object.keys(tagWrote).filter(h => tagWrote[h].colour !== 'plain')
+        .map(h => h + ' ' + tagWrote[h].colour).sort().join(', ');
+      if (said !== tagSaid) { tagSaid = said; say('name tags: ' + (said || 'all plain')); }
+    }
+  }));
 
   function markerFor(hex, name) {
     if (partyMarks[hex]) { return partyMarks[hex]; }
@@ -6118,8 +6193,7 @@
       want[String(row.a)] = row;
     }
 
-    colourNames(want);
-    hideNames(want);
+    tagWants(want);
 
     // A marker for everybody in the party, moved to where the server last
     // said they were.
@@ -6162,6 +6236,18 @@
     speaking mark. The name tag is the client's, and this does not
     touch it: hiding a name leaves the words and the mark where they
     are. One line at a time, for six seconds. The mark is not words.
+
+    THE MARK IS LIVE, the way the microphone at the bottom of your own
+    screen is (#2474, Patrick, 12 Oct: "it should be live and reflective
+    like the one on your screen"). It is up while their talk key is down,
+    gone when it is up, and while it is up it breathes on the same beat as
+    yours: full to 58% and back over 1.15 seconds (twPulse in
+    thornswood-voice.js). Its colour is the distance they are speaking at,
+    the same three colours your own microphone takes while you speak
+    (docs/systems/voice.md): whisper pale blue, ordinary white, yell amber.
+    Never the party's green, which is the name's alone. It is a round dot
+    out of DIN-Pro-bold, a font the fork ships with Skyrim Platform, because
+    the asterisk in the client's own Tavern was eleven pixels high.
   */
   const HEAD_MS = 6000;
   const HEAD_COLOUR = [0.95, 0.91, 0.82, 0.95];
@@ -6170,6 +6256,11 @@
     local: [1, 1, 1, 0.95],
     yell: [0.93, 0.68, 0.22, 0.95]
   };
+  const MARK_TEXT = '\u2022';            // a bullet, in DIN-Pro-bold.spritefont
+  const MARK_FONT = 'DIN-Pro-bold';      // client-deps\common\Data\Platform\Fonts in the fork
+  const MARK_SIZE = 1.6;                 // ten pixels of dot at 1.0, so sixteen
+  const MARK_BEAT_MS = 1150;             // twPulse's 1.15s
+  const MARK_LOW = 0.58;                 // twPulse's low point
   const overheadHeads = {};
   const overheadMarks = {};
   let overheadScreen = [1920, 1080];
@@ -6184,7 +6275,14 @@
     rec.said = '';
   }
 
-  function overheadPut(rec, x, y, text, colour) {
+  /*
+    font and size are for the mark (MARK_FONT, MARK_SIZE); words leave them
+    out and keep the client's Tavern at half size. The colour is written
+    whenever it is not the one last written, which is what lets the mark
+    breathe and lets it change colour when the speaker changes distance
+    without being made again.
+  */
+  function overheadPut(rec, x, y, text, colour, font, size) {
     if (rec.id) {
       let ours = false;
       try { ours = sp.getTextString(rec.id) === rec.said; } catch (e) { ours = false; }
@@ -6192,6 +6290,7 @@
         try {
           if (text !== rec.said) { sp.setTextString(rec.id, text); rec.said = text; }
           sp.setTextPos(rec.id, x, y);
+          if (String(colour) !== rec.colour) { sp.setTextColor(rec.id, colour); rec.colour = String(colour); }
           return;
         } catch (e) { }
       }
@@ -6200,11 +6299,39 @@
     try {
       rec.id = sp.createText(x, y, text, colour);
       rec.said = text;
-      try { sp.setTextSize(rec.id, 0.5); } catch (e2) { }
+      rec.colour = String(colour);
+      if (font) { try { sp.setTextFont(rec.id, font); } catch (e3) { } }
+      try { sp.setTextSize(rec.id, size || 0.5); } catch (e2) { }
     } catch (e) {
       rec.id = 0;
       rec.said = '';
     }
+  }
+
+  /*
+    THE SERVER'S FORM ID IS NOT THIS MACHINE'S (#2474). Words and marks come
+    keyed by the actor id the server knows, out of the voice feed (the
+    gamemode's voiceFeed sends mp's own id). The character standing in front
+    of you is a reference the client placed itself, with an id this machine
+    gave it, and the two are not the same number: the same split #1275 found
+    for the crosshair, which is why the look prompt converts the other way
+    through thornswoodSocialServerId. Looking the server's id up as if it
+    were this machine's found nobody, or somebody else, so no mark and no
+    words ever stood over another person. The client converts it
+    (remoteIdToLocalId in worldViewMisc.ts), handed out by the gamemode's
+    near script as thornswoodSocialClientId.
+  */
+  function localRef(serverId) {
+    const id = Number(serverId) || 0;
+    if (!id) { return null; }
+    let local = 0;
+    try {
+      const convert = globalThis.thornswoodSocialClientId;
+      local = typeof convert === 'function' ? (Number(convert(id >>> 0)) || 0) : 0;
+    } catch (e) { local = 0; }
+    if (!local) { return null; }
+    try { return sp.ObjectReference.from(sp.Game.getFormEx(local >>> 0)); }
+    catch (e) { return null; }
   }
 
   /* The head, in screen pixels, or null when it is behind the camera
@@ -6213,7 +6340,7 @@
     let refr = null;
     try {
       if (key === 'self') { refr = sp.Game.getPlayer(); }
-      else { refr = sp.ObjectReference.from(sp.Game.getFormEx(Number(key) || 0)); }
+      else { refr = localRef(key); }
     } catch (e) { refr = null; }
     if (!refr) { return null; }
     let x = 0, y = 0, z = 0, node = false;
@@ -6322,6 +6449,9 @@
       if (w && h) { overheadScreen = [w, h]; }
     }
     const seen = {};
+    // twPulse: full, down to MARK_LOW halfway through the beat, full again.
+    const phase = (now % MARK_BEAT_MS) / MARK_BEAT_MS;
+    const breath = MARK_LOW + (1 - MARK_LOW) * (0.5 + 0.5 * Math.cos(phase * 2 * Math.PI));
     function drawOne(key) {
       if (seen[key]) { return; }
       seen[key] = true;
@@ -6335,8 +6465,9 @@
       }
       if (words) { overheadPut(words, at.x, at.y - 28, words.text, HEAD_COLOUR); }
       if (mark) {
-        const colour = MARK_COLOUR[mark.mode] || MARK_COLOUR.local;
-        overheadPut(mark, at.x, at.y - (words ? 46 : 28), '*', colour);
+        const base = MARK_COLOUR[mark.mode] || MARK_COLOUR.local;
+        const colour = [base[0], base[1], base[2], Math.round(base[3] * breath * 100) / 100];
+        overheadPut(mark, at.x, at.y - (words ? 46 : 28), MARK_TEXT, colour, MARK_FONT, MARK_SIZE);
       }
     }
     for (const k in overheadHeads) {
@@ -6919,76 +7050,158 @@
   }));
 
   /*
-    ------------------------------------------ no bounty for killing an NPC
+    ---------------------------------------------------- no bounty for anything
 
     Patrick, 11 October (#502): "there should be no bounties at all added
-    when killing NPCs". Guards are people now, and no NPC guard comes back.
+    when killing NPCs". Then on 12 October, the same issue: no bounty for
+    anything, killing, attacking, theft, pickpocketing or trespass, "the
+    whole bounty system should be removed in its entirety". Guards are
+    people now, and no NPC guard comes back.
 
-    WHERE THE BOUNTY CAME FROM, measured on 12 October. Nothing Thornswood
+    WHERE A BOUNTY CAME FROM, measured on 12 October. Nothing Thornswood
     wrote adds one: no line of the gamemode, these plugins or the fork's
     server calls modCrimeGold or setCrimeGold. It is Skyrim's own crime
-    system, running here in each person's game. Killing or striking an actor
-    whose crime faction tracks crime adds that faction's murder or assault
-    gold to its bounty: 1000 for a kill and 40 for a blow, from the game
-    settings for a faction on Use Defaults, and from the faction's own record
-    for CrimeFactionReach, which carries its own 1000 and 40. So zeroing the
-    two settings would have left Markarth's, and the answer is on each
-    faction instead: its ignore murder and ignore assault flags, which tell
-    the game that killing or striking a member is not a crime against it.
-    Every hold's crime faction, Raven Rock's, the Orcs' and one Dark
-    Brotherhood contract's are the twelve, read out of the load order by
-    scripts\dev\Build-CrimeTable.py (game\data\crime-factions.json says why
-    each is there).
+    system, running here in each person's game. A crime against a member of
+    a faction that tracks crime, or against something it owns, adds that
+    faction's gold for the crime to its bounty: murder, assault, trespass,
+    pickpocketing, theft, escaping jail and being seen to turn into a
+    werewolf. A faction on Use Defaults takes the amounts from the game's
+    settings and the rest carry their own (CrimeFactionReach, the Companions,
+    the Skaal), so zeroing the settings would have left some, and the answer
+    is on each faction instead: its six ignore flags, which tell the game a
+    crime of that kind against a member is not a crime against it at all.
+    Every faction that tracks crime is listed, 83 of them, read out of the
+    load order by scripts\dev\Build-CrimeTable.py; game\data\crime-factions.json
+    says what each one charged. Escape has no flag, and the game adds it only
+    to somebody it jailed, which it does to nobody here: there is no NPC
+    guard, and the json lists every script that sends anybody to jail or adds
+    gold by itself, and why none of them can run.
 
     WHEN. A faction's flags are the game's own record, so they are set once
     a game is loaded, which is when the world this session plays in starts,
-    and before that nothing can be killed. Each one is read back and the log
-    says how many took it, so the line is a measurement and not a hope.
+    and before that no crime can be committed. Each one is read back and the
+    log says how many took all six, so the line is a measurement and not a
+    hope.
   */
-  // ==== KILL_CRIME_FACTIONS, generated ====
+  // ==== NO_BOUNTY_FACTIONS, generated ====
   // One row a faction: its form id in its plugin, the plugin, its editor id.
   // Generated by scripts\dev\Build-CrimeTable.py; do not hand edit.
-  const KILL_CRIME_FACTIONS = [
+  const NO_BOUNTY_FACTIONS = [
+    [0x5211, "HearthFires.esm", "BYOHHousecarlFalkreathCrimeFaction"],
+    [0x5212, "HearthFires.esm", "BYOHHousecarlHjaalmarchCrimeFaction"],
+    [0x5213, "HearthFires.esm", "BYOHHousecarlPaleCrimeFaction"],
+    [0x48362, "Skyrim.esm", "CompanionsFaction"],
+    [0x10b1fc, "Skyrim.esm", "CrimeFactionCidhnaMine"],
     [0x267e3, "Skyrim.esm", "CrimeFactionEastmarch"],
     [0x28170, "Skyrim.esm", "CrimeFactionFalkreath"],
+    [0x10f72b, "Skyrim.esm", "CrimeFactionGreybeard"],
     [0x29db0, "Skyrim.esm", "CrimeFactionHaafingar"],
     [0x2816d, "Skyrim.esm", "CrimeFactionHjaalmarch"],
+    [0x28848, "Skyrim.esm", "CrimeFactionImperial"],
+    [0x10cee9, "Skyrim.esm", "CrimeFactionKhajiitCaravans"],
+    [0x2b036, "Skyrim.esm", "CrimeFactionNull"],
     [0x28713, "Skyrim.esm", "CrimeFactionOrcs"],
     [0x2816e, "Skyrim.esm", "CrimeFactionPale"],
     [0x2816c, "Skyrim.esm", "CrimeFactionReach"],
     [0x2816b, "Skyrim.esm", "CrimeFactionRift"],
+    [0x28849, "Skyrim.esm", "CrimeFactionSons"],
+    [0x10a794, "Skyrim.esm", "CrimeFactionThievesGuild"],
     [0x267ea, "Skyrim.esm", "CrimeFactionWhiterun"],
     [0x2816f, "Skyrim.esm", "CrimeFactionWinterhold"],
+    [0xed167, "Skyrim.esm", "DA06YamarzCrimeFaction"],
+    [0x8942f, "Skyrim.esm", "DA11CannibalFaction"],
+    [0x1bdb3, "Skyrim.esm", "DarkBrotherhoodFaction"],
+    [0x10fe28, "Skyrim.esm", "DB09TowerFaction"],
     [0xe7c27, "Skyrim.esm", "DBCrimeFactionMaro"],
+    [0xedddf, "Skyrim.esm", "DBRecuringContact10CrimeFaction"],
+    [0xeddde, "Skyrim.esm", "DBRecuringContact1CrimeFaction"],
+    [0xedddd, "Skyrim.esm", "DBRecuringContact2CrimeFaction"],
+    [0xedddc, "Skyrim.esm", "DBRecuringContact3CrimeFaction"],
+    [0xedddb, "Skyrim.esm", "DBRecuringContact4CrimeFaction"],
+    [0xeddda, "Skyrim.esm", "DBRecuringContact5CrimeFaction"],
+    [0xeddd9, "Skyrim.esm", "DBRecuringContact6CrimeFaction"],
+    [0xeddd8, "Skyrim.esm", "DBRecuringContact7CrimeFaction"],
+    [0xeddd7, "Skyrim.esm", "DBRecuringContact8CrimeFaction"],
+    [0xeddd6, "Skyrim.esm", "DBRecuringContact9CrimeFaction"],
+    [0xe7b9d, "Skyrim.esm", "DBRecuringTarget10CrimeFaction"],
+    [0xe7b9e, "Skyrim.esm", "DBRecuringTarget1CrimeFaction"],
+    [0xe7b9f, "Skyrim.esm", "DBRecuringTarget2CrimeFaction"],
+    [0xe7ba0, "Skyrim.esm", "DBRecuringTarget3CrimeFaction"],
+    [0xe7ba1, "Skyrim.esm", "DBRecuringTarget4CrimeFaction"],
+    [0xe7ba2, "Skyrim.esm", "DBRecuringTarget5CrimeFaction"],
+    [0xe7ba3, "Skyrim.esm", "DBRecuringTarget6CrimeFaction"],
+    [0xe7ba4, "Skyrim.esm", "DBRecuringTarget7CrimeFaction"],
+    [0xe7ba5, "Skyrim.esm", "DBRecuringTarget8CrimeFaction"],
+    [0xe7ba6, "Skyrim.esm", "DBRecuringTarget9CrimeFaction"],
+    [0x14b5b, "Dawnguard.esm", "DLC1MothPriestCrimeFaction"],
+    [0x137ba, "Dawnguard.esm", "DLC1SeranaCrimeFaction"],
+    [0x17f71, "Dawnguard.esm", "DLC1VampireCrimeFaction"],
+    [0x145c3, "Dawnguard.esm", "DLC1WE01AttackPlayerFaction"],
     [0x18279, "Dragonborn.esm", "DLC2CrimeRavenRockFaction"],
+    [0x1dc61, "Dragonborn.esm", "DLC2dunFrostmoonWerewolvesFaction"],
+    [0x38562, "Dragonborn.esm", "DLC2HirelingTeldrynCrimeFaction"],
+    [0x31786, "Dragonborn.esm", "DLC2SkaalDialogueFaction"],
+    [0x27291, "Dragonborn.esm", "DLC2SkaalShamanFaction"],
+    [0x18f9a, "Dragonborn.esm", "DLC2SkaalVillageCitizenFaction"],
+    [0x2173a, "Dragonborn.esm", "DLC2SV02ThalmorCrimeFaction"],
+    [0x17ebd, "Dragonborn.esm", "DLC2TameDragonFaction"],
+    [0x3d126, "Dragonborn.esm", "DLC2ThirskNordCrimeFaction"],
+    [0x108232, "Skyrim.esm", "dunPOIWitchAniseCrimeFaction"],
+    [0x103aec, "Skyrim.esm", "HirelingBelrandCrimeFaction"],
+    [0x103366, "Skyrim.esm", "HirelingErikCrimeFaction"],
+    [0x103367, "Skyrim.esm", "HirelingJenassaCrimeFaction"],
+    [0x103368, "Skyrim.esm", "HirelingMarcurioCrimeFaction"],
+    [0x103369, "Skyrim.esm", "HirelingStenvarCrimeFaction"],
+    [0x10336a, "Skyrim.esm", "HirelingVorstagCrimeFaction"],
+    [0x10336b, "Skyrim.esm", "HousecarlMarkarthCrimeFaction"],
+    [0x10336c, "Skyrim.esm", "HousecarlRiftenCrimeFaction"],
+    [0x10336d, "Skyrim.esm", "HousecarlSolitudeCrimeFaction"],
+    [0x10336e, "Skyrim.esm", "HousecarlWhiterunCrimeFaction"],
+    [0x10336f, "Skyrim.esm", "HousecarlWindhelmCrimeFaction"],
+    [0x622e6, "Skyrim.esm", "KarthwastenSilverFishGuards"],
+    [0x88ee4, "Skyrim.esm", "MS07BanditFaction"],
+    [0x13cab, "Populated Cities Towns Villages Legendary.esp", "ssssDawnstarMercenaryMixHIRELING"],
+    [0x13cac, "Populated Cities Towns Villages Legendary.esp", "ssssFalkreathMercenaryMixHIRELING"],
+    [0x13cad, "Populated Cities Towns Villages Legendary.esp", "ssssMarkarthMercenaryMixHIRELING"],
+    [0x13cae, "Populated Cities Towns Villages Legendary.esp", "ssssMorthalMercenaryMixHIRELING"],
+    [0x13caf, "Populated Cities Towns Villages Legendary.esp", "ssssRiftenMercenaryMixHIRELING"],
+    [0x13cb0, "Populated Cities Towns Villages Legendary.esp", "ssssSolitudeMercenaryMixHIRELING"],
+    [0x13cb1, "Populated Cities Towns Villages Legendary.esp", "ssssWhiterunMercenaryMixHIRELING"],
+    [0x13cb2, "Populated Cities Towns Villages Legendary.esp", "ssssWindhelmMercenaryMixHIRELING"],
+    [0x13cb3, "Populated Cities Towns Villages Legendary.esp", "ssssWinterholdMageMercenaryMixHIRELING"],
+    [0x522b6, "Skyrim.esm", "WIGenericCrimeFaction"],
   ];
-  // ==== end KILL_CRIME_FACTIONS ====
-  const IGNORE_MURDER = 0x80;
-  const IGNORE_ASSAULT = 0x100;
+  // ==== end NO_BOUNTY_FACTIONS ====
+  // Murder, assault, stealing, trespass, pickpocket and werewolf, as the FACT
+  // record and SKSE's SetFactionFlag number them.
+  const IGNORE_CRIMES = [0x80, 0x100, 0x200, 0x400, 0x2000, 0x10000];
 
-  function noKillBounty() {
+  function noBounty() {
     const took = [], absent = [], refused = [];
-    for (let i = 0; i < KILL_CRIME_FACTIONS.length; i++) {
-      const row = KILL_CRIME_FACTIONS[i];
+    for (let i = 0; i < NO_BOUNTY_FACTIONS.length; i++) {
+      const row = NO_BOUNTY_FACTIONS[i];
       let f = null;
       try { f = sp.Faction.from(sp.Game.getFormFromFile(row[0], row[1])); } catch (e) { f = null; }
       if (!f) { absent.push(row[2]); continue; }
       try {
-        f.setFactionFlag(IGNORE_MURDER);
-        f.setFactionFlag(IGNORE_ASSAULT);
-        if (f.isFactionFlagSet(IGNORE_MURDER) && f.isFactionFlagSet(IGNORE_ASSAULT)) { took.push(row[2]); }
+        let all = true;
+        for (let j = 0; j < IGNORE_CRIMES.length; j++) {
+          f.setFactionFlag(IGNORE_CRIMES[j]);
+          if (!f.isFactionFlagSet(IGNORE_CRIMES[j])) { all = false; }
+        }
+        if (all) { took.push(row[2]); }
         else { refused.push(row[2] + ' (the flags did not stay)'); }
       } catch (e) {
         refused.push(row[2] + ' (' + e + ')');
       }
     }
-    say('no bounty for a kill or a blow: ' + took.length + ' of ' + KILL_CRIME_FACTIONS.length +
-        ' crime factions now ignore murder and assault' +
+    say('no bounty for any crime: ' + took.length + ' of ' + NO_BOUNTY_FACTIONS.length +
+        ' crime factions now ignore murder, assault, theft, trespass, pickpocketing and werewolves' +
         (absent.length ? '; not in this load order: ' + absent.join(', ') : '') +
         (refused.length ? '; REFUSED: ' + refused.join(', ') : ''));
   }
 
-  sp.on('loadGame', guard('no kill bounty', noKillBounty));
+  sp.on('loadGame', guard('no bounty', noBounty));
 
   /*
     ------------------------------------------------- the town gates

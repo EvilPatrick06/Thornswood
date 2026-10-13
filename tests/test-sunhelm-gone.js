@@ -261,11 +261,12 @@ const MCM_PAGES = { 'QuickLoot': 'QuickLootIEMCM.pex', 'Skyrim Unbound': 'Skyrim
 const named = Object.keys(MCM_PAGES).filter(function (k) { return mcmRow.indexOf(k) >= 0; });
 yes('the row gives an example of a mod whose page is there', named.length > 0);
 
-const KNOWN = read(['site', 'data', 'known.md']);
-yes('the row does not say the choices are kept in your save, when known.md says menus reset',
+// Known Issues is the known board, written out the way /known writes it (#2414).
+const KNOWN = require('./fixtures/known-page').knownPage() || '';
+yes('the row does not say the choices are kept in your save, when Known Issues says menus reset',
     !(/reset every session/i.test(KNOWN) && /kept in your save/i.test(mcmRow)));
 
-// ------------------------------------------------------------- known.md
+// --------------------------------------------------------- Known Issues
 /*
   The table of what the collection took out belongs to entry 280 and to
   tests/test-known-page.js, which checks every row is Out or In by its plugin
@@ -275,7 +276,7 @@ yes('the row does not say the choices are kept in your save, when known.md says 
   went too. What it says is checked against the gamemode like the Help item.
 */
 const shRow = KNOWN.split('\n').filter(function (l) { return /^\|\s*SunHelm Survival\s*\|/.test(l); })[0] || '';
-yes('known.md has a row for SunHelm Survival', shRow.length > 0);
+yes('Known Issues has a row for SunHelm Survival', shRow.length > 0);
 yes('it says the needs run on the server now', /on the server/i.test(shRow) && /hunger/i.test(shRow));
 yes('and points at the Body page on K, which the K panel draws (#1631)',
     /Body page on K/.test(shRow) && bodyPage && shRow.indexOf('/needs') < 0);

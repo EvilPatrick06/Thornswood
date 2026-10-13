@@ -122,7 +122,7 @@ feet (#2246). Today every row costs the whole clock and only your own bed
 and a bed you are allowed in give the fill, so it is the rule above. An
 inn or a temple is read off the room's own records: its location carries
 the game's inn or temple mark, and a house the game sells as a home never counts as one.
-Tea and skooma are not items the needs block knows.
+Skooma is in the server (#1382): all six drugs (Skooma, Redwater Skooma, Double-Distilled Skooma, Balmora Blue, Eversnow and Sleeping Tree Sap) hold the rest drain at zero for 10 real minutes, resting still gains, and when the window ends each dose taken inside it costs 30 rest and 10 hunger. Tea is not: no item is a tea.
 Sleeping on open ground, an hour on a seat with no roof over you and
 no fire in reach, starts a chill. See [Disease](disease.md).
 The craft gate is asked at every bench's own menu, brews, enchanting

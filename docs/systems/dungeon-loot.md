@@ -14,8 +14,9 @@ the same way a scene quest creates its reward. See [Gold](gold.md).
 
 A chest, an urn, a coffin, a sarcophagus, a strongbox, a coffer, a
 safe, or a knapsack. A barrel, a sack, a cupboard, a dresser, a
-shelf, or a crate does not pay. A container somebody placed does not
-pay. The world's copy of that container does.
+shelf, or a crate does not pay. A burnt body left in the world is a
+person, not an urn, and does not pay. A container somebody placed does
+not pay. The world's copy of that container does.
 
 The same container pays once, to the person who opens it. Everybody
 else shares that pile by handing it over themselves. It pays again
@@ -117,7 +118,7 @@ chest places are the interiors whose names match a dungeon, a cave,
 or a sewer in the population catalogue. A place the catalogue has not
 named does not pay a chest. A camp does not pay a chest.
 
-This reward service is enabled on Dev. A living human must be within 400
+This reward service runs on both servers, Main and Dev. A living human must be within 400
 units. A chest return is saved in the private ledger before the complete
 gold and goods bundle is queued into one inventory write. The return
 belongs to that container, shared by everyone, and survives reload or

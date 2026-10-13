@@ -16,7 +16,7 @@
 // instrumentPlayDrum. The meshes are in the game folder and point at Skyrim's
 // own textures, which are in Skyrim - Textures3.bsa. So no file is missing.
 // What goes wrong is scripts, and a script attached to a record never fires
-// here (known.md). That is the blocked Papyrus bucket, not something a release
+// here (the Known Issues page). That is the blocked Papyrus bucket, not something a release
 // can fix.
 //
 // Read only. The plugin half runs only where the game folder is, and says SKIP
@@ -29,7 +29,6 @@ const CR = String.fromCharCode(13);
 const read = (p) => fs.readFileSync(p, 'utf8').split(CR).join('');
 
 const TESTS = process.env.TESTS_MD || path.join(REPO_DIR, 'site', 'data', 'tests.md');
-const KNOWN = path.join(REPO_DIR, 'site', 'data', 'known.md');
 const EMOTES = path.join(REPO_DIR, 'game', 'plugins', 'thornswood-emotes.js');
 const INI = path.join(REPO_DIR, 'launcher', 'Thornswood.ini');
 const GM = process.env.GM || path.join(REPO_DIR, 'game', 'gamemode.js');
@@ -74,7 +73,7 @@ yes('it never says player', !/player/i.test(note));
   "scripts that never fire here" is the Known Issues page's own reason. If
   that row ever changes, because scripts start running, this line is wrong.
 */
-const known = read(KNOWN);
+const known = require('./fixtures/known-page').knownPage() || '';  // the known board, as /known writes it (#2414)
 yes('Known Issues still says mod scripts never fire',
     /Most mod scripts never fire \| All Papyrus events except OnUpdate are blocked/.test(known));
 

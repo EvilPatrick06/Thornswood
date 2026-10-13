@@ -38,9 +38,12 @@ const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in test
 const fs = require('fs');
 const path = require('path');
 
-const PAGE = process.env.KNOWN || path.join(REPO_DIR, 'site', 'data', 'known.md');
+// The page is the known board, written out the way /known writes it (#2414),
+// unless KNOWN names a saved copy of the page.
 const CR = String.fromCharCode(13);
-const text = fs.readFileSync(PAGE, 'utf8').split(CR).join('');
+const text = process.env.KNOWN
+  ? fs.readFileSync(process.env.KNOWN, 'utf8').split(CR).join('')
+  : (require('./fixtures/known-page').knownPage(REPO_DIR) || '');
 const lines = text.split('\n');
 
 let pass = 0, fail = 0;
@@ -120,7 +123,7 @@ lines.forEach(function (l, i) {
   if (!r || !isOut(r)) { loose.push(i + 1); }
 });
 yes('the mods that came out are named nowhere else on the page', loose.length === 0);
-if (loose.length) { console.log('      known.md lines ' + loose.join(', ')); }
+if (loose.length) { console.log('      Known Issues page lines ' + loose.join(', ')); }
 yes('there is no section of mods that do not work as installed',
     !/do not work as installed/i.test(text));
 yes('and nothing says what to do about them is not settled yet',

@@ -159,6 +159,14 @@
       "why": "scripts/vps/Watch-Load.ps1 -Install, every five minutes as SYSTEM (#2061)"
     },
     {
+      "name": "Thornswood Disk History",
+      "user": "SYSTEM",
+      "triggers": [
+        "Daily"
+      ],
+      "why": "scripts/vps/Forecast-Storage.ps1 -Install, one disk sample a day at 04:00 as SYSTEM, and the forecast told to staff when it turns (#2178)"
+    },
+    {
       "name": "Thornswood Maint Update",
       "user": "SYSTEM",
       "why": "maintenance update task found on the box in the Oct 11 run; runs as SYSTEM, Highest per docs/DEPLOY-IDENTITIES.md section 1"

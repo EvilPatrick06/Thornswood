@@ -47,7 +47,7 @@ A night in a real bed adds 25 thirst when you return.
 ## Where this is
 
 The clock, the bands, the 20, the ale curve and the potion sip of 5 are
-in the server. Cold does not yet speed thirst. The server does not yet
+in the server, and so is cold speeding thirst. The server does not yet
 know whether the water you drank was a well or a ditch. Soups do not
 yet add thirst on top of hunger. The bed is the one the server saw
 them lie down in, by whose it is, the same as for rest. See
