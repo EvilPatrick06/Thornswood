@@ -7,6 +7,7 @@ const source = fs.readFileSync(path.join(__dirname, '../game/gamemode.js'), 'utf
 const begin = source.lastIndexOf('// NPC SERVER STARTUP BEGIN');
 const end = source.indexOf('// NPC SERVER STARTUP END', begin);
 assert.ok(begin >= 0 && end > begin);
+const manifest = source.slice(source.indexOf('function npcMerchantManifest('), source.indexOf('function createNpcMerchantPurses('));
 for (const channel of ['main', 'dev', undefined]) {
   let prepared = 0, population = 0, runtime = 0, quotes = 0, shutdowns = 0;
   const ledgerChannels = [], logs = [];
@@ -15,7 +16,7 @@ for (const channel of ['main', 'dev', undefined]) {
     require, setTimeout, clearTimeout, Date,
     log: text => logs.push(text),
     mp: { getServerSettings: () => settings, prepareNpcLoad: () => prepared++ },
-    NPC_POPULATION_DATA: { plugins: ['Skyrim.esm'], keep: [['id',0,0,0,0,0,'trader']] },
+    NPC_POPULATION_DATA: { plugins: ['Skyrim.esm'], keep: [['1:Skyrim.esm','a:Skyrim.esm',0,0,0,0,'trader']] },
     createPrivateMerchantLedger: (fs, path, cfg) => { ledgerChannels.push(cfg.privDir); return {}; },
     createNpcMerchantPurses: () => ({ shutdown() {} }),
     createNpcPopulation: () => { population++; return {}; },
@@ -23,6 +24,7 @@ for (const channel of ['main', 'dev', undefined]) {
     MERCHANT_TRADING: { installMerchantTrading: () => { quotes++; return { shutdown() { shutdowns++; } }; } }
   };
   vm.createContext(ctx);
+  vm.runInContext(manifest, ctx);
   vm.runInContext(source.slice(begin, end), ctx);
   assert.equal(prepared, 1, `${channel || 'legacy Main'} prepares the winning records`);
   assert.equal(population, 1, `${channel || 'legacy Main'} starts the curated population`);
