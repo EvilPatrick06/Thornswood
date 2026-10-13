@@ -351,12 +351,9 @@ function Save-ServerRecords([switch]$PutBack) {
     $null = Save-ThornswoodDeployedBuild $target $ssh $VpsRoot
 }
 
-# ------------------------------------------------------------- -TaskOnly ----
-# The installer and the files it loads go up, as for a put-back, and it
-# registers the task again and restarts the server under it (#2491). Nothing
-# in the server's folder changes, so there is no record to write.
-if ($TaskOnly) {
-    Head ('Registering the task again: ' + $TaskName)
+# The installer and the files it loads, sent alone, before a run that
+# sends no zip (-TaskOnly and -PutBack).
+function Send-InstallerOnly {
     Invoke-ThornswoodNative { & scp @ssh $installer "${target}:C:/Install-ThornswoodServer.ps1" }
     if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
     Invoke-ThornswoodNative { & scp @ssh $rollLog "${target}:C:/Roll-Log.ps1" }
@@ -368,6 +365,15 @@ if ($TaskOnly) {
     Invoke-ThornswoodNative { & scp @ssh $waitLib "${target}:C:/ServerReadyWait.ps1" }
     if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
     Send-ShapeLibs 'Nothing up there was changed.'
+}
+
+# ------------------------------------------------------------- -TaskOnly ----
+# The installer and the files it loads go up, as for a put-back, and it
+# registers the task again and restarts the server under it (#2491). Nothing
+# in the server's folder changes, so there is no record to write.
+if ($TaskOnly) {
+    Head ('Registering the task again: ' + $TaskName)
+    Send-InstallerOnly
     Invoke-Installer "-Root '$VpsRoot' -TaskName '$TaskName' -StartNow -TaskOnly -Wait $Wait"
     Say 'the task is registered again and the server answers under it' 'Green'
     Write-Host ''
@@ -378,17 +384,7 @@ if ($TaskOnly) {
 # ------------------------------------------------------------- -PutBack -----
 if ($PutBack) {
     Head 'Putting the previous server back'
-    Invoke-ThornswoodNative { & scp @ssh $installer "${target}:C:/Install-ThornswoodServer.ps1" }
-    if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
-    Invoke-ThornswoodNative { & scp @ssh $rollLog "${target}:C:/Roll-Log.ps1" }
-    if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
-    Invoke-ThornswoodNative { & scp @ssh $settingsLib "${target}:C:/ServerSettings.ps1" }
-    if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
-    Invoke-ThornswoodNative { & scp @ssh $buildLib "${target}:C:/ServerBuild.ps1" }
-    if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
-    Invoke-ThornswoodNative { & scp @ssh $waitLib "${target}:C:/ServerReadyWait.ps1" }
-    if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
-    Send-ShapeLibs 'Nothing up there was changed.'
+    Send-InstallerOnly
     Invoke-Installer "-Root '$VpsRoot' -TaskName '$TaskName' -StartNow -PutBack -Wait $Wait"
     Say 'the previous server is back and answering up there' 'Green'
     Save-ServerRecords -PutBack
