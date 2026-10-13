@@ -162,15 +162,14 @@ If the keyboard is dead, in this order: press Escape once and try to move, and w
 
 Grab `thornswood-front.log`.
 
-## TEST 10. Guards after death
+## TEST 10. No bounty for anything
 
-1. Steal in front of a guard, or attack someone, to get a bounty.
-2. When the guard approaches, resist arrest.
-3. Let them kill you.
-4. Respawn.
-5. Walk up to a guard in the same hold.
+1. Open the Journal, General Stats, and look at the bounty for each hold.
+2. In a town, take something a trader owns while they watch (the prompt says Steal).
+3. Strike a trader once.
+4. Open the Journal again.
 
-Pass if the guard talks to you and offers the fine or jail. You keep the bounty, that is intended.
+Pass if every hold's bounty is still 0. There are no NPC guards, so nobody comes for you either way.
 
 ## TEST 11. Voice
 
