@@ -157,7 +157,12 @@ impact is total, and four of the five keys showed no use in the sampled log.
    to be removed. Claude removes them, and only after the provider's hosting
    console login is confirmed working.
 2. Port 22. Yes, restrict the inbound rules on 22 to known addresses. Same
-   condition: only after the console login check.
+   condition: only after the console login check. The way it is done:
+   `scripts\vps\Set-SshScope.ps1 -From <addresses>`, which proves key login,
+   refuses a list that leaves out the machine running it, arms a ten minute
+   put back, and cancels it only once a new key login gets in
+   (`tests\test-ssh-scope.ps1`). Which addresses go in the list is still to
+   be decided (#2182).
 3. `cloudbase-init`. Undecided. Left as it is (enabled local admin); revisit
    later.
 4. Deploy identity and gate. Undecided. The design in section 3 stays ready,

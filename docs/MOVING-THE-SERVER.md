@@ -339,7 +339,9 @@ repository folder, as docs\RESTORING.md "The box is gone" says.
     has passed `.\scripts\vps\Setup-SshKey.ps1 -Test` against it:
     `.\scripts\vps\Harden-VPS.ps1`. It proves key login first, then turns ssh
     password login and Remote Desktop off (issue #450). The provider's console
-    and the Administrator password stay the way back.
+    and the Administrator password stay the way back. If the old box had port
+    22 limited to a list of addresses, set the same list on the new one:
+    `.\scripts\vps\Set-SshScope.ps1 -From <the list>` (issue #2182).
 
 ### Moving everybody
 
