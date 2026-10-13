@@ -3,10 +3,19 @@
 
       pwsh -NoProfile -File .\tests\test-server-task-priority.ps1
 
-  The game server's scheduled task starts it at normal priority: normal for
-  the processor, the disk and memory, the same as a service on the box.
+  The game server's scheduled task starts it at high priority for the
+  processor, and normal for the disk and memory.
 
-  WHY. The first-move stall: the server stopped for seconds, on 5 October for
+  WHY HIGH (#2491). Decided by Patrick on 12 Oct 2026 at about 6:20 PM: "we
+  need to fix it so the servers run on high priority". The VPS has six cores,
+  and its six build runners are services at Normal, so a build took the
+  processor from both game servers at the same priority as them. The task is
+  registered at priority 1, HIGH_PRIORITY_CLASS, and node is started through
+  cmd's start /high: a task at 1 starts its cmd.exe High, and cmd.exe starts
+  node Normal unless asked (measured 12 Oct, cmd High and its child Normal),
+  because Windows hands a parent's class on only for Idle and BelowNormal.
+
+  WHY NOT BELOW NORMAL. The first-move stall: the server stopped for seconds, on 5 October for
   48 s, when somebody first entered a cell. The kernel trace of 4 October
   17:19 (logs\dev\stall-trace-20261004-173319) has the dev server's main
   thread reading its own memory back from pagefile.sys at low I/O priority,
@@ -21,25 +30,28 @@
   HOW.
     1. Read, not run, wherever PowerShell runs: the installer is parsed, its
        one New-ScheduledTaskSettingsSet found and the -Priority it passes read
-       (none is 7, the default every Thornswood task on the VPS shows). It
-       must be 4 to 6, the band Microsoft's table starts as
-       NORMAL_PRIORITY_CLASS.
+       (none is 7, the default every Thornswood task on the VPS showed on
+       5 October). It must be 1, HIGH_PRIORITY_CLASS in Microsoft's table,
+       never 0, which is realtime. Its one task command line, $cmd, must
+       start node through start "" /b /wait /high.
     2. On Windows, that same call is run for real (it only builds the
        settings; nothing is registered by it), and a task with those settings
        and a made-up name is registered. Its principal is the installer's
        own call run for real (SYSTEM, as a service) when this shell is
        elevated, and otherwise the person running this, logged on
-       interactively, so no admin and no password. Its action has the
-       installer's shape, cmd.exe /c starting a program, so what is measured
-       is cmd's child, as node is. It is started, and that process is asked
-       what Windows gave it: priority class (GetPriorityClass), I/O priority
-       (NtQueryInformationProcess, ProcessIoPriority) and memory priority
-       (GetProcessInformation, ProcessMemoryPriority). They must be Normal, 2
-       and 5, what the VPS measured for its services. The task and its two
-       processes are removed again whatever happens, and the test checks they
-       are gone. Where a task cannot be registered or does not start for this
-       account (a build runner's service account has no session to start it
-       in), this part says SKIP and why.
+       interactively, so no admin and no password. Its action is the
+       installer's own command line, with Windows PowerShell sleeping in
+       place of node and a scratch log and roller, so what is measured is
+       what start /high starts under cmd.exe, as node is. It is started, and
+       that process is asked what Windows gave it: priority class
+       (GetPriorityClass), I/O priority (NtQueryInformationProcess,
+       ProcessIoPriority) and memory priority (GetProcessInformation,
+       ProcessMemoryPriority). They must be High, 2 and 5: high for the
+       processor, and no lower on the disk or memory than a service on the
+       box. The task and its processes are removed again whatever happens,
+       and the test checks they are gone. Where a task cannot be registered
+       or does not start for this account (a build runner's service account
+       has no session to start it in), this part says SKIP and why.
 
   -Installer reads another copy of the installer, so the same test runs on the
   one from before this change:
@@ -48,8 +60,9 @@
       pwsh -NoProfile -File .\tests\test-server-task-priority.ps1 -Installer $env:TEMP\install-before.ps1
 
   Registers and removes one task named Thornswood priority harness <guid> (for
-  SYSTEM when elevated, else for the account running it) and stops the
-  cmd.exe and Windows PowerShell it started; writes nothing else.
+  SYSTEM when elevated, else for the account running it), stops the cmd.exe
+  and Windows PowerShell it started, and removes the scratch folder in TEMP
+  that holds its log and roller; writes nothing else.
 #>
 [CmdletBinding()]
 param([string]$Installer)
@@ -104,7 +117,21 @@ for ($i = 1; $i -lt $el.Count; $i++) {
         }
     }
 }
-Yes ("the server task's priority is in the normal band 4 to 6 ($asked, $how)") ($asked -is [int] -and $asked -ge 4 -and $asked -le 6)
+Yes ("the server task's priority is 1, high, never 0, realtime ($asked, $how)") ($asked -is [int] -and $asked -eq 1)
+
+# The task's command line: the one $cmd = ('...' -f ...) in the installer, the
+# format string and what fills it, by name.
+$cmdAsts = @($ast.FindAll({ param($n)
+    $n -is [System.Management.Automation.Language.AssignmentStatementAst] -and $n.Left.Extent.Text -eq '$cmd' }, $true))
+Yes ('the installer builds the task''s command line in one place (' + $cmdAsts.Count + ')') ($cmdAsts.Count -eq 1)
+$format = $null
+if ($cmdAsts.Count -eq 1) {
+    $fmtAst = $cmdAsts[0].Right.Find({ param($n)
+        $n -is [System.Management.Automation.Language.BinaryExpressionAst] -and $n.Operator -eq 'Format' }, $true)
+    if ($fmtAst -and $fmtAst.Left -is [System.Management.Automation.Language.StringConstantExpressionAst]) { $format = $fmtAst.Left.Value }
+}
+Yes 'it starts node through start "" /b /wait /high' ($format -and $format.Contains('start "" /b /wait /high "{0}" dist_back/skymp5-server.js'))
+Yes '  and hands node''s exit code back as the task''s' ($format -and $format.Contains('& call exit %^errorlevel%"'))
 
 # ---- 2. run, through Task Scheduler ----------------------------------------------
 $onWindows = [Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT
@@ -170,10 +197,11 @@ if ($admin -and $pCalls.Count -eq 1) {
     $who = $me + ', logged on interactively (not elevated, so not the installer''s SYSTEM principal)'
 }
 
-# The action has the installer's shape: cmd.exe /c starting the program, so the
-# process measured is cmd's child, as node is on the VPS, and what it inherits
-# through cmd is measured too. Windows PowerShell sleeping stands in for node;
-# the mark in its command line is how its process is found.
+# The action is the installer's own command line: cmd.exe /c rolling the log,
+# then start /high starting the program, so the process measured is what
+# start starts under cmd, as node is on the VPS. Windows PowerShell sleeping
+# stands in for node, with a scratch log and an empty roller; the mark in its
+# command line is how its process is found.
 # Not 'Thornswood Test...': test-deploy-swaps and test-install-server clear
 # away every task named 'Thornswood Test*' (names match without case), so one
 # of them running beside this deletes its task half way (on 5 October a
@@ -185,8 +213,13 @@ if ($admin -and $pCalls.Count -eq 1) {
 $name = 'Thornswood priority harness ' + [Guid]::NewGuid().ToString('N')
 $mark = [Guid]::NewGuid().ToString('N')
 $ps51 = [IO.Path]::Combine($env:SystemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
-$action = New-ScheduledTaskAction -Execute ([IO.Path]::Combine($env:SystemRoot, 'System32', 'cmd.exe')) `
-                                  -Argument ('/c ""' + $ps51 + '" -NoProfile -NonInteractive -Command Start-Sleep -Seconds 90 #' + $mark + '"')
+if (-not $format) { Write-Host 'SKIP  there is no task command line to run'; Done }
+$scratch = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-priority-' + $mark)
+New-Item -ItemType Directory -Force -Path $scratch | Out-Null
+$rollerAt = Join-Path $scratch 'roll-log.ps1'
+[IO.File]::WriteAllText($rollerAt, '')
+$line = $format.Replace('dist_back/skymp5-server.js', ('-NoProfile -NonInteractive -Command Start-Sleep -Seconds 90 #' + $mark)) -f $ps51, (Join-Path $scratch 'server.log'), $ps51, $rollerAt
+$action = New-ScheduledTaskAction -Execute ([IO.Path]::Combine($env:SystemRoot, 'System32', 'cmd.exe')) -Argument $line -WorkingDirectory $scratch
 $child = $null
 $parent = $null
 $skip = $null
@@ -216,9 +249,10 @@ try {
         Write-Host ("the task's cmd.exe:          {0}, I/O priority {1}, memory priority {2}" -f $up.Class, $up.Io, $up.Memory)
         Write-Host ("the program cmd.exe started: {0}, I/O priority {1}, memory priority {2}" -f $got.Class, $got.Io, $got.Memory)
         Yes '  the program is cmd.exe''s child, as node is on the VPS' ($parent -and $parent.Name -eq 'cmd.exe')
-        Yes '  runs at the Normal priority class (BelowNormal was measured for the servers on 5 October)' ($got.Class -eq 'Normal')
-        Yes '  issues its disk reads at normal I/O priority, 2 (1, low, was measured)' ($got.Io -eq 2)
-        Yes '  has normal memory priority, 5 (2 was measured)' ($got.Memory -eq 5)
+        Yes '  the task''s cmd.exe runs High, from priority 1' ($up.Class -eq 'High')
+        Yes '  the program runs at the High priority class (Normal under a priority 1 task without start /high, measured 12 October)' ($got.Class -eq 'High')
+        Yes '  issues its disk reads at normal I/O priority, 2 (1, low, was measured on 5 October)' ($got.Io -eq 2)
+        Yes '  has normal memory priority, 5 (2 was measured on 5 October)' ($got.Memory -eq 5)
     }
 }
 finally {
@@ -226,10 +260,17 @@ finally {
     Unregister-ScheduledTask -TaskName $name -Confirm:$false -ErrorAction SilentlyContinue
     if ($child) { Stop-Process -Id ([int]$child.ProcessId) -Force -ErrorAction SilentlyContinue }
     if ($parent) { Stop-Process -Id ([int]$parent.ProcessId) -Force -ErrorAction SilentlyContinue }
+    # Tried a few times: cmd.exe, stopped a moment ago, can still hold the
+    # log open, a file another program has open. Checked below either way.
+    for ($i = 0; $i -lt 20 -and (Test-Path -LiteralPath $scratch); $i++) {
+        Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue
+        if (Test-Path -LiteralPath $scratch) { Start-Sleep -Milliseconds 250 }
+    }
 }
 if ($skip) { Write-Host ('SKIP  ' + $skip) }
 Yes 'the scratch task is gone again' (-not (Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue))
 if ($child) {
     Yes '  and so are its processes' (-not (Get-Process -Id ([int]$child.ProcessId), ([int]$child.ParentProcessId) -ErrorAction SilentlyContinue))
 }
+Yes '  and its scratch folder' (-not (Test-Path -LiteralPath $scratch))
 Done
