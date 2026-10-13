@@ -69,7 +69,7 @@ their medicine recipes. Additional Cook resource goods require verified
 food records; its public authored outputs and ingredients, including
 cooking materials such as fire paste, retain their owning trade. Unranked sources
 are not imported wholesale, and potion-name text does not classify a good.
-This static catalogue does not implement trading player-created brews.
+This static catalogue does not implement trading custom brews.
 
 `python scripts/dev/Build-MerchantRoleTables.py` generates source data from
 the recorded load order and repository-owned plugins. It never writes game
