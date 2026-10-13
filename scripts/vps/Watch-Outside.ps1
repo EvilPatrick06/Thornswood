@@ -84,7 +84,7 @@
   Then, for whatever has not gone yet:
     1. over ssh, with the key this machine already uses for the VPS, the lines
        are appended to C:\Thornswood-Watch\alerts.jsonl on the VPS, the
-       watchdog's outbox. From there the bot says them in the staff channel,
+       watchdog's outbox. From there the bot says them in #staff-updates,
        or the watchdog posts them through its webhook when the bot cannot,
        exactly as it does its own, and marks them the same way. The ids go in
        alerts-sent-vps.txt here. The lines go on ssh's standard input, so
@@ -92,9 +92,12 @@
     2. when ssh cannot reach the VPS, which is the case this exists for, or
        the watchdog is not installed there, they are posted from here through
        the Discord webhook in alerts-webhook.txt beside this machine's
-       outbox: the same staff channel webhook the VPS keeps, set here with
-       -SetWebhook, never committed, printed or logged. The ids go in
-       alerts-sent-webhook.txt. No mentions, so nothing can ping anybody.
+       outbox: the same #staff-updates webhook the VPS keeps, set here with
+       -SetWebhook, never committed, printed or logged. -SetWebhook asks
+       Discord where a pasted webhook posts and refuses any channel but the
+       one in bot\staff-channel.txt, and -Status says where the one here
+       posts (#2501). The ids go in alerts-sent-webhook.txt. No mentions, so
+       nothing can ping anybody.
   With neither, a message waits and is tried again every run for a day.
 
   WHERE IT LIVES. -Install copies this script to
@@ -137,7 +140,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 function Read-Settings([string]$repo, [string]$saved) {
   $s = @{
     Site = 'https://thornswood.net/'; SiteHost = 'thornswood.net'
-    Feeds = @(); VpsAddress = ''; VpsUser = 'Administrator'; WatchRoot = 'C:\Thornswood-Watch'
+    Feeds = @(); VpsAddress = ''; VpsUser = 'Administrator'; WatchRoot = 'C:\Thornswood-Watch'; StaffChannel = ''
     Repo = 'EvilPatrick06/Thornswood'; RunnerName = 'thornswood-vps'
     SignEndpoint = ''; SignAccount = ''; SignProfile = ''; Identities = @()
     NexusGame = ''; NexusSlug = ''
@@ -166,6 +169,11 @@ function Read-Settings([string]$repo, [string]$saved) {
     # The watchdog's folder on the VPS, where its outbox is: Watch-Services.ps1's own -Root.
     $ws = Get-Content -LiteralPath (Join-Path $repo 'scripts\vps\Watch-Services.ps1') -Raw
     $s.WatchRoot = [regex]::Match($ws, '\[string\]\$Root\s*=\s*''([^'']+)''').Groups[1].Value
+    # #staff-updates, the channel the bot says the watchdog's messages in and
+    # so the one the webhook has to post in: the id the bot reads (#2501).
+    $sc = Join-Path $repo 'bot\staff-channel.txt'
+    if (Test-Path -LiteralPath $sc) { $s.StaffChannel = ("$(Get-Content -LiteralPath $sc -Raw)").Trim() }
+    if ($s.StaffChannel -notmatch '^\d{17,20}$') { $s.StaffChannel = '' }
     return $s
   }
   if ($saved -and (Test-Path -LiteralPath $saved)) {
@@ -315,6 +323,23 @@ function Send-Webhook([string]$url, [string]$text) {
   if ($a.Code -ge 200 -and $a.Code -lt 300) { return '' }
   if ($a.Code -gt 0) { return ('HTTP ' + $a.Code) }
   return 'Discord could not be reached'
+}
+
+# Where a webhook posts, asked of Discord: a GET on the webhook's own address
+# answers with its channel_id, so no token is involved. Channel is '' and Why
+# says why when Discord would not say; neither ever holds the address.
+function Webhook-Channel([string]$url) {
+  $a = Get-Http $url 'GET' '' @{} -timeout 15
+  if ($a.Code -ge 200 -and $a.Code -lt 300) {
+    try {
+      $o = $a.Body | ConvertFrom-Json
+      if ($o -and $o.PSObject.Properties['channel_id'] -and ('' + $o.channel_id)) { return @{ Channel = ('' + $o.channel_id); Why = '' } }
+    } catch { }
+    return @{ Channel = ''; Why = 'Discord answered without a channel' }
+  }
+  if ($a.Code -eq 401 -or $a.Code -eq 404) { return @{ Channel = ''; Why = ('Discord answered ' + $a.Code + ', so that webhook does not exist any more or the address is not whole') } }
+  if ($a.Code -gt 0) { return @{ Channel = ''; Why = ('Discord answered ' + $a.Code) } }
+  return @{ Channel = ''; Why = 'Discord could not be reached' }
 }
 
 # Hands outbox lines to the VPS watchdog's outbox, the path #447 built:
@@ -788,13 +813,18 @@ Write-Host '  THORNSWOOD  -  watched from outside the VPS' -ForegroundColor Whit
 
 if ($SetWebhook) {
   Say ''
-  Say '  Paste the staff alerts webhook address (Discord: the channel, Edit Channel, Integrations, Webhooks).' 'Cyan'
+  if (-not $S.StaffChannel) { Say '  STOP. There is no channel id in bot\staff-channel.txt, so the webhook cannot be checked. Run this from the repository. Nothing was saved.' 'Red'; Done 1 }
+  Say '  Paste the staff alerts webhook address (Discord: #staff-updates, Edit Channel, Integrations, Webhooks).' 'Cyan'
   Say '  Use the same one the VPS watchdog posts through, so both land in one channel. It is not shown.' 'DarkGray'
   $sec = Read-Host '  Webhook' -AsSecureString
   $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec)
   try { $url = ('' + [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)).Trim() }
   finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
   if ($url -notmatch $hookRx) { $url = $null; Say '  STOP. That is not a Discord webhook address. Nothing was saved.' 'Red'; Done 1 }
+  $where = Webhook-Channel $url
+  if (-not $where.Channel) { $url = $null; Say ('  STOP. Discord would not say where that webhook posts: ' + $where.Why + '. Nothing was saved.') 'Red'; Done 1 }
+  if ($where.Channel -ne $S.StaffChannel) { $url = $null; Say ('  STOP. That webhook posts in channel ' + $where.Channel + ', not #staff-updates (' + $S.StaffChannel + '). Make it in #staff-updates. Nothing was saved.') 'Red'; Done 1 }
+  Say ('  Discord says it posts in ' + $where.Channel + ', which is #staff-updates.') 'Green'
   $null = New-Item -ItemType Directory -Path $Folder -Force
   [IO.File]::WriteAllText($P.Hook, $url, (New-Object Text.UTF8Encoding($false)))
   $url = $null
@@ -825,7 +855,16 @@ if ($Status) {
     $i = Get-ScheduledTaskInfo -TaskName $TaskName
     Say ('  task      ' + $t.State + ', last run ' + $i.LastRunTime + ' (result ' + $i.LastTaskResult + '), next ' + $i.NextRunTime) 'Green'
   } else { Say '  task      NOT installed. Run this with -Install' 'Red' }
-  Say ('  webhook   ' + $(if (Webhook-Url $P) { 'set, for when the VPS cannot be reached' } else { 'NOT set. Run this with -SetWebhook' })) $(if (Webhook-Url $P) { 'Green' } else { 'Red' })
+  $u = Webhook-Url $P
+  if (-not $u) { Say '  webhook   NOT set. Run this with -SetWebhook' 'Red' }
+  else {
+    $where = Webhook-Channel $u
+    $u = $null
+    if (-not $where.Channel) { Say ('  webhook   set, and DISCORD WOULD NOT SAY WHERE IT POSTS: ' + $where.Why) 'Red' }
+    elseif ($S.StaffChannel -and $where.Channel -ne $S.StaffChannel) { Say ('  webhook   set, and posts in ' + $where.Channel + ', NOT #staff-updates (' + $S.StaffChannel + '). Make one there and run this with -SetWebhook') 'Red' }
+    elseif ($S.StaffChannel) { Say ('  webhook   set, for when the VPS cannot be reached; posts in ' + $where.Channel + ', which is #staff-updates') 'Green' }
+    else { Say ('  webhook   set, for when the VPS cannot be reached; posts in ' + $where.Channel) 'Green' }
+  }
   # Read only: whether ssh reaches the box without a prompt and the watchdog
   # whose outbox the messages go to is there.
   $ssh = Get-Command ssh -EA SilentlyContinue

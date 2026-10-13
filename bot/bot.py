@@ -51,7 +51,8 @@ Everything it needs is in env:
                    Content Creator only
   TICKET_COOLDOWN  seconds between one person's tickets, default 300
   WATCH_CHANNEL_ID id of the staff channel the watchdog's messages go in,
-                   default whatever dev-channel.txt beside this file holds
+                   default whatever staff-channel.txt beside this file
+                   holds, #staff-updates. Leave it unset
   WATCH_DIR        the watchdog's folder, default the one Watch-Services.ps1
                    makes on the VPS
   WATCH_READ_EVERY seconds between reads of its outbox, default 60
@@ -215,25 +216,31 @@ EXTRA_STAFF = {'creator': CREATOR}
 EXTRA_STAFF_IDS = {'creator': (CREATOR_IDS, CREATOR_NAMES)}
 
 
-# Where the site watcher speaks. Staff, not public: an outage is something to
-# fix, not an announcement.
+# The staff channel, #staff-updates, where staff hear what needs fixing: the
+# watchdog's messages (a service down or back, the disk, the disk forecast,
+# what the outside watcher on One sees) and the sessions that went wrong.
+# Staff, not public: an outage is something to fix, not an announcement.
+# Patrick, 11 Oct: staff status updates go in #staff-updates, 1549254991082946570.
 #
-# BY ID AND NOT BY NAME, and the reason is the whole point. The staff channel
-# is called news and sits in the Staff category. There is also a public news,
-# made by Build-Discord.py:154, which is the one releases are announced in. Two
-# channels, one name, and by_name hands back whichever the server lists first,
-# so a watcher matching on 'news' would eventually tell everybody the site was
-# down. A first draft guessed at 'dev-notes' and then 'dev', neither of which
-# exists at all, and would have fallen through to whatever did.
+# BY ID AND NOT BY NAME, and the reason is the whole point. This server has two
+# channels called news, the public one releases are announced in and a staff
+# one, and by_name hands back whichever the server lists first, so a watcher
+# matching on a name would eventually tell everybody the site was down.
 #
-# dev-channel.txt holds that id, sits beside this file and is tracked in git,
-# unlike the webhook files next to it, so the id is not a secret and does not
-# need putting anywhere new.
-def _dev_channel_id():
-    """The staff channel's id, from the file that already records it."""
+# staff-channel.txt holds that id, sits beside this file and is tracked in git,
+# unlike the webhook files next to it, so the id is not a secret. Install-Bot
+# sends it with the code.
+#
+# NOT dev-channel.txt. That one is the dev updates channel, where dev releases
+# are announced, and only Set-DevNews.ps1 reads it, to check the dev release
+# webhook. The watchdog read it until 12 Oct (#2501), from a comment here that
+# called that channel "the staff channel", so every outage and the disk
+# forecast's test went in among the dev release posts.
+def _staff_channel_id():
+    """#staff-updates' id, from staff-channel.txt beside this file. 0 without."""
     here = os.path.dirname(os.path.abspath(__file__))
     try:
-        with open(os.path.join(here, 'dev-channel.txt')) as f:
+        with open(os.path.join(here, 'staff-channel.txt')) as f:
             return int(f.read().strip())
     except Exception:
         return 0
@@ -248,38 +255,21 @@ def _int_env(name, fallback):
         return fallback
 
 
-WATCH_ID = _int_env('WATCH_CHANNEL_ID', _dev_channel_id())
+# WATCH_CHANNEL_ID in bot.env.json on the VPS overrides it. Nothing in the
+# repository sets it, and it should stay unset: one id, in one tracked file.
+WATCH_ID = _int_env('WATCH_CHANNEL_ID', _staff_channel_id())
 
 
-# The channel that hears about a session that went wrong.
+# The channel that hears about a session that went wrong: the same one.
 #
-# staff-channel.txt beside this file, the same shape and for the same reason as
-# dev-channel.txt: an id rather than a name, because a name lookup hands back
-# whichever channel the server lists first and this server already has two
-# called news.
-#
-# With no file it falls back to the watcher's channel, which is a real staff
-# channel that already works, rather than guessing at a name or going quiet.
-# TROUBLE_CHANNEL_ID in bot.env.json on the VPS overrides both.
-def _staff_channel_id():
-    here = os.path.dirname(os.path.abspath(__file__))
-    try:
-        with open(os.path.join(here, 'staff-channel.txt')) as f:
-            return int(f.read().strip())
-    except Exception:
-        return 0
-
-
-# No fallback to the watcher's channel here, and that is the whole point.
-#
-# It used to read `_staff_channel_id() or _dev_channel_id()`, so with no
-# staff-channel.txt it took the watcher's id and never reached the name lookup
-# below. The first deploy on 22 September logged "speaking in #news", which is
-# the staff news channel: right kind of place, wrong place, and it would have
-# put every crash report in with the release announcements.
+# It once read `_staff_channel_id() or _dev_channel_id()`, so with no
+# staff-channel.txt it took the dev updates channel's id and never reached the
+# name lookup in _trouble_channel. The first deploy on 22 September logged
+# "speaking in #news": right kind of place, wrong place, and it would have put
+# every crash report in with the release announcements.
 #
 # 0 when there is no file, so _trouble_channel falls through to looking
-# staff-general up by name, which is what was wanted.
+# staff-general up by name. TROUBLE_CHANNEL_ID in bot.env.json overrides it.
 TROUBLE_ID = _int_env('TROUBLE_CHANNEL_ID', _staff_channel_id())
 
 # The bot's own records, joins.json, open-tickets.json, heartbeat.json and
@@ -3485,7 +3475,8 @@ async def watch_known_issues():
 
 # ----------------------------------------------------- the staff channel --
 #
-# Where the watchdog's messages are said. There used to be a site watcher here
+# Where the watchdog's messages are said: #staff-updates, by WATCH_ID from
+# staff-channel.txt (#2501). There used to be a site watcher here
 # as well, asking https://thornswood.net every five minutes since the Caddy
 # outage of 21 September. The watchdog on the VPS asks the same address (its
 # caddy check), so one outage was two messages from two watchers; since #447
@@ -3502,9 +3493,8 @@ async def watch_say(text):
     public one.
     """
     if not WATCH_ID:
-        log('watch: no channel id, so nothing was said. dev-channel.txt is '
-            'missing or unreadable, or set WATCH_CHANNEL_ID in bot.env.json '
-            'on the VPS.')
+        log('watch: no channel id, so nothing was said. staff-channel.txt is '
+            'missing or unreadable; Install-Bot.ps1 sends it with the code.')
         return False
     ch = client.get_channel(WATCH_ID)
     if ch is None:
