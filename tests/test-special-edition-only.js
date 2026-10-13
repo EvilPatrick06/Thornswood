@@ -261,6 +261,18 @@ yes('the mentions left are all in tables that only describe a record or list it 
       inPopulation.filter(function (h) { return !h.allowed && /3025/.test(h.key); }).length === 1);
   yes('...and a Creation Club file is refused even in a row left out',
       inPopulation.some(function (h) { return !h.allowed && h.why === 'a Creation Club file'; }));
+  // last-plugin.json lists the quests Thornswood-Last.esp stops (#2468).
+  const last = { name: 'last-plugin.json', text: JSON.stringify({
+    quests: { stopped: [{ quest: '306a:Update.esm', edid: 'ccSomething' }],
+              kept: [{ quest: '306b:Update.esm', edid: 'ccOther' }] },
+    arrivalTalk: [{ quest: '306c:Update.esm' }]
+  }) };
+  const inLast = C.gamemodeUses(records, [last], true);
+  yes('in last-plugin.json a stopped quest may name one',
+      inLast.some(function (h) { return h.allowed && /306a/.test(h.key); }));
+  yes('...a kept quest may not, nor the arrival talk',
+      inLast.some(function (h) { return !h.allowed && /306b/.test(h.key); }) &&
+      inLast.some(function (h) { return !h.allowed && /306c/.test(h.key); }));
 }
 
 // The twenty bone wolf rows are what keeps those refs out of the world: each is

@@ -6,6 +6,20 @@ including later saved-form loads. Main and dev both start this controller:
 `game/gamemode.js` starts it when `thornswoodServer` is main or dev (or unset,
 which reads as main), since 6e4488e4 on 3 October.
 
+A cut actor is never made on the server, and since #2468 it is meant never to
+be drawn in anybody's game either. Until then each person's game loaded every
+placed actor of a cell from the plugins, and the client's world cleaner
+removed the ones the server does not own one per frame, so a cut guard or
+filler stood there for a moment. `game/content/Thornswood-Last.esp` overrides
+every cut placed actor initially disabled, with no enable parent, built by
+`scripts/mods/Build-LastPlugin.py` from this catalogue; the server's reader
+skips a disabled reference too (measured on 12 Oct with the built server
+addon: 5,038 actors made with the plugin at the end of the load order, none
+of them a cut one, against 11,273 without it and without the cut list). The
+gamemode keeps handing the server the cut list until the plugin is in the
+servers' load order, and drops it in the same change that puts it there
+(`tests/test-2468-last-plugin.js`).
+
 The 48-plugin catalogue contains 14,641 placements: 5,072 retained and 9,569
 excluded. Named pets and enemies are cut even without a Unique flag. Fourteen
 old Justiciars and the embassy soldier are excluded too. Remnant patrols are

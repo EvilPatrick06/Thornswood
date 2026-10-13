@@ -118,10 +118,14 @@ if (block !== null && smoke) {
         (100 / d.food) > 2 && (100 / d.food) < 3);
   }
 
-  // S2: a meter empties on the clock, and stops at nothing.
+  // S2: a meter empties on the clock, and stops at nothing. Settled once
+  // first, so the three hours are spent in the world: the first settle of
+  // somebody is their arrival, and the time before it is time away, which
+  // since #2246 costs half the clock with a floor of 25 (test-2246).
   {
     const r = rig();
     r.seed(ME);
+    r.settle(ME);
     r.clock.now += 3 * HOUR;
     let n = r.settle(ME);
     yes('S2 after three hours drink is long empty and so is food',

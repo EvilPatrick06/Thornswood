@@ -2231,7 +2231,7 @@ $relSource = Get-ReleaseSource $RepoDir
 $relBaseline = if ($releaseBaseline) { [string]$releaseBaseline.id } else { '' }
 $relPacks = @(if (-not $packsGone) { $chunks | ForEach-Object { [string]$_.Id } })
 $relRecord = New-ReleaseRecord $Id $Channel (Val $doc 'launcherVersion') $relPacks `
-    $relBaseline $relSource.Commit $relSource.Branch $relSource.Uncommitted @($script:ShipUiHashedWritten)
+    $relBaseline $relSource.Commit $relSource.Branch $relSource.Uncommitted
 Set-Prop $doc 'release' $relRecord
 Say ("  release {0}{1}" -f $Id, $(if ($relRecord.commit) { ', built from ' + $relRecord.commit.Substring(0, 12) } else { ', not from a git checkout' })) 'Green'
 # ==== end thornswood release record ====
@@ -2252,11 +2252,11 @@ try {
 } catch { Die ($_.Exception.Message + ' Run Ship again.') }
 # ==== end thornswood news out ====
 
-# Set-Content -Encoding UTF8 writes a byte order mark on Windows PowerShell,
-# and a BOM is not JSON. The launcher's reader stops on it and reports an
-# unexpected character, which takes out the update check for everyone at once,
-# including their route to a fix. So this file is written without one.
-[IO.File]::WriteAllText($VersionFile, ($doc | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))
+# Compact and without a byte order mark, the one way every feed writer writes
+# it (Feed-Json.ps1, Write-FeedVersionFile, #1050). A BOM is not JSON: the
+# launcher's reader stops on it, which takes out the update check for everyone
+# at once, including their route to a fix.
+Write-FeedVersionFile $VersionFile $doc
 
 # A pack with no url is not a warning. It is a release that switches Play off
 # for every person who takes it, because their launcher tries to download from

@@ -86,7 +86,7 @@ $block = $src.Substring($a, $b - $a)
 
 # The block has to sit before the file is written and before it is pushed, or
 # the pull and the check are decorations.
-foreach ($mark in 'WriteAllText($vf', "Head 'Pushing'", 'git commit') {
+foreach ($mark in 'Write-FeedVersionFile $vf', "Head 'Pushing'", 'git commit') {
     $at = $src.IndexOf($mark)
     Yes ("the block comes before the first " + $mark) ($at -lt 0 -or $a -lt $at)
 }
@@ -202,7 +202,7 @@ try {
         Yes 'the site upload never talks to GitHub' ($siteBlock -notmatch 'api\.github\.com|Invoke-RestMethod')
         $fOpen = $src.IndexOf('# ==== thornswood pack site feed ====')
         Yes 'the feed goes to the site after it is written, so launchers hear of the packs' (
-            $fOpen -gt $src.IndexOf('WriteAllText($vf') -and $src.Substring($fOpen) -match 'Remirror-Site-Feed\.ps1')
+            $src.IndexOf('Write-FeedVersionFile $vf') -gt 0 -and $fOpen -gt $src.IndexOf('Write-FeedVersionFile $vf') -and $src.Substring($fOpen) -match 'Remirror-Site-Feed\.ps1')
 
         # Runs the lifted block with Remirror-Site-Feed.ps1 -Send into a scratch
         # site folder, the same way test-site-assets.ps1 drives Publish-Update.

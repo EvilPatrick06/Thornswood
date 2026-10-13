@@ -602,7 +602,7 @@ if ($packSwap.Count -or $recSwap.Count -or $stateSwap) {
     # The store's list goes back with the pointers it holds swapped, and the
     # feed no longer carries one (#1050).
     if ($relList.Count) { Save-StoreReleases $ReleaseDir $relList; Remove-FeedReleasesField $doc }
-    [IO.File]::WriteAllText($VersionFile, ($doc | ConvertTo-Json -Depth 6), $utf8)
+    Write-FeedVersionFile $VersionFile $doc
     if ($stateSwap) { Copy-Item -LiteralPath $stateSwap -Destination $StateFile -Force }
     $files = @('version.json')
     if ($relList.Count) { $files += $FeedReleasesFile }

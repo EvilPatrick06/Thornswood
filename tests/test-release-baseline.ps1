@@ -314,7 +314,7 @@ try {
     $iMan = $src.IndexOf('# ==== thornswood release manifest ====')
     $iUp = $src.IndexOf('# ==== end thornswood site upload ====')
     $iSet = $src.IndexOf("Set-Prop `$doc 'baseline' `$releaseBaseline")
-    $iWrite = $src.IndexOf('[IO.File]::WriteAllText($VersionFile')
+    $iWrite = $src.IndexOf('Write-FeedVersionFile $VersionFile')
     $iSend = $src.IndexOf("Send-FeedStore `$Channel `$ReleaseDir `$feedFiles")
     Yes 'it runs after the packs are on the site and before the feed is written or sent' ($iUp -gt 0 -and $iMan -gt $iUp -and $iSet -gt $iMan -and $iWrite -gt $iSet -and $iSend -gt $iWrite)
     Yes 'Save-State writes the store copy with the same writer' ($src -match '(?s)function Save-State \{\s+\[void\]\(Write-BaselineFile \$now \$StateFile\)')

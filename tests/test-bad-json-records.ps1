@@ -62,7 +62,8 @@ try {
     $sc = Join-Path $T 'sc'
     [void][IO.Directory]::CreateDirectory((Join-Path $sc 'scripts\ops'))
     [IO.File]::Copy((Join-Path $Repo 'scripts\ops\Set-Collection.ps1'), (Join-Path $sc 'scripts\ops\Set-Collection.ps1'))
-    W (Join-Path $sc 'scripts\release\Feed-Store.ps1') "function Get-FeedStoreDir { 'unused' }`nfunction Receive-FeedStore { throw 'stub: no receive' }`nfunction Send-FeedStore { throw 'stub: no send' }`n"
+    # The real Feed-Json.ps1, which Feed-Store.ps1 dot-sources, so the feed is written the real way (#1050).
+    W (Join-Path $sc 'scripts\release\Feed-Store.ps1') (". '" + (Join-Path $Repo 'scripts\release\Feed-Json.ps1').Replace("'", "''") + "'`nfunction Get-FeedStoreDir { 'unused' }`nfunction Receive-FeedStore { throw 'stub: no receive' }`nfunction Send-FeedStore { throw 'stub: no send' }`n")
     $croot = Join-Path $T 'sc-root'; $cfeed = Join-Path $T 'sc-feed'
     $url = 'https://www.nexusmods.com/games/skyrimspecialedition/collections/abc'
     foreach ($k in $bad.Keys) {

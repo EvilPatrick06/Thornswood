@@ -988,10 +988,10 @@ if (-not $NoNews -and $up) {
                 $minNews = if ($doc.PSObject.Properties['minLauncher'] -and [string]$doc.minLauncher) { [string]$doc.minLauncher } else { [string]$doc.launcherVersion }
                 [void](Set-FeedNewsList $doc $newsList 'main' $minNews (Join-Path $ReleaseDir 'news-out') '' -NoSend:$NoPush)
 
-                # No byte order mark. The launcher's reader stops on one and
-                # reports an unexpected character, which takes out the update
-                # check for everybody at once, including their route to a fix.
-                [IO.File]::WriteAllText($VersionFile, ($doc | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))
+                # Compact, no byte order mark (Feed-Json.ps1,
+                # Write-FeedVersionFile). A BOM takes out the update check for
+                # everybody at once, including their route to a fix.
+                Write-FeedVersionFile $VersionFile $doc
                 Say ("  added: {0}" -f $entry.title) 'Green'
 
                 if (-not $NoPush) {

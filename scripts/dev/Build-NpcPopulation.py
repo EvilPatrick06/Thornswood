@@ -21,6 +21,7 @@ cast_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(cast_module)
 C = cast_module
 
+LAST_PLUGIN = 'Thornswood-Last.esp'
 CITY_WORLDS = {'WhiterunWorld', 'RiftenWorld', 'SolitudeWorld', 'WindhelmWorld', 'MarkarthWorld'}
 DOMESTIC = {'chicken', 'cow', 'goat', 'dog', 'horse'}
 CITY_ANIMALS = {'chicken', 'dog', 'goat'}
@@ -336,6 +337,15 @@ def build(paths, strings_dir=None):
         plugin = C.Plugin(path, name)
         if not plugin.ok:
             raise ValueError('Invalid plugin: ' + name)
+        # Thornswood-Last.esp is built FROM this catalogue: it switches off
+        # every placed actor the catalogue cuts (#2468). Read as an input it
+        # would make every cut actor "Deleted or initially switched off", and
+        # a rule changed later (keep the guards again, say) could never bring
+        # one back. So it is in the load order the gamemode checks, by name
+        # and sha256, and its records are not read.
+        if name == LAST_PLUGIN:
+            sources.append({'name': name, 'sha256': hashlib.sha256(plugin.buf).hexdigest()})
+            continue
         plugin.masters = [canon.get(m.lower(), m) for m in plugin.masters]
         if plugin.localised:
             plugin.strings = C.bsa.load_strings(strings_dir or os.path.dirname(path), name)
