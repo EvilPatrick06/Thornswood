@@ -67232,7 +67232,7 @@ try {
       var row = byId[id];
       if (!row || !boundOffer(row)) return {ok:false,why:'unbound'};
       var origin=admission,current=captureAdmission(actor,traderRef);
-      admission=function(){return admitted(current) && admitted(origin);};
+      admission=function(){return admitted(origin) && admitted(current);};
       if(!admitted(admission))return {ok:false,why:'session'};
       held=held || questsOf(actor);
       if(!held)return {ok:false,why:'unread'};

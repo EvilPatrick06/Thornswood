@@ -260,6 +260,26 @@ for(const capture of ['missing','replace']) for(const entry of ['act','offer','r
   assert.equal(JSON.stringify(record),beforeRecord);assert.equal(JSON.stringify(routed.world.inv),beforeInventory);
   routed.api.shutdown();quest.shutdown();
 }
+{
+  const routed=service({on:true},250,undefined,prices,roleConfig('Smith'));
+  let record=null,questWrites=0,inCommit=false;
+  const quest=roleQuestContext.__thornswoodCustomQuestsCreate({now:()=>1,load:()=>record,
+    identity:()=> 'quest-owner',ready:()=>true,available:()=>true,rankOf:()=> 'master',
+    commit(actor,expected,next,goods,guard) {
+      inCommit=true;
+      if(guard && !guard())return {ok:false};questWrites++;record=JSON.parse(JSON.stringify(next));return {ok:true};
+    },traderAdmission:(actor,ref)=>routed.api.questAdmission(actor,ref),traderRole:()=> 'Smith'});
+  quest.bindPlace('ebony',{cell:'test'});routed.deps.quests=()=>quest;open(routed.api);
+  const originalAdmission=routed.api.questAdmission(10,1),beforeInventory=JSON.stringify(routed.world.inv);
+  const result=quest.act(10,'take','ebony',null,1,undefined,function() {
+    if(inCommit)open(routed.api);
+    return true;
+  });
+  assert.equal(originalAdmission(),false,'the supplied origin callback replaces the original conversation');
+  assert.equal(result.ok,false,'the actual session is checked after a supplied origin callback');
+  assert.equal(questWrites,0);assert.equal(record,null);assert.equal(JSON.stringify(routed.world.inv),beforeInventory);
+  routed.api.shutdown();quest.shutdown();
+}
 let native = { on: true };
 let box = service(native, 250);
 let opened = open(box.api);
