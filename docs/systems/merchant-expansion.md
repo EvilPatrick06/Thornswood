@@ -105,6 +105,10 @@ intent without retained terms. This readiness check still needs integration
 with the explicit roster activation step before a cut; no population change
 is included here. Unresolved legacy transfers retain their records and block
 activation rather than being reset or reissued.
+New intents use format3 and require their retained terms; format2 identifies
+genuine pre-summary legacy work. Dropping terms cannot downgrade a new record.
+Legacy array cooldown keys still require a nonempty item label; original
+item-only legacy keys keep their compatible saved meaning.
 Without an explicit history manifest, the current active roster remains the
 manifest. This support alone does not cut the current 249 traders. Before
 activating retirement, validate writer ownership, pending-intent uniqueness,

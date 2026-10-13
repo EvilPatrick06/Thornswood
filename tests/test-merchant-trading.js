@@ -474,7 +474,7 @@ open(legacy.api);
 legacy.api.command({actorId:10,profileId:7,parts:['/merchant','supply','Iron','Ingot']});
 let oldPending=legacy.purses.prepare(1);
 oldPending.pending.next.supply={'iron ingot':legacyAt};
-delete oldPending.pending.terms; // Pre-summary legacy intent keeps its original item-only key.
+oldPending.pending.version=2;delete oldPending.pending.terms; // Explicit pre-summary legacy format keeps its item-only key.
 legacy.purses.commit(1,oldPending);
 legacyAt+=12*60*60*1000;
 legacy.world.save();delete legacyNative.fail;

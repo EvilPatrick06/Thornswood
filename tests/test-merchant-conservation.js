@@ -33,7 +33,7 @@ for(const defect of ['gold','purse','metadata','inventory','wrapper','attempt'])
  assert.equal(f.inv.entries[1].count,9,'a free purchase still transfers the actual goods');assert.equal(f.inv.entries[0].count,40);
 }
 {
- const f=armed();delete f.states.get(1).pending.terms;const s=f.make();
+ const f=armed();f.states.get(1).pending.version=2;delete f.states.get(1).pending.terms;const s=f.make();
  assert.equal(s.canRetire(),false,'legacy reservations must finish before activating retirement');
  s.tick();assert.equal(f.states.get(1).pending.terms,undefined,'legacy compaction gains no new bytes');
  f.save();s.tick();assert.equal(f.inv.entries[0].count,43);assert.equal(f.states.get(1).pending,null);assert.equal(s.canRetire(),true);
@@ -50,7 +50,7 @@ for(const defect of ['gold','purse','metadata','inventory','wrapper','attempt'])
 }
 {
  const f=armed(),state=f.states.get(1),p=state.pending;
- delete p.terms;
+ p.version=2;delete p.terms;
  const held={baseId:200,count:1,name:'Old stock',entry:{baseId:200,count:1,name:''}};
  state.stock=[copy(held)];p.previous.stock=[copy(held)];p.next.stock.unshift(copy(held));
  function recovery(){
@@ -93,5 +93,33 @@ for(const defect of ['foreign','same-owner','unchanged','sell-change']) {
  f.purses.pendingRecords=()=>{const all=enumerate();if(++reads===2)s.shutdown();return all;};s=f.make();
  assert.throws(()=>s.canRetire(),/changed/,'shutdown during final enumeration cannot report readiness');
  assert.equal(s.available(),false);
+}
+for(const phase of ['debit','credit'])for(const callback of ['resolve','identity']) {
+ const f=ctx.fixture(),cas=f.transfer.cas,first=f.make();
+ if(phase==='debit')f.transfer.cas=()=>{throw Error('pause debit');};
+ first.begin(f.offer());first.shutdown();f.transfer.cas=cas;if(phase==='credit')f.save();f.calls.length=0;
+ const s=f.make(),original=f.transfer[callback];let reads=0;
+ f.transfer[callback]=(...args)=>{const result=original(...args);if(++reads===2)s.shutdown();return result;};
+ const before=JSON.stringify(f.inv);s.tick();
+ assert.equal(f.calls.length,0,phase+' CAS must not follow shutdown inside '+callback);assert.equal(JSON.stringify(f.inv),before);
+}
+function compactSaved(f) {
+ const inventory=f.transfer.inventory,s=f.make();f.transfer.inventory=()=>{throw Error('pause credit');};s.tick();s.shutdown();f.transfer.inventory=inventory;
+ assert.equal(f.states.get(1).pending.phase,'credit');assert.equal(f.states.get(1).pending.creditAttempt,undefined);
+}
+for(const phase of ['debit','credit'])for(const label of [null,123,'']) {
+ const f=ctx.fixture(),offer=f.offer(),s=f.make();offer.kind='supply';offer.next.supply={'["10",7,"iron ingot"]':100};s.begin(offer);f.save();s.shutdown();
+ if(phase==='credit')compactSaved(f);
+ const state=f.states.get(1),p=state.pending;p.version=2;delete p.terms;p.next.supply={[JSON.stringify(['10',7,label])]:100};
+ if(phase==='credit')state.supply=copy(p.next.supply);
+ const before=JSON.stringify(state);f.calls.length=0;assert.throws(()=>f.make().tick(),/owner.*verified/i);
+ assert.equal(JSON.stringify(f.states.get(1)),before);assert.equal(f.calls.length,0);
+}
+for(const phase of ['debit','credit']) {
+ const f=armed();if(phase==='credit')compactSaved(f);
+ const p=f.states.get(1).pending;delete p.terms;if(phase==='credit')p.credit[0].count+=10;
+ const before=JSON.stringify(f.states.get(1));f.calls.length=0;
+ assert.throws(()=>f.make().tick(),/verified/i,'new '+phase+' intent cannot downgrade when terms disappear');
+ assert.equal(f.calls.length,0);assert.equal(JSON.stringify(f.states.get(1)),before);
 }
 console.log('PASS merchant saved-transfer conservation, zero prices, metadata and legacy retirement gate');
