@@ -40,7 +40,7 @@ sys.path.insert(0, HERE)
 os.environ.setdefault('DISCORD_TOKEN', 'not-a-real-token')
 # The defaults are what is being tested, so nothing in this shell may move them.
 for _k in ('TICKET_CHANNEL', 'TICKET_LOG', 'STAFF_ROLES', 'CREATOR_ROLES',
-           'TICKET_COOLDOWN'):
+           'TICKET_COOLDOWN', 'UPPER_STAFF_ROLES'):
     os.environ.pop(_k, None)
 
 import discord  # noqa: E402
@@ -556,6 +556,39 @@ def startup():
         any(s == bot.PANEL for s in panel.sent))
 
 run('startup', startup)
+
+
+def faction_thread_fails():
+    # Djinn: a Faction Leader ticket that cannot open a private thread
+    # must not land in #tickets or the site inbox. General staff read both.
+    g, panel, mod = server(threads=False)
+    owner = [r for r in g.roles if r.name == 'Owner'][0]
+    book = g.channel('tickets', overwrites=staff_only(g, mod))
+    keep = bot.UPPER_STAFF_IDS
+    bot.UPPER_STAFF_IDS = {owner.id}
+    who = Person('Brynjolf')
+    ix = Interaction(g, who)
+    PUSHED[:] = []
+
+    async def go():
+        m = bot.TicketModal('faction', 'Apply: Faction Leader')
+        m.faction_select._values = ['The Companions']
+        m.faction_other._value = ''
+        for f in m.fields:
+            f._value = 'yes'
+        await m.on_submit(ix)
+
+    asyncio.run(go())
+    bot.UPPER_STAFF_IDS = keep
+    yes('a Faction Leader thread that fails is not written to #tickets',
+        book.text() == '')
+    nowhere_public('and not in the panel channel', [panel])
+    yes('and not pushed to the site inbox', not PUSHED)
+    yes('and the applicant is told to try again later',
+        bot.FACTION_THREAD_FAILED in ix.followup.said
+        and bot.FACTION_THREAD_FAILED in who.dms)
+
+run('faction thread fails', faction_thread_fails)
 
 
 # -------------------------------------------------------------- source --

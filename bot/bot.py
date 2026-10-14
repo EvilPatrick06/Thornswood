@@ -49,6 +49,12 @@ Everything it needs is in env:
                    pulled into every ticket thread
   CREATOR_ROLES    comma separated role IDs or names, added to Apply:
                    Content Creator only
+  UPPER_STAFF_ROLES comma separated role IDs only, who is pinged and added
+                   to Faction Leader tickets. Must include the Owner role
+                   ID and each department Lead ID (today Lead Gamemaster).
+                   Names are ignored and logged. Empty or unset means a
+                   Faction Leader ticket is refused: nobody else is added,
+                   and the applicant is told to try again later.
   TICKET_COOLDOWN  seconds between one person's tickets, default 300
   WATCH_CHANNEL_ID id of the staff channel the watchdog's messages go in,
                    default whatever staff-channel.txt beside this file
@@ -215,6 +221,78 @@ CREATOR = sorted(CREATOR_NAMES) if CREATOR_NAMES else [t.lower() for t in _CREAT
 EXTRA_STAFF = {'creator': CREATOR}
 EXTRA_STAFF_IDS = {'creator': (CREATOR_IDS, CREATOR_NAMES)}
 
+# Faction Leader tickets go only to the role IDs in UPPER_STAFF_ROLES.
+# IDs only: a name, including Owner, is ignored so a renamed or invented
+# role cannot read these. Owner's ID has to be in the list; it is not
+# added by name. Empty or unset means the ticket is refused, never opened
+# to general staff. A future Lead role is added here by its ID.
+_UPPER_RAW = [r.strip() for r in
+              os.environ.get('UPPER_STAFF_ROLES', '').split(',')
+              if r.strip()]
+
+
+def upper_staff_ids(raw):
+    """Snowflake IDs from UPPER_STAFF_ROLES. Names are ignored, not matched."""
+    ids, ignored = set(), []
+    for t in raw:
+        t = (t or '').strip()
+        if not t:
+            continue
+        if t.isdigit():
+            ids.add(int(t))
+        else:
+            ignored.append(t)
+    return ids, ignored
+
+
+UPPER_STAFF_IDS, UPPER_STAFF_IGNORED = upper_staff_ids(_UPPER_RAW)
+
+
+def ticket_pull_tokens(kind):
+    """The role ids and names pinged and added for a ticket of this kind."""
+    if kind == 'faction':
+        return set(UPPER_STAFF_IDS), set()
+    ids, names = set(STAFF_IDS), set(STAFF_NAMES)
+    extra = EXTRA_STAFF_IDS.get(kind)
+    if extra:
+        ids |= extra[0]
+        names |= extra[1]
+    return ids, names
+
+
+def ticket_pull_roles(kind, guild):
+    ids, names = ticket_pull_tokens(kind)
+    if kind == 'faction':
+        return [r for r in getattr(guild, 'roles', None) or []
+                if getattr(r, 'id', None) in ids]
+    return [r for r in getattr(guild, 'roles', None) or [] if _role_hit(r, ids, names)]
+
+
+def warn_upper_staff_config(guilds=None):
+    """
+    Log when Faction Leader routing cannot work. Log only: never a
+    channel, a DM or a ping. Empty is said at process start. IDs that
+    match no role are said once the guilds are known.
+    """
+    if not UPPER_STAFF_IDS:
+        log('UPPER_STAFF_ROLES is empty, so Faction Leader tickets will '
+            'be refused. Set it to the Owner role ID and the Lead '
+            'Gamemaster role ID.')
+        return
+    for g in guilds or ():
+        have = set(getattr(r, 'id', None)
+                   for r in getattr(g, 'roles', None) or [])
+        if not (UPPER_STAFF_IDS & have):
+            log('UPPER_STAFF_ROLES ids %s match no role in "%s", so '
+                'Faction Leader tickets will be refused.'
+                % (sorted(UPPER_STAFF_IDS), getattr(g, 'name', '?')))
+
+
+FACTION_REFUSED = ('This application cannot be opened right now. '
+                   'Try again later.')
+FACTION_THREAD_FAILED = ('This application could not be opened. '
+                         'Try again later.')
+
 
 # The staff channel, #staff-updates, where staff hear what needs fixing: the
 # watchdog's messages (a service down or back, the disk, the disk forecast,
@@ -272,8 +350,8 @@ WATCH_ID = _int_env('WATCH_CHANNEL_ID', _staff_channel_id())
 # staff-general up by name. TROUBLE_CHANNEL_ID in bot.env.json overrides it.
 TROUBLE_ID = _int_env('TROUBLE_CHANNEL_ID', _staff_channel_id())
 
-# The bot's own records, joins.json, open-tickets.json, heartbeat.json and
-# commands-synced.json, go in a folder of their own, data beside bot.py, and
+# The bot's own records, joins.json, open-tickets.json, heartbeat.json
+# and commands-synced.json, go in a folder of their own, data beside bot.py, and
 # so does bot.log, which the service writes (issue #1104). The service's
 # account may write there and nowhere else in the bot's folder: the code is
 # read only to it, so nothing that gets into the bot can rewrite bot.py or put
@@ -342,6 +420,10 @@ class Thornswood(discord.Client):
         # The one switch (#428), before the panel is built from KINDS.
         set_open(await asyncio.get_running_loop().run_in_executor(None, site_open))
         log('the world is %s' % ('open to everybody' if OPEN else 'in alpha, open by application'))
+        if UPPER_STAFF_IGNORED:
+            log('UPPER_STAFF_ROLES is IDs only, ignored names: %s'
+                % ', '.join(UPPER_STAFF_IGNORED))
+        warn_upper_staff_config()
         self.add_view(TicketPanel())          # so it keeps working after a restart
         self.add_view(TicketTools())          # and so does Close on every old ticket
         self.add_view(HoldPanel())            # and the hold and ping buttons
@@ -764,7 +846,7 @@ KINDS = [
     ('playtest',    'Apply to be an alpha playtester',
                     'How you get into the world. Anyone can apply. Break it and write down how.'),
     ('jarl',        'Apply: Jarl',          'A seat in a hold. In character, and the first ones come out of these.'),
-    ('company',     'Apply: Trading Company', 'Haul, make, sell and buy for the Free Skyrim Trading Company. In character.'),
+    ('faction',     'Apply: Faction Leader', 'A seat at the head of a faction. In character, and the first ones come out of these.'),
     ('gamemaster',  'Apply: Gamemaster',    'Run events, settle disputes, hold the line in character.'),
     ('loremaster',  'Apply: Loremaster',    'Keep the history straight and write the rest of it.'),
     ('moderator',   'Apply: Moderator',     'The unglamorous one. Tickets, reports, difficult people.'),
@@ -780,7 +862,7 @@ KINDS = [
 ROLE_FOR = {
     'playtest':   'Playtester',
     'jarl':       'Jarl of the hold named below',
-    'company':    'Trading Company',
+    'faction':    'Faction Lead of the faction named below',
     'gamemaster': 'Gamemaster',
     'loremaster': 'Loremaster',
     'moderator':  'Moderator',
@@ -938,14 +1020,18 @@ QUESTIONS = {
         ('What happens if they lose the seat?',
          'A seat that cannot be lost is not a seat. Say how you play that.', True),
     ],
-    # The Free Skyrim Trading Company (#1393, docs/systems/trading-company.md).
-    # The same shape as a Jarl's: answered in character, and the role it
-    # leads to is what lets a character handle a company sale in the game.
-    'company': [
+    # A faction lead seat. The same three questions the Trading Company form
+    # used to ask, answered in character. The second question is reworded so
+    # it fits any faction, not the company and hauling; that wording is a
+    # proposal. Required and optional stay as they were: long means optional.
+    # The faction pick itself is a Select, required, built in TicketModal,
+    # because a form with no faction is useless. The Free Skyrim Trading
+    # Company is one of the seats (bot/factions.json).
+    'faction': [
         ('Who is your character?',
          'Name, where they come from, what they have been doing until now. In character.', True),
-        ('What would they do for the company?',
-         'Haul, make, sell or buy, and what goods. Answer as them, not as you.', True),
+        ('What would they do with the faction?',
+         'What they actually do with it. Answer as them, not as you.', True),
         ('How much time can you give it?', 'Hours a week, and which days.', True),
     ],
     'gamemaster': _job('running events',
@@ -971,12 +1057,119 @@ QUESTIONS = {
 }
 
 
+# Named factions, names only, beside this file. Other is always added in
+# code, last, and is never stored here. A name change is a pull request.
+# Seat tracking waits for a Faction Lead Discord role; the list always
+# shows every name in this file, plus Other.
+FACTIONS_FILE = os.path.join(HERE, 'factions.json')
+FACTION_OTHER = 'Other'
+FACTION_PICK_Q = 'Which faction?'
+FACTION_OTHER_Q = 'If Other, which faction?'
+FACTION_OTHER_HINT = 'Only if you picked Other. The name of the faction.'
+# Jarl and Faction Leader: staff cannot hold these, so a staff applicant is
+# flagged. Wider than is_staff: Lead Gamemaster and Trial Gamemaster are not
+# staff for /close, and they still cannot hold a lead seat. is_staff is left
+# as it is. Content Creator is on neither list.
+LEADERSHIP_KINDS = ('jarl', 'faction')
+LEADERSHIP_EXTRA = ('Lead Gamemaster', 'Trial Gamemaster')
+# Djinn, 12 Oct 2026. On the public panel, word for word.
+STAFF_LEADERSHIP_RULE = 'No GM or staff member (Loremaster, Discord Moderator, or any other staff role) may hold an in-game RP role with faction leadership, such as a Jarl or a faction lead.'
+
+
+def faction_names():
+    """The named factions, from factions.json beside this file. Other is not in it."""
+    try:
+        with open(FACTIONS_FILE, encoding='utf-8') as f:
+            d = json.load(f)
+        if isinstance(d, list):
+            return [str(n).strip() for n in d if str(n).strip()]
+    except Exception as e:
+        log('could not read factions.json:', e)
+    return []
+
+
+def faction_pick_options():
+    """Select options for the form: every named faction, then Other last."""
+    opts = [discord.SelectOption(label=n[:100], value=n[:100])
+            for n in faction_names()]
+    opts.append(discord.SelectOption(label=FACTION_OTHER, value=FACTION_OTHER))
+    return opts
+
+
+def faction_pick_is_known(picked):
+    """True for a named faction in factions.json, or for Other.
+
+    Other is a normal option and is not flagged. A value that is not on
+    the list (a tampered submit) is not known. Empty is not known.
+    """
+    name = (picked or '').strip()
+    if not name:
+        return False
+    if name == FACTION_OTHER:
+        return True
+    return name in faction_names()
+
+
+def field_said(item):
+    """What a form field holds: a Select's first pick, or a TextInput's text."""
+    vals = getattr(item, 'values', None)
+    if isinstance(vals, (list, tuple)):
+        return (str(vals[0]) if vals else '').strip()
+    return (getattr(item, 'value', None) or '').strip()
+
+
+def leadership_staff_held(who):
+    """
+    Names of staff roles they hold, including Lead and Trial Gamemaster.
+
+    The list the Faction Leader and Jarl flags use. is_staff does not include
+    those two, and it is left as it is so /close stays on the same five
+    roles. Content Creator is not on this list either.
+    """
+    try:
+        ids, names = set(STAFF_IDS), set(STAFF_NAMES)
+        for n in LEADERSHIP_EXTRA:
+            names.add(n.lower())
+        found = []
+        for r in getattr(who, 'roles', None) or []:
+            if _role_hit(r, ids, names):
+                found.append(r.name)
+        return found
+    except Exception:
+        return []
+
+
 class TicketModal(discord.ui.Modal):
     def __init__(self, kind, label):
         super().__init__(title=label[:45])
         self.kind = kind
         self.label_text = label
         self.fields = []
+        self.faction_select = None
+        self.faction_other = None
+        # Discord takes five items on a form. The faction kind uses all five:
+        # a required Select of every named faction plus Other (discord.py
+        # 2.6.0 put Select inside a modal; 2.7.1 is the pin), an optional
+        # Other box, and the three copied questions.
+        if kind == 'faction':
+            sel = discord.ui.Select(
+                placeholder='Pick a faction',
+                options=faction_pick_options(),
+                min_values=1,
+                max_values=1,
+                required=True)
+            self.faction_select = sel
+            self.add_item(discord.ui.Label(
+                text=FACTION_PICK_Q[:45],
+                component=sel))
+            other = discord.ui.TextInput(
+                label=FACTION_OTHER_Q[:45],
+                placeholder=FACTION_OTHER_HINT[:100],
+                style=discord.TextStyle.short,
+                required=False,
+                max_length=200)
+            self.faction_other = other
+            self.add_item(other)
         for q, ph, long in QUESTIONS[kind]:
             item = discord.ui.TextInput(
                 label=q[:45],
@@ -995,6 +1188,25 @@ class TicketModal(discord.ui.Modal):
         if no:
             await interaction.response.send_message(no, ephemeral=True)
             return
+        # Faction Leader tickets go only to the IDs in UPPER_STAFF_ROLES.
+        # Empty, or IDs that match no role, means refuse: do not open a
+        # thread only the applicant can see, and do not fall through to
+        # general staff. Other kinds are unchanged.
+        if self.kind == 'faction':
+            if not UPPER_STAFF_IDS:
+                log('UPPER_STAFF_ROLES is empty, so a Faction Leader ticket '
+                    'was refused. Set it to the Owner role ID and the Lead '
+                    'Gamemaster role ID.')
+                await interaction.response.send_message(
+                    FACTION_REFUSED, ephemeral=True)
+                return
+            if not ticket_pull_roles('faction', interaction.guild):
+                log('UPPER_STAFF_ROLES ids %s matched no role on this '
+                    'server, so a Faction Leader ticket was refused'
+                    % sorted(UPPER_STAFF_IDS))
+                await interaction.response.send_message(
+                    FACTION_REFUSED, ephemeral=True)
+                return
         # Before the first await, so two forms sent in the same moment cannot
         # both get past the check above.
         _last_ticket[_ticket_key(interaction.guild, interaction.user)] = _now()
@@ -1008,7 +1220,7 @@ class TicketModal(discord.ui.Modal):
             """What they typed in the question that reads exactly like this."""
             for item, (q, _, _) in zip(self.fields, QUESTIONS[self.kind]):
                 if q == want:
-                    return (item.value or '').strip()
+                    return field_said(item)
             return ''
 
         age_said = answered(AGE_Q[0]) if self.kind in AGE_KINDS else ''
@@ -1020,11 +1232,23 @@ class TicketModal(discord.ui.Modal):
             rules_said = answered(RULES_Q[0])
             rules = {'said': rules_said[:200], 'yes': accepted_rules(rules_said)}
 
+        # The faction pick is read again here. Other is a normal option and
+        # is not flagged. A value that is not a named faction and not Other
+        # (a tampered submit) is flagged. The pick and the Other box stay out of the opening line
+        # and out of Asking for: they go only in the escaped answers below.
+        picked = field_said(self.faction_select) if self.faction_select is not None else ''
+        other_said = field_said(self.faction_other) if self.faction_other is not None else ''
+
         def written(clean):
             lines = []
+            if self.kind == 'faction':
+                lines.append('**%s**\n%s'
+                             % (FACTION_PICK_Q, clean(picked) or 'nothing said'))
+                lines.append('**%s**\n%s'
+                             % (FACTION_OTHER_Q, clean(other_said) or 'nothing said'))
             for item, (q, _, _) in zip(self.fields, QUESTIONS[self.kind]):
                 lines.append('**%s**\n%s'
-                             % (q, clean((item.value or '').strip()) or 'nothing said'))
+                             % (q, clean(field_said(item)) or 'nothing said'))
             out = '\n\n'.join(lines)
             if asking:
                 out = '**Asking for:** ' + asking + '\n\n' + out
@@ -1038,6 +1262,15 @@ class TicketModal(discord.ui.Modal):
             if rules is not None and not rules['yes']:
                 out = ('**CHECK THIS ONE.** Asked if they accept the rules they '
                        'said "%s".\n\n' % (clean(rules_said) or 'nothing')) + out
+            if self.kind == 'faction' and not faction_pick_is_known(picked):
+                out = ('**CHECK THIS ONE.** The faction they picked is not on '
+                       'the list.\n\n') + out
+            if self.kind in LEADERSHIP_KINDS:
+                held = leadership_staff_held(who)
+                if held:
+                    out = ('**CHECK THIS ONE.** Holds a staff role (%s); staff '
+                           'cannot hold a Jarl seat or a faction lead.\n\n'
+                           % ', '.join(held)) + out
             return out
 
         # Two copies of the same ticket, because the two places that take it
@@ -1062,13 +1295,12 @@ class TicketModal(discord.ui.Modal):
         # without this was visible to the applicant and to nobody else, and the
         # @mention went into a room staff were not in. They are added one at a
         # time, which is the only way Discord offers.
-        ids, names = set(STAFF_IDS), set(STAFF_NAMES)
-        extra = EXTRA_STAFF_IDS.get(self.kind)
-        if extra:
-            ids |= extra[0]
-            names |= extra[1]
-        staff_roles = [r for r in guild.roles if _role_hit(r, ids, names)]
+        # Faction Leader tickets go only to the IDs in UPPER_STAFF_ROLES.
+        # Other kinds still use STAFF_ROLES (and Content Creator on creator
+        # applications).
+        staff_roles = ticket_pull_roles(self.kind, guild)
         if not staff_roles:
+            ids, names = ticket_pull_tokens(self.kind)
             log('no role matched ids %r or names %r, so nobody will be pulled '
                 'into this ticket. Set STAFF_ROLES in bot.env.json to the role '
                 'ids or names this server actually uses.'
@@ -1090,6 +1322,11 @@ class TicketModal(discord.ui.Modal):
                 log('no ticket thread: %s' % why)
             else:
                 try:
+                    # Private, not invitable: only people the bot adds can
+                    # read it. Roles with Manage Threads on this channel
+                    # (Lead Gamemaster and Trial Gamemaster, per the note
+                    # on is_staff) can still open a private thread. That
+                    # is Discord's permission, not something this bot sets.
                     opened = await ch.create_thread(
                         name=title,
                         type=discord.ChannelType.private_thread,
@@ -1152,6 +1389,17 @@ class TicketModal(discord.ui.Modal):
                 why = 'the thread opened but nothing could be written in it (%s)' % e
                 log('writing the ticket into the thread failed:\n'
                     + traceback.format_exc())
+                # Faction Leader: a half-written private thread that
+                # general staff cannot see, and that we then refuse, is
+                # leftover. Delete this object, the one create_thread
+                # just returned, never one looked up by name.
+                if self.kind == 'faction':
+                    try:
+                        await opened.delete()
+                    except Exception:
+                        log('could not delete the half-written Faction '
+                            'Leader thread:\n' + traceback.format_exc())
+                    forget_ticket(guild, who, opened)
 
         # A ticket nobody can see is the same as no ticket, and a ticket
         # everybody can see is worse. If the thread could not be made, or could
@@ -1173,7 +1421,19 @@ class TicketModal(discord.ui.Modal):
         # all: the site inbox still gets the ticket below, and the person is
         # told by DM.
         fell_back = False
-        if not posted:
+        # A Faction Leader ticket that has no private thread must not go
+        # into #tickets or the site inbox: those are readable by general
+        # staff. Refuse, tell the applicant to try again, and log it.
+        # Other kinds keep the staff-only log fallback below.
+        if not posted and self.kind == 'faction':
+            log('Faction Leader ticket had no private thread%s. It was not written to the staff log or the site inbox.'
+                % ((' (%s)' % why) if why else ''))
+            try:
+                await who.send(FACTION_THREAD_FAILED)
+            except Exception as e:
+                log('could not DM %s about the refused Faction Leader '
+                    'ticket: %s' % (who, e))
+        elif not posted:
             try:
                 book = await log_channel(guild)
             except Exception:
@@ -1207,7 +1467,7 @@ class TicketModal(discord.ui.Modal):
 
         # And whatever happened in Discord, the person gets told something
         # true. The old wording promised a message that nothing ever sent.
-        if not posted and not fell_back:
+        if not posted and not fell_back and self.kind != 'faction':
             try:
                 await who.send(
                     'Your ticket reached staff, but Discord would not let the '
@@ -1225,16 +1485,21 @@ class TicketModal(discord.ui.Modal):
         # copy still lands." It is started here rather than after the replies
         # so that a reply Discord refuses cannot take the site copy with it.
         # push_async logs its own failure, so nothing is lost by not awaiting.
-        task = asyncio.create_task(push_async(
-            self.kind, '%s: %s' % (self.label_text, who.display_name),
-            detail, str(who), who.id, rules))
-        _pushes.add(task)
-        task.add_done_callback(_pushes.discard)
+        # A Faction Leader ticket that never opened a thread is not sent:
+        # the site inbox is readable by general staff.
+        if posted or self.kind != 'faction':
+            task = asyncio.create_task(push_async(
+                self.kind, '%s: %s' % (self.label_text, who.display_name),
+                detail, str(who), who.id, rules))
+            _pushes.add(task)
+            task.add_done_callback(_pushes.discard)
 
         if posted:
             await interaction.followup.send(
                 'Opened %s. Everything else goes in there.' % opened.mention,
                 ephemeral=True)
+        elif self.kind == 'faction':
+            await interaction.followup.send(FACTION_THREAD_FAILED, ephemeral=True)
         elif fell_back:
             await interaction.followup.send(
                 'Sent. A private thread would not open, so it has gone straight '
@@ -1262,8 +1527,9 @@ def _chunks(s, n):
 def is_staff(who):
     """
     Somebody holding one of the STAFF_ROLES roles, matched by id or by name.
-    The one gate on /close, the Close ticket button and the ticket limits, and
-    the same list that pulls staff into every ticket thread.
+    The one gate on /close, the Close ticket button and the
+    ticket limits, and the same list that pulls staff into every ticket
+    thread except Faction Leader, which uses UPPER_STAFF_ROLES.
 
     Nothing else makes somebody staff here, a channel permission included.
     This used to let in anybody the channel trusted with threads as well, and
@@ -1365,6 +1631,26 @@ def remember_ticket(guild, who, thread):
             'a second one:\n' % who + traceback.format_exc())
 
 
+def forget_ticket(guild, who, thread):
+    """
+    Drop this thread from the open-ticket file, if it is still the one
+    written. Used when a Faction Leader thread is deleted in the same
+    submit that created it, so the person is not held to a ticket that
+    no longer exists. Matches on the thread's id, never its name.
+    """
+    try:
+        key = _ticket_key(guild, who)
+        have = _open_tickets()
+        if have.get(key) != getattr(thread, 'id', None):
+            return
+        have.pop(key, None)
+        with open(OPEN_TICKETS, 'w') as f:
+            json.dump(have, f)
+    except Exception:
+        log('could not forget the half-written ticket for %s:\n'
+            % who + traceback.format_exc())
+
+
 def ticket_refusal(interaction):
     """
     Why this person cannot open a ticket right now, in words, or None.
@@ -1424,6 +1710,46 @@ def is_ticket_thread(ch):
     return bool(name) and name.lower() in TICKETS
 
 
+def faction_leader_label():
+    for k, lab, _d in KINDS:
+        if k == 'faction':
+            return lab
+    return 'Apply: Faction Leader'
+
+
+def is_faction_leader_thread(ch):
+    """
+    A ticket thread TicketModal opened for Apply: Faction Leader.
+
+    The name starts with that label because that is what on_submit writes.
+    Used only to decide who may /close this kind. is_staff is not changed.
+    """
+    if not is_ticket_thread(ch):
+        return False
+    label = faction_leader_label()
+    name = getattr(ch, 'name', None) or ''
+    return bool(label) and name.startswith(label)
+
+
+def holds_upper_staff(who):
+    """A role whose ID is in UPPER_STAFF_ROLES. Names are ignored."""
+    try:
+        return _who_hits(who, UPPER_STAFF_IDS, set())
+    except Exception:
+        return False
+
+
+def can_close_ticket(who, ch):
+    """
+    Staff close every ticket. On a Faction Leader thread, a member whose
+    role ID is in UPPER_STAFF_ROLES may close it too. is_staff itself is
+    not changed: ticket limits and cooldowns still answer to that.
+    """
+    if is_staff(who):
+        return True
+    return is_faction_leader_thread(ch) and holds_upper_staff(who)
+
+
 async def close_here(interaction, why=None):
     """
     Close the ticket this was used in.
@@ -1442,7 +1768,10 @@ async def close_here(interaction, why=None):
             'This one only works inside a ticket.', ephemeral=True)
         return
 
-    if not is_staff(interaction.user):
+    # is_staff is unchanged and still gates every other ticket, the
+    # one-open-ticket rule and the cooldown. Faction Leader threads
+    # also let through a member whose role ID is in UPPER_STAFF_ROLES.
+    if not can_close_ticket(interaction.user, ch):
         await interaction.response.send_message(
             'Staff close these. Say what you need in here and somebody will.',
             ephemeral=True)
@@ -1532,9 +1861,10 @@ _PANEL_TOP = ('**Open a ticket**\n\n'
               'Pick the one that fits. It asks a few questions, then opens a thread '
               'only you and staff can see. Nothing here is public and nobody else in '
               'the server can read it.\n\n')
-_PANEL_JOBS = ('**Apply: Jarl** is '
+_PANEL_JOBS = ('**Apply: Jarl** and **Apply: Faction Leader** are '
                'answered in character: the seats are empty, and the first people to '
-               'hold them are picked out of what is written there.\n\n'
+               'hold them are picked out of what is written there. A faction has one '
+               'leader. ' + STAFF_LEADERSHIP_RULE + '\n\n'
                'The jobs below that are open to anybody already in, and they are jobs '
                'rather than titles: each one is work somebody is currently doing '
                'instead of you.\n\n'
@@ -4525,6 +4855,11 @@ async def on_ready():
         await ensure_panel(g)
         await ensure_hold_panel(g)
     log('watching %d server(s)' % len(client.guilds))
+    # Guilds are known here. Empty was already said in setup_hook. IDs
+    # that match no role can only be seen once the guild's roles are in.
+    # Log only: do not post this to a channel.
+    if UPPER_STAFF_IDS:
+        warn_upper_staff_config(client.guilds)
 
     # Three separate things have to be true for a join card to appear, and
     # when one of them is not, the only symptom is silence. So check all three
