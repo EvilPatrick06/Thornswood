@@ -426,48 +426,90 @@ try {
     }
 
     # ---- 7. Install-Thornswood's launcher step ----------------------------------
-    # It refuses to run beside a game, which is the right thing for it to do,
-    # so on a machine with one open this part is skipped rather than failed.
-    $gameOpen = @(Get-Process -Name 'SkyrimSE', 'skse64_loader' -ErrorAction SilentlyContinue).Count -gt 0
-    if ($gameOpen) {
-        Skip 'T Install-Thornswood runs, because a game is open on this machine and that script will not run beside one'
-    } else {
-        # Laid out like the real tree after issue #440 phase 8: Install-Thornswood
-        # lives in scripts\dev and reaches Build/Install/Ship/Where via ..\release,
-        # and Vps.ps1 via ..\vps. Flat tools\ copies broke those relatives.
-        $itDev = Join-Path $work 'it\scripts\dev'
-        $itRel = Join-Path $work 'it\scripts\release'
-        $itVps = Join-Path $work 'it\scripts\vps'
-        $itRoot = Join-Path $work 'it\root'
-        foreach ($d in @($itDev, $itRel, $itVps, $itRoot)) { New-Item -ItemType Directory -Force -Path $d | Out-Null }
-        Copy-Item -LiteralPath (Join-Path $Here 'scripts\dev\Install-Thornswood.ps1') -Destination $itDev
-        Copy-Item -LiteralPath (Join-Path $Here 'scripts\vps\Vps.ps1') -Destination $itVps
-        Copy-Item -LiteralPath (Join-Path $Here 'scripts\vps\vps.json') -Destination $itVps
-        Set-Content -LiteralPath (Join-Path $itRel 'Build-Launcher.ps1') -Value $stubBuild -Encoding ASCII
-        Set-Content -LiteralPath (Join-Path $itRel 'Install-Launcher.ps1') -Value $stubInstall -Encoding ASCII
-        Copy-Item -LiteralPath (Join-Path $Here 'scripts\release\Get-ScratchDir.ps1') -Destination $itRel
-        $env:TS_TEST_BUILD_EXIT = '0'
-        $env:TS_TEST_INSTALL_EXIT = '0'
+    # It refuses to run beside a game run from its own root, which is the right
+    # thing for it to do, and only that one: a game anywhere else on the machine
+    # does not hold the root's files. Until 12 Oct it refused for any SkyrimSE on
+    # the machine, so this part was skipped when one was open, and on the VPS
+    # another runner's stand-in Skyrim, started between that look and the run,
+    # failed T1 to T7 (#2410). U1 to U3 below prove the rule with stand-ins.
+    # Laid out like the real tree after issue #440 phase 8: Install-Thornswood
+    # lives in scripts\dev and reaches Build/Install/Ship/Where via ..\release,
+    # and Vps.ps1 via ..\vps. Flat tools\ copies broke those relatives.
+    $itDev = Join-Path $work 'it\scripts\dev'
+    $itRel = Join-Path $work 'it\scripts\release'
+    $itVps = Join-Path $work 'it\scripts\vps'
+    $itRoot = Join-Path $work 'it\root'
+    foreach ($d in @($itDev, $itRel, $itVps, $itRoot)) { New-Item -ItemType Directory -Force -Path $d | Out-Null }
+    Copy-Item -LiteralPath (Join-Path $Here 'scripts\dev\Install-Thornswood.ps1') -Destination $itDev
+    Copy-Item -LiteralPath (Join-Path $Here 'scripts\dev\Close-Launcher.ps1') -Destination $itDev
+    Copy-Item -LiteralPath (Join-Path $Here 'scripts\vps\Vps.ps1') -Destination $itVps
+    Copy-Item -LiteralPath (Join-Path $Here 'scripts\vps\vps.json') -Destination $itVps
+    Set-Content -LiteralPath (Join-Path $itRel 'Build-Launcher.ps1') -Value $stubBuild -Encoding ASCII
+    Set-Content -LiteralPath (Join-Path $itRel 'Install-Launcher.ps1') -Value $stubInstall -Encoding ASCII
+    Copy-Item -LiteralPath (Join-Path $Here 'scripts\release\Get-ScratchDir.ps1') -Destination $itRel
+    $env:TS_TEST_BUILD_EXIT = '0'
+    $env:TS_TEST_INSTALL_EXIT = '0'
 
-        Remove-Item -LiteralPath $callLog -Force -ErrorAction SilentlyContinue
-        # -Server/-Client skip Where.ps1 defaults; the launcher steps do not use them.
-        $t = Invoke-Child $ps (Join-Path $itDev 'Install-Thornswood.ps1') @('-Root', $itRoot, '-Only', 'launcher', '-NoShip', '-NoPause', '-Server', $itRoot, '-Client', $itRoot)
-        $calls = @(Read-Log $callLog | ForEach-Object { Split-Call $_ })
-        Yes "T1 Install-Thornswood -Only launcher -NoShip passes (exit $($t.Code))" ($t.Code -eq 0)
-        if ($t.Code -ne 0) { Write-Host $t.Out }
-        Yes 'T2 it builds and then installs, both for its own root' (($calls.Count -eq 2) -and ($calls[0].What -eq 'build') -and ($calls[1].What -eq 'install') -and ($calls[0].Root -eq $itRoot) -and ($calls[1].Root -eq $itRoot))
-        Yes 'T3 the install takes the exe from the folder the build wrote' (($calls.Count -eq 2) -and $calls[0].Dir -and ($calls[1].Dir -eq $calls[0].Dir) -and ($calls[0].Dir.TrimEnd('\') -ne (Join-Path $itRoot 'Launcher')))
-        Yes 'T4 so the new exe ends up in the root, as it always did' (Test-Path -LiteralPath (Join-Path $itRoot 'Launcher\Thornswood.exe'))
+    Remove-Item -LiteralPath $callLog -Force -ErrorAction SilentlyContinue
+    # -Server/-Client skip Where.ps1 defaults; the launcher steps do not use them.
+    $t = Invoke-Child $ps (Join-Path $itDev 'Install-Thornswood.ps1') @('-Root', $itRoot, '-Only', 'launcher', '-NoShip', '-NoPause', '-Server', $itRoot, '-Client', $itRoot)
+    $calls = @(Read-Log $callLog | ForEach-Object { Split-Call $_ })
+    Yes "T1 Install-Thornswood -Only launcher -NoShip passes (exit $($t.Code))" ($t.Code -eq 0)
+    if ($t.Code -ne 0) { Write-Host $t.Out }
+    Yes 'T2 it builds and then installs, both for its own root' (($calls.Count -eq 2) -and ($calls[0].What -eq 'build') -and ($calls[1].What -eq 'install') -and ($calls[0].Root -eq $itRoot) -and ($calls[1].Root -eq $itRoot))
+    Yes 'T3 the install takes the exe from the folder the build wrote' (($calls.Count -eq 2) -and $calls[0].Dir -and ($calls[1].Dir -eq $calls[0].Dir) -and ($calls[0].Dir.TrimEnd('\') -ne (Join-Path $itRoot 'Launcher')))
+    Yes 'T4 so the new exe ends up in the root, as it always did' (Test-Path -LiteralPath (Join-Path $itRoot 'Launcher\Thornswood.exe'))
 
-        # With Ship beside it and no -NoShip, Ship does both and this does neither.
-        Set-Content -LiteralPath (Join-Path $itRel 'Ship.ps1') -Value $stubShip -Encoding ASCII
-        Remove-Item -LiteralPath $callLog -Force -ErrorAction SilentlyContinue
-        $t = Invoke-Child $ps (Join-Path $itDev 'Install-Thornswood.ps1') @('-Root', $itRoot, '-Only', 'launcher', '-NoPause', '-Notes', 'test', '-Server', $itRoot, '-Client', $itRoot)
-        $calls = @(Read-Log $callLog | ForEach-Object { Split-Call $_ })
-        Yes "T5 without -NoShip it passes (exit $($t.Code))" ($t.Code -eq 0)
-        Yes 'T6 and hands the launcher to Ship alone, once' (($calls.Count -eq 1) -and ($calls[0].What -eq 'ship'))
-        Yes 'T7 and says so once, not once per launcher step' (([regex]::Matches($t.Out, 'built as part of publishing')).Count -eq 1)
+    # With Ship beside it and no -NoShip, Ship does both and this does neither.
+    Set-Content -LiteralPath (Join-Path $itRel 'Ship.ps1') -Value $stubShip -Encoding ASCII
+    Remove-Item -LiteralPath $callLog -Force -ErrorAction SilentlyContinue
+    $t = Invoke-Child $ps (Join-Path $itDev 'Install-Thornswood.ps1') @('-Root', $itRoot, '-Only', 'launcher', '-NoPause', '-Notes', 'test', '-Server', $itRoot, '-Client', $itRoot)
+    $calls = @(Read-Log $callLog | ForEach-Object { Split-Call $_ })
+    Yes "T5 without -NoShip it passes (exit $($t.Code))" ($t.Code -eq 0)
+    Yes 'T6 and hands the launcher to Ship alone, once' (($calls.Count -eq 1) -and ($calls[0].What -eq 'ship'))
+    Yes 'T7 and says so once, not once per launcher step' (([regex]::Matches($t.Out, 'built as part of publishing')).Count -eq 1)
+
+    # A stand-in Skyrim, a copy of ping.exe named SkyrimSE.exe as
+    # tests\test-2233-inuse-image.ps1 makes, run from somewhere else and then
+    # from the root's own Game folder.
+    $elsewhere = Join-Path $work 'elsewhere'
+    $itGame = Join-Path $itRoot 'Game'
+    New-Item -ItemType Directory -Force -Path $elsewhere, $itGame | Out-Null
+    $ping = Join-Path $env:SystemRoot 'System32\PING.EXE'
+    $realClose = Join-Path $itDev 'Close-Launcher.ps1'
+    # The root's own Game\SkyrimSE.exe, told running by Close-Launcher.ps1 from
+    # the folder's side; null when that script has no such test.
+    function Test-OwnImage {
+        & { . $realClose; if (Get-Command Test-GameImageRunning -ErrorAction SilentlyContinue) { Test-GameImageRunning (Join-Path $itGame 'SkyrimSE.exe') } else { $null } }
     }
+    foreach ($case in @(@{ Dir = $elsewhere; Ours = $false }, @{ Dir = $itGame; Ours = $true })) {
+        $sky = Join-Path $case.Dir 'SkyrimSE.exe'
+        Copy-Item -LiteralPath $ping -Destination $sky -Force
+        $p = Start-Process -FilePath $sky -ArgumentList '-n', '30', '127.0.0.1' -PassThru -WindowStyle Hidden
+        try {
+            Start-Sleep -Milliseconds 500
+            Remove-Item -LiteralPath $callLog -Force -ErrorAction SilentlyContinue
+            $t = Invoke-Child $ps (Join-Path $itDev 'Install-Thornswood.ps1') @('-Root', $itRoot, '-Only', 'launcher', '-NoShip', '-NoPause', '-Server', $itRoot, '-Client', $itRoot)
+            $calls = @(Read-Log $callLog)
+            $image = Test-OwnImage
+            if (-not $case.Ours) {
+                Yes "U1 a Skyrim running from another folder does not stop it (exit $($t.Code))" ($t.Code -eq 0 -and $calls.Count -eq 2)
+                if ($t.Code -ne 0) { Write-Host $t.Out }
+                Yes 'U1 and the root''s own Game\SkyrimSE.exe is not taken for running' ($image -eq $false)
+            } else {
+                Yes "U2 a Skyrim running from the root's own Game folder stops it (exit $($t.Code))" ($t.Code -eq 1)
+                Yes 'U2 and says so, naming that folder' ($t.Out.Contains('STOP. Skyrim is running from ' + $itGame))
+                Yes 'U2 and builds nothing' ($calls.Count -eq 0)
+                # The test another account's game gets, whose path cannot be read.
+                Yes 'U3 the root''s own Game\SkyrimSE.exe is told running from the folder''s side' ($image -eq $true)
+            }
+        } finally { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue; $p.WaitForExit() }
+    }
+    Yes 'U3 and once it has exited, it is not' ((Test-OwnImage) -eq $false)
+    $src = Get-Content -LiteralPath $realClose -Raw
+    Yes 'U4 Test-GameRunning no longer counts a game it cannot read on its name alone' (
+        $src -notmatch "if \(-not \`$path -or" -and $src -match "elseif \(Test-GameImageRunning \(Join-Path \`$Root \('Game\\' \+ \`$n \+ '\.exe'\)\)\)")
+    Yes 'U5 and matches the root with its backslash, so C:\Thornswood is not C:\Thornswood-DevBuild' ($src.Contains("`$prefix = `$Root.TrimEnd('\') + '\'"))
 
     # ---- 8. who calls the install ------------------------------------------------
     # By code, not by comment: Build-Launcher.ps1's header names the install

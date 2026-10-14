@@ -127,7 +127,17 @@ function Get-RepoHashes([string]$rel) {
     $sha = [Security.Cryptography.SHA256]::Create()
     @($lf, $crlf) | ForEach-Object { -join ($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($_)) | ForEach-Object { $_.ToString('x2') }) }
 }
+. (Join-Path $PSScriptRoot 'Get-ProdFacts.ps1') -Define
 foreach ($e in $r.files) {
+    # "compare": "config" judges a config file by its body, comment and blank
+    # lines left out on both sides (Get-ConfigBodyHash). Facts from before the
+    # collector sent fileBodies fall back to the raw hash.
+    $body = if ($f.fileBodies) { [string]$f.fileBodies.($e.live) } else { '' }
+    if ($e.compare -eq 'config' -and $body) {
+        $ok = (Get-ConfigBodyHash ([IO.File]::ReadAllText((Join-Path $Repo $e.repo)))) -eq $body
+        Row 'file' $e.live "same as $($e.repo) at this checkout, comments aside" $(if ($ok) { 'same' } else { 'differs (or deployed from another commit)' }) $ok
+        continue
+    }
     $live = [string]$f.files.($e.live)
     if (-not $live) { Row 'file' $e.live "same as $($e.repo)" 'missing on the box' $false; continue }
     $ok = (Get-RepoHashes $e.repo) -contains $live

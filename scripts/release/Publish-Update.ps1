@@ -153,6 +153,8 @@ if ($Dev -and -not (Test-Path (Join-Path $Root 'Launcher'))) {
 . (Join-Path $Here 'Dev-News.ps1')
 # Which content plugin the channel's server holds (#2308, ServerContent.ps1).
 . (Join-Path $Here '..\deploy\ServerContent.ps1')
+# Where the notes are kept, in the feed or as a file of their own (#1050).
+. (Join-Path $Here 'Feed-News.ps1')
 if (-not $ReleaseDir) { $ReleaseDir = Get-FeedStoreDir $Channel }
 if (-not (Test-Path -LiteralPath $ReleaseDir)) { New-Item -ItemType Directory -Path $ReleaseDir -Force | Out-Null }
 $haveLocal = (Test-Path -LiteralPath (Join-Path $ReleaseDir 'version.json')) -and (Test-Path -LiteralPath (Join-Path $ReleaseDir 'published.json'))
@@ -1156,6 +1158,40 @@ if ($changed.Count -or $removed.Count -or $profileChanged.Count) {
     }
 }
 
+# ==== thornswood launcher number ====
+# tests\test-2347-publish-launcher-number.ps1 runs this block on its own.
+#
+# A LAUNCHER UPDATES BY ITS NUMBER ALONE (Updater.cs IsNewer), so a launcher
+# published under the number the feed already offers, built from other
+# sources, reaches nobody who already has that number. Until #2347 this file
+# found that out only after the launcher was built, signed and sent, and said
+# so in a WARNING with advice that no longer applied (-NoBump has done nothing
+# since main Ships stopped bumping). Ship's Assert-DevVersionSelection refuses
+# the dev case before anything is built; a main Ship that signs CI's exe for
+# the number main's feed already offers could still get here. So this refuses,
+# in the same terms, before anything is sent, and again before the feed is
+# written in case a feed received again meanwhile offers it.
+#
+# The same launcher is the same bytes, or the same fingerprint of what it is
+# compiled from (launcherInputs, #921). A feed launcher with neither to compare
+# is not known to be this one, so it is refused, as Ship refuses it.
+# Returns '' or the sentence to stop with.
+function Get-LauncherNumberRefusal($feed, [string]$version, [string]$sha, [string]$inputs, [string]$channel, [string]$nothing) {
+    if ($null -eq $feed -or -not $version) { return '' }
+    function Field($o, [string]$k) { if ($o.PSObject.Properties[$k] -and $null -ne $o.$k) { return ([string]$o.$k).Trim() } return '' }
+    $was = Field $feed 'launcherVersion'
+    if ($was -ne $version) { return '' }
+    $wasSha = Field $feed 'launcherSha256'
+    if ($wasSha -and $sha -and $wasSha -eq $sha.ToLowerInvariant()) { return '' }
+    $wasInputs = Field $feed 'launcherInputs'
+    if ($wasInputs -and $inputs -and $wasInputs -eq $inputs) { return '' }
+    $way = if ($channel -eq 'dev') { 'Ship without -Version so it takes the next dev number.' }
+           else { 'This is main''s number, so move main past it first with .\scripts\release\Bump-Version.ps1 and its pull request, then Ship again.' }
+    return ("$version is already out on the $channel feed as a launcher built from other sources than these, and a launcher " +
+            "updates by its number alone, so nobody on $version would ever be offered this one. $nothing $way")
+}
+# ==== end thornswood launcher number ====
+
 # ------------------------------------------------------------ launcher exe
 $exePath = Get-LauncherExe (Join-Path $Root 'Launcher')
 $launcherVersion = ''
@@ -1168,6 +1204,9 @@ if ($Launcher) {
     }
     if ($VersionOverride) { $launcherVersion = $VersionOverride }
     if (-not $launcherVersion) { Die 'Could not read the version out of app\Updater.cs. Bump it before publishing a launcher.' }
+    # Before anything is sent (the launcher number block above, #2347).
+    $numberWhy = Get-LauncherNumberRefusal $feedNow $launcherVersion (Get-FileHash $exePath -Algorithm SHA256).Hash $LauncherInputs $Channel 'Nothing was sent.'
+    if ($numberWhy) { Die $numberWhy }
     Say "  launcher $launcherVersion" 'Green'
 }
 
@@ -1748,9 +1787,13 @@ if ($releaseBaseline) {
     Say '  -NoUpload: the feed no longer names a baseline, so the next release reads the store''s copy' 'Yellow'
 }
 if ($Launcher -and (Test-Path $exePath)) {
-    $wasVersion = Val $doc 'launcherVersion'
-    $wasSha     = Val $doc 'launcherSha256'
     $nowSha     = (Get-FileHash $exePath -Algorithm SHA256).Hash.ToLower()
+    # The feed as it is now, received again above if somebody changed it while
+    # this ran: the same refusal as before anything was sent, before a byte of
+    # the feed is written (the launcher number block, #2347).
+    $numberWhy = Get-LauncherNumberRefusal $doc $launcherVersion $nowSha $LauncherInputs $Channel `
+        'Nothing was written to the feed; what was sent is on the site, where no feed names it.'
+    if ($numberWhy) { Die $numberWhy }
 
     Set-Prop $doc 'launcherVersion' $launcherVersion
     Set-Prop $doc 'launcherUrl' $exeUrl
@@ -1760,18 +1803,6 @@ if ($Launcher -and (Test-Path $exePath)) {
     # said, so a launcher published by hand never inherits the last fingerprint.
     Set-Prop $doc 'launcherInputs' ([string]$LauncherInputs)
     Say "  launcher $launcherVersion recorded" 'Green'
-
-    # The updater decides by version number alone. A changed exe under an
-    # unchanged version reaches nobody who already has that version, and says
-    # nothing while it does not.
-    if ($wasSha -and $wasSha -ne $nowSha -and $wasVersion -eq $launcherVersion) {
-        Write-Host ''
-        Say "  WARNING: the launcher changed but is still version $launcherVersion." 'Red'
-        Say '  Anyone already on that version will never be offered this build.' 'Red'
-        Say '  Re-run without -NoBump, or with -Version, to get it to them.' 'Yellow'
-        Say '  If only mod files changed, -ModsOnly skips the launcher entirely.' 'DarkGray'
-        Write-Host ''
-    }
 }
 
 # ==== thornswood min launcher ====
@@ -1895,8 +1926,12 @@ if (Test-Path $cfgPath) {
         # records\most-online.json, the one place the number lives, which the
         # deploy scripts write into the servers too (#481); it used to be this
         # machine's launcher config.json, which the launcher rewrites itself.
+        # The channel's own numbers (dev's are the record's dev object), and
+        # its seats, people and staff seats together, because this is the M
+        # of "N of M awake" (Patrick, 12 Oct: "the real cap is 30 but 25 for
+        # people with non staff roles I still want it to say of 30 awake").
         . (Join-Path $PSScriptRoot '..\deploy\MaxOnline.ps1')
-        $mo = (Get-MostOnline).Value
+        $mo = (Get-MostOnline -Channel $Channel).Seats
         if ($mo -gt 0) { Set-Prop $doc 'maxOnline' $mo }
 
         # Which collection revision this release agrees with.
@@ -2000,8 +2035,14 @@ try {
 # The launcher's News page reads this. Without it the page sits empty however
 # many releases go out, because the notes were only ever going into the GitHub
 # release body, which nobody playing the game ever sees.
-$news = @()
-if ($doc.PSObject.Properties['news'] -and $doc.news) { $news = @($doc.news) }
+#
+# Every note the feed has, wherever it keeps them (Feed-News.ps1, #1050): in
+# "news", or, once the channel's minLauncher reads it, the news file it names.
+# Held whole in "news" in memory from here, so the DEV marks below see every
+# note, and put back the way the channel keeps them just before the feed is
+# written (the news out block).
+try { $news = @(Open-FeedNewsList $doc (Get-FeedStoreSiteDir $SiteDir) $SiteUrl) }
+catch { Die ("The notes the feed already has could not be read, so nothing was written: " + $_.Exception.Message) }
 
 # A note can be a headline on its own, or a headline followed by lines. Any
 # line starting with - or * becomes its own bullet on the News page, which is
@@ -2142,9 +2183,10 @@ if ($repeat) {
 # The rule is Update-DevNewsChannels in Dev-News.ps1, the one place it lives
 # since 6 Oct, because a dev publish with nothing new and a main Ship mark the
 # dev feed by it too (Set-DevFeedMarks, Update-DevFeedMarks). Main's fresh
-# release record proves which source commits have shipped; historical notes
-# use the preceding clean Dev release as their source; headline changes
-# therefore cannot leave completed work marked Dev-only.
+# release record proves which source commits have shipped; a note from before
+# sourceCommit is proved by the dev release it came with, found by its tag
+# (#2401); headline changes therefore cannot leave completed work marked
+# Dev-only.
 if ($Dev) {
     # Main's feed as the site serves it, read fresh on every dev publish, so
     # mainVersion and the news marks are what main has published, not whatever
@@ -2158,9 +2200,12 @@ if ($Dev) {
         Say "  could not read main's feed, so the dev marks were left alone: $($_.Exception.Message)" 'Yellow'
     }
     if ($null -ne $mainDoc) {
-        $marks = Set-DevFeedMarks $doc $mainDoc $RepoDir
+        $marks = Set-DevFeedMarks $doc $mainDoc $RepoDir $SiteDir $SiteUrl
         Say ("  {0} note{1} marked dev, the ones main has not had" -f $marks.Marked, $(if ($marks.Marked -eq 1) { '' } else { 's' })) 'DarkGray'
-        if ($marks.MainVersion) { Say "  main is on $($marks.MainVersion), this one is on $launcherVersion" 'DarkGray' }
+        # The feed's own number, not $launcherVersion: that is set only when a
+        # launcher is sent, so a packs-only dev Ship (#921) printed "this one is
+        # on" and nothing after it (12 Oct, 20261012-180219-dev).
+        if ($marks.MainVersion) { Say "  main is on $($marks.MainVersion), this one is on $(Val $doc 'launcherVersion')" 'DarkGray' }
     } else {
         Say '  the site has no main feed, so the dev marks were left alone' 'Yellow'
     }
@@ -2186,16 +2231,32 @@ $relSource = Get-ReleaseSource $RepoDir
 $relBaseline = if ($releaseBaseline) { [string]$releaseBaseline.id } else { '' }
 $relPacks = @(if (-not $packsGone) { $chunks | ForEach-Object { [string]$_.Id } })
 $relRecord = New-ReleaseRecord $Id $Channel (Val $doc 'launcherVersion') $relPacks `
-    $relBaseline $relSource.Commit $relSource.Branch $relSource.Uncommitted @($script:ShipUiHashedWritten)
+    $relBaseline $relSource.Commit $relSource.Branch $relSource.Uncommitted
 Set-Prop $doc 'release' $relRecord
 Say ("  release {0}{1}" -f $Id, $(if ($relRecord.commit) { ', built from ' + $relRecord.commit.Substring(0, 12) } else { ', not from a git checkout' })) 'Green'
 # ==== end thornswood release record ====
 
-# Set-Content -Encoding UTF8 writes a byte order mark on Windows PowerShell,
-# and a BOM is not JSON. The launcher's reader stops on it and reports an
-# unexpected character, which takes out the update check for everyone at once,
-# including their route to a fix. So this file is written without one.
-[IO.File]::WriteAllText($VersionFile, ($doc | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))
+# ==== thornswood news out ====
+# THE NOTES GO WHERE THE CHANNEL KEEPS THEM (#1050, Feed-News.ps1): in "news"
+# while any launcher let in reads only that, and from the first minLauncher
+# that reads the news file (1.2.4) as one asset named as "newsFile", sent to
+# the site before the feed names it, with "news" left []. minLauncher is the
+# one this publish writes (the min launcher block). A dry run (-NoUpload
+# -NoPush) writes the file here and sends nothing, like the rest of it; a run
+# that sends the feed but uploads nothing keeps the notes in "news", so the
+# feed never names a file the site does not hold.
+$newsMin = if ($NoUpload -and -not $NoPush) { '' } else { Val $doc 'minLauncher' }
+try {
+    $newsWhere = Set-FeedNewsList $doc @($doc.news) $Channel $newsMin (Join-Path $DistDir ('news-' + $Id)) $SiteDir -NoSend:$NoUpload
+    if ($newsWhere -eq 'file') { Say ("  the {0} notes are one file on the site, named in the feed (every launcher let in reads it)" -f @($news).Count) 'Green' }
+} catch { Die ($_.Exception.Message + ' Run Ship again.') }
+# ==== end thornswood news out ====
+
+# Compact and without a byte order mark, the one way every feed writer writes
+# it (Feed-Json.ps1, Write-FeedVersionFile, #1050). A BOM is not JSON: the
+# launcher's reader stops on it, which takes out the update check for everyone
+# at once, including their route to a fix.
+Write-FeedVersionFile $VersionFile $doc
 
 # A pack with no url is not a warning. It is a release that switches Play off
 # for every person who takes it, because their launcher tries to download from

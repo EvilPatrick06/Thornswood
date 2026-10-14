@@ -9,7 +9,18 @@ standing there: J has every one, under Boards.
 The object is the message board. One stands at every board, wherever
 the server has it: indoors or out, in Skyrim or on Solstheim. It is
 put down when you are in that board's cell, or its worldspace outdoors.
-You are at it when you are within 400 of that board. Click the board.
+You are at it when you are within 400 of that board. Click the board:
+E on the board itself opens it, and nothing else does. E on a person
+beside it, or on anything else near it, is answered by that, not the
+board (Patrick, 12 Oct, #2298: clicking the board does only the board).
+
+The board is Thornswood's own, built from Skyrim's own pieces (#2298):
+two Windhelm sign posts, a face of stockade planks between two log
+rails, a gable of shingle boards, a candle lantern on a bracket, and
+notices nailed to it. On a shelf on its right post sits the hold's drop
+box. It is about 3.5 metres tall and 4.4 wide with the shelf.
+`scripts/mods/Build-NoticeBoard.py` builds both meshes from the game's
+own archives; only the meshes ship, never a texture.
 
 A steward moves it. Standing where it should be, they press its town
 under the notice boards on the Office page of the K panel, and press
@@ -102,6 +113,13 @@ already put up.
 
 Take down is the poster's. The fee stays with the hold. A job
 somebody has taken stays up until they hand it back.
+
+A guard of the hold takes down any post on its board, taken or not
+(#502). The fee stays with the hold. Gold the post was holding goes back
+to whoever posted it: a letter's 15, a haul's pay. When they are away it
+is held for them and handed over when they are back. Whoever had taken
+it is told it is off their list. At another hold's board a guard is
+anybody. See [Offices](offices.md).
 
 ## Where this is
 

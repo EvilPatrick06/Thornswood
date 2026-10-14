@@ -28,6 +28,7 @@ own overwrite last.
 Read only. Never connects to anything and never writes beside the code: the
 news webhook the builder saves is pointed at a temporary folder.
 """
+import _pyguard  # noqa: F401  (first: Python 3.10 or newer, #2276)
 import asyncio
 import contextlib
 import importlib.util
@@ -70,6 +71,8 @@ VIEW_CHANNEL = 1 << 10
 SEND_MESSAGES = 1 << 11
 READ_MESSAGE_HISTORY = 1 << 16
 WANT = VIEW_CHANNEL | SEND_MESSAGES | READ_MESSAGE_HISTORY
+# The join card is a file (#2341).
+ATTACH_FILES = 1 << 15
 
 # Every mode that shuts @everyone out of one of the three. Only public does
 # not, and a public channel needs nothing for the bot.
@@ -562,6 +565,93 @@ try:
             ok = False
         yes('a channel -Check never made is passed over', ok)
 
+    # ------------------------------- the join card's channel (#2341) --
+    #
+    # The bot's start on 12 Oct: "cannot post in #welcome-travelers ... the
+    # bot is missing Attach Files there". The card is a file. The channel's
+    # overwrite for the bot named only the three, so whether it could attach
+    # was down to its role's server-wide bits and @everyone's overwrite there,
+    # which a build with Administrator cannot see. Either way round, the
+    # bot's own overwrite in that channel has to say it.
+    join_spec = [s for _c, specs in B.PLAN for s in specs
+                 if s['name'] == 'welcome-travelers'][0]
+    yes('the plan gives the bot Attach Files in #welcome-travelers and only '
+        'there, of the channels it posts in',
+        'attach_files' in B.bot_needs(join_spec) and
+        not [s for _c, specs in B.PLAN for s in specs
+             if s is not join_spec and 'attach_files' in B.bot_needs(s)])
+    o = B.overwrites(g, join_spec['mode'], roles, None, B.bot_needs(join_spec)).get(me)
+    yes('a new #welcome-travelers gives the bot the three and Attach Files, '
+        'and denies nothing',
+        o is not None and o.pair()[0].value == WANT | ATTACH_FILES
+        and o.pair()[1].value == 0)
+
+    if keep is not None:
+        B.CHECK = False
+        del B.failed[:]
+        # Two ways the live channel can keep the file out, both measured off
+        # resolve(): the bot's role without Attach Files and @everyone without
+        # it either, or @everyone's overwrite there denying it.
+        no_attach = Role('Thornswood Bot', 7, 60,
+                         B.RUN_PERMISSIONS & ~ATTACH_FILES)
+        bare_role = Role('@everyone', 1, 0, B.PLAIN.value & ~ATTACH_FILES)
+        cases = []
+        g2, roles2, people2, _n2, _l2 = live_server()
+        g2.default_role = bare_role
+        g2.me = Member(424242, [no_attach])
+        bare2 = types.SimpleNamespace(default_role=g2.default_role, me=None,
+                                      roles=g2.roles)
+        cases.append(('its role and @everyone without Attach Files', g2,
+                      Channel(g2, 'welcome-travelers', 'text',
+                              ow=B.overwrites(bare2, 'open', roles2))))
+        g3, roles3, people3, _n3, _l3 = live_server()
+        bare3 = types.SimpleNamespace(default_role=g3.default_role, me=None,
+                                      roles=g3.roles)
+        ow3 = B.overwrites(bare3, 'open', roles3)
+        ow3[g3.default_role].update(attach_files=False)
+        cases.append(('@everyone\'s overwrite there denying Attach Files', g3,
+                      Channel(g3, 'welcome-travelers', 'text', ow=ow3)))
+        g4, roles4, _p4, _n4, _l4 = live_server()
+        g4.default_role = Role('@everyone', 1, 0, B.PLAIN.value & ~ATTACH_FILES)
+        g4.me = Member(424242, [Role('Thornswood Bot', 7, 60,
+                                     B.RUN_PERMISSIONS & ~ATTACH_FILES)])
+        cases.append(('a channel open to everybody, and a role without Attach '
+                      'Files', g4, Channel(g4, 'welcome-travelers', 'text')))
+        for what, gx, ch in cases:
+            mex = gx.me
+            # As the #455 run left a gated channel: the bot's own three.
+            if ch.ow:
+                ch.ow[mex] = discord.PermissionOverwrite(
+                    view_channel=True, send_messages=True,
+                    read_message_history=True)
+            folk = [Member(5, [r for r in gx.roles if r.name == 'Member']),
+                    Member(6, [])]
+            before = dict((p, resolve(gx, p, ch).value) for p in folk)
+            yes('#welcome-travelers with ' + what + ': the bot sees and posts '
+                'there but cannot attach the card, which is what its start '
+                'logged (the problem, measured)',
+                gets_in(resolve(gx, mex, ch)) and not resolve(gx, mex, ch).attach_files)
+            gx.calls = []
+            quiet(keep(ch, B.bot_needs(join_spec)))
+            p = resolve(gx, mex, ch)
+            yes('  after it the bot sees, posts, reads and attaches the card there',
+                gets_in(p) and p.attach_files)
+            yes('  written once, the bot\'s own overwrite and nothing else',
+                [(c[0], c[2]) for c in gx.calls] == [('set_permissions', mex)])
+            yes('  and nobody else gained anything',
+                all(resolve(gx, q, ch).value == before[q] for q in folk))
+            gx.calls = []
+            quiet(keep(ch, B.bot_needs(join_spec)))
+            yes('  and a second run writes nothing', gx.calls == [])
+
+        # A channel the plan asks nothing extra of is still left alone when
+        # it is open to everybody: the change is the join channel's own.
+        ch = Channel(g4, 'general', 'text')
+        g4.calls = []
+        quiet(keep(ch))
+        yes('an ordinary channel open to everybody is still never touched',
+            g4.calls == [] and g4.me not in ch.ow)
+
     # ------------------------------------ the whole build, on the live server --
     g, roles, people, news, loose = live_server()
     me = g.me
@@ -647,9 +737,15 @@ try:
         'Send Messages in Threads, and denies nothing',
         o is not None and o.pair()[0].value == WANT | (1 << 36) | (1 << 38)
         and o.pair()[1].value == 0)
+    join = by_name['welcome-travelers']
+    o = join.ow.get(me)
+    yes('its overwrite in #welcome-travelers is the three plus Attach Files, '
+        'for the join card, and denies nothing (#2341)',
+        o is not None and o.pair()[0].value == WANT | ATTACH_FILES
+        and o.pair()[1].value == 0)
     yes('  and every other channel it writes gets the three and nothing more',
         all(c[1].ow[me].pair()[0].value == WANT for c in writes
-            if c[1] is not tickets))
+            if c[1] is not tickets and c[1] is not join))
     yes('the build ends without the invite when the client cannot say which '
         'application it is, rather than a link with no id in it',
         'oauth2/authorize' not in said)

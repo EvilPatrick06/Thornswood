@@ -96,6 +96,11 @@ $serverBuildPath = Join-Path $Here 'scripts\deploy\ServerBuild.ps1'
 Yes 'Swap.ps1 puts ServerBuild.ps1 in front of the stage check' (
     $lib.Substring($b).Contains('$checkBlock = [IO.File]::ReadAllText((Join-Path $PSScriptRoot ''ServerBuild.ps1'')) + "`r`n" + $checkBlock'))
 $checkBlock = [IO.File]::ReadAllText($serverBuildPath) + "`r`n" + $checkBlock
+# And the record contracts (#2180, slice 4), the way Swap.ps1 puts them in front.
+Yes 'Swap.ps1 puts Read-JsonFile.ps1 and RecordShape.ps1 in front of the stage check' (
+    $lib.Substring($b).Contains('$checkBlock = $ThornswoodRecordShapeText + $checkBlock'))
+$checkBlock = [IO.File]::ReadAllText((Join-Path $Here 'scripts\release\Read-JsonFile.ps1')) + "`r`n" +
+              [IO.File]::ReadAllText((Join-Path $Here 'scripts\release\RecordShape.ps1')) + "`r`n" + $checkBlock
 Yes 'Deploy-Server.ps1 loads Swap.ps1' ($src -match "\. \(Join-Path \`$Here 'Swap\.ps1'\)")
 # Which settings Deploy-Server takes from the build and which stay the live
 # server's (#1222), and the carry it runs on the box: ServerSettings.ps1.
@@ -287,7 +292,7 @@ function MakeStage {
         $recFiles[$k] = [ordered]@{ sha256 = (Sha $said); bytes = 1; commit = $c }
     }
     if (-not $NoRecord) {
-        $files['server-build.json'] = ([ordered]@{ binary = 'scam_native.node'; sha256 = (Sha $RecordFor); source = [ordered]@{ commit = $c }; files = $recFiles } | ConvertTo-Json -Depth 5)
+        $files['server-build.json'] = ([ordered]@{ binary = 'scam_native.node'; sha256 = (Sha $RecordFor); bytes = 1; source = [ordered]@{ commit = $c }; files = $recFiles } | ConvertTo-Json -Depth 5)
     }
     # The build stamp Deploy-Gamemode leaves beside gamemode.js goes up in the
     # stage with it, so a rollback cannot leave a new stamp describing the old

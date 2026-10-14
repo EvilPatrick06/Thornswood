@@ -7,7 +7,10 @@ arrive in a quiet stone hall and the race menu opens. That menu is the
 face, the race, and nothing else about the life they will lead. The ten
 peoples and the rieklings are in [Races](races.md).
 
-When the face is done they are dressed in a plain tunic and boots. The
+When the face is done they are dressed in a plain tunic and boots. A
+riekling is dressed in a riekling's own loincloth and cloth wraps
+instead, because the tunic and boots are cut for the other peoples and
+do not fit a riekling (Patrick, 12 October 2026). The
 panel behind K opens on its own. On it:
 
 - **Home.** The town they wake in. This one is required before they leave

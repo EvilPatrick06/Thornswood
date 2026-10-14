@@ -49,6 +49,18 @@
   puts the newest back the same checked way (-Channel dev for the dev server),
   and records the folder that came back by its own record (#459).
 
+  THE TASK ALONE (#2491).
+      .\scripts\release\Publish-Server.ps1 -TaskOnly
+  sends the installer and nothing to install, and the installer registers the
+  server's scheduled task again with its own action and settings, stops the
+  server and starts it through the new task (Install-ThornswoodServer.ps1
+  -TaskOnly). No zip, no file in the server's folder, no setting, no record
+  and no news: it is how the box takes a change to the task itself, the
+  priority it starts node at (#2491), without a release. If the server does
+  not answer under the new task, the task it had goes back and is started.
+  -Channel dev for the dev server. It drops whoever is on that server, so
+  look at its online.json first.
+
   THE JOIN PASS SWITCH (#1804). The installer refuses, before anything is
   stopped, a server whose thornswoodRequirePass is neither true nor false,
   because the gamemode reads that as on (#1319), and says so. A first
@@ -56,6 +68,31 @@
       .\scripts\release\Publish-Server.ps1 -RequirePass on
   sets it on the server in that publish (off lets a session act until its
   pass arrives); without it the running server keeps its own.
+
+  THE BUILD IT PACKS (#459; the same defect #2309 found in
+  Deploy-DevGamemode -LoadOrder). A publish packs a built server: the binary
+  and the rest the fork builds, from an engine build's dist\server. -Dist
+  names it. Left out, it is this checkout's own engine build (Where.ps1
+  ServerDist), never another folder. This script runs only from a clean
+  checkout at origin (#2118), which on the shipping machine is a fresh
+  worktree with no engine build, so there -Dist is how the build is named:
+      .\scripts\release\Publish-Server.ps1 -Channel dev -Dist <the build's dist\server>
+  With no built server at -Dist it stops before anything is copied, built or
+  sent, and says so. Whatever -Dist names, its server files are held to
+  records\server-build.json before anything leaves (Export-ServerPayload and
+  the zip read below), so a build of another engine commit is refused. The
+  publish copies the commit's gamemode.js into that build and sets how many
+  it holds in its server-settings.json, as it always has; the build is
+  otherwise read, not changed.
+
+  A LOAD ORDER THAT DROPS PLUGINS (#2320). The installer refuses, before
+  anything is stopped, a payload whose load order leaves out a plugin the
+  running server loads. On 5 Oct at 9:56 PM a dev publish of a fresh engine
+  build carried the engine's own five base masters, because Deploy-Gamemode.ps1
+  -Vortex had not yet written the collection's order into that build, and the
+  dev server ran 48 plugins before and five after. When a plugin really is
+  leaving the collection, name each one:
+      .\scripts\release\Publish-Server.ps1 -Channel dev -DropPlugins 'Old Mod.esp'
 
   It also writes a line into the launcher's News page and pushes it.
 
@@ -97,8 +134,13 @@ param(
     [switch]$NoPush,
     [string]$VpsHost  = '',
     [string]$VpsUser  = '',
-    [string]$Dist     = (& (Join-Path $PSScriptRoot 'Where.ps1') ServerDist),
-    [string]$Zip      = (& (Join-Path $PSScriptRoot 'Where.ps1') ServerZip),
+    # The built server this packs (an engine build's dist\server). Left out,
+    # this checkout's own engine build, and a publish stops before anything
+    # when that is not there (THE BUILD IT PACKS in the header). Never another
+    # folder by default.
+    [string]$Dist     = '',
+    # Where the payload zip is made. Left out, this checkout's out folder.
+    [string]$Zip      = '',
     [string]$VpsRoot,
     [string]$TaskName,
     [switch]$FreshWorld,
@@ -107,6 +149,9 @@ param(
     # Put the previous server folder back instead of publishing. Builds and
     # sends nothing but the installer, and writes no news.
     [switch]$PutBack,
+    # Register the server's task again and restart it under it, sending
+    # nothing to install (#2491, THE TASK ALONE in the header).
+    [switch]$TaskOnly,
     # How long the new server has to answer on the box before the previous one
     # goes back. Left off, the shared ceiling in ServerReadyWait.ps1, derived
     # from measured Live and Dev starts (#1938). A start that never answers
@@ -134,6 +179,12 @@ param(
     # its own, and one with neither true nor false is refused. Live goes on
     # only when Patrick says Main.
     [ValidateSet('', 'on', 'off')][string]$RequirePass = '',
+    # The plugins the running server loads that this release's load order may
+    # leave out, each by its file name (#2320). Left off, the installer
+    # refuses an order that drops any plugin the running server loads, which
+    # is what a payload built before Deploy-Gamemode.ps1 -Vortex wrote the
+    # collection's order carries: on 5 Oct, the engine's five base masters.
+    [string[]]$DropPlugins = @(),
     # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
     [switch]$AllowStaleCheckout
 )
@@ -162,6 +213,12 @@ if ($IsDev) {
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+# Resolved here, not as the parameters' defaults: 5.1 leaves $PSScriptRoot
+# empty in an advanced script's defaults (#2229). $DistGiven says whether the
+# person named the build, for the refusal below.
+$DistGiven = [bool]$Dist
+if (-not $Dist) { $Dist = & (Join-Path $Here 'Where.ps1') ServerDist }
+if (-not $Zip)  { $Zip  = & (Join-Path $Here 'Where.ps1') ServerZip }
 . (Join-Path $Here '..\vps\Vps.ps1')
 if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
@@ -175,6 +232,13 @@ function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if
 # sent or asked, the way Deploy-Server.ps1 refuses -PutBack with -RequirePass.
 if ($PutBack -and $RequirePass) {
     Die '-PutBack sets no setting: it puts the previous server back with the running server''s own settings. Run it without -RequirePass, then a publish with it. Nothing was sent.'
+}
+if ($PutBack -and @($DropPlugins).Count) {
+    Die '-PutBack brings back an order the server ran, so it does not take -DropPlugins. Nothing was sent.'
+}
+# The task alone changes no file, setting or world (#2491).
+if ($TaskOnly -and ($PutBack -or $RequirePass -or @($DropPlugins).Count -or $FreshWorld)) {
+    Die '-TaskOnly registers the server''s task again and changes nothing else, so it does not go with -PutBack, -RequirePass, -DropPlugins or -FreshWorld. Nothing was sent.'
 }
 
 $target = "$VpsUser@$VpsHost"
@@ -199,8 +263,8 @@ foreach ($t in 'ssh', 'scp') {
 . (Join-Path $Here '..\deploy\Artifact.ps1')
 # What engine each server runs, for the site's credits page (#2303).
 . (Join-Path $Here '..\deploy\DeployedBuild.ps1')
-$committedOnly = @('scripts/deploy/Install-ThornswoodServer.ps1', 'scripts/deploy/ServerSettings.ps1', 'scripts/deploy/ServerBuild.ps1', 'scripts/deploy/ServerReadyWait.ps1', 'scripts/vps/Roll-Log.ps1')
-if (-not $PutBack) { $committedOnly += 'game/gamemode.js', 'records/most-online.json', 'records/server-build.json' }
+$committedOnly = @('scripts/deploy/Install-ThornswoodServer.ps1', 'scripts/deploy/ServerSettings.ps1', 'scripts/deploy/ServerBuild.ps1', 'scripts/deploy/ServerReadyWait.ps1', 'scripts/vps/Roll-Log.ps1', 'scripts/release/Read-JsonFile.ps1', 'scripts/release/RecordShape.ps1')
+if (-not $PutBack -and -not $TaskOnly) { $committedOnly += 'game/gamemode.js', 'records/most-online.json', 'records/server-build.json' }
 try { Assert-ThornswoodCommitted -RepoDir (Join-Path $Here '..\..') -Paths $committedOnly -What 'this publish' }
 catch { Die $_.Exception.Message }
 
@@ -229,6 +293,16 @@ if (-not (Test-Path -LiteralPath $buildLib)) { Die "not found: $buildLib" }
 $waitLib = Join-Path $Here '..\deploy\ServerReadyWait.ps1'
 if (-not (Test-Path -LiteralPath $waitLib)) { Die "not found: $waitLib" }
 . $waitLib
+# And the record contracts (#2180, slice 4), which the installer holds the
+# payload's settings and server-build.json to. It refuses without them.
+$shapeLibs = @((Join-Path $Here 'Read-JsonFile.ps1'), (Join-Path $Here 'RecordShape.ps1'))
+foreach ($f in $shapeLibs) { if (-not (Test-Path -LiteralPath $f)) { Die "not found: $f" } }
+function Send-ShapeLibs([string]$Why) {
+    foreach ($f in $shapeLibs) {
+        Invoke-ThornswoodNative { & scp @ssh $f ("${target}:C:/" + (Split-Path -Leaf $f)) }
+        if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. $Why" }
+    }
+}
 if (-not $PSBoundParameters.ContainsKey('Wait')) {
     $Wait = Get-ThornswoodServerReadyWait
 }
@@ -277,9 +351,9 @@ function Save-ServerRecords([switch]$PutBack) {
     $null = Save-ThornswoodDeployedBuild $target $ssh $VpsRoot
 }
 
-# ------------------------------------------------------------- -PutBack -----
-if ($PutBack) {
-    Head 'Putting the previous server back'
+# The installer and the files it loads, sent alone, before a run that
+# sends no zip (-TaskOnly and -PutBack).
+function Send-InstallerOnly {
     Invoke-ThornswoodNative { & scp @ssh $installer "${target}:C:/Install-ThornswoodServer.ps1" }
     if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
     Invoke-ThornswoodNative { & scp @ssh $rollLog "${target}:C:/Roll-Log.ps1" }
@@ -290,6 +364,27 @@ if ($PutBack) {
     if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
     Invoke-ThornswoodNative { & scp @ssh $waitLib "${target}:C:/ServerReadyWait.ps1" }
     if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
+    Send-ShapeLibs 'Nothing up there was changed.'
+}
+
+# ------------------------------------------------------------- -TaskOnly ----
+# The installer and the files it loads go up, as for a put-back, and it
+# registers the task again and restarts the server under it (#2491). Nothing
+# in the server's folder changes, so there is no record to write.
+if ($TaskOnly) {
+    Head ('Registering the task again: ' + $TaskName)
+    Send-InstallerOnly
+    Invoke-Installer "-Root '$VpsRoot' -TaskName '$TaskName' -StartNow -TaskOnly -Wait $Wait"
+    Say 'the task is registered again and the server answers under it' 'Green'
+    Write-Host ''
+    if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+    exit 0
+}
+
+# ------------------------------------------------------------- -PutBack -----
+if ($PutBack) {
+    Head 'Putting the previous server back'
+    Send-InstallerOnly
     Invoke-Installer "-Root '$VpsRoot' -TaskName '$TaskName' -StartNow -PutBack -Wait $Wait"
     Say 'the previous server is back and answering up there' 'Green'
     Save-ServerRecords -PutBack
@@ -297,6 +392,34 @@ if ($PutBack) {
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
     exit 0
 }
+
+# ------------------------------------------------------- the build it packs ---
+# THE BUILD IT PACKS (#459, the same defect as #2309). See the header. A
+# publish packs a built server, so with none at $Dist it stops here, before
+# the gamemode is copied, the settings are read or anything is built or sent,
+# and says how to name one. Until 12 Oct a missing build skipped the gamemode
+# copy and the start point check without a word and stopped later inside
+# Export-ServerPayload with "server dist not found", which named neither
+# -Dist nor the build the record wants.
+$recCommit = ''
+try { $recCommit = [string](([IO.File]::ReadAllText($Record) | ConvertFrom-Json).source.commit) } catch { }
+$recShort = if ($recCommit.Length -ge 8) { $recCommit.Substring(0, 8) } else { 'the one it names' }
+$distWhy = ''
+if (-not (Test-Path -LiteralPath $Dist -PathType Container)) { $distWhy = "there is no built server at $Dist" }
+elseif (-not (Test-Path -LiteralPath (Join-Path $Dist 'server-settings.json'))) { $distWhy = "$Dist holds no server-settings.json, so it is not a built server" }
+if ($distWhy) {
+    $nl = [Environment]::NewLine
+    if ($DistGiven) {
+        Die ($distWhy + '. -Dist names the engine build''s dist\server to pack. Nothing was built or sent.')
+    }
+    Die ($distWhy + ', which is this checkout''s own engine build. A publish packs a built server, and a fresh checkout has none: the' + $nl +
+         'deploy guard lets this run only from a clean checkout at origin (#2118), and the engine is built in another folder.' + $nl +
+         'Name that build:' + $nl +
+         '    .\scripts\release\Publish-Server.ps1 -Channel ' + $Channel + ' -Dist <the engine build''s dist\server>' + $nl +
+         'Its server files must be the build records\server-build.json names (engine ' + $recShort + '); that is checked before anything is sent.' + $nl +
+         'Nothing was built or sent.')
+}
+Say ('{0,-22} {1}' -f 'built server', $Dist) 'DarkGray'
 
 # ------------------------------------------------------------- gamemode ------
 # The gamemode is edited in game\ and packaged from dist\server. Those are two
@@ -388,12 +511,13 @@ $settingsPath = Join-Path $Dist 'server-settings.json'
   AND HOW MANY IT HOLDS AT ONCE, #481, whichever channel it goes to:
   thornswoodMostOnline for the gamemode and maxPlayers, with the staff seats
   on top, for the engine, from records\most-online.json by way of
-  MaxOnline.ps1. Into the DIST copy like the ports above, so what is packed
+  MaxOnline.ps1, the channel's own numbers (dev's are its dev object since
+  12 Oct). Into the DIST copy like the ports above, so what is packed
   carries the one number, and only written when it moved.
 #>
 if (Test-Path -LiteralPath $settingsPath) {
     . (Join-Path $PSScriptRoot '..\deploy\MaxOnline.ps1')
-    $mostOnline = Get-MostOnline
+    $mostOnline = Get-MostOnline -Channel $Channel
     # The two keys a publish puts over the running server's (ServerSettings.ps1,
     # #1222), so they are the record's number or the publish does not go.
     if ($mostOnline.Value -le 0) { Die ("$($mostOnline.From) gave no number ($($mostOnline.Why)), and a publish sets how many the server holds from it. Nothing was sent.") }
@@ -575,6 +699,7 @@ Invoke-ThornswoodNative { & scp @ssh $buildLib "${target}:C:/ServerBuild.ps1" }
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. The server up there was not touched." }
 Invoke-ThornswoodNative { & scp @ssh $waitLib "${target}:C:/ServerReadyWait.ps1" }
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. The server up there was not touched." }
+Send-ShapeLibs 'The server up there was not touched.'
 Say 'copied' 'Green'
 
 Head 'Installing'
@@ -584,6 +709,12 @@ $instArgs = "-Zip C:\thornswood-server.zip -Root '$VpsRoot' -TaskName '$TaskName
 if ($RequirePass) {
     Say "the installer sets the join pass hold $RequirePass, as asked" 'Yellow'
     $instArgs += " -RequirePass $RequirePass"
+}
+if (@($DropPlugins).Count) {
+    # Names with spaces cross the ssh command line as base64 (ServerSettings.ps1).
+    . $settingsLib
+    Say ('the installer may leave these out of the running server''s load order, as asked: ' + (@($DropPlugins) -join ', ')) 'Yellow'
+    $instArgs += (' -DropPlugins ' + (ConvertTo-ThornswoodNamesArg $DropPlugins))
 }
 if ($FreshWorld) {
     # Not deleted any more: the installer starts the new server with no world
@@ -852,8 +983,11 @@ if (-not $NoNews -and $up) {
                 named   = $named
             }
 
-            $newsList = @()
-            if ($doc.PSObject.Properties['news'] -and $doc.news) { $newsList = @($doc.news) }
+            # Every note, wherever the feed keeps them (Feed-News.ps1, #1050).
+            # A news file that cannot be read stops the entry here, so a list
+            # without its older notes is never written back.
+            . (Join-Path $Here 'Feed-News.ps1')
+            $newsList = @(Open-FeedNewsList $doc)
 
             # Publishing the server twice over one change is normal while
             # something is being chased. That is one piece of news, not four.
@@ -888,13 +1022,15 @@ if (-not $NoNews -and $up) {
                 }
                 # Forty, not twenty. Twenty was one evening's worth.
                 if ($newsList.Count -gt 40) { $newsList = $newsList[0..39] }
-                if ($doc.PSObject.Properties.Name -contains 'news') { $doc.news = $newsList }
-                else { $doc | Add-Member -NotePropertyName news -NotePropertyValue $newsList }
+                # Back the way the live feed keeps them: in "news", or once its
+                # minLauncher reads it, a news file sent to the site first.
+                $minNews = if ($doc.PSObject.Properties['minLauncher'] -and [string]$doc.minLauncher) { [string]$doc.minLauncher } else { [string]$doc.launcherVersion }
+                [void](Set-FeedNewsList $doc $newsList 'main' $minNews (Join-Path $ReleaseDir 'news-out') '' -NoSend:$NoPush)
 
-                # No byte order mark. The launcher's reader stops on one and
-                # reports an unexpected character, which takes out the update
-                # check for everybody at once, including their route to a fix.
-                [IO.File]::WriteAllText($VersionFile, ($doc | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))
+                # Compact, no byte order mark (Feed-Json.ps1,
+                # Write-FeedVersionFile). A BOM takes out the update check for
+                # everybody at once, including their route to a fix.
+                Write-FeedVersionFile $VersionFile $doc
                 Say ("  added: {0}" -f $entry.title) 'Green'
 
                 if (-not $NoPush) {

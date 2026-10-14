@@ -115,8 +115,10 @@ setting a bone, and a master physicker clearing a crooked heal; a
 healing spell by its own rank (novice stops a bleed, advanced and up
 closes a cut, expert sets a splinted break); and a shrine pressed
 inside one of the temples the wake uses, which sets breaks and clears
-a crooked heal. A remedy closes a cut the way a bandage does and
-clears one ordinary disease, wound fever first.
+a crooked heal. A remedy closes a cut the way a bandage does,
+clears one ordinary disease, wound fever first, and ends a hangover
+(see [Drink](drink.md)). A hangover counts as something to tend, so
+the H line and Tend their wounds are offered for it too.
 
 Your own wounds are tended from the inventory: while you have one
 somebody could tend, a line at the bottom names H, and H opens a panel

@@ -40,7 +40,7 @@ function Run([string]$packager, [int]$before = 0) {
     Set-Content -LiteralPath (Join-Path $tmp 'Package-Thornswood.ps1') -Value $packager
     $script:said = New-Object System.Collections.Generic.List[string]
     $script:InstallerFailed = 0; $script:InstallerWhy = ''; $script:after = $false
-    $Here = $tmp; $Root = $tmp; $DistDir = $tmp; $ciStub = $null
+    $Here = $tmp; $Root = $tmp; $DistDir = $tmp; $ciStub = $null; $AllowStaleCheckout = $false
     function Say([string]$t, [string]$c = 'Gray') { $script:said.Add("$c|$t") }
     $global:LASTEXITCODE = $before
     $threw = $null

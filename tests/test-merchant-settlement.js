@@ -10,7 +10,7 @@ function fixture() {
   const calls=[];
   const purses={
     read: id => copy(states.get(id)),
-    pendingRecords: () => Array.from(states, ([merchantId,state]) => ({merchantId,reference:state.reference,state:copy(state)})).filter(x=>x.state.pending),
+    pendingRecords: () => Array.from(states, ([merchantId,state]) => ({merchantId,reference:state.reference,state:copy(state)})).filter(x=>x.state.pending!==undefined && x.state.pending!==null),
     compareAndCommit(id,rev,next) {
       if (states.get(id).revision!==rev) return null;
       states.set(id,copy({...next,revision:rev+1}));
@@ -19,15 +19,15 @@ function fixture() {
   };
   const transfer={
     available: () => available, validate: () => true,
-    identity: id => id===10 && profile>0 ? {desc:'ff000010:Skyrim.esm',profileId:profile} : null,
-    resolve: desc => desc==='ff000010:Skyrim.esm' ? 10 : 0,
+    identity: id => id===10 && profile>0 ? {desc:'10',profileId:profile} : null,
+    resolve: desc => desc==='10' ? 10 : 0,
     inventory: () => copy(inv), receipt: () => live, saved: () => saved,
     cas(id,expected,receipt,next,sequence,expectedProfile) {
       assert.equal(id,10); assert.equal(expectedProfile,profile);
       calls.push(sequence);
       if (live!==receipt || JSON.stringify(inv)!==JSON.stringify(expected)) return false;
       inv.entries=copy(next.entries);
-      live=JSON.stringify({actor:'ff000010:Skyrim.esm',profile,sequence});
+      live=JSON.stringify({actor:'10',profile,sequence});
       return true;
     }
   };
@@ -39,6 +39,17 @@ function fixture() {
       next:{purse:247,stock:[{baseId:100,count:1,name:'Iron Ingot',entry:{baseId:100,count:1,name:'Tempered iron',health:0.7}}],supply:{}},
       debit:{entries:[{baseId:15,count:40},{baseId:100,count:7,name:'Tempered iron',health:0.7}]},
       credit:[{baseId:15,count:3}],expected:copy(inv),kind:'sell'})};
+}
+
+function offlineRecord(id) {
+  const seed=fixture(),service=seed.make();service.begin(seed.offer());service.shutdown();
+  const state=copy(seed.states.get(1)),pending=state.pending;
+  state.reference=id.toString(16)+':Skyrim.esm';pending.reference=state.reference;
+  pending.id='dev:test-ledger:'+state.reference+':0';
+  pending.human={desc:id.toString(16),profileId:id};
+  pending.debitReceipt=JSON.stringify({actor:pending.human.desc,profile:id,sequence:1});
+  pending.finalReceipt=JSON.stringify({actor:pending.human.desc,profile:id,sequence:2});
+  return state;
 }
 
 // Four large snapshots fit the initial phase but exceeded the old recovery
@@ -69,7 +80,7 @@ function fixture() {
 let f=fixture(), s=f.make();
 // A quest or another inventory transaction can have a live receipt that has
 // not reached storage. Reserving against it would strand a trade on restart.
-const questReceipt=JSON.stringify({actor:'ff000010:Skyrim.esm',profile:7,sequence:1});
+const questReceipt=JSON.stringify({actor:'10',profile:7,sequence:1});
 f.transfer.cas(10,copy(f.inv),'null',copy(f.inv),1,7);
 let result=s.begin(f.offer());
 assert.equal(result.accepted,false,'an unsaved preceding transaction blocks admission');
@@ -94,7 +105,7 @@ assert.equal(guarded,false,'an unresolved merchant reservation prevents quest in
 f=fixture();s=f.make();let heldLease;
 assert.equal(s.withInventoryMutation(10,(human,alive)=>{heldLease=alive;return {ok:true};}).ok,true);
 assert.equal(heldLease(),false,'a returned synchronous lease has expired');
-for(let i=0;i<25;i++) f.states.set(100+i,{reference:(100+i)+':Skyrim.esm',pending:{human:{desc:'other'+i,profileId:100+i}}});
+for(let i=0;i<25;i++) f.states.set(100+i,offlineRecord(100+i));
 assert.equal(s.canInventoryMutation(10),true,'unrelated reservations do not consume quest capacity');
 assert.equal(s.withInventoryMutation(10,()=>({ok:true})).ok,true);
 assert.equal(s.withInventoryMutation(10,()=>({ok:false,uncertain:true})).ok,false);
@@ -141,7 +152,8 @@ assert.deepEqual(f.calls,[1]);
 f=fixture(); s=f.make(); s.begin(f.offer()); f.save(); f.profile(9); s.tick();
 assert.equal(f.inv.entries[0].count,40); assert.ok(f.states.get(1).pending);
 s.shutdown(); s=createSettlement({purses:f.purses,transfer:f.transfer,world:'main:test-ledger'});
-f.profile(7); s.tick(); assert.equal(f.inv.entries[0].count,40);
+f.profile(7); assert.throws(()=>s.tick(),/Pending merchant records cannot be verified/);
+assert.equal(s.available(),false);assert.equal(f.inv.entries[0].count,40);
 
 // Definitive refusal releases capacity without requiring the old inventory.
 f=fixture(); f.transfer.cas=()=>false; s=f.make();
@@ -151,16 +163,17 @@ assert.ok(f.states.get(1).pending,'ambiguous call stays reserved');
 f.inv.entries[1].count=6; s.tick();
 assert.equal(f.states.get(1).pending,null,'original receipt proves no debit even when inventory changed');
 
-f=fixture(); for(let id=2;id<=26;id++) f.states.set(id,{reference:id+':Skyrim.esm',revision:1,purse:250,stock:[],
-  pending:{id:'offline-'+id,human:{desc:'ff'+id+':Skyrim.esm',profileId:id}}});
+f=fixture(); for(let id=2;id<=26;id++) f.states.set(id,offlineRecord(id));
 s=f.make(); assert.equal(s.begin(f.offer()).accepted,false,'25 identifiable offline intents fill global capacity');
 f.states.delete(26); assert.equal(s.begin(f.offer()).accepted,true,'the twenty-fifth slot can be used');
 
-// Legacy and offline records count toward admission. No hidden human lock is guessed.
+// Unverifiable records quarantine admission without guessing or removing a lock.
 f=fixture(); for(let id=2;id<=26;id++) f.states.set(id,{reference:id+':Skyrim.esm',revision:1,purse:250,stock:[],pending:{id:'legacy-'+id}});
-s=f.make(); assert.equal(s.begin(f.offer()).accepted,false); assert.deepEqual(f.calls,[]);
+s=f.make(); assert.throws(()=>s.begin(f.offer()),/Pending merchant records cannot be verified/);
+assert.equal(s.available(),false);assert.deepEqual(f.calls,[]);
 f=fixture(); f.states.set(2,{reference:'2:Skyrim.esm',revision:1,purse:250,stock:[],pending:{id:'legacy'}});
-s=f.make(); assert.equal(s.begin(f.offer()).accepted,false,'unknown legacy identity blocks admission');
+s=f.make(); assert.throws(()=>s.begin(f.offer()),/Pending merchant records cannot be verified/,'unknown legacy identity blocks admission');
+assert.equal(s.available(),false);
 
 // Stale closures and reentrant reloads cannot mutate native state after saving.
 f=fixture(); s=f.make(); s.shutdown(); assert.equal(s.begin(f.offer()).accepted,false);

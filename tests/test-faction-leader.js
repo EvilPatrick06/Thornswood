@@ -100,7 +100,7 @@ yes('F4 the three copied questions stay optional (long), and only the pick is re
 
 yes('F5 Install-Bot sends factions.json on the artifact list and in the copy loop',
     install.indexOf("'bot/factions.json'") !== -1 &&
-    install.indexOf("foreach ($f in 'bot.py', 'card.py', 'dev-channel.txt', 'requirements.txt', 'factions.json')") !== -1);
+    install.indexOf("foreach ($f in 'bot.py', '_pyguard.py', 'card.py', 'staff-channel.txt', 'requirements.txt', 'factions.json')") !== -1);
 
 yes('F6 Build-Discord still makes Trading Company and does not make a faction lead role',
     build.indexOf("ROLES.append(('Trading Company'") !== -1 &&

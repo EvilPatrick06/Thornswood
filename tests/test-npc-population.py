@@ -120,6 +120,47 @@ class Catalogue:
 
 
 class PopulationTests(unittest.TestCase):
+    def test_transport_classification_sees_unlisted_active_factions(self):
+        for edid, known, custom in [
+            ('DLC2RRGjalundSaltSageWindhelm', None, 'CustomFerryFaction'),
+            ('DLC2RRGjalundSaltSageWindhelm', None, 'CustomCarriageFaction'),
+            ('KmodCarriageDriverWinterhold', 'JobCarriageFaction', 'CustomFerryFaction'),
+            ('KmodFerrymanDragonBridge', 'DLC1FerrySystemFaction', 'CustomCarriageFaction'),
+        ]:
+            with self.subTest(edid=edid, custom=custom):
+                self.setUp()
+                factions = [name for name in [known, custom] if name]
+                for index, name in enumerate(factions):
+                    identity = desc(0xf000 + index)
+                    self.catalogue.factions[name] = identity
+                    self.catalogue.tables[b'FACT'][identity] = {'edid': name, 'flags': 0}
+                self.catalogue.bases['transport'] = self.catalogue.base('transport', edid, 'NordRace', factions)
+                ref, actor = self.catalogue.placement('transport', 'town')
+                with self.assertRaisesRegex(ValueError, 'ambiguous'):
+                    self.population.classify(CAST.Cast(self.catalogue.tables), ref, actor)
+
+    def test_transport_classification_ignores_inactive_conflicting_factions(self):
+        identity = desc(0xf000)
+        self.catalogue.factions['CustomFerryFaction'] = identity
+        self.catalogue.tables[b'FACT'][identity] = {'edid': 'CustomFerryFaction', 'flags': 0}
+        base = self.catalogue.base('captain', 'DLC2RRGjalundSaltSageWindhelm',
+                                   'NordRace', ['CustomFerryFaction'], rank=-1)
+        self.catalogue.bases['captain'] = base
+        ref, actor = self.catalogue.placement('captain', 'town')
+        result = self.population.classify(CAST.Cast(self.catalogue.tables), ref, actor)
+        self.assertTrue(result['keep'])
+        self.assertEqual(result['displayName'], 'Ship Captain')
+
+    def test_descriptive_transport_titles_use_source_role(self):
+        self.assertEqual(self.population.transport_title('KmodCarriageDriverWinterhold', ['KmodFastTravelDialogueFaction']), 'Coach Driver')
+        self.assertEqual(self.population.transport_title('KmodFerrymanDragonBridge', ['KmodFerryRoute1Faction']), 'Ferry Operator')
+        self.assertEqual(self.population.transport_title('DLC2RRGjalundSaltSageWindhelm', []), 'Ship Captain')
+        for faction in ['DLC1FerrySystemFaction', 'JobCarriageFaction']:
+            with self.assertRaises(ValueError):
+                self.population.transport_title('DLC2RRGjalundSaltSageWindhelm', [faction])
+        with self.assertRaises(ValueError):
+            self.population.transport_title('UnclassifiedService', ['KmodFastTravelDialogueFaction'])
+
     def test_authored_corpses_do_not_consume_live_encounter_capacity(self):
         ref, actor = self.catalogue.placement('bandit', 'dungeon')
         actor['startsDead'] = True

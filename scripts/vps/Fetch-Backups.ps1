@@ -39,7 +39,9 @@
   %LOCALAPPDATA%\Thornswood\Backups-Fetch and points a task on this machine at
   that copy, so the task does not break when a repo folder or worktree is
   moved or removed. The task is given -To as a whole path, the folder this run
-  would use, because the copy has no Where.ps1 beside it to ask. It runs as
+  would use, because the copy has no Where.ps1 beside it to ask; a -To or
+  -KeyFile that is not a whole path (C:\... or \\server\share) is refused
+  before anything is made or registered (#2199). It runs as
   you, while you are signed in, and a run missed because the machine was off
   happens at the next sign in. Run -Schedule again after this script changes
   to refresh the copy, and after the backups folder moves so the task writes
@@ -113,13 +115,27 @@ function Prune {
   for ($i = 7; $i -lt $mine.Count; $i++) {
     $d = [datetime]::ParseExact($mine[$i].Name.Substring(11, 8), 'yyyyMMdd', $null)
     if ($d -lt $cut) {
-      Remove-Item -LiteralPath $mine[$i].FullName -Force -EA SilentlyContinue
-      Say ("  dropped {0}, older than {1} days" -f $mine[$i].Name, $KeepDays) 'DarkGray'
-      $dropped++
+      # Said truthfully (#2354): a copy that will not delete is named with
+      # the kind of error and counted as a failure, so the run ends non-zero
+      # and the task's last result says so. It used to be -EA
+      # SilentlyContinue and then "dropped" whatever happened.
+      try {
+        Remove-Item -LiteralPath $mine[$i].FullName -Force -ErrorAction Stop
+        if (Test-Path -LiteralPath $mine[$i].FullName) { throw [IO.IOException]::new('still there after the delete') }
+        Say ("  dropped {0}, older than {1} days" -f $mine[$i].Name, $KeepDays) 'DarkGray'
+        $dropped++
+      } catch {
+        $ex = $_.Exception
+        $kind = $ex.GetType().Name
+        if ($ex.HResult) { $kind += (' 0x{0:X8}' -f $ex.HResult) }
+        Say ("  NOT DROPPED {0}: {1}. It is older than {2} days and is still here." -f $mine[$i].Name, $kind, $KeepDays) 'Red'
+        $script:pruneFailed++
+      }
     }
   }
   Say ("  kept {0} backup(s) here" -f ($mine.Count - $dropped)) 'DarkGray'
 }
+$script:pruneFailed = 0
 
 # Where they land when -To is not given (WHERE THEY LAND above, 5 October).
 # The copy -Schedule makes has no Where.ps1 beside it and its task always
@@ -133,6 +149,22 @@ if (-not $To -and -not $Unschedule) {
     Die "$repoDir is a git worktree, and its local folder goes when the worktree is removed. Run this from the repository folder itself, or pass -To <folder>."
   }
 }
+
+# -To, and under -Schedule -KeyFile, must be whole paths: a drive and a
+# backslash (C:\...) or \\server\share. Each is used as given, and the task
+# -Schedule registers is handed both word for word, so anything else means a
+# different folder depending on where it runs. Measured 12 Oct (#2199): -To
+# given through Git Bash unquoted arrived as C:UsersevilpDownloadsThornswood-
+# Repolocalbackups, a path relative to the current folder on C:. This script
+# made that folder inside the worktree it ran from and registered the task
+# with it, so the next 4:15 AM run would have fetched into a new folder under
+# its own copy's folder and left local\backups to go stale.
+function Test-WholePath([string]$p) { return ($p -match '^[A-Za-z]:[\\/]' -or $p -match '^\\\\[^\\/]+[\\/][^\\/]+') }
+function Stop-NotWholePath([string]$name, [string]$p) {
+  Die ("-{0} is not a whole path: '{1}'. Give it as C:\folder\... or \\server\share\... A path like C:Users... is what a shell that dropped the backslashes passes on (Git Bash does this to an unquoted C:\...); run it from PowerShell, or quote the path." -f $name, $p)
+}
+if ($To -and -not (Test-WholePath $To)) { $bad = $To; $To = ''; Stop-NotWholePath 'To' $bad }
+if ($Schedule -and -not (Test-WholePath $KeyFile)) { Stop-NotWholePath 'KeyFile' $KeyFile }
 if ($To -and -not (Test-Path -LiteralPath $To)) { [void](New-Item -ItemType Directory -Path $To -Force) }
 
 # ---------------------------------------------------------- the schedule ----
@@ -173,6 +205,7 @@ if ($PruneOnly) {
   Head "Tidying $To"
   Prune
   if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+  if ($script:pruneFailed) { exit 1 }
   exit 0
 }
 
@@ -220,6 +253,7 @@ if (-not $want.Count) {
   Say "  Everything on the box is already in $To" 'Green'
   Prune
   if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+  if ($script:pruneFailed) { exit 1 }
   exit 0
 }
 
@@ -248,7 +282,7 @@ if ($NoVerify -or -not $got.Count) {
   if ($NoVerify -and $got.Count) { Say ("  -NoVerify: {0} copied and NOT checked" -f $got.Count) 'Yellow' }
   Prune
   if (-not $NoPause) { [void](Read-Host 'Enter to close') }
-  if ($failed) { exit 1 }
+  if ($failed -or $script:pruneFailed) { exit 1 }
   exit 0
 }
 
@@ -286,5 +320,5 @@ Write-Host ''
 Say "  They are in $To" 'DarkGray'
 Say '  Restoring one for real is docs\RESTORING.md.' 'DarkGray'
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
-if ($failed) { exit 1 }
+if ($failed -or $script:pruneFailed) { exit 1 }
 exit 0

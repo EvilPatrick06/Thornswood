@@ -33,6 +33,9 @@ is not going to get done.
 - A fix people would notice says `Refs #N` instead, and its issue stays open
   until the fix is on main, where testers test. Then it is closed with a
   comment that starts `Test task:`, which the bot posts to #test-tasks.
+  A test task with `Server: Dev` under its first line is a measurement
+  someone on dev has to take: the bot posts it, open issue or closed, in the
+  staff-only #dev-test-tasks.
 
 The rules behind all of this are in
 [Developer-Guide.md](https://github.com/EvilPatrick06/Thornswood/blob/main/Developer-Guide.md).

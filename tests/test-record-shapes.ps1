@@ -10,6 +10,8 @@
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 . (Join-Path $repo 'scripts\release\RecordShape.ps1')
+# Kinds with a committed file; server-settings is each box's own (#2180, slice 4).
+$fileKinds = @($script:ThornswoodRecordKinds.Keys | Where-Object { $script:ThornswoodRecordKinds[$_].File })
 
 $pass = 0; $fail = 0
 function Yes([string]$what, [bool]$cond) {
@@ -18,13 +20,13 @@ function Yes([string]$what, [bool]$cond) {
 function Refusal([scriptblock]$b) { try { $null = & $b; return '' } catch { return $_.Exception.Message } }
 
 # ---- the committed records pass
-foreach ($kind in @($script:ThornswoodRecordKinds.Keys)) {
+foreach ($kind in $fileKinds) {
     $p = Join-Path $repo $script:ThornswoodRecordKinds[$kind].File
     Yes "the committed $kind record reads at a known version with its fields" ((Refusal { Read-ThornswoodRecord -Path $p -Kind $kind }) -eq '')
 }
 $out = & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repo 'scripts\release\Check-Records.ps1') 2>&1
-Yes 'Check-Records passes this checkout (exit 0), one OK line per record' ($LASTEXITCODE -eq 0 -and @($out | Where-Object { "$_" -match '^\s+OK ' }).Count -eq ($script:ThornswoodRecordKinds.Count + 1))
-Yes 'docs\JSON-STATE-INVENTORY.md lists each of these records' ((Test-Path -LiteralPath (Join-Path $repo 'docs\JSON-STATE-INVENTORY.md')) -and -not @($script:ThornswoodRecordKinds.Values | Where-Object { -not ([IO.File]::ReadAllText((Join-Path $repo 'docs\JSON-STATE-INVENTORY.md')).Contains($_.File.Replace('\', '/'))) }).Count)
+Yes 'Check-Records passes this checkout (exit 0), one OK line per record' ($LASTEXITCODE -eq 0 -and @($out | Where-Object { "$_" -match '^\s+OK ' }).Count -eq ($fileKinds.Count + 1))
+Yes 'docs\JSON-STATE-INVENTORY.md lists each of these records' ((Test-Path -LiteralPath (Join-Path $repo 'docs\JSON-STATE-INVENTORY.md')) -and -not @($script:ThornswoodRecordKinds.Values | Where-Object { $_.File } | Where-Object { -not ([IO.File]::ReadAllText((Join-Path $repo 'docs\JSON-STATE-INVENTORY.md')).Contains($_.File.Replace('\', '/'))) }).Count)
 
 # ---- bad copies are refused, naming the file and the reason
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('tw-2180 [x] & ' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
@@ -35,9 +37,9 @@ try {
         return @{ Path = $p; Why = (Refusal { Read-ThornswoodRecord -Path $p -Kind $kind }) }
     }
     $real = @{}
-    foreach ($kind in @($script:ThornswoodRecordKinds.Keys)) { $real[$kind] = [IO.File]::ReadAllText((Join-Path $repo $script:ThornswoodRecordKinds[$kind].File)) }
+    foreach ($kind in $fileKinds) { $real[$kind] = [IO.File]::ReadAllText((Join-Path $repo $script:ThornswoodRecordKinds[$kind].File)) }
 
-    foreach ($kind in @($script:ThornswoodRecordKinds.Keys)) {
+    foreach ($kind in $fileKinds) {
         $b = Bad $kind ''
         Yes "$kind`: an empty file is refused as empty, named" ($b.Why -eq "$($b.Path) is empty")
         $b = Bad $kind $real[$kind].Substring(0, [int]($real[$kind].Length / 2))
@@ -72,6 +74,14 @@ try {
     Yes 'most-online: people "25" (a string) is refused' ((Bad 'most-online' '{ "people": "25" }').Why -match 'people is missing')
     Yes 'most-online: negative staffSeats is refused' ((Bad 'most-online' '{ "people": 25, "staffSeats": -1 }').Why -match 'staffSeats')
     Yes 'most-online: a byte order mark and the minimum fields read fine' ((Bad 'most-online' ([string][char]0xFEFF + '{ "people": 25 }')).Why -eq '')
+    # Dev's own numbers, its dev object (Patrick, 12 Oct), held the same way.
+    Yes 'most-online: a dev object of the same three reads fine' ((Bad 'most-online' '{ "dev": { "people": 5, "staffSeats": 0, "voice": 5, "note": "x" }, "people": 25 }').Why -eq '')
+    Yes 'most-online: the committed record has its dev numbers' (($real['most-online'] | ConvertFrom-Json).dev.people -eq 5)
+    Yes 'most-online: a dev that is not an object is refused' ((Bad 'most-online' '{ "dev": 5, "people": 25 }').Why -match 'dev is there and not an object')
+    Yes 'most-online: dev with no people is refused, named as dev''s' ((Bad 'most-online' '{ "dev": { "voice": 5 }, "people": 25 }').Why -match 'dev\.people is missing or not a whole number above zero')
+    Yes 'most-online: dev people 1001 is refused, the engine''s limit' ((Bad 'most-online' '{ "dev": { "people": 1001 }, "people": 25 }').Why -match 'dev\.people is over 1000')
+    Yes 'most-online: dev staffSeats -1 is refused' ((Bad 'most-online' '{ "dev": { "people": 5, "staffSeats": -1 }, "people": 25 }').Why -match 'dev\.staffSeats is there and not a whole number')
+    Yes 'most-online: a bad dev does not hide a bad main' ((Bad 'most-online' '{ "dev": { "people": 0 }, "people": 0 }').Why -match '(?s)people is missing.*dev\.people is missing')
     $d = $real['collection-plugins'] | ConvertFrom-Json; $d.PSObject.Properties.Remove('version')
     Yes 'collection-plugins: it must say its version' ((Bad 'collection-plugins' ($d | ConvertTo-Json -Depth 10)).Why -match 'it has no version')
     Yes 'collection-plugins: a plugin twice and a row without sha256 are refused' ((Bad 'collection-plugins' ('{"version":1,"plugins":[{"name":"a.esp","size":1,"sha256":"' + ('0' * 64) + '"},{"name":"A.esp","size":1}]}')).Why -match 'lists A\.esp twice.*has no sha256')
@@ -81,10 +91,10 @@ try {
     # Check-Records against a checkout with one bad record: exit 1, naming it.
     $fake = Join-Path $tmp 'repo'
     $null = New-Item -ItemType Directory -Path (Join-Path $fake 'records')
-    foreach ($kind in @($script:ThornswoodRecordKinds.Keys)) { [IO.File]::WriteAllText((Join-Path $fake $script:ThornswoodRecordKinds[$kind].File), $real[$kind]) }
+    foreach ($kind in $fileKinds) { [IO.File]::WriteAllText((Join-Path $fake $script:ThornswoodRecordKinds[$kind].File), $real[$kind]) }
     [IO.File]::WriteAllText((Join-Path $fake 'records\most-online.json'), '{ "people": "lots" }')
     $out = & pwsh -NoProfile -File (Join-Path $repo 'scripts\release\Check-Records.ps1') -Repo $fake 2>&1
-    Yes 'Check-Records exits 1 on one bad record, naming it, and still checks the others' ($LASTEXITCODE -eq 1 -and @($out | Where-Object { "$_" -match 'REFUSED\s+most-online' }).Count -eq 1 -and @($out | Where-Object { "$_" -match '^\s+OK ' }).Count -eq $script:ThornswoodRecordKinds.Count)
+    Yes 'Check-Records exits 1 on one bad record, naming it, and still checks the others' ($LASTEXITCODE -eq 1 -and @($out | Where-Object { "$_" -match 'REFUSED\s+most-online' }).Count -eq 1 -and @($out | Where-Object { "$_" -match '^\s+OK ' }).Count -eq $fileKinds.Count)
 } finally {
     Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
 }

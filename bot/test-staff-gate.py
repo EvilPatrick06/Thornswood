@@ -33,6 +33,7 @@ open tickets, which is pointed at a temporary folder.
 
 Read only. Never connects to anything.
 """
+import _pyguard  # noqa: F401  (first: Python 3.10 or newer, #2276)
 import asyncio
 import inspect
 import os
@@ -443,13 +444,15 @@ for name in STAFF_ROLES:
         and ticket.edited[0].get('locked') and len(BOOK) == 1)
 
 for name in TASK_ROLES:
-    guild = Server()                  # no test-tasks forum, so nothing is posted
-    ask = Ask(Person([name]), guild, Posted('general'))
-    asyncio.run(LEAVES['test-task'].callback(
-        ask, title='x', body='x', tag='Dev'))
-    yes('%s gets past the test task gate' % name,
-        ask.response.said
-        and 'is not a forum yet' in ask.response.said[-1][0])
+    # No test-tasks forum and no dev-test-tasks forum, so nothing is posted.
+    # Main is the default tag; Dev goes to #dev-test-tasks (Patrick, 12 Oct).
+    for tag, want in ((None, 'is not a forum yet'), ('Dev', 'is not made yet')):
+        guild = Server()
+        ask = Ask(Person([name]), guild, Posted('general'))
+        kw = {} if tag is None else {'tag': tag}
+        asyncio.run(LEAVES['test-task'].callback(ask, title='x', body='x', **kw))
+        yes('%s gets past the test task gate (%s)' % (name, tag or 'Main'),
+            ask.response.said and want in ask.response.said[-1][0])
 
 for roles in (['Moderator'], ['Owner']):
     guild, _t, panel = world()

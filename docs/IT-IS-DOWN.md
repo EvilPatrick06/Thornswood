@@ -35,7 +35,10 @@ first. That cost the first round of the 21 September outage.
 `it does, nothing to do` means the box is up and this is a service. If ssh
 itself does not answer, the box is off or unreachable and nothing in this file
 helps: that is the host's control panel, and the address is in
-`docs\MOVING-THE-SERVER.md`.
+`docs\MOVING-THE-SERVER.md`. Once port 22 is limited to known addresses
+(`scripts\vps\Set-SshScope.ps1`, #2182), a machine whose own address changed
+is refused too while everyone else still gets in: run the same check from
+another machine in the list before deciding the box is down.
 
 ## The site
 

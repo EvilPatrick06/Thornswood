@@ -64,10 +64,15 @@ read it (issue #440, phase 8):
   (`staffSeats`), with Patrick's decisions in its `note` (issue #481), and
   the most people the voice service takes at once (`voice`), never fewer than
   the two together, since everybody seated and everybody waiting in line at
-  the menu holds a socket to it.
+  the menu holds a socket to it. Those are main's. Its `dev` object holds the
+  same three for the dev server and dev voice (Patrick, 12 Oct: 5, 0 and 5),
+  and a record without one gives dev main's numbers.
   `scripts\deploy\MaxOnline.ps1` reads it for Deploy-Gamemode,
-  Deploy-DevGamemode, Publish-Server, Publish-Update and Install-Voice, and `site\server.js`
-  reads `people` when the site runs from the repository. No script writes
+  Deploy-DevGamemode (dev), Publish-Server and Publish-Update (each for its
+  channel) and Install-Voice (dev for `C:\Thornswood-Voice-Dev`), and
+  `site\server.js` reads `people` and `staffSeats` when the site runs from
+  the repository. What people are shown, the M of "N of M awake", is the
+  seats, people and staffSeats together: 30 on main, 5 on dev. No script writes
   this one: it is changed by hand in a pull request, then each server is
   deployed and a Ship carries it to the feed.
 - `upstream-not-taken.json`: the upstream SkyMP commits the fork is not
@@ -75,6 +80,21 @@ read it (issue #440, phase 8):
   #1791). `tests\test-fork-upstream.js` is red every night upstream `main`
   has a commit `thornswood/engine-changes` lacks that is not listed here.
   No script writes this one: it is changed by hand in a pull request.
+- `papyrus-events.json`: the fork's Papyrus event list, both halves (issue
+  #503). The client half is what the blocker in skyrim-platform's
+  FridaHooks.cpp lets through on each person's machine: the event names
+  and the script names that free an object. The server half is the event
+  names the server's own Papyrus machine is sent, that it attaches scripts
+  only to placed references, the scripts its storage can load (built in,
+  data\scripts, and the archives the "archives" setting names, which no
+  deploy script writes), and what InitScripts drops. `readAt` is the fork
+  commit it was read at. `node scripts\dev\PapyrusEventList.js --write`
+  writes it from the fork at the pin; `scripts\dev\Audit-PapyrusEvents.py`
+  judges the load order against it. `tests\test-papyrus-event-list.js`
+  holds it to the rest of this repository on every pull request, and the
+  nightly fetches the fork and reads it against the pin. The check is the
+  list, not the commit: a pin moved over fork work that leaves the list
+  alone passes, and one that changes it fails there, naming what changed.
 - `signing\`: the code signing setup, with its own README. On since
   27 September: Ship refuses a launcher that is not signed (Developer-Guide.md).
 
@@ -94,6 +114,7 @@ names. No script reads them. `THIRD-PARTY.md` and
   built for the starting clothes in character creation (fork commit
   75cb6ca1, 3 October).
 - `runner-isolation.json`: what a runner account on the VPS must not reach (production paths, groups), the crash dump folder it may only write, the age limit for files left in its temp folder, and differences agreed as intentional. `scripts\vps\Check-RunnerIsolation.ps1` compares the runners against it (issue #2161).
+- `remote-commands.json`: every call under `scripts\` that reaches the VPS (ssh, scp, Invoke-ThornswoodRemote and its wrappers, Remote.ps1), what it sends, and the class it needs: a gate verb, admin, or transport. Read from the code; `docs\DEPLOY-IDENTITIES.md` section 2a is its summary. `tests\test-remote-command-map.ps1` fails when a remote call has no row or a row has no call (issue #2182).
 - `prod-parity.json`: what the VPS should look like (which ports listen where and as which program, each task's account and triggers, the services' accounts, which live files must match which repository file, the TLS margin, environment variables that must not be set) and the differences agreed as intentional, each with its reason. `scripts\vps\Check-ProdParity.ps1` compares the box against it; no secret belongs in it (issue #2165).
 - `merchant-runtime-provenance.md`: the server module built for merchant
   settlement, and why the six client files kept their ac044a49 bytes (fork

@@ -81,16 +81,48 @@ function Stop-Game {
     return $true
 }
 
+# Is this install's own game running? Only a game run from <Root>\Game holds
+# the files a script that writes into <Root> is about to write.
+#
+# A game whose path can be read counts when it is under <Root>\, with the
+# backslash, so C:\Thornswood is not taken for C:\Thornswood-DevBuild. A game
+# whose path cannot be read belongs to another Windows account. Until 12 Oct
+# every one of those counted, so on the VPS, where the four build runners are
+# four accounts, one runner's stand-in Skyrim (tests\test-2233-inuse-image.ps1
+# runs a copy of ping.exe named SkyrimSE.exe) stopped Install-Thornswood.ps1 in
+# another runner's tests\test-build-vs-install.ps1 (#2410). Which folder such a
+# process runs from is told from the folder's side, as Build-Generated.ps1 does
+# since #2233: a running program's file cannot be opened for writing (Windows
+# answers with a sharing violation), whoever runs it.
+function Test-GameImageRunning {
+    param([Parameter(Mandatory)][string]$Path)
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $false }
+    try {
+        $fs = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::ReadWrite)
+        $fs.Dispose()
+        return $false
+    } catch {
+        $e = $_.Exception
+        while ($e -and $e -isnot [IO.IOException] -and $e.InnerException) { $e = $e.InnerException }
+        # ERROR_SHARING_VIOLATION (32): the image is mapped by a running process.
+        return ($e -is [IO.IOException] -and ($e.HResult -band 0xFFFF) -eq 32)
+    }
+}
+
 function Test-GameRunning {
     param([Parameter(Mandatory)][string]$Root)
 
+    $prefix = $Root.TrimEnd('\') + '\'
     foreach ($n in 'SkyrimSE', 'skse64_loader') {
         foreach ($p in @(Get-Process -Name $n -ErrorAction SilentlyContinue)) {
             $path = $null
             try { $path = $p.MainModule.FileName } catch { }
-            # A path we cannot read is running higher than us. Assume it counts,
-            # because being wrong the other way means writing into a live game.
-            if (-not $path -or $path.StartsWith($Root, 'OrdinalIgnoreCase')) { return $true }
+            if ($path) {
+                if ($path.StartsWith($prefix, 'OrdinalIgnoreCase')) { return $true }
+            } elseif (Test-GameImageRunning (Join-Path $Root ('Game\' + $n + '.exe'))) {
+                return $true
+            }
         }
     }
     return $false

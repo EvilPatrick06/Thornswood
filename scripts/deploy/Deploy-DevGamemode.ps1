@@ -219,6 +219,10 @@ param(
   # the dev server already has and reads it off the box (WHERE THE ORDER COMES
   # FROM in the header, #2309); no build folder is assumed.
   [string]$Dist = '',
+  # The plugins the dev server loads that the -Dist build's order may leave
+  # out, each by its file name (#2320). Left off, an order from -Dist that
+  # drops any plugin the dev server loads is refused before anything is sent.
+  [string[]]$DropPlugins = @(),
   # Where the other plugins live on this machine. Ours is taken from the repo
   # instead; see the header.
   [string]$Data = 'C:\Thornswood\Game\Data',
@@ -266,6 +270,7 @@ if (-not $PSBoundParameters.ContainsKey('Wait')) {
   $Wait = Get-ThornswoodServerReadyWait
 }
 if ($PutBack -and $LoadOrder) { throw '-PutBack puts the last files back and sends nothing, so it does not take -LoadOrder.' }
+if (@($DropPlugins).Count -and -not $LoadOrder) { throw '-DropPlugins goes with -LoadOrder -Dist, the one run here that writes a load order over the dev server''s. Nothing was sent.' }
 if (-not $PutBack) {
   if (-not $Note.Trim()) {
     Write-Host ''
@@ -384,12 +389,14 @@ Write-Host ('  build stamp: ' + (Format-ThornswoodBuildStamp $buildStamp))
 
 # How many the dev server holds at once, read here so a number the engine
 # would refuse stops this while the dev server is still up. MaxOnline.ps1 says
-# where it lives (records\most-online.json) and why.
+# where it lives (records\most-online.json) and why. The dev server's own
+# numbers, its dev object (Patrick, 12 Oct: 5 at once on dev).
 . (Join-Path $Here 'MaxOnline.ps1')
-$got = Get-MostOnline
+$got = Get-MostOnline -Channel dev
 $maxOnline = $got.Value
 $seats = $got.Seats
-if ($maxOnline -gt 0) { Write-Host ('  most online: {0}, engine seats {1} ({2} over it for staff roles), from {3}' -f $maxOnline, $seats, $got.Staff, $got.From) }
+if ($got.Note) { Write-Host ('  most online: ' + $got.Note) -ForegroundColor Yellow }
+if ($maxOnline -gt 0) { Write-Host ('  most online on dev: {0}, engine seats {1} ({2} over it for staff roles), from {3}' -f $maxOnline, $seats, $got.Staff, $got.From) }
 else { Write-Host ('  most online: {0} gave no number ({1}), so the dev server keeps the one it has' -f $got.From, $got.Why) -ForegroundColor Yellow }
 
 # --------------------------------------------------------- the load order ---
@@ -414,6 +421,9 @@ if ($LoadOrder) {
     throw ("the dev server did not say what it holds (it answered: " + ((@($boxContent.Said | Where-Object { $_ }) | Select-Object -Last 3) -join ' | ') +
            "), so there is no telling which plugins it needs. Nothing was sent and the dev server was not touched.")
   }
+  if (@($DropPlugins).Count -and -not $Dist) {
+    throw '-DropPlugins goes with -Dist: without it the dev server keeps its own load order, so nothing is dropped. Nothing was sent.'
+  }
   if ($Dist) {
     $settingsSrc = Join-Path $Dist 'server-settings.json'
     if (-not (Test-Path -LiteralPath $settingsSrc)) {
@@ -423,6 +433,14 @@ if ($LoadOrder) {
     if (-not $built.loadOrder) { throw "$settingsSrc has no loadOrder" }
     $pluginNames = @($built.loadOrder | ForEach-Object { [IO.Path]::GetFileName(([string]$_).Replace('/', '\')) })
     Write-Host ('  load order from the build at {0}, written over the dev server''s' -f $Dist) -ForegroundColor DarkGray
+    # Held to the order the dev server runs (#2320): one that leaves out a
+    # plugin it loads is refused unless -DropPlugins names each one.
+    if ($boxContent.OrderRead) {
+      . (Join-Path $Here 'ServerSettings.ps1')
+      $drop = Test-ThornswoodLoadOrderDrop ([pscustomobject]@{ loadOrder = @($boxContent.Order) }) ([pscustomobject]@{ loadOrder = $pluginNames }) $DropPlugins
+      foreach ($l in $drop.Said) { Write-Host ('  ' + $l) -ForegroundColor Yellow }
+      if ($drop.Problem) { throw ($drop.Problem + ' Nothing was sent and the dev server was not touched.') }
+    }
   } else {
     if (-not $boxContent.OrderRead) {
       throw ("the dev server's server-settings.json gave no load order, so there is nothing to send plugins for. " +
@@ -838,7 +856,7 @@ Copy-Item -LiteralPath '$rootWin\server-settings.json' -Destination '$stageWin\s
   # AND HOW MANY IT HOLDS AT ONCE, #481. thornswoodMostOnline is the number the
   # gamemode turns people away past, and maxPlayers, the engine's own slot
   # count, is set that plus the staff seats, both from records\most-online.json
-  # read above. With no number both are left as the box has them and that does
+  # read above, its dev numbers. With no number both are left as the box has them and that does
   # not count as a reason to rewrite.
   #
   # AND NO "default" KEY IN npcSettings, added 28 September for issue #879. The

@@ -42,7 +42,7 @@ if ($block) {
     $scratch = Join-Path ([System.IO.Path]::GetTempPath()) ('ts-docs-backup-' + [guid]::NewGuid().ToString('N'))
     $data = Join-Path $scratch 'data'
     New-Item -ItemType Directory -Force -Path (Join-Path $data 'site') | Out-Null
-    Set-Content -LiteralPath (Join-Path $data 'known.md') -Value 'typed on the site' -Encoding UTF8
+    Set-Content -LiteralPath (Join-Path $data 'help.md') -Value 'typed on the site' -Encoding UTF8
     Set-Content -LiteralPath (Join-Path $data 'board.json') -Value '{"typed":true}' -Encoding UTF8
     Set-Content -LiteralPath (Join-Path $data 'notes.txt') -Value 'not a document' -Encoding UTF8
     Set-Content -LiteralPath (Join-Path $data 'site\world.md') -Value 'public page' -Encoding UTF8
@@ -58,7 +58,7 @@ if ($block) {
         $said = ($said -join ' ').Trim()
         Write-Host ('      it said: ' + $said)
 
-        yes 'known.md gets a .bak' (Test-Path -LiteralPath (Join-Path $data 'known.md.bak'))
+        yes 'help.md gets a .bak' (Test-Path -LiteralPath (Join-Path $data 'help.md.bak'))
         yes 'board.json gets a .bak' (Test-Path -LiteralPath (Join-Path $data 'board.json.bak'))
         yes 'and the .bak holds what was typed' ((Test-Path -LiteralPath (Join-Path $data 'board.json.bak')) -and
             ((Get-Content -Raw -LiteralPath (Join-Path $data 'board.json.bak')) -match 'typed'))

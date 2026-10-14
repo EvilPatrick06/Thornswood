@@ -3,7 +3,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),vm=require('node:vm');
 const {createNativeMerchantTransfer,installMerchantTrading}=require('../game/merchant-trading');
 const {createSettlement,takeEntries}=require('../game/merchant-settlement');
-const {createQuestTransactions}=require('../game/quest-transactions');
+const {createQuestTransactions,actorIdentity,targetIdentity}=require('../game/quest-transactions');
 const addon=require(path.resolve(process.argv[2]));
 const installed=JSON.parse(fs.readFileSync(process.argv[3],'utf8'));
 const root=fs.mkdtempSync(path.join(os.tmpdir(),'tw-native-settlement-'));
@@ -22,6 +22,7 @@ vm.runInContext(source.slice(source.indexOf('// NPC MERCHANT PURSES BEGIN'),sour
   const base=mp.get(merchantId,'baseDesc');
   const data={keep:[['13487:Skyrim.esm',base,null,null,null,null,'trader']]};
   const storage=ctx.createPrivateMerchantLedger(fs,path,settings,['13487:Skyrim.esm'],mp.writePrivateEconomyLedger.bind(mp));
+  require('./fixtures/merchant-ledger')(fs,path,settings.privDir,['13487:Skyrim.esm']);
   const purseApi={}; for(const key of ['makeProperty','getIdFromDesc','getNpcAIState','get','set']) purseApi[key]=mp[key].bind(mp);
   let purses=ctx.createNpcMerchantPurses(purseApi,data,storage); purses.prepare(merchantId);
   const human=mp.createActor(0,mp.get(merchantId,'pos'),0,mp.getIdFromDesc(mp.get(merchantId,'worldOrCellDesc')),7);
@@ -128,12 +129,34 @@ vm.runInContext(source.slice(source.indexOf('// NPC MERCHANT PURSES BEGIN'),sour
   assert.equal(mp.get(human,'inventory').entries.filter(x=>x.baseId===15).reduce((n,x)=>n+x.count,0),questGold+25);
   assert.deepEqual(mp.get(human,'inventory').entries.filter(x=>x.baseId!==15),questBefore.entries.filter(x=>x.baseId!==15));
   const questReceipt=mp.getInventoryReceipt(human);
-  assert.equal(quests.commit(human,questRecord,questRecord,[]).ok,false,'the shared lease refuses an unsaved quest receipt');
+  assert.equal(quests.commit(human,questRecord,questRecord,[]).ok,true,'metadata can queue while a goods receipt is unsaved');
+  assert.equal(mp.getInventoryReceipt(human),questReceipt,'metadata does not advance the goods receipt');
+  assert.equal(quests.commit(human,questRecord,questRecord,[{item:'f:Skyrim.esm',count:1}]).ok,false,
+    'another goods transaction still waits for its exact saved receipt');
+  assert.equal(mp.get(human,'inventory').entries.filter(x=>x.baseId===15).reduce((n,x)=>n+x.count,0),questGold+25);
   for(let i=0;i<600 && mp.getSavedInventoryReceipt(human)!==questReceipt;i++){mp.tick();await new Promise(resolve=>setTimeout(resolve,10));}
   assert.equal(mp.getSavedInventoryReceipt(human),questReceipt);
   assert.equal(quests.commit(human,null,questRecord,[{item:'f:Skyrim.esm',count:25}]).ok,false,'a stale quest record cannot pay twice');
   assert.equal(mp.getInventoryReceipt(human),questReceipt);
   assert.equal(panel.questReady(human),true,'saved quest receipts are accepted by merchant admission');
+  const initialToken=actorIdentity(mp,human),initialBody=targetIdentity(mp,human),initialLife=mp.getNpcAIState(human).lifeGeneration;
+  mp.set(human,'isDead',true);
+  assert.notEqual(actorIdentity(mp,human),initialToken,'real human death must revoke the canonical caller token');
+  assert.equal(targetIdentity(mp,human),initialBody,'a valid killing blow retains its native body');
+  mp.set(human,'isDead',false);
+  assert.notEqual(actorIdentity(mp,human),initialToken,'real human respawn cannot restore the old caller token');
+  assert.notEqual(targetIdentity(mp,human),initialBody,'a real human respawn must revoke the queued target body');
+  assert.equal(mp.getNpcAIState(human).lifeGeneration,initialLife,'the persisted NPC counter is not the human session fence');
+  const inventoryBeforeReentry=mp.get(human,'inventory');
+  const reentrantExpected={toJSON() {
+    mp.set(human,'isDead',true);mp.set(human,'isDead',false);
+    return questRecord;
+  }};
+  assert.equal(quests.commit(human,reentrantExpected,questRecord,[{item:'f:Skyrim.esm',count:25}]).ok,false,
+    'native CAS must reject a human lifecycle change during argument serialization');
+  assert.deepEqual(mp.get(human,'inventory'),inventoryBeforeReentry);
+  assert.equal(mp.getInventoryReceipt(human),questReceipt);
+  assert.deepEqual(mp.get(human,'thornswoodQuests'),questRecord);
   quests.shutdown();
   panel.shutdown();purses.shutdown();
   const alias=path.join(served,'private-alias');

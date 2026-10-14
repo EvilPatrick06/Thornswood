@@ -61,10 +61,29 @@
   No build carries the switch (#1223), so a first install always needs it.
   Deploy-Server.ps1 and Deploy-DevGamemode.ps1 refuse the same way.
 
+  A LOAD ORDER THAT DROPS WHAT THE SERVER LOADS IS REFUSED (#2320). On
+  5 Oct at 9:56 PM a dev publish of a fresh engine build carried the engine's
+  own order, the five base masters, and this took it over the 48 plugins the
+  dev server ran, because every plugin it named was there. In step 1 the
+  stage's order is held to the running server's: one that leaves out any
+  plugin the running order has is refused, unless -DropPlugins names each
+  one (Publish-Server.ps1 -DropPlugins passes it; ServerSettings.ps1,
+  Test-ThornswoodLoadOrderDrop, says why). A first install has no running
+  order and a put-back brings an order that ran, so neither is held to it.
+
   The newest two .prev folders are kept, and the last .failed one to read.
   -PutBack puts the newest .prev folder back the same way, keeping what it
   took out as <root>.undone-<stamp>. The renames keep every path the task and
   server-settings.json name the same, so nothing has to be rewritten.
+
+  -TaskOnly REGISTERS THE TASK AGAIN AND NOTHING ELSE (#2491). No zip, no
+  stage, no swap, no setting: the server already in -Root is stopped, the
+  task is registered with this installer's action and settings, and the
+  server is started through it and given -Wait seconds to answer on both
+  ports. If it does not answer, the task it had goes back, exactly as it was
+  exported, and is started again: INSTALL ROLLED BACK. It is how a box takes a
+  change to the task itself (its priority, #2491) without a release.
+  Publish-Server.ps1 -TaskOnly sends this and runs it.
 #>
 [CmdletBinding()]
 param(
@@ -93,8 +112,17 @@ param(
     # refused (#1804, see the header). Publish-Server.ps1 -RequirePass passes it.
     [ValidateSet('', 'on', 'off')]
     [string]$RequirePass = '',
+    # The plugins this install may leave out of the running server's load
+    # order (#2320), as base64 of the names one to a line, because a name with
+    # a space does not survive the ssh command line Publish-Server.ps1 runs
+    # this on. Publish-Server.ps1 -DropPlugins writes it. Left off, an order
+    # that drops any plugin the running server loads is refused.
+    [string]$DropPlugins = '',
     # How many <root>.prev-<stamp> folders to keep.
     [int]$Keep = 2,
+    # Register the task again for the server already in -Root, stop it and
+    # start it through the new task, and touch no file (#2491, the header).
+    [switch]$TaskOnly,
     # Lets tests\test-install-server.ps1 run this on a machine with the game on
     # it, against a scratch root. Nothing else passes it.
     [switch]$AllowGamingPc
@@ -105,7 +133,7 @@ $ErrorActionPreference = 'Stop'
 if (-not $AllowGamingPc -and (Test-Path 'C:\Thornswood\Game\SkyrimSE.exe')) {
     throw "SkyrimSE.exe is present, so this looks like the gaming PC, not the VPS. Nothing was changed."
 }
-if (-not $PutBack -and -not (Test-Path -LiteralPath $Zip)) { throw "not found: $Zip" }
+if (-not $PutBack -and -not $TaskOnly -and -not (Test-Path -LiteralPath $Zip)) { throw "not found: $Zip" }
 
 # A shell started before the bootstrap installed Node carries the old PATH, and
 # every SSH and RDP session inherits it, so "open a new window" is advice that
@@ -149,9 +177,34 @@ if (-not (Test-Path -LiteralPath $settingsLib)) {
 $asked = New-Object PSObject -Property (New-ThornswoodAsked $RequirePass)
 $askedKeys = @(Get-ThornswoodSettingNames $asked)
 $passScript = '.\scripts\release\Publish-Server.ps1'
+$dropNames = @()
+try { $dropNames = @(ConvertFrom-ThornswoodNamesArg $DropPlugins) }
+catch { Say "-DropPlugins does not read as the names Publish-Server.ps1 sends: $($_.Exception.Message). Nothing was changed." 'Red'; Finish 'INSTALL REFUSED' 1 }
+if ($PutBack -and $dropNames.Count) {
+    Say '-PutBack brings back an order the server ran and drops nothing on purpose, so it does not take -DropPlugins. Nothing was changed.' 'Red'
+    Finish 'INSTALL REFUSED' 1
+}
 if ($PutBack -and $askedKeys.Count) {
     Say '-PutBack sets no setting: it puts the previous folder back with the running server''s own settings. Run it without -RequirePass. Nothing was changed.' 'Red'
     Finish 'INSTALL REFUSED' 1
+}
+# -TaskOnly touches the task and nothing else (#2491), so a switch that
+# changes a folder, a setting or the world would do nothing, and is refused.
+if ($TaskOnly) {
+    $with = @()
+    if ($PutBack) { $with += '-PutBack' }
+    if ($NoTask) { $with += '-NoTask' }
+    if ($FreshWorld) { $with += '-FreshWorld' }
+    if ($askedKeys.Count) { $with += '-RequirePass' }
+    if ($dropNames.Count) { $with += '-DropPlugins' }
+    if ($with.Count) {
+        Say ('-TaskOnly registers the task again and changes no file or setting, so it does not take ' + ($with -join ', ') + '. Nothing was changed.') 'Red'
+        Finish 'INSTALL REFUSED' 1
+    }
+    if (-not $StartNow) {
+        Say '-TaskOnly stops the server to register its task again, so it takes -StartNow to start it again. Nothing was changed.' 'Red'
+        Finish 'INSTALL REFUSED' 1
+    }
 }
 # Which server files the record holds, and holding them (#1214): beside this
 # script too, sent with it.
@@ -161,6 +214,20 @@ if (-not (Test-Path -LiteralPath $buildLib)) {
     Finish 'INSTALL REFUSED' 1
 }
 . $buildLib
+# The record contracts (#2180, slice 4): beside this script too, sent with it
+# (Read-JsonFile.ps1 and RecordShape.ps1), or in scripts\release when it runs
+# from a checkout. Without them a broken settings file or record would be read
+# as whatever ConvertFrom-Json made of it, so nothing runs.
+$shapeDir = $here
+if (-not (Test-Path -LiteralPath (Join-Path $here 'RecordShape.ps1'))) { $shapeDir = Join-Path $here '..\release' }
+foreach ($lib in 'Read-JsonFile.ps1', 'RecordShape.ps1') {
+    if (-not (Test-Path -LiteralPath (Join-Path $shapeDir $lib))) {
+        Say "$lib is not beside this installer, so the payload's settings and record could not be held to their shape. Nothing was changed." 'Red'
+        Finish 'INSTALL REFUSED' 1
+    }
+}
+. (Join-Path $shapeDir 'Read-JsonFile.ps1')
+. (Join-Path $shapeDir 'RecordShape.ps1')
 # How long a start may take to answer on both ports (#1938): beside this
 # script too, sent with it. Without it there is no ceiling, so nothing runs.
 $waitLib = Join-Path $here 'ServerReadyWait.ps1'
@@ -209,12 +276,12 @@ function MoveDir([string]$from, [string]$to) {
   its line and node as cmd's child. The trailing backslash matters: C:\Thornswood-Server
   is a prefix of C:\Thornswood-Server-Dev.
 #>
-function StopServer([string]$dir) {
-    # Ours only, found before the task is stopped: cmd.exe with this root's
-    # log on its line, the node it started (whose own line is relative), and
-    # any node with the root on its line. The game port alone is not proof: a
-    # scratch root holding a copy of the live settings names 7777, and the
-    # process there is the live server (docs\RESTORING.md installs into one).
+# Ours only: cmd.exe with this root's log on its line, the node it started
+# (whose own line is relative), and any node with the root on its line. The
+# game port alone is not proof: a scratch root holding a copy of the live
+# settings names 7777, and the process there is the live server
+# (docs\RESTORING.md installs into one). Each as its Win32_Process.
+function ServerProcesses([string]$dir) {
     $mark = $dir + '\'
     $all = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine })
     $ids = @()
@@ -225,6 +292,12 @@ function StopServer([string]$dir) {
     foreach ($p in $all) {
         if ($p.Name -eq 'node.exe' -and $ids -contains [int]$p.ParentProcessId) { $ids += [int]$p.ProcessId }
     }
+    @($all | Where-Object { $ids -contains [int]$_.ProcessId })
+}
+
+function StopServer([string]$dir) {
+    # Found before the task is stopped.
+    $ids = @(ServerProcesses $dir | ForEach-Object { [int]$_.ProcessId })
     if (-not $NoTask) { try { Stop-ScheduledTask -TaskName $TaskName -ErrorAction Stop } catch { } }
     $port = GamePortOf $dir
     foreach ($id in @($ids | Where-Object { $_ -gt 0 -and $_ -ne $PID } | Sort-Object -Unique)) {
@@ -366,6 +439,156 @@ function Prune([string]$kind, [int]$n) {
         ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue }
 }
 
+# ---- the task --------------------------------------------------------------
+# What the task runs and how, registered over whatever task has the name.
+# $roller is roll-log.ps1 in the root.
+function Register-ServerTask([string]$roller) {
+    $existing = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+    if ($existing) { Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false }
+
+    # Through cmd rather than straight at node, purely so there is a log.
+    # A scheduled task throws its child's stdout and stderr away, so a server
+    # that refuses to start leaves nothing behind at all: the task reports it
+    # ran, the port never opens, and there is no way to find out why without
+    # sitting in an ssh session running it by hand. Redirecting is the whole
+    # reason cmd is in the chain.
+    #
+    # roll-log.ps1 goes first, because cmd holds server.log open for as long
+    # as node runs and nothing can move it until then (see Roll-Log.ps1). &
+    # rather than &&, so a roll that fails, or a roller that is not there,
+    # still starts the server.
+    #
+    # node goes through cmd's start /high, for the priority (below). /b keeps
+    # it in cmd's console, so the redirection to server.log holds, and /wait
+    # keeps cmd, and so the task, running until node ends. start leaves cmd's
+    # exit code 0 whatever node's was, so call exit %^errorlevel% hands node's
+    # back, and the task's last result says how node ended, as it did before
+    # (measured 12 Oct: 3 for a node that exited 3, 0 without it).
+    $log = Join-Path $Root 'server.log'
+    $psExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    $cmd = ('/c ""{2}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{3}" -Path "{1}" & start "" /b /wait /high "{0}" dist_back/skymp5-server.js >> "{1}" 2>&1 & call exit %^errorlevel%"' -f $node.Source, $log, $psExe, $roller)
+    $action = New-ScheduledTaskAction -Execute "$env:SystemRoot\System32\cmd.exe" `
+                                      -Argument $cmd `
+                                      -WorkingDirectory $Root
+    $triggers = @(New-ScheduledTaskTrigger -AtStartup)
+
+    # High, above everything else on the box (#2491). Decided by Patrick on
+    # 12 Oct 2026 at about 6:20 PM: "we need to fix it so the servers run on
+    # high priority". The VPS has six cores, and the six build runners are
+    # Windows services at Normal (Install-Runner.ps1), so until then a build
+    # took the processor from both game servers at the same priority as them.
+    # Voice runs High the same way (Install-Voice.ps1); the site, Caddy, the
+    # bot and the runners stay Normal.
+    #
+    # It takes both halves. -Priority 1 is HIGH_PRIORITY_CLASS in Microsoft's
+    # table (0 is realtime, never used here: it can hold back the box's own
+    # disk and network work; 2 and 3 are above normal, 4 to 6 normal), and it
+    # starts the task's cmd.exe High. But a process started from a High one
+    # runs Normal unless it is asked for another class (CreateProcess hands
+    # the parent's class on only for Idle and BelowNormal), so node, cmd's
+    # child, still ran Normal at priority 1: measured 12 Oct on a scratch task
+    # as SYSTEM, cmd High and its child Normal. start /high asks for High.
+    # Measured the same way with both: node High, I/O priority 2 and memory
+    # priority 5, the same I/O and memory priority it had at 4.
+    #
+    # Never left at Task Scheduler's default of 7, which is where this began
+    # (#1931). A task registered without -Priority starts its process below
+    # normal, with I/O priority 1 (low) and memory priority 2, and node,
+    # started by the task's cmd.exe, inherits all three. Measured on the VPS
+    # on 5 October: both game servers ran BelowNormal, I/O priority 1, memory
+    # priority 2, while the build runners, the bot and lsass ran Normal, 2
+    # and 5.
+    #
+    # The low I/O priority is what the server waited on when somebody first
+    # entered a cell (#1931). The kernel trace of 4 October 17:19
+    # (logs\dev\stall-trace-20261004-173319) has the dev server's main thread
+    # reading its own memory back from pagefile.sys: 91 reads in a login that
+    # took 1.9 s, 51 in the 2.1 s after a move into WhiterunWorld. Every read
+    # went out at low priority and took 24 ms on average, up to 78 ms, held
+    # back in steps of the 15.6 ms clock tick, while none of the 79,000 normal
+    # priority I/Os on the same disk in those 90 s took 5 ms. Windows holds
+    # low priority I/O back while normal priority I/O is going, and on the VPS
+    # it always is, mostly from the two servers' own saves; low priority I/O
+    # waited longest in the seconds the build job did no I/O at all.
+    #
+    # Memory priority 2 puts the server's pages below every service's: first
+    # to be trimmed from its working set, and once trimmed, first to be given
+    # to other uses, after which touching them again is a read from the page
+    # file. Priority 1 gives memory priority 5, so nothing else sets it.
+    #
+    # tests\test-server-task-priority.ps1 registers a task with these settings
+    # and this command line, and measures the CPU, I/O and memory priority of
+    # the program it starts.
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries `
+                                             -DontStopIfGoingOnBatteries `
+                                             -StartWhenAvailable `
+                                             -RestartCount 999 `
+                                             -RestartInterval (New-TimeSpan -Minutes 1) `
+                                             -ExecutionTimeLimit ([TimeSpan]::Zero) `
+                                             -Priority 1
+    $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+
+    Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $triggers `
+                           -Settings $settings -Principal $principal | Out-Null
+    Write-Host "scheduled task '$TaskName' registered, starts at boot, restarts every minute if it stops" -ForegroundColor Cyan
+}
+
+# The priority node runs at under this root, read back after a start (#2491).
+function Show-ServerPriority([string]$dir) {
+    $nodes = @(ServerProcesses $dir | Where-Object { $_.Name -eq 'node.exe' })
+    if (-not $nodes.Count) { Say "no node is running under $dir, so there is no priority to read" 'Yellow'; return }
+    foreach ($p in $nodes) {
+        $class = 'unreadable'
+        try { $class = [string](Get-Process -Id ([int]$p.ProcessId) -ErrorAction Stop).PriorityClass } catch { }
+        Say ("node, pid {0}, runs at {1} priority" -f $p.ProcessId, $class) $(if ($class -eq 'High') { 'Green' } else { 'Yellow' })
+    }
+}
+
+# ---- -TaskOnly: the task again, and nothing else (#2491) -----------------------
+if ($TaskOnly) {
+    if (-not (Test-Path -LiteralPath (Join-Path $Root 'dist_back\skymp5-server.js'))) {
+        Say "there is no server in $Root (no dist_back\skymp5-server.js), so there is nothing for the task to start. Nothing was changed." 'Red'
+        Finish 'INSTALL REFUSED' 1
+    }
+    $roller = Join-Path $Root 'roll-log.ps1'
+    if (-not (Test-Path -LiteralPath $roller)) { Say "$roller is not there, so server.log will not be rolled at start" 'Yellow' }
+    # The task as it is now, for the way back.
+    $oldXml = $null
+    if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) { $oldXml = (Export-ScheduledTask -TaskName $TaskName | Out-String) }
+    $gamePort = GamePortOf $Root
+    $resPort = if ($gamePort -eq 7777) { 3000 } else { $gamePort + 1 }
+    Say 'stopping the server' 'Cyan'
+    StopServer $Root
+    Register-ServerTask $roller
+    $log = Join-Path $Root 'server.log'
+    if (Test-Path -LiteralPath $roller) {
+        try { & $roller -Path $log -Force | ForEach-Object { Write-Host $_ -ForegroundColor DarkGray } }
+        catch { Write-Host ("could not roll server.log: {0}" -f $_.Exception.Message) -ForegroundColor Yellow }
+    }
+    Start-ScheduledTask -TaskName $TaskName
+    Say ("started through the new task, giving it {0} seconds to answer on UDP {1} and on {2}" -f $Wait, $gamePort, $resPort) 'DarkGray'
+    if (Answers $Root) {
+        Say ("the server is answering on {0}, game port {1}" -f $resPort, $gamePort) 'Green'
+        Show-ServerPriority $Root
+        Finish 'INSTALL OK' 0
+    }
+    Write-Host ''
+    Say 'the server did not come up under the new task. Its log says:' 'Red'
+    TailLog $Root
+    if (-not $oldXml) {
+        Say "there was no task named $TaskName before this, so there is none to put back" 'Red'
+        Finish 'INSTALL FAILED' 1
+    }
+    Say 'putting the task it had back' 'Yellow'
+    StopServer $Root
+    Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
+    Register-ScheduledTask -TaskName $TaskName -Xml $oldXml | Out-Null
+    Start-ScheduledTask -TaskName $TaskName
+    if (Answers $Root) { Say ("the task it had is back and the server is answering on {0}" -f $resPort) 'Yellow' }
+    else { Say "THE TASK IT HAD IS BACK AND THE SERVER STILL IS NOT ANSWERING on $resPort" 'Red'; TailLog $Root }
+    Finish 'INSTALL ROLLED BACK' 1
+}
+
 # ---- the stage: nothing running is touched -----------------------------------
 if (-not $PutBack) {
     $bad = @()
@@ -411,7 +634,7 @@ if (-not $PutBack) {
         [IO.File]::WriteAllBytes($settingsPath, $bytes[3..($bytes.Length - 1)])
         Say 'took a byte order mark off server-settings.json, node cannot parse one' 'Yellow'
     }
-    try { $s = [IO.File]::ReadAllText($settingsPath) | ConvertFrom-Json } catch { Refuse @("server-settings.json does not parse: $($_.Exception.Message)") }
+    try { $s = Read-ThornswoodRecord -Path $settingsPath -Kind server-settings } catch { Refuse @("the payload's settings cannot be trusted: $($_.Exception.Message)") }
 
     # The running server's own settings, with only the release's keys taken
     # from the payload (#1222, see the header). Written into the stage, so
@@ -426,6 +649,10 @@ if (-not $PutBack) {
         foreach ($l in $m.Said) { Say $l 'Cyan' }
         $s = $m.Settings
         # Before the file is written, so a refusal leaves only the stage to clear.
+        # An order that leaves out a plugin the running server loads (#2320).
+        $drop = Test-ThornswoodLoadOrderDrop $script:running $s $dropNames
+        foreach ($l in $drop.Said) { Say $l 'Yellow' }
+        if ($drop.Problem) { Refuse @($drop.Problem) }
         $passWhy = Get-ThornswoodPassSwitchProblem $s $passScript
         if ($passWhy) { Refuse @($passWhy) }
         [IO.File]::WriteAllText($settingsPath, (ConvertTo-Json -InputObject $s -Depth 30), (New-Object Text.UTF8Encoding($false)))
@@ -489,9 +716,9 @@ if (-not $PutBack) {
         $bad += 'the payload carries no server-build.json, so nothing says its server files are a recorded build'
     } else {
         try {
-            $recObj = [IO.File]::ReadAllText($rec) | ConvertFrom-Json
+            $recObj = Read-ThornswoodRecord -Path $rec -Kind server-build
             $bad += @(Get-ThornswoodServerBuildProblems $recObj (Get-ThornswoodServerFolderSums $stageDir) 'the payload' 'server-build.json')
-        } catch { $bad += "server-build.json does not parse: $($_.Exception.Message)" }
+        } catch { $bad += "the payload's server-build.json cannot be trusted: $($_.Exception.Message)" }
     }
     if ($bad.Count) { Refuse $bad }
     Say ("load order: all {0} plugins present" -f $order.Count) 'Green'
@@ -757,70 +984,8 @@ if ($rollSrc) {
 # ---- end of the roller copy
 
 # ---- scheduled task --------------------------------------------------------
-if (-not $NoTask) {
-    $existing = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
-    if ($existing) { Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false }
-
-    # Through cmd rather than straight at node, purely so there is a log.
-    # A scheduled task throws its child's stdout and stderr away, so a server
-    # that refuses to start leaves nothing behind at all: the task reports it
-    # ran, the port never opens, and there is no way to find out why without
-    # sitting in an ssh session running it by hand. Redirecting is the whole
-    # reason cmd is in the chain.
-    #
-    # roll-log.ps1 goes first, because cmd holds server.log open for as long
-    # as node runs and nothing can move it until then (see Roll-Log.ps1). &
-    # rather than &&, so a roll that fails, or a roller that is not there,
-    # still starts the server.
-    $log = Join-Path $Root 'server.log'
-    $psExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    $cmd = ('/c ""{2}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{3}" -Path "{1}" & "{0}" dist_back/skymp5-server.js >> "{1}" 2>&1"' -f $node.Source, $log, $psExe, $roller)
-    $action = New-ScheduledTaskAction -Execute "$env:SystemRoot\System32\cmd.exe" `
-                                      -Argument $cmd `
-                                      -WorkingDirectory $Root
-    $triggers = @(New-ScheduledTaskTrigger -AtStartup)
-
-    # Priority 4, normal, not Task Scheduler's default of 7. A task registered
-    # without -Priority starts its process below normal, with I/O priority 1
-    # (low) and memory priority 2, and node, started by the task's cmd.exe,
-    # inherits all three. Measured on the VPS on 5 October: both game servers
-    # ran BelowNormal, I/O priority 1, memory priority 2, while the build
-    # runners, the bot and lsass ran Normal, 2 and 5.
-    #
-    # The low I/O priority is what the server waited on when somebody first
-    # entered a cell (#1931). The kernel trace of 4 October 17:19
-    # (logs\dev\stall-trace-20261004-173319) has the dev server's main thread
-    # reading its own memory back from pagefile.sys: 91 reads in a login that
-    # took 1.9 s, 51 in the 2.1 s after a move into WhiterunWorld. Every read
-    # went out at low priority and took 24 ms on average, up to 78 ms, held
-    # back in steps of the 15.6 ms clock tick, while none of the 79,000 normal
-    # priority I/Os on the same disk in those 90 s took 5 ms. Windows holds
-    # low priority I/O back while normal priority I/O is going, and on the VPS
-    # it always is, mostly from the two servers' own saves; low priority I/O
-    # waited longest in the seconds the build job did no I/O at all.
-    #
-    # Memory priority 2 puts the server's pages below every service's: first
-    # to be trimmed from its working set, and once trimmed, first to be given
-    # to other uses, after which touching them again is a read from the page
-    # file. Priority 4 gives memory priority 5 too, so nothing else sets it.
-    #
-    # 4 to 6 is the band Microsoft's table starts as NORMAL_PRIORITY_CLASS.
-    # tests\test-server-task-priority.ps1 registers a task with these settings
-    # and measures the CPU, I/O and memory priority of the program its cmd.exe
-    # starts.
-    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries `
-                                             -DontStopIfGoingOnBatteries `
-                                             -StartWhenAvailable `
-                                             -RestartCount 999 `
-                                             -RestartInterval (New-TimeSpan -Minutes 1) `
-                                             -ExecutionTimeLimit ([TimeSpan]::Zero) `
-                                             -Priority 4
-    $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
-
-    Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $triggers `
-                           -Settings $settings -Principal $principal | Out-Null
-    Write-Host "scheduled task '$TaskName' registered, starts at boot, restarts every minute if it stops" -ForegroundColor Cyan
-}
+# Register-ServerTask, above, says what the task is and why.
+if (-not $NoTask) { Register-ServerTask $roller }
 
 function Tidy {
     Prune '.prev-*' $Keep
@@ -859,6 +1024,7 @@ $resPort = if ($gamePort -eq 7777) { 3000 } else { $gamePort + 1 }
 Say ("started, giving it {0} seconds to answer on UDP {1} and on {2}" -f $Wait, $gamePort, $resPort) 'DarkGray'
 if (Answers $Root) {
     Say ("the server is answering on {0}, game port {1}" -f $resPort, $gamePort) 'Green'
+    Show-ServerPriority $Root
     Tidy
     Say ("the task appends everything it prints to {0}\server.log, rolled at 4 MB before each start, five kept" -f $Root) 'DarkGray'
     Finish 'INSTALL OK' 0

@@ -25,8 +25,10 @@
 //
 // THE SITE. /api/play/join no longer refuses a full world: it lets them in
 // and says there may be a wait. /api/allowed sends the staff role holders.
-// /api/public and the home page say N of 25 with or without a number from the
-// server.
+// /api/public and the home page say N of 30 with or without a number from the
+// server: every seat, the staff seats too (Patrick, 12 Oct: "the real cap is
+// 30 but 25 for people with non staff roles I still want it to say of 30
+// awake tho"), and full still comes at 25 for anybody without a staff role.
 //
 // Read only. Nothing connects to anything.
 const fs = require('fs');
@@ -43,6 +45,8 @@ const chatJs = read('game/ui/thornswood-chat.js');
 const page = read('game/ui/thornswood-select.js');
 const front = read('game/plugins/thornswood-front.js');
 const doorCs = read('launcher/app/Door.cs');
+const onlineCs = read('launcher/app/Online.cs');
+const configCs = read('launcher/app/Config.cs');
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -61,6 +65,20 @@ function clean(s) { return String(s).indexOf(EM) < 0 && !FORBIDDEN.test(String(s
 const record = JSON.parse(fs.readFileSync(path.join(ROOT, 'records', 'most-online.json'), 'utf8').replace(/^﻿/, ''));
 yes('records\\most-online.json says 25 people', record.people === 25);
 yes('and 5 staff seats over it (Patrick, 29 Sep)', record.staffSeats === 5);
+yes('dev has its own: 5 people, no staff seats over them, voice 5 (Patrick, 12 Oct)',
+    !!record.dev && record.dev.people === 5 && record.dev.staffSeats === 0 && record.dev.voice === 5);
+
+// ------------------------------------------------------------ the launcher
+// "N of M awake": M is the server's own max, else this build's feed's
+// maxOnline, and never the other channel's (main 30 and dev 5 since 12 Oct).
+yes('the launcher shows N of M awake from the count and the max it has',
+    /if \(c\.Known\) return c\.Now \+ \(c\.Max > 0 \? " of " \+ c\.Max : ""\) \+ " awake";/.test(onlineCs));
+yes('its own server falls back to its own feed\'s number',
+    /Count got = AskPort\(cfg, SkyMp\.ResourcePortFor\(cfg\), cfg != null && cfg\.MaxOnline > 0 \? cfg\.MaxOnline : 0\);/.test(onlineCs));
+yes('the other build\'s server has no fallback, only the number it announces',
+    /return AskPort\(cfg, other, 0\);/.test(onlineCs) && /got\.Max = fallbackMax;/.test(onlineCs) &&
+    /"\\"max\\"\\\\s\*:\\\\s\*\(\\\\d\+\)"/.test(onlineCs));
+yes('and no seat count is built into the launcher', /\[DataMember\] public int MaxOnline = 0;/.test(configCs));
 
 // ------------------------------------------------------------ the block
 const a = src.indexOf('// ==== thornswood seats ====');
@@ -83,8 +101,10 @@ yes('the door writes it into allowed.json, and keeps it for a profile Discord co
     /doc\.staffRoleProfiles = kept\.staffRoleProfiles;/.test(src));
 yes('the seats block no longer borrows the chat commands staff check', !/g\.__thornswoodIsStaff = isStaff;/.test(src));
 yes('the online count file carries max, how many wait, and whether it is full',
-    /thornswoodMostOnline\) \|\| 0/.test(src) &&
     /restarting: restarting, max: max, line: line, full: full/.test(src));
+yes('and max is every seat, the number and the staff seats over it, from the seats block',
+    /var capNow = seatsApi \? seatsApi\.cap\(settingsNow\) : 0;\s*max = capNow \? capNow \+ seatsApi\.staffSeats\(settingsNow\) : 0;/.test(src) &&
+    !/max = Number\(\(mp\.getServerSettings\(\) \|\| \{\}\)\.thornswoodMostOnline\)/.test(src));
 yes('dispatch() takes /line, /line leave and /line hand from the relay, with no character needed',
     /if \(word === '\/line'\) \{[\s\S]{0,500}seatsApi\.leave\(profileId, seatsApi\.liveHow\(\)\)[\s\S]{0,400}seatsApi\.hand\(profileId, Number\(parts\[2\]\) \|\| 0, Date\.now\(\), seatsApi\.liveHow\(\)\)[\s\S]{0,200}seatsApi\.want\(profileId, Date\.now\(\), seatsApi\.liveHow\(\)\)/.test(src));
 yes('and /line gone only when the relay itself marked it (cmd.relay), so no person can drop a place with it',
@@ -520,6 +540,9 @@ yes('not full with no number', seatsFull({ up: true, online: 60, max: 0 }) === f
 yes('not full while the server is down', seatsFull({ up: false, online: 25, max: 25, full: true }) === false);
 yes("the site's sentence says there may be a wait at the menu, not no ('" + worldFull(25) + "')",
     /25 people/.test(worldFull(25)) && /place in line/.test(worldFull(25)) && !/Try again/.test(worldFull(25)) && clean(worldFull(25)));
+yes('full at 25 of 30 when the server says so: the 5 over are staff seats', seatsFull({ up: true, online: 25, max: 30, full: true }) === true);
+yes('and every seat taken is full whatever the server says', seatsFull({ up: true, online: 30, max: 30 }) === true);
+yes('with no count the sentence names no number', !/\d/.test(worldFull(0)) && /place in line/.test(worldFull(0)) && clean(worldFull(0)));
 yes('a staff role is a staff role: Moderator yes, Owner yes', holdsStaffRole(['Moderator']) && holdsStaffRole(['Owner']));
 yes('a playtester or nothing is not', !holdsStaffRole(['Playtester', 'Content Creator']) && !holdsStaffRole([]) && !holdsStaffRole(null));
 yes('standing() sets staffRole from the roles in both of its paths, the hand written admins path too',
@@ -531,6 +554,8 @@ yes('the count poll reads max, line and full out of online.json',
     /o\.max > 0\) max = o\.max/.test(site) && /o\.line > 0\) line = o\.line/.test(site) && /o\.full === true\) full = true/.test(site));
 yes('/api/public carries max from the server, or else from the record, and the line',
     /max: gameStatus\.max \|\| mostOnlineFallback\(\),\s*line: gameStatus\.line, full: seatsFull\(gameStatus\)/.test(site));
+yes('/api/play/join says how many are in the world, not the seats, when it says there may be a wait',
+    /message: wait \? worldFull\(gameStatus\.online\) : '',/.test(site));
 
 // The fallback number: records\most-online.json, then the main feed's maxOnline.
 (function () {
@@ -549,7 +574,12 @@ yes('/api/public carries max from the server, or else from the record, and the l
     yes('on the VPS (no records folder) it is the feed maxOnline: 25, which is what live serves today', make()() === 25);
     fs.mkdirSync(path.join(tmp, 'records'));
     fs.writeFileSync(path.join(tmp, 'records', 'most-online.json'), '﻿' + JSON.stringify({ people: 30, staffSeats: 5 }));
-    yes('run from the repository it is records\\most-online.json itself', make()() === 30);
+    yes('run from the repository it is records\\most-online.json itself, its seats: people and staff seats', make()() === 35);
+    fs.writeFileSync(path.join(tmp, 'records', 'most-online.json'),
+      JSON.stringify({ dev: { people: 5, staffSeats: 0, voice: 5 }, people: 25, staffSeats: 5, voice: 60 }));
+    yes('the site is the live server, so it is main\'s 30 and never dev\'s 5', make()() === 30);
+    fs.writeFileSync(path.join(tmp, 'records', 'most-online.json'), JSON.stringify({ people: 25 }));
+    yes('with no staff seats it is the people', make()() === 25);
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 })();
 
@@ -604,7 +634,10 @@ async function join(standing, status, channel) {
 
 (async function () {
   const FULL = { up: true, online: 25, max: 25, line: 3, full: true };
-  let got = await join({}, FULL);
+  let got = await join({}, { up: true, online: 25, max: 30, line: 1, full: true });
+  yes('25 of 30 and full for anybody without a staff role: the wait names the 25 in the world, never 30',
+      !!got.obj && got.obj.wait === true && /25 people are in the world/.test(got.obj.message) && !/30/.test(got.obj.message) && got.obj.max === 30);
+  got = await join({}, FULL);
   yes('world full: a person with no staff role is let in, not refused', !!got.obj && got.code === 200 && got.obj.ok === true);
   yes('with wait and the sentence saying there may be a wait', !!got.obj && got.obj.wait === true && got.obj.message === worldFull(25));
   yes('and the count and the line', !!got.obj && got.obj.online === 25 && got.obj.max === 25 && got.obj.line === 3);
@@ -644,6 +677,12 @@ async function join(standing, status, channel) {
     };
     let e = say({ up: true, online: 3, max: 25 });
     yes("with a number: '3 of 25 people in the world'", e.livetext.textContent === '3 of 25 people in the world');
+    e = say({ up: true, online: 3, max: 30 });
+    yes("with the seats the server says: '3 of 30 people in the world'", e.livetext.textContent === '3 of 30 people in the world');
+    e = say({ up: true, online: 25, max: 30, line: 1, full: true });
+    yes("full for people at 25 of 30 says the rest are kept for staff (got '" + e.livetext.textContent + "')",
+        e.livetext.textContent === 'The world is full, 25 of 30 people are in it and the rest of the seats are kept for staff, 1 waiting for a seat' &&
+        e.figOnline.textContent === '25 of 30' && clean(e.livetext.textContent));
     e = say({ up: true, online: 27, max: 25, line: 2, full: true });
     yes("staff over the number: never 27 of 25, and it says who waits (got '" + e.livetext.textContent + "')",
         e.livetext.textContent === 'The world is full, 25 of 25 people are in it, 2 waiting for a seat' &&

@@ -21,6 +21,7 @@ cast_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(cast_module)
 C = cast_module
 
+LAST_PLUGIN = 'Thornswood-Last.esp'
 CITY_WORLDS = {'WhiterunWorld', 'RiftenWorld', 'SolitudeWorld', 'WindhelmWorld', 'MarkarthWorld'}
 DOMESTIC = {'chicken', 'cow', 'goat', 'dog', 'horse'}
 CITY_ANIMALS = {'chicken', 'dog', 'goat'}
@@ -147,6 +148,18 @@ def species_of(race):
     return lower.removesuffix('race') or 'unknown'
 
 
+def transport_title(edid, factions):
+    captain = edid in C.TRANSPORT_BASES
+    identities = [edid.lower()] + [value.lower() for value in factions]
+    ferry = any('ferry' in value for value in identities)
+    carriage = any('carriage' in value for value in identities)
+    if sum([captain, ferry, carriage]) != 1:
+        raise ValueError('Transport role is missing or ambiguous: ' + edid)
+    if captain:
+        return 'Ship Captain'
+    return 'Ferry Operator' if ferry else 'Coach Driver'
+
+
 def classify(context, ref, actor):
     base = actor.get('base')
     habitat, location = habitat_at(context, actor)
@@ -190,7 +203,10 @@ def classify(context, ref, actor):
     if role == 'transport':
         world_name = context.t[b'WRLD'].get(actor.get('world'), {}).get('edid')
         interior = context.cells.get(actor.get('cell'), {}).get('interior')
-        return decide('transport', not interior and world_name not in CITY_WORLDS,
+        keep = not interior and world_name not in CITY_WORLDS
+        if keep:
+            result['displayName'] = transport_title(base_edid, members)
+        return decide('transport', keep,
                       'Authored exterior carriage or ferry stop; city ancestry is not a wall')
     if role == 'guards':
         return decide('cut', False, 'Bethesda town guard; law belongs to people')
@@ -321,6 +337,15 @@ def build(paths, strings_dir=None):
         plugin = C.Plugin(path, name)
         if not plugin.ok:
             raise ValueError('Invalid plugin: ' + name)
+        # Thornswood-Last.esp is built FROM this catalogue: it switches off
+        # every placed actor the catalogue cuts (#2468). Read as an input it
+        # would make every cut actor "Deleted or initially switched off", and
+        # a rule changed later (keep the guards again, say) could never bring
+        # one back. So it is in the load order the gamemode checks, by name
+        # and sha256, and its records are not read.
+        if name == LAST_PLUGIN:
+            sources.append({'name': name, 'sha256': hashlib.sha256(plugin.buf).hexdigest()})
+            continue
         plugin.masters = [canon.get(m.lower(), m) for m in plugin.masters]
         if plugin.localised:
             plugin.strings = C.bsa.load_strings(strings_dir or os.path.dirname(path), name)
@@ -420,7 +445,8 @@ def write_runtime(payload):
                   r['returnMinutes'], r['role'], r['habitat'], r['tier'], r.get('cap'),
                   r.get('populationBucket'),
                   # 1: swims and cannot walk; 2: an ambush placement (#2067).
-                  (1 if r.get('swims') else 0) | (2 if r.get('ambush') else 0)]
+                  (1 if r.get('swims') else 0) | (2 if r.get('ambush') else 0), r['species']] +
+                 ([r['displayName']] if 'displayName' in r else [])
                  for r in payload['npcs'] if r['keep']]}
     target = HERE.parent.parent / 'game/gamemode.js'
     source = target.read_text(encoding='utf-8')

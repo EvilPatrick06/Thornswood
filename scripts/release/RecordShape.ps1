@@ -8,7 +8,7 @@
 
       server-build        records\server-build.json      the server build every deploy is held to
       client-build        records\client-build.json      the client build Ship and the launcher are held to
-      most-online         records\most-online.json       the seat count the engine and gamemode take
+      most-online         records\most-online.json       the seat count the engine and gamemode take, main's and dev's
       collection-plugins  records\collection-plugins.json  the collection's plugin bytes (#2019)
       skyrim-pin          records\skyrim-pin.json        the Skyrim build a release is pinned to
       skyrim-files        records\skyrim-files.json      every file of that build (the launcher embeds it)
@@ -29,7 +29,12 @@
   records, and tests\test-record-shapes.ps1 holds it.
   Works on Windows PowerShell 5.1 and PowerShell 7.
 #>
-. (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')
+# Slice 4 (#2180): the box has no checkout, so the scripts that run there get
+# this file's text with Read-JsonFile.ps1's in front of it ($ThornswoodRecordShapeText
+# in Swap.ps1), or the two files beside them (Install-ThornswoodServer.ps1,
+# sent by Publish-Server.ps1). Either way ConvertFrom-ThornswoodJson is
+# already defined, and only a reader that has not loaded it loads it here.
+if (-not (Get-Command ConvertFrom-ThornswoodJson -EA SilentlyContinue)) { . (Join-Path $PSScriptRoot 'Read-JsonFile.ps1') }
 
 # Which versions each kind is understood at, and whether the file must say so.
 $script:ThornswoodRecordKinds = [ordered]@{
@@ -42,6 +47,14 @@ $script:ThornswoodRecordKinds = [ordered]@{
     'skyrim-files'       = @{ File = 'records\skyrim-files.json';       Versions = @(1); MustSay = $false }
     'ui-gone'            = @{ File = 'records\ui-gone.json';            Versions = @(1); MustSay = $false }
     'generated'          = @{ File = 'records\generated.json';          Versions = @(1); MustSay = $false }
+    # Slice 5 (#2180): the feed store's files. No committed file: each channel's
+    # store holds its own (Check-Records -Feed <folder> reads them).
+    'feed-version'       = @{ File = $null; Feed = 'version.json';      Versions = @(1); MustSay = $false }
+    'feed-published'     = @{ File = $null; Feed = 'published.json';    Versions = @(1); MustSay = $false; NoVersion = $true }
+    'feed-releases'      = @{ File = $null; Feed = 'releases.json';     Versions = @(1); MustSay = $false; NoVersion = $true; List = $true }
+    # Slice 4 (#2180): a server's own settings, read on the box. No committed
+    # file (File is $null, so Check-Records skips it): each server keeps its own.
+    'server-settings'    = @{ File = $null;                             Versions = @(1); MustSay = $false }
 }
 
 function Get-ThornswoodRecordProp($o, [string]$name) {
@@ -77,7 +90,34 @@ function Get-ThornswoodRecordProblems {
     param([Parameter(Mandatory)][AllowNull()]$Doc, [Parameter(Mandatory)][string]$Kind)
     if (-not $script:ThornswoodRecordKinds.Contains($Kind)) { throw "no record kind '$Kind' (known: $(@($script:ThornswoodRecordKinds.Keys) -join ', '))" }
     $k = $script:ThornswoodRecordKinds[$Kind]
+    if ($k.ContainsKey('List')) {
+        # releases.json is a list, newest first, of the release records a
+        # rollback reads (Release-Baseline.ps1 New-FeedReleaseEntry).
+        if ($Doc -isnot [array]) { $Doc = @($Doc) }
+        $out = @()
+        $i = 0
+        foreach ($r in @($Doc)) {
+            $w = "release $i"
+            if ($null -eq $r -or $r -isnot [psobject] -or $r -is [array] -or $r -is [string]) { $out += "$w is not an object"; $i++; continue }
+            $id = Get-ThornswoodRecordProp $r 'id'
+            if (-not ($id -is [string]) -or -not $id.Trim()) { $out += "$w has no id" } else { $w = "release $id" }
+            if (-not (Test-ThornswoodHex (Get-ThornswoodRecordProp $r 'sha256') 64 64)) { $out += "$w has no sha256" }
+            if (-not ((Get-ThornswoodRecordProp $r 'url') -is [string]) -or -not (Get-ThornswoodRecordProp $r 'url')) { $out += "$w has no url" }
+            if (-not (Test-ThornswoodWhole (Get-ThornswoodRecordProp $r 'entries') 0)) { $out += "$w has no whole entries" }
+            foreach ($s in 'lastPack', 'to') { $v = Get-ThornswoodRecordProp $r $s; if ($null -ne $v -and $v -isnot [string]) { $out += "$w.$s is there and not text" } }
+            $i++
+        }
+        return $out
+    }
     if ($null -eq $Doc -or $Doc -isnot [psobject] -or $Doc -is [array] -or $Doc -is [string]) { return @('it is not a JSON object') }
+    if ($k.ContainsKey('NoVersion')) {
+        # published.json is the baseline map, file to hash, written whole by
+        # ConvertTo-BaselineJson: every value is text, and a "version" key is
+        # a file name like any other.
+        $out = @()
+        foreach ($p in $Doc.PSObject.Properties) { if ($p.Value -isnot [string]) { $out += "$($p.Name) is not text" } }
+        return $out
+    }
     $out = @()
     $ver = Get-ThornswoodRecordProp $Doc 'version'
     if ($null -eq $ver) {
@@ -100,14 +140,25 @@ function Get-ThornswoodRecordProblems {
             $out += @(Get-ThornswoodFilesMapProblems (Get-ThornswoodRecordProp $Doc 'files') 'files')
         }
         'most-online' {
-            if (-not (Test-ThornswoodWhole (Get-ThornswoodRecordProp $Doc 'people') 1)) { $out += 'people is missing or not a whole number above zero' }
-            elseif ([int64](Get-ThornswoodRecordProp $Doc 'people') -gt 1000) { $out += 'people is over 1000, the engine''s limit' }
-            $s = Get-ThornswoodRecordProp $Doc 'staffSeats'
-            if ($null -ne $s -and -not (Test-ThornswoodWhole $s 0)) { $out += 'staffSeats is there and not a whole number' }
-            # The most the voice service takes at once (#481); MaxOnline.ps1
-            # holds it to no fewer than the seats.
-            $v = Get-ThornswoodRecordProp $Doc 'voice'
-            if ($null -ne $v -and -not (Test-ThornswoodWhole $v 1)) { $out += 'voice is there and not a whole number above zero' }
+            # Main's numbers are the record's own, and dev's, when it has its
+            # own (Patrick, 12 Oct), are the same three keys in a dev object.
+            $sets = @(@{ Pre = ''; O = $Doc })
+            $dev = Get-ThornswoodRecordProp $Doc 'dev'
+            if ($null -ne $dev) {
+                if ($dev -isnot [System.Management.Automation.PSCustomObject]) { $out += 'dev is there and not an object of people, staffSeats and voice' }
+                else { $sets += @{ Pre = 'dev.'; O = $dev } }
+            }
+            foreach ($set in $sets) {
+                $o = $set.O; $pre = $set.Pre
+                if (-not (Test-ThornswoodWhole (Get-ThornswoodRecordProp $o 'people') 1)) { $out += "${pre}people is missing or not a whole number above zero" }
+                elseif ([int64](Get-ThornswoodRecordProp $o 'people') -gt 1000) { $out += "${pre}people is over 1000, the engine's limit" }
+                $s = Get-ThornswoodRecordProp $o 'staffSeats'
+                if ($null -ne $s -and -not (Test-ThornswoodWhole $s 0)) { $out += "${pre}staffSeats is there and not a whole number" }
+                # The most the voice service takes at once (#481); MaxOnline.ps1
+                # holds it to no fewer than the seats.
+                $v = Get-ThornswoodRecordProp $o 'voice'
+                if ($null -ne $v -and -not (Test-ThornswoodWhole $v 1)) { $out += "${pre}voice is there and not a whole number above zero" }
+            }
         }
         'skyrim-pin' {
             # What Publish-Update writes into version.json and the launcher's
@@ -163,6 +214,85 @@ function Get-ThornswoodRecordProblems {
                 $sl = Get-ThornswoodRecordProp $bod 'sliders'
                 if ($null -ne $sl -and ($sl -isnot [psobject] -or $sl -is [array] -or $sl -is [string])) { $out += 'bodyslide.sliders is there and not a map' }
             }
+        }
+        'feed-version' {
+            # What every launcher reads, held to launcher\app\Config.cs
+            # VersionDoc. Its serializer throws on one value of the wrong JSON
+            # type, and a throw is the whole document unread: every launcher
+            # then says there was no answer and shuts Play. So each member is
+            # held to what that serializer takes: text members take a string,
+            # a number or null; int and long members a whole number; arrays a
+            # list or null; objects an object or null.
+            $lv = Get-ThornswoodRecordProp $Doc 'launcherVersion'
+            if (-not ($lv -is [string]) -or $lv -notmatch '^\d+(\.\d+){1,3}$') { $out += 'launcherVersion is missing or not a version like 1.2.3' }
+            $lu = Get-ThornswoodRecordProp $Doc 'launcherUrl'
+            if ($lu -is [string] -and $lu -and -not (Test-ThornswoodHex (Get-ThornswoodRecordProp $Doc 'launcherSha256') 64 64)) { $out += 'launcherUrl is set and launcherSha256 is not 64 hex digits' }
+            $text = 'launcherVersion', 'launcherUrl', 'launcherSha256', 'serverAddress', 'collectionUrl', 'serverPort', 'expectedExeBytes', 'newerExeBytes',
+                    'updateRepo', 'updateFeedUrl', 'voicePort', 'voiceUrl', 'discordAppId', 'siteUrl', 'presenceImage', 'message', 'maintenance', 'minLauncher', 'mainVersion'
+            foreach ($n in $text) {
+                $p = $Doc.PSObject.Properties[$n]
+                if ($p -and $null -ne $p.Value -and -not ($p.Value -is [string] -or (Test-ThornswoodWhole $p.Value ([int64]::MinValue)))) { $out += "$n is not text, so the launcher would not read the feed" }
+            }
+            foreach ($n in 'collectionRevision', 'maxOnline') {
+                $p = $Doc.PSObject.Properties[$n]
+                if ($p -and -not (Test-ThornswoodWhole $p.Value 0)) { $out += "$n is there and not a whole number, so the launcher would not read the feed" }
+            }
+            $cr = Get-ThornswoodRecordProp $Doc 'clientRuntime'
+            if ($null -ne $cr) {
+                if ($cr -isnot [psobject] -or $cr -is [array] -or $cr -is [string]) { $out += 'clientRuntime is not an object' }
+                else {
+                    if (-not ((Get-ThornswoodRecordProp $cr 'url') -is [string])) { $out += 'clientRuntime.url is missing' }
+                    if (-not (Test-ThornswoodHex (Get-ThornswoodRecordProp $cr 'sha256') 64 64)) { $out += 'clientRuntime.sha256 is not 64 hex digits' }
+                    if (-not (Test-ThornswoodWhole (Get-ThornswoodRecordProp $cr 'bytes') 1)) { $out += 'clientRuntime.bytes is not a whole number above zero' }
+                }
+            }
+            $deps = Get-ThornswoodRecordProp $Doc 'depots'
+            if ($null -ne $deps) {
+                if ($deps -isnot [array]) { $out += 'depots is not a list' }
+                else { foreach ($d in @($deps)) { foreach ($m in 'id', 'manifest') { $v = Get-ThornswoodRecordProp $d $m; if (-not ($v -is [string] -and $v -match '^\d+$')) { $out += "a depot's $m is not digits in a string" } } } }
+            }
+            foreach ($list in 'packs', 'optional') {
+                $pk = Get-ThornswoodRecordProp $Doc $list
+                if ($null -eq $pk) { continue }
+                if ($pk -isnot [array]) { $out += "$list is not a list"; continue }
+                foreach ($q in @($pk)) {
+                    $id = Get-ThornswoodRecordProp $q 'id'
+                    if (-not ($id -is [string]) -or -not $id) { $out += "a $list entry has no id"; continue }
+                    if (-not ((Get-ThornswoodRecordProp $q 'url') -is [string]) -or -not (Get-ThornswoodRecordProp $q 'url')) { $out += "$list.$id has no url" }
+                    if (-not (Test-ThornswoodHex (Get-ThornswoodRecordProp $q 'sha256') 64 64)) { $out += "$list.$id has no sha256" }
+                    foreach ($s in 'notes', 'name') { $v = Get-ThornswoodRecordProp $q $s; if ($null -ne $v -and $v -isnot [string]) { $out += "$list.$id.$s is not text" } }
+                    $b = $q.PSObject.Properties['bytes']
+                    if ($b -and -not (Test-ThornswoodWhole $b.Value 0)) { $out += "$list.$id.bytes is not a whole number" }
+                }
+            }
+            $nw = Get-ThornswoodRecordProp $Doc 'news'
+            if ($null -ne $nw) {
+                if ($nw -isnot [array]) { $out += 'news is not a list' }
+                else {
+                    foreach ($e in @($nw)) {
+                        foreach ($s in 'date', 'title', 'body') { $v = Get-ThornswoodRecordProp $e $s; if ($null -ne $v -and $v -isnot [string]) { $out += "a news item's $s is not text" } }
+                        foreach ($s in 'details', 'files') { $v = Get-ThornswoodRecordProp $e $s; if ($null -ne $v -and ($v -isnot [array] -or @($v | Where-Object { $_ -isnot [string] }).Count)) { $out += "a news item's $s is not a list of text" } }
+                    }
+                }
+            }
+            # Not a launcher member: what Publish-Update and Rollback-Feed read
+            # to find the last release (Release-Baseline.ps1 Get-FeedBaselinePointer).
+            $bl = Get-ThornswoodRecordProp $Doc 'baseline'
+            if ($null -ne $bl -and (-not (Test-ThornswoodHex (Get-ThornswoodRecordProp $bl 'sha256') 64 64) -or -not ((Get-ThornswoodRecordProp $bl 'url') -is [string]))) { $out += 'baseline is there without a sha256 and a url' }
+        }
+        'server-settings' {
+            # What the box-side scripts read before they stop or start
+            # anything: the port picks the process and the health check, and
+            # dataDir and privDir say where the world is. skymp itself reads
+            # the rest, and a broken key there is the server's to report.
+            $port = Get-ThornswoodRecordProp $Doc 'port'
+            if (-not (Test-ThornswoodWhole $port 1) -or [int64]$port -gt 65535) { $out += 'port is missing or not a whole number from 1 to 65535' }
+            foreach ($k in 'dataDir', 'privDir') {
+                $v = Get-ThornswoodRecordProp $Doc $k
+                if ($null -ne $v -and (-not ($v -is [string]) -or -not $v.Trim())) { $out += "$k is there and not a folder name" }
+            }
+            $lo = Get-ThornswoodRecordProp $Doc 'loadOrder'
+            if ($null -ne $lo -and ($lo -isnot [array] -or @($lo | Where-Object { -not ($_ -is [string]) -or -not $_.Trim() }).Count)) { $out += 'loadOrder is there and not a list of plugin paths' }
         }
         'collection-plugins' {
             $rows = Get-ThornswoodRecordProp $Doc 'plugins'

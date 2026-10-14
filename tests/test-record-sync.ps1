@@ -83,6 +83,7 @@ trap { $script:fail++; Write-Host ("FAIL  stopped: " + $_.Exception.Message + ' 
 . (Join-Path $repo 'scripts\release\Release-Baseline.ps1')
 . (Join-Path $repo 'scripts\release\Feed-Store.ps1')
 . (Join-Path $repo 'scripts\release\Release-Name.ps1')
+. (Join-Path $repo 'scripts\release\Feed-News.ps1')
 Add-Type -AssemblyName System.IO.Compression -ErrorAction SilentlyContinue
 Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction SilentlyContinue
 $ascii = New-Object Text.ASCIIEncoding
@@ -710,6 +711,10 @@ $d5 = Feed; $m5 = $records[$R5]
 Yes '  the feed carries packs as an empty list, the shape every launcher reads' ($d5.PSObject.Properties['packs'] -and @($d5.packs).Count -eq 0 -and
     ([IO.File]::ReadAllText((Join-Path $feedDir 'version.json')) -match '"packs":\s*\[\s*\]'))
 Yes '  and minLauncher is 1.2.3' ([string]$d5.minLauncher -eq '1.2.3')
+# The launchers in this harness sync from feeds the publisher wrote, so their
+# passes are also the proof that a launcher reads one written this way.
+Yes '  the publisher writes version.json compact, one line, and its release carries no uiAssets (#1050)' (
+    ([IO.File]::ReadAllText((Join-Path $feedDir 'version.json')) -notmatch '[\r\n]') -and -not $d5.release.PSObject.Properties['uiAssets'])
 Yes '  the release names no pack, and its record says every file is up' (@($d5.release.packs).Count -eq 0 -and [string]$m5[':record:files'] -eq '1' -and
     @((Get-RecordFileShas $m5).Keys | Where-Object { -not (Test-Path -LiteralPath (Join-Path $feedDir "assets\$_")) }).Count -eq 0)
 $zip5 = @(Get-ChildItem -LiteralPath (Join-Path $pub 'dist') -Recurse -File -Filter "pack-$R5.zip")
@@ -753,6 +758,33 @@ Yes 'a launcher that syncs lands back on the third release''s files' ((Test-Land
 $r = Rollback @('-To', $R5, '-Id', '20260930-0800')
 [void](Update-New $fresh)
 Yes '  and forward again to the fifth' ($r.Code -eq 0 -and @((Feed).packs).Count -eq 0 -and (Test-Lands $fresh $m5))
+
+# ---- the notes leave the feed too, from 1.2.4 (#1050) ----------------------------
+# Every launcher up to 1.2.3 reads the News tab only out of "news", so on 1.2.3
+# the notes stayed there; from the first launcher that reads the news file
+# (Feed-News.ps1) they are one asset of their own.
+Write-Host ''; Write-Host 'the notes leave the feed'
+Yes 'on 1.2.3 the notes stayed in version.json and the feed named no news file' (@($d5.news).Count -ge 1 -and -not $d5.PSObject.Properties['newsFile'])
+$fd = Feed
+$fd.launcherVersion = '1.2.4'; $fd.minLauncher = '1.2.4'
+Put (Join-Path $feedDir 'version.json') ($fd | ConvertTo-Json -Depth 8)
+$R6 = '20260930-0900'
+Set-Build 'Data\Platform\UI\thornswood-new3.esp' 'changed by the sixth release'
+Yes 'a release goes out with every launcher let in reading the news file' (Release $R6 'Notes in a file of their own')
+$d6 = Feed
+$nf = if ($d6.PSObject.Properties['newsFile'] -and $d6.newsFile) { Join-Path $feedDir ("assets\" + [string]$d6.newsFile.sha256) } else { '' }
+Yes '  version.json carries "news" as [] and names the file, on this channel''s folder' (@($d6.news).Count -eq 0 -and $nf -and
+    ([IO.File]::ReadAllText((Join-Path $feedDir 'version.json')) -match '"news":\s*\[\s*\]') -and [string]$d6.newsFile.url -eq ('https://thornswood.net/feed/assets/' + [string]$d6.newsFile.sha256))
+$six = @(Get-FeedNewsList $d6 $site)
+Yes ("  the file is on the site, its bytes its name, this release's note first and the {0} before it after" -f ($six.Count - 1)) (
+    (Test-Path -LiteralPath $nf) -and (Get-BaselineFileSha $nf) -eq [string]$d6.newsFile.sha256 -and [string]$six[0].title -eq 'Notes in a file of their own' -and
+    $six.Count -eq [int]$d6.newsFile.count -and @($six | Where-Object { [string]$_.title -eq $note5 }).Count -eq 1)
+$sz6 = (Get-Item -LiteralPath (Join-Path $feedDir 'version.json')).Length
+Yes ("  version.json is {0:n0} bytes, from {1:n0} with the notes in it" -f $sz6, $sz) ($sz6 -lt $sz)
+$R7 = '20260930-1000'
+Set-Build 'Data\Platform\UI\thornswood-new3.esp' 'changed by the seventh release'
+Yes 'the next release adds its note to the file, and keeps every older one' ((Release $R7 'Another note on top') -and
+    ((@(Get-FeedNewsList (Feed) $site) | ForEach-Object { [string]$_.title }) -join '|').StartsWith('Another note on top|Notes in a file of their own|'))
 
 # ---- nothing here weakens the launcher's own update -------------------------------
 Write-Host ''; Write-Host 'the launcher itself'

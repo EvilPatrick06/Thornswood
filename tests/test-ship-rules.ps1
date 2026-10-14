@@ -389,10 +389,11 @@ Yes 'Ship writes the parsed names into thornswood-ui-assets.txt' (
     (Test-UiNameSetsEqual $savedNames $parsed) -and
     (Test-UiNameSetsEqual $gameList $parsed))
 
-# Pack ui-assets.txt and the release record must carry the same names by
-# content, not just a count. Publish-Update writes the zip entry from
-# $script:ShipUiHashedWritten; this reads that entry back from a zip built
-# the same way. New-ReleaseRecord takes the same list.
+# Pack ui-assets.txt must carry the same names by content, not just a count.
+# Publish-Update writes the zip entry from $script:ShipUiHashedWritten; this
+# reads that entry back from a zip built the same way. The release record in
+# version.json stopped carrying the names (#1050): the game file
+# thornswood-ui-assets.txt is a file of the release, so its record holds it.
 function Read-PackUiAssetsFromZip([string]$zipPath, [string[]]$names) {
     Add-Type -AssemblyName System.IO.Compression
     Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -416,9 +417,9 @@ function Read-PackUiAssetsFromZip([string]$zipPath, [string[]]$names) {
 }
 . (Join-Path $Here 'scripts\release\Release-Name.ps1')
 $packUiLines = Read-PackUiAssetsFromZip (Join-Path $uiWork 'pack.zip') @($script:ShipUiHashedWritten)
-$uiRelease = New-ReleaseRecord 't' 'dev' '0' @('t') 't' '' '' 0 @($script:ShipUiHashedWritten)
+$uiRelease = New-ReleaseRecord 't' 'dev' '0' @('t') 't' '' '' 0
 Yes 'pack zip ui-assets.txt names match the parse of build.js by content' (Test-UiNameSetsEqual $packUiLines $parsed)
-Yes 'the release record uiAssets match the parse of build.js by content' (Test-UiNameSetsEqual $uiRelease.uiAssets $parsed)
+Yes 'the release record in version.json carries no uiAssets (#1050)' (-not $uiRelease.PSObject.Properties['uiAssets'])
 
 # Same content check against the real shipped file, not the two-font excerpt.
 $uiRealWork = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-ui-real-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
@@ -434,10 +435,8 @@ $script:ShipUiHashedCache = $null
 $realSaved = @(Save-ShipUiHashedAssets $uiRealWork)
 $realGameList = Get-Content -LiteralPath (Join-Path $uiRealWork $ShipUiAssetsRel)
 $realPack = Read-PackUiAssetsFromZip (Join-Path $uiRealWork 'pack.zip') @($script:ShipUiHashedWritten)
-$realRelease = New-ReleaseRecord 't' 'dev' '0' @('t') 't' '' '' 0 @($script:ShipUiHashedWritten)
 Yes 'the ship record of the real build.js matches that parse by content' (Test-UiNameSetsEqual $realSaved $uiRealParsed)
 Yes '  and so does pack zip ui-assets.txt' (Test-UiNameSetsEqual $realPack $uiRealParsed)
-Yes '  and so does the release record uiAssets' (Test-UiNameSetsEqual $realRelease.uiAssets $uiRealParsed)
 Yes '  and so does the game file thornswood-ui-assets.txt' (Test-UiNameSetsEqual $realGameList $uiRealParsed)
 Remove-Item -LiteralPath $uiRealWork -Recurse -Force -ErrorAction SilentlyContinue
 

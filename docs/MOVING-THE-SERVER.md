@@ -139,7 +139,7 @@ typed on a command line or written on this page.
 | The new box's Administrator password | the hosting provider's panel for the new box | typed once, at Setup-SshKey's prompt, step 4 |
 | The backup passphrase | `Documents\thornswood-backup-key.txt` on One | read there by Restore-Box at step 9, sent as a file by it at step 13 and by Install-Backup at step 23 |
 | The bot token, the Discord client secret, the site's keys, the door key | inside the backup: the site's `config.json`, the bot's `bot.env.json`, each server's `private\door.json` | put back by Restore-Box, step 13; Install-Bot runs with `-NoToken`, so nothing asks for them |
-| The staff channel webhook | Discord: the staff channel, Edit Channel, Integrations, Webhooks, Copy Webhook URL | pasted at Watch-Services' prompt, step 21 |
+| The staff channel webhook | Discord: #staff-updates, Edit Channel, Integrations, Webhooks, Copy Webhook URL | pasted at Watch-Services' prompt, step 21 |
 | Patrick's GitHub sign in | `gh auth login` on One | the build runner's registration, step 24 |
 | The DNS records | Patrick's own Cloudflare login, which he signs in to with GitHub, where thornswood.net is registered | step 18 |
 | Code signing | `records\signing\signing.json` on One and the Azure account behind it | the installer, step 17, and the main Ship, step 29 |
@@ -196,7 +196,7 @@ typed on a command line or written on this page.
    .\scripts\deploy\Deploy-Gamemode.ps1
    .\scripts\release\Export-ServerPayload.ps1
    scp (.\scripts\release\Where.ps1 ServerZip) Administrator@<new address>:C:/thornswood-server.zip
-   scp .\scripts\deploy\Install-ThornswoodServer.ps1 .\scripts\deploy\ServerSettings.ps1 .\scripts\deploy\ServerBuild.ps1 .\scripts\deploy\ServerReadyWait.ps1 .\scripts\vps\Roll-Log.ps1 Administrator@<new address>:C:/
+   scp .\scripts\deploy\Install-ThornswoodServer.ps1 .\scripts\deploy\ServerSettings.ps1 .\scripts\deploy\ServerBuild.ps1 .\scripts\deploy\ServerReadyWait.ps1 .\scripts\release\Read-JsonFile.ps1 .\scripts\release\RecordShape.ps1 .\scripts\vps\Roll-Log.ps1 Administrator@<new address>:C:/
    ssh Administrator@<new address> "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Install-ThornswoodServer.ps1 -RequirePass on"
    ```
    The last one prints `load order: all <n> plugins present` and registers the
@@ -320,8 +320,13 @@ repository folder, as docs\RESTORING.md "The box is gone" says.
     `.\scripts\vps\Watch-Services.ps1 -Install`.
 21. **Where it posts when the bot is down:**
     `.\scripts\vps\Watch-Services.ps1 -SetWebhook`. It asks for the webhook at
-    a prompt and posts a test message in the staff channel.
-22. **The load record:** `.\scripts\vps\Watch-Load.ps1 -Install`.
+    a prompt, refuses one that does not post in #staff-updates, and posts a
+    test message there.
+22. **The load record:** `.\scripts\vps\Watch-Load.ps1 -Install`. **The disk
+    forecast:** `.\scripts\vps\Forecast-Storage.ps1 -Install`, one sample a
+    day as the task `Thornswood Disk History`. Copy the old box's
+    `C:\Thornswood-Watch\disk-history.jsonl` across first if it can still be
+    read, so the forecast does not start again from nothing.
 23. **The nightly backup, and one now:**
     `.\scripts\deploy\Install-Backup.ps1 -RunNow`. The box already has this
     machine's passphrase from step 13; on a box without one, Install-Backup
@@ -335,7 +340,9 @@ repository folder, as docs\RESTORING.md "The box is gone" says.
     has passed `.\scripts\vps\Setup-SshKey.ps1 -Test` against it:
     `.\scripts\vps\Harden-VPS.ps1`. It proves key login first, then turns ssh
     password login and Remote Desktop off (issue #450). The provider's console
-    and the Administrator password stay the way back.
+    and the Administrator password stay the way back. If the old box had port
+    22 limited to a list of addresses, set the same list on the new one:
+    `.\scripts\vps\Set-SshScope.ps1 -From <the list>` (issue #2182).
 
 ### Moving everybody
 

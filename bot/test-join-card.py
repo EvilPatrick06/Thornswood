@@ -20,6 +20,7 @@ The background half runs the real card.render and the real make-join-card.py.
 
 Read only. Never connects to anything.
 """
+import _pyguard  # noqa: F401  (first: Python 3.10 or newer, #2276)
 import asyncio
 import io
 import json
@@ -290,7 +291,7 @@ sends = re.search(r"foreach \(\$f in ([^)]*)\)", install)
 listed = re.findall(r"'([^']+)'", sends.group(1)) if sends else None
 yes('I1 the code Install-Bot sends is a fixed list, and the record is not '
     'on it (got %r)' % (listed,),
-    listed == ['bot.py', 'card.py', 'dev-channel.txt', 'requirements.txt',
+    listed == ['bot.py', '_pyguard.py', 'card.py', 'staff-channel.txt', 'requirements.txt',
                'factions.json']
     and 'joins.json' not in (listed or []))
 
@@ -302,7 +303,7 @@ for ln in lines:
 # service/BotService.cs is the source of the Windows service the bot runs
 # under (issue #465), which replaced roll-log.ps1 here. It is a program, not
 # the record, and I4 below still refuses any write that names joins.json.
-allowed = ['$Root/$f', '$Root/staff-channel.txt', '$Root/assets/join-card.png',
+allowed = ['$Root/$f', '$Root/assets/join-card.png',
            '$Root/service/BotService.cs', '$far']
 # Since #1093 the code goes up into a stage folder first ($Root/$stageName/$rel,
 # stage, check, swap), each file under its key in $send. So that destination is

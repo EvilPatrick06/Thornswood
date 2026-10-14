@@ -186,9 +186,9 @@ how to make the check (issue #449, `bot/bot.py:uptime_ping`, `bot/bot.py:PING_UR
 both game servers and both voice servers over HTTP, which it tells about and
 never restarts for, and checks the `Thornswood Backup` task's last result with
 a backup under 26 hours old, every build runner's service, and writes DISK LOW
-under 20 percent free on C: and DISK CRITICAL under 10. It tells the staff
-channel once when any of these goes down and once when it is back (issue
-#447): each message goes into `C:\Thornswood-Watch\alerts.jsonl`, the bot
+under 20 percent free on C: and DISK CRITICAL under 10. It tells
+#staff-updates once when any of these goes down and once when it is back
+(issue #447; the channel is the id in `bot/staff-channel.txt`, #2501): each message goes into `C:\Thornswood-Watch\alerts.jsonl`, the bot
 posts it within a minute, and when the bot is down or silent the watchdog posts
 it through the webhook in `alerts-webhook.txt` beside it
 (`Watch-Services.ps1:HealthProblem`, `Watch-Services.ps1:$tellOnly`,

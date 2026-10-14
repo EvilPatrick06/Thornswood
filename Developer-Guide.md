@@ -963,9 +963,22 @@ How to use it:
   should happen, with no issue numbers, links or code, and closes the issue.
   The bot turns that comment into a post in the #test-tasks forum the moment
   the issue closes, tagged Main, so closing it when it merges or when it
-  reaches dev sends testers to look for a fix that main does not have. The
-  `Server:` line those comments carried before is no longer needed; the bot
-  reads it and ignores it (`bot\README.md`, Testing).
+  reaches dev sends testers to look for a fix that main does not have. Write
+  `Server: Main` on the line under the title, or no `Server:` line at all.
+- Most test tasks are Main, because testers play on main in the alpha and dev
+  is where the team checks nothing is broken (Patrick, 12 Oct). When the code
+  is done and someone on dev has to measure something first, write a
+  `Test task:` comment with `Server: Dev` on the line under the title, and
+  leave the issue open. That one is for developers, so write it in developer
+  terms: the files, log lines and commands to run, and what each should
+  print, with a `Build:` line naming the dev release or gamemode commit it
+  needs. The bot posts it at once in #dev-test-tasks, a forum in the Staff
+  category that only staff see, whole, with links to the issue, its pull
+  requests and commits, and its labels. It takes the post down when the
+  issue closes or a newer `Test task:` comment does not say `Server: Dev`.
+  Put what was measured on the issue: the post is deleted when it goes. When
+  the fix reaches main, write the Main test task in plain words and close
+  the issue as above, and it moves to #test-tasks (`bot\README.md`, Testing).
 
 #### What is not a reason to skip an issue
 
@@ -1293,7 +1306,10 @@ The short form of the rules. The same decisions, with the dates they were made, 
   ~410 of them (tests/, bot, and voice), and a look for stray pull requests
   and branches run every night on the VPS (.github/workflows/nightly.yml,
   03:00 Mountain); a failure there opens an issue on the board, "Nightly
-  checks failed", and whoever broke it fixes it next. It runs on the VPS, on the runners
+  checks failed", and whoever broke it fixes it next. The harnesses run in
+  shares, a job each on a runner of its own with 45 minutes of its own
+  (`scripts\dev\Nightly-Harnesses.ps1`, #2357); a share that runs out of
+  time names the harnesses it did not get to, and the cure is another share. It runs on the VPS, on the runners
   `.\scripts\deploy\Install-Runner.ps1` puts there (issue #437), because
   GitHub's own runners were blocked on billing from 25 Sep. Several since
   4 Oct, so checks run side by side: `-Number 2` and up puts each one after
@@ -1527,7 +1543,7 @@ The gamemode command, then the server command, is the live pair. `-GamemodeOnly`
 
 ### A hotfix
 
-A hotfix is the one live release that does not come off `main`. The branch starts from the tag of the release that is live, carries only the fix and its `Bump-Version.ps1` commit, and is pushed. Ship runs from a checkout of that branch. The dev feed stays as it is. The fix also goes to `main` through its own pull request, or the next main release loses it. The long form is in [How a release goes out](#how-a-release-goes-out).
+A hotfix is the one live release that does not come off `main`. The branch starts from the tag of the release that is live, carries only the fix and its `Bump-Version.ps1` commit, and is pushed. Ship runs from a checkout of that branch. When the installer has to be rebuilt for it, `Package-Thornswood.ps1 -OneFile` runs from the same checkout: it and `Publish-Installer.ps1` accept a clean `hotfix/` branch that matches GitHub by the same rule Ship uses (#2436), with no `-AllowStaleCheckout`. The dev feed stays as it is. The fix also goes to `main` through its own pull request, or the next main release loses it. The long form is in [How a release goes out](#how-a-release-goes-out).
 
 ### How a release goes out
 
@@ -1721,7 +1737,7 @@ release, launcher, game files and server together, are in How work moves.
 | Voice | `C:\Thornswood-Voice` 7778 and `C:\Thornswood-Voice-Dev` 7789 | node, `voice\voice-server.js`; the launcher holds the microphone, the game plugin relays state through files in `Data\Platform` |
 | Site | `site`, on the VPS at `C:\Thornswood-Docs`, node on 127.0.0.1:3001 behind Caddy, https://thornswood.net | Public pages from `data\site\*.md`, admin hub, Discord login, the door API, uploads, news |
 | Bot | `bot`, on the VPS at `C:\Thornswood-Bot`, the Windows service `ThornswoodBot` under its own account, `NT SERVICE\ThornswoodBot` | discord.py: tickets, join cards, staff tools |
-| Watchdog | `C:\Thornswood-Watch\watch.ps1`, every five minutes | Restarts any service that stops answering, three tries an hour, and tells the staff channel once when anything dies and once when it is back: the servers, voice, the site, the bot, the nightly backup, the build runner and the disk. Through the bot, or its own webhook when the bot is down |
+| Watchdog | `C:\Thornswood-Watch\watch.ps1`, every five minutes | Restarts any service that stops answering, three tries an hour, and tells #staff-updates (the id in `bot\staff-channel.txt`) once when anything dies and once when it is back: the servers, voice, the site, the bot, the nightly backup, the build runner and the disk. Through the bot, or its own webhook when the bot is down |
 
 The server's SkyMP fork is on GitHub (github.com/EvilPatrick06/skymp, branch
 `thornswood/engine-changes`), so its source survives any one machine, and since
@@ -1943,9 +1959,12 @@ it per session and ignores which profile Vortex has on.
 - `lore\`: history and the Accord. `site\data\site\*.md`: the public
   pages (join, rules, classes, world, credits, privacy, terms), also live on
   the site.
-- The site's hub boards (Active Issues, Known Issues, Test These, Suggestions,
-  Archive, the Patrick runbook) are older than the board and are being retired
-  (issue #433); where they disagree with the board, the board is right.
+- The site's hub boards (Active Issues, Test These, Suggestions, Archive, the
+  Patrick runbook) are older than the board and are being retired (issue
+  #433); where they disagree with the board, the board is right. Known
+  Issues is not one of them: it is the public page's only copy, the known
+  board in `site\dataoard.json`, edited in the hub at `/hub/known` and
+  written out at `/known` (decided by Patrick on 12 Oct, issue #2414).
 - `docs\archive`: dated snapshots (HANDOFF, the 17 September audit,
   WORKING-NOTES and the old To Do List), history only.
 
@@ -2542,7 +2561,7 @@ says **not enforced** where nothing checks it.
 | Discord bot token | `discord.botToken` in `C:\Thornswood-Docs\config.json` and `DISCORD_TOKEN` in `C:\Thornswood-Bot\bot.env.json`, the same token in both | Everything the bot may do in the Discord, and the site's reading of who holds which role, which is what decides who may play. | The application's owner resets it in the developer portal (Bot, Reset Token). Then `.\scripts\deploy\Rotate-BotToken.ps1`, one command: it asks at a prompt, writes both files or neither, restarts the bot and the site, and `-Check` afterwards says whether each file holds a token without showing it. `Install-Bot.ps1` and `Set-DiscordLogin.ps1` write it through the same writer, `scripts\vps\Write-BotToken.ps1`, so either one also updates both. Every backup made before the reset still holds the old token: the nightly ones in `C:\Thornswood-Backup` on the VPS and anything brought down to `local\backups` in the repository folder. |
 | #news webhook | `C:\Thornswood-Bot\webhooks\news.txt` on the VPS, read over ssh by every machine that ships (`Discord-Hook.ps1`); `bot\news-webhook.txt` on a machine only as the fallback when the VPS cannot be asked | Posting in #news as the bot, for anybody holding the URL. | Delete the webhook called Thornswood in #news (Edit Channel, Integrations, Webhooks), make a new one, and put its URL in that file. |
 | Dev updates webhook | `C:\Thornswood-Bot\webhooks\dev.txt` on the VPS, read the same way; `bot\dev-webhook.txt` only as the fallback | Posting in the dev updates channel as the bot, for anybody holding the URL. | Delete it in that channel's Integrations, Webhooks, make a new one, and give its URL to `Set-DevNews.ps1`, which checks it points at the dev channel before it saves anything. |
-| Watchdog alerts webhook | `C:\Thornswood-Watch\alerts-webhook.txt` on the VPS, readable by SYSTEM and Administrators only, and `%LOCALAPPDATA%\Thornswood\Watch-Outside\alerts-webhook.txt` on One | Posting in the staff channel, for anybody holding the URL. The watchdog uses it only when the bot is down or silent. | Delete it in the staff channel's Integrations, Webhooks, make a new one, and give its URL to `.\scripts\vps\Watch-Services.ps1 -SetWebhook`, which asks at a prompt and posts a test message, and on One to `.\scripts\vps\Watch-Outside.ps1 -SetWebhook`, which keeps its own copy for when the VPS cannot be reached (issue #448). |
+| Watchdog alerts webhook | `C:\Thornswood-Watch\alerts-webhook.txt` on the VPS, readable by SYSTEM and Administrators only, and `%LOCALAPPDATA%\Thornswood\Watch-Outside\alerts-webhook.txt` on One | Posting in #staff-updates, for anybody holding the URL. The watchdog uses it only when the bot is down or silent. | Delete it in #staff-updates' Integrations, Webhooks, make a new one there, and give its URL to `.\scripts\vps\Watch-Services.ps1 -SetWebhook`, which asks at a prompt, refuses a webhook in any other channel and posts a test message (the report it prints with no switch says where the one on the box posts), and on One to `.\scripts\vps\Watch-Outside.ps1 -SetWebhook`, which keeps its own copy for when the VPS cannot be reached (issue #448). |
 | Voice join token key | `token-key.txt` in `C:\Thornswood-Voice` on the VPS. `C:\Thornswood-Voice-Dev` has its own, which dev voice makes itself; `vps-dev-instance.ps1` never copies live's (#1083) | Signs the token that says which profile a voice connection belongs to. Enforced: a connection that cannot prove itself with one is refused, and the service mints one only when the site says the Discord ticket owns that profile (#1303, #1315). Holding the key is being able to join voice as anybody. | The service makes it itself. Delete the file and run `Install-Voice.ps1 -Restart`; tokens already issued stop working, and the launcher's voice page and the game's chat each ask for a new one when they connect again (one token, one connection, two minutes: #1322). |
 | TURN relay key, not in use yet | `turn-key.txt` in `C:\Thornswood-Voice` on the VPS, put there by hand, and its own in `C:\Thornswood-Voice-Dev`, put there by hand too; `vps-dev-instance.ps1` never copies the live one (#1083). Neither is there yet: no relay has been stood up, so the service offers STUN only | Nothing yet. Once a relay is up, the voice service makes each browser a credential from it, and a credential lets whoever holds it send traffic through the relay until it expires. **Not enforced** as to who gets one: `/ice` answers anybody who asks. | Whoever runs the relay changes its shared secret there, puts the same value in `turn-key.txt`, and runs `Install-Voice.ps1 -Restart`. Credentials already handed out stop working at once. |
 | Backup passphrase | `C:\Thornswood-Backup\key.txt` on the VPS and `Documents\thornswood-backup-key.txt` on Patrick's machine, one copy in each on purpose | The nightly backups, which hold the site's `config.json`, `bot.env.json` and the live game server's `private` folder: every VPS secret above except the voice service's files. | `Install-Backup.ps1` sends the Documents copy up when the box has no `key.txt` (a new box, issue #454), makes one when neither has it, and copies it down when the Documents copy is missing. Keep the old one until the backups made with it have aged out. |
@@ -2708,4 +2727,4 @@ Not from the chat: `/restart` and `/shutdown` answer that restarts are not run f
 | Command | Who | What it does |
 | --- | --- | --- |
 | `/close [why]` | Staff, in a ticket: the bot's `STAFF_ROLES`, by id or name, never Manage Threads alone (#1342) | Closes the ticket |
-| `/test-task title body tag` | Owner, Dev and Lead Gamemaster (`TEST_TASK_ROLES`) | Posts one thread in the #test-tasks forum, tagged Dev or Main. The Live smoke checklist and `/live-smoke` were taken out on 11 October |
+| `/test-task title body [tag]` | Owner, Dev and Lead Gamemaster (`TEST_TASK_ROLES`) | Posts one thread: tagged Main (the default) in the #test-tasks forum, for testers on main, or tagged Dev in the staff-only #dev-test-tasks, for something someone on dev has to measure (Patrick, 12 Oct). The Live smoke checklist and `/live-smoke` were taken out on 11 October |

@@ -218,6 +218,9 @@ function boot(reg, w, opts) {
     'function save() { reg.funds = JSON.parse(JSON.stringify(funds)); ' +
     'reg.notices = JSON.parse(JSON.stringify(notices)); reg.boards = JSON.parse(JSON.stringify(boards)); reg.saves = (reg.saves || 0) + 1; }',
     'function refreshPanel() { }',
+    // Nobody guards these boards; a guard's take down (#502) is
+    // tests/test-502-guard-board.js.
+    'function isGuard() { return false; }',
     ['deeds', 'setLock', 'mold', 'moldHere', 'cutKey', 'here', 'claim', 'jarlCmd', 'stewardCmd',
      'evict', 'boxCmd', 'rentCmd', 'bedCmd'].map(function (n) { return 'function ' + n + '() { return true; }'; }).join('\n')
   ];

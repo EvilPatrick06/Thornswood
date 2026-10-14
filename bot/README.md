@@ -70,7 +70,9 @@ until somebody decides otherwise.
 One general. A second one only ever splits the same conversation in half. It
 was `#general` until it was renamed, and the topic on it is written by hand,
 so the builder leaves the topic alone. `#welcome-travelers` is where the join
-cards go, and the server's system channel points at it.
+cards go, and the server's system channel points at it. The card is a file, so
+the builder gives the bot Attach Files in that channel's overwrite for the bot,
+beside seeing, posting and reading back, which is all it gets elsewhere (#2341).
 
 `#game-rules` sits here rather than in In Character, because that is where it
 was moved to. It carries the nine in-world rules, read out of the "In the
@@ -117,11 +119,15 @@ it back. Until 11 October `#test-tasks` carried the Live smoke checklist
 (dated sessions with Pass, Fail, Skip and Fail-known rows, `/live-smoke`).
 Patrick's card of that day took all of it out.
 
-**Test tasks.** One thread per test task, from a title and a body, with the
-forum's Dev or Main tag on it:
+**Test tasks.** One thread per test task, from a title and a body, tagged
+Main or Dev. Main, the default, goes to `#test-tasks` for testers on main;
+Dev goes to the staff-only `#dev-test-tasks` (below), for something someone
+on dev has to measure. `#test-tasks` itself only ever holds Main (Patrick,
+#2276). On 12 Oct Patrick gave hand posts the Dev choice back, now that Dev
+has a forum of its own; #2413 had made them Main only.
 
-    /test-task title body tag     in Discord: Owner, Dev and Lead Gamemaster
-    python bot.py --env-file C:\Thornswood-Bot\bot.env.json --post-task --title "..." --body-file task.txt --tag Dev
+    /test-task title body [tag]   in Discord: Owner, Dev and Lead Gamemaster; tag is Main (default) or Dev
+    python bot.py --env-file C:\Thornswood-Bot\bot.env.json --post-task --title "..." --body-file task.txt [--tag Dev]
 
 Who may post is `TEST_TASK_ROLES` in `bot.env.json`, by role id (preferred) or
 name, Owner, Dev, Lead Gamemaster and Lead GM by default. A `bot.env.json`
@@ -129,10 +135,10 @@ that still carries `LIVE_SMOKE_ADMIN_ROLES` is read for it. A thread already
 open under the same title is handed back rather than made twice.
 
 **Known issues and test tasks, from the board** (Patrick, 11 Oct: "it is
-supposed to be automatic as we add things and fix things"). Two forums are
+supposed to be automatic as we add things and fix things"). Three forums are
 kept from `EvilPatrick06/Thornswood`, every five minutes (`KNOWN_ISSUES_EVERY`,
 never under a minute), with `GITHUB_TOKEN` from `bot.env.json`, a read only
-token for that repository's issues. No token, neither is kept, said once in the
+token for that repository's issues. No token, none is kept, said once in the
 log.
 
 - `#known-issues`, read only: one post per open issue labelled Dev Findings
@@ -159,6 +165,35 @@ log.
   gets no post. A reopened issue loses its test task and comes
   back to `#known-issues` if it is still a finding. Staff close a test task
   in Discord once it is confirmed.
+- `#dev-test-tasks`, in Staff and seen only by staff (Patrick, 12 Oct): one
+  post per issue whose last `Test task:` comment has `Server: Dev` straight
+  under its first line, tagged Dev. That is a measurement someone on dev has
+  to take, usually on an open issue whose code is done. The post is made as
+  soon as the comment is there, open issue or closed, and it goes when the
+  issue is closed after that comment, or when a newer `Test task:` comment
+  does not say `Server: Dev`. A closed issue's last test task then goes to
+  `#test-tasks` as above, if it is Main; an issue that closes while its last
+  test task still says `Server: Dev` gets no `#test-tasks` post from it.
+  Every other test task is Main, because testers play on main in the alpha.
+  The post is deleted when it goes, so what was measured belongs on the
+  issue.
+
+  A dev post is written for developers, who have GitHub (Patrick, 12 Oct):
+  it links the issue and says its state and labels, links every pull request
+  of this repository that mentions the issue and is merged or still open,
+  and every commit of this repository that names it (both read from the
+  issue's timeline, which the same issues token reads; a commit there can be
+  a branch commit as well as a merge), names the build it needs from a
+  `Build:` line in the comment or the issue (a dev release id or a gamemode
+  commit), links the comment, and then gives the whole test task. That
+  comment may be written in developer terms, with file names, log lines,
+  commands and what each should print. Nothing is cut: Discord takes 2000
+  characters in a message, so the rest goes in follow-up messages in the
+  post, in order, kept in step when the comment changes (their ids are in
+  the record's `more`). The links are as of the last change to the issue.
+  `#test-tasks` posts stay exactly as they were: the test task alone, plain
+  words, no numbers, links or code, because testers are not developers. A Dev test task posted by hand (`/test-task` with the tag Dev) also
+  lands here; it belongs to no issue, so the bot leaves it for staff to close.
 
 **When an issue is closed** (Patrick, 11 Oct): dev is where the team checks
 that nothing breaks the game, and main is where testers test, since we are in
@@ -166,10 +201,14 @@ alpha. So a fix people would notice is closed, with its `Test task:` comment,
 when it reaches main, not when its pull request merges or when it reaches
 dev. The bot posts a test task the moment the issue closes, so closing it
 earlier sends testers to look for a fix main does not have. That is why every
-test task from the board is tagged Main. The `Server:` line that comments
-carried until then is no longer needed: a `Server: Dev` or `Server: Main`
-line straight under `Test task:` is still read, so it never shows in the
-post, and it changes nothing. Under `Known issue:` it still sets the tag.
+test task in `#test-tasks` is tagged Main. Write `Server: Main` (or no
+`Server:` line) under `Test task:` for testers on main, and `Server: Dev`
+only when someone on dev has to measure it, which sends it to
+`#dev-test-tasks` for staff. The line never shows in the post. `Server: Dev`
+counts only on a comment written from the day `#dev-test-tasks` began (the
+bot's first pass that finds it, `dev_since` in `data\known-issues.json`), so
+the comments written before that, which all carried a `Server:` line, stay in
+`#test-tasks`. Under `Known issue:` the line still sets the tag.
 
 A rewritten `Known issue:` or `Test task:` comment edits its post (title,
 body and tag) on the next pass. Comments are read only for an issue GitHub
@@ -208,11 +247,26 @@ same people and read only for all but the bot. A server set up before
 channel is deleted when it holds only the bot's own posts (otherwise renamed
 `#known-issues-archive` and locked), and the forum takes the name. A finished apply is written to `data\channel-setup.json` and a
 second run does nothing; an apply that stopped part way does only what is left.
-`test-testing-channels.py` holds all of this.
+
+The third step (Patrick, 12 Oct) makes the `#dev-test-tasks` forum, tagged
+Dev, in the category whose id is `DEV_TASKS_CATEGORY` (the Staff category,
+1549254990110134374, by default), with that category's permission overwrites
+copied, so the same staff see it, and the bot's own overwrite from
+`#test-tasks` with the forum rights on (see it, post, reply, delete its posts,
+read them back). A server set up before gets this step alone on its next
+apply. Its id goes into `data\channel-setup.json` as `dev_tasks_id`, and the
+bot finds the forum by that id from then on, never by its name: a rename
+keeps it, and no second one is made. A forum of that name already in the
+category is taken as it is, with the Dev tag and the bot's rights added. If
+the recorded forum is deleted, the bot says so in its log once and posts no
+dev test tasks until the next apply makes it again. `Build-Discord.py` names
+it in Staff with `make=False` and in its never-delete list, so `-Prune`
+leaves it. `test-testing-channels.py` holds all of this.
 
 ### Staff
 
 A staff `#news` where the site watcher speaks, `dev-test-results` (a forum),
+`#dev-test-tasks` (a forum the bot keeps, see Testing above),
 `#staff-general` and a Staff Room. Invisible to everybody else.
 
 `#dev-notes`, `#deploys` and `#reports` were here and are gone, and like
@@ -309,6 +363,21 @@ accepted. Discord has no default-role setting. Then the person picks a hold.
 `content.py` holds every read only post. Edit it, run `Setup-Discord.ps1`
 again, and the posts are rewritten in place. It deletes what the bot wrote last
 time rather than adding a second copy, so the rules never end up posted twice.
+
+## Running the bot's tests
+
+The bot and its tests need Python 3.10 or newer, and the bot runs on 3.12.
+On a Windows PC with more than one Python installed, plain `python` is
+whichever comes first on PATH (on One that is 3.9), so run them with the
+launcher:
+
+    py -3.12 bot\test-testing-channels.py
+
+With the libraries from `bot\requirements.txt`. On an older Python, bot.py
+and every test stop at once and say so, rather than failing somewhere deep in
+a test (#2276). The check is `_pyguard.py`, imported first by bot.py and by
+every `test-*.py`, and Install-Bot.ps1 sends it with bot.py.
+`test-python-version.py` holds that.
 
 ## Putting a bot change on the VPS
 
@@ -407,7 +476,7 @@ Thornswood, so do not put it in the repository or paste it anywhere.
 
 ## Being told when the bot or the VPS stops, from outside
 
-The watchdog on the VPS tells the staff channel when something there dies,
+The watchdog on the VPS tells #staff-updates when something there dies,
 and One watches the site from outside (issue #448). Neither can say anything
 when the whole VPS is off or cut off while One is off too. So the bot pings an
 outside uptime monitor once a minute while it is on Discord, and when the

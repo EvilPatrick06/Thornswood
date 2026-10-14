@@ -359,6 +359,111 @@ function Get-SourceRepo([string]$repoDir) {
     return 'EvilPatrick06/Thornswood'
 }
 
+# FOUND THROUGH REST, NOT GRAPHQL, issue #2432. The drafts release.yml makes
+# were fetched with gh release download, which finds a release by its tag
+# through GitHub's GraphQL API. On 12 October, main 1.2.4: the v1.2.4 draft
+# carried all three files (run 38281424727), gh release download answered
+# "release not found" most of the time, a GraphQL query for that tag answered
+# RATE_LIMIT with 4,999 of 5,000 points left (GitHub's secondary limit, from
+# many agents calling at once), and the REST releases list showed the draft
+# every time. So Ship said "There is no verified launcher" for a launcher that
+# was there. The draft is found in the REST list instead (it lists drafts to an
+# account that can push), and each file is downloaded by its asset id with
+# Accept: application/octet-stream, which is REST too.
+#
+# Invoke-GhToStream runs gh with its standard output going straight into a
+# stream, a file for an asset, so the exe arrives byte for byte; a PowerShell
+# redirect would read it as text lines and write them back changed. gh is the
+# one PowerShell would run for "& gh", so a gh.ps1 earlier on PATH (which is
+# what the harnesses put there) runs under this same PowerShell. Returns ''
+# when gh exits 0, else what gh said.
+function ConvertTo-GhArgument([string]$a) {
+    if ($a -ne '' -and $a -notmatch '[\s"]') { return $a }
+    $s = [regex]::Replace($a, '(\\*)"', '$1$1\"')
+    $s = [regex]::Replace($s, '(\\+)$', '$1$1')
+    return '"' + $s + '"'
+}
+function Invoke-GhToStream([string[]]$ghArgs, [IO.Stream]$to) {
+    $gh = Get-Command gh -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $gh) { return 'gh is not on this machine' }
+    $exe = $gh.Source
+    $all = @($ghArgs)
+    if ($gh.CommandType -eq 'ExternalScript') {
+        $exe = (Get-Process -Id $PID).Path
+        $all = @('-NoProfile', '-File', $gh.Source) + $all
+    }
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $exe
+    $psi.Arguments = (@($all | ForEach-Object { ConvertTo-GhArgument ([string]$_) }) -join ' ')
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $p = [System.Diagnostics.Process]::Start($psi)
+    try {
+        $err = $p.StandardError.ReadToEndAsync()
+        $p.StandardOutput.BaseStream.CopyTo($to)
+        $p.WaitForExit()
+        if ($p.ExitCode -eq 0) { return '' }
+        $said = (([string]$err.Result).Trim() -split "`r?`n" | Where-Object { $_.Trim() } | Select-Object -Last 3) -join ' '
+        if (-not $said) { $said = 'no message' }
+        return ("gh exited $($p.ExitCode): $said")
+    } finally { $p.Dispose() }
+}
+
+# The release for $tag, out of the REST list of every release, drafts
+# included. Returns @{ Release; Why }: Release is $null with Why '' when the
+# repository has no release for that tag, and $null with Why saying so when
+# the list could not be read. Pages of 100 until a short page. Two drafts for
+# one tag happen (v1.1.96 has two, made in the same second on 27 Sep, before
+# release.yml queued its runs): the newest, the highest id, is taken, which is
+# the one the last run of release.yml uploaded into.
+function Find-ReleaseByTag([string]$repo, [string]$tag) {
+    $found = $null
+    for ($page = 1; ; $page++) {
+        $ms = New-Object IO.MemoryStream
+        try {
+            $why = Invoke-GhToStream @('api', '-H', 'Accept: application/vnd.github+json', "repos/$repo/releases?per_page=100&page=$page") $ms
+            $text = [Text.Encoding]::UTF8.GetString($ms.ToArray())
+        } finally { $ms.Dispose() }
+        if ($why) { return @{ Release = $null; Why = "gh could not list the releases of $repo ($why)" } }
+        try { $list = @($text | ConvertFrom-Json) }
+        catch { return @{ Release = $null; Why = "the list of releases of $repo did not read as JSON ($($_.Exception.Message))" } }
+        # PowerShell 5.1 hands a JSON array back as one item holding the array.
+        if ($list.Count -eq 1 -and $list[0] -is [array]) { $list = @($list[0]) }
+        foreach ($r in $list) {
+            if ($r -and [string]$r.tag_name -eq $tag -and ($null -eq $found -or [long]$r.id -gt [long]$found.id)) { $found = $r }
+        }
+        if ($list.Count -lt 100) { break }
+    }
+    return @{ Release = $found; Why = '' }
+}
+
+# Downloads each of $names from $release into $into by asset id, binary safe,
+# and checks each is the size the release lists. Returns '' when every one is
+# there, else which one is missing or did not come down whole (and a file that
+# did not is removed, so nothing half written is left to be read).
+function Save-ReleaseAssets([string]$repo, $release, [string[]]$names, [string]$into) {
+    New-Item -ItemType Directory -Force -Path $into | Out-Null
+    foreach ($n in $names) {
+        $a = @($release.assets | Where-Object { $_ -and [string]$_.name -eq $n }) | Select-Object -First 1
+        if (-not $a) { return "the release has no $n" }
+        $path = Join-Path $into $n
+        $fs = [IO.File]::Create($path)
+        try { $why = Invoke-GhToStream @('api', '-H', 'Accept: application/octet-stream', "repos/$repo/releases/assets/$($a.id)") $fs }
+        finally { $fs.Dispose() }
+        if (-not $why) {
+            $len = (Get-Item -LiteralPath $path).Length
+            if ($len -ne [long]$a.size) { $why = "$n came down as $len bytes, and the release lists $($a.size)" }
+        }
+        if ($why) {
+            Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
+            return "could not download $n ($why)"
+        }
+    }
+    return ''
+}
+
 # Downloads Thornswood.exe and SHA256SUMS for tag v<version> into $into and
 # checks the exe against its line in SHA256SUMS. Returns '' when the verified
 # exe is sitting in $into, or a sentence saying why not, for the caller to Die
@@ -373,20 +478,22 @@ function Get-ReleaseLauncher([string]$repo, [string]$version, [string]$into) {
         $p = Join-Path $into $n
         if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Force }
     }
-    $repoArg = @(); if ($repo) { $repoArg = @('--repo', $repo) }
-    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    & gh release download $tag @repoArg --dir $into --pattern 'Thornswood.exe' --pattern 'SHA256SUMS' --clobber 2>&1 | Out-Host
-    $rc = $LASTEXITCODE
-    $ErrorActionPreference = $old
+    $notYet = ("There is no verified launcher for $tag on $repo yet. CI builds the exe that ships; this machine does not compile it. " +
+               "Push the tag to build it, wait for the ""Build the release launcher"" run to attach Thornswood.exe and SHA256SUMS to the " +
+               "draft release, then run this same Ship again:`r`n" +
+               "    git tag $tag`r`n" +
+               "    git push origin $tag")
+    $look = Find-ReleaseByTag $repo $tag
+    if ($look.Why) {
+        return ("The launcher CI built for $tag could not be looked for: $($look.Why). This is GitHub or gh, not the release; " +
+                "check gh auth status and run this same Ship again. Nothing was published.")
+    }
+    if (-not $look.Release) { return $notYet }
+    $got = Save-ReleaseAssets $repo $look.Release @('Thornswood.exe', 'SHA256SUMS') $into
+    if ($got -match '^the release has no ') { return $notYet }
+    if ($got) { return ("The launcher CI built for $tag is on $repo, but $got. Run this same Ship again. Nothing was published.") }
     $exe = Join-Path $into 'Thornswood.exe'
     $sums = Join-Path $into 'SHA256SUMS'
-    if ($rc -ne 0 -or -not (Test-Path -LiteralPath $exe) -or -not (Test-Path -LiteralPath $sums)) {
-        return ("There is no verified launcher for $tag on $repo yet. CI builds the exe that ships; this machine does not compile it. " +
-                "Push the tag to build it, wait for the ""Build the release launcher"" run to attach Thornswood.exe and SHA256SUMS to the " +
-                "draft release, then run this same Ship again:`r`n" +
-                "    git tag $tag`r`n" +
-                "    git push origin $tag")
-    }
     # SHA256SUMS is "<hash>  Thornswood.exe", the sha256sum shape, so the line
     # for the exe is found and its hash compared with the download's.
     $want = ''
@@ -426,17 +533,19 @@ function Get-ReleaseStub([string]$repo, [string]$version, [string]$into) {
         $p = Join-Path $into $n
         if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Force }
     }
-    $repoArg = @(); if ($repo) { $repoArg = @('--repo', $repo) }
-    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    & gh release download $tag @repoArg --dir $into --pattern 'setup-stub.exe' --pattern 'SHA256SUMS' --clobber 2>&1 | Out-Host
-    $rc = $LASTEXITCODE
-    $ErrorActionPreference = $old
+    $none = ("The release for $tag on $repo has no setup program (setup-stub.exe), so -Package would build an installer " +
+             "with nothing to run it. Nothing was published. " + $again)
+    $look = Find-ReleaseByTag $repo $tag
+    if ($look.Why) {
+        return ("The setup program CI built for $tag could not be looked for: $($look.Why). This is GitHub or gh, not the release; " +
+                "check gh auth status and run this same Ship again. Nothing was published.")
+    }
+    if (-not $look.Release) { return $none }
+    $got = Save-ReleaseAssets $repo $look.Release @('setup-stub.exe', 'SHA256SUMS') $into
+    if ($got -match '^the release has no ') { return $none }
+    if ($got) { return ("The setup program CI built for $tag is on $repo, but $got. Run this same Ship again. Nothing was published.") }
     $stub = Join-Path $into 'setup-stub.exe'
     $sums = Join-Path $into 'SHA256SUMS'
-    if ($rc -ne 0 -or -not (Test-Path -LiteralPath $stub) -or -not (Test-Path -LiteralPath $sums)) {
-        return ("The release for $tag on $repo has no setup program (setup-stub.exe), so -Package would build an installer " +
-                "with nothing to run it. Nothing was published. " + $again)
-    }
     $want = ''
     foreach ($line in [IO.File]::ReadAllLines($sums)) {
         $m = [regex]::Match($line, '(?i)^\s*([0-9a-f]{64})\s+\*?setup-stub\.exe\s*$')
@@ -478,9 +587,12 @@ function Get-LauncherDrift([string]$repoDir, [string]$tag) {
     } finally { $ErrorActionPreference = $old }
 }
 
-# THE EXE CI BUILT IS NOT SIGNED, issue #921. release.yml compiles on the VPS
-# runner, which holds no signing certificate, so Sign-Artifact.ps1 there says
-# "not signing" and every v<version> draft carries an unsigned Thornswood.exe.
+# THE EXE CI BUILT MAY NOT BE SIGNED, issue #921. release.yml's VPS job
+# compiles on a runner that holds no signing certificate, so its v<version>
+# draft carries an unsigned Thornswood.exe, and until #2163's switch-over
+# every release is built there. release.yml's hosted job signs the exe on a
+# v tag, and such a draft passes through here untouched ("already signed by
+# us" below).
 # 20260927-1633 put exactly that on Main as 1.1.101 (sha256 38d4cd5d...), an
 # hour before the publish sign gate existed. Since then the gate refuses it,
 # which is safe but means no main Ship can go out at all.
@@ -688,7 +800,9 @@ function Test-KeepFeedLauncher($pub, [string]$inputs, [string]$current, [bool]$d
 # fingerprint: a number either feed already offers with a launcher built from
 # other sources is refused (#2347), because the launcher updates by number
 # alone and nobody on that number would ever be offered this one. Publish-Update
-# used to say so only once the launcher was built, signed and sent.
+# used to say so only once the launcher was built, signed and sent; it now
+# refuses the same case itself before anything is sent. A main Ship asks this
+# too, with main's feed alone and $aligned, since main's number is main's own.
 function Assert-DevVersionSelection([string]$selected, [string]$current, [bool]$aligned, [string[]]$published, [object[]]$launchers = @(), [string]$inputs = '') {
     if ($aligned -and $selected -ne $current) {
         Die "Main-equivalent source ships $current in both channels. Use a separate branch for a different Dev version."
@@ -1206,6 +1320,15 @@ if ($Dev -and -not $ModsOnly) {
         if ($liveLauncher -and $liveLauncher.Version) { $publishedVersions += $liveLauncher.Version; $liveLaunchers += $liveLauncher }
     }
     Assert-DevVersionSelection $target $current $MainEquivalent $publishedVersions $liveLaunchers $LauncherInputs
+}
+# A main Ship that would sign CI's exe again for the number main's feed already
+# offers, built from other sources (#2347): nobody on that number would be
+# offered it, so it stops here, before the exe is fetched or signed, in the
+# same terms as the dev case. The same sources, or no launcher (-ModsOnly, or
+# kept above), go on. Main's own number only, so no dev number is read.
+if (-not $Dev -and -not $ModsOnly) {
+    $mainNow = Get-PublishedLauncher $ReleaseDir 'main'
+    if ($mainNow -and $mainNow.Version) { Assert-DevVersionSelection $target $current $true @() @($mainNow) $LauncherInputs }
 }
 
 if ($target -ne $current) {
@@ -2023,6 +2146,9 @@ elseif ($Package) {
     # on #1213; this keeps the one it has.
     $pkgArgs = @{ Root = $Root; OutDir = $DistDir; NoPause = $true; OneFile = $true }
     if ($ciStub) { $pkgArgs['Stub'] = $ciStub }
+    # Ship's -AllowStaleCheckout goes on to the packager (#2436), the same as
+    # to Publish-Update (#2235), or the packager refuses what Ship let past.
+    if ($AllowStaleCheckout) { $pkgArgs['AllowStaleCheckout'] = $true }
     # A THROW IS A FAILED BUILD TOO (#2243). On 11 October a stale generated
     # files check inside the packager (Assert-ShipGeneratedBodies) threw, and
     # the throw went straight out of Ship: the remirror, the dev feed's marks,

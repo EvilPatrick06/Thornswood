@@ -9,19 +9,46 @@
 
       .\scripts\release\Check-Records.ps1
       .\scripts\release\Check-Records.ps1 -Repo <another checkout>
+      .\scripts\release\Check-Records.ps1 -Feed <a feed store folder>
+
+  -Feed (#2180, slice 5) holds that folder's version.json (which must be
+  there), published.json and releases.json (each when there) to RecordShape's
+  feed contracts instead, and checks nothing else. tests\fixtures\feed-2180
+  is a committed sample that passes.
 
   Reads only. docs\JSON-STATE-INVENTORY.md lists the rest of the critical
   JSON and who owns it.
 #>
 [CmdletBinding()]
-param([string]$Repo)
+param([string]$Repo, [string]$Feed)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'RecordShape.ps1')
+if ($Feed) {
+    if (-not (Test-Path -LiteralPath $Feed -PathType Container)) { Write-Host "  REFUSED  there is no feed folder at $Feed" -ForegroundColor Red; exit 1 }
+    $bad = 0
+    foreach ($kind in @($script:ThornswoodRecordKinds.Keys | Where-Object { $script:ThornswoodRecordKinds[$_].ContainsKey('Feed') })) {
+        $name = $script:ThornswoodRecordKinds[$kind].Feed
+        $path = Join-Path $Feed $name
+        if ($name -ne 'version.json' -and -not (Test-Path -LiteralPath $path)) { Write-Host ('  NONE     {0,-20} {1}' -f $kind, $name); continue }
+        try {
+            $null = Read-ThornswoodRecord -Path $path -Kind $kind
+            Write-Host ('  OK       {0,-20} {1}' -f $kind, $name)
+        } catch {
+            $bad++
+            Write-Host ('  REFUSED  {0,-20} {1}' -f $kind, $_.Exception.Message) -ForegroundColor Red
+        }
+    }
+    if ($bad) { Write-Host "$bad feed file(s) cannot be trusted." -ForegroundColor Red; exit 1 }
+    Write-Host 'Every feed file there reads in the shape its readers need.'
+    exit 0
+}
 if (-not $Repo) { $Repo = Join-Path $PSScriptRoot '..\..' }
 $Repo = (Resolve-Path -LiteralPath $Repo).Path
 $bad = 0
 foreach ($kind in @($script:ThornswoodRecordKinds.Keys)) {
+    # A kind with no committed file (server-settings) is each server's own, read on the box.
+    if (-not $script:ThornswoodRecordKinds[$kind].File) { continue }
     $path = Join-Path $Repo $script:ThornswoodRecordKinds[$kind].File
     try {
         $null = Read-ThornswoodRecord -Path $path -Kind $kind

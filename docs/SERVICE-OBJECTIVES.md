@@ -37,9 +37,10 @@ Three things watch the services, and one bot posts what they find.
   Discord (issue #449). Whether `PING_URL` is set is not visible from the
   repository.
 - **Where people are told.** The bot reads `alerts.jsonl` every minute and
-  posts each message in the staff channel. When the bot has not posted one
-  within two and a half minutes (`Watch-Services.ps1:$ackWait = 150`),
-  the watchdog posts it through the staff channel webhook. The outside watcher
+  posts each message in #staff-updates, the staff channel, by the id in
+  `bot/staff-channel.txt`. When the bot has not posted one within two and a
+  half minutes (`Watch-Services.ps1:$ackWait = 150`), the watchdog posts it
+  through its webhook, which `-SetWebhook` only accepts in that channel. The outside watcher
   appends its messages to the same file over ssh, and posts through its own
   copy of that webhook when the VPS cannot be reached.
 
@@ -63,6 +64,7 @@ check calls it one.
 | Backup freshness | The `Thornswood Backup` task's last result, and the newest backup's age | 1 run | Last result not 0 (or running), or newest over 26 hours old | `Watch-Services.ps1:BackupProblem`, `Watch-Services.ps1:Hours = 26` | Staff channel | 5 min | Patrick (holds the passphrase) |
 | Off-box copy | The newest backup on One, in `local\backups` | Nothing measures this today | **Proposal:** newest copy on One under 30 hours old | `scripts/vps/Fetch-Backups.ps1` fetches it at 4:15 AM (`Fetch-Backups.ps1:every day at 04:15`) and keeps 30 days (`Fetch-Backups.ps1:$KeepDays = 30`), but nothing checks its age | None today | Daily | Patrick |
 | Disk on the VPS | Free space on C: | 1 run | Under 20% DISK LOW, under 10% DISK CRITICAL | `Watch-Services.ps1:$diskLow = 20`, `Watch-Services.ps1:$diskCritical = 10` | Staff channel | 5 min | Installer lane (as `Forecast-Storage.ps1` names it), with Patrick |
+| Disk forecast | Days until free space on C: crosses 10% and 20%, a straight line through one sample a day over the last 30 days | 14 samples over at least 7 days before any forecast | Warning: 10% within 30 days, or 20% within 7. Critical: 10% within 7 days, or already under | `Forecast-Storage.ps1:$WarnDays = 30`, `Forecast-Storage.ps1:$CriticalDays = 7`; the `Thornswood Disk History` task, daily at 04:00 box time | Staff channel, once when the forecast turns and once when it is back | Daily | Warning: Installer lane. Critical: whoever is on staff |
 | Build runners | Every runner's service runs, and GitHub lists every runner online | 1 run on the box; 3 runs, 15 minutes from outside | Any runner not running or not online | `Watch-Services.ps1:$tellOnly`; `Watch-Outside.ps1:are not all online on GitHub` | Staff channel | 5 min | GitHub lane, with Patrick |
 | RPO (data that can be lost) | Hours between the newest backup and a failure | Per failure | 26 hours on the box (the freshness line above); the off-box copy is the newest fetched one | See "RPO" below | As above | Daily | Patrick |
 | RTO (time to come back) | Minutes from deciding to restore to a server answering | Per restore | Nothing measures this today | See "RTO" below | None | Per rehearsal | Patrick |
@@ -187,8 +189,10 @@ and every restart. What it leaves:
   until it is needed, and the 28 September rehearsal found three faults that
   would have been found during a real restore instead.
 - **Capacity:** the disk warns only once it is under 20%.
-  `scripts/vps/Forecast-Storage.ps1` forecasts the day each line is crossed,
-  but no task runs it, so it has no history to forecast from. Without
+  `scripts/vps/Forecast-Storage.ps1` forecasts the day each line is crossed
+  and tells the staff channel when the forecast turns, once
+  `Forecast-Storage.ps1 -Install` has put its daily task on the box and two
+  weeks of samples exist (#2178). Until then it has no history. Without
   `load.csv` read over a week, a bigger box or a split is decided by guess.
 - **Off-box backups:** a week of One being off is a week of no off-box copy,
   and nobody is told.

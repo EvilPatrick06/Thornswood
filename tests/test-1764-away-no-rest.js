@@ -11,6 +11,13 @@
 //
 // Runs the REAL needs block over the stand-in mp test-1606-logout-fill.js
 // uses: lie or sit down at Rest 30, log out, come back, and read the meters.
+//
+// Since #2246 (Patrick, 12 Oct 2026) what the time away drains is the row of
+// NEEDS.away for where they logged out: nothing in a bed indoors, half the
+// clock and never under 25 anywhere else, and a night on a bedroll or a bed
+// on the road leaves rest at least 50. So "the drain alone" below is that
+// row's drain, floor and night, worked out here from the table, and never
+// the place's rate per hour.
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -107,29 +114,39 @@ function away(kind, ms, first) {
 
 // ---- the issue's measurement: Rest 30, back 9 hours later -------------------
 const N = rig().N.NEEDS;
+/* Rest 30 after ms away from kind, by NEEDS.away alone: the row's share of
+   the clock, never under its floor from above it, then the night's rest. */
+function want(kind, ms) {
+  const row = N.away[kind || 'up'];
+  let v = Math.max(0, 30 - N.drain.rest * row.drain * ms / HOUR);
+  if (row.floor > 0 && 30 > row.floor && v < row.floor) { v = row.floor; }
+  if (ms >= N.sleptFor && v < row.rest) { v = row.rest; }
+  return v;
+}
 ['', 'sit', 'rough', 'campfire', 'camp'].forEach(function (kind) {
   const t = away(kind, 9 * HOUR);
+  const w = want(kind, 9 * HOUR);
   yes('9 hours away from ' + (kind ? kind + ' (' + N.recover[kind] + ' an hour)' : 'standing') +
-      ' comes back at Rest ' + t.n.rest.toFixed(1) + ', the drain alone',
-      t.n.rest === 0 && t.r.slept(ME) === 0);
+      ' comes back at Rest ' + t.n.rest.toFixed(1) + ', the drain and the night alone (' + w + '), not the place\'s rate',
+      Math.abs(t.n.rest - w) < 1e-9 && t.n.rest < 30 + (kind ? N.recover[kind] : 0) * 9 && t.r.slept(ME) === 0);
 });
 
 // ---- an hour away, where the drain shows ------------------------------------
 ['', 'sit', 'rough', 'campfire', 'camp'].forEach(function (kind) {
   const t = away(kind, HOUR);
-  const want = 30 - t.drain;
-  yes('an hour away from ' + (kind || 'standing') + ' is ' + want + ', not more: ' + t.n.rest.toFixed(2),
-      Math.abs(t.n.rest - want) < 1e-9);
+  const w = want(kind, HOUR);
+  yes('an hour away from ' + (kind || 'standing') + ' is ' + w + ', not more: ' + t.n.rest.toFixed(2),
+      Math.abs(t.n.rest - w) < 1e-9 && w < 30 + (kind ? N.recover[kind] : 0));
 });
 {
   const t = away('sit', HOUR, 'tick');
   yes('whichever reader comes first: the needs tick counts the hour away the same way',
-      Math.abs(t.n.rest - (30 - t.drain)) < 1e-9);
+      Math.abs(t.n.rest - want('sit', HOUR)) < 1e-9);
 }
 {
   const t = away('bed', 20 * MIN);
-  yes('your own bed, away less than a night: no fill, and the time away only drained',
-      Math.abs(t.n.rest - (30 - t.drain / 3)) < 1e-9 && t.r.slept(ME) === 0);
+  yes('your own bed, away less than a night: no fill, and the time away gained nothing (it drains nothing there since #2246)',
+      Math.abs(t.n.rest - want('bed', 20 * MIN)) < 1e-9 && t.n.rest === 30 && t.r.slept(ME) === 0);
 }
 
 // ---- the logout fill (#1606) still counts for the beds that give it ----------

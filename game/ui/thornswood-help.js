@@ -88,9 +88,14 @@
           k.skills + ' says why. Eat or drink from your pack. With the bars hidden in the ' +
           'launcher\'s Settings, /needs in the chat says all four as a line of text.',
         'Sit or lie down to rest: on a seat, on the ground with Sit on the emote wheel (' +
-          k.wheel + '), or in a bed. By a fire is better, and your own bed is best. ' +
+          k.wheel + '), or in a bed. By a fire is better, an inn or temple bed is better ' +
+          'than the road, and your own bed is best. ' +
           'Somebody else\'s bed counts when they let you sleep there or you carry its key. ' +
           'A lute, flute or drum played on the wheel, or Sing, helps everybody resting there.',
+        'Log out lying in a bed indoors, your own, one you may use, or an inn or temple bed, ' +
+          'and nothing runs down while you are away, and you come back rested. Anywhere else ' +
+          'the bars fall at half the pace while you are gone, and never below 25. The Body ' +
+          'page says what logging out where you are now would do.',
         'Fires warm you and standing in one burns you. Fur is the warmest to wear, metal the worst.',
         'In your inventory, while you have a wound to tend, ' + k.trade + ' opens the panel ' +
           'that tends it. Looking at somebody hurt, ' + k.lock + ' tends theirs when the ' +
@@ -118,8 +123,8 @@
         'At a door you just opened, a line names ' + k.lock + ': it claims a building nobody ' +
           'holds, and locks or unlocks one you hold. At a crop the same key claims the farm ' +
           'around it.',
-        k.skills + ' lists what you hold and the rent owed. A Jarl or a steward has an ' +
-          'Office page on ' + k.skills + '.',
+        k.skills + ' lists what you hold and the rent owed. A Jarl, a steward or a guard has an ' +
+          'Office page on ' + k.skills + '. The Jarl of a hold names its guards there.',
         'To let somebody sleep in a building you hold, look at them inside it and press ' +
           k.mold + '.',
         'A blank key mold goes into a door\'s lock on ' + k.mold + ', and a smith carrying ' +
@@ -132,7 +137,8 @@
           'the person\'s name and what they did, reports somebody to staff and nobody else.',
         '/stuck, when you are wedged in the world, takes you back a few steps or to the ' +
           'nearest temple: once every 5 minutes, a 15 second wait in a fight, and every use ' +
-          'is logged for staff.',
+          'is logged for staff. It does not move anybody out of a jail while a guard has a cell ' +
+          'there locked.',
         'These are typed in the chat: ' + k.chat + ' opens it, or ' + k.command +
           ' with the slash already typed.',
         'The rules are on thornswood.net and in the Discord, and a ticket there reaches ' +

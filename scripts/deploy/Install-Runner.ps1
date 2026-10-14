@@ -113,10 +113,11 @@
     2. Makes a local account, thornswood-runner, that is in no group but
        Users. Its password is made on the box, handed to the service once and
        never printed, stored or sent anywhere.
-    3. Denies that account every C:\Thornswood-* folder but its own, so a job
-       cannot read the site's config, the bot's token or the backups, and
-       cannot write into anything live. And locks its own folder to SYSTEM,
-       Administrators and that account (below).
+    3. Denies that account every C:\Thornswood-* folder but its own and
+       C:\Thornswood-Dumps (CRASH DUMPS, below), so a job cannot read the
+       site's config, the bot's token or the backups, and cannot write into
+       anything live. And locks its own folder to SYSTEM, Administrators and
+       that account (below).
     4. Downloads a pinned actions/runner win-x64 zip (version + SHA-256
        hardcoded below, #1372), checked against that pin, and registers it as a
        service that runs as that account.
@@ -143,10 +144,33 @@
 
   -LOCK puts that right on a box as it is, without replacing anything: for
   every runner service there, it locks the runner's folder, and shuts its
-  account out of every C:\Thornswood-* folder but its own, saying which it
-  had to close, and it takes off every priority watcher task left on the
-  box. No service is stopped and no job is touched. An install ends by doing
-  the same for every runner, so adding one leaves all of them locked.
+  account out of every C:\Thornswood-* folder but its own and Dumps, saying
+  which it had to close, takes off a deny an earlier install put on Dumps
+  for it, and it takes off every priority watcher task left on the box. No
+  service is stopped and no job is touched. An install ends by doing the
+  same for every runner, so adding one leaves all of them locked.
+
+  CRASH DUMPS (#2127, #2488). Patrick decided on 11 October 2026 (#2127)
+  that C:\Thornswood-Dumps is read by SYSTEM and Administrators only, and that
+  LOCAL SERVICE and every local thornswood-runner* account may make and write
+  files there and read nothing: Windows Error Reporting writes a crashing
+  node.exe's dump there as the account that node ran as, a build's included.
+  scripts\vps\Lock-VpsFolders.ps1 gives the folder those rules. Until 12
+  October this script still put a full-control deny for each runner account
+  on every C:\Thornswood-* folder, Dumps included, and a deny beats the write
+  allow, so a build that crashed node left no dump: adding runners 5 and 6
+  that day put the deny back on runners 1 to 4 (#2488). icacls /deny also
+  takes away the account's own allow rules on that folder (measured 12
+  October on a scratch folder), so the deny took the write with it. Now the
+  folder is Lock-VpsFolders.ps1's alone on the VPS: the install, -Lock and
+  the lock at the end of an install put no deny on it, take off the one an
+  earlier install left there for a runner account and say so, and say when
+  Users still reach it, which means Lock-VpsFolders.ps1 has not been run
+  since. After a deny comes off, Lock-VpsFolders.ps1 is run again to give
+  the write back.
+  Off the box (-OffBox) nothing gives a pull request runner write there, so
+  Dumps is shut to it like every other C:\Thornswood* folder.
+  tests\test-runner-lock.ps1 holds it.
 
   NO PRIORITY TASK (#1969). Until 5 October each install registered a task,
   Thornswood Runner Priority (Thornswood Runner N Priority from the second
@@ -164,9 +188,11 @@
   priority 7 task started went from BelowNormal, I/O 1, memory 2 to Normal,
   1 and 2, measured the same day (tests\test-runner-priority.ps1). The
   install, -Lock and -Remove take every such task off the box and name it;
-  -Status says when one is still there. A build still shares the five cores
-  with the game server, the site, voice and the bot at the same priority as
-  them, never above.
+  -Status says when one is still there. A build shares the box's six cores
+  at Normal with the site, Caddy and the bot, never above them. Since
+  12 Oct 2026 the game servers and voice run High, above every build:
+  Patrick's decision, "we need to fix it so the servers run on high
+  priority" (#2491, Install-ThornswoodServer.ps1 and Install-Voice.ps1).
 
   Safe to run again. An existing runner is replaced, the account keeps its
   name and gets a new password, and the folder denials are made again.
@@ -238,8 +264,11 @@ if ($OffBox) {
   $liveFilter = 'Thornswood*'
   if ($Label -match 'thornswood-vps' -and -not $NetworkOnly) { Write-Host 'STOP. -OffBox never takes the VPS label: build.yml would send it main and release builds.' -ForegroundColor Red; exit 1 }
 }
-# The list the scripts below are given, as PowerShell source.
+# The lists the scripts below are given, as PowerShell source. $leaveList is
+# the folders under C:\ that Lock-VpsFolders.ps1 gives the runner accounts
+# write on, which this script never denies them (the header's CRASH DUMPS).
 $alsoDenyList = '@(' + ((@($AlsoDeny | Where-Object { $_ }) | ForEach-Object { "'" + $_.Replace("'", "''") + "'" }) -join ', ') + ')'
+$leaveList = $(if ($OffBox) { '@()' } else { "@('Thornswood-Dumps')" })
 $defenderOn = $(if ($OffBox -and -not $DefenderSkip) { '$false' } else { '$true' })
 $where = $(if ($OffBox) { 'this machine' } else { 'the VPS' })
 $guardGroup = 'Thornswood PR runner ' + $Account
@@ -358,7 +387,11 @@ function Lock-RunnerRoot([string]$root, [string]$acct) {
 # tests\test-runner-lock.ps1, which runs both of these on scratch folders.
 # $filter is 'Thornswood-*' on the VPS and 'Thornswood*' off it (-OffBox), where
 # the worktrees and the play build have no hyphen. $also is -AlsoDeny.
-function Close-RunnerAccount([string]$acct, [string]$own, [string]$parent = 'C:\', [string]$filter = 'Thornswood-*', [string[]]$also = @()) {
+# $leave names the folders under $parent that Lock-VpsFolders.ps1 gives the
+# runner accounts write on (Thornswood-Dumps on the VPS, the header's CRASH
+# DUMPS): never denied, and a deny an earlier install put there for this
+# account is taken off and named.
+function Close-RunnerAccount([string]$acct, [string]$own, [string]$parent = 'C:\', [string]$filter = 'Thornswood-*', [string[]]$also = @(), [string[]]$leave = @()) {
   $ErrorActionPreference = 'Continue'
   $sid = ''
   if ($acct.StartsWith('*')) { $sid = $acct.Substring(1) }
@@ -369,6 +402,18 @@ function Close-RunnerAccount([string]$acct, [string]$own, [string]$parent = 'C:\
             @($also | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Container) } | ForEach-Object { Get-Item -LiteralPath $_ }))
   foreach ($d in $dirs) {
     if ($d.FullName -eq $own) { continue }
+    if ($leave -contains $d.Name -and $d.Parent.FullName.TrimEnd('\') -eq $parent.TrimEnd('\')) {
+      $mine = @((Get-Acl -LiteralPath $d.FullName).GetAccessRules($true, $false, [Security.Principal.SecurityIdentifier]) |
+                Where-Object { "$($_.AccessControlType)" -eq 'Deny' -and $_.IdentityReference.Value -eq $sid })
+      if ($mine.Count) {
+        $null = & icacls.exe $d.FullName /remove:d ('*' + $sid) /C /Q 2>&1
+        $left = @((Get-Acl -LiteralPath $d.FullName).GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) |
+                  Where-Object { "$($_.AccessControlType)" -eq 'Deny' -and $_.IdentityReference.Value -eq $sid })
+        if ($LASTEXITCODE -ne 0 -or $left.Count) { throw ('icacls could not take ' + $acct + '''s deny off ' + $d.FullName + ', which Lock-VpsFolders.ps1 gives it write on (#2127)') }
+        $acct + ': took off the deny an earlier install put on ' + $d.FullName + '; that deny also took its write away, so run Lock-VpsFolders.ps1 to give it write and no read there again (#2127, #2488)'
+      }
+      continue
+    }
     $rules = $null
     try { $rules = @((Get-Acl -LiteralPath $d.FullName).GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])) } catch { }
     if ($null -ne $rules -and @($rules | Where-Object { "$($_.AccessControlType)" -eq 'Deny' -and $_.IdentityReference.Value -eq $sid }).Count) { $had++; continue }
@@ -379,6 +424,19 @@ function Close-RunnerAccount([string]$acct, [string]$own, [string]$parent = 'C:\
   }
   foreach ($w in $wasOpen) { $acct + ' COULD READ ' + $w + ' until now; shut out of it' }
   $acct + ': already shut out of ' + $had + ' folder(s)' + $(if ($shut) { ', and a deny added on ' + $shut + ' that were closed to it anyway' } else { '' })
+}
+# Says, once for the box, what each $leave folder is: Lock-VpsFolders.ps1's,
+# and whether Users, Everyone or Authenticated Users still reach it, which
+# means that script has not been run on it, and every runner may read it.
+function Show-LeftFolders([string]$parent = 'C:\', [string[]]$leave = @()) {
+  foreach ($n in $leave) {
+    $p = Join-Path $parent $n
+    if (-not (Test-Path -LiteralPath $p -PathType Container)) { continue }
+    $acl = Get-Acl -LiteralPath $p
+    $broad = @($acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) | Where-Object { "$($_.AccessControlType)" -eq 'Allow' -and $broadSids -contains $_.IdentityReference.Value })
+    if ($broad.Count) { $p + ' is left to Lock-VpsFolders.ps1 (#2127), and USERS STILL REACH IT, so every runner may read it: run .\scripts\vps\Remote.ps1 -File .\scripts\vps\Lock-VpsFolders.ps1 from the repository' }
+    else { $p + ' is left to Lock-VpsFolders.ps1 (#2127): no deny from here, and Users do not reach it' }
+  }
 }
 '@
 
@@ -538,7 +596,7 @@ function Get-GuardBlocks {
 # Every runner service on the box, by what Windows says it is: its folder is
 # the one its RunnerService.exe is in, its account the one it runs as. Then
 # the old priority watchers, which belong to no one runner.
-$lockAll = $lockLib + $watcherLib + "`n`$liveFilter = '" + $liveFilter + "'`n`$alsoDeny = " + $alsoDenyList + "`n" + @'
+$lockAll = $lockLib + $watcherLib + "`n`$liveFilter = '" + $liveFilter + "'`n`$alsoDeny = " + $alsoDenyList + "`n`$leave = " + $leaveList + "`n" + @'
 
 $ErrorActionPreference = 'Continue'
 $bad = 0
@@ -553,9 +611,10 @@ foreach ($svc in $services) {
   if (-not $acct -or $acct -match '^(LocalSystem|LocalService|NetworkService)$') { $svc.Name + ' runs as ' + $svc.StartName + ', not an account of its own, so it was left alone'; $bad++; continue }
   try {
     Lock-RunnerRoot $root $acct
-    Close-RunnerAccount $acct $root 'C:\' $liveFilter $alsoDeny
+    Close-RunnerAccount $acct $root 'C:\' $liveFilter $alsoDeny $leave
   } catch { 'NOT LOCKED: ' + $svc.Name + ': ' + $_.Exception.Message; $bad++ }
 }
+Show-LeftFolders 'C:\' $leave
 if ($bad) { exit 1 }
 '@
 
@@ -753,12 +812,10 @@ if (Get-LocalUser -Name `$acct -EA SilentlyContinue) {
 }
 
 # Every live Thornswood folder is closed to it: read and write both. Off the
-# box that is every C:\Thornswood* folder, and -AlsoDeny's besides.
-foreach (`$d in @(@(Get-ChildItem 'C:\' -Directory -Filter '$liveFilter' -EA SilentlyContinue | ForEach-Object { `$_.FullName }) + $alsoDenyList)) {
-  if (`$d -eq `$root -or -not (Test-Path -LiteralPath `$d)) { continue }
-  & icacls.exe `$d /deny (`$acct + ':(OI)(CI)F') /C /Q 2>&1 | Out-Null
-  'closed to it: ' + `$d
-}
+# box that is every C:\Thornswood* folder, and -AlsoDeny's besides. On the
+# box Dumps is left to Lock-VpsFolders.ps1 (the header's CRASH DUMPS). The
+# same Close-RunnerAccount -Lock runs, so the two can never disagree again.
+Close-RunnerAccount `$acct `$root 'C:\' '$liveFilter' $alsoDenyList $leaveList
 # Off the box: the network and the reads (WHAT A PULL REQUEST JOB MAY REACH),
 # before the runner can take a job.
 $guard
@@ -842,10 +899,21 @@ if ($OffBox -and "$out" -match 'COULD NOT shut') { Die 'The runner is installed,
 if ("$out" -notmatch 'service Running') { Die 'The runner service is not running. The lines above say where it stopped; .\scripts\deploy\Install-Runner.ps1 -Status shows what is there.' }
 
 Head 'GitHub'
-Start-Sleep -Seconds 10
-$r = (Invoke-Gh api "repos/$Repo/actions/runners" | Out-String) | ConvertFrom-Json
-$mine = @($r.runners | Where-Object { $_.name -eq $RunnerName })
-if (-not $mine.Count) { Die "The service runs but GitHub does not list a runner called $RunnerName yet. Give it a minute and run -Status." }
+# GitHub shows the runner online once its listener has connected, a few
+# seconds after the service starts; how long that takes is on GitHub's side,
+# outside this script, so GitHub is asked every 3 seconds until it says so,
+# for a minute at most. Until #2357 this was a fixed 10 second wait and one
+# ask, and the wait ran in every -DryRunTo too, where the stand-in answers at
+# once: nine of them in tests\test-runner-offbox.ps1, 90 of its 100 seconds
+# in the nightly.
+$askUntil = (Get-Date).AddSeconds(60)
+while ($true) {
+  $r = (Invoke-Gh api "repos/$Repo/actions/runners" | Out-String) | ConvertFrom-Json
+  $mine = @($r.runners | Where-Object { $_.name -eq $RunnerName })
+  if (($mine.Count -and "$($mine[0].status)" -like 'online*') -or (Get-Date) -ge $askUntil) { break }
+  Start-Sleep -Seconds 3
+}
+if (-not $mine.Count) { Die "The service runs but GitHub did not list a runner called $RunnerName within a minute. Run -Status to ask again." }
 Say ('  ' + $mine[0].name + ' is ' + $mine[0].status) 'Green'
 
 # Every runner, this one included, so adding one leaves all of them locked.

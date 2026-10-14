@@ -51,6 +51,7 @@
     '#' + ID + ' .quest-copy{flex:1;min-width:240px}',
     '#' + ID + ' .quest-copy p{margin:4px 0;font-size:14px;line-height:1.5}',
     '#' + ID + ' select{font:inherit;color:#f6e9c8;background:#17140f;border:1px solid #ac9564;padding:6px;max-width:100%}',
+    '#' + ID + ' input[type=number]{width:5em;font:inherit;color:#f6e9c8;background:#17140f;border:1px solid #ac9564;padding:6px}',
     '#' + ID + ' button{font-family:inherit;cursor:pointer;border:1px solid rgba(198,170,109,.55);',
     '  background:rgba(0,0,0,.25);color:#e9d19b;padding:5px 10px;font-size:15px;line-height:20px;',
     '  letter-spacing:.14em;text-transform:uppercase}',
@@ -96,14 +97,18 @@
         return gem + ': ' + quest.locations[gem];
       }).join('; ');
       if (quest.gem && quest.locations && typeof quest.locations === 'object') location = quest.locations[quest.gem] || location;
-      var status = quest.state === 'open' ? ('Drawn ' + quest.drawn + ' of ' + quest.holds + (quest.gem ? ', ' + quest.gem : '')) :
-        quest.state === 'cooldown' ? ('Returns in ' + quest.waitMinutes + ' minutes') : quest.state === 'locked' ? ('Requires ' + quest.who) : 'Available';
+      var status = quest.state === 'open' ? (quest.kind==='kill' ? 'Defeated '+quest.kills+' of '+quest.count :
+        'Drawn ' + quest.drawn + ' of ' + quest.holds + (quest.gem ? ', ' + quest.gem : '')) :
+        quest.state === 'cooldown' ? ('Returns in ' + quest.waitMinutes + ' minutes') : quest.state === 'locked' ? ('Requires ' + quest.who) :
+        quest.state==='unavailable' ? 'This work is unavailable.' : 'Available';
+      var terms=quest.kind==='kill' ? 'Defeat '+quest.count+' at this place. Reward '+quest.gold+' gold. Return to a guild trader in this hold. Returns after '+quest.hours+' hours.' :
+        'Draw up to '+quest.holds+', return '+quest.ask+' to finish, and keep the rest. Returns after '+quest.hours+' hours.';
       body += '<div class="line"><div class="quest-copy"><strong>' + esc(quest.name) + '</strong>' +
-        '<p>' + esc(location) + '</p><p>Draw up to ' + esc(quest.holds) + ', return ' + esc(quest.ask) +
-        ' to finish, and keep the rest. Returns after ' + esc(quest.hours) + ' hours.</p><p>' + esc(status) + '</p></div>';
+        '<p>' + esc(location) + '</p><p>'+esc(terms)+'</p><p>' + esc(status) + '</p>'+
+        (quest.recovery ? '<p>Leave this older work before taking it again. Its progress could not be verified.</p>' : '')+'</div>';
       if (quest.state === 'open') {
         body += '<button data-quest="' + esc(quest.id) + '" data-action="return"' + (quest.canReturn ? '' : ' disabled') + '>Turn in work</button>' +
-          '<button data-quest="' + esc(quest.id) + '" data-action="abandon"' + (quest.canAbandon ? '' : ' disabled') + '>Give back and leave</button>';
+          '<button data-quest="' + esc(quest.id) + '" data-action="abandon"' + (quest.canAbandon ? '' : ' disabled') + '>'+(quest.kind==='kill'?'Leave work':'Give back and leave')+'</button>';
       } else {
         var gems = quest.gems || [], chosen = gemChoices[quest.id] || '';
         if (gems.length) {
@@ -116,26 +121,31 @@
       }
       body += '</div>';
     }
-    if (quests.length) body += '<h3>Trade</h3>';
+    body += '<h3>Sell from your pack</h3>';
     var rows = data.offers || [];
-    if (!rows.length) body += '<p class="note">No submitted price.</p>';
+    var saleCount = 0;
     for (var i = 0; i < rows.length; i++) {
       var row = rows[i];
-      var buy = row.buy == null ? 'no buy' : (row.buy + ' buy');
-      var sell = row.sell == null ? 'no sell' : (row.sell + ' sell');
-      body += '<div class="line"><span class="nm">' + esc(row.name) + '</span>' +
-        '<span>' + esc(buy) + '</span><span>' + esc(sell) + '</span>' +
-        '<span>shelf ' + esc(row.stock || 0) + '</span>' +
-        '<button data-verb="sell" data-name="' + esc(row.name) + '"' + (data.transfer && row.buy != null ? '' : ' disabled') + '>Sell</button>' +
-        '<button data-verb="buy" data-name="' + esc(row.name) + '"' + (data.transfer && row.sell != null && row.stock > 0 ? '' : ' disabled') + '>Buy</button>' +
-        '</div>';
+      if (!Number.isInteger(row.maxSell) || row.maxSell < 1) continue;
+      saleCount++;
+      body += tradeLine(row, 'sell', i, row.maxSell);
     }
+    if (!saleCount) body += '<p class="note" role="status">' + esc(data.sellReason || 'This trader cannot buy anything from your pack right now.') + '</p>';
+    body += '<h3>Buy from their shelf</h3>';
+    var shelfCount = 0;
+    for (var j = 0; j < rows.length; j++) {
+      var shelf = rows[j];
+      if (!Number.isInteger(shelf.sell) || shelf.sell < 0 || !(shelf.stock > 0)) continue;
+      shelfCount++;
+      body += tradeLine(shelf, 'buy', j, Math.min(shelf.stock, 100000));
+    }
+    if (!shelfCount) body += '<p class="note">This trader has no goods for sale.</p>';
     var supply = data.supply || [];
     for (var s = 0; s < supply.length; s++) {
       if (!supply[s].ready) continue;
       body += '<div class="line"><span class="nm">Supply ' + esc(supply[s].count) + ' ' + esc(supply[s].name) +
         ' for ' + esc(supply[s].pay) + '</span>' +
-        '<button data-verb="supply" data-name="' + esc(supply[s].name) + '"' + (data.transfer ? '' : ' disabled') + '>Turn in</button></div>';
+        '<button data-verb="supply" data-name="' + esc(supply[s].name) + '" data-price="' + supply[s].unit + '"' + (data.canTrade ? '' : ' disabled') + '>Turn in</button></div>';
     }
     var host = root.querySelector('#' + ID + '-body');
     host.innerHTML = body;
@@ -153,8 +163,17 @@
         }
         var verb = el.getAttribute('data-verb');
         var name = el.getAttribute('data-name');
-        if (verb === 'supply') net('/merchant supply ' + name);
-        else net('/merchant ' + verb + ' 1 ' + name);
+        if (verb === 'supply') net('/merchant supply @' + el.getAttribute('data-price') + ' ' + name);
+        else {
+          var input = document.getElementById(el.getAttribute('data-count'));
+          var count = input ? Number(input.value) : 0;
+          if (!Number.isInteger(count) || count < 1 || count > Number(input.max)) {
+            if (input) { input.setCustomValidity('Choose a whole count from 1 to ' + input.max + '.'); input.reportValidity(); }
+            return;
+          }
+          input.setCustomValidity('');
+          net('/merchant ' + verb + ' ' + count + ' @' + el.getAttribute('data-price') + ' ' + name);
+        }
       };
     }
     var selects = host.querySelectorAll('select[data-gem]');
@@ -167,6 +186,17 @@
       };
     }
     tell('opened');
+  }
+  function tradeLine(row, verb, index, maximum) {
+    var countId = ID + '-' + verb + '-' + index;
+    var selling = verb === 'sell';
+    return '<div class="line"><span class="nm">' + esc(row.name) + '</span>' +
+      '<span>' + esc(selling ? row.buy : row.sell) + ' gold each</span>' +
+      '<span>' + (selling ? 'Pack ' + esc(row.carried) : 'Shelf ' + esc(row.stock)) + '</span>' +
+      '<label for="' + countId + '">Count</label><input id="' + countId + '" type="number" min="1" max="' + maximum + '" step="1" value="1" aria-label="' +
+      (selling ? 'Sell count for ' : 'Buy count for ') + esc(row.name) + '">' +
+      '<button data-verb="' + verb + '" data-name="' + esc(row.name) + '" data-price="' + (selling ? row.buy : row.sell) + '" data-count="' + countId + '"' +
+      (data.canTrade ? '' : ' disabled') + '>' + (selling ? 'Sell' : 'Buy') + '</button></div>';
   }
   function open() { dismissed=null; draw(); }
   function close() {

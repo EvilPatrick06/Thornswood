@@ -1,5 +1,12 @@
 # Merchant's Guild
 
+Patrick's 12 October requirement is one Smith, Woodworker, Tailor, Enchanter,
+Cook and Alchemist in each of the ten book holds, 60 guild NPCs total, each
+with its own trade table and hold-specific quest work. See
+[Six trades in each hold](merchant-expansion.md). The 249-trader count below
+describes the current controller, not the requested final roster. Retirement
+must preserve its existing purse, stock and unfinished transfer records.
+
 The Merchant's Guild is the merchant NPCs of each hold. People cannot
 join it. There is no membership roll, join fee, dues, factor appointment,
 strike command or membership discount. Corrected by Patrick on 2 October

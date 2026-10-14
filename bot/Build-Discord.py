@@ -380,7 +380,8 @@ PLAN = [
    dict(kind='text',  name='media',       key='MEDIA',    mode='open',
         topic='Screenshots and clips. Talk about one in a thread under it.'),
    # Where the join cards go, and what the server's system channel points at.
-   dict(kind='text',  name='welcome-travelers', mode='open'),
+   # JOIN gives the bot Attach Files here as well (JOIN_BOT_NEEDS, #2341).
+   dict(kind='text',  name='welcome-travelers', key='JOIN', mode='open'),
    dict(kind='text',  name='game-rules',  key='GAMERULES', mode='membersread',
         topic='How roleplay works here. Nine rules, and what we let slide.',
         post=C.GAME_RULES),
@@ -421,7 +422,7 @@ PLAN = [
  # one: it is in RETIRED below so a re-run does not bring it back. Test-Tasks
  # was a text channel from 1 October holding the Live smoke checklist. Since
  # Patrick's card of 11 October it is a forum of test tasks, one thread each,
- # tagged Dev or Main (bot.py, the testing channels section), #test-results is
+ # tagged Main since #2276 (bot.py, the testing channels section), #test-results is
  # #test-findings, and #known-issues is new. The bot's one-time
  # `python bot.py --setup-channels --apply` moves an existing server across;
  # these lines are what a fresh server is made with. The old text channel is
@@ -442,17 +443,26 @@ PLAN = [
         topic='Pass, fail, and what went wrong.'),
    dict(kind='forum', name='Test-Tasks',   key='TESTS',   mode='pathfind',
         extra_roles=('Lead Gamemaster', 'Lead GM'),
-        topic='One thread per test task, tagged Dev or Main.'),
+        topic='One thread per test task, tagged Main.'),
    dict(kind='text',  name='known-issues', key='KNOWN',   mode='pathfind',
         topic='Known issues the team is working on. Kept by the bot.'),
    dict(kind='text',  name='test-tasks-archive', mode='pathfind', make=False),
    dict(kind='voice', name='play-testing', mode='pathfind'),
  ]),
  ('Staff', [
-   # The staff #news, where the site watcher speaks. Not the public #news in
-   # Information: that one carries the key, and the release webhook with it.
+   # The staff #news. Not the public #news in Information: that one carries
+   # the key, and the release webhook with it. The watchdog does not speak
+   # here; it speaks in #staff-updates (bot.py, staff-channel.txt, #2501).
    dict(kind='announce', name='news',      mode='staff'),
    dict(kind='forum', name='dev-test-results', mode='staff'),
+   # The test tasks someone on dev has to measure (Patrick, 12 Oct). Made by
+   # the bot's one-time `python bot.py --setup-channels --apply`, which finds
+   # it by id from then on, never by this: named here so -Prune leaves it and
+   # a run does not make a second one. The topic is the bot's DEV_TOPIC.
+   dict(kind='forum', name='dev-test-tasks', mode='staff', make=False,
+        topic='Test tasks someone on dev has to measure, from the board. Kept '
+              'by the bot: a post goes when its issue closes as fixed or its '
+              'test task no longer says Server: Dev.'),
    dict(kind='text',  name='staff-general', mode='staff',
         topic='Nobody else can see this.'),
    dict(kind='voice', name='Staff Room',    mode='staff'),
@@ -506,7 +516,12 @@ RETIRED = [
 KEEP = (
     'general-chat', 'welcome-travelers', 'server-progression-and-economy',
     'play-testing', 'dev-test-results', 'test-results', 'test-tasks',
-    'test-findings', 'test-tasks-archive', 'known-issues',
+    'test-findings', 'test-tasks-archive', 'known-issues', 'dev-test-tasks',
+    # Where staff status updates go (Patrick, 11 Oct), and where the bot says
+    # the watchdog's messages and the sessions that went wrong, by the id in
+    # staff-channel.txt. Not in PLAN, so without this a run would list it as
+    # no longer in the plan and -Prune would delete it (#2501).
+    'staff-updates',
 )
 
 
@@ -522,8 +537,8 @@ def say(mark, what):
 # the holds, and post in the read only ones: nothing below ever named it.
 # Untick Administrator and the @everyone deny lands on the bot too, since
 # nothing here gives it Member, a staff role or a hold. The trouble alerts
-# in #staff-general and the site watcher in the staff #news (bot.py,
-# _trouble_channel and WATCH_ID) go quiet, the hold panel cannot be posted
+# and the watchdog's messages, both in #staff-updates (bot.py, TROUBLE_ID,
+# WATCH_ID and staff-channel.txt), go quiet, the hold panel cannot be posted
 # in #choose-your-hold, and -Posts can no longer write the rules, welcome,
 # news and faq posts.
 #
@@ -551,8 +566,26 @@ TICKET_BOT_NEEDS = BOT_NEEDS + ('create_private_threads',
 TALK_NEEDS = ('view_channel', 'send_messages', 'read_message_history')
 
 
+# And one more in the channel the join cards go to (#2341). The card is a
+# picture sent as a file (bot.py, on_member_join), the one thing the bot
+# attaches anywhere, and posting a file needs Attach Files in that channel.
+# The three above were all this channel's overwrite named, so once
+# Administrator came off the bot's role (#455) the card depended on the
+# role's server-wide bits and the channel's @everyone overwrite both letting
+# it through. On 12 Oct the bot's start said it could not post there:
+# "the bot is missing Attach Files there". Naming it in the bot's own
+# overwrite, which Discord applies last, makes the channel give it whatever
+# the role or @everyone say, the way the ticket channel's thread bits do.
+JOIN_BOT_NEEDS = BOT_NEEDS + ('attach_files',)
+
+
 def bot_needs(spec):
-    return TICKET_BOT_NEEDS if spec.get('key') == 'TICKETS' else BOT_NEEDS
+    key = spec.get('key')
+    if key == 'TICKETS':
+        return TICKET_BOT_NEEDS
+    if key == 'JOIN':
+        return JOIN_BOT_NEEDS
+    return BOT_NEEDS
 
 
 def with_bot(guild, out, needs=BOT_NEEDS):
@@ -589,8 +622,16 @@ async def keep_bot(ch, needs=BOT_NEEDS):
        on it. Only the ones it needs are set, anything else already on it
        stays as it is, and a channel that already has all of them is not written
        to at all, so running this again after Administrator is gone changes
-       nothing and asks Discord for nothing."""
-    if ch is None or not shuts_out(ch, needs):
+       nothing and asks Discord for nothing.
+
+       A channel PLAN names more needs for than the three (the ticket
+       channel, the join channel) is touched whether or not @everyone is shut
+       out: those bits are the channel's own job, and the bot's role holding
+       them server wide is not something a build can see while it still has
+       Administrator (#2341)."""
+    if ch is None:
+        return
+    if tuple(needs) == BOT_NEEDS and not shuts_out(ch, needs):
         return
     me = getattr(getattr(ch, 'guild', None), 'me', None)
     if me is None:

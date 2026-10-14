@@ -125,8 +125,9 @@ function workFor(text) {
 }
 
 // ---------------------------------------------------------- the known page
-const known = read(path.join('data', 'known.md'));
-yes('known.md is there', known !== null);
+// The page is the known board, written out the way /known writes it (#2414).
+const known = require('./fixtures/known-page').knownPage();
+yes('the Known Issues page is there, written from the known board', known !== null);
 const page = sections(known || '');
 const skymp = page.list[0] || { heading: '', lead: '', rows: [] };
 yes('its first table is the group that follows from SkyMP, with its rows',
@@ -245,26 +246,14 @@ yes('help.md is there', help !== null);
   yes('nothing in it is roadmap work', bad.length === 0);
 }
 
-// ---------------------------------------------------- the hub's own board
-/* The hub keeps its own copy of the table in board.json under "known". Its
-   intro said "Permanent limits of how this server works. None are bugs, none
-   are changing." over the same NPC rows. */
-{
-  const k = board && board.known;
-  yes('board.json has the hub copy of Known Issues', !!(k && k.sections));
-  const intro = String((k && k.intro) || '');
-  const rows = [];
-  ((k && k.sections) || []).forEach(function (s) {
-    const first = (s.columns || [])[0];
-    (s.rows || []).forEach(function (r) {
-      if (first) { rows.push(String((r.cells || {})[first.id] || '')); }
-    });
-  });
-  const onIt = rows.filter(function (row) { return workFor(row).length > 0; });
-  yes('its intro does not promise permanence over roadmap work',
-      !(PROMISE.test(intro) && onIt.length));
-  yes('and says the roadmap has some of it', !onIt.length || /roadmap/i.test(intro));
-}
+// ---------------------------------------------------- one copy only (#2414)
+/* The text was kept twice, known.md for the page and a known board nothing
+   showed, and the board went stale: its intro said "Permanent limits of how
+   this server works. None are bugs, none are changing." over NPC rows #504
+   made untrue. Patrick, 12 October: the hub board is the one copy. The page
+   above is that board, and tests/test-2414-known-one-copy.js keeps a second
+   copy from coming back. */
+yes('there is no known.md beside the board', read(path.join('data', 'known.md')) === null);
 
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');

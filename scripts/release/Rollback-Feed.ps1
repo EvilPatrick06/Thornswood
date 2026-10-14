@@ -112,6 +112,7 @@ function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; Wr
 . (Join-Path $Here 'Source-Notice.ps1')
 . (Join-Path $Here 'Ship-Rules.ps1')
 . (Join-Path $Here 'Release-Name.ps1')
+. (Join-Path $Here 'Feed-News.ps1')
 Add-Type -AssemblyName System.IO.Compression -ErrorAction SilentlyContinue
 Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction SilentlyContinue
 
@@ -606,14 +607,19 @@ $details = @($bullets)
 if ($write.Count) { $details += ('{0:n0} file{1} to download, {2:n1} MB' -f $write.Count, $(if ($write.Count -eq 1) { '' } else { 's' }), ($writeBytes / 1MB)) }
 $entry = [pscustomobject][ordered]@{ date = (Get-Date).ToString('M-d-yyyy h:mm tt', [Globalization.CultureInfo]::InvariantCulture); title = $noteLines[0]
                                      body = $body; details = $details; channel = $(if ($Dev) { 'dev' } else { '' }) }
-$news = @()
-if ($doc.PSObject.Properties['news'] -and $doc.news) { $news = @($doc.news) }
+# Every note the feed has, wherever it keeps them, and back the way the channel
+# keeps them: in "news", or once its minLauncher reads it, a news file sent to
+# the site before the feed names it (Feed-News.ps1, #1050).
+try { $news = @(Open-FeedNewsList $doc $sd $SiteUrl) }
+catch { Die ("The notes the feed already has could not be read, so the feed was not changed: " + $_.Exception.Message) }
 $news = @($entry) + $news
 if ($news.Count -gt 40) { $news = @($news[0..39]) }
-if ($doc.PSObject.Properties['news']) { $doc.news = $news } else { $doc | Add-Member -NotePropertyName 'news' -NotePropertyValue $news }
+$minNews = if ($doc.PSObject.Properties['minLauncher'] -and [string]$doc.minLauncher) { [string]$doc.minLauncher } else { Get-Prop $doc 'launcherVersion' }
+try { [void](Set-FeedNewsList $doc $news $Channel $minNews (Join-Path $WorkDir ('news-' + $Id)) $SiteDir) }
+catch { Die ($_.Exception.Message + ' Run this again.') }
 
-# No byte order mark: the launcher's reader stops on one (Publish-Update.ps1).
-[IO.File]::WriteAllText($VersionFile, ($doc | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))
+# Compact, no byte order mark (Feed-Json.ps1, Write-FeedVersionFile).
+Write-FeedVersionFile $VersionFile $doc
 Copy-Item -LiteralPath $manifestPath -Destination $StateFile -Force
 try { $sent = Send-FeedStore $Channel $ReleaseDir @('version.json', 'published.json', $FeedReleasesFile) -SiteDir $SiteDir }
 catch {

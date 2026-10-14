@@ -107,16 +107,17 @@ if (Test-Path -LiteralPath $sp) {
   if ($b.Length -ge 3 -and $b[0] -eq 0xEF -and $b[1] -eq 0xBB -and $b[2] -eq 0xBF) {
     $bad += 'server-settings.json starts with a byte order mark, and node will not parse it'
   }
-  try { $new = [IO.File]::ReadAllText($sp) | ConvertFrom-Json }
-  catch { $bad += ('server-settings.json does not parse: ' + $_.Exception.Message) }
+  try { $new = Read-ThornswoodRecord -Path $sp -Kind server-settings }
+  catch { $bad += ('the staged settings cannot be trusted: ' + $_.Exception.Message) }
 } else { $bad += 'there is no server-settings.json in the stage' }
 # The port it runs on now and the port the new settings name must agree. The
 # stop picks its process by that port and the health check asks it, so a file
 # that moved it would stop one process and then ask about another.
 $now = $null
-try { $now = [IO.File]::ReadAllText((Join-Path $Root 'server-settings.json')) | ConvertFrom-Json } catch { }
+$nowWhy = ''
+try { $now = Read-ThornswoodRecord -Path (Join-Path $Root 'server-settings.json') -Kind server-settings } catch { $nowWhy = $_.Exception.Message }
 if (-not $now) {
-  $bad += ('the settings in ' + $Root + ' cannot be read, so there is no telling which process is this server')
+  $bad += ('the settings in ' + $Root + ' cannot be read, so there is no telling which process is this server: ' + $nowWhy)
 } elseif ($new -and [int]$new.port -ne [int]$now.port) {
   $bad += ('the new settings put this server on port ' + [int]$new.port + ' and it is on ' + [int]$now.port + ' now')
 }
@@ -158,11 +159,11 @@ $forkSent = @($sums.Keys | Where-Object { Test-ThornswoodServerForkFile $_ })
 $rp = Join-Path $stageDir 'server-build.json'
 if ($sums.ContainsKey('server-build.json') -and (Test-Path -LiteralPath $rp)) {
   try {
-    $rec = [IO.File]::ReadAllText($rp) | ConvertFrom-Json
+    $rec = Read-ThornswoodRecord -Path $rp -Kind server-build
     $forkSums = @{}
     foreach ($k in $forkSent) { $forkSums[$k] = $sums[$k] }
     $bad += @(Get-ThornswoodServerBuildProblems $rec $forkSums 'the stage' 'server-build.json')
-  } catch { $bad += ('server-build.json does not parse: ' + $_.Exception.Message) }
+  } catch { $bad += ('the staged server-build.json cannot be trusted: ' + $_.Exception.Message) }
 } elseif ($forkSent.Count) {
   $bad += ('server files came with no server-build.json to hold them to: ' + ($forkSent -join ', '))
 }
@@ -182,19 +183,27 @@ $ProgressPreference = 'SilentlyContinue'
 $stageDir = Join-Path $Root $Stage
 $prevDir  = Join-Path $Root $Prev
 $log      = Join-Path $Root 'server.log'
-# The task starts the server at priority 4, normal, before every start here
-# (#1931, #2015). Only the installer registered it so, and a server put up by
-# Deploy-Server or Deploy-DevGamemode kept Task Scheduler's default of 7: on
-# 5 Oct 11:47 PM the live server's node ran BelowNormal, with I/O priority 1
-# and memory priority 2, after a deploy of the release that fixed it. Only
-# the priority changes; the task keeps everything else it has.
-function NormalTask {
+# Before every start here: whether the task is the one the installer makes,
+# said and never changed (#2491). Install-ThornswoodServer.ps1 registers it at
+# priority 1 with node started through cmd's start /high, so the server runs
+# High (Patrick, 12 Oct 2026). The installer is the one place the task is
+# made. A task an older install registered is registered again by
+# Publish-Server.ps1 -TaskOnly, which this names; a deploy starts the task the
+# box has. From 5 Oct (#2015) this step set the task's priority to 4 before
+# each start instead, repairing at every deploy the tasks registered before
+# #1967 rather than registering them again, and on a task at 1 it would have
+# put the server back to Normal.
+function TaskShape {
   $t = Get-ScheduledTask -TaskName $Task -EA SilentlyContinue
-  if (-not $t -or $t.Settings.Priority -eq 4) { return }
-  $was = $t.Settings.Priority
-  $t.Settings.Priority = 4
-  try { $t | Set-ScheduledTask -EA Stop | Out-Null; 'the task starts the server at priority 4 now, not ' + $was }
-  catch { 'could not set the task to priority 4: ' + $_.Exception.Message }
+  if (-not $t) { return }
+  $high = @($t.Actions | Where-Object { [string]$_.Arguments -like '*start "" /b /wait /high *' }).Count -gt 0
+  if ($t.Settings.Priority -eq 1 -and $high) { return }
+  $why = @()
+  if ($t.Settings.Priority -ne 1) { $why += ('its priority is ' + $t.Settings.Priority + ', not 1') }
+  if (-not $high) { $why += 'it does not start node through start /high' }
+  $chan = ''
+  if ($Root.TrimEnd('\') -like '*-Dev') { $chan = ' -Channel dev' }
+  'the task ' + $Task + ' is not the one the installer makes (' + ($why -join '; ') + '), so the server will not run High: register it again with .\scripts\release\Publish-Server.ps1 -TaskOnly' + $chan
 }
 $new      = [IO.File]::ReadAllText((Join-Path $stageDir 'server-settings.json')) | ConvertFrom-Json
 # The check has already refused a port that moves, so this is the port the
@@ -355,7 +364,7 @@ if ($moved -and $null -ne $ReleaseKeys -and $placed -contains 'server-settings.j
 
 if ($moved) {
   'swapped in ' + $placed.Count + ' file(s), the ones they replaced are in ' + $prevDir
-  NormalTask
+  TaskShape
   Start-ScheduledTask -TaskName $Task -EA SilentlyContinue
   'started, giving it ' + $Wait + ' seconds to answer on UDP ' + $port + ' and on ' + $resPort
   if (Answering) {
@@ -378,7 +387,7 @@ if ($moved) {
 
 'putting the previous files back'
 PutBack
-NormalTask
+TaskShape
 Start-ScheduledTask -TaskName $Task -EA SilentlyContinue
 if (Answering) { 'the previous files are back and the server is answering on ' + $resPort + ' again' }
 else { 'THE PREVIOUS FILES ARE BACK AND THE SERVER STILL IS NOT ANSWERING on ' + $resPort }
@@ -427,6 +436,14 @@ function SwapVars([string]$farRoot, [string]$taskName, [string]$stageName, [stri
 # file beside this one: tests\test-deploy-server-swap.ps1 runs the blocks out
 # of the markers and puts the same text in front itself.
 $checkBlock = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'ServerBuild.ps1')) + "`r`n" + $checkBlock
+# And the record contracts (#2180, slice 4): Read-JsonFile.ps1 and
+# RecordShape.ps1 as text, so the stage's server-build.json and both
+# settings files are held to the same shape on the box as they are here, and
+# a bad one is refused naming the file and the field instead of read as
+# whatever ConvertFrom-Json made of it.
+$ThornswoodRecordShapeText = [IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\release\Read-JsonFile.ps1')) + "`r`n" +
+                             [IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\release\RecordShape.ps1')) + "`r`n"
+$checkBlock = $ThornswoodRecordShapeText + $checkBlock
 
 # ==== put-back pick ====
 #

@@ -38,6 +38,7 @@
 
 . (Join-Path $PSScriptRoot 'Feed-Store.ps1')
 . (Join-Path $PSScriptRoot 'Release-Name.ps1')
+. (Join-Path $PSScriptRoot 'Feed-News.ps1')
 
 # ConvertFrom-Json hands back an object with only the keys the file had:
 # reading one that is not there throws under strict mode, and assigning one
@@ -53,11 +54,81 @@ function Set-DevNewsProp($obj, [string]$name, $value) {
     else { $obj | Add-Member -NotePropertyName $name -NotePropertyValue $value }
 }
 
+# Every dev release Ship tagged that this clone has (release/dev/<id>,
+# Add-ReleaseTag in Release-Name.ps1), each with the commit it was built from,
+# whether it was built with uncommitted files, and the minutes its note can
+# carry: from the minute its id names (Publish-Update mints the id before it
+# writes the note) to the minute Ship tagged it (after the feed with the note
+# was sent), both on the clock of the machine that shipped it, the one the
+# note's date is written on. A tag with no tagger, made by hand without -a,
+# has no end to that span and no message, so it is left out.
+function Get-DevReleaseTags([string]$sourceRepo) {
+    $tags = @()
+    # The caller's last exit code is put back, as Is-Published does below.
+    $hadCode = Test-Path -LiteralPath 'variable:global:LASTEXITCODE'
+    $was = if ($hadCode) { $global:LASTEXITCODE } else { 0 }
+    try {
+        $g = Invoke-ReleaseGit $sourceRepo @('for-each-ref', 'refs/tags/release/dev',
+            '--format=@@%(refname)%09%(objecttype)%09%(*objectname)%09%(taggerdate:iso)%0a%(contents)')
+    } finally {
+        if ($hadCode) { $global:LASTEXITCODE = $was }
+        else { Remove-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue }
+    }
+    if ($g.Code -ne 0) { return @() }
+    $cur = $null
+    $inv = [Globalization.CultureInfo]::InvariantCulture
+    foreach ($l in @($g.Lines)) {
+        $s = [string]$l
+        if ($s.StartsWith('@@')) {
+            if ($cur) { $tags += $cur }
+            $cur = $null
+            $f = $s.Substring(2).Split("`t")
+            if ($f.Count -lt 4 -or $f[1] -ne 'tag' -or $f[2] -notmatch '^[0-9a-f]{40}$') { continue }
+            $id = $f[0] -replace '^refs/tags/release/dev/', ''
+            $from = [datetime]::MinValue; $to = [datetime]::MinValue
+            # The first 13 characters of an id are its minute in both shapes
+            # it has had, yyyyMMdd-HHmm and yyyyMMdd-HHmmss (New-ReleaseId).
+            if ($id.Length -lt 13 -or -not [datetime]::TryParseExact($id.Substring(0, 13), 'yyyyMMdd-HHmm', $inv, 'None', [ref]$from)) { continue }
+            # "2026-10-01 20:04:26 -0600": the tagger's own clock.
+            $at = $f[3].Trim()
+            if ($at.Length -lt 16 -or -not [datetime]::TryParseExact($at.Substring(0, 16), 'yyyy-MM-dd HH:mm', $inv, 'None', [ref]$to)) { continue }
+            $cur = [pscustomobject]@{ Id = $id; Commit = $f[2]; From = $from; To = $to; Clean = $true }
+        } elseif ($cur -and $s -match '^built with \d+ uncommitted change') {
+            # Get-ReleaseTagMessage writes this line for a release whose
+            # record says uncommitted above 0.
+            $cur.Clean = $false
+        }
+    }
+    if ($cur) { $tags += $cur }
+    return $tags
+}
+
+# The release a note from before sourceCommit came with: the tagged dev
+# release whose span holds the note's date. $null when none does, when two do
+# that were built from different commits (no one proof), or when the date is
+# not a date and a time (entries older than the time on them carry a bare
+# date). Two at once from the same commit are the same proof: measured on the
+# 12 Oct dev feed, "Safer updates and a quieter journal key" (2 Oct 2:37 PM)
+# sits in 20261002-143545-dev and 20261002-143641-dev, both from 85e44094.
+function Find-DevNoteRelease($tags, [string]$date) {
+    $t = [datetime]::MinValue
+    if (-not [datetime]::TryParseExact(([string]$date).Trim(), 'M-d-yyyy h:mm tt', [Globalization.CultureInfo]::InvariantCulture, 'None', [ref]$t)) { return $null }
+    $hits = @(@($tags) | Where-Object { $_.From -le $t -and $t -le $_.To })
+    if ($hits.Count -eq 0) { return $null }
+    if (@($hits | ForEach-Object { $_.Commit } | Select-Object -Unique).Count -ne 1) { return $null }
+    return [pscustomobject]@{
+        Ids    = @($hits | ForEach-Object { $_.Id })
+        Commit = $hits[0].Commit
+        Clean  = (@($hits | Where-Object { -not $_.Clean }).Count -eq 0)
+    }
+}
+
 # Which of these notes the dev build has and main does not.
 #
-# Main's fresh release record proves which source commits have shipped.
-# Historical notes use the preceding clean Dev release as their source.
-# Headline changes therefore cannot leave completed work marked Dev-only.
+# Main's fresh release record proves which source commits have shipped. A
+# note proves its own: its sourceCommit, or before that field existed, the
+# commit of the dev release it came with (Find-DevNoteRelease). Headline
+# changes therefore cannot leave completed work marked Dev-only.
 function Update-DevNewsChannels($doc, $news, $mainDoc, [string]$sourceRepo) {
     if ($null -eq $mainDoc) { return }
     $mainRelease = $mainDoc.PSObject.Properties['release']
@@ -131,27 +202,30 @@ function Update-DevNewsChannels($doc, $news, $mainDoc, [string]$sourceRepo) {
         $script:publishedSeen[$commit] = $yes
         return $yes
     }
-    # Before sourceCommit existed, the preceding Dev release is the only
-    # recorded source covering its historical notes. Dirty releases provide
-    # no such proof; matching a headline alone is never proof of promotion.
+    # Before sourceCommit existed (3 Oct, 1:57 PM) a note recorded no source,
+    # so its proof is the dev release it came with, found by that release's
+    # tag (Find-DevNoteRelease), and never by its headline.
     #
-    # No proof is not proof of the opposite. With a dirty release, or none,
-    # the feed says nothing new about those notes, so each keeps the mark it
-    # was last given while a clean release could speak for it. Marking them
-    # all DEV instead turned a dev Ship from a dirty tree (20261006-141047-dev,
-    # 6 Oct 2:10 PM) into 23 completed notes tagged DEV on the next refresh.
-    $legacyKnown = $false
-    $legacyPublished = $false
-    if ($doc.PSObject.Properties['release'] -and $doc.release.PSObject.Properties['uncommitted'] -and $doc.release.uncommitted -eq 0) {
-        $legacyKnown = $true
-        $legacyPublished = Is-Published (Get-DevNewsVal $doc.release 'commit')
-    }
+    # Until 12 Oct every such note took the commit of the dev feed's current
+    # release instead. Between main releases the newest dev release is always
+    # ahead of main, so every one of them was marked DEV: measured on 12 Oct,
+    # the 16 notes of 1 to 3 Oct, all shipped on main 1.1.105 on 3 Oct, were
+    # marked DEV beside the 4 that really were (#2401).
+    #
+    # No proof is not proof of the opposite. A note whose release this clone
+    # has no tag for, or whose release was built with uncommitted files (no
+    # commit records what those carried), keeps the mark it was last given.
+    $devTags = $null
     $marked = 0
     foreach ($n in @($news)) {
         $commit = Get-DevNewsVal $n 'sourceCommit'
         if ($n.PSObject.Properties['sourceCommit']) { $published = Is-Published $commit }
-        elseif ($legacyKnown) { $published = $legacyPublished }
-        else { $published = ((Get-DevNewsVal $n 'channel') -ne 'dev') }
+        else {
+            if ($null -eq $devTags) { $devTags = @(Get-DevReleaseTags $sourceRepo) }
+            $rel = Find-DevNoteRelease $devTags (Get-DevNewsVal $n 'date')
+            if ($rel -and $rel.Clean) { $published = Is-Published $rel.Commit }
+            else { $published = ((Get-DevNewsVal $n 'channel') -ne 'dev') }
+        }
         $want = if ($published) { '' } else { 'dev' }
         Set-DevNewsProp $n 'channel' $want
         if ($want -eq 'dev') { $marked++ }
@@ -165,11 +239,16 @@ function Update-DevNewsChannels($doc, $news, $mainDoc, [string]$sourceRepo) {
 # moved comes back, note by note, so a caller can say so and send only when
 # something did. A note with no channel at all reads the same as '' (main),
 # which is how the launcher reads it, so giving it '' is not a change.
-function Set-DevFeedMarks($doc, $mainDoc, [string]$SourceRepo) {
+#
+# Every note, wherever the feed keeps them (Feed-News.ps1, #1050): "news", and
+# the news file once the dev feed's minLauncher reads it. $SiteDir and
+# $SiteUrl are where that file is read from. The marked list is left whole in
+# "news"; whoever sends the feed puts it back the way the channel keeps it
+# (Set-FeedNewsList), as Update-DevFeedMarks below and Publish-Update do.
+function Set-DevFeedMarks($doc, $mainDoc, [string]$SourceRepo, [string]$SiteDir, [string]$SiteUrl = 'https://thornswood.net') {
     if ($null -eq $doc) { throw 'There is no dev feed to mark.' }
     if ($null -eq $mainDoc) { throw "There is no main feed to mark the dev feed against, so the dev marks were left alone." }
-    $news = @()
-    if ($doc.PSObject.Properties['news'] -and $doc.news) { $news = @($doc.news) }
+    $news = @(Open-FeedNewsList $doc (Get-FeedStoreSiteDir $SiteDir) $SiteUrl)
     $before = @($news | ForEach-Object { Get-DevNewsVal $_ 'channel' })
     $wasMain = Get-DevNewsVal $doc 'mainVersion'
     $marked = Update-DevNewsChannels $doc $news $mainDoc $SourceRepo
@@ -233,11 +312,15 @@ function Update-DevFeedMarks {
     $mainDoc = Read-SiteFeed 'main' -SiteDir $SiteDir -SiteUrl $SiteUrl
     if ($null -eq $mainDoc) { throw 'The site has no main feed, so the dev marks were left alone.' }
     $doc = (([IO.File]::ReadAllText($file)) -replace '^\uFEFF', '') | ConvertFrom-Json
-    $r = Set-DevFeedMarks $doc $mainDoc $SourceRepo
+    $r = Set-DevFeedMarks $doc $mainDoc $SourceRepo $SiteDir $SiteUrl
     if ($r.Changed -and -not $NoSend) {
-        # No byte order mark: the launcher's reader stops on one, which takes
-        # out the update check for everybody (see Publish-Update.ps1).
-        [IO.File]::WriteAllText($file, ($doc | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))
+        # The notes back the way the dev feed keeps them (#1050): in "news",
+        # or once its minLauncher reads it, a news file sent to the site first.
+        $min = Get-DevNewsVal $doc 'minLauncher'
+        if (-not $min) { $min = Get-DevNewsVal $doc 'launcherVersion' }
+        [void](Set-FeedNewsList $doc @($doc.news) 'dev' $min (Join-Path $Dir 'news-out') $SiteDir)
+        # Compact, no byte order mark (Feed-Json.ps1, Write-FeedVersionFile).
+        Write-FeedVersionFile $file $doc
         $sent = Send-FeedStore 'dev' $Dir @('version.json') -SiteDir $SiteDir -To $To
         $r.Sent = (@($sent.Sent).Count -gt 0)
     }

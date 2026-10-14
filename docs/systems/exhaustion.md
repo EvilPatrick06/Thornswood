@@ -42,7 +42,9 @@ the ground, and the ground is a seat.
 | A bed or bedroll nobody can lend you | 25 |
 | A seat with a fire in reach | 35 |
 | A bed or bedroll nobody can lend you, with a fire in reach | 45 |
-| A bed you are allowed in: an inn, a night the holder gave you, or its key or deed carried | 50 |
+| An inn or temple bed nobody holds | 40 |
+| An inn or temple bed nobody holds, with a fire in reach | 45 |
+| A bed you are allowed in: a night the holder gave you, or its key or deed carried | 50 |
 | Your own bed | 80 |
 
 Patrick, 4 Oct: "use some common sense". A bed is better than a
@@ -55,10 +57,11 @@ bed in a building somebody else holds, who has not let you sleep there,
 is no rest at all. See [Property](property.md).
 
 A bed in an inn or a temple nobody holds is a place of its own (#2246).
-Djinn asked on 26 Sep for an inn or a temple to give back the most and the
-wild the least. What it is worth is Patrick's to set on #2246, and until
-he does it is worth what it always was: 25 an hour, 45 with a fire in
-reach, and no logout fill.
+Djinn asked on 26 Sep for an inn or a temple to give back more than the
+wild. Patrick set it on 12 Oct: 40 an hour, 45 with a fire in reach,
+better than a bedroll on the road and under a bed you are allowed in.
+Every new character arrives in one of nine inns, so this is their first
+bed.
 
 Someone playing in the same cell adds 25 on top of whatever place you
 are already in, while they play and for 5 minutes after. Playing is the
@@ -69,16 +72,40 @@ as /bard, and also add a singing emote for people that are only
 singing". There is no bard profession. The check is that the server
 sees them playing.
 
-Logging out lying in your own bed, or in a bed you are allowed in,
-fills rest to 100 when you come back, and puts 25 back on hunger and
-on thirst. A bed or bedroll nobody can lend you does not. You have to
-be away for a night: 8 hours on the game clock, which is 24 real
-minutes. Hunger and thirst fall while you are away, the same as
-anywhere, and the 25 goes back on what is left. It is not a stat
-bonus for logging out at a clever hour. It is a rule about the bed.
-
 Sleeping on open ground is sitting, 20 an hour, and it can start a
 chill. See [Disease](disease.md).
+
+## Logging out
+
+Where you are lying or sitting when you log out decides what the time
+away costs and what a night away gives back. Patrick, 12 Oct, on #2246:
+
+| Where you logged out | While you are away | After a night away |
+| --- | --- | --- |
+| Your own bed | Nothing runs down | Rest 100, 25 back on hunger and on thirst |
+| A bed you are allowed in | Nothing runs down | Rest 100, 25 back on hunger and on thirst |
+| An inn or temple bed nobody holds, by a fire or not | Nothing runs down | Rest 100, 15 back on hunger and on thirst |
+| A bed or bedroll nobody can lend you, by a fire or not | Half the clock, never under 25 | Rest at least 50 |
+| A seat, by a fire or not, or on your feet | Half the clock, never under 25 | Nothing |
+
+Half the clock is hunger, thirst and rest falling at half their pace
+for the whole time away, up to 48 hours. Never under 25 means the time
+away takes no meter below 25; one that was already under 25 when you
+left stays where it was. A night is 8 hours on the game clock, which
+is 24 real minutes. Away for less is no night: only the middle column
+applies. What comes back is put on what the time away left. It is not
+a stat bonus for logging out at a clever hour. It is a rule about where
+you sleep.
+
+A new character who eats and drinks nothing in their first hour is at
+Hunger 58, Thirst 17, Rest 88. Lying down in their arrival inn's bed
+and logging out for the night, they come back at Hunger 73, Thirst 32,
+Rest 100. In their own bed, 83, 42 and 100. Logging out on their feet,
+25, 17 and 38. Before 12 Oct every one of these but the two beds came
+back at 0, 0 and 0.
+
+The Body page on K says, under Rest, what logging out where you are
+now would do.
 
 ## A stimulant
 
@@ -90,8 +117,8 @@ clock and adds the crash again.
 
 ## Where this is
 
-The 8 hour clock, the per-swing costs, the craft gate at 15, the six
-rest rates, the bard's +25, and the logout bonus are in the server.
+The 8 hour clock, the per-swing costs, the craft gate at 15, the eight
+rest rates, the bard's +25, and the logout table are in the server.
 Sitting down and lying down tell the server by themselves, and nobody
 types anything. The server counts only furniture it saw the person
 press and that they are still beside. A chair, bench, stool or throne
@@ -112,17 +139,16 @@ counts you as up then, not lying in the bed. Coming back from any
 logout, on a seat or in a bed, with or without a server restart, you
 are up: nobody comes back into the world sitting or lying down, so a
 rest counts again once you sit or lie down again (#1734). The time you
-were away gains no rest, whatever you logged out on: it only drains,
-and the logout fill above is the one thing a bed gives for it (#1764). Which beds
-give the fill and the 24 minutes are the suggested answers on #1606,
-built that way until Patrick says otherwise. What the time away costs,
-and what a night gives back to rest, hunger and thirst, is one table in
-the server with a row for each place above and one for somebody on their
-feet (#2246). Today every row costs the whole clock and only your own bed
-and a bed you are allowed in give the fill, so it is the rule above. An
+were away gains no rest at the place's rate, whatever you logged out
+on (#1764): what it does is the logging out table above, and the night
+is the one thing a place gives for it. The 24 minutes are the suggested
+answer on #1606. What the time away costs, and what a night gives back
+to rest, hunger and thirst, is one table in the server with a row for
+each place above and one for somebody on their feet (#2246), and the
+Body page's line is worked out from the same row. An
 inn or a temple is read off the room's own records: its location carries
 the game's inn or temple mark, and a house the game sells as a home never counts as one.
-Tea and skooma are not items the needs block knows.
+Skooma is in the server (#1382): all six drugs (Skooma, Redwater Skooma, Double-Distilled Skooma, Balmora Blue, Eversnow and Sleeping Tree Sap) hold the rest drain at zero for 10 real minutes, resting still gains, and when the window ends each dose taken inside it costs 30 rest and 10 hunger. Tea is not: no item is a tea.
 Sleeping on open ground, an hour on a seat with no roof over you and
 no fire in reach, starts a chill. See [Disease](disease.md).
 The craft gate is asked at every bench's own menu, brews, enchanting

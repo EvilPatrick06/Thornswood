@@ -6,31 +6,74 @@ function same(a,b) {
   var left=Object.keys(a).sort(),right=Object.keys(b).sort();
   return left.length===right.length && left.every(function(key,i){return key===right[i] && same(a[key],b[key]);});
 }
+function nativeRevision(value) {
+  return typeof value==='string' && value.length>0 && value.length<=20 && value[0]!=='0' &&
+    !/[^0-9]/.test(value) && (value.length<20 || value<='18446744073709551615');
+}
+function targetIdentity(mp,actor) {
+  try {
+    var ai=mp.getNpcAIState(actor),desc=mp.getDescFromId(actor);
+    if(!ai || !Number.isInteger(ai.profileId) || !Number.isSafeInteger(ai.lifeGeneration) ||
+        ai.lifeGeneration<0 || typeof desc!=='string' || !desc || !nativeRevision(ai.runtimeLifeIdentity))return null;
+    return JSON.stringify({desc:desc,profileId:ai.profileId,life:ai.lifeGeneration,body:ai.runtimeLifeIdentity});
+  } catch(error) { return null; }
+}
+function actorIdentity(mp,actor) {
+  try {
+    var ai=mp.getNpcAIState(actor),desc=mp.getDescFromId(actor),runtime=mp.getActorRuntimeIdentity(actor);
+    if(!ai || ai.isHuman!==true || !Number.isInteger(ai.profileId) || ai.profileId<=0 ||
+        !Number.isSafeInteger(ai.lifeGeneration) || ai.lifeGeneration<0 || typeof desc!=='string' || !desc ||
+        !nativeRevision(runtime))return null;
+    return JSON.stringify({desc:desc,profileId:ai.profileId,life:ai.lifeGeneration,runtime:runtime});
+  } catch(error) { return null; }
+}
 function createQuestTransactions(deps) {
   var mp=deps.mp,active=true,property='thornswoodQuests';
   var log=deps.log || function(){};
   function report(message,error) {try{log(message+String(error));}catch(ignored){}}
   function available() {
     return active && typeof deps.withInventoryMutation==='function' && !!mp &&
-      ['compareAndSetInventoryAndProperty','getInventoryReceipt','getSavedInventoryReceipt',
-        'get','getIdFromDesc','getDescFromId','getNpcAIState'].every(function(key){return typeof mp[key]==='function';});
+      ['compareAndSetActorProperty','compareAndSetInventoryAndProperty','getInventoryReceipt','getSavedInventoryReceipt',
+        'get','getIdFromDesc','getDescFromId','getNpcAIState','getActorRuntimeIdentity'].every(function(key){return typeof mp[key]==='function';});
   }
   function identity(actor) {
-    if(!active)return null;
-    var ai=mp.getNpcAIState(actor),desc=mp.getDescFromId(actor);
-    if(!ai || !ai.isHuman || !Number.isInteger(ai.profileId) || ai.profileId<=0 ||
-        !Number.isSafeInteger(ai.lifeGeneration) || ai.lifeGeneration<0 || !desc)return null;
-    return JSON.stringify({desc:desc,profileId:ai.profileId,life:ai.lifeGeneration});
+    return active ? actorIdentity(mp,actor) : null;
   }
-  function commit(actor,expectedRecord,nextRecord,changes) {
+  function commit(actor,expectedRecord,nextRecord,changes,admission) {
     if(!available())return {ok:false,why:'unavailable'};
     try {
+      var token=identity(actor);
+      if(!token)return {ok:false,why:'identity'};
       // Match the addon's JSON boundary, including omitted optional fields.
       nextRecord=JSON.parse(JSON.stringify(nextRecord));
+      if(!Array.isArray(changes))throw new Error('Invalid quest goods.');
+      if(changes.length===0) {
+        var metadataOwner=JSON.parse(token);
+        if(!available() || identity(actor)!==token)return {ok:false,why:'identity'};
+        if(admission!==undefined && (typeof admission!=='function' || admission()!==true))return {ok:false,why:'session'};
+        try {
+          var committed=mp.compareAndSetActorProperty(actor,metadataOwner.profileId,
+            {name:property,expected:expectedRecord===undefined?null:expectedRecord,replacement:nextRecord,
+              expectedLifeGeneration:metadataOwner.life,expectedRuntimeIdentity:metadataOwner.runtime});
+          return {ok:committed===true,why:committed===true?'':'changed'};
+        } catch(error) {
+          // An unchanged inventory receipt says nothing about a metadata save.
+          // Only a verified unchanged property establishes a refused operation.
+          try {
+            var record=mp.get(actor,property);
+            if(identity(actor)===token && same(record==null?null:record,expectedRecord==null?null:expectedRecord)) {
+              report('quest metadata refused: ',error);
+              return {ok:false,why:'unwritten'};
+            }
+          } catch(readError) { /* Unreadable outcomes revoke the service below. */ }
+          active=false;
+          report('quest metadata outcome is unknown; service revoked: ',error);
+          return {ok:false,why:'unavailable',uncertain:true};
+        }
+      }
       return deps.withInventoryMutation(actor,function(human,stillActive){
         if(!available() || !stillActive())return {ok:false,why:'unavailable'};
-        var token=identity(actor);
-        if(!token)return {ok:false,why:'identity'};
+        if(identity(actor)!==token)return {ok:false,why:'identity'};
         var owner=JSON.parse(token);
         if(owner.desc!==human.desc || owner.profileId!==human.profileId)return {ok:false,why:'identity'};
         var receipt=mp.getInventoryReceipt(actor);
@@ -53,9 +96,11 @@ function createQuestTransactions(deps) {
         });
         var nextReceipt=JSON.stringify({actor:human.desc,profile:human.profileId,sequence:sequence});
         if(!stillActive() || !available() || identity(actor)!==token)return {ok:false,why:'identity'};
+        if(admission!==undefined && (typeof admission!=='function' || admission()!==true))return {ok:false,why:'session'};
         try {
           var changed=mp.compareAndSetInventoryAndProperty(actor,before,receipt,next,sequence,human.profileId,
-            {name:property,expected:expectedRecord===undefined?null:expectedRecord,replacement:nextRecord,expectedLifeGeneration:owner.life});
+            {name:property,expected:expectedRecord===undefined?null:expectedRecord,replacement:nextRecord,
+              expectedLifeGeneration:owner.life,expectedRuntimeIdentity:owner.runtime});
           return {ok:changed===true,why:changed===true?'':'changed'};
         } catch(error) {
           // Publication can fail after the atomic live edit. Read back that
@@ -82,4 +127,4 @@ function createQuestTransactions(deps) {
   }
   return {commit:commit,identity:identity,available:available,shutdown:function(){active=false;}};
 }
-module.exports={createQuestTransactions:createQuestTransactions};
+module.exports={createQuestTransactions:createQuestTransactions,actorIdentity:actorIdentity,targetIdentity:targetIdentity};

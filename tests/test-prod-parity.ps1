@@ -43,12 +43,17 @@ function Facts { [ordered]@{
         @{ proto = 'tcp'; address = '0.0.0.0'; port = 22; process = 'sshd' }, @{ proto = 'tcp'; address = '127.0.0.1'; port = 3001; process = 'node' },
         @{ proto = 'tcp'; address = '127.0.0.1'; port = 7778; process = 'node' }, @{ proto = 'tcp'; address = '127.0.0.1'; port = 7789; process = 'node' },
         @{ proto = 'udp'; address = '0.0.0.0'; port = 7777; process = 'node' }, @{ proto = 'tcp'; address = '0.0.0.0'; port = 3000; process = 'node' },
-        @{ proto = 'udp'; address = '0.0.0.0'; port = 7787; process = 'node' }, @{ proto = 'tcp'; address = '0.0.0.0'; port = 7788; process = 'node' })
+        @{ proto = 'udp'; address = '0.0.0.0'; port = 7787; process = 'node' }, @{ proto = 'tcp'; address = '0.0.0.0'; port = 7788; process = 'node' },
+        @{ proto = 'udp'; address = '0.0.0.0'; port = 443; process = 'caddy' }, @{ proto = 'tcp'; address = '0.0.0.0'; port = 135; process = 'svchost' },
+        @{ proto = 'tcp'; address = '::'; port = 445; process = 'System' }, @{ proto = 'udp'; address = '0.0.0.0'; port = 123; process = 'svchost' },
+        @{ proto = 'udp'; address = '0.0.0.0'; port = 5353; process = 'svchost' }, @{ proto = 'udp'; address = '::'; port = 5355; process = 'svchost' })
     tasks = @(
         @{ name = 'Thornswood Server'; user = 'SYSTEM'; triggers = @('Boot') }, @{ name = 'Thornswood Dev Server'; user = 'SYSTEM'; triggers = @('Boot') },
         @{ name = 'Thornswood Voice'; user = 'SYSTEM'; triggers = @('Boot') }, @{ name = 'Thornswood Dev Voice'; user = 'SYSTEM'; triggers = @('Boot') },
         @{ name = 'Thornswood Docs'; user = 'NT AUTHORITY\LOCAL SERVICE'; triggers = @('Boot') }, @{ name = 'Thornswood Web'; user = 'SYSTEM'; triggers = @('Boot', 'Time') },
-        @{ name = 'Thornswood Watch'; user = 'SYSTEM'; triggers = @('Time') }, @{ name = 'Thornswood Backup'; user = 'SYSTEM'; triggers = @('Daily') })
+        @{ name = 'Thornswood Watch'; user = 'SYSTEM'; triggers = @('Time') }, @{ name = 'Thornswood Backup'; user = 'SYSTEM'; triggers = @('Daily') },
+        @{ name = 'Thornswood Load'; user = 'SYSTEM'; triggers = @('Time') }, @{ name = 'Thornswood Maint Update'; user = 'SYSTEM'; triggers = @('Daily') },
+        @{ name = 'Thornswood Dev Crash Capture'; user = 'SYSTEM'; triggers = @('Boot') }, @{ name = 'Thornswood Disk History'; user = 'SYSTEM'; triggers = @('Daily') })
     services = @(
         @{ name = 'sshd'; account = 'LocalSystem'; state = 'Running' }, @{ name = 'ThornswoodBot'; account = 'NT SERVICE\ThornswoodBot'; state = 'Running' },
         @{ name = 'actions.runner.X.thornswood-vps'; account = '.\thornswood-runner'; state = 'Running' })
@@ -107,6 +112,31 @@ try {
     $x = Run $d ''
     T ($x.Code -eq 2 -and -not $x.Report) 'a report holding something shaped like a secret is refused and not written'
 
+    # ---- #2165 first live run: expected box state and the comment-blind Caddyfile
+    $body = 'thornswood.net {' + "`n" + '    reverse_proxy 127.0.0.1:3001' + "`n" + '}'
+    $h1 = Get-ConfigBodyHash ("# header line one`n#`n# header line three`n`n" + $body + "`n")
+    T ($h1 -eq (Get-ConfigBodyHash $body)) 'comment and blank lines do not change a config body hash'
+    T ($h1 -eq (Get-ConfigBodyHash (($body -replace "`n", "`r`n") + "   `r`n"))) 'line endings and trailing spaces do not either'
+    T ($h1 -ne (Get-ConfigBodyHash ($body -replace '3001', '3002'))) 'a changed directive does'
+
+    $repoBody = Get-ConfigBodyHash ([IO.File]::ReadAllText((Join-Path $repo 'scripts\deploy\Caddyfile')))
+    $e = Facts; $e.files.'C:\Thornswood-Caddy\Caddyfile' = ('0' * 64); $e.fileBodies = [ordered]@{ 'C:\Thornswood-Caddy\Caddyfile' = $repoBody }
+    $x = Run $e ''
+    T ($x.Code -eq 0 -and $x.Report -match '\| file \| C:\\Thornswood-Caddy\\Caddyfile \|[^\n]*comments aside \| same \| ok \|') 'a live Caddyfile without the comment header is ok'
+    $e.fileBodies.'C:\Thornswood-Caddy\Caddyfile' = ('1' * 64)
+    $x = Run $e ''
+    T ($x.Code -eq 1 -and $x.Out -match 'REVIEW  file C:\\Thornswood-Caddy\\Caddyfile') 'a live Caddyfile whose body differs is still caught'
+
+    $x = Run (Facts) ''
+    T ($x.Code -eq 0 -and $x.Out -cnotmatch 'REVIEW  ') 'the Oct 11 run''s ten rows (3 tasks, udp 443, Windows ports) are recorded and pass'
+    T ($x.Report -match '\| listener \| udp 443 \|[^\n]*\| ok \|') 'udp 443 for Caddy HTTP/3 is an expected listener'
+    $h = Facts; ($h.listeners | Where-Object { $_.proto -eq 'udp' -and $_.port -eq 443 }).process = 'node'
+    $x = Run $h ''
+    T ($x.Out -match 'REVIEW  listener udp 443') 'udp 443 held by anything but Caddy is caught'
+    $rj = Get-Content (Join-Path $repo 'records\prod-parity.json') -Raw | ConvertFrom-Json
+    $new2165 = @(@($rj.listeners | Where-Object { "$($_.proto) $($_.port)" -in 'udp 443', 'tcp 135', 'tcp 445', 'udp 123', 'udp 5353', 'udp 5355' }) + @($rj.tasks | Where-Object { $_.name -in 'Thornswood Load', 'Thornswood Maint Update', 'Thornswood Dev Crash Capture' }))
+    T ($new2165.Count -eq 9 -and -not @($new2165 | Where-Object { -not $_.why })) 'the nine rows from the Oct 11 run are recorded, each with a reason'
+    T (-not @($rj.intentional)) 'expected state is recorded as expected, not as an ignore list'
     $rec2 = Get-Content (Join-Path $repo 'records\prod-parity.json') -Raw
     T ($rec2 -notmatch '(?i)password\s*[=:]|BEGIN ') 'records\prod-parity.json holds no secret'
 } finally { Remove-Item -LiteralPath $scratch -Recurse -Force -EA SilentlyContinue }

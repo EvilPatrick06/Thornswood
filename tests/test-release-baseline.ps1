@@ -314,7 +314,7 @@ try {
     $iMan = $src.IndexOf('# ==== thornswood release manifest ====')
     $iUp = $src.IndexOf('# ==== end thornswood site upload ====')
     $iSet = $src.IndexOf("Set-Prop `$doc 'baseline' `$releaseBaseline")
-    $iWrite = $src.IndexOf('[IO.File]::WriteAllText($VersionFile')
+    $iWrite = $src.IndexOf('Write-FeedVersionFile $VersionFile')
     $iSend = $src.IndexOf("Send-FeedStore `$Channel `$ReleaseDir `$feedFiles")
     Yes 'it runs after the packs are on the site and before the feed is written or sent' ($iUp -gt 0 -and $iMan -gt $iUp -and $iSet -gt $iMan -and $iWrite -gt $iSet -and $iSend -gt $iWrite)
     Yes 'Save-State writes the store copy with the same writer' ($src -match '(?s)function Save-State \{\s+\[void\]\(Write-BaselineFile \$now \$StateFile\)')
@@ -355,8 +355,9 @@ try {
     Write-Host ''; Write-Host 'the real Publish-Update.ps1'
     $fake = Join-Path $T 'repo'
     foreach ($f in 'scripts\release\Publish-Update.ps1', 'scripts\release\Read-JsonFile.ps1', 'scripts\release\RecordShape.ps1', 'scripts\release\Ship-Rules.ps1', 'scripts\mods\LoadOrder.ps1',
-                   'scripts\release\Feed-Store.ps1', 'scripts\release\Release-Baseline.ps1', 'scripts\release\Release-Name.ps1', 'scripts\release\Source-Notice.ps1',
+                   'scripts\release\Feed-Store.ps1', 'scripts\release\Feed-Json.ps1', 'scripts\release\Release-Baseline.ps1', 'scripts\release\Release-Name.ps1', 'scripts\release\Source-Notice.ps1',
                    'scripts\release\Dev-News.ps1', 'scripts\deploy\ServerContent.ps1',
+                   'scripts\release\Feed-News.ps1', 'scripts\release\Feed-Rules.ps1',
                    'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt',
                    'scripts\release\Where.ps1', 'records\client-build.json', 'records\ui-gone.json',
                    'scripts\mods\Generated.ps1', 'records\generated.json') {

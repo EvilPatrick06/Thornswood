@@ -158,7 +158,7 @@ $docsWin = $DocsRoot.Replace('/','\')
 . (Join-Path $Here 'Artifact.ps1')
 $artifact = $null
 if (-not $PutBack -and -not $SetPing) {
-$artifact = New-ThornswoodArtifact -Component bot -RepoDir $Repo -Paths 'bot/bot.py', 'bot/card.py', 'bot/dev-channel.txt', 'bot/requirements.txt', 'bot/factions.json', 'bot/staff-channel.txt', 'bot/assets/join-card.png', 'scripts/vps/BotService.cs'
+$artifact = New-ThornswoodArtifact -Component bot -RepoDir $Repo -Paths 'bot/bot.py', 'bot/_pyguard.py', 'bot/card.py', 'bot/staff-channel.txt', 'bot/requirements.txt', 'bot/factions.json', 'bot/assets/join-card.png', 'scripts/vps/BotService.cs'
 Write-Host ('artifact ' + (Format-ThornswoodArtifact $artifact)) -ForegroundColor DarkGray
 Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
 $Repo = $artifact.Folder
@@ -365,14 +365,21 @@ $prevName  = '.prev-' + $stamp
 $hashes    = [ordered]@{}
 if (-not $PutBack) {
 Head 'Staging it'
-# dev-channel.txt goes up with the code, and it is not an afterthought.
+# staff-channel.txt goes up with the code, and it is not an afterthought.
 #
-# The site watcher reads the staff channel's id out of it, beside bot.py. It
-# was not in this list on 21 September, so the first run of the watcher on the
-# VPS said "in channel 0" and would have found the site down and had nowhere to
-# say so. The id is not a secret and the file is tracked in git, unlike the two
-# webhook files sitting next to it, which are not sent by anything and must not
-# be added here.
+# It holds the id of #staff-updates, where the bot says the watchdog's messages
+# and the sessions that went wrong (bot.py, WATCH_ID and TROUBLE_ID). The
+# channel id file was not in this list on 21 September, so the first run of the
+# watcher on the VPS said "in channel 0" and would have found the site down and
+# had nowhere to say so. The id is not a secret and the file is tracked in git,
+# unlike the webhook files that sit on the box, which are not sent by anything
+# and must not be added here.
+#
+# dev-channel.txt is not sent any more (#2501). It is the dev updates channel,
+# where dev releases are announced, and only Set-DevNews.ps1 on a developer's
+# machine reads it. The bot read it for the watchdog until 12 Oct, which put
+# every outage among the dev release posts. The copy an earlier run left on the
+# box is not the bot's own, so the swap moves it into .prev with the old code.
 #
 # requirements.txt too, because the full run installs the libraries from it.
 #
@@ -384,7 +391,8 @@ Head 'Staging it'
 # factions.json too: the named factions the Faction Leader form reads from
 # beside itself. A file this list does not name never reaches the box.
 $send = [ordered]@{}
-foreach ($f in 'bot.py', 'card.py', 'dev-channel.txt', 'requirements.txt', 'factions.json') {
+# _pyguard.py is the Python version check bot.py imports first (#2276).
+foreach ($f in 'bot.py', '_pyguard.py', 'card.py', 'staff-channel.txt', 'requirements.txt', 'factions.json') {
   $src = Join-Path $Repo "bot\$f"
   if (-not (Test-Path $src)) { Die "missing: $src" }
   $send[$f] = $src
@@ -392,15 +400,6 @@ foreach ($f in 'bot.py', 'card.py', 'dev-channel.txt', 'requirements.txt', 'fact
 # No roll-log.ps1 any more: the service rolls bot.log itself, by size, while
 # the bot runs (BotService.cs).
 
-# staff-channel.txt the same way, when there is one. It holds the id of the
-# channel a session that went wrong is announced in. Unlike the file above it
-# is optional: with no id the bot falls back to the name staff-general, and
-# only when exactly one channel carries that name, so a missing file leaves a
-# working bot rather than a silent one. Put an id in it the moment two
-# channels ever share that name, which has already happened here with news.
-$staff = Join-Path $Repo 'bot\staff-channel.txt'
-if (Test-Path $staff) { $send['staff-channel.txt'] = $staff }
-else { Say '  no staff-channel.txt, so the bot resolves staff-general by name' 'DarkGray' }
 $art = Join-Path $Repo 'bot\assets\join-card.png'
 if (Test-Path $art) { $send['assets/join-card.png'] = $art }
 else { Say '  no join-card.png, cards will fall back to a plain background' 'Yellow' }
@@ -431,7 +430,7 @@ foreach ($rel in $send.Keys) {
   Say "  $rel" 'Green'
 }
 $hashes = Get-SwapHashes $send
-$checkOut = @(Remote ((ServiceSwapVars $Root $stageName $prevName $Wait $hashes @('bot.py', 'card.py')) + $serviceCheckBlock) |
+$checkOut = @(Remote ((ServiceSwapVars $Root $stageName $prevName $Wait $hashes @('bot.py', '_pyguard.py', 'card.py')) + $serviceCheckBlock) |
               ForEach-Object { Say "  $_"; "$_".Trim() })
 if ($checkOut -notcontains 'STAGE OK') { Die 'the stage did not check out, so the bot was not stopped or changed. The lines above say why.' }
 }

@@ -37,6 +37,9 @@
     - a good one swaps in, carries the world, the roster, the runtime data and
       the logs across, keeps the old root as .prev and the newest two of them
     - -PutBack puts the newest .prev back and keeps what it took out
+    - issue #2491: -TaskOnly registers the task again over one with no start
+      /high, restarts the server under it with node at High, and changes no
+      file; with a switch that would change one it is INSTALL REFUSED
     - a root that cannot be moved because something holds a file in it is
       INSTALL REFUSED, and the old server is started again
     - -FreshWorld starts with no world and leaves the old one in .prev
@@ -66,6 +69,10 @@
       Publish-Server payloads carry this checkout's gamemode artifact and a
       stamp for the channel, as Export-ServerPayload.ps1 makes them, so they
       are told apart by what they ship into data.
+    - issue #2323: every stub server here starts on ports below the range
+      Windows hands to outgoing connections, each pair bound before it is
+      handed out, so a block Windows keeps for TCP or a connection that took
+      the port cannot stop a start the case expects to answer.
 
   Connects to nothing but 127.0.0.1.
 #>
@@ -94,6 +101,13 @@ function Done {
     Remove-Variable -Name TsSshSeen, TsScpFail, TsLastCode -Scope Global -ErrorAction SilentlyContinue
     Write-Host ''
     Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
+    # A failing run's whole output is kept (#2323): the one failure of 11 Oct
+    # could not be read because only its last twelve lines were.
+    if ($script:transcript) {
+        try { Stop-Transcript | Out-Null } catch { }
+        if ($script:fail) { Write-Host ('the whole of this run is kept in ' + $script:transcript) }
+        else { Remove-Item -LiteralPath $script:transcript -Force -ErrorAction SilentlyContinue }
+    }
     if ($script:fail) { exit 1 }
     exit 0
 }
@@ -102,8 +116,11 @@ function Done {
 $src = [IO.File]::ReadAllText($installer)
 $iStage = $src.IndexOf('Expand-Archive -LiteralPath $Zip -DestinationPath $stageDir')
 $iCheck = $src.IndexOf('load order does not resolve')
-$iStop  = $src.IndexOf("StopServer `$Root`r`n")
-if ($iStop -lt 0) { $iStop = $src.IndexOf("StopServer `$Root`n") }
+# The swap's stop. -TaskOnly (#2491) stops the server earlier in the file, in
+# a branch that ends before the stage and touches no folder.
+$iSwap  = $src.IndexOf('# ---- the swap')
+$iStop  = if ($iSwap -ge 0) { $src.IndexOf("StopServer `$Root`r`n", $iSwap) } else { -1 }
+if ($iSwap -ge 0 -and $iStop -lt 0) { $iStop = $src.IndexOf("StopServer `$Root`n", $iSwap) }
 Yes 'the installer unpacks into a stage and checks the load order before it stops anything' (
     $iStage -gt 0 -and $iCheck -gt $iStage -and $iStop -gt $iCheck)
 Yes 'and no longer deletes the root' ($src -notmatch 'Remove-Item -LiteralPath \$Root -Recurse')
@@ -134,6 +151,9 @@ $utf8    = New-Object Text.UTF8Encoding($false)
 $runTag  = [Guid]::NewGuid().ToString('N').Substring(0, 8)
 $TaskPrefix = 'Thornswood Test ' + $runTag   # every task this run makes, and only those
 foreach ($d in $box, $tasks, $far) { $null = [IO.Directory]::CreateDirectory($d) }
+# Beside the scratch folder, not in it, because that is removed at the end.
+$script:transcript = Join-Path ([IO.Path]::GetTempPath()) ('ts-install-' + $runTag + '.log')
+try { Start-Transcript -LiteralPath $script:transcript -Force | Out-Null } catch { $script:transcript = '' }
 
 function Put([string]$path, [string]$text) {
     $null = [IO.Directory]::CreateDirectory((Split-Path -Parent $path))
@@ -148,28 +168,42 @@ function Get([string]$path) {
 # A real task by the name the stand-ins use means a stand-in did not take.
 # Only this run's own tasks carry $TaskPrefix, so only those are taken off
 # again; any other 'Thornswood Test*' task (another run's, or a real one) is
-# left exactly where it is and reported, because it is not ours to remove.
+# left exactly where it is, because it is not ours to remove, and says
+# nothing about this run.
 # The same per-run tag test-deploy-swaps.ps1 uses since #1973 (c8f51230).
-function NoRealTask([string]$own = $TaskPrefix) {
+#
+# Asked by the names this run uses, one by one, never by 'Thornswood Test*'
+# (#2323). Until then it listed every 'Thornswood Test*' task and was true
+# only when there was none at all, so runs side by side failed each other:
+# one run's decoy scene below registers real tasks for a moment, and every
+# far call of another run then said a real task had been touched and threw.
+# Four runs started together on One on 12 Oct all failed that way. And the
+# wildcard listing itself is not safe beside another process: measured the
+# same night, Get-ScheduledTask -TaskName 'Thornswood Test*' threw "The
+# system cannot find the file specified" when a task was removed while it
+# listed, and with SilentlyContinue that is an empty list, a task of this
+# run's missed; the exact name never failed in 80 asks. The installer and
+# Publish-Server register only the -TaskName they are given, so these are
+# every name a stand-in that did not take could leave.
+$script:ownTasks = @('Server', 'Dev', 'Live', 'Scene') | ForEach-Object { $TaskPrefix + ' ' + $_ }
+function NoRealTask {
     # The task folder on disk, when this account can read it, because asking
     # the scheduler takes seconds and this is asked after every far call.
     $folder = Join-Path $env:SystemRoot 'System32\Tasks'
     $readable = $false
     try { $null = [IO.Directory]::GetFiles($folder, 'x'); $readable = $true } catch { }
-    if ($readable -and -not (Test-Path -Path (Join-Path $folder 'Thornswood Test*'))) { return $true }
-    $real = @(Get-ScheduledTask -TaskName 'Thornswood Test*' -ErrorAction SilentlyContinue)
-    foreach ($r in $real) {
-        if ($r.TaskName.StartsWith($own + ' ', [StringComparison]::Ordinal)) {
-            Stop-ScheduledTask -TaskName $r.TaskName -ErrorAction SilentlyContinue
-            Unregister-ScheduledTask -TaskName $r.TaskName -Confirm:$false -ErrorAction SilentlyContinue
-        } else {
-            Write-Host ("      a task this run did not make is left alone: '" + $r.TaskName + "'")
-        }
+    if ($readable -and -not (Test-Path -Path (Join-Path $folder ($TaskPrefix + ' *')))) { return $true }
+    $mine = 0
+    foreach ($n in $script:ownTasks) {
+        if ($null -eq (Get-ScheduledTask -TaskName $n -ErrorAction SilentlyContinue)) { continue }
+        $mine++
+        Stop-ScheduledTask -TaskName $n -ErrorAction SilentlyContinue
+        Unregister-ScheduledTask -TaskName $n -Confirm:$false -ErrorAction SilentlyContinue
     }
-    return ($real.Count -eq 0)
+    return ($mine -eq 0)
 }
 # A decoy 'Thornswood Test <x>' task that is not this run's survives NoRealTask
-# and is reported, while one this run made is taken off. Real tasks, made and
+# and does not count against it, while one this run made is taken off. Real tasks, made and
 # removed here only, under names nothing else uses.
 $decoy = 'Thornswood Test Decoy ' + [Guid]::NewGuid().ToString('N').Substring(0, 8)
 $mine  = $TaskPrefix + ' Scene'
@@ -178,9 +212,10 @@ try {
     $null = Register-ScheduledTask -TaskName $decoy -Action $act -ErrorAction Stop
     $null = Register-ScheduledTask -TaskName $mine  -Action $act -ErrorAction Stop
     $clean = NoRealTask
-    Yes 'a task this run did not make is reported' (-not $clean)
-    Yes 'and left where it was' ($null -ne (Get-ScheduledTask -TaskName $decoy -ErrorAction SilentlyContinue))
+    Yes 'a real task under one of this run''s names counts against this run' (-not $clean)
+    Yes 'a task this run did not make is left where it was' ($null -ne (Get-ScheduledTask -TaskName $decoy -ErrorAction SilentlyContinue))
     Yes 'while a task this run made is removed' ($null -eq (Get-ScheduledTask -TaskName $mine -ErrorAction SilentlyContinue))
+    Yes 'and with only another run''s task there, this run counts as clean, so runs side by side do not fail each other (#2323)' (NoRealTask)
 } catch {
     Yes ('the decoy scene could register its tasks: ' + $_.Exception.Message) $false
 } finally {
@@ -242,22 +277,90 @@ function WaitUp([int]$port) {
     for ($i = 0; $i -lt 40; $i++) { if (Answers $port) { return $true }; Start-Sleep -Milliseconds 250 }
     return $false
 }
-# A game port the system hands out, with the port above it free as well,
-# because the server in a payload binds its game port and the resources port
-# one above it. Not one already taken by this run ($avoid). 0 when the system
-# hands out none such in fifty asks. For the Publish-Server runs below, which
-# until #1728 needed the dev and live servers' own ports and skipped when
-# anything held one.
+# A game port for a stub server, with the port above it for its resources:
+# the stub binds UDP on the first and listens on TCP on the second, as
+# skymp5-server does. Not within two of one this run already took ($avoid).
+# 0 when fifty tries find none. Every server below takes its ports from here:
+# the installs, the scratch root's other server, and the Publish-Server runs,
+# which until #1728 needed the dev and live servers' own ports.
+#
+# BELOW THE RANGE WINDOWS HANDS OUT, AND PROVED BY BINDING BOTH (#2323). The
+# dev and live pairs used to be asked of the system (UdpClient(0)), which
+# answers from the dynamic range, 49152 and up. Two things there stopped a
+# stub from ever answering, measured on One on 12 Oct:
+#   - Windows reserves blocks of that range for TCP alone (netsh int ipv4 show
+#     excludedportrange: 49709-49808, 50321-50420, 51343-51442, 63701-63800
+#     and 63874-63973 that day). A UDP port handed out next to one has its
+#     TCP port above inside it, nothing holds it, so "free" said yes, and the
+#     stub's listen failed with EACCES.
+#   - every outgoing connection on the machine takes its own port from the
+#     same range, so the port above can be taken between the choice and the
+#     start.
+#   A start with either never answers. Of 35 stub starts that day, the same
+#   cmd, roll-log and node chain the installer registers, on random ports in
+#   that range, 3 never answered: the stub's log said EACCES on 49731, inside
+#   49709-49808, and EACCES on 50426 with an established connection on it.
+#   On 11 Oct the two live Publish-Server cases failed together in one run,
+#   the way a live pair whose resources port cannot be listened on fails: the
+#   first install had no old folder to go back to, so it was INSTALL FAILED
+#   after the swap and the lock, and the one over it rolled back and kept its
+#   .failed folder.
+# So ports come from below the dynamic range, which no outgoing connection is
+# given, and each pair is bound here, UDP and TCP the way the stub binds them,
+# before it is handed out: a reserved block, wherever it is, refuses the bind.
+$script:dynamicStart = 49152
+try {
+    $starts = @(@(Get-NetTCPSetting -ErrorAction Stop) + @(Get-NetUDPSetting -ErrorAction Stop) |
+                ForEach-Object { [int]$_.DynamicPortRangeStartPort } | Where-Object { $_ -gt 0 } | Sort-Object)
+    if ($starts.Count) { $script:dynamicStart = $starts[0] }
+} catch { }
+$script:portLow = 41000
+$script:portTop = [Math]::Min(48000, $script:dynamicStart - 2)
+$script:portRand = New-Object Random
+function Bindable([int]$p) {
+    if (-not ((Free $p) -and (Free ($p + 1)))) { return $false }
+    $u = $null
+    $t = $null
+    try {
+        $u = New-Object Net.Sockets.UdpClient((New-Object Net.IPEndPoint([Net.IPAddress]::Loopback, $p)))
+        $t = New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback, ($p + 1))
+        $t.Start()
+        return $true
+    } catch { return $false }
+    finally {
+        if ($t) { $t.Stop() }
+        if ($u) { $u.Close() }
+    }
+}
 function Pair([int[]]$avoid) {
+    if ($script:portTop -le $script:portLow) { return 0 }
     for ($i = 0; $i -lt 50; $i++) {
-        $u = New-Object Net.Sockets.UdpClient(0)
-        $p = ([Net.IPEndPoint]$u.Client.LocalEndPoint).Port
-        $u.Close()
+        $p = $script:portRand.Next($script:portLow, $script:portTop)
         $near = @($avoid | Where-Object { [Math]::Abs($_ - $p) -le 2 }).Count
-        if ($p -lt 65535 -and $near -eq 0 -and (Free $p) -and (Free ($p + 1))) { return $p }
+        if ($near -eq 0 -and (Bindable $p)) { return $p }
     }
     return 0
 }
+# The case measured: a TCP block Windows reserved, with nothing in it for
+# "free" to see. A pair whose resources port is the block's first is not
+# handed out. A machine with no such block has nothing to show it on.
+$blocks = @()
+try {
+    foreach ($l in @(& netsh int ipv4 show excludedportrange protocol=tcp 2>$null)) {
+        $m = [regex]::Match([string]$l, '^\s*(\d+)\s+(\d+)')
+        if ($m.Success) { $blocks += [int]$m.Groups[1].Value }
+    }
+} catch { }
+$blockAt = @($blocks | Where-Object { $_ -gt 1025 -and $_ -lt 65535 -and (Free ($_ - 1)) -and (Free $_) } | Select-Object -First 1)
+if ($blockAt.Count) {
+    Yes ("a pair whose resources port is in a block Windows keeps for TCP ({0}) is not handed out, though nothing holds it (#2323)" -f $blockAt[0]) (
+        -not (Bindable ($blockAt[0] - 1)))
+} else {
+    Write-Host 'SKIP  no TCP block is kept on this machine, so the refusal of one is not shown here'
+}
+$probe = Pair @()
+Yes ('a pair is handed out below the range outgoing connections take ports from, which starts at ' + $script:dynamicStart) (
+    $probe -ge $script:portLow -and ($probe + 1) -lt $script:dynamicStart)
 
 # The task scheduler, for the far side. A task is a file holding its action;
 # starting it starts that action, the real cmd.exe line, and stopping it ends
@@ -423,7 +526,7 @@ function RecordText([string]$Binary, [string]$Js = $stubJs) {
     $files['scam_native.node'] = [ordered]@{ sha256 = (TextSha $Binary); bytes = 1; commit = $c }
     $files['dist_back/skymp5-server.js'] = [ordered]@{ sha256 = (TextSha $Js); bytes = 1; commit = $c }
     foreach ($k in $forkRest.Keys) { $files[$k] = [ordered]@{ sha256 = (TextSha $forkRest[$k]); bytes = 1; commit = $c } }
-    return ([ordered]@{ binary = 'scam_native.node'; sha256 = (TextSha $Binary); source = [ordered]@{ commit = $c }; files = $files } | ConvertTo-Json -Depth 5)
+    return ([ordered]@{ binary = 'scam_native.node'; sha256 = (TextSha $Binary); bytes = 1; source = [ordered]@{ commit = $c }; files = $files } | ConvertTo-Json -Depth 5)
 }
 # A payload as Export-ServerPayload makes one: the load order written out in
 # full under the root it is for, and every server file with its record.
@@ -470,9 +573,10 @@ function Payload {
     return $zip
 }
 
-$rand = New-Object Random
 try {
-    do { $P = $rand.Next(41000, 48000) } until ((Free $P) -and (Free ($P + 1)))
+    $P = Pair @()
+    Yes ("a game port for the installs, {0}, and {1} above it, both bound and let go below the dynamic range, which starts at {2}" -f $P, ($P + 1), $script:dynamicStart) ($P -gt 0)
+    if (-not $P) { throw ('no pair of ports from {0} to {1} could be bound, so no stub server can start' -f $script:portLow, $script:portTop) }
 
     # ---- a first install ---------------------------------------------------
     $v1 = Payload -Gamemode '// v1' -Binary 'binary v1' -Shipped 'shipped v1'
@@ -490,8 +594,8 @@ try {
     # docs\RESTORING.md installs into C:\Thornswood-RestoreTest\server with
     # -NoTask, from a payload whose settings are the live server's. The stop
     # must be by this root's own processes: the one on that port is live.
-    $Q = 0
-    do { $Q = $rand.Next(41000, 48000) } until ((Free $Q) -and (Free ($Q + 1)) -and [Math]::Abs($Q - $P) -gt 2)
+    $Q = Pair @($P)
+    if (-not $Q) { throw ('no second pair of ports from {0} to {1} could be bound, so the other server cannot start' -f $script:portLow, $script:portTop) }
     $other = Join-Path $work 'other-server'
     Put (Join-Path $other 'gamemode.js') '// the other server'
     Put (Join-Path $other 'server-settings.json') ((@{ port = $Q; name = 'other' }) | ConvertTo-Json)
@@ -627,6 +731,33 @@ try {
     $undone = @(Beside '.undone-*')
     Yes '  and what it took out is kept as .undone, and the .prev it put back is gone' (
         $undone.Count -eq 1 -and (Get (Join-Path $undone[0] 'gamemode.js')) -eq '// v2' -and @(Beside '.prev-*').Count -eq 0)
+    if ($script:fail -gt $failed) { Show }
+
+    # ---- -TaskOnly (#2491) -----------------------------------------------------
+    # The task as an install before #2491 registered it, node started by cmd
+    # with no start /high, which is what the box has. -TaskOnly registers the
+    # installer's task again, restarts the server under it and changes no file.
+    $taskFile = Join-Path $tasks ((($TaskPrefix + ' Server') -replace '[^A-Za-z0-9]', '_') + '.json')
+    $tj = [IO.File]::ReadAllText($taskFile) | ConvertFrom-Json
+    $tj.Argument = ([string]$tj.Argument).Replace('start "" /b /wait /high ', '').Replace(' & call exit %^errorlevel%', '')
+    [IO.File]::WriteAllText($taskFile, ($tj | ConvertTo-Json -Depth 4))
+    $gmWas = Get (Join-Path $root 'gamemode.js')
+    $setWas = Get (Join-Path $root 'server-settings.json')
+    $besideWas = @(Beside '.*').Count
+    $running = Owner $P
+    $taskOnly = "& '" + $installer.Replace("'", "''") + "' -Root '" + $root.Replace("'", "''") + "' -TaskName '$TaskPrefix Server' -StartNow -AllowGamingPc -Wait 8 -TaskOnly"
+    $out = RunWrapped ($taskOnly + " -FreshWorld`r`nexit `$LASTEXITCODE`r`n")
+    $failed = $script:fail
+    Yes '-TaskOnly with -FreshWorld is INSTALL REFUSED, and the same server is still answering' (
+        ($out -contains 'INSTALL REFUSED') -and $script:lastCode -ne 0 -and ((Owner $P) -eq $running))
+    Yes '  and the task is left as it was' (([IO.File]::ReadAllText($taskFile) | ConvertFrom-Json).Argument -notlike '*/high*')
+    $out = RunWrapped ($taskOnly + "`r`nexit `$LASTEXITCODE`r`n")
+    Yes '-TaskOnly is INSTALL OK, answering as a new process' (($out -contains 'INSTALL OK') -and (WaitUp $P) -and ((Owner $P) -ne $running))
+    Yes '  and the task starts node through start /high again, and hands its exit code back' (
+        [string](([IO.File]::ReadAllText($taskFile) | ConvertFrom-Json).Argument) -like '*start "" /b /wait /high "*" dist_back/skymp5-server.js >> *2>&1 & call exit %^errorlevel%"')
+    Yes '  and it reads node back at High' (($out -join "`n") -match 'node, pid \d+, runs at High priority')
+    Yes '  and no file of the server changed, and nothing was set beside it' (
+        (Get (Join-Path $root 'gamemode.js')) -eq $gmWas -and (Get (Join-Path $root 'server-settings.json')) -eq $setWas -and @(Beside '.*').Count -eq $besideWas)
     if ($script:fail -gt $failed) { Show }
 
     # ---- the running server's settings are its own (#1222) ----------------------
@@ -797,10 +928,10 @@ try {
     # Publish-Server holds the payload to a game port and checks the answer on
     # the resources port. By default those are the dev server's own, 7787 and
     # 7788, which the dev server holds on the VPS where this runs; so this
-    # takes a pair from the system and passes them (-GamePort, -ResourcesPort,
-    # #1728). A pair the system will not give fails here rather than skipping.
+    # takes a pair of its own and passes them (-GamePort, -ResourcesPort,
+    # #1728). No pair to be had fails here rather than skipping.
     $D = Pair @($P, $Q)
-    Yes ("a game port from the system for the dev Publish-Server runs, {0}, and {1} above it, both free" -f $D, ($D + 1)) ($D -gt 0)
+    Yes ("a game port for the dev Publish-Server runs, {0}, and {1} above it, both bound and let go" -f $D, ($D + 1)) ($D -gt 0)
     if ($D -gt 0) {
         $devRoot = Join-Path $box 'Thornswood-Server-Dev'
         $dist = Join-Path $work 'dist'
@@ -817,7 +948,7 @@ try {
         # box's own C:\Thornswood-Deploys or C:\Thornswood-Docs, which on the
         # VPS are real.
         function MapFar([string]$s) {
-            foreach ($p in 'C:\thornswood-server.zip', 'C:\Install-ThornswoodServer.ps1', 'C:\ServerSettings.ps1', 'C:\ServerBuild.ps1', 'C:\ServerReadyWait.ps1', 'C:\Roll-Log.ps1', 'C:\Thornswood-Server\',
+            foreach ($p in 'C:\thornswood-server.zip', 'C:\Install-ThornswoodServer.ps1', 'C:\ServerSettings.ps1', 'C:\ServerBuild.ps1', 'C:\ServerReadyWait.ps1', 'C:\Read-JsonFile.ps1', 'C:\RecordShape.ps1', 'C:\Roll-Log.ps1', 'C:\Thornswood-Server\',
                            'C:\Thornswood-Deploys', 'C:\Thornswood-Docs', 'C:\Windows\Temp\thornswood-remote-') {
                 $to = Join-Path $global:TsBox.Box $p.Substring(3)
                 $s = $s.Replace($p, $to).Replace($p.Replace('\', '/'), $to)
@@ -999,13 +1130,23 @@ try {
         Yes '  and the box records the folder that came back by its own record (#459)' ((Get $devCur) -eq $rec1 -and (Get $devBeside) -eq $rec1)
         Yes '    and history.log says it was put back to it' ((Get (Join-Path $deploys 'history.log')) -match [regex]::Escape('thornswood-server-dev put back to ' + $art.Name))
         if ($script:fail -gt $failed) { Show }
+
+        # Issue #2491: the task alone, through the same installer.
+        $shippedWas = Get (Join-Path $devRoot 'data\shipped.txt')
+        $curWas = Get $devCur
+        $code = Publish '' @('TaskOnly')
+        $failed = $script:fail
+        Yes 'Publish-Server -TaskOnly exits 0 and the dev server answers under the task again' ($code -eq 0 -and (WaitUp $D))
+        Yes '  having changed no file and no record' ((Get (Join-Path $devRoot 'data\shipped.txt')) -eq $shippedWas -and (Get $devCur) -eq $curWas)
+        Yes '  and node reads back at High' ((@($script:lastOut) -join "`n") -match 'node, pid \d+, runs at High priority')
+        if ($script:fail -gt $failed) { Show }
     }
 
     # ---- Publish-Server.ps1, whole, on the live channel (#1222) --------------------
     # The same over a live server. Its own ports, 7777 and 3000, are the live
-    # server's on the VPS, so this takes a pair from the system too (#1728).
+    # server's on the VPS, so this takes a pair of its own too (#1728).
     $L = Pair @($P, $Q, $D)
-    Yes ("a game port from the system for the live Publish-Server runs, {0}, and {1} above it, both free" -f $L, ($L + 1)) ($L -gt 0)
+    Yes ("a game port for the live Publish-Server runs, {0}, and {1} above it, both bound and let go" -f $L, ($L + 1)) ($L -gt 0)
     if ($L -gt 0 -and $D -gt 0) {
         $liveRoot = Join-Path $box 'Live\Thornswood-Server'
         $script:PayloadStampFor = 'main'

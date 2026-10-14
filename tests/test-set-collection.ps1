@@ -52,7 +52,10 @@ function Logged { if (Test-Path -LiteralPath $Log) { return @([IO.File]::ReadAll
 try {
     [void][IO.Directory]::CreateDirectory((Join-Path $Fake 'scripts\ops'))
     [IO.File]::Copy((Join-Path $Repo 'scripts\ops\Set-Collection.ps1'), (Join-Path $Fake 'scripts\ops\Set-Collection.ps1'))
+    # The stub sends nothing, but writes the feed the real way: the real
+    # Feed-Json.ps1, which Feed-Store.ps1 dot-sources (#1050).
     $stub = @"
+. '$((Join-Path $Repo 'scripts\release\Feed-Json.ps1').Replace("'", "''"))'
 `$script:StubLog = '$($Log.Replace("'", "''"))'
 `$script:StubStore = '$($Store.Replace("'", "''"))'
 `$script:StubFail = '$((Join-Path $T 'receive-fails').Replace("'", "''"))'

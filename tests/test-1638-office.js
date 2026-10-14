@@ -9,6 +9,11 @@
 // and move a board to where they stand. Each button sends the line the
 // command was, which the server still answers; none is named to anybody.
 //
+// #502, Patrick, 12 Oct: guards are named by the Jarl of that hold, and
+// taking the Jarl office asks for a hold. So the office is taken by pressing
+// its hold (twice), the hold is chosen once, and the Jarl of a hold names and
+// removes that hold's guards alone (section I, and H14 to H17 on the page).
+//
 // The server half is lifted out of the property block and run together over
 // a small world: the page's view (officeView), and the lines the buttons
 // send, through the property block's own command. The page half is the real
@@ -77,7 +82,8 @@ function line(re) {
   return m ? m[0] : null;
 }
 
-const NAMES = ['officeView', 'officeRedraw', 'stewardCmd', 'jarlCmd', 'evict', 'rentCmd', 'boxCmd',
+const NAMES = ['officeView', 'officeRedraw', 'stewardCmd', 'jarlCmd', 'guardCmd', 'officeHoldOf', 'jarlHoldOf',
+               'guardHoldOf', 'evict', 'rentCmd', 'boxCmd',
                'moveBoard', 'board', 'command', 'isJarl', 'isSteward', 'holderOf', 'here', 'buildingOf',
                'boxAt', 'holdOfBox', 'rentDue', 'nameOf', 'profileOf', 'onlineActorOf', 'redrawPanel', 'personName',
                'boardHere'];
@@ -93,7 +99,9 @@ const VARS = [
   line(/  var DOOR_MEMORY_MS = \d+;/),
   line(/  var DOOR_PROPERTY = '[^']*';/),
   line(/  var BOX_PROPERTY = '[^']*';/),
-  line(/  var BOARD_REACH = \d+;/)
+  line(/  var BOARD_REACH = \d+;/),
+  line(/  var HOLD_TOWN = \{[^}]*\};/),
+  line(/  var JAIL_NAME = \{[^\n]*\};/)
 ];
 yes('and the numbers and names they read', VARS.every(function (v) { return !!v; }));
 
@@ -111,7 +119,7 @@ function server() {
   const states = {};       // actor -> character state
   const writes = [];       // [actor, redraw]
   const roles = { admin: {}, jarl: {} };
-  const reg = { saves: 0 };
+  const reg = { saves: 0, pushes: 0, lawSaves: 0 };
   const mp = {
     get: function (id, key) {
       if (id === 0 && key === 'onlinePlayers') { return online.slice(); }
@@ -146,14 +154,16 @@ function server() {
     'var BUILDING_NAME = { breezehome: "Breezehome" };',
     'function lapseDays() { return 14; }',
     'function save() { reg.saves++; }',
-    'function pushAll() { }',
+    'function pushAll() { reg.pushes++; }',
+    'var law = { guards: {}, cells: {} };',
+    'function saveLaw() { reg.lawSaves++; }',
     'function plog() { }',
     ['deeds', 'setLock', 'mold', 'moldHere', 'cutKey', 'claim', 'sleepHere', 'post', 'take', 'jobs',
      'dropJob', 'unpin', 'postLetter', 'deliver', 'haulCmd', 'haulText']
       .map(function (n) { return 'function ' + n + '() { return true; }'; }).join('\n')
   ].concat(VARS, NAMES.map(function (n) { return lifted[n]; }));
   body.push('return { command: command, officeView: officeView, isJarl: isJarl, isSteward: isSteward, ' +
-            'claims: claims, stewards: stewards, boxes: boxes, boards: boards, ' +
+            'claims: claims, stewards: stewards, boxes: boxes, boards: boards, law: law, ' +
             'OFFICE_AT_DOOR: OFFICE_AT_DOOR };');
   const make = new Function('mp', 'g', 'boards', 'reg', body.join('\n'));
   const api = make(mp, g, boards, reg);
@@ -201,10 +211,14 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
     yes('A2 a Jarl-role character that has not taken the office gets the page with Take the office and nothing else',
         !!v && v.may === true && v.jarl === false && v.name === false && v.steward === false &&
         v.people.length === 0 && v.door === null && v.boards.length === 0);
-    const r = srv.say(JARL, '/jarl');
+    const bare = srv.say(JARL, '/jarl');
+    yes('A3 the office is of one hold: /jarl with none seats nothing and says where to press (' + bare.told + ')',
+        srv.states[JARL].office === null && /one hold/.test(bare.told) && /Office page of K/.test(bare.told));
+    const r = srv.say(JARL, '/jarl whiterun');
     const v2 = srv.view(JARL);
     yes('A3 Take the office sends /jarl, the character holds it, and its page is written again (' + r.told + ')',
-        r.answered && srv.states[JARL].office === 'jarl' && srv.writes.length === 1 && srv.writes[0][1] === true &&
+        r.answered && srv.states[JARL].office === 'jarl' && srv.states[JARL].officeHold === 'whiterun' &&
+        srv.writes.length === 1 && srv.writes[0][1] === true &&
         v2.jarl === true && v2.may === false && v2.name === true && v2.steward === true);
     const a = srv.view(ADMIN);
     yes('A4 an admin may take the office, and names and acts as a steward without it, as isJarl says',
@@ -247,7 +261,7 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
   // ------------------------------------------------ C. naming a steward
   {
     const srv = world();
-    srv.say(JARL, '/jarl');
+    srv.say(JARL, '/jarl whiterun');
     const v = srv.view(JARL);
     const names = v.people.map(function (p) { return p.name + ':' + p.pid; });
     yes('C1 the Jarl picks from the people in the world, by name with the id, never themselves (' + names.join(', ') + ')',
@@ -283,7 +297,7 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
   // ------------------------------------------- D. at the door: evict, rent
   {
     const srv = world();
-    srv.say(JARL, '/jarl');
+    srv.say(JARL, '/jarl whiterun');
     srv.say(JARL, '/steward ' + P_STEW);
     const lost = srv.say(STEW, '/evict');
     yes('D1 away from a door the steward is told to open one and use the page, not to say anything (' + lost.told + ')',
@@ -367,13 +381,85 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
         srv.boards.riften.pos.join() === '123,456,7' && srv.boards.riften.where === 'Riften');
     const no = srv.say(NOBODY, '/board move whiterun');
     yes('F3 somebody who is not a steward cannot', no.told === 'Only a steward moves a board.' && srv.boards.whiterun.pos[0] === 0);
-    srv.say(JARL, '/jarl');
+    srv.say(JARL, '/jarl whiterun');
     srv.people[JARL].pos = [9, 9, 9];
     srv.say(JARL, '/board move whiterun');
     yes('F4 a Jarl who is not staff can', srv.boards.whiterun.pos.join() === '9,9,9');
     srv.people[NOBODY].pos = [-5e6, 0, 0];
     yes('F5 the lines with nothing after them say what to do without naming one to type',
         !/\//.test(srv.say(STEW, '/board move').told) && !/\//.test(srv.say(NOBODY, '/board here').told));
+  }
+
+  // ------------------------------------- I. the Jarl of a hold names its guards (#502)
+  {
+    const srv = world();
+    srv.roles.jarl[P_ALICE] = true;
+    const before = srv.say(JARL, '/guard ' + P_NOBODY);
+    yes('I1 a Jarl-role character with no office names no guard (' + before.told + ')',
+        before.told === 'Only the Jarl of a hold names its guards.' && Object.keys(srv.law.guards).length === 0);
+    srv.say(JARL, '/jarl whiterun');
+    srv.say(ALICE, '/jarl riften');
+    const again = srv.say(JARL, '/jarl riften');
+    yes('I2 the hold is chosen once: a second /jarl changes nothing (' + again.told + ')',
+        srv.states[JARL].officeHold === 'whiterun' && /already holds the Jarl office of Whiterun/.test(again.told));
+    const odd = srv.say(NOBODY, '/jarl whiterun');
+    yes('I3 somebody with no Jarl role cannot take it, hold or no hold', srv.states[NOBODY].office === null &&
+        /Only someone with the Jarl role/.test(odd.told));
+    const v = srv.view(JARL);
+    yes('I4 the Jarl\'s page has the hold, no hold list, no guards yet, and everybody who guards no hold to name, themselves too',
+        v.hold === 'whiterun' && v.where === 'Whiterun' && v.holds.length === 0 && v.guards.length === 0 &&
+        v.guardPeople.length === 6 && v.guardPeople.some(function (p) { return p.pid === P_JARL; }));
+    srv.writes.length = 0; srv.reg.pushes = 0; srv.reg.lawSaves = 0;
+    const named = srv.say(JARL, '/guard ' + P_STEW);
+    yes('I5 Name guard names a guard of Whiterun, in the register, saved, every door list pushed (' + named.told + ')',
+        srv.law.guards[P_STEW] === 'whiterun' && srv.reg.lawSaves === 1 && srv.reg.pushes === 1 &&
+        /Proventus is a guard of Whiterun now\./.test(named.told) && /names you a guard of the hold/.test(named.told));
+    yes('I5 and both pages are written again, the Jarl\'s and the guard\'s',
+        srv.writesFor(JARL) === 1 && srv.writesFor(STEW) === 1);
+    const gv = srv.view(STEW);
+    yes('I6 the guard gets an Office page that says which hold they guard, and nothing else to press',
+        !!gv && gv.guardOf && gv.guardOf.hold === 'whiterun' && gv.guardOf.jail === 'Dragonsreach Dungeon' &&
+        gv.name === false && gv.steward === false && gv.may === false && gv.guardPeople.length === 0);
+    const v2 = srv.view(JARL);
+    yes('I7 the Jarl\'s page lists them as a guard by name and no longer offers them',
+        v2.guards.length === 1 && v2.guards[0].pid === P_STEW && v2.guards[0].name === 'Proventus' &&
+        v2.guardPeople.every(function (p) { return p.pid !== P_STEW; }));
+    const poach = srv.say(ALICE, '/guard ' + P_STEW);
+    yes('I8 the Jarl of Riften cannot name Whiterun\'s guard: a guard keeps one hold (' + poach.told + ')',
+        srv.law.guards[P_STEW] === 'whiterun' && /is a guard of Whiterun\. A guard keeps one hold/.test(poach.told));
+    const steal = srv.say(ALICE, '/guard -' + P_STEW);
+    yes('I9 nor take Whiterun\'s guard back (' + steal.told + ')',
+        srv.law.guards[P_STEW] === 'whiterun' && /is not a guard of Riften/.test(steal.told));
+    const hers = srv.say(ALICE, '/guard ' + P_ALICE2);
+    yes('I10 the Jarl of Riften names Riften\'s guards', srv.law.guards[P_ALICE2] === 'riften' && /guard of Riften now/.test(hers.told));
+    const riftenView = srv.view(ALICE);
+    yes('I11 and each Jarl\'s page lists only their own hold\'s guards',
+        riftenView.guards.map(function (g) { return g.pid; }).join() === String(P_ALICE2) &&
+        srv.view(JARL).guards.map(function (g) { return g.pid; }).join() === String(P_STEW));
+    const steward = srv.say(STEW, '/guard ' + P_NOBODY);
+    yes('I12 a guard, or a steward, who is not a Jarl names nobody', !srv.law.guards[P_NOBODY] &&
+        steward.told === 'Only the Jarl of a hold names its guards.');
+    const adm = srv.say(ADMIN, '/guard ' + P_NOBODY);
+    yes('I13 an admin with no seated office has no hold, so names no guard (' + adm.told + ')',
+        !srv.law.guards[P_NOBODY] && /no hold yet/.test(adm.told));
+    srv.writes.length = 0;
+    const back = srv.say(JARL, '/guard -' + P_STEW);
+    yes('I14 Remove takes the office back, and both pages are written again (' + back.told + ')',
+        !srv.law.guards[P_STEW] && srv.writesFor(JARL) === 1 && srv.writesFor(STEW) === 1 && srv.view(STEW) === null &&
+        /no longer a guard of Whiterun/.test(back.told));
+    srv.states[JARL].officeHold = undefined;
+    const old = srv.view(JARL);
+    yes('I15 a Jarl seated before there was a hold is offered the ten to choose from, and names no guard until then',
+        old.jarl === true && old.hold === null && old.holds.length === 10 && old.guardPeople.length === 0 &&
+        /no hold yet/.test(srv.say(JARL, '/guard ' + P_NOBODY).told));
+    srv.say(JARL, '/jarl markarth');
+    yes('I16 and choosing it seats that hold on the same office', srv.states[JARL].office === 'jarl' &&
+        srv.states[JARL].officeHold === 'markarth');
+    delete srv.law.guards[P_ALICE2];
+    srv.roles.jarl[P_ALICE2] = true;
+    const bad = srv.say(ALICE2, '/jarl __proto__');
+    yes('I17 a hold that is not one of the ten is refused (' + bad.told + ')',
+        !srv.states[ALICE2].office && /no hold called __proto__/.test(bad.told));
   }
 }
 
@@ -386,7 +472,7 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
   };
   const WORDS = arrayOf('WORDS');
   const PLAYER = arrayOf('PLAYER_WORDS');
-  const five = ['/jarl', '/steward', '/evict', '/box', '/rent'];
+  const five = ['/jarl', '/steward', '/guard', '/evict', '/box', '/rent'];
   yes('G1 the server still answers the five lines the page sends',
       !!WORDS && five.every(function (w) { return WORDS.indexOf(w) !== -1; }) && WORDS.indexOf('/board') !== -1);
   yes('G2 and none of them is in the list named to everybody, which /help and the unknown command reply read',
@@ -394,15 +480,15 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
   // The help is a panel since #1633: its Land topic, as a fresh install reads it.
   const help = helpTopic('land');
   yes('G3 the help panel\'s Land names no office line, and says where the office is',
-      !!help && !/\/rent|\/steward|\/evict|\/box|\/jarl|board move|board here/.test(help) && /Office page on K/.test(help));
+      !!help && !/\/rent|\/steward|\/evict|\/box|\/jarl|\/guard|board move|board here/.test(help) && /Office page on K/.test(help));
   // What the server says, in the functions the buttons reach: no line to type.
   const said = [];
-  ['stewardCmd', 'jarlCmd', 'evict', 'rentCmd', 'boxCmd', 'moveBoard', 'board'].forEach(function (n) {
+  ['stewardCmd', 'jarlCmd', 'guardCmd', 'evict', 'rentCmd', 'boxCmd', 'moveBoard', 'board'].forEach(function (n) {
     const code = strip(lifted[n]);
     const re = /'((?:[^'\\]|\\.)*)'/g;
     let m;
     while ((m = re.exec(code)) !== null) {
-      if (/\/(jarl|steward|evict|rent|box)\b|board move|board here|say that again|then say/.test(m[1])) { said.push(n + ': ' + m[1]); }
+      if (/\/(jarl|steward|guard|evict|rent|box)\b|board move|board here|say that again|then say/.test(m[1])) { said.push(n + ': ' + m[1]); }
     }
   });
   const atDoor = (/  var OFFICE_AT_DOOR = '([^\n]*)';/.exec(gm) || [])[1] || '';
@@ -481,12 +567,17 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
         !!row && /may take the office/.test(row.textContent));
     yes('H2 and no Confirm on it', confirmBtn.style.display === 'none');
     lines.length = 0;
-    const take = buttons('Take the office');
+    const take = buttons('Falkreath');
+    yes('H3 the office is taken by pressing its hold, one of ten (#502)',
+        take.length === 1 && buttons('Raven Rock').length === 1 && buttons('Take the office').length === 0);
     if (take.length) { take[0].onclick({}); }
-    yes('H3 Take the office sends /jarl (' + lines.join(' | ') + ')', take.length === 1 && lines.join() === '/jarl');
+    yes('H3 the first press sends nothing and says what the second does',
+        lines.length === 0 && take.length === 1 && take[0].textContent === 'Press again to be Jarl of Falkreath');
+    if (take.length) { take[0].onclick({}); }
+    yes('H3 the second sends /jarl falkreath (' + lines.join(' | ') + ')', lines.join() === '/jarl falkreath');
     yes('H3 and the page says the answer is in the chat', /chat/.test(status.textContent));
 
-    srv.say(JARL, '/jarl');
+    srv.say(JARL, '/jarl whiterun');
     srv.say(JARL, '/steward ' + P_STEW);
     show(srv.view(JARL));
     goOffice();
@@ -546,6 +637,35 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
     srv.stewards.length = 0;
     show(srv.view(STEW));
     yes('H13 a steward who is removed loses the page', navNames().indexOf('Office') === -1);
+
+    // The guards on the page (#502).
+    srv.say(JARL, '/guard ' + P_ALICE);
+    show(srv.view(JARL));
+    goOffice();
+    yes('H14 the Jarl\'s page is the Jarl of Whiterun, with a Guards of Whiterun card (' + body.textContent.slice(0, 200) + ')',
+        /Jarl of Whiterun/.test(body.textContent) && /Guards of Whiterun/.test(body.textContent));
+    lines.length = 0;
+    const nameGuard = buttons('Name guard');
+    const pickNobody = all(body).filter(function (n) {
+      return /guest/.test(n.className) && /profile 15/.test(n.textContent) && /Name guard/.test(n.textContent);
+    })[0];
+    const ng = pickNobody ? pickNobody.children.filter(function (c) { return c.className === 'stop'; })[0] : null;
+    if (ng) { ng.onclick({}); }
+    yes('H15 Name guard beside a person sends /guard <their id> (' + lines.join(' | ') + ')',
+        nameGuard.length >= 1 && lines.join() === '/guard ' + P_NOBODY);
+    lines.length = 0;
+    const guardRow = all(body).filter(function (n) {
+      return /guest/.test(n.className) && /profile 13/.test(n.textContent) && /Remove/.test(n.textContent);
+    })[0];
+    const rm = guardRow ? guardRow.children.filter(function (c) { return c.className === 'stop'; })[0] : null;
+    if (rm) { rm.onclick({}); }
+    yes('H16 Remove beside a guard sends /guard -<their id> (' + lines.join(' | ') + ')', lines.join() === '/guard -' + P_ALICE);
+    show(srv.view(ALICE));
+    const grow = goOffice();
+    yes('H17 the guard has an Office page naming their hold and their jail, with nothing to press (' +
+        (grow ? grow.textContent : '') + ')',
+        !!grow && /guard of Whiterun/.test(grow.textContent) && /Guard of Whiterun/.test(body.textContent) &&
+        /Dragonsreach Dungeon/.test(body.textContent) && all(body).every(function (n) { return n.className !== 'stop'; }));
   }
 }
 

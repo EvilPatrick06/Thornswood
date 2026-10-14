@@ -56,12 +56,15 @@
   publisher said it sent the feed; D, V and E make no tag at all.
 
   R also proves the launcher that ships is the one CI built, not one compiled
-  here (issue #457). A real main Ship never calls Build-Launcher.ps1: it runs
-  gh release download for the tag, checks the exe against its SHA256SUMS, and
-  only then installs and packs it. The gh stand-in writes a Thornswood.exe and a
-  matching SHA256SUMS on "release download", so the verification passes and the
-  path is exercised. A dev build and a dry run still compile locally, which is
-  why V and D call Build-Launcher and never gh release download.
+  here (issue #457). A real main Ship never calls Build-Launcher.ps1: it finds
+  the tag's draft in GitHub's REST list of releases and downloads each file by
+  its asset id (gh api, issue #2432, since gh release download asks GraphQL),
+  checks the exe against its SHA256SUMS, and only then installs and packs it.
+  The gh stand-in answers the list with a draft for the tag and each asset
+  with a Thornswood.exe, a setup-stub.exe and a matching SHA256SUMS, so the
+  verification passes and the path is exercised. A dev build and a dry run
+  still compile locally, which is why V and D call Build-Launcher and ask
+  nothing of gh.
 
   The stand-ins are only worth what the real scripts do, so two of those are
   read as well: Package-Thornswood.ps1 calls Publish-Installer.ps1 only without
@@ -213,6 +216,7 @@ $oldTemp = $env:TEMP
 $oldTmp = $env:TMP
 $oldCalls = $env:TS_DRY_CALLS
 $oldGhDl = $env:TS_GH_DL
+$oldGhTag = $env:TS_GH_TAG
 $oldSite = $env:THORNSWOOD_TEST_SITE_DIR
 $oldScratch = $env:THORNSWOOD_SCRATCH_ROOT
 $ps = (Get-Process -Id $PID).Path
@@ -262,7 +266,7 @@ try {
     Copy-Item -LiteralPath $ShipPath -Destination (Join-Path $repo 'scripts\release\Ship.ps1') -Force
     # The real files Ship dot-sources, beside it, so it runs as it does for real.
     $realRel = Split-Path -Parent $ShipPath
-    foreach ($n in 'Ship-Rules.ps1', 'Assert-PublishSigned.ps1', 'Feed-Store.ps1', 'Release-Name.ps1', 'Note-Rules.ps1', 'Where.ps1', 'Get-ScratchDir.ps1', 'Read-JsonFile.ps1', 'RecordShape.ps1') {
+    foreach ($n in 'Ship-Rules.ps1', 'Assert-PublishSigned.ps1', 'Feed-Store.ps1', 'Feed-Json.ps1', 'Release-Name.ps1', 'Note-Rules.ps1', 'Where.ps1', 'Get-ScratchDir.ps1', 'Read-JsonFile.ps1', 'RecordShape.ps1') {
         Copy-Item -LiteralPath (Join-Path $realRel $n) -Destination (Join-Path $repo ('scripts\release\' + $n)) -Force
     }
     Copy-Item -LiteralPath (Join-Path $realRel '..\..\layout.json') -Destination (Join-Path $repo 'layout.json') -Force
@@ -305,7 +309,11 @@ function Get-LoadOrderCopyDiffs([hashtable]$Copies) { return @() }
     # machine's working copies of it as the last run left them.
     foreach ($d in (Join-Path $site 'feed'), (Join-Path $site 'feed-dev')) { New-Item -ItemType Directory -Force -Path $d | Out-Null }
     foreach ($pair in @(@($rel, 'feed'), @($relDev, 'feed-dev'))) {
-        $v = if ($pair[1] -eq 'feed') { '{"launcherVersion":"1.1.93","packs":[]}' } else { '{"launcherVersion":"1.1.93.2","packs":[],"serverPort":7001}' }
+        # Main's feed offers 1.1.92: main moved to 1.1.93 with Bump-Version and has
+        # not shipped it, the state a main Ship starts from. A main feed already
+        # offering 1.1.93 from other launcher sources is refused before anything is
+        # built (#2347, tests\test-2347-dev-launcher-version.ps1).
+        $v = if ($pair[1] -eq 'feed') { '{"launcherVersion":"1.1.92","packs":[]}' } else { '{"launcherVersion":"1.1.93.2","packs":[],"serverPort":7001}' }
         $b = if ($pair[1] -eq 'feed') { '{"main":"as last published"}' } else { '{"dev":"as last published"}' }
         [IO.File]::WriteAllText((Join-Path $site ($pair[1] + '\version.json')), $v)
         [IO.File]::WriteAllText((Join-Path $site ($pair[1] + '\published.json')), $b)
@@ -333,18 +341,33 @@ function Get-LoadOrderCopyDiffs([hashtable]$Copies) { return @() }
                            '[switch]$NoPause, [switch]$MoveServer, [switch]$AcceptSize, [switch]$Launcher, ' +
                            '[string]$Channel, [string]$VersionOverride, [switch]$NoUpload, [switch]$NoPush, ' +
                            # A dry run also passes these two since #494: close no game, prune no packs.
-                           '[switch]$NoClose, [int]$KeepPacks = 10') @'
+                           '[switch]$NoClose, [int]$KeepPacks = 10, ' +
+                           # And the fingerprint of the launcher's sources since #921, which
+                           # the feed records with the launcher (#2347 compares it).
+                           '[string]$LauncherInputs') @'
 # F: the send of the feed failed, the way the real one ends then (#1055).
 if ($env:TS_PUB_FAIL) { Write-Host 'NOT SHIPPED. the store refused version.json'; exit 1 }
 . (Join-Path $PSScriptRoot 'Feed-Store.ps1')
 if (-not $NoPush) { [void](Receive-FeedStore $(if ($Channel) { $Channel } else { 'main' }) $ReleaseDir) }
 $vf = Join-Path $ReleaseDir 'version.json'
-$was = [string]((Get-Content -LiteralPath $vf -Raw | ConvertFrom-Json).launcherVersion)
-$now = if ($VersionOverride) { $VersionOverride } else { $was }
+$feedWas = Get-Content -LiteralPath $vf -Raw | ConvertFrom-Json
+$was = [string]$feedWas.launcherVersion
+# The launcher number the real one records: -VersionOverride, else with
+# -Launcher the number in launcher\app\Updater.cs beside it, else the feed's
+# own (a Ship that sends no launcher keeps the one the feed offers). With a
+# launcher it records that launcher's fingerprint; without, the feed's stays.
+$now = $was
+$inputsNow = if ($feedWas.PSObject.Properties['launcherInputs']) { [string]$feedWas.launcherInputs } else { '' }
+if ($Launcher) {
+    $m = [regex]::Match([IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\..\launcher\app\Updater.cs')), 'Version\s*=\s*"([^"]+)"')
+    if ($m.Success) { $now = $m.Groups[1].Value }
+    $inputsNow = [string]$LauncherInputs
+}
+if ($VersionOverride) { $now = $VersionOverride }
 # With the release record the real one writes (#444): one name, 20990101-0000,
 # for the pack, the launcher it offers and the commit it was built from.
 $ch = if ($Channel -eq 'dev') { 'dev' } else { 'main' }
-[IO.File]::WriteAllText($vf, '{"launcherVersion":"' + $now + '","packs":[{"id":"20990101-0000"}],' +
+[IO.File]::WriteAllText($vf, '{"launcherVersion":"' + $now + '","launcherInputs":"' + $inputsNow + '","packs":[{"id":"20990101-0000"}],' +
     '"release":{"id":"20990101-0000","channel":"' + $ch + '","launcherVersion":"' + $now + '","packs":["20990101-0000"],' +
     '"baseline":"","commit":"' + ('ab12' * 10) + '","branch":"main","uncommitted":0,"tag":"release/' + $ch + '/20990101-0000"}}')
 [IO.File]::WriteAllText((Join-Path $ReleaseDir 'published.json'), '{"written":"by the publisher"}')
@@ -387,35 +410,39 @@ if (-not $NoPublish) { & (Join-Path $PSScriptRoot 'Publish-Installer.ps1') -OutD
     }
     # gh needs one thing more than logging: on a real main Ship the launcher is
     # not compiled here, it is downloaded from the release CI built and checked
-    # against SHA256SUMS (issue #457). So the gh stand-in, on "release download",
-    # writes Thornswood.exe and a SHA256SUMS whose hash is that file's, into the
-    # --dir it was given, the way the real gh would. It computes the hash itself,
-    # so the download always verifies and the test proves the path runs, not that
-    # a particular byte matches. Every other gh call still only logs. It
-    # writes each asset a --pattern names, and the setup program too, since a
-    # main Ship with -Package takes the one CI built (issue #932).
+    # against SHA256SUMS (issue #457). Since #2432 Ship finds that draft in the
+    # REST list of releases and downloads each file by its asset id, reading
+    # gh's standard output as bytes. So the gh stand-in answers both, the way
+    # GitHub does: the list with a draft for TS_GH_TAG carrying Thornswood.exe
+    # (id 21), setup-stub.exe (id 22, since a main Ship with -Package takes the
+    # one CI built, issue #932) and SHA256SUMS (id 23), and each asset with its
+    # bytes. It computes the hashes itself, so the download always verifies and
+    # the test proves the path runs, not that a particular byte matches. Every
+    # other gh call still only logs.
     $ghDl = Join-Path $bin 'gh-download.ps1'
     [IO.File]::WriteAllText($ghDl, @'
-$dir = ''
-$want = @()
-for ($i = 0; $i -lt $args.Count; $i++) {
-    if ($args[$i] -eq '--dir') { $dir = $args[$i + 1] }
-    if ($args[$i] -eq '--pattern') { $want += [string]$args[$i + 1] }
-}
-if ($dir) {
-    New-Item -ItemType Directory -Force -Path $dir | Out-Null
-    $lines = @()
-    foreach ($n in 'Thornswood.exe', 'setup-stub.exe') {
-        if ($want -notcontains $n) { continue }
-        $f = Join-Path $dir $n
-        [IO.File]::WriteAllText($f, "the $n CI built for this tag")
-        $lines += ((Get-FileHash -LiteralPath $f -Algorithm SHA256).Hash.ToLower() + '  ' + $n)
+$utf8 = New-Object Text.UTF8Encoding($false)
+function Out-Bytes([byte[]]$b) { $o = [Console]::OpenStandardOutput(); $o.Write($b, 0, $b.Length); $o.Flush() }
+$exe = $utf8.GetBytes('the Thornswood.exe CI built for this tag')
+$stub = $utf8.GetBytes('the setup-stub.exe CI built for this tag')
+$sha = [Security.Cryptography.SHA256]::Create()
+$sums = $utf8.GetBytes(((@(@('Thornswood.exe', $exe), @('setup-stub.exe', $stub)) | ForEach-Object {
+    (($sha.ComputeHash([byte[]]$_[1]) | ForEach-Object { $_.ToString('x2') }) -join '') + '  ' + $_[0] }) -join "`n") + "`n")
+$files = @{ 21 = $exe; 22 = $stub; 23 = $sums }
+$target = [string]$args[$args.Count - 1]
+if ($target -match '^repos/[^/]+/[^/]+/releases\?per_page=100&page=(\d+)$') {
+    $list = @()
+    if ($Matches[1] -eq '1') {
+        $assets = @(@(21, 'Thornswood.exe'), @(22, 'setup-stub.exe'), @(23, 'SHA256SUMS') | ForEach-Object { [ordered]@{ id = $_[0]; name = $_[1]; size = $files[$_[0]].Length } })
+        $list = @([ordered]@{ id = 501; tag_name = $env:TS_GH_TAG; draft = $true; assets = $assets })
     }
-    Set-Content -LiteralPath (Join-Path $dir 'SHA256SUMS') -Value $lines -Encoding ascii
+    Out-Bytes ($utf8.GetBytes((ConvertTo-Json -InputObject @($list) -Depth 5 -Compress)))
+} elseif ($target -match '^repos/[^/]+/[^/]+/releases/assets/(\d+)$' -and $files.ContainsKey([int]$Matches[1])) {
+    Out-Bytes $files[[int]$Matches[1]]
 }
 '@)
     [IO.File]::WriteAllText((Join-Path $bin 'gh.ps1'), $standIn.Replace('NAME', 'gh') + "`r`n" +
-        "if (`$args.Count -ge 2 -and `$args[0] -eq 'release' -and `$args[1] -eq 'download') { & `$env:TS_GH_DL @args }`r`nexit 0`r`n")
+        "if (`$args.Count -ge 2 -and `$args[0] -eq 'api') { & `$env:TS_GH_DL @args }`r`nexit 0`r`n")
 
     $env:PATH = $bin + ';' + $oldPath
     $env:LOCALAPPDATA = $appdata
@@ -430,6 +457,8 @@ if ($dir) {
     New-Item -ItemType Directory -Force -Path $env:TEMP | Out-Null
     $env:TS_DRY_CALLS = $log
     $env:TS_GH_DL = $ghDl
+    # The tag a main Ship of launcher\app\Updater.cs's 1.1.93 looks for.
+    $env:TS_GH_TAG = 'v1.1.93'
     $env:THORNSWOOD_TEST_SITE_DIR = $site
 
     $feed = Join-Path $rel 'version.json'
@@ -522,9 +551,13 @@ if ($dir) {
         $inst.Count -eq 1 -and $inst[0].Contains(' -Root ' + $root))
     $gone = Away $r
     Yes 'R the shipped launcher is not compiled here: Build-Launcher.ps1 is not called' ((Called $r 'Build-Launcher').Count -eq 0)
-    Yes ('R the launcher and the setup program CI built are downloaded and verified: gh release download runs for each (' + ($gone -join '; ') + ')') (
-        @($gone | Where-Object { $_ -match '^gh release download .*--pattern Thornswood\.exe' }).Count -eq 1 -and
-        @($gone | Where-Object { $_ -match '^gh release download .*--pattern setup-stub\.exe' }).Count -eq 1)
+    # Through REST, not gh release download, which asks GraphQL (#2432): the
+    # list of releases to find the draft, then each file by its asset id.
+    Yes ('R the launcher and the setup program CI built are downloaded and verified: each found in the REST list of releases and fetched by asset id (' + ($gone -join '; ') + ')') (
+        @($gone | Where-Object { $_ -match '^gh api .*repos/\S+/releases\?per_page=100&page=1$' }).Count -ge 1 -and
+        @($gone | Where-Object { $_ -match '^gh api -H Accept: application/octet-stream repos/\S+/releases/assets/21$' }).Count -eq 1 -and
+        @($gone | Where-Object { $_ -match '^gh api -H Accept: application/octet-stream repos/\S+/releases/assets/22$' }).Count -eq 1 -and
+        @($gone | Where-Object { $_ -match '^gh release download' }).Count -eq 0)
     Yes 'R the feed reaches the VPS store: the site serves what the publisher wrote' (
         ([IO.File]::ReadAllText($siteFeed)) -match '20990101-0000')
     # The one thing pushed is the release tag (#444), on the commit the feed
@@ -739,6 +772,7 @@ finally {
     $env:TMP = $oldTmp
     $env:TS_DRY_CALLS = $oldCalls
     $env:TS_GH_DL = $oldGhDl
+    $env:TS_GH_TAG = $oldGhTag
     $env:THORNSWOOD_TEST_SITE_DIR = $oldSite
     if ($null -eq $oldScratch) { Remove-Item Env:THORNSWOOD_SCRATCH_ROOT -ErrorAction SilentlyContinue } else { $env:THORNSWOOD_SCRATCH_ROOT = $oldScratch }
     Remove-Item -LiteralPath $T -Recurse -Force -ErrorAction SilentlyContinue

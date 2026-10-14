@@ -56,7 +56,7 @@ $dist = Join-Path $T 'dist'
 $plant = 'HARNESS1081 the player must not ship'
 try {
     New-Item -ItemType Directory -Force -Path (Join-Path $tree 'scripts\release'), (Join-Path $tree 'scripts\dev'), (Join-Path $tree 'records'), $play, $dist | Out-Null
-    foreach ($n in 'Ship.ps1', 'Ship-Rules.ps1', 'Assert-PublishSigned.ps1', 'Feed-Store.ps1', 'Release-Name.ps1', 'Note-Rules.ps1', 'Where.ps1', 'Read-JsonFile.ps1', 'RecordShape.ps1') {
+    foreach ($n in 'Ship.ps1', 'Ship-Rules.ps1', 'Assert-PublishSigned.ps1', 'Feed-Store.ps1', 'Feed-Json.ps1', 'Release-Name.ps1', 'Note-Rules.ps1', 'Where.ps1', 'Read-JsonFile.ps1', 'RecordShape.ps1') {
         Copy-Item -LiteralPath (Join-Path $Repo ('scripts\release\' + $n)) -Destination (Join-Path $tree ('scripts\release\' + $n)) -Force
     }
     Copy-Item -LiteralPath $wordsReal -Destination (Join-Path $tree 'scripts\dev\Check-Words.ps1') -Force

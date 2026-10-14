@@ -54,7 +54,14 @@ param(
 )
 
 # A stale or dirty checkout sends old or unlanded code; refuse it (#2118).
-. (Join-Path $PSScriptRoot '..\deploy\Fresh-Checkout.ps1'); Assert-FreshCheckout -RepoDir (Join-Path $PSScriptRoot '..\..') -What 'Publish-Installer' -Target $Vps -AllowStale:$AllowStaleCheckout
+# The installer is a live release, so the branch rule is Ship's for a main
+# release, Test-FreshAnyBranch -Channel main (#2436): main, or a clean
+# hotfix/ branch that matches its own origin branch. Until 12 October this
+# asked for origin/main only, and the 1.2.4 hotfix's installer needed
+# -AllowStaleCheckout to go out.
+. (Join-Path $PSScriptRoot '..\deploy\Fresh-Checkout.ps1')
+$freshRepo = Join-Path $PSScriptRoot '..\..'
+Assert-FreshCheckout -RepoDir $freshRepo -What 'Publish-Installer' -Target $Vps -AnyBranch:(Test-FreshAnyBranch -RepoDir $freshRepo -Channel main) -AllowStale:$AllowStaleCheckout
 
 $ErrorActionPreference = 'Stop'
 $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')

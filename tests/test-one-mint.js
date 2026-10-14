@@ -328,6 +328,7 @@ const WRITERS = {
   'outer/takeItem': [1, 'only takes things away'],
   'outer/takeItemById': [1, 'only takes things away'],
   'outer/giveShift': [1, 'the shift, out of CHARGEN.shift'],
+  'outer/rieklingShift': [1, 'a new riekling\'s shift taken back and its own three pieces, out of CHARGEN.rieklingShift, put in (#614): armour descriptors, never gold'],
   'outer/giveItems': [1, 'descriptor pairs, and nothing calls it (checked below)'],
   'outer/packAsServerHasIt': [1, 'the take limit sends back the pack the server already holds, so it adds nothing'],
   'staff spells/(top)': [1, 'a refused spell tome sends back the pack the server already holds (#2261), so it adds nothing'],
@@ -770,7 +771,9 @@ function goldDescriptors(text) {
     'open.itemDesc': 'puts back the retrieval good the place row already handed over; not a coin',
     'place.item': 'the unbound scene container good on the place row; not a coin',
     'row.out': 'Grand Chef\'s second batch, the output of a Cook row of RECIPES_BY_ID (#1398), and section 5 says no recipe makes gold',
-    'KEY_INGOT': 'puts back the iron ingot a key at a forge took a line before, when the key could not be handed over (#1637); an iron ingot, not a coin'
+    'KEY_INGOT': 'puts back the iron ingot a key at a forge took a line before, when the key could not be handed over (#1637); an iron ingot, not a coin',
+    'NEEDS.waterItems.full': 'a bottle of water for the empty bottle a well took a line before, a constant of the needs block (#1382); Glacier Water, not a coin',
+    'NEEDS.waterItems.empty': 'puts back the empty bottle a well took, when the water could not be handed over (#1382); not a coin'
   };
   const re = /\baddItem\(\s*[^,()]+,\s*([^,]+?),/g;
   const unknown = [];

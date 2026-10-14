@@ -58,7 +58,8 @@ try {
     Yes '  never the VPS label' ($r.Text -notmatch "--labels 'thornswood-vps")
     Yes '  in C:\Thornswood-RunnerPR, as the account thornswood-pr' ($r.Text -match [regex]::Escape("`$root = 'C:\Thornswood-RunnerPR'") -and $r.Text -match [regex]::Escape("`$acct = 'thornswood-pr'"))
     Yes '  its own folder is still locked before config.cmd writes into it' ($r.Text -match '(?m)^Lock-RunnerRoot \$root \$acct')
-    Yes '  the install shuts it out of every C:\Thornswood* folder, hyphen or not' ($r.Text -match [regex]::Escape("-Filter 'Thornswood*'"))
+    Yes '  the install shuts it out of every C:\Thornswood* folder, hyphen or not, Dumps included (#2488)' ($r.Text -match [regex]::Escape("Close-RunnerAccount `$acct `$root 'C:\' 'Thornswood*' @() @()"))
+    Yes '  and the lock after leaves nothing out either' ($r.Text -match [regex]::Escape("`$leave = @()"))
     Yes '  and so does the lock of every runner after' ($r.Text -match [regex]::Escape("`$liveFilter = 'Thornswood*'") -and $r.Text -match [regex]::Escape('Close-RunnerAccount $acct $root ''C:\'' $liveFilter $alsoDeny'))
     Yes '  Defender keeps scanning its folder' ($r.Text -match '(?m)^if \(\$false\) \{\s*$')
     Yes '  the stand-in registration token is in none of the scripts (it goes on standard input)' ($r.Text -notmatch 'DRY-RUN-TOKEN-NOT-REAL')
@@ -67,7 +68,7 @@ try {
 
     $r = Dry @('-OffBox', '-DefenderSkip', '-AlsoDeny', 'D:\Somewhere Else')
     Yes '-DefenderSkip lets Defender skip it, as on the VPS' ($r.Text -match '(?m)^if \(\$true\) \{\s*$')
-    Yes '-AlsoDeny is in the install''s deny list and the lock''s' (($r.Text -match [regex]::Escape("+ @('D:\Somewhere Else')")) -and ($r.Text -match [regex]::Escape("`$alsoDeny = @('D:\Somewhere Else')")))
+    Yes '-AlsoDeny is in the install''s deny list and the lock''s' (($r.Text -match [regex]::Escape("'Thornswood*' @('D:\Somewhere Else') @()")) -and ($r.Text -match [regex]::Escape("`$alsoDeny = @('D:\Somewhere Else')")))
 
     $r = Dry @('-OffBox', '-Number', '2')
     Yes '-OffBox -Number 2 numbers its folder, account and name' ($r.Text -match [regex]::Escape("`$root = 'C:\Thornswood-RunnerPR2'") -and $r.Text -match [regex]::Escape("`$acct = 'thornswood-pr2'") -and $r.Text -match ("--name 'thornswood-pr-" + [regex]::Escape($comp) + "-2'"))
@@ -84,7 +85,8 @@ try {
     $r = Dry @()
     Yes "without -OffBox the dry run still ends 0 (got $($r.Code))" ($r.Code -eq 0)
     Yes '  the VPS runner keeps its label, name and folder' ($r.Text -match "--name 'thornswood-vps' --labels 'thornswood-vps'" -and $r.Text -match [regex]::Escape("`$root = 'C:\Thornswood-Runner'"))
-    Yes '  and its C:\Thornswood-* filter and Defender skip' ($r.Text -match [regex]::Escape("-Filter 'Thornswood-*'") -and $r.Text -match '(?m)^if \(\$true\) \{\s*$')
+    Yes '  and its C:\Thornswood-* filter and Defender skip' ($r.Text -match [regex]::Escape("Close-RunnerAccount `$acct `$root 'C:\' 'Thornswood-*' @()") -and $r.Text -match '(?m)^if \(\$true\) \{\s*$')
+    Yes '  and Dumps left to Lock-VpsFolders.ps1, at install and in the lock after (#2127, #2488)' ($r.Text -match [regex]::Escape("'Thornswood-*' @() @('Thornswood-Dumps')") -and $r.Text -match [regex]::Escape("`$leave = @('Thornswood-Dumps')"))
     Yes '  GitHub still never asked' (-not (Test-Path -LiteralPath $ghCalled))
 
     # ---- Close-RunnerAccount on scratch folders, the off-box filter ---------

@@ -104,7 +104,7 @@ jobs:
   launcher-vps:
     name: Launcher builds (VPS fallback)
     needs: launcher
-    if: ${{ always() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}
+    if: ${{ !cancelled() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}
     runs-on: [self-hosted, Windows, thornswood-vps]
     # About fifteen minutes on the VPS. Past this it is stuck, not slow.
     timeout-minutes: 20
@@ -254,6 +254,16 @@ jobs:
             exit 1
           }
 
+      - name: Check inactive merchant role data
+        shell: pwsh
+        run: |
+          & python tests/test-merchant-role-data.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & python tests/test-merchant-roster.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & python scripts/dev/Build-MerchantRoleTables.py --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Run the harnesses that went red unseen
         shell: pwsh
         run: |
@@ -321,6 +331,10 @@ jobs:
           # worldspace the server has it in, from the list the server sends;
           # tests\test-1597-board-objects.js runs the plugin's board code on a
           # pretend game. Under a second.
+          # Issue #503: tests/test-papyrus-event-list.js holds the fork's Papyrus
+          # event list, records/papyrus-events.json, to the rest of this
+          # repository and proves its reader on a small fork it makes. The
+          # fork itself is read against the record in the nightly. A second.
           # $six is a historical name: the gate list grew well past six (#1368).
           # Issue #1589: a line here with no comma after it ends the list, and
           # every name below it only prints itself. test-gate-list.ps1 parses
@@ -348,23 +362,25 @@ jobs:
                  'test-vps-defaults.ps1', 'test-runner-lock.ps1', 'test-runner-offbox.ps1', 'test-restore-staging.ps1', 'test-deploy-artifact.ps1', 'test-deploy-records.js',
                  'test-own-folder-alone.ps1', 'test-own-folder-first.ps1', 'test-own-folder-again.ps1', 'test-setup-game-files.ps1', 'test-setup-robocopy.ps1', 'test-sign-pilot.ps1', 'test-prod-parity.ps1', 'test-runner-isolation.ps1', 'test-discord-announced-shared.ps1', 'test-check-build.ps1', 'test-client-build-record.ps1', 'test-npc-runtime.js',
                  'test-mold-key.js', 'test-putback-flora.js', 'test-staff-spells.js', 'test-join-pass-trust.js',
-                 'test-npc-shared-runtime.js', 'test-npc-navigation-equivalence.js', 'test-npc-population-runtime.js',
+                 'test-npc-shared-runtime.js', 'test-npc-navigation-equivalence.js', 'test-npc-population-runtime.js', 'test-npc-role-titles.js',
                  'test-shared-resource-stock.js', 'test-resource-stock-integration.js',
                  'test-npc-death-policy.js', 'test-vortex-profile-state.ps1',
                  'test-books.js', 'test-guild-ledger-safety.js', 'test-book-review-regressions.js',
                  'test-recipeless-craft.js',
                  'test-npc-merchant-purses.js', 'test-merchant-ledger-storage.js', 'test-npc-merchant-startup.js',
-                 'test-merchant-ledger-revisions.js', 'test-merchant-settlement.js', 'test-merchant-trading.js', 'test-merchant-deployment.js', 'test-merchant-traders.js',
+                 'test-npc-activation-staging.js', 'test-merchant-roster-runtime.js',
+                 'test-merchant-ledger-revisions.js', 'test-merchant-runtime-evidence.js', 'test-merchant-writer-ownership.js', 'test-merchant-pending-preflight.js', 'test-merchant-conservation.js', 'test-merchant-settlement.js', 'test-merchant-trading.js', 'test-merchant-deployment.js', 'test-merchant-traders.js', 'test-merchant-retirement.js',
                  'test-dungeon-loot.js', 'test-dungeon-reward-safety.js', 'test-dungeon-reward-storage.js', 'test-one-mint.js',
                  'test-1319-pass-switch.js',
                  'test-1319-pass-switch.ps1',
                  'test-1320-pass-one-session.js',
-                 'test-1373-scarce-scene.js', 'test-quest-transactions.js',
-                 'test-nobody-makes.js',
+                 'test-1373-scarce-scene.js', 'test-quest-transactions.js', 'test-kill-contracts.js',
+                 'test-nobody-makes.js', 'test-614-riekling-shift.js',
                  'test-1378-shared-gather.js',
                  'test-special-edition-only.js',
                  'test-1374-letters.js',
                  'test-1597-board-objects.js',
+                 'test-2298-board-meshes.js',
                  'test-1380-rare-mines.js',
                  'test-1621-quest-state.js',
                  'test-unpin.js', 'test-coffers.js',
@@ -375,6 +391,7 @@ jobs:
                  'test-2337-kiln-menu.js',
                  'test-1306-pr-workflow.js',
                  'test-2261-tome-refused.js',
+                 'test-papyrus-event-list.js',
                  'test-1383-treatments.js',
                  'test-1384-condition.js',
                  'test-1385-perks.js',
@@ -388,10 +405,13 @@ jobs:
                  'test-launcher-help.js', 'test-classes-page.js',
                  'test-tester-checklist.js',
                  'test-1389-lists.js',
+                 'test-1382-food-groups.js',
+                 'test-1382-drug.js',
                  'test-1590-hunter-lists.js',
                  'test-1390-embassy.js',
                  'test-1603-beds.js',
                  'test-1606-logout-fill.js',
+                 'test-1382-water.js',
                  'test-1734-rest-reconnect.js',
                  'test-1676-rest-gate.js',
                  'test-1677-ale-curve.js',
@@ -401,8 +421,11 @@ jobs:
                  'test-1588-tools-50.js',
                  'test-1741-encoding.js',
                  'test-1634-apprentice-gui.js',
-                 'test-1637-door-gui.js', 'test-2250-claim-door.js', 'test-2256-locked-for-everyone.js', 'test-2245-drawn-pick.js', 'test-item-names.js', 'test-2255-key-mold-models.js', 'test-2258-house-parts-hidden.js', 'test-2298-held-board.ps1',
-                 'test-502-kill-bounty.js',
+                 'test-1637-door-gui.js', 'test-2250-claim-door.js', 'test-2256-locked-for-everyone.js', 'test-2245-drawn-pick.js', 'test-2244-after-mining-measure.js', 'test-item-names.js', 'test-2255-key-mold-models.js', 'test-2258-house-parts-hidden.js', 'test-2468-last-plugin.js', 'test-2298-held-board.ps1',
+                 'test-502-no-bounty.js',
+                 'test-502-jail-cells.js',
+                 'test-502-guard-board.js',
+                 'test-502-jail-rules.js',
                  'test-1636-farm-gui.js',
                  'test-1394-fares.js',
                  'test-1635-ride-panel.js',
@@ -485,33 +508,41 @@ jobs:
                  'test-1885-manifest-order.js',
                  'test-1075-script-citations.js',
                  'test-1397-npc-docs-live.js',
+                 'test-1382-meal-time-cold.js',
+                 'test-1382-wet-fade.js',
+                 'test-1382-ale-help-hangover.js',
                  'test-table-install.js',
                  'test-secrets-fail-closed.js',
                  'test-our-key-menus.js', 'test-slash-key.js', 'test-social-keys.js', 'test-server-pick-order.ps1',
                  'test-2037-journal-new.js', 'test-2135-journal-press.js', 'test-social.js', 'test-2157-reconfigure.ps1', 'test-2210-links-attributes.ps1', 'test-2210-refresh-scope.ps1',
                  'test-site-auth.js',
                  'test-site-route-gaps.js', 'test-2215-play-pressed-by.ps1',
-                 'test-docs-pwfile.ps1',
+                 'test-docs-pwfile.ps1', 'test-docs-password.ps1', 'test-2317-rotate-config.ps1',
                  'test-site-credits-fill.js', 'test-deployed-build.ps1', 'test-459-publish-record.ps1',
                  'test-site-headers.js', 'test-generated-source-chain.ps1',
                  'test-site-render.js', 'test-site-discovery.js',
                  'test-home-status.js', 'test-seats.js', 'test-age-gate.js', 'test-download-hash.js', 'test-2233-inuse-image.ps1',
                  'test-download-button.js', 'test-gallery-ux.js', 'test-gallery.js', 'test-site-local.js',
-                 'test-session-cards.js', 'test-staff-bans.js', 'test-hub-staff-gallery.js', 'test-known-issues.js',
+                 'test-session-cards.js', 'test-staff-bans.js', 'test-hub-staff-gallery.js', 'test-known-issues.js', 'test-2414-known-one-copy.js',
                  'test-join-outage.js', 'test-join-pass-site.js', 'test-open-switch.js', 'test-component-readmes.js',
                  'test-site-front-resilience.js', 'test-site-upload-guard.js',
                  'test-report-limits.js', 'test-site-hangs.js',
-                 'test-site-oauth-gaps.js', 'test-site-escaping.js', 'test-2185-site-bind.js', 'test-2193-hero-video.js', 'test-2187-signin-addr.js', 'test-2192-age-expiry.js', 'test-2189-log-rotation.js', 'test-2188-board-revision.js', 'test-2235-dev-ship-guard.ps1', 'test-2243-installer-throw.ps1', 'test-2251-key-press-log.js', 'test-swap-helpers.ps1',
-                 'test-backup-restore.ps1', 'test-backup-streaming.ps1', 'test-fetch-verify-all.ps1', 'test-2199-zip-policy.ps1',
+                 'test-site-oauth-gaps.js', 'test-site-escaping.js', 'test-2185-site-bind.js', 'test-2193-hero-video.js', 'test-2187-signin-addr.js', 'test-2192-age-expiry.js', 'test-2189-log-rotation.js', 'test-2188-board-revision.js', 'test-2235-dev-ship-guard.ps1', 'test-2436-installer-hotfix.ps1', 'test-2243-installer-throw.ps1', 'test-2251-key-press-log.js', 'test-swap-helpers.ps1',
+                 'test-backup-restore.ps1', 'test-backup-streaming.ps1', 'test-fetch-verify-all.ps1', 'test-2199-zip-policy.ps1', 'test-2199-fetch-whole-path.ps1',
                  'test-content-release.ps1',
                  'test-cooldown-sweep.js', 'test-voice-moved-clients.js',
-                 'test-release-parity.ps1', 'test-dev-version.ps1', 'test-ship-launcher-reuse.ps1', 'test-2347-dev-launcher-version.ps1',
+                 'test-release-parity.ps1', 'test-dev-version.ps1', 'test-ship-launcher-reuse.ps1', 'test-2347-dev-launcher-version.ps1', 'test-2347-publish-launcher-number.ps1',
+                 'test-2401-legacy-dev-marks.ps1',
                  'test-server-stage-directories.ps1',
                  'test-dev-settings-keys.ps1',
                  'test-dev-gamemode-notes.ps1',
                  'test-2076-dev-build-check.ps1',
                  'test-2308-content-before-ship.ps1',
+                 'test-1050-news-out.ps1',
+                 'test-1050-feed-compact.ps1',
                  'test-2309-loadorder-fresh.ps1',
+                 'test-459-publish-dist.ps1',
+                 'test-2320-short-load-order.ps1',
                  'test-1929-dev-gamemode-note.ps1',
                  'test-1938-server-ready-wait.ps1',
                  'test-1955-ship-stack-note.ps1',

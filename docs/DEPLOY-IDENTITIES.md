@@ -49,9 +49,45 @@ folder locks from `Lock-VpsFolders.ps1`).
 | Add or remove an ssh key | Add-VpsKey, Setup-SshKey | Yes |
 
 Most day to day traffic (every Ship, deploy and feed write) is in the first
-three rows. The admin rows are install-time and rare. This table is read off
-the script names and what they do; a per-call check of every remote command
-each script sends is the first build step in section 5.
+three rows. The admin rows are install-time and rare. This table was first
+read off the script names and what they do. Section 2a checks it against the
+commands each script actually sends, and where the two differ, 2a is right.
+
+## 2a. Checked against the code (12 Oct 2026)
+
+`records\remote-commands.json` lists every call under `scripts\` that reaches
+the box: 227 calls in 52 files (section 1 said 34 scripts; the extra files
+are the shared helpers, `Artifact.ps1`, `Swap.ps1`, `ServerContent.ps1`,
+`DeployedBuild.ps1`, `Send-Script.ps1`, `Send-Secret.ps1`, `Vps.ps1`, plus ops
+and one-off scripts the first count left out). Each row gives the script, the
+function it sits in, what it sends, and its class: a gate verb, `admin`, or
+`transport` (31 rows, helpers that only carry what their caller hands them).
+By class: 91 admin, 59 read-status, 25 stage, 9 feed-send, 8 swap,
+3 task-start-stop, 1 putback. `tests\test-remote-command-map.ps1` parses
+every script and fails when a remote call has no row, or a row has no call.
+Nothing on the box was read or changed for this.
+
+Where the evidence differs from section 2:
+
+| Section 2 said | The code does | So |
+| --- | --- | --- |
+| Swap and put back need no admin | `Swap.ps1` StopOurs kills the server by pid with `Stop-Process`, and the Deploy-Docs swap (StopIt) does the same to `node.exe`, besides stopping the task. The game servers run as SYSTEM | Task start and stop rights are not enough. The gate's swap and putback verbs must stop the process themselves, elevated, or the swap blocks change first |
+| Artifact store writes need Modify only | `Send-ThornswoodArtifact` and the put back record restore (`Restore-SwapRecord`, `Restore-ThornswoodServerRecord`) run `Get-ThornswoodLockedFolderScript`, which sets the store's ACL, on every call | Admin today. The ACL belongs at install time (Lock-VpsFolders), not in every deploy |
+| Deploy-Docs is a file deploy | Every run also opens or removes the site firewall rule, sets the task's account, and can write the site password into `config.json` | Admin for those three calls. The file stage, check and swap rows are deploy verbs |
+| Install-Bot files need no admin | The bot swap goes through `Bot-Service.ps1`: `sc.exe`, `Stop-Service`, `Stop-Process` and `Set-Acl`. The rest installs Python, pip packages and the service | Admin. Only the stage upload and its hash check are deploy verbs |
+| Install-Voice files need no admin | The main run registers the task and the firewall rule and stops the process | Admin, apart from the stage, its check and the task restart |
+| Publish-Server is a file deploy | It copies the zip and four libraries to `C:\` and runs `Install-ThornswoodServer.ps1`, which registers the SYSTEM task | Admin (first install). Day to day server deploys are Deploy-Server |
+| Watch is a read | Watch-Services and Watch-Load write their scripts into locked folders and register or delete their tasks | Admin for those calls; their status reads stay read-status |
+| Feed writes are Feed-Store, Publish-Update and Publish-Discord | Feed writes also come from Remirror-Site-Feed, Publish-News (`news.json`) and Publish-Installer (site `files`) | All feed-send; the feed verb must cover those folders too |
+| Request-Restart stops and starts a task | It only drops a request json in the server data folder; the gamemode warns everyone on the server, sends them off and deletes it | stage (a file write), no task rights needed |
+| (not listed) | Restart-Server uses `Restart-Service`; Go.ps1 copies `voice-server.js` straight into the live voice folder and kills the voice process; Wipe-Saves, Reset-Character, Set-Door and Clean-Everything delete or rewrite game data and stop processes; Backup-Server and Fetch-Backups read every secret | Admin, outside every gate verb |
+| (not listed) | Every secret write (Rotate-*, Set-DiscordLogin, Install-Bot and Install-Runner tokens, the site password) | Admin. No gate verb carries a secret |
+
+What this means for section 3: the first three rows of section 2 hold only
+for Deploy-Server, Deploy-DevGamemode and the stage half of Deploy-Docs,
+Install-Voice and Install-Bot, and only once the process kill and the store
+ACL move out of the deploy path (or into the gate, run elevated). Patrick has
+not decided the deploy identity (section 7.4), so nothing here changes that.
 
 ## 3. Proposed identities
 
@@ -86,8 +122,9 @@ verb is refused rather than retrying as admin.
 
 ## 5. Migration and rollback
 
-1. In the repo: list every remote command each of the 34 scripts sends and
-   map it to a gate verb or to admin. No box change.
+1. In the repo: list every remote command each script sends and map it to a
+   gate verb or to admin. No box change. Done: section 2a,
+   `records\remote-commands.json` and `tests\test-remote-command-map.ps1`.
 2. Create `thornswood-deploy`, the gate, the ACLs and task rights. Admin
    access untouched. Rollback: delete the user and the gate folder.
 3. Dev only: point the dev deploy scripts at deploy. Run a dev Ship and a dev
@@ -120,7 +157,12 @@ impact is total, and four of the five keys showed no use in the sampled log.
    to be removed. Claude removes them, and only after the provider's hosting
    console login is confirmed working.
 2. Port 22. Yes, restrict the inbound rules on 22 to known addresses. Same
-   condition: only after the console login check.
+   condition: only after the console login check. The way it is done:
+   `scripts\vps\Set-SshScope.ps1 -From <addresses>`, which proves key login,
+   refuses a list that leaves out the machine running it, arms a ten minute
+   put back, and cancels it only once a new key login gets in
+   (`tests\test-ssh-scope.ps1`). Which addresses go in the list is still to
+   be decided (#2182).
 3. `cloudbase-init`. Undecided. Left as it is (enabled local admin); revisit
    later.
 4. Deploy identity and gate. Undecided. The design in section 3 stays ready,

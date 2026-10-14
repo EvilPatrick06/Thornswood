@@ -21,6 +21,7 @@ cannot touch the one beside the code.
 
 Read only. Never connects to anything.
 """
+import _pyguard  # noqa: F401  (first: Python 3.10 or newer, #2276)
 import asyncio
 import json
 import os

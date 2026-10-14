@@ -37,22 +37,26 @@ See [Disease](disease.md).
 
 ## Sleep
 
-Logging out in a bed adds 25 hunger when you return, and fills rest.
-The bed has to be a bed. See [Property](property.md) and
-[Exhaustion](exhaustion.md).
+Logging out lying in a bed indoors stops the clock while you are away.
+After a night away, your own bed or one you are allowed in adds 25
+hunger and fills rest, and an inn or temple bed nobody holds adds 15.
+Anywhere else, hunger falls at half its pace while you are away and the
+time away takes it no lower than 25. The bed has to be a bed. The whole
+table is on [Exhaustion](exhaustion.md), Logging out. See
+[Property](property.md).
 
 ## Where this is
 
-The clock, the four bands, the 15, the ale cost and the 25 from a bed
-are in the server. The cold multipliers are not. Hunger does not yet
-speed up in the snow. Food states are not on the meal. "Full" does not
-yet sicken you.
+The clock, the four bands, the 15, the ale cost and the logout table
+are in the server. So are the cold multipliers, and a meal at 90 or above
+starts food sickness instead of raising the meter. Food states are not on
+the meal.
 
 A bed counts only when the server saw the person press it and they are
 still beside it. Lying down tells the server by itself, and nobody
-types anything. The 25 comes with the logout fill: log out lying in
-your own bed or one you are allowed in, stay away at least 24 minutes,
-and the time away is settled first, then 25 goes back on hunger and on
-thirst and rest is full. A bed or bedroll nobody can lend you gives no
-fill. Which beds give it and the 24 minutes are the suggested answers
-on #1606. See [Exhaustion](exhaustion.md) and [Property](property.md).
+types anything. The 25 and the 15 come with a night: log out lying in
+the bed, stay away at least 24 minutes, and the time away is settled
+first, then they go back on hunger and on thirst and rest is full. A
+bed or bedroll nobody can lend you puts nothing back on hunger. The
+24 minutes are the suggested answer on #1606, and the rest of the table
+is Patrick's of 12 Oct on #2246. See [Exhaustion](exhaustion.md) and [Property](property.md).

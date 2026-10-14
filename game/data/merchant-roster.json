@@ -1,0 +1,1424 @@
+{
+  "version": 1,
+  "worldMode": "existing",
+  "history": [
+    [
+      "1000a:Populated Cities Towns Villages Legendary.esp",
+      "ffd3:Populated Cities Towns Villages Legendary.esp"
+    ],
+    [
+      "1021:Solitude Arena.esp",
+      "1039:Solitude Arena.esp"
+    ],
+    [
+      "109aa9:Arena - Markarth Side.esp",
+      "109aa3:Arena - Markarth Side.esp"
+    ],
+    [
+      "127bb6:Arena - Markarth Side.esp",
+      "127bb4:Arena - Markarth Side.esp"
+    ],
+    [
+      "13482:Skyrim.esm",
+      "13475:Skyrim.esm"
+    ],
+    [
+      "13487:Skyrim.esm",
+      "1347a:Skyrim.esm"
+    ],
+    [
+      "13488:Skyrim.esm",
+      "1347b:Skyrim.esm"
+    ],
+    [
+      "135227:WindhelmSSE.esp",
+      "135226:WindhelmSSE.esp"
+    ],
+    [
+      "136edc:Arena - Markarth Side.esp",
+      "136ed8:Arena - Markarth Side.esp"
+    ],
+    [
+      "13bffc:Arena - Markarth Side.esp",
+      "13bffb:Arena - Markarth Side.esp"
+    ],
+    [
+      "13c008:Arena - Markarth Side.esp",
+      "13c004:Arena - Markarth Side.esp"
+    ],
+    [
+      "149aca:WindhelmSSE.esp",
+      "10682d:WindhelmSSE.esp"
+    ],
+    [
+      "15cfcd:WindhelmSSE.esp",
+      "15cfcc:WindhelmSSE.esp"
+    ],
+    [
+      "160715:Riften Expansion.esp",
+      "15b609:Riften Expansion.esp"
+    ],
+    [
+      "16acf:Skyrim.esm",
+      "16ace:Skyrim.esm"
+    ],
+    [
+      "16d752:WindhelmSSE.esp",
+      "16d74f:WindhelmSSE.esp"
+    ],
+    [
+      "172ca7:WindhelmSSE.esp",
+      "172ca6:WindhelmSSE.esp"
+    ],
+    [
+      "177da:Dragonborn.esm",
+      "1773a:Dragonborn.esm"
+    ],
+    [
+      "177db:Dragonborn.esm",
+      "17777:Dragonborn.esm"
+    ],
+    [
+      "177dc:Dragonborn.esm",
+      "17778:Dragonborn.esm"
+    ],
+    [
+      "179c40:Riften Expansion.esp",
+      "15b60a:Riften Expansion.esp"
+    ],
+    [
+      "1828f:Dragonborn.esm",
+      "1828e:Dragonborn.esm"
+    ],
+    [
+      "18291:Dragonborn.esm",
+      "18290:Dragonborn.esm"
+    ],
+    [
+      "18293:Dragonborn.esm",
+      "18292:Dragonborn.esm"
+    ],
+    [
+      "182a0:Dragonborn.esm",
+      "1829f:Dragonborn.esm"
+    ],
+    [
+      "182a2:Dragonborn.esm",
+      "182a1:Dragonborn.esm"
+    ],
+    [
+      "18fac:Dragonborn.esm",
+      "18fa9:Dragonborn.esm"
+    ],
+    [
+      "18fb8:Dragonborn.esm",
+      "18fb5:Dragonborn.esm"
+    ],
+    [
+      "18fc0:Dragonborn.esm",
+      "18fbd:Dragonborn.esm"
+    ],
+    [
+      "1939ba:aaaGraniteHill.esp",
+      "18e8b6:aaaGraniteHill.esp"
+    ],
+    [
+      "1981e:Skyrim.esm",
+      "13652:Skyrim.esm"
+    ],
+    [
+      "198a0:Skyrim.esm",
+      "13266:Skyrim.esm"
+    ],
+    [
+      "198ac:Skyrim.esm",
+      "132ab:Skyrim.esm"
+    ],
+    [
+      "198ad:Skyrim.esm",
+      "1326f:Skyrim.esm"
+    ],
+    [
+      "198af:Skyrim.esm",
+      "1328c:Skyrim.esm"
+    ],
+    [
+      "198b1:Skyrim.esm",
+      "13275:Skyrim.esm"
+    ],
+    [
+      "198b3:Skyrim.esm",
+      "13273:Skyrim.esm"
+    ],
+    [
+      "198b6:Skyrim.esm",
+      "1327a:Skyrim.esm"
+    ],
+    [
+      "198c5:Skyrim.esm",
+      "132aa:Skyrim.esm"
+    ],
+    [
+      "198c9:Skyrim.esm",
+      "1329a:Skyrim.esm"
+    ],
+    [
+      "198d2:Skyrim.esm",
+      "13260:Skyrim.esm"
+    ],
+    [
+      "198d3:Skyrim.esm",
+      "132ae:Skyrim.esm"
+    ],
+    [
+      "198d4:Skyrim.esm",
+      "13255:Skyrim.esm"
+    ],
+    [
+      "198d5:Skyrim.esm",
+      "1327d:Skyrim.esm"
+    ],
+    [
+      "198d8:Skyrim.esm",
+      "13261:Skyrim.esm"
+    ],
+    [
+      "198ea:Skyrim.esm",
+      "133a5:Skyrim.esm"
+    ],
+    [
+      "198eb:Skyrim.esm",
+      "133a1:Skyrim.esm"
+    ],
+    [
+      "198ec:Skyrim.esm",
+      "133a3:Skyrim.esm"
+    ],
+    [
+      "198ed:Skyrim.esm",
+      "13398:Skyrim.esm"
+    ],
+    [
+      "198f2:Skyrim.esm",
+      "133a2:Skyrim.esm"
+    ],
+    [
+      "198f7:Skyrim.esm",
+      "1338b:Skyrim.esm"
+    ],
+    [
+      "198f8:Skyrim.esm",
+      "1406b:Skyrim.esm"
+    ],
+    [
+      "19906:Skyrim.esm",
+      "1339a:Skyrim.esm"
+    ],
+    [
+      "19907:Skyrim.esm",
+      "1402d:Skyrim.esm"
+    ],
+    [
+      "19908:Skyrim.esm",
+      "1338e:Skyrim.esm"
+    ],
+    [
+      "19909:Skyrim.esm",
+      "1402e:Skyrim.esm"
+    ],
+    [
+      "1990a:Skyrim.esm",
+      "13387:Skyrim.esm"
+    ],
+    [
+      "19929:Skyrim.esm",
+      "13b7a:Skyrim.esm"
+    ],
+    [
+      "1992b:Skyrim.esm",
+      "13b7c:Skyrim.esm"
+    ],
+    [
+      "199cf:Skyrim.esm",
+      "13b77:Skyrim.esm"
+    ],
+    [
+      "199d0:Skyrim.esm",
+      "13b78:Skyrim.esm"
+    ],
+    [
+      "19dc8:Skyrim.esm",
+      "13365:Skyrim.esm"
+    ],
+    [
+      "19dc9:Skyrim.esm",
+      "13373:Skyrim.esm"
+    ],
+    [
+      "19dce:Skyrim.esm",
+      "13370:Skyrim.esm"
+    ],
+    [
+      "19dcf:Skyrim.esm",
+      "13354:Skyrim.esm"
+    ],
+    [
+      "19dd0:Skyrim.esm",
+      "1334d:Skyrim.esm"
+    ],
+    [
+      "19ddc:Skyrim.esm",
+      "1334f:Skyrim.esm"
+    ],
+    [
+      "19ddd:Skyrim.esm",
+      "1337e:Skyrim.esm"
+    ],
+    [
+      "19df0:Skyrim.esm",
+      "19def:Skyrim.esm"
+    ],
+    [
+      "19df1:Skyrim.esm",
+      "1334c:Skyrim.esm"
+    ],
+    [
+      "19df3:Skyrim.esm",
+      "19df2:Skyrim.esm"
+    ],
+    [
+      "19df9:Skyrim.esm",
+      "13380:Skyrim.esm"
+    ],
+    [
+      "19dfa:Skyrim.esm",
+      "1336d:Skyrim.esm"
+    ],
+    [
+      "19dfb:Skyrim.esm",
+      "13357:Skyrim.esm"
+    ],
+    [
+      "19dfc:Skyrim.esm",
+      "13360:Skyrim.esm"
+    ],
+    [
+      "19e02:Skyrim.esm",
+      "136bb:Skyrim.esm"
+    ],
+    [
+      "19e03:Skyrim.esm",
+      "136bc:Skyrim.esm"
+    ],
+    [
+      "19e09:Skyrim.esm",
+      "136c3:Skyrim.esm"
+    ],
+    [
+      "19e14:Skyrim.esm",
+      "13369:Skyrim.esm"
+    ],
+    [
+      "19e19:Skyrim.esm",
+      "19e18:Skyrim.esm"
+    ],
+    [
+      "1a51b:Dragonborn.esm",
+      "1a51a:Dragonborn.esm"
+    ],
+    [
+      "1a51d:Dragonborn.esm",
+      "1a51c:Dragonborn.esm"
+    ],
+    [
+      "1a66d:Skyrim.esm",
+      "13ba4:Skyrim.esm"
+    ],
+    [
+      "1a66e:Skyrim.esm",
+      "13ba3:Skyrim.esm"
+    ],
+    [
+      "1a672:Skyrim.esm",
+      "13ba1:Skyrim.esm"
+    ],
+    [
+      "1a675:Skyrim.esm",
+      "13b99:Skyrim.esm"
+    ],
+    [
+      "1a67c:Skyrim.esm",
+      "13bb9:Skyrim.esm"
+    ],
+    [
+      "1a680:Skyrim.esm",
+      "13b97:Skyrim.esm"
+    ],
+    [
+      "1a681:Skyrim.esm",
+      "13b9e:Skyrim.esm"
+    ],
+    [
+      "1a683:Skyrim.esm",
+      "13b9d:Skyrim.esm"
+    ],
+    [
+      "1a684:Skyrim.esm",
+      "13b9c:Skyrim.esm"
+    ],
+    [
+      "1a69a:Skyrim.esm",
+      "13bab:Skyrim.esm"
+    ],
+    [
+      "1a6a5:Skyrim.esm",
+      "13bbe:Skyrim.esm"
+    ],
+    [
+      "1a6a8:Skyrim.esm",
+      "136b6:Skyrim.esm"
+    ],
+    [
+      "1a6b5:Skyrim.esm",
+      "13614:Skyrim.esm"
+    ],
+    [
+      "1a6be:Skyrim.esm",
+      "1361e:Skyrim.esm"
+    ],
+    [
+      "1a6bf:Skyrim.esm",
+      "1361f:Skyrim.esm"
+    ],
+    [
+      "1a6c3:Skyrim.esm",
+      "1361d:Skyrim.esm"
+    ],
+    [
+      "1aa35:The Great City of Solitude.esp",
+      "1aa31:The Great City of Solitude.esp"
+    ],
+    [
+      "1aa5e:Skyrim.esm",
+      "135e9:Skyrim.esm"
+    ],
+    [
+      "1aa61:Skyrim.esm",
+      "135ef:Skyrim.esm"
+    ],
+    [
+      "1aa62:Skyrim.esm",
+      "135ed:Skyrim.esm"
+    ],
+    [
+      "1b085:Skyrim.esm",
+      "13662:Skyrim.esm"
+    ],
+    [
+      "1b086:Skyrim.esm",
+      "13663:Skyrim.esm"
+    ],
+    [
+      "1b08b:Skyrim.esm",
+      "1365f:Skyrim.esm"
+    ],
+    [
+      "1b097:Skyrim.esm",
+      "1b076:Skyrim.esm"
+    ],
+    [
+      "1b099:Skyrim.esm",
+      "1b079:Skyrim.esm"
+    ],
+    [
+      "1b115:Skyrim.esm",
+      "14148:Skyrim.esm"
+    ],
+    [
+      "1b116:Skyrim.esm",
+      "1414c:Skyrim.esm"
+    ],
+    [
+      "1b118:Skyrim.esm",
+      "1412a:Skyrim.esm"
+    ],
+    [
+      "1b11a:Skyrim.esm",
+      "1414b:Skyrim.esm"
+    ],
+    [
+      "1b11c:Skyrim.esm",
+      "14123:Skyrim.esm"
+    ],
+    [
+      "1b123:Skyrim.esm",
+      "1413a:Skyrim.esm"
+    ],
+    [
+      "1b124:Skyrim.esm",
+      "14140:Skyrim.esm"
+    ],
+    [
+      "1b128:Skyrim.esm",
+      "1413e:Skyrim.esm"
+    ],
+    [
+      "1b129:Skyrim.esm",
+      "1414e:Skyrim.esm"
+    ],
+    [
+      "1b12e:Skyrim.esm",
+      "1411f:Skyrim.esm"
+    ],
+    [
+      "1b132:Skyrim.esm",
+      "14146:Skyrim.esm"
+    ],
+    [
+      "1b135:Skyrim.esm",
+      "14142:Skyrim.esm"
+    ],
+    [
+      "1b136:Skyrim.esm",
+      "1412d:Skyrim.esm"
+    ],
+    [
+      "1b145:Skyrim.esm",
+      "14141:Skyrim.esm"
+    ],
+    [
+      "1c18c:Skyrim.esm",
+      "1c187:Skyrim.esm"
+    ],
+    [
+      "1c18d:Skyrim.esm",
+      "1c183:Skyrim.esm"
+    ],
+    [
+      "1c18e:Skyrim.esm",
+      "1c184:Skyrim.esm"
+    ],
+    [
+      "1c1a1:Skyrim.esm",
+      "1c19e:Skyrim.esm"
+    ],
+    [
+      "1c1a5:Skyrim.esm",
+      "1c197:Skyrim.esm"
+    ],
+    [
+      "1c1a6:Skyrim.esm",
+      "1c198:Skyrim.esm"
+    ],
+    [
+      "1c1a7:Skyrim.esm",
+      "1c199:Skyrim.esm"
+    ],
+    [
+      "1c1a8:Skyrim.esm",
+      "1c19a:Skyrim.esm"
+    ],
+    [
+      "1c1aa:Skyrim.esm",
+      "1c19c:Skyrim.esm"
+    ],
+    [
+      "1c1b4:Skyrim.esm",
+      "1c193:Skyrim.esm"
+    ],
+    [
+      "1d4bc:Skyrim.esm",
+      "1d4b7:Skyrim.esm"
+    ],
+    [
+      "1d503:The Great City of Solitude.esp",
+      "800a:The Great City of Solitude.esp"
+    ],
+    [
+      "1e7d6:Skyrim.esm",
+      "1e7d5:Skyrim.esm"
+    ],
+    [
+      "1e9f92:Riften Expansion.esp",
+      "16070c:Riften Expansion.esp"
+    ],
+    [
+      "1e9f93:Riften Expansion.esp",
+      "1d076a:Riften Expansion.esp"
+    ],
+    [
+      "1eec1:Dragonborn.esm",
+      "1eeb1:Dragonborn.esm"
+    ],
+    [
+      "1f9c2:Dragonborn.esm",
+      "1dc67:Dragonborn.esm"
+    ],
+    [
+      "2005a:Skyrim.esm",
+      "13627:Skyrim.esm"
+    ],
+    [
+      "207af8:WindhelmSSE.esp",
+      "149ab9:WindhelmSSE.esp"
+    ],
+    [
+      "21612:aaaGraniteHill.esp",
+      "21611:aaaGraniteHill.esp"
+    ],
+    [
+      "21ea6:Skyrim.esm",
+      "1b072:Skyrim.esm"
+    ],
+    [
+      "2214de:WindhelmSSE.esp",
+      "2214dd:WindhelmSSE.esp"
+    ],
+    [
+      "24004:JKs Skyrim.esp",
+      "24005:JKs Skyrim.esp"
+    ],
+    [
+      "25906:FishingInSkyrim.esp",
+      "25905:FishingInSkyrim.esp"
+    ],
+    [
+      "284ad:Skyrim.esm",
+      "284ac:Skyrim.esm"
+    ],
+    [
+      "2b82e:aaaGraniteHill.esp",
+      "2b82d:aaaGraniteHill.esp"
+    ],
+    [
+      "2ba8d:Skyrim.esm",
+      "2ba8c:Skyrim.esm"
+    ],
+    [
+      "2c1ea:Dragonborn.esm",
+      "2c1eb:Dragonborn.esm"
+    ],
+    [
+      "31861:Dragonborn.esm",
+      "31862:Dragonborn.esm"
+    ],
+    [
+      "31efc3:Riften Expansion.esp",
+      "1d0769:Riften Expansion.esp"
+    ],
+    [
+      "33a2:JKs Skyrim.esp",
+      "342f:JKs Skyrim.esp"
+    ],
+    [
+      "33b45:OarsRest.esp",
+      "2ea43:OarsRest.esp"
+    ],
+    [
+      "3a198:Skyrim.esm",
+      "13655:Skyrim.esm"
+    ],
+    [
+      "3a19b:Skyrim.esm",
+      "3a19a:Skyrim.esm"
+    ],
+    [
+      "3a19f:Skyrim.esm",
+      "13650:Skyrim.esm"
+    ],
+    [
+      "3a22:JKs Skyrim.esp",
+      "3a21:JKs Skyrim.esp"
+    ],
+    [
+      "3abab:aaaGraniteHill.esp",
+      "e164:aaaGraniteHill.esp"
+    ],
+    [
+      "3abac:aaaGraniteHill.esp",
+      "5c0c:aaaGraniteHill.esp"
+    ],
+    [
+      "3abad:aaaGraniteHill.esp",
+      "e6db:aaaGraniteHill.esp"
+    ],
+    [
+      "3fcce:aaaGraniteHill.esp",
+      "3fccd:aaaGraniteHill.esp"
+    ],
+    [
+      "4031:HearthFires.esm",
+      "403b:HearthFires.esm"
+    ],
+    [
+      "418a:JKs Skyrim.esp",
+      "4189:JKs Skyrim.esp"
+    ],
+    [
+      "41dae:AnotherOakwood.esp",
+      "41dad:AnotherOakwood.esp"
+    ],
+    [
+      "44dd7:aaaGraniteHill.esp",
+      "44dd5:aaaGraniteHill.esp"
+    ],
+    [
+      "4d53e:WindhelmSSE.esp",
+      "4d53d:WindhelmSSE.esp"
+    ],
+    [
+      "4d593:WindhelmSSE.esp",
+      "4d592:WindhelmSSE.esp"
+    ],
+    [
+      "4d594:WindhelmSSE.esp",
+      "4d58f:WindhelmSSE.esp"
+    ],
+    [
+      "4e0b3:Skyrim.esm",
+      "136c5:Skyrim.esm"
+    ],
+    [
+      "52e7f:WindhelmSSE.esp",
+      "52e7e:WindhelmSSE.esp"
+    ],
+    [
+      "52e81:WindhelmSSE.esp",
+      "52e80:WindhelmSSE.esp"
+    ],
+    [
+      "542f:OarsRest.esp",
+      "542d:OarsRest.esp"
+    ],
+    [
+      "55a63:Skyrim.esm",
+      "55a5e:Skyrim.esm"
+    ],
+    [
+      "5b685:Skyrim.esm",
+      "19953:Skyrim.esm"
+    ],
+    [
+      "5b687:Skyrim.esm",
+      "19957:Skyrim.esm"
+    ],
+    [
+      "5cbf8:SkyrimSewers.esp",
+      "5cbf7:SkyrimSewers.esp"
+    ],
+    [
+      "5cc07:SkyrimSewers.esp",
+      "5cc06:SkyrimSewers.esp"
+    ],
+    [
+      "5d16:aaaGraniteHill.esp",
+      "5d15:aaaGraniteHill.esp"
+    ],
+    [
+      "5d1b8:SkyrimSewers.esp",
+      "5d1b7:SkyrimSewers.esp"
+    ],
+    [
+      "5f3a5c:aaaGraniteHill.esp",
+      "5f3a5b:aaaGraniteHill.esp"
+    ],
+    [
+      "5f3a63:aaaGraniteHill.esp",
+      "5f3a62:aaaGraniteHill.esp"
+    ],
+    [
+      "60752:SkyrimSewers.esp",
+      "60751:SkyrimSewers.esp"
+    ],
+    [
+      "6311:JKs Skyrim.esp",
+      "62e2:JKs Skyrim.esp"
+    ],
+    [
+      "684a1:North Keep.esp",
+      "5900c:North Keep.esp"
+    ],
+    [
+      "68b0:aaaGraniteHill.esp",
+      "68af:aaaGraniteHill.esp"
+    ],
+    [
+      "6c730:WindhelmSSE.esp",
+      "6c72f:WindhelmSSE.esp"
+    ],
+    [
+      "6d8e8:North Keep.esp",
+      "5900f:North Keep.esp"
+    ],
+    [
+      "6d8e9:North Keep.esp",
+      "59011:North Keep.esp"
+    ],
+    [
+      "72c89:North Keep.esp",
+      "59028:North Keep.esp"
+    ],
+    [
+      "74340:Skyrim.esm",
+      "1b1db:Skyrim.esm"
+    ],
+    [
+      "74345:Skyrim.esm",
+      "1b1d1:Skyrim.esm"
+    ],
+    [
+      "7434a:Skyrim.esm",
+      "1b1d6:Skyrim.esm"
+    ],
+    [
+      "7e5b:aaaGraniteHill.esp",
+      "7e59:aaaGraniteHill.esp"
+    ],
+    [
+      "80c5e:WindhelmSSE.esp",
+      "80c60:WindhelmSSE.esp"
+    ],
+    [
+      "80c73:WindhelmSSE.esp",
+      "85da5:WindhelmSSE.esp"
+    ],
+    [
+      "80c74:WindhelmSSE.esp",
+      "80c77:WindhelmSSE.esp"
+    ],
+    [
+      "8472:aaaGraniteHill.esp",
+      "8471:aaaGraniteHill.esp"
+    ],
+    [
+      "8751:OarsRest.esp",
+      "874e:OarsRest.esp"
+    ],
+    [
+      "8755:OarsRest.esp",
+      "8754:OarsRest.esp"
+    ],
+    [
+      "8759:OarsRest.esp",
+      "8758:OarsRest.esp"
+    ],
+    [
+      "8c5a:The Great City of Solitude.esp",
+      "8c55:The Great City of Solitude.esp"
+    ],
+    [
+      "9226:OarsRest.esp",
+      "9223:OarsRest.esp"
+    ],
+    [
+      "922b:OarsRest.esp",
+      "9227:OarsRest.esp"
+    ],
+    [
+      "9ea8:Populated Cities Towns Villages Legendary.esp",
+      "61eb:Populated Cities Towns Villages Legendary.esp"
+    ],
+    [
+      "9eae:Populated Cities Towns Villages Legendary.esp",
+      "61f0:Populated Cities Towns Villages Legendary.esp"
+    ],
+    [
+      "a3d26:Arena - Markarth Side.esp",
+      "a3d21:Arena - Markarth Side.esp"
+    ],
+    [
+      "a453:Populated Cities Towns Villages Legendary.esp",
+      "6205:Populated Cities Towns Villages Legendary.esp"
+    ],
+    [
+      "a4910:WindhelmSSE.esp",
+      "a490e:WindhelmSSE.esp"
+    ],
+    [
+      "a4982:WindhelmSSE.esp",
+      "a4983:WindhelmSSE.esp"
+    ],
+    [
+      "a547:AnotherOakwood.esp",
+      "a545:AnotherOakwood.esp"
+    ],
+    [
+      "a553:AnotherOakwood.esp",
+      "a552:AnotherOakwood.esp"
+    ],
+    [
+      "aadd:AnotherOakwood.esp",
+      "aad7:AnotherOakwood.esp"
+    ],
+    [
+      "ab16:AnotherOakwood.esp",
+      "ab14:AnotherOakwood.esp"
+    ],
+    [
+      "b4a3:Populated Cities Towns Villages Legendary.esp",
+      "7da1:Populated Cities Towns Villages Legendary.esp"
+    ],
+    [
+      "b818c:Arena - Markarth Side.esp",
+      "a8e2c:Arena - Markarth Side.esp"
+    ],
+    [
+      "b818d:Arena - Markarth Side.esp",
+      "52308:Arena - Markarth Side.esp"
+    ],
+    [
+      "b882a:Skyrim.esm",
+      "b8827:Skyrim.esm"
+    ],
+    [
+      "bd300:Arena - Markarth Side.esp",
+      "b8195:Arena - Markarth Side.esp"
+    ],
+    [
+      "c7261:JK's Whiterun's Outskirts.esp",
+      "c7260:JK's Whiterun's Outskirts.esp"
+    ],
+    [
+      "c7264:JK's Whiterun's Outskirts.esp",
+      "c7263:JK's Whiterun's Outskirts.esp"
+    ],
+    [
+      "c7596:Arena - Markarth Side.esp",
+      "c7595:Arena - Markarth Side.esp"
+    ],
+    [
+      "d15b0:Skyrim.esm",
+      "13b9f:Skyrim.esm"
+    ],
+    [
+      "d587:The Great City of Solitude.esp",
+      "d586:The Great City of Solitude.esp"
+    ],
+    [
+      "d6ad9:Skyrim.esm",
+      "d6ad8:Skyrim.esm"
+    ],
+    [
+      "d7505:Skyrim.esm",
+      "13ba2:Skyrim.esm"
+    ],
+    [
+      "e1c1:JKs Skyrim.esp",
+      "e1c2:JKs Skyrim.esp"
+    ],
+    [
+      "e24:JKs Skyrim.esp",
+      "2453c:JKs Skyrim.esp"
+    ],
+    [
+      "e2d7:Populated Cities Towns Villages Legendary.esp",
+      "6d2c:Populated Cities Towns Villages Legendary.esp"
+    ],
+    [
+      "e2d9:Populated Cities Towns Villages Legendary.esp",
+      "6d2d:Populated Cities Towns Villages Legendary.esp"
+    ],
+    [
+      "e897:Populated Cities Towns Villages Legendary.esp",
+      "67ad:Populated Cities Towns Villages Legendary.esp"
+    ],
+    [
+      "e898:Populated Cities Towns Villages Legendary.esp",
+      "67ae:Populated Cities Towns Villages Legendary.esp"
+    ],
+    [
+      "e899:Populated Cities Towns Villages Legendary.esp",
+      "67af:Populated Cities Towns Villages Legendary.esp"
+    ],
+    [
+      "eee3:Populated Cities Towns Villages Legendary.esp",
+      "678e:Populated Cities Towns Villages Legendary.esp"
+    ],
+    [
+      "eee8:Populated Cities Towns Villages Legendary.esp",
+      "678f:Populated Cities Towns Villages Legendary.esp"
+    ],
+    [
+      "eee9:Populated Cities Towns Villages Legendary.esp",
+      "6790:Populated Cities Towns Villages Legendary.esp"
+    ],
+    [
+      "fe498:Skyrim.esm",
+      "16973:Skyrim.esm"
+    ],
+    [
+      "fe4aa:Skyrim.esm",
+      "16973:Skyrim.esm"
+    ],
+    [
+      "fe4bc:Skyrim.esm",
+      "16973:Skyrim.esm"
+    ],
+    [
+      "fe4c1:Skyrim.esm",
+      "16973:Skyrim.esm"
+    ],
+    [
+      "fe4c2:Skyrim.esm",
+      "16973:Skyrim.esm"
+    ],
+    [
+      "fe4cb:Skyrim.esm",
+      "16ace:Skyrim.esm"
+    ],
+    [
+      "fe4e4:Skyrim.esm",
+      "16ace:Skyrim.esm"
+    ],
+    [
+      "fe4e7:Skyrim.esm",
+      "16ace:Skyrim.esm"
+    ],
+    [
+      "fe4f0:Skyrim.esm",
+      "16ace:Skyrim.esm"
+    ],
+    [
+      "ffe0:Populated Cities Towns Villages Legendary.esp",
+      "f9cf:Populated Cities Towns Villages Legendary.esp"
+    ],
+    [
+      "ffec:Populated Cities Towns Villages Legendary.esp",
+      "fa05:Populated Cities Towns Villages Legendary.esp"
+    ],
+    [
+      "fff0:Populated Cities Towns Villages Legendary.esp",
+      "ff74:Populated Cities Towns Villages Legendary.esp"
+    ],
+    [
+      "fff2:Populated Cities Towns Villages Legendary.esp",
+      "ff77:Populated Cities Towns Villages Legendary.esp"
+    ],
+    [
+      "fffe:Populated Cities Towns Villages Legendary.esp",
+      "ff97:Populated Cities Towns Villages Legendary.esp"
+    ]
+  ],
+  "merchants": [
+    {
+      "reference": "1a67c:Skyrim.esm",
+      "base": "13bb9:Skyrim.esm",
+      "role": "Smith",
+      "hold": "Whiterun",
+      "bookHold": "whiterun"
+    },
+    {
+      "reference": "1a681:Skyrim.esm",
+      "base": "13b9e:Skyrim.esm",
+      "role": "Woodworker",
+      "hold": "Whiterun",
+      "bookHold": "whiterun"
+    },
+    {
+      "reference": "1a684:Skyrim.esm",
+      "base": "13b9c:Skyrim.esm",
+      "role": "Tailor",
+      "hold": "Whiterun",
+      "bookHold": "whiterun"
+    },
+    {
+      "reference": "1a672:Skyrim.esm",
+      "base": "13ba1:Skyrim.esm",
+      "role": "Enchanter",
+      "hold": "Whiterun",
+      "bookHold": "whiterun"
+    },
+    {
+      "reference": "1a66e:Skyrim.esm",
+      "base": "13ba3:Skyrim.esm",
+      "role": "Cook",
+      "hold": "Whiterun",
+      "bookHold": "whiterun"
+    },
+    {
+      "reference": "1a66d:Skyrim.esm",
+      "base": "13ba4:Skyrim.esm",
+      "role": "Alchemist",
+      "hold": "Whiterun",
+      "bookHold": "whiterun"
+    },
+    {
+      "reference": "198d8:Skyrim.esm",
+      "base": "13261:Skyrim.esm",
+      "role": "Smith",
+      "hold": "Haafingar",
+      "bookHold": "solitude"
+    },
+    {
+      "reference": "198b1:Skyrim.esm",
+      "base": "13275:Skyrim.esm",
+      "role": "Woodworker",
+      "hold": "Haafingar",
+      "bookHold": "solitude"
+    },
+    {
+      "reference": "198ac:Skyrim.esm",
+      "base": "132ab:Skyrim.esm",
+      "role": "Tailor",
+      "hold": "Haafingar",
+      "bookHold": "solitude"
+    },
+    {
+      "reference": "198c5:Skyrim.esm",
+      "base": "132aa:Skyrim.esm",
+      "role": "Enchanter",
+      "hold": "Haafingar",
+      "bookHold": "solitude"
+    },
+    {
+      "reference": "198a0:Skyrim.esm",
+      "base": "13266:Skyrim.esm",
+      "role": "Cook",
+      "hold": "Haafingar",
+      "bookHold": "solitude"
+    },
+    {
+      "reference": "198d2:Skyrim.esm",
+      "base": "13260:Skyrim.esm",
+      "role": "Alchemist",
+      "hold": "Haafingar",
+      "bookHold": "solitude"
+    },
+    {
+      "reference": "19df1:Skyrim.esm",
+      "base": "1334c:Skyrim.esm",
+      "role": "Smith",
+      "hold": "the Rift",
+      "bookHold": "riften"
+    },
+    {
+      "reference": "19dd0:Skyrim.esm",
+      "base": "1334d:Skyrim.esm",
+      "role": "Woodworker",
+      "hold": "the Rift",
+      "bookHold": "riften"
+    },
+    {
+      "reference": "31efc3:Riften Expansion.esp",
+      "base": "1d0769:Riften Expansion.esp",
+      "role": "Tailor",
+      "hold": "the Rift",
+      "bookHold": "riften"
+    },
+    {
+      "reference": "19df0:Skyrim.esm",
+      "base": "19def:Skyrim.esm",
+      "role": "Enchanter",
+      "hold": "the Rift",
+      "bookHold": "riften"
+    },
+    {
+      "reference": "19e14:Skyrim.esm",
+      "base": "13369:Skyrim.esm",
+      "role": "Cook",
+      "hold": "the Rift",
+      "bookHold": "riften"
+    },
+    {
+      "reference": "19dfb:Skyrim.esm",
+      "base": "13357:Skyrim.esm",
+      "role": "Alchemist",
+      "hold": "the Rift",
+      "bookHold": "riften"
+    },
+    {
+      "reference": "19906:Skyrim.esm",
+      "base": "1339a:Skyrim.esm",
+      "role": "Smith",
+      "hold": "the Reach",
+      "bookHold": "markarth"
+    },
+    {
+      "reference": "198eb:Skyrim.esm",
+      "base": "133a1:Skyrim.esm",
+      "role": "Woodworker",
+      "hold": "the Reach",
+      "bookHold": "markarth"
+    },
+    {
+      "reference": "198ea:Skyrim.esm",
+      "base": "133a5:Skyrim.esm",
+      "role": "Tailor",
+      "hold": "the Reach",
+      "bookHold": "markarth"
+    },
+    {
+      "reference": "19908:Skyrim.esm",
+      "base": "1338e:Skyrim.esm",
+      "role": "Enchanter",
+      "hold": "the Reach",
+      "bookHold": "markarth"
+    },
+    {
+      "reference": "1990a:Skyrim.esm",
+      "base": "13387:Skyrim.esm",
+      "role": "Cook",
+      "hold": "the Reach",
+      "bookHold": "markarth"
+    },
+    {
+      "reference": "198f7:Skyrim.esm",
+      "base": "1338b:Skyrim.esm",
+      "role": "Alchemist",
+      "hold": "the Reach",
+      "bookHold": "markarth"
+    },
+    {
+      "reference": "1b135:Skyrim.esm",
+      "base": "14142:Skyrim.esm",
+      "role": "Smith",
+      "hold": "Eastmarch",
+      "bookHold": "windhelm"
+    },
+    {
+      "reference": "1b123:Skyrim.esm",
+      "base": "1413a:Skyrim.esm",
+      "role": "Woodworker",
+      "hold": "Eastmarch",
+      "bookHold": "windhelm"
+    },
+    {
+      "reference": "1b124:Skyrim.esm",
+      "base": "14140:Skyrim.esm",
+      "role": "Tailor",
+      "hold": "Eastmarch",
+      "bookHold": "windhelm"
+    },
+    {
+      "reference": "1b132:Skyrim.esm",
+      "base": "14146:Skyrim.esm",
+      "role": "Enchanter",
+      "hold": "Eastmarch",
+      "bookHold": "windhelm"
+    },
+    {
+      "reference": "1b11a:Skyrim.esm",
+      "base": "1414b:Skyrim.esm",
+      "role": "Cook",
+      "hold": "Eastmarch",
+      "bookHold": "windhelm"
+    },
+    {
+      "reference": "1b115:Skyrim.esm",
+      "base": "14148:Skyrim.esm",
+      "role": "Alchemist",
+      "hold": "Eastmarch",
+      "bookHold": "windhelm"
+    },
+    {
+      "reference": "e24:JKs Skyrim.esp",
+      "base": "2453c:JKs Skyrim.esp",
+      "role": "Smith",
+      "hold": "Hjaalmarch",
+      "bookHold": "morthal"
+    },
+    {
+      "reference": "b818d:Arena - Markarth Side.esp",
+      "base": "52308:Arena - Markarth Side.esp",
+      "role": "Woodworker",
+      "hold": "Hjaalmarch",
+      "bookHold": "morthal"
+    },
+    {
+      "reference": "13c008:Arena - Markarth Side.esp",
+      "base": "13c004:Arena - Markarth Side.esp",
+      "role": "Tailor",
+      "hold": "Hjaalmarch",
+      "bookHold": "morthal"
+    },
+    {
+      "reference": "1aa5e:Skyrim.esm",
+      "base": "135e9:Skyrim.esm",
+      "role": "Enchanter",
+      "hold": "Hjaalmarch",
+      "bookHold": "morthal"
+    },
+    {
+      "reference": "1aa62:Skyrim.esm",
+      "base": "135ed:Skyrim.esm",
+      "role": "Cook",
+      "hold": "Hjaalmarch",
+      "bookHold": "morthal"
+    },
+    {
+      "reference": "1aa61:Skyrim.esm",
+      "base": "135ef:Skyrim.esm",
+      "role": "Alchemist",
+      "hold": "Hjaalmarch",
+      "bookHold": "morthal"
+    },
+    {
+      "reference": "1a6be:Skyrim.esm",
+      "base": "1361e:Skyrim.esm",
+      "role": "Smith",
+      "hold": "the Pale",
+      "bookHold": "dawnstar"
+    },
+    {
+      "reference": "33a2:JKs Skyrim.esp",
+      "base": "342f:JKs Skyrim.esp",
+      "role": "Woodworker",
+      "hold": "the Pale",
+      "bookHold": "dawnstar"
+    },
+    {
+      "reference": "1a6bf:Skyrim.esm",
+      "base": "1361f:Skyrim.esm",
+      "role": "Tailor",
+      "hold": "the Pale",
+      "bookHold": "dawnstar"
+    },
+    {
+      "reference": "1a6c3:Skyrim.esm",
+      "base": "1361d:Skyrim.esm",
+      "role": "Enchanter",
+      "hold": "the Pale",
+      "bookHold": "dawnstar"
+    },
+    {
+      "reference": "3a22:JKs Skyrim.esp",
+      "base": "3a21:JKs Skyrim.esp",
+      "role": "Cook",
+      "hold": "the Pale",
+      "bookHold": "dawnstar"
+    },
+    {
+      "reference": "1a6b5:Skyrim.esm",
+      "base": "13614:Skyrim.esm",
+      "role": "Alchemist",
+      "hold": "the Pale",
+      "bookHold": "dawnstar"
+    },
+    {
+      "reference": "1c18c:Skyrim.esm",
+      "base": "1c187:Skyrim.esm",
+      "role": "Smith",
+      "hold": "Winterhold",
+      "bookHold": "winterhold"
+    },
+    {
+      "reference": "b4a3:Populated Cities Towns Villages Legendary.esp",
+      "base": "7da1:Populated Cities Towns Villages Legendary.esp",
+      "role": "Woodworker",
+      "hold": "Winterhold",
+      "bookHold": "winterhold"
+    },
+    {
+      "reference": "1c18e:Skyrim.esm",
+      "base": "1c184:Skyrim.esm",
+      "role": "Tailor",
+      "hold": "Winterhold",
+      "bookHold": "winterhold"
+    },
+    {
+      "reference": "1e7d6:Skyrim.esm",
+      "base": "1e7d5:Skyrim.esm",
+      "role": "Enchanter",
+      "hold": "Winterhold",
+      "bookHold": "winterhold"
+    },
+    {
+      "reference": "1c18d:Skyrim.esm",
+      "base": "1c183:Skyrim.esm",
+      "role": "Cook",
+      "hold": "Winterhold",
+      "bookHold": "winterhold"
+    },
+    {
+      "reference": "1c1aa:Skyrim.esm",
+      "base": "1c19c:Skyrim.esm",
+      "role": "Alchemist",
+      "hold": "Winterhold",
+      "bookHold": "winterhold"
+    },
+    {
+      "reference": "3a19f:Skyrim.esm",
+      "base": "13650:Skyrim.esm",
+      "role": "Smith",
+      "hold": "Falkreath",
+      "bookHold": "falkreath"
+    },
+    {
+      "reference": "1981e:Skyrim.esm",
+      "base": "13652:Skyrim.esm",
+      "role": "Woodworker",
+      "hold": "Falkreath",
+      "bookHold": "falkreath"
+    },
+    {
+      "reference": "1939ba:aaaGraniteHill.esp",
+      "base": "18e8b6:aaaGraniteHill.esp",
+      "role": "Tailor",
+      "hold": "Falkreath",
+      "bookHold": "falkreath"
+    },
+    {
+      "reference": "72c89:North Keep.esp",
+      "base": "59028:North Keep.esp",
+      "role": "Enchanter",
+      "hold": "Falkreath",
+      "bookHold": "falkreath"
+    },
+    {
+      "reference": "3a198:Skyrim.esm",
+      "base": "13655:Skyrim.esm",
+      "role": "Cook",
+      "hold": "Falkreath",
+      "bookHold": "falkreath"
+    },
+    {
+      "reference": "3a19b:Skyrim.esm",
+      "base": "3a19a:Skyrim.esm",
+      "role": "Alchemist",
+      "hold": "Falkreath",
+      "bookHold": "falkreath"
+    },
+    {
+      "reference": "1828f:Dragonborn.esm",
+      "base": "1828e:Dragonborn.esm",
+      "role": "Smith",
+      "hold": "Solstheim",
+      "bookHold": "ravenrock"
+    },
+    {
+      "reference": "18293:Dragonborn.esm",
+      "base": "18292:Dragonborn.esm",
+      "role": "Woodworker",
+      "hold": "Solstheim",
+      "bookHold": "ravenrock"
+    },
+    {
+      "reference": "18fc0:Dragonborn.esm",
+      "base": "18fbd:Dragonborn.esm",
+      "role": "Tailor",
+      "hold": "Solstheim",
+      "bookHold": "ravenrock"
+    },
+    {
+      "reference": "177da:Dragonborn.esm",
+      "base": "1773a:Dragonborn.esm",
+      "role": "Enchanter",
+      "hold": "Solstheim",
+      "bookHold": "ravenrock"
+    },
+    {
+      "reference": "18291:Dragonborn.esm",
+      "base": "18290:Dragonborn.esm",
+      "role": "Cook",
+      "hold": "Solstheim",
+      "bookHold": "ravenrock"
+    },
+    {
+      "reference": "182a2:Dragonborn.esm",
+      "base": "182a1:Dragonborn.esm",
+      "role": "Alchemist",
+      "hold": "Solstheim",
+      "bookHold": "ravenrock"
+    }
+  ]
+}
