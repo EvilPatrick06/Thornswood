@@ -376,7 +376,7 @@ def world():
     return guild, ticket, tasks
 
 
-def refusal_for(gate, guild):
+def refusal_for(gate, guild, label=''):
     if gate == STAFF:
         return 'Staff close these'
     return 'post test tasks'
@@ -396,7 +396,7 @@ for label, gate, run in POINTS:
         del BOOK[:]
         by_check = asyncio.run(run(ask))
         said = ask.response.said
-        want = refusal_for(gate, guild)
+        want = refusal_for(gate, guild, label)
         quiet = (not ticket.edited and not ticket.sent and not tasks.sent
                  and not BOOK and not ask.response.deferred
                  and not ask.response.edited and not ask.response.modals)

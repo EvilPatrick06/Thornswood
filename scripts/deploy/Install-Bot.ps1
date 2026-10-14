@@ -81,6 +81,11 @@ param(
   # social media rather than staff, so it has no business reading a report
   # about somebody or another person's playtest application.
   [string]$CreatorRoles  = 'Content Creator',
+  # Faction Leader tickets. IDs only. Install-Bot -UpperStaffRoles should
+  # carry the Owner role ID and the Lead Gamemaster role ID (and any later
+  # Lead department role ID). Names are ignored. Empty means those tickets
+  # are refused, not opened to general staff.
+  [string]$UpperStaffRoles = '',
   # Every run used to mint a new shared key, which meant every run also
   # silently stopped tickets reaching the site inbox until Deploy-Docs was run
   # again. The key is kept unless you ask for a new one.
@@ -114,6 +119,17 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# IDs only, and only when this run asked. A name, a space or any other
+# character stops here so bot.env.json is not written with something the
+# bot will silently ignore. Leaving the switch off keeps whatever is
+# already on the box.
+if ($PSBoundParameters.ContainsKey('UpperStaffRoles') -and
+    $UpperStaffRoles -notmatch '^[0-9,]*$') {
+  Write-Host ''
+  Write-Host 'STOP. UPPER_STAFF_ROLES must be role IDs only (digits and commas). Nothing was written.' -ForegroundColor Red
+  if (-not $NoPause) { [void](Read-Host 'Enter to exit') }
+  exit 1
+}
 $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
@@ -142,7 +158,7 @@ $docsWin = $DocsRoot.Replace('/','\')
 . (Join-Path $Here 'Artifact.ps1')
 $artifact = $null
 if (-not $PutBack -and -not $SetPing) {
-$artifact = New-ThornswoodArtifact -Component bot -RepoDir $Repo -Paths 'bot/bot.py', 'bot/_pyguard.py', 'bot/card.py', 'bot/staff-channel.txt', 'bot/requirements.txt', 'bot/assets/join-card.png', 'scripts/vps/BotService.cs'
+$artifact = New-ThornswoodArtifact -Component bot -RepoDir $Repo -Paths 'bot/bot.py', 'bot/_pyguard.py', 'bot/card.py', 'bot/staff-channel.txt', 'bot/requirements.txt', 'bot/factions.json', 'bot/assets/join-card.png', 'scripts/vps/BotService.cs'
 Write-Host ('artifact ' + (Format-ThornswoodArtifact $artifact)) -ForegroundColor DarkGray
 Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
 $Repo = $artifact.Folder
@@ -371,9 +387,12 @@ Head 'Staging it'
 # smoke checklist was taken out on 11 Oct. Nothing reads it now. The join-card
 # harness's point is that joins.json, the bot's own record, is never sent; it
 # still checks that.
+#
+# factions.json too: the named factions the Faction Leader form reads from
+# beside itself. A file this list does not name never reaches the box.
 $send = [ordered]@{}
 # _pyguard.py is the Python version check bot.py imports first (#2276).
-foreach ($f in 'bot.py', '_pyguard.py', 'card.py', 'staff-channel.txt', 'requirements.txt') {
+foreach ($f in 'bot.py', '_pyguard.py', 'card.py', 'staff-channel.txt', 'requirements.txt', 'factions.json') {
   $src = Join-Path $Repo "bot\$f"
   if (-not (Test-Path $src)) { Die "missing: $src" }
   $send[$f] = $src
@@ -895,6 +914,11 @@ if ('$KeyMode' -eq 'new' -or -not `$env2['THORNSWOOD_KEY']) {
 `$env2['TICKET_LOG']      = '$TicketLog'
 `$env2['STAFF_ROLES']     = '$StaffRoles'
 `$env2['CREATOR_ROLES']   = '$CreatorRoles'
+# Only when this run passed -UpperStaffRoles. An omitted switch must not
+# wipe a list that is already in bot.env.json.
+if ('$($PSBoundParameters.ContainsKey('UpperStaffRoles'))' -eq 'True') {
+  `$env2['UPPER_STAFF_ROLES'] = '$UpperStaffRoles'
+}
 # Piped, Python writes in the machine's ANSI codepage and PowerShell reads the
 # pipe as OEM. Anything outside plain ASCII, a role name or a channel name with
 # an accent in it, came out of that as a screenful of question marks. Both ends
@@ -928,6 +952,10 @@ catch { 'could not tighten bot.env.json: ' + `$_.Exception.Message }
 'join cards:    #' + `$env2['JOIN_CHANNEL']
 'staff:         ' + `$env2['STAFF_ROLES']
 'creator only:  ' + `$env2['CREATOR_ROLES']
+'upper staff:   ' + `$env2['UPPER_STAFF_ROLES']
+if (-not [string]`$env2['UPPER_STAFF_ROLES']) {
+  'WARNING: UPPER_STAFF_ROLES is empty. Faction Leader applications will be refused until it is set to the Owner role ID and the Lead Gamemaster role ID.'
+}
 
 # The same key into the site's config, so it accepts the bot and nobody else.
 # Never over a config.json that is there and does not parse: it is not empty,
