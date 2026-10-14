@@ -76,7 +76,7 @@ ATTACH_FILES = 1 << 15
 
 # Every mode that shuts @everyone out of one of the three. Only public does
 # not, and a public channel needs nothing for the bot.
-RESTRICTED = ('read', 'open', 'membersread', 'hold', 'staff', 'pathfind')
+RESTRICTED = ('read', 'open', 'membersread', 'hold', 'staff', 'pathfind', 'gm')
 # The hold a hold mode is asked about, where one is needed.
 HOLD = 'Whiterun'
 
@@ -275,6 +275,7 @@ def live_server():
         cat = None
         # The same modes on_ready gives a category it makes.
         cmode = {'Staff': 'staff', 'Testing': 'pathfind', 'The Holds': 'hold',
+                 'Gamemasters': 'gm',
                  'Applications': 'public'}.get(catname, 'open')
         if catname:
             cat = Channel(g, catname, 'category',
