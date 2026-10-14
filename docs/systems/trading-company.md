@@ -94,7 +94,10 @@ the hauler is away. Decided by Patrick on 4 Oct (#1646).
 
 ## Who runs it
 
-An application, the same shape as a Jarl. It is asked for in Discord.
+The Free Skyrim Trading Company is a faction. Its lead seat is one of
+the Faction Leader applications in Discord, the same shape as a Jarl.
+A faction has one leader.
+
 The people who are accepted run it as a business: they make, they
 sell, and they buy. What they wear on the road while a crate is in
 the pack is their own affair, in the world. It is not a server rule.
@@ -150,10 +153,11 @@ The ledger goes down only for these payouts and a letter's 15. A
 withdrawal never leaves less on the ledger than the open letters and
 hauls still hold, and what a haul holds for somebody away.
 
-The application is a ticket in Discord, Apply: Trading Company. The
-role it leads to is Trading Company, given by a person in Discord.
-`bot/Build-Discord.py` makes the role, and `access.company` in the
-site's config names it. A sale out of Skyrim is the trade panel's Buy
+The lead of the company is a Faction Leader ticket in Discord, Apply:
+Faction Leader, picking Free Skyrim Trading Company. The role that
+lets a character handle a company sale is still Trading Company, given
+by a person in Discord. `bot/Build-Discord.py` makes that role, and
+`access.company` in the site's config names it. A sale out of Skyrim is the trade panel's Buy
 for the company, as above. The things the seller put up leave the
 seller's pack and the world. The worker pays the price less their
 10%, another 10% is destroyed, and the seller receives the rest.

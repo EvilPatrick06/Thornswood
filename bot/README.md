@@ -39,7 +39,7 @@ Discord is a copy that goes stale, so the welcome post links to them instead.
 
 | Channel | Who reads | What it is |
 |---|---|---|
-| `#tickets-and-applications` | everybody | The bot's ticket panel: applying for any job, reporting somebody, cannot install or connect. Each ticket opens a private thread only the person and staff can read |
+| `#tickets-and-applications` | everybody | The bot's ticket panel: applying for any job, reporting somebody, cannot install or connect. Each ticket opens a private thread only the person and the roles pulled into that kind can read. Faction Leader tickets go only to the role IDs in `UPPER_STAFF_ROLES` (Owner ID and each Lead department ID). Empty means the ticket is refused |
 | `#tickets` | staff only | Every closed ticket, with a link back to it, and the whole of any ticket whose private thread would not open |
 
 `#tickets` has to stay staff only, because a report about somebody lands there
@@ -309,7 +309,12 @@ Neither is staff to the bot either. Closing a ticket, with `/close` or the
 Close ticket button, and skipping the one open ticket rule and the cooldown
 take one of the `STAFF_ROLES` roles in `bot.env.json` (Owner, Dev, Gamemaster,
 Moderator and Loremaster by default), matched by id or name, and nothing
-else. The Manage Threads that both of them carry on every channel used to
+else. Faction Leader tickets are pulled to the role IDs in `UPPER_STAFF_ROLES`
+only (Install-Bot `-UpperStaffRoles`: the Owner ID and the Lead Gamemaster
+ID). Names are ignored. Empty or unset refuses the ticket. A future Lead
+role is added there by its ID. `/close` on a Faction Leader thread also
+lets through a member holding one of those IDs; `is_staff` is unchanged,
+so they still wait out the ticket limits. The Manage Threads that both of them carry on every channel used to
 count as staff there, and it no longer does (#1342). `test-staff-gate.py`
 runs every staff and admin command and button as somebody who is not staff
 for it, and fails on any new one whose gate is not written down in it.
@@ -406,7 +411,8 @@ them, the way [Setting up a machine](../Developer-Guide.md#setting-up-a-machine)
 installs them (#1401).
 
 What goes up with it: `bot.py`, `card.py`, the channel ids, the card artwork,
-and `requirements.txt`. A file the bot reads and this list does
+`requirements.txt`, and `factions.json`, the named factions the Faction
+Leader form reads from beside itself. A file the bot reads and this list does
 not name is a file that is only ever on main, never on the box.
 
 Nothing else stays in the bot's folder (#1184). It holds what that list sends
