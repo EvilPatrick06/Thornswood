@@ -346,10 +346,56 @@ function New-ThornswoodArtifact {
   [IO.File]::WriteAllText($recordPath, (ConvertTo-Json -InputObject $record -Depth 5), (New-Object Text.UTF8Encoding($false)))
 
   # Laid out like the repository, so a script that sent <repo>\site\server.js
-  # sends <folder>\site\server.js.
+  # sends <folder>\site\server.js. The folder name is the zip basename (commit
+  # + hash), so two runs at one commit in one checkout share it (#2459). Never
+  # Remove-Item that shared folder: a second call (or a concurrent first) would
+  # delete it under another run that is reading game\gamemode.js from it.
+  # Reuse when every recorded file is already there at the recorded size;
+  # otherwise unpack into a unique staging dir and Move-Item into place only
+  # when the shared name is still free. No lock and no wait/retry.
   $folder = Join-Path $OutDir ([IO.Path]::GetFileNameWithoutExtension($name))
-  if (Test-Path -LiteralPath $folder) { Remove-Item -LiteralPath $folder -Recurse -Force }
-  [IO.Compression.ZipFile]::ExtractToDirectory($zip, $folder)
+  $ready = $false
+  if (Test-Path -LiteralPath $folder) {
+    $ready = $true
+    foreach ($f in $contents) {
+      $p = Join-Path $folder (($f.path -replace '/', [IO.Path]::DirectorySeparatorChar))
+      if (-not (Test-Path -LiteralPath $p) -or ((Get-Item -LiteralPath $p).Length -ne [long]$f.size)) {
+        $ready = $false
+        break
+      }
+    }
+  }
+  if (-not $ready) {
+    $staging = Join-Path $OutDir ('.unpacking-' + [Guid]::NewGuid().ToString('N'))
+    try {
+      [IO.Compression.ZipFile]::ExtractToDirectory($zip, $staging)
+      if (-not (Test-Path -LiteralPath $folder)) {
+        try {
+          Move-Item -LiteralPath $staging -Destination $folder
+        } catch {
+          # Another run promoted first; theirs is the shared folder.
+        }
+      }
+    } finally {
+      if (Test-Path -LiteralPath $staging) {
+        Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue
+      }
+    }
+    $ready = $false
+    if (Test-Path -LiteralPath $folder) {
+      $ready = $true
+      foreach ($f in $contents) {
+        $p = Join-Path $folder (($f.path -replace '/', [IO.Path]::DirectorySeparatorChar))
+        if (-not (Test-Path -LiteralPath $p) -or ((Get-Item -LiteralPath $p).Length -ne [long]$f.size)) {
+          $ready = $false
+          break
+        }
+      }
+    }
+    if (-not $ready) {
+      throw ("The $Component artifact folder could not be made ready at $folder (another run may hold an incomplete copy; clear it and retry).")
+    }
+  }
 
   return [pscustomobject]@{
     Component  = $Component
