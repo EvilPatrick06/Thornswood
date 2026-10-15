@@ -2871,18 +2871,67 @@ function noteSignIn(req, me, st, back) {
  * are still in now, not which build it was. Djinn asked on 20 September for a
  * sheet testers are logged in and out of, and this is the record behind it.
  *
- * One row a session. Newest LAST, the way a log is written, and capped so the
- * file cannot grow without bound on the VPS. Two thousand sessions is years of
- * a closed playtest. */
+ * One row a session. Newest LAST, the way a log is written.
+ *
+ * KEPT FOR SESSIONS_DAYS, THEN DROPPED (#2350). The privacy page says session
+ * records are kept for 365 days. Until 12 October the rows were only capped
+ * by count, the newest 2000, so on a quiet server a row lived as long as
+ * fewer than 2000 sessions came after it, which could be years. Decided by
+ * Patrick on 12 October: age the rows by time, keep a row marked kept, and
+ * run the ageing on a timer as well as when a session ends.
+ *
+ * A row's time is the later of its start and its end. A row with neither is
+ * a corrupt row and is kept rather than guessed at, the way the sign-in log
+ * keeps one. A row marked kept is evidence somebody chose to hold, and it is
+ * never aged and never pushed out by the count either: before this, 2000
+ * newer sessions pushed a kept row off the front and its logs lost their hold
+ * with it.
+ *
+ * The count stays as a bound on the file's size: past 2000 rows the oldest
+ * unkept ones go first, which is only ever sooner than the page says.
+ *
+ * The ageing runs on the way in (putSessions), on the way out (sessionRows,
+ * so the hub never shows a row past the window), at start and every hour
+ * (retentionSweep), with no session ending needed. */
 const SESSIONS = path.join(DATA, 'sessions.json');
 const SESSIONS_KEEP = 2000;
+const SESSIONS_DAYS = 365;
 
+function freshSessions(rows, now) {
+  const cut = (Number(now) || Date.now()) - SESSIONS_DAYS * 86400000;
+  const kept = (Array.isArray(rows) ? rows : []).filter((r) => {
+    if (!r || typeof r !== 'object') return false;
+    if (r.keep) return true;
+    const at = Math.max(Number(r.end) || 0, Number(r.start) || 0);
+    return !(at > 0 && at < cut);
+  });
+  let over = kept.length - SESSIONS_KEEP;
+  if (over <= 0) return kept;
+  return kept.filter((r) => {
+    if (over > 0 && !r.keep) { over--; return false; }
+    return true;
+  });
+}
 function sessionRows() {
   const list = jsonFile(SESSIONS, []);
-  return Array.isArray(list) ? list : [];
+  return freshSessions(list, Date.now());
 }
 function putSessions(rows) {
-  return putJson(SESSIONS, rows.slice(-SESSIONS_KEEP));
+  return putJson(SESSIONS, freshSessions(rows, Date.now()));
+}
+/* The timer's half for the rows. Writes only when something aged out, and a
+   write that fails is said, the count and never what the rows hold (#2354).
+   A file that is there and cannot be read is left alone: jsonFile answers []
+   for it, and an empty list never writes over anything. */
+function sweepSessions(now) {
+  const raw = jsonFile(SESSIONS, []);
+  const rows = Array.isArray(raw) ? raw : [];
+  const kept = freshSessions(rows, now);
+  const out = { rows: rows.length, kept: kept.length, written: false };
+  if (kept.length === rows.length) return out;
+  out.written = putJson(SESSIONS, kept);
+  if (!out.written) retentionSay('session', { event: 'write-failed', rows: rows.length, kept: kept.length });
+  return out;
 }
 
 /* The id the launcher made for one session: its characters only, so nothing
@@ -2933,11 +2982,12 @@ function findSession(rows, key, who) {
   security theatre: it is so that a copy pasted into a Discord argument months
   later can be held against the one on the box and shown to be the same text.
 
-  KEPT BY AGE, NOT BY THE ROLLING LIST. sessions.json keeps the last two
-  thousand rows. Tying the logs to that would quietly delete the evidence for
-  an old incident the moment two thousand newer sessions had happened, which
-  on a public server is weeks. They are kept for SLOG_DAYS instead, and a
-  session whose row is marked kept is never pruned at all.
+  KEPT BY AGE, NOT BY THE ROLLING LIST. sessions.json is aged by
+  SESSIONS_DAYS and also bounded at two thousand rows. Tying the logs to the
+  rows would quietly delete the evidence for an old incident the moment two
+  thousand newer sessions had happened, which on a public server is weeks.
+  They are kept for SLOG_DAYS instead, the same 365 days, and a session whose
+  row is marked kept is never pruned at all.
 
   CHAT is kept elsewhere: the voice service writes one JSON line per message
   under its chat folder and ages whole days past THORNSWOOD_CHAT_DAYS
@@ -3028,10 +3078,11 @@ function putSessionLogs(key, who, logs) {
 /*
   Old log sets go, by age.
 
-  NOT by whether the session is still in sessions.json. That file keeps the
-  last two thousand rows, so tying the logs to it would delete the evidence
-  for an old incident the moment two thousand newer sessions had happened, and
-  on a public server that is weeks. A row marked kept is never pruned, so
+  NOT by whether the session is still in sessions.json. That file is also
+  bounded at two thousand rows, so tying the logs to it would delete the
+  evidence for an old incident the moment two thousand newer sessions had
+  happened, and on a public server that is weeks. A row marked kept is never
+  pruned, and never pushed out of sessions.json by the count (#2350), so
   anything an argument rests on can be held indefinitely by marking it.
 */
 /*
@@ -3083,6 +3134,22 @@ function pruneSessionLogs() {
   }
   return out;
 }
+
+/*
+  THE RETENTION TIMER (#2350). Both prunes used to run only when a session
+  ended, so a quiet stretch with nobody playing left rows and log sets past
+  365 days on disk, against what the privacy page says. Decided by Patrick
+  on 12 October: run them on a timer too. Once as the site comes up and then
+  every hour; each says its own failures (retentionSay) and neither throws.
+  The rows go first, so the log prune reads which rows are still kept from
+  the file as it now stands.
+*/
+const RETENTION_EVERY_MS = 60 * 60 * 1000;
+function retentionSweep() {
+  const now = Date.now();
+  return { sessions: sweepSessions(now), sessionLogs: pruneSessionLogs() };
+}
+setInterval(retentionSweep, RETENTION_EVERY_MS).unref?.();
 
 /*
   Did this session go wrong, and how badly?
@@ -6694,6 +6761,8 @@ http.createServer((req, res) => {
               ', rolled at 4 MB, five kept');
   console.log('[thornswood-docs] documents in ' + DATA);
   rereadTrouble();
+  // The first retention pass, then every hour (#2350).
+  retentionSweep();
   console.log('[thornswood-docs] downloads in ' + FILES);
   console.log('[thornswood-docs] uploads in ' + UP);
   console.log('[thornswood-docs] watching the game on 127.0.0.1:' +
