@@ -276,7 +276,8 @@ withdraw from the ledger are built: a haul's pay to its hauler, less
 the company's tenth, or back to its poster. A withdrawal never leaves
 less on the ledger than the open letters and hauls still hold, and
 what a haul holds for somebody away. The four house parts are
-already refused. The drop box is the notice board. Standing at the
-board and clicking it opens the panel. A price list is left from that
+already refused. The drop box stands on the notice board's post, and
+E on it opens its own panel (#2298). Standing at the board and clicking
+it opens the board's panel. A price list is left from that
 panel. The book stays in the journal. The guild average of those
 copies is kept.

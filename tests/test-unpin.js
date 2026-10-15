@@ -151,6 +151,7 @@ function boot(dir, eng) {
     // tests/test-502-guard-board.js.
     'function isGuard() { return false; }',
     'var boxes = loadPart(\'boxes\', {});',
+    'var dropbox = loadPart(\'dropbox\', {});',
     'var funds = loadPart(\'funds\', {});',
     'var notices = loadPart(\'notices\', {});',
     'var boards = loadPart(\'boards\', { whiterun: { where: \'Whiterun\' }, riften: { where: \'Riften\' } });',
