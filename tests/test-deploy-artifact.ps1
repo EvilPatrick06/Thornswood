@@ -434,7 +434,9 @@ foreach ($w in $wiring) {
     Yes "$n loads Artifact.ps1" (DotSources $ast 'Artifact.ps1')
     $builds = @(Commands $ast 'New-ThornswoodArtifact')
     Yes "$n builds the $($w.Component) artifact" ($builds.Count -ge 1 -and @($builds | Where-Object { (Arg $_ 'Component') -ne $w.Component }).Count -eq 0)
-    $sends = @(Commands $ast 'Send-ThornswoodArtifact')
+    # Its own artifact; Deploy-Server also sends the server build's (#459,
+    # ServerArtifact.ps1), checked below.
+    $sends = @(Commands $ast 'Send-ThornswoodArtifact' | Where-Object { (Arg $_ 'Artifact') -eq '$artifact' })
     $sets = @(Commands $ast 'Set-ThornswoodArtifactCurrent')
     Yes "$n sends it to the store once" ($sends.Count -eq 1)
     Yes "$n records it on the box once" ($sets.Count -eq 1)
@@ -480,9 +482,12 @@ if ($ps) {
 
 $ds = Read-Ast 'scripts\deploy\Deploy-Server.ps1'
 if ($ds) {
-    $send = @(Commands $ds 'Send-ThornswoodArtifact')
+    $send = @(Commands $ds 'Send-ThornswoodArtifact' | Where-Object { (Arg $_ 'Artifact') -eq '$artifact' })
     $set = @(Commands $ds 'Set-ThornswoodArtifactCurrent')
     Yes 'Deploy-Server sends the artifact before anything is staged' ($send.Count -eq 1 -and $send[0].Extent.StartOffset -lt (At $ds 'Write-Host "Staging in'))
+    $sendSrv = @(Commands $ds 'Send-ThornswoodArtifact' | Where-Object { (Arg $_ 'Artifact') -eq '$serverArtifact' })
+    Yes '  and the server build''s, once, before anything is staged (#459)' ($sendSrv.Count -eq 1 -and $sendSrv[0].Extent.StartOffset -lt (At $ds 'Write-Host "Staging in') -and
+        @(Commands $ds 'Send-ThornswoodArtifact').Count -eq 2)
     Yes 'and records it only once the swap has said SWAP OK' ($set.Count -eq 1 -and $set[0].Extent.StartOffset -gt (At $ds "if (`$swapOut -notcontains 'SWAP OK')"))
     Yes 'and the live server serves the record from its data folder' ($set.Count -eq 1 -and (Arg $set[0] 'Beside') -eq '"$Root/data/thornswood-deploy.json"')
     Yes 'the build copy of gamemode.js is compared by hash, not by size' ((At $ds '(Get-FileHash -LiteralPath $src).Hash -ne (Get-FileHash -LiteralPath $built).Hash') -ge 0)
