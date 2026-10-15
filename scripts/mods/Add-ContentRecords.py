@@ -247,6 +247,28 @@ the recipe's bench, and because the server then refuses it too.
 THIS IS A SHIPPED FILE, so its size changing means a release and every client
 downloading it again.
 
+THE WOODWORKING BENCH (#516)
+
+Patrick, 12 October 2026: bows, arrows, instruments and fishing poles listed at
+the forge are a woodworker's job. Trade ownership was already correct; the forge
+menu is wrong because each COBJ's BNAM is still CraftingSmithingForge.
+
+(A) This plugin gets its own woodworking bench: keyword
+ThornswoodCraftingWoodworking and furniture ThornswoodCraftingWoodworkingWorkbench,
+wearing Hearthfire's carpenter workbench mesh so no new art ships. The 26 recipes
+this plugin can already reach (six Skyrim bows, twelve Dawnguard bows/arrows/bolts,
+four Dragonborn bows/arrows, and our own three poles plus the fish trap) have their
+BNAM pointed at that keyword. The charcoal kiln is not used until #2337 is fixed.
+
+(i) The other 53 rows live in plugins that load after this one (or that would force
+a master renumber if added here). scripts/mods/Build-WoodworkerTrailOverrides.py
+and woodworker-trail-recipes.json prepare a small trailing plugin for the next
+collection revision. Until that ships, the server refusal stays the gate for those.
+
+Placements of the furniture in the world are Claude's: at least one beside a forge
+in every major hold and some minor towns. This script only adds the base records.
+
+
 Usage (both default to game\\content\\Thornswood-Content.esp in this repo):
     python scripts/mods/Add-ContentRecords.py --check
     python scripts/mods/Add-ContentRecords.py
@@ -405,6 +427,54 @@ BOARD_BOUNDS = (-168, -71, 0, 140, 71, 246)     # the mesh's, rounded outward
 DROP_BOX = 0x50154D0
 DROP_BOX_MODEL = 'thornswood\\dropbox01.nif'
 DROP_BOX_BOUNDS = (-26, -18, 0, 26, 18, 37)
+
+# THE WOODWORKING BENCH (#516). Keyword + furniture, then the 26 COBJ overrides.
+# Mesh is Hearthfire's carpenter workbench (_BYOH\Furniture\CraftingWorkbench01.nif),
+# measured from BYOHHouseCarpentersWorkbench in HearthFires.esm. Bounds are that
+# furniture's OBND. Form ids follow DROP_BOX with a gap, same pattern as the kits.
+WOODWORKING_KEYWORD = 0x50154E0
+WOODWORKING_BENCH = 0x50154E1
+WOODWORKING_MODEL = '_BYOH\Furniture\CraftingWorkbench01.nif'
+WOODWORKING_BOUNDS = (-72, -10, -34, 81, 75, 64)
+WOODWORKING_FULL = 'Woodworking Bench'
+
+# Master recipes this plugin overrides onto the woodworking bench. Form ids are
+# already in this plugin's numbering (Skyrim 00, Dawnguard 02, Dragonborn 04).
+WOODWORKER_MASTER_RECIPES = (
+    # Skyrim.esm bows
+    (0x00108CF7, 'RecipeWeaponDaedricBow', 'Skyrim.esm'),
+    (0x00108CF8, 'RecipeWeaponDwarvenBow', 'Skyrim.esm'),
+    (0x00108CF9, 'RecipeWeaponEbonyBow', 'Skyrim.esm'),
+    (0x00108CFA, 'RecipeWeaponElvenBow', 'Skyrim.esm'),
+    (0x00108CFB, 'RecipeWeaponGlassBow', 'Skyrim.esm'),
+    (0x00108CFC, 'RecipeWeaponOrcishBow', 'Skyrim.esm'),
+    # Dawnguard.esm
+    (0x02019824, 'DLC1RecipeWeaponDragonboneBow', 'Dawnguard.esm'),
+    (0x02003987, 'DLC1RecipeArrowDaedric', 'Dawnguard.esm'),
+    (0x02006928, 'DLC1RecipeArrowDragonbone', 'Dawnguard.esm'),
+    (0x0200B64F, 'DLC1RecipeArrowIron', 'Dawnguard.esm'),
+    (0x0200B650, 'DLC1RecipeArrowSteel', 'Dawnguard.esm'),
+    (0x0200B651, 'DLC1RecipeArrowEbony', 'Dawnguard.esm'),
+    (0x0200B652, 'DLC1RecipeArrowDwarven', 'Dawnguard.esm'),
+    (0x0200B653, 'DLC1RecipeArrowGlass', 'Dawnguard.esm'),
+    (0x0200B654, 'DLC1RecipeArrowOrcish', 'Dawnguard.esm'),
+    (0x0200B655, 'DLC1RecipeArrowElven', 'Dawnguard.esm'),
+    (0x0200F813, 'DLC1RecipeTechBoltSteel', 'Dawnguard.esm'),
+    (0x0200F814, 'DLC1RecipeTechBoltDwarven', 'Dawnguard.esm'),
+    # Dragonborn.esm
+    (0x0402B077, 'DLC2RecipeWeaponStalhrimBow', 'Dragonborn.esm'),
+    (0x0402B07F, 'DLC2RecipeWeaponNordicBow', 'Dragonborn.esm'),
+    (0x0403CF53, 'DLC2RecipeArrowNordic', 'Dragonborn.esm'),
+    (0x0403CF54, 'DLC2RecipeArrowStalhrim', 'Dragonborn.esm'),
+)
+
+# Our own poles and trap: already in this plugin, BNAM flipped from the forge.
+WOODWORKER_OWN_RECIPES = (
+    RECIPE_POLE_CRUDE,
+    RECIPE_POLE_FINE,
+    RECIPE_POLE_MASTER,
+    RECIPE_TRAP,
+)
 
 LEATHER_STRIPS = 0x000800E4
 TUNDRA_COTTON = 0x0003F7F8
@@ -657,6 +727,34 @@ def set_inputs(rec, items):
     if not placed:
         raise SystemExit('recipe had no CNTO to replace')
     rec.data = pack_subrecords(out)
+
+
+def set_bnam(rec, keyword):
+    """The recipe's BNAM set to keyword. True when that changed anything."""
+    pairs = subrecords(rec.data)
+    want = struct.pack('<I', keyword)
+    if not any(t == b'BNAM' for t, _ in pairs):
+        raise SystemExit('0x%07X has no BNAM to set' % rec.fid)
+    out = [(t, want) if t == b'BNAM' else (t, b) for t, b in pairs]
+    if out == pairs:
+        return False
+    rec.data = pack_subrecords(out)
+    return True
+
+
+def kwda_swap(kwda, old_fid, new_fid):
+    """KWDA bytes with one form id replaced. Raises if old_fid is not there."""
+    if len(kwda) % 4:
+        raise SystemExit('KWDA length %d is not a multiple of 4' % len(kwda))
+    out = bytearray(kwda)
+    found = False
+    for o in range(0, len(out), 4):
+        if struct.unpack_from('<I', out, o)[0] == old_fid:
+            struct.pack_into('<I', out, o, new_fid)
+            found = True
+    if not found:
+        raise SystemExit('KWDA does not carry 0x%08X to swap' % old_fid)
+    return bytes(out)
 
 
 def ensure_top_group(tree, tag):
@@ -1114,23 +1212,23 @@ def main():
     })
     make_pole_crude = clone(cobj_charcoal, RECIPE_POLE_CRUDE, 'ThornswoodRecipePoleCrude', sets={
         b'CNAM': struct.pack('<I', POLE_CRUDE),
-        b'BNAM': struct.pack('<I', FORGE_KEYWORD),
+        b'BNAM': struct.pack('<I', WOODWORKING_KEYWORD),
     })
     set_inputs(make_pole_crude, [(FIREWOOD, 2), (LEATHER_STRIPS, 1), (TUNDRA_COTTON, 2)])
     make_pole_fine = clone(cobj_charcoal, RECIPE_POLE_FINE, 'ThornswoodRecipePoleFine', sets={
         b'CNAM': struct.pack('<I', POLE_FINE),
-        b'BNAM': struct.pack('<I', FORGE_KEYWORD),
+        b'BNAM': struct.pack('<I', WOODWORKING_KEYWORD),
     })
     set_inputs(make_pole_fine, [(FIREWOOD, 2), (LEATHER_STRIPS, 1), (STEEL_INGOT, 1), (TUNDRA_COTTON, 3)])
     make_pole_master = clone(cobj_charcoal, RECIPE_POLE_MASTER, 'ThornswoodRecipePoleMaster', sets={
         b'CNAM': struct.pack('<I', POLE_MASTER),
-        b'BNAM': struct.pack('<I', FORGE_KEYWORD),
+        b'BNAM': struct.pack('<I', WOODWORKING_KEYWORD),
     })
     set_inputs(make_pole_master, [
         (FIREWOOD, 3), (LEATHER_STRIPS, 2), (STEEL_INGOT, 1), (REFINED_MOONSTONE, 1)])
     make_trap = clone(cobj_charcoal, RECIPE_TRAP, 'ThornswoodRecipeFishTrap', sets={
         b'CNAM': struct.pack('<I', FISH_TRAP),
-        b'BNAM': struct.pack('<I', FORGE_KEYWORD),
+        b'BNAM': struct.pack('<I', WOODWORKING_KEYWORD),
     })
     set_inputs(make_trap, [(FIREWOOD, 3), (LEATHER_STRIPS, 2), (IRON_INGOT, 1)])
 
@@ -1249,6 +1347,66 @@ def main():
     house_bare = [r for r in house_have
                   if not any(t == b'CTDA' and b == NEVER_TRUE for t, b in subrecords(r.data))]
 
+    # Woodworking bench (#516): keyword + furniture cloned from the alchemy lab,
+    # mesh and bounds from Hearthfire's carpenter workbench.
+    alchemy_kw = next((r for r in records if r.fid == ALCHEMY_KEYWORD and r.tag == b'KYWD'), None)
+    alchemy_furn = next((r for r in records
+                         if r.fid == 0x5042E69 and r.tag == b'FURN'), None)
+    if alchemy_kw is None or alchemy_kw.compressed or alchemy_kw.editor_id() != 'ThornswoodCraftingAlchemy':
+        print('')
+        print('STOP. KYWD 0x%07X is not ThornswoodCraftingAlchemy as it should be. '
+              'Nothing was written.' % ALCHEMY_KEYWORD)
+        return 1
+    if (alchemy_furn is None or alchemy_furn.compressed or
+            alchemy_furn.editor_id() != 'ThornswoodCraftingAlchemyWorkbench'):
+        print('')
+        print('STOP. FURN 0x%07X is not ThornswoodCraftingAlchemyWorkbench as it should be. '
+              'Nothing was written.' % 0x5042E69)
+        return 1
+    old_kwda = next((b for t, b in subrecords(alchemy_furn.data) if t == b'KWDA'), None)
+    if old_kwda is None:
+        print('')
+        print('STOP. alchemy workbench has no KWDA. Nothing was written.')
+        return 1
+    wood_kw = clone(alchemy_kw, WOODWORKING_KEYWORD, 'ThornswoodCraftingWoodworking')
+    wood_furn = clone(alchemy_furn, WOODWORKING_BENCH, 'ThornswoodCraftingWoodworkingWorkbench',
+                      sets={
+                          b'FULL': zstr(WOODWORKING_FULL),
+                          b'MODL': zstr(WOODWORKING_MODEL),
+                          b'OBND': struct.pack('<6h', *WOODWORKING_BOUNDS),
+                          b'KWDA': kwda_swap(old_kwda, ALCHEMY_KEYWORD, WOODWORKING_KEYWORD),
+                          b'WBDT': b'\x01\xff',
+                      }, drop=(b'MODT', b'MODS'))
+
+    # Master recipe overrides onto the woodworking bench (#516).
+    wood_new, wood_have = [], []
+    for fid, edid, master in WOODWORKER_MASTER_RECIPES:
+        have = next((r for r in records if r.fid == fid and r.tag == b'COBJ'), None)
+        if have is not None:
+            if have.compressed or have.editor_id() != edid:
+                print('')
+                print('STOP. COBJ 0x%08X in this plugin is not %s as it should be. '
+                      'Nothing was written.' % (fid, edid))
+                return 1
+            wood_have.append(have)
+            continue
+        if fid in taken:
+            print('')
+            print('STOP. 0x%08X is already taken by something that is not a recipe. '
+                  'Nothing was written.' % fid)
+            return 1
+        made_here = from_master(args.masters, master, fid, plugin_masters)
+        if made_here.editor_id() != edid:
+            print('')
+            print('STOP. %s 0x%06X is %s, not %s. Nothing was written.'
+                  % (master, fid & 0xFFFFFF, made_here.editor_id(), edid))
+            return 1
+        set_bnam(made_here, WOODWORKING_KEYWORD)
+        wood_new.append(made_here)
+    wood_bare = [r for r in wood_have
+                 if not any(t == b'BNAM' and struct.unpack_from('<I', b, 0)[0] == WOODWORKING_KEYWORD
+                            for t, b in subrecords(r.data))]
+
     print('')
     print('What goes in')
     print('  MISC 0x%07X ThornswoodMiscToolHandle      Tool Handle, %d gold, %s weight'
@@ -1308,10 +1466,27 @@ def main():
               % (r.fid, r.editor_id()))
     print('  ACTI 0x%07X ThornswoodDropBox             the hold\'s drop box, %s'
           % (DROP_BOX, DROP_BOX_MODEL))
+    print('  KYWD 0x%07X ThornswoodCraftingWoodworking  the woodworker\'s bench keyword (#516)'
+          % WOODWORKING_KEYWORD)
+    print('  FURN 0x%07X ThornswoodCraftingWoodworkingWorkbench  %s, mesh %s'
+          % (WOODWORKING_BENCH, WOODWORKING_FULL, WOODWORKING_MODEL))
+    for r in wood_new:
+        print('  COBJ 0x%08X %-30s %s override, BNAM -> woodworking bench'
+              % (r.fid, r.editor_id(), next(m for f, e, m in WOODWORKER_MASTER_RECIPES if f == r.fid)))
     print('')
     print('What changes')
     for r in house_bare:
         print('  COBJ 0x%08X %-30s gains the condition that is never true' % (r.fid, r.editor_id()))
+    for r in wood_bare:
+        print('  COBJ 0x%08X %-30s BNAM -> woodworking bench' % (r.fid, r.editor_id()))
+    for fid in WOODWORKER_OWN_RECIPES:
+        have = next((r for r in records if r.fid == fid and r.tag == b'COBJ'), None)
+        if have is None:
+            continue
+        if any(t == b'BNAM' and struct.unpack_from('<I', b, 0)[0] == WOODWORKING_KEYWORD
+               for t, b in subrecords(have.data)):
+            continue
+        print('  COBJ 0x%07X %-30s BNAM forge -> woodworking bench' % (have.fid, have.editor_id()))
     print('  ACTI 0x%07X ThornswoodMessageBoard        its mesh is %s' % (BOARD, BOARD_MODEL))
     print('  COBJ 0x%07X ThornswoodRecipeWeaponPickaxe now wants a handle as well as the ingot'
           % cobj_pickaxe.fid)
@@ -1355,8 +1530,8 @@ def main():
                          make_weapon_kit, make_armor_kit, make_sewing_kit,
                          bandage, splint, poultice, remedy,
                          make_bandage, make_splint, make_poultice, make_remedy,
-                         drop_box)
-             if r.editor_id() not in already] + house_new
+                         drop_box, wood_kw, wood_furn)
+             if r.editor_id() not in already] + house_new + wood_new
     # An edit that has already been made is not made twice. A recipe that already
     # asks for a handle would otherwise gain a second one on every run.
     edited = set()
@@ -1373,6 +1548,14 @@ def main():
     for r in house_have:
         if never_listed(r):
             edited.add(r.fid)
+    # Woodworking bench overrides and our poles/trap (#516).
+    for r in wood_have:
+        if set_bnam(r, WOODWORKING_KEYWORD):
+            edited.add(r.fid)
+    for fid in WOODWORKER_OWN_RECIPES:
+        have = next((r for r in records if r.fid == fid and r.tag == b'COBJ'), None)
+        if have is not None and set_bnam(have, WOODWORKING_KEYWORD):
+            edited.add(have.fid)
     # A key and a mold already in the plugin get their own meshes (#2255).
     for name, model in (('ThornswoodMiscKey', KEY_MODEL), ('ThornswoodMiscKeyMold', MOLD_MODEL)):
         if name in already and set_model(by_edid[name], model):

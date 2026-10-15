@@ -2049,6 +2049,7 @@ $BENCH_OWNER = [ordered]@{
     # with 'Woodworker/Charburner owns no recipes at all', and refused to write
     # game\data\recipes.json, which is the check doing its job.
     'ThornswoodCraftingCharcoalKiln' = @{ Owner = 'Woodworker'; Half = 'Charburner'; Why = 'the charcoal kiln Thornswood-Content.esp already ships. classes.md gives the Charburner firewood through to coke in as many words, and this bench is that chain.' }
+    'ThornswoodCraftingWoodworking' = @{ Owner = 'Woodworker'; Half = 'Woodwright'; Why = 'the woodworking bench Thornswood-Content.esp ships for #516. Bows, arrows, instruments and poles are made here; classes.md gives them to the Woodwright.' }
     'MCE_CraftingLoom'        = @{ Owner = 'Tailor';     Why = 'a loom, from MoreCraftableEquipment' }
     'DLC2StaffEnchanter'      = @{ Owner = 'Enchanter';  Half = 'Bladebinder'; Why = 'the Dragonborn staff enchanter. Every one of its recipes outputs a staff, and a staff is a weapon, so it is the Bladebinder''s by the same rule that gives him swords.' }
     'CraftingSmelter'         = @{ Owner = '';           Why = 'a smelter makes ingots, which are stock rather than a finished good. Both halves of the Smith need them, and a Miner who could not smelt his own ore would have nothing to sell. Left open to everybody on purpose.' }
