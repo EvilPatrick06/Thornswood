@@ -1645,6 +1645,26 @@
   }
 
   /*
+    The page's own ask, 'select:keycheck <n>' (#591): a key landed with no
+    answer from the last moment, so it is held until Windows is asked again,
+    now rather than on the next second. The answer carries the same n, which
+    is what lets the page act on the held key. Nothing is written to the log:
+    menuWatch already says when the keyboard moves.
+  */
+  function menuKeyCheck(ask) {
+    const n = Number(ask) || 0;
+    let fg = null;
+    try {
+      if (sp.win32 && typeof sp.win32.foregroundWindow === 'function') {
+        fg = sp.win32.foregroundWindow();
+      }
+    } catch (e) { fg = null; }
+    const here = !!(fg && fg.isGame);
+    T.js('try{window.thornswoodSelect&&window.thornswoodSelect.keys(' +
+         (here ? 'true' : 'false') + ',' + n + ');}catch(e){}');
+  }
+
+  /*
     THE WORLD ARRIVED WITH THE CHOICE STILL UP AND NOTHING PICKED.
 
     Djinn on dev, 24 September: "Sitting on the character select window for
@@ -9258,6 +9278,13 @@
     }
     if (a[0] !== 'thornswood-front') return;
     const what = String(a[1]);
+
+    // A held key on the choice page asking who has the keyboard now (#591).
+    if (what.indexOf('select:keycheck ') === 0) {
+      menuBeatAt = Date.now();
+      menuKeyCheck(what.slice(16));
+      return;
+    }
 
     // The chat is about to connect and has no join token (#1322).
     if (what.indexOf('token? ') === 0) {
