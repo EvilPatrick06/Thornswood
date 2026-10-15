@@ -9,7 +9,7 @@ Patrick, 12 Oct 2026: our own woodworking bench, at least one in every major hol
 
 ## Where to place
 
-Place one REFR of `ThornswoodCraftingWoodworkingWorkbench` beside the player forge in each major hold capital, and in some minor towns that already have a forge players use:
+Place one REFR of `ThornswoodCraftingWoodworkingWorkbench` beside the public forge in each major hold capital, and in some minor towns that already have a forge people use:
 
 Major holds (required):
 - Whiterun (Warmaiden's / Skyforge area: prefer Warmaiden's outdoor forge side, not inside the Skyforge ritual space unless Patrick says otherwise)
@@ -18,9 +18,9 @@ Major holds (required):
 - Markarth (Understone / forge court)
 - Riften (The Scorched Hammer yard)
 - Falkreath (blacksmith)
-- Morthal (if a forge is present for players)
+- Morthal (if a forge is present for people)
 - Dawnstar (blacksmith)
-- Winterhold (if a usable forge exists for players; otherwise skip)
+- Winterhold (if a usable forge exists for people; otherwise skip)
 
 Minor towns (some, not all): Riverwood, Rorikstead, Ivarstead, Dragon Bridge, where a forge already sits in the open.
 
