@@ -64,7 +64,11 @@ new (require('node:perf_hooks').PerformanceObserver)(list => {
   }
 }).observe({entryTypes:['gc']});
 const turn = () => new Promise(resolve => setTimeout(resolve,0)).then(() => new Promise(resolve => setImmediate(resolve)));
-assert.equal(installed.loadOrder.length, 102, 'Use the actual installed 102-plugin fixture');
+// 103 since #2468: the 102 the collection installs, then Thornswood-Last.esp,
+// which switches every cut placement off at the record (light, so the 48 full
+// plugins keep their indices).
+assert.equal(installed.loadOrder.length, 103, 'Use the actual installed 103-plugin fixture');
+assert.equal(path.basename(installed.loadOrder[102]), 'Thornswood-Last.esp', 'The fixture ends with Thornswood-Last.esp');
 const server = new addon.ScampServer(JSON.stringify({port:0,maxPlayers:2,offlineMode:true,
   name:'npc-shared-native-check',dataDir:path.dirname(installed.loadOrder[0]),
   loadOrder:installed.loadOrder,npcEnabled:true,npcAllowEssential:true,npcAllowCrimeFaction:true,
@@ -124,10 +128,15 @@ if(populationMode) {
   const humanId = server.getIdFromDesc('14:Skyrim.esm');
   assert.throws(() => server.setNpcPlacementExclusions([humanId]),/existing placed NPC identities/,
     'Native policy exclusions must protect the human reference');
-  cutIds = new Set(populationData.cut.map(desc => server.getIdFromDesc(desc)));
+  // The gamemode no longer carries a cut list (#2468): the catalogue's own
+  // left out rows are the cut, and Thornswood-Last.esp keeps them out.
+  assert.equal(populationData.cut,undefined,'The gamemode hands the engine no cut list');
+  const cutRows = JSON.parse(fs.readFileSync(path.join(__dirname,'../game/data/npc-population.json'),'utf8')).npcs
+    .filter(row => !row.keep && row.ref !== '14:Skyrim.esm');
+  cutIds = new Set(cutRows.map(row => server.getIdFromDesc(row.ref)));
   const keepIds = new Set(populationData.keep.map(row => server.getIdFromDesc(row[0])));
   for(const row of populationData.keep) expectedTierById.set(server.getIdFromDesc(row[0]),row[8] || 0);
-  assert.equal(cutIds.size,populationData.cut.length,'Cut catalogue identities are unique');
+  assert.equal(cutIds.size,cutRows.length,'Cut catalogue identities are unique');
   assert.equal(keepIds.size,populationData.keep.length,'Retained catalogue identities are unique');
   assert.ok(!cutIds.has(humanId),'Production catalogue cannot exclude the human reference');
   for(const id of keepIds) assert.ok(!cutIds.has(id),'Retained and cut catalogues cannot overlap');
@@ -153,6 +162,9 @@ if(populationMode) {
       excludedNativeEligible:[...baselineIds].filter(id => cutIds.has(id)).length,
       catalogueKeep:keepIds.size,catalogueCut:cutIds.size,baselinePeakRssMiB:baseline.peakRssMiB};
     assert.equal(baselineSummary.retainedNativeEligible+baselineSummary.excludedNativeEligible,baselineIds.size);
+    // With Thornswood-Last.esp at the end of the order the engine finds no
+    // cut placement eligible at all: it skips a disabled reference.
+    assert.equal(baselineSummary.excludedNativeEligible,0,'No cut placement is native eligible with Thornswood-Last.esp');
     console.log(JSON.stringify({populationAcceptance:baselineSummary}));
   } finally {
     const ownedDirectory = fs.realpathSync(baselineDirectory);

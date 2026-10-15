@@ -25,6 +25,10 @@
     S  the server's own cut list in game/gamemode.js stays exactly as long as
        the plugin is not in the servers' load order (the catalogue's), and
        goes in the same change that puts it there
+    B  the bytes it was built against are the ones the collection installs
+       (records/collection-plugins.json) and the repository's content plugin,
+       so a new collection revision or a content change without a rebuild
+       turns this red (#2486)
 
   On a machine with the game (C:\Thornswood\Game\Data, or THORNSWOOD_DATA)
   holding the catalogue's load order, it also rebuilds the plugin and the
@@ -43,6 +47,8 @@ const MANIFEST = path.join(ROOT, 'game', 'data', 'last-plugin.json');
 const POLICY = path.join(ROOT, 'game', 'data', 'last-plugin-policy.json');
 const CATALOGUE = path.join(ROOT, 'game', 'data', 'npc-population.json');
 const GM = path.join(ROOT, 'game', 'gamemode.js');
+const COLLECTION = path.join(ROOT, 'records', 'collection-plugins.json');
+const CONTENT = path.join(ROOT, 'game', 'content', 'Thornswood-Content.esp');
 const TOOL = path.join(ROOT, 'scripts', 'mods', 'Build-LastPlugin.py');
 const POP_TOOL = path.join(ROOT, 'scripts', 'dev', 'Build-NpcPopulation.py');
 const NAME = 'Thornswood-Last.esp';
@@ -154,9 +160,10 @@ yes('A5 a cut Whiterun guard is among them' + (guard ? ' (' + guard.ref + ')' : 
 
 // ---------------------------------------------------------------- Q
 const qrecs = Object.keys(recs).filter((k) => k.startsWith('QUST:')).map((k) => recs[k]);
-const stopped = manifest.quests.stopped, kept = manifest.quests.kept;
+const stopped = manifest.quests.stopped, kept = manifest.quests.kept, modStopped = manifest.quests.modStopped;
 yes('Q1 every quest in the plugin is one the manifest stops (' + qrecs.length + ')',
-    qrecs.length === stopped.length && stopped.every((q) => recs['QUST:' + fidOf(q.quest)]));
+    qrecs.length === stopped.length + modStopped.length &&
+    stopped.concat(modStopped).every((q) => recs['QUST:' + fidOf(q.quest)]));
 let qbad = [];
 for (const r of qrecs) {
   const t = r.subs.map((s) => s.t);
@@ -167,7 +174,18 @@ for (const r of qrecs) {
 }
 yes('Q2 none starts with the game, and the first Story Manager condition of each is never true' +
     (qbad.length ? ' (not: ' + qbad.slice(0, 5).join(', ') + ')' : ''), qbad.length === 0);
-yes('Q3 only vanilla quests are stopped', stopped.every((q) => VANILLA.indexOf(q.quest.split(':')[1].toLowerCase()) >= 0));
+yes('Q3 the vanilla list holds only vanilla quests', stopped.every((q) => VANILLA.indexOf(q.quest.split(':')[1].toLowerCase()) >= 0));
+const modPolicy = (policy.modQuestsStopped || []).map((q) => q.quest + ' ' + q.edid);
+yes('Q3b the mod quests stopped are exactly the policy\'s ' + modPolicy.length + ', none of them vanilla',
+    JSON.stringify(modStopped.map((q) => q.quest + ' ' + q.edid)) === JSON.stringify(modPolicy) &&
+    modStopped.every((q) => VANILLA.indexOf(q.quest.split(':')[1].toLowerCase()) < 0));
+const decided = ['13eb3:Skyrim.esm', '17f01:Skyrim.esm', '68d73:Skyrim.esm', '750ba:Skyrim.esm', '5a6dc:Skyrim.esm',
+  'bcc94:Skyrim.esm', '1aa70:Dawnguard.esm', '38566:Dragonborn.esm', '39f82:Skyrim.esm', 'fc1a2:Skyrim.esm',
+  '13e06:Skyrim.esm', 'eafd5:Skyrim.esm', '2ba16:Skyrim.esm', '2c09:Dawnguard.esm', '16e02:Dragonborn.esm'];
+yes('Q3c Patrick\'s 12 Oct answers: barter, carriages, followers, courier and the start-up quests are stopped (15)',
+    decided.every((d) => stopped.some((q) => q.quest === d)));
+yes('Q3d ...and the creature voices are the only quests kept',
+    kept.length > 0 && kept.every((q) => q.edid.startsWith('CreatureDialogue')));
 const keptNames = policy.questsKept.map((q) => q.quest);
 yes('Q4 every quest the policy keeps is kept (' + keptNames.length + ' by name)',
     keptNames.every((k) => kept.some((q) => q.quest === k) && !recs['QUST:' + fidOf(k)]));
@@ -179,10 +197,10 @@ const gate = stopped.find((q) => q.quest === 'd1984:Skyrim.esm');
 yes('Q6 the Whiterun gate guard\'s quest, DialogueWhiterunGuardGateStop, is stopped', !!gate && gate.edid === 'DialogueWhiterunGuardGateStop');
 
 // ---------------------------------------------------------------- G
-const arrive = manifest.arrivalTalk.filter((r) => r.vanilla);
-const stoppedSet = new Set(stopped.map((q) => q.quest)), keptSet = new Set(kept.map((q) => q.quest));
-yes('G1 every vanilla quest with gate, door or arrival talk (' + arrive.length + ') is stopped or kept for a decision',
-    arrive.length > 0 && arrive.every((r) => stoppedSet.has(r.quest) || keptSet.has(r.quest)));
+const arrive = manifest.arrivalTalk;
+const stoppedSet = new Set(stopped.concat(modStopped).map((q) => q.quest)), keptSet = new Set(kept.map((q) => q.quest));
+yes('G1 every quest with gate, door or arrival talk (' + arrive.length + ', vanilla and the mods\') is stopped',
+    arrive.length > 0 && arrive.every((r) => stoppedSet.has(r.quest)));
 const wr = manifest.arrivalTalk.find((r) => r.quest === 'd1984:Skyrim.esm');
 yes('G2 the Whiterun gate is found by its door\'s script', !!wr && wr.why.indexOf('a door names it') >= 0);
 const riften = stopped.find((q) => q.edid === 'DialogueRiftenGateGuards');
@@ -198,9 +216,31 @@ if (inOrder) {
   yes('S1 the plugin is not in the servers\' load order yet, so the gamemode still hands the server the cut list',
       calls);
 }
+if (inOrder) {
+  const lastRow = catalogue.loadOrder[catalogue.loadOrder.length - 1];
+  yes('S3 the catalogue lists it last, at the committed plugin\'s bytes (rebuild the catalogue after the plugin)',
+      lastRow.name === NAME && lastRow.sha256 === crypto.createHash('sha256').update(esp).digest('hex'));
+}
 const pop = fs.readFileSync(POP_TOOL, 'utf8');
 yes('S2 the catalogue does not read this plugin\'s records, which are made from it',
     /LAST_PLUGIN = 'Thornswood-Last\.esp'/.test(pop) && /if name == LAST_PLUGIN:/.test(pop));
+
+// ---------------------------------------------------------------- B
+const built = manifest.builtAgainst || [];
+yes('B1 the manifest records the bytes of every plugin it was built against, in load order (' + built.length + ')',
+    JSON.stringify(built.map((r) => r.name)) === JSON.stringify(manifest.loadOrder) &&
+    built.every((r) => /^[0-9a-f]{64}$/.test(r.sha256) && r.size > 0));
+const record = JSON.parse(fs.readFileSync(COLLECTION, 'utf8'));
+const rec = {};
+for (const r of record.plugins) { rec[r.name.toLowerCase()] = r; }
+const other = built.filter((r) => r.name !== 'Thornswood-Content.esp' &&
+  !(rec[r.name.toLowerCase()] && rec[r.name.toLowerCase()].sha256.toLowerCase() === r.sha256 && rec[r.name.toLowerCase()].size === r.size));
+yes('B2 every plugin but ours is the collection\'s own bytes, revision ' + record.revision +
+    (other.length ? ' (not: ' + other.slice(0, 4).map((r) => r.name).join(', ') + '; rebuild the plugin for this revision)' : ''),
+    other.length === 0);
+const contentRow = built.find((r) => r.name === 'Thornswood-Content.esp');
+yes('B3 and the content plugin is the repository\'s (rebuild the plugin after a content change)',
+    !!contentRow && contentRow.sha256 === crypto.createHash('sha256').update(fs.readFileSync(CONTENT)).digest('hex'));
 
 // ---------------------------------------------------------------- rebuild
 function python(args) {

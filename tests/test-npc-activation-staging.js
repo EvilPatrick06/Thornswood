@@ -13,23 +13,22 @@ const data={version:1,plugins:['Skyrim.esm'],cut:['2:Skyrim.esm'],keep:[
   const population=ctx.createNpcPopulation(api,data,data.plugins,null,{suspended:true});
   assert.deepEqual(cuts,[],'constructing a staged policy must not apply any exclusions');
   assert.equal(population.configure(1,{isHuman:false}),null,'staged policy grants no ownership');
-  population.commit();assert.deepEqual(cuts,[[2]]);
-  population.commit();assert.equal(cuts.length,1,'activation commits exclusions once');
+  // No cut list goes to the engine (#2468, #2486): Thornswood-Last.esp switches
+  // every cut placement off at the record, so activation hands over nothing.
+  population.commit();assert.deepEqual(cuts,[],'activation hands the engine no cut list');
+  assert.equal(population.commit(),true,'a second commit of an active policy is a no-op');
   population.configure(1,{isHuman:false,pos:[10,20,30],cellOrWorld:60});
   population.stop();assert.throws(()=>population.commit(),/unavailable|revoked/);
   const before=writes;population.afterOwnership(1);assert.equal(writes,before,'stopped policy cannot mutate ownership state');
 }
 {
-  let attempts=0,policy;
-  const api={makeProperty(){},getIdFromDesc:d=>parseInt(d,16),setNpcPlacementExclusions(){
-    attempts++;
-    assert.throws(()=>policy.commit(),/attempt|unavailable|revoked/,'a native callback cannot repeat the commit');
-    throw Error('uncertain native commit');
-  }};
-  policy=ctx.createNpcPopulation(api,data,data.plugins,null,{suspended:true});
-  assert.throws(()=>policy.commit(),/uncertain native commit/);
-  assert.throws(()=>policy.commit(),/attempt|unavailable|revoked/);
-  assert.equal(attempts,1,'uncertain native application is never automatically retried');
+  // The engine's exclusion call is never reached, even where it would fail.
+  let attempts=0;
+  const api={makeProperty(){},getIdFromDesc:d=>parseInt(d,16),setNpcPlacementExclusions(){attempts++;throw Error('never called');}};
+  const policy=ctx.createNpcPopulation(api,data,data.plugins,null,{suspended:true});
+  assert.equal(policy.commit(),true);
+  assert.equal(attempts,0,'activation never asks the engine to exclude placements');
+  policy.stop();assert.throws(()=>policy.commit(),/unavailable|revoked/);
 }
 for(const failAt of Array.from({length:8},(_,i)=>i+1)) {
   const pending=new Map();let serial=0;

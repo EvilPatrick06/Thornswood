@@ -710,6 +710,17 @@ if (Test-Path -LiteralPath $rp) {
   # Every plugin of ours (RepoPlugins.ps1), not the content plugin alone (#2486).
   $sendPlugins = @()
   $changed = @()
+  # The plugin that loads last (#2468) is only loaded as the live server's
+  # last plugin, and this run changes no setting, so a live order that does
+  # not end with it is a refusal: the full deploy (Deploy-Gamemode.ps1, then
+  # this without -GamemodeOnly) puts it there.
+  if (Test-Path -LiteralPath (Join-Path $Here '..\..\game\content\Thornswood-Last.esp')) {
+    $liveOrder = @($boxContent.Order)
+    if (-not $boxContent.OrderRead -or $liveOrder.Count -eq 0 -or $liveOrder[-1] -ine 'Thornswood-Last.esp') {
+      throw ('the live load order does not end with Thornswood-Last.esp, and -GamemodeOnly changes no setting. ' +
+             'Run .\scripts\deploy\Deploy-Gamemode.ps1, then .\scripts\deploy\Deploy-Server.ps1 without -GamemodeOnly. Nothing was sent and the server was not touched.')
+    }
+  }
   foreach ($ownName in $ThornswoodRepoPlugins) {
     $own = Get-ThornswoodRepoPluginPath (Join-Path $Here '..\..') $ownName
     if (-not (Test-Path -LiteralPath $own)) { continue }

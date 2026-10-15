@@ -14,11 +14,14 @@ foreach ($name in 'Val', 'Set-Prop', 'Get-ReferenceInServerOrder', 'Get-ActiveOr
     if ($null -eq $fn) { throw "Publisher lacks $name" }
     Invoke-Expression $fn.Extent.Text
 }
+# Get-ReferenceInServerOrder asks Ship-Rules.ps1 whether the checkout holds
+# Thornswood-Last.esp (#2486); this fixture's checkout does not.
+. (Join-Path $repo 'scripts\release\Ship-Rules.ps1')
 function Say($message, $color) {}
 function Die($message) { throw $message }
 function Assert($condition, $message) { if (-not $condition) { throw $message }; Write-Host "PASS $message" }
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('ts-parity-' + [guid]::NewGuid().ToString('N'))
-$Root = $tmp; $DistDir = Join-Path $tmp 'dist'; $GameDir = Join-Path $tmp 'Game'
+$Root = $tmp; $DistDir = Join-Path $tmp 'dist'; $GameDir = Join-Path $tmp 'Game'; $RepoDir = $tmp
 [IO.Directory]::CreateDirectory($DistDir) | Out-Null
 [IO.Directory]::CreateDirectory((Join-Path $GameDir 'Data')) | Out-Null
 function Get-LoadOrderManifestUrl($root) { 'fixture' }
