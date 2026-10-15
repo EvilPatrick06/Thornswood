@@ -29,10 +29,13 @@
 # the queue reached an hour when the lanes opened pull requests in bursts.
 # Install-Runner.ps1 -Number <n> puts each one after the first beside it with
 # the same label, so a check goes to whichever is free.
-# NOT PULL REQUESTS, since 11 October (#1306, Patrick's option C; #2161): a
-# pull request runs these same steps on GitHub's hosted Windows runner, in
-# build-pr.yml, which scripts\dev\Build-PrWorkflow.js generates from this
-# file. Only a push to main, already merged, and a manual run use the box.
+# HOSTED FIRST, THE BOX WHEN HOSTED HAS NO USAGE (#2393, Patrick, 15 Oct):
+# the Actions budget is not being raised. Every build tries GitHub's hosted
+# Windows runner first; when the month's included minutes are used up the
+# hosted job is refused before any step runs and the VPS fallback builds it.
+# A pull request runs these same steps in build-pr.yml, which
+# scripts\dev\Build-PrWorkflow.js generates from this file; it has the same
+# fallback, for this repository's own branches only (Patrick, 12 Oct).
 # Change a step here, then run  node scripts/dev/Build-PrWorkflow.js;
 # tests\test-1306-pr-workflow.js fails while the two differ.
 #
@@ -90,10 +93,11 @@ jobs:
   # WHERE IT RUNS, since 11 October (#1306, Patrick's final call on #2161):
   # GitHub's hosted windows-latest is the default, in the job "launcher"
   # at the end of this file. This job is the VPS FALLBACK. It runs only
-  # for a trusted event (this file has no pull_request trigger: a pull
-  # request builds in build-pr.yml, hosted only), and only when
-  #   - the repository variable BUILD_RUNNER is vps (hosted minutes ran out,
-  #     or GitHub is down: Settings, Variables, BUILD_RUNNER = vps), or
+  # when the hosted job did not succeed (for a pull request, only on a
+  # branch of this repository, never a fork), that is when
+  #   - the repository variable BUILD_RUNNER is vps, which skips the hosted
+  #     job outright (Settings, Variables). Optional: a refused hosted job
+  #     already falls through to the box, the variable only saves the red, or
   #   - a manual run asked for runner: vps, or
   #   - the hosted job failed. A quota or billing stop fails it before any
   #     step runs, and this picks the build up on the box. A real red fails

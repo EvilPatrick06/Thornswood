@@ -106,9 +106,9 @@ outbound limit as residual risk.
    (build.yml and nightly.yml install eslint with npm).
 2. GitHub-hosted runners are the default for builds. The VPS runners are a
    backup only: used by hand, or automatically when a hosted run fails
-   because the account's Actions minutes or usage ran out. The Codex lane
-   owns that design (it continues #1306) and the build.yml change; this
-   change does not touch build.yml. Release and Ship jobs stay where they
+   because the account's Actions minutes or usage ran out. Patrick confirmed
+   it on 15 Oct (#2393): the budget is not raised, hosted first, then the VPS.
+   build.yml and build-pr.yml wire it that way. Release and Ship jobs stay where they
    are unless the Codex design finds a conflict.
 
 What follows for the check:

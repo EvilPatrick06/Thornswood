@@ -239,7 +239,8 @@ names the runs.
 
 The switch-over, the last step. It waits on three things, in this order:
 
-1. GitHub's hosted runner starts jobs again (#2393, Patrick's billing).
+1. GitHub's hosted runner has usage that month. Patrick is not raising the
+   Actions budget (#2393, 15 Oct): hosted first, the VPS when hosted has none.
 2. A pilot: a tag that can never ship (`v0.0.2163-pilot<n>`) on a commit
    with this release.yml, then
    `gh workflow run release.yml --ref <tag> -f tag=<tag> -f runner=hosted`.
@@ -256,8 +257,8 @@ Then one pull request: in release.yml the hosted job's `if` becomes
 runner input's default becomes `hosted`; the two "until the switch-over"
 checks in `tests\test-release-workflow.ps1` change to match. While
 `BUILD_RUNNER` is `vps` (set 12 Oct for #2393) releases stay on the box even
-after it, so whoever fixes billing and takes `BUILD_RUNNER` off `vps` moves
-pull request builds and releases together.
+after it, so taking `BUILD_RUNNER` off `vps` moves pull request builds and
+releases together.
 
 ## 8. Decisions (Patrick)
 
