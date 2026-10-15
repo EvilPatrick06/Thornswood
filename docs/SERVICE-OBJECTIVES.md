@@ -10,8 +10,9 @@ number it offers there is marked **Proposal**. Nothing here claims a service
 has met an objective: no check keeps a running availability figure yet (see
 "What is not measured").
 
-The owners are **proposed, Patrick's decision**. Until he decides, the owner
-of every row is Patrick, as it is today ([OWNERSHIP.md](OWNERSHIP.md)).
+The owners below were **decided by Patrick on 12 October 2026**: he took the
+proposed list as written (issue #2183). Behind every row is still Patrick's
+own accounts ([OWNERSHIP.md](OWNERSHIP.md)).
 
 ## How the checks work
 
@@ -49,7 +50,7 @@ Three things watch the services, and one bot posts what they find.
 One row per service. "Window" is how long a failure has to last before the
 check calls it one.
 
-| Service | Metric | Window | Threshold today | Measured by | Alert | Cadence | Proposed owner |
+| Service | Metric | Window | Threshold today | Measured by | Alert | Cadence | Owner |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Site, from outside | `https://thornswood.net/` answers over HTTPS with a valid certificate | 2 runs in a row, 10 minutes | Any HTTP answer within 10 s | `Watch-Outside.ps1:Get-Checks`; Caddy from the box, `Watch-Services.ps1:Url = 'https://thornswood.net/'` | Staff channel | 5 min | Website lane, with Patrick |
 | Site app | `http://127.0.0.1:3001/api/public` answers under HTTP 500 within 10 s | 2 runs, 10 minutes | Down: restart; sick: told | `Watch-Services.ps1:Health = 'http://127.0.0.1:3001/api/public'`, `Watch-Services.ps1:HealthProblem` | Staff channel | 5 min | Website lane, with Patrick |
@@ -62,11 +63,11 @@ check calls it one.
 | Dev voice | The same on port 7789 | 2 runs, 10 minutes | The same | `Watch-Services.ps1:Health = 'http://127.0.0.1:7789/health'` | Staff channel | 5 min | Whoever deployed dev last |
 | Bot | The bot's python process runs and `heartbeat.json` is under 10 minutes old | 10 minutes | Heartbeat older than 600 s, or no process: restart the service | `Watch-Services.ps1:$beatStale = 600`, `Watch-Services.ps1:BotSilent`; heartbeat every 60 s (`bot/bot.py:HEARTBEAT_EVERY`) | Staff channel, through the webhook when the bot is the thing down | 5 min | Patrick |
 | Backup freshness | The `Thornswood Backup` task's last result, and the newest backup's age | 1 run | Last result not 0 (or running), or newest over 26 hours old | `Watch-Services.ps1:BackupProblem`, `Watch-Services.ps1:Hours = 26` | Staff channel | 5 min | Patrick (holds the passphrase) |
-| Off-box copy | The newest backup on One, in `local\backups` | Nothing measures this today | **Proposal:** newest copy on One under 30 hours old | `scripts/vps/Fetch-Backups.ps1` fetches it at 4:15 AM (`Fetch-Backups.ps1:every day at 04:15`) and keeps 30 days (`Fetch-Backups.ps1:$KeepDays = 30`), but nothing checks its age | None today | Daily | Patrick |
+| Off-box copy | Age of the newest backup on One, in `local\backups`, by the stamp in its name | 1 run | Over 26 hours old, or none there | `Watch-Outside.ps1:function Check-OffBox`, `Watch-Outside.ps1:OffBoxHours = 26`; filled by `Fetch-Backups.ps1` at 4:15 AM (`Fetch-Backups.ps1:every day at 04:15`) | Staff channel | Hourly, while One is on | Patrick |
 | Disk on the VPS | Free space on C: | 1 run | Under 20% DISK LOW, under 10% DISK CRITICAL | `Watch-Services.ps1:$diskLow = 20`, `Watch-Services.ps1:$diskCritical = 10` | Staff channel | 5 min | Installer lane (as `Forecast-Storage.ps1` names it), with Patrick |
 | Disk forecast | Days until free space on C: crosses 10% and 20%, a straight line through one sample a day over the last 30 days | 14 samples over at least 7 days before any forecast | Warning: 10% within 30 days, or 20% within 7. Critical: 10% within 7 days, or already under | `Forecast-Storage.ps1:$WarnDays = 30`, `Forecast-Storage.ps1:$CriticalDays = 7`; the `Thornswood Disk History` task, daily at 04:00 box time | Staff channel, once when the forecast turns and once when it is back | Daily | Warning: Installer lane. Critical: whoever is on staff |
 | Build runners | Every runner's service runs, and GitHub lists every runner online | 1 run on the box; 3 runs, 15 minutes from outside | Any runner not running or not online | `Watch-Services.ps1:$tellOnly`; `Watch-Outside.ps1:are not all online on GitHub` | Staff channel | 5 min | GitHub lane, with Patrick |
-| RPO (data that can be lost) | Hours between the newest backup and a failure | Per failure | 26 hours on the box (the freshness line above); the off-box copy is the newest fetched one | See "RPO" below | As above | Daily | Patrick |
+| RPO (data that can be lost) | Hours between the newest backup and a failure | Per failure | 26 hours on the box and 26 hours off it (the two lines above) | See "RPO" below | As above | Daily | Patrick |
 | RTO (time to come back) | Minutes from deciding to restore to a server answering | Per restore | Nothing measures this today | See "RTO" below | None | Per rehearsal | Patrick |
 
 ## Service by service
@@ -132,11 +133,15 @@ half minutes.
 The nightly backup runs at 3:15 AM by the box's clock (`Install-Backup.ps1:$At = '03:15'`)
 and keeps seven daily and four weekly (`vps-nightly-backup.ps1:$KeepDaily = 7`, `vps-nightly-backup.ps1:$KeepWeekly = 4`). What it
 takes is in `docs/SYSTEM.md`. On One, `Thornswood Fetch Backups` brings each
-one down at 4:15 AM; its last run, 4:15 AM on 11 October, ended with result 0.
+one down at 4:15 AM. Since #2183 the outside watcher tells the staff channel
+when the newest copy there is over 26 hours old (`Watch-Outside.ps1:function Check-OffBox`).
 `local\backups` on One held 14 copies on 12 October, the newest
 `thornswood-20261011-152237.zip.enc`. The copy for 7 October arrived on
-9 October, so a day One is off is a day the off-box copy falls behind, and
-nothing says so.
+9 October, so a day One is off is a day the off-box copy falls behind. On
+15 October the newest copy on One was `thornswood-20261013-031501`: the fetch
+task's last run was 4:15 AM on 13 October (result 0), and nothing had said so.
+The outside watcher runs only while One is on, so this is told the next time
+it is, not while it is off.
 
 The backup's contents are proved every night on stand-in folders by
 `tests/test-backup-restore.ps1` in the nightly checks (`.github/workflows/nightly.yml`, which runs every `tests/test-*`
@@ -149,13 +154,14 @@ How much can be lost:
 - **The box is fine, a folder is damaged:** up to the age of the newest backup
   on the box, at most 26 hours before the watchdog says so (backup freshness).
 - **The box is gone:** up to the age of the newest copy on One, which is the
-  last 4:15 AM fetch, or older when One was off. Nothing checks that age.
+  last 4:15 AM fetch, or older when One was off. The outside watcher says so
+  past 26 hours.
 - During the alpha all world and character data is throwaway
   ([RESTORING.md](RESTORING.md), "The box is gone"), so this is the most that
   can be lost, not a promise that nothing will be.
 
-**Proposal:** 26 hours for both, the line the watchdog already holds the box
-to, with a check of the off-box copy's age added to the outside watcher.
+26 hours for both, the line the watchdog already holds the box to; the
+off-box check was added for #2183.
 
 ### RTO
 
@@ -194,8 +200,8 @@ and every restart. What it leaves:
   `Forecast-Storage.ps1 -Install` has put its daily task on the box and two
   weeks of samples exist (#2178). Until then it has no history. Without
   `load.csv` read over a week, a bigger box or a split is decided by guess.
-- **Off-box backups:** a week of One being off is a week of no off-box copy,
-  and nobody is told.
+- **Off-box backups:** a week of One being off is a week of no off-box copy.
+  Since #2183 staff are told once One is back on; while it is off, nobody is.
 - **Availability:** without a count, nobody can say whether the services are
   more or less reliable than last month.
 
@@ -210,6 +216,5 @@ Each of these needs the box or a person, and none was read for this page:
   `.\scripts\vps\Watch-Load.ps1` with no switches brings it down and reads it.
 - Whether `PING_URL` is set in `bot.env.json` and which outside monitor it
   pings. Patrick, who would have made the monitor.
-- The age of the off-box copy as a check: nothing reads it today.
 - A restore that starts a server and connects to it (RESTORING.md, "Not done
   yet").
