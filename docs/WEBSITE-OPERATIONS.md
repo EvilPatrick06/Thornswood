@@ -46,6 +46,10 @@ verification provider needs its own necessity, retention and security review.
 | Cinzel and Spectral font files | `site/public/fonts.css` identifies the authors, upstream projects and SIL Open Font License 1.1. | Preserve the licence notices with the distributed files. |
 | Community gallery media | Signed-in submissions, captions and moderation records; publication permissions described in Terms. | Staff must check permission and privacy before approving each submission. Submission alone is not proof of ownership of third-party material. |
 
+The register is `records/asset-provenance.json` (#2177), held to the files by
+`tests/test-asset-provenance.js` on every pull request; it records what is
+still unconfirmed for each asset above and who can answer.
+
 For each brand asset, keep creator/source, permission or licence, permitted
 uses, attribution requirements, approval date and the file hash together.
 Store private permission correspondence in the private staff records, not

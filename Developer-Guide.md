@@ -185,7 +185,7 @@ The words this guide uses. The long alphabetical list, with file names, is [docs
 
 Do this once on a new Windows PC. Stay in order. On every PC is the steps. Setting up a machine and Shipping from another machine are for a PC that will publish a release. You can read those two after the clone works.
 
-Use your own GitHub account. Patrick adds that account as a collaborator on the private repository before a clone will work. Say so in Discord and wait for that. Use your own clone. The shared folder `C:\Users\evilp\Downloads\Thornswood-Repo` on the shipping machine is for the lanes that build from it. Your clone can live at `C:\Dev\Thornswood`, or any empty folder you own.
+Use your own GitHub account. Patrick adds that account as a collaborator on the private repository before a clone will work. Say so in Discord and wait for that. Before your first change, read `LICENSE` at the root of the repository and say in #staff-general that you agree to its contributor terms. You agree once, and it covers anything you contributed before. Use your own clone. The shared folder `C:\Users\evilp\Downloads\Thornswood-Repo` on the shipping machine is for the lanes that build from it. Your clone can live at `C:\Dev\Thornswood`, or any empty folder you own.
 
 ### On every PC
 
@@ -782,7 +782,8 @@ Python) and every script that ships or runs it. Owner: Patrick (EvilPatrick06).
 Nothing here assumes you use Claude: this file is the rules for everybody, and a Claude
 reads the same file. CLAUDE.md only adds what is about a Claude. A new developer
 is added as a collaborator on the repository, and on CODEOWNERS beside the
-shared files.
+shared files, and agrees once to the contributor terms in `LICENSE`.
+Thornswood's own work is all rights reserved (Patrick, 12 Oct, #1331).
 
 Patrick's Grok Bot lanes (Smeagle, Launcher, Installer, Website, GitHub,
 Vortex) also work here, on the shipping machine, under his GitHub account.
@@ -844,6 +845,14 @@ if either check lets one through. Secrets are checked by
 `engine\skymp` too whenever the fork is checked out, and says so when it is
 not (#1326); the build leaves it out, and the nightly fetches it at its pin
 and reads it every night (`tests\test-1326-engine-secrets.ps1`).
+
+Two names are in no tracked file at all, code, tests, records, data,
+`docs\archive` and binary files included, and the build turns red when one
+comes back: the multiplayer mod this build replaced (#497,
+`tests\test-old-name-gone.js`), and the SkyMP server `Thornswood-Content.esp`
+was salvaged from (#400, Patrick, 12 Oct: "no records may keep it";
+`tests\test-other-server-name-gone.js`). Say "the other server" in prose and
+OtherServer in a file, folder or code name.
 
 No machine checks these, so the person writing keeps them: plain, direct
 sentences with no filler; the text inside code (the launcher's messages, the
@@ -1025,7 +1034,7 @@ from the board, none of these three puts an issue aside:
   the old wording would have believed the wrong layout was live, which is the
   one thing this section exists to prevent.
   Decided by Patrick on 24 Sep, for a tester whose Vortex deploys into
-  another server's copy of Skyrim (`steamapps\common\Keizaal Online`), in
+  another server's copy of Skyrim (its own folder under `steamapps\common`), in
   his words "detcts and fixes this but doesnt have the servers bleed": when
   Vortex deploys anywhere but the Steam copy, `Thornswood\Game` is the Steam
   copy's game plus exactly the files Vortex's record in that folder lists,
@@ -1789,7 +1798,7 @@ found, and no longer looks for any.
 
 **When Vortex deploys somewhere else.** Vortex can manage a Skyrim that is not
 the Steam copy: on 24 September a tester's Vortex deployed the collection into
-another SkyMP server's copy of the game, `steamapps\common\Keizaal Online`. The
+another SkyMP server's copy of the game, a folder of its own under `steamapps\common`. The
 launcher finds that folder by itself (`OwnGame.DeploysInto`: any folder
 directly under a Steam library's `steamapps\common` with `SkyrimSE.exe` and
 `Data\vortex.deployment.json`, a Steam copy of Skyrim Special Edition first,
@@ -1963,7 +1972,7 @@ it per session and ignores which profile Vortex has on.
   Patrick runbook) are older than the board and are being retired (issue
   #433); where they disagree with the board, the board is right. Known
   Issues is not one of them: it is the public page's only copy, the known
-  board in `site\dataoard.json`, edited in the hub at `/hub/known` and
+  board in `site\data\board.json`, edited in the hub at `/hub/known` and
   written out at `/known` (decided by Patrick on 12 Oct, issue #2414).
 - `docs\archive`: dated snapshots (HANDOFF, the 17 September audit,
   WORKING-NOTES and the old To Do List), history only.

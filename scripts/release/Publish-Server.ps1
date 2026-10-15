@@ -24,7 +24,9 @@
        boot task and starts it; if it does not answer on its ports, the
        previous folder goes back and is started again (issue #446)
     5. once the installer has said INSTALL OK, records on the box what the
-       server now runs (#459): the gamemode artifact goes to the store, the
+       server now runs (#459): the server build it installed goes to the
+       store as an artifact with a name, read out of the payload
+       (ServerArtifact.ps1), the gamemode artifact goes to the store, the
        box holds the installed gamemode.js and its build stamp to it, and the
        record goes into data\thornswood-deploy.json and the store's current
        record; then the engine commit the root's server-build.json names goes
@@ -261,6 +263,8 @@ foreach ($t in 'ssh', 'scp') {
 # with uncommitted changes, or untracked, refuses it here, naming each, before
 # anything is built or the box is asked anything. There is no switch past it.
 . (Join-Path $Here '..\deploy\Artifact.ps1')
+# The server build as an artifact the store keeps by name (#459).
+. (Join-Path $Here '..\deploy\ServerArtifact.ps1')
 # What engine each server runs, for the site's credits page (#2303).
 . (Join-Path $Here '..\deploy\DeployedBuild.ps1')
 $committedOnly = @('scripts/deploy/Install-ThornswoodServer.ps1', 'scripts/deploy/ServerSettings.ps1', 'scripts/deploy/ServerBuild.ps1', 'scripts/deploy/ServerReadyWait.ps1', 'scripts/vps/Roll-Log.ps1', 'scripts/release/Read-JsonFile.ps1', 'scripts/release/RecordShape.ps1')
@@ -339,6 +343,7 @@ function Save-ServerRecords([switch]$PutBack) {
         if ($PutBack) {
             $lines = @(Restore-ThornswoodServerRecord -Target $target -SshArgs $ssh -Root $VpsRoot)
         } else {
+            Send-ThornswoodArtifact -Artifact $serverArtifact -Target $target -SshArgs $ssh
             Send-ThornswoodArtifact -Artifact $artifact -Target $target -SshArgs $ssh
             $lines = @(Set-ThornswoodServerRecord -Artifact $artifact -Target $target -SshArgs $ssh -Root $VpsRoot)
         }
@@ -678,6 +683,13 @@ if ($stampSays -ne ($gmSha + '/' + $Channel)) {
          ", so the server could not say which gamemode it runs. Nothing was sent. Run it again without -SkipBuild.")
 }
 Say ("payload gamemode is the artifact's, " + $artifact.Short + ", with its stamp for the $Channel server") 'Green'
+# The server build it installs, as an artifact with a name (#459,
+# ServerArtifact.ps1): the recorded files read out of this zip, so what the
+# store keeps is what the server runs. Built here, before anything is sent;
+# it goes to the store with the gamemode artifact once the install answers.
+try { $serverArtifact = New-ThornswoodServerBuildArtifact -From $Zip -Record $Record }
+catch { Die ($_.Exception.Message + ' Nothing was sent.') }
+Say ('{0,-22} {1}' -f 'server build artifact', (Format-ThornswoodArtifact $serverArtifact)) 'DarkGray'
 
 # ------------------------------------------------------------ no stop here ---
 # This used to stop the server here, before anything was copied, so a copy

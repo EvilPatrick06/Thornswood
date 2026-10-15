@@ -7,8 +7,9 @@ file or from a font's own name table. Where a file came from was checked by
 comparing its sha256 with the copy it came from. Where something could not be
 identified, this file says so instead of guessing.
 
-This file does not license Thornswood's own code. The repository has no licence
-of its own, and choosing one is Patrick's decision.
+This file does not license Thornswood's own work. That is `LICENSE` at the
+root: all rights reserved, with terms every contributor agrees to once
+(decided by Patrick on 12 Oct 2026, #1331).
 
 `tests\test-third-party.js` checks this file against the build. It covers every
 resource Build-Launcher.ps1 compiles into the launcher, every file under
@@ -320,10 +321,14 @@ collection and Vortex's staging folder on the shipping machine:
   above exactly, and Vortex's staging copy is the same bytes. That is the
   collection's base: the plugin #954 rebuilt, 382 records, with no Execution
   Block and no editor id or script named for another server (#400). Its
-  header's description still says where the records came from: "Crafting and
-  gathering content salvaged from Keizaal Online. Stations, salt, ore, charcoal
-  kilns, the skill manuals and their recipes." The release plugin below
-  carries the same description. Until 12 October this
+  header's description still names the SkyMP server the records were
+  salvaged from, and so does the description of the release plugins in the
+  table below. The repository's plugin carries Thornswood's own description
+  since 15 October (#400, Patrick: the name is mentioned nowhere): "Thornswood's
+  crafting and gathering content: stations, salt, ore, charcoal kilns, skill
+  manuals, tools, keys, fishing, repair kits, treatments, the notice board and
+  drop box, house parts, and their recipes." The collection's copy keeps the
+  old one until a later revision patches it. Until 12 October this
   section gave the 1.1 file as read on 24 September, 141,234 bytes, sha256
   `3b3ecb3bda4b97e312df10a61191cdd2949286007ab03a948b323d4a749af2ae`.
 - `SKSE\Plugins\SkyrimSoulsRE.ini`: Skyrim Souls RE's own settings file (mod

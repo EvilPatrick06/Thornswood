@@ -9,7 +9,7 @@
 
   WHY THIS EXISTS. Patrick, 24 September, a tester on 1.1.94: "the dowgrader
   this time didnt even upon the steam console let alone put the commands in for
-  you", then "Keizaal Onlines downgrader tool does this so it is possible", and
+  you", then that another server's downgrader "does this so it is possible", and
   "they have a progress bar of it in the launcher". Read from
   launcher\app\Downgrade.cs that evening:
 

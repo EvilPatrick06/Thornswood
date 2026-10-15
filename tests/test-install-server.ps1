@@ -1047,6 +1047,13 @@ try {
         Yes '    and the artifact is in the store, as it was built' (
             (Test-Path -LiteralPath (Join-Path $deploys ('gamemode\' + $art.Name))) -and (Sha (Join-Path $deploys ('gamemode\' + $art.Name))) -eq $art.Sha256)
         Yes '    and history.log has the publish' ((Get (Join-Path $deploys 'history.log')) -match [regex]::Escape('thornswood-server-dev ' + $art.Name))
+        # The server build it installed, kept by name (ServerArtifact.ps1).
+        $srvJson = @(Get-ChildItem -LiteralPath (Join-Path $deploys 'server') -Filter 'server-abcdef012345-*.json' -File -ErrorAction SilentlyContinue)
+        $srvRec = if ($srvJson.Count -eq 1) { Rec $srvJson[0].FullName } else { $null }
+        Yes '    and the server build it installed is in the store by name, as it was built (#459)' (
+            $srvRec -and $srvRec.component -eq 'server' -and $srvRec.commit -eq 'abcdef0123456789abcdef0123456789abcdef01' -and
+            (Sha (Join-Path $deploys ('server\' + $srvRec.name))) -eq $srvRec.sha256 -and
+            @($srvRec.files | Where-Object { $_.path -eq 'scam_native.node' -and $_.sha256 -eq (TextSha 'binary v2') }).Count -eq 1)
         $sb = Rec $siteBuild
         Yes '    and the site''s deployed-build.json names the engine dev runs (#2303)' ($sb -and $sb.dev.commit -eq 'abcdef0123456789abcdef0123456789abcdef01')
         $rec1 = Get $devCur
