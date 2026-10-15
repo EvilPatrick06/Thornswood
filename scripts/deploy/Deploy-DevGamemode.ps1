@@ -318,7 +318,8 @@ if (-not (Test-Path -LiteralPath $Gamemode)) { throw "There is no gamemode at $G
 $artifact = $null
 if (-not $PutBack) {
 $alsoSends = @('records/most-online.json', 'records/server-build.json')
-if ($LoadOrder) { $alsoSends += 'game/content/Thornswood-Content.esp' }
+# Every plugin of ours (RepoPlugins.ps1, #2486), held to the commit like the gamemode.
+if ($LoadOrder) { . (Join-Path $Here '..\release\RepoPlugins.ps1'); foreach ($ownName in $ThornswoodRepoPlugins) { $alsoSends += ('game/content/' + $ownName) } }
 $artifact = New-ThornswoodArtifact -Component gamemode -RepoDir (Join-Path $Here '..\..') -Paths 'game/gamemode.js' -AlsoSends $alsoSends
 Write-Host ('  artifact ' + (Format-ThornswoodArtifact $artifact))
 $Gamemode = Join-Path $artifact.Folder 'game\gamemode.js'
@@ -475,7 +476,12 @@ if ($LoadOrder) {
 
   foreach ($n in $pluginNames) {
     $local = Join-Path $Data $n
-    if ($n -eq 'Thornswood-Content.esp' -and (Test-Path -LiteralPath $ours)) { $local = $ours }
+    # Ours (RepoPlugins.ps1) comes from the repo, never -Data (#2486).
+    $isOurs = $false
+    if (Test-ThornswoodRepoPlugin $n) {
+      $own = Get-ThornswoodRepoPluginPath (Join-Path $Here '..\..') $n
+      if (Test-Path -LiteralPath $own) { $local = $own; $isOurs = $true }
+    }
     if (-not $thereSize.ContainsKey($n)) {
       if (Test-Path -LiteralPath $local) { $sendPlugins += $local }
       else { throw "the load order names $n, the dev server does not have it, and it is not at $local either" }
@@ -486,14 +492,15 @@ if ($LoadOrder) {
     # one outcome worse than it being stale.
     if (-not (Test-Path -LiteralPath $local)) { continue }
     $localLen = (Get-Item -LiteralPath $local).Length
-    if ($local -eq $ours) {
+    if ($isOurs) {
       # Ours by sha256 as well as size (#2308): Ship holds a release to the
       # server's copy byte for byte, so this has to send it on the same test.
-      $mine = Get-ThornswoodLocalContent $ours
-      if (-not (Test-ThornswoodContentSame $boxContent $mine.Bytes $mine.Sha)) {
+      $mine = Get-ThornswoodLocalContent $local
+      $boxPlugin = Get-ThornswoodServerPlugin $boxContent $n
+      if (-not (Test-ThornswoodContentSame $boxPlugin $mine.Bytes $mine.Sha)) {
         $sendPlugins += $local
-        $changed += ('{0}  {1:N0} -> {2:N0} bytes, sha256 {3} -> {4}' -f $n, $boxContent.Bytes, $mine.Bytes,
-                     $(if ($boxContent.Sha) { $boxContent.Sha.Substring(0, 12) } else { 'none' }), $mine.Sha.Substring(0, 12))
+        $changed += ('{0}  {1:N0} -> {2:N0} bytes, sha256 {3} -> {4}' -f $n, $boxPlugin.Bytes, $mine.Bytes,
+                     $(if ($boxPlugin.Sha) { $boxPlugin.Sha.Substring(0, 12) } else { 'none' }), $mine.Sha.Substring(0, 12))
       }
       continue
     }
@@ -512,7 +519,7 @@ if ($LoadOrder) {
   # no record it stops too: nothing else can say those bytes are the
   # collection's. Only the plugins about to go are read.
   . (Join-Path $Here 'CollectionPlugins.ps1')
-  Assert-ThornswoodCollectionPlugins -RecordPath (Join-Path $Here '..\..\records\collection-plugins.json') -Files $sendPlugins -Exempt 'Thornswood-Content.esp' -What 'this deploy'
+  Assert-ThornswoodCollectionPlugins -RecordPath (Join-Path $Here '..\..\records\collection-plugins.json') -Files $sendPlugins -Exempt $ThornswoodRepoPlugins -What 'this deploy'
   Write-Host ''
   Write-Host ('  load order: {0} plugins, paths rewritten to {1}' -f $pluginNames.Count, $remotePlugins) -ForegroundColor DarkGray
   if ($sendPlugins.Count) {

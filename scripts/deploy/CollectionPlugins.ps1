@@ -22,9 +22,9 @@
 
   Throws, naming every plugin it would send that is not in the record, or is
   in it at another size or sha256. Only the plugins about to go are read, so
-  a deploy that sends nothing reads nothing. Thornswood-Content.esp is ours,
-  built in this repo and sent from it, so it is never in the record and is
-  passed in -Exempt. With no record at all, a deploy that would send any
+  a deploy that sends nothing reads nothing. Our own plugins
+  ($ThornswoodRepoPlugins, RepoPlugins.ps1) are built in this repo and sent
+  from it, so they are never in the record and are passed in -Exempt. With no record at all, a deploy that would send any
   other plugin is refused: the record is the only thing that can say those
   bytes are the collection's, and sending them unchecked is what #2019 was.
 
@@ -33,6 +33,7 @@
 #>
 . (Join-Path $PSScriptRoot '..\release\Read-JsonFile.ps1')
 . (Join-Path $PSScriptRoot '..\release\RecordShape.ps1')
+. (Join-Path $PSScriptRoot '..\release\RepoPlugins.ps1')
 
 function Get-ThornswoodPluginSha256([string]$Path) {
     $Path = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
@@ -86,7 +87,7 @@ function Assert-ThornswoodCollectionPlugins {
     param(
         [Parameter(Mandatory)][string]$RecordPath,
         [AllowEmptyCollection()][string[]]$Files = @(),
-        [string[]]$Exempt = @('Thornswood-Content.esp'),
+        [string[]]$Exempt = $ThornswoodRepoPlugins,
         [string]$What = 'this deploy'
     )
     $check = @(@($Files) | Where-Object { $_ -and ($Exempt -notcontains [IO.Path]::GetFileName($_)) })

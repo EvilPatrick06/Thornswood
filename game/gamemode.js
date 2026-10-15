@@ -29688,7 +29688,7 @@ log('gamemode loaded:',
   // scripts\release\Ship-Rules.ps1 calls ours ($ShipOursFiles), and
   // tests\test-1180-own-plugins.js holds the two lists to each other, so a
   // plugin the repo makes goes into both in one change.
-  var OURS = { 'thornswood-content.esp': 1 };
+  var OURS = { 'thornswood-content.esp': 1, 'thornswood-last.esp': 1 };
 
   // Returns '' once the manifest is published, otherwise why it was not.
   function publish() {
