@@ -67,3 +67,54 @@ for(const boundary of ['spawnDelay','titleLookup','titleWrite','homeWrite','spaw
   assert.equal(policy.admit(id,{isHuman:false,pos:[10,20,30],cellOrWorld:60}),false);
   assert.deepEqual(stale,[],'revocation during '+boundary+' must prevent every later native mutation');
 }
+
+for(const boundary of ['stateRead','ownership','activityRead','rejectionOwnership']) {
+  let runtime,revoked=false,serial=0,ownershipCalls=0;const pending=new Map(),stale=[];
+  const timers={setTimeout(fn){pending.set(++serial,fn);return serial;},clearTimeout(id){pending.delete(id);}};
+  function stopAt(name){if(name===boundary){runtime.stop();revoked=true;}}
+  const api={makeProperty(){},getNpcAIState(){stopAt('stateRead');return {isHuman:false,cellOrWorld:60,pos:[0,0,0],rot:[0,0,0],
+      aggression:0,confidence:1,meleeReach:1,meleeAllowance:16,factions:[]};},
+    setNpcServerControlled(){if(revoked)stale.push('ownership');stopAt(++ownershipCalls===1?'ownership':'rejectionOwnership');},
+    get(){stopAt('activityRead');throw Error('activity read failed');},
+    stopNpcMovement(){if(revoked)stale.push('movement');}};
+  runtime=ctx.startSharedNpcServerRuntime(api,timers,()=>0,()=>{},null,{suspended:true});
+  runtime.enroll(1);
+  const [handle,callback]=Array.from(pending).find(([,fn])=>fn.npcRuntimeTask==='prepareTick');
+  pending.delete(handle);callback();
+  assert.equal(runtime.start(),false,'queued native callback can revoke activation');
+  assert.deepEqual(stale,[],'queued '+boundary+' failure cannot mutate NPCs after runtime stop');
+  assert.equal(pending.size,0);
+}
+
+{
+  let serial=0,clears=0;const pending=new Map();
+  const timers={setTimeout(fn){pending.set(++serial,fn);return serial;},clearTimeout(id){
+    clears++;if(id===1)throw Error('timer cancellation failed');pending.delete(id);}};
+  const runtime=ctx.startSharedNpcServerRuntime({makeProperty(){}},timers,()=>0,()=>{},null,{suspended:true});
+  assert.throws(()=>runtime.stop(),/cancellation/);
+  assert.equal(clears,serial,'one timer cancellation error must not skip the other owned handles');
+  assert.throws(()=>runtime.start(),/revoked/);
+  for(const callback of pending.values())assert.doesNotThrow(()=>callback(),'uncancelled callbacks remain revoked');
+}
+
+for(const method of ['getNavmeshRecords','lookupEspmRecordById']) for(const boundary of ['lookup','return']) {
+  let runtime,serial=0,revoked=false;const pending=new Map(),stale=[];
+  const timers={setTimeout(fn){pending.set(++serial,fn);return serial;},clearTimeout(id){pending.delete(id);}};
+  const api={makeProperty(){},getNpcAIState:()=>({isHuman:false,cellOrWorld:60,pos:[0,0,0],rot:[0,0,0],
+      aggression:0,confidence:1,meleeReach:1,meleeAllowance:16,factions:[]}),
+    setNpcServerControlled(){if(revoked)stale.push('ownership');},get:()=>null,
+    stopNpcMovement(){if(revoked)stale.push('movement');},getNavmeshRecords:()=>[1]};
+  Object.defineProperty(api,method,{get(){
+    if(boundary==='lookup'){runtime.stop();revoked=true;}
+    return function(){if(revoked)stale.push(method);if(boundary==='return'){runtime.stop();revoked=true;}return [1];};
+  }});
+  runtime=ctx.startSharedNpcServerRuntime(api,timers,()=>0,()=>{},null,{suspended:true});
+  runtime.enroll(1);
+  for(const task of ['prepareTick','meshTick']) {
+    const [handle,callback]=Array.from(pending).find(([,fn])=>fn.npcRuntimeTask===task);
+    pending.delete(handle);callback();
+  }
+  assert.equal(runtime.start(),false,'delegated native '+method+' revokes activation at '+boundary);
+  assert.deepEqual(stale,[],'navigation may not invoke natives after runtime revocation');
+  assert.equal(pending.size,0);
+}

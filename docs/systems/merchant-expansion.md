@@ -218,6 +218,12 @@ uncertain native result revokes that policy instead of retrying it. Failure
 after the commit attempt stops the new services; it does not claim to undo
 native exclusions or durable receipt work.
 
+Native callbacks, including navigation reads, check that their runtime is
+still active before and after calling the engine. Teardown snapshots old
+controller identities before callbacks run, attempts all owned cancellations
+and service shutdowns, and refuses new startup after a teardown error or an
+unexpected replacement. A failing cancellation leaves its callback revoked.
+
 `game/data/merchant-roster.json` records the proposed 60 role bindings and
 all 249 historical identities. Its source validator checks every binding
 before changing any population row. This prerequisite does not import that

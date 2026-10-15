@@ -98,3 +98,32 @@ for(const failure of ['trading','native','retirement','population','runtime',nul
   assert.match(logs.join('\n'),/ownership is revoked/);
 }
 console.log('PASS NPC merchant partial startup revocation and successful startup');
+
+for(const failure of ['__thornswoodMerchantTrade','__thornswoodNpcRuntime',
+    '__thornswoodNpcPopulation','__thornswoodNpcMerchants']) for(const error of [Error('old teardown failed'),undefined,null,0]) {
+  const keys=['__thornswoodMerchantTrade','__thornswoodNpcRuntime','__thornswoodNpcPopulation','__thornswoodNpcMerchants'];
+  const calls=new Map();let settings=0;
+  const ctx={mp:{getServerSettings(){settings++;return {thornswoodServer:'unsupported'};}},log(){}};
+  for(const key of keys) {
+    const method=key==='__thornswoodNpcRuntime'||key==='__thornswoodNpcPopulation'?'stop':'shutdown';
+    ctx[key]={[method](){calls.set(key,(calls.get(key)||0)+1);if(key===failure)throw error;}};
+  }
+  vm.createContext(ctx);vm.runInContext(startup,ctx);
+  for(const key of keys){assert.equal(calls.get(key),1,'teardown must attempt every prior controller exactly once');
+    assert.equal(ctx[key],null,'failed teardown cannot leave old services published');}
+  assert.equal(settings,0,'failed teardown cannot proceed into a new startup');
+}
+
+{
+  const calls=[];let settings=0;
+  const replacement={stop(){calls.push('replacement runtime');}};
+  const ctx={mp:{getServerSettings(){settings++;return {thornswoodServer:'unsupported'};}},log(){},
+    __thornswoodMerchantTrade:{shutdown(){calls.push('trade');ctx.__thornswoodNpcRuntime=replacement;}},
+    __thornswoodNpcRuntime:{stop(){calls.push('old runtime');}},
+    __thornswoodNpcPopulation:{stop(){calls.push('population');}},
+    __thornswoodNpcMerchants:{shutdown(){calls.push('merchants');}}};
+  vm.createContext(ctx);vm.runInContext(startup,ctx);
+  assert.deepEqual(calls,['trade','old runtime','population','merchants'],'teardown uses snapshots taken before callbacks');
+  assert.equal(ctx.__thornswoodNpcRuntime,replacement,'teardown preserves a separately published replacement');
+  assert.equal(settings,0,'unexpected replacement prevents old startup from overwriting it');
+}

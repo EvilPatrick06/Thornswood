@@ -85,3 +85,14 @@ for(const suspended of [undefined,false]) {
   api.shutdown();
 }
 console.log('PASS existing-world roster refuses missing purse state before grants');
+
+for(const boundary of [1,2]) {
+  const box=tradingContext.service({on:true},0,undefined,undefined,{suspended:true});
+  let checks=0,prepares=0;
+  const prepare=box.purses.prepare;
+  box.purses.prepare=function(id){prepares++;return prepare.call(this,id);};
+  box.world.transfer.available=function(){if(++checks===boundary)box.api.shutdown();return true;};
+  assert.throws(()=>box.api.start(),/unavailable/,'availability callback cannot reactivate a stopped trader');
+  assert.match(tradingContext.open(box.api).text,/unavailable/);
+  assert.equal(prepares,0,'revoked trading cannot prepare a merchant purse');
+}

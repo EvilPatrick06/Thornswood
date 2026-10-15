@@ -64568,7 +64568,10 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
   api.makeProperty(property, {isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
   const handles = new Set(), actors = new Map(), order = [], preparing = [], owned = new Set(), unavailable = new Set();
   const reactions = new Map(), knownFactions = new Set();
-  const navigation = createNpcNavigation(api, now, report, bank => {preparing.push(...bank.waiting);bank.waiting=[];});
+  const navigation = createNpcNavigation({
+    getNavmeshRecords:(...args)=>nativeCall('getNavmeshRecords',...args),
+    lookupEspmRecordById:(...args)=>nativeCall('lookupEspmRecordById',...args)
+  }, now, report, bank => {preparing.push(...bank.waiting);bank.waiting=[];});
   const {banks, ensureBank, locate, search} = navigation;
   const npcTiles = new Map();
   const enrolled = new Set(), excluded = new Set(), policies = new Map();
@@ -64591,13 +64594,28 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     try {handle = timers.setTimeout(callback,delay);} catch(error) {stop();throw error;}
     handles.add(handle);
   }
-  function stop() { stopped=true;ready.length=0;for(const h of handles) timers.clearTimeout(h);handles.clear(); }
+  function stop() {
+    stopped=true;ready.length=0;
+    const errors=[];
+    for(const h of handles) {try {timers.clearTimeout(h);} catch(error) {errors.push(error);}}
+    handles.clear();
+    if(errors.length) throw errors[0];
+  }
   function start() {
     if(stopped) throw new Error('NPC runtime activation is revoked');
     if(running) return true;
     running=true;
     while(ready.length && !stopped) ready.shift()();
     return !stopped;
+  }
+  function nativeCall(method,...args) {
+    if(stopped) throw new Error('NPC runtime activation is revoked');
+    const fn=api[method];
+    if(stopped) throw new Error('NPC runtime activation is revoked');
+    const result=fn.apply(api,args);
+    // A native callback may replace this runtime before returning.
+    if(stopped) throw new Error('NPC runtime activation is revoked');
+    return result;
   }
   const distance=(a,b)=>Math.hypot(...a.map((v,i)=>v-b[i]));
   const tile=(cell,p)=>cell+':'+Math.floor(p[0]/512)+':'+Math.floor(p[1]/512);
@@ -64614,7 +64632,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     s.factions=(s.factions || []).filter(f=>Number.isInteger(f.id) && f.rank>=0);
     const missing=s.factions.map(f=>f.id).filter(id=>!knownFactions.has(id));
     for (let i=0;i<missing.length;i+=128) {
-      for(const r of api.getFactionReactions(missing.slice(i,i+128))) {
+      for(const r of nativeCall('getFactionReactions',missing.slice(i,i+128))) {
         if (r.reaction>=0 && r.reaction<=3) reactions.set(r.source+':'+r.target,r.reaction);
       }
     }
@@ -64698,7 +64716,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
       path:[],dwell:0,last:now(),sequence:saved && Number.isInteger(saved.sequence) ? saved.sequence : id%997,
       mode:'ambient',target:0,lastSaved:now(),policy:policies.get(id)};
     actors.set(id,a);order.push(id);indexActor(a);
-    api.set(id,property,{version:2,sequence:a.sequence,mode:'ambient',cell:a.cell});
+    nativeCall('set',id,property,{version:2,sequence:a.sequence,mode:'ambient',cell:a.cell});
   }
   // Runs right after humanTick has read where everybody is.
   function settleHeld() {
@@ -64712,7 +64730,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
       try {
         if(h.ambush) emerge(h);
         else {
-          api.set(id,'locationalData',{cellOrWorldDesc:api.getDescFromId(h.state.cellOrWorld),
+          nativeCall('set',id,'locationalData',{cellOrWorldDesc:nativeCall('getDescFromId',h.state.cellOrWorld),
             pos:h.near.pos.slice(),rot:h.state.rot.slice()});
           preparing.push(id);
         }
@@ -64724,10 +64742,12 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     schedule(meshTick,2);
   }
   function reject(id,error) {
+    if(stopped) return;
     unavailable.add(id);failed=unavailable.size;
     // Navigation failure pauses activity, never hands a placed NPC to a client.
     // Native authority validation still rejects human identities and profiles.
-    try {api.setNpcServerControlled(id,true);owned.add(id);api.stopNpcMovement(id);} catch(e) {}
+    try {nativeCall('setNpcServerControlled',id,true);owned.add(id);nativeCall('stopNpcMovement',id);} catch(e) {}
+    if(stopped) return;
     report('NPC '+id.toString(16)+' remains loaded; activity unavailable: '+error);
   }
   function prepareTick() {
@@ -64735,7 +64755,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     for(let i=0;i<4 && preparing.length && now()-begin<4;i++) {
       const entry=preparing.shift(),id=typeof entry==='number' ? entry : entry.id;
       try {
-        const state=factionData(api.getNpcAIState(id));
+        const state=factionData(nativeCall('getNpcAIState',id));
         if(!validState(state) || state.isHuman) throw new Error('Invalid NPC state');
         if(population && !policies.has(id)) {
           const policy=population.configure(id,state);
@@ -64746,11 +64766,11 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
           policies.set(id,policy);
         }
         if(!owned.has(id)) {
-          api.setNpcServerControlled(id,true);
+          nativeCall('setNpcServerControlled',id,true);
           if(population && population.afterOwnership) population.afterOwnership(id);
           owned.add(id);
         }
-        const saved=api.get(id,property);
+        const saved=nativeCall('get',id,property);
         swimming(state,policies.get(id));
         const bank=ensureBank(state.cellOrWorld,state.pos);
         if(!bank.ready) { bank.waiting.push({id,state,saved}); continue; }
@@ -64764,14 +64784,14 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
           path:[],dwell:0,last:now(),sequence:saved && Number.isInteger(saved.sequence) ? saved.sequence : id%997,
           mode:'ambient',target:0,lastSaved:now(),policy:policies.get(id)};
         actors.set(id,a);order.push(id);indexActor(a);
-        api.set(id,property,{version:2,sequence:a.sequence,mode:'ambient',cell:a.cell});
+        nativeCall('set',id,property,{version:2,sequence:a.sequence,mode:'ambient',cell:a.cell});
       } catch(e) { reject(id,e); }
     }
     schedule(prepareTick,10);
   }
   function preload() {
     try {
-      const batch=api.loadNpcBatch(cursor,1);
+      const batch=nativeCall('loadNpcBatch',cursor,1);
       if(!Number.isInteger(batch.nextCursor) || batch.nextCursor<cursor || batch.nextCursor>batch.total ||
           (batch.nextCursor===cursor && cursor!==batch.total)) throw new Error('Invalid NPC loading cursor');
       cursor=batch.nextCursor;total=batch.total;loaded+=batch.actorIds.length;
@@ -64787,7 +64807,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
   function discover() {
     try {
       if(api.getLoadedNpcIds) {
-        const ids=api.getLoadedNpcIds();
+        const ids=nativeCall('getLoadedNpcIds');
         if(population.reconcile) population.reconcile(ids);
         for(const id of ids) enroll(id);
       }
@@ -64808,8 +64828,8 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     const next=new Map();
     let everybody=true;
     try {
-      for(const id of api.get(0,'onlinePlayers') || []) {
-        try { const s=factionData(api.getNpcAIState(id)); if(validState(s) && !s.isDead && !s.isDisabled) next.set(id,s); }
+      for(const id of nativeCall('get',0,'onlinePlayers') || []) {
+        try { const s=factionData(nativeCall('getNpcAIState',id)); if(validState(s) && !s.isDead && !s.isDisabled) next.set(id,s); }
         catch(e) { everybody=false;report('NPC observer state unavailable for '+id.toString(16)); }
       }
     } catch(e) { everybody=false;report('NPC observer list unavailable: '+e); }
@@ -64895,16 +64915,16 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
   }
   function update(a) {
     const at=now(),elapsed=Math.min(4000,Math.max(0,at-a.last));a.last=at;
-    const s=swimming(factionData(api.getNpcAIState(a.id)),a.policy);
+    const s=swimming(factionData(nativeCall('getNpcAIState',a.id)),a.policy);
     if(!validState(s)) throw new Error('Invalid live state');
     a.state=s;
     if(s.isDead || s.isDisabled || s.immobile) {
-      if(!a.paused) api.stopNpcMovement(a.id);
+      if(!a.paused) nativeCall('stopNpcMovement',a.id);
       a.paused=true;a.path=[];a.target=0;return;
     }
     a.paused=false;
     if(!withinHome(a,s.pos,s.cellOrWorld)) {
-      api.stopNpcMovement(a.id);a.paused=true;a.path=[];a.target=0;return;
+      nativeCall('stopNpcMovement',a.id);a.paused=true;a.path=[];a.target=0;return;
     }
     if(a.approach) {
       // An ambush stepping out of its alcove onto the floor beside it, in a
@@ -64913,7 +64933,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
       const from=s.pos.slice(),d=distance(from,a.approach),step=Math.min(d,60*elapsed/1000);
       const pos=d>0.001 ? from.map((v,j)=>v+(a.approach[j]-v)*step/d) : a.approach.slice();
       const delta=pos.map((v,j)=>v-from[j]);
-      api.updateNpcMovement(a.id,pos,step>0 ? [0,0,Math.atan2(delta[0],delta[1])*180/Math.PI] : s.rot,step>0 ? 60 : 0);
+      nativeCall('updateNpcMovement',a.id,pos,step>0 ? [0,0,Math.atan2(delta[0],delta[1])*180/Math.PI] : s.rot,step>0 ? 60 : 0);
       if(step>0) moved++;
       a.pos=pos;
       if(step>=d) a.approach=null;
@@ -64959,7 +64979,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
         distance(a.pos,targetState.pos)>4096 || !withinHome(a,targetState.pos))) {target=0;targetState=null;}
     if(targetState) {
       try {
-        const live=api.getNpcAIState(target);
+        const live=nativeCall('getNpcAIState',target);
         if(!validState(live) || live.isDead || live.isDisabled || (live.isHuman && !live.isConnected) || live.cellOrWorld!==a.cell ||
             distance(a.pos,live.pos)>4096 || !withinHome(a,live.pos)) {target=0;targetState=null;}
         else if(!retaliation && !hostile(s,factionData(live))) {target=0;targetState=null;}
@@ -65005,7 +65025,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
           while(ahead.length && distance(a.pos,aim(ahead[0]))<0.01) ahead.shift();
           if(!ahead.length || a.node===tn && distance(a.pos,targetState.pos)<=attackDistance) {
             a.path=[];
-            if(api.serverNpcAttack(a.id,target)) attacks++;
+            if(nativeCall('serverNpcAttack',a.id,target)) attacks++;
           } else a.path=ahead;
         }
       } else {target=0;targetState=null;}
@@ -65035,11 +65055,11 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     }
     const delta=pos.map((v,j)=>v-a.pos[j]);
     const rot=speed ? [0,0,Math.atan2(delta[0],delta[1])*180/Math.PI] : s.rot;
-    api.updateNpcMovement(a.id,pos,rot,speed);
+    nativeCall('updateNpcMovement',a.id,pos,rot,speed);
     if(speed) moved++;
     a.pos=pos;a.node=node;indexActor(a);
     if(at-a.lastSaved>=30000) {
-      api.set(a.id,property,{version:2,sequence:a.sequence,mode:a.mode,cell:a.cell});a.lastSaved=at;
+      nativeCall('set',a.id,property,{version:2,sequence:a.sequence,mode:a.mode,cell:a.cell});a.lastSaved=at;
     }
   }
   function step(id) {
@@ -66540,9 +66560,9 @@ function createMerchantTrading(deps) {
       return !closed && ready;
     },
     start: function () {
-      if(closed || !settlement.available()) throw new Error('Trading is unavailable.');
+      if(!settlement.available() || closed) throw new Error('Trading is unavailable.');
       if(retirementRequired && !settlement.canRetire()) throw new Error('Legacy work blocks roster activation.');
-      if(closed || !settlement.available()) throw new Error('Trading is unavailable.');
+      if(!settlement.available() || closed) throw new Error('Trading is unavailable.');
       active=true;
       return true;
     },
@@ -66763,13 +66783,19 @@ function cleanup(key,value,method) {
   if(globalThis[key]===value) globalThis[key]=null;
 }
 try {
-  for(const [key,method] of [['__thornswoodMerchantTrade','shutdown'],['__thornswoodNpcRuntime','stop'],
-      ['__thornswoodNpcPopulation','stop'],['__thornswoodNpcMerchants','shutdown']]) {
-    const prior=globalThis[key];
-    if(prior && typeof prior[method]==='function') prior[method]();
+  const teardownErrors=[];
+  const priorControllers=[['__thornswoodMerchantTrade','shutdown'],['__thornswoodNpcRuntime','stop'],
+    ['__thornswoodNpcPopulation','stop'],['__thornswoodNpcMerchants','shutdown']]
+    .map(([key,method])=>[key,method,globalThis[key]]);
+  for(const [key,method,prior] of priorControllers) {
+    try {if(prior && typeof prior[method]==='function') prior[method]();}
+    catch(error) {teardownErrors.push(error);}
     current();
     if(globalThis[key]===prior) globalThis[key]=null;
+    else if(globalThis[key]!==null && globalThis[key]!==undefined)
+      teardownErrors.push(new Error('NPC startup controller was replaced during teardown'));
   }
+  if(teardownErrors.length) throw teardownErrors[0];
   const cfgNpc = mp.getServerSettings();
   current();
   if (/^(main|dev)$/i.test(String(cfgNpc.thornswoodServer || 'main'))) {

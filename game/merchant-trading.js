@@ -663,9 +663,9 @@ function createMerchantTrading(deps) {
       return !closed && ready;
     },
     start: function () {
-      if(closed || !settlement.available()) throw new Error('Trading is unavailable.');
+      if(!settlement.available() || closed) throw new Error('Trading is unavailable.');
       if(retirementRequired && !settlement.canRetire()) throw new Error('Legacy work blocks roster activation.');
-      if(closed || !settlement.available()) throw new Error('Trading is unavailable.');
+      if(!settlement.available() || closed) throw new Error('Trading is unavailable.');
       active=true;
       return true;
     },
