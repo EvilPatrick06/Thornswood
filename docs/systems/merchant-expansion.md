@@ -246,6 +246,21 @@ goods, using the same native size and count limits as a new trade. Checking
 the two inventories separately is insufficient. Validation does not rewrite
 the record; compact credit records keep their existing recovery checks.
 
+`game/merchant-roster-admission.js` provides read-only ledger inspection.
+It accepts copied ledger, marker and roster bytes, the original world identity,
+and trusted isolated native record and inventory validators. It checks the
+complete historical manifest, retained purses, stocks and pending transfers,
+then returns counts and hashes without exposing private rows or paths. The
+record resolver must verify each winning placement and its base; decoding a
+form descriptor alone is insufficient. Unit fixtures are not operational proof.
+
+This component performs no file or server operation and cannot authorize a cut.
+A future caller still needs private-file and alias checks, a stopped world and
+completed saves, native build and load-order binding, a fresh hash check,
+coordinated plugin delivery and strict client admission. The component is not
+imported into startup and does not change the 249-trader roster or initialize
+new ledger state. `node tests/test-merchant-ledger-inspection.js` checks it.
+
 Local checks include `node tests/test-merchant-trading.js`,
 `node tests/test-merchant-settlement.js`,
 `node tests/test-merchant-pending-preflight.js`,
