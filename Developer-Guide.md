@@ -2075,6 +2075,22 @@ $PSVersionTable.PSVersion
 
 Scripts in this repository run in PowerShell 7. If the major number is 5, type `pwsh`.
 
+#### Run a harness by hand
+
+Every nightly and build run starts a PowerShell harness with `pwsh -NoProfile -File`, from the repository folder. Do the same by hand:
+
+```powershell
+pwsh -NoProfile -File .\tests\test-install-server.ps1
+```
+
+From Git Bash too (the shell Claude Code's Bash tool uses on One), never `powershell.exe` straight: Windows PowerShell 5.1 started from there inherits PowerShell 7's `PSModulePath`, finds PowerShell 7's Utility module first and loses `Get-FileHash` (#2460). PowerShell 7 rewrites that path for every 5.1 it starts, so a harness started with `pwsh` that runs 5.1 keeps working. `tests\test-2460-winps-module-path.ps1` holds both halves.
+
+If 5.1 itself is the point, clear the inherited path first:
+
+```bash
+env -u PSModulePath powershell.exe -NoProfile -File ./tests/test-install-server.ps1
+```
+
 #### Learn more about PowerShell
 
 - [PowerShell 101](https://learn.microsoft.com/en-us/powershell/scripting/learn/ps101/00-introduction), Microsoft's first course
