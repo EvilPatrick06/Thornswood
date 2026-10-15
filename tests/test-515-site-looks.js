@@ -137,6 +137,8 @@ names.forEach((n) => {
 Object.keys(OPTIONS).forEach((kind) => OPTIONS[kind].slice(1).forEach((o) => {
   yes('C looks.js offers ' + kind + '=' + o[0] + ' and looks.css styles it', !!blocks[kind + '=' + o[0]]);
 }));
+yes('C a light palette keeps the hero over the painting on the Night tokens',
+  /:root\[data-palette="parchment"\] #landing > \.hero\{[^}]*--page:#E4E7DA/.test(LOOKS_CSS));
 const palettes = names.filter((n) => n.startsWith('palette='));
 const colourBase = [...base].filter((k) => !/^--(w-|serif|sans|carve|mono|blurple)/.test(k));
 palettes.forEach((n) => {

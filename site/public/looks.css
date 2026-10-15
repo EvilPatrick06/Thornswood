@@ -28,6 +28,14 @@
   --lift:#000000; --on-mark:#FBF7EC;
   color-scheme:light;
 }
+/* The hero sits on the painting, not on the page ground, so under a light
+   palette it keeps the Night tokens: dark-gold buttons and dark text over a
+   sunset sky are unreadable. */
+:root[data-palette="parchment"] #landing > .hero{
+  --page:#E4E7DA; --quiet:#96A084; --faint:#7A8568; --edge2:#3D4733;
+  --gold:#C9A24B; --gold-hot:#E4BE66; --on-gold:#120F07; --night:#0B0E0A;
+  --live:#79B05F;
+}
 
 /* -------------------------------------------------------- High contrast -- */
 :root[data-palette="contrast"]{
