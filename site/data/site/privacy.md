@@ -2,7 +2,7 @@
 
 What Thornswood keeps about you, why, and how to have it deleted.
 
-Last changed: 11 October 2026.
+Last changed: 12 October 2026.
 
 Thornswood is a free fan project run by two people. It is not a company. This
 page is written plainly rather than legally, and it is meant to be the whole
@@ -107,15 +107,18 @@ both are served from here now.
   site from, as our own front door saw it, not anything your browser claims
   about itself. That is enforced by the site rather than promised:
   old rows go whenever the log is written or read.
-- **Session records and chat** are kept for 365 days, then dropped. The site
-  prunes session logs after that window (a session marked kept is never
-  pruned). Chat on the voice service ages the same way. Both numbers come from
-  the code rather than a promise on this page; if they change, this line
-  changes with them.
+- **Session records and chat** are kept for 365 days, then dropped. That is
+  the record of each session and the launcher log sent with it. The site
+  checks every hour, so nothing waits for somebody to play first. A session
+  staff mark as kept, because a report or a ban rests on it, is not dropped,
+  and neither is its launcher log. Chat on the voice service ages the same
+  way. Both numbers come from the code rather than a promise on this page; if
+  they change, this line changes with them.
 
 - **Your character** is kept until you ask for it to be deleted, or until a
   wipe, which is announced first.
-- **Launcher logs** are kept while they are useful for fixing something.
+- **Launcher logs** are kept for 365 days, like session records, unless staff
+  mark the session kept.
 
 **Backups.** Encrypted recovery copies include site records and uploads. The
 server keeps seven daily and four weekly copies. Copies fetched to the
