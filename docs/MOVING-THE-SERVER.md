@@ -184,12 +184,13 @@ typed on a command line or written on this page.
    `.\scripts\vps\Setup-SshKey.ps1 -Test` says the key works. Another machine that deploys runs
    `.\scripts\vps\Setup-SshKey.ps1 -KeyOnly` and Patrick adds the line it
    prints with `.\scripts\vps\Add-VpsKey.ps1`.
-5. **PowerShell 7, Node and Git on the box**, and the firewall for the live
-   game:
-   `.\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeGit'`.
+5. **PowerShell 7, Node, Git and the Build Tools on the box**, and the
+   firewall for the live game:
+   `.\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeGit -IncludeBuildTools'`.
    Bootstrap-VPS runs on the box and refuses to run anywhere else; Remote.ps1
-   carries it there. Git is for the build runner, step 24. Python comes with
-   the bot, step 15.
+   carries it there. Git and the Build Tools (MSBuild and the .NET Framework
+   4.8.1 reference assemblies the launcher's project files build with, #498)
+   are for the build runner, step 24. Python comes with the bot, step 15.
 6. **The live game server program**, built here from this branch and installed
    there without being started. The world is not in it; that is step 13.
    ```powershell
