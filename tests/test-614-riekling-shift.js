@@ -6,9 +6,10 @@
 // sized Khajiit model, the neck in the wrong place and the body showing through,
 // because those two items have no armour addon for either playable Riekling
 // race and both races name KhajiitRace as their armour race. Patrick, 12 October
-// 2026: "Rieklings get Riekling clothing". So a riekling's shift is Playable
-// Rieklings.esp's own LoinCloth 1, cloth hand wraps and cloth foot wraps, and
-// those come out of the cut file to the Haberdasher.
+// 2026: "Rieklings get Riekling clothing", and later that evening the riekling
+// cut of the same clothes rather than its light armour. So a riekling's shift
+// is Playable Rieklings.esp's Riekling Belted Tunic and Riekling Footwraps,
+// both clothing, and those two come out of the cut file to the Haberdasher.
 //
 // This lifts the real giveShift and rieklingShift out of gamemode.js by text and
 // runs them against a stand-in mp. GM points it at another copy of the file,
@@ -50,13 +51,12 @@ yes('rieklingShift is in the gamemode', !!rieklingSrc);
 yes('CHARGEN has a riekling shift', !!(CHARGEN && Array.isArray(CHARGEN.rieklingShift)));
 
 // ------------------------------------------------------ the pieces themselves
-const LOIN = '19f6c:Playable Rieklings.esp';
-const HANDS = '19f69:Playable Rieklings.esp';
-const FEET = '19f68:Playable Rieklings.esp';
+const TUNIC = 'bfd98:Playable Rieklings.esp';
+const FEET = 'bfdb1:Playable Rieklings.esp';
 const RS = (CHARGEN && CHARGEN.rieklingShift) || [];
-yes('the riekling shift is LoinCloth 1, the cloth hand wraps and the cloth foot wraps, one each',
-  RS.length === 3 && RS.every(function (p) { return p[1] === 1; }) &&
-  [LOIN, HANDS, FEET].every(function (d) { return RS.some(function (p) { return p[0] === d; }); }));
+yes('the riekling shift is the Riekling Belted Tunic and the Riekling Footwraps, one each',
+  RS.length === 2 && RS.every(function (p) { return p[1] === 1; }) &&
+  [TUNIC, FEET].every(function (d) { return RS.some(function (p) { return p[0] === d; }); }));
 yes('the human shift is still the Belted Tunic and the Boots',
   !!CHARGEN && JSON.stringify(CHARGEN.shift) === JSON.stringify([['1be1a:Skyrim.esm', 1], ['1be1b:Skyrim.esm', 1]]));
 yes('beginChoosing, the step after the race menu, gives the shift for the race',
@@ -66,7 +66,7 @@ if (fail) { done(); }
 // ------------------------------------------------------------- the stand-in
 const IDS = {
   '1be1a:Skyrim.esm': 0x1be1a, '1be1b:Skyrim.esm': 0x1be1b,
-  [LOIN]: 0x0b019f6c, [HANDS]: 0x0b019f69, [FEET]: 0x0b019f68
+  [TUNIC]: 0x0b0bfd98, [FEET]: 0x0b0bfdb1
 };
 const GOLD = 0xf;
 function world(race, pack) {
@@ -102,7 +102,7 @@ const has = (pack, id) => pack.some(e => e.baseId === id && e.count > 0);
   w.give(7);
   yes('a nord keeps the tunic and the boots', has(w.pack(), 0x1be1a) && has(w.pack(), 0x1be1b));
   yes('and is given no riekling piece and asked to put nothing on',
-    !has(w.pack(), IDS[LOIN]) && !w.calls.some(c => /EquipItem/.test(c)));
+    !has(w.pack(), IDS[TUNIC]) && !w.calls.some(c => /EquipItem/.test(c)));
 }
 
 // ------------------------------------------------------------- a riekling
@@ -112,13 +112,13 @@ for (const race of ['1rieklingbluerace', '1rieklingpurplerace']) {
   const pack = w.pack();
   yes(race + ': the tunic and the boots go back out of the pack',
     !has(pack, 0x1be1a) && !has(pack, 0x1be1b));
-  yes(race + ': the loincloth and both wraps are in it',
-    has(pack, IDS[LOIN]) && has(pack, IDS[HANDS]) && has(pack, IDS[FEET]));
+  yes(race + ': the riekling tunic and footwraps are in it',
+    has(pack, IDS[TUNIC]) && has(pack, IDS[FEET]));
   yes(race + ': the purse is untouched', pack.some(e => e.baseId === GOLD && e.count === 40));
   const equips = w.calls.filter(c => /EquipItem/.test(c));
   yes(race + ': its game is asked once for each piece, silently, never to keep it on',
-    equips.length === 3 &&
-    [LOIN, HANDS, FEET].every(d => equips.some(c => c === 'method Actor EquipItem 7:Thornswood ' + d + ' false true')));
+    equips.length === 2 &&
+    [TUNIC, FEET].every(d => equips.some(c => c === 'method Actor EquipItem 7:Thornswood ' + d + ' false true')));
   yes(race + ': the pack is written before anything is asked',
     w.calls.indexOf('set inventory') === 0 && w.calls.filter(c => c === 'set inventory').length === 1);
   yes(race + ': the log says what was done', w.lines.some(l => /is a riekling/.test(l)));
@@ -133,9 +133,9 @@ for (const race of ['1rieklingbluerace', '1rieklingpurplerace']) {
 {
   const w = world('1rieklingbluerace', [{ baseId: GOLD, count: 40 }]);
   w.give(7);
-  yes('a riekling with no shift in the pack still gets its own three pieces',
-    has(w.pack(), IDS[LOIN]) && has(w.pack(), IDS[HANDS]) && has(w.pack(), IDS[FEET]) &&
-    w.calls.filter(c => /EquipItem/.test(c)).length === 3);
+  yes('a riekling with no shift in the pack still gets its own two pieces',
+    has(w.pack(), IDS[TUNIC]) && has(w.pack(), IDS[FEET]) &&
+    w.calls.filter(c => /EquipItem/.test(c)).length === 2);
 }
 
 // A riekling whose race could not be read is given the shift, as anybody.
@@ -155,11 +155,12 @@ function row(desc) {
   try { return m ? JSON.parse(m[1]) : null; } catch (e) { return null; }
 }
 const RECIPE = {
-  '19f92:Playable Rieklings.esp': LOIN,
-  '19f94:Playable Rieklings.esp': '19f6e:Playable Rieklings.esp',
-  '19f90:Playable Rieklings.esp': HANDS,
-  '19f91:Playable Rieklings.esp': FEET
+  'bfee5:Playable Rieklings.esp': TUNIC,
+  'bfefb:Playable Rieklings.esp': FEET
 };
+// The light armour pieces the first pass put back (#2503) are cut again.
+const ARMOUR = ['19f92:Playable Rieklings.esp', '19f94:Playable Rieklings.esp',
+  '19f90:Playable Rieklings.esp', '19f91:Playable Rieklings.esp'];
 for (const r of Object.keys(RECIPE)) {
   const x = row(r);
   yes('recipe ' + r + ' makes ' + RECIPE[r] + ', Haberdasher work at novice, race locked to a riekling',
@@ -167,10 +168,13 @@ for (const r of Object.keys(RECIPE)) {
     x.rank === 'novice' && x.race === 'riekling' && !x.nobody);
 }
 const cut = JSON.parse(fs.readFileSync(path.join(ROOT, 'docs', 'systems', 'cut-items.json'), 'utf8'));
-yes('and none of the four is in the cut file',
+yes('and neither is in the cut file',
   Object.keys(RECIPE).every(id => !cut.items.some(i => i.id === id)));
+yes('the loincloths and cloth wraps are cut again, and nobody makes them',
+  ARMOUR.every(id => cut.items.some(i => i.id === id && i.disposition === 'cut')) &&
+  ARMOUR.every(id => { const x = row(id); return !x || !!x.nobody; }));
 yes('the cut file names them with the riekling pieces that stay',
-  ['Riekling LoinCloth 1', 'Riekling LoinCloth 2', 'Riekling Cloth Hand Wraps', 'Riekling Cloth Foot Wraps']
-    .every(n => cut.rieklingKept.indexOf(n) >= 0));
+  ['Riekling Belted Tunic', 'Riekling Footwraps'].every(n => cut.rieklingKept.indexOf(n) >= 0) &&
+  ['Riekling LoinCloth 1', 'Riekling Cloth Hand Wraps'].every(n => cut.rieklingKept.indexOf(n) < 0));
 
 done();

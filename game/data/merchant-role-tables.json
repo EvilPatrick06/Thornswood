@@ -3,11 +3,11 @@
   "active": false,
   "builtBy": "scripts/dev/Build-MerchantRoleTables.py",
   "sources": {
-    "game/data/recipes.json": "fa9159196566762c087de1542e2f379510f29b0bee56a19ea6201f873bb620a8",
+    "game/data/recipes.json": "9bedc02b09815ef225815e0bfe974bec6ac85dc66c1a059d03ac717374ee34f8",
     "game/data/harvests.json": "da87513ba8c931267dd13d1b39fabcc0de9bfaa5bc064be474eea22783b1d77b",
     "game/data/hunts.json": "b3ad957575d1f2083e202e6253cc1e29edd23bb215bed89f1d3f77a6fce5aa4b",
     "game/data/items.json": "b91464db89a6a455f5f00bffc81329a5801f236519949bb1cb394e02d9354b4c",
-    "docs/systems/cut-items.json": "bed6ab1cff8426edbd9d7597478d2283dacfd376926729eb1b791ddd8502e2d7"
+    "docs/systems/cut-items.json": "ee6f0c7d1172008c5f51cbd9702477e4f0817db3aa98d4f94271a47286c8bef1"
   },
   "loadOrder": [
     {
@@ -1685,34 +1685,10 @@
       "edid": "1ArmorRieklingHelmet",
       "winner": "Playable Rieklings.esp"
     },
-    "19f68:Playable Rieklings.esp": {
-      "type": "ARMO",
-      "flags": 0,
-      "edid": "1ArmorRieklingFootWraps",
-      "winner": "Playable Rieklings.esp"
-    },
-    "19f69:Playable Rieklings.esp": {
-      "type": "ARMO",
-      "flags": 0,
-      "edid": "1ArmorRieklingHandWraps",
-      "winner": "Playable Rieklings.esp"
-    },
     "19f6a:Playable Rieklings.esp": {
       "type": "ARMO",
       "flags": 0,
       "edid": "1ArmorRieklingHelmetChief",
-      "winner": "Playable Rieklings.esp"
-    },
-    "19f6c:Playable Rieklings.esp": {
-      "type": "ARMO",
-      "flags": 0,
-      "edid": "1ArmorRieklingCuirassAlt",
-      "winner": "Playable Rieklings.esp"
-    },
-    "19f6e:Playable Rieklings.esp": {
-      "type": "ARMO",
-      "flags": 0,
-      "edid": "1ArmorRieklingCuirass2Alt",
       "winner": "Playable Rieklings.esp"
     },
     "19f71:Playable Rieklings.esp": {
@@ -4783,6 +4759,18 @@
       "edid": "StaffSoulTrap",
       "winner": "Skyrim.esm"
     },
+    "bfd98:Playable Rieklings.esp": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ClothesFarmClothes01",
+      "winner": "Playable Rieklings.esp"
+    },
+    "bfdb1:Playable Rieklings.esp": {
+      "type": "ARMO",
+      "flags": 0,
+      "edid": "ClothesPrisonerShoes",
+      "winner": "Playable Rieklings.esp"
+    },
     "c36e8:Skyrim.esm": {
       "type": "ARMO",
       "flags": 0,
@@ -5998,10 +5986,6 @@
         "19adf:Dawnguard.esm",
         "19ae1:Dawnguard.esm",
         "19ae3:Dawnguard.esm",
-        "19f68:Playable Rieklings.esp",
-        "19f69:Playable Rieklings.esp",
-        "19f6c:Playable Rieklings.esp",
-        "19f6e:Playable Rieklings.esp",
         "1bc82:Skyrim.esm",
         "1bca7:Skyrim.esm",
         "1be1a:Skyrim.esm",
@@ -6202,6 +6186,8 @@
         "ba99a:Hothtrooper44_ArmorCompilation.esp",
         "bacd7:Skyrim.esm",
         "bacf3:Skyrim.esm",
+        "bfd98:Playable Rieklings.esp",
+        "bfdb1:Playable Rieklings.esp",
         "c36e8:Skyrim.esm",
         "c742:HearthFires.esm",
         "c743:HearthFires.esm",
@@ -6271,10 +6257,6 @@
         "19adf:Dawnguard.esm",
         "19ae1:Dawnguard.esm",
         "19ae3:Dawnguard.esm",
-        "19f68:Playable Rieklings.esp",
-        "19f69:Playable Rieklings.esp",
-        "19f6c:Playable Rieklings.esp",
-        "19f6e:Playable Rieklings.esp",
         "1bc82:Skyrim.esm",
         "1bca7:Skyrim.esm",
         "1be1a:Skyrim.esm",
@@ -6475,6 +6457,8 @@
         "ba99a:Hothtrooper44_ArmorCompilation.esp",
         "bacd7:Skyrim.esm",
         "bacf3:Skyrim.esm",
+        "bfd98:Playable Rieklings.esp",
+        "bfdb1:Playable Rieklings.esp",
         "c36e8:Skyrim.esm",
         "c742:HearthFires.esm",
         "c743:HearthFires.esm",
@@ -6626,11 +6610,7 @@
         "19f60:Playable Rieklings.esp",
         "19f61:Playable Rieklings.esp",
         "19f62:Playable Rieklings.esp",
-        "19f68:Playable Rieklings.esp",
-        "19f69:Playable Rieklings.esp",
         "19f6a:Playable Rieklings.esp",
-        "19f6c:Playable Rieklings.esp",
-        "19f6e:Playable Rieklings.esp",
         "19f71:Playable Rieklings.esp",
         "1b39f:Skyrim.esm",
         "1b3a0:Skyrim.esm",
@@ -6913,6 +6893,8 @@
         "bacf3:Skyrim.esm",
         "be11f:Skyrim.esm",
         "be122:Skyrim.esm",
+        "bfd98:Playable Rieklings.esp",
+        "bfdb1:Playable Rieklings.esp",
         "c36e8:Skyrim.esm",
         "cae15:Skyrim.esm",
         "cee76:Skyrim.esm",
@@ -7036,11 +7018,7 @@
         "19f60:Playable Rieklings.esp",
         "19f61:Playable Rieklings.esp",
         "19f62:Playable Rieklings.esp",
-        "19f68:Playable Rieklings.esp",
-        "19f69:Playable Rieklings.esp",
         "19f6a:Playable Rieklings.esp",
-        "19f6c:Playable Rieklings.esp",
-        "19f6e:Playable Rieklings.esp",
         "19f71:Playable Rieklings.esp",
         "1b39f:Skyrim.esm",
         "1b3a0:Skyrim.esm",
@@ -7323,6 +7301,8 @@
         "bacf3:Skyrim.esm",
         "be11f:Skyrim.esm",
         "be122:Skyrim.esm",
+        "bfd98:Playable Rieklings.esp",
+        "bfdb1:Playable Rieklings.esp",
         "c36e8:Skyrim.esm",
         "cae15:Skyrim.esm",
         "cee76:Skyrim.esm",
@@ -8571,25 +8551,9 @@
       "Enchanter:wardweaver:public-wearable",
       "Smith:recipe:19f8f:Playable Rieklings.esp:out"
     ],
-    "19f68:Playable Rieklings.esp": [
-      "Enchanter:wardweaver:public-wearable",
-      "Tailor:recipe:19f91:Playable Rieklings.esp:out"
-    ],
-    "19f69:Playable Rieklings.esp": [
-      "Enchanter:wardweaver:public-wearable",
-      "Tailor:recipe:19f90:Playable Rieklings.esp:out"
-    ],
     "19f6a:Playable Rieklings.esp": [
       "Enchanter:wardweaver:public-wearable",
       "Smith:recipe:19f9d:Playable Rieklings.esp:out"
-    ],
-    "19f6c:Playable Rieklings.esp": [
-      "Enchanter:wardweaver:public-wearable",
-      "Tailor:recipe:19f92:Playable Rieklings.esp:out"
-    ],
-    "19f6e:Playable Rieklings.esp": [
-      "Enchanter:wardweaver:public-wearable",
-      "Tailor:recipe:19f94:Playable Rieklings.esp:out"
     ],
     "19f71:Playable Rieklings.esp": [
       "Enchanter:wardweaver:public-wearable",
@@ -11265,10 +11229,6 @@
       "Smith:recipe:f6f2a:Skyrim.esm:input:0",
       "Smith:recipe:f7f43:Skyrim.esm:out",
       "Tailor:recipe:154b5:Thornswood-Content.esp:input:1",
-      "Tailor:recipe:19f90:Playable Rieklings.esp:input:0",
-      "Tailor:recipe:19f91:Playable Rieklings.esp:input:0",
-      "Tailor:recipe:19f92:Playable Rieklings.esp:input:0",
-      "Tailor:recipe:19f94:Playable Rieklings.esp:input:0",
       "Tailor:recipe:1d90:Hothtrooper44_ArmorCompilation.esp:input:0",
       "Tailor:recipe:22fe:Hothtrooper44_ArmorCompilation.esp:input:0",
       "Tailor:recipe:23062:Hothtrooper44_ArmorCompilation.esp:input:0",
@@ -11323,6 +11283,8 @@
       "Tailor:recipe:9d0:MoreCraftableEquipment.esp:input:0",
       "Tailor:recipe:9df:MoreCraftableEquipment.esp:input:0",
       "Tailor:recipe:bc99a:Hothtrooper44_ArmorCompilation.esp:input:0",
+      "Tailor:recipe:bfee5:Playable Rieklings.esp:input:0",
+      "Tailor:recipe:bfefb:Playable Rieklings.esp:input:0",
       "Tailor:recipe:f74d:Hothtrooper44_ArmorCompilation.esp:input:1",
       "Woodworker:recipe:1549c:Thornswood-Content.esp:input:1",
       "Woodworker:recipe:1549d:Thornswood-Content.esp:input:1",
@@ -11787,6 +11749,14 @@
     "be122:Skyrim.esm": [
       "Enchanter:recipe:1776b:Dragonborn.esm:out"
     ],
+    "bfd98:Playable Rieklings.esp": [
+      "Enchanter:wardweaver:public-wearable",
+      "Tailor:recipe:bfee5:Playable Rieklings.esp:out"
+    ],
+    "bfdb1:Playable Rieklings.esp": [
+      "Enchanter:wardweaver:public-wearable",
+      "Tailor:recipe:bfefb:Playable Rieklings.esp:out"
+    ],
     "c36e8:Skyrim.esm": [
       "Enchanter:wardweaver:public-wearable",
       "Tailor:recipe:9b2:MoreCraftableEquipment.esp:out"
@@ -11990,8 +11960,6 @@
       "Smith:recipe:f46cf:Skyrim.esm:input:3",
       "Smith:recipe:f46d0:Skyrim.esm:input:3",
       "Smith:recipe:f7f43:Skyrim.esm:input:0",
-      "Tailor:recipe:19f92:Playable Rieklings.esp:input:1",
-      "Tailor:recipe:19f94:Playable Rieklings.esp:input:1",
       "Tailor:recipe:231c6:Hothtrooper44_ArmorCompilation.esp:input:3",
       "Tailor:recipe:231c7:Hothtrooper44_ArmorCompilation.esp:input:3",
       "Tailor:recipe:231c8:Hothtrooper44_ArmorCompilation.esp:input:3",
@@ -12289,13 +12257,13 @@
       "supply": 16
     },
     "Tailor": {
-      "buy": 271,
-      "sell": 271,
+      "buy": 269,
+      "sell": 269,
       "supply": 23
     },
     "Enchanter": {
-      "buy": 408,
-      "sell": 408,
+      "buy": 406,
+      "sell": 406,
       "supply": 16
     },
     "Cook": {
