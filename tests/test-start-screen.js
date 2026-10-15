@@ -125,13 +125,15 @@ yes('it starts out refusing: nothing has said the game has the keyboard',
 yes('and it keeps refusing once the answer is stale, rather than trusting an old yes',
     /keysSaidAt\) < 5000/.test(keysCount));
 yes('the front is the one that answers, through the page\'s own handle',
-    /keys: function \(on\) \{ keysHere = !!on; keysSaidAt = Date\.now\(\); \}/.test(page));
+    /keys: keysSay,/.test(page) &&
+    /function keysSay\(on, ask\) \{\s*keysHere = !!on;\s*keysSaidAt = Date\.now\(\);/.test(page));
 yes('a client that never answers leaves the keys as they were, from the first mouse move',
     /if \(!keysSaidAt\) return moved;/.test(keysCount));
 const onKey = between(page, '  function onKey(ev) {', '\n  }\n') || '';
 yes('and every key on the slots goes through that gate before Enter can play anybody',
     onKey.indexOf('if (!keysCount()) {') >= 0 &&
-    onKey.indexOf('if (!keysCount()) {') < onKey.indexOf("ev.key === 'Enter'"));
+    onKey.indexOf('if (!keysCount()) {') < onKey.indexOf('holdKey(ev.key)') &&
+    onKey.indexOf('holdKey(ev.key)') < onKey.indexOf('if (keyAct(ev.key))'));
 
 // Running it, because a read cannot show the staleness rule working.
 if (keysCount) {
@@ -148,6 +150,112 @@ if (keysCount) {
       run(false, true, 1000, at(1200)) === true);
   yes('and a yes nobody has repeated for five seconds stops counting',
       run(false, true, 1000, at(6500)) === false);
+}
+
+// ============ #591  a key counts on an answer given after it, not before ==
+//
+// The page's key handling, lifted out whole and run against a clock, a fake
+// front and fake slots: the second between two once a second answers is
+// where a key typed into Discord still played the lit character.
+const KEYS = between(page, '  var keysHere = false;', "\n  window.addEventListener('keydown', onKey, true);");
+yes('#591: the page\'s key handling can be lifted out', KEYS !== null);
+if (KEYS) {
+  const keyRig = function () {
+    const st = { now: 10000, told: [], played: 0, timers: [], drawn: 0, forgot: 0, moved: false };
+    const clock = { now: function () { return st.now; } };
+    const make = new Function('root', 'introKey', 'slots', 'draw', 'play', 'forget', 'tell', 'Date', 'setTimeout', 'clearTimeout', 'st',
+      'var moved = false, asking = 0, at = 0;\n' + KEYS + '\n' +
+      'return { onKey: onKey, keys: keysSay, at: function () { return at; }, asking: function () { return asking; } };');
+    const api = make({ className: '' }, function () { return false; },
+      function () { return [{ id: 1, c: 1 }, { id: 2, c: 1 }]; },
+      function () { st.drawn++; }, function () { st.played++; }, function () { st.forgot++; },
+      function (s) { st.told.push(s); }, clock,
+      function (fn, ms) { const t = { fn: fn, at: st.now + ms, live: true }; st.timers.push(t); return t; },
+      function (t) { if (t) t.live = false; }, st);
+    const run = function (ms) {
+      st.now += ms;
+      st.timers.forEach(function (t) { if (t.live && t.at <= st.now) { t.live = false; t.fn(); } });
+    };
+    const key = function (k) { let stopped = false; api.onKey({ key: k, preventDefault: function () { stopped = true; } }); return stopped; };
+    const asks = function () { return st.told.filter(function (s) { return s.indexOf('keycheck ') === 0; }); };
+    return { st: st, api: api, run: run, key: key, asks: asks };
+  };
+  {
+    const r = keyRig();
+    r.api.keys(true);          // the once a second answer: the game
+    r.run(600);                // ... and then they alt tab and type
+    yes('#591: Enter with an answer from 600 ms ago is not acted on yet', r.key('Enter') === true && r.st.played === 0);
+    yes('#591: and the page asks the front again at once', r.asks().length === 1 && r.asks()[0] === 'keycheck 1');
+    r.run(20);
+    r.api.keys(false, 1);      // the answer to that ask: Discord
+    yes('#591: told another window has the keyboard, the held Enter plays nobody', r.st.played === 0);
+    r.run(2000);
+    yes('#591: and it does not come back later either', r.st.played === 0);
+  }
+  {
+    const r = keyRig();
+    r.api.keys(true);
+    r.run(600);
+    r.key('Enter');
+    r.run(20);
+    r.api.keys(true, 1);
+    yes('#591: told the game has the keyboard, the held Enter plays the lit character', r.st.played === 1);
+  }
+  {
+    const r = keyRig();
+    r.api.keys(true);
+    r.run(600);
+    r.key('Enter');
+    r.api.keys(true);          // a once a second yes, read before the key, landing after it
+    yes('#591: a yes that is not the answer to the ask does not release the key', r.st.played === 0);
+    r.run(1100);
+    yes('#591: with no answer to the ask inside a second, the key is dropped', r.st.played === 0);
+    r.api.keys(true, 1);
+    yes('#591: and a late answer finds nothing left to play', r.st.played === 0);
+  }
+  {
+    const r = keyRig();
+    r.api.keys(true);
+    r.run(50);
+    yes('#591: with an answer from the last 150 ms the key acts at once, as before', r.key('ArrowDown') === true && r.api.at() === 1 && r.asks().length === 0);
+  }
+  {
+    const r = keyRig();
+    r.api.keys(true);
+    r.run(600);
+    r.key('ArrowDown'); r.key('ArrowDown'); r.key('ArrowDown');
+    yes('#591: keys in a burst share one ask', r.asks().length === 1);
+    r.api.keys(true, 1);
+    yes('#591: and are all played back in order once the game is confirmed', r.api.at() === 1);
+  }
+  {
+    const r = keyRig();
+    r.api.keys(true);
+    r.run(600);
+    yes('#591: a key the page has no use for is held but not stopped', r.key('a') === false);
+  }
+  {
+    const r = keyRig();
+    r.st.now = 10000;
+    // No front ever answered: keysSaidAt stays 0, and the first mouse move rule holds.
+    yes('#591: a client that never answers is never asked either', (r.key('Enter'), r.asks().length === 0));
+  }
+}
+const KEYCHECK = between(front, '  function menuKeyCheck(ask) {', '\n  }\n');
+yes('#591: the front answers the page\'s ask', KEYCHECK !== null &&
+    front.indexOf("if (what.indexOf('select:keycheck ') === 0) {") >= 0 &&
+    front.indexOf("if (what.indexOf('select:keycheck ') === 0) {") < front.indexOf("if (what.indexOf('select:') === 0) {"));
+if (KEYCHECK) {
+  const ask = function (fg, noWin32, throws) {
+    const said = [];
+    const sp = { win32: noWin32 ? undefined : { foregroundWindow: function () { if (throws) throw new Error('x'); return fg; } } };
+    new Function('sp', 'T', KEYCHECK + '\n}\nmenuKeyCheck("7");')(sp, { js: function (s) { said.push(s); } });
+    return said.join('');
+  };
+  yes('#591: the front asks Windows now and answers with the same number',
+      ask({ isGame: true }).indexOf('keys(true,7)') >= 0);
+  yes('#591: another window in front is a no', ask({ isGame: false }).indexOf('keys(false,7)') >= 0);
+  yes('#591: and so is a Windows call that fails, rather than silence', ask(null, false, true).indexOf('keys(false,7)') >= 0);
 }
 
 // ================== #621  Continue gives the whole three minutes to choose ==
@@ -306,7 +414,7 @@ if (WATCH) {
 yes('the front only does any of this while the choice is actually up',
     front.indexOf('if (choiceUp()) { menuWatch(now); }') >= 0);
 yes('and the page hands the front a way in that the front uses by that name',
-    page.indexOf('keys: function (on)') >= 0 &&
+    page.indexOf('keys: keysSay,') >= 0 &&
     front.indexOf('window.thornswoodSelect.keys(') >= 0);
 
 console.log('');
