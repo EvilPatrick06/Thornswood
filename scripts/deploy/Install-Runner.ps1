@@ -108,8 +108,11 @@
 
   WHAT IT DOES ON THE BOX, in order:
     1. Checks what the build check needs is there: pwsh, node, python and git
-       on the machine PATH, the .NET Framework csc, and WPF in Windows
-       PowerShell. It installs none of them; it names the script that does.
+       on the machine PATH, MSBuild and the .NET Framework 4.8.1 reference
+       assemblies the launcher's project files build with (#498; until
+       15 Oct it checked the in-box csc, which builds nothing past C# 5), and
+       WPF in Windows PowerShell. It installs none of them; it names the
+       script that does.
     2. Makes a local account, thornswood-runner, that is in no group but
        Users. Its password is made on the box, handed to the service once and
        never printed, stored or sent anywhere.
@@ -747,8 +750,13 @@ foreach (`$c in 'pwsh','node','python','git') {
   `$g = Get-Command `$c -EA SilentlyContinue
   if (`$g) { 'HAVE ' + `$c + ' ' + `$g.Source } else { 'MISSING ' + `$c }
 }
-`$csc = Join-Path `$env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
-if (Test-Path `$csc) { 'HAVE csc ' + `$csc } else { 'MISSING csc' }
+`$pf86 = `${env:ProgramFiles(x86)}
+`$vw = Join-Path `$pf86 'Microsoft Visual Studio\Installer\vswhere.exe'
+`$msb = `$null
+if (Test-Path `$vw) { `$msb = @(& `$vw -latest -products '*' -requires Microsoft.Component.MSBuild -find 'MSBuild\**\Bin\MSBuild.exe' 2>`$null | Where-Object { `$_ -and (`$_ -notmatch '\\amd64\\|\\arm64\\') }) | Select-Object -First 1 }
+if (`$msb) { 'HAVE msbuild ' + `$msb } else { 'MISSING msbuild' }
+`$ref = Join-Path `$pf86 'Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8.1'
+if (Test-Path (Join-Path `$ref 'mscorlib.dll')) { 'HAVE net481refs ' + `$ref } else { 'MISSING net481refs' }
 try { Add-Type -AssemblyName PresentationFramework; 'HAVE wpf' } catch { 'MISSING wpf' }
 "@
 $need | ForEach-Object { Say "  $_" }
@@ -757,7 +765,8 @@ if ($missing.Count) {
   $how = @()
   if ($missing -contains 'pwsh' -or $missing -contains 'node' -or $missing -contains 'git') { $how += ".\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeGit'   (PowerShell 7, Node, Git, for all users; from this machine, it runs on the VPS)" }
   if ($missing -contains 'python') { $how += '.\scripts\deploy\Install-Bot.ps1   (Python for all users; the bot needs it anyway)' }
-  if ($missing -contains 'csc' -or $missing -contains 'wpf') { $how += 'the box needs Windows Server with the Desktop Experience and .NET Framework 4.8; that is not a script' }
+  if ($missing -contains 'msbuild' -or $missing -contains 'net481refs') { $how += ".\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeBuildTools -SkipFirewall'   (MSBuild and the .NET Framework 4.8.1 reference assemblies the launcher builds with, #498)" }
+  if ($missing -contains 'wpf') { $how += 'the box needs Windows Server with the Desktop Experience and .NET Framework 4.8; that is not a script' }
   Die ("$where is missing " + ($missing -join ', ') + ". Nothing was installed. Put them there with:" + [Environment]::NewLine + '    ' + ($how -join ([Environment]::NewLine + '    ')))
 }
 
