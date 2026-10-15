@@ -5,7 +5,7 @@
 
   The shape of .github\workflows\release.yml after #2163 and #498: where the
   release launcher is built, who may sign it, the VPS job, the one draft per
-  tag, and the second machine that checks a signed draft.
+  tag (#2462), and the second machine that checks a signed draft.
 
   WHY. Patrick's decisions of 12 Oct on #2163: release.yml builds on GitHub's
   hosted Windows runner, with #498's MSBuild switch in the same change, and
