@@ -129,3 +129,21 @@ for(const [publisher,target] of [['trade','runtime'],['merchants','trade']]) {
     'teardown preserves a separately published replacement');
   assert.equal(settings,0,'unexpected replacement prevents old startup from overwriting it');
 }
+
+{
+  let serial=0,loads=0;const pending=new Map();
+  const timers={setTimeout(fn){pending.set(++serial,fn);return serial;},clearTimeout(id){pending.delete(id);}};
+  const ctx={Map,Set,Math,Number,JSON,Buffer,Date,require,...timers,log(){},
+    mp:{getServerSettings:()=>({thornswoodServer:'unsupported'})}};vm.createContext(ctx);
+  vm.runInContext(source.slice(source.indexOf('// NPC SERVER RUNTIME BEGIN'),source.indexOf('// NPC SERVER RUNTIME END')),ctx);
+  const oldRuntime=ctx.startSharedNpcServerRuntime({makeProperty(){},loadNpcBatch(){loads++;return {nextCursor:0,total:0,actorIds:[]};}},
+    timers,()=>0,()=>{},null);
+  const preload=Array.from(pending.values()).find(fn=>fn.npcRuntimeTask==='preload');
+  ctx.__thornswoodNpcRuntime=oldRuntime;
+  ctx.__thornswoodMerchantTrade={shutdown(){ctx.__thornswoodMerchantTrade=null;
+    ctx.__thornswoodNpcRuntime={stop(){}};vm.runInContext(startup,ctx);}};
+  vm.runInContext(startup,ctx);
+  assert.equal(pending.size,0,'reentrant startup must still stop every original snapshot');
+  preload();assert.equal(loads,0,'abandoned old timers cannot load NPCs after replacement');
+  assert.throws(()=>oldRuntime.start(),/revoked/);
+}

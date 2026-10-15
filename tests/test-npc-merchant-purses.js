@@ -52,3 +52,35 @@ assert.throws(()=>current.prepare(1),/saved merchant/i,'saved identity must matc
 const population=JSON.parse(fs.readFileSync(path.join(__dirname,'../game/data/npc-population.json'),'utf8'));
 assert.equal(population.npcs.filter(n=>n.keep && n.role==='trader').length,249);
 console.log('PASS NPC merchant purse initialization, depletion, reload, identity and failure checks');
+
+for(const method of ['getNpcAIState','get','save','set']) for(const boundary of ['lookup','return']) {
+  let armed=false,current=true,saves=0,mirrors=0;const stale=[];
+  let document={version:1,entries:{'1:Skyrim.esm':null}};
+  const native={makeProperty(){},getIdFromDesc:d=>ids[d],
+    getNpcAIState:()=>({isHuman:false,profileId:-1}),get:(_id,key)=>key==='baseDesc'?'a:Skyrim.esm':null,
+    set(){mirrors++;}};
+  const disk={namespace:{},durable:true,load:()=>JSON.parse(JSON.stringify(document)),
+    save(next){saves++;document=JSON.parse(JSON.stringify(next));return true;}};
+  const target=method==='save'?disk:native,original=target[method];
+  Object.defineProperty(target,method,{get(){
+    if(armed && boundary==='lookup')current=false;
+    return function(...args){
+      assert.equal(this,target,'guarded calls preserve the API receiver');
+      if(!current)stale.push(method);
+      const result=original.apply(this,args);
+      if(armed && boundary==='return')current=false;
+      return result;
+    };
+  }});
+  const purse=ctx.createNpcMerchantPurses(native,data,disk);armed=true;
+  assert.throws(()=>purse.prepare(1,()=>current),/revoked/);
+  assert.deepEqual(stale,[],method+' cannot run after its lookup revokes the caller');
+  assert.equal(saves,method==='set' || method==='save' && boundary==='return'?1:0);
+  assert.equal(mirrors,method==='set' && boundary==='return'?1:0);
+  if(method==='getNpcAIState' || method==='get') {
+    assert.doesNotThrow(()=>purse.read(1),'revoking a caller does not close a shared purse');
+    armed=false;current=true;
+    assert.equal(purse.prepare(1).purse,250,'a current caller can still initialize the untouched purse');
+  }
+}
+console.log('PASS scoped merchant preparation at native lookup, return and durable-save boundaries');

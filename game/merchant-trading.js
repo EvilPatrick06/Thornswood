@@ -817,7 +817,14 @@ function installMerchantTrading(env) {
   var timers=env.timers || (typeof setTimeout === 'function' && typeof clearTimeout === 'function' ? {setTimeout:setTimeout,clearTimeout:clearTimeout} : null);
   var alive=true, timer=null, started=false;
   var stop=trading.shutdown;
-  trading.shutdown=function () {alive=false; if(timer!==null && timers) timers.clearTimeout(timer);timer=null;stop();};
+  trading.shutdown=function () {
+    alive=false;
+    var ownedTimer=timer;
+    timer=null;
+    // Revoke authority before cancellation can call back or throw.
+    try {stop();}
+    finally {if(ownedTimer!==null && timers) timers.clearTimeout(ownedTimer);}
+  };
   function scheduleAdvance() {
     if(!alive || !timers || timer!==null) return;
     try {

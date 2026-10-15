@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const source=fs.readFileSync(path.join(__dirname,'../game/gamemode.js'),'utf8');
 const ctx={Map,Set,Math,Number,JSON,Buffer,Date};vm.createContext(ctx);
-for(const name of ['NPC POPULATION POLICY','NPC SERVER RUNTIME'])
+for(const name of ['NPC MERCHANT PURSES','NPC POPULATION POLICY','NPC SERVER RUNTIME'])
   vm.runInContext(source.slice(source.indexOf('// '+name+' BEGIN'),source.indexOf('// '+name+' END')),ctx);
 const data={version:1,plugins:['Skyrim.esm'],cut:['2:Skyrim.esm'],keep:[
   ['1:Skyrim.esm','a:Skyrim.esm','3c:Skyrim.esm',[10,20,30],100,45,'animal','farm',null,3,'farm1']]};
@@ -116,5 +116,29 @@ for(const method of ['getNavmeshRecords','lookupEspmRecordById']) for(const boun
   }
   assert.equal(runtime.start(),false,'delegated native '+method+' revokes activation at '+boundary);
   assert.deepEqual(stale,[],'navigation may not invoke natives after runtime revocation');
+  assert.equal(pending.size,0);
+}
+
+for(const merchant of [false,true]) {
+  let runtime,serial=0,revoked=false,stateReads=0,saves=0;const pending=new Map(),stale=[];
+  const catalogue=JSON.parse(JSON.stringify(data));catalogue.keep[0][6]=merchant?'trader':'transport';
+  if(!merchant)catalogue.keep[0][13]='Coach Driver';
+  const timers={setTimeout(fn){pending.set(++serial,fn);return serial;},clearTimeout(id){pending.delete(id);}};
+  const api={makeProperty(){},getIdFromDesc:d=>parseInt(d,16),setNpcPlacementExclusions(){},
+    getNpcAIState(){if(merchant && ++stateReads===2){runtime.stop();revoked=true;}
+      return {isHuman:false,profileId:-1,cellOrWorld:60,pos:[0,0,0],rot:[0,0,0],
+        aggression:0,confidence:1,meleeReach:1,meleeAllowance:16,factions:[]};},
+    getDescFromId(){if(!merchant){runtime.stop();revoked=true;}return '1:Skyrim.esm';},
+    get(id,key){return key==='baseDesc'?'a:Skyrim.esm':null;},
+    set(id,key){if(revoked)stale.push(key);},callPapyrusFunction(){if(revoked)stale.push('title');},
+    setNpcServerControlled(){if(revoked)stale.push('ownership');},stopNpcMovement(){if(revoked)stale.push('movement');}};
+  const purses=merchant?ctx.createNpcMerchantPurses(api,catalogue,{namespace:{},durable:true,
+    load:()=>({version:1,entries:{'1:Skyrim.esm':null}}),save(){saves++;return true;}}):null;
+  const policy=ctx.createNpcPopulation(api,catalogue,data.plugins,purses);
+  runtime=ctx.startSharedNpcServerRuntime(api,timers,()=>0,()=>{},policy,{suspended:true});runtime.enroll(1);
+  const [handle,callback]=Array.from(pending).find(([,fn])=>fn.npcRuntimeTask==='prepareTick');
+  pending.delete(handle);callback();assert.equal(runtime.start(),false);
+  assert.deepEqual(stale,[],'delegated population and purse work observes runtime revocation');
+  assert.equal(saves,0,'a revoked caller cannot initialize a merchant purse');
   assert.equal(pending.size,0);
 }
