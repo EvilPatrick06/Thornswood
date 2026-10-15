@@ -35741,13 +35741,32 @@ log('gamemode loaded:',
       try { require('fs').mkdirSync(dir, { recursive: true }); } catch (e) { }
       require('fs').writeFileSync(registerPath(),
         JSON.stringify({ claims: claims, stewards: stewards, boxes: boxes,
-                        funds: funds, notices: notices, boards: boards }, null, 1));
+                        funds: funds, notices: notices, boards: boards, steps: steps }, null, 1));
     } catch (e) {
       plog('could not write the register:', e);
     }
   }
 
   var claims = load();
+
+  /*
+    STEPS THAT RUN ONCE ON THE REGISTER, and the mark that each has run.
+    steps.<name> is the time it ran. A step reads its mark at server start,
+    runs only when the mark is missing, and writes the mark in the same save
+    as what it changed, so it never runs twice and never needs a timer.
+  */
+  var steps = (function () {
+    var out = {};
+    var raw = null;
+    try { raw = JSON.parse(require('fs').readFileSync(registerPath(), 'utf8')); } catch (e) { return out; }
+    var st = (raw && raw.steps && typeof raw.steps === 'object') ? raw.steps : {};
+    for (var k in st) {
+      if (Object.prototype.hasOwnProperty.call(st, k) && k !== '__proto__' && Number(st[k]) > 0) {
+        out[k] = Number(st[k]);
+      }
+    }
+    return out;
+  })();
 
   /*
     ------------------------------------------------------------ the offices
@@ -35910,9 +35929,23 @@ log('gamemode loaded:',
       if (Object.prototype.hasOwnProperty.call(JAIL_DOOR, d)) { out.cells[d] = cs[d] === true; }
       else { dropped++; }
     }
-    if (dropped) { plog('law: dropped', dropped, 'row(s) that were not a guard or a cell'); }
-    plog('law: read', Object.keys(out.guards).length, 'guard(s) and', Object.keys(out.cells).length,
-         'cell door(s) a guard has turned');
+    // The Jarl's seat of each hold (#502): the profile and the character that
+    // holds it, and the character's name for whoever asks who holds it.
+    out.jarls = {};
+    var js = (raw && raw.jarls && typeof raw.jarls === 'object') ? raw.jarls : {};
+    for (var h in js) {
+      if (!Object.prototype.hasOwnProperty.call(js, h)) { continue; }
+      var seat = js[h];
+      var spid = seat ? Number(seat.pid) || 0 : 0;
+      var sact = seat ? Number(seat.actor) || 0 : 0;
+      if (Object.prototype.hasOwnProperty.call(JAIL_NAME, h) && spid > 0 && sact > 0) {
+        out.jarls[h] = { pid: spid, actor: sact, name: String(seat.name || 'somebody').slice(0, 60),
+                         at: Number(seat.at) || 0 };
+      } else { dropped++; }
+    }
+    if (dropped) { plog('law: dropped', dropped, 'row(s) that were not a guard, a cell or a Jarl\'s seat'); }
+    plog('law: read', Object.keys(out.guards).length, 'guard(s),', Object.keys(out.cells).length,
+         'cell door(s) a guard has turned, and', Object.keys(out.jarls).length, 'seated Jarl(s)');
     return out;
   }
 
@@ -35920,7 +35953,7 @@ log('gamemode loaded:',
     try {
       var fs = require('fs');
       try { fs.mkdirSync(require('path').dirname(lawPath()), { recursive: true }); } catch (e) { }
-      fs.writeFileSync(lawPath(), JSON.stringify({ guards: law.guards, cells: law.cells }, null, 1));
+      fs.writeFileSync(lawPath(), JSON.stringify({ guards: law.guards, cells: law.cells, jarls: law.jarls }, null, 1));
     } catch (e) {
       plog('law: could not write the register:', e);
     }
@@ -35960,10 +35993,37 @@ log('gamemode loaded:',
     winterhold: 'Winterhold', ravenrock: 'Raven Rock'
   };
 
-  /** The hold of the Jarl office in this character state, or ''. */
-  function officeHoldOf(s) {
+  /*
+    ONE JARL A HOLD (#502). Patrick, 12 October evening: a second character
+    cannot take a hold that already has a seated Jarl; the office is kept in
+    law.json, and the Office page has a Give up the office button. So each
+    hold's seat is in the law register (law.jarls: the profile, the
+    character and its name), written when the office is taken and removed
+    when it is given up (jarlCmd). The character still carries s.office and
+    s.officeHold, but a hold is this character's only while the seat says
+    so: the seat is the one record two characters cannot both write.
+  */
+  function seatOf(hold) {
+    var h = String(hold || '');
+    return Object.prototype.hasOwnProperty.call(law.jarls, h) ? law.jarls[h] : null;
+  }
+
+  /** The hold whose seat this character holds, or ''. */
+  function seatHeldBy(actorId) {
+    var a = Number(actorId) || 0;
+    if (!a) { return ''; }
+    for (var h in law.jarls) {
+      if (Object.prototype.hasOwnProperty.call(law.jarls, h) && law.jarls[h].actor === a) { return h; }
+    }
+    return '';
+  }
+
+  /** The hold of the Jarl office in this character state, while its seat is this character's, or ''. */
+  function officeHoldOf(s, actorId) {
     var h = (s && s.office === 'jarl') ? String(s.officeHold || '') : '';
-    return Object.prototype.hasOwnProperty.call(HOLD_TOWN, h) ? h : '';
+    if (!Object.prototype.hasOwnProperty.call(HOLD_TOWN, h)) { return ''; }
+    var seat = seatOf(h);
+    return (seat && seat.actor === (Number(actorId) || 0)) ? h : '';
   }
 
   /** The hold this person is Jarl of, on the character in the world, or ''. */
@@ -35973,13 +36033,14 @@ log('gamemode loaded:',
     if (!c || typeof c.stateOf !== 'function') { return ''; }
     var s = null;
     try { s = c.stateOf(actorId); } catch (e) { s = null; }
-    return officeHoldOf(s);
+    return officeHoldOf(s, actorId);
   }
 
   /*
     EVERY OFFICE A PERSON HOLDS, READ IN ONE PLACE. The offices live in three
-    homes: the Jarl office on the character (s.office, s.officeHold), the
-    stewards in property.json, the guards in law.json. Anything outside this
+    homes: the Jarl office on the character (s.office, s.officeHold) with
+    each hold's seat in law.json, the stewards in property.json, the guards
+    in law.json. Anything outside this
     block that asks who holds what (a hold's box, a drop box, a court once
     there is one) asks this, through g.__thornswoodProperty.officeOf, rather
     than reading any of the three itself, so a rule about who holds an
@@ -40474,7 +40535,8 @@ log('gamemode loaded:',
   /*
     Seat the Jarl office on THIS character.
 
-        /jarl
+        /jarl <hold>     take the office of that hold, while it has no Jarl
+        /jarl -          give the office up (giveUpJarl)
 
     Sent by Take the office on the Office page of the K panel (#1638), never
     typed. Discord Jarl (or admin) eligibility is required. The office is the
@@ -40483,6 +40545,10 @@ log('gamemode loaded:',
     office can be placed out of character (#397).
   */
   function jarlCmd(parts, actorId, profileId, toProfile) {
+    var arg0 = (parts && parts.length > 1) ? String(parts[1]).trim() : '';
+    // Give up the office (#502): the page's button sends /jarl -. Asked
+    // before the role, so a Jarl whose role was taken can still leave the seat.
+    if (arg0 === '-') { return giveUpJarl(actorId, profileId, toProfile); }
     var adm = g['__thornswoodIsAdmin'];
     var isAdmin = false;
     try { if (typeof adm === 'function' && adm(profileId)) { isAdmin = true; } } catch (e) { }
@@ -40509,12 +40575,12 @@ log('gamemode loaded:',
       Jarl seated before there was a hold sends it once to choose theirs.
       Chosen once: a Jarl does not move to another hold by a button.
     */
-    var had = officeHoldOf(s);
+    var had = officeHoldOf(s, actorId) || seatHeldBy(actorId);
     if (had) {
       toProfile(profileId, 'This character already holds the Jarl office of ' + HOLD_TOWN[had] + '.');
       return true;
     }
-    var want = (parts && parts.length > 1) ? String(parts[1]).trim().toLowerCase() : '';
+    var want = arg0.toLowerCase();
     if (!want) {
       toProfile(profileId, 'The Jarl office is of one hold. Press the hold on the Office page of K.');
       return true;
@@ -40523,14 +40589,66 @@ log('gamemode loaded:',
       toProfile(profileId, 'There is no hold called ' + want.slice(0, 30) + '.');
       return true;
     }
+    // One Jarl a hold (#502): a seat somebody else holds is theirs until
+    // they give the office up.
+    var seat = seatOf(want);
+    if (seat) {
+      toProfile(profileId, seat.name + ' holds the Jarl\'s seat of ' + HOLD_TOWN[want] + '. A hold has one ' +
+                           'Jarl, and the seat comes free when they give up the office.');
+      return true;
+    }
     var was = s.office === 'jarl';
+    law.jarls[want] = { pid: Number(profileId) || 0, actor: Number(actorId) || 0,
+                        name: personName(actorId), at: Date.now() };
+    saveLaw();
     s.office = 'jarl';
     s.officeHold = want;
     c.writeState(actorId, s, true);
-    plog(was ? 'gave the jarl office on actor' : 'seated jarl office on actor', actorId, 'profile', profileId,
-         'the hold', want);
+    plog('law:', was ? 'gave the jarl office on actor' : 'seated jarl office on actor', actorId, 'profile', profileId,
+         '(' + law.jarls[want].name + ') the seat of', want);
     toProfile(profileId, 'This character holds the Jarl office of ' + HOLD_TOWN[want] + ' now. ' +
                          'You name its guards on the Office page.');
+    return true;
+  }
+
+  /*
+    GIVE UP THE OFFICE (#502). Patrick, 12 October evening: the Office page
+    gains a Give up the office button. The seat comes free for the next
+    Jarl-role character, the character holds no office, and the hold's jail,
+    which only its Jarl holds, goes back to nobody with its claim. The guards
+    the office named stay guards: they are the hold's, and the next Jarl
+    keeps or removes them.
+  */
+  function giveUpJarl(actorId, profileId, toProfile) {
+    var c = g['__thornswoodCharacter'];
+    var s = (c && typeof c.stateOf === 'function') ? c.stateOf(actorId) : null;
+    var hold = seatHeldBy(actorId);
+    if (!hold && !(s && s.office === 'jarl')) {
+      toProfile(profileId, 'This character holds no Jarl office.');
+      return true;
+    }
+    if (hold) {
+      delete law.jarls[hold];
+      saveLaw();
+    }
+    if (s && s.office === 'jarl' && c && typeof c.writeState === 'function') {
+      s.office = null;
+      s.officeHold = null;
+      c.writeState(actorId, s, true);
+    }
+    var ended = [];
+    for (var b in claims) {
+      if (!Object.prototype.hasOwnProperty.call(claims, b)) { continue; }
+      if (hold && jailOfBuilding(b) === hold && claims[b].by === Number(profileId)) {
+        ended.push(nameOf(b));
+        delete claims[b];
+      }
+    }
+    if (ended.length) { save(); pushAll(); }
+    plog('law: actor', actorId, 'profile', profileId, 'gave up the jarl office',
+         hold ? 'and the seat of ' + hold : '(no seat)', ended.length ? 'and the claim on ' + ended.join(', ') : '');
+    toProfile(profileId, 'You give up the Jarl office' + (hold ? ' of ' + HOLD_TOWN[hold] : '') + '.' +
+              (ended.length ? ' ' + ended.join(', ') + ' is the next Jarl\'s to claim.' : ''));
     return true;
   }
 
@@ -40766,9 +40884,10 @@ log('gamemode loaded:',
     var holds = !!(s && s.office === 'jarl');
     var jarl = admin || (role && holds);                     // isJarl
     var steward = jarl || stewards.indexOf(pid) !== -1;      // isSteward
-    var hold = jarl ? officeHoldOf(s) : '';                  // jarlHoldOf
+    var hold = jarl ? officeHoldOf(s, actorId) : '';                  // jarlHoldOf
     var guarding = guardHoldOf(pid);
-    if (!admin && !role && !steward && !guarding) { return null; }
+    // A Jarl whose role was taken still sees the page, to give the office up.
+    if (!admin && !role && !steward && !guarding && !holds) { return null; }
 
     // Who is in the world, by profile, named the way a guest is named.
     var names = {};
@@ -40792,7 +40911,7 @@ log('gamemode loaded:',
                  // The guards (#502): the Jarl's hold, the ten to choose from
                  // while the office has none, that hold's guards, the people
                  // who could be named one, and the hold this person guards.
-                 hold: hold || null, holds: [], guards: [], guardPeople: [],
+                 hold: hold || null, giveUp: holds, holds: [], guards: [], guardPeople: [],
                  guardOf: guarding ? { hold: guarding, where: HOLD_TOWN[guarding], jail: JAIL_NAME[guarding] } : null };
     for (var k = 0; k < stewards.length; k++) {
       view.stewards.push({ pid: stewards[k],
@@ -40813,7 +40932,10 @@ log('gamemode loaded:',
     }
     if ((view.may || (holds && !hold))) {
       for (var t in HOLD_TOWN) {
-        if (Object.prototype.hasOwnProperty.call(HOLD_TOWN, t)) { view.holds.push({ hold: t, where: HOLD_TOWN[t] }); }
+        if (!Object.prototype.hasOwnProperty.call(HOLD_TOWN, t)) { continue; }
+        // A hold with a seated Jarl names them, and its button is not drawn (#502).
+        var tseat = seatOf(t);
+        view.holds.push({ hold: t, where: HOLD_TOWN[t], by: (tseat && tseat.actor !== actorId) ? tseat.name : null });
       }
     }
     if (hold) {
@@ -40854,6 +40976,40 @@ log('gamemode loaded:',
     return view;
   }
 
+  /*
+    THE JAIL RULE, APPLIED TO THE CLAIMS MADE BEFORE IT, ONCE (#502).
+
+    Patrick, 12 October evening: jail claims made before the jail rule end
+    once, and then the rule holds. Before #2497 anybody could claim a jail
+    building; since, only the seated Jarl of its hold may. So at the first
+    server start with this code, every claim on a jail building whose holder
+    is not that hold's seated Jarl ends, each logged by building, holder and
+    profile, and steps.jailRule records that it ran, in the same save. With
+    no such claim nothing ends and the mark is still written. It runs here,
+    after every part of the register is read, because save() writes all of
+    them, and it never runs again: a claim after this is made under the rule.
+  */
+  function endPreRuleJailClaims() {
+    if (steps.jailRule) { return 0; }
+    var ended = 0;
+    for (var b in claims) {
+      if (!Object.prototype.hasOwnProperty.call(claims, b)) { continue; }
+      var hold = jailOfBuilding(b);
+      if (!hold) { continue; }
+      var seat = seatOf(hold);
+      if (seat && seat.pid === claims[b].by) { continue; }
+      plog('law: the jail rule ends', claims[b].name + '\'s claim (profile ' + claims[b].by + ') on',
+           nameOf(b) + ', made before only the seated Jarl of', hold, 'could hold it');
+      delete claims[b];
+      ended++;
+    }
+    steps.jailRule = Date.now();
+    save();
+    plog('law: the jail rule was applied to the claims made before it once:', ended, 'claim(s) ended');
+    return ended;
+  }
+  endPreRuleJailClaims();
+
   ready();
   g.__thornswoodProperty = {
     command: command, touched: touched, here: here, claim: claim, deeds: deeds,
@@ -40873,6 +41029,8 @@ log('gamemode loaded:',
     DOOR_PROPERTY: DOOR_PROPERTY,
     claims: function () { return claims; },
     isJarl: isJarl, isSteward: isSteward, officeView: officeView, jarlHoldOf: jarlHoldOf, HOLD_TOWN: HOLD_TOWN,
+    seatOf: function (h) { var s0 = seatOf(h); return s0 ? Object.assign({}, s0) : null; },
+    endPreRuleJailClaims: endPreRuleJailClaims, steps: function () { return Object.assign({}, steps); },
     officeOf: officeOf,
     isGuard: isGuard, guardHoldOf: guardHoldOf, jailHoldOf: jailHoldOf, cellLocked: cellLocked,
     mayPassCell: mayPassCell, lockCell: lockCell,

@@ -83,6 +83,7 @@ function line(re) {
 }
 
 const NAMES = ['officeView', 'officeRedraw', 'stewardCmd', 'jarlCmd', 'guardCmd', 'officeHoldOf', 'jarlHoldOf',
+               'seatOf', 'seatHeldBy', 'giveUpJarl', 'officeOf',
                'guardHoldOf', 'evict', 'rentCmd', 'boxCmd',
                'moveBoard', 'board', 'command', 'isJarl', 'isSteward', 'holderOf', 'here', 'buildingOf',
                'boxAt', 'holdOfBox', 'rentDue', 'nameOf', 'profileOf', 'onlineActorOf', 'redrawPanel', 'personName',
@@ -155,14 +156,15 @@ function server() {
     'function lapseDays() { return 14; }',
     'function save() { reg.saves++; }',
     'function pushAll() { reg.pushes++; }',
-    'var law = { guards: {}, cells: {} };',
+    'var law = { guards: {}, cells: {}, jarls: {} };',
+    'function jailOfBuilding(b) { return b === "dungeon" ? "whiterun" : null; }',
     'function saveLaw() { reg.lawSaves++; }',
     'function plog() { }',
     ['deeds', 'setLock', 'mold', 'moldHere', 'cutKey', 'claim', 'sleepHere', 'post', 'take', 'jobs',
      'dropJob', 'unpin', 'postLetter', 'deliver', 'haulCmd', 'haulText']
       .map(function (n) { return 'function ' + n + '() { return true; }'; }).join('\n')
   ].concat(VARS, NAMES.map(function (n) { return lifted[n]; }));
-  body.push('return { command: command, officeView: officeView, isJarl: isJarl, isSteward: isSteward, ' +
+  body.push('return { command: command, officeView: officeView, isJarl: isJarl, isSteward: isSteward, officeOf: officeOf, ' +
             'claims: claims, stewards: stewards, boxes: boxes, boards: boards, law: law, ' +
             'OFFICE_AT_DOOR: OFFICE_AT_DOOR };');
   const make = new Function('mp', 'g', 'boards', 'reg', body.join('\n'));
@@ -448,6 +450,7 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
         !srv.law.guards[P_STEW] && srv.writesFor(JARL) === 1 && srv.writesFor(STEW) === 1 && srv.view(STEW) === null &&
         /no longer a guard of Whiterun/.test(back.told));
     srv.states[JARL].officeHold = undefined;
+    delete srv.law.jarls.whiterun;   // seated before there was a hold, so no seat either
     const old = srv.view(JARL);
     yes('I15 a Jarl seated before there was a hold is offered the ten to choose from, and names no guard until then',
         old.jarl === true && old.hold === null && old.holds.length === 10 && old.guardPeople.length === 0 &&
@@ -460,6 +463,58 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
     const bad = srv.say(ALICE2, '/jarl __proto__');
     yes('I17 a hold that is not one of the ten is refused (' + bad.told + ')',
         !srv.states[ALICE2].office && /no hold called __proto__/.test(bad.told));
+  }
+
+  // ---------------------- J. one Jarl a hold, and giving the office up (#502)
+  {
+    const srv = world();
+    srv.roles.jarl[P_ALICE] = true;
+    srv.say(JARL, '/jarl whiterun');
+    const seat = srv.law.jarls.whiterun;
+    yes('J1 taking the office seats the character in the law register, by profile, character and name',
+        !!seat && seat.pid === P_JARL && seat.actor === JARL && seat.name === 'Balgruuf' && srv.reg.lawSaves === 1);
+    const v = srv.view(ALICE);
+    const wr = v.holds.filter(function (h) { return h.hold === 'whiterun'; })[0];
+    const rf = v.holds.filter(function (h) { return h.hold === 'riften'; })[0];
+    yes('J2 another Jarl-role character sees Whiterun held by its Jarl, by name, and Riften free',
+        !!wr && wr.by === 'Balgruuf' && !!rf && rf.by === null);
+    const second = srv.say(ALICE, '/jarl whiterun');
+    yes('J3 and is refused Whiterun, told who holds the seat (' + second.told + ')',
+        srv.states[ALICE].office === null && srv.law.jarls.whiterun.actor === JARL &&
+        second.told === 'Balgruuf holds the Jarl\'s seat of Whiterun. A hold has one Jarl, and the seat comes free when they give up the office.');
+    srv.say(ALICE, '/jarl riften');
+    yes('J4 Riften is free, so they take it', srv.states[ALICE].officeHold === 'riften' && srv.law.jarls.riften.actor === ALICE);
+    const twice = srv.say(ALICE, '/jarl solitude');
+    yes('J5 one character holds one seat', !srv.law.jarls.solitude && /already holds the Jarl office of Riften/.test(twice.told));
+    srv.states[ALICE2].office = 'jarl';
+    srv.states[ALICE2].officeHold = 'whiterun';
+    srv.roles.jarl[P_ALICE2] = true;
+    const fake = srv.view(ALICE2);
+    yes('J6 a character whose own record says Whiterun, without the seat, is no Jarl of Whiterun',
+        fake.hold === null && fake.holds.length === 10 && srv.officeOf(P_ALICE2, ALICE2).jarlOf === '');
+    yes('J7 officeOf reads the seat: the Jarl of Whiterun is that, Alice is Riften\'s',
+        srv.officeOf(P_JARL, JARL).jarlOf === 'whiterun' && srv.officeOf(P_ALICE, ALICE).jarlOf === 'riften');
+    srv.claims.dungeon = { by: P_JARL, name: 'Balgruuf', at: Date.now(), touched: Date.now(), locked: false };
+    srv.claims[HOUSE] = { by: P_JARL, name: 'Balgruuf', at: Date.now(), touched: Date.now(), locked: false };
+    yes('J8 the Jarl\'s page offers Give up the office', srv.view(JARL).giveUp === true);
+    srv.writes.length = 0;
+    const gave = srv.say(JARL, '/jarl -');
+    yes('J9 Give up the office frees the seat, clears the office on the character, and redraws the page (' + gave.told + ')',
+        !srv.law.jarls.whiterun && srv.states[JARL].office === null && srv.states[JARL].officeHold === null &&
+        srv.writesFor(JARL) === 1 && /You give up the Jarl office of Whiterun\./.test(gave.told));
+    yes('J10 the hold\'s jail goes back to nobody with it, and the Jarl\'s house stays theirs',
+        !srv.claims.dungeon && !!srv.claims[HOUSE] && /is the next Jarl's to claim/.test(gave.told));
+    const now = srv.say(ALICE2, '/jarl whiterun');
+    yes('J11 and the next Jarl-role character takes Whiterun (' + now.told + ')',
+        srv.law.jarls.whiterun && srv.law.jarls.whiterun.actor === ALICE2);
+    const none = srv.say(NOBODY, '/jarl -');
+    yes('J12 somebody with no office has nothing to give up', none.told === 'This character holds no Jarl office.');
+    delete srv.roles.jarl[P_ALICE];
+    const lost = srv.view(ALICE);
+    yes('J13 a Jarl whose role was taken still has the page, to give the office up',
+        !!lost && lost.giveUp === true && lost.name === false);
+    const adm = srv.view(ADMIN);
+    yes('J14 an admin with no seated office has no hold', adm.hold === null && srv.officeOf(P_ADMIN, ADMIN).jarlOf === '');
   }
 }
 
@@ -666,6 +721,24 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
         (grow ? grow.textContent : '') + ')',
         !!grow && /guard of Whiterun/.test(grow.textContent) && /Guard of Whiterun/.test(body.textContent) &&
         /Dragonsreach Dungeon/.test(body.textContent) && all(body).every(function (n) { return n.className !== 'stop'; }));
+
+    // One Jarl a hold, and Give up the office (#502).
+    srv.roles.jarl[P_ALICE2] = true;
+    show(srv.view(ALICE2));
+    goOffice();
+    yes('H18 another Jarl-role character is not offered Whiterun, and is told who holds it (' +
+        body.textContent.slice(0, 200) + ')',
+        buttons('Whiterun').length === 0 && buttons('Riften').length === 1 &&
+        /Held by their Jarl: Whiterun \(Balgruuf\)\./.test(body.textContent));
+    show(srv.view(JARL));
+    goOffice();
+    lines.length = 0;
+    const give = buttons('Give up the office');
+    if (give.length) { give[0].onclick({}); }
+    yes('H19 Give up the office asks first', give.length === 1 && lines.length === 0 &&
+        give[0].textContent === 'Press again to give up the office of Whiterun');
+    if (give.length) { give[0].onclick({}); }
+    yes('H19 and the second press sends /jarl - (' + lines.join(' | ') + ')', lines.join() === '/jarl -');
   }
 }
 
