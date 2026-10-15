@@ -66,7 +66,7 @@ function rig(saved) {
   const fn = new Function(
     'PASSAGES', 'plog', 'loadPart', 'Object', 'Date',
     block + '\nreturn { boards: boards, seed: BOARD_SEED, sites: BOARD_SITES, ' +
-            'cell: BOARD_CELL, reach: BOARD_REACH, seedBoards: seedBoards };');
+            'cell: \'3c:Skyrim.esm\', reach: BOARD_REACH, seedBoards: seedBoards };');
   const api = fn(
     PASSAGES,
     function () { logs.push(Array.prototype.join.call(arguments, ' ')); },
@@ -104,6 +104,9 @@ if (block !== null) {
         TOWNS.every(function (t) { return !!r.boards[t]; }));
     yes('S1 every one of the nine is outdoors in Tamriel, not in an inn',
         TOWNS.every(function (t) { return r.boards[t].cell === r.cell; }));
+    // #2516: no single BOARD_CELL; each site names its own cell or worldspace.
+    yes('S1 and each site carries its own worldspace, rather than one for all',
+        TOWNS.every(function (t) { return r.sites[t] && r.sites[t].cell === r.boards[t].cell; }));
     yes('S1 and a town with no site of its own still gets its inn',
         !!r.boards.ravenrock && r.boards.ravenrock.cell === '1a26f:Dragonborn.esm');
     yes('S1 Djinn\'s Whiterun coordinate is the one that went in',
@@ -245,10 +248,11 @@ if (block !== null) {
         front.indexOf("e.userEventName !== 'Activate'") !== -1 &&
         front.indexOf('dist > BOARD_REACH') !== -1 &&
         page.indexOf('window.thornswoodBoard') !== -1);
-    yes('the message board object is put down at the spot',
-        front.indexOf('Thornswood-Content.esp') !== -1 &&
-        front.indexOf('0x593B') !== -1 &&
-        front.indexOf('placeAtMe(base, 1, false, false)') !== -1);
+    // #2516: the server stands the message board at the spot, and every game is sent it.
+    yes('the message board object is stood at the spot by the server, not by each game',
+        src.indexOf("var BOARD_BASE_DESC = '593b:Thornswood-Content.esp';") !== -1 &&
+        /function standBoard\(hold, anchor\)/.test(src) &&
+        front.indexOf('0x593B') === -1 && front.indexOf('ensureBoards') === -1);
     yes('the panel is how a notice, a job, and a price list go up',
         page.indexOf("net('/notice ") !== -1 &&
         page.indexOf("net('/job ") !== -1 &&
@@ -270,9 +274,9 @@ if (block !== null) {
       }
     }
     yes('the click keeps no copy of the nine spots of its own' + copied, copied === '');
-    yes('it learns every board, with its cell, from what the server sends',
-        /row\.cell = bh\.cell;/.test(src) && page.indexOf("tell('spots ' + said)") !== -1 &&
-        front.indexOf("what.indexOf('board:spots ') === 0") !== -1);
+    yes('the server sends every board with its cell, and the game no longer needs the list to place them',
+        /row\.cell = bh\.cell;/.test(src) && page.indexOf("tell('spots ' + said)") === -1 &&
+        front.indexOf("what.indexOf('board:spots ') === 0") === -1);
   }
 }
 

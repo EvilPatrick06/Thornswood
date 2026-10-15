@@ -275,9 +275,9 @@ jobs:
           # seconds when the token exchange or the profile lookup stalls,
           # never answers, or drops halfway, and the page says to try again.
           # Issue #1597: every notice board gets its object, in the cell or
-          # worldspace the server has it in, from the list the server sends;
-          # tests\test-1597-board-objects.js runs the plugin's board code on a
-          # pretend game. Under a second.
+          # worldspace the server has it in; since #2516 the server stands it
+          # and the game places none (tests\test-1597-board-objects.js and
+          # tests\test-2516-server-boards.js). Under a second.
           # Issue #503: tests/test-papyrus-event-list.js holds the fork's Papyrus
           # event list, records/papyrus-events.json, to the rest of this
           # repository and proves its reader on a small fork it makes. The
@@ -335,6 +335,7 @@ jobs:
                  'test-1597-board-objects.js',
                  'test-2298-board-meshes.js',
                  'test-2298-dropbox.js',
+                 'test-2516-server-boards.js',
                  'test-1380-rare-mines.js',
                  'test-1621-quest-state.js',
                  'test-unpin.js', 'test-coffers.js',

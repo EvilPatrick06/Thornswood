@@ -530,7 +530,7 @@ if (C0) {
 {
   const press = slice(front, '  function driverPress(e) {', '\n  }\n');
   yes('the front plugin asks the server when E is pressed on a driver', !!press && /tellServer\('\/ride e ' \+ hex\)/.test(press));
-  yes('and asks before the merchant press, which would take any person', /if \(boardPress\(e\)\) return;\n\s*if \(driverPress\(e\)\) return;\n\s*if \(merchantPress\(e\)\) return;/.test(front));
+  yes('and asks before the merchant press, which would take any person', /if \(driverPress\(e\)\) return;\n\s*if \(merchantPress\(e\)\) return;/.test(front));
   const listSrc = slice(front, '  const RIDE_DRIVER_BASES = [', '\n  ];');
   let list = null;
   try { list = listSrc ? new Function('return ' + listSrc.slice(listSrc.indexOf('['))) () : null; } catch (e) { list = null; }

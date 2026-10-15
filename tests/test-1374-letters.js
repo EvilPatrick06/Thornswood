@@ -169,7 +169,9 @@ function boot(reg, w, opts) {
     'function isGuard() { return false; }',
     // Every word the property block answers that is not a board's.
     ['deeds', 'setLock', 'mold', 'moldHere', 'cutKey', 'here', 'claim', 'jarlCmd', 'stewardCmd',
-     'evict', 'boxCmd', 'rentCmd'].map(function (n) { return 'function ' + n + '() { return true; }'; }).join('\n')
+     'evict', 'boxCmd', 'rentCmd',
+     // The server stands the board where a steward moves it (#2516): test-2516-server-boards.js.
+     'standBoard'].map(function (n) { return 'function ' + n + '() { return true; }'; }).join('\n')
   ];
   NAMES.forEach(function (n) { body.push(lifted[n]); });
   body.push('return { boards: boards, funds: function () { return funds; }, ' +
@@ -503,9 +505,11 @@ if (missing.length === 0 && fees && seeding && PASSAGES) {
   const press = slice(front, '  function boardPress(e) {', '\n  }\n') || '';
   // Since #2298 only the board object itself opens the board, so a person or
   // an NPC under the crosshair (Geldis Sadri) answers E themselves.
+  // Since #2516 the server answers E on its own board reference, so a person
+  // or an NPC beside it (Geldis Sadri) answers E themselves.
+  const gmAll = read('game/gamemode.js');
   yes('pressing E on a person or an NPC by a board answers them, so Geldis Sadri still trades',
-      /if \(!ref \|\| !boardObjectHere\(ref\)\) \{ return false; \}/.test(press) &&
-      press.indexOf('rd > 250') === -1);
+      press === '' && gmAll.indexOf('propBoard.boardActivated(refrId, casterRefrId)') > 0);
   const page = read('game/ui/thornswood-board.js');
   yes('the board panel calls a letter a letter', page.indexOf("row.letter ? 'Letter'") !== -1);
 }

@@ -161,7 +161,9 @@ function server() {
     'function saveLaw() { reg.lawSaves++; }',
     'function plog() { }',
     ['deeds', 'setLock', 'mold', 'moldHere', 'cutKey', 'claim', 'sleepHere', 'post', 'take', 'jobs',
-     'dropJob', 'unpin', 'postLetter', 'deliver', 'haulCmd', 'haulText']
+     'dropJob', 'unpin', 'postLetter', 'deliver', 'haulCmd', 'haulText',
+     // The server stands the board where a steward moves it (#2516): test-2516-server-boards.js.
+     'standBoard']
       .map(function (n) { return 'function ' + n + '() { return true; }'; }).join('\n')
   ].concat(VARS, NAMES.map(function (n) { return lifted[n]; }));
   body.push('return { command: command, officeView: officeView, isJarl: isJarl, isSteward: isSteward, officeOf: officeOf, ' +

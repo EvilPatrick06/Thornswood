@@ -7,12 +7,16 @@ standing there: J has every one, under Boards.
 ## Where a board is
 
 The object is the message board. One stands at every board, wherever
-the server has it: indoors or out, in Skyrim or on Solstheim. It is
-put down when you are in that board's cell, or its worldspace outdoors.
-You are at it when you are within 400 of that board. Click the board:
-E on the board itself opens it, and nothing else does. E on a person
-beside it, or on anything else near it, is answered by that, not the
-board (Patrick, 12 Oct, #2298: clicking the board does only the board).
+the server has it: indoors or out, in Skyrim or on Solstheim. The server
+stands it, and its drop box, as its own references that every game is
+sent (#2516): a board in Tamriel at once, one in any other cell or
+worldspace the first time somebody is there. Until 12 Oct each game put
+its own copies down, and lost them in cells that were not loaded, so it
+kept putting new ones down at the person. You are at it when you are
+within 400 of that board. Click the board: E on the board itself opens
+it, and nothing else does. E on a person beside it, or on anything else
+near it, is answered by that, not the board (Patrick, 12 Oct, #2298:
+clicking the board does only the board).
 
 The board is Thornswood's own, built from Skyrim's own pieces (#2298):
 two Windhelm sign posts, a face of stockade planks between two log
@@ -22,10 +26,19 @@ box. It is about 3.5 metres tall and 4.4 wide with the shelf.
 `scripts/mods/Build-NoticeBoard.py` builds both meshes from the game's
 own archives; only the meshes ship, never a texture.
 
-A steward moves it. Standing where it should be, they press its town
-under the notice boards on the Office page of the K panel, and press
-again. A board a steward has walked to is saved, and a later seeding
-does not put it back.
+A steward moves it. Standing where it should be, facing the way its
+notices should face, they press its town under the notice boards on the
+Office page of the K panel, and press again. The server records the cell
+or worldspace, the point and the facing where they stand, and moves the
+board and its box there. A board a steward has walked to is saved, and a
+later seeding does not put it back.
+
+Solitude, Whiterun, Windhelm, Riften and Markarth are walled cities, each
+its own worldspace inside the walls. Their five spots are sent as
+Tamriel, the world outside the walls, because nobody has measured
+whether those numbers were read inside the walls or out; on dev on
+12 Oct Whiterun's board appeared only outside the gate. One steward's
+move inside each city settles it (#2516).
 
 The nine mainland towns have a spot each: Solitude, Whiterun, Riften,
 Windhelm, Markarth, Falkreath, Morthal, Dawnstar, Winterhold. Raven
@@ -38,9 +51,9 @@ boards, one per town in [Creation](creation.md).
 The hold's drop box stands on the shelf on the board's right post, an
 iron strongbox with a coin slot (Patrick, 12 Oct, #2298). E on the box
 opens the box's own panel, and only the box: E on the board opens the
-board. You use it standing at the board, within 400 of it. Each client
-draws the box beside its board, and what is in it is the server's own
-record, never a chest's contents.
+board. You use it standing at the board, within 400 of it. The server
+stands the box beside its board and turns it with the board, and what is
+in it is the server's own record, never a chest's contents.
 
 What goes in:
 

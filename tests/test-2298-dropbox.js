@@ -319,24 +319,22 @@ yes('  the server never sends the box\'s contents to anybody but the one who ope
 const front = read(path.join(REPO_DIR, 'game', 'plugins', 'thornswood-front.js'));
 yes('  the front plugin loads the box\'s panel and lets its focus go', /'thornswood-box\.js'/.test(front) &&
     /box: 'thornswoodBox'/.test(front) && /what === 'box:opened'/.test(front) && /what === 'box:closed'/.test(front));
-yes('  and asks the box before the board on E', front.indexOf('if (boxPress(e)) return;') > 0 &&
-    front.indexOf('if (boxPress(e)) return;') < front.indexOf('if (boardPress(e)) return;'));
+yes('  and E on the box is the server\'s to answer: the client presses nothing (#2516)',
+    front.indexOf('function boxPress(') < 0 && gm.indexOf('propBoard.boardActivated(refrId, casterRefrId)') > 0);
 
 // ------------------------------------------------------ the box beside the board
 {
-  const a = front.indexOf('  function boxPoint(spot) {');
-  const b = front.indexOf('\n  }\n', a);
-  const AT = /const BOX_AT = \[([^\]]+)\];/.exec(front);
-  const fn = new Function('BOX_AT', front.slice(a, b + 4) + '\nreturn boxPoint;')(AT ? AT[1].split(',').map(Number) : null);
-  const p0 = fn({ x: 0, y: 0, z: 0, face: 0 });
-  const p90 = fn({ x: 1000, y: 2000, z: 10, face: 90 });
+  // The server stands the box (#2516): boxOffset is BOX_AT turned with the board.
+  const p0 = W.boxOffset(0);
+  const p90 = W.boxOffset(90);
   yes('D12 the box stands at the right post of a board facing north, on the shelf',
-      Math.abs(p0.x - (-134.52)) < 0.01 && Math.abs(p0.y - 4) < 0.01 && Math.abs(p0.z - 80) < 0.01);
+      Math.abs(p0[0] - (-134.52)) < 0.01 && Math.abs(p0[1] - 4) < 0.01 && Math.abs(p0[2] - 80) < 0.01);
   // Turned a quarter east, the board's right (its -x, seen from the front at +y) is north.
   yes('  and turns with the board: facing east it is to the north of it, up the same',
-      Math.abs(p90.x - (1000 + 4)) < 0.01 && Math.abs(p90.y - (2000 + 134.52)) < 0.01 && Math.abs(p90.z - 90) < 0.01);
+      Math.abs(p90[0] - 4) < 0.01 && Math.abs(p90[1] - 134.52) < 0.01 && Math.abs(p90[2] - 80) < 0.01);
+  const AT = /var BOX_AT = \[([^\]]+)\];/.exec(gm);
   const mesh = read(path.join(REPO_DIR, 'scripts', 'mods', 'Build-NoticeBoard.py'));
-  yes('  where the mesh builder says the box stands', /box.{0,2}s origin stands at/.test(mesh) && AT &&
+  yes('  where the mesh builder says the box stands', /box.{0,2}s origin stands at/.test(mesh) && !!AT &&
       AT[1].replace(/\s/g, '') === '-134.52,4.0,80.0');
 }
 

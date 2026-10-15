@@ -356,7 +356,7 @@ attempt('the look prompt', function () {
   const keys = slice(front, "  sp.on('buttonEvent', guard('keys', (e) => {", '\n  }));\n');
   const at = keys ? keys.indexOf('if (deliverPress(e)) return;') : -1;
   yes('P11 the key handler asks it before the board, the driver and the trader take E',
-      at > 0 && at < keys.indexOf('if (boardPress(e)) return;') && at < keys.indexOf('if (merchantPress(e)) return;'));
+      at > 0 && at < keys.indexOf('if (driverPress(e)) return;') && at < keys.indexOf('if (merchantPress(e)) return;'));
 });
 
 // -------------------------------------------------------------- the board panel
