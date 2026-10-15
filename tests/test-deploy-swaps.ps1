@@ -203,6 +203,15 @@ function WaitFor([scriptblock]$cond) {
     for ($i = 0; $i -lt 60; $i++) { if (& $cond) { return $true }; Start-Sleep -Milliseconds 250 }
     return $false
 }
+# Asked by the names this run uses, one by one, never by 'Thornswood Test*'
+# (#2461). Until then it listed every 'Thornswood Test*' task and asked for
+# the bot service by 'ThornswoodTest*Bot*'; with SilentlyContinue a concurrent
+# register/remove can make the wildcard listing throw and look empty, so a
+# task this run left behind is missed. Exact names never failed that way
+# (same measurement as #2323 / the #2383 fix in test-install-server.ps1).
+# Deploy scripts register only the -Task / -TaskName / -Service they are
+# given, so these are every name a stand-in that did not take could leave.
+$script:ownTasks = @('Docs', 'Voice', 'Dev Server', 'Live Server') | ForEach-Object { $TaskPrefix + ' ' + $_ }
 function NoRealTask {
     # The task folder on disk, when this account can read it, because asking
     # the scheduler takes seconds and this is asked after every far call.
@@ -210,14 +219,16 @@ function NoRealTask {
     $readable = $false
     try { $null = [IO.Directory]::GetFiles($folder, 'x'); $readable = $true } catch { }
     if ($readable -and -not (Test-Path -Path (Join-Path $folder ($TaskPrefix + '*')))) { return $true }
-    $svc = @(Get-Service -Name ($BotService + '*') -ErrorAction SilentlyContinue)
-    if ($svc.Count) { return $false }
-    $real = @(Get-ScheduledTask -TaskName ($TaskPrefix + '*') -ErrorAction SilentlyContinue)
-    foreach ($r in $real) {
-        Stop-ScheduledTask -TaskName $r.TaskName -ErrorAction SilentlyContinue
-        Unregister-ScheduledTask -TaskName $r.TaskName -Confirm:$false -ErrorAction SilentlyContinue
+    # Exact service name - no wildcard Get-Service (#2461 / #2383).
+    if ($null -ne (Get-Service -Name $BotService -ErrorAction SilentlyContinue)) { return $false }
+    $mine = 0
+    foreach ($n in $script:ownTasks) {
+        if ($null -eq (Get-ScheduledTask -TaskName $n -ErrorAction SilentlyContinue)) { continue }
+        $mine++
+        Stop-ScheduledTask -TaskName $n -ErrorAction SilentlyContinue
+        Unregister-ScheduledTask -TaskName $n -Confirm:$false -ErrorAction SilentlyContinue
     }
-    return ($real.Count -eq 0)
+    return ($mine -eq 0)
 }
 
 # The task scheduler and the firewall, for the far side; the same stand-ins

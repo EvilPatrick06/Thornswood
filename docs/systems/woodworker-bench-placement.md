@@ -1,11 +1,11 @@
-﻿# Woodworking benches for #516 (placement brief)
+# Woodworking benches for #516 (placement brief)
 
 Patrick, 12 Oct 2026: our own woodworking bench, at least one in every major hold and some minor towns, placed by Claude.
 
 ## Base records (this PR)
 
-- KYWD `ThornswoodCraftingWoodworking` (0x050154E0) in `Thornswood-Content.esp`
-- FURN `ThornswoodCraftingWoodworkingWorkbench` (0x050154E1), mesh `_BYOH\Furniture\CraftingWorkbench01.nif` (Hearthfire carpenter workbench), create-object bench, carries the keyword above
+- KYWD `ThornswoodCraftingWoodworking` (0x050154E1) in `Thornswood-Content.esp`
+- FURN `ThornswoodCraftingWoodworkingWorkbench` (0x050154E2), mesh `_BYOH\Furniture\CraftingWorkbench01.nif` (Hearthfire carpenter workbench), create-object bench, carries the keyword above
 
 ## Where to place
 

@@ -1,4 +1,4 @@
-﻿"""Build Thornswood-WoodworkerTrail.esp for issue #516 (i).
+"""Build Thornswood-WoodworkerTrail.esp for issue #516 (i).
 
 The 53 Woodworker forge recipes that Thornswood-Content.esp cannot override
 (Immersive Weapons, PlayFluteLuteDrum, Playable Rieklings, MoreCraftableEquipment,
@@ -36,7 +36,7 @@ spec = importlib.util.spec_from_file_location(
 acr = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(acr)
 
-CONTENT_KEYWORD_LOCAL = 0x0154E0  # 0x50154E0 without the 05 load index
+CONTENT_KEYWORD_LOCAL = 0x0154E1  # 0x50154E1 without the 05 load index
 CONTENT_PLUGIN = "Thornswood-Content.esp"
 LIST_NAME = "woodworker-trail-recipes.json"
 OUT_NAME = "Thornswood-WoodworkerTrail.esp"

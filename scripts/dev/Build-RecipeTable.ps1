@@ -1913,20 +1913,6 @@ $RECIPE_OWNER = [ordered]@{
     # rule further down; the trap is a MISC with no pole in its name, so the
     # forge rule leaves it to anybody unless it is named here.
     'ThornswoodRecipeFishTrap'   = @{ Owner = 'Woodworker'; Half = 'Woodwright'; Why = 'the fish trap is a woodwright novice good, made with the poles (docs/systems/classes/fisher.md, issue #1379). A MISC at a forge with no pole in its name, so neither the forge rule nor the spear rule can see it.' }
-    # A RIEKLING'S OWN PLAIN CLOTHES (#614). Patrick, 12 October 2026: "Rieklings
-    # get Riekling clothing". The ten human and beast races' clothes have no
-    # addon for either playable Riekling race, so a riekling in them is drawn in
-    # the human sized Khajiit model; of 2,704 armour addons in the load order only
-    # the 148 in Playable Rieklings.esp fit one. These four are what a new
-    # riekling starts in, and they come back out of the cut file. They carry
-    # ArmorLight, which hands them to the Platewright with the armour, but they
-    # are clothes, the tailor's work like the Riekling Fur Cloak, so they are
-    # named here. The race lock stays, read from the name like every other
-    # Riekling row.
-    'RecipeArmorRieklingCuirassAlt'  = @{ Owner = 'Tailor'; Half = 'Haberdasher'; Family = 'Robes and body wear'; Why = 'a riekling''s own loincloth, the plain body piece a new riekling starts in (#614). It carries ArmorLight, but it is clothing, the tailor''s like the Riekling Fur Cloak.' }
-    'RecipeArmorRieklingCuirass2Alt' = @{ Owner = 'Tailor'; Half = 'Haberdasher'; Family = 'Robes and body wear'; Why = 'a riekling''s own second loincloth (#614). It carries ArmorLight, but it is clothing, the tailor''s like the Riekling Fur Cloak.' }
-    'RecipeArmorRieklingHandWraps'   = @{ Owner = 'Tailor'; Half = 'Haberdasher'; Family = 'Gloves'; Why = 'a riekling''s own cloth hand wraps, which a new riekling starts in (#614). They carry ArmorLight, but they are cloth, the tailor''s like the Riekling Fur Cloak.' }
-    'RecipeArmorRieklingFootWraps'   = @{ Owner = 'Tailor'; Half = 'Haberdasher'; Family = 'Shoes and light boots'; Why = 'a riekling''s own cloth foot wraps, which a new riekling starts in (#614). They carry ArmorLight, but they are cloth, the tailor''s like the Riekling Fur Cloak.' }
     # ONE SMELT ROW PER INGOT AND ONE ROW FOR LEATHER (#1391, #1400). Smelting an
     # ingot is smith work and tanning a hide is the Platewright's
     # (docs/systems/cut-items.md, "Smelting and tanning are not anybody's work").

@@ -2,10 +2,10 @@
   "builtFrom": "game/data/recipes.json",
   "note": "References held out of the open craft book. recipes.json is not edited by the script that writes this file.",
   "counts": {
-    "cut": 3317,
+    "cut": 3319,
     "embassy": 15,
     "thalmor": 9,
-    "kept": 597
+    "kept": 595
   },
   "rieklingKept": [
     "Riekling Fur Armour",
@@ -17,10 +17,8 @@
     "Riekling Chief Helmet",
     "Riekling Spear",
     "Riekling Bone Club",
-    "Riekling LoinCloth 1",
-    "Riekling LoinCloth 2",
-    "Riekling Cloth Hand Wraps",
-    "Riekling Cloth Foot Wraps"
+    "Riekling Belted Tunic",
+    "Riekling Footwraps"
   ],
   "items": [
     {
@@ -6132,18 +6130,6 @@
       "why": "Extra Riekling copy of someone else's gear, or a spare piece. Not found and not made."
     },
     {
-      "id": "bfee5:Playable Rieklings.esp",
-      "name": "Riekling Belted Tunic",
-      "plugin": "Playable Rieklings.esp",
-      "half": "Haberdasher",
-      "owner": "Tailor",
-      "family": "Robes and body wear",
-      "rank": "novice",
-      "fires": true,
-      "disposition": "cut",
-      "why": "Extra Riekling copy of someone else's gear, or a spare piece. Not found and not made."
-    },
-    {
       "id": "bfee0:Playable Rieklings.esp",
       "name": "Riekling Blacksmith's Apron",
       "plugin": "Playable Rieklings.esp",
@@ -6246,6 +6232,30 @@
       "half": "Edgewright",
       "owner": "Smith",
       "family": "Other weapons",
+      "rank": "novice",
+      "fires": true,
+      "disposition": "cut",
+      "why": "Extra Riekling copy of someone else's gear, or a spare piece. Not found and not made."
+    },
+    {
+      "id": "19f91:Playable Rieklings.esp",
+      "name": "Riekling Cloth Foot Wraps",
+      "plugin": "Playable Rieklings.esp",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Armoured boots",
+      "rank": "novice",
+      "fires": true,
+      "disposition": "cut",
+      "why": "Extra Riekling copy of someone else's gear, or a spare piece. Not found and not made."
+    },
+    {
+      "id": "19f90:Playable Rieklings.esp",
+      "name": "Riekling Cloth Hand Wraps",
+      "plugin": "Playable Rieklings.esp",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Gauntlets",
       "rank": "novice",
       "fires": true,
       "disposition": "cut",
@@ -6582,18 +6592,6 @@
       "half": "Haberdasher",
       "owner": "Tailor",
       "family": "Gauntlets",
-      "rank": "novice",
-      "fires": true,
-      "disposition": "cut",
-      "why": "Extra Riekling copy of someone else's gear, or a spare piece. Not found and not made."
-    },
-    {
-      "id": "bfefb:Playable Rieklings.esp",
-      "name": "Riekling Footwraps",
-      "plugin": "Playable Rieklings.esp",
-      "half": "Haberdasher",
-      "owner": "Tailor",
-      "family": "Shoes and light boots",
       "rank": "novice",
       "fires": true,
       "disposition": "cut",
@@ -6960,8 +6958,32 @@
       "why": "Extra Riekling copy of someone else's gear, or a spare piece. Not found and not made."
     },
     {
+      "id": "19f92:Playable Rieklings.esp",
+      "name": "Riekling LoinCloth 1",
+      "plugin": "Playable Rieklings.esp",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "novice",
+      "fires": true,
+      "disposition": "cut",
+      "why": "Extra Riekling copy of someone else's gear, or a spare piece. Not found and not made."
+    },
+    {
       "id": "babbc:Playable Rieklings.esp",
       "name": "Riekling LoinCloth 1a",
+      "plugin": "Playable Rieklings.esp",
+      "half": "Platewright",
+      "owner": "Smith",
+      "family": "Body armour",
+      "rank": "novice",
+      "fires": true,
+      "disposition": "cut",
+      "why": "Extra Riekling copy of someone else's gear, or a spare piece. Not found and not made."
+    },
+    {
+      "id": "19f94:Playable Rieklings.esp",
+      "name": "Riekling LoinCloth 2",
       "plugin": "Playable Rieklings.esp",
       "half": "Platewright",
       "owner": "Smith",

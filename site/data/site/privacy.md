@@ -2,7 +2,7 @@
 
 What Thornswood keeps about you, why, and how to have it deleted.
 
-Last changed: 12 October 2026.
+Last changed: 15 October 2026.
 
 Thornswood is a free fan project run by two people. It is not a company. This
 page is written plainly rather than legally, and it is meant to be the whole
@@ -77,7 +77,8 @@ the name for its caption and any note for staff are kept for review. Only
 approved submissions appear publicly. Their caption and media then become
 public too. Submit only material you have permission to share, without
 private information about other people. Ask in the Discord to have a
-submission removed. See [Terms](/terms) for publication permissions.
+submission removed. Removing one deletes its file from the site. See
+[Terms](/terms) for publication permissions.
 
 ## What is not stored
 
@@ -119,6 +120,9 @@ both are served from here now.
   wipe, which is announced first.
 - **Launcher logs** are kept for 365 days, like session records, unless staff
   mark the session kept.
+- **A gallery submission that is removed** has its file deleted then. One
+  taken down after somebody reported it is kept out of sight for 30 days, so
+  staff can look into the report, then deleted. The site checks every hour.
 
 **Backups.** Encrypted recovery copies include site records and uploads. The
 server keeps seven daily and four weekly copies. Copies fetched to the

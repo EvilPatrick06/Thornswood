@@ -218,6 +218,18 @@ uncertain native result revokes that policy instead of retrying it. Failure
 after the commit attempt stops the new services; it does not claim to undo
 native exclusions or durable receipt work.
 
+Native callbacks, including navigation reads, check that their runtime is
+still active before and after calling the engine. Teardown snapshots old
+controller identities before callbacks run, attempts all owned cancellations
+and service shutdowns, and refuses new startup after a teardown error or an
+unexpected replacement. A failing cancellation leaves its callback revoked.
+Trading closes before timer cancellation can call back or throw. A reentrant
+startup still finishes every captured old service without clearing its
+successor. Population and purse preparation check the calling runtime too,
+including native lookups, returns and the durable initialization boundary.
+Cancelling that caller alone leaves the shared services available to others;
+an uncertain durable write retains the existing writer revocation rule.
+
 `game/data/merchant-roster.json` records the proposed 60 role bindings and
 all 249 historical identities. Its source validator checks every binding
 before changing any population row. This prerequisite does not import that
@@ -228,6 +240,35 @@ alone do not suppress native client copies deterministically.
 Implement quests in complete, source-bound slices with coverage checks for
 all trades, holds, tiers, classes, professions, halves and schools. Legacy
 open quests must remain recoverable during catalogue changes.
+
+A full saved trade must fit the remaining pack together with its incoming
+goods, using the same native size and count limits as a new trade. Checking
+the two inventories separately is insufficient. Validation does not rewrite
+the record; compact credit records keep their existing recovery checks.
+
+`game/merchant-roster-admission.js` provides read-only ledger inspection.
+It accepts copied ledger, marker and roster bytes, the original world identity,
+and trusted isolated native record and inventory validators. It checks the
+complete historical manifest, retained purses, stocks and pending transfers,
+then returns counts and hashes without exposing private rows or paths. The
+record resolver must verify each winning placement and its base; decoding a
+form descriptor alone is insufficient. Unit fixtures are not operational proof.
+
+This component performs no file or server operation and cannot authorize a cut.
+A future caller still needs private-file and alias checks, a stopped world and
+completed saves, native build and load-order binding, a fresh hash check,
+coordinated plugin delivery and strict client admission. The component is not
+imported into startup and does not change the 249-trader roster or initialize
+new ledger state. `node tests/test-merchant-ledger-inspection.js` checks it.
+
+`game/merchant-ledger-native.js` binds an already isolated native reader to
+that inspection interface. It checks each winning actor placement and its
+NPC base, translating record-local IDs through the owning plugin's mapping.
+Light-plugin IDs must fit their local width; masked aliases are refused.
+It also uses the native inventory validator. The adapter creates no server,
+loads no actors and supplies no cut authorization or population-policy check.
+Interface fixtures in `tests/test-merchant-ledger-native.js` cover full and
+light plugins and overridden records; compiled native acceptance is separate.
 
 Local checks include `node tests/test-merchant-trading.js`,
 `node tests/test-merchant-settlement.js`,

@@ -121,6 +121,9 @@ if (missing.length || !fees || !holds || !tenthFrom || !seeding || !reads || !PA
 
 const GOLD = 15;
 const TAMRIEL = '3c:Skyrim.esm';
+// Whiterun's and Riften's boards stand inside their walled cities (#2516).
+const WHITERUN_WORLD = '1a26f:Skyrim.esm';
+const RIFTEN_WORLD = '16bb4:Skyrim.esm';
 const WHITERUN = [23139.4, -7891.7, -3494.4];
 
 /* The engine: packs, names and places, kept across a restart. */
@@ -129,7 +132,7 @@ function world() {
   return {
     people: people,
     add: function (p) {
-      people[p.actor] = { pid: p.pid, name: p.name, cell: p.cell || TAMRIEL,
+      people[p.actor] = { pid: p.pid, name: p.name, cell: p.cell || WHITERUN_WORLD,
                           pos: (p.pos || WHITERUN).slice(), pack: [{ baseId: GOLD, count: p.gold }] };
       return p;
     },
@@ -320,9 +323,9 @@ attempt('J\'s Boards tab', function () {
       s.boardsView(CYRUS.pid).read.hold === 'whiterun');
 
   // Bob reads another town; his jobs are under it, from every town.
-  w.move(BOB, TAMRIEL, s.boards.riften.pos);
+  w.move(BOB, RIFTEN_WORLD, s.boards.riften.pos);
   s.say(ALICE, '/notice nothing');   // Alice is still in Whiterun.
-  w.move(ALICE, TAMRIEL, s.boards.riften.pos);
+  w.move(ALICE, RIFTEN_WORLD, s.boards.riften.pos);
   s.say(ALICE, '/job Guard the gate');
   s.say(BOB, '/take 1');
   w.move(BOB, TAMRIEL, FAR);
@@ -349,11 +352,11 @@ attempt('the board panel', function () {
   s.say(ALICE, '/job Fetch firewood');
   s.say(BOB, '/take 1');
   for (let i = 1; i <= 11; i++) { s.say(ALICE, '/notice Notice ' + i); }
-  w.move(ALICE, TAMRIEL, s.boards.riften.pos);
+  w.move(ALICE, RIFTEN_WORLD, s.boards.riften.pos);
   s.say(ALICE, '/job Guard the gate');
-  w.move(BOB, TAMRIEL, s.boards.riften.pos);
+  w.move(BOB, RIFTEN_WORLD, s.boards.riften.pos);
   s.say(BOB, '/take 1');
-  w.move(BOB, TAMRIEL, WHITERUN);
+  w.move(BOB, WHITERUN_WORLD, WHITERUN);
 
   const panel = s.boardPanel(BOB.actor, BOB.pid);
   yes('P1 the job Bob took is older than the newest ten, so it is not on the wall',
@@ -370,7 +373,7 @@ attempt('the board panel', function () {
       s.notices().riften[0].taken === BOB.pid);
   yes('P5 away from a board the panel is not drawn', s.boardPanel(BOB.actor, BOB.pid) === null);
 
-  w.move(CYRUS, TAMRIEL, WHITERUN);
+  w.move(CYRUS, WHITERUN_WORLD, WHITERUN);
   const refusals = [s.say(CYRUS, '/take 99'), s.say(CYRUS, '/dropjob 99'), s.say(CYRUS, '/unpin 99'), s.say(CYRUS, '/take x')];
   yes('P6 a number that is not on the board is refused in words that name no command',
       refusals.every(function (r) { return r === 'That one is not on the board.'; }));

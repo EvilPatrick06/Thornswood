@@ -1,9 +1,9 @@
 {
   "issue": 516,
-  "purpose": "Trailing plugin overrides: point these 53 Woodworker forge recipes at ThornswoodCraftingWoodworking (0x50154E0 in Thornswood-Content.esp). Content.esp cannot override them because the source plugins load after it, or adding them as masters would renumber Content records.",
+  "purpose": "Trailing plugin overrides: point these 53 Woodworker forge recipes at ThornswoodCraftingWoodworking (0x50154E1 in Thornswood-Content.esp). Content.esp cannot override them because the source plugins load after it, or adding them as masters would renumber Content records.",
   "targetKeyword": {
     "editorId": "ThornswoodCraftingWoodworking",
-    "formIdInContent": "50154e0:Thornswood-Content.esp"
+    "formIdInContent": "50154e1:Thornswood-Content.esp"
   },
   "loadOrderNote": "Ship as Thornswood-WoodworkerTrail.esp at the end of the collection load order, after Immersive Weapons, PlayFluteLuteDrum, Playable Rieklings, MoreCraftableEquipment, and FishingInSkyrim. Masters must include those plugins, RaceCompatibility.esm (Playable Rieklings needs it), Thornswood-Content.esp (for the keyword), and the usual Bethesda masters.",
   "count": 53,

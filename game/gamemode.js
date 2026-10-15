@@ -4187,7 +4187,7 @@ const HALL = {
   front doors two units apart, which is the only reason Morthal's and
   Dawnstar's old points looked like one spot.
 */
-const CHARGEN = {"shift":[["1be1a:Skyrim.esm",1],["1be1b:Skyrim.esm",1]],"rieklingShift":[["19f6c:Playable Rieklings.esp",1],["19f69:Playable Rieklings.esp",1],["19f68:Playable Rieklings.esp",1]],"towns":{"e80030:Thornswood-Content.esp":{"key":"whiterun","town":"Whiterun","arrival":{"cell":"WhiterunBanneredMare","desc":"1605e:Skyrim.esm","pos":[-113.6,-810,69.3],"rot":[0,0,3.7]}},"e80031:Thornswood-Content.esp":{"key":"riften","town":"Riften","arrival":{"cell":"RiftenBeeandBarb","desc":"16bdf:Skyrim.esm","pos":[-150.2,-598.2,64],"rot":[0,0,36.3]}},"e80032:Thornswood-Content.esp":{"key":"solitude","town":"Solitude","arrival":{"cell":"SolitudeWinkingSkeever","desc":"16a0e:Skyrim.esm","pos":[-293.9,-1450.6,0],"rot":[0,0,0]}},"e80033:Thornswood-Content.esp":{"key":"windhelm","town":"Windhelm","arrival":{"cell":"WindhelmCandlehearthHall","desc":"16789:Skyrim.esm","pos":[554.3,-3766.2,64],"rot":[0,0,91.9]}},"e80034:Thornswood-Content.esp":{"key":"markarth","town":"Markarth","arrival":{"cell":"MarkarthSilverBloodInn","desc":"16dfe:Skyrim.esm","pos":[-5588.5,-1925.8,-16],"rot":[0,0,180]}},"e80035:Thornswood-Content.esp":{"key":"falkreath","town":"Falkreath","arrival":{"cell":"FalkreathDeadMansDrink","desc":"3a184:Skyrim.esm","pos":[670.4,-443.1,0.5],"rot":[0,0,0]}},"e80036:Thornswood-Content.esp":{"key":"morthal","town":"Morthal","arrival":{"cell":"MorthalMoorsideInn","desc":"138ce:Skyrim.esm","pos":[1970.6,-160.2,0],"rot":[0,0,270.9]}},"e80037:Thornswood-Content.esp":{"key":"dawnstar","town":"Dawnstar","arrival":{"cell":"DawnstarWindpeakInn","desc":"13a7f:Skyrim.esm","pos":[1823.2,-534.7,0.5],"rot":[0,0,0]}},"e80038:Thornswood-Content.esp":{"key":"winterhold","town":"Winterhold","arrival":{"cell":"WinterholdTheFrozenHearth","desc":"13814:Skyrim.esm","pos":[1791.6,7.3,0],"rot":[0,0,88]}}}};
+const CHARGEN = {"shift":[["1be1a:Skyrim.esm",1],["1be1b:Skyrim.esm",1]],"rieklingShift":[["bfd98:Playable Rieklings.esp",1],["bfdb1:Playable Rieklings.esp",1]],"towns":{"e80030:Thornswood-Content.esp":{"key":"whiterun","town":"Whiterun","arrival":{"cell":"WhiterunBanneredMare","desc":"1605e:Skyrim.esm","pos":[-113.6,-810,69.3],"rot":[0,0,3.7]}},"e80031:Thornswood-Content.esp":{"key":"riften","town":"Riften","arrival":{"cell":"RiftenBeeandBarb","desc":"16bdf:Skyrim.esm","pos":[-150.2,-598.2,64],"rot":[0,0,36.3]}},"e80032:Thornswood-Content.esp":{"key":"solitude","town":"Solitude","arrival":{"cell":"SolitudeWinkingSkeever","desc":"16a0e:Skyrim.esm","pos":[-293.9,-1450.6,0],"rot":[0,0,0]}},"e80033:Thornswood-Content.esp":{"key":"windhelm","town":"Windhelm","arrival":{"cell":"WindhelmCandlehearthHall","desc":"16789:Skyrim.esm","pos":[554.3,-3766.2,64],"rot":[0,0,91.9]}},"e80034:Thornswood-Content.esp":{"key":"markarth","town":"Markarth","arrival":{"cell":"MarkarthSilverBloodInn","desc":"16dfe:Skyrim.esm","pos":[-5588.5,-1925.8,-16],"rot":[0,0,180]}},"e80035:Thornswood-Content.esp":{"key":"falkreath","town":"Falkreath","arrival":{"cell":"FalkreathDeadMansDrink","desc":"3a184:Skyrim.esm","pos":[670.4,-443.1,0.5],"rot":[0,0,0]}},"e80036:Thornswood-Content.esp":{"key":"morthal","town":"Morthal","arrival":{"cell":"MorthalMoorsideInn","desc":"138ce:Skyrim.esm","pos":[1970.6,-160.2,0],"rot":[0,0,270.9]}},"e80037:Thornswood-Content.esp":{"key":"dawnstar","town":"Dawnstar","arrival":{"cell":"DawnstarWindpeakInn","desc":"13a7f:Skyrim.esm","pos":[1823.2,-534.7,0.5],"rot":[0,0,0]}},"e80038:Thornswood-Content.esp":{"key":"winterhold","town":"Winterhold","arrival":{"cell":"WinterholdTheFrozenHearth","desc":"13814:Skyrim.esm","pos":[1791.6,7.3,0],"rot":[0,0,88]}}}};
 
 /* The plain outfit is supplied before a fresh character opens the face menu.
  * Choosing reuses those same owned pieces after the body has settled. */
@@ -4293,9 +4293,12 @@ function giveShift(actorId) {
   again. Measured on the dev load order: of 2,704 armour addons only the 148 in
   Playable Rieklings.esp fit a playable riekling.
 
-  So a riekling's shift is that mod's own (CHARGEN.rieklingShift): LoinCloth
-  1, the cloth hand wraps and the cloth foot wraps, whose first addons list
-  both playable Riekling races.
+  So a riekling's shift is that mod's own riekling cut of the same plain
+  clothes (CHARGEN.rieklingShift): the Riekling Belted Tunic (bfd98) and the
+  Riekling Footwraps (bfdb1), clothing like the shift, whose addons
+  (FarmerTorso01AA and PrisonerShoesAA of Playable Rieklings.esp) list both
+  playable Riekling races. Patrick chose these over the mod's loincloth and
+  cloth wraps, which are light armour, later the same evening.
 
   WHY HERE AND NOT IN created(). The race is picked in the race menu, which
   opens after the engine has handed the new character over, so created() has
@@ -8487,6 +8490,20 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
   }
 
   /*
+    A NOTICE BOARD OR ITS DROP BOX (#2516, #2298): the server's own
+    references. The board opens only the board's panel and the box only the
+    box's, and nothing else in this chain sees the press.
+  */
+  try {
+    const propBoard = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodProperty;
+    if (propBoard && propBoard.boardActivated && propBoard.boardActivated(refrId, casterRefrId)) {
+      return false;
+    }
+  } catch (eBoard) {
+    log('the board or box at', Number(refrId).toString(16), 'threw:', eBoard);
+  }
+
+  /*
     WATER (#1382). A well activator with an empty bottle fills it; a cooking
     spot starts boiling any unboiled water carried. It answers nothing to the
     engine, so the press goes on down the chain and the cooking menu opens as
@@ -10896,11 +10913,11 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "19f8d:Playable Rieklings.esp": { "out": "19f60:Playable Rieklings.esp", "name": "Riekling Fur Boots", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "riekling", "rank": "novice", "family": "Armoured boots", "open": true },
     "19f8e:Playable Rieklings.esp": { "out": "19f61:Playable Rieklings.esp", "name": "Riekling Fur Gauntlets", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "riekling", "rank": "novice", "family": "Gauntlets", "open": true },
     "19f8f:Playable Rieklings.esp": { "out": "19f62:Playable Rieklings.esp", "name": "Riekling Horned Helmet", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "riekling", "rank": "novice", "family": "Helmets", "open": true },
-    "19f90:Playable Rieklings.esp": { "out": "19f69:Playable Rieklings.esp", "name": "Riekling Cloth Hand Wraps", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "riekling", "rank": "novice", "family": "Gloves", "open": true },
-    "19f91:Playable Rieklings.esp": { "out": "19f68:Playable Rieklings.esp", "name": "Riekling Cloth Foot Wraps", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "riekling", "rank": "novice", "family": "Shoes and light boots", "open": true },
-    "19f92:Playable Rieklings.esp": { "out": "19f6c:Playable Rieklings.esp", "name": "Riekling LoinCloth 1", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "riekling", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "19f90:Playable Rieklings.esp": { "out": "19f69:Playable Rieklings.esp", "name": "Riekling Cloth Hand Wraps", "type": "ARMO", "makes": 1, "owner": "", "half": "", "race": "riekling", "rank": "", "family": "", "nobody": "Cut from the open book. Not found and not made. The reference stays in the cut file." },
+    "19f91:Playable Rieklings.esp": { "out": "19f68:Playable Rieklings.esp", "name": "Riekling Cloth Foot Wraps", "type": "ARMO", "makes": 1, "owner": "", "half": "", "race": "riekling", "rank": "", "family": "", "nobody": "Cut from the open book. Not found and not made. The reference stays in the cut file." },
+    "19f92:Playable Rieklings.esp": { "out": "19f6c:Playable Rieklings.esp", "name": "Riekling LoinCloth 1", "type": "ARMO", "makes": 1, "owner": "", "half": "", "race": "riekling", "rank": "", "family": "", "nobody": "Cut from the open book. Not found and not made. The reference stays in the cut file." },
     "19f93:Playable Rieklings.esp": { "out": "19f6d:Playable Rieklings.esp", "name": "Riekling Iron Armour", "type": "ARMO", "makes": 1, "owner": "", "half": "", "race": "riekling", "rank": "", "family": "", "nobody": "Cut from the open book. Not found and not made. The reference stays in the cut file." },
-    "19f94:Playable Rieklings.esp": { "out": "19f6e:Playable Rieklings.esp", "name": "Riekling LoinCloth 2", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "riekling", "rank": "novice", "family": "Robes and body wear", "open": true },
+    "19f94:Playable Rieklings.esp": { "out": "19f6e:Playable Rieklings.esp", "name": "Riekling LoinCloth 2", "type": "ARMO", "makes": 1, "owner": "", "half": "", "race": "riekling", "rank": "", "family": "", "nobody": "Cut from the open book. Not found and not made. The reference stays in the cut file." },
     "19f95:Playable Rieklings.esp": { "out": "19f6f:Playable Rieklings.esp", "name": "Riekling Fur Iron Armour", "type": "ARMO", "makes": 1, "owner": "", "half": "", "race": "riekling", "rank": "", "family": "", "nobody": "Cut from the open book. Not found and not made. The reference stays in the cut file." },
     "19f96:Playable Rieklings.esp": { "out": "19f70:Playable Rieklings.esp", "name": "Riekling Chief Fur Armour", "type": "ARMO", "makes": 1, "owner": "", "half": "", "race": "riekling", "rank": "", "family": "", "nobody": "Cut from the open book. Not found and not made. The reference stays in the cut file." },
     "19f97:Playable Rieklings.esp": { "out": "19f71:Playable Rieklings.esp", "name": "Riekling Chief Fur Iron Armour", "type": "ARMO", "makes": 1, "owner": "Smith", "half": "Platewright", "race": "riekling", "rank": "novice", "family": "Body armour", "open": true },
@@ -10997,7 +11014,7 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "bfee2:Playable Rieklings.esp": { "out": "bfd95:Playable Rieklings.esp", "name": "Riekling Chef's Tunic", "type": "ARMO", "makes": 1, "owner": "", "half": "", "race": "riekling", "rank": "", "family": "", "nobody": "Cut from the open book. Not found and not made. The reference stays in the cut file." },
     "bfee3:Playable Rieklings.esp": { "out": "bfd96:Playable Rieklings.esp", "name": "Riekling Executioner's Hood", "type": "ARMO", "makes": 1, "owner": "", "half": "", "race": "riekling", "rank": "", "family": "", "nobody": "Cut from the open book. Not found and not made. The reference stays in the cut file." },
     "bfee4:Playable Rieklings.esp": { "out": "bfd97:Playable Rieklings.esp", "name": "Riekling Executioner's Robes", "type": "ARMO", "makes": 1, "owner": "", "half": "", "race": "riekling", "rank": "", "family": "", "nobody": "Cut from the open book. Not found and not made. The reference stays in the cut file." },
-    "bfee5:Playable Rieklings.esp": { "out": "bfd98:Playable Rieklings.esp", "name": "Riekling Belted Tunic", "type": "ARMO", "makes": 1, "owner": "", "half": "", "race": "riekling", "rank": "", "family": "", "nobody": "Cut from the open book. Not found and not made. The reference stays in the cut file." },
+    "bfee5:Playable Rieklings.esp": { "out": "bfd98:Playable Rieklings.esp", "name": "Riekling Belted Tunic", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "riekling", "rank": "novice", "family": "Robes and body wear", "open": true },
     "bfee6:Playable Rieklings.esp": { "out": "bfd99:Playable Rieklings.esp", "name": "Riekling Clothes", "type": "ARMO", "makes": 1, "owner": "", "half": "", "race": "riekling", "rank": "", "family": "", "nobody": "Cut from the open book. Not found and not made. The reference stays in the cut file." },
     "bfee7:Playable Rieklings.esp": { "out": "bfd9a:Playable Rieklings.esp", "name": "Riekling Clothes", "type": "ARMO", "makes": 1, "owner": "", "half": "", "race": "riekling", "rank": "", "family": "", "nobody": "Cut from the open book. Not found and not made. The reference stays in the cut file." },
     "bfee8:Playable Rieklings.esp": { "out": "bfd9b:Playable Rieklings.esp", "name": "Riekling Clothes", "type": "ARMO", "makes": 1, "owner": "", "half": "", "race": "riekling", "rank": "", "family": "", "nobody": "Cut from the open book. Not found and not made. The reference stays in the cut file." },
@@ -11019,7 +11036,7 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     "bfef8:Playable Rieklings.esp": { "out": "bfe26:Playable Rieklings.esp", "name": "Riekling Footwraps Bloody ", "type": "ARMO", "makes": 1, "owner": "", "half": "", "race": "riekling", "rank": "", "family": "", "nobody": "Cut from the open book. Not found and not made. The reference stays in the cut file." },
     "bfef9:Playable Rieklings.esp": { "out": "bfdb0:Playable Rieklings.esp", "name": "Riekling Ragged Trousers", "type": "ARMO", "makes": 1, "owner": "", "half": "", "race": "riekling", "rank": "", "family": "", "nobody": "Cut from the open book. Not found and not made. The reference stays in the cut file." },
     "bfefa:Playable Rieklings.esp": { "out": "bfe27:Playable Rieklings.esp", "name": "Riekling Ragged Bloody Trousers", "type": "ARMO", "makes": 1, "owner": "", "half": "", "race": "riekling", "rank": "", "family": "", "nobody": "Cut from the open book. Not found and not made. The reference stays in the cut file." },
-    "bfefb:Playable Rieklings.esp": { "out": "bfdb1:Playable Rieklings.esp", "name": "Riekling Footwraps", "type": "ARMO", "makes": 1, "owner": "", "half": "", "race": "riekling", "rank": "", "family": "", "nobody": "Cut from the open book. Not found and not made. The reference stays in the cut file." },
+    "bfefb:Playable Rieklings.esp": { "out": "bfdb1:Playable Rieklings.esp", "name": "Riekling Footwraps", "type": "ARMO", "makes": 1, "owner": "Tailor", "half": "Haberdasher", "race": "riekling", "rank": "novice", "family": "Shoes and light boots", "open": true },
     "bfefc:Playable Rieklings.esp": { "out": "bfdb2:Playable Rieklings.esp", "name": "Riekling Roughspun Tunic", "type": "ARMO", "makes": 1, "owner": "", "half": "", "race": "riekling", "rank": "", "family": "", "nobody": "Cut from the open book. Not found and not made. The reference stays in the cut file." },
     "bfefd:Playable Rieklings.esp": { "out": "bfe2f:Playable Rieklings.esp", "name": "Riekling Roughspun Bloody Tunic", "type": "ARMO", "makes": 1, "owner": "", "half": "", "race": "riekling", "rank": "", "family": "", "nobody": "Cut from the open book. Not found and not made. The reference stays in the cut file." },
     "bfefe:Playable Rieklings.esp": { "out": "bfdb4:Playable Rieklings.esp", "name": "Riekling Ulfric's Bracers", "type": "ARMO", "makes": 1, "owner": "", "half": "", "race": "riekling", "rank": "", "family": "", "nobody": "Cut from the open book. Not found and not made. The reference stays in the cut file." },
@@ -26822,10 +26839,10 @@ const CHARCOAL_GRADES = [
 
 // ==== FUEL_BY_RECIPE, generated ====
 /* Built by scripts\dev\Build-FuelTable.js out of game\data\recipes.json. Do not hand edit.
-   336 recipes at a forge, a skyforge or a smelter, out of 3717.
-   183 burn Poor Charcoal, 76 Charcoal, 59 Charcoal Briquette and 18 Coke.
+   334 recipes at a forge, a skyforge or a smelter, out of 3717.
+   181 burn Poor Charcoal, 76 Charcoal, 59 Charcoal Briquette and 18 Coke.
    Recipe desc -> [grade 1 to 4, the metal that asks for it or nothing, the bench]. */
-const FUEL_BY_RECIPE = {"108cf8:Skyrim.esm":[2,"dwarven","forge"],"108cf9:Skyrim.esm":[3,"ebony","forge"],"108cfa:Skyrim.esm":[2,"elven","forge"],"108cfb:Skyrim.esm":[3,"glass","forge"],"108cfc:Skyrim.esm":[2,"orcish","forge"],"10dd28:Skyrim.esm":[2,"dwarven","smelter"],"1548d:Thornswood-Content.esp":[1,"iron","forge"],"1548e:Thornswood-Content.esp":[1,"iron","forge"],"15492:Thornswood-Content.esp":[1,"iron","forge"],"15496:Thornswood-Content.esp":[1,"iron","forge"],"15497:Thornswood-Content.esp":[1,"iron","forge"],"1549c:Thornswood-Content.esp":[1,"","forge"],"1549d:Thornswood-Content.esp":[1,"steel","forge"],"1549e:Thornswood-Content.esp":[2,"elven","forge"],"1549f:Thornswood-Content.esp":[1,"iron","forge"],"154b3:Thornswood-Content.esp":[1,"iron","forge"],"154b4:Thornswood-Content.esp":[1,"iron","forge"],"1838:PlayFluteLuteDrum.esp":[1,"","forge"],"19f8c:Playable Rieklings.esp":[1,"","forge"],"19f8d:Playable Rieklings.esp":[1,"","forge"],"19f8e:Playable Rieklings.esp":[1,"","forge"],"19f8f:Playable Rieklings.esp":[1,"iron","forge"],"19f90:Playable Rieklings.esp":[1,"","forge"],"19f91:Playable Rieklings.esp":[1,"","forge"],"19f92:Playable Rieklings.esp":[1,"","forge"],"19f94:Playable Rieklings.esp":[1,"","forge"],"19f97:Playable Rieklings.esp":[1,"iron","forge"],"19f9d:Playable Rieklings.esp":[1,"iron","forge"],"19fb4:Playable Rieklings.esp":[1,"steel","forge"],"19fb7:Playable Rieklings.esp":[1,"steel","forge"],"19fb8:Playable Rieklings.esp":[1,"steel","forge"],"1d90:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"214aa:Hothtrooper44_ArmorCompilation.esp":[1,"steel","skyforge"],"22fe:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23062:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23063:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23190:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"23195:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"2319a:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"2319f:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"231a9:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231ae:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231b3:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231b8:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231c6:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231c7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231c8:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231c9:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231ca:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cb:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cc:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cd:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231ce:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cf:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d0:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d1:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d2:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d3:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d4:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d5:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d6:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d8:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d9:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"238fd:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"238fe:Hothtrooper44_ArmorCompilation.esp":[2,"silver","forge"],"23900:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"23907:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23908:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"2390e:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"23918:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23919:Hothtrooper44_ArmorCompilation.esp":[2,"silver","forge"],"23a0a:Playable Rieklings.esp":[1,"","forge"],"286a:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"2b04f:Dragonborn.esm":[1,"iron","forge"],"2b050:Dragonborn.esm":[1,"iron","forge"],"2b051:Dragonborn.esm":[1,"iron","forge"],"2b052:Dragonborn.esm":[1,"","forge"],"2b053:Dragonborn.esm":[1,"iron","forge"],"2b054:Dragonborn.esm":[1,"iron","forge"],"2b055:Dragonborn.esm":[1,"","forge"],"2b056:Dragonborn.esm":[1,"","forge"],"2b057:Dragonborn.esm":[1,"","forge"],"2b058:Dragonborn.esm":[1,"iron","forge"],"2b05a:Dragonborn.esm":[1,"iron","forge"],"2b05b:Dragonborn.esm":[1,"iron","forge"],"2b05c:Dragonborn.esm":[1,"iron","forge"],"2b065:Dragonborn.esm":[3,"nordic","forge"],"2b066:Dragonborn.esm":[3,"nordic","forge"],"2b067:Dragonborn.esm":[3,"nordic","forge"],"2b068:Dragonborn.esm":[3,"nordic","forge"],"2b069:Dragonborn.esm":[3,"nordic","forge"],"2b06a:Dragonborn.esm":[4,"stalhrim","forge"],"2b06c:Dragonborn.esm":[4,"stalhrim","forge"],"2b06d:Dragonborn.esm":[4,"stalhrim","forge"],"2b06e:Dragonborn.esm":[4,"stalhrim","forge"],"2b06f:Dragonborn.esm":[4,"stalhrim","forge"],"2b070:Dragonborn.esm":[4,"stalhrim","forge"],"2b071:Dragonborn.esm":[4,"stalhrim","forge"],"2b072:Dragonborn.esm":[4,"stalhrim","forge"],"2b075:Dragonborn.esm":[4,"stalhrim","forge"],"2b076:Dragonborn.esm":[4,"stalhrim","forge"],"2b077:Dragonborn.esm":[4,"stalhrim","forge"],"2b078:Dragonborn.esm":[4,"stalhrim","forge"],"2b079:Dragonborn.esm":[4,"stalhrim","forge"],"2b07a:Dragonborn.esm":[4,"stalhrim","forge"],"2b07b:Dragonborn.esm":[4,"stalhrim","forge"],"2b07c:Dragonborn.esm":[4,"stalhrim","forge"],"2b07d:Dragonborn.esm":[4,"stalhrim","forge"],"2b07e:Dragonborn.esm":[3,"nordic","forge"],"2b07f:Dragonborn.esm":[3,"nordic","forge"],"2b080:Dragonborn.esm":[3,"nordic","forge"],"2b081:Dragonborn.esm":[3,"nordic","forge"],"2b082:Dragonborn.esm":[3,"nordic","forge"],"2b083:Dragonborn.esm":[3,"nordic","forge"],"2b084:Dragonborn.esm":[3,"nordic","forge"],"2b085:Dragonborn.esm":[3,"nordic","forge"],"2dd7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"2de4:PlayFluteLuteDrum.esp":[1,"","forge"],"2de5:PlayFluteLuteDrum.esp":[1,"","forge"],"372fe:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"372ff:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"37300:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"37301:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"37306:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"37307:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"37308:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"37309:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"3cf53:Dragonborn.esm":[3,"nordic","forge"],"3cf54:Dragonborn.esm":[4,"stalhrim","forge"],"3d2dd:Dragonborn.esm":[1,"iron","forge"],"490d86:Immersive Weapons.esp":[1,"","forge"],"491dc0:Immersive Weapons.esp":[3,"glass","forge"],"491dc4:Immersive Weapons.esp":[3,"glass","forge"],"53b3:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"53b5:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"53b7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"6aa09:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"77100a:Immersive Weapons.esp":[1,"steel","forge"],"82ebf:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"82ec0:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"82ec1:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"82ec2:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"844:MoreCraftableEquipment.esp":[1,"","forge"],"848:MoreCraftableEquipment.esp":[1,"","forge"],"849:MoreCraftableEquipment.esp":[1,"","forge"],"855:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"856:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"857:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"858:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"85f:MoreCraftableEquipment.esp":[1,"steel","forge"],"860:MoreCraftableEquipment.esp":[1,"steel","forge"],"861:MoreCraftableEquipment.esp":[1,"steel","forge"],"863:MoreCraftableEquipment.esp":[1,"steel","forge"],"866:MoreCraftableEquipment.esp":[1,"steel","forge"],"867:MoreCraftableEquipment.esp":[1,"steel","forge"],"868:MoreCraftableEquipment.esp":[1,"iron","forge"],"869:MoreCraftableEquipment.esp":[1,"iron","forge"],"874:MoreCraftableEquipment.esp":[2,"falmer","forge"],"87b:MoreCraftableEquipment.esp":[2,"falmer","forge"],"87c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88d:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88e:MoreCraftableEquipment.esp":[2,"falmer","forge"],"897:MoreCraftableEquipment.esp":[2,"falmer","forge"],"89c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8a9:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8aa:MoreCraftableEquipment.esp":[1,"","forge"],"8ab:MoreCraftableEquipment.esp":[1,"","forge"],"8ac:MoreCraftableEquipment.esp":[1,"","forge"],"8ad:MoreCraftableEquipment.esp":[1,"","forge"],"8d0:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d1:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d2:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d3:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d4:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d5:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d6:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d7:MoreCraftableEquipment.esp":[1,"","forge"],"8d8:MoreCraftableEquipment.esp":[1,"","forge"],"8d9:MoreCraftableEquipment.esp":[1,"","forge"],"8db:MoreCraftableEquipment.esp":[1,"iron","forge"],"8f0:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8f7:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8f8:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8f9:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8fa:MoreCraftableEquipment.esp":[1,"steel","forge"],"8fc:MoreCraftableEquipment.esp":[1,"iron","forge"],"900:MoreCraftableEquipment.esp":[2,"silver","forge"],"901:MoreCraftableEquipment.esp":[2,"silver","forge"],"94185a:Immersive Weapons.esp":[3,"glass","forge"],"9cf:Update.esm":[1,"steel","forge"],"9d0:Update.esm":[1,"steel","forge"],"9d1:Update.esm":[1,"steel","forge"],"9d2:Update.esm":[1,"steel","forge"],"9d3:Update.esm":[1,"steel","forge"],"9e775:Playable Rieklings.esp":[1,"","forge"],"a30c3:Skyrim.esm":[1,"iron","smelter"],"a30cb:Skyrim.esm":[1,"","smelter"],"a30d3:Skyrim.esm":[3,"ebony","smelter"],"a30d4:Skyrim.esm":[1,"","smelter"],"a30d9:Skyrim.esm":[2,"elven","smelter"],"a30da:Skyrim.esm":[3,"glass","smelter"],"a30db:Skyrim.esm":[2,"orcish","smelter"],"a30dc:Skyrim.esm":[1,"","smelter"],"a30dd:Skyrim.esm":[2,"silver","smelter"],"a30e4:Skyrim.esm":[1,"steel","smelter"],"a5cd6:Skyrim.esm":[1,"steel","forge"],"ab72:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab73:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab74:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab75:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"b64f:Dawnguard.esm":[1,"iron","forge"],"b650:Dawnguard.esm":[1,"steel","forge"],"b651:Dawnguard.esm":[3,"ebony","forge"],"b652:Dawnguard.esm":[2,"dwarven","forge"],"b653:Dawnguard.esm":[3,"glass","forge"],"b654:Dawnguard.esm":[2,"orcish","forge"],"b655:Dawnguard.esm":[2,"elven","forge"],"bc99a:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"c74736:Immersive Weapons.esp":[2,"silver","forge"],"c74737:Immersive Weapons.esp":[2,"silver","forge"],"da0c03:Update.esm":[2,"elven","smelter"],"da769:Skyrim.esm":[1,"iron","forge"],"da76a:Skyrim.esm":[1,"iron","forge"],"da76b:Skyrim.esm":[1,"iron","forge"],"da76c:Skyrim.esm":[1,"iron","forge"],"da76d:Skyrim.esm":[1,"iron","forge"],"da76e:Skyrim.esm":[1,"iron","forge"],"da76f:Skyrim.esm":[1,"iron","forge"],"db28e:Skyrim.esm":[1,"","forge"],"db28f:Skyrim.esm":[1,"iron","forge"],"db290:Skyrim.esm":[1,"iron","forge"],"db291:Skyrim.esm":[1,"iron","forge"],"db292:Skyrim.esm":[1,"iron","forge"],"db293:Skyrim.esm":[1,"iron","forge"],"db5d3:Skyrim.esm":[1,"","forge"],"db5d4:Skyrim.esm":[1,"","forge"],"db5d5:Skyrim.esm":[1,"","forge"],"db5d6:Skyrim.esm":[1,"","forge"],"db5d7:Skyrim.esm":[1,"steel","forge"],"db896:Skyrim.esm":[1,"steel","forge"],"db897:Skyrim.esm":[1,"steel","forge"],"db898:Skyrim.esm":[1,"steel","forge"],"db899:Skyrim.esm":[2,"orcish","forge"],"db89a:Skyrim.esm":[2,"orcish","forge"],"db89b:Skyrim.esm":[1,"steel","forge"],"db89c:Skyrim.esm":[2,"orcish","forge"],"db89d:Skyrim.esm":[2,"orcish","forge"],"db89e:Skyrim.esm":[1,"steel","forge"],"db89f:Skyrim.esm":[2,"orcish","forge"],"db8a0:Skyrim.esm":[2,"orcish","forge"],"db8a1:Skyrim.esm":[2,"orcish","forge"],"db8a3:Skyrim.esm":[2,"dwarven","forge"],"db8a4:Skyrim.esm":[2,"dwarven","forge"],"db8a5:Skyrim.esm":[2,"dwarven","forge"],"db8a6:Skyrim.esm":[2,"dwarven","forge"],"db8a7:Skyrim.esm":[2,"dwarven","forge"],"db8a8:Skyrim.esm":[2,"dwarven","forge"],"db8a9:Skyrim.esm":[2,"dwarven","forge"],"db8aa:Skyrim.esm":[2,"elven","forge"],"db8ab:Skyrim.esm":[2,"elven","forge"],"db8ac:Skyrim.esm":[2,"elven","forge"],"db8ad:Skyrim.esm":[2,"elven","forge"],"db8ae:Skyrim.esm":[2,"elven","forge"],"db8af:Skyrim.esm":[2,"elven","forge"],"db8b0:Skyrim.esm":[2,"elven","forge"],"db8b1:Skyrim.esm":[3,"glass","forge"],"db8b2:Skyrim.esm":[3,"glass","forge"],"db8b3:Skyrim.esm":[3,"glass","forge"],"db8b4:Skyrim.esm":[3,"glass","forge"],"db8b5:Skyrim.esm":[3,"glass","forge"],"db8b6:Skyrim.esm":[3,"glass","forge"],"db8b7:Skyrim.esm":[3,"glass","forge"],"db8b8:Skyrim.esm":[3,"ebony","forge"],"db8b9:Skyrim.esm":[3,"ebony","forge"],"db8ba:Skyrim.esm":[3,"ebony","forge"],"db8bb:Skyrim.esm":[3,"ebony","forge"],"db8bc:Skyrim.esm":[3,"ebony","forge"],"db8bd:Skyrim.esm":[3,"ebony","forge"],"db8be:Skyrim.esm":[3,"ebony","forge"],"dc9f5:Skyrim.esm":[1,"steel","forge"],"dc9f6:Skyrim.esm":[1,"steel","forge"],"dc9f7:Skyrim.esm":[1,"steel","forge"],"dc9f8:Skyrim.esm":[1,"steel","forge"],"dc9f9:Skyrim.esm":[1,"steel","forge"],"dc9fa:Skyrim.esm":[2,"elven","forge"],"dc9fb:Skyrim.esm":[2,"elven","forge"],"dc9fc:Skyrim.esm":[2,"elven","forge"],"dc9fd:Skyrim.esm":[2,"elven","forge"],"dc9fe:Skyrim.esm":[2,"elven","forge"],"dc9ff:Skyrim.esm":[1,"iron","forge"],"dca00:Skyrim.esm":[1,"iron","forge"],"dca01:Skyrim.esm":[1,"","forge"],"dca02:Skyrim.esm":[1,"","forge"],"dca03:Skyrim.esm":[1,"","forge"],"dca04:Skyrim.esm":[1,"","forge"],"dca05:Skyrim.esm":[1,"steel","forge"],"dca06:Skyrim.esm":[1,"steel","forge"],"dca07:Skyrim.esm":[1,"steel","forge"],"dca08:Skyrim.esm":[1,"steel","forge"],"dca0e:Skyrim.esm":[3,"glass","forge"],"dca0f:Skyrim.esm":[3,"glass","forge"],"dca10:Skyrim.esm":[3,"glass","forge"],"dca11:Skyrim.esm":[3,"glass","forge"],"dca12:Skyrim.esm":[3,"glass","forge"],"dd975:Skyrim.esm":[1,"steel","forge"],"dd977:Skyrim.esm":[1,"steel","forge"],"dd978:Skyrim.esm":[1,"steel","forge"],"dd979:Skyrim.esm":[2,"dwarven","forge"],"dd97a:Skyrim.esm":[2,"dwarven","forge"],"dd97b:Skyrim.esm":[2,"dwarven","forge"],"dd97c:Skyrim.esm":[2,"dwarven","forge"],"dd97d:Skyrim.esm":[2,"dwarven","forge"],"dd97e:Skyrim.esm":[1,"steel","forge"],"dd97f:Skyrim.esm":[1,"steel","forge"],"dd980:Skyrim.esm":[1,"steel","forge"],"dd981:Skyrim.esm":[1,"steel","forge"],"dd983:Skyrim.esm":[2,"orcish","forge"],"dd984:Skyrim.esm":[2,"orcish","forge"],"dd985:Skyrim.esm":[2,"orcish","forge"],"dd986:Skyrim.esm":[2,"orcish","forge"],"dd987:Skyrim.esm":[2,"orcish","forge"],"dd988:Skyrim.esm":[3,"ebony","forge"],"dd989:Skyrim.esm":[3,"ebony","forge"],"dd98a:Skyrim.esm":[3,"ebony","forge"],"dd98b:Skyrim.esm":[3,"ebony","forge"],"dd98c:Skyrim.esm":[3,"ebony","forge"],"f46cc:Skyrim.esm":[1,"ancient nord","skyforge"],"f46cd:Skyrim.esm":[1,"ancient nord","skyforge"],"f46cf:Skyrim.esm":[1,"ancient nord","skyforge"],"f46d0:Skyrim.esm":[1,"ancient nord","skyforge"],"f6f2a:Skyrim.esm":[1,"steel","forge"],"f74d:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"f813:Dawnguard.esm":[1,"steel","forge"],"f814:Dawnguard.esm":[2,"dwarven","forge"]};
+const FUEL_BY_RECIPE = {"108cf8:Skyrim.esm":[2,"dwarven","forge"],"108cf9:Skyrim.esm":[3,"ebony","forge"],"108cfa:Skyrim.esm":[2,"elven","forge"],"108cfb:Skyrim.esm":[3,"glass","forge"],"108cfc:Skyrim.esm":[2,"orcish","forge"],"10dd28:Skyrim.esm":[2,"dwarven","smelter"],"1548d:Thornswood-Content.esp":[1,"iron","forge"],"1548e:Thornswood-Content.esp":[1,"iron","forge"],"15492:Thornswood-Content.esp":[1,"iron","forge"],"15496:Thornswood-Content.esp":[1,"iron","forge"],"15497:Thornswood-Content.esp":[1,"iron","forge"],"1549c:Thornswood-Content.esp":[1,"","forge"],"1549d:Thornswood-Content.esp":[1,"steel","forge"],"1549e:Thornswood-Content.esp":[2,"elven","forge"],"1549f:Thornswood-Content.esp":[1,"iron","forge"],"154b3:Thornswood-Content.esp":[1,"iron","forge"],"154b4:Thornswood-Content.esp":[1,"iron","forge"],"1838:PlayFluteLuteDrum.esp":[1,"","forge"],"19f8c:Playable Rieklings.esp":[1,"","forge"],"19f8d:Playable Rieklings.esp":[1,"","forge"],"19f8e:Playable Rieklings.esp":[1,"","forge"],"19f8f:Playable Rieklings.esp":[1,"iron","forge"],"19f97:Playable Rieklings.esp":[1,"iron","forge"],"19f9d:Playable Rieklings.esp":[1,"iron","forge"],"19fb4:Playable Rieklings.esp":[1,"steel","forge"],"19fb7:Playable Rieklings.esp":[1,"steel","forge"],"19fb8:Playable Rieklings.esp":[1,"steel","forge"],"1d90:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"214aa:Hothtrooper44_ArmorCompilation.esp":[1,"steel","skyforge"],"22fe:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23062:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23063:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23190:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"23195:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"2319a:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"2319f:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"231a9:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231ae:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231b3:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231b8:Hothtrooper44_ArmorCompilation.esp":[3,"glass","forge"],"231c6:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231c7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231c8:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231c9:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231ca:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cb:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cc:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cd:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231ce:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231cf:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d0:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d1:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d2:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d3:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d4:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d5:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d6:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d8:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"231d9:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"238fd:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"238fe:Hothtrooper44_ArmorCompilation.esp":[2,"silver","forge"],"23900:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"23907:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23908:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"2390e:Hothtrooper44_ArmorCompilation.esp":[2,"elven","forge"],"23918:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"23919:Hothtrooper44_ArmorCompilation.esp":[2,"silver","forge"],"23a0a:Playable Rieklings.esp":[1,"","forge"],"286a:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"2b04f:Dragonborn.esm":[1,"iron","forge"],"2b050:Dragonborn.esm":[1,"iron","forge"],"2b051:Dragonborn.esm":[1,"iron","forge"],"2b052:Dragonborn.esm":[1,"","forge"],"2b053:Dragonborn.esm":[1,"iron","forge"],"2b054:Dragonborn.esm":[1,"iron","forge"],"2b055:Dragonborn.esm":[1,"","forge"],"2b056:Dragonborn.esm":[1,"","forge"],"2b057:Dragonborn.esm":[1,"","forge"],"2b058:Dragonborn.esm":[1,"iron","forge"],"2b05a:Dragonborn.esm":[1,"iron","forge"],"2b05b:Dragonborn.esm":[1,"iron","forge"],"2b05c:Dragonborn.esm":[1,"iron","forge"],"2b065:Dragonborn.esm":[3,"nordic","forge"],"2b066:Dragonborn.esm":[3,"nordic","forge"],"2b067:Dragonborn.esm":[3,"nordic","forge"],"2b068:Dragonborn.esm":[3,"nordic","forge"],"2b069:Dragonborn.esm":[3,"nordic","forge"],"2b06a:Dragonborn.esm":[4,"stalhrim","forge"],"2b06c:Dragonborn.esm":[4,"stalhrim","forge"],"2b06d:Dragonborn.esm":[4,"stalhrim","forge"],"2b06e:Dragonborn.esm":[4,"stalhrim","forge"],"2b06f:Dragonborn.esm":[4,"stalhrim","forge"],"2b070:Dragonborn.esm":[4,"stalhrim","forge"],"2b071:Dragonborn.esm":[4,"stalhrim","forge"],"2b072:Dragonborn.esm":[4,"stalhrim","forge"],"2b075:Dragonborn.esm":[4,"stalhrim","forge"],"2b076:Dragonborn.esm":[4,"stalhrim","forge"],"2b077:Dragonborn.esm":[4,"stalhrim","forge"],"2b078:Dragonborn.esm":[4,"stalhrim","forge"],"2b079:Dragonborn.esm":[4,"stalhrim","forge"],"2b07a:Dragonborn.esm":[4,"stalhrim","forge"],"2b07b:Dragonborn.esm":[4,"stalhrim","forge"],"2b07c:Dragonborn.esm":[4,"stalhrim","forge"],"2b07d:Dragonborn.esm":[4,"stalhrim","forge"],"2b07e:Dragonborn.esm":[3,"nordic","forge"],"2b07f:Dragonborn.esm":[3,"nordic","forge"],"2b080:Dragonborn.esm":[3,"nordic","forge"],"2b081:Dragonborn.esm":[3,"nordic","forge"],"2b082:Dragonborn.esm":[3,"nordic","forge"],"2b083:Dragonborn.esm":[3,"nordic","forge"],"2b084:Dragonborn.esm":[3,"nordic","forge"],"2b085:Dragonborn.esm":[3,"nordic","forge"],"2dd7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"2de4:PlayFluteLuteDrum.esp":[1,"","forge"],"2de5:PlayFluteLuteDrum.esp":[1,"","forge"],"372fe:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"372ff:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"37300:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"37301:Hothtrooper44_ArmorCompilation.esp":[3,"ebony","forge"],"37306:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"37307:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"37308:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"37309:Hothtrooper44_ArmorCompilation.esp":[2,"dwarven","forge"],"3cf53:Dragonborn.esm":[3,"nordic","forge"],"3cf54:Dragonborn.esm":[4,"stalhrim","forge"],"3d2dd:Dragonborn.esm":[1,"iron","forge"],"490d86:Immersive Weapons.esp":[1,"","forge"],"491dc0:Immersive Weapons.esp":[3,"glass","forge"],"491dc4:Immersive Weapons.esp":[3,"glass","forge"],"53b3:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"53b5:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"53b7:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"6aa09:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"77100a:Immersive Weapons.esp":[1,"steel","forge"],"82ebf:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"82ec0:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"82ec1:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"82ec2:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"844:MoreCraftableEquipment.esp":[1,"","forge"],"848:MoreCraftableEquipment.esp":[1,"","forge"],"849:MoreCraftableEquipment.esp":[1,"","forge"],"855:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"856:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"857:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"858:MoreCraftableEquipment.esp":[1,"iron","skyforge"],"85f:MoreCraftableEquipment.esp":[1,"steel","forge"],"860:MoreCraftableEquipment.esp":[1,"steel","forge"],"861:MoreCraftableEquipment.esp":[1,"steel","forge"],"863:MoreCraftableEquipment.esp":[1,"steel","forge"],"866:MoreCraftableEquipment.esp":[1,"steel","forge"],"867:MoreCraftableEquipment.esp":[1,"steel","forge"],"868:MoreCraftableEquipment.esp":[1,"iron","forge"],"869:MoreCraftableEquipment.esp":[1,"iron","forge"],"874:MoreCraftableEquipment.esp":[2,"falmer","forge"],"87b:MoreCraftableEquipment.esp":[2,"falmer","forge"],"87c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88d:MoreCraftableEquipment.esp":[2,"falmer","forge"],"88e:MoreCraftableEquipment.esp":[2,"falmer","forge"],"897:MoreCraftableEquipment.esp":[2,"falmer","forge"],"89c:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8a9:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8aa:MoreCraftableEquipment.esp":[1,"","forge"],"8ab:MoreCraftableEquipment.esp":[1,"","forge"],"8ac:MoreCraftableEquipment.esp":[1,"","forge"],"8ad:MoreCraftableEquipment.esp":[1,"","forge"],"8d0:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d1:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d2:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d3:MoreCraftableEquipment.esp":[1,"steel","forge"],"8d4:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d5:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d6:MoreCraftableEquipment.esp":[1,"iron","forge"],"8d7:MoreCraftableEquipment.esp":[1,"","forge"],"8d8:MoreCraftableEquipment.esp":[1,"","forge"],"8d9:MoreCraftableEquipment.esp":[1,"","forge"],"8db:MoreCraftableEquipment.esp":[1,"iron","forge"],"8f0:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8f7:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8f8:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8f9:MoreCraftableEquipment.esp":[2,"falmer","forge"],"8fa:MoreCraftableEquipment.esp":[1,"steel","forge"],"8fc:MoreCraftableEquipment.esp":[1,"iron","forge"],"900:MoreCraftableEquipment.esp":[2,"silver","forge"],"901:MoreCraftableEquipment.esp":[2,"silver","forge"],"94185a:Immersive Weapons.esp":[3,"glass","forge"],"9cf:Update.esm":[1,"steel","forge"],"9d0:Update.esm":[1,"steel","forge"],"9d1:Update.esm":[1,"steel","forge"],"9d2:Update.esm":[1,"steel","forge"],"9d3:Update.esm":[1,"steel","forge"],"9e775:Playable Rieklings.esp":[1,"","forge"],"a30c3:Skyrim.esm":[1,"iron","smelter"],"a30cb:Skyrim.esm":[1,"","smelter"],"a30d3:Skyrim.esm":[3,"ebony","smelter"],"a30d4:Skyrim.esm":[1,"","smelter"],"a30d9:Skyrim.esm":[2,"elven","smelter"],"a30da:Skyrim.esm":[3,"glass","smelter"],"a30db:Skyrim.esm":[2,"orcish","smelter"],"a30dc:Skyrim.esm":[1,"","smelter"],"a30dd:Skyrim.esm":[2,"silver","smelter"],"a30e4:Skyrim.esm":[1,"steel","smelter"],"a5cd6:Skyrim.esm":[1,"steel","forge"],"ab72:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab73:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab74:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"ab75:Hothtrooper44_ArmorCompilation.esp":[1,"steel","forge"],"b64f:Dawnguard.esm":[1,"iron","forge"],"b650:Dawnguard.esm":[1,"steel","forge"],"b651:Dawnguard.esm":[3,"ebony","forge"],"b652:Dawnguard.esm":[2,"dwarven","forge"],"b653:Dawnguard.esm":[3,"glass","forge"],"b654:Dawnguard.esm":[2,"orcish","forge"],"b655:Dawnguard.esm":[2,"elven","forge"],"bc99a:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"bfee5:Playable Rieklings.esp":[1,"","forge"],"bfefb:Playable Rieklings.esp":[1,"","forge"],"c74736:Immersive Weapons.esp":[2,"silver","forge"],"c74737:Immersive Weapons.esp":[2,"silver","forge"],"da0c03:Update.esm":[2,"elven","smelter"],"da769:Skyrim.esm":[1,"iron","forge"],"da76a:Skyrim.esm":[1,"iron","forge"],"da76b:Skyrim.esm":[1,"iron","forge"],"da76c:Skyrim.esm":[1,"iron","forge"],"da76d:Skyrim.esm":[1,"iron","forge"],"da76e:Skyrim.esm":[1,"iron","forge"],"da76f:Skyrim.esm":[1,"iron","forge"],"db28e:Skyrim.esm":[1,"","forge"],"db28f:Skyrim.esm":[1,"iron","forge"],"db290:Skyrim.esm":[1,"iron","forge"],"db291:Skyrim.esm":[1,"iron","forge"],"db292:Skyrim.esm":[1,"iron","forge"],"db293:Skyrim.esm":[1,"iron","forge"],"db5d3:Skyrim.esm":[1,"","forge"],"db5d4:Skyrim.esm":[1,"","forge"],"db5d5:Skyrim.esm":[1,"","forge"],"db5d6:Skyrim.esm":[1,"","forge"],"db5d7:Skyrim.esm":[1,"steel","forge"],"db896:Skyrim.esm":[1,"steel","forge"],"db897:Skyrim.esm":[1,"steel","forge"],"db898:Skyrim.esm":[1,"steel","forge"],"db899:Skyrim.esm":[2,"orcish","forge"],"db89a:Skyrim.esm":[2,"orcish","forge"],"db89b:Skyrim.esm":[1,"steel","forge"],"db89c:Skyrim.esm":[2,"orcish","forge"],"db89d:Skyrim.esm":[2,"orcish","forge"],"db89e:Skyrim.esm":[1,"steel","forge"],"db89f:Skyrim.esm":[2,"orcish","forge"],"db8a0:Skyrim.esm":[2,"orcish","forge"],"db8a1:Skyrim.esm":[2,"orcish","forge"],"db8a3:Skyrim.esm":[2,"dwarven","forge"],"db8a4:Skyrim.esm":[2,"dwarven","forge"],"db8a5:Skyrim.esm":[2,"dwarven","forge"],"db8a6:Skyrim.esm":[2,"dwarven","forge"],"db8a7:Skyrim.esm":[2,"dwarven","forge"],"db8a8:Skyrim.esm":[2,"dwarven","forge"],"db8a9:Skyrim.esm":[2,"dwarven","forge"],"db8aa:Skyrim.esm":[2,"elven","forge"],"db8ab:Skyrim.esm":[2,"elven","forge"],"db8ac:Skyrim.esm":[2,"elven","forge"],"db8ad:Skyrim.esm":[2,"elven","forge"],"db8ae:Skyrim.esm":[2,"elven","forge"],"db8af:Skyrim.esm":[2,"elven","forge"],"db8b0:Skyrim.esm":[2,"elven","forge"],"db8b1:Skyrim.esm":[3,"glass","forge"],"db8b2:Skyrim.esm":[3,"glass","forge"],"db8b3:Skyrim.esm":[3,"glass","forge"],"db8b4:Skyrim.esm":[3,"glass","forge"],"db8b5:Skyrim.esm":[3,"glass","forge"],"db8b6:Skyrim.esm":[3,"glass","forge"],"db8b7:Skyrim.esm":[3,"glass","forge"],"db8b8:Skyrim.esm":[3,"ebony","forge"],"db8b9:Skyrim.esm":[3,"ebony","forge"],"db8ba:Skyrim.esm":[3,"ebony","forge"],"db8bb:Skyrim.esm":[3,"ebony","forge"],"db8bc:Skyrim.esm":[3,"ebony","forge"],"db8bd:Skyrim.esm":[3,"ebony","forge"],"db8be:Skyrim.esm":[3,"ebony","forge"],"dc9f5:Skyrim.esm":[1,"steel","forge"],"dc9f6:Skyrim.esm":[1,"steel","forge"],"dc9f7:Skyrim.esm":[1,"steel","forge"],"dc9f8:Skyrim.esm":[1,"steel","forge"],"dc9f9:Skyrim.esm":[1,"steel","forge"],"dc9fa:Skyrim.esm":[2,"elven","forge"],"dc9fb:Skyrim.esm":[2,"elven","forge"],"dc9fc:Skyrim.esm":[2,"elven","forge"],"dc9fd:Skyrim.esm":[2,"elven","forge"],"dc9fe:Skyrim.esm":[2,"elven","forge"],"dc9ff:Skyrim.esm":[1,"iron","forge"],"dca00:Skyrim.esm":[1,"iron","forge"],"dca01:Skyrim.esm":[1,"","forge"],"dca02:Skyrim.esm":[1,"","forge"],"dca03:Skyrim.esm":[1,"","forge"],"dca04:Skyrim.esm":[1,"","forge"],"dca05:Skyrim.esm":[1,"steel","forge"],"dca06:Skyrim.esm":[1,"steel","forge"],"dca07:Skyrim.esm":[1,"steel","forge"],"dca08:Skyrim.esm":[1,"steel","forge"],"dca0e:Skyrim.esm":[3,"glass","forge"],"dca0f:Skyrim.esm":[3,"glass","forge"],"dca10:Skyrim.esm":[3,"glass","forge"],"dca11:Skyrim.esm":[3,"glass","forge"],"dca12:Skyrim.esm":[3,"glass","forge"],"dd975:Skyrim.esm":[1,"steel","forge"],"dd977:Skyrim.esm":[1,"steel","forge"],"dd978:Skyrim.esm":[1,"steel","forge"],"dd979:Skyrim.esm":[2,"dwarven","forge"],"dd97a:Skyrim.esm":[2,"dwarven","forge"],"dd97b:Skyrim.esm":[2,"dwarven","forge"],"dd97c:Skyrim.esm":[2,"dwarven","forge"],"dd97d:Skyrim.esm":[2,"dwarven","forge"],"dd97e:Skyrim.esm":[1,"steel","forge"],"dd97f:Skyrim.esm":[1,"steel","forge"],"dd980:Skyrim.esm":[1,"steel","forge"],"dd981:Skyrim.esm":[1,"steel","forge"],"dd983:Skyrim.esm":[2,"orcish","forge"],"dd984:Skyrim.esm":[2,"orcish","forge"],"dd985:Skyrim.esm":[2,"orcish","forge"],"dd986:Skyrim.esm":[2,"orcish","forge"],"dd987:Skyrim.esm":[2,"orcish","forge"],"dd988:Skyrim.esm":[3,"ebony","forge"],"dd989:Skyrim.esm":[3,"ebony","forge"],"dd98a:Skyrim.esm":[3,"ebony","forge"],"dd98b:Skyrim.esm":[3,"ebony","forge"],"dd98c:Skyrim.esm":[3,"ebony","forge"],"f46cc:Skyrim.esm":[1,"ancient nord","skyforge"],"f46cd:Skyrim.esm":[1,"ancient nord","skyforge"],"f46cf:Skyrim.esm":[1,"ancient nord","skyforge"],"f46d0:Skyrim.esm":[1,"ancient nord","skyforge"],"f6f2a:Skyrim.esm":[1,"steel","forge"],"f74d:Hothtrooper44_ArmorCompilation.esp":[1,"","forge"],"f813:Dawnguard.esm":[1,"steel","forge"],"f814:Dawnguard.esm":[2,"dwarven","forge"]};
 // ==== end FUEL_BY_RECIPE ====
 
 /** The fuel a recipe burns, { grade, metal, bench }, or null when it burns none. */
@@ -29688,7 +29705,7 @@ log('gamemode loaded:',
   // scripts\release\Ship-Rules.ps1 calls ours ($ShipOursFiles), and
   // tests\test-1180-own-plugins.js holds the two lists to each other, so a
   // plugin the repo makes goes into both in one change.
-  var OURS = { 'thornswood-content.esp': 1 };
+  var OURS = { 'thornswood-content.esp': 1, 'thornswood-last.esp': 1 };
 
   // Returns '' once the manifest is published, otherwise why it was not.
   function publish() {
@@ -35727,6 +35744,12 @@ log('gamemode loaded:',
         }
       }
 
+      // The master key cut for this holding (#2254): whose and which number.
+      if (c.master && typeof c.master === 'object' && Number(c.master.for) > 0 &&
+          Number(c.master.no) > 0) {
+        row.master = { for: Number(c.master.for), no: Number(c.master.no) };
+      }
+
       out[k] = row;
       kept++;
     }
@@ -35741,13 +35764,35 @@ log('gamemode loaded:',
       try { require('fs').mkdirSync(dir, { recursive: true }); } catch (e) { }
       require('fs').writeFileSync(registerPath(),
         JSON.stringify({ claims: claims, stewards: stewards, boxes: boxes,
-                        funds: funds, notices: notices, boards: boards, steps: steps }, null, 1));
+                        funds: funds, notices: notices, boards: boards, steps: steps,
+                        masters: masterCut, dropbox: dropbox }, null, 1));
     } catch (e) {
       plog('could not write the register:', e);
     }
   }
 
   var claims = load();
+  var masterCut = loadMasterCut();
+
+  /*
+    The last number a master key was cut with (#2254), from the register. Never
+    lower than any number a claim still names, so a register written before
+    the counter was can never hand out a number already in somebody's pack.
+    See MASTER KEYS in locks and keys.
+  */
+  function loadMasterCut() {
+    var top = 0;
+    try {
+      var raw = JSON.parse(require('fs').readFileSync(registerPath(), 'utf8'));
+      top = Number(raw && raw.masters) || 0;
+    } catch (e) { top = 0; }
+    for (var b in claims) {
+      if (!Object.prototype.hasOwnProperty.call(claims, b)) { continue; }
+      var m = claims[b] && claims[b].master;
+      if (m && m.no > top) { top = m.no; }
+    }
+    return top;
+  }
 
   /*
     STEPS THAT RUN ONCE ON THE REGISTER, and the mark that each has run.
@@ -36399,16 +36444,42 @@ log('gamemode loaded:',
                            ground: keepGround };
       save();
       pushAll();
+      /*
+        A NEW HOLDER, A NEW MASTER KEY (#2254). The claim above is a new
+        record with no master on it, so the old holder's master key stopped
+        opening anything the moment it was written: a master key works only
+        while the person it was cut for holds the building. The one who holds
+        it now is handed their own, the way a claim hands one with the deed.
+      */
+      var master2 = issueMaster(actorId, building, claims[building]);
       plog(who2, 'presented the deed at', nameOf(building), 'and now holds it',
-           was ? '(it was ' + was + '\'s)' : '(it was nobody\'s)');
+           was ? '(it was ' + was + '\'s)' : '(it was nobody\'s)',
+           master2 ? 'with master key no. ' + master2 : '');
       var told = 'You present the deed at ' + nameOf(building) +
-                 '. It is yours now' + (was ? ', and no longer ' + was + '\'s' : '') + '.';
+                 '. It is yours now' + (was ? ', and no longer ' + was + '\'s' : '') + '.' +
+                 (master2 ? ' ' + masterHandedLine(building) : '');
       notify(actorId, told);
       say(actorId, told);
       return;
     }
 
     if (!held) { return; }
+    /*
+      A HOLDING FROM BEFORE MASTER KEYS (#2254). A claim made before they
+      existed was never handed one, so its holder is handed it at their own
+      door, once: after that the claim names a master key and a lost one is
+      cut again at a forge from the mold.
+    */
+    if (mine && held.by === mine && !held.master) {
+      var late = issueMaster(actorId, building, held);
+      if (late) {
+        plog(held.name, 'was handed master key no.', late, 'to', nameOf(building),
+             'at its door, a holding from before master keys');
+        var lateLine = masterHandedLine(building);
+        notify(actorId, lateLine);
+        say(actorId, lateLine);
+      }
+    }
     if (mine && held.by === mine && (Date.now() - held.touched) > 3600000) {
       // Once an hour at most. A door is opened a great many times and the
       // register does not need writing on every one of them.
@@ -36503,7 +36574,8 @@ log('gamemode loaded:',
         if (!(accordLine && accordLine.holds(building)) && mayHold(actorId, profileId, building)) {
           line.x = 'claim';
         }
-      } else if ((profileId && held.by === profileId) || holdsDeed(actorId, building)) {
+      } else if ((profileId && held.by === profileId) || holdsDeed(actorId, building) ||
+                 holdsMasterKey(actorId, building)) {
         line.x = held.locked ? 'unlock' : 'lock';
       }
       if (line.x) {
@@ -36661,11 +36733,15 @@ log('gamemode loaded:',
     // nobody's, and a view that is right from the first second costs one write.
     pushAll();
     var handed = giveDeed(actorId, building);
-    plog(who, 'claimed', nameOf(building), handed ? 'and took the deed' : 'and got no deed');
+    // The master key comes with the deed (#2254). See MASTER KEYS.
+    var master = handed ? issueMaster(actorId, building, claims[building]) : 0;
+    plog(who, 'claimed', nameOf(building), handed ? 'and took the deed' : 'and got no deed',
+         master ? 'and master key no. ' + master : '');
     toProfile(profileId, 'You claim ' + nameOf(building) + '. ' +
               (handed ? 'The deed is in your pack. Whoever carries it holds the place, ' +
                         'so keep it somewhere a thief will not look. '
                       : 'The deed could not be handed over, so say so in the dev channel. ') +
+              (master ? masterHandedLine(building) + ' ' : '') +
               'Go in at least once every ' + lapseDays() + ' days or it goes back.');
     return true;
   }
@@ -36888,6 +36964,8 @@ log('gamemode loaded:',
     if (profileId && held.by === profileId) { return true; }
     if (holdsKey(actorId, building)) { return true; }
     if (holdsDeed(actorId, building)) { return true; }
+    // A master key while the person it was cut for holds it (#2254).
+    if (holdsMasterKey(actorId, building)) { return true; }
     return false;
   }
 
@@ -36997,7 +37075,9 @@ log('gamemode loaded:',
                            (on ? 'lock' : 'unlock') + '. It can be claimed at its door for nothing.');
       return true;
     }
-    if (held.by !== profileId && !holdsDeed(actorId, building)) {
+    // The holder, the deed, or its master key (#2254) turns the lock.
+    if (held.by !== profileId && !holdsDeed(actorId, building) &&
+        !holdsMasterKey(actorId, building)) {
       toProfile(profileId, nameOf(building) + ' is held by ' + held.name +
                            '. A lock is the holder\'s to turn.');
       return true;
@@ -37045,7 +37125,7 @@ log('gamemode loaded:',
     var name = nameOf(building);
     if (on) {
       return (mine ? 'You lock ' + name + '. ' : '') + name + ' is locked for everyone now. ' +
-             'Only a key to it or its deed opens it; anybody else has to pick the lock.';
+             'Only a key to it, its master key or its deed opens it; anybody else has to pick the lock.';
     }
     return (mine ? 'You unlock ' + name + '. ' : '') + name + ' is open to everyone now.';
   }
@@ -37311,6 +37391,10 @@ log('gamemode loaded:',
   }
 
   function cutKey(actorId, profileId, toProfile, parts) {
+    // The mold key at a forge asks for the master key instead (#2254).
+    if (parts && String(parts[2] || '') === 'master') {
+      return cutMasterKey(actorId, profileId, toProfile, parts);
+    }
     if (!isSmith(actorId)) {
       toProfile(profileId, 'Cutting a key is a smith\'s work. Hand the mold to a smith.');
       return true;
@@ -37400,6 +37484,211 @@ log('gamemode loaded:',
     plog('a key to', nameOf(building), 'was cut');
     toProfile(profileId, 'You cut a key to ' + nameOf(building) + '. It opens the door for ' +
                          'whoever is carrying it, so hand it over yourself.');
+    return true;
+  }
+
+  /*
+    MASTER KEYS (#2254).
+
+    Patrick, 12 Oct 2026, on #2254: a "Master key to" one building, handed
+    with the deed when the building is claimed, which opens it and turns its
+    lock, works only while the person it was cut for holds the building, and
+    is re-cut from the mold for 2 iron ingots, the new one replacing the old.
+
+    What it is for: the deed is the title and the one thing a thief can take
+    the house with, so it can sit in a chest. The master key does the daily
+    work of the deed without being it: whoever carries it, the holder or a
+    partner they hand it to, gets through the locked door and turns the lock.
+    An ordinary key still only opens.
+
+    WHY A NUMBER IS ON IT. A key here is its name, because the name is the one
+    thing the fork keeps per item in a pack (Inventory::Entry's name; nothing
+    else on an entry is ours to write). A master key has to stop working twice
+    over: when the holding changes hands, and when a new one is cut for a lost
+    one. Both mean the server has to tell the master key in the pack from an
+    older one with the same building on it, and the only place that can be
+    told is the name. So each one is cut with the next number of a counter
+    that only ever goes up and is kept in the register (masters in
+    property.json): "Master key to Breezehome, no. 12". The claim names the
+    number and the profile it was cut for (claim.master), and a master key
+    opens only while its name is that number and that profile still holds
+    the building. A lapse or an eviction drops the claim, and a deed
+    presented at the door writes a new one, so the old number names nothing.
+    The counter never goes back, so a number is never handed out twice, and
+    a key from a lapsed holding cannot match the next holder's.
+
+    THE RECORD is ThornswoodMiscMasterKey in Thornswood-Content.esp (scripts/
+    mods/Add-ContentRecords.py), a MISC on the key's mesh, with no recipe. The
+    gamemode and the plugin reach the server by different roads, so until the
+    server's plugin carries the record (mastersExist) none is handed or cut,
+    and everything else about property is as it was.
+  */
+  var MASTER_KEY = '154e0:Thornswood-Content.esp';
+  var MASTER_INGOTS = 2;   // Patrick, #2254: re-cut from the mold for 2 iron ingots
+
+  function masterLabel(building, no) { return 'Master key to ' + nameOf(building) + ', no. ' + no; }
+
+  /* Is the master key's record in the plugins this server loaded. See blankMoldsExist. */
+  var mastersKnown = false;
+  function mastersExist() {
+    if (mastersKnown) { return true; }
+    var id = idOf(MASTER_KEY);
+    if (!id) { return false; }
+    var found = null;
+    try { found = mp.lookupEspmRecordById(id); } catch (e) { found = null; }
+    if (found && found.record) { mastersKnown = true; }
+    return mastersKnown;
+  }
+
+  /* The building's master key, while the person it was cut for holds it, or null. */
+  function liveMaster(building) {
+    var held = holderOf(building);
+    if (!held || !held.master || !(held.master.no > 0)) { return null; }
+    if (held.master.for !== held.by) { return null; }
+    return held.master;
+  }
+
+  /* Does this person carry that building's master key, the one that works. */
+  function holdsMasterKey(actorId, building) {
+    var m = liveMaster(building);
+    return !!m && holdsNamed(actorId, MASTER_KEY, masterLabel(building, m.no));
+  }
+
+  /* Every building whose working master key is in this pack, for the K panel. */
+  function masterKeysOf(actorId) {
+    var out = [];
+    var baseId = idOf(MASTER_KEY);
+    if (!baseId) { return out; }
+    var inv = null;
+    try { inv = mp.get(actorId, 'inventory'); } catch (e) { return out; }
+    var entries = (inv && inv.entries) || [];
+    for (var b in claims) {
+      if (!Object.prototype.hasOwnProperty.call(claims, b)) { continue; }
+      var m = liveMaster(b);
+      if (!m) { continue; }
+      var want = masterLabel(b, m.no);
+      for (var i = 0; i < entries.length; i++) {
+        var e = entries[i];
+        if (e && e.count > 0 && e.baseId === baseId && String(e.name || '') === want) { out.push(b); break; }
+      }
+    }
+    return out;
+  }
+
+  /*
+    Cut a master key for the holding and put it in toActorId's pack: the
+    next number, and the claim names it, so any master key cut before stops
+    opening anything. Answers the number, or 0 when none was cut: the record
+    is not on this server, or the pack could not take it, and then the claim
+    and the counter are left as they were, so the old one still works.
+  */
+  function issueMaster(toActorId, building, held) {
+    if (!held || !mastersExist()) { return 0; }
+    var no = masterCut + 1;
+    if (!giveNamed(toActorId, MASTER_KEY, masterLabel(building, no))) { return 0; }
+    masterCut = no;
+    held.master = { for: held.by, no: no };
+    save();
+    pushAll();
+    return no;
+  }
+
+  function masterHandedLine(building) {
+    return 'Its master key is in your pack: it opens ' + nameOf(building) + ' and turns its lock ' +
+           'for whoever carries it, for as long as you hold the place.';
+  }
+
+  /* The holder themselves, standing here: not a deed carrier. See holderNearby. */
+  function holderHere(actorId, held) {
+    var near = [];
+    try {
+      var cell = String(mp.get(actorId, 'worldOrCellDesc') || '');
+      var pos = mp.get(actorId, 'pos');
+      if (cell && pos) { near = mp.getNeighborsByPosition(cell, pos) || []; }
+    } catch (e) { near = []; }
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { online = []; }
+    var all = [actorId];
+    for (var n = 0; n < near.length; n++) {
+      if (near[n] !== actorId && online.indexOf(near[n]) !== -1) { all.push(near[n]); }
+    }
+    for (var i = 0; i < all.length; i++) {
+      var pid = 0;
+      try { pid = Number(mp.get(all[i], 'profileId')) || 0; } catch (e) { pid = 0; }
+      if (pid && pid === held.by) { return { actorId: all[i], profileId: pid }; }
+    }
+    return null;
+  }
+
+  /*
+    A MASTER KEY CUT AGAIN, at a forge, by a smith, from the building's mold,
+    with the holder standing there, for two iron ingots (#2254). The mold key
+    at a forge sends it (/key, the forge's id, and master), beside the lock
+    key's ordinary key; nobody types it. The smith pays the ingots, as for a
+    key, and the master key goes to the holder, because it is cut for them,
+    the way a mold goes to the holder and not to the smith. The holder has to
+    be there for the same reason a mold needs them: nothing is cut for a
+    house while its holder is offline. The new one replaces the old.
+  */
+  function cutMasterKey(actorId, profileId, toProfile, parts) {
+    if (!isSmith(actorId)) {
+      toProfile(profileId, 'Cutting a master key is a smith\'s work. Hand the mold to a smith.');
+      return true;
+    }
+    var forge = forgeHere(parts, actorId);
+    if (!forge) {
+      toProfile(profileId, 'Stand at a forge and look at it, then press the key the line ' +
+                           'under the crosshair names.');
+      return true;
+    }
+    var unfit = unfitToMake(actorId, forge);
+    if (unfit) {
+      toProfile(profileId, unfit);
+      return true;
+    }
+    if (!mastersExist()) {
+      toProfile(profileId, 'There are no master keys on this server yet, so there is none to cut.');
+      return true;
+    }
+    var building = moldInHand(actorId);
+    if (!building) {
+      toProfile(profileId, 'A master key comes off the key mold of the place it opens, and you ' +
+                           'are carrying none.');
+      return true;
+    }
+    var held = holderOf(building);
+    if (!held) {
+      toProfile(profileId, 'Nobody holds ' + nameOf(building) + ', so there is nobody to cut its ' +
+                           'master key for. It can be claimed for nothing.');
+      return true;
+    }
+    var owner = holderHere(actorId, held);
+    if (!owner) {
+      toProfile(profileId, held.name + ' holds ' + nameOf(building) + ' and has to be standing ' +
+                           'here. A master key is cut for the holder, with the holder there.');
+      return true;
+    }
+    if (!takeItem(actorId, KEY_INGOT, MASTER_INGOTS)) {
+      toProfile(profileId, 'A master key is cut from ' + MASTER_INGOTS + ' iron ingots, and you are ' +
+                           'carrying fewer.');
+      return true;
+    }
+    var had = !!(held.master && held.master.for === held.by);
+    var no = issueMaster(owner.actorId, building, held);
+    if (!no) {
+      addItem(actorId, KEY_INGOT, MASTER_INGOTS);
+      toProfile(profileId, 'The master key could not be handed over. Say so in the dev channel.');
+      return true;
+    }
+    plog('master key no.', no, 'to', nameOf(building), 'was cut at a forge for', held.name);
+    var mine = owner.actorId === actorId;
+    toProfile(profileId, 'You cut a master key to ' + nameOf(building) +
+                         (mine ? ' and it is in your pack.' : ' and hand it to ' + held.name + '.') +
+                         (had ? ' The master key cut before it no longer opens anything.' : ''));
+    if (!mine && owner.profileId !== profileId) {
+      toProfile(owner.profileId, 'The new master key to ' + nameOf(building) + ' is in your pack.' +
+                                 (had ? ' The one cut before it no longer opens anything.' : ''));
+    }
     return true;
   }
 
@@ -37780,8 +38069,10 @@ log('gamemode loaded:',
       var atBoard = boardHere(actorId);
       var hold = atBoard || (at ? holdOfBox(at) : null);
       if (hold && atBoard) {
-        toProfile(profileId, 'This is ' + hold + '\'s notice board, and its drop box. ' +
-          (Number(funds[hold]) || 0) + ' gold has been paid into it.');
+        // The fees are a record and never in the box (#2298); the box is
+        // on the board's post and answers E itself.
+        toProfile(profileId, 'This is ' + hold + '\'s notice board. Its drop box is on the shelf ' +
+          'on the board\'s post: press E on it.');
         return true;
       }
       toProfile(profileId, hold
@@ -37972,6 +38263,402 @@ log('gamemode loaded:',
     funds[key] = (Number(funds[key]) || 0) - n;
     save();
     plog(n, 'gold off', key + '\'s ledger:', String(reason || 'no reason given'));
+    return true;
+  }
+
+  /*
+    ------------------------------------- THE DROP BOX ON THE BOARD (#2298)
+
+    Patrick, 12 October, every rule below is his:
+      - The box sits on a shelf on the board's right post, and E on it does
+        only the box; E on the board does only the board.
+      - What goes in: gold (rent among it), and the Free Skyrim Trading
+        Company's drop offs, left for somebody who was not there to take
+        them, which a steward hands out. Carriage and ferry fares go in by
+        themselves, as real gold, each time a fare is paid.
+      - Notice and job fees never go in. They leave the world and stay a
+        record (funds, above), so the Court never has money it does not.
+      - Anybody may take back what they put in, rent included: then the rent
+        simply is not paid any more. That hold's officers may take anything.
+      - Every deposit and every take is recorded with the character's name,
+        what, how much and when.
+      - A person sees only what they put in, gold too: only the gold they
+        added, never the box's total. Only the officers see everything, and
+        only they get the Records button: what is in it now, what has left,
+        who added and who took what, and when.
+
+    WHY THE SERVER'S RECORD IS THE BOX, AND NOT A CONTAINER. A Skyrim
+    container shows whoever opens it everything in it, and the server sends a
+    container's whole inventory to every client that has it in view
+    (MpObjectReference::VisitProperties in the fork). So the box is an
+    activator (ThornswoodDropBox) the server stands beside its board
+    (standBoard, #2516), E on it is answered here with the box's own panel
+    (boardActivated), and what is in the box is this record, one copy, never
+    a count beside a chest that can drift from it. The box is at the board:
+    standing at the board's spot is standing at the box (boardHere), as it
+    always was.
+
+    WHO IS AN OFFICER OF A HOLD, AS THE SERVER KNOWS IT TODAY: that hold's
+    Jarl, that hold's guards, and a steward. Stewards are one list for every
+    hold (stewardCmd records no hold), so a steward is an officer at every
+    box; and there is no Court office in the server. Both are written on
+    #2298 as questions.
+
+    Every line here comes from the box's own panel (game/ui/thornswood-box.js)
+    and is never typed (Patrick, 4 Oct: no chat commands for what people do).
+  */
+  var dropbox = loadPart('dropbox', {});
+  var BOX_LOG_KEEP = 500;
+  var BOX_RECORDS_SHOWN = 150;
+  var BOX_FOR_CHARS = 60;
+  var BOX_VIEW_PROPERTY = 'thornswoodBoxView';
+  var boxViewScript = [
+    '(function(){',
+    '  try {',
+    '    var v = ctx.value;',
+    '    if (!v || typeof v !== "object") { return; }',
+    '    var st = ctx.state;',
+    '    if (!st) { return; }',
+    '    if (st.thornswoodBoxAt === v.at) { return; }',
+    '    st.thornswoodBoxAt = v.at;',
+    '    var body = JSON.stringify(v);',
+    '    var src = "(function(){try{" +',
+    '      "var d=" + body + ";window.thornswoodBoxView=d;" +',
+    '      "if(window.thornswoodBox&&window.thornswoodBox.setData){window.thornswoodBox.setData(d);}" +',
+    '      "}catch(e){}})();";',
+    '    try { ctx.sp.browser.executeJavaScript(src); } catch (e) { }',
+    '  } catch (e) { }',
+    '})();'
+  ].join('\n');
+  try {
+    mp.makeProperty(BOX_VIEW_PROPERTY, {
+      isVisibleByOwner: true, isVisibleByNeighbors: false,
+      updateOwner: boxViewScript, updateNeighbor: ''
+    });
+  } catch (e) { /* made by an earlier load. harmless. */ }
+
+  function dropboxOf(hold) {
+    var d = dropbox[hold];
+    if (!d || typeof d !== 'object') { d = dropbox[hold] = {}; }
+    if (!Array.isArray(d.items)) { d.items = []; }
+    if (!Array.isArray(d.log)) { d.log = []; }
+    if (!(Number(d.next) > 0)) { d.next = 1; }
+    return d;
+  }
+
+  function characterName(actorId) {
+    try {
+      var ap = mp.get(actorId, 'appearance');
+      if (ap && ap.name) { return String(ap.name); }
+    } catch (e) { }
+    return 'somebody';
+  }
+
+  /*
+    An item's name for the panel and the record. A stack with a name of its
+    own (a key, a deed) keeps it; gold is gold; anything else is named out of
+    the two generated name tables /give reads, when this file has them.
+  */
+  var boxNames = null;
+  function itemName(entry) {
+    if (entry && typeof entry.name === 'string' && entry.name) { return entry.name; }
+    var base = Number(entry && entry.baseId) || 0;
+    if (base === GOLD_ID) { return 'Gold'; }
+    if (!boxNames) {
+      boxNames = {};
+      var tables = [];
+      if (typeof ITEM_NAMES !== 'undefined') { tables.push(ITEM_NAMES); }
+      if (typeof ADMIN_ITEMS !== 'undefined') { tables.push(ADMIN_ITEMS); }
+      for (var t = 0; t < tables.length; t++) {
+        for (var k in tables[t]) {
+          if (!Object.prototype.hasOwnProperty.call(tables[t], k)) { continue; }
+          var row = tables[t][k];
+          var at = String((row && row[1]) || '').toLowerCase();
+          if (at && !Object.prototype.hasOwnProperty.call(boxNames, at)) { boxNames[at] = row[0]; }
+        }
+      }
+    }
+    var desc = '';
+    try { desc = String(mp.getDescFromId(base) || '').toLowerCase(); } catch (e) { desc = ''; }
+    if (desc && Object.prototype.hasOwnProperty.call(boxNames, desc)) { return boxNames[desc]; }
+    return desc ? 'something (' + desc + ')' : 'something';
+  }
+
+  /*
+    May this person take anything out of this hold's box: its officers.
+    That hold's Jarl and that hold's guards; and a steward Jarl named, from
+    the one list there is (isSteward also counts every Jarl, of any hold, so
+    it is not asked here: a Jarl is an officer of their own hold's box).
+  */
+  function boxOfficer(hold, profileId, actorId) {
+    var pid = Number(profileId) || 0;
+    if (!pid || !hold) { return false; }
+    if (isGuard(pid, hold)) { return true; }
+    if (stewards.indexOf(pid) !== -1) { return true; }
+    return jarlHoldOf(pid, actorId) === hold;
+  }
+
+  function boxLog(hold, row) {
+    var d = dropboxOf(hold);
+    row.at = Date.now();
+    d.log.push(row);
+    if (d.log.length > BOX_LOG_KEEP) { d.log.splice(0, d.log.length - BOX_LOG_KEEP); }
+  }
+
+  /*
+    What the box's panel shows this person. Filtered here, never in the page:
+    somebody who is not an officer is sent their own rows and nothing else,
+    and never the box's total.
+  */
+  function boxView(actorId, profileId, hold, said, withRecords) {
+    var d = dropboxOf(hold);
+    var officer = boxOfficer(hold, profileId, actorId);
+    var rows = [];
+    var mineGold = 0;
+    var allGold = 0;
+    for (var i = 0; i < d.items.length; i++) {
+      var it = d.items[i];
+      var gold = Number(it.baseId) === GOLD_ID ? (Number(it.count) || 0) : 0;
+      allGold += gold;
+      var mine = Number(it.by) === Number(profileId) && Number(it.by) > 0;
+      if (mine) { mineGold += gold; }
+      if (!mine && !officer) { continue; }
+      rows.push({ n: it.n, who: it.name || 'somebody', what: it.what || 'something',
+                  count: Number(it.count) || 0, at: Number(it.at) || 0, forName: it.forName || '',
+                  kind: it.kind || '', mine: mine, gold: !!gold });
+    }
+    var pack = [];
+    var packGold = 0;
+    var inv = null;
+    try { inv = mp.get(actorId, 'inventory'); } catch (e) { inv = null; }
+    var entries = (inv && inv.entries) || [];
+    for (var p = 0; p < entries.length; p++) {
+      var e = entries[p];
+      if (!e) { continue; }
+      if (Number(e.baseId) === GOLD_ID) { packGold += Number(e.count) || 0; continue; }
+      if (e.worn || e.wornLeft) { continue; }
+      pack.push({ slot: p, what: itemName(e), count: Number(e.count) || 0 });
+    }
+    var view = {
+      open: true, hold: hold, where: (boards[hold] && boards[hold].where) || HOLD_TOWN[hold] || hold,
+      officer: officer, rows: rows, mineGold: mineGold, packGold: packGold, pack: pack,
+      said: said || ''
+    };
+    if (officer) {
+      view.allGold = allGold;
+      if (withRecords) {
+        var recs = [];
+        for (var r = d.log.length - 1; r >= 0 && recs.length < BOX_RECORDS_SHOWN; r--) {
+          var l = d.log[r];
+          recs.push({ at: l.at, act: l.act, who: l.whoName || 'somebody', by: l.byName || '',
+                      what: l.what || '', count: l.count, forName: l.forName || '', note: l.note || '' });
+        }
+        view.records = recs;
+      }
+    }
+    return view;
+  }
+
+  var boxShownAt = 0;
+  function showBox(actorId, view) {
+    var payload = JSON.parse(JSON.stringify(view));
+    boxShownAt = Math.max(Date.now(), boxShownAt + 1);
+    payload.at = boxShownAt;
+    try { mp.set(actorId, BOX_VIEW_PROPERTY, payload); } catch (e) {
+      plog('could not send the drop box panel to', Number(actorId).toString(16) + ':', e);
+    }
+  }
+
+  /*
+    Gold in. Rent first, as putting gold in the box always did: what the
+    payer owes on their places is paid down, and the entry remembers how much
+    went to which place, so taking that gold back makes it owed again.
+  */
+  function boxPutGold(hold, actorId, profileId, amount) {
+    var n = Math.floor(Number(amount));
+    if (!(n > 0) || String(n) !== String(amount).trim()) { return 'Say how much gold, as a whole number.'; }
+    if (!takeGold(actorId, n)) { return 'You do not have ' + n + ' gold in one purse.'; }
+    var owed = rentOwedBy(profileId);
+    var left = n;
+    var rent = [];
+    for (var i = 0; i < owed.length && left > 0; i++) {
+      var c = claims[owed[i]];
+      if (!c || !c.rent) { continue; }
+      var due = Number(c.rent.owed) || 0;
+      var take = left >= due ? due : left;
+      if (take <= 0) { continue; }
+      c.rent.owed = due - take;
+      if (c.rent.owed <= 0) { c.rent.owed = 0; c.rent.since = Date.now(); }
+      left -= take;
+      rent.push({ building: owed[i], amount: take });
+    }
+    var d = dropboxOf(hold);
+    var who = characterName(actorId);
+    var item = { n: d.next++, by: profileId, name: who, kind: 'gold', baseId: GOLD_ID, count: n,
+                 what: 'Gold', at: Date.now() };
+    if (rent.length) { item.rent = rent; }
+    d.items.push(item);
+    var paid = n - left;
+    boxLog(hold, { act: 'in', n: item.n, who: profileId, whoName: who, by: profileId, byName: who,
+                   what: 'Gold', count: n, note: paid ? paid + ' of it rent' : '' });
+    save();
+    plog(who, '(profile ' + profileId + ') put', n, 'gold in', hold + '\'s drop box', paid ? '(' + paid + ' of it rent)' : '');
+    return 'You put ' + n + ' gold in the box.' + (paid ? ' ' + paid + ' of it pays your rent.' : '');
+  }
+
+  /*
+    Something left for somebody: a Trading Company drop off for a person who
+    was not there when it came. Only with a name on it, so the steward who
+    hands it out knows whose it is. Worn things are not offered.
+  */
+  function boxLeave(hold, actorId, profileId, slot, count, forName) {
+    var to = String(forName || '').trim().replace(/\s+/g, ' ');
+    if (!to) { return 'Say who it is for.'; }
+    if (to.length > BOX_FOR_CHARS) { return 'That name is too long.'; }
+    var inv = null;
+    try { inv = mp.get(actorId, 'inventory'); } catch (e) { return 'Your pack could not be read.'; }
+    var entries = (inv && inv.entries) || [];
+    var at = Math.floor(Number(slot));
+    var e = (at >= 0 && at < entries.length) ? entries[at] : null;
+    if (!e || Number(e.baseId) === GOLD_ID) { return 'That is not in your pack.'; }
+    if (e.worn || e.wornLeft) { return 'Take it off first.'; }
+    var n = Math.floor(Number(count));
+    if (!(n > 0) || n > (Number(e.count) || 0)) { return 'You do not have that many.'; }
+    var kept = JSON.parse(JSON.stringify(e));
+    delete kept.count; delete kept.worn; delete kept.wornLeft;
+    e.count = (Number(e.count) || 0) - n;
+    if (e.count <= 0) { entries.splice(at, 1); }
+    try { mp.set(actorId, 'inventory', { entries: entries }); } catch (e2) { return 'Your pack could not be written.'; }
+    var d = dropboxOf(hold);
+    var who = characterName(actorId);
+    var what = itemName(kept);
+    var item = { n: d.next++, by: profileId, name: who, kind: 'left', baseId: Number(kept.baseId),
+                 count: n, what: what, entry: kept, forName: to, at: Date.now() };
+    d.items.push(item);
+    boxLog(hold, { act: 'in', n: item.n, who: profileId, whoName: who, by: profileId, byName: who,
+                   what: what, count: n, forName: to });
+    save();
+    plog(who, '(profile ' + profileId + ') left', n, what, 'for', to, 'in', hold + '\'s drop box');
+    return 'You left ' + (n > 1 ? n + ' ' : '') + what + ' in the box for ' + to + '.';
+  }
+
+  /*
+    Something out. What you put in yourself, or anything if you are one of
+    this hold's officers. Your own gold back undoes the rent it paid; an
+    officer taking it leaves the rent paid.
+  */
+  function boxTake(hold, actorId, profileId, num, count) {
+    var d = dropboxOf(hold);
+    var at = -1;
+    for (var i = 0; i < d.items.length; i++) {
+      if (Number(d.items[i].n) === Math.floor(Number(num))) { at = i; break; }
+    }
+    if (at < 0) { return 'That is not in the box.'; }
+    var it = d.items[at];
+    var own = Number(it.by) > 0 && Number(it.by) === Number(profileId);
+    if (!own && !boxOfficer(hold, profileId, actorId)) {
+      return 'That is not yours to take. Only what you put in, unless you are one of this hold\'s officers.';
+    }
+    var have = Number(it.count) || 0;
+    var n = (count === undefined || count === null || count === '') ? have : Math.floor(Number(count));
+    if (!(n > 0) || n > have) { return 'There are not that many.'; }
+    if (Number(it.baseId) === GOLD_ID) {
+      if (!payOut(actorId, n)) { return 'Your pack could not be written.'; }
+    } else {
+      var inv = null;
+      try { inv = mp.get(actorId, 'inventory'); } catch (e) { return 'Your pack could not be read.'; }
+      var entries = (inv && inv.entries) || [];
+      var give = JSON.parse(JSON.stringify(it.entry || { baseId: it.baseId }));
+      give.count = n;
+      entries.push(give);
+      try { mp.set(actorId, 'inventory', { entries: entries }); } catch (e2) { return 'Your pack could not be written.'; }
+    }
+    var back = 0;
+    if (own && Array.isArray(it.rent)) {
+      // The rent this gold paid, owed again, newest place first, never more than was taken.
+      var left = n;
+      for (var r = it.rent.length - 1; r >= 0 && left > 0; r--) {
+        var row = it.rent[r];
+        var amt = Math.min(left, Number(row.amount) || 0);
+        var c = claims[row.building];
+        if (c && c.rent && amt > 0) { c.rent.owed = (Number(c.rent.owed) || 0) + amt; back += amt; }
+        row.amount = (Number(row.amount) || 0) - amt;
+        left -= amt;
+      }
+      it.rent = it.rent.filter(function (x) { return (Number(x.amount) || 0) > 0; });
+    }
+    it.count = have - n;
+    if (it.count <= 0) { d.items.splice(at, 1); }
+    var who = characterName(actorId);
+    boxLog(hold, { act: 'out', n: it.n, who: profileId, whoName: who, by: it.by, byName: it.name || '',
+                   what: it.what || '', count: n, forName: it.forName || '',
+                   note: back ? back + ' of it rent, owed again' : '' });
+    save();
+    plog(who, '(profile ' + profileId + ') took', n, it.what, 'out of', hold + '\'s drop box, put in by', it.name,
+         back ? '(' + back + ' rent owed again)' : '');
+    return 'You took ' + (n > 1 ? n + ' ' : '') + (it.what || 'it') + ' out of the box.' +
+           (back ? ' ' + back + ' gold of rent is owed again.' : '');
+  }
+
+  /*
+    A carriage or ferry fare, into the box of the hold the ride left from,
+    as real gold, by itself (Patrick, 12 Oct). One running row per hold, put
+    in by the hold rather than by a person, so nobody but its officers sees
+    it; each fare is its own line in the record.
+  */
+  function boxFare(hold, amount, reason) {
+    var key = String(hold || '').toLowerCase();
+    var n = Number(amount);
+    if (LEDGER_HOLDS.indexOf(key) < 0) { return false; }
+    if (!Number.isInteger(n) || n <= 0) { return false; }
+    var d = dropboxOf(key);
+    var row = null;
+    for (var i = 0; i < d.items.length; i++) {
+      if (d.items[i].kind === 'fare') { row = d.items[i]; break; }
+    }
+    if (!row) {
+      row = { n: d.next++, by: 0, name: 'Carriage and ferry fares', kind: 'fare', baseId: GOLD_ID,
+              count: 0, what: 'Gold', at: Date.now() };
+      d.items.push(row);
+    }
+    row.count = (Number(row.count) || 0) + n;
+    boxLog(key, { act: 'in', n: row.n, who: 0, whoName: 'A fare', by: 0, byName: 'Carriage and ferry fares',
+                  what: 'Gold', count: n, note: String(reason || '') });
+    save();
+    plog(n, 'gold of fare into', key + '\'s drop box:', String(reason || ''));
+    return true;
+  }
+
+  /*
+    /dropbox open                         what E on the box sends
+    /dropbox gold <amount>                Put in
+    /dropbox leave <slot> <count> <name>  Leave it for somebody
+    /dropbox take <n> [count]             Take out
+    /dropbox records                      an officer's Records
+    Every one answers by drawing the panel again, with what happened in it.
+  */
+  function dropboxCmd(parts, actorId, profileId, toProfile) {
+    var hold = boardHere(actorId);
+    if (!hold) {
+      toProfile(profileId, 'Stand at a hold\'s notice board to use its drop box.');
+      return true;
+    }
+    var sub = (parts && parts.length > 1) ? String(parts[1]).trim().toLowerCase() : 'open';
+    var said = '';
+    var records = false;
+    if (sub === 'gold') {
+      said = boxPutGold(hold, actorId, profileId, parts[2]);
+    } else if (sub === 'leave') {
+      said = boxLeave(hold, actorId, profileId, parts[2], parts[3], (parts.slice(4) || []).join(' '));
+    } else if (sub === 'take') {
+      said = boxTake(hold, actorId, profileId, parts[2], parts[3]);
+    } else if (sub === 'records') {
+      records = boxOfficer(hold, profileId, actorId);
+      if (!records) { said = 'Only this hold\'s officers keep the records.'; }
+    } else if (sub !== 'open') {
+      said = 'The box does not know that.';
+    }
+    showBox(actorId, boxView(actorId, profileId, hold, said, records));
     return true;
   }
 
@@ -38476,6 +39163,8 @@ log('gamemode loaded:',
     if (guestOf(building, held, profileId)) { return true; }
     if (holdsKey(actorId, building)) { return true; }
     if (holdsDeed(actorId, building)) { return true; }
+    // Its master key counts as a key for the beds (#2254).
+    if (holdsMasterKey(actorId, building)) { return true; }
     return false;
   }
 
@@ -38943,12 +39632,29 @@ log('gamemode loaded:',
     THE Z AND THE FACING ARE THE SAME KIND OF UNVERIFIED. BOARD_REACH is 400,
     so a height that is out by more than that leaves a board nobody can reach
     while standing under it, and that is the first thing verification should
-    check. The server has no use for the facing: a board here is a PLACE, a
-    cell and a point. Each client does: it puts the message board object down
-    at every board and turns it to this facing, from the cell, point and
-    facing boardsView sends (#1597).
+    check. The facing turns the board object, which the server stands at
+    every board and turns to this facing (standBoard, #2516).
   */
-  var BOARD_CELL = '3c:Skyrim.esm';   // Tamriel
+  /*
+    EVERY SPOT CARRIES ITS OWN CELL OR WORLDSPACE (#2516). Until 15 Oct all
+    nine were sent as Tamriel, 3c:Skyrim.esm. Patrick on dev, 12 Oct, saw no
+    board inside Whiterun, and Whiterun's appeared only once he walked out of
+    the gate: Solitude, Whiterun, Windhelm, Riften and Markarth are walled
+    cities, each its own worldspace inside the walls, and their numbers were
+    read inside them. Measured 15 Oct:
+      - the game's own NPCs placed near each point (docs/NPC-SPAWNS.csv)
+        stand in WhiterunWorld 1a26f, RiftenWorld 16bb4, WindhelmWorld 1691d
+        and MarkarthWorld 16d71;
+      - Solitude has no NPC within 3,000, so the cell its point falls in was
+        read out of Skyrim.esm: cell -16, 25 holds 252 references in
+        SolitudeWorld 37edf and 20 in Tamriel, the same shape as Whiterun's
+        (243 in WhiterunWorld, 14 in Tamriel), so the city is SolitudeWorld;
+      - Falkreath, Morthal and Winterhold have NPCs in Tamriel, and Dawnstar
+        is an open town, so those four stay Tamriel.
+    A steward standing where a board should be and pressing Move it here on
+    the Office page still moves it anywhere in one press: moveBoard records
+    the cell or worldspace, the point and the facing where they stand.
+  */
   var BOARD_SITES = {
     /*
       SOLITUDE'S X WAS MISSING A DIGIT, corrected 23 September, and it is a
@@ -38978,15 +39684,15 @@ log('gamemode loaded:',
       somebody in the world can say whether it is a wall. /board move solitude
       settles it for good and a deploy will never touch it again.
     */
-    solitude:   { pos: [-64867, 104407.2, -8405.9], facing: 9.9, where: 'Solitude' },
-    whiterun:   { pos: [23139.4, -7891.7, -3494.4], facing: 188.4, where: 'Whiterun' },
-    riften:     { pos: [174559.5, -94337, 11130.2], facing: 38, where: 'Riften' },
-    windhelm:   { pos: [134265.1, 35842.3, -12397.5], facing: 85.8, where: 'Windhelm' },
-    markarth:   { pos: [-173494.7, 5049.1, -3447.6], facing: 72, where: 'Markarth' },
-    falkreath:  { pos: [-30342.2, -87022.7, -3119.1], facing: 56.6, where: 'Falkreath' },
-    morthal:    { pos: [-38766.1, 64411.9, -13920.9], facing: 251.2, where: 'Morthal' },
-    dawnstar:   { pos: [32216.4, 102314, -13263], facing: 110, where: 'Dawnstar' },
-    winterhold: { pos: [109969.6, 100594.4, -9033], facing: 241.4, where: 'Winterhold' }
+    solitude:   { cell: '37edf:Skyrim.esm', pos: [-64867, 104407.2, -8405.9], facing: 9.9, where: 'Solitude' },
+    whiterun:   { cell: '1a26f:Skyrim.esm', pos: [23139.4, -7891.7, -3494.4], facing: 188.4, where: 'Whiterun' },
+    riften:     { cell: '16bb4:Skyrim.esm', pos: [174559.5, -94337, 11130.2], facing: 38, where: 'Riften' },
+    windhelm:   { cell: '1691d:Skyrim.esm', pos: [134265.1, 35842.3, -12397.5], facing: 85.8, where: 'Windhelm' },
+    markarth:   { cell: '16d71:Skyrim.esm', pos: [-173494.7, 5049.1, -3447.6], facing: 72, where: 'Markarth' },
+    falkreath:  { cell: '3c:Skyrim.esm', pos: [-30342.2, -87022.7, -3119.1], facing: 56.6, where: 'Falkreath' },
+    morthal:    { cell: '3c:Skyrim.esm', pos: [-38766.1, 64411.9, -13920.9], facing: 251.2, where: 'Morthal' },
+    dawnstar:   { cell: '3c:Skyrim.esm', pos: [32216.4, 102314, -13263], facing: 110, where: 'Dawnstar' },
+    winterhold: { cell: '3c:Skyrim.esm', pos: [109969.6, 100594.4, -9033], facing: 241.4, where: 'Winterhold' }
   };
 
   /*
@@ -39029,7 +39735,8 @@ log('gamemode loaded:',
     it. The next time these coordinates change, this number goes up and the
     boards follow, except the ones people have moved on purpose.
   */
-  var BOARD_SEED = 3;   // 3: Solitude's X, 23 September. See BOARD_SITES above.
+  // 4: the five walled cities in their own worldspaces, 15 October (#2516).
+  var BOARD_SEED = 4;   // 3: Solitude's X, 23 September. See BOARD_SITES above.
 
   var boards = seedBoards(loadPart('boards', null));
 
@@ -39059,6 +39766,11 @@ log('gamemode loaded:',
       if (!Object.prototype.hasOwnProperty.call(fresh, hold)) { continue; }
       if (out[hold]) { continue; }
       out[hold] = fresh[hold];
+      // The board and box the server already stood for it (#2516) are moved
+      // to the new spot by standBoard, not left behind beside a new pair.
+      var had = saved && typeof saved === 'object' ? saved[hold] : null;
+      if (had && had.ref) { out[hold].ref = had.ref; }
+      if (had && had.boxRef) { out[hold].boxRef = had.boxRef; }
       moved++;
     }
     if (moved) {
@@ -39087,7 +39799,7 @@ log('gamemode loaded:',
         var site = Object.prototype.hasOwnProperty.call(BOARD_SITES, t.key)
           ? BOARD_SITES[t.key] : null;
         if (site) {
-          out[t.key] = { cell: BOARD_CELL,
+          out[t.key] = { cell: site.cell,
                          pos: [site.pos[0], site.pos[1], site.pos[2]],
                          facing: site.facing,
                          where: site.where || t.town || t.key,
@@ -39359,13 +40071,234 @@ log('gamemode loaded:',
       moved twice does not lose 'Whiterun' and become 'whiterun'.
     */
     var was = boards[hold];
+    // The facing too (#2516): the board faces the way the steward does, so
+    // they stand where it should be, facing the way its notices should face.
+    var face = null;
+    try { var ang = mp.get(actorId, 'angle'); face = ang ? Number(ang[2]) : null; } catch (e) { face = null; }
     boards[hold] = { cell: cell, pos: [pos[0], pos[1], pos[2]],
                      where: (was && was.where) || hold, placed: Date.now() };
+    if (face !== null && isFinite(face)) { boards[hold].facing = ((face % 360) + 360) % 360; }
+    if (was && was.ref) { boards[hold].ref = was.ref; }
+    if (was && was.boxRef) { boards[hold].boxRef = was.boxRef; }
     save();
     plog('a steward put', hold + '\'s board where they stood, at',
-         cell, pos[0] + ',' + pos[1] + ',' + pos[2]);
+         cell, pos[0] + ',' + pos[1] + ',' + pos[2], 'facing', boards[hold].facing);
+    standBoard(hold, actorId);
     toProfile(profileId, hold + '\'s board is here now.');
     return true;
+  }
+
+  /*
+    ---------------------- THE BOARDS AND THEIR BOXES ARE THE SERVER'S (#2516)
+
+    Each client used to put every board down itself: placeAtMe made the copy
+    where the person stood, setPosition sent it to the town's spot, and the
+    next check, two seconds later, looked for it with Game.getFormEx. A
+    reference moved into a cell that is not loaded is unloaded, so the check
+    missed it and put another down at the person, for every far town, every
+    two seconds: Patrick on dev, 12 Oct, "it keeps adding the notice board on
+    top of me as I walk", 1,073 such lines in his front log.
+
+    So the server stands one board and one drop box per hold, as references of
+    its own that every game is sent, and the client places nothing. mp.place
+    makes the reference (at the middle of Tamriel), and the fork's own Papyrus
+    ObjectReference.MoveTo, called through mp.callPapyrusFunction, puts it in
+    its cell or worldspace at its point (PapyrusObjectReference::MoveTo: for
+    an object it sets the cell, the angle and the point, and the point is
+    saved). mp.set cannot: it refuses 'locationalData' for anything but an
+    actor. MoveTo moves a reference next to another one, with an offset:
+      - a board in Tamriel moves next to itself, by the spot's own numbers,
+        because a new reference starts at Tamriel's 0, 0, 0;
+      - a board in any other cell or worldspace (Raven Rock's inn, one a
+        steward walked indoors or into a walled city) moves next to somebody
+        standing in that cell, the first time somebody is (boardTick), or
+        next to the steward who moved it;
+      - the box moves next to its board, at BOX_AT turned with the board
+        (scripts/mods/Build-NoticeBoard.py prints it).
+    Then SetAngle turns both to the board's facing.
+
+    E on either is the server's to answer (boardActivated, from onActivate):
+    the board opens only the board, the box only the box (Patrick, 12 Oct).
+    The ids are kept on boards[hold] (ref, boxRef), saved with the register;
+    one that is gone or in the wrong cell is stood again.
+  */
+  var BOARD_BASE_DESC = '593b:Thornswood-Content.esp';
+  var BOX_BASE_DESC = '154d0:Thornswood-Content.esp';
+  var BOX_AT = [-134.52, 4.0, 80.0];
+  var TAMRIEL_DESC = '3c:Skyrim.esm';
+  var BOARD_CHECK_MS = 10000;
+
+  function refSelf(id) { return { type: 'form', desc: mp.getDescFromId(id) }; }
+  function refCall(fn, id, args) {
+    return mp.callPapyrusFunction('method', 'ObjectReference', fn, refSelf(id), args || []);
+  }
+
+  /* The reference is there and of this base, and in this cell when one is given. */
+  function refStands(id, baseDesc, cell) {
+    if (!id) { return false; }
+    try {
+      if (String(mp.get(id, 'baseDesc') || '').toLowerCase() !== baseDesc.toLowerCase()) { return false; }
+      return !cell || String(mp.get(id, 'worldOrCellDesc') || '') === cell;
+    } catch (e) { return false; }
+  }
+
+  function boardFacing(hold) {
+    var b = boards[hold];
+    var f = Number(b && b.facing);
+    if (b && b.facing !== undefined && b.facing !== null && isFinite(f)) { return f; }
+    var site = Object.prototype.hasOwnProperty.call(BOARD_SITES, hold) ? BOARD_SITES[hold] : null;
+    f = site ? Number(site.facing) : 0;
+    return isFinite(f) ? f : 0;
+  }
+
+  /* Where the box stands from its board's point: BOX_AT turned by the board's facing. */
+  function boxOffset(face) {
+    var h = face * Math.PI / 180;
+    var c = Math.cos(h), s = Math.sin(h);
+    return [BOX_AT[0] * c + BOX_AT[1] * s, -BOX_AT[0] * s + BOX_AT[1] * c, BOX_AT[2]];
+  }
+
+  /* Somebody standing in this cell or worldspace now, or 0. */
+  function somebodyIn(cell) {
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { online = []; }
+    for (var i = 0; i < online.length; i++) {
+      try { if (String(mp.get(online[i], 'worldOrCellDesc')) === cell) { return online[i]; } } catch (e2) { }
+    }
+    return 0;
+  }
+
+  function placedBase(desc) {
+    var id = 0;
+    try { id = mp.getIdFromDesc(desc) >>> 0; } catch (e) { id = 0; }
+    if (!id) { return 0; }
+    // getIdFromDesc is arithmetic on the load order and answers for a record that is not there.
+    try { if (!(mp.lookupEspmRecordById(id) || {}).record) { return 0; } } catch (e2) { return 0; }
+    return id;
+  }
+
+  /*
+    Stand this hold's board and box where boards[hold] says, or move them
+    there. anchor is somebody standing in the board's cell, when the caller
+    has one (the steward who moved it). Answers whether the board stands.
+  */
+  function standBoard(hold, anchor) {
+    var b = boards[hold];
+    if (!b || typeof b.cell !== 'string' || !b.pos || b.pos.length !== 3) { return false; }
+    var face = boardFacing(hold);
+    var changed = false;
+    var boardOk = refStands(b.ref, BOARD_BASE_DESC, b.cell) && !anchor;
+    if (!boardOk) {
+      var by = 0;
+      var at = null;
+      if (anchor) {
+        by = anchor;
+      } else if (b.cell !== TAMRIEL_DESC) {
+        by = somebodyIn(b.cell);
+        if (!by) { return false; }
+      }
+      var id = refStands(b.ref, BOARD_BASE_DESC, '') ? b.ref : 0;
+      try {
+        if (!id) {
+          var base = placedBase(BOARD_BASE_DESC);
+          if (!base) { plog('boards: the message board record is not in the load order'); return false; }
+          id = mp.place(base);
+        }
+        if (by) {
+          at = mp.get(by, 'pos');
+          refCall('MoveTo', id, [refSelf(by), b.pos[0] - at[0], b.pos[1] - at[1], b.pos[2] - at[2], false]);
+        } else {
+          refCall('MoveTo', id, [refSelf(id), b.pos[0], b.pos[1], b.pos[2], false]);
+        }
+        refCall('SetAngle', id, [0, 0, face]);
+      } catch (e) {
+        plog('boards: could not stand', hold + '\'s board:', e);
+        return false;
+      }
+      b.ref = id;
+      changed = true;
+      plog('boards: stood', hold + '\'s board', Number(id).toString(16), 'in', b.cell, 'at',
+           b.pos.join(','), 'facing', face);
+    }
+    if (!refStands(b.boxRef, BOX_BASE_DESC, b.cell) || changed) {
+      var bid = refStands(b.boxRef, BOX_BASE_DESC, '') ? b.boxRef : 0;
+      try {
+        if (!bid) {
+          var boxBase = placedBase(BOX_BASE_DESC);
+          if (!boxBase) { plog('boards: the drop box record is not in the load order'); }
+          else { bid = mp.place(boxBase); }
+        }
+        if (bid) {
+          var off = boxOffset(face);
+          refCall('MoveTo', bid, [refSelf(b.ref), off[0], off[1], off[2], false]);
+          refCall('SetAngle', bid, [0, 0, face]);
+          b.boxRef = bid;
+          changed = true;
+        }
+      } catch (e3) {
+        plog('boards: could not stand', hold + '\'s drop box:', e3);
+      }
+    }
+    if (changed) { save(); }
+    return true;
+  }
+
+  /* Every board that is not standing where it should, stood: Tamriel's at once, any other once somebody is in its cell. */
+  function boardTick() {
+    for (var hold in boards) {
+      if (!Object.prototype.hasOwnProperty.call(boards, hold)) { continue; }
+      var b = boards[hold];
+      if (refStands(b.ref, BOARD_BASE_DESC, b.cell) && refStands(b.boxRef, BOX_BASE_DESC, b.cell)) { continue; }
+      standBoard(hold, 0);
+    }
+  }
+
+  /*
+    E ON A BOARD OR ITS BOX, answered by the server (#2516, #2298). The board
+    opens the board's panel for the one who pressed it, and the box the box's;
+    never the other. Answers 'board', 'box' or '' for anything else.
+  */
+  var BOARD_OPEN_PROPERTY = 'thornswoodBoardOpen';
+  try {
+    mp.makeProperty(BOARD_OPEN_PROPERTY, {
+      isVisibleByOwner: true, isVisibleByNeighbors: false,
+      updateOwner: [
+        '(function(){',
+        '  try {',
+        '    var v = ctx.value;',
+        '    if (!v || typeof v !== "object") { return; }',
+        '    var st = ctx.state;',
+        '    if (!st || st.thornswoodBoardOpenAt === v.at) { return; }',
+        '    st.thornswoodBoardOpenAt = v.at;',
+        '    ctx.sp.browser.executeJavaScript("(function(){try{if(window.thornswoodBoard){window.thornswoodBoard.open();}}catch(e){}})();");',
+        '  } catch (e) { }',
+        '})();'
+      ].join('\n'),
+      updateNeighbor: ''
+    });
+  } catch (e) { /* made by an earlier load. harmless. */ }
+  var boardOpenedAt = 0;
+
+  function boardActivated(refrId, actorId) {
+    var id = Number(refrId) >>> 0;
+    if (!id) { return ''; }
+    var pid = 0;
+    try { pid = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { pid = 0; }
+    for (var hold in boards) {
+      if (!Object.prototype.hasOwnProperty.call(boards, hold)) { continue; }
+      var b = boards[hold];
+      if ((Number(b.ref) >>> 0) === id) {
+        refreshPanel(actorId);
+        boardOpenedAt = Math.max(Date.now(), boardOpenedAt + 1);
+        try { mp.set(actorId, BOARD_OPEN_PROPERTY, { at: boardOpenedAt }); } catch (e2) { }
+        return 'board';
+      }
+      if ((Number(b.boxRef) >>> 0) === id) {
+        dropboxCmd(['/dropbox', 'open'], actorId, pid, function () { });
+        return 'box';
+      }
+    }
+    return '';
   }
 
   /*
@@ -40358,6 +41291,11 @@ log('gamemode loaded:',
   g.__thornswoodHaulTimer = setInterval(
     (typeof guard === 'function') ? guard('haulTick', haulTick) : haulTick, HAUL_EVERY_MS);
 
+  // The boards and boxes stood where they should be (#2516), checked every ten seconds.
+  if (g.__thornswoodBoardTimer) { try { clearInterval(g.__thornswoodBoardTimer); } catch (e) { } }
+  g.__thornswoodBoardTimer = setInterval(
+    (typeof guard === 'function') ? guard('boardTick', boardTick) : boardTick, BOARD_CHECK_MS);
+
   /*
     A haul comes down before it is delivered: the hauler's /dropjob, the
     poster's /unpin before anybody has taken it, or a steward's /unpin at the
@@ -40502,6 +41440,7 @@ log('gamemode loaded:',
     if (word === '/guard') { return guardCmd(parts, actorId, profileId, toProfile); }
     if (word === '/evict') { return evict(actorId, profileId, toProfile); }
     if (word === '/box') { return boxCmd(parts, actorId, profileId, toProfile); }
+    if (word === '/dropbox') { return dropboxCmd(parts, actorId, profileId, toProfile); }
     if (word === '/rent') { return rentCmd(parts, actorId, profileId, toProfile); }
     if (word === '/sleephere') { return sleepHere(parts, actorId, profileId, toProfile); }
     if (word === '/notice') { return post(parts, actorId, profileId, toProfile, false); }
@@ -41017,6 +41956,9 @@ log('gamemode loaded:',
     holderOf: holderOf, buildingOf: buildingOf, nameOf: nameOf, giveDeed: giveDeed,
     setLock: setLock, mold: mold, cutKey: cutKey, mayPass: mayPass,
     holdsKey: holdsKey, holdsMold: holdsMold, holdsDeed: holdsDeed,
+    // The master key (#2254). See MASTER KEYS in locks and keys.
+    holdsMasterKey: holdsMasterKey, masterLabel: masterLabel, liveMaster: liveMaster,
+    masterKeysOf: masterKeysOf, MASTER_KEY: MASTER_KEY,
     giveNamed: giveNamed, doorsOf: doorsOf, shutFor: shutFor, push: push,
     wayOut: wayOut,
     pushAll: pushAll, touchedBench: touchedBench, moldInHand: moldInHand,
@@ -41038,6 +41980,8 @@ log('gamemode loaded:',
     JAIL_KEY: JAIL_KEY,
     guards: function () { return Object.assign({}, law.guards); },
     touchedBox: touchedBox, putIn: putIn, holdOfBox: holdOfBox,
+    dropboxCmd: dropboxCmd, boxView: boxView, boxFare: boxFare, boxOfficer: boxOfficer,
+    dropbox: function () { return dropbox; },
     deposit: deposit, takeGold: takeGold, LEDGER_HOLDS: LEDGER_HOLDS,
     withdraw: withdraw, mayWithdraw: mayWithdraw, heldOn: heldOn,
     haulTenth: haulTenth, haulTick: haulTick, saleCuts: saleCuts, inCompany: inCompany,
@@ -41046,6 +41990,7 @@ log('gamemode loaded:',
     boxes: function () { return boxes; },
     notices: function () { return notices; }, takedown: takedown,
     boards: function () { return boards; }, boardHere: boardHere, boardPanel: boardPanel,
+    standBoard: standBoard, boardTick: boardTick, boardActivated: boardActivated, boxOffset: boxOffset,
     boardsView: boardsView, lettersCarried: lettersCarried,
     stewards: function () { return stewards.slice(); }
   };
@@ -41526,8 +42471,9 @@ log('gamemode loaded:',
   A carriage is 10 to a stop in the same hold and 20 to another hold. 40 is
   only the crossing between the mainland and Solstheim, the Northern Maiden
   between Windhelm and Raven Rock (Patrick, 4 Oct, on #1394). The fare
-  goes onto the ledger of the hold the stop you leave from is in, counted the
-  way a notice fee is counted (deposit, in the property block). A pack that is
+  goes into the drop box of the hold the stop you leave from is in, as real
+  gold, by itself (Patrick, 12 Oct, #2298: boxFare, in the property block);
+  until then it was only counted on that hold's ledger. A pack that is
   short does not move and loses nothing. Fast travel stays off: nothing here
   offers the map, and there is no word that skips the driver.
 
@@ -42028,7 +42974,7 @@ log('gamemode loaded:',
     // amount below 1 would make takeGold add rather than take.
     if (!(price > 0)) { return answer('No ride to ' + wanted + ' from here.', from); }
     var prop = g.__thornswoodProperty;
-    if (!prop || typeof prop.takeGold !== 'function' || typeof prop.deposit !== 'function') {
+    if (!prop || typeof prop.takeGold !== 'function' || typeof prop.boxFare !== 'function') {
       plog('a ride was asked for and the hold ledger is not loaded');
       return answer('The hold\'s ledger is not running on this server, so nobody rides. Say so in the dev channel.', from);
     }
@@ -42057,12 +43003,12 @@ log('gamemode loaded:',
     }
     delete pressedBy[actorId];
     var what = RIDE_LINES[from.line].what;
-    if (!prop.deposit(from.hold, price, 'fare, ' + from.name + ' to ' + to.name + ' by ' + what +
+    if (!prop.boxFare(from.hold, price, from.name + ' to ' + to.name + ' by ' + what +
                       ', profile ' + profileId)) {
-      plog('profile', profileId, 'paid', price, 'at', from.key, 'and', from.hold, 'took no deposit');
+      plog('profile', profileId, 'paid', price, 'at', from.key, 'and', from.hold, 'has no drop box for it');
     }
     plog('profile', profileId, 'rode', what, 'from', from.name, 'to', to.name, 'for', price,
-         'gold, onto', from.hold + '\'s ledger');
+         'gold, into', from.hold + '\'s drop box');
     return answer('You pay the ' + price + ' gold fare and ride to ' + to.name + '.', from, true);
   }
 
@@ -44093,6 +45039,7 @@ log('gamemode loaded:',
                                  every: Number(held.rent.everyDays) || 7,
                                  owed: Number(held.rent.owed) || 0 } : null;
         rows.push({ name: W.nameOf(b), mine: true, locked: !!held.locked, rent: rent,
+                    master: !!(W.holdsMasterKey && W.holdsMasterKey(actorId, b)),
                     keyed: W.holdsKey(actorId, b), b: b,
                     sleep: (B && B.guestsOf) ? B.guestsOf(b) : [] });
       }
@@ -44103,6 +45050,17 @@ log('gamemode loaded:',
       if (farm) {
         rows.push({ name: 'Your farm', mine: true, farm: true,
                     days: farm.days, reach: farm.reach });
+      }
+      // A master key somebody handed you, while it still works (#2254): it
+      // opens the door and turns the lock, so its row says both.
+      var masters = W.masterKeysOf ? W.masterKeysOf(actorId) : [];
+      for (var mi = 0; mi < masters.length && rows.length < PROPERTY_PAGE_MAX; mi++) {
+        var mb = masters[mi];
+        if (seen[mb]) { continue; }
+        seen[mb] = true;
+        var mh = W.holderOf(mb);
+        rows.push({ name: W.nameOf(mb), mine: false, locked: !!(mh && mh.locked),
+                    keyed: true, master: true, by: mh ? mh.name : null });
       }
       // Then the places somebody let you into. A key to a building you already
       // hold is not a second row: it is the same house and the row above says
@@ -45359,7 +46317,7 @@ log('gamemode loaded:',
     if (word === '/plant' || word === '/claim' || word === '/plot' ||
         word === '/deed' || word === '/deeds' || word === '/lock' ||
         word === '/unlock' || word === '/mold' || word === '/moldhere' || word === '/key' ||
-        word === '/jarl' || word === '/steward' || word === '/guard' || word === '/evict' || word === '/box' ||
+        word === '/jarl' || word === '/steward' || word === '/guard' || word === '/evict' || word === '/box' || word === '/dropbox' ||
         word === '/rent' || word === '/sleephere' || word === '/notice' || word === '/job' ||
         word === '/board' || word === '/take' ||
         word === '/haul' ||
@@ -50173,6 +51131,10 @@ const WORDS = ['/ooc', '/o',
                // A Jarl names a guard of their hold (#502): Name guard and
                // Remove on the Office page send it, never typed.
                '/guard',
+               // The hold's drop box on the board (#2298). E on the box sends
+               // /dropbox open, and its panel's buttons send the rest; never
+               // typed, so NOT in PLAYER_WORDS.
+               '/dropbox',
                // The notice board (#1627). Sent by the board panel's buttons
                // and J's Boards tab, never typed, and so NOT in PLAYER_WORDS:
                // Patrick, 4 October, nothing people do is a chat command. A
@@ -55190,7 +56152,16 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       poison counts the same because applying one to a blade and drinking it
       fire the same event and nothing here can tell them apart.
     */
-    potion: { def: 5 },
+    /*
+      THE POTION WINDOW (#1382). potions.md: "Inside 60 seconds, the first
+      potion does what it says. The second heals or buffs at 50%. The third
+      at 25%. The fourth and after do the sip of thirst and nothing else.
+      The window is from the first swallow." The server applies a potion's
+      effects itself (EatItemEvent in the engine) and the client's own heal
+      is cropped to regeneration, so the scale is handed to the engine in
+      onEatItem before anything lands, through eatItemScale (skymp #62).
+    */
+    potion: { def: 5, windowSeconds: 60, scales: [1, 0.5, 0.25, 0] },
 
     /*
       WATER YOU CARRY (#1382). drink.md's table: a well, an inn or a filled
@@ -56069,6 +57040,36 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     Something was eaten or drunk in the game. See the /ate command and the
     equip handler in thornswood-front.js.
   */
+  /*
+    WHAT THIS POTION IS WORTH, by how many came before it in the window.
+    Kept in memory: a window is a minute, and a restart inside it starts a
+    new one, which is the generous side. Food and drink are 1, always.
+  */
+  var potionWindow = {};
+
+  function isPotion(baseId) {
+    if (!baseId) { return false; }
+    if (baseId >= 0xff000000) { return true; }
+    // The food groups move a record's kind (#1382): Goodberry is a potion
+    // with the food flag, and consumed() reads the group first too.
+    var grouped = foodGroup(baseId);
+    if (grouped) { return grouped === 'potion'; }
+    return foodKind(baseId) === 'potion';
+  }
+
+  function potionScale(actorId, baseId) {
+    if (!isPotion(baseId)) { return 1; }
+    var now = Date.now();
+    var w = potionWindow[actorId];
+    if (!w || now - w.from >= NEEDS.potion.windowSeconds * 1000) {
+      w = potionWindow[actorId] = { from: now, n: 0 };
+    }
+    var scales = NEEDS.potion.scales;
+    var scale = scales[Math.min(w.n, scales.length - 1)];
+    w.n++;
+    return scale;
+  }
+
   function consumed(actorId, baseId) {
     if (!baseId) { return ''; }
     if (isWaterItem(baseId)) { return drankWater(actorId); }
@@ -57606,6 +58607,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     bandOf: bandOf, tempBand: tempBand, consumed: consumed, kindOf: foodKind, groupOf: foodGroup,
     // Water at a well and over a cooking fire, from mp.onActivate (#1382).
     activatedWater: activatedWater, drankWater: drankWater,
+    // The potion window (#1382), asked by mp.onEatItem before the engine applies it.
+    potionScale: potionScale,
     settle: settle, view: view, effects: effects,
     // The bars as a line of text, for /needs (#2267).
     textView: textView,
@@ -59273,6 +60276,21 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     engine takes the potion whatever this answers.
   */
   mp.onEatItem = guard('onEatItem', function (actorId, baseId) {
+    /*
+      THE POTION WINDOW (#1382) goes first, because the engine applies the
+      potion as soon as this returns. A second potion in the minute lands at
+      half, a third at a quarter, a fourth at nothing (the sip of thirst still
+      comes from the needs block). Nothing is taken back afterwards.
+      eatItemScale is the engine's (skymp #62). An engine without it does not
+      read it, and the potion lands whole, as it always has.
+    */
+    var needsApi = g.__thornswoodNeeds;
+    if (needsApi && needsApi.potionScale) {
+      try {
+        var scale = needsApi.potionScale(actorId, Number(baseId) || 0);
+        if (scale < 1) { mp.set(actorId, 'eatItemScale', scale); }
+      } catch (e) { hlog('the potion window threw:', e); }
+    }
     try { tell(actorId, swallowed(actorId, Number(baseId) || 0)); } catch (e) { hlog('the drink threw:', e); }
     // Withered (#1387), in the college block, on its own: five potions in an hour.
     var college = g.__thornswoodCollege;
@@ -63915,6 +64933,7 @@ function npcMerchantManifest(data) {
   return Array.from(entries.values());
 }
 function createNpcMerchantPurses(api,data,storage) {
+  const invoke=Reflect.apply;
   if(!storage) throw new Error('A durable merchant ledger is required');
   const retirement=data.merchantRoster!==undefined;
   if(retirement && (!data.merchantRoster || typeof data.merchantRoster!=='object' ||
@@ -63965,19 +64984,33 @@ function createNpcMerchantPurses(api,data,storage) {
   }
   if(retirement && Array.from(references.values()).some(identity=>identity.active && ledger.entries[identity.reference]===null))
     throw new Error('Existing-world roster activation requires every retained saved purse');
-  function prepare(id) {
-    return mutate(()=>prepareState(id));
+  function prepare(id,owner) {
+    return mutate(()=>prepareState(id,owner));
   }
-  function prepareState(id) {
-    assertOwner();
+  function prepareState(id,owner) {
+    let saveAttempted=false;
+    function assertCurrent() {
+      assertOwner();
+      if(owner && !owner()) throw new Error('Merchant preparation caller is revoked');
+    }
+    function call(target,method,...args) {
+      assertCurrent();
+      const fn=target[method];
+      assertCurrent();
+      if(target===storage && method==='save') saveAttempted=true;
+      const result=invoke(fn,target,args);
+      assertCurrent();
+      return result;
+    }
+    assertCurrent();
     const identity=catalogue.get(id);
     if(!identity) return null;
     // Retired identities remain private ledger records, never live traders.
     if(!identity.active) return null;
-    const actor=api.getNpcAIState(id);
+    const actor=call(api,'getNpcAIState',id);
     if(!actor || actor.isHuman || actor.profileId>0) throw new Error('A human cannot receive an NPC merchant purse');
-    if(api.get(id,'baseDesc')!==identity.base) throw new Error('Merchant base does not match its authored reference');
-    const projection=api.get(id,property);
+    if(call(api,'get',id,'baseDesc')!==identity.base) throw new Error('Merchant base does not match its authored reference');
+    const projection=call(api,'get',id,property);
     if(projection!==undefined && projection!==null && !valid(projection,identity))
       throw new Error('Saved merchant state cannot be verified');
     let state=ledger.entries[identity.reference];
@@ -63988,19 +65021,19 @@ function createNpcMerchantPurses(api,data,storage) {
       next.entries[identity.reference]=state;
       // Initialization and balance commit together before the native mirror.
       try {
-        assertOwner();
-        const acknowledgement=storage.save(next);
+        assertCurrent();
+        const acknowledgement=call(storage,'save',next);
         if(storage.durable===true && acknowledgement!==true) throw new Error('Durable merchant save acknowledgement is missing');
-      } catch(error) {active=false;throw error;}
-      assertOwner();
-      ledger=next;
-      initialized++;
+        assertCurrent();
+        ledger=next;
+        initialized++;
+      } catch(error) {if(saveAttempted) active=false;throw error;}
     }
     // Native saves are asynchronous. A lost or older mirror uses the ledger's
     // current balance, including zero; it never creates another grant.
-    assertOwner();
-    if(JSON.stringify(projection)!==JSON.stringify(state)) api.set(id,property,JSON.parse(JSON.stringify(state)));
-    assertOwner();
+    assertCurrent();
+    if(JSON.stringify(projection)!==JSON.stringify(state)) call(api,'set',id,property,JSON.parse(JSON.stringify(state)));
+    assertCurrent();
     verified.add(id);
     return JSON.parse(JSON.stringify(state));
   }
@@ -64072,11 +65105,12 @@ function createNpcMerchantPurses(api,data,storage) {
 
 // NPC POPULATION POLICY BEGIN
 function createNpcPopulation(api,data,plugins,merchants,options) {
+  const invoke=Reflect.apply;
   if(data.version!==1 || JSON.stringify(data.plugins)!==JSON.stringify(plugins))
     throw new Error('NPC population catalogue does not match the installed load order');
   const allowed=new Map(),byBase=new Map(),configured=new Map(),counts=new Map();
-  const resolve=desc=>{
-    const id=api.getIdFromDesc(desc);
+  const resolve=(desc,call)=>{
+    const id=typeof call==='function' ? call('getIdFromDesc',desc) : api.getIdFromDesc(desc);
     if(!Number.isInteger(id) || id<=0) throw new Error('Unresolved NPC catalogue identity: '+desc);
     return id;
   };
@@ -64109,23 +65143,44 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
     return true;
   }
   if(!options || options.suspended!==true) commit();
-  function configure(id,state) {
+  // A population can outlive one caller. Fence that caller without revoking
+  // the shared population or purse service used by its successor.
+  function whileCurrent(owner,fallback,work) {
+    const revoked={};
+    const current=()=>committed && !closed && (!owner || owner());
+    function check() {if(!current()) throw revoked;}
+    function call(method,...args) {
+      check();
+      const fn=api[method];
+      check();
+      const result=invoke(fn,api,args);
+      check();
+      return result;
+    }
+    if(!current()) return fallback;
+    try {const result=work(call,current);return current() ? result : fallback;}
+    catch(error) {if(error===revoked || !current()) return fallback;throw error;}
+  }
+  function configure(id,state,owner) {
+    return whileCurrent(owner,null,(call)=>configureCurrent(id,state,call));
+  }
+  function configureCurrent(id,state,call) {
     if(!committed || closed) return null;
     if(state.isHuman) return null;
     if(configured.has(id)) return configured.get(id).policy;
     let rule=allowed.get(id),home;
     if(!rule && id>=0xff000000) {
-      const base=resolve(api.get(id,'baseDesc'));
-      const saved=api.get(id,'thornswoodNpcHome');
+      const base=resolve(call('get',id,'baseDesc'),call);
+      const saved=call('get',id,'thornswoodNpcHome');
       const validHome=saved && Number.isInteger(saved.cell) && Array.isArray(saved.home) &&
         saved.home.length===3 && saved.home.every(Number.isFinite);
       const anchor=validHome ? saved.home : state.pos,cell=validHome ? saved.cell : state.cellOrWorld;
-      const commanded=api.get(id,'thornswoodNpcCommanded')===true;
+      const commanded=call('get',id,'thornswoodNpcCommanded')===true;
       if(commanded && Number.isInteger(cell) && cell>0 && Array.isArray(anchor) &&
           anchor.length===3 && anchor.every(Number.isFinite)) {
         // Only trusted spawn commands set this private marker. They keep
         // authority and a saved home without joining a natural habitat cap.
-        rule={cell,commanded:true,row:[null,base,api.getDescFromId(cell),anchor,1024,45,null,null,0]};
+        rule={cell,commanded:true,row:[null,base,call('getDescFromId',cell),anchor,1024,45,null,null,0]};
       } else if(!commanded) rule=(byBase.get(base)||[]).filter(r=>r.cell===cell &&
         (!saved || !saved.source || saved.source===r.row[0]) &&
         Math.hypot(...r.row[3].map((v,j)=>v-anchor[j]))<=r.row[4])
@@ -64135,26 +65190,26 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
       if(closed) return null;
       if(rule) {
         home=validHome ? saved.home.slice() : state.pos.slice();
-        api.set(id,'thornswoodNpcHome',{home,cell:rule.cell,source:rule.commanded ? 'command' : rule.row[0]});
+        call('set',id,'thornswoodNpcHome',{home,cell:rule.cell,source:rule.commanded ? 'command' : rule.row[0]});
         if(closed) return null;
-        api.set(id,'spawnPoint',{cellOrWorldDesc:rule.row[2],pos:home,rot:[0,0,0]});
+        call('set',id,'spawnPoint',{cellOrWorldDesc:rule.row[2],pos:home,rot:[0,0,0]});
         if(closed) return null;
       }
     }
     if(!rule) {
       // Native placement exclusions handle authored references. Dynamic NPCs
       // must also pass a species, habitat and shared density check.
-      if(id>=0xff000000) {api.set(id,'isDisabled',true);}
+      if(id>=0xff000000) {call('set',id,'isDisabled',true);}
       return null;
     }
     if(rule.row[13]) {
-      const desc=api.getDescFromId(id);
+      const desc=call('getDescFromId',id);
       if(closed) return null;
-      api.callPapyrusFunction('method','ObjectReference','SetDisplayName',
+      call('callPapyrusFunction','method','ObjectReference','SetDisplayName',
         {type:'form',desc},[rule.row[13],true]);
       if(closed) return null;
     }
-    api.set(id,'spawnDelay',rule.row[5]*60);
+    call('set',id,'spawnDelay',rule.row[5]*60);
     if(closed) return null;
     // row[11]: 1 the race swims and cannot walk, 2 an ambush placement (#2067).
     const flags=rule.row[11] || 0;
@@ -64166,12 +65221,14 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
     configured.set(id,{policy,rule});
     return policy;
   }
-  function afterOwnership(id) {
-    if(!committed || closed) return;
-    const entry=configured.get(id);
-    if(entry && api.setNpcDifficultyTier) api.setNpcDifficultyTier(id,entry.rule.row[8] || 0);
-    if(closed) return;
-    if(entry && merchants) merchants.prepare(id);
+  function afterOwnership(id,owner) {
+    return whileCurrent(owner,undefined,(call,current)=>{
+      if(!committed || closed) return;
+      const entry=configured.get(id);
+      if(entry && api.setNpcDifficultyTier) call('setNpcDifficultyTier',id,entry.rule.row[8] || 0);
+      if(closed) return;
+      if(entry && merchants) merchants.prepare(id,current);
+    });
   }
   function release(id) {
     const entry=configured.get(id);
@@ -64183,13 +65240,12 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
   return {configure,afterOwnership,release,commit,stop:()=>{closed=true;},merchantStats:()=>merchants && merchants.stats(),reconcile:ids=>{
     const live=new Set(ids);
     for(const id of configured.keys()) if(id>=0xff000000 && !live.has(id)) release(id);
-  },admit:(id,state)=>{
-    if(!configure(id,state) || closed) return false;
-    api.setNpcServerControlled(id,true);
-    if(closed) return false;
-    afterOwnership(id);
-    return !closed;
-  },returnMinutes:id=>{
+  },admit:(id,state,owner)=>whileCurrent(owner,false,(call,current)=>{
+    if(!configure(id,state,current)) return false;
+    call('setNpcServerControlled',id,true);
+    afterOwnership(id,current);
+    return current();
+  }),returnMinutes:id=>{
     const entry=configured.get(id),rule=entry ? entry.rule : allowed.get(id);
     return rule && rule.row[5];
   }};
@@ -64748,11 +65804,15 @@ function createNpcNavigation(api, now, report, ready) {
     meshes:sharedMeshes,cellTiles,tiles,slots,version:()=>geometryVersion};
 }
 function startSharedNpcServerRuntime(api, timers, now, report, population, options) {
+  const invoke=Reflect.apply;
   const property = 'thornswoodNpcActivity';
   api.makeProperty(property, {isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
   const handles = new Set(), actors = new Map(), order = [], preparing = [], owned = new Set(), unavailable = new Set();
   const reactions = new Map(), knownFactions = new Set();
-  const navigation = createNpcNavigation(api, now, report, bank => {preparing.push(...bank.waiting);bank.waiting=[];});
+  const navigation = createNpcNavigation({
+    getNavmeshRecords:(...args)=>nativeCall('getNavmeshRecords',...args),
+    lookupEspmRecordById:(...args)=>nativeCall('lookupEspmRecordById',...args)
+  }, now, report, bank => {preparing.push(...bank.waiting);bank.waiting=[];});
   const {banks, ensureBank, locate, search} = navigation;
   const npcTiles = new Map();
   const enrolled = new Set(), excluded = new Set(), policies = new Map();
@@ -64775,13 +65835,29 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     try {handle = timers.setTimeout(callback,delay);} catch(error) {stop();throw error;}
     handles.add(handle);
   }
-  function stop() { stopped=true;ready.length=0;for(const h of handles) timers.clearTimeout(h);handles.clear(); }
+  function stop() {
+    stopped=true;ready.length=0;
+    const ownedHandles=Array.from(handles);
+    handles.clear();
+    const errors=[];
+    for(const h of ownedHandles) {try {timers.clearTimeout(h);} catch(error) {errors.push(error);}}
+    if(errors.length) throw errors[0];
+  }
   function start() {
     if(stopped) throw new Error('NPC runtime activation is revoked');
     if(running) return true;
     running=true;
     while(ready.length && !stopped) ready.shift()();
     return !stopped;
+  }
+  function nativeCall(method,...args) {
+    if(stopped) throw new Error('NPC runtime activation is revoked');
+    const fn=api[method];
+    if(stopped) throw new Error('NPC runtime activation is revoked');
+    const result=invoke(fn,api,args);
+    // A native callback may replace this runtime before returning.
+    if(stopped) throw new Error('NPC runtime activation is revoked');
+    return result;
   }
   const distance=(a,b)=>Math.hypot(...a.map((v,i)=>v-b[i]));
   const tile=(cell,p)=>cell+':'+Math.floor(p[0]/512)+':'+Math.floor(p[1]/512);
@@ -64798,7 +65874,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     s.factions=(s.factions || []).filter(f=>Number.isInteger(f.id) && f.rank>=0);
     const missing=s.factions.map(f=>f.id).filter(id=>!knownFactions.has(id));
     for (let i=0;i<missing.length;i+=128) {
-      for(const r of api.getFactionReactions(missing.slice(i,i+128))) {
+      for(const r of nativeCall('getFactionReactions',missing.slice(i,i+128))) {
         if (r.reaction>=0 && r.reaction<=3) reactions.set(r.source+':'+r.target,r.reaction);
       }
     }
@@ -64882,7 +65958,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
       path:[],dwell:0,last:now(),sequence:saved && Number.isInteger(saved.sequence) ? saved.sequence : id%997,
       mode:'ambient',target:0,lastSaved:now(),policy:policies.get(id)};
     actors.set(id,a);order.push(id);indexActor(a);
-    api.set(id,property,{version:2,sequence:a.sequence,mode:'ambient',cell:a.cell});
+    nativeCall('set',id,property,{version:2,sequence:a.sequence,mode:'ambient',cell:a.cell});
   }
   // Runs right after humanTick has read where everybody is.
   function settleHeld() {
@@ -64896,7 +65972,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
       try {
         if(h.ambush) emerge(h);
         else {
-          api.set(id,'locationalData',{cellOrWorldDesc:api.getDescFromId(h.state.cellOrWorld),
+          nativeCall('set',id,'locationalData',{cellOrWorldDesc:nativeCall('getDescFromId',h.state.cellOrWorld),
             pos:h.near.pos.slice(),rot:h.state.rot.slice()});
           preparing.push(id);
         }
@@ -64908,10 +65984,12 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     schedule(meshTick,2);
   }
   function reject(id,error) {
+    if(stopped) return;
     unavailable.add(id);failed=unavailable.size;
     // Navigation failure pauses activity, never hands a placed NPC to a client.
     // Native authority validation still rejects human identities and profiles.
-    try {api.setNpcServerControlled(id,true);owned.add(id);api.stopNpcMovement(id);} catch(e) {}
+    try {nativeCall('setNpcServerControlled',id,true);owned.add(id);nativeCall('stopNpcMovement',id);} catch(e) {}
+    if(stopped) return;
     report('NPC '+id.toString(16)+' remains loaded; activity unavailable: '+error);
   }
   function prepareTick() {
@@ -64919,10 +65997,10 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     for(let i=0;i<4 && preparing.length && now()-begin<4;i++) {
       const entry=preparing.shift(),id=typeof entry==='number' ? entry : entry.id;
       try {
-        const state=factionData(api.getNpcAIState(id));
+        const state=factionData(nativeCall('getNpcAIState',id));
         if(!validState(state) || state.isHuman) throw new Error('Invalid NPC state');
         if(population && !policies.has(id)) {
-          const policy=population.configure(id,state);
+          const policy=population.configure(id,state,()=>!stopped);
           if(!policy) {excluded.add(id);continue;}
           if(!Array.isArray(policy.home) || policy.home.length!==3 || !policy.home.every(Number.isFinite) ||
               !Number.isInteger(policy.cell) || !Number.isFinite(policy.leash) || policy.leash<=0)
@@ -64930,11 +66008,11 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
           policies.set(id,policy);
         }
         if(!owned.has(id)) {
-          api.setNpcServerControlled(id,true);
-          if(population && population.afterOwnership) population.afterOwnership(id);
+          nativeCall('setNpcServerControlled',id,true);
+          if(population && population.afterOwnership) population.afterOwnership(id,()=>!stopped);
           owned.add(id);
         }
-        const saved=api.get(id,property);
+        const saved=nativeCall('get',id,property);
         swimming(state,policies.get(id));
         const bank=ensureBank(state.cellOrWorld,state.pos);
         if(!bank.ready) { bank.waiting.push({id,state,saved}); continue; }
@@ -64948,14 +66026,14 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
           path:[],dwell:0,last:now(),sequence:saved && Number.isInteger(saved.sequence) ? saved.sequence : id%997,
           mode:'ambient',target:0,lastSaved:now(),policy:policies.get(id)};
         actors.set(id,a);order.push(id);indexActor(a);
-        api.set(id,property,{version:2,sequence:a.sequence,mode:'ambient',cell:a.cell});
+        nativeCall('set',id,property,{version:2,sequence:a.sequence,mode:'ambient',cell:a.cell});
       } catch(e) { reject(id,e); }
     }
     schedule(prepareTick,10);
   }
   function preload() {
     try {
-      const batch=api.loadNpcBatch(cursor,1);
+      const batch=nativeCall('loadNpcBatch',cursor,1);
       if(!Number.isInteger(batch.nextCursor) || batch.nextCursor<cursor || batch.nextCursor>batch.total ||
           (batch.nextCursor===cursor && cursor!==batch.total)) throw new Error('Invalid NPC loading cursor');
       cursor=batch.nextCursor;total=batch.total;loaded+=batch.actorIds.length;
@@ -64971,7 +66049,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
   function discover() {
     try {
       if(api.getLoadedNpcIds) {
-        const ids=api.getLoadedNpcIds();
+        const ids=nativeCall('getLoadedNpcIds');
         if(population.reconcile) population.reconcile(ids);
         for(const id of ids) enroll(id);
       }
@@ -64992,8 +66070,8 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     const next=new Map();
     let everybody=true;
     try {
-      for(const id of api.get(0,'onlinePlayers') || []) {
-        try { const s=factionData(api.getNpcAIState(id)); if(validState(s) && !s.isDead && !s.isDisabled) next.set(id,s); }
+      for(const id of nativeCall('get',0,'onlinePlayers') || []) {
+        try { const s=factionData(nativeCall('getNpcAIState',id)); if(validState(s) && !s.isDead && !s.isDisabled) next.set(id,s); }
         catch(e) { everybody=false;report('NPC observer state unavailable for '+id.toString(16)); }
       }
     } catch(e) { everybody=false;report('NPC observer list unavailable: '+e); }
@@ -65079,16 +66157,16 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
   }
   function update(a) {
     const at=now(),elapsed=Math.min(4000,Math.max(0,at-a.last));a.last=at;
-    const s=swimming(factionData(api.getNpcAIState(a.id)),a.policy);
+    const s=swimming(factionData(nativeCall('getNpcAIState',a.id)),a.policy);
     if(!validState(s)) throw new Error('Invalid live state');
     a.state=s;
     if(s.isDead || s.isDisabled || s.immobile) {
-      if(!a.paused) api.stopNpcMovement(a.id);
+      if(!a.paused) nativeCall('stopNpcMovement',a.id);
       a.paused=true;a.path=[];a.target=0;return;
     }
     a.paused=false;
     if(!withinHome(a,s.pos,s.cellOrWorld)) {
-      api.stopNpcMovement(a.id);a.paused=true;a.path=[];a.target=0;return;
+      nativeCall('stopNpcMovement',a.id);a.paused=true;a.path=[];a.target=0;return;
     }
     if(a.approach) {
       // An ambush stepping out of its alcove onto the floor beside it, in a
@@ -65097,7 +66175,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
       const from=s.pos.slice(),d=distance(from,a.approach),step=Math.min(d,60*elapsed/1000);
       const pos=d>0.001 ? from.map((v,j)=>v+(a.approach[j]-v)*step/d) : a.approach.slice();
       const delta=pos.map((v,j)=>v-from[j]);
-      api.updateNpcMovement(a.id,pos,step>0 ? [0,0,Math.atan2(delta[0],delta[1])*180/Math.PI] : s.rot,step>0 ? 60 : 0);
+      nativeCall('updateNpcMovement',a.id,pos,step>0 ? [0,0,Math.atan2(delta[0],delta[1])*180/Math.PI] : s.rot,step>0 ? 60 : 0);
       if(step>0) moved++;
       a.pos=pos;
       if(step>=d) a.approach=null;
@@ -65143,7 +66221,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
         distance(a.pos,targetState.pos)>4096 || !withinHome(a,targetState.pos))) {target=0;targetState=null;}
     if(targetState) {
       try {
-        const live=api.getNpcAIState(target);
+        const live=nativeCall('getNpcAIState',target);
         if(!validState(live) || live.isDead || live.isDisabled || (live.isHuman && !live.isConnected) || live.cellOrWorld!==a.cell ||
             distance(a.pos,live.pos)>4096 || !withinHome(a,live.pos)) {target=0;targetState=null;}
         else if(!retaliation && !hostile(s,factionData(live))) {target=0;targetState=null;}
@@ -65189,7 +66267,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
           while(ahead.length && distance(a.pos,aim(ahead[0]))<0.01) ahead.shift();
           if(!ahead.length || a.node===tn && distance(a.pos,targetState.pos)<=attackDistance) {
             a.path=[];
-            if(api.serverNpcAttack(a.id,target)) attacks++;
+            if(nativeCall('serverNpcAttack',a.id,target)) attacks++;
           } else a.path=ahead;
         }
       } else {target=0;targetState=null;}
@@ -65219,11 +66297,11 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     }
     const delta=pos.map((v,j)=>v-a.pos[j]);
     const rot=speed ? [0,0,Math.atan2(delta[0],delta[1])*180/Math.PI] : s.rot;
-    api.updateNpcMovement(a.id,pos,rot,speed);
+    nativeCall('updateNpcMovement',a.id,pos,rot,speed);
     if(speed) moved++;
     a.pos=pos;a.node=node;indexActor(a);
     if(at-a.lastSaved>=30000) {
-      api.set(a.id,property,{version:2,sequence:a.sequence,mode:a.mode,cell:a.cell});a.lastSaved=at;
+      nativeCall('set',a.id,property,{version:2,sequence:a.sequence,mode:a.mode,cell:a.cell});a.lastSaved=at;
     }
   }
   function step(id) {
@@ -65366,6 +66444,7 @@ function digest(value) {return require('crypto').createHash('sha256').update(JSO
 function rows(snapshot) {return inventory(snapshot).entries.map(function(entry) {return {entry:entry,label:''};});}
 function stockRows(stock) {
   var out=stock.map(function(row) {
+    if(row.baseId===15) throw new Error('Merchant stock cannot be verified.');
     if(typeof row.name!=='string' || !row.name) throw new Error('Merchant stock cannot be verified.');
     var entry=row.entry===undefined ? {baseId:row.baseId,count:row.count} : row.entry;
     if(!entry || entry.baseId!==row.baseId || entry.count!==row.count) throw new Error('Merchant stock cannot be verified.');
@@ -65488,6 +66567,8 @@ function createSettlement(deps) {
       }
       return pending.terms;
     }
+    // A saved full transfer must still fit its eventual native replacement.
+    nativeRows(addEntries(pending.debit,pending.credit));
     var removed=difference(nativeRows(pending.expected),nativeRows(pending.debit),false);
     var moved=pending.kind==='buy'?difference(stockRows(previous.stock),stockRows(next.stock),true):
       difference(stockRows(next.stock),stockRows(previous.stock),true);
@@ -65783,7 +66864,7 @@ function createSettlement(deps) {
     withInventoryMutation:withInventoryMutation,canInventoryMutation:canInventoryMutation,shutdown:function () { active=false; }};
 }
 
-module.exports = {createSettlement:createSettlement,inventory:inventory,takeEntries:takeEntries,
+module.exports = {createSettlement:createSettlement,stockRows:stockRows,inventory:inventory,takeEntries:takeEntries,
   addEntries:addEntries,metadataKey:metadataKey,MAX_PENDING:MAX_PENDING};
 return module.exports;})();
 const QUEST_TRANSACTIONS = (function () { const module = {exports:{}};
@@ -66724,9 +67805,9 @@ function createMerchantTrading(deps) {
       return !closed && ready;
     },
     start: function () {
-      if(closed || !settlement.available()) throw new Error('Trading is unavailable.');
+      if(!settlement.available() || closed) throw new Error('Trading is unavailable.');
       if(retirementRequired && !settlement.canRetire()) throw new Error('Legacy work blocks roster activation.');
-      if(closed || !settlement.available()) throw new Error('Trading is unavailable.');
+      if(!settlement.available() || closed) throw new Error('Trading is unavailable.');
       active=true;
       return true;
     },
@@ -66878,7 +67959,14 @@ function installMerchantTrading(env) {
   var timers=env.timers || (typeof setTimeout === 'function' && typeof clearTimeout === 'function' ? {setTimeout:setTimeout,clearTimeout:clearTimeout} : null);
   var alive=true, timer=null, started=false;
   var stop=trading.shutdown;
-  trading.shutdown=function () {alive=false; if(timer!==null && timers) timers.clearTimeout(timer);timer=null;stop();};
+  trading.shutdown=function () {
+    alive=false;
+    var ownedTimer=timer;
+    timer=null;
+    // Revoke authority before cancellation can call back or throw.
+    try {stop();}
+    finally {if(ownedTimer!==null && timers) timers.clearTimeout(ownedTimer);}
+  };
   function scheduleAdvance() {
     if(!alive || !timers || timer!==null) return;
     try {
@@ -66947,13 +68035,24 @@ function cleanup(key,value,method) {
   if(globalThis[key]===value) globalThis[key]=null;
 }
 try {
-  for(const [key,method] of [['__thornswoodMerchantTrade','shutdown'],['__thornswoodNpcRuntime','stop'],
-      ['__thornswoodNpcPopulation','stop'],['__thornswoodNpcMerchants','shutdown']]) {
-    const prior=globalThis[key];
-    if(prior && typeof prior[method]==='function') prior[method]();
-    current();
-    if(globalThis[key]===prior) globalThis[key]=null;
+  const teardownErrors=[];
+  const priorControllers=[['__thornswoodMerchantTrade','shutdown'],['__thornswoodNpcRuntime','stop'],
+    ['__thornswoodNpcPopulation','stop'],['__thornswoodNpcMerchants','shutdown']]
+    .map(([key,method])=>[key,method,globalThis[key]]);
+  current();
+  for(const [key,method,prior] of priorControllers) {
+    try {if(prior && typeof prior[method]==='function') prior[method]();}
+    catch(error) {teardownErrors.push(error);}
+    // Finish every captured controller even if a callback starts a successor.
+    // Only the current startup may clear its global slots.
+    if(globalThis.__thornswoodNpcStartupOwner===owner && globalThis[key]===prior) globalThis[key]=null;
   }
+  current();
+  for(const [key] of priorControllers) {
+    if(globalThis[key]!==null && globalThis[key]!==undefined)
+      teardownErrors.push(new Error('NPC startup controller was replaced during teardown'));
+  }
+  if(teardownErrors.length) throw teardownErrors[0];
   const cfgNpc = mp.getServerSettings();
   current();
   if (/^(main|dev)$/i.test(String(cfgNpc.thornswoodServer || 'main'))) {

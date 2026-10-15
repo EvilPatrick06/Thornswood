@@ -244,6 +244,14 @@ BNAM so no bench lists the recipe. The condition is used here because it keeps
 the bench on the record, which is what recipes.json and the gamemode read as
 the recipe's bench, and because the server then refuses it too.
 
+THE MASTER KEY (issue #2254)
+
+    ThornswoodMiscMasterKey       one MISC, named per instance in the pack:
+                                  "Master key to Breezehome, no. 12". Handed
+                                  with the deed at a claim and cut again at a
+                                  forge by the server, so no recipe. On the
+                                  key's mesh, weightless, worth nothing.
+
 THIS IS A SHIPPED FILE, so its size changing means a release and every client
 downloading it again.
 
@@ -356,6 +364,17 @@ MOLD_MODEL = 'Clutter\\SilverMold01.nif'
 RECIPE_MOLD = 0x5015496
 RECIPE_KEY = 0x5015497
 
+# THE MASTER KEY (#2254). Patrick, 12 Oct 2026: a "Master key to" one building,
+# handed with the deed when the building is claimed, which opens it and turns
+# its lock, works only while the person it was cut for holds the building, and
+# is re-cut from the mold for 2 iron ingots. One MISC for every building, named
+# per instance in the pack like the key ("Master key to Breezehome, no. 12"),
+# a MISC for the reasons the key is one, on the key's own mesh. It has no
+# recipe: it is handed at the claim and cut at a forge by the server, never
+# made in the crafting menu, because a master key nobody cut for a holder
+# opens nothing. 0x50154D0 is the drop box (#2298), so after a gap from it.
+MASTER_KEY = 0x50154E0
+
 # Poles, the trap, and the pressable catches. fisher.md ingredients.
 # The master pole does not take dragon bone. A trap is not a pole.
 # The catches are one FLOR base each, cloned from Clam01 so they carry a
@@ -415,12 +434,10 @@ RECIPE_REMEDY = 0x50154C7
 # WHY AN ACTIVATOR AND NOT A CONTAINER. Patrick, 12 Oct: a person sees only what
 # they put in, gold included, and only the hold's officers see everything. A
 # Skyrim container shows whoever opens it everything in it, and the server sends
-# a container's whole inventory to every client that has it in view. And the
-# server cannot stand a placed container anywhere but the middle of Tamriel:
-# mp.set refuses 'locationalData' for anything but an actor
-# (LocationalDataBinding::Set in the fork, read 12 Oct). So what is in the box
-# is the server's record, the box is drawn by each client beside its board the
-# way the board is, and E on it opens the box's own panel, never a container.
+# a container's whole inventory to every client that has it in view. So what is
+# in the box is the server's record, the server stands the box beside its board
+# (standBoard in game/gamemode.js, #2516), and E on it opens the box's own
+# panel, never a container.
 BOARD = 0x500593B
 BOARD_MODEL = 'thornswood\\noticeboard01.nif'
 BOARD_BOUNDS = (-168, -71, 0, 140, 71, 246)     # the mesh's, rounded outward
@@ -431,9 +448,9 @@ DROP_BOX_BOUNDS = (-26, -18, 0, 26, 18, 37)
 # THE WOODWORKING BENCH (#516). Keyword + furniture, then the 26 COBJ overrides.
 # Mesh is Hearthfire's carpenter workbench (_BYOH\Furniture\CraftingWorkbench01.nif),
 # measured from BYOHHouseCarpentersWorkbench in HearthFires.esm. Bounds are that
-# furniture's OBND. Form ids follow DROP_BOX with a gap, same pattern as the kits.
-WOODWORKING_KEYWORD = 0x50154E0
-WOODWORKING_BENCH = 0x50154E1
+# furniture's OBND. Form ids follow MASTER_KEY (#2254), same pattern as the kits.
+WOODWORKING_KEYWORD = 0x50154E1
+WOODWORKING_BENCH = 0x50154E2
 WOODWORKING_MODEL = r'_BYOH\Furniture\CraftingWorkbench01.nif'
 WOODWORKING_BOUNDS = (-72, -10, -34, 81, 75, 64)
 WOODWORKING_FULL = 'Woodworking Bench'
@@ -1054,6 +1071,7 @@ def main():
                       ('ThornswoodRecipePoultice', RECIPE_POULTICE),
                       ('ThornswoodRecipeRemedy', RECIPE_REMEDY),
                       ('ThornswoodDropBox', DROP_BOX),
+                      ('ThornswoodMiscMasterKey', MASTER_KEY),
                       ('ThornswoodCraftingWoodworking', WOODWORKING_KEYWORD),
                       ('ThornswoodCraftingWoodworkingWorkbench', WOODWORKING_BENCH)):
         here_already = name in by_edid
@@ -1139,6 +1157,13 @@ def main():
         b'DATA': struct.pack('<If', 25, 1.0),
     })
     set_model(mold, MOLD_MODEL)
+    # The master key (#2254), the key's twin: weightless and worth nothing to a
+    # merchant, on the key's mesh. See MASTER_KEY at the top.
+    master_key = clone(misc_src, MASTER_KEY, 'ThornswoodMiscMasterKey', sets={
+        b'FULL': zstr('Master Key'),
+        b'DATA': struct.pack('<If', 0, 0.0),
+    })
+    set_model(master_key, KEY_MODEL)
     # THE MOLD AND THE KEY ARE BOTH MADE BY A SMITH, WHICH IS WHAT MAKES THE
     # CHAIN START AT ALL.
     #
@@ -1423,6 +1448,8 @@ def main():
           % KEY)
     print('  MISC 0x%07X ThornswoodMiscKeyMold         the mold a smith cuts keys from'
           % MOLD)
+    print('  MISC 0x%07X ThornswoodMiscMasterKey       one building\'s master key, named per instance, '
+          'no recipe' % MASTER_KEY)
     print('  COBJ 0x%07X ThornswoodRecipeKeyMold       1 iron ingot -> 1 blank mold, at a forge'
           % RECIPE_MOLD)
     print('  COBJ 0x%07X ThornswoodRecipeKey           1 iron ingot -> 1 key, at a forge, named '
@@ -1532,7 +1559,7 @@ def main():
                          make_weapon_kit, make_armor_kit, make_sewing_kit,
                          bandage, splint, poultice, remedy,
                          make_bandage, make_splint, make_poultice, make_remedy,
-                         drop_box, wood_kw, wood_furn)
+                         drop_box, master_key, wood_kw, wood_furn)
              if r.editor_id() not in already] + house_new + wood_new
     # An edit that has already been made is not made twice. A recipe that already
     # asks for a handle would otherwise gain a second one on every run.

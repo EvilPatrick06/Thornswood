@@ -93,6 +93,9 @@ if (missing.length || !fees || !holds || !tenthFrom || !reads || !seeding || !PA
 
 const GOLD = 15;
 const TAMRIEL = '3c:Skyrim.esm';
+// Whiterun's and Riften's boards stand inside their walled cities (#2516).
+const WHITERUN_WORLD = '1a26f:Skyrim.esm';
+const RIFTEN_WORLD = '16bb4:Skyrim.esm';
 const WHITERUN = [23139.4, -7891.7, -3494.4];
 const WORDS_OF_IT = 'Meet me at the Drunken Huntsman at dusk.';
 
@@ -104,7 +107,7 @@ function world() {
   const w = {
     people: people, online: online, props: props,
     add: function (p) {
-      people[p.actor] = { pid: p.pid, name: p.name, cell: p.cell || TAMRIEL,
+      people[p.actor] = { pid: p.pid, name: p.name, cell: p.cell || WHITERUN_WORLD,
                           pos: (p.pos || WHITERUN).slice(), pack: [{ baseId: GOLD, count: p.gold }] };
       online.push(p.actor);
       return p;
@@ -356,7 +359,7 @@ attempt('the look prompt', function () {
   const keys = slice(front, "  sp.on('buttonEvent', guard('keys', (e) => {", '\n  }));\n');
   const at = keys ? keys.indexOf('if (deliverPress(e)) return;') : -1;
   yes('P11 the key handler asks it before the board, the driver and the trader take E',
-      at > 0 && at < keys.indexOf('if (boardPress(e)) return;') && at < keys.indexOf('if (merchantPress(e)) return;'));
+      at > 0 && at < keys.indexOf('if (driverPress(e)) return;') && at < keys.indexOf('if (merchantPress(e)) return;'));
 });
 
 // -------------------------------------------------------------- the board panel

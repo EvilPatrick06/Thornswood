@@ -121,6 +121,7 @@ function rig(opts) {
     // Hand over the letter (#1595) answers only Activate on somebody you
     // carry a letter for; test-1595-deliver.js has what it does.
     'function deliverPress() { return false; }\n' +
+    'function boxPress() { return false; }\n' +
     'function boardPress() { return false; }\n' +
     'function driverPress() { return false; }\n' +
     'function merchantPress() { return false; }\n' +

@@ -17,10 +17,10 @@ you. Walking away closes the panel. Nothing is typed in the chat.
 
 | Trip | Gold | Where it goes |
 | --- | --- | --- |
-| A ferry, one stop to another on its water, Solstheim's own ferry included | 10 | The departure hold's ledger |
-| A carriage to a stop in the same hold | 10 | The departure hold's ledger |
-| A carriage, one hold to another | 20 | The departure hold's ledger |
-| The crossing between the mainland and Solstheim, the Northern Maiden between Windhelm and Raven Rock | 40 | The departure hold's ledger |
+| A ferry, one stop to another on its water, Solstheim's own ferry included | 10 | The departure hold's drop box |
+| A carriage to a stop in the same hold | 10 | The departure hold's drop box |
+| A carriage, one hold to another | 20 | The departure hold's drop box |
+| The crossing between the mainland and Solstheim, the Northern Maiden between Windhelm and Raven Rock | 40 | The departure hold's drop box |
 
 Decided by Patrick on 4 Oct (#1394): 40 is only that crossing. A ferry
 ride between Raven Rock, Skaal Village and Tel Mithryn is 10 like any
@@ -70,7 +70,8 @@ places. That is nine carriages, the North Coast, Lake Honrich, Lake
 Ilinalta and Solstheim ferries, and the Northern Maiden between
 Windhelm and Raven Rock. Pressing E on a driver opens the panel of
 that driver's stops and fares (`game/ui/thornswood-ride.js`, #1635).
-Ride takes the fare onto the departure hold's ledger and moves you,
+Ride takes the fare into the departure hold's drop box, as real gold
+(#2298), and moves you,
 once. A short pack is refused and keeps its gold, and the panel stays
 open with the reason. Walking out of reach of the driver closes it.
 The fares are the table above.

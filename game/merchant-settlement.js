@@ -86,6 +86,7 @@ function digest(value) {return require('crypto').createHash('sha256').update(JSO
 function rows(snapshot) {return inventory(snapshot).entries.map(function(entry) {return {entry:entry,label:''};});}
 function stockRows(stock) {
   var out=stock.map(function(row) {
+    if(row.baseId===15) throw new Error('Merchant stock cannot be verified.');
     if(typeof row.name!=='string' || !row.name) throw new Error('Merchant stock cannot be verified.');
     var entry=row.entry===undefined ? {baseId:row.baseId,count:row.count} : row.entry;
     if(!entry || entry.baseId!==row.baseId || entry.count!==row.count) throw new Error('Merchant stock cannot be verified.');
@@ -208,6 +209,8 @@ function createSettlement(deps) {
       }
       return pending.terms;
     }
+    // A saved full transfer must still fit its eventual native replacement.
+    nativeRows(addEntries(pending.debit,pending.credit));
     var removed=difference(nativeRows(pending.expected),nativeRows(pending.debit),false);
     var moved=pending.kind==='buy'?difference(stockRows(previous.stock),stockRows(next.stock),true):
       difference(stockRows(next.stock),stockRows(previous.stock),true);
@@ -503,5 +506,5 @@ function createSettlement(deps) {
     withInventoryMutation:withInventoryMutation,canInventoryMutation:canInventoryMutation,shutdown:function () { active=false; }};
 }
 
-module.exports = {createSettlement:createSettlement,inventory:inventory,takeEntries:takeEntries,
+module.exports = {createSettlement:createSettlement,stockRows:stockRows,inventory:inventory,takeEntries:takeEntries,
   addEntries:addEntries,metadataKey:metadataKey,MAX_PENDING:MAX_PENDING};

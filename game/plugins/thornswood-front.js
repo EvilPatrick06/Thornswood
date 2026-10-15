@@ -93,7 +93,7 @@
                     'thornswood-skills.js', 'thornswood-party.js',
                     'thornswood-journal.js', 'thornswood-board.js', 'thornswood-trade.js', 'thornswood-merchant.js',
                     'thornswood-repair.js', 'thornswood-treat.js', 'thornswood-maneuvers.js', 'thornswood-ride.js',
-                    'thornswood-help.js', 'thornswood-afk.js'];
+                    'thornswood-help.js', 'thornswood-afk.js', 'thornswood-box.js'];
   const LOG_FILE = 'Data/Platform/thornswood-front.log';
   const INI = 'Data/SKSE/Plugins/Thornswood.ini';
   const CLIENT_SETTINGS = 'Data/Platform/Plugins/skymp5-client-settings.txt';
@@ -1645,6 +1645,26 @@
   }
 
   /*
+    The page's own ask, 'select:keycheck <n>' (#591): a key landed with no
+    answer from the last moment, so it is held until Windows is asked again,
+    now rather than on the next second. The answer carries the same n, which
+    is what lets the page act on the held key. Nothing is written to the log:
+    menuWatch already says when the keyboard moves.
+  */
+  function menuKeyCheck(ask) {
+    const n = Number(ask) || 0;
+    let fg = null;
+    try {
+      if (sp.win32 && typeof sp.win32.foregroundWindow === 'function') {
+        fg = sp.win32.foregroundWindow();
+      }
+    } catch (e) { fg = null; }
+    const here = !!(fg && fg.isGame);
+    T.js('try{window.thornswoodSelect&&window.thornswoodSelect.keys(' +
+         (here ? 'true' : 'false') + ',' + n + ');}catch(e){}');
+  }
+
+  /*
     THE WORLD ARRIVED WITH THE CHOICE STILL UP AND NOTHING PICKED.
 
     Djinn on dev, 24 September: "Sitting on the character select window for
@@ -2078,7 +2098,7 @@
     board: 'thornswoodBoard', repair: 'thornswoodRepair', treat: 'thornswoodTreat',
     trade: 'thornswoodTrade', merchant: 'thornswoodMerchant', select: 'thornswoodSelect', wheel: 'thornswoodEmotes',
     afk: 'thornswoodAfk', maneuvers: 'thornswoodManeuvers', ride: 'thornswoodRide',
-    help: 'thornswoodHelp'
+    help: 'thornswoodHelp', box: 'thornswoodBox'
   };
 
   T.claimFocus = function (who, on) {
@@ -5680,7 +5700,10 @@
       carried = (pc && form) ? pc.getItemCount(form) : 0;
     } catch (e) { carried = 0; }
     if (!(carried > 0) || !(stampedMolds(pc, mold) > 0)) { return null; }
-    return { hex: hex, verb: 'key', words: 'Cut a key from your key mold' };
+    // And the mold key's row for the master key, cut again from the same mold
+    // for two iron ingots (#2254). See masterPress.
+    return { hex: hex, verb: 'key', words: 'Cut a key from your key mold',
+             master: 'Cut a master key from your key mold, 2 iron ingots' };
   }
 
   function plainWords(text) { return String(text || '').replace(/[<>&"]/g, ''); }
@@ -5702,6 +5725,7 @@
     const rows = [];
     if (now && now.e) { rows.push(lockRow('E', now.e)); }
     if (now && now.words) { rows.push(lockRow(LOCK_NAME, now.words)); }
+    if (now && now.master) { rows.push(lockRow(MOLD_NAME, now.master)); }
     const html = (info ? '<div style="font-size:16px;color:#c9b99a;margin-bottom:3px">' + info + '</div>' : '') +
                  rows.join('');
     if (html === lockShown) { return; }
@@ -5749,6 +5773,33 @@
     lockSentAt = t;
     tellServer('/' + sig);
     say('pressed ' + LOCK_NAME + ' for /' + sig);
+    return true;
+  }
+
+  /*
+    THE MASTER KEY AT A FORGE (#2254). Patrick, 12 Oct 2026: a lost master
+    key is cut again from the building's mold for two iron ingots. At a forge
+    with a stamped mold in the pack the lock key's line has a second row, the
+    mold key's, and the mold key sends /key with the forge's id and master.
+    U means nothing else there: the mold's own line wants a door, the sleep
+    key a person, the repair line the inventory. The server checks the rest:
+    the smith, the forge, the mold, the holder standing there and the ingots.
+  */
+  let masterSentFor = '';
+  let masterSentAt = 0;
+  function masterPress() {
+    if (!T.ready) { return false; }
+    if (claims.chat) { return false; }
+    const now = lockKeyNow();
+    drawLock(now);
+    if (!now || !now.master) { return false; }
+    const sig = 'key ' + now.hex + ' master';
+    const t = Date.now();
+    if (sig === masterSentFor && t - masterSentAt < 1500) { return true; }
+    masterSentFor = sig;
+    masterSentAt = t;
+    tellServer('/' + sig);
+    say('pressed ' + MOLD_NAME + ' for /' + sig);
     return true;
   }
 
@@ -8029,201 +8080,32 @@
   }
 
   /*
-    THE MESSAGE BOARD OBJECT. Thornswood-Content.esp already has the
-    activator (local id 0x593B, ThornswoodMessageBoard). The four copies it
-    places start disabled. Each client puts one enabled copy wherever the
-    server says a board is (#1597). The server's boards, each with its cell
-    or worldspace, come in the social view, and the board page hands them
-    here as 'board:spots'.
+    THE NOTICE BOARDS AND THEIR DROP BOXES ARE THE SERVER'S (#2516). This
+    plugin used to put every board down itself: placeAtMe where the person
+    stood, then setPosition to the town, and two seconds later getFormEx no
+    longer found a copy moved into a cell that was not loaded, so it put
+    another down at the person, for every far town, for ever (Patrick on dev,
+    12 Oct). The server now stands one board and one box per hold as its own
+    references, sent to every game, and answers E on each: the board opens
+    the board's panel, the box the box's (Patrick, 12 Oct, #2298). Nothing
+    here places, finds or presses either.
 
-    WHY THE CELL. placeAtMe puts the copy in the cell you are in, and
-    setPosition moves it inside that same cell or worldspace. This used to be
-    nine points in Tamriel with no cell, put down the moment the page was
-    ready: somebody who came in indoors had all nine put inside that room,
-    and a board anywhere else (Raven Rock's in The Retching Netch, one a
-    steward walked indoors or to Solstheim) never had an object. So a board
-    is put down only while you are in its cell, or its worldspace outdoors.
-
-    A form is asked for in the frame it is used, because a kept form wrapper
-    dies. What is kept is the reference id and where it was put. A steward
-    move comes as a new list: the copy is moved when the board stays in the
-    same cell or worldspace, and taken away when it does not, to be put down
-    in the new one when you are there.
-    A click is the use key on that object, while you are standing at it.
+    What is left is the reach: the board's panel says where its board is
+    ('board:near'), and both panels close when you walk out of reach of it.
   */
   const BOARD_REACH = 400;
-  const BOARD_LOCAL = 0x593B;
-  const BOARD_FILE = 'Thornswood-Content.esp';
-  let boardSpots = [];       // { hold, cell, x, y, z, face }, the server's
-  const boardRefs = {};      // hold -> { id, cell, x, y, z, face }, what was put down
-  const boardPlaceIds = {};  // '17ec0:Dragonborn.esm' -> that cell's runtime id
-  const boardFailSaid = {};
   let boardNear = null;
   let boardWatchAt = 0;
-  let boardPlaceAt = 0;
-
-  function boardQuiet(p) {
-    if (p && typeof p.then === 'function') { p.then(function () { }, function () { }); }
-  }
-
-  function boardRef(id) {
-    if (!id) { return null; }
-    try {
-      const ref = sp.ObjectReference.from(sp.Game.getFormEx(id >>> 0));
-      return ref && (ref.getFormID() >>> 0) === (id >>> 0) ? ref : null;
-    } catch (e) { return null; }
-  }
-
-  function boardLive(id) { return !!boardRef(id); }
-
-  function boardObjectHere(ref) {
-    if (!ref) { return false; }
-    let id = 0;
-    try { id = ref.getFormID() >>> 0; } catch (e) { return false; }
-    for (const hold in boardRefs) {
-      if ((boardRefs[hold].id >>> 0) === id) { return true; }
-    }
-    return false;
-  }
-
-  /*
-    The server's descriptor of a cell or worldspace, 'local id:file' the way
-    worldOrCellDesc writes it, as the id this game gave that record. Asked by
-    file and local id because a runtime id carries the plugin's place in the
-    load order. Kept once found; not found yet is asked again next time.
-  */
-  function boardPlaceId(desc) {
-    if (Object.prototype.hasOwnProperty.call(boardPlaceIds, desc)) { return boardPlaceIds[desc]; }
-    const at = String(desc).indexOf(':');
-    if (at <= 0) { return 0; }
-    const local = parseInt(String(desc).slice(0, at), 16);
-    const file = String(desc).slice(at + 1);
-    if (!isFinite(local) || !file) { return 0; }
-    let id = 0;
-    try {
-      const form = sp.Game.getFormFromFile(local, file);
-      id = form ? (form.getFormID() >>> 0) : 0;
-    } catch (e) { id = 0; }
-    if (id) { boardPlaceIds[desc] = id; }
-    return id;
-  }
-
-  /* The worldspace you are in, or your cell indoors, as the server matches a board. */
-  function boardPlaceHere(pc) {
-    try {
-      const ws = pc.getWorldSpace();
-      if (ws) { return ws.getFormID() >>> 0; }
-      const cell = pc.getParentCell();
-      return cell ? (cell.getFormID() >>> 0) : 0;
-    } catch (e) { return 0; }
-  }
-
-  function boardTakeAway(hold, why) {
-    const had = boardRefs[hold];
-    delete boardRefs[hold];
-    const ref = had ? boardRef(had.id) : null;
-    if (!ref) { return; }
-    try {
-      boardQuiet(ref.disable(false));
-      boardQuiet(ref.delete());
-      say('took the notice board in ' + hold + ' away: ' + why);
-    } catch (e) {
-      say('could not take the notice board in ' + hold + ' away: ' + e);
-    }
-  }
-
-  /* The list the page hands on: every board the server has, with its cell. */
-  function boardsSet(list) {
-    const next = [];
-    const byHold = {};
-    for (let i = 0; i < (Array.isArray(list) ? list.length : 0); i++) {
-      const s = list[i];
-      if (!s || typeof s.hold !== 'string' || typeof s.cell !== 'string' || !s.cell) { continue; }
-      const x = Number(s.x), y = Number(s.y), z = Number(s.z), face = Number(s.face);
-      if (!isFinite(x) || !isFinite(y) || !isFinite(z)) { continue; }
-      const spot = { hold: s.hold, cell: s.cell, x: x, y: y, z: z, face: isFinite(face) ? face : 0 };
-      next.push(spot);
-      byHold[spot.hold] = spot;
-    }
-    boardSpots = next;
-    for (const hold in boardRefs) {
-      if (!Object.prototype.hasOwnProperty.call(boardRefs, hold)) { continue; }
-      const had = boardRefs[hold];
-      const spot = byHold[hold];
-      if (!spot) { boardTakeAway(hold, 'the server has no board there now'); continue; }
-      if (spot.cell !== had.cell) { boardTakeAway(hold, 'the board is in ' + spot.cell + ' now'); continue; }
-      if (spot.x === had.x && spot.y === had.y && spot.z === had.z && spot.face === had.face) { continue; }
-      const ref = boardRef(had.id);
-      if (!ref) { continue; }
-      try {
-        boardQuiet(ref.setPosition(spot.x, spot.y, spot.z));
-        boardQuiet(ref.setAngle(0, 0, spot.face));
-        had.x = spot.x; had.y = spot.y; had.z = spot.z; had.face = spot.face;
-        say('moved the notice board in ' + hold + ' to where the server has it');
-      } catch (e) {
-        say('could not move the notice board in ' + hold + ': ' + e);
-      }
-    }
-    boardPlaceAt = 0;
-  }
-
-  function ensureBoards() {
-    const now = Date.now();
-    if (now - boardPlaceAt < 2000) { return; }
-    boardPlaceAt = now;
-    if (!T.ready || !boardSpots.length) { return; }
-    let base = null;
-    let pc = null;
-    try { base = sp.Game.getFormFromFile(BOARD_LOCAL, BOARD_FILE); } catch (e) { base = null; }
-    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
-    if (!base || !pc) { return; }
-    const here = boardPlaceHere(pc);
-    if (!here) { return; }
-    for (let i = 0; i < boardSpots.length; i++) {
-      const spot = boardSpots[i];
-      const had = boardRefs[spot.hold];
-      if (had && had.cell === spot.cell && boardLive(had.id)) { continue; }
-      if (boardPlaceId(spot.cell) !== here) { continue; }
-      let ref = null;
-      try { ref = pc.placeAtMe(base, 1, false, false); } catch (e) { ref = null; }
-      if (!ref) { continue; }
-      try {
-        boardQuiet(ref.setPosition(spot.x, spot.y, spot.z));
-        boardQuiet(ref.setAngle(0, 0, spot.face));
-        boardQuiet(ref.enable(false));
-        boardRefs[spot.hold] = { id: ref.getFormID() >>> 0, cell: spot.cell,
-                                 x: spot.x, y: spot.y, z: spot.z, face: spot.face };
-        say('put the notice board down in ' + spot.hold + ' (' + spot.cell + ')');
-      } catch (e) {
-        if (!boardFailSaid[spot.hold]) {
-          boardFailSaid[spot.hold] = true;
-          say('could not put the notice board down in ' + spot.hold + ': ' + e);
-        }
-      }
-    }
-  }
 
   function boardDist(px, py, pz, spot) {
     const dx = px - spot.x, dy = py - spot.y, dz = pz - spot.z;
     return Math.sqrt(dx * dx + dy * dy + dz * dz);
   }
 
-  /*
-    The board you are aiming at: the one the server says you are near, which
-    it matched by cell, or else the nearest within 1500 of the boards in the
-    cell or worldspace you are in.
-  */
+  /* The board the server says you are near, while you are within 1500 of it. */
   function boardAimSpot(pc, px, py, pz) {
     if (boardNear && boardDist(px, py, pz, boardNear) <= 1500) { return boardNear; }
-    const here = boardPlaceHere(pc);
-    let best = null;
-    let bestD = 1500;
-    for (let i = 0; i < boardSpots.length; i++) {
-      if (!here || boardPlaceId(boardSpots[i].cell) !== here) { continue; }
-      const d = boardDist(px, py, pz, boardSpots[i]);
-      if (d <= bestD) { bestD = d; best = boardSpots[i]; }
-    }
-    return best;
+    return null;
   }
 
   /*
@@ -8387,48 +8269,6 @@
     return true;
   }
 
-  function boardPress(e) {
-    if (!e || e.userEventName !== 'Activate') { return false; }
-    for (const held in claims) {
-      if (Object.prototype.hasOwnProperty.call(claims, held) && claims[held]) { return false; }
-    }
-    if (busyMenuOpen()) { return false; }
-    let pc = null;
-    try { pc = sp.Game.getPlayer(); } catch (err) { pc = null; }
-    if (!pc) { return false; }
-    let px, py, pz;
-    try {
-      px = pc.getPositionX(); py = pc.getPositionY(); pz = pc.getPositionZ();
-    } catch (err) { return false; }
-    const spot = boardAimSpot(pc, px, py, pz);
-    if (!spot) { return false; }
-    const dist = boardDist(px, py, pz, spot);
-    if (dist > BOARD_REACH) { return false; }
-    /*
-      ONLY THE BOARD ITSELF OPENS THE BOARD (#2298). Patrick, 12 Oct: "when
-      they click on the Notice Board it does the Notice Board and when they
-      click on the dropbox it does just the dropbox". The hold's drop box now
-      stands on a shelf on the board's right post, about 140 from the board's
-      spot, and it is a container the server places, which answers E itself.
-
-      This used to open the board for E on anything within 250 of the spot
-      that was not a person, and for E on nothing at all while facing the
-      spot. Both came in with #1430, whose own comment said why: "THE NOTICE
-      BOARD HAS NO MESH", so there was nothing to aim at. Kept, the first
-      would open the board when somebody pressed E on the box. The
-      board has its own mesh and collision now, so the crosshair finds it,
-      and anything else under the crosshair (the box, Geldis Sadri behind
-      Raven Rock's board, #1374) answers E itself.
-    */
-    let ref = null;
-    try { ref = sp.Game.getCurrentCrosshairRef(); } catch (err) { ref = null; }
-    if (!ref || !boardObjectHere(ref)) { return false; }
-    T.js('try{window.thornswoodBoard&&window.thornswoodBoard.open();}catch(e){}');
-    return true;
-  }
-
-  sp.on('update', guard('board object', () => { ensureBoards(); }));
-
   sp.on('update', guard('board distance', () => {
     if (!T.hasFocus('board')) { return; }
     const now = Date.now();
@@ -8444,6 +8284,26 @@
     } catch (e) { dist = 99999; }
     if (dist > BOARD_REACH) {
       T.js('try{window.thornswoodBoard&&window.thornswoodBoard.close();}catch(e){}');
+    }
+  }));
+
+  // The drop box's panel closes when you walk away from its board, as the board's does.
+  let boxWatchAt = 0;
+  sp.on('update', guard('box distance', () => {
+    if (!T.hasFocus('box')) { return; }
+    const now = Date.now();
+    if (now - boxWatchAt < 250) { return; }
+    boxWatchAt = now;
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
+    if (!pc) { return; }
+    let dist = 99999;
+    try {
+      const spot = boardAimSpot(pc, pc.getPositionX(), pc.getPositionY(), pc.getPositionZ());
+      if (spot) { dist = boardDist(pc.getPositionX(), pc.getPositionY(), pc.getPositionZ(), spot); }
+    } catch (e) { dist = 99999; }
+    if (dist > BOARD_REACH) {
+      T.js('try{window.thornswoodBox&&window.thornswoodBox.close();}catch(e){}');
     }
   }));
 
@@ -8488,7 +8348,6 @@
     // E on somebody you carry a letter for hands it over (#1595), before the
     // trader's E below takes any press on a person.
     if (deliverPress(e)) return;
-    if (boardPress(e)) return;
     if (driverPress(e)) return;
     if (merchantPress(e)) return;
 
@@ -8514,6 +8373,8 @@
     if (e.code === SLEEP_KEY && sleepPress()) { return; }
     // The same key in the inventory, with a repair kit in the pack (#1384).
     if (e.code === MOLD_KEY && repairPress()) { return; }
+    // The same key at a forge with a stamped mold: the master key (#2254).
+    if (e.code === MOLD_KEY && masterPress()) { return; }
     if (e.code === LOCK_KEY && lockPress()) { return; }
     // The same key on a hurt person under the crosshair (#1383). See TREAT_KEY.
     if (e.code === TREAT_KEY && treatPress()) { return; }
@@ -9259,6 +9120,13 @@
     if (a[0] !== 'thornswood-front') return;
     const what = String(a[1]);
 
+    // A held key on the choice page asking who has the keyboard now (#591).
+    if (what.indexOf('select:keycheck ') === 0) {
+      menuBeatAt = Date.now();
+      menuKeyCheck(what.slice(16));
+      return;
+    }
+
     // The chat is about to connect and has no join token (#1322).
     if (what.indexOf('token? ') === 0) {
       askToken(what.slice(7));
@@ -9442,6 +9310,10 @@
     if (what === 'journal:closed') { T.claimFocus('journal', false); return; }
     if (what === 'board:opened') { T.claimFocus('board', true); return; }
     if (what === 'board:closed') { T.claimFocus('board', false); return; }
+    // The hold's drop box (#2298): its own panel, opened by E on the box.
+    if (what === 'box:opened') { T.claimFocus('box', true); return; }
+    if (what === 'box:closed') { T.claimFocus('box', false); return; }
+    if (what === 'box:ready') { log('the drop box panel is in'); return; }
     if (what.indexOf('board:near ') === 0) {
       const bits = what.slice('board:near '.length).trim().split(/\s+/);
       if (bits[0] === 'none' || bits.length < 3) { boardNear = null; return; }
@@ -9455,18 +9327,6 @@
       }
       if (!isFinite(bx) || !isFinite(by) || !isFinite(bz)) { boardNear = null; return; }
       boardNear = { hold: hold, x: bx, y: by, z: bz };
-      return;
-    }
-    /*
-      Every board the server has, with its cell or worldspace (#1597). The
-      board page sends it when the list changes, a steward move included;
-      boardsSet puts the objects where it says.
-    */
-    if (what.indexOf('board:spots ') === 0) {
-      let list = null;
-      try { list = JSON.parse(what.slice('board:spots '.length)); } catch (e) { list = null; }
-      if (!Array.isArray(list)) { log('board: the page sent a list of boards that does not read'); return; }
-      boardsSet(list);
       return;
     }
     if (what === 'maneuvers:opened') { T.claimFocus('maneuvers', true); return; }

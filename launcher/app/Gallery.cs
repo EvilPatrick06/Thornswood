@@ -430,10 +430,10 @@ namespace Thornswood
         /// the queue without putting it up. "" when the site did it, and a
         /// sentence to show the person when it did not.
         ///
-        /// The file itself stays in the site's uploads folder. The site's own
-        /// page asks whether to delete it as well; deleting somebody's file for
-        /// good is not a thing to do from one button on a card, so nothing here
-        /// sends deleteFile and the queue entry is all that goes.
+        /// The site decides what happens to the file (#2352): it is deleted,
+        /// unless somebody reported the picture, and then the site keeps it out
+        /// of sight for 30 days for staff and deletes it after. Nothing here
+        /// says which.
         /// </summary>
         public static string Reject(string name)
         {
@@ -446,8 +446,10 @@ namespace Thornswood
         /// the public gallery, which is what a report is answered with. "" when
         /// the site did it, and a sentence to show the person when it did not.
         ///
-        /// The site drops any open report against that name in the same move
-        /// and keeps the file, for the same reason Reject does.
+        /// The site moves any open report against that name onto the file's
+        /// note in the same move and keeps the file out of sight for 30 days
+        /// for staff, then deletes it; with no report the file is deleted
+        /// (#2352).
         /// </summary>
         public static string TakeDown(string name)
         {

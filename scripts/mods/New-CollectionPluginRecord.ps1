@@ -34,9 +34,9 @@ if (-not (Test-Path -LiteralPath $Data -PathType Container)) { throw "There is n
 if (-not $Out) { $Out = Join-Path $Here '..\..\records\collection-plugins.json' }
 $Out = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Out)
 
-$files = @(Get-ChildItem -LiteralPath $Data -File | Where-Object { $_.Extension -match '^\.es[pml]$' -and $_.Name -ne 'Thornswood-Content.esp' })
+$files = @(Get-ChildItem -LiteralPath $Data -File | Where-Object { $_.Extension -match '^\.es[pml]$' -and -not (Test-ThornswoodRepoPlugin $_.Name) })
 if ($Plugins) {
-    $want = @($Plugins | Where-Object { $_ -ne 'Thornswood-Content.esp' })
+    $want = @($Plugins | Where-Object { -not (Test-ThornswoodRepoPlugin $_) })
     $missing = @($want | Where-Object { $n = $_; -not @($files | Where-Object { $_.Name -eq $n }).Count })
     if ($missing.Count) { throw ('not in ' + $Data + ': ' + ($missing -join ', ')) }
     $files = @($files | Where-Object { $want -contains $_.Name })

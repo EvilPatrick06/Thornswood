@@ -17,7 +17,8 @@ in the inventory opens while a repair kit is carried (`thornswood-repair.js`),
 the wounds panel that a key in the inventory, or X on somebody hurt, opens
 (`thornswood-treat.js`),
 the stops and fares of a carriage or ferry driver that E on the driver
-opens (`thornswood-ride.js`), the help that the help key, F7, and Help on
+opens (`thornswood-ride.js`), the hold's drop box that E on the box on a
+notice board opens (`thornswood-box.js`), the help that the help key, F7, and Help on
 the K, P and J panels open (`thornswood-help.js`), and the "Are you still here?"
 window after 15 minutes idle (`thornswood-afk.js`). `thornswood-theme.mp3` is
 the theme the main menu plays, and the launcher plays it too while it is open.

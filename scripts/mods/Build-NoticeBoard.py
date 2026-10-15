@@ -42,7 +42,7 @@ scales the concept used. Both meshes face +y, the way the board they replace
 faced, so the spots the client already puts boards at keep working. The
 board's origin is on the ground in the middle of the board; the box's is the
 bottom middle of the box, which stands BOX_OFFSET from the board's origin in
-the board's own space (each client puts it there, turned with the board).
+the board's own space (the server stands it there, turned with the board).
 
 COLLISION, AND PATRICK'S CLICK RULE
 
@@ -653,7 +653,7 @@ def main():
              allb.min(0).round(1).tolist(), allb.max(0).round(1).tolist()))
     print('dropbox01.nif      %s bytes, %d triangles, %d collision box'
           % (format(len(box_bytes), ','), box.triangles, len(box.hulls)))
-    print('the box\'s origin stands at %s in the board\'s space; each client puts it there'
+    print('the box\'s origin stands at %s in the board\'s space; the server stands it there'
           % origin.round(2).tolist())
     for b in bad:
         print('  BAD  ' + b)

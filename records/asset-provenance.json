@@ -494,10 +494,10 @@
     },
     {
       "path": "game/content/Thornswood-Content.esp",
-      "sha256": "4917915f004018720d9014cdc014bd1c461afb671d579a685c5a502b40d00f9a",
-      "what": "Thornswood's own plugin, 151,078 bytes on 15 Oct (the woodworking bench keyword and furniture, #516; its header now carries Thornswood's own description, #400; the notice board names our own mesh and the drop box is a record of its own, #2502). Until #400 its header said its crafting and gathering content was salvaged from another server's plugin.",
+      "sha256": "37aa6a4531ae796d8e371afa4486305193c6e96a2e650abc55c93ed4542d80a8",
+      "what": "Thornswood's own plugin, 151,225 bytes on 15 Oct (the woodworking bench keyword and furniture, #516; its header now carries Thornswood's own description, #400; the notice board names our own mesh and the drop box is a record of its own, #2502; the master key is a record of its own, #2254). Until #400 its header said its crafting and gathering content was salvaged from another server's plugin.",
       "published": "Every pack and the installer on both channels, and Nexus Mods mod 192001 through the collection",
-      "source": "Records salvaged from another server's plugin (what the plugin's header said until #400), rebuilt under #954 and #400, then added to here (#613, #1379, #1383, #1384, #2255, #2258)",
+      "source": "Records salvaged from another server's plugin (what the plugin's header said until #400), rebuilt under #954 and #400, then added to here (#516, #613, #1379, #1383, #1384, #2254, #2255, #2258)",
       "creator": "Thornswood, from another server's records",
       "licence": "not recorded: no permission from that server's makers is recorded",
       "attribution": "not recorded",
@@ -508,7 +508,7 @@
     },
     {
       "path": "game/content/Thornswood-WoodworkerTrail.esp",
-      "sha256": "a2a467848d3e80be94b08d5fb532fa47d9aa15f9b636a00d415db857e2fb8023",
+      "sha256": "d12bcd2e54d874c5005303082b5ac40ad01af3d5d8bfb5c75a4795b39d988482",
       "what": "The light plugin for the woodworker trail (#516): 53 late-load COBJ overrides that move bow, arrow, bolt and wooden-item recipes to the woodworking bench. 9,628 bytes. On 15 Oct no release carries it: it is not in the load order yet.",
       "published": "not yet: it ships once it is put at the end of the collection load order",
       "source": "Built by scripts\\\\mods\\\\Build-WoodworkerTrailOverrides.py from the load order's own plugins, as overrides of their recipes",

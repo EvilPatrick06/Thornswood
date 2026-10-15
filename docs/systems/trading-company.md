@@ -92,6 +92,12 @@ they are in the world. Until then it stays on the ledger, held for
 them, and nothing else can spend it. A confirm is not refused because
 the hauler is away. Decided by Patrick on 4 Oct (#1646).
 
+A thing delivered to somebody who is not there to take it, a crate from
+another hold among them, is left in the hold's drop box on the notice
+board, with their name on it, and that hold's steward hands it out
+(Patrick, 12 Oct, #2298). See [Notice boards](noticeboards.md), the drop
+box.
+
 ## Who runs it
 
 The Free Skyrim Trading Company is a faction. Its lead seat is one of
