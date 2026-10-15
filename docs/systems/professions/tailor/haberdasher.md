@@ -32,9 +32,9 @@ Riekling 44, Dark Elf 8, Redguard 7, Wood Elf 4. Cultural dress, not
 the metal tiers. The rows are in
 [lists/race-locks.md](../../lists/race-locks.md).
 
-A riekling's own plain clothes are this half's novice work since 12
-October 2026 (#614): the two loincloths and the cloth hand and foot
-wraps, which a new riekling starts in. They are race locked, so a
+A riekling's plain clothes are this half's novice work since 12
+October 2026 (#614): the Riekling Belted Tunic and the Riekling
+Footwraps, which a new riekling starts in. They are race locked, so a
 riekling Haberdasher makes them, at the forge like the Riekling Fur
 Cloak.
 
@@ -57,13 +57,13 @@ fur. The garment's material is still what the table says. See
 
 ## Every recipe
 
-Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 172 recipes. 172 reach the server. None of them are tempering. The same rows, with ids, are in [tailor-haberdasher](../../lists/tailor-haberdasher.md).
+Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 170 recipes. 170 reach the server. None of them are tempering. The same rows, with ids, are in [tailor-haberdasher](../../lists/tailor-haberdasher.md).
 
 The rank on the row is the rank. It is the dearest ingredient a class produces. An item has no gold price.
 
 ### Names that reach the server
 
-**Novice** (86 names). Alik'r Hood. Bandage. Belted Tunic. Blacksmith's Apron. Boots. Boy's Blue Tunic. Boy's Green Tunic. Boy's Grey Tunic. Boy's Red Tunic. Boy's Yellow Tunic. Chef's Hat. Chef's Tunic. Clothes. College Boots. Cowl. Cuffed Boots. Dark Alik'r Hood. Dark Hammerfell Garb. Dark Redguard Boots. Dunmer Hooded Outfit. Dunmer Outfit. Dunmer Shoes. Embroidered Garment. Fine Armguards. Fine Boots. Fine Clothes. Fine Hat. Fine Raiment. Footwraps. Fur Collar - Loose. Fur Collar - Tight. Fur Hood. Fur Hood - Black. Fur Hood - White. Fur Mantle. Fur Mantle - Black. Fur Mantle - White. Fur-Trimmed Cloak. Fur-lined Boots. Girl's Blue Dress. Girl's Green Dress. Girl's Grey Dress. Girl's Red Dress. Girl's Yellow Dress. Gloves. Hammerfell Garb. Hat. Jester's Boots. Jester's Clothes. Jester's Gloves. Jester's Hat. Leather Cape. Miner's Clothes. Mourner's Clothes. Mourner's Hat. Noble Clothes. Pleated Shoes. Ragged Boots. Ragged Cap. Ragged Trousers. Redguard Boots. Refined Tunic. Riekling Cloth Foot Wraps. Riekling Cloth Hand Wraps. Riekling Fur Cloak. Riekling LoinCloth 1. Riekling LoinCloth 2. Roughspun Tunic. Sewing Kit. Shoes. Shrouded Hand Wraps. Shrouded Hood. Shrouded Shoes. Tavern Clothes. Telvanni Shoes. Temple Priest Boots. Temple Priest Hood. Thread. Ulfric's Armguards. Ulfric's Boots. Ulfric's Clothes. Vampire Boots. Vampire Gloves. Vampire Hood. Wedding Dress. Wedding Sandals.
+**Novice** (84 names). Alik'r Hood. Bandage. Belted Tunic. Blacksmith's Apron. Boots. Boy's Blue Tunic. Boy's Green Tunic. Boy's Grey Tunic. Boy's Red Tunic. Boy's Yellow Tunic. Chef's Hat. Chef's Tunic. Clothes. College Boots. Cowl. Cuffed Boots. Dark Alik'r Hood. Dark Hammerfell Garb. Dark Redguard Boots. Dunmer Hooded Outfit. Dunmer Outfit. Dunmer Shoes. Embroidered Garment. Fine Armguards. Fine Boots. Fine Clothes. Fine Hat. Fine Raiment. Footwraps. Fur Collar - Loose. Fur Collar - Tight. Fur Hood. Fur Hood - Black. Fur Hood - White. Fur Mantle. Fur Mantle - Black. Fur Mantle - White. Fur-Trimmed Cloak. Fur-lined Boots. Girl's Blue Dress. Girl's Green Dress. Girl's Grey Dress. Girl's Red Dress. Girl's Yellow Dress. Gloves. Hammerfell Garb. Hat. Jester's Boots. Jester's Clothes. Jester's Gloves. Jester's Hat. Leather Cape. Miner's Clothes. Mourner's Clothes. Mourner's Hat. Noble Clothes. Pleated Shoes. Ragged Boots. Ragged Cap. Ragged Trousers. Redguard Boots. Refined Tunic. Riekling Belted Tunic. Riekling Footwraps. Riekling Fur Cloak. Roughspun Tunic. Sewing Kit. Shoes. Shrouded Hand Wraps. Shrouded Hood. Shrouded Shoes. Tavern Clothes. Telvanni Shoes. Temple Priest Boots. Temple Priest Hood. Thread. Ulfric's Armguards. Ulfric's Boots. Ulfric's Clothes. Vampire Boots. Vampire Gloves. Vampire Hood. Wedding Dress. Wedding Sandals.
 
 **Advanced** (23 names). Apotheus Scarf. Bandana. Bandana, Tied. College of Winterhold Cloak. Eyepatch. Linen Cape (Black). Linen Cape (Blue). Linen Cape (Green). Linen Cape (Purple). Linen Cape (Red). Linen Cape (White). Linen Cape (Yellow). Redguard Knight Cape. Seadog Cape. Shaman Unarmored Boots. Shaman Unarmored Gloves. Thread. Tribunal Unarmored Hood Black. Tribunal Unarmored Hood Blue. Tribunal Unarmored Hood Green. Tribunal Unarmored Hood Red. Tribunal Unarmored Hood White. Wedding Wreath.
 
@@ -76,7 +76,6 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 | Fine Armguards | 1 | novice | Gloves | MCE_CraftingLoom | 2 Leather Strips, 2 Leather |  | yes | `989:MoreCraftableEquipment.esp` |
 | Gloves | 1 | novice | Gloves | MCE_CraftingLoom | 1 Leather, 1 Thread |  | yes | `978:MoreCraftableEquipment.esp` |
 | Jester's Gloves | 1 | novice | Gloves | MCE_CraftingLoom | 2 Thread |  | yes | `944:MoreCraftableEquipment.esp` |
-| Riekling Cloth Hand Wraps | 1 | novice | Gloves | SmithingForge | 3 Leather Strips | riekling | yes | `19f90:Playable Rieklings.esp` |
 | Shrouded Hand Wraps | 1 | novice | Gloves | MCE_CraftingLoom | 2 Thread |  | yes | `940:MoreCraftableEquipment.esp` |
 | Ulfric's Armguards | 1 | novice | Gloves | MCE_CraftingLoom | 2 Leather Strips, 2 Leather |  | yes | `9df:MoreCraftableEquipment.esp` |
 | Vampire Gloves | 1 | novice | Gloves | MCE_CraftingLoom | 1 Leather, 1 Thread |  | yes | `94d:MoreCraftableEquipment.esp` |
@@ -155,8 +154,7 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 | Noble Clothes | 1 | novice | Robes and body wear | MCE_CraftingLoom | 1 Leather, 5 Thread |  | yes | `984:MoreCraftableEquipment.esp` |
 | Ragged Trousers | 1 | novice | Robes and body wear | MCE_CraftingLoom | 1 Thread |  | yes | `9b6:MoreCraftableEquipment.esp` |
 | Refined Tunic | 1 | novice | Robes and body wear | MCE_CraftingLoom | 1 Leather, 5 Thread |  | yes | `98e:MoreCraftableEquipment.esp` |
-| Riekling LoinCloth 1 | 1 | novice | Robes and body wear | SmithingForge | 2 Leather Strips, 2 Leather | riekling | yes | `19f92:Playable Rieklings.esp` |
-| Riekling LoinCloth 2 | 1 | novice | Robes and body wear | SmithingForge | 2 Leather Strips, 3 Leather | riekling | yes | `19f94:Playable Rieklings.esp` |
+| Riekling Belted Tunic | 1 | novice | Robes and body wear | SmithingForge | 2 Leather Strips | riekling | yes | `bfee5:Playable Rieklings.esp` |
 | Roughspun Tunic | 1 | novice | Robes and body wear | MCE_CraftingLoom | 1 Thread |  | yes | `9b8:MoreCraftableEquipment.esp` |
 | Tavern Clothes | 1 | novice | Robes and body wear | MCE_CraftingLoom | 4 Thread |  | yes | `9d2:MoreCraftableEquipment.esp` |
 | Ulfric's Clothes | 1 | novice | Robes and body wear | MCE_CraftingLoom | 1 Leather, 5 Thread |  | yes | `9de:MoreCraftableEquipment.esp` |
@@ -182,7 +180,7 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 | Pleated Shoes | 1 | novice | Shoes and light boots | MCE_CraftingLoom | 2 Leather, 3 Thread |  | yes | `98b:MoreCraftableEquipment.esp` |
 | Ragged Boots | 1 | novice | Shoes and light boots | MCE_CraftingLoom | 1 Thread |  | yes | `922:MoreCraftableEquipment.esp` |
 | Redguard Boots | 1 | novice | Shoes and light boots | MCE_CraftingLoom | 2 Leather, 1 Thread | redguard | yes | `9bd:MoreCraftableEquipment.esp` |
-| Riekling Cloth Foot Wraps | 1 | novice | Shoes and light boots | SmithingForge | 3 Leather Strips | riekling | yes | `19f91:Playable Rieklings.esp` |
+| Riekling Footwraps | 1 | novice | Shoes and light boots | SmithingForge | 2 Leather Strips | riekling | yes | `bfefb:Playable Rieklings.esp` |
 | Shoes | 1 | novice | Shoes and light boots | MCE_CraftingLoom | 1 Leather, 1 Thread |  | yes | `920:MoreCraftableEquipment.esp` |
 | Shoes | 1 | novice | Shoes and light boots | MCE_CraftingLoom | 1 Leather, 1 Thread |  | yes | `926:MoreCraftableEquipment.esp` |
 | Shoes | 1 | novice | Shoes and light boots | MCE_CraftingLoom | 1 Leather, 1 Thread |  | yes | `92b:MoreCraftableEquipment.esp` |
