@@ -335,7 +335,7 @@ namespace Thornswood
         /// <summary>
         /// The bar on the Downgrade card, set by Shell before Start: 0 to 100,
         /// -1 hides it, and -2 is a bar that moves without a number, for the
-        /// stretches with nothing to measure against. Keizaal's launcher shows
+        /// stretches with nothing to measure against. Another server's launcher shows
         /// one, and a line of megabytes that nobody knows the end of is not
         /// the same thing (Patrick, 24 September).
         /// </summary>
@@ -732,7 +732,7 @@ namespace Thornswood
         /// or taken by something else), that threw, the throw was thrown away,
         /// Steam was never asked anything, and nothing was written anywhere:
         /// "didnt even upon the steam console" (Patrick, 24 September, a tester
-        /// on 1.1.94). Keizaal Online's launcher opens the console on those
+        /// on 1.1.94). Another SkyMP server's launcher opens the console on those
         /// machines, so it is possible, and this is how.
         /// </summary>
         internal static bool AskSteam(string link, Action<string> log)

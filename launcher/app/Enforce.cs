@@ -112,7 +112,7 @@ namespace Thornswood
         /// Thornswood pinned Skyrim Souls' favourites menu to paused in
         /// September while it still ran from the Steam copy, the write landed
         /// in Vortex's own file, and the Q menu went on pausing the world in
-        /// Keizaal long after Thornswood stopped asking for it (Djinn, 20
+        /// another server long after Thornswood stopped asking for it (Djinn, 20
         /// September). The folder copies these files now rather than linking
         /// them, so this is the belt rather than the braces, and it is cheap:
         /// one handle, and nothing to do in the normal case.

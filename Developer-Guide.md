@@ -845,6 +845,14 @@ if either check lets one through. Secrets are checked by
 not (#1326); the build leaves it out, and the nightly fetches it at its pin
 and reads it every night (`tests\test-1326-engine-secrets.ps1`).
 
+Two names are in no tracked file at all, code, tests, records, data,
+`docs\archive` and binary files included, and the build turns red when one
+comes back: the multiplayer mod this build replaced (#497,
+`tests\test-old-name-gone.js`), and the SkyMP server `Thornswood-Content.esp`
+was salvaged from (#400, Patrick, 12 Oct: "no records may keep it";
+`tests\test-other-server-name-gone.js`). Say "the other server" in prose and
+OtherServer in a file, folder or code name.
+
 No machine checks these, so the person writing keeps them: plain, direct
 sentences with no filler; the text inside code (the launcher's messages, the
 game's chat lines, the bot's replies), because a word check there cannot
@@ -1025,7 +1033,7 @@ from the board, none of these three puts an issue aside:
   the old wording would have believed the wrong layout was live, which is the
   one thing this section exists to prevent.
   Decided by Patrick on 24 Sep, for a tester whose Vortex deploys into
-  another server's copy of Skyrim (`steamapps\common\Keizaal Online`), in
+  another server's copy of Skyrim (its own folder under `steamapps\common`), in
   his words "detcts and fixes this but doesnt have the servers bleed": when
   Vortex deploys anywhere but the Steam copy, `Thornswood\Game` is the Steam
   copy's game plus exactly the files Vortex's record in that folder lists,
@@ -1789,7 +1797,7 @@ found, and no longer looks for any.
 
 **When Vortex deploys somewhere else.** Vortex can manage a Skyrim that is not
 the Steam copy: on 24 September a tester's Vortex deployed the collection into
-another SkyMP server's copy of the game, `steamapps\common\Keizaal Online`. The
+another SkyMP server's copy of the game, a folder of its own under `steamapps\common`. The
 launcher finds that folder by itself (`OwnGame.DeploysInto`: any folder
 directly under a Steam library's `steamapps\common` with `SkyrimSE.exe` and
 `Data\vortex.deployment.json`, a Steam copy of Skyrim Special Edition first,

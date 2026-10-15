@@ -98,6 +98,17 @@ change form the server may have saved for that reference is kept aside and
 never loaded (LoadChangeForm defers a form id the plugin does not create, and
 skips one whose base is gone), so nothing has to be cleaned out of a save.
 
+THE HEADER'S DESCRIPTION (issue #400, Patrick, 12 October)
+
+The plugin's header carries a description (SNAM), which Vortex and other mod
+tools show beside the plugin. Until 12 October it still said the content was
+salvaged from the other server, by that server's full name, and was out of
+date besides. Patrick's answer B on #400: the description says what the plugin
+is for Thornswood, the salvaged records stay, and the other server's name is
+mentioned nowhere. So this writes DESCRIPTION into the header, changing only
+that subrecord and the header's size, and refuses to write a file whose
+header or any record still carries the other server's full name.
+
 If something ever does point at the base record, the tool keeps the base,
 takes only its script off as before, says what points at it, and still takes
 the placed reference out. If something points at the placed reference, it
@@ -113,8 +124,10 @@ the same order, with the same form id, type and flags; that the ones taken out
 are gone; that every record it was not asked to touch has the bytes it started with;
 that the new records parse back to exactly what was built; that no form id it
 allocates is already taken; that the header's record count matches what is
-actually in the file; and that the other server's name (Kzl, kzolivar) is in
-no record, compressed ones included.
+actually in the file; that the other server's naming (Kzl, kzolivar) is on no
+editor id and no script, and its full name in no record and not in the header,
+compressed records included; and that the header changed in its description
+and its record count and nowhere else.
 
 It will not touch a compressed record, and it refuses to add a record whose
 editor id is already in the file, because two records with one name is the kind
@@ -259,6 +272,18 @@ EXECUTION_BLOCK_REF = 0x5DFCC75
 # The other server's naming, in either spelling the plugin used. Lower case,
 # because the comparison is.
 OTHER_SERVER = (b'kzl', b'kzolivar')
+
+# The other server's full name, lower case. Written as its code points so that
+# this file does not carry the name either: it goes from everywhere in the
+# repository (Patrick, 12 October, #400), and scripts\dev\Check-Words.ps1
+# refuses it in any file git tracks.
+OTHER_SERVER_NAME = bytes([107, 101, 105, 122, 97, 97, 108])
+
+# What the header says the plugin is (SNAM), written by this tool (#400).
+DESCRIPTION = (b"Thornswood's crafting and gathering content: stations, salt, ore, "
+               b"charcoal kilns, skill manuals, tools, keys, fishing, repair kits, "
+               b"treatments, the notice board and drop box, house parts, and their "
+               b"recipes.")
 
 # Form ids for the three new records. The plugin's own records all sit in the
 # 0x05______ space; 0x501548E is the highest of the 0x0501____ family in use, so
@@ -722,7 +747,31 @@ def other_server_names(rec):
             found.append('editor id ' + body.rstrip(b'\x00').decode('ascii', 'replace'))
         elif tag == b'VMAD' and any(n in low for n in OTHER_SERVER):
             found.append('a script it attaches')
+        elif OTHER_SERVER_NAME in low:
+            found.append('its full name, in ' + tag.decode('ascii', 'replace'))
     return found
+
+
+def described(head):
+    """The header with DESCRIPTION as its SNAM, its size field set to match,
+    and whether that changed anything. A header with no SNAM gains one after
+    CNAM, where the Creation Kit writes it."""
+    pairs = subrecords(bytes(head[24:]))
+    want = DESCRIPTION + b'\x00'
+    out, put = [], False
+    for tag, body in pairs:
+        if tag == b'SNAM':
+            out.append((tag, want))
+            put = True
+        else:
+            out.append((tag, body))
+    if not put:
+        at = next((i + 1 for i, (t, _) in enumerate(out) if t == b'CNAM'), 1)
+        out.insert(at, (b'SNAM', want))
+    body = pack_subrecords(out)
+    new = bytearray(head[:24]) + body
+    struct.pack_into('<I', new, 4, len(body))
+    return new, bytes(new) != bytes(head)
 
 
 def masters_of(buf):
@@ -1283,6 +1332,14 @@ def main():
         print('  kept: FURN 0x%07X stays, because %s 0x%07X %s names it'
               % (EXECUTION_BLOCK, r.tag.decode(), r.fid, r.editor_id()))
 
+    new_head, head_changed = described(head)
+    print('')
+    print('The header')
+    if head_changed:
+        print('  its description becomes: %s' % DESCRIPTION.decode('ascii'))
+    else:
+        print('  its description already reads as this tool writes it')
+
     if args.check:
         print('')
         print('  --check, so nothing was written.')
@@ -1324,10 +1381,12 @@ def main():
     board_moved = set_model(board, BOARD_MODEL)
     if set_bounds(board, BOARD_BOUNDS) or board_moved:
         edited.add(board.fid)
-    if not built and not edited and not removing:
+    if not built and not edited and not removing and not head_changed:
         print('')
         print('  Everything this adds is already in the plugin. Nothing was written.')
         return 0
+    old_head = bytes(head)
+    head = new_head
     tree = take_out(tree, removing)
     for r in built:
         ensure_top_group(tree, r.tag).kids.append(r)
@@ -1360,7 +1419,22 @@ def main():
 
     print('')
     print('Does the result verify')
-    after_records = list(every_record(parse(out, 24 + header_size, len(out))))
+    after_records = list(every_record(parse(out, len(head), len(out))))
+    # The header: the other server's name nowhere in it, and nothing changed
+    # but the description and the record count.
+    out_head = out[:len(head)]
+    if OTHER_SERVER_NAME in out_head.lower():
+        print('  STOP. the header still carries the other server\'s name. Nothing was written.')
+        return 1
+    def header_rest(h):
+        return [(t, b) for t, b in subrecords(h[24:]) if t not in (b'SNAM', b'HEDR')]
+    if header_rest(out_head) != header_rest(old_head) or out_head[8:24] != old_head[8:24]:
+        print('  STOP. the header changed in more than its description and record count. '
+              'Nothing was written.')
+        return 1
+    if struct.unpack_from('<I', out_head, 4)[0] != len(out_head) - 24:
+        print('  STOP. the header\'s size field does not match the header. Nothing was written.')
+        return 1
     if len(after_records) != len(kept) + len(built):
         print('  STOP. %d records in, %d out, expected %d. Nothing was written.'
               % (len(records), len(after_records), len(kept) + len(built)))
@@ -1414,6 +1488,8 @@ def main():
           % (len(built), len(edited), len(removing)))
     print('  ok    the header record count reads %d, which is what is in the file' % count)
     print('  ok    no record carries the other server\'s name, compressed ones included')
+    print('  ok    the header carries Thornswood\'s description and not that name, '
+          'and nothing else in it moved')
 
     open(path, 'wb').write(out)
     print('')
