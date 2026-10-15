@@ -63,6 +63,14 @@ yes('/api/public tells the bot and the pages', /\n      open: cfg\.open === true
 const PLAY = ['Owner', 'Dev', 'Moderator', 'Gamemaster', 'Loremaster', 'Content Creator', 'Playtester'];
 yes('off: the play list is exactly what it was', JSON.stringify(S.playRoles(PLAY, false)) === JSON.stringify(PLAY));
 yes('on: Member is added', S.playRoles(PLAY, true).indexOf('Member') >= 0);
+yes('LOCKED closed: committed defaults keep open: false (#428 Patrick 15 Oct)',
+    /\n  open: false,\n  access: \{/.test(src) && /LOCKED 12 Oct and 15 Oct/.test(src));
+yes('LOCKED closed: open-switch comment forbids flipping from this card',
+    /LOCKED closed \(Patrick, 12 Oct option B \+ 15 Oct via Smeagle\)/.test(src));
+yes('LOCKED closed: playRoles(off) never injects Member',
+    S.playRoles(PLAY, false).indexOf('Member') < 0 &&
+    S.playRoles(['Playtester'], false).indexOf('Member') < 0 &&
+    S.playRoles([], false).indexOf('Member') < 0);
 yes('on: once, however often it runs', S.playRoles(S.playRoles(PLAY, true), true).filter((n) => n === 'Member').length === 1);
 yes('"true" as a string is not on', S.playRoles(PLAY, 'true').indexOf('Member') < 0);
 yes('it never changes the list it was given', PLAY.indexOf('Member') < 0);
