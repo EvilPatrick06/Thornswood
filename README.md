@@ -58,6 +58,10 @@ change it.
   starts, what each class owns and every step between Play and the game.
 - [docs/IT-IS-DOWN.md](docs/IT-IS-DOWN.md): what to do when the server is down.
 - [SECURITY.md](SECURITY.md): how to report a hole quietly.
+- [LICENSE](LICENSE): Thornswood's own work is all rights reserved, and
+  everybody who contributes agrees once to the contributor terms in it.
+  [THIRD-PARTY.md](THIRD-PARTY.md) is what other people wrote, under their
+  own licences.
 
 Everything reaches `main` through a pull request, and `main` is what ships.
 
