@@ -7,12 +7,16 @@ standing there: J has every one, under Boards.
 ## Where a board is
 
 The object is the message board. One stands at every board, wherever
-the server has it: indoors or out, in Skyrim or on Solstheim. It is
-put down when you are in that board's cell, or its worldspace outdoors.
-You are at it when you are within 400 of that board. Click the board:
-E on the board itself opens it, and nothing else does. E on a person
-beside it, or on anything else near it, is answered by that, not the
-board (Patrick, 12 Oct, #2298: clicking the board does only the board).
+the server has it: indoors or out, in Skyrim or on Solstheim. The server
+stands it, and its drop box, as its own references that every game is
+sent (#2516): a board in Tamriel at once, one in any other cell or
+worldspace the first time somebody is there. Until 12 Oct each game put
+its own copies down, and lost them in cells that were not loaded, so it
+kept putting new ones down at the person. You are at it when you are
+within 400 of that board. Click the board: E on the board itself opens
+it, and nothing else does. E on a person beside it, or on anything else
+near it, is answered by that, not the board (Patrick, 12 Oct, #2298:
+clicking the board does only the board).
 
 The board is Thornswood's own, built from Skyrim's own pieces (#2298):
 two Windhelm sign posts, a face of stockade planks between two log
@@ -22,16 +26,61 @@ box. It is about 3.5 metres tall and 4.4 wide with the shelf.
 `scripts/mods/Build-NoticeBoard.py` builds both meshes from the game's
 own archives; only the meshes ship, never a texture.
 
-A steward moves it. Standing where it should be, they press its town
-under the notice boards on the Office page of the K panel, and press
-again. A board a steward has walked to is saved, and a later seeding
-does not put it back.
+A steward moves it. Standing where it should be, facing the way its
+notices should face, they press its town under the notice boards on the
+Office page of the K panel, and press again. The server records the cell
+or worldspace, the point and the facing where they stand, and moves the
+board and its box there. A board a steward has walked to is saved, and a
+later seeding does not put it back.
+
+Solitude, Whiterun, Windhelm, Riften and Markarth are walled cities, each
+its own worldspace inside the walls, and their boards stand inside them:
+their spots were read there, which the game's own people placed nearby,
+and Solitude's own ground, measured on 15 Oct (#2516). Until then all
+nine were sent as Tamriel, so inside those cities no board ever stood.
+Falkreath, Morthal, Dawnstar and Winterhold are open towns in Tamriel.
 
 The nine mainland towns have a spot each: Solitude, Whiterun, Riften,
 Windhelm, Markarth, Falkreath, Morthal, Dawnstar, Winterhold. Raven
 Rock's board starts at that town's inn, The Retching Netch, where
 Geldis Sadri stands, until a steward walks it somewhere better. Ten
 boards, one per town in [Creation](creation.md).
+
+## The drop box
+
+The hold's drop box stands on the shelf on the board's right post, an
+iron strongbox with a coin slot (Patrick, 12 Oct, #2298). E on the box
+opens the box's own panel, and only the box: E on the board opens the
+board. You use it standing at the board, within 400 of it. The server
+stands the box beside its board and turns it with the board, and what is
+in it is the server's own record, never a chest's contents.
+
+What goes in:
+
+- Gold. Gold you put in pays what you owe on your rent first.
+- Something left for somebody who was not there to take it, a Free
+  Skyrim Trading Company drop off: you pick it from your pack and name who
+  it is for, and the hold's steward hands it out.
+- Carriage and ferry fares, by themselves, as real gold, each time a fare
+  is paid to a driver or a ferryman of that hold.
+
+Notice, job and letter fees never go in. They leave the world and stay a
+record on the server, the hold's ledger, so the Court never has gold
+that does not exist.
+
+Who sees and takes what:
+
+- Anybody sees only what they put in themselves, gold included: only the
+  gold they added, never the box's total. They may take back what they
+  put in, rent included, and then that rent is owed again.
+- That hold's officers, its Jarl, its guards and a steward, see
+  everything in it and may take anything. Only they get Records: every
+  deposit and every take, by character name, what, how much, and when,
+  newest first. An officer taking gold somebody paid rent with leaves the
+  rent paid.
+
+Nothing about the box is typed. The panel's buttons send the server lines
+nobody is told to type (Patrick, 4 Oct).
 
 ## A notice and a job
 

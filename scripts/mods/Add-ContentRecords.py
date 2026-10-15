@@ -412,12 +412,10 @@ RECIPE_REMEDY = 0x50154C7
 # WHY AN ACTIVATOR AND NOT A CONTAINER. Patrick, 12 Oct: a person sees only what
 # they put in, gold included, and only the hold's officers see everything. A
 # Skyrim container shows whoever opens it everything in it, and the server sends
-# a container's whole inventory to every client that has it in view. And the
-# server cannot stand a placed container anywhere but the middle of Tamriel:
-# mp.set refuses 'locationalData' for anything but an actor
-# (LocationalDataBinding::Set in the fork, read 12 Oct). So what is in the box
-# is the server's record, the box is drawn by each client beside its board the
-# way the board is, and E on it opens the box's own panel, never a container.
+# a container's whole inventory to every client that has it in view. So what is
+# in the box is the server's record, the server stands the box beside its board
+# (standBoard in game/gamemode.js, #2516), and E on it opens the box's own
+# panel, never a container.
 BOARD = 0x500593B
 BOARD_MODEL = 'thornswood\\noticeboard01.nif'
 BOARD_BOUNDS = (-168, -71, 0, 140, 71, 246)     # the mesh's, rounded outward

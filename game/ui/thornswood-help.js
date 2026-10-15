@@ -113,7 +113,8 @@
           ' on an empty plot sows the crop in your pack, and on a ripe one brings it in.',
         'A warrior\'s maneuvers open on ' + k.maneuver + '.',
         'In your inventory, with a repair kit in your pack, ' + k.mold + ' opens the repair panel.',
-        k.activate + ' on a notice board opens it, with its notices and jobs, and ' +
+        k.activate + ' on a notice board opens it, with its notices and jobs; ' +
+        k.activate + ' on the drop box on its post opens the box, and ' +
           k.journal + ' shows every town\'s board. ' + k.activate + ' on a carriage driver ' +
           'shows his stops and fares, and on a guild trader the wares.'
       ];

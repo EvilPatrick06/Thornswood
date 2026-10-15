@@ -127,7 +127,7 @@
         '<span class="fare">' + esc(stops[i].fare) + ' gold</span>' +
         '<button class="go" data-n="' + i + '">Ride</button></div>';
     }
-    out += '<div class="note">The fare goes to ' + esc(d.ledger || 'the hold') + '\'s ledger. ' +
+    out += '<div class="note">The fare goes into ' + esc(d.ledger || 'the hold') + '\'s drop box. ' +
       'If the gold is not in your pack, you do not move and nothing is taken.</div>';
     body.innerHTML = out;
     var buttons = body.querySelectorAll('button[data-n]');

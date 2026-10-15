@@ -47,12 +47,32 @@ const depositSrc = slice(gm, '  var LEDGER_HOLDS = [', '\n  }\n');
 yes('the carriages block, takeGold and deposit are where this expects them', !!block && !!takeSrc && !!depositSrc);
 
 // ===================================================================== the server
+const boxSrc = ['  function dropboxOf(hold) {', '  function boxLog(hold, row) {',
+                '  function boxFare(hold, amount, reason) {'].map(function (f) { return slice(gm, f, '\n  }\n'); });
+// What each hold's drop box holds of fares (#2298: a fare goes into the box as real gold, not onto the ledger).
+function fareBox(dropbox) {
+  function row(k) {
+    const d = dropbox[k];
+    const r = d && d.items && d.items.filter(function (i) { return i.kind === 'fare'; })[0];
+    return r ? r.count : undefined;
+  }
+  return new Proxy({}, {
+    get: function (t, k) { return typeof k === 'string' ? row(k) : undefined; },
+    ownKeys: function () { return Object.keys(dropbox).filter(function (k) { return row(k) !== undefined; }); },
+    getOwnPropertyDescriptor: function (t, k) {
+      return row(k) === undefined ? undefined : { enumerable: true, configurable: true, value: row(k) };
+    }
+  });
+}
 function ledger(mp) {
   const funds = {};
-  const fn = new Function('mp', 'funds', 'save', 'plog', 'GOLD_ID',
-    takeSrc + '\n' + depositSrc + '\nreturn { takeGold: takeGold, deposit: deposit };');
-  const api = fn(mp, funds, function () { }, function () { }, GOLD);
-  api.funds = funds;
+  const dropbox = {};
+  const fn = new Function('mp', 'funds', 'save', 'plog', 'GOLD_ID', 'dropbox', 'BOX_LOG_KEEP',
+    takeSrc + '\n' + depositSrc + '\n' + boxSrc.join('\n') +
+    '\nreturn { takeGold: takeGold, deposit: deposit, boxFare: boxFare, LEDGER_HOLDS: LEDGER_HOLDS };');
+  const api = fn(mp, funds, function () { }, function () { }, GOLD, dropbox, 500);
+  api.ledger = funds;
+  api.funds = fareBox(dropbox);
   return api;
 }
 
@@ -85,7 +105,7 @@ function rig() {
   const L = ledger(mp);
   const box = { mp: mp, console: { log: function () { } }, Date: { now: function () { return clock; } } };
   box.globalThis = box;
-  box.__thornswoodProperty = { takeGold: L.takeGold, deposit: L.deposit };
+  box.__thornswoodProperty = { takeGold: L.takeGold, deposit: L.deposit, boxFare: L.boxFare };
   vm.runInNewContext(block, box);
   return { forms: forms, views: views, made: made, L: L, C: box.__thornswoodCarriages };
 }
@@ -349,7 +369,7 @@ function pageRig() {
     /Solitude<\/span><span class="fare">20 gold<\/span><button class="go" data-n="0">Ride<\/button>/.test(P.body.innerHTML) &&
     /Riverwood<\/span><span class="fare">10 gold<\/span>/.test(P.body.innerHTML));
   yes('and it says where the fare goes and what a short pack means',
-    /The fare goes to Whiterun's ledger\. If the gold is not in your pack, you do not move and nothing is taken\./.test(P.body.innerHTML));
+    /The fare goes into Whiterun's drop box\. If the gold is not in your pack, you do not move and nothing is taken\./.test(P.body.innerHTML));
   yes('the words on it are clean', clean(P.body.innerHTML) && clean(P.h2.innerHTML) && clean(page));
   const b = P.rides()[0];
   b.onclick.call(b);
