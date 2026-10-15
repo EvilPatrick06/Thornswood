@@ -35730,6 +35730,12 @@ log('gamemode loaded:',
         }
       }
 
+      // The master key cut for this holding (#2254): whose and which number.
+      if (c.master && typeof c.master === 'object' && Number(c.master.for) > 0 &&
+          Number(c.master.no) > 0) {
+        row.master = { for: Number(c.master.for), no: Number(c.master.no) };
+      }
+
       out[k] = row;
       kept++;
     }
@@ -35744,13 +35750,35 @@ log('gamemode loaded:',
       try { require('fs').mkdirSync(dir, { recursive: true }); } catch (e) { }
       require('fs').writeFileSync(registerPath(),
         JSON.stringify({ claims: claims, stewards: stewards, boxes: boxes,
-                        funds: funds, notices: notices, boards: boards, steps: steps }, null, 1));
+                        funds: funds, notices: notices, boards: boards, steps: steps,
+                        masters: masterCut }, null, 1));
     } catch (e) {
       plog('could not write the register:', e);
     }
   }
 
   var claims = load();
+  var masterCut = loadMasterCut();
+
+  /*
+    The last number a master key was cut with (#2254), from the register. Never
+    lower than any number a claim still names, so a register written before
+    the counter was can never hand out a number already in somebody's pack.
+    See MASTER KEYS in locks and keys.
+  */
+  function loadMasterCut() {
+    var top = 0;
+    try {
+      var raw = JSON.parse(require('fs').readFileSync(registerPath(), 'utf8'));
+      top = Number(raw && raw.masters) || 0;
+    } catch (e) { top = 0; }
+    for (var b in claims) {
+      if (!Object.prototype.hasOwnProperty.call(claims, b)) { continue; }
+      var m = claims[b] && claims[b].master;
+      if (m && m.no > top) { top = m.no; }
+    }
+    return top;
+  }
 
   /*
     STEPS THAT RUN ONCE ON THE REGISTER, and the mark that each has run.
@@ -36402,16 +36430,42 @@ log('gamemode loaded:',
                            ground: keepGround };
       save();
       pushAll();
+      /*
+        A NEW HOLDER, A NEW MASTER KEY (#2254). The claim above is a new
+        record with no master on it, so the old holder's master key stopped
+        opening anything the moment it was written: a master key works only
+        while the person it was cut for holds the building. The one who holds
+        it now is handed their own, the way a claim hands one with the deed.
+      */
+      var master2 = issueMaster(actorId, building, claims[building]);
       plog(who2, 'presented the deed at', nameOf(building), 'and now holds it',
-           was ? '(it was ' + was + '\'s)' : '(it was nobody\'s)');
+           was ? '(it was ' + was + '\'s)' : '(it was nobody\'s)',
+           master2 ? 'with master key no. ' + master2 : '');
       var told = 'You present the deed at ' + nameOf(building) +
-                 '. It is yours now' + (was ? ', and no longer ' + was + '\'s' : '') + '.';
+                 '. It is yours now' + (was ? ', and no longer ' + was + '\'s' : '') + '.' +
+                 (master2 ? ' ' + masterHandedLine(building) : '');
       notify(actorId, told);
       say(actorId, told);
       return;
     }
 
     if (!held) { return; }
+    /*
+      A HOLDING FROM BEFORE MASTER KEYS (#2254). A claim made before they
+      existed was never handed one, so its holder is handed it at their own
+      door, once: after that the claim names a master key and a lost one is
+      cut again at a forge from the mold.
+    */
+    if (mine && held.by === mine && !held.master) {
+      var late = issueMaster(actorId, building, held);
+      if (late) {
+        plog(held.name, 'was handed master key no.', late, 'to', nameOf(building),
+             'at its door, a holding from before master keys');
+        var lateLine = masterHandedLine(building);
+        notify(actorId, lateLine);
+        say(actorId, lateLine);
+      }
+    }
     if (mine && held.by === mine && (Date.now() - held.touched) > 3600000) {
       // Once an hour at most. A door is opened a great many times and the
       // register does not need writing on every one of them.
@@ -36506,7 +36560,8 @@ log('gamemode loaded:',
         if (!(accordLine && accordLine.holds(building)) && mayHold(actorId, profileId, building)) {
           line.x = 'claim';
         }
-      } else if ((profileId && held.by === profileId) || holdsDeed(actorId, building)) {
+      } else if ((profileId && held.by === profileId) || holdsDeed(actorId, building) ||
+                 holdsMasterKey(actorId, building)) {
         line.x = held.locked ? 'unlock' : 'lock';
       }
       if (line.x) {
@@ -36664,11 +36719,15 @@ log('gamemode loaded:',
     // nobody's, and a view that is right from the first second costs one write.
     pushAll();
     var handed = giveDeed(actorId, building);
-    plog(who, 'claimed', nameOf(building), handed ? 'and took the deed' : 'and got no deed');
+    // The master key comes with the deed (#2254). See MASTER KEYS.
+    var master = handed ? issueMaster(actorId, building, claims[building]) : 0;
+    plog(who, 'claimed', nameOf(building), handed ? 'and took the deed' : 'and got no deed',
+         master ? 'and master key no. ' + master : '');
     toProfile(profileId, 'You claim ' + nameOf(building) + '. ' +
               (handed ? 'The deed is in your pack. Whoever carries it holds the place, ' +
                         'so keep it somewhere a thief will not look. '
                       : 'The deed could not be handed over, so say so in the dev channel. ') +
+              (master ? masterHandedLine(building) + ' ' : '') +
               'Go in at least once every ' + lapseDays() + ' days or it goes back.');
     return true;
   }
@@ -36891,6 +36950,8 @@ log('gamemode loaded:',
     if (profileId && held.by === profileId) { return true; }
     if (holdsKey(actorId, building)) { return true; }
     if (holdsDeed(actorId, building)) { return true; }
+    // A master key while the person it was cut for holds it (#2254).
+    if (holdsMasterKey(actorId, building)) { return true; }
     return false;
   }
 
@@ -37000,7 +37061,9 @@ log('gamemode loaded:',
                            (on ? 'lock' : 'unlock') + '. It can be claimed at its door for nothing.');
       return true;
     }
-    if (held.by !== profileId && !holdsDeed(actorId, building)) {
+    // The holder, the deed, or its master key (#2254) turns the lock.
+    if (held.by !== profileId && !holdsDeed(actorId, building) &&
+        !holdsMasterKey(actorId, building)) {
       toProfile(profileId, nameOf(building) + ' is held by ' + held.name +
                            '. A lock is the holder\'s to turn.');
       return true;
@@ -37048,7 +37111,7 @@ log('gamemode loaded:',
     var name = nameOf(building);
     if (on) {
       return (mine ? 'You lock ' + name + '. ' : '') + name + ' is locked for everyone now. ' +
-             'Only a key to it or its deed opens it; anybody else has to pick the lock.';
+             'Only a key to it, its master key or its deed opens it; anybody else has to pick the lock.';
     }
     return (mine ? 'You unlock ' + name + '. ' : '') + name + ' is open to everyone now.';
   }
@@ -37314,6 +37377,10 @@ log('gamemode loaded:',
   }
 
   function cutKey(actorId, profileId, toProfile, parts) {
+    // The mold key at a forge asks for the master key instead (#2254).
+    if (parts && String(parts[2] || '') === 'master') {
+      return cutMasterKey(actorId, profileId, toProfile, parts);
+    }
     if (!isSmith(actorId)) {
       toProfile(profileId, 'Cutting a key is a smith\'s work. Hand the mold to a smith.');
       return true;
@@ -37403,6 +37470,211 @@ log('gamemode loaded:',
     plog('a key to', nameOf(building), 'was cut');
     toProfile(profileId, 'You cut a key to ' + nameOf(building) + '. It opens the door for ' +
                          'whoever is carrying it, so hand it over yourself.');
+    return true;
+  }
+
+  /*
+    MASTER KEYS (#2254).
+
+    Patrick, 12 Oct 2026, on #2254: a "Master key to" one building, handed
+    with the deed when the building is claimed, which opens it and turns its
+    lock, works only while the person it was cut for holds the building, and
+    is re-cut from the mold for 2 iron ingots, the new one replacing the old.
+
+    What it is for: the deed is the title and the one thing a thief can take
+    the house with, so it can sit in a chest. The master key does the daily
+    work of the deed without being it: whoever carries it, the holder or a
+    partner they hand it to, gets through the locked door and turns the lock.
+    An ordinary key still only opens.
+
+    WHY A NUMBER IS ON IT. A key here is its name, because the name is the one
+    thing the fork keeps per item in a pack (Inventory::Entry's name; nothing
+    else on an entry is ours to write). A master key has to stop working twice
+    over: when the holding changes hands, and when a new one is cut for a lost
+    one. Both mean the server has to tell the master key in the pack from an
+    older one with the same building on it, and the only place that can be
+    told is the name. So each one is cut with the next number of a counter
+    that only ever goes up and is kept in the register (masters in
+    property.json): "Master key to Breezehome, no. 12". The claim names the
+    number and the profile it was cut for (claim.master), and a master key
+    opens only while its name is that number and that profile still holds
+    the building. A lapse or an eviction drops the claim, and a deed
+    presented at the door writes a new one, so the old number names nothing.
+    The counter never goes back, so a number is never handed out twice, and
+    a key from a lapsed holding cannot match the next holder's.
+
+    THE RECORD is ThornswoodMiscMasterKey in Thornswood-Content.esp (scripts/
+    mods/Add-ContentRecords.py), a MISC on the key's mesh, with no recipe. The
+    gamemode and the plugin reach the server by different roads, so until the
+    server's plugin carries the record (mastersExist) none is handed or cut,
+    and everything else about property is as it was.
+  */
+  var MASTER_KEY = '154e0:Thornswood-Content.esp';
+  var MASTER_INGOTS = 2;   // Patrick, #2254: re-cut from the mold for 2 iron ingots
+
+  function masterLabel(building, no) { return 'Master key to ' + nameOf(building) + ', no. ' + no; }
+
+  /* Is the master key's record in the plugins this server loaded. See blankMoldsExist. */
+  var mastersKnown = false;
+  function mastersExist() {
+    if (mastersKnown) { return true; }
+    var id = idOf(MASTER_KEY);
+    if (!id) { return false; }
+    var found = null;
+    try { found = mp.lookupEspmRecordById(id); } catch (e) { found = null; }
+    if (found && found.record) { mastersKnown = true; }
+    return mastersKnown;
+  }
+
+  /* The building's master key, while the person it was cut for holds it, or null. */
+  function liveMaster(building) {
+    var held = holderOf(building);
+    if (!held || !held.master || !(held.master.no > 0)) { return null; }
+    if (held.master.for !== held.by) { return null; }
+    return held.master;
+  }
+
+  /* Does this person carry that building's master key, the one that works. */
+  function holdsMasterKey(actorId, building) {
+    var m = liveMaster(building);
+    return !!m && holdsNamed(actorId, MASTER_KEY, masterLabel(building, m.no));
+  }
+
+  /* Every building whose working master key is in this pack, for the K panel. */
+  function masterKeysOf(actorId) {
+    var out = [];
+    var baseId = idOf(MASTER_KEY);
+    if (!baseId) { return out; }
+    var inv = null;
+    try { inv = mp.get(actorId, 'inventory'); } catch (e) { return out; }
+    var entries = (inv && inv.entries) || [];
+    for (var b in claims) {
+      if (!Object.prototype.hasOwnProperty.call(claims, b)) { continue; }
+      var m = liveMaster(b);
+      if (!m) { continue; }
+      var want = masterLabel(b, m.no);
+      for (var i = 0; i < entries.length; i++) {
+        var e = entries[i];
+        if (e && e.count > 0 && e.baseId === baseId && String(e.name || '') === want) { out.push(b); break; }
+      }
+    }
+    return out;
+  }
+
+  /*
+    Cut a master key for the holding and put it in toActorId's pack: the
+    next number, and the claim names it, so any master key cut before stops
+    opening anything. Answers the number, or 0 when none was cut: the record
+    is not on this server, or the pack could not take it, and then the claim
+    and the counter are left as they were, so the old one still works.
+  */
+  function issueMaster(toActorId, building, held) {
+    if (!held || !mastersExist()) { return 0; }
+    var no = masterCut + 1;
+    if (!giveNamed(toActorId, MASTER_KEY, masterLabel(building, no))) { return 0; }
+    masterCut = no;
+    held.master = { for: held.by, no: no };
+    save();
+    pushAll();
+    return no;
+  }
+
+  function masterHandedLine(building) {
+    return 'Its master key is in your pack: it opens ' + nameOf(building) + ' and turns its lock ' +
+           'for whoever carries it, for as long as you hold the place.';
+  }
+
+  /* The holder themselves, standing here: not a deed carrier. See holderNearby. */
+  function holderHere(actorId, held) {
+    var near = [];
+    try {
+      var cell = String(mp.get(actorId, 'worldOrCellDesc') || '');
+      var pos = mp.get(actorId, 'pos');
+      if (cell && pos) { near = mp.getNeighborsByPosition(cell, pos) || []; }
+    } catch (e) { near = []; }
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { online = []; }
+    var all = [actorId];
+    for (var n = 0; n < near.length; n++) {
+      if (near[n] !== actorId && online.indexOf(near[n]) !== -1) { all.push(near[n]); }
+    }
+    for (var i = 0; i < all.length; i++) {
+      var pid = 0;
+      try { pid = Number(mp.get(all[i], 'profileId')) || 0; } catch (e) { pid = 0; }
+      if (pid && pid === held.by) { return { actorId: all[i], profileId: pid }; }
+    }
+    return null;
+  }
+
+  /*
+    A MASTER KEY CUT AGAIN, at a forge, by a smith, from the building's mold,
+    with the holder standing there, for two iron ingots (#2254). The mold key
+    at a forge sends it (/key, the forge's id, and master), beside the lock
+    key's ordinary key; nobody types it. The smith pays the ingots, as for a
+    key, and the master key goes to the holder, because it is cut for them,
+    the way a mold goes to the holder and not to the smith. The holder has to
+    be there for the same reason a mold needs them: nothing is cut for a
+    house while its holder is offline. The new one replaces the old.
+  */
+  function cutMasterKey(actorId, profileId, toProfile, parts) {
+    if (!isSmith(actorId)) {
+      toProfile(profileId, 'Cutting a master key is a smith\'s work. Hand the mold to a smith.');
+      return true;
+    }
+    var forge = forgeHere(parts, actorId);
+    if (!forge) {
+      toProfile(profileId, 'Stand at a forge and look at it, then press the key the line ' +
+                           'under the crosshair names.');
+      return true;
+    }
+    var unfit = unfitToMake(actorId, forge);
+    if (unfit) {
+      toProfile(profileId, unfit);
+      return true;
+    }
+    if (!mastersExist()) {
+      toProfile(profileId, 'There are no master keys on this server yet, so there is none to cut.');
+      return true;
+    }
+    var building = moldInHand(actorId);
+    if (!building) {
+      toProfile(profileId, 'A master key comes off the key mold of the place it opens, and you ' +
+                           'are carrying none.');
+      return true;
+    }
+    var held = holderOf(building);
+    if (!held) {
+      toProfile(profileId, 'Nobody holds ' + nameOf(building) + ', so there is nobody to cut its ' +
+                           'master key for. It can be claimed for nothing.');
+      return true;
+    }
+    var owner = holderHere(actorId, held);
+    if (!owner) {
+      toProfile(profileId, held.name + ' holds ' + nameOf(building) + ' and has to be standing ' +
+                           'here. A master key is cut for the holder, with the holder there.');
+      return true;
+    }
+    if (!takeItem(actorId, KEY_INGOT, MASTER_INGOTS)) {
+      toProfile(profileId, 'A master key is cut from ' + MASTER_INGOTS + ' iron ingots, and you are ' +
+                           'carrying fewer.');
+      return true;
+    }
+    var had = !!(held.master && held.master.for === held.by);
+    var no = issueMaster(owner.actorId, building, held);
+    if (!no) {
+      addItem(actorId, KEY_INGOT, MASTER_INGOTS);
+      toProfile(profileId, 'The master key could not be handed over. Say so in the dev channel.');
+      return true;
+    }
+    plog('master key no.', no, 'to', nameOf(building), 'was cut at a forge for', held.name);
+    var mine = owner.actorId === actorId;
+    toProfile(profileId, 'You cut a master key to ' + nameOf(building) +
+                         (mine ? ' and it is in your pack.' : ' and hand it to ' + held.name + '.') +
+                         (had ? ' The master key cut before it no longer opens anything.' : ''));
+    if (!mine && owner.profileId !== profileId) {
+      toProfile(owner.profileId, 'The new master key to ' + nameOf(building) + ' is in your pack.' +
+                                 (had ? ' The one cut before it no longer opens anything.' : ''));
+    }
     return true;
   }
 
@@ -38479,6 +38751,8 @@ log('gamemode loaded:',
     if (guestOf(building, held, profileId)) { return true; }
     if (holdsKey(actorId, building)) { return true; }
     if (holdsDeed(actorId, building)) { return true; }
+    // Its master key counts as a key for the beds (#2254).
+    if (holdsMasterKey(actorId, building)) { return true; }
     return false;
   }
 
@@ -41020,6 +41294,9 @@ log('gamemode loaded:',
     holderOf: holderOf, buildingOf: buildingOf, nameOf: nameOf, giveDeed: giveDeed,
     setLock: setLock, mold: mold, cutKey: cutKey, mayPass: mayPass,
     holdsKey: holdsKey, holdsMold: holdsMold, holdsDeed: holdsDeed,
+    // The master key (#2254). See MASTER KEYS in locks and keys.
+    holdsMasterKey: holdsMasterKey, masterLabel: masterLabel, liveMaster: liveMaster,
+    masterKeysOf: masterKeysOf, MASTER_KEY: MASTER_KEY,
     giveNamed: giveNamed, doorsOf: doorsOf, shutFor: shutFor, push: push,
     wayOut: wayOut,
     pushAll: pushAll, touchedBench: touchedBench, moldInHand: moldInHand,
@@ -44096,6 +44373,7 @@ log('gamemode loaded:',
                                  every: Number(held.rent.everyDays) || 7,
                                  owed: Number(held.rent.owed) || 0 } : null;
         rows.push({ name: W.nameOf(b), mine: true, locked: !!held.locked, rent: rent,
+                    master: !!(W.holdsMasterKey && W.holdsMasterKey(actorId, b)),
                     keyed: W.holdsKey(actorId, b), b: b,
                     sleep: (B && B.guestsOf) ? B.guestsOf(b) : [] });
       }
@@ -44106,6 +44384,17 @@ log('gamemode loaded:',
       if (farm) {
         rows.push({ name: 'Your farm', mine: true, farm: true,
                     days: farm.days, reach: farm.reach });
+      }
+      // A master key somebody handed you, while it still works (#2254): it
+      // opens the door and turns the lock, so its row says both.
+      var masters = W.masterKeysOf ? W.masterKeysOf(actorId) : [];
+      for (var mi = 0; mi < masters.length && rows.length < PROPERTY_PAGE_MAX; mi++) {
+        var mb = masters[mi];
+        if (seen[mb]) { continue; }
+        seen[mb] = true;
+        var mh = W.holderOf(mb);
+        rows.push({ name: W.nameOf(mb), mine: false, locked: !!(mh && mh.locked),
+                    keyed: true, master: true, by: mh ? mh.name : null });
       }
       // Then the places somebody let you into. A key to a building you already
       // hold is not a second row: it is the same house and the row above says

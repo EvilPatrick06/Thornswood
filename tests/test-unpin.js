@@ -145,6 +145,8 @@ function boot(dir, eng) {
   const body = [
     'var claims = {};',
     'var stewards = [];',
+    // The master key counter save() writes beside the claims (#2254).
+    'var masterCut = 0;',
     // Nobody guards this board; a guard's take down (#502) is
     // tests/test-502-guard-board.js.
     'function isGuard() { return false; }',
