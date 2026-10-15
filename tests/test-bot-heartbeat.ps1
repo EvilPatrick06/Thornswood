@@ -322,15 +322,18 @@ try {
     # Python's own complaints on stderr are not this harness failing.
     $ErrorActionPreference = 'Continue'
     $py = $null
-    foreach ($c in @(@('py', '-3.9'), @('python'))) {
+    # The bot's own floor (bot\_pyguard.py, #2276): 3.10 or newer. Until #2504
+    # this tried py -3.9 first and never asked the version, so on a machine
+    # whose 3.9 had discord.py the real bot refused to start and wrote nothing.
+    foreach ($c in @(@('py', '-3.12'), @('python'))) {
         $exe = Get-Command $c[0] -EA SilentlyContinue
         if (-not $exe) { continue }
         $pre = @(); if ($c.Count -gt 1) { $pre = @($c[1]) }
-        $null = & $c[0] @pre -c 'import discord, PIL' 2>&1
+        $null = & $c[0] @pre -c 'import sys; assert sys.version_info >= (3, 10); import discord, PIL' 2>&1
         if ($LASTEXITCODE -eq 0) { $py = $c; break }
     }
     if (-not $py) {
-        Write-Host 'SKIP  the real bot''s heartbeat: no python with discord.py on this machine'
+        Write-Host 'SKIP  the real bot''s heartbeat: no python 3.10 or newer with discord.py on this machine'
     } else {
         $real = Join-Path $tmp 'real-heartbeat.json'
         $botDir = (Resolve-Path (Join-Path $Here '..\bot')).Path
