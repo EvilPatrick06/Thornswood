@@ -114,16 +114,18 @@ for(const failure of ['__thornswoodMerchantTrade','__thornswoodNpcRuntime',
   assert.equal(settings,0,'failed teardown cannot proceed into a new startup');
 }
 
-{
+for(const [publisher,target] of [['trade','runtime'],['merchants','trade']]) {
   const calls=[];let settings=0;
-  const replacement={stop(){calls.push('replacement runtime');}};
+  const replacement={stop(){calls.push('replacement');},shutdown(){calls.push('replacement');}};
+  const publish=key=>{if(key===publisher)ctx[target==='runtime'?'__thornswoodNpcRuntime':'__thornswoodMerchantTrade']=replacement;};
   const ctx={mp:{getServerSettings(){settings++;return {thornswoodServer:'unsupported'};}},log(){},
-    __thornswoodMerchantTrade:{shutdown(){calls.push('trade');ctx.__thornswoodNpcRuntime=replacement;}},
+    __thornswoodMerchantTrade:{shutdown(){calls.push('trade');publish('trade');}},
     __thornswoodNpcRuntime:{stop(){calls.push('old runtime');}},
     __thornswoodNpcPopulation:{stop(){calls.push('population');}},
-    __thornswoodNpcMerchants:{shutdown(){calls.push('merchants');}}};
+    __thornswoodNpcMerchants:{shutdown(){calls.push('merchants');publish('merchants');}}};
   vm.createContext(ctx);vm.runInContext(startup,ctx);
   assert.deepEqual(calls,['trade','old runtime','population','merchants'],'teardown uses snapshots taken before callbacks');
-  assert.equal(ctx.__thornswoodNpcRuntime,replacement,'teardown preserves a separately published replacement');
+  assert.equal(ctx[target==='runtime'?'__thornswoodNpcRuntime':'__thornswoodMerchantTrade'],replacement,
+    'teardown preserves a separately published replacement');
   assert.equal(settings,0,'unexpected replacement prevents old startup from overwriting it');
 }

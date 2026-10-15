@@ -66787,12 +66787,15 @@ try {
   const priorControllers=[['__thornswoodMerchantTrade','shutdown'],['__thornswoodNpcRuntime','stop'],
     ['__thornswoodNpcPopulation','stop'],['__thornswoodNpcMerchants','shutdown']]
     .map(([key,method])=>[key,method,globalThis[key]]);
+  current();
   for(const [key,method,prior] of priorControllers) {
     try {if(prior && typeof prior[method]==='function') prior[method]();}
     catch(error) {teardownErrors.push(error);}
     current();
     if(globalThis[key]===prior) globalThis[key]=null;
-    else if(globalThis[key]!==null && globalThis[key]!==undefined)
+  }
+  for(const [key] of priorControllers) {
+    if(globalThis[key]!==null && globalThis[key]!==undefined)
       teardownErrors.push(new Error('NPC startup controller was replaced during teardown'));
   }
   if(teardownErrors.length) throw teardownErrors[0];
