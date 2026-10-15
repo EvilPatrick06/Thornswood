@@ -494,8 +494,8 @@
     },
     {
       "path": "game/content/Thornswood-Content.esp",
-      "sha256": "644bb1c0afb885d852d894820f8519a0440bfba6d50d91fea2435733c6c93e2f",
-      "what": "Thornswood's own plugin, 147,112 bytes on 15 Oct (its header now carries Thornswood's own description, #400; the notice board names our own mesh and the drop box is a record of its own, #2502). Until #400 its header said its crafting and gathering content was salvaged from another server's plugin.",
+      "sha256": "4917915f004018720d9014cdc014bd1c461afb671d579a685c5a502b40d00f9a",
+      "what": "Thornswood's own plugin, 151,078 bytes on 15 Oct (the woodworking bench keyword and furniture, #516; its header now carries Thornswood's own description, #400; the notice board names our own mesh and the drop box is a record of its own, #2502). Until #400 its header said its crafting and gathering content was salvaged from another server's plugin.",
       "published": "Every pack and the installer on both channels, and Nexus Mods mod 192001 through the collection",
       "source": "Records salvaged from another server's plugin (what the plugin's header said until #400), rebuilt under #954 and #400, then added to here (#613, #1379, #1383, #1384, #2255, #2258)",
       "creator": "Thornswood, from another server's records",
@@ -505,6 +505,20 @@
       "evidence": "THIRD-PARTY.md, Thornswood Content, Thornswood's other mod on Nexus Mods.",
       "status": "unconfirmed",
       "ask": "Patrick: whether that server's makers gave permission for the salvaged records, and where that is kept (#2177)."
+    },
+    {
+      "path": "game/content/Thornswood-WoodworkerTrail.esp",
+      "sha256": "a2a467848d3e80be94b08d5fb532fa47d9aa15f9b636a00d415db857e2fb8023",
+      "what": "The light plugin for the woodworker trail (#516): 53 late-load COBJ overrides that move bow, arrow, bolt and wooden-item recipes to the woodworking bench. 9,628 bytes. On 15 Oct no release carries it: it is not in the load order yet.",
+      "published": "not yet: it ships once it is put at the end of the collection load order",
+      "source": "Built by scripts\\\\mods\\\\Build-WoodworkerTrailOverrides.py from the load order's own plugins, as overrides of their recipes",
+      "creator": "Built here; the recipes it overrides are those plugins' authors'",
+      "licence": "not recorded: the permissions of the plugins whose recipes it overrides were not read",
+      "attribution": "not recorded",
+      "approved": "not recorded",
+      "evidence": "PR #2529 (#516); scripts\\\\mods\\\\Build-WoodworkerTrailOverrides.py.",
+      "status": "not-published",
+      "ask": "Whoever puts it in the load order: read the overridden plugins' permissions for redistributing overrides, before the first release that carries it."
     },
     {
       "path": "game/content/Thornswood-Last.esp",

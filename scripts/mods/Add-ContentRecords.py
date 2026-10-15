@@ -434,7 +434,7 @@ DROP_BOX_BOUNDS = (-26, -18, 0, 26, 18, 37)
 # furniture's OBND. Form ids follow DROP_BOX with a gap, same pattern as the kits.
 WOODWORKING_KEYWORD = 0x50154E0
 WOODWORKING_BENCH = 0x50154E1
-WOODWORKING_MODEL = '_BYOH\Furniture\CraftingWorkbench01.nif'
+WOODWORKING_MODEL = r'_BYOH\Furniture\CraftingWorkbench01.nif'
 WOODWORKING_BOUNDS = (-72, -10, -34, 81, 75, 64)
 WOODWORKING_FULL = 'Woodworking Bench'
 
@@ -1053,7 +1053,9 @@ def main():
                       ('ThornswoodRecipeSplint', RECIPE_SPLINT),
                       ('ThornswoodRecipePoultice', RECIPE_POULTICE),
                       ('ThornswoodRecipeRemedy', RECIPE_REMEDY),
-                      ('ThornswoodDropBox', DROP_BOX)):
+                      ('ThornswoodDropBox', DROP_BOX),
+                      ('ThornswoodCraftingWoodworking', WOODWORKING_KEYWORD),
+                      ('ThornswoodCraftingWoodworkingWorkbench', WOODWORKING_BENCH)):
         here_already = name in by_edid
         if here_already and by_edid[name].fid != fid:
             print('')
