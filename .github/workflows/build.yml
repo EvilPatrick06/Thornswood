@@ -413,6 +413,7 @@ jobs:
                  'test-2259-forge-burn.js',
                  'test-2337-kiln-menu.js',
                  'test-1306-pr-workflow.js',
+                 'test-2181-gamemode-source.js',
                  'test-2261-tome-refused.js',
                  'test-papyrus-event-list.js',
                  'test-1383-treatments.js',
