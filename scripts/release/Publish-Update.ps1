@@ -440,7 +440,7 @@ $shipGeneratedFiles = Get-ShipGeneratedFiles $ProfileDir
 Assert-ShipGeneratedBodies $GameDir $ProfileDir
 function Test-FromCollection([string]$rel) {
     if ($null -eq $vortexFiles) { return $false }
-    if ($rel -ieq 'Data\Thornswood-Content.esp') { return $false }
+    if (Test-ThornswoodRepoPlugin $rel) { return $false }
     if ($shipGeneratedFiles -contains $rel) { return $false }
     return $vortexFiles.Contains($rel)
 }
@@ -991,18 +991,24 @@ if (-not $changed.Count -and -not $realRemoved -and -not $profileChanged.Count -
 # a refusal too. ServerContent.ps1 says why the box is read over ssh rather
 # than through the server's manifest. A dry run (-NoUpload -NoPush) asks the
 # same and stops the same, so it says what the real Ship would do.
-$contentChanged = @($changed | Where-Object { $_ -ieq $ThornswoodContentRel })
+# Every plugin of ours (RepoPlugins.ps1), not the content plugin alone: since
+# #2486 Thornswood-Last.esp ships from the repo too, under the same rule.
+$contentChanged = @($changed | Where-Object { Test-ThornswoodRepoPlugin $_ })
 if ($contentChanged.Count) {
-    Head 'The content plugin on the server'
-    $contentEntry = [string]$now[$contentChanged[0]]
+    Head 'Our plugins on the server'
     $contentBox = $null
     try { $contentBox = Read-ThornswoodServerContent -Channel $Channel }
-    catch { $contentBox = [pscustomobject]@{ Answered = $false; Bytes = [int64]-1; Sha = ''; Order = @(); OrderRead = $false; Said = @($_.Exception.Message) } }
-    $contentProblem = Get-ThornswoodContentShipProblem $Channel $contentEntry $contentBox
-    if ($contentProblem) {
-        Die ('Nothing was published, posted or told to a server: ' + $contentProblem)
+    catch { $contentBox = [pscustomobject]@{ Answered = $false; Bytes = [int64]-1; Sha = ''; Order = @(); OrderRead = $false; Ours = @{}; Said = @($_.Exception.Message) } }
+    foreach ($contentRel in $contentChanged) {
+        $contentName = Split-Path -Leaf $contentRel
+        $contentEntry = [string]$now[$contentRel]
+        $pluginBox = Get-ThornswoodServerPlugin $contentBox $contentName
+        $contentProblem = Get-ThornswoodContentShipProblem $Channel $contentEntry $pluginBox $contentName
+        if ($contentProblem) {
+            Die ('Nothing was published, posted or told to a server: ' + $contentProblem)
+        }
+        Say ("  the {0} server already holds this release's {1} ({2:N0} bytes, the same sha256)" -f $Channel, $contentName, $pluginBox.Bytes) 'Green'
     }
-    Say ("  the {0} server already holds this release's {1} ({2:N0} bytes, the same sha256)" -f $Channel, $ThornswoodContentPlugin, $contentBox.Bytes) 'Green'
 }
 # ==== end thornswood content on the server first ====
 

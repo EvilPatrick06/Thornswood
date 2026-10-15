@@ -451,14 +451,19 @@ foreach ($w in $wiring) {
 # The other repository files each sends, beside its artifact, are checked too.
 $also = @(
     @{ File = 'scripts\deploy\Install-Voice.ps1';      Want = @('scripts/vps/Roll-Log.ps1') },
-    @{ File = 'scripts\deploy\Deploy-DevGamemode.ps1'; Want = @('records/most-online.json', 'records/server-build.json', 'game/content/Thornswood-Content.esp') },
-    @{ File = 'scripts\deploy\Deploy-Server.ps1';      Want = @('game/content/Thornswood-Content.esp', 'records/server-build.json') }
+    @{ File = 'scripts\deploy\Deploy-DevGamemode.ps1'; Want = @('records/most-online.json', 'records/server-build.json', 'game/content/Thornswood-Content.esp', 'game/content/Thornswood-Last.esp') },
+    @{ File = 'scripts\deploy\Deploy-Server.ps1';      Want = @('game/content/Thornswood-Content.esp', 'game/content/Thornswood-Last.esp', 'records/server-build.json') }
 )
 foreach ($w in $also) {
     $t = Get-Content -LiteralPath (Join-Path $Repo $w.File) -Raw
     $missing = @($w.Want | Where-Object { -not $t.Contains("'" + $_ + "'") })
     Yes ((Split-Path -Leaf $w.File) + ' has the files it sends beside its artifact checked: ' + ($w.Want -join ', ')) (
         $missing.Count -eq 0 -and $t -match '-AlsoSends')
+}
+. (Join-Path $Repo 'scripts\release\RepoPlugins.ps1')
+foreach ($w in $also | Where-Object { $_.File -like '*Deploy-*' }) {
+    $plug = @($w.Want | Where-Object { $_ -like 'game/content/*' } | ForEach-Object { $_.Substring(13) } | Sort-Object)
+    Yes ((Split-Path -Leaf $w.File) + ' sends every plugin RepoPlugins.ps1 calls ours, no more (#2486)') (($plug -join '|') -eq ((@($ThornswoodRepoPlugins) | Sort-Object) -join '|'))
 }
 $iv = Read-Ast 'scripts\deploy\Install-Voice.ps1'
 if ($iv) {
