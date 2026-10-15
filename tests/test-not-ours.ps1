@@ -9,7 +9,7 @@
   424 loose files of other people's mods, 124.7 MB, outside Data\Platform:
   RaceMenu's menus and translations, IED's, MCM Helper's, the Unofficial
   Patch's and interior mods' scripts, BodySlide builds made on some other
-  machine, leftovers of mods nothing loads, Bethesda's own meshes, Keizaal's
+  machine, leftovers of mods nothing loads, Bethesda's own meshes, another server's
   haybale and Daedric Online's TrueHUD boss list. None of them Vortex deployed,
   so the rules called them ours. Ship-Rules now names what is ours outside
   Data\Platform and nothing else is (Test-ShipNotOurs); files of Nexus mods the

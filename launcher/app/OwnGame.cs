@@ -219,7 +219,7 @@ namespace Thornswood
         /// own folder", and the launcher said Vortex had nothing deployed in
         /// S:\SteamLibrary\steamapps\common\Skyrim Special Edition. Their
         /// Vortex, Mods, Open, Open Game Folder opened
-        /// S:\SteamLibrary\steamapps\common\Keizaal Online, another SkyMP
+        /// a folder of its own under S:\SteamLibrary\steamapps\common, another SkyMP
         /// server's copy of Skyrim: their Vortex manages that folder and
         /// deploys the Thornswood collection into it, so the Steam copy had
         /// none of the 94 plugins. Vortex's own note of its game folder is in

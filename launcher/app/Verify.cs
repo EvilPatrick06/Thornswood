@@ -153,7 +153,7 @@ namespace Thornswood
 
             // Vortex deploys the collection somewhere other than the Skyrim this
             // install reads. 24 September, a tester whose Vortex manages another
-            // SkyMP server's copy of Skyrim, Keizaal Online, and deploys
+            // SkyMP server's copy of Skyrim, and deploys
             // Thornswood's collection into it: every plugin below then reads as
             // not installed, and nothing said where the mods actually were.
             // Patrick: "can we fix it so the launcher can detect and fix this in

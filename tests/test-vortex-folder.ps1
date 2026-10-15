@@ -12,7 +12,7 @@
   folder", and the launcher said "Vortex has nothing deployed in
   S:/SteamLibrary/steamapps/common/Skyrim Special Edition right now". Their
   Vortex, Mods, Open, Open Game Folder opened
-  S:/SteamLibrary/steamapps/common/Keizaal Online: another SkyMP server's copy
+  a folder of its own under S:/SteamLibrary/steamapps/common: another SkyMP server's copy
   of Skyrim, with its own exe, script extender, dlls, ini files, Mods, src,
   Skyrim and Creations folders, and Vortex deploying the Thornswood collection
   into it. Patrick: "can we fix it so the launcher can detect and fix this in
@@ -41,7 +41,7 @@
   with Paths.cs, Config.cs, Secrets.cs and LoadOrder.cs, using the same .NET
   Framework csc Build-Launcher.ps1 uses (C# 5), with small stand-ins for the
   classes they call that touch the machine (Checks, Keep, Junction, Downgrade,
-  SkyMp, Updater). A driver builds a pretend Steam, a pretend Keizaal Online
+  SkyMp, Updater). A driver builds a pretend Steam, a pretend Other Server Online
   and a pretend Vortex staging folder in a scratch folder, points Steam.cs at
   it through Steam.RootForTest, and runs the real Scan, Fix, Make and Refresh.
   Members added by this change are reached by name, so the driver also builds
@@ -407,7 +407,7 @@ namespace Thornswood
             new string[] { "meshes\\ts\\chair.nif", "ModB" },
             new string[] { "Scripts\\vanilla.pex", "ModB" },             // a mod's copy of a game file
             new string[] { "..\\..\\escape.txt", "ModA" },               // would climb out of the game folder
-            new string[] { "High.ini", "..\\..\\..\\steam\\steamapps\\common\\Keizaal Online" },   // would read the other folder
+            new string[] { "High.ini", "..\\..\\..\\steam\\steamapps\\common\\Other Server Online" },   // would read the other folder
         };
         static readonly string[][] RootFiles = {
             new string[] { "skse64_loader.exe", "SKSE" },
@@ -429,31 +429,31 @@ namespace Thornswood
         }
 
         // Another server's copy of Skyrim that Vortex deploys into. Every file
-        // of its own says KEIZAAL, so one byte of it in Thornswood's folder shows.
-        static string Keizaal(Scene s, string lib, string name, DateTime when)
+        // of its own says THEIRS, so one byte of it in Thornswood's folder shows.
+        static string OtherServer(Scene s, string lib, string name, DateTime when)
         {
             string k = s.Common(lib, name);
-            Exe(Path.Combine(k, "SkyrimSE.exe"), "KEIZAAL-EXE");
-            Put(Path.Combine(k, "skse64_1_6_1170.dll"), "KEIZAAL-SKSE");
-            Put(Path.Combine(k, "bink2w64.dll"), "KEIZAAL-BINK");
-            Put(Path.Combine(k, "High.ini"), "KEIZAAL-INI");
-            Put(Path.Combine(k, "ControlMap_Custom.txt"), "KEIZAAL-CONTROLS");
-            Put(Path.Combine(k, "installscript.vdf"), "KEIZAAL-VDF");
-            Put(Path.Combine(k, "Mods\\x.txt"), "KEIZAAL-MODS");
-            Put(Path.Combine(k, "src\\x.txt"), "KEIZAAL-SRC");
-            Put(Path.Combine(k, "Skyrim\\x.txt"), "KEIZAAL-SKYRIM");
-            Put(Path.Combine(k, "Creations\\x.txt"), "KEIZAAL-CREATIONS");
-            Put(Path.Combine(k, "Data\\Platform\\Plugins\\skymp5-client.js"), "KEIZAAL-CLIENT");
-            Put(Path.Combine(k, "Data\\KeizaalOnly.esp"), "KEIZAAL-PLUGIN");
-            Put(Path.Combine(k, "Data\\Scripts\\keizaal.pex"), "KEIZAAL-SCRIPT");
-            Put(Path.Combine(k, "Data\\textures\\keizaal\\sky.dds"), "KEIZAAL-TEXTURE");
+            Exe(Path.Combine(k, "SkyrimSE.exe"), "THEIRS-EXE");
+            Put(Path.Combine(k, "skse64_1_6_1170.dll"), "THEIRS-SKSE");
+            Put(Path.Combine(k, "bink2w64.dll"), "THEIRS-BINK");
+            Put(Path.Combine(k, "High.ini"), "THEIRS-INI");
+            Put(Path.Combine(k, "ControlMap_Custom.txt"), "THEIRS-CONTROLS");
+            Put(Path.Combine(k, "installscript.vdf"), "THEIRS-VDF");
+            Put(Path.Combine(k, "Mods\\x.txt"), "THEIRS-MODS");
+            Put(Path.Combine(k, "src\\x.txt"), "THEIRS-SRC");
+            Put(Path.Combine(k, "Skyrim\\x.txt"), "THEIRS-SKYRIM");
+            Put(Path.Combine(k, "Creations\\x.txt"), "THEIRS-CREATIONS");
+            Put(Path.Combine(k, "Data\\Platform\\Plugins\\skymp5-client.js"), "THEIRS-CLIENT");
+            Put(Path.Combine(k, "Data\\TheirOnly.esp"), "THEIRS-PLUGIN");
+            Put(Path.Combine(k, "Data\\Scripts\\theirs.pex"), "THEIRS-SCRIPT");
+            Put(Path.Combine(k, "Data\\textures\\theirs\\sky.dds"), "THEIRS-TEXTURE");
             // Where Vortex deployed, with what is there now: the other server's
             // installer has since written over one, so taking the file from
             // this folder rather than from staging would show.
-            Put(Path.Combine(k, "Data\\TsOne.esp"), "KEIZAAL-OVERWROTE");
+            Put(Path.Combine(k, "Data\\TsOne.esp"), "THEIRS-OVERWROTE");
             Put(Path.Combine(k, "Data\\TsTwo.esm"), "VORTEX-TSTWO");
             Put(Path.Combine(k, "Data\\textures\\ts\\wood.dds"), "VORTEX-DDS");
-            Put(Path.Combine(k, "skse64_loader.exe"), "KEIZAAL-LOADER");
+            Put(Path.Combine(k, "skse64_loader.exe"), "THEIRS-LOADER");
             Record(Path.Combine(k, "Data\\vortex.deployment.json"), s.Staging, Path.Combine(k, "Data"), DataFiles, when);
             Record(Path.Combine(k, "vortex.deployment.dinput.json"), s.Staging, k, RootFiles, when);
             return k;
@@ -469,7 +469,7 @@ namespace Thornswood
 
             try
             {
-                if (seam) KeizaalScene(found);
+                if (seam) OtherServerScene(found);
                 else OldCode();
                 if (seam && found)
                 {
@@ -495,14 +495,14 @@ namespace Thornswood
         // ---- the code before the change -------------------------------------
         //
         // No seam, so the real Steam must never be asked: the old launcher is
-        // pointed at the pretend Keizaal Online through VortexGame, which is
+        // pointed at the pretend Other Server Online through VortexGame, which is
         // all it had, and made to build. This is where the bleed shows.
         static void OldCode()
         {
             Scene s = NewScene("old", false);
             string steam = SteamCopy(s, s.Steam, "STEAM");
             Staging(s);
-            string k = Keizaal(s, s.Steam, "Keizaal Online", DateTime.UtcNow.AddMinutes(-5));
+            string k = OtherServer(s, s.Steam, "Other Server Online", DateTime.UtcNow.AddMinutes(-5));
             s.Cfg.VortexGame = k;
             try { OwnGame.Make(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Make said: " + ex.Message); }
             Bleed(s, steam, k, "the code before the change, pointed at the other folder");
@@ -548,7 +548,7 @@ namespace Thornswood
             foreach (string r in rels)
             {
                 string t = Text(Path.Combine(game, r)) ?? "";
-                if (t.IndexOf("KEIZAAL", StringComparison.Ordinal) >= 0) theirs.Add(r);
+                if (t.IndexOf("THEIRS", StringComparison.Ordinal) >= 0) theirs.Add(r);
             }
             Yes(when + ": not one of the other folder's own files is in it: exe, script extender, bink, ini, " +
                 "ControlMap, installscript, client, its own plugin, script and texture, Mods, src, Skyrim, Creations" +
@@ -556,10 +556,10 @@ namespace Thornswood
             Yes(when + ": what Vortex has in staging and did not deploy stays out", !File.Exists(Path.Combine(game, "Data\\NotDeployed.esp")));
         }
 
-        // ---- 1 and 3: Keizaal Online ------------------------------------------
-        static void KeizaalScene(bool found)
+        // ---- 1 and 3: Other Server Online ------------------------------------------
+        static void OtherServerScene(bool found)
         {
-            Scene s = NewScene("keizaal", true);
+            Scene s = NewScene("otherserver", true);
             List<string> libs = Libraries();
             bool fenced = libs.Count > 0;
             foreach (string l in libs) if (!l.StartsWith(T, StringComparison.OrdinalIgnoreCase)) fenced = false;
@@ -569,12 +569,12 @@ namespace Thornswood
 
             string steam = SteamCopy(s, s.Steam, "STEAM");
             Staging(s);
-            string k = Keizaal(s, s.Steam, "Keizaal Online", DateTime.UtcNow.AddMinutes(-5));
+            string k = OtherServer(s, s.Steam, "Other Server Online", DateTime.UtcNow.AddMinutes(-5));
             // SteamCopy is what Paths.Init sets beside Game under the collection (#1226).
             Paths.Game = Paths.SteamCopy = steam;
 
             Yes("Steam.SkyrimPath still answers the Steam copy", string.Equals(Steam.SkyrimPath(), steam, StringComparison.OrdinalIgnoreCase));
-            Yes("the folder Vortex deploys into is found without being told: Keizaal Online", string.Equals(DeploysInto(s.Cfg), k, StringComparison.OrdinalIgnoreCase));
+            Yes("the folder Vortex deploys into is found without being told: Other Server Online", string.Equals(DeploysInto(s.Cfg), k, StringComparison.OrdinalIgnoreCase));
             Yes("the game itself still comes from the Steam copy (Source, which Downgrade, Leaks and Uninstall use)", string.Equals(OwnGame.Source(s.Cfg), steam, StringComparison.OrdinalIgnoreCase));
             string why = OwnGame.WhyNot(s.Cfg, DeploysInto(s.Cfg));
             Yes("and the folder can be made from it" + (why == null ? "" : " (" + why + ")"), why == null);
@@ -583,7 +583,7 @@ namespace Thornswood
             Dictionary<string, string> before = Snap(k), staged = Snap(s.Staging);
             List<Issue> issues = Verify.Run(s.Cfg);
             Issue first = issues.Count > 0 ? issues[0] : null;
-            Yes("Scan's first line names Keizaal Online as where Vortex deploys",
+            Yes("Scan's first line names Other Server Online as where Vortex deploys",
                 first != null && first.Text.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0 && first.Text.IndexOf("Fix", StringComparison.Ordinal) >= 0);
             Yes("and says Fix makes Thornswood's own folder from it, the game from the Steam copy",
                 first != null && first.Text.IndexOf("own Skyrim folder", StringComparison.Ordinal) >= 0 && first.Text.IndexOf("Steam copy", StringComparison.Ordinal) >= 0);
@@ -609,7 +609,7 @@ namespace Thornswood
             var said = new List<string>();
             Verify.Fix(s.Cfg, delegate(string m) { said.Add(m); });
             Config saved = Config.Load(Paths.CfgFile);
-            Yes("Fix saves Keizaal Online as VortexGame in config.json", saved != null && string.Equals(saved.VortexGame, k, StringComparison.OrdinalIgnoreCase));
+            Yes("Fix saves Other Server Online as VortexGame in config.json", saved != null && string.Equals(saved.VortexGame, k, StringComparison.OrdinalIgnoreCase));
             Yes("and hands on to making the own folder the way Make it does (Verify.OwnFolderNext)", OwnFolderNext());
             bool named = false;
             foreach (string m in said) if (m.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0 && Clean(m)) named = true;
@@ -620,7 +620,7 @@ namespace Thornswood
             string made = null;
             try { made = OwnGame.Make(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Make said: " + ex.Message); }
             Yes("the own folder is built from it", made != null && Directory.Exists(OwnGame.Folder));
-            Bleed(s, steam, k, "built from Keizaal Online");
+            Bleed(s, steam, k, "built from Other Server Online");
 
             string game = OwnGame.Folder;
             Yes("the big mod files are hard links to Vortex's staging copies, so the collection is not on the disk twice",
@@ -643,7 +643,7 @@ namespace Thornswood
             Yes("a record entry that would climb out of the game folder, or read the other folder, is refused and said",
                 left.IndexOf("escape.txt", StringComparison.OrdinalIgnoreCase) >= 0 && left.IndexOf("High.ini", StringComparison.OrdinalIgnoreCase) >= 0 &&
                 !File.Exists(Path.Combine(s.Dir, "escape.txt")) && !File.Exists(Path.Combine(s.Ts, "escape.txt")));
-            Yes("nothing in Keizaal Online was changed", SameSnap(before, Snap(k)));
+            Yes("nothing in Other Server Online was changed", SameSnap(before, Snap(k)));
             Yes("nothing in Vortex's staging was changed", SameSnap(staged, Snap(s.Staging)));
 
             // Refresh, once the launcher runs from the folder.
@@ -656,20 +656,20 @@ namespace Thornswood
             foreach (string[] f in DataFiles) if (f[0] != "meshes\\ts\\chair.nif") next.Add(f);
             next.Add(new string[] { "textures\\ts\\new.dds", "ModA" });
             Record(Path.Combine(k, "Data\\vortex.deployment.json"), s.Staging, Path.Combine(k, "Data"), next.ToArray(), DateTime.UtcNow.AddMinutes(2));
-            Put(Path.Combine(k, "Data\\textures\\ts\\new.dds"), "KEIZAAL-OVERWROTE-NEW");
-            Put(Path.Combine(k, "Data\\KeizaalLater.esp"), "KEIZAAL-LATER");
+            Put(Path.Combine(k, "Data\\textures\\ts\\new.dds"), "THEIRS-OVERWROTE-NEW");
+            Put(Path.Combine(k, "Data\\TheirLater.esp"), "THEIRS-LATER");
             before = Snap(k);
             staged = Snap(s.Staging);
-            Yes("Vortex deploying again into Keizaal Online is noticed", OwnGame.NeedsRefresh(s.Cfg));
+            Yes("Vortex deploying again into Other Server Online is noticed", OwnGame.NeedsRefresh(s.Cfg));
             string refreshed = null;
             try { refreshed = OwnGame.Refresh(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Refresh said: " + ex.Message); }
             Yes("the refresh runs", refreshed != null);
             Yes("it brings in the new file from staging", Text(Path.Combine(game, "Data\\textures\\ts\\new.dds")) == "VORTEX-NEW");
             Yes("and takes out the one Vortex no longer deploys", !File.Exists(Path.Combine(game, "Data\\meshes\\ts\\chair.nif")));
             bool dirty = false;
-            foreach (string r in Rels(game)) if ((Text(Path.Combine(game, r)) ?? "").IndexOf("KEIZAAL", StringComparison.Ordinal) >= 0) dirty = true;
+            foreach (string r in Rels(game)) if ((Text(Path.Combine(game, r)) ?? "").IndexOf("THEIRS", StringComparison.Ordinal) >= 0) dirty = true;
             Yes("and still nothing of the other folder's own comes with it", !dirty);
-            Yes("nothing in Keizaal Online or staging was changed by the refresh", SameSnap(before, Snap(k)) && SameSnap(staged, Snap(s.Staging)));
+            Yes("nothing in Other Server Online or staging was changed by the refresh", SameSnap(before, Snap(k)) && SameSnap(staged, Snap(s.Staging)));
             Yes("the game still comes from the Steam copy, which is where Downgrade works", string.Equals(OwnGame.Source(s.Cfg), steam, StringComparison.OrdinalIgnoreCase));
         }
 
@@ -702,7 +702,7 @@ namespace Thornswood
 
         // ---- an older deployment left in the Steam copy ----------------------
         //
-        // Vortex moved to Keizaal Online and something of its old deployment
+        // Vortex moved to Other Server Online and something of its old deployment
         // stayed behind in the Steam copy. The game is taken from the Steam
         // copy; that old deployment is not the game and stays out.
         static void StaleInSteam()
@@ -713,7 +713,7 @@ namespace Thornswood
             Record(Path.Combine(steam, "Data\\vortex.deployment.json"), s.Staging, Path.Combine(steam, "Data"),
                    new string[][] { new string[] { "Stale.esp", "ModOld" } }, DateTime.UtcNow.AddDays(-2));
             Staging(s);
-            string k = Keizaal(s, s.Steam, "Keizaal Online", DateTime.UtcNow);
+            string k = OtherServer(s, s.Steam, "Other Server Online", DateTime.UtcNow);
             s.Cfg.VortexGame = k;
             Paths.Game = Paths.SteamCopy = steam;
             string made = null;
@@ -731,24 +731,24 @@ namespace Thornswood
             SteamCopy(s, s.Steam, "STEAM");
             string ssc = SteamCopy(s, s.Lib2, "LIB2");
             Record(Path.Combine(ssc, "Data\\vortex.deployment.json"), s.Staging, Path.Combine(ssc, "Data"), new string[][] { new string[] { "TsOne.esp", "ModA" } }, DateTime.UtcNow.AddHours(-3));
-            string k = Keizaal(s, s.Steam, "Keizaal Online", DateTime.UtcNow);
+            string k = OtherServer(s, s.Steam, "Other Server Online", DateTime.UtcNow);
             Yes("a Steam copy of Skyrim Special Edition with a record comes before a newer record elsewhere",
                 string.Equals(DeploysInto(s.Cfg), ssc, StringComparison.OrdinalIgnoreCase));
 
             Scene t = NewScene("newest", true);
             SteamCopy(t, t.Steam, "STEAM");
-            Keizaal(t, t.Steam, "Keizaal Online", DateTime.UtcNow.AddHours(-3));
-            string other = Keizaal(t, t.Lib2, "Some Other Server", DateTime.UtcNow);
+            OtherServer(t, t.Steam, "Other Server Online", DateTime.UtcNow.AddHours(-3));
+            string other = OtherServer(t, t.Lib2, "Some Other Server", DateTime.UtcNow);
             Yes("among folders that are not Steam copies, the newest record wins", string.Equals(DeploysInto(t.Cfg), other, StringComparison.OrdinalIgnoreCase));
-            t.Cfg.VortexGame = Path.Combine(t.Steam, "steamapps\\common\\Keizaal Online");
+            t.Cfg.VortexGame = Path.Combine(t.Steam, "steamapps\\common\\Other Server Online");
             Yes("and VortexGame wins over the search", string.Equals(DeploysInto(t.Cfg), t.Cfg.VortexGame, StringComparison.OrdinalIgnoreCase));
 
             // A choice Vortex has since purged does not pin Thornswood to it.
-            // Fix saved Keizaal Online; the tester then pointed Vortex back at
-            // the Steam copy, which purges Keizaal and deploys into the copy.
+            // Fix saved Other Server Online; the tester then pointed Vortex back at
+            // the Steam copy, which purges the other server and deploys into the copy.
             Scene u = NewScene("purged", true);
             string copy = SteamCopy(u, u.Steam, "STEAM");
-            string was = Keizaal(u, u.Steam, "Keizaal Online", DateTime.UtcNow.AddHours(-1));
+            string was = OtherServer(u, u.Steam, "Other Server Online", DateTime.UtcNow.AddHours(-1));
             u.Cfg.VortexGame = was;
             Yes("a saved folder with Vortex's record is used", string.Equals(DeploysInto(u.Cfg), was, StringComparison.OrdinalIgnoreCase));
             File.Delete(Path.Combine(was, "Data\\vortex.deployment.json"));
@@ -765,19 +765,19 @@ namespace Thornswood
         //
         // The judge of the hotfix 1.1.93 verification: nothing checked that
         // Vortex's mods folder named in a record lies outside the folder it
-        // deploys into, so a record naming Keizaal Online itself as staging
-        // would bring in any of Keizaal's own files it listed. Vortex will not
+        // deploys into, so a record naming Other Server Online itself as staging
+        // would bring in any of that server's own files it listed. Vortex will not
         // write such a record; the launcher must not trust one anyway.
         static void StagingInside()
         {
             Scene s = NewScene("inside", true);
             string steam = SteamCopy(s, s.Steam, "STEAM");
             Staging(s);
-            string k = Keizaal(s, s.Steam, "Keizaal Online", DateTime.UtcNow);
+            string k = OtherServer(s, s.Steam, "Other Server Online", DateTime.UtcNow);
             // Everything the record lists really is under the folder it names,
             // so without the refusal the build goes ahead and takes them.
-            Put(Path.Combine(k, "ModA\\TsOne.esp"), "KEIZAAL-MODA-ONE");
-            Put(Path.Combine(k, "ModA\\TsTwo.esm"), "KEIZAAL-MODA-TWO");
+            Put(Path.Combine(k, "ModA\\TsOne.esp"), "THEIRS-MODA-ONE");
+            Put(Path.Combine(k, "ModA\\TsTwo.esm"), "THEIRS-MODA-TWO");
             Record(Path.Combine(k, "Data\\vortex.deployment.json"), k, Path.Combine(k, "Data"),
                    new string[][] { new string[] { "TsOne.esp", "ModA" }, new string[] { "TsTwo.esm", "ModA" }, new string[] { "x.txt", "Mods" } }, DateTime.UtcNow);
             Paths.Game = Paths.SteamCopy = steam;
@@ -785,7 +785,7 @@ namespace Thornswood
             try { made = OwnGame.Make(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Make said: " + ex.Message); }
             string game = OwnGame.Folder;
             bool none = !File.Exists(Path.Combine(game, "Data\\x.txt")) &&
-                        Text(Path.Combine(game, "Data\\TsOne.esp")) != "KEIZAAL-MODA-ONE" && Text(Path.Combine(game, "Data\\TsTwo.esm")) != "KEIZAAL-MODA-TWO";
+                        Text(Path.Combine(game, "Data\\TsOne.esp")) != "THEIRS-MODA-ONE" && Text(Path.Combine(game, "Data\\TsTwo.esm")) != "THEIRS-MODA-TWO";
             Yes("a record whose mods folder is the other folder itself brings nothing of that folder in", none);
             string left = "";
             try { left = File.ReadAllText(Path.Combine(OwnGame.Dir, "left-out.txt")); } catch { }
@@ -919,7 +919,7 @@ namespace Thornswood
             string empty = Path.Combine(s.Dir, "nothing here");
             Directory.CreateDirectory(empty);
             Staging(s);
-            string k = Keizaal(s, s.Lib2, "Keizaal Online", DateTime.UtcNow);
+            string k = OtherServer(s, s.Lib2, "Other Server Online", DateTime.UtcNow);
             s.Cfg.Save(Paths.CfgFile);
 
             bool ok;
@@ -974,7 +974,7 @@ namespace Thornswood
         {
             Scene s = NewScene("nosteam", true);
             Staging(s);
-            string k = Keizaal(s, s.Steam, "Keizaal Online", DateTime.UtcNow);
+            string k = OtherServer(s, s.Steam, "Other Server Online", DateTime.UtcNow);
             Paths.Game = Paths.SteamCopy = k;
             Yes("with no Steam copy, Vortex's folder is still found", string.Equals(DeploysInto(s.Cfg), k, StringComparison.OrdinalIgnoreCase));
             Yes("but the game is never taken from it", OwnGame.Source(s.Cfg) == "");

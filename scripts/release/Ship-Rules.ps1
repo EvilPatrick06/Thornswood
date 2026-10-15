@@ -495,13 +495,17 @@ function Test-ShipOtherServer([string]$rel) {
     if ($rel -match '^Data\\NirnLabUIPlatform($|\\)') { return $true }
     if ((Split-Path $rel -Leaf) -ieq 'NirnLabUIPlugin.dll') { return $true }
     # Other launchers' parking folders inside our own game folder, Djinn, 25
-    # September. Keizaal's launcher moves the Creation Club archives it turns
+    # September. Another SkyMP server's launcher moves the Creation Club archives it turns
     # off into Data\_disabledByKzl and keeps its own backup and plugin list
     # beside the game; the Daedric server's launcher keeps DaedricData. They
     # came back after a Play and put 2.4 GB of somebody else's files into a dev
     # release. Never shipped, never removed. Anchored, with a boundary.
+    # The backup and the plugin list are matched by their shape, a folder at
+    # the root named <name>-backup-<version> or _<name>-plugins-off, not by
+    # the server's name, which no file here carries (Patrick, 12 October,
+    # #400). Nothing of ours sits at the game's root under either shape.
     if ($rel -match '^Data\\_disabledByKzl($|\\)') { return $true }
-    if ($rel -match '^(_keizaal-plugins-off|DaedricData|keizaal-backup-[^\\]+)($|\\)') { return $true }
+    if ($rel -match '^(DaedricData|_[^\\]+-plugins-off|[^\\]+-backup-[^\\]+)($|\\)') { return $true }
     # See $ShipDeleteAlways below for why this one also has to be DELETED from
     # machines that already have it, and not merely left out of new packs.
     # A loose map.swf. Somebody else left it in the Steam copy, it overrides
@@ -1172,7 +1176,7 @@ function Get-ShipLooseArt($files) {
 #     Unofficial Patch and interior mods' scripts without their plugins, old
 #     MCM Helper scripts that override the collection's newer ones, and
 #     retextures with no mod found.
-#   - Another server's files: Keizaal's kzl_haybale.nif, Daedric Online's
+#   - Another server's files: kzl_haybale.nif, Daedric Online's
 #     TrueHUD boss list (RP_Bosses.ini, "Daedric Online boss health bars" by
 #     its first line; Patrick, 29 September, #1253: it goes).
 #   - Settings a mod or the launcher writes on each machine: ImGui window state,
