@@ -97,7 +97,7 @@ Yes 'the sign step has the same gate and signs -Required' ($sign.Contains($gate)
 Yes '  and does not sign setup-stub.exe (Package signs the finished Setup)' (-not ($sign -match 'setup-stub'))
 Yes 'no step in release.yml reads a secret but the repository token' (-not (($wf -replace '\$\{\{ github\.token \}\}', '') -match 'secrets\.'))
 $build = Get-Step $wf 'Build the launcher into RUNNER_TEMP'
-Yes 'the build uses MSBuild on GitHub''s runner, csc on the VPS (#498)' ($build.Contains("if (`$env:RUNNER_KIND -eq 'github-hosted') { `$with = 'msbuild' }") -and $build.Contains("`$with = 'csc'") -and $build.Contains('-With $with -NoSign'))
+Yes 'the build is MSBuild on either runner, with no -With (#498 switched)' ($build.Contains('Build-Launcher.ps1 -Root $root -NoSign -NoPause') -and $build -notmatch '-With\b' -and $build -notmatch "'csc'")
 $iBuild = $wf.IndexOf('- name: Build the launcher into RUNNER_TEMP')
 $iFetch = $wf.IndexOf('- name: Fetch the signing client')
 $iLogin = $wf.IndexOf('- name: Sign in to Azure')

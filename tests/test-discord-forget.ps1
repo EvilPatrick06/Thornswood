@@ -19,6 +19,7 @@
 param()
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Repo = Split-Path -Parent $Here
@@ -129,7 +130,7 @@ $sources = @(
     (Join-Path $Repo 'launcher\app\Swallow.cs'),
     $driver
 )
-& $csc /nologo /t:exe /out:$exe /r:$core $sources
+& $LauncherCsc /nologo /t:exe /out:$exe /r:$core $sources
 Yes 'Discord.cs compiles with Forget under the C# 5 compiler' ($LASTEXITCODE -eq 0)
 if ($LASTEXITCODE -ne 0) { Done }
 

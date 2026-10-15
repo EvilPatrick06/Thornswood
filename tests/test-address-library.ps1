@@ -42,6 +42,7 @@
 param([string]$ChecksPath, [string]$ShellPath, [string]$UiPath)
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, the repository is one folder up.
@@ -114,7 +115,7 @@ $null = New-Item -ItemType Directory -Force -Path $root
 function Csc([string]$source, [string]$out) {
   $cs = Join-Path $root ('src-' + [Guid]::NewGuid().ToString('N').Substring(0, 8) + '.cs')
   [IO.File]::WriteAllText($cs, $source)
-  $said = & $csc /nologo /target:library ('/out:' + $out) $cs 2>&1 | Out-String
+  $said = & $LauncherCsc /nologo /target:library ('/out:' + $out) $cs 2>&1 | Out-String
   if ($LASTEXITCODE -ne 0) { Write-Host $said; return $false }
   return $true
 }

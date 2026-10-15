@@ -276,8 +276,8 @@ decisions relayed by Smeagle; recorded on #2163). None is pending.
    waits on). The VPS stays the backup for every
    GitHub runner build: release.yml's fallback job runs there the way
    build.yml's does (BUILD_RUNNER = vps, a manual run asking for the box, or
-   the hosted job failing), with the in-box csc and unsigned until the VPS
-   has MSBuild and a signing path (#498), and Ship signs that draft on
+   the hosted job failing), with MSBuild like the hosted job (the VPS has the Build Tools since
+   #498) and unsigned until the VPS has a signing path, and Ship signs that draft on
    download as before (#921). The draft from the hosted job carries the
    signed launcher and a `SHA256SUMS` of the signed files. setup-stub.exe
    stays unsigned on purpose: Package signs the finished Setup after the

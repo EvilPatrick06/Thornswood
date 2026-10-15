@@ -32,6 +32,7 @@
 param()
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Repo = Split-Path -Parent $Here
@@ -81,7 +82,7 @@ namespace Thornswood
     $stubCs = Join-Path $work 'Stubs.cs'
     Set-Content -LiteralPath $stubCs -Value $stub -Encoding ASCII
     $dll = Join-Path $work 'IconsUnderTest.dll'
-    $out = & $csc /nologo /target:library /langversion:5 "/out:$dll" "/resource:$appIco,app.ico" "/resource:$devIco,app-dev.ico" $iconsCs $stubCs 2>&1
+    $out = & $LauncherCsc /nologo /target:library "/langversion:$LauncherLangVersion" "/out:$dll" "/resource:$appIco,app.ico" "/resource:$devIco,app-dev.ico" $iconsCs $stubCs 2>&1
     Yes 'Icons.cs compiles with the launcher''s csc as C# 5' ($LASTEXITCODE -eq 0)
     if ($LASTEXITCODE -ne 0) { $out | ForEach-Object { Write-Host "  $_" }; Done }
 
@@ -176,7 +177,7 @@ namespace Thornswood
     Set-Content -LiteralPath $prog -Value 'static class Program { static void Main() { } }' -Encoding ASCII
     # An exe whose app.ico is the dev art: what a CI-built exe with art other
     # than the checkout's looks like to the install.
-    $out = & $csc /nologo /target:winexe "/out:$(Join-Path $stage 'Thornswood.exe')" "/resource:$devIco,app.ico" $prog 2>&1
+    $out = & $LauncherCsc /nologo /target:winexe "/out:$(Join-Path $stage 'Thornswood.exe')" "/resource:$devIco,app.ico" $prog 2>&1
     Yes 'a stand-in exe carrying other art compiles' ($LASTEXITCODE -eq 0)
     $sroot = Join-Path $work 'scratchroot'
     $ps = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
