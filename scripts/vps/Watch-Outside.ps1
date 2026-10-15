@@ -57,6 +57,15 @@
               az login is also told about, because Ship cannot sign then
               either. Account ThornswoodSigning in westus2, profile
               ThornswoodRelease Active that day. Three runs in a row.
+    offbox    the newest backup Fetch-Backups.ps1 brought down to this machine
+              (local\backups, Where.ps1 Backups) is under 26 hours old, once an
+              hour (#2183). Its age is read from the name the VPS gave it,
+              thornswood-yyyyMMdd-HHmmss, by the box's clock, which is this
+              machine's zone (the 03:15 copy lands here at 04:15). 26 hours is
+              the line Watch-Services.ps1 holds the copy on the box to. Measured
+              15 October: the newest copy here was thornswood-20261013-031501,
+              because the 04:15 fetch had not run on 14 or 15 October, and
+              nothing said so.
     nexus     the Nexus collection still exists, once an hour. Nexus refuses
               a plain page request (403), but its public GraphQL answers a
               stranger: collection "Thornswood", revision 1, that day.
@@ -144,8 +153,12 @@ function Read-Settings([string]$repo, [string]$saved) {
     Repo = 'EvilPatrick06/Thornswood'; RunnerName = 'thornswood-vps'
     SignEndpoint = ''; SignAccount = ''; SignProfile = ''; Identities = @()
     NexusGame = ''; NexusSlug = ''
-    CertDays = 14; DomainDays = 30; Minutes = $(if ($Minutes) { $Minutes } else { 5 })
+    CertDays = 14; DomainDays = 30; OffBoxHours = 26; BackupsFolder = ''; Minutes = $(if ($Minutes) { $Minutes } else { 5 })
   }
+  # Where Fetch-Backups.ps1 puts what it brings down (#2183). Asked once here
+  # and saved by -Install, because the installed copy has no Where.ps1.
+  $whereBk = Join-Path $repo 'scripts\release\Where.ps1'
+  if ($repo -and (Test-Path -LiteralPath $whereBk)) { try { $s.BackupsFolder = [string](& $whereBk Backups) } catch { } }
   $updater = Join-Path $repo 'launcher\app\Updater.cs'
   if ($repo -and (Test-Path -LiteralPath $updater)) {
     $u = Get-Content -LiteralPath $updater -Raw
@@ -499,6 +512,25 @@ function Check-Nexus($S) {
   return (Ok ('"' + $c.name + '", revision ' + $c.latestPublishedRevision.revisionNumber))
 }
 
+# The newest backup brought down to this machine (#2183). By its name, the
+# way Fetch-Backups.ps1 and the box both match them, so nothing put there by
+# hand and no .failed- copy counts. Age from the stamp in the name, not the
+# file's time, which is when it was copied here.
+function Check-OffBox($S) {
+  $folder = '' + $S.BackupsFolder
+  if (-not $folder) { return (Wrong 'no backups folder is known here, so the off-box copy cannot be judged. Run -Install from the repository') }
+  if (-not (Test-Path -LiteralPath $folder -PathType Container)) { return (Wrong ($folder + ' is not there, so there is no copy of the backups off the VPS')) }
+  $line = 26; if ($S.OffBoxHours -and [double]$S.OffBoxHours -gt 0) { $line = [double]$S.OffBoxHours }
+  $mine = @(Get-ChildItem -LiteralPath $folder -File -EA SilentlyContinue |
+            Where-Object { $_.Name -match '^thornswood-\d{8}-\d{6}\.zip(\.enc)?$' } |
+            Sort-Object Name -Descending)
+  if (-not $mine.Count) { return (Wrong ('there is no backup in ' + $folder + ', so there is no copy off the VPS')) }
+  $newest = $mine[0].Name
+  $taken = [datetime]::ParseExact($newest.Substring(11, 15), 'yyyyMMdd-HHmmss', [Globalization.CultureInfo]::InvariantCulture)
+  $age = ((Get-Now) - $taken).TotalHours
+  if ($age -gt $line) { return (Wrong ('the newest copy here is ' + $newest + ', ' + [math]::Floor($age) + ' hours old, and the line is ' + $line)) }
+  return (Ok ($newest + ', ' + [math]::Round($age, 1) + ' hours old'))
+}
 # Everything it watches. Misses is how many runs in a row before it counts,
 # Back how many good runs before it is said to be fixed, Every how often it
 # is asked, in minutes (0 is every run). Say, Fails and Recovers make the
@@ -523,6 +555,8 @@ function Get-Checks($S) {
        Fix = 'With none of them online no pull request gets its Launcher builds check, so nothing can be merged; with some, the checks wait longer. .\scripts\deploy\Install-Runner.ps1 -Status says what the VPS sees of the first, and -Number <n> -Status of the others.' },
     @{ Name = 'signing'; Say = ('Code signing (Azure Artifact Signing, account ' + $S.SignAccount + ')'); Fails = 'is not answering'; Recovers = 'answers again'; Misses = 3; Back = 2; Every = 0
        Fix = 'Until it answers no Ship can sign, dev included.' },
+    @{ Name = 'offbox'; Say = 'The copy of the backups off the VPS, on this machine,'; Fails = 'is out of date'; Recovers = 'is up to date again'; Misses = 1; Back = 1; Every = 60
+       Fix = 'Fetch-Backups.ps1 brings the nightly backup down at 04:15 while this machine is on and signed in. Run .\scripts\vps\Fetch-Backups.ps1 now, and -Schedule again if its task is gone. Until then a VPS lost is everything since that copy lost too.' },
     @{ Name = 'nexus'; Say = 'The Nexus collection'; Fails = 'cannot be reached'; Recovers = 'is reachable again'; Misses = 2; Back = 2; Every = 60
        Fix = 'A new install gets its mods through this collection.' }
   )
@@ -538,6 +572,7 @@ function Invoke-Check($S, $c) {
     'runner'  { return (Check-Runner $S) }
     'signing' { return (Check-Signing $S) }
     'nexus'   { return (Check-Nexus $S) }
+    'offbox'  { return (Check-OffBox $S) }
     default   { return (Check-Feed $S $c.Feed) }
   }
 }
