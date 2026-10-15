@@ -85,3 +85,30 @@ for(const suspended of [undefined,false]) {
   api.shutdown();
 }
 console.log('PASS existing-world roster refuses missing purse state before grants');
+
+for(const boundary of [1,2]) {
+  const box=tradingContext.service({on:true},0,undefined,undefined,{suspended:true});
+  let checks=0,prepares=0;
+  const prepare=box.purses.prepare;
+  box.purses.prepare=function(id){prepares++;return prepare.call(this,id);};
+  box.world.transfer.available=function(){if(++checks===boundary)box.api.shutdown();return true;};
+  assert.throws(()=>box.api.start(),/unavailable/,'availability callback cannot reactivate a stopped trader');
+  assert.match(tradingContext.open(box.api).text,/unavailable/);
+  assert.equal(prepares,0,'revoked trading cannot prepare a merchant purse');
+}
+
+for(const fails of [false,true]) {
+  const mp={makeProperty(){},getIdFromDesc:()=>1};
+  for(const name of ['validateInventoryTransaction','compareAndSetInventory','getInventoryReceipt',
+      'getSavedInventoryReceipt','getNpcAIState','getDescFromId','get'])mp[name]=()=>true;
+  const purses={durable:true,namespace:'dev:teardown-test',read:()=>null,compareAndCommit(){},pendingRecords:()=>[]};
+  let closedAtCancel=false,clears=0,service;
+  service=require('../game/merchant-trading').installMerchantTrading({mp,purses,g:{},catalog:{byRef:{}},suspended:true,
+    timers:{setTimeout:()=>1,clearTimeout(){clears++;closedAtCancel=!service.nativeReady();if(fails)throw Error('cancellation failed');}}});
+  service.start();
+  if(fails)assert.throws(()=>service.shutdown(),/cancellation/);else service.shutdown();
+  assert.equal(closedAtCancel,true,'merchant authority closes before timer cancellation callbacks');
+  assert.equal(service.nativeReady(),false,'timer cancellation failure cannot leave the underlying trader open');
+  assert.throws(()=>service.start(),/unavailable/);
+  service.shutdown();assert.equal(clears,1,'shutdown never retries an uncertain cancellation');
+}

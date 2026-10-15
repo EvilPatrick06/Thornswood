@@ -63915,6 +63915,7 @@ function npcMerchantManifest(data) {
   return Array.from(entries.values());
 }
 function createNpcMerchantPurses(api,data,storage) {
+  const invoke=Reflect.apply;
   if(!storage) throw new Error('A durable merchant ledger is required');
   const retirement=data.merchantRoster!==undefined;
   if(retirement && (!data.merchantRoster || typeof data.merchantRoster!=='object' ||
@@ -63965,19 +63966,33 @@ function createNpcMerchantPurses(api,data,storage) {
   }
   if(retirement && Array.from(references.values()).some(identity=>identity.active && ledger.entries[identity.reference]===null))
     throw new Error('Existing-world roster activation requires every retained saved purse');
-  function prepare(id) {
-    return mutate(()=>prepareState(id));
+  function prepare(id,owner) {
+    return mutate(()=>prepareState(id,owner));
   }
-  function prepareState(id) {
-    assertOwner();
+  function prepareState(id,owner) {
+    let saveAttempted=false;
+    function assertCurrent() {
+      assertOwner();
+      if(owner && !owner()) throw new Error('Merchant preparation caller is revoked');
+    }
+    function call(target,method,...args) {
+      assertCurrent();
+      const fn=target[method];
+      assertCurrent();
+      if(target===storage && method==='save') saveAttempted=true;
+      const result=invoke(fn,target,args);
+      assertCurrent();
+      return result;
+    }
+    assertCurrent();
     const identity=catalogue.get(id);
     if(!identity) return null;
     // Retired identities remain private ledger records, never live traders.
     if(!identity.active) return null;
-    const actor=api.getNpcAIState(id);
+    const actor=call(api,'getNpcAIState',id);
     if(!actor || actor.isHuman || actor.profileId>0) throw new Error('A human cannot receive an NPC merchant purse');
-    if(api.get(id,'baseDesc')!==identity.base) throw new Error('Merchant base does not match its authored reference');
-    const projection=api.get(id,property);
+    if(call(api,'get',id,'baseDesc')!==identity.base) throw new Error('Merchant base does not match its authored reference');
+    const projection=call(api,'get',id,property);
     if(projection!==undefined && projection!==null && !valid(projection,identity))
       throw new Error('Saved merchant state cannot be verified');
     let state=ledger.entries[identity.reference];
@@ -63988,19 +64003,19 @@ function createNpcMerchantPurses(api,data,storage) {
       next.entries[identity.reference]=state;
       // Initialization and balance commit together before the native mirror.
       try {
-        assertOwner();
-        const acknowledgement=storage.save(next);
+        assertCurrent();
+        const acknowledgement=call(storage,'save',next);
         if(storage.durable===true && acknowledgement!==true) throw new Error('Durable merchant save acknowledgement is missing');
-      } catch(error) {active=false;throw error;}
-      assertOwner();
-      ledger=next;
-      initialized++;
+        assertCurrent();
+        ledger=next;
+        initialized++;
+      } catch(error) {if(saveAttempted) active=false;throw error;}
     }
     // Native saves are asynchronous. A lost or older mirror uses the ledger's
     // current balance, including zero; it never creates another grant.
-    assertOwner();
-    if(JSON.stringify(projection)!==JSON.stringify(state)) api.set(id,property,JSON.parse(JSON.stringify(state)));
-    assertOwner();
+    assertCurrent();
+    if(JSON.stringify(projection)!==JSON.stringify(state)) call(api,'set',id,property,JSON.parse(JSON.stringify(state)));
+    assertCurrent();
     verified.add(id);
     return JSON.parse(JSON.stringify(state));
   }
@@ -64072,11 +64087,12 @@ function createNpcMerchantPurses(api,data,storage) {
 
 // NPC POPULATION POLICY BEGIN
 function createNpcPopulation(api,data,plugins,merchants,options) {
+  const invoke=Reflect.apply;
   if(data.version!==1 || JSON.stringify(data.plugins)!==JSON.stringify(plugins))
     throw new Error('NPC population catalogue does not match the installed load order');
   const allowed=new Map(),byBase=new Map(),configured=new Map(),counts=new Map();
-  const resolve=desc=>{
-    const id=api.getIdFromDesc(desc);
+  const resolve=(desc,call)=>{
+    const id=typeof call==='function' ? call('getIdFromDesc',desc) : api.getIdFromDesc(desc);
     if(!Number.isInteger(id) || id<=0) throw new Error('Unresolved NPC catalogue identity: '+desc);
     return id;
   };
@@ -64109,23 +64125,44 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
     return true;
   }
   if(!options || options.suspended!==true) commit();
-  function configure(id,state) {
+  // A population can outlive one caller. Fence that caller without revoking
+  // the shared population or purse service used by its successor.
+  function whileCurrent(owner,fallback,work) {
+    const revoked={};
+    const current=()=>committed && !closed && (!owner || owner());
+    function check() {if(!current()) throw revoked;}
+    function call(method,...args) {
+      check();
+      const fn=api[method];
+      check();
+      const result=invoke(fn,api,args);
+      check();
+      return result;
+    }
+    if(!current()) return fallback;
+    try {const result=work(call,current);return current() ? result : fallback;}
+    catch(error) {if(error===revoked || !current()) return fallback;throw error;}
+  }
+  function configure(id,state,owner) {
+    return whileCurrent(owner,null,(call)=>configureCurrent(id,state,call));
+  }
+  function configureCurrent(id,state,call) {
     if(!committed || closed) return null;
     if(state.isHuman) return null;
     if(configured.has(id)) return configured.get(id).policy;
     let rule=allowed.get(id),home;
     if(!rule && id>=0xff000000) {
-      const base=resolve(api.get(id,'baseDesc'));
-      const saved=api.get(id,'thornswoodNpcHome');
+      const base=resolve(call('get',id,'baseDesc'),call);
+      const saved=call('get',id,'thornswoodNpcHome');
       const validHome=saved && Number.isInteger(saved.cell) && Array.isArray(saved.home) &&
         saved.home.length===3 && saved.home.every(Number.isFinite);
       const anchor=validHome ? saved.home : state.pos,cell=validHome ? saved.cell : state.cellOrWorld;
-      const commanded=api.get(id,'thornswoodNpcCommanded')===true;
+      const commanded=call('get',id,'thornswoodNpcCommanded')===true;
       if(commanded && Number.isInteger(cell) && cell>0 && Array.isArray(anchor) &&
           anchor.length===3 && anchor.every(Number.isFinite)) {
         // Only trusted spawn commands set this private marker. They keep
         // authority and a saved home without joining a natural habitat cap.
-        rule={cell,commanded:true,row:[null,base,api.getDescFromId(cell),anchor,1024,45,null,null,0]};
+        rule={cell,commanded:true,row:[null,base,call('getDescFromId',cell),anchor,1024,45,null,null,0]};
       } else if(!commanded) rule=(byBase.get(base)||[]).filter(r=>r.cell===cell &&
         (!saved || !saved.source || saved.source===r.row[0]) &&
         Math.hypot(...r.row[3].map((v,j)=>v-anchor[j]))<=r.row[4])
@@ -64135,26 +64172,26 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
       if(closed) return null;
       if(rule) {
         home=validHome ? saved.home.slice() : state.pos.slice();
-        api.set(id,'thornswoodNpcHome',{home,cell:rule.cell,source:rule.commanded ? 'command' : rule.row[0]});
+        call('set',id,'thornswoodNpcHome',{home,cell:rule.cell,source:rule.commanded ? 'command' : rule.row[0]});
         if(closed) return null;
-        api.set(id,'spawnPoint',{cellOrWorldDesc:rule.row[2],pos:home,rot:[0,0,0]});
+        call('set',id,'spawnPoint',{cellOrWorldDesc:rule.row[2],pos:home,rot:[0,0,0]});
         if(closed) return null;
       }
     }
     if(!rule) {
       // Native placement exclusions handle authored references. Dynamic NPCs
       // must also pass a species, habitat and shared density check.
-      if(id>=0xff000000) {api.set(id,'isDisabled',true);}
+      if(id>=0xff000000) {call('set',id,'isDisabled',true);}
       return null;
     }
     if(rule.row[13]) {
-      const desc=api.getDescFromId(id);
+      const desc=call('getDescFromId',id);
       if(closed) return null;
-      api.callPapyrusFunction('method','ObjectReference','SetDisplayName',
+      call('callPapyrusFunction','method','ObjectReference','SetDisplayName',
         {type:'form',desc},[rule.row[13],true]);
       if(closed) return null;
     }
-    api.set(id,'spawnDelay',rule.row[5]*60);
+    call('set',id,'spawnDelay',rule.row[5]*60);
     if(closed) return null;
     // row[11]: 1 the race swims and cannot walk, 2 an ambush placement (#2067).
     const flags=rule.row[11] || 0;
@@ -64166,12 +64203,14 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
     configured.set(id,{policy,rule});
     return policy;
   }
-  function afterOwnership(id) {
-    if(!committed || closed) return;
-    const entry=configured.get(id);
-    if(entry && api.setNpcDifficultyTier) api.setNpcDifficultyTier(id,entry.rule.row[8] || 0);
-    if(closed) return;
-    if(entry && merchants) merchants.prepare(id);
+  function afterOwnership(id,owner) {
+    return whileCurrent(owner,undefined,(call,current)=>{
+      if(!committed || closed) return;
+      const entry=configured.get(id);
+      if(entry && api.setNpcDifficultyTier) call('setNpcDifficultyTier',id,entry.rule.row[8] || 0);
+      if(closed) return;
+      if(entry && merchants) merchants.prepare(id,current);
+    });
   }
   function release(id) {
     const entry=configured.get(id);
@@ -64183,13 +64222,12 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
   return {configure,afterOwnership,release,commit,stop:()=>{closed=true;},merchantStats:()=>merchants && merchants.stats(),reconcile:ids=>{
     const live=new Set(ids);
     for(const id of configured.keys()) if(id>=0xff000000 && !live.has(id)) release(id);
-  },admit:(id,state)=>{
-    if(!configure(id,state) || closed) return false;
-    api.setNpcServerControlled(id,true);
-    if(closed) return false;
-    afterOwnership(id);
-    return !closed;
-  },returnMinutes:id=>{
+  },admit:(id,state,owner)=>whileCurrent(owner,false,(call,current)=>{
+    if(!configure(id,state,current)) return false;
+    call('setNpcServerControlled',id,true);
+    afterOwnership(id,current);
+    return current();
+  }),returnMinutes:id=>{
     const entry=configured.get(id),rule=entry ? entry.rule : allowed.get(id);
     return rule && rule.row[5];
   }};
@@ -64748,11 +64786,15 @@ function createNpcNavigation(api, now, report, ready) {
     meshes:sharedMeshes,cellTiles,tiles,slots,version:()=>geometryVersion};
 }
 function startSharedNpcServerRuntime(api, timers, now, report, population, options) {
+  const invoke=Reflect.apply;
   const property = 'thornswoodNpcActivity';
   api.makeProperty(property, {isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
   const handles = new Set(), actors = new Map(), order = [], preparing = [], owned = new Set(), unavailable = new Set();
   const reactions = new Map(), knownFactions = new Set();
-  const navigation = createNpcNavigation(api, now, report, bank => {preparing.push(...bank.waiting);bank.waiting=[];});
+  const navigation = createNpcNavigation({
+    getNavmeshRecords:(...args)=>nativeCall('getNavmeshRecords',...args),
+    lookupEspmRecordById:(...args)=>nativeCall('lookupEspmRecordById',...args)
+  }, now, report, bank => {preparing.push(...bank.waiting);bank.waiting=[];});
   const {banks, ensureBank, locate, search} = navigation;
   const npcTiles = new Map();
   const enrolled = new Set(), excluded = new Set(), policies = new Map();
@@ -64775,13 +64817,29 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     try {handle = timers.setTimeout(callback,delay);} catch(error) {stop();throw error;}
     handles.add(handle);
   }
-  function stop() { stopped=true;ready.length=0;for(const h of handles) timers.clearTimeout(h);handles.clear(); }
+  function stop() {
+    stopped=true;ready.length=0;
+    const ownedHandles=Array.from(handles);
+    handles.clear();
+    const errors=[];
+    for(const h of ownedHandles) {try {timers.clearTimeout(h);} catch(error) {errors.push(error);}}
+    if(errors.length) throw errors[0];
+  }
   function start() {
     if(stopped) throw new Error('NPC runtime activation is revoked');
     if(running) return true;
     running=true;
     while(ready.length && !stopped) ready.shift()();
     return !stopped;
+  }
+  function nativeCall(method,...args) {
+    if(stopped) throw new Error('NPC runtime activation is revoked');
+    const fn=api[method];
+    if(stopped) throw new Error('NPC runtime activation is revoked');
+    const result=invoke(fn,api,args);
+    // A native callback may replace this runtime before returning.
+    if(stopped) throw new Error('NPC runtime activation is revoked');
+    return result;
   }
   const distance=(a,b)=>Math.hypot(...a.map((v,i)=>v-b[i]));
   const tile=(cell,p)=>cell+':'+Math.floor(p[0]/512)+':'+Math.floor(p[1]/512);
@@ -64798,7 +64856,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     s.factions=(s.factions || []).filter(f=>Number.isInteger(f.id) && f.rank>=0);
     const missing=s.factions.map(f=>f.id).filter(id=>!knownFactions.has(id));
     for (let i=0;i<missing.length;i+=128) {
-      for(const r of api.getFactionReactions(missing.slice(i,i+128))) {
+      for(const r of nativeCall('getFactionReactions',missing.slice(i,i+128))) {
         if (r.reaction>=0 && r.reaction<=3) reactions.set(r.source+':'+r.target,r.reaction);
       }
     }
@@ -64882,7 +64940,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
       path:[],dwell:0,last:now(),sequence:saved && Number.isInteger(saved.sequence) ? saved.sequence : id%997,
       mode:'ambient',target:0,lastSaved:now(),policy:policies.get(id)};
     actors.set(id,a);order.push(id);indexActor(a);
-    api.set(id,property,{version:2,sequence:a.sequence,mode:'ambient',cell:a.cell});
+    nativeCall('set',id,property,{version:2,sequence:a.sequence,mode:'ambient',cell:a.cell});
   }
   // Runs right after humanTick has read where everybody is.
   function settleHeld() {
@@ -64896,7 +64954,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
       try {
         if(h.ambush) emerge(h);
         else {
-          api.set(id,'locationalData',{cellOrWorldDesc:api.getDescFromId(h.state.cellOrWorld),
+          nativeCall('set',id,'locationalData',{cellOrWorldDesc:nativeCall('getDescFromId',h.state.cellOrWorld),
             pos:h.near.pos.slice(),rot:h.state.rot.slice()});
           preparing.push(id);
         }
@@ -64908,10 +64966,12 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     schedule(meshTick,2);
   }
   function reject(id,error) {
+    if(stopped) return;
     unavailable.add(id);failed=unavailable.size;
     // Navigation failure pauses activity, never hands a placed NPC to a client.
     // Native authority validation still rejects human identities and profiles.
-    try {api.setNpcServerControlled(id,true);owned.add(id);api.stopNpcMovement(id);} catch(e) {}
+    try {nativeCall('setNpcServerControlled',id,true);owned.add(id);nativeCall('stopNpcMovement',id);} catch(e) {}
+    if(stopped) return;
     report('NPC '+id.toString(16)+' remains loaded; activity unavailable: '+error);
   }
   function prepareTick() {
@@ -64919,10 +64979,10 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     for(let i=0;i<4 && preparing.length && now()-begin<4;i++) {
       const entry=preparing.shift(),id=typeof entry==='number' ? entry : entry.id;
       try {
-        const state=factionData(api.getNpcAIState(id));
+        const state=factionData(nativeCall('getNpcAIState',id));
         if(!validState(state) || state.isHuman) throw new Error('Invalid NPC state');
         if(population && !policies.has(id)) {
-          const policy=population.configure(id,state);
+          const policy=population.configure(id,state,()=>!stopped);
           if(!policy) {excluded.add(id);continue;}
           if(!Array.isArray(policy.home) || policy.home.length!==3 || !policy.home.every(Number.isFinite) ||
               !Number.isInteger(policy.cell) || !Number.isFinite(policy.leash) || policy.leash<=0)
@@ -64930,11 +64990,11 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
           policies.set(id,policy);
         }
         if(!owned.has(id)) {
-          api.setNpcServerControlled(id,true);
-          if(population && population.afterOwnership) population.afterOwnership(id);
+          nativeCall('setNpcServerControlled',id,true);
+          if(population && population.afterOwnership) population.afterOwnership(id,()=>!stopped);
           owned.add(id);
         }
-        const saved=api.get(id,property);
+        const saved=nativeCall('get',id,property);
         swimming(state,policies.get(id));
         const bank=ensureBank(state.cellOrWorld,state.pos);
         if(!bank.ready) { bank.waiting.push({id,state,saved}); continue; }
@@ -64948,14 +65008,14 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
           path:[],dwell:0,last:now(),sequence:saved && Number.isInteger(saved.sequence) ? saved.sequence : id%997,
           mode:'ambient',target:0,lastSaved:now(),policy:policies.get(id)};
         actors.set(id,a);order.push(id);indexActor(a);
-        api.set(id,property,{version:2,sequence:a.sequence,mode:'ambient',cell:a.cell});
+        nativeCall('set',id,property,{version:2,sequence:a.sequence,mode:'ambient',cell:a.cell});
       } catch(e) { reject(id,e); }
     }
     schedule(prepareTick,10);
   }
   function preload() {
     try {
-      const batch=api.loadNpcBatch(cursor,1);
+      const batch=nativeCall('loadNpcBatch',cursor,1);
       if(!Number.isInteger(batch.nextCursor) || batch.nextCursor<cursor || batch.nextCursor>batch.total ||
           (batch.nextCursor===cursor && cursor!==batch.total)) throw new Error('Invalid NPC loading cursor');
       cursor=batch.nextCursor;total=batch.total;loaded+=batch.actorIds.length;
@@ -64971,7 +65031,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
   function discover() {
     try {
       if(api.getLoadedNpcIds) {
-        const ids=api.getLoadedNpcIds();
+        const ids=nativeCall('getLoadedNpcIds');
         if(population.reconcile) population.reconcile(ids);
         for(const id of ids) enroll(id);
       }
@@ -64992,8 +65052,8 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     const next=new Map();
     let everybody=true;
     try {
-      for(const id of api.get(0,'onlinePlayers') || []) {
-        try { const s=factionData(api.getNpcAIState(id)); if(validState(s) && !s.isDead && !s.isDisabled) next.set(id,s); }
+      for(const id of nativeCall('get',0,'onlinePlayers') || []) {
+        try { const s=factionData(nativeCall('getNpcAIState',id)); if(validState(s) && !s.isDead && !s.isDisabled) next.set(id,s); }
         catch(e) { everybody=false;report('NPC observer state unavailable for '+id.toString(16)); }
       }
     } catch(e) { everybody=false;report('NPC observer list unavailable: '+e); }
@@ -65079,16 +65139,16 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
   }
   function update(a) {
     const at=now(),elapsed=Math.min(4000,Math.max(0,at-a.last));a.last=at;
-    const s=swimming(factionData(api.getNpcAIState(a.id)),a.policy);
+    const s=swimming(factionData(nativeCall('getNpcAIState',a.id)),a.policy);
     if(!validState(s)) throw new Error('Invalid live state');
     a.state=s;
     if(s.isDead || s.isDisabled || s.immobile) {
-      if(!a.paused) api.stopNpcMovement(a.id);
+      if(!a.paused) nativeCall('stopNpcMovement',a.id);
       a.paused=true;a.path=[];a.target=0;return;
     }
     a.paused=false;
     if(!withinHome(a,s.pos,s.cellOrWorld)) {
-      api.stopNpcMovement(a.id);a.paused=true;a.path=[];a.target=0;return;
+      nativeCall('stopNpcMovement',a.id);a.paused=true;a.path=[];a.target=0;return;
     }
     if(a.approach) {
       // An ambush stepping out of its alcove onto the floor beside it, in a
@@ -65097,7 +65157,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
       const from=s.pos.slice(),d=distance(from,a.approach),step=Math.min(d,60*elapsed/1000);
       const pos=d>0.001 ? from.map((v,j)=>v+(a.approach[j]-v)*step/d) : a.approach.slice();
       const delta=pos.map((v,j)=>v-from[j]);
-      api.updateNpcMovement(a.id,pos,step>0 ? [0,0,Math.atan2(delta[0],delta[1])*180/Math.PI] : s.rot,step>0 ? 60 : 0);
+      nativeCall('updateNpcMovement',a.id,pos,step>0 ? [0,0,Math.atan2(delta[0],delta[1])*180/Math.PI] : s.rot,step>0 ? 60 : 0);
       if(step>0) moved++;
       a.pos=pos;
       if(step>=d) a.approach=null;
@@ -65143,7 +65203,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
         distance(a.pos,targetState.pos)>4096 || !withinHome(a,targetState.pos))) {target=0;targetState=null;}
     if(targetState) {
       try {
-        const live=api.getNpcAIState(target);
+        const live=nativeCall('getNpcAIState',target);
         if(!validState(live) || live.isDead || live.isDisabled || (live.isHuman && !live.isConnected) || live.cellOrWorld!==a.cell ||
             distance(a.pos,live.pos)>4096 || !withinHome(a,live.pos)) {target=0;targetState=null;}
         else if(!retaliation && !hostile(s,factionData(live))) {target=0;targetState=null;}
@@ -65189,7 +65249,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
           while(ahead.length && distance(a.pos,aim(ahead[0]))<0.01) ahead.shift();
           if(!ahead.length || a.node===tn && distance(a.pos,targetState.pos)<=attackDistance) {
             a.path=[];
-            if(api.serverNpcAttack(a.id,target)) attacks++;
+            if(nativeCall('serverNpcAttack',a.id,target)) attacks++;
           } else a.path=ahead;
         }
       } else {target=0;targetState=null;}
@@ -65219,11 +65279,11 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     }
     const delta=pos.map((v,j)=>v-a.pos[j]);
     const rot=speed ? [0,0,Math.atan2(delta[0],delta[1])*180/Math.PI] : s.rot;
-    api.updateNpcMovement(a.id,pos,rot,speed);
+    nativeCall('updateNpcMovement',a.id,pos,rot,speed);
     if(speed) moved++;
     a.pos=pos;a.node=node;indexActor(a);
     if(at-a.lastSaved>=30000) {
-      api.set(a.id,property,{version:2,sequence:a.sequence,mode:a.mode,cell:a.cell});a.lastSaved=at;
+      nativeCall('set',a.id,property,{version:2,sequence:a.sequence,mode:a.mode,cell:a.cell});a.lastSaved=at;
     }
   }
   function step(id) {
@@ -66724,9 +66784,9 @@ function createMerchantTrading(deps) {
       return !closed && ready;
     },
     start: function () {
-      if(closed || !settlement.available()) throw new Error('Trading is unavailable.');
+      if(!settlement.available() || closed) throw new Error('Trading is unavailable.');
       if(retirementRequired && !settlement.canRetire()) throw new Error('Legacy work blocks roster activation.');
-      if(closed || !settlement.available()) throw new Error('Trading is unavailable.');
+      if(!settlement.available() || closed) throw new Error('Trading is unavailable.');
       active=true;
       return true;
     },
@@ -66878,7 +66938,14 @@ function installMerchantTrading(env) {
   var timers=env.timers || (typeof setTimeout === 'function' && typeof clearTimeout === 'function' ? {setTimeout:setTimeout,clearTimeout:clearTimeout} : null);
   var alive=true, timer=null, started=false;
   var stop=trading.shutdown;
-  trading.shutdown=function () {alive=false; if(timer!==null && timers) timers.clearTimeout(timer);timer=null;stop();};
+  trading.shutdown=function () {
+    alive=false;
+    var ownedTimer=timer;
+    timer=null;
+    // Revoke authority before cancellation can call back or throw.
+    try {stop();}
+    finally {if(ownedTimer!==null && timers) timers.clearTimeout(ownedTimer);}
+  };
   function scheduleAdvance() {
     if(!alive || !timers || timer!==null) return;
     try {
@@ -66947,13 +67014,24 @@ function cleanup(key,value,method) {
   if(globalThis[key]===value) globalThis[key]=null;
 }
 try {
-  for(const [key,method] of [['__thornswoodMerchantTrade','shutdown'],['__thornswoodNpcRuntime','stop'],
-      ['__thornswoodNpcPopulation','stop'],['__thornswoodNpcMerchants','shutdown']]) {
-    const prior=globalThis[key];
-    if(prior && typeof prior[method]==='function') prior[method]();
-    current();
-    if(globalThis[key]===prior) globalThis[key]=null;
+  const teardownErrors=[];
+  const priorControllers=[['__thornswoodMerchantTrade','shutdown'],['__thornswoodNpcRuntime','stop'],
+    ['__thornswoodNpcPopulation','stop'],['__thornswoodNpcMerchants','shutdown']]
+    .map(([key,method])=>[key,method,globalThis[key]]);
+  current();
+  for(const [key,method,prior] of priorControllers) {
+    try {if(prior && typeof prior[method]==='function') prior[method]();}
+    catch(error) {teardownErrors.push(error);}
+    // Finish every captured controller even if a callback starts a successor.
+    // Only the current startup may clear its global slots.
+    if(globalThis.__thornswoodNpcStartupOwner===owner && globalThis[key]===prior) globalThis[key]=null;
   }
+  current();
+  for(const [key] of priorControllers) {
+    if(globalThis[key]!==null && globalThis[key]!==undefined)
+      teardownErrors.push(new Error('NPC startup controller was replaced during teardown'));
+  }
+  if(teardownErrors.length) throw teardownErrors[0];
   const cfgNpc = mp.getServerSettings();
   current();
   if (/^(main|dev)$/i.test(String(cfgNpc.thornswoodServer || 'main'))) {
