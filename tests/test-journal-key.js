@@ -258,6 +258,9 @@ function rig(opts) {
     // The same key's check in the inventory (#1384). No inventory is open
     // here, so it passes every key on as well.
     "function repairPress() { return false; }\n" +
+    // The same key at a forge with a stamped mold, the master key (#2254).
+    // No forge is looked at here; test-1637-door-gui.js has the press.
+    'function masterPress() { return false; }\n' +
     'function lockPress() { return false; }\n' +
     // Tend their wounds (#1383), X on a hurt person, and Tend your wounds,
     // H in the inventory. Nobody is looked at and no inventory is open

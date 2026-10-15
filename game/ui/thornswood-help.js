@@ -128,7 +128,11 @@
         'To let somebody sleep in a building you hold, look at them inside it and press ' +
           k.mold + '.',
         'A blank key mold goes into a door\'s lock on ' + k.mold + ', and a smith carrying ' +
-          'that mold cuts a key at a forge with ' + k.lock + '.'
+          'that mold cuts a key at a forge with ' + k.lock + '.',
+        'Claiming a building hands you its master key with the deed. Whoever carries it gets ' +
+          'in and locks or unlocks the door, for as long as you hold the place, so the deed ' +
+          'can stay in a chest. A lost one is cut again at a forge from the mold, with ' +
+          k.mold + ', for 2 iron ingots, with you standing there.'
       ];
     } },
     { id: 'help', title: 'Getting help', text: function (k) {

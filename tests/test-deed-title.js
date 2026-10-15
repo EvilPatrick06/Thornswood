@@ -54,12 +54,14 @@ const HOUSE = 'breezehome';
 function press(opts) {
   const said = [];
   const logs = [];
+  const issued = [];
   const claims = {};
   if (opts.held) { claims[HOUSE] = opts.held; }
 
   const fn = new Function(
     'mine', 'actorId', 'building', 'held', 'claims', 'holdsDeed', 'holderOf',
     'nameOf', 'groundHere', 'save', 'pushAll', 'plog', 'notify', 'say', 'mp', 'mayHold',
+    'issueMaster', 'masterHandedLine',
     block + '\nreturn { moved: false, claims: claims };');
 
   const out = fn(
@@ -73,9 +75,18 @@ function press(opts) {
     function (id, m) { said.push(m); },
     function (id, m) { said.push(m); },
     { get: function () { return { name: opts.who || 'Somebody' }; } },
-    function () { return opts.mayHold !== false; });
+    function () { return opts.mayHold !== false; },
+    // The master key (#2254): the new holder is handed their own. 0 is a
+    // server whose plugin has no master key record yet.
+    function (to, b, held) {
+      issued.push({ to: to, b: b, held: held });
+      if (!opts.master) { return 0; }
+      held.master = { for: held.by, no: opts.master };
+      return opts.master;
+    },
+    function () { return 'Its master key is in your pack.'; });
 
-  return { claim: claims[HOUSE], said: said, logs: logs };
+  return { claim: claims[HOUSE], said: said, logs: logs, issued: issued };
 }
 
 if (block !== null) {
@@ -102,6 +113,21 @@ if (block !== null) {
     const r = press({ mine: BOB, who: 'Bob', hasDeed: true, held: alicesHouse, mayHold: false });
     yes('S1j a jail\'s deed presented by somebody who may not hold it takes nothing',
         r.claim && r.claim.by === ALICE && r.said.length === 0);
+  }
+
+  // S1b (#2254): the new holder is handed a master key of their own, and the
+  //     claim is a new record, so Alice's master key names nothing now.
+  {
+    const old = { by: ALICE, name: 'Alice', at: 1, touched: 1, locked: true,
+                  ground: 'the field', master: { for: ALICE, no: 4 } };
+    const r = press({ mine: BOB, who: 'Bob', hasDeed: true, held: old, master: 9 });
+    yes('S1b the master key is cut for the new holder, on the new claim',
+        r.issued.length === 1 && r.issued[0].held === r.claim && r.claim.master &&
+        r.claim.master.for === BOB && r.claim.master.no === 9);
+    yes('S1b and they are told it is in their pack', /master key is in your pack/.test(r.said[0]));
+    const none = press({ mine: BOB, who: 'Bob', hasDeed: true, held: old, master: 0 });
+    yes('S1b with no master key record on the server, the deed still takes the house and no master is named',
+        none.claim.by === BOB && !none.claim.master && !/master key/.test(none.said[0]));
   }
 
   // S2: THE LOCK SURVIVES THE TRANSFER. A house that was locked stays locked,
