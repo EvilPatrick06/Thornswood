@@ -84,3 +84,33 @@ for(const method of ['getNpcAIState','get','save','set']) for(const boundary of 
   }
 }
 console.log('PASS scoped merchant preparation at native lookup, return and durable-save boundaries');
+
+{
+  let current=true,armed=false,saves=0;
+  let document={version:1,entries:{'1:Skyrim.esm':null}};
+  const native={makeProperty(){},getIdFromDesc:d=>ids[d],getNpcAIState:()=>({isHuman:false,profileId:-1}),
+    get:(_id,key)=>key==='baseDesc'?'a:Skyrim.esm':null,set(){}};
+  const disk={namespace:{},load:()=>JSON.parse(JSON.stringify(document)),
+    save(next){saves++;document=JSON.parse(JSON.stringify(next));return true;},
+    get durable(){if(armed)current=false;return true;}};
+  const purse=ctx.createNpcMerchantPurses(native,data,disk);armed=true;
+  assert.throws(()=>purse.prepare(1,()=>current),/revoked/);
+  assert.throws(()=>purse.read(1),/unavailable/,'post-save cancellation must revoke the stale writer');
+  assert.throws(()=>purse.prepare(1),/unavailable/);
+  assert.equal(saves,1,'a stale writer cannot initialize twice');
+  armed=false;current=true;
+  const successor=ctx.createNpcMerchantPurses(native,data,disk);
+  assert.equal(successor.prepare(1).purse,250);
+  assert.equal(saves,1,'a successor reads the committed purse without another grant');
+}
+{
+  let reads=0,saves=0;
+  const save=function(){assert.equal(this,disk);saves++;return true;};
+  Object.defineProperty(save,'apply',{get(){reads++;throw Error('untrusted apply getter');}});
+  const disk={namespace:{},durable:true,load:()=>({version:1,entries:{'1:Skyrim.esm':null}}),save};
+  const native={makeProperty(){},getIdFromDesc:d=>ids[d],getNpcAIState:()=>({isHuman:false,profileId:-1}),
+    get:(_id,key)=>key==='baseDesc'?'a:Skyrim.esm':null,set(){}};
+  const purse=ctx.createNpcMerchantPurses(native,data,disk);
+  assert.equal(purse.prepare(1).purse,250,'dispatch cannot consult the supplied function apply property');
+  assert.equal(reads,0);assert.equal(saves,1);
+}

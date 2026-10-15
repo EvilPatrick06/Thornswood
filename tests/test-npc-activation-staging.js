@@ -156,3 +156,31 @@ for(const merchant of [false,true]) {
   assert.equal(new Set(cleared).size,serial);
   assert.equal(pending.size,0);
 }
+
+{
+  let reads=0,writes=0;const policyData=JSON.parse(JSON.stringify(data));
+  const native={makeProperty(){},getIdFromDesc:d=>parseInt(d,16),setNpcPlacementExclusions(){},set(){},
+    setNpcServerControlled(){assert.equal(this,native);writes++;},
+    setNpcDifficultyTier(){assert.equal(this,native);writes++;}};
+  for(const method of ['set','setNpcServerControlled','setNpcDifficultyTier'])
+    Object.defineProperty(native[method],'apply',{get(){reads++;throw Error('untrusted apply getter');}});
+  const policy=ctx.createNpcPopulation(native,policyData,data.plugins,null);
+  assert.equal(policy.admit(1,{isHuman:false,pos:[10,20,30],cellOrWorld:60}),true);
+  assert.equal(reads,0);assert.equal(writes,2);
+}
+
+{
+  let serial=0,reads=0;const seen=new Set();const pending=new Map();
+  const timers={setTimeout(fn){pending.set(++serial,fn);return serial;},clearTimeout(id){pending.delete(id);}};
+  const native={makeProperty(){},getNpcAIState(){assert.equal(this,native);seen.add('state');
+      return {isHuman:false,cellOrWorld:60,pos:[0,0,0],rot:[0,0,0],
+        aggression:0,confidence:1,meleeReach:1,meleeAllowance:16,factions:[]};},
+    setNpcServerControlled(){assert.equal(this,native);seen.add('ownership');},get(){assert.equal(this,native);seen.add('read');return null;}};
+  for(const method of ['getNpcAIState','setNpcServerControlled','get'])
+    Object.defineProperty(native[method],'apply',{get(){reads++;throw Error('untrusted apply getter');}});
+  const runtime=ctx.startSharedNpcServerRuntime(native,timers,()=>0,()=>{},null,{suspended:true});runtime.enroll(1);
+  const [handle,callback]=Array.from(pending).find(([,fn])=>fn.npcRuntimeTask==='prepareTick');
+  pending.delete(handle);callback();assert.equal(runtime.start(),true);
+  assert.equal(reads,0);assert.deepEqual(Array.from(seen).sort(),['ownership','read','state'],'runtime invokes the real natives with their original receiver');
+  runtime.stop();assert.equal(pending.size,0);
+}

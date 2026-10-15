@@ -63915,6 +63915,7 @@ function npcMerchantManifest(data) {
   return Array.from(entries.values());
 }
 function createNpcMerchantPurses(api,data,storage) {
+  const invoke=Reflect.apply;
   if(!storage) throw new Error('A durable merchant ledger is required');
   const retirement=data.merchantRoster!==undefined;
   if(retirement && (!data.merchantRoster || typeof data.merchantRoster!=='object' ||
@@ -63979,7 +63980,7 @@ function createNpcMerchantPurses(api,data,storage) {
       const fn=target[method];
       assertCurrent();
       if(target===storage && method==='save') saveAttempted=true;
-      const result=fn.apply(target,args);
+      const result=invoke(fn,target,args);
       assertCurrent();
       return result;
     }
@@ -64005,10 +64006,10 @@ function createNpcMerchantPurses(api,data,storage) {
         assertCurrent();
         const acknowledgement=call(storage,'save',next);
         if(storage.durable===true && acknowledgement!==true) throw new Error('Durable merchant save acknowledgement is missing');
+        assertCurrent();
+        ledger=next;
+        initialized++;
       } catch(error) {if(saveAttempted) active=false;throw error;}
-      assertCurrent();
-      ledger=next;
-      initialized++;
     }
     // Native saves are asynchronous. A lost or older mirror uses the ledger's
     // current balance, including zero; it never creates another grant.
@@ -64086,6 +64087,7 @@ function createNpcMerchantPurses(api,data,storage) {
 
 // NPC POPULATION POLICY BEGIN
 function createNpcPopulation(api,data,plugins,merchants,options) {
+  const invoke=Reflect.apply;
   if(data.version!==1 || JSON.stringify(data.plugins)!==JSON.stringify(plugins))
     throw new Error('NPC population catalogue does not match the installed load order');
   const allowed=new Map(),byBase=new Map(),configured=new Map(),counts=new Map();
@@ -64133,7 +64135,7 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
       check();
       const fn=api[method];
       check();
-      const result=fn.apply(api,args);
+      const result=invoke(fn,api,args);
       check();
       return result;
     }
@@ -64784,6 +64786,7 @@ function createNpcNavigation(api, now, report, ready) {
     meshes:sharedMeshes,cellTiles,tiles,slots,version:()=>geometryVersion};
 }
 function startSharedNpcServerRuntime(api, timers, now, report, population, options) {
+  const invoke=Reflect.apply;
   const property = 'thornswoodNpcActivity';
   api.makeProperty(property, {isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
   const handles = new Set(), actors = new Map(), order = [], preparing = [], owned = new Set(), unavailable = new Set();
@@ -64833,7 +64836,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     if(stopped) throw new Error('NPC runtime activation is revoked');
     const fn=api[method];
     if(stopped) throw new Error('NPC runtime activation is revoked');
-    const result=fn.apply(api,args);
+    const result=invoke(fn,api,args);
     // A native callback may replace this runtime before returning.
     if(stopped) throw new Error('NPC runtime activation is revoked');
     return result;
