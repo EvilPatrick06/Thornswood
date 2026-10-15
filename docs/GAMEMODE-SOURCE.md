@@ -2,8 +2,7 @@
 
 This page is the plan for issue #2181: how `game\gamemode.js` could be
 written as many source files and still reach the server as the one file it
-needs. It is a plan only. Nothing here has been split, and no behaviour
-changes until Patrick picks an option (the decision is on #2181). How the file
+needs. Patrick chose option D on 12 Oct 2026 (on #2181). Nothing has been split yet; each stage must leave the running gamemode's behaviour the same until that stage's proof says otherwise. How the file
 is laid out today is [GAMEMODE.md](GAMEMODE.md).
 
 Measured on 12 Oct, about 1:30 AM, at origin/main 55c22556, with the engine
@@ -105,118 +104,73 @@ What our own scripts need, all of which read the committed file:
 So whatever the source looks like, `game\gamemode.js` stays one committed file
 with everything inlined.
 
-## The options
+## Decision (Patrick, 12 Oct 2026): D
 
-**A. Do nothing.** Keep one file. Cost: none now. The file keeps growing (2.7
-times in 17 days), the map keeps falling behind, and 128 tests keep depending
-on banner text inside one 6 MB file. What it would need anyway: GAMEMODE.md's
-line numbers brought up to date, and the three-slash seats banner fixed.
+Generated tables move out of the code into data files; the hand-written code
+splits into small modules by system; a bundler joins them into the **one file**
+the server loads when the **gamemode artifact** is made (the versioned artifact
+every deploy already builds and checks). Git holds **sources and data only**.
+The server's proof of what runs is the **artifact hash**. Tests load the built
+artifact.
 
-**B. Source files, joined into the committed `gamemode.js` (recommended).**
-The code is written in `game\gamemode\` as one file per section, in order, and
-a build script joins them, byte for byte, into `game\gamemode.js`, which stays
-committed. The join is plain concatenation in a listed order, not a bundler, so
-the sections keep sharing one scope exactly as they do now: no code changes, no
-`require`, no `module.exports` needed. The generated tables move into files of
-their own that their `Build-*` scripts write, instead of regions of the big
-file. Deploys, records, the blob id and every test keep reading the same file.
+This is not option B below (committed joined `gamemode.js`). It is closer to
+building at artifact time, with a real split and a bundler, and with proof
+moved off the git blob of a committed `gamemode.js`.
 
-**C. Source files, `gamemode.js` built at deploy time and not committed.** The
-same sources, but the joined file is made by the artifact step. This is the only
-option that takes `gamemode.js` out of reviews and merges altogether. It changes
-`Artifact.ps1`, the server records, `Check-LiveGamemode.ps1` (the blob id would
-no longer be a blob in git) and all 240 tests, and since no conflict was
-measured in the joined file, it buys little that B does not.
+### Why not the other shapes
 
-**D. Real modules with `require`.** Refused by the loader: relative requires
-fail (point 2) and absolute ones go stale on a hot reload (point 3).
+- **A (do nothing):** the file keeps growing; the map stays stale.
+- **B (sources joined into a committed `gamemode.js`):** keeps blob-id proof and
+  every test on a committed file, but Patrick's call was D.
+- **C (join only at deploy, no bundler/modules):** takes the file out of git but
+  does not define modules or data-at-source the way D does.
+- **Real `require` of our files at run time:** refused by the loader (relative
+  requires fail beside the temp copy; absolute ones go stale on hot reload).
+- **Bundler alone without artifact proof:** still leaves "what runs" ambiguous.
 
-**E. A bundler (esbuild, which the fork already uses for its own server code).**
-Turns modules into one file, but rewrites the code it joins, so the output is
-no longer the sections as written, a line in an error no longer matches a line
-in a source file, and a byte-identical first step is impossible. Not needed
-while the sections already share one scope.
+### How D meets the loader
 
-## How option B would work
+The live server still receives **one** file. Sources and `game/data/*.json`
+live in git. `scripts/dev/Build-Gamemode.js` (and the artifact step that calls
+it) bundle them into that file. No relative `require` at run time. Hot reload
+still watches one path. Until proof moves to the artifact hash, each stage
+keeps behaviour identical to today's committed file.
 
-**Layout.**
+### What already exists
 
-```
-game\gamemode\
-  order.txt                 the files, in the order they are joined
-  00-header.js              'use strict', the contract comment
-  01-tables.generated.js    DATA, STATIONS, ITEMS, WATERS ... (lines 23-30)
-  02-small-helpers.js
-  ...
-  40-needs.js               the "thornswood needs" block, banners included
-  ...
-  data\recipes.generated.js RECIPES_BY_ID, written by Build-RecipeTable.ps1
-  ...
-```
+- Many tables already have `game/data/*.json`; their `Build-*` scripts still
+  also inline them into `gamemode.js`.
+- `game/merchant-trading.js`, `merchant-settlement.js`, `quest-transactions.js`
+  and `kill-contracts.js` are already modules; `Build-MerchantGamemode.js`
+  inlines them (and catalogues) into a marked region. That is the pattern to
+  generalize.
 
-A file whose name ends `.generated.js` is written only by its `Build-*` script,
-and says which one in its first line. Every other file is edited by hand.
+## Stages (each one pull request)
 
-**The build.** `scripts\dev\Build-Gamemode.js` reads `order.txt`, joins the
-files, and writes `game\gamemode.js`. `--check` fails, naming the first line
-that differs, when the committed file is not what the sources make. Launcher
-builds runs `--check`, the way `test-merchant-deployment.js` runs the merchant
-bundle's. `--where 41233` prints the source file and line for a line of
-`gamemode.js`, for reading an error in the server log.
+1. **Docs and scaffold (this change).** This page records D. `Build-Gamemode.js`
+   exists with `--check` so Launcher builds can hold the bundle contract once
+   sources appear. No split yet.
+2. **Tables out.** Selected `Build-*` scripts stop rewriting regions of
+   `gamemode.js`. The bundler embeds the matching `game/data/*.json` so the
+   server still sees the same consts. Behaviour unchanged; the committed file
+   (or the artifact, once we stop committing the join) shrinks for editors.
+3. **Modules and bundler.** Hand-written blocks move under `game/gamemode/` by
+   system; the bundler joins them in a listed order into the one server file.
+4. **Tests on the artifact.** The 240 tests that read `game/gamemode.js` run
+   against the built output (or a cached build in CI).
+5. **Proof on the artifact hash.** `gamemodeId`, `Check-LiveGamemode.ps1` and
+   deploy records name the artifact, not a git blob of a committed join.
+   Git stops holding the joined file.
 
-**Equivalence.** The first split must produce the same bytes. That is provable
-with nothing running: `game\gamemode.js` keeps the same git blob id, so the
-server's "gamemode.js is git blob" log line, `Check-LiveGamemode.ps1` and every
-test are unchanged, and no deploy is needed for any of the split's pull
-requests.
+## Scaffold
 
-**Editing after the split.** A change goes in the source file, then the build
-runs, and both are committed together. Hand edits to `game\gamemode.js` are
-refused by `--check`. A merge conflict in `gamemode.js` is resolved by
-resolving the source files and building again, never by editing the joined
-file.
+`scripts/dev/Build-Gamemode.js` is the entry. Today it only `--check`s that
+the merchant bundle is current (delegates to `Build-MerchantGamemode.js
+--check`) and prints that the full split is not started. Later it will read
+`game/gamemode/order.txt`, embed data, and write the artifact file.
 
-**Debugging.** Lines in errors stay lines in `gamemode.js`; `--where` maps one
-back. No source map is involved, because the server reads none.
+## Rollback
 
-**Rollback.** At every stage the committed `gamemode.js` is the file that runs,
-so going back is reverting the pull request. Until stage 4, reverting a stage
-leaves the server's file byte for byte the same.
-
-## The stages
-
-Each stage is one pull request, and each must leave `game\gamemode.js` byte for
-byte as it was (same blob id).
-
-1. **The build, splitting nothing.** `Build-Gamemode.js` with `order.txt`
-   naming one file, `game\gamemode\all.js`, which is today's file; `--check` in
-   Launcher builds; a test that the join of the parts is the committed file.
-   The three-slash seats banner and the unbannered regions get banners first,
-   in their own pull request, because that does change the file.
-2. **The generated tables out.** Each `Build-*` script writes its own
-   `.generated.js` file instead of rewriting a region of the big one. This takes
-   about 3.9 MB out of the file people edit, and is the largest gain for the
-   least risk.
-3. **The blocks out.** One file per `// ==== thornswood X ====` block and per
-   `BEGIN`/`END` region, in their current order.
-4. **The early part out.** Lines 1 to 28127 split by their dashed headers. This
-   is the part that shares the most top-level names, so it goes last, and only
-   by cutting at existing headers.
-5. **Tests read the source files** (optional). Tests that cut a block out by
-   its banner can read the block's own file instead. They keep working without
-   this step, because the joined file still holds every banner.
-
-What stays the same throughout: the server, the deploy scripts, the records and
-the blob id check. What is new: one build script, one check in Launcher builds,
-and the rule that `game\gamemode.js` is never edited by hand.
-
-## What is not known yet
-
-- How long the build takes on a 6 MB join. The merchant bundle check, which
-  reads and compares the whole file, takes 0.3 seconds; the full join has not
-  been timed.
-- Whether any tool the team relies on writes into `game\gamemode.js` outside
-  the 19 `Build-*` scripts (an editor's format on save, a lane's own script).
-  Stage 1's `--check` is what would find out.
-- Conflicts met and fixed before merging, which the measurement above cannot
-  see.
+Until stage 5, going back is reverting the pull request. While the server still
+loads a file whose text matches today's behaviour, a revert does not need a
+special deploy beyond the usual gamemode put-back.
