@@ -44,11 +44,19 @@ function Read([string]$name) {
 
 # ---- Build-Launcher.ps1 --------------------------------------------------------
 $b = Read 'Build-Launcher.ps1'
+# Since #498's switch the project files hold the list of what goes in, and
+# their ThornswoodCheckInputs target stops MSBuild by name on a missing one;
+# Build-Launcher.ps1 stops when MSBuild does.
+$appProj = [IO.File]::ReadAllText((Join-Path $Repo 'launcher\app\Thornswood.csproj'))
+$setupProj = [IO.File]::ReadAllText((Join-Path $Repo 'installer\setup\Setup.csproj'))
+$checksInputs = '<Error Condition="!Exists(''%(EmbeddedResource.FullPath)'')"'
+Yes 'the launcher project stops the build on any embedded file that is not found' ($appProj.Contains($checksInputs))
 foreach ($n in 'logo.png', 'launcher-header.jpg', 'launcher-header.mp4', 'Thornswood.ini', 'client-build.json', 'ui-gone.json') {
-    Yes "Build-Launcher stops when $n is not found" ($b -match ('Die "' + [regex]::Escape($n) + ' is not at'))
+    Yes "  $n is one of them" ($appProj -match ('<EmbeddedResource Include="[^"]*' + [regex]::Escape($n) + '"'))
 }
-Yes '  and no longer only warns about any of them' ($b -notmatch "is missing, the launcher will run without its emblem' 'Yellow'" -and $b -notmatch "client-build\.json is missing; the launcher will not be able")
-Yes 'Build-Launcher stops when Bootstrap.cs is not found' ($b -match 'Die "Bootstrap\.cs is not at')
+Yes 'Build-Launcher stops when MSBuild does' ($b -match 'if \(\$rc -ne 0 -or -not \(Test-Path \$exe\)\) \{ Die "MSBuild exited with \$rc" \}')
+Yes '  and no longer only warns about a missing file' ($b -notmatch "is missing, the launcher will run without its emblem' 'Yellow'" -and $b -notmatch "client-build\.json is missing; the launcher will not be able")
+Yes 'the setup project compiles Bootstrap.cs, so a missing one stops its build' ($setupProj.Contains('<Compile Include="Bootstrap.cs" />') -and $setupProj.Contains($checksInputs))
 Yes 'Build-Launcher stops when the setup stub fails to rebuild' ($b -match "Die 'setup-stub\.exe did not rebuild" -and $b -notmatch "packaging carries on with that one")
 
 # ---- Package-Thornswood.ps1 ----------------------------------------------------
