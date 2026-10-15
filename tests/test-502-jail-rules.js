@@ -138,7 +138,10 @@ const PEOPLE = [JARL_W, JARL_R, GUARD_W, PRISONER];
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-502-rules-'));
 fs.writeFileSync(path.join(dir, 'server-settings.json'), JSON.stringify({ dataDir: 'data', privDir: 'private' }));
 fs.mkdirSync(path.join(dir, 'private'));
-fs.writeFileSync(path.join(dir, 'private', 'law.json'), JSON.stringify({ guards: { '503': 'whiterun' }, cells: {} }));
+// The two Jarls hold their holds' seats (#502, one Jarl a hold).
+fs.writeFileSync(path.join(dir, 'private', 'law.json'), JSON.stringify({ guards: { '503': 'whiterun' }, cells: {},
+  jarls: { whiterun: { pid: 501, actor: 0xff000501, name: 'Balgruuf' },
+           riften: { pid: 502, actor: 0xff000502, name: 'Laila' } } }));
 function inDir(f) {
   const was = process.cwd();
   process.chdir(dir);
@@ -385,5 +388,75 @@ if (arrivalSrc) {
   });
   yes('D2 the six holds with a temple of their own wake there', own.length === 6);
 }
+
+// ------------------------- P. claims on a jail made before the rule end, once
+/*
+  Patrick, 12 October evening: jail claims made before the jail rule end once
+  if there are any, and then the rule holds. A fresh server folder holds
+  property.json as an older server left it: a claim on Dragonsreach Dungeon by
+  somebody who is not Whiterun's seated Jarl, one on Riften Jail by Riften's
+  seated Jarl, and a house. The property block is started on it three times.
+*/
+function startOn(folder) {
+  const out = [];
+  const pbox = Object.assign({}, box, {
+    console: { log: function () { out.push(Array.prototype.join.call(arguments, ' ')); } },
+    log: function () { out.push(Array.prototype.join.call(arguments, ' ')); }
+  });
+  delete pbox.__thornswoodProperty;
+  pbox.globalThis = pbox;
+  const was = process.cwd();
+  process.chdir(folder);
+  try { vm.runInNewContext(propBlock, pbox, { filename: 'gamemode.js property' }); }
+  finally { process.chdir(was); }
+  return { W: pbox.__thornswoodProperty, logged: out };
+}
+const old = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-502-rule-once-'));
+fs.writeFileSync(path.join(old, 'server-settings.json'), JSON.stringify({ dataDir: 'data', privDir: 'private' }));
+fs.mkdirSync(path.join(old, 'private'));
+fs.writeFileSync(path.join(old, 'private', 'law.json'), JSON.stringify({ guards: {}, cells: {},
+  jarls: { riften: { pid: 502, actor: 0xff000502, name: 'Laila' } } }));
+const RIFTEN_JAIL = byHold.riften;
+const before = { claims: {
+  [JAIL]: { by: 909, name: 'Erik', at: clock.t, touched: clock.t, locked: true },
+  [RIFTEN_JAIL]: { by: 502, name: 'Laila', at: clock.t, touched: clock.t, locked: false },
+  [HOUSE]: { by: 909, name: 'Erik', at: clock.t, touched: clock.t, locked: false }
+}, boxes: { whiterun: 1234 }, funds: { whiterun: 77 } };
+fs.writeFileSync(path.join(old, 'private', 'property.json'), JSON.stringify(before));
+let run1 = startOn(old);
+const reg1 = JSON.parse(fs.readFileSync(path.join(old, 'private', 'property.json'), 'utf8'));
+yes('P1 at the first start, the claim on a jail by somebody who is not its hold\'s seated Jarl ends',
+    !!run1.W && !run1.W.claims()[JAIL] && !reg1.claims[JAIL]);
+yes('P2 the seated Jarl\'s claim on their own jail, and a house, are kept',
+    !!reg1.claims[RIFTEN_JAIL] && reg1.claims[RIFTEN_JAIL].by === 502 && !!reg1.claims[HOUSE]);
+yes('P3 the log names the holder, the profile and the jail, and counts what ended',
+    run1.logged.some(function (l) { return /law: the jail rule ends Erik's claim \(profile 909\) on Dragonsreach Dungeon, made before only the seated Jarl of whiterun could hold it/.test(l); }) &&
+    run1.logged.some(function (l) { return /applied to the claims made before it once: 1 claim\(s\) ended/.test(l); }));
+yes('P4 the register records that it ran, and keeps every other part it holds',
+    Number(reg1.steps && reg1.steps.jailRule) > 0 && reg1.boxes && reg1.boxes.whiterun === 1234 &&
+    reg1.funds && reg1.funds.whiterun === 77);
+// A claim on a jail somehow in the register after that (written by hand, say) is not touched again.
+reg1.claims[JAIL] = { by: 909, name: 'Erik', at: clock.t, touched: clock.t, locked: false };
+fs.writeFileSync(path.join(old, 'private', 'property.json'), JSON.stringify(reg1));
+const run2 = startOn(old);
+yes('P5 at every start after that it does nothing: it runs once, not as a watch',
+    !!run2.W.claims()[JAIL] && !run2.logged.some(function (l) { return /the jail rule/.test(l); }));
+// A server with no such claim: nothing ends, and the mark is still written.
+const clean = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-502-rule-none-'));
+fs.writeFileSync(path.join(clean, 'server-settings.json'), JSON.stringify({ dataDir: 'data', privDir: 'private' }));
+fs.mkdirSync(path.join(clean, 'private'));
+fs.writeFileSync(path.join(clean, 'private', 'property.json'), JSON.stringify({ claims: {
+  [HOUSE]: { by: 909, name: 'Erik', at: clock.t, touched: clock.t, locked: false } } }));
+const run3 = startOn(clean);
+const reg3 = JSON.parse(fs.readFileSync(path.join(clean, 'private', 'property.json'), 'utf8'));
+yes('P6 with no claim on a jail nothing ends, and the mark is written',
+    !!reg3.claims[HOUSE] && Number(reg3.steps && reg3.steps.jailRule) > 0 &&
+    run3.logged.some(function (l) { return /once: 0 claim\(s\) ended/.test(l); }));
+yes('P7 the step is no timer: the function has no clock in it and is called once, at load',
+    (function () {
+      const fn = slice(propBlock, '  function endPreRuleJailClaims() {', '\n  }\n') || '';
+      return !!fn && !/setTimeout|setInterval/.test(fn) &&
+        propBlock.split('endPreRuleJailClaims();').length === 2;
+    }()));
 
 done();

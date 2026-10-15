@@ -165,7 +165,7 @@
 
     officePage: { jarl, may, name, steward: <bool>,
                   stewards: [ { pid, name } ], people: [ { pid, name } ],
-                  hold, where, holds: [ { hold, where } ], guards: [ { pid, name } ],
+                  hold, where, giveUp, holds: [ { hold, where, by } ], guards: [ { pid, name } ],
                   guardPeople: [ { pid, name } ], guardOf: { hold, where, jail } | null,
                   door: { name, by, rent: { amount, every, owed } | null } | null,
                   box: { hold } | null, boards: [ { hold, where } ] }
@@ -179,7 +179,7 @@
       press while the office has none: taking it sends /jarl <hold>. guards
       are that hold's, guardPeople who could be named one (Name guard sends
       /guard <pid>, Remove /guard -<pid>), and guardOf the hold this
-      character's account guards.
+      character's account guards. A hold with a seated Jarl carries by, their name, and is not offered; giveUp draws Give up the office, which sends /jarl - (#502, one Jarl a hold).
       Its buttons send the server's own lines through the chat line, the way
       the property page's Stop does: /jarl, /steward <pid>, /steward -<pid>,
       /evict, /rent <gold>, /rent -, /box <hold> and /board move <hold>. The
@@ -2050,11 +2050,18 @@
                  : 'A Jarl named you a steward.')));
       if (holds.length) {
         var pick = officeRow(seat, '', '', []);
+        var held = [];
         holds.forEach(function (h) {
           var where = String(h.where || h.hold);
+          // One Jarl a hold (#502): a seated hold is named, not offered.
+          if (h.by) { held.push(where + ' (' + String(h.by) + ')'); return; }
           pick.appendChild(officeButton(where, '/jarl ' + String(h.hold), 'Press again to be Jarl of ' + where));
         });
+        if (held.length) seat.appendChild(el('div', 'inn', 'Held by their Jarl: ' + held.join(', ') + '.'));
       }
+      // Give up the office (#502), asked twice: the seat goes to the next Jarl.
+      if (o.giveUp) officeRow(seat, '', '', [officeButton('Give up the office', '/jarl -',
+        'Press again to give up the office' + (o.where ? ' of ' + String(o.where) : ''))]);
       wrap.appendChild(seat);
     }
 
