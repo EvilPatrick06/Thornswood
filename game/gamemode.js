@@ -65548,6 +65548,8 @@ function createSettlement(deps) {
       }
       return pending.terms;
     }
+    // A saved full transfer must still fit its eventual native replacement.
+    nativeRows(addEntries(pending.debit,pending.credit));
     var removed=difference(nativeRows(pending.expected),nativeRows(pending.debit),false);
     var moved=pending.kind==='buy'?difference(stockRows(previous.stock),stockRows(next.stock),true):
       difference(stockRows(next.stock),stockRows(previous.stock),true);
