@@ -236,6 +236,11 @@ let cfg = {
     The application, and the age and rules questions it asks (#428), is the
     way into the world.
 
+    LOCKED 12 Oct and 15 Oct (Patrick via Smeagle on #428): closed playtest /
+    alpha stays. Do not flip public mode. open stays false until Patrick ends
+    the alpha and Discord onboarding grants Member with the 18+ and rules
+    answers. The switch below is built; leaving it off is the requirement.
+
     The day the world opens to everybody, "open": true in config.json is the
     one switch (#428). It puts Member on the play list at load (playRoles),
     tells the bot and the pages through /api/public, and they follow: the
@@ -916,6 +921,11 @@ function findPageVersion(sha) {
 
 // ==== thornswood open switch ====
 /* The one switch (#428), cfg.open, off unless config.json says true.
+
+   LOCKED closed (Patrick, 12 Oct option B + 15 Oct via Smeagle): do not set
+   open true and do not ship a public-mode flip from this card. Alpha / apply
+   for Playtester stays the door. Public flip waits on Discord onboarding that
+   grants Member and records 18+ and rules, after Patrick ends the alpha.
 
    playRoles is the play list with Member added when the world is open to
    everybody. Staff give Member after an application is accepted. Discord
