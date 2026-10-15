@@ -152,6 +152,16 @@ function Owner([int]$port) {
     if ($e.Count) { return [int]$e[0].OwningProcess }
     return 0
 }
+# Which process holds the game port, as pid and start time. Windows hands a
+# freed pid out again quickly, so on a busy box the new stand-in can get the
+# old one's pid; the pid alone cannot tell them apart (#2466).
+function Ident([int]$port) {
+    $id = Owner $port
+    if (-not $id) { return '' }
+    $p = Get-Process -Id $id -EA SilentlyContinue
+    if (-not $p) { return '' }
+    return ('{0}@{1:o}' -f $id, $p.StartTime)
+}
 function Answers([int]$port) {
     if (-not (Owner $port)) { return $false }
     $ok = $false
@@ -217,7 +227,11 @@ const gm = fs.readFileSync(path.join(root, 'gamemode.js'), 'utf8');
 const s = JSON.parse(fs.readFileSync(path.join(root, 'server-settings.json'), 'utf8'));
 const res = s.port === 7777 ? 3000 : s.port + 1;
 dgram.createSocket('udp4').bind(s.port, '127.0.0.1');
-function listen() { net.createServer(function (c) { c.end(); }).listen(res, '127.0.0.1'); }
+function listen() {
+  const srv = net.createServer(function (c) { c.end(); });
+  srv.on('error', function (e) { log('resources port ' + res + ' taken: ' + e.code); process.exit(1); });
+  srv.listen(res, '127.0.0.1');
+}
 if (gm.indexOf('udp-only') >= 0) {
   log('listening on ' + s.port + ' only');
 } else if (gm.indexOf('slow-start-past-60') >= 0) {
@@ -235,16 +249,19 @@ try {
     Put $stub $stubJs
     Put (Join-Path $root 'gamemode.js') '// old gamemode'
     Put (Join-Path $root 'plugins\Skyrim.esm') 'skyrim'
-    $up = $false
-    $oldPid = 0
-    for ($try = 0; $try -lt 5 -and -not $up; $try++) {
-        PickPort
-        Put (Join-Path $root 'server-settings.json') (SettingsJson $P)
-        $oldPid = (Start-Process -FilePath $node.Source -WindowStyle Hidden -PassThru `
-                                 -ArgumentList ('"' + $stub + '" "' + $root + '" "' + $pidLog + '"')).Id
-        $up = WaitUp $P
-        if (-not $up) { Stop-Process -Id $oldPid -Force -EA SilentlyContinue }
+    function StartOld {
+        $up = $false
+        for ($try = 0; $try -lt 5 -and -not $up; $try++) {
+            PickPort
+            Put (Join-Path $root 'server-settings.json') (SettingsJson $script:P)
+            $oldPid = (Start-Process -FilePath $node.Source -WindowStyle Hidden -PassThru `
+                                     -ArgumentList ('"' + $stub + '" "' + $root + '" "' + $pidLog + '"')).Id
+            $up = WaitUp $script:P
+            if (-not $up) { Stop-Process -Id $oldPid -Force -EA SilentlyContinue }
+        }
+        return $up
     }
+    $up = StartOld
     Yes ("the stand-in server is answering on UDP {0} and TCP {1}" -f $P, ($P + 1)) $up
     if (-not $up) { throw 'no stand-in server came up, so there is nothing to deploy over' }
     $before = (Get-FileHash -LiteralPath (Join-Path $root 'gamemode.js') -Algorithm SHA256).Hash
@@ -267,11 +284,34 @@ try {
     if ($script:fail -gt $failed) { Show }
 
     # A slow-but-healthy start past 60 s is kept.
-    $running = Owner $P
-    $w = MakeStage '.stage-slow' '// new gamemode, slow-start-past-60'
-    $sw = [Diagnostics.Stopwatch]::StartNew()
-    $out = RunFar '.stage-slow' '.prev-slow' (Get-ThornswoodServerReadyWait) $w
-    $sw.Stop()
+    # The stand-in opens its resources port 61 s after it starts. Nobody holds
+    # that port in between, and the VPS runners share one box, so another
+    # harness can take it; the stand-in then says so in server.log. That is
+    # the box, not the wait, so the case is set up again on a fresh port, at
+    # most three times, and says so (#2466).
+    $logPath = Join-Path $root 'server.log'
+    for ($slowTry = 1; $slowTry -le 3; $slowTry++) {
+        $logFrom = if (Test-Path -LiteralPath $logPath) { (Get-Item -LiteralPath $logPath).Length } else { 0 }
+        $running = Ident $P
+        $w = MakeStage '.stage-slow' '// new gamemode, slow-start-past-60'
+        $sw = [Diagnostics.Stopwatch]::StartNew()
+        $out = RunFar '.stage-slow' '.prev-slow' (Get-ThornswoodServerReadyWait) $w
+        $sw.Stop()
+        $newLog = ''
+        if (Test-Path -LiteralPath $logPath) {
+            $all = [IO.File]::ReadAllText($logPath)
+            if ($all.Length -gt $logFrom) { $newLog = $all.Substring([int]$logFrom) }
+        }
+        if ($out -contains 'SWAP OK' -or $newLog -notmatch 'resources port \d+ taken: ') { break }
+        Write-Host ('NOTE  try {0}: another process took TCP {1} during the 61 s, setting the case up again on a fresh port' -f $slowTry, ($P + 1))
+        $owner = Owner $P
+        if ($owner) { Stop-Process -Id $owner -Force -EA SilentlyContinue }
+        Start-Sleep -Milliseconds 500
+        if (-not (StartOld)) { throw 'no stand-in server came up again after the resources port was taken' }
+    }
+    if ($newLog -match 'resources port \d+ taken: ') {
+        Write-Host 'NOTE  the resources port was taken on all three tries, so the box was too busy to judge the wait'
+    }
     $said = $out -join "`n"
     $failed = $script:fail
     Yes 'a start that answers after 61 s, past the old 60 s wait, is SWAP OK' ($out -contains 'SWAP OK')
@@ -281,7 +321,7 @@ try {
         $sw.Elapsed.TotalSeconds -ge 60 -and $sw.Elapsed.TotalSeconds -lt (Get-ThornswoodServerReadyWait))
     Yes '  and the new gamemode is the one answering' (
         ([IO.File]::ReadAllText((Join-Path $root 'gamemode.js'))) -match 'slow-start-past-60' -and
-        (Answers $P) -and ((Owner $P) -ne $running))
+        (Answers $P) -and ((Ident $P) -ne $running))
     if ($script:fail -gt $failed) { Show }
 }
 catch {
