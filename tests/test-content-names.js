@@ -21,7 +21,11 @@
 //   3. a second run changes nothing;
 //   4. on a copy where another record names the base, the base stays with its
 //      script taken off and the placed block still comes out; on one where
-//      another record names the placed block, the tool writes nothing.
+//      another record names the placed block, the tool writes nothing;
+//   5. the header's description is Thornswood's own and the other server's
+//      full name is nowhere in the committed plugin (Patrick, 12 Oct, B), and
+//      on a copy whose description still names it, the tool writes
+//      Thornswood's and changes nothing else.
 //
 // The copies are written to a temporary folder (TEST_TMP if set) and removed.
 // Nothing in the repo is written.
@@ -116,6 +120,52 @@ yes('no editor id in the committed plugin begins Kzl or kzolivar (' + before.rec
 for (const r of badIds) { console.log('      ' + r.tag + ' 0x' + r.fid.toString(16) + ' ' + edid(r)); }
 yes('the shipped plugin no longer contains the execution block or its placement',
     !committed.records.some(r => r.fid === BLOCK || r.fid === BLOCK_REF));
+
+// The header's description (#400, Patrick, 12 Oct: B, and the other server is
+// mentioned nowhere). Its name is built from code points so this file does not
+// carry it; tests\test-other-server-name-gone.js reads every tracked file.
+const OTHER_NAME = String.fromCharCode(107, 101, 105, 122, 97, 97, 108);
+function headerSubs(head) {
+  const out = [];
+  let i = 24;
+  while (i + 6 <= head.length) {
+    const tag = head.toString('latin1', i, i + 4);
+    const size = head.readUInt16LE(i + 4);
+    out.push({ tag, body: head.subarray(i + 6, i + 6 + size) });
+    i += 6 + size;
+  }
+  return out;
+}
+function description(head) {
+  const s = headerSubs(head).find(x => x.tag === 'SNAM');
+  return s ? s.body.toString('latin1').replace(/\0+$/, '') : null;
+}
+function everyByte(p) {
+  let s = p.head.toString('latin1');
+  for (const r of p.records) {
+    s += (r.flags & COMPRESSED) ? zlib.inflateSync(r.raw.subarray(4)).toString('latin1') : r.raw.toString('latin1');
+  }
+  return s.toLowerCase();
+}
+// The same plugin with another description, its header size set to match.
+function withDescription(buf, text) {
+  const p = readPlugin(buf);
+  const parts = [];
+  for (const s of headerSubs(p.head)) {
+    const body = s.tag === 'SNAM' ? Buffer.concat([Buffer.from(text, 'latin1'), Buffer.alloc(1)]) : s.body;
+    const h = Buffer.alloc(6); h.write(s.tag, 0, 'latin1'); h.writeUInt16LE(body.length, 4);
+    parts.push(h, body);
+  }
+  const body = Buffer.concat(parts);
+  const head = Buffer.from(p.head.subarray(0, 24));
+  head.writeUInt32LE(body.length, 4);
+  return Buffer.concat([head, body, buf.subarray(p.head.length)]);
+}
+const committedDescription = description(committed.head);
+yes('the committed plugin\'s header describes it as Thornswood\'s: ' + JSON.stringify(committedDescription),
+    !!committedDescription && /^Thornswood's crafting and gathering content: /.test(committedDescription));
+yes('the other server\'s name is nowhere in the committed plugin, header and records, compressed included',
+    everyByte(committed).indexOf(OTHER_NAME) < 0);
 
 // Restore the two historical records only in a temporary fixture, in their
 // original group paths. This keeps removal and reference-safety coverage after
@@ -280,6 +330,36 @@ try {
       yes('when a record names the placed block the tool exits 1', s.status === 1);
       yes('and writes nothing', fs.readFileSync(copy).equals(pointed));
     }
+
+    // ------------------------------------------- 5. the header's description --
+    // The committed plugin as it was before 15 October: the description named
+    // the server the records were salvaged from. The tool writes Thornswood's
+    // own and touches nothing else.
+    const oldText = 'Crafting and gathering content salvaged from ' +
+      OTHER_NAME.charAt(0).toUpperCase() + OTHER_NAME.slice(1) +
+      ' Online. Stations, salt, ore, charcoal kilns, the skill manuals and their recipes.';
+    const named = withDescription(shipped, oldText);
+    const was = readPlugin(named);
+    yes('a copy whose description names the other server could be made',
+        description(was.head) === oldText && was.ends && everyByte(was).indexOf(OTHER_NAME) >= 0);
+    fs.writeFileSync(copy, named);
+    const h = python([TOOL, '--data', dir]);
+    yes('the tool exits 0 on it', h.status === 0);
+    if (h.status !== 0) { console.log(h.stdout + h.stderr); }
+    yes('and says the description changes', /its description becomes: Thornswood's crafting/.test(h.stdout));
+    const ha = readPlugin(fs.readFileSync(copy));
+    yes('the result reads to its last byte', ha.ends);
+    yes('its description is Thornswood\'s, the same as the committed plugin\'s',
+        description(ha.head) === committedDescription);
+    yes('the other server\'s name is nowhere in it', everyByte(ha).indexOf(OTHER_NAME) < 0);
+    const rest = x => headerSubs(x).filter(s => s.tag !== 'SNAM').map(s => s.tag + s.body.toString('hex')).join('|');
+    yes('every other subrecord of the header is as it was, masters and record count included',
+        rest(ha.head) === rest(was.head) && ha.head.subarray(8, 24).equals(was.head.subarray(8, 24)));
+    yes('every record is byte for byte what it was (' + was.records.length + ')',
+        ha.records.length === was.records.length && ha.records.every((r, i) => r.bytes.equals(was.records[i].bytes)));
+    yes('the result is the committed plugin exactly', fs.readFileSync(copy).equals(shipped));
+    const h2 = python([TOOL, '--data', dir]);
+    yes('a second run changes nothing', h2.status === 0 && fs.readFileSync(copy).equals(shipped));
   }
 } finally {
   fs.rmSync(dir, { recursive: true, force: true });

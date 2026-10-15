@@ -161,7 +161,7 @@ public static class Ts906 {
         ([Ts906]::SetupStartInfo('powershell.exe', $script, 'D:\Thornswood', $false, $null)).Arguments -eq $before)
     Yes 'ticked, it adds -MakeOwnGame and nothing else' (
         ([Ts906]::SetupStartInfo('powershell.exe', $script, 'D:\Thornswood', $true, '')).Arguments -eq ($before + ' -MakeOwnGame'))
-    $vf = 'S:\Steam Library\steamapps\common\Keizaal Online'
+    $vf = 'S:\Steam Library\steamapps\common\Other Server Online'
     Yes 'a chosen folder goes as -VortexGame, quoted' (
         ([Ts906]::SetupStartInfo('powershell.exe', $script, 'D:\Thornswood', $true, $vf + '\')).Arguments -eq ($before + ' -MakeOwnGame -VortexGame "' + $vf + '"'))
 

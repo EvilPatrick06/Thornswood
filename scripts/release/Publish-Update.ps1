@@ -2364,8 +2364,9 @@ if ($profileChanged.Count) {
             # line above had its + outside brackets, so PowerShell read '+' as a
             # colour and threw, and that throw was the only thing between two dev
             # releases and every tester being refused at connect: the list had 7
-            # Keizaal plugins switched on (KeizaalStart, KzlHorses, SunHelm...),
-            # taken from Vortex's deployment because the Keizaal collection is
+            # plugins of another server switched on (its own start plugin, KzlHorses,
+            # SunHelm...), taken from Vortex's deployment because that server's
+            # collection is
             # deployed to the same Steam copy. version.json is written and not
             # pushed, so nobody has it; the assets are up and nothing points at
             # them. If the server really should gain these, deploy it first and

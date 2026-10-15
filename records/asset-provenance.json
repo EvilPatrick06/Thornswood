@@ -494,17 +494,17 @@
     },
     {
       "path": "game/content/Thornswood-Content.esp",
-      "sha256": "b6bb2bf0454f256188da7eac44def4d6ef71af3884cd429e5a23bee817b1be53",
-      "what": "Thornswood's own plugin, 147,040 bytes on 12 Oct (the notice board now names our own mesh and the drop box is a record of its own, #2502). Its header's description says its crafting and gathering content was salvaged from Keizaal Online, another server.",
+      "sha256": "644bb1c0afb885d852d894820f8519a0440bfba6d50d91fea2435733c6c93e2f",
+      "what": "Thornswood's own plugin, 147,112 bytes on 15 Oct (its header now carries Thornswood's own description, #400; the notice board names our own mesh and the drop box is a record of its own, #2502). Until #400 its header said its crafting and gathering content was salvaged from another server's plugin.",
       "published": "Every pack and the installer on both channels, and Nexus Mods mod 192001 through the collection",
-      "source": "Records salvaged from Keizaal Online's plugin (the plugin's own description), rebuilt under #954 and #400, then added to here (#613, #1379, #1383, #1384, #2255, #2258)",
-      "creator": "Thornswood, from Keizaal Online's records",
-      "licence": "not recorded: no permission from Keizaal Online's makers is recorded",
+      "source": "Records salvaged from another server's plugin (what the plugin's header said until #400), rebuilt under #954 and #400, then added to here (#613, #1379, #1383, #1384, #2255, #2258)",
+      "creator": "Thornswood, from another server's records",
+      "licence": "not recorded: no permission from that server's makers is recorded",
       "attribution": "not recorded",
       "approved": "Patrick publishes it as Thornswood Content on Nexus Mods (EvilPatrick06)",
       "evidence": "THIRD-PARTY.md, Thornswood Content, Thornswood's other mod on Nexus Mods.",
       "status": "unconfirmed",
-      "ask": "Patrick: whether Keizaal Online's makers gave permission for the salvaged records, and where that is kept."
+      "ask": "Patrick: whether that server's makers gave permission for the salvaged records, and where that is kept (#2177)."
     },
     {
       "path": "game/content/Thornswood-Last.esp",
