@@ -251,9 +251,15 @@ yes('S7 after a restart the same references stand, and none is placed again',
   yes('S8 each of the nine sites carries its own cell or worldspace', nine.length === 9 &&
       nine.every(function (h) { return typeof sites[h].cell === 'string' && sites[h].cell; }));
   yes('  and there is no single BOARD_CELL for all of them', gm.indexOf('BOARD_CELL') < 0);
-  yes('  the five walled cities are said to be unmeasured, and the steward\'s move is the fix',
-      /Solitude, Whiterun, Windhelm, Riften and Markarth\s+are walled cities/.test(gm) &&
-      /Move it here on the Office page settles it in one press/.test(gm));
+  // Measured 15 Oct (#2516): the five walled cities in their own worldspaces, the four open towns in Tamriel.
+  yes('  the five walled cities stand in their own worldspaces, as measured',
+      sites.solitude.cell === '37edf:Skyrim.esm' && sites.whiterun.cell === '1a26f:Skyrim.esm' &&
+      sites.riften.cell === '16bb4:Skyrim.esm' && sites.windhelm.cell === '1691d:Skyrim.esm' &&
+      sites.markarth.cell === '16d71:Skyrim.esm');
+  yes('  and the four open towns in Tamriel',
+      ['falkreath', 'morthal', 'dawnstar', 'winterhold'].every(function (h) { return sites[h].cell === TAMRIEL; }));
+  const seed = /var BOARD_SEED = (\d+);/.exec(gm);
+  yes('  in a new seeding, so a saved board no steward moved follows on the next deploy', !!seed && Number(seed[1]) >= 4);
 }
 
 done();

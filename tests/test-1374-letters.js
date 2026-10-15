@@ -95,6 +95,9 @@ yes('the letter is 300 characters and the delivery reach is the trade\'s 700',
 
 const GOLD = 15;
 const TAMRIEL = '3c:Skyrim.esm';
+// Whiterun's and Riften's boards stand inside their walled cities (#2516).
+const WHITERUN_WORLD = '1a26f:Skyrim.esm';
+const RIFTEN_WORLD = '16bb4:Skyrim.esm';
 const NETCH = '17ec0:Dragonborn.esm';
 const WHITERUN = [23139.4, -7891.7, -3494.4];
 
@@ -104,7 +107,7 @@ function world() {
   return {
     people: people,
     add: function (p) {
-      people[p.actor] = { pid: p.pid, name: p.name, cell: p.cell || TAMRIEL,
+      people[p.actor] = { pid: p.pid, name: p.name, cell: p.cell || WHITERUN_WORLD,
                           pos: (p.pos || WHITERUN).slice(), pack: [{ baseId: GOLD, count: p.gold }] };
       return p;
     },
@@ -227,7 +230,7 @@ if (missing.length === 0 && fees && seeding && PASSAGES) {
         rr.cell === NETCH && Math.abs(rr.pos[0] + 39) < 1 && Math.abs(rr.pos[1] + 178.2) < 1 && rr.pos[2] === 0 &&
         rr.where === 'Raven Rock' && rr.seed === s.seed);
     yes('B1 and the nine mainland boards are still Djinn\'s outdoor spots',
-        s.boards.whiterun.cell === TAMRIEL && s.boards.whiterun.pos[0] === 23139.4);
+        s.boards.whiterun.cell === WHITERUN_WORLD && s.boards.whiterun.pos[0] === 23139.4);
 
     // A server that has been played on, with the nine already saved and no Raven Rock.
     const nine = JSON.parse(JSON.stringify(s.boards));
@@ -306,7 +309,7 @@ if (missing.length === 0 && fees && seeding && PASSAGES) {
     let said = s.say(ALICE, '/letter Lydia ' + WORDS);
     yes('P1 away from a board a letter is refused and nothing is taken',
         /Stand at a hold's notice board/.test(said) && w.gold(ALICE) === 200);
-    w.move(ALICE, TAMRIEL, WHITERUN);
+    w.move(ALICE, WHITERUN_WORLD, WHITERUN);
 
     said = s.say(ALICE, '/letter');
     yes('P2 a letter with no name is refused', /Say who the letter is for/.test(said) && w.gold(ALICE) === 200);
@@ -371,9 +374,9 @@ if (missing.length === 0 && fees && seeding && PASSAGES) {
     // Delivering it.
     yes('D1 somebody carrying nothing has nothing to deliver',
         /not carrying a letter/.test(s.say(CYRUS, '/deliver Lydia')));
-    w.move(BOB, TAMRIEL, [WHITERUN[0] + 300, WHITERUN[1], WHITERUN[2]]);
-    w.move(LYDIA, TAMRIEL, [WHITERUN[0] + 1200, WHITERUN[1], WHITERUN[2]]);
-    w.move(CYRUS, TAMRIEL, [WHITERUN[0] + 400, WHITERUN[1], WHITERUN[2]]);
+    w.move(BOB, WHITERUN_WORLD, [WHITERUN[0] + 300, WHITERUN[1], WHITERUN[2]]);
+    w.move(LYDIA, WHITERUN_WORLD, [WHITERUN[0] + 1200, WHITERUN[1], WHITERUN[2]]);
+    w.move(CYRUS, WHITERUN_WORLD, [WHITERUN[0] + 400, WHITERUN[1], WHITERUN[2]]);
     yes('D2 /deliver with nobody named points at the look prompt',
         /Look at the person the letter is for, and use the key the prompt shows/.test(s.say(BOB, '/deliver')));
     said = s.say(BOB, '/deliver Cyrus');
@@ -387,7 +390,7 @@ if (missing.length === 0 && fees && seeding && PASSAGES) {
     w.move(LYDIA, '1605e:Skyrim.esm', [WHITERUN[0] + 400, WHITERUN[1], WHITERUN[2]]);
     yes('D6 so is somebody with the same coordinates in another cell',
         /Stand closer/.test(s.say(BOB, '/deliver Lydia')) && w.gold(BOB) === 10);
-    w.move(LYDIA, TAMRIEL, [WHITERUN[0] + 990, WHITERUN[1], WHITERUN[2]]);
+    w.move(LYDIA, WHITERUN_WORLD, [WHITERUN[0] + 990, WHITERUN[1], WHITERUN[2]]);
     said = s.say(BOB, '/deliver ' + LYDIA.actor.toString(16));
     yes('D7 within 700 the named person, by the form id the crosshair gives, gets the letter',
         /You hand Lydia Stormblade the letter. 15 gold is yours./.test(said));

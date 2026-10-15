@@ -39636,16 +39636,23 @@ log('gamemode loaded:',
     every board and turns to this facing (standBoard, #2516).
   */
   /*
-    EVERY SPOT CARRIES ITS OWN CELL OR WORLDSPACE (#2516). All nine below are
-    Tamriel, 3c:Skyrim.esm, because that is what Djinn's numbers were sent as.
-    Falkreath, Morthal, Dawnstar and Winterhold are open towns in Tamriel, so
-    that is right for them. Solitude, Whiterun, Windhelm, Riften and Markarth
-    are walled cities, each its own worldspace inside the walls, and nobody has
-    yet measured whether their numbers were read inside the walls or out:
-    Patrick on dev, 12 Oct, saw no board inside Whiterun, and Whiterun's
-    appeared only once he walked out of the gate. Until it is measured they
-    stay Tamriel. A steward standing where the board should be and pressing
-    Move it here on the Office page settles it in one press: moveBoard records
+    EVERY SPOT CARRIES ITS OWN CELL OR WORLDSPACE (#2516). Until 15 Oct all
+    nine were sent as Tamriel, 3c:Skyrim.esm. Patrick on dev, 12 Oct, saw no
+    board inside Whiterun, and Whiterun's appeared only once he walked out of
+    the gate: Solitude, Whiterun, Windhelm, Riften and Markarth are walled
+    cities, each its own worldspace inside the walls, and their numbers were
+    read inside them. Measured 15 Oct:
+      - the game's own NPCs placed near each point (docs/NPC-SPAWNS.csv)
+        stand in WhiterunWorld 1a26f, RiftenWorld 16bb4, WindhelmWorld 1691d
+        and MarkarthWorld 16d71;
+      - Solitude has no NPC within 3,000, so the cell its point falls in was
+        read out of Skyrim.esm: cell -16, 25 holds 252 references in
+        SolitudeWorld 37edf and 20 in Tamriel, the same shape as Whiterun's
+        (243 in WhiterunWorld, 14 in Tamriel), so the city is SolitudeWorld;
+      - Falkreath, Morthal and Winterhold have NPCs in Tamriel, and Dawnstar
+        is an open town, so those four stay Tamriel.
+    A steward standing where a board should be and pressing Move it here on
+    the Office page still moves it anywhere in one press: moveBoard records
     the cell or worldspace, the point and the facing where they stand.
   */
   var BOARD_SITES = {
@@ -39677,11 +39684,11 @@ log('gamemode loaded:',
       somebody in the world can say whether it is a wall. /board move solitude
       settles it for good and a deploy will never touch it again.
     */
-    solitude:   { cell: '3c:Skyrim.esm', pos: [-64867, 104407.2, -8405.9], facing: 9.9, where: 'Solitude' },
-    whiterun:   { cell: '3c:Skyrim.esm', pos: [23139.4, -7891.7, -3494.4], facing: 188.4, where: 'Whiterun' },
-    riften:     { cell: '3c:Skyrim.esm', pos: [174559.5, -94337, 11130.2], facing: 38, where: 'Riften' },
-    windhelm:   { cell: '3c:Skyrim.esm', pos: [134265.1, 35842.3, -12397.5], facing: 85.8, where: 'Windhelm' },
-    markarth:   { cell: '3c:Skyrim.esm', pos: [-173494.7, 5049.1, -3447.6], facing: 72, where: 'Markarth' },
+    solitude:   { cell: '37edf:Skyrim.esm', pos: [-64867, 104407.2, -8405.9], facing: 9.9, where: 'Solitude' },
+    whiterun:   { cell: '1a26f:Skyrim.esm', pos: [23139.4, -7891.7, -3494.4], facing: 188.4, where: 'Whiterun' },
+    riften:     { cell: '16bb4:Skyrim.esm', pos: [174559.5, -94337, 11130.2], facing: 38, where: 'Riften' },
+    windhelm:   { cell: '1691d:Skyrim.esm', pos: [134265.1, 35842.3, -12397.5], facing: 85.8, where: 'Windhelm' },
+    markarth:   { cell: '16d71:Skyrim.esm', pos: [-173494.7, 5049.1, -3447.6], facing: 72, where: 'Markarth' },
     falkreath:  { cell: '3c:Skyrim.esm', pos: [-30342.2, -87022.7, -3119.1], facing: 56.6, where: 'Falkreath' },
     morthal:    { cell: '3c:Skyrim.esm', pos: [-38766.1, 64411.9, -13920.9], facing: 251.2, where: 'Morthal' },
     dawnstar:   { cell: '3c:Skyrim.esm', pos: [32216.4, 102314, -13263], facing: 110, where: 'Dawnstar' },
@@ -39728,7 +39735,8 @@ log('gamemode loaded:',
     it. The next time these coordinates change, this number goes up and the
     boards follow, except the ones people have moved on purpose.
   */
-  var BOARD_SEED = 3;   // 3: Solitude's X, 23 September. See BOARD_SITES above.
+  // 4: the five walled cities in their own worldspaces, 15 October (#2516).
+  var BOARD_SEED = 4;   // 3: Solitude's X, 23 September. See BOARD_SITES above.
 
   var boards = seedBoards(loadPart('boards', null));
 
@@ -39758,6 +39766,11 @@ log('gamemode loaded:',
       if (!Object.prototype.hasOwnProperty.call(fresh, hold)) { continue; }
       if (out[hold]) { continue; }
       out[hold] = fresh[hold];
+      // The board and box the server already stood for it (#2516) are moved
+      // to the new spot by standBoard, not left behind beside a new pair.
+      var had = saved && typeof saved === 'object' ? saved[hold] : null;
+      if (had && had.ref) { out[hold].ref = had.ref; }
+      if (had && had.boxRef) { out[hold].boxRef = had.boxRef; }
       moved++;
     }
     if (moved) {

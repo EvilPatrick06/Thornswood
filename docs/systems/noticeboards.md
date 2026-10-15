@@ -34,11 +34,11 @@ board and its box there. A board a steward has walked to is saved, and a
 later seeding does not put it back.
 
 Solitude, Whiterun, Windhelm, Riften and Markarth are walled cities, each
-its own worldspace inside the walls. Their five spots are sent as
-Tamriel, the world outside the walls, because nobody has measured
-whether those numbers were read inside the walls or out; on dev on
-12 Oct Whiterun's board appeared only outside the gate. One steward's
-move inside each city settles it (#2516).
+its own worldspace inside the walls, and their boards stand inside them:
+their spots were read there, which the game's own people placed nearby,
+and Solitude's own ground, measured on 15 Oct (#2516). Until then all
+nine were sent as Tamriel, so inside those cities no board ever stood.
+Falkreath, Morthal, Dawnstar and Winterhold are open towns in Tamriel.
 
 The nine mainland towns have a spot each: Solitude, Whiterun, Riften,
 Windhelm, Markarth, Falkreath, Morthal, Dawnstar, Winterhold. Raven

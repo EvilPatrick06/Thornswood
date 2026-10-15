@@ -81,7 +81,10 @@ fs.writeFileSync(path.join(dir, 'private', 'property.json'), JSON.stringify({
   funds: {}, notices: {}
 }));
 fs.writeFileSync(path.join(dir, 'private', 'law.json'), JSON.stringify({
-  guards: { '101': 'whiterun', '202': 'riften' }, cells: {}
+  guards: { '101': 'whiterun', '202': 'riften' }, cells: {},
+  // Each Jarl holds their hold's seat (#502), which is what makes them its Jarl.
+  jarls: { whiterun: { pid: 707, actor: 0xff000707, name: 'Balgruuf' },
+           riften: { pid: 808, actor: 0xff000808, name: 'Laila' } }
 }));
 function inDir(f) {
   const was = process.cwd();
