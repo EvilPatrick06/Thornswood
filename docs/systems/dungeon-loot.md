@@ -32,11 +32,15 @@ tier.
 
 The boss chest at the end of a place pays one tier above the place:
 its gold, goods, tome and exclusive rolls are the next row's. A boss
-chest in a tier 4 place has no row above it and pays tier 4. It rests
-for the place's own time, like every other chest there. A boss chest
-is one whose record Skyrim names as the boss's: 33 containers in the
-load order, such as the draugr, bandit, Falmer and Riekling boss
-chests. Decided by Patrick on 12 October 2026.
+chest in a tier 4 place has no row above it and pays tier 4, with the
+exclusive roll made a second time. Every boss chest holds a spell tome
+or a dungeon exclusive for certain: when neither roll comes up, one of
+the two is put in, the tome or the exclusive in proportion to their
+chances on that row. It rests for the place's own time, like every
+other chest there. A boss chest is one whose record Skyrim names as
+the boss's: 33 containers in the load order, such as the draugr,
+bandit, Falmer and Riekling boss chests. Decided by Patrick on 12
+October 2026.
 
 Gold is always in the chest pile, inside those spans. Two draws are
 made for ordinary goods. The pile is food, drink, potions, ore, gems,
