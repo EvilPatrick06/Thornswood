@@ -156,6 +156,8 @@ function boot(dir, eng) {
     'var NOTICE_FEE = ' + NOTICE_FEE + ';',
     'var JOB_FEE = ' + JOB_FEE + ';',
     'var boardReads = {};',
+    // The register's one-shot marks (#502), which save() writes with the rest.
+    'var steps = loadPart(\'steps\', {});',
     'var g = { __thornswoodSocial: { push: function (actorId, now) { pushed.push(actorId); } } };'
   ];
   for (const k in lifted) { body.push(lifted[k]); }

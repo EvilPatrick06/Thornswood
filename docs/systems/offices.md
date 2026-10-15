@@ -23,8 +23,12 @@ See [Death](death.md).
 ## What the server already treats as an office
 
 A Jarl is Jarl of one hold, chosen when the office is taken, and names
-stewards and that hold's guards. The office is on the character, not a
-Discord role by itself. A steward is the only one who evicts, sets rent, names
+stewards and that hold's guards. A hold has one Jarl (Patrick,
+12 October, #502): its seat is kept by the server, a hold whose seat is
+taken is not offered to anybody else, and the seat comes free when its
+Jarl presses Give up the office. Giving it up hands the hold's jail back
+to nobody; the guards stay the hold's. The office is on the character,
+not a Discord role by itself. A steward is the only one who evicts, sets rent, names
 the hold's box, and moves the notice board, and a Jarl counts as a
 steward. All of it is buttons on the Office page of the K panel, and
 nothing is typed. See [Property](property.md) and
@@ -58,7 +62,9 @@ The rest of the jail, as Patrick decided on 12 October (#502):
 
 - Only the Jarl of a hold claims its jail building. Nobody else is
   offered the claim at its door, and its deed presented by anybody else
-  claims nothing.
+  claims nothing. A claim made on a jail before this rule, by anybody
+  but that hold's seated Jarl, ended once at the first server start
+  with the rule, and the server log names each.
 - There is no timer. Whoever is locked in stays until a guard of that
   hold unlocks the cell, or until they pick the lock, which is allowed.
 - The game's own jail keys open nothing: the world does not hand one
@@ -127,8 +133,10 @@ and the board. They are the Office page of the K panel, which only a
 character that holds an office or may take one sees, and a guard. On an
 account with the Discord Jarl role, or an admin's, it offers the ten
 holds: pressing one twice takes the Jarl office of that hold, which is
-chosen once. A Jarl seated before there was a hold is offered the same
-ten until they choose. A Jarl
+chosen once. A hold with a seated Jarl is named with its Jarl and not
+offered. A Jarl seated before there was a hold is offered the same
+ten until they choose, and every Jarl has Give up the office, pressed
+twice. A Jarl
 names a steward by picking somebody in the world from a list of names,
 and removes one with Remove beside the name; a steward is kept by
 profile, and the list shows the profile beside the name, so two

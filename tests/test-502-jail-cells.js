@@ -202,7 +202,7 @@ yes('R2 a guard of no hold and a guard with no profile are dropped', !g0['505'] 
 yes('R3 and a cell that is not a jail door', W.cellLocked(bogusCell) === false && W.jailHoldOf(bogusCell) === null);
 yes('R4 the log says what was read and what was dropped',
     S.logged.some(function (l) { return /law: dropped 3 row\(s\)/.test(l); }) &&
-    S.logged.some(function (l) { return /law: read 2 guard\(s\) and 0 cell door\(s\)/.test(l); }));
+    S.logged.some(function (l) { return /law: read 2 guard\(s\), 0 cell door\(s\) a guard has turned, and 0 seated Jarl\(s\)/.test(l); }));
 yes('R5 a guard is a guard of their own hold and no other',
     W.isGuard(101, 'whiterun') && !W.isGuard(101, 'riften') && !W.isGuard(303, 'whiterun') && !W.isGuard(0, 'whiterun'));
 

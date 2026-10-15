@@ -42,8 +42,14 @@ const propCommand = slice(propBlock, HEAD, '\n  }\n');
 const charCommand = slice(charBlock, HEAD, '\n  }\n');
 const jarlSrc = slice(propBlock, '  function jarlCmd(parts, actorId, profileId, toProfile) {', '\n  }\n');
 // The Jarl office is of one hold (#502): jarlCmd reads the hold through these.
+// And one Jarl a hold: the seat is in the law register (a fresh one here).
 const holdSrc = slice(propBlock, '  var HOLD_TOWN = {', '};') + '\n' +
-                slice(propBlock, '  function officeHoldOf(s) {', '\n  }\n');
+                slice(propBlock, '  function seatOf(hold) {', '\n  }\n') + '\n' +
+                slice(propBlock, '  function seatHeldBy(actorId) {', '\n  }\n') + '\n' +
+                slice(propBlock, '  function officeHoldOf(s, actorId) {', '\n  }\n') + '\n' +
+                'var law = { guards: {}, cells: {}, jarls: {} };\n' +
+                'function saveLaw() { }\nfunction personName() { return "Somebody"; }\n' +
+                'function giveUpJarl() { return true; }\n';
 yes('the property block\'s command is in the gamemode', propCommand !== null);
 yes('the character block\'s command is in the gamemode', charCommand !== null);
 yes('jarlCmd is in the property block', jarlSrc !== null);
