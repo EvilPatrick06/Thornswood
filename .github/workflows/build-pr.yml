@@ -20,10 +20,11 @@ jobs:
   # WHERE IT RUNS, since 11 October (#1306, Patrick's final call on #2161):
   # GitHub's hosted windows-latest is the default, in the job "launcher"
   # at the end of this file. This job is the VPS FALLBACK. It runs only
-  # for a trusted event (this file has no pull_request trigger: a pull
-  # request builds in build-pr.yml, hosted only), and only when
-  #   - the repository variable BUILD_RUNNER is vps (hosted minutes ran out,
-  #     or GitHub is down: Settings, Variables, BUILD_RUNNER = vps), or
+  # when the hosted job did not succeed (for a pull request, only on a
+  # branch of this repository, never a fork), that is when
+  #   - the repository variable BUILD_RUNNER is vps, which skips the hosted
+  #     job outright (Settings, Variables). Optional: a refused hosted job
+  #     already falls through to the box, the variable only saves the red, or
   #   - a manual run asked for runner: vps, or
   #   - the hosted job failed. A quota or billing stop fails it before any
   #     step runs, and this picks the build up on the box. A real red fails
