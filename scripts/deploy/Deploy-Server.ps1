@@ -195,6 +195,7 @@ if (-not $PSBoundParameters.ContainsKey('Wait')) {
   $Wait = Get-ThornswoodServerReadyWait
 }
 . (Join-Path $Here 'Artifact.ps1')
+. (Join-Path $Here 'ServerArtifact.ps1')   # the server build as an artifact the store keeps (#459)
 . (Join-Path $Here 'ServerSettings.ps1')
 . (Join-Path $Here 'ServerBuild.ps1')
 . (Join-Path $Here 'DeployedBuild.ps1')
@@ -609,6 +610,11 @@ if ($GamemodeOnly) {
   }
   $serverFiles = @((Get-ThornswoodServerRecordFiles $rec).Keys)
   Write-Host ('{0,-22} every server file is the recorded build, commit {1}' -f 'build', $rec.source.commit.Substring(0, 8)) -ForegroundColor DarkGray
+  # The same files as an artifact with a name, for the store on the box
+  # (#459, ServerArtifact.ps1), sent beside the gamemode artifact before the
+  # stage. Built from the bytes it holds to the record as it reads them.
+  $serverArtifact = New-ThornswoodServerBuildArtifact -From $Dist -Record $recordPath
+  Write-Host ('{0,-22} {1}' -f 'server build artifact', (Format-ThornswoodArtifact $serverArtifact)) -ForegroundColor DarkGray
 }
 
 $files = @($serverFiles) + @('gamemode.js', 'server-settings.json')
@@ -892,6 +898,12 @@ foreach ($rel in $send.Keys) {
 Write-Host ''
 Write-Host 'The gamemode artifact, to the store on the box...'
 Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
+# And the server build, on a full deploy (#459). -GamemodeOnly sends no server
+# file, and the box keeps the build it runs.
+if (-not $GamemodeOnly) {
+  Write-Host 'The server build artifact, to the store on the box...'
+  Send-ThornswoodArtifact -Artifact $serverArtifact -Target "$User@$Vps" -SshArgs $ssh
+}
 
 Write-Host ''
 Write-Host "Staging in $rootWin\$stageName..."

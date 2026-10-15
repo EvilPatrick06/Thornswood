@@ -44,7 +44,10 @@
 
   ON THE BOX, C:\Thornswood-Deploys:
     <component>\<name>.zip and <name>.json   every artifact sent, kept
-                                              (Send-ThornswoodArtifact)
+                                              (Send-ThornswoodArtifact); server\
+                                              holds each server build a full
+                                              deploy or a publish sent
+                                              (ServerArtifact.ps1)
     current\<part>.json                       what each part runs now, one per
                                               folder a part runs from, e.g.
                                               thornswood-server-dev.json

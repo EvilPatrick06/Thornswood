@@ -214,12 +214,40 @@ try {
     # have one in its path. The real ssh and scp are programs and take it whole.
     # Each answers as the box does when all is well: the installer's last line,
     # and the dev door script's (#1336, which a dev publish now stops without).
+    # The server build artifact (#459, ServerArtifact.ps1) is a different
+    # build in several runs below, so its store is a stand-in folder: scp puts
+    # the artifact there, and the box answers for it with the hash of what
+    # arrived, the way Send-ThornswoodArtifact asks after a send.
+    $fake = @'
+[IO.File]::AppendAllText($env:TS_PUB_CALLS, ('NAME ' + ($args -join ' ') + [Environment]::NewLine))
+$all = $args -join ' '
+$text = $all
+if ($all -match '-EncodedCommand (\S+)') { $text = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($Matches[1])) }
+# A script over the command line's limit goes up as a file and is run from
+# there (Send-Script.ps1), so the stand-in keeps it to read when it is run.
+elseif ($all -match '-File \S*(thornswood-remote-[0-9a-f]+\.ps1)') {
+    $kept = Join-Path $env:TS_PUB_STORE $Matches[1]
+    if (Test-Path -LiteralPath $kept) { $text = [IO.File]::ReadAllText($kept) }
+}
+if ('NAME' -eq 'scp' -and $args.Count -ge 2 -and [string]$args[-1] -match '(?:Thornswood-Deploys/server/|Windows/Temp/)((?:server-|thornswood-remote-).+)$') {
+    Copy-Item -LiteralPath ([string]$args[-2]) -Destination (Join-Path $env:TS_PUB_STORE $Matches[1]) -Force
+}
+'INSTALL OK'
+'DOOR CARRIED'
+if ($text -match 'Thornswood-Deploys\\server\\(server-[^'']+\.zip)') {
+    $f = Join-Path $env:TS_PUB_STORE $Matches[1]
+    if (Test-Path -LiteralPath $f) { 'HAS ' + (Get-FileHash -LiteralPath $f -Algorithm SHA256).Hash.ToLowerInvariant() } else { 'HAS none' }
+} else { 'HAS ' + $env:TS_PUB_HAS }
+'SERVER RECORDED stand-in'
+exit 0
+'@
     foreach ($n in 'ssh', 'scp') {
-        [IO.File]::WriteAllText((Join-Path $bin ($n + '.ps1')),
-            "[IO.File]::AppendAllText(`$env:TS_PUB_CALLS, ('$n ' + (`$args -join ' ') + [Environment]::NewLine))`r`n'INSTALL OK'`r`n'DOOR CARRIED'`r`n('HAS ' + `$env:TS_PUB_HAS)`r`n'SERVER RECORDED stand-in'`r`nexit 0`r`n")
+        [IO.File]::WriteAllText((Join-Path $bin ($n + '.ps1')), $fake.Replace('NAME', $n))
     }
     $env:PATH = $bin + ';' + $oldPath
     $env:TS_PUB_CALLS = $log
+    $env:TS_PUB_STORE = Join-Path $T 'store-server'
+    New-Item -ItemType Directory -Force -Path $env:TS_PUB_STORE | Out-Null
     # The resources port the run probes afterwards: one from the system, held
     # by this listener for the whole run and handed to every publish as
     # -ResourcesPort, so what answers is this listener and nothing else. Until
@@ -267,6 +295,12 @@ try {
     Yes '  and the build''s own folder was given no stamp' (-not (Test-Path -LiteralPath (Join-Path $dist 'thornswood-build.json')))
     Yes '  and once the install answered, the artifact''s record went to the box''s store' (
         @($r.Calls | Where-Object { $_ -match ('^scp .*C:/Thornswood-Deploys/gamemode/' + [regex]::Escape($art.Name.Replace('.zip', '.json'))) }).Count -eq 1)
+    # The server build it installed, by name, read out of the zip it sent (#459).
+    $srvSent = @(Get-ChildItem -LiteralPath $env:TS_PUB_STORE -Filter 'server-*.zip' -File)
+    $srvNew = & { Set-StrictMode -Off; . (Join-Path $repo 'scripts\deploy\ServerArtifact.ps1'); New-ThornswoodServerBuildArtifact -From $zip -Record $record -OutDir (Join-Path $T 'server-check') }
+    Yes '  and the server build it installed went to the store, the bytes the payload holds' (
+        $srvSent.Count -eq 1 -and $srvSent[0].Name -eq $srvNew.Name -and
+        (Get-FileHash -LiteralPath $srvSent[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant() -eq $srvNew.Sha256)
 
     # ---- 2. the live publish straight after -----------------------------------------
     Write-Host ''; Write-Host 'a live publish after it'
@@ -407,7 +441,7 @@ try {
 }
 finally {
     foreach ($l in $listeners) { try { $l.Stop() } catch { } }
-    $env:PATH = $oldPath; $env:TS_PUB_CALLS = $oldCalls; Remove-Item Env:\TS_PUB_HAS -ErrorAction SilentlyContinue
+    $env:PATH = $oldPath; $env:TS_PUB_CALLS = $oldCalls; Remove-Item Env:\TS_PUB_HAS, Env:\TS_PUB_STORE -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $T -Recurse -Force -ErrorAction SilentlyContinue
 }
 Done
