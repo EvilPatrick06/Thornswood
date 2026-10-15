@@ -45,7 +45,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Repo = Split-Path -Parent $Here
 if (-not $Record) { $Record = Join-Path $Repo 'records\remote-commands.json' }
-. (Join-Path $Here 'fixtures\remote-calls.ps1')
+. (Join-Path $Repo 'tests\fixtures\remote-calls.ps1')
 
 $pass = 0; $fail = 0
 function Ok([bool]$cond, [string]$what) {
