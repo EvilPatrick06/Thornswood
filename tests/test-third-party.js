@@ -751,7 +751,14 @@ if (filesTxt === null) {
   yes(pair[0] + ' has no em dash', pair[1].indexOf('\u2014') < 0);
   yes(pair[0] + ' never says player', !/\bplayers?\b/i.test(pair[1]));
 });
-yes('THIRD-PARTY.md leaves the project\'s own licence to Patrick', /choosing one is Patrick's decision/.test(N));
+// Thornswood's own work is all rights reserved, in LICENSE at the root, with
+// the terms every contributor agrees to once (Patrick, 12 Oct, #1331). This
+// file points there and licenses nothing of ours itself.
+const licence = read(path.join(ROOT, 'LICENSE'));
+yes('LICENSE is at the repo root', licence !== null);
+yes('  it keeps every right to Thornswood\'s own work', /All rights reserved\./.test(licence || ''));
+yes('  and carries the contributor terms', /CONTRIBUTOR TERMS/.test(licence || '') && /agrees to these\s+terms once/.test(licence || ''));
+yes('THIRD-PARTY.md sends the project\'s own licence to LICENSE', /does not license Thornswood's own work\. That is `LICENSE` at the\s+root/.test(N));
 
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
