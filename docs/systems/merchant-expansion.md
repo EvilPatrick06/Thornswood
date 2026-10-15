@@ -241,6 +241,11 @@ Implement quests in complete, source-bound slices with coverage checks for
 all trades, holds, tiers, classes, professions, halves and schools. Legacy
 open quests must remain recoverable during catalogue changes.
 
+A full saved trade must fit the remaining pack together with its incoming
+goods, using the same native size and count limits as a new trade. Checking
+the two inventories separately is insufficient. Validation does not rewrite
+the record; compact credit records keep their existing recovery checks.
+
 Local checks include `node tests/test-merchant-trading.js`,
 `node tests/test-merchant-settlement.js`,
 `node tests/test-merchant-pending-preflight.js`,
