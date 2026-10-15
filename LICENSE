@@ -1,0 +1,49 @@
+Thornswood
+
+Copyright (c) 2026 Patrick (GitHub: EvilPatrick06), the owner of Thornswood.
+All rights reserved.
+
+This repository holds Thornswood's own work: the launcher, the installer and
+its setup program, the game plugins and overlays, the gamemode and its data,
+the content plugin, the website, the Discord bot, the voice service, the
+scripts, the tests, the documents and the lore. No licence to use, copy,
+change or share any of it is granted, except as this file says.
+
+THE TEAM
+
+A collaborator on this repository may read, run, change and build it, only to
+work on Thornswood. That permission ends when their access to the repository
+ends.
+
+WHAT REACHES THE PUBLIC
+
+Thornswood hands people a launcher, an installer, game plugins and overlays
+in readable source, the website's pages and scripts, and a content plugin on
+Nexus Mods. Each is given so people can play on Thornswood's servers and for
+nothing else. Being able to read a file is not a licence to copy, change or
+share it.
+
+OTHER PEOPLE'S WORK
+
+Some files in this repository, and in what Thornswood ships, belong to other
+people and stay under their own licences. THIRD-PARTY.md lists each one with
+its licence and where its source is. This file changes none of those
+licences, and it does not cover the SkyMP fork in engine/skymp, which keeps
+its own.
+
+CONTRIBUTOR TERMS
+
+Everybody who contributes to this repository (code, text, art, data or any
+other change, by commit, pull request or any other way) agrees to these
+terms once, in #staff-general, before their first contribution. Agreeing
+covers what they contributed before that as well.
+
+1. You keep the copyright in what you contribute.
+2. You give the owner of Thornswood a permanent, worldwide, free,
+   non-exclusive and irrevocable licence to use, copy, change, publish,
+   distribute and sublicense what you contribute, as part of Thornswood or
+   on its own, and to put it under any other licence later, an open one
+   included.
+3. You have the right to give that licence: the work is your own, or its
+   owner has given you leave, and the pull request says whose it is.
+4. You give it as it is, with no warranty of any kind.

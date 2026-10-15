@@ -7,8 +7,9 @@ file or from a font's own name table. Where a file came from was checked by
 comparing its sha256 with the copy it came from. Where something could not be
 identified, this file says so instead of guessing.
 
-This file does not license Thornswood's own code. The repository has no licence
-of its own, and choosing one is Patrick's decision.
+This file does not license Thornswood's own work. That is `LICENSE` at the
+root: all rights reserved, with terms every contributor agrees to once
+(decided by Patrick on 12 Oct 2026, #1331).
 
 `tests\test-third-party.js` checks this file against the build. It covers every
 resource Build-Launcher.ps1 compiles into the launcher, every file under
