@@ -294,6 +294,47 @@ if (block) {
     && bossRig.payTierFor(4, 'TreasFalmerChestBoss') === 4
     && bossRig.payTierFor(2, 'TreasFalmerChest') === 2);
 
+  // #510, Patrick 12 Oct, the extras: every boss chest holds a tome or a
+  // burial piece for certain, and a boss chest in a tier 4 place rolls the
+  // burial piece a second time. These fail on the gamemode before the extras.
+  const special = function (rolled) {
+    return !!rolled && rolled.items.some(function (it) { return it.exclusive || !!it.rank; });
+  };
+  const burials = function (rolled) {
+    let n = 0;
+    (rolled ? rolled.items : []).forEach(function (it) { if (it.exclusive) n += it.count; });
+    return n;
+  };
+  // rng order: gold, goods, goods, tome, exclusive, then the sure pick.
+  const quiet = bossRig.roll(1, seqRng([0, 0.99, 0.99, 0.99, 0.99, 0.99, 0]), {});
+  yes('a boss roll that missed both still holds a burial piece or a tome',
+    special(quiet) && quiet.items.length === 1);
+  const quietTome = bossRig.roll(1, seqRng([0, 0.99, 0.99, 0.99, 0.99, 0, 0, 0]), {});
+  yes('and the sure pick can be a novice tome',
+    !!quietTome && quietTome.items.length === 1 && quietTome.items[0].rank === 'novice');
+  const plainQuiet = bossRig.roll(1, seqRng([0, 0.99, 0.99, 0.99, 0.99, 0.99, 0]));
+  yes('an ordinary roll that missed both holds neither', !!plainQuiet && plainQuiet.items.length === 0);
+
+  const unluckyRig = rig(function () { return 0.99; });
+  unluckyRig.putActor(1, '371de:Skyrim.esm');
+  unluckyRig.putChest(0x2100, 'TreasDraugrChestBoss');
+  unluckyRig.putChest(0x2101, 'TreasureChestLarge');
+  yes('opening a boss chest on the unluckiest rolls still pays a tome or a burial piece',
+    special(unluckyRig.onChest(1, 0x2100)));
+  yes('an ordinary chest on the same rolls pays neither', !special(unluckyRig.onChest(1, 0x2101)));
+
+  const luckyRig = rig(function () { return 0; });
+  luckyRig.putActor(3, '142f0:Dragonborn.esm');
+  luckyRig.putChest(0x2200, 'TreasDraugrChestBoss');
+  luckyRig.putChest(0x2201, 'TreasureChestLarge');
+  yes('a boss chest in a tier 4 place rolls the burial piece twice', burials(luckyRig.onChest(3, 0x2200)) === 2);
+  yes('an ordinary chest there rolls it once', burials(luckyRig.onChest(3, 0x2201)) === 1);
+  luckyRig.putActor(4, '142f3:Dragonborn.esm');
+  luckyRig.putChest(0x2202, 'TreasDraugrChestBoss');
+  const fromThree = luckyRig.onChest(4, 0x2202);
+  yes('a boss chest in a tier 3 place pays tier 4 but rolls the burial piece once',
+    !!fromThree && fromThree.tier === 4 && burials(fromThree) === 1);
+
   const act = src.slice(src.indexOf('function activate(actorId, refrId, baseDesc)'),
                         src.indexOf('// ------------------------------------------------- where gold comes from --'));
   yes('opening a container asks the dungeon table',

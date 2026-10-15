@@ -42542,7 +42542,9 @@ log('gamemode loaded:',
     DLC2TreasRieklingChestBoss, DLC2RR02BossChest, MorvunskarBossChest
     and the rest), every one of them a chest, and no other container does.
     The pile (gold, goods, tome, exclusive) is the next tier's. A tier 4
-    place has no tier above it, so its boss chest stays a tier 4 pile.
+    place has no tier above it, so its boss chest stays a tier 4 pile and
+    rolls the burial piece a second time instead, and every boss chest
+    holds a tome or a burial piece for certain (see roll, below).
     The rest is still the place's, because the rest is how long that
     place takes to fill again, not what the chest holds.
   */
@@ -43014,7 +43016,40 @@ log('gamemode loaded:',
     return out;
   }
 
-  function roll(tier, rng) {
+  /*
+    THE BOSS CHEST'S EXTRAS (#510). Patrick, 12 October 2026, on top of the
+    tier above: every boss chest holds a tome or a burial piece for certain,
+    and a boss chest in a tier 4 place, which has no tier above it, rolls the
+    burial piece a second time. The ordinary rolls run first, in the order
+    every other chest rolls them; when neither a tome nor a burial piece came
+    of them, one of the two is put in, the tome or the burial piece in
+    proportion to how likely each is at that tier.
+  */
+  function addTome(items, tier, rng) {
+    var rank = pickWeighted(RANK_WEIGHT[tier].map(function (row) {
+      return { weight: row[1], rank: row[0] };
+    }), rng);
+    var books = TOMES[rank.rank] || [];
+    if (!books.length) return false;
+    var book = books[Math.floor(rng() * books.length)];
+    items.push({
+      desc: book.desc, name: book.name, plural: book.name,
+      count: 1, exclusive: false, rank: rank.rank
+    });
+    return true;
+  }
+
+  function addExclusive(items, tier, rng) {
+    var excl = pickWeighted(exclusiveFor(tier), rng);
+    if (!excl) return false;
+    items.push({
+      desc: excl.desc, name: excl.name, plural: excl.name,
+      count: excl.count || 1, exclusive: true
+    });
+    return true;
+  }
+
+  function roll(tier, rng, boss) {
     tier = clampTier(tier);
     if (typeof rng !== 'function') rng = Math.random;
     var span = GOLD_SPAN[tier];
@@ -43033,27 +43068,16 @@ log('gamemode loaded:',
         }
       }
     }
-    if (rng() < TOME_CHANCE[tier]) {
-      var rank = pickWeighted(RANK_WEIGHT[tier].map(function (row) {
-        return { weight: row[1], rank: row[0] };
-      }), rng);
-      var books = TOMES[rank.rank] || [];
-      if (books.length) {
-        var book = books[Math.floor(rng() * books.length)];
-        items.push({
-          desc: book.desc, name: book.name, plural: book.name,
-          count: 1, exclusive: false, rank: rank.rank
-        });
-      }
+    var tome = false, burial = false;
+    if (rng() < TOME_CHANCE[tier]) tome = addTome(items, tier, rng);
+    if (rng() < EXCL_CHANCE[tier]) burial = addExclusive(items, tier, rng);
+    if (boss && boss.secondExclusive && rng() < EXCL_CHANCE[tier]) {
+      burial = addExclusive(items, tier, rng) || burial;
     }
-    if (rng() < EXCL_CHANCE[tier]) {
-      var excl = pickWeighted(exclusiveFor(tier), rng);
-      if (excl) {
-        items.push({
-          desc: excl.desc, name: excl.name, plural: excl.name,
-          count: excl.count || 1, exclusive: true
-        });
-      }
+    if (boss && !tome && !burial) {
+      var tomeShare = TOME_CHANCE[tier] / (TOME_CHANCE[tier] + EXCL_CHANCE[tier]);
+      if (rng() < tomeShare) addTome(items, tier, rng);
+      else addExclusive(items, tier, rng);
     }
     return { tier: tier, gold: gold, items: mergeItems(items) };
   }
@@ -43157,7 +43181,9 @@ log('gamemode loaded:',
     }
     var wait = RETURN_MIN[tier] * 60000;
     if (last && (now - last) < wait) return null;
-    var rolled = roll(payTierFor(tier, baseName), Math.random);
+    var boss = BOSS_WORD.test(baseName);
+    var rolled = roll(payTierFor(tier, baseName), Math.random,
+      boss ? { secondExclusive: tier === 4 } : null);
     var next=JSON.parse(JSON.stringify(ledger));
     next.entries[reference]={at:now,actor:actorId,tier:rolled.tier,gold:rolled.gold,items:rolled.items};
     // Reserve durably before touching inventory. An uncertain native write
