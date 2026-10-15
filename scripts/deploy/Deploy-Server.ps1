@@ -493,7 +493,7 @@ if (-not $GamemodeOnly -and -not (Test-Path -LiteralPath $Dist)) {
 # uncommitted changes (#1121).
 . (Join-Path $Here 'Artifact.ps1')
 $artifact = New-ThornswoodArtifact -Component gamemode -RepoDir (Join-Path $Here '..\..') -Paths 'game/gamemode.js' `
-  -AlsoSends (@($ThornswoodRepoPlugins | ForEach-Object { 'game/content/' + $_ }) + 'records/server-build.json')
+  -AlsoSends 'game/content/Thornswood-Content.esp', 'game/content/Thornswood-Last.esp', 'records/server-build.json'
 '{0,-22} {1}' -f 'artifact', (Format-ThornswoodArtifact $artifact) | Write-Host
 $src = Join-Path $artifact.Folder 'game\gamemode.js'
 # -GamemodeOnly has no build to copy it into, and sends the artifact's own.

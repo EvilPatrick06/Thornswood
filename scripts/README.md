@@ -1,6 +1,6 @@
 # The PowerShell scripts
 
-Every `.ps1` under this folder, 199 of them, by area: `release` builds and
+Every `.ps1` under this folder, 200 of them, by area: `release` builds and
 ships, `deploy` puts things on the VPS, `vps` looks after the box, `ops` runs
 the world day to day, `mods` works on the collection and the plugins, `dev`
 is for whoever is changing this repository. `oneoff` holds finished one time
@@ -160,11 +160,11 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/Publish-VirusTotal.ps1](release/Publish-VirusTotal.ps1) | Optional manual tool: sends a file to VirusTotal, or says plainly that it is not sending and carries on. Not called from publish. |
 | [release/Read-JsonFile.ps1](release/Read-JsonFile.ps1) | ConvertFrom-ThornswoodJson: JSON text read from a file, parsed, or a stop that names the file. |
 | [release/RecordShape.ps1](release/RecordShape.ps1) | The shape and version each high-risk JSON record must have, checked fail closed (#2180, first slice). docs\JSON-STATE-INVENTORY.md lists every critical JSON file, who writes it and who reads it. |
-| [release/RepoPlugins.ps1](release/RepoPlugins.ps1) | The plugins this repo builds and ships itself (Thornswood-Content.esp, Thornswood-Last.esp), one list for packs, deploys and the server-first check, so a rebuild needs no collection revision (#2486). |
 | [release/Refresh-DevNews.ps1](release/Refresh-DevNews.ps1) | Marks the dev feed's notes DEV again against what main has published, and sets its mainVersion, with no release. |
 | [release/Release-Baseline.ps1](release/Release-Baseline.ps1) | What a release is diffed against, and the record each release publishes of what it left installed (#441). |
 | [release/Release-Name.ps1](release/Release-Name.ps1) | One name for each release, recorded in the feed and the store, and a git tag on the commit it was built from (#444). |
 | [release/Repair-Manifest.ps1](release/Repair-Manifest.ps1) | Takes packs with no download url back out of version.json and sends the fix. |
+| [release/RepoPlugins.ps1](release/RepoPlugins.ps1) | The plugins this repository builds and ships itself, in one list (#2486). |
 | [release/Resolve-ReleaseTag.ps1](release/Resolve-ReleaseTag.ps1) | Says which commit a launcher release builds, or refuses (#2202). |
 | [release/Rollback-Feed.ps1](release/Rollback-Feed.ps1) | Puts a channel's feed back to an earlier release, so every launcher on that channel moves its game files back to what that release installed, with no hand editing of version.json (#442). |
 | [release/Scrub-Feed.ps1](release/Scrub-Feed.ps1) | Takes Bethesda's files and one machine's own files out of what a channel's feed has already published: every pack that carries one is rebuilt without it, every release record that names one is written again without it, the feed and the store's baseline are sent through Feed-Store.ps1 like any other feed edit, and the old bytes are then deleted from the site once no feed names them (#1152, #1227, #1229, #1239). |

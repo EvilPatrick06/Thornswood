@@ -318,8 +318,9 @@ if (-not (Test-Path -LiteralPath $Gamemode)) { throw "There is no gamemode at $G
 $artifact = $null
 if (-not $PutBack) {
 $alsoSends = @('records/most-online.json', 'records/server-build.json')
-# Every plugin of ours (RepoPlugins.ps1, #2486), held to the commit like the gamemode.
-if ($LoadOrder) { . (Join-Path $Here '..\release\RepoPlugins.ps1'); foreach ($ownName in $ThornswoodRepoPlugins) { $alsoSends += ('game/content/' + $ownName) } }
+# Every plugin of ours, held to the commit like the gamemode: the names in
+# RepoPlugins.ps1 (#2486), written out so tests\test-deploy-artifact.ps1 can read them.
+if ($LoadOrder) { $alsoSends += 'game/content/Thornswood-Content.esp', 'game/content/Thornswood-Last.esp' }
 $artifact = New-ThornswoodArtifact -Component gamemode -RepoDir (Join-Path $Here '..\..') -Paths 'game/gamemode.js' -AlsoSends $alsoSends
 Write-Host ('  artifact ' + (Format-ThornswoodArtifact $artifact))
 $Gamemode = Join-Path $artifact.Folder 'game\gamemode.js'
