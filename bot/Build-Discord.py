@@ -292,6 +292,15 @@ NOT_MADE = ('Server Booster', 'Patreon', 'News Pings', 'Updates Pings')
 # opens #reports and every other staff channel.
 STAFF = ('Owner', 'Dev', 'Moderator', 'Gamemaster')
 
+# Who sees the Gamemasters category: the gamemaster ranks and nobody else.
+# Djinn, 14 Oct 2026: "there should be NO public channel inside the GM channel
+# area. GM only." So no Member, no Moderator, no Loremaster, no Playtester.
+# Owner and Dev hold Administrator, which Discord lets through every overwrite,
+# so they see it anyway; nothing here grants it to them. Both spellings of the
+# lead role are named, the same as the Test-Tasks line, because the role has
+# been written both ways; _named passes over the one that is not there.
+GM_ONLY = ('Lead Gamemaster', 'Lead GM', 'Gamemaster', 'Trial Gamemaster')
+
 # --------------------------------------------------------------- channels --
 # mode:  public       anybody talks, including somebody not yet approved
 #        read         staff post, everybody reads, including the unapproved
@@ -300,6 +309,8 @@ STAFF = ('Owner', 'Dev', 'Moderator', 'Gamemaster')
 #        hold         one hold's Citizen and Jarl, and hold staff
 #        staff        staff only, invisible to everybody else
 #        pathfind     testers and staff only
+#        gm           the gamemaster ranks only (GM_ONLY), invisible to
+#                     everybody else, staff included
 #
 # THE GATE, set up by hand on 23 and 24 September. Somebody who joins sees the
 # Start Here category (#rules, #welcome, #start-here, #say-hello) and the
@@ -449,6 +460,16 @@ PLAN = [
    dict(kind='text',  name='test-tasks-archive', mode='pathfind', make=False),
    dict(kind='voice', name='play-testing', mode='pathfind'),
  ]),
+ # The gamemasters' own room. Djinn, 14 Oct (off hold): a GM room, a GM Voice
+ # room, and one channel for reprimands, punishments and bans only. Every
+ # channel in it is gm, and nothing public goes in here.
+ ('Gamemasters', [
+   dict(kind='text',  name='gm',             mode='gm',
+        topic='Planning, handoffs and questions between gamemasters.'),
+   dict(kind='text',  name='gm-discipline',  mode='gm',
+        topic='Reprimands, punishments and bans only. Nothing else.'),
+   dict(kind='voice', name='GM Voice',       mode='gm'),
+ ]),
  ('Staff', [
    # The staff #news. Not the public #news in Information: that one carries
    # the key, and the release webhook with it. The watchdog does not speak
@@ -522,6 +543,8 @@ KEEP = (
     # staff-channel.txt. Not in PLAN, so without this a run would list it as
     # no longer in the plan and -Prune would delete it (#2501).
     'staff-updates',
+    # Gamemasters category (#2519). Named so -Prune cannot take them.
+    'gm', 'gm-discipline', 'gm voice',
 )
 
 
@@ -776,6 +799,13 @@ def overwrites(guild, mode, roles, hold=None, needs=BOT_NEEDS, extra=None):
         for r in list(STAFF) + ['Playtester']:
             if roles.get(r):
                 out[roles[r]] = talk
+        return with_bot(guild, _also(guild, roles, out, extra, talk), needs)
+    if mode == 'gm':
+        out = {ev: deny_all}
+        for n in GM_ONLY:
+            r = _named(guild, roles, n)
+            if r is not None:
+                out[r] = talk
         return with_bot(guild, _also(guild, roles, out, extra, talk), needs)
     return {}
 
@@ -1091,6 +1121,7 @@ async def on_ready():
                 cat = discord.utils.get(guild.categories, name=catname)
                 if cat is None:
                     mode = {'Staff': 'staff', 'Testing': 'pathfind',
+                            'Gamemasters': 'gm',
                             'The Holds': 'hold',
                             'Start Here': 'public',
                             'Applications': 'public'}.get(catname, 'open')
