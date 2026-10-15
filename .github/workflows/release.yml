@@ -65,14 +65,15 @@
 # SHA256SUMS, then the publish gate and the launcher's own Signature.cs on the
 # launcher. A red verify means the draft must not be shipped.
 #
-# ONE DRAFT PER TAG. GET /releases/tags/<tag> never returns a draft (measured
-# 12 Oct: it answered 404 for v1.2.4 while release 410844061 was its draft),
-# so a run that looked there made a second draft every time a tag was built
-# again; v1.1.96 has two. The draft step reads the releases list, which does
-# hold drafts, uploads into the one draft the tag has, and stops when the tag
-# has more than one release or its release is already published (a new build
-# is a new tag, never a replaced asset). The concurrency group is the tag, so
-# a tag push and a manual run for the same tag queue instead of racing.
+# ONE DRAFT PER TAG (#2462). GET /releases/tags/<tag> never returns a draft
+# (measured 12 Oct: it answered 404 for v1.2.4 while release 410844061 was
+# its draft), so a run that looked there made a second draft every time a
+# tag was built again; v1.1.96 has two. The draft step reads the releases
+# list, which does hold drafts, uploads into the one draft the tag has, and
+# stops when the tag has more than one release or its release is already
+# published (a new build is a new tag, never a replaced asset). The
+# concurrency group is the tag, so a tag push and a manual run for the same
+# tag queue instead of racing. test-release-workflow.ps1 holds the shape.
 #
 # WHY IT IS PINNED. Every action is pinned to a full-length commit SHA: a
 # moved tag on an action cannot change what runs.
