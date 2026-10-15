@@ -275,6 +275,11 @@ jobs:
           # tests\test-launcher-icons.js fails if any frame of
           # launcher\app.ico matches a frame of site\public\favicon.ico, or
           # if app.ico and app-dev.ico share a frame.
+          # Issue #2177: every picture, video, sound, font, mesh, interface
+          # file and plugin in the repository is in the asset provenance
+          # register, recordsasset-provenance.json, by its sha256, so a
+          # new or changed one is red until its source, maker, licence and
+          # approval are written down, or what is missing is. Under a second.
           # Issue #485: the whose-game gate is one copy, in
           # thornswood-front.js, and every other plugin reads it on the first
           # tick and stays idle without it. tests\test-whose-game-gate.js
@@ -284,6 +289,7 @@ jobs:
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
                  'test-third-party.js',
+                 'test-asset-provenance.js',
                  'test-ship-rules.ps1',
                  'test-chargen-gone.ps1',
                  'test-hand-install-retired.ps1',
