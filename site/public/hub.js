@@ -2225,19 +2225,17 @@ function loadGalleryStaff() {
     each(box, '[data-galdel]', function (b) {
       b.onclick = function () {
         var pendingOne = b.getAttribute('data-galpend') === '1';
-        var ask = pendingOne
+        // One question (#2352, option C): removing deletes the file. The site
+        // keeps a picture somebody reported, out of sight, for 30 days so
+        // staff can look into the report, then deletes it.
+        var ask = (pendingOne
           ? ('Delete ' + b.dataset.galdel + ' from the waiting queue?')
-          : ('Delete ' + b.dataset.galdel + ' from the live gallery?');
+          : ('Delete ' + b.dataset.galdel + ' from the live gallery?')) +
+          '\n\nIts file is deleted from the site. If somebody reported it, the site keeps the file out of sight for 30 days for staff, then deletes it.';
         if (!confirm(ask)) return;
-        // Said plainly (#2352): OK deletes the file from the site; Cancel
-        // keeps it on the site's disk, where it is no longer shown
-        // to anybody. A removal the sender asked for is OK.
-        var drop = confirm('Delete the file from the site as well?\n\n' +
-          'OK deletes it. Choose OK when the person who sent it asked for it to be removed.\n' +
-          'Cancel keeps the file on the site\'s disk. It is not shown anywhere, and it stays until somebody deletes it there.');
         b.disabled = true; b.textContent = 'deleting';
         api('/api/gallery/approved', { method:'DELETE', headers:{ 'content-type':'application/json' },
-            body: JSON.stringify({ name: b.dataset.galdel, deleteFile: drop }) })
+            body: JSON.stringify({ name: b.dataset.galdel }) })
           .then(function (r) { return r.json().catch(function () { return { ok: r.ok }; }); })
           .then(function (a) {
             if (a && a.ok === false) alert(a.error || 'The site could not finish removing that picture.');
