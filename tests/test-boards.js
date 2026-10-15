@@ -232,7 +232,7 @@ if (block !== null) {
         flat.indexOf("SOLITUDE'S X WAS MISSING A DIGIT") !== -1 &&
         flat.indexOf('-64263') !== -1);
     yes('S6 and the seeding number moved with it, or nothing in the world would change',
-        /var BOARD_SEED = 4;/.test(src));
+        Number((/var BOARD_SEED = (\d+);/.exec(src) || [])[1]) >= 4);
     yes('the hold box is that town\'s notice board',
         /function holdStanding\(actorId\) \{[\s\S]*?boardHere\(actorId\)/.test(src));
     yes('S6 and a steward placing a board marks it so a deploy cannot undo it',
