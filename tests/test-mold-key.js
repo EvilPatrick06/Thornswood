@@ -272,6 +272,7 @@ function client(opt) {
     // Hand over the letter (#1595), Activate on somebody you carry a letter
     // for, asked first. test-1595-deliver.js has what it does.
     'function deliverPress() { return false; }',
+    'function boxPress() { return false; }',
     'function boardPress() { return false; }',
     'function driverPress() { return false; }',
     'function merchantPress() { return false; }',

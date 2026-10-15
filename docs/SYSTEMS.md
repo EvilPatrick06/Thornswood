@@ -36,7 +36,7 @@ of these:
   body, J for journals, group books and every town's notice board, the
   notice board itself, the trade window, a trader's wares, and the help,
   on F7 and on Help on the K, P and J panels (#1633);
-- activating the thing itself in the world: E on a board, a driver or
+- activating the thing itself in the world: E on a board, its drop box, a driver or
   a trader, lying down in a bed, sitting on a seat;
 - the emote wheel: Sit is a seat on the ground, and a lute, a flute,
   a drum or Sing is the bard.
