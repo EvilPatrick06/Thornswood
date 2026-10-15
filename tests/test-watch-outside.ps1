@@ -56,6 +56,8 @@ Yes 'the collection comes from Config.cs' ($S.NexusSlug -and $S.NexusGame)
 Yes 'the VPS address comes from scripts\vps\vps.json' ($S.VpsAddress -match '^\d+\.\d+\.\d+\.\d+$')
 Yes 'the certificate line is 14 days' ($S.CertDays -eq 14)
 Yes 'the VPS user comes from scripts\vps\vps.json' ($S.VpsUser -eq 'Administrator')
+Yes 'the off-box line is 26 hours, the box''s own (#2183)' ($S.OffBoxHours -eq 26)
+Yes 'the off-box folder is Where.ps1 Backups' (('' + $S.BackupsFolder) -match 'local[\\/]backups$')
 Yes 'the watchdog''s folder is Watch-Services.ps1''s own -Root' ($S.WatchRoot -eq 'C:\Thornswood-Watch')
 Yes 'the webhook''s channel is #staff-updates, bot\staff-channel.txt''s id (#2501)' ($S.StaffChannel -eq '1549254991082946570')
 
@@ -70,7 +72,17 @@ $script:posted = New-Object 'System.Collections.Generic.List[string]'
 $script:hookFails = $false
 $script:asked = New-Object 'System.Collections.Generic.List[string]'
 
+$script:bk = Join-Path $Temp ('thornswood-offbox-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+$null = New-Item -ItemType Directory -Path $script:bk -Force
+$S.BackupsFolder = $script:bk
+function Set-Copies([string[]]$names) {
+  Get-ChildItem -LiteralPath $script:bk -File | Remove-Item -Force
+  foreach ($n in $names) { [IO.File]::WriteAllText((Join-Path $script:bk $n), 'x') }
+}
+function Copy-Aged([double]$hours) { return ('thornswood-' + $script:clock.AddHours(-$hours).ToString('yyyyMMdd-HHmmss') + '.zip.enc') }
+
 function Reset-World {
+  Set-Copies @((Copy-Aged 3))
   $script:online = $true
   $script:site = 200
   $script:feed = 200
@@ -148,7 +160,7 @@ try {
   # ---- everything fine ----------------------------------------------------
   Reset-World
   $r = Pass-Once
-  Yes 'a healthy world: every check ran' ($r.Count -eq 9)
+  Yes 'a healthy world: every check ran' ($r.Count -eq 10)
   Yes 'a healthy world: nothing is wrong' (@($r.Values | Where-Object { $_.Bad }).Count -eq 0)
   Yes 'a healthy world: nothing is posted' ($script:posted.Count -eq 0)
   Yes 'signing was asked with the Azure token as a bearer' ($script:signAuth -eq 'Bearer eyFAKE')
@@ -288,6 +300,37 @@ try {
   Yes 'a collection Nexus no longer has is wrong' ((Check-Nexus $S).Bad)
   Reset-World
 
+  # ---- the copy of the backups off the VPS (#2183) ----------------------------
+  Reset-World
+  Yes 'off-box: a copy 3 hours old is fine' (-not (Check-OffBox $S).Bad)
+  Set-Copies @((Copy-Aged 25.5))
+  Yes 'off-box: 25.5 hours is still inside the 26 hour line' (-not (Check-OffBox $S).Bad)
+  Set-Copies @((Copy-Aged 57), (Copy-Aged 81))
+  $o = Check-OffBox $S
+  Yes 'off-box: newest 57 hours old is wrong, and says its age and the line' ($o.Bad -and $o.Why -match '57 hours old, and the line is 26')
+  Set-Copies @(((Copy-Aged 2) + '.failed-20261015-040000'), (Copy-Aged 40))
+  Yes 'off-box: a copy set aside as failed does not count as fresh' ((Check-OffBox $S).Bad)
+  Set-Copies @('notes.txt', 'thornswood-latest.zip.enc')
+  Yes 'off-box: no backup by the box''s naming is wrong' ((Check-OffBox $S).Bad -and (Check-OffBox $S).Why -match 'no backup in')
+  $keep = $S.BackupsFolder; $S.BackupsFolder = (Join-Path $script:bk 'gone')
+  Yes 'off-box: the folder missing is wrong' ((Check-OffBox $S).Bad -and (Check-OffBox $S).Why -match 'is not there')
+  $S.BackupsFolder = ''
+  Yes 'off-box: no folder known is wrong and says -Install' ((Check-OffBox $S).Why -match '-Install')
+  $S.BackupsFolder = $keep
+  Clear-Posted
+  Reset-World
+  Tick 60
+  Set-Copies @((Copy-Aged 30))
+  $null = Pass-Once
+  Yes 'off-box stale: one message at once' ((Posted '*copy of the backups off the VPS, on this machine, is out of date*') -eq 1)
+  Yes 'it says what to run' ((Posted '*Fetch-Backups.ps1*') -eq 1)
+  Tick 60; $null = Pass-Once
+  Yes 'still stale an hour later: no second message' ((Posted '*off the VPS, on this machine*') -eq 1)
+  Set-Copies @((Copy-Aged 1))
+  Tick 60; $null = Pass-Once
+  Yes 'a new copy: one message saying it is up to date again' ((Posted '*is up to date again*') -eq 1)
+  Clear-Posted
+  Reset-World
   # ---- a webhook that fails, then works ---------------------------------------
   Clear-Posted
   $script:hookFails = $true
@@ -449,6 +492,7 @@ try {
 }
 finally {
   Remove-Item -LiteralPath $dir -Recurse -Force -EA SilentlyContinue
+  Remove-Item -LiteralPath $script:bk -Recurse -Force -EA SilentlyContinue
 }
 
 Write-Host ''
