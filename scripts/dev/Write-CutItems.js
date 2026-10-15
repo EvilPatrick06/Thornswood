@@ -116,9 +116,9 @@ const RIEKLING_KEEP = new Set([
   'Riekling Fur Armour', 'Riekling Fur Boots', 'Riekling Fur Gauntlets', 'Riekling Fur Cloak', 'Riekling Horned Helmet',
   'Riekling Chief Fur Iron Armour', 'Riekling Chief Helmet',
   'Riekling Spear', 'Riekling Bone Club',
-  // A riekling's own plain clothes, put back by Patrick on 12 October 2026
-  // (#614): a new riekling starts in them, and a riekling tailor makes them.
-  'Riekling LoinCloth 1', 'Riekling LoinCloth 2', 'Riekling Cloth Hand Wraps', 'Riekling Cloth Foot Wraps'
+  // A riekling's plain clothes, put back by Patrick on 12 October 2026 (#614):
+  // a new riekling starts in them, and a riekling tailor makes them.
+  'Riekling Belted Tunic', 'Riekling Footwraps'
 ]);
 
 const ARROW_KEEP = new Set([
@@ -550,7 +550,7 @@ md += 'A woodwright still makes ammunition. That is the job.\n\n';
 md += 'Cook dishes stay. A second row of the same dish, the two-portion copy, is cut.\n\n';
 md += 'Staves stay only when the spell the menu asks for is in the college book. The others are cut. The Aetherial Staff is cut with the Aetherium.\n\n';
 md += 'Riekling gear that is a copy of a human suit is cut. What stays is one light fur set, one chief set, a spear, and a bone club, ';
-md += 'and a riekling\'s own plain clothes: the two loincloths and the cloth hand and foot wraps, which a new riekling starts in and a tailor makes (Patrick, 12 October 2026). ';
+md += 'and a riekling\'s plain clothes, the Riekling Belted Tunic and the Riekling Footwraps, which a new riekling starts in and a tailor makes (Patrick, 12 October 2026). ';
 md += 'Those stay race locked, and they are company wares: the company may haul them, and a riekling may make them.\n\n';
 md += 'Imperial and Penitus pieces are not in the open book. One heavy set and one light set, plus Penitus pieces, are embassy craft. The knight, legate, and captain variants are cut.\n\n';
 md += 'Thalmor robes and Justiciar weapons are not found. The remnant roll may craft them.\n\n';
