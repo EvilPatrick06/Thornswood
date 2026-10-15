@@ -19,15 +19,23 @@
   whose call is gone.
 
   HOW. Parses every .ps1 and .psm1 under scripts\ with the PowerShell parser
-  (comments and the text of scripts sent to the box are not commands, so they
-  never count) and finds each command named ssh, scp, ssh-keyscan,
-  Invoke-ThornswoodRemote, Invoke-ThornswoodSecretRemote,
-  Invoke-ThornswoodArtifactRemote, Send-ThornswoodArtifactFile or Remote, and
-  each call of Remote.ps1 by path. A call is keyed by script, the function it
-  sits in (<top> outside one), the command, and its number among calls with
-  that same script, function and command. Line numbers are not part of the
-  key, so an edit above a call does not break it. Nothing is run and nothing
-  leaves this machine.
+  (tests\fixtures\remote-calls.ps1; comments and the text of scripts sent to
+  the box are not commands, so they never count) and finds each command named
+  ssh, scp, ssh-keyscan, Invoke-ThornswoodRemote,
+  Invoke-ThornswoodSecretRemote, Invoke-ThornswoodArtifactRemote,
+  Send-ThornswoodArtifactFile or Remote, and each call of Remote.ps1 by path.
+
+  A ROW NAMES ITS CALL BY TEXT, NOT BY PLACE (#2498). A row is script, the
+  function the call sits in (<top> outside one), the command, and an anchor:
+  text from the call's own lines, or from the few lines above it when several
+  calls in that function send the same text. Until #2498 a row carried the
+  call's number among its script's calls instead, so a call put in ahead of
+  others moved every later row onto the wrong call (#2471, #2500) and only a
+  renumbering by hand, which nothing checked, put them back. Now an anchor
+  that names no call, or more than one, fails here, and so does a call that
+  no row names or that two rows name. A call put in anywhere fails by name
+  until it has a row, and every other row stays on its own call. Nothing is
+  run and nothing leaves this machine.
 #>
 [CmdletBinding()]
 param([string]$Record)
@@ -37,46 +45,34 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Repo = Split-Path -Parent $Here
 if (-not $Record) { $Record = Join-Path $Repo 'records\remote-commands.json' }
+. (Join-Path $Here 'fixtures\remote-calls.ps1')
 
 $pass = 0; $fail = 0
 function Ok([bool]$cond, [string]$what) {
     if ($cond) { $script:pass++ } else { $script:fail++; Write-Host ('FAIL ' + $what) -ForegroundColor Red }
 }
 
-$names = @('Invoke-ThornswoodRemote', 'Invoke-ThornswoodSecretRemote', 'Invoke-ThornswoodArtifactRemote',
-    'Send-ThornswoodArtifactFile', 'Remote', 'ssh', 'scp', 'ssh-keyscan')
 $classes = @('stage', 'swap', 'putback', 'feed-send', 'task-start-stop', 'read-status', 'admin', 'transport')
 
-function Get-RemoteCalls([string]$Root) {
-    $found = New-Object System.Collections.Generic.List[string]
-    $files = Get-ChildItem -LiteralPath (Join-Path $Root 'scripts') -Recurse -File |
-        Where-Object { $_.Extension -eq '.ps1' -or $_.Extension -eq '.psm1' } | Sort-Object FullName
-    foreach ($f in $files) {
-        $tokens = $null; $errs = $null
-        $ast = [System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$tokens, [ref]$errs)
-        $rel = $f.FullName.Substring($Root.Length + 1).Replace('\', '/')
-        $count = @{}
-        $cmds = $ast.FindAll({ param($a) $a -is [System.Management.Automation.Language.CommandAst] }, $true) |
-            Sort-Object { $_.Extent.StartOffset }
-        foreach ($c in $cmds) {
-            $n = $c.GetCommandName()
-            if ($n) { $n = $n -replace '(?i)\.exe$', '' }
-            $via = $null
-            if ($n -and ($names -contains $n)) { $via = $n }
-            elseif ($c.CommandElements[0].Extent.Text -match 'Remote\.ps1') { $via = 'Remote.ps1' }
-            if (-not $via) { continue }
-            $scope = '<top>'
-            $p = $c.Parent
-            while ($p) {
-                if ($p -is [System.Management.Automation.Language.FunctionDefinitionAst]) { $scope = $p.Name; break }
-                $p = $p.Parent
-            }
-            $k = $rel + '|' + $scope + '|' + $via
-            $count[$k] = 1 + [int]$count[$k]
-            $found.Add($k + '#' + $count[$k])
-        }
+# Holds rows to calls. Returns the problems, one string each.
+function Get-MapProblems($Calls, $Rows) {
+    $out = New-Object System.Collections.Generic.List[string]
+    $named = @{}
+    foreach ($r in @($Rows)) {
+        $key = [string]$r.script + '|' + [string]$r.scope + '|' + [string]$r.via
+        $anchor = [string]$r.anchor
+        if (-not $anchor.Trim()) { $out.Add($key + ' has no anchor'); continue }
+        $m = @(Find-RemoteCallsByAnchor $Calls $key $anchor)
+        if ($m.Count -eq 0) { $out.Add($key + ' anchor names no call: ' + $anchor); continue }
+        if ($m.Count -gt 1) { $out.Add($key + ' anchor names ' + $m.Count + ' calls (lines ' + (($m | ForEach-Object { $_.Line }) -join ', ') + '): ' + $anchor); continue }
+        $id = $m[0].Key + '@' + $m[0].Line
+        if ($named.ContainsKey($id)) { $out.Add($key + ' line ' + $m[0].Line + ' is named by two rows: ' + $named[$id] + ' and ' + $anchor) }
+        else { $named[$id] = $anchor }
     }
-    return , $found
+    foreach ($c in $Calls) {
+        if (-not $named.ContainsKey($c.Key + '@' + $c.Line)) { $out.Add('remote call not in the record: ' + $c.Key + ' at line ' + $c.Line + ': ' + (($c.Own | Select-Object -First 1) -as [string]).Trim()) }
+    }
+    return , $out
 }
 
 $calls = Get-RemoteCalls $Repo
@@ -87,26 +83,48 @@ if (-not (Test-Path -LiteralPath $Record)) {
 } else {
     $doc = Get-Content -LiteralPath $Record -Raw | ConvertFrom-Json
     $rows = @($doc.calls)
-    $keys = @{}
     foreach ($r in $rows) {
-        $k = $r.script + '|' + $r.scope + '|' + $r.via + '#' + $r.n
-        Ok (-not $keys.ContainsKey($k)) ('the record has ' + $k + ' twice')
-        $keys[$k] = $r
+        $k = $r.script + '|' + $r.scope + '|' + $r.via + ' (' + $r.anchor + ')'
+        Ok ($null -eq $r.PSObject.Properties['n']) ($k + ' still carries a position number, which #2498 took out')
         Ok ($classes -contains $r.class) ($k + ' has class ' + $r.class + ', not one of ' + ($classes -join ', '))
         Ok ([bool]([string]$r.does).Trim()) ($k + ' says nothing about what it does')
         Ok ([bool]([string]$r.reason).Trim()) ($k + ' gives no reason for its class')
     }
-    $seen = @{}
-    foreach ($c in $calls) {
-        $seen[$c] = $true
-        Ok ($keys.ContainsKey($c)) ('remote call not in the record: ' + $c)
-    }
-    foreach ($k in $keys.Keys) {
-        Ok ($seen.ContainsKey($k)) ('the record maps a call that is no longer there: ' + $k)
-    }
-    $scripts = @($calls | ForEach-Object { $_.Split('|')[0] } | Sort-Object -Unique)
+    $problems = Get-MapProblems $calls $rows
+    foreach ($p in $problems) { Ok $false $p }
+    Ok ($problems.Count -eq 0) 'every row names exactly one call and every call exactly one row'
+    $scripts = @($calls | ForEach-Object { $_.Script } | Sort-Object -Unique)
     Ok ([int]$doc.scriptCount -eq $scripts.Count) ('the record says ' + $doc.scriptCount + ' scripts, the scan finds ' + $scripts.Count)
     Ok ([int]$doc.callCount -eq $calls.Count) ('the record says ' + $doc.callCount + ' calls, the scan finds ' + $calls.Count)
+}
+
+# ---- planted: a call put in ahead of others moves no row (#2498) -------------
+$tmp = Join-Path ([IO.Path]::GetTempPath()) ('remote-map-' + [guid]::NewGuid().ToString('n'))
+try {
+    $dir = Join-Path $tmp 'scripts'
+    [void][IO.Directory]::CreateDirectory($dir)
+    $f = Join-Path $dir 'Planted.ps1'
+    $before = "function Remote(`$s) { }`r`n# stop the site`r`nRemote @`"`r`nStop-It`r`n`"@`r`n# read the log`r`nRemote @`"`r`nRead-It`r`n`"@`r`n"
+    [IO.File]::WriteAllText($f, $before)
+    $c1 = Get-RemoteCalls $tmp
+    $planted = @(
+        [pscustomobject]@{ script = 'scripts/Planted.ps1'; scope = '<top>'; via = 'Remote'; anchor = 'Stop-It'; does = 'stops'; class = 'admin'; reason = 'x' },
+        [pscustomobject]@{ script = 'scripts/Planted.ps1'; scope = '<top>'; via = 'Remote'; anchor = 'Read-It'; does = 'reads'; class = 'read-status'; reason = 'x' })
+    Ok ((Get-MapProblems $c1 $planted).Count -eq 0) 'planted: two calls sending the same opening line are each named by their own text'
+    [IO.File]::WriteAllText($f, $before.Replace("# stop the site", "Remote 'New-It'`r`n# stop the site"))
+    $c2 = Get-RemoteCalls $tmp
+    $p2 = Get-MapProblems $c2 $planted
+    Ok ($p2.Count -eq 1 -and $p2[0] -like 'remote call not in the record:*New-It*') ('planted: a call put in first fails by name, alone (' + ($p2 -join ' / ') + ')')
+    $stop = @(Find-RemoteCallsByAnchor $c2 'scripts/Planted.ps1|<top>|Remote' 'Stop-It')
+    Ok ($stop.Count -eq 1 -and ($stop[0].Own -join "`n").Contains('Stop-It')) 'planted: and the row that named the stop call still names the stop call'
+    $dup = @($planted[0], $planted[0])
+    Ok (@(Get-MapProblems $c1 $dup | Where-Object { $_ -like '*named by two rows*' }).Count -eq 1) 'planted: two rows on one call fail'
+    $gone = @([pscustomobject]@{ script = 'scripts/Planted.ps1'; scope = '<top>'; via = 'Remote'; anchor = 'Gone-It' })
+    Ok (@(Get-MapProblems $c1 $gone | Where-Object { $_ -like '*names no call*' }).Count -eq 1) 'planted: an anchor whose call is gone fails'
+    $wide = @([pscustomobject]@{ script = 'scripts/Planted.ps1'; scope = '<top>'; via = 'Remote'; anchor = '-It' })
+    Ok (@(Get-MapProblems $c1 $wide | Where-Object { $_ -like '*names 2 calls*' }).Count -eq 1) 'planted: an anchor that names two calls fails'
+} finally {
+    if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Recurse -Force }
 }
 
 Write-Host ('{0} passed, {1} failed' -f $pass, $fail)
