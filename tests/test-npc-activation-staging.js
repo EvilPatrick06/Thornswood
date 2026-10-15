@@ -142,3 +142,17 @@ for(const merchant of [false,true]) {
   assert.equal(saves,0,'a revoked caller cannot initialize a merchant purse');
   assert.equal(pending.size,0);
 }
+
+{
+  let runtime,serial=0,reentered=false;const pending=new Map(),cleared=[];
+  const timers={setTimeout(fn){pending.set(++serial,fn);return serial;},clearTimeout(id){
+    cleared.push(id);
+    if(!reentered){reentered=true;runtime.stop();}
+    pending.delete(id);
+  }};
+  runtime=ctx.startSharedNpcServerRuntime({makeProperty(){}},timers,()=>0,()=>{},null,{suspended:true});
+  runtime.stop();
+  assert.equal(cleared.length,serial,'reentrant stop cannot cancel an owned timer twice');
+  assert.equal(new Set(cleared).size,serial);
+  assert.equal(pending.size,0);
+}

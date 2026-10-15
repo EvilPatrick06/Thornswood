@@ -77,7 +77,7 @@ for(const method of ['getNpcAIState','get','save','set']) for(const boundary of 
   assert.deepEqual(stale,[],method+' cannot run after its lookup revokes the caller');
   assert.equal(saves,method==='set' || method==='save' && boundary==='return'?1:0);
   assert.equal(mirrors,method==='set' && boundary==='return'?1:0);
-  if(method==='getNpcAIState' || method==='get') {
+  if(method==='getNpcAIState' || method==='get' || method==='save' && boundary==='lookup') {
     assert.doesNotThrow(()=>purse.read(1),'revoking a caller does not close a shared purse');
     armed=false;current=true;
     assert.equal(purse.prepare(1).purse,250,'a current caller can still initialize the untouched purse');

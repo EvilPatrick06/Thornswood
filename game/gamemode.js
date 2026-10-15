@@ -63969,6 +63969,7 @@ function createNpcMerchantPurses(api,data,storage) {
     return mutate(()=>prepareState(id,owner));
   }
   function prepareState(id,owner) {
+    let saveAttempted=false;
     function assertCurrent() {
       assertOwner();
       if(owner && !owner()) throw new Error('Merchant preparation caller is revoked');
@@ -63977,6 +63978,7 @@ function createNpcMerchantPurses(api,data,storage) {
       assertCurrent();
       const fn=target[method];
       assertCurrent();
+      if(target===storage && method==='save') saveAttempted=true;
       const result=fn.apply(target,args);
       assertCurrent();
       return result;
@@ -64003,7 +64005,7 @@ function createNpcMerchantPurses(api,data,storage) {
         assertCurrent();
         const acknowledgement=call(storage,'save',next);
         if(storage.durable===true && acknowledgement!==true) throw new Error('Durable merchant save acknowledgement is missing');
-      } catch(error) {active=false;throw error;}
+      } catch(error) {if(saveAttempted) active=false;throw error;}
       assertCurrent();
       ledger=next;
       initialized++;
@@ -64814,9 +64816,10 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
   }
   function stop() {
     stopped=true;ready.length=0;
-    const errors=[];
-    for(const h of handles) {try {timers.clearTimeout(h);} catch(error) {errors.push(error);}}
+    const ownedHandles=Array.from(handles);
     handles.clear();
+    const errors=[];
+    for(const h of ownedHandles) {try {timers.clearTimeout(h);} catch(error) {errors.push(error);}}
     if(errors.length) throw errors[0];
   }
   function start() {
