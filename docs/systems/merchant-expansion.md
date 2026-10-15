@@ -261,6 +261,15 @@ coordinated plugin delivery and strict client admission. The component is not
 imported into startup and does not change the 249-trader roster or initialize
 new ledger state. `node tests/test-merchant-ledger-inspection.js` checks it.
 
+`game/merchant-ledger-native.js` binds an already isolated native reader to
+that inspection interface. It checks each winning actor placement and its
+NPC base, translating record-local IDs through the owning plugin's mapping.
+Light-plugin IDs must fit their local width; masked aliases are refused.
+It also uses the native inventory validator. The adapter creates no server,
+loads no actors and supplies no cut authorization or population-policy check.
+Interface fixtures in `tests/test-merchant-ledger-native.js` cover full and
+light plugins and overridden records; compiled native acceptance is separate.
+
 Local checks include `node tests/test-merchant-trading.js`,
 `node tests/test-merchant-settlement.js`,
 `node tests/test-merchant-pending-preflight.js`,

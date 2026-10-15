@@ -29,10 +29,13 @@
 # the queue reached an hour when the lanes opened pull requests in bursts.
 # Install-Runner.ps1 -Number <n> puts each one after the first beside it with
 # the same label, so a check goes to whichever is free.
-# NOT PULL REQUESTS, since 11 October (#1306, Patrick's option C; #2161): a
-# pull request runs these same steps on GitHub's hosted Windows runner, in
-# build-pr.yml, which scripts\dev\Build-PrWorkflow.js generates from this
-# file. Only a push to main, already merged, and a manual run use the box.
+# HOSTED FIRST, THE BOX WHEN HOSTED HAS NO USAGE (#2393, Patrick, 15 Oct):
+# the Actions budget is not being raised. Every build tries GitHub's hosted
+# Windows runner first; when the month's included minutes are used up the
+# hosted job is refused before any step runs and the VPS fallback builds it.
+# A pull request runs these same steps in build-pr.yml, which
+# scripts\dev\Build-PrWorkflow.js generates from this file; it has the same
+# fallback, for this repository's own branches only (Patrick, 12 Oct).
 # Change a step here, then run  node scripts/dev/Build-PrWorkflow.js;
 # tests\test-1306-pr-workflow.js fails while the two differ.
 #
@@ -90,10 +93,11 @@ jobs:
   # WHERE IT RUNS, since 11 October (#1306, Patrick's final call on #2161):
   # GitHub's hosted windows-latest is the default, in the job "launcher"
   # at the end of this file. This job is the VPS FALLBACK. It runs only
-  # for a trusted event (this file has no pull_request trigger: a pull
-  # request builds in build-pr.yml, hosted only), and only when
-  #   - the repository variable BUILD_RUNNER is vps (hosted minutes ran out,
-  #     or GitHub is down: Settings, Variables, BUILD_RUNNER = vps), or
+  # when the hosted job did not succeed (for a pull request, only on a
+  # branch of this repository, never a fork), that is when
+  #   - the repository variable BUILD_RUNNER is vps, which skips the hosted
+  #     job outright (Settings, Variables). Optional: a refused hosted job
+  #     already falls through to the box, the variable only saves the red, or
   #   - a manual run asked for runner: vps, or
   #   - the hosted job failed. A quota or billing stop fails it before any
   #     step runs, and this picks the build up on the box. A real red fails
@@ -345,9 +349,9 @@ jobs:
           # seconds when the token exchange or the profile lookup stalls,
           # never answers, or drops halfway, and the page says to try again.
           # Issue #1597: every notice board gets its object, in the cell or
-          # worldspace the server has it in, from the list the server sends;
-          # tests\test-1597-board-objects.js runs the plugin's board code on a
-          # pretend game. Under a second.
+          # worldspace the server has it in; since #2516 the server stands it
+          # and the game places none (tests\test-1597-board-objects.js and
+          # tests\test-2516-server-boards.js). Under a second.
           # Issue #503: tests/test-papyrus-event-list.js holds the fork's Papyrus
           # event list, records/papyrus-events.json, to the rest of this
           # repository and proves its reader on a small fork it makes. The
@@ -382,7 +386,7 @@ jobs:
                  'test-hand-install-retired.ps1',
                  'test-downgrade-steam-window.ps1', 'test-address-library.ps1', 'test-vortex-folder.ps1',
                  'test-new-box-runbook.ps1', 'test-remote-header.ps1',
-                 'test-vps-defaults.ps1', 'test-runner-lock.ps1', 'test-runner-offbox.ps1', 'test-restore-staging.ps1', 'test-deploy-artifact.ps1', 'test-remote-command-map.ps1', 'test-deploy-records.js',
+                 'test-vps-defaults.ps1', 'test-runner-lock.ps1', 'test-runner-offbox.ps1', 'test-498-buildtools.ps1', 'test-restore-staging.ps1', 'test-deploy-artifact.ps1', 'test-remote-command-map.ps1', 'test-deploy-records.js',
                  'test-own-folder-alone.ps1', 'test-own-folder-first.ps1', 'test-own-folder-again.ps1', 'test-setup-game-files.ps1', 'test-setup-robocopy.ps1', 'test-sign-pilot.ps1', 'test-prod-parity.ps1', 'test-runner-isolation.ps1', 'test-discord-announced-shared.ps1', 'test-check-build.ps1', 'test-client-build-record.ps1', 'test-npc-runtime.js',
                  'test-mold-key.js', 'test-putback-flora.js', 'test-staff-spells.js', 'test-join-pass-trust.js',
                  'test-npc-shared-runtime.js', 'test-npc-navigation-equivalence.js', 'test-npc-population-runtime.js', 'test-npc-role-titles.js',
@@ -391,7 +395,7 @@ jobs:
                  'test-books.js', 'test-guild-ledger-safety.js', 'test-book-review-regressions.js',
                  'test-recipeless-craft.js',
                  'test-npc-merchant-purses.js', 'test-merchant-ledger-storage.js', 'test-npc-merchant-startup.js',
-                 'test-npc-activation-staging.js', 'test-merchant-roster-runtime.js', 'test-merchant-retirement-inspection.js', 'test-merchant-ledger-inspection.js',
+                 'test-npc-activation-staging.js', 'test-merchant-roster-runtime.js', 'test-merchant-retirement-inspection.js', 'test-merchant-ledger-inspection.js', 'test-merchant-ledger-native.js',
                  'test-merchant-ledger-revisions.js', 'test-merchant-runtime-evidence.js', 'test-merchant-writer-ownership.js', 'test-merchant-pending-preflight.js', 'test-merchant-conservation.js', 'test-merchant-settlement.js', 'test-merchant-trading.js', 'test-merchant-deployment.js', 'test-merchant-traders.js', 'test-merchant-retirement.js',
                  'test-dungeon-loot.js', 'test-dungeon-reward-safety.js', 'test-dungeon-reward-storage.js', 'test-one-mint.js',
                  'test-1319-pass-switch.js',
@@ -404,6 +408,8 @@ jobs:
                  'test-1374-letters.js',
                  'test-1597-board-objects.js',
                  'test-2298-board-meshes.js',
+                 'test-2298-dropbox.js',
+                 'test-2516-server-boards.js',
                  'test-1380-rare-mines.js',
                  'test-1621-quest-state.js',
                  'test-unpin.js', 'test-coffers.js',
@@ -435,6 +441,7 @@ jobs:
                  'test-1390-embassy.js',
                  'test-1603-beds.js',
                  'test-1606-logout-fill.js',
+                 'test-1382-potion-window.js',
                  'test-1382-water.js',
                  'test-1734-rest-reconnect.js',
                  'test-1676-rest-gate.js',
@@ -445,7 +452,7 @@ jobs:
                  'test-1588-tools-50.js',
                  'test-1741-encoding.js',
                  'test-1634-apprentice-gui.js',
-                 'test-1637-door-gui.js', 'test-2250-claim-door.js', 'test-2256-locked-for-everyone.js', 'test-2245-drawn-pick.js', 'test-2244-after-mining-measure.js', 'test-item-names.js', 'test-2255-key-mold-models.js', 'test-2258-house-parts-hidden.js', 'test-2468-last-plugin.js', 'test-2298-held-board.ps1',
+                 'test-1637-door-gui.js', 'test-2250-claim-door.js', 'test-2256-locked-for-everyone.js', 'test-2245-drawn-pick.js', 'test-2244-after-mining-measure.js', 'test-item-names.js', 'test-2255-key-mold-models.js', 'test-2254-master-key.js', 'test-2258-house-parts-hidden.js', 'test-2468-last-plugin.js', 'test-2298-held-board.ps1',
                  'test-502-no-bounty.js',
                  'test-502-jail-cells.js',
                  'test-502-guard-board.js',
@@ -547,7 +554,7 @@ jobs:
                  'test-site-render.js', 'test-site-discovery.js',
                  'test-home-status.js', 'test-seats.js', 'test-age-gate.js', 'test-download-hash.js', 'test-2233-inuse-image.ps1',
                  'test-download-button.js', 'test-gallery-ux.js', 'test-gallery.js', 'test-site-local.js',
-                 'test-release-baseline.ps1', 'test-publish-refusals.ps1', 'test-2513-every-harness-listed.ps1',
+                 'test-release-baseline.ps1', 'test-publish-refusals.ps1', 'test-2513-every-harness-listed.ps1', 'test-release-workflow.ps1',
                  'test-2460-winps-module-path.ps1',
                  'test-session-cards.js', 'test-staff-bans.js', 'test-hub-staff-gallery.js', 'test-known-issues.js', 'test-2414-known-one-copy.js',
                  'test-join-outage.js', 'test-join-pass-site.js', 'test-open-switch.js', 'test-component-readmes.js',

@@ -98,7 +98,7 @@ try {
     [void][IO.Directory]::CreateDirectory((Join-Path $sr 'scripts\release'))
     [IO.File]::Copy((Join-Path $Repo 'scripts\release\Ship-Rules.ps1'), (Join-Path $sr 'scripts\release\Ship-Rules.ps1'))
 # Ship-Rules holds ui-gone.json to RecordShape.ps1 (#2180), which loads Read-JsonFile.ps1.
-foreach ($n in 'RecordShape.ps1', 'Read-JsonFile.ps1') { [IO.File]::Copy((Join-Path $Repo ('scripts\release\' + $n)), (Join-Path $sr ('scripts\release\' + $n)), $true) }
+foreach ($n in 'RecordShape.ps1', 'Read-JsonFile.ps1', 'RepoPlugins.ps1') { [IO.File]::Copy((Join-Path $Repo ('scripts\release\' + $n)), (Join-Path $sr ('scripts\release\' + $n)), $true) }
     $load = Join-Path $sr 'load.ps1'
     W $load ("`$ErrorActionPreference = 'Stop'`ntry { . '" + (Join-Path $sr 'scripts\release\Ship-Rules.ps1').Replace("'", "''") + "'; 'LOADED' } catch { 'THREW ' + `$_.Exception.Message; exit 1 }`n")
     foreach ($k in $bad.Keys) {

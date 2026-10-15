@@ -27,7 +27,7 @@ if ($fn) {
     # would hold at that point.
     function Ask([bool]$dev, [string]$rel) {
         $block = [scriptblock]::Create(
-            '$Dev = $args[0]; ' +
+            '. $args[2]; $Dev = $args[0]; ' +
             '$vortexFiles = New-Object ''System.Collections.Generic.HashSet[string]'' ([StringComparer]::OrdinalIgnoreCase); ' +
             '[void]$vortexFiles.Add(''Data\Thornswood-Content.esp''); ' +
             '[void]$vortexFiles.Add(''Data\Skyrim.esm''); ' +
@@ -35,12 +35,13 @@ if ($fn) {
             '[void]$vortexFiles.Add(''Data\Thornswood-Content-extra.esp''); ' +
             $fn.Extent.Text + '; ' +
             'Test-FromCollection $args[1]')
-        return [bool](& $block $dev $rel)
+        return [bool](& $block $dev $rel (Join-Path (Split-Path -Parent $src) 'RepoPlugins.ps1'))
     }
 
     yes 'on the dev channel our plugin is not treated as the collection''s, so it ships' (-not (Ask $true 'Data\Thornswood-Content.esp'))
     yes 'and the match ignores case, the way the record does' (-not (Ask $true 'data\thornswood-content.esp'))
     yes 'Main also carries our completed plugin' (-not (Ask $false 'Data\Thornswood-Content.esp'))
+    yes 'and the late-loading plugin ships from the repo too (#2486)' ((-not (Ask $true 'Data\Thornswood-Last.esp')) -and (-not (Ask $false 'Data\Thornswood-Last.esp')))
     yes 'a master the collection provides stays out of a dev release' (Ask $true 'Data\Skyrim.esm')
     yes 'and so does a mod the collection provides' (Ask $true 'Data\SunHelmSurvival.esp')
     yes 'and a file the collection does not provide is still ours on both channels' ((-not (Ask $true 'Data\Platform\Plugins\thornswood-front.js')) -and (-not (Ask $false 'Data\Platform\Plugins\thornswood-front.js')))

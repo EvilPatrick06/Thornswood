@@ -16,9 +16,10 @@
 //   4. Thornswood-Content.esp's board names the new mesh, the drop box is a
 //      separate object naming its own, and no record names the old mesh.
 //   5. Go.ps1 writes both meshes and Ship-Rules.ps1 calls both ours.
-//   6. The client opens the board only for E on the board object itself: not
-//      for the box beside it, not for a person, not for nothing under the
-//      crosshair, not from beyond the board's reach.
+//   6. E on the board or the box is the server's to answer, on its own
+//      references (#2516): the client answers neither, so a press on the box
+//      can never open the board. tests/test-2516-server-boards.js drives the
+//      server's answer: the board opens only the board, the box only the box.
 //
 // What cannot be proven here is how the game's own crosshair meets that
 // collision; that is the in game check on the issue's test task.
@@ -220,38 +221,12 @@ for (const [name, rel] of [['the board', BOARD], ['the drop box', BOX]]) {
 // ---------------------------------------------------------------------- 6 --
 {
   const front = read('game/plugins/thornswood-front.js').toString().replace(/\r\n/g, '\n');
-  const a = front.indexOf('  function boardPress(e) {');
-  const b = front.indexOf('\n  }\n', a);
-  const press = a < 0 || b < 0 ? '' : front.slice(a, b + 4);
-  yes('the board press is in front.js where this lifts it', !!press);
-  const SPOT = { hold: 'whiterun', x: 0, y: 0, z: 0 };
-  function run(crosshair, at) {
-    let opened = false;
-    const pc = { getPositionX: () => at[0], getPositionY: () => at[1], getPositionZ: () => at[2] };
-    const sp = { Game: { getPlayer: () => pc, getCurrentCrosshairRef: () => crosshair } };
-    const T = { js: s => { if (s.indexOf('thornswoodBoard.open') >= 0) { opened = true; } } };
-    const f = new Function('sp', 'T', 'claims', 'busyMenuOpen', 'boardAimSpot', 'boardDist', 'BOARD_REACH',
-      'boardObjectHere', press + '\nreturn boardPress;');
-    const dist = (x, y, z, s) => Math.sqrt((x - s.x) ** 2 + (y - s.y) ** 2 + (z - s.z) ** 2);
-    const fn = f(sp, T, {}, () => false, () => SPOT, dist, 400, ref => !!ref && ref.board === true);
-    const answered = fn({ userEventName: 'Activate' });
-    return { opened, answered };
-  }
-  const boardRef = { board: true };
-  const boxRef = { board: false, getPositionX: () => -134.5, getPositionY: () => 4, getPositionZ: () => 80,
-                   getBaseObject: () => ({ getType: () => 28 }) };
-  const npc = { board: false, getBaseObject: () => ({ getType: () => 43 }) };
-  let r = run(boardRef, [0, 150, 0]);
-  yes('E on the board, standing at it, opens the board', r.opened && r.answered);
-  r = run(boxRef, [-100, 150, 0]);
-  yes('E on the drop box beside it does not open the board, and leaves the press to the box', !r.opened && !r.answered);
-  r = run(npc, [0, 150, 0]);
-  yes('E on a person by the board answers them, not the board', !r.opened && !r.answered);
-  r = run(null, [0, 150, 0]);
-  yes('E on nothing, facing the board, opens nothing', !r.opened && !r.answered);
-  r = run(boardRef, [0, 600, 0]);
-  yes('E on the board from beyond its reach opens nothing', !r.opened && !r.answered);
-  yes('the facing fallback is gone from front.js', front.indexOf('function boardFacing(') < 0);
+  const gm = read('game/gamemode.js').toString().replace(/\r\n/g, '\n');
+  yes('the client answers no press on the board or the box', front.indexOf('function boardPress(') < 0 &&
+      front.indexOf('function boxPress(') < 0 && front.indexOf('function boardFacing(') < 0);
+  yes('the server answers it, first in onActivate, on its own references',
+      gm.indexOf('propBoard.boardActivated(refrId, casterRefrId)') > 0 &&
+      gm.indexOf('propBoard.boardActivated(refrId, casterRefrId)') < gm.indexOf('WATER (#1382)'));
 }
 
 console.log('');

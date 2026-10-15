@@ -220,10 +220,10 @@ word(ALICE, '/claim', [hex(DOOR_OUT)]);
 let by = heard(function (tp) { W.command('/lock', ['/lock', hex(DOOR_OUT)], ALICE.a, ALICE.pid, tp); });
 const mine = (by[ALICE.pid] || []).join(' ');
 yes('L1 the locker is told it is locked for everyone: "' + mine + '"', /You lock Honeyside\. Honeyside is locked for everyone now\./.test(mine));
-yes('L2 and who can still open it', /Only a key to it or its deed opens it/.test(mine) && /pick the lock/.test(mine));
+yes('L2 and who can still open it', /Only a key to it, its master key or its deed opens it/.test(mine) && /pick the lock/.test(mine));
 yes('L3 and the lock took', W.holderOf(HOME).locked === true);
 yes('L4 Bob and Carol, standing at the door, hear it is locked for everyone',
-    (by[BOB.pid] || []).join(' ') === 'Honeyside is locked for everyone now. Only a key to it or its deed opens it; anybody else has to pick the lock.' &&
+    (by[BOB.pid] || []).join(' ') === 'Honeyside is locked for everyone now. Only a key to it, its master key or its deed opens it; anybody else has to pick the lock.' &&
     /locked for everyone/.test((by[CAROL.pid] || []).join(' ')));
 yes('L5 nobody hears it twice, the locker included', (by[ALICE.pid] || []).length === 1 && (by[BOB.pid] || []).length === 1);
 yes('L6 Dave, in another cell, hears nothing (it went to the whole server before #2256)', !by[DAVE.pid]);

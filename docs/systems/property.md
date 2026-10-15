@@ -34,7 +34,8 @@ involved. The server does not glue them into one record.
 
 ## The deed
 
-Claiming hands you a deed there and then. Every building uses one book.
+Claiming hands you a deed there and then, and the building's master
+key with it (see The master key, below). Every building uses one book.
 The name on that copy is the building: Deed to Breezehome is not Deed
 to Honeyside.
 
@@ -43,9 +44,11 @@ whether it is locked, the rent owed on it, and your farm with the days
 it has left. The page is there once you hold something or carry a key.
 
 The register is the record that decides the holder. It lives with the
-server, not in the pack. A deed can be stolen. A stolen deed does not
-move the claim. A book somebody renamed by hand is not a deed, because
-the server never issued it.
+server, not in the pack. A deed can be stolen, and carrying it through
+one of the building's doors is presenting it: the building is the
+carrier's from then on, sold, given or stolen alike, and the server
+does not tell those apart. A book somebody renamed by hand is not a
+deed, because the server never issued it.
 
 ## Locks and keys
 
@@ -69,6 +72,37 @@ building.
 
 A key can be lifted, the same as any other thing in a pack. The server
 does not change which key a door wants.
+
+## The master key
+
+Patrick, 12 Oct, on #2254. Claiming a building hands its holder a
+master key beside the deed: Master key to Breezehome, with a number
+after it. Whoever carries it gets through the building's locked doors,
+like a key, and turns its lock at the door, like the deed, without
+being the deed. So the deed, which is what takes the house, can sit in
+a chest, and the holder, or a partner they hand the master key to,
+carries the master key day to day. An ordinary key still only opens.
+It counts as a key for the beds too: a bed you are allowed in.
+
+It works only while the person it was cut for holds the building. When
+the claim lapses, a steward evicts, or somebody presents the deed at
+the door, it opens nothing any more, so an old holder cannot lock the
+new one out. Whoever holds the building after a deed is presented is
+handed a master key of their own. Somebody who held a building before
+master keys existed is handed theirs the next time they open one of its
+doors.
+
+A lost one is cut again at a forge, from the building's mold, by a
+smith, with the holder standing there, for 2 iron ingots. A smith
+carrying the mold looks at a forge, and under the lock key's Cut a key
+the line has a second row, the mold key, U unless you changed it: Cut a
+master key. The smith pays the ingots and the master key goes to the
+holder, because it is cut for them. The new one replaces the old: the
+master key cut before it stops opening anything, wherever it is.
+
+The number is how the server tells the master key that works from an
+older one: a key here is its name, and each master key is cut with the
+next number, never used twice.
 
 ## Stewards and rent
 
@@ -185,8 +219,8 @@ not company wares.
 
 ## Where this is
 
-Claims, deeds, the 14 day lapse, locks, molds, keys, stewards,
-eviction, rent, and the gold-only box are in the server. The register
+Claims, deeds, the 14 day lapse, locks, molds, keys, master keys,
+stewards, eviction, rent, and the gold-only box are in the server. The register
 is `private/property.json`. Eviction, the rent and marking a box are
 the Office page of the K panel, for a steward or a Jarl; see
 [Offices](offices.md). A container is made one of the ten holds' boxes
@@ -211,11 +245,20 @@ there: one key that locks and unlocks and says which, what you hold on
 K, the same key to claim at a door and to cut at a forge, and one iron
 ingot for each key it cuts.
 
+The master key (#2254) is one record in the content plugin, Master Key,
+on the key's mesh, with no recipe, named per copy like the key. The
+claim in `private/property.json` names the number it was cut with and
+the profile it was cut for, and the register keeps the last number cut
+(`masters`), so a number is never handed out twice. Until the server's
+content plugin carries the record, a claim hands the deed alone and no
+master key is cut. The line the mold key at a forge sends is in
+[Chat commands](commands.md).
+
 A bed counts only when the server saw the person press it and they
 are still beside it, and the rest stops when they leave it, the night
 runs out, or the holder ends it. The holder sleeps at 80. A guest of
-the night, and anybody carrying the building's key or its deed, sleeps
-at 50. The look prompt offers Let sleep here only to the holder, only
+the night, and anybody carrying the building's key, its master key
+or its deed, sleeps at 50. The look prompt offers Let sleep here only to the holder, only
 while the person is in the same building, and the server checks both
 again when the key arrives. A night is 8 real hours from the key press
 and covers every bed in that building. The property page in the K
@@ -233,7 +276,8 @@ withdraw from the ledger are built: a haul's pay to its hauler, less
 the company's tenth, or back to its poster. A withdrawal never leaves
 less on the ledger than the open letters and hauls still hold, and
 what a haul holds for somebody away. The four house parts are
-already refused. The drop box is the notice board. Standing at the
-board and clicking it opens the panel. A price list is left from that
+already refused. The drop box stands on the notice board's post, and
+E on it opens its own panel (#2298). Standing at the board and clicking
+it opens the board's panel. A price list is left from that
 panel. The book stays in the journal. The guild average of those
 copies is kept.

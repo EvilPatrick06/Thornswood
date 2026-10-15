@@ -977,6 +977,57 @@
     if (!keysSaidAt) return moved;
     return keysHere && (Date.now() - keysSaidAt) < 5000;
   }
+
+  /*
+    DECIDED AT THE KEY, NOT ON THE LAST ANSWER (#591).
+
+    The once a second answer above is up to a second old when a key lands,
+    and somebody who alt tabs to Discord and types hi and Enter inside that
+    second had the Enter count as the game's: the lit character played. So a
+    key that comes with no answer from the last 150 ms is held, the front is
+    asked again at once ('select:keycheck <n>'), and the key is acted on only
+    if the answer to that ask, carrying the same n, says the game has the
+    keyboard. Another window, or no answer inside a second, and it is dropped.
+    Keys that come in a burst share one ask, so arrows held down still move.
+  */
+  var KEY_FRESH_MS = 150;
+  var KEY_ASK_MS = 1000;
+  var heldKeys = [];
+  var heldAsk = 0;
+  var heldTimer = 0;
+  function keysFresh() {
+    return keysHere && (Date.now() - keysSaidAt) < KEY_FRESH_MS;
+  }
+  function holdKey(key) {
+    if (heldKeys.length < 20) heldKeys.push(key);
+    if (heldTimer) return;
+    heldAsk++;
+    tell('keycheck ' + heldAsk);
+    heldTimer = setTimeout(function () {
+      heldTimer = 0;
+      if (!heldKeys.length) return;
+      heldKeys = [];
+      strayKey('nothing said in time which window has the keyboard');
+    }, KEY_ASK_MS);
+  }
+  function keysSay(on, ask) {
+    keysHere = !!on;
+    keysSaidAt = Date.now();
+    if (!heldKeys.length) return;
+    if (!keysHere) {
+      heldKeys = [];
+      if (heldTimer) { clearTimeout(heldTimer); heldTimer = 0; }
+      strayKey('the keys are going to another window, not the game');
+      return;
+    }
+    // A yes counts for held keys only when it answers this ask; a once a
+    // second answer read before the key was pressed does not.
+    if (ask !== heldAsk) return;
+    if (heldTimer) { clearTimeout(heldTimer); heldTimer = 0; }
+    var keys = heldKeys;
+    heldKeys = [];
+    for (var i = 0; i < keys.length; i++) keyAct(keys[i]);
+  }
   /* One line in the front log, and not one every keystroke. */
   function strayKey(why) {
     var now = Date.now();
@@ -993,25 +1044,42 @@
       strayKey('the keys are going to another window, not the game');
       return;
     }
+    if (keysSaidAt && (heldKeys.length || !keysFresh())) {
+      if (keyActs(ev.key)) ev.preventDefault();
+      holdKey(ev.key);
+      return;
+    }
+    if (keyAct(ev.key)) ev.preventDefault();
+  }
+  /* Whether this page has anything bound to the key at all. */
+  function keyActs(key) {
+    if (asking) return key === 'Escape' || key === 'Enter';
+    return key === 'ArrowDown' || key === 'ArrowUp' || key === 'Enter' ||
+           key === 'Delete' || /^[1-9]$/.test(key);
+  }
+  /* What a key does once it counts. True when it was used. */
+  function keyAct(key) {
+    if (root.className === 'gone') return false;
     var list = slots();
     var n = list.length;
     if (asking) {
-      if (ev.key === 'Escape') { asking = 0; draw(); ev.preventDefault(); }
-      else if (ev.key === 'Enter') { forget(asking); ev.preventDefault(); }
-      return;
+      if (key === 'Escape') { asking = 0; draw(); return true; }
+      if (key === 'Enter') { forget(asking); return true; }
+      return false;
     }
-    if (ev.key === 'ArrowDown') { at = n ? (at + 1) % n : 0; draw(); ev.preventDefault(); }
-    else if (ev.key === 'ArrowUp') { at = n ? (at + n - 1) % n : 0; draw(); ev.preventDefault(); }
-    else if (ev.key === 'Enter') { play(); ev.preventDefault(); }
-    else if (ev.key === 'Delete') {
+    if (key === 'ArrowDown') { at = n ? (at + 1) % n : 0; draw(); return true; }
+    if (key === 'ArrowUp') { at = n ? (at + n - 1) % n : 0; draw(); return true; }
+    if (key === 'Enter') { play(); return true; }
+    if (key === 'Delete') {
       var e = list[at];
       if (e && e.c) { asking = e.id; draw(); }
-      ev.preventDefault();
+      return true;
     }
-    else if (/^[1-9]$/.test(ev.key)) {
-      var k = Number(ev.key) - 1;
-      if (k < n) { at = k; draw(); ev.preventDefault(); }
+    if (/^[1-9]$/.test(key)) {
+      var k = Number(key) - 1;
+      if (k < n) { at = k; draw(); return true; }
     }
+    return false;
   }
   window.addEventListener('keydown', onKey, true);
   window.addEventListener('resize', fit);
@@ -1100,7 +1168,8 @@
     acked: onAcked,
     // The front, once a second while this page is up: whether the game is the
     // window Windows is sending the keys to. See keysCount above.
-    keys: function (on) { keysHere = !!on; keysSaidAt = Date.now(); },
+    // And at once with the same n when the page asks 'select:keycheck <n>'.
+    keys: keysSay,
     close: function () { root.className = 'gone'; },
     // The front's answer to 'select:want' (#481): a seat, or wait in line.
     go: go,

@@ -143,7 +143,7 @@
       'skills:pick weave <key>', and a refusal comes back as a note about
       'weave'.
 
-    property: [ { name, mine: <bool>, locked, keyed, b, by,
+    property: [ { name, mine: <bool>, locked, keyed, master (#2254), b, by,
                   rent: { amount, every, owed } | null,
                   sleep: [ { pid, name } ], farm, days, reach } ]
       The property page (#1637, #1603), sent once somebody holds a building
@@ -1919,7 +1919,7 @@
     pRows.forEach(function (r) {
       var card = el('div', 'card' + (r.mine ? ' mine' : ' off'));
       var name = el('div', 'name', String(r.name || 'somewhere'));
-      name.appendChild(el('span', 'tag', r.farm ? 'farm' : (r.mine ? 'yours' : 'key only')));
+      name.appendChild(el('span', 'tag', r.farm ? 'farm' : (r.mine ? 'yours' : (r.master ? 'master key' : 'key only'))));
       card.appendChild(name);
       if (r.farm) {
         var days = Number(r.days) || 0;
@@ -1933,10 +1933,14 @@
         ? (r.locked ? 'Locked. Anybody without a key has to pick it. Open its door and the ' +
                       'key the line names unlocks it.'
                     : 'Unlocked. Open its door and the key the line names locks it.') +
+          (r.master ? ' You are carrying its master key.' : '') +
           (r.keyed ? ' You are carrying a key to it as well.' : '') + rentLine(r.rent)
         : (r.by ? 'Held by ' + r.by + '. ' : 'Nobody holds it. ') +
-          (r.locked ? 'Your key opens the door.'
-                    : 'It is not locked, so your key is not needed yet.')));
+          // A master key opens the door and turns the lock (#2254).
+          (r.master ? 'Your master key opens the door, and at the door the key the line names ' +
+                      (r.locked ? 'unlocks it.' : 'locks it.')
+                    : (r.locked ? 'Your key opens the door.'
+                                : 'It is not locked, so your key is not needed yet.'))));
       if (r.mine) drawGuests(card, r);
       wrap.appendChild(card);
     });

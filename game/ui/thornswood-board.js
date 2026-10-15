@@ -7,7 +7,6 @@
     window.thornswoodBoard = { open, close, toggle, isOpen, setData }
     page -> plugin  'board:ready' | 'board:opened' | 'board:closed'
                     'board:near x y z here'
-                    'board:spots [{ hold, cell, x, y, z, face }, ...]'
 
   Everything this panel DOES it does by sending the ordinary lines, through
   window.thornswoodNet.say. There is no second protocol. The labels are
@@ -17,7 +16,8 @@
   and /dropjob (#1627); Send a haul and Confirm send /haul (#1393); Write a
   letter sends /letter (#1595).
 
-  setData never opens the panel. The click does. A later setData redraws
+  setData never opens the panel. E on the board does: the server answers it
+  (#2516) on thornswoodBoardOpen, which calls open(). A later setData redraws
   what is already open, and the plugin closes it once you walk away.
 */
 (function () {
@@ -335,28 +335,6 @@
     if (foot) { foot.onclick = function () { close(); }; }
   }
 
-  /*
-    WHERE EVERY BOARD IS (#1597). The server's list of boards, with each
-    one's cell or worldspace, is in the social view; the plugin puts the
-    message board object down from it. Sent when it changes, not on every
-    view, and again after the page loads afresh.
-  */
-  var spotsSaid = '';
-  function tellSpots(list) {
-    if (!list || typeof list.length !== 'number') { return; }   // no view of the boards this time
-    var out = [];
-    for (var i = 0; i < list.length; i++) {
-      var t = list[i];
-      if (!t || !t.cell || !isFinite(Number(t.x)) || !isFinite(Number(t.y)) || !isFinite(Number(t.z))) { continue; }
-      out.push({ hold: String(t.hold), cell: String(t.cell), x: Number(t.x), y: Number(t.y), z: Number(t.z),
-                 face: isFinite(Number(t.face)) ? Number(t.face) : 0 });
-    }
-    var said = JSON.stringify(out);
-    if (said === spotsSaid) { return; }
-    spotsSaid = said;
-    tell('spots ' + said);
-  }
-
   window.thornswoodBoard = {
     open: function () { wireFoot(); open(); },
     close: close,
@@ -370,7 +348,6 @@
       } else {
         tell('near none');
       }
-      tellSpots(data && data.boards && data.boards.list);
       wireFoot();
       if (shown) { draw(); }
     }

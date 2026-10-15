@@ -1194,9 +1194,14 @@ function Get-ShipLooseArt($files) {
 # person's own Vortex deployment. Installs that already took one of these keep
 # it until Patrick decides otherwise; published packs are scrubbed apart
 # (Scrub-Feed.ps1).
+# The plugins this repo builds and ships itself (#2486).
+. (Join-Path $PSScriptRoot 'RepoPlugins.ps1')
 $ShipOursFiles = @(
-    # Our completed plugin ships on both channels beyond the collection base.
+    # Our completed plugins ship on both channels beyond the collection base:
+    # the content plugin and the late-loading one (#2468). These two lines are
+    # $ThornswoodRepoPlugins (RepoPlugins.ps1) as Data\ paths.
     'Data\Thornswood-Content.esp',
+    'Data\Thornswood-Last.esp',
     # The SkyMP client's compiled script, from the engine fork.
     'Data\Scripts\MpClientPlugin.pex',
     # Our main menu: no Bethesda logo and no button list, an empty loading
@@ -1741,11 +1746,14 @@ function Ensure-ShipRequiredData([string]$GameDir, [string]$RepoDir) {
     }
     $placed = New-Object System.Collections.Generic.List[string]
     $sources = @(Get-ChildItem -LiteralPath $srcRoot -File -EA Stop)
-    # Content is Thornswood's own plugin. A completed release can update it
-    # beyond the published collection base without changing anybody's staging
-    # copy. Packs and the installer place exactly this committed source.
-    $content = Join-Path $RepoDir 'game\content\Thornswood-Content.esp'
-    if (Test-Path -LiteralPath $content) { $sources += Get-Item -LiteralPath $content }
+    # Our own plugins (RepoPlugins.ps1): the content plugin and, since #2486,
+    # the late-loading one. A completed release can update them beyond the
+    # published collection base without changing anybody's staging copy.
+    # Packs and the installer place exactly this committed source.
+    foreach ($ownName in $ThornswoodRepoPlugins) {
+        $own = Get-ThornswoodRepoPluginPath $RepoDir $ownName
+        if (Test-Path -LiteralPath $own) { $sources += Get-Item -LiteralPath $own }
+    }
     foreach ($f in $sources) {
         if ($f.Name -eq 'README.md') { continue }
         $rel = 'Data\' + $f.Name

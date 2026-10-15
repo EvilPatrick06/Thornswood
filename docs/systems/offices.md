@@ -122,9 +122,11 @@ not turn eviction, rent, the box or the board off.
 ## What an office does not do
 
 It does not grant a recipe, a spell, a class verb, or a rank. It does
-not mint coin. A Jarl who wants gold puts it in the box or takes it
-from somebody under the theft rule. The box is the hold's ledger, and
-only the payouts on the trading company page leave it.
+not mint coin. A Jarl who wants gold takes it from the hold's drop box,
+which holds the fares and what people put in, or from somebody under the
+theft rule. The fees are the hold's ledger, a record only: only the
+payouts on the trading company page leave it. See
+[Notice boards](noticeboards.md), the drop box.
 
 ## Where this is
 
