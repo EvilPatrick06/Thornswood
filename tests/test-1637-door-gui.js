@@ -544,10 +544,11 @@ function client() {
     CLIENT.iniNumber, CLIENT.keyName, CLIENT.anyClaim, CLIENT.gameMenuOpen, CLIENT.menus,
     CLIENT.busyMenuOpenNow,
     'const LOCK_KEY = 45; const LOCK_NAME = keyName(LOCK_KEY);',
+    'const MOLD_KEY = 22; const MOLD_NAME = keyName(MOLD_KEY);',
     "const MOLD_FILE = 'Thornswood-Content.esp'; const MOLD_ITEM = 0x15495; const DOOR_TYPE = 29;",
     'let moldBase = 0;',
     CLIENT.stampedMolds, CLIENT.lock,
-    'return { lockPress: lockPress, lockKeyNow: lockKeyNow };'
+    'return { lockPress: lockPress, lockKeyNow: lockKeyNow, masterPress: masterPress };'
   ].join('\n');
   w.api = new Function('sp', 'T', 'claims', 'tellServer', 'say', 'log', 'guard', 'globalThis', body)(
     sp, T, w.claims, function (line) { w.sent.push(line); }, function () { }, function () { },
@@ -647,22 +648,27 @@ try {
       w.crosshair = { id: FORGE_HERE, type: 40, base: 0x1a2ad };
       w.molds = 1; w.stamped = 1;
       w.tick();
-      yes('C7 at a forge with a stamped mold the line says Cut a key: "' + w.lineText() + '"',
-          w.lineText() === 'X Cut a key from your key mold');
+      yes('C7 at a forge with a stamped mold the line says Cut a key, and U cuts a master key (#2254): "' + w.lineText() + '"',
+          w.lineText() === 'X Cut a key from your key mold U Cut a master key from your key mold, 2 iron ingots');
       yes('C7 and the key sends /key with the forge\'s id', w.api.lockPress() === true && w.sent[0] === '/key a00010');
+      yes('C9 the mold key there sends /key with the forge\'s id and master (#2254)',
+          w.api.masterPress() === true && w.sent[1] === '/key a00010 master');
+      yes('C9 and a double press is one line', w.api.masterPress() === true && w.sent.length === 2);
       w.crosshair = { id: FORGE_HERE, type: 40, base: (0x04000000 | 0x2b074) >>> 0 };
       w.tick();
-      yes('C7 a Dragonborn forge is a forge too', w.lineText() === 'X Cut a key from your key mold');
+      yes('C7 a Dragonborn forge is a forge too', /^X Cut a key from your key mold U Cut a master key/.test(w.lineText()));
       w.stamped = 0;
       w.tick();
-      yes('C8 a blank mold alone draws nothing', w.lineText() === '' && w.api.lockPress() === false);
+      yes('C8 a blank mold alone draws nothing', w.lineText() === '' && w.api.lockPress() === false &&
+          w.api.masterPress() === false);
       w.molds = 0;
       w.tick();
       yes('C8 nor no mold', w.lineText() === '');
       w.molds = 1; w.stamped = 1;
       w.crosshair = { id: FORGE_HERE, type: 40, base: 0x1a2ae };
       w.tick();
-      yes('C8 nor a bench that is not a forge', w.lineText() === '' && w.api.lockPress() === false && w.sent.length === 1);
+      yes('C8 nor a bench that is not a forge', w.lineText() === '' && w.api.lockPress() === false &&
+          w.api.masterPress() === false && w.sent.length === 2);
     }
   }
 } finally {

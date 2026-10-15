@@ -314,7 +314,7 @@ function liftFn(name) {
     claims[HOUSE] = { by: HOLDER, name: 'Holder', locked: locked };
     // No jail in this town: the cells (#502) are tests/test-502-jail-cells.js.
     return new Function('BUILDING_BY_DOOR', 'WAY_OUT', 'claims', 'holderOf', 'holdsKey',
-      'holdsDeed', 'idOf', 'jailHoldOf', 'cellLists',
+      'holdsDeed', 'idOf', 'jailHoldOf', 'cellLists', 'holdsMasterKey',
       'var doorIndex = null;\n' + parts.filter(Boolean).join('\n') +
       '\nreturn { shutFor: shutFor, mayPass: mayPass,' +
       ' wayOut: typeof wayOut === "function" ? wayOut : null };')(
@@ -324,7 +324,9 @@ function liftFn(name) {
       function () { return false; },
       function (d) { return ID[d] || 0; },
       function () { return null; },
-      function () { });
+      function () { },
+      // 0x113 carries the house's working master key (#2254).
+      function (actorId, b) { return actorId === 0x113 && b === HOUSE; });
   }
   function ids(list) { return list.slice().sort(function (x, y) { return x - y; }).join(','); }
   function same(list, want) {
@@ -332,6 +334,12 @@ function liftFn(name) {
   }
 
   if (parts[1] && parts[2] && parts[3]) {
+    {
+      const M = town(true);
+      const m = M.shutFor(0x113, 13);
+      yes('somebody carrying its master key finds no door of it locked (#2254)',
+          m.shut.length === 0 && M.mayPass(0x113, 13, HOUSE) === true);
+    }
     const T = town(true);
     const s = T.shutFor(0x109, STRANGER);
     yes('a stranger finds both doors in from outside locked, and only those',
