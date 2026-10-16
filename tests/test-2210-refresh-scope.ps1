@@ -406,6 +406,14 @@ namespace Thornswood
             Scene s = Prepared("scoped", "15");
             string own = OwnGame.Folder;
             Dictionary<string, string> before = Record();
+            // As if Make could not bring the plugin over: vortex.txt has no
+            // line for it, so the next refresh after a Vortex deploy looks at
+            // it again. A rules-only refresh in between must not write it down
+            // as taken in, since it does not look at it.
+            string vt = Path.Combine(OwnGame.Dir, "vortex.txt");
+            var vl = new List<string>();
+            foreach (string l in File.ReadAllLines(vt)) if (!l.EndsWith("|Data\\TsOne.esp", StringComparison.OrdinalIgnoreCase)) vl.Add(l);
+            File.WriteAllLines(vt, vl.ToArray());
             Yes("a folder on rules 15 that Vortex has not deployed into since asks for a refresh", OwnGame.NeedsRefresh(s.Cfg));
             string said = null;
             try { said = OwnGame.Refresh(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Refresh said: " + ex.Message); }
@@ -428,6 +436,25 @@ namespace Thornswood
             Yes("made.txt is on the current rules, so it does not ask again", Recorded("rules") == RulesNow() && !OwnGame.NeedsRefresh(s.Cfg));
             Yes("the line says what it looked at, why, and how long it took",
                 said != null && said.Contains("looking only at Data\\Platform\\UI\\") && said.Contains("only the rules about those changed") && said.Contains("It took "));
+            string seenNow = File.ReadAllText(vt);
+            Yes("vortex.txt gains only what the rules-only refresh looked at, not a file it did not take in",
+                seenNow.Contains("|" + Menu) && !seenNow.Contains("|Data\\TsOne.esp"));
+            Deploy(s, DateTime.UtcNow);
+            said = Refreshed(s);
+            Yes("so the next refresh after a Vortex deploy looks at that file again, and only it",
+                said != null && said.Contains("looking only at the 1 file whose entry in Vortex's record changed") && File.ReadAllText(vt).Contains("|Data\\TsOne.esp"));
+
+            // A folder made by a launcher before vortex.txt: the rules-only
+            // refresh writes none, and the first refresh after a Vortex deploy
+            // walks everything and writes it whole.
+            File.Delete(vt);
+            SetRecorded("rules", "15");
+            said = Refreshed(s);
+            Yes("a rules-only refresh of a folder with no vortex.txt writes none", said != null && said.Contains("looking only at Data\\Platform\\UI\\") && !File.Exists(vt));
+            Deploy(s, DateTime.UtcNow.AddMinutes(1));
+            said = Refreshed(s);
+            Yes("  then a Vortex deploy walks everything once and writes it whole",
+                said != null && said.Contains("looking at every file") && File.ReadAllText(vt).Contains("|Data\\TsOne.esp") && File.ReadAllText(vt).Contains("|" + Cef));
         }
 
         static string Refreshed(Scene s)

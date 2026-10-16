@@ -847,12 +847,37 @@ namespace Thornswood
         /// </summary>
         static string VortexSeenFile { get { return Path.Combine(Dir, "vortex.txt"); } }
 
-        static void WriteVortexSeen(string src, Record rec, HashSet<string> failed)
+        /// <summary>
+        /// Writes vortex.txt for the record a make or refresh has just taken
+        /// in. A file it could not bring over (<paramref name="failed"/>) is
+        /// left out, so the next refresh looks at it again. A file outside
+        /// what a scoped refresh looked at keeps the line it had in
+        /// <paramref name="was"/>, or none: the refresh did not take it in, so
+        /// it must not be written down as taken in. A file the last full walk
+        /// could not bring over is then still looked at again by the next
+        /// refresh after a Vortex deploy, even when a rules-only refresh came
+        /// in between.
+        /// </summary>
+        static void WriteVortexSeen(string src, Record rec, HashSet<string> failed, Scope scope, Dictionary<string, string> was)
         {
+            // A scoped refresh of a folder with no vortex.txt yet (one made by
+            // a launcher before this) took in too little to write one: the
+            // next refresh after a Vortex deploy walks everything and writes
+            // it whole.
+            if (scope != null && was == null) return;
             var lines = new List<string>();
             lines.Add("source=" + src);
             foreach (KeyValuePair<string, string> kv in rec.Entry)
-                if (failed == null || !failed.Contains(kv.Key)) lines.Add(kv.Value + "|" + kv.Key);
+            {
+                if (failed != null && failed.Contains(kv.Key)) continue;
+                if (scope != null && !InScope(kv.Key, scope))
+                {
+                    string then;
+                    if (was != null && was.TryGetValue(kv.Key, out then)) lines.Add(then + "|" + kv.Key);
+                    continue;
+                }
+                lines.Add(kv.Value + "|" + kv.Key);
+            }
             File.WriteAllLines(VortexSeenFile, lines.ToArray());
         }
 
@@ -894,9 +919,8 @@ namespace Thornswood
         /// lists without an entry the launcher could read is always counted.
         /// Null when there is nothing to compare with, which walks everything.
         /// </summary>
-        static HashSet<string> VortexMoved(string src, Record rec, HashSet<string> deployed)
+        static HashSet<string> VortexMoved(Dictionary<string, string> was, Record rec, HashSet<string> deployed)
         {
-            Dictionary<string, string> was = ReadVortexSeen(src);
             if (was == null) return null;
             var moved = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (string rel in deployed)
@@ -1073,7 +1097,7 @@ namespace Thornswood
             Directory.Move(temp, Folder);
             // Vortex's record as the folder took it in, so the first refresh
             // after a Vortex deploy opens only what moved (VortexMoved).
-            WriteVortexSeen(src, Staged(src), failed);
+            WriteVortexSeen(src, Staged(src), failed, null, null);
             WriteMade(src, SumCopied(lines), 1);
             SettleSettings(true);
             string payloadLeft = DropPayload();
@@ -1143,6 +1167,7 @@ namespace Thornswood
             // folder with no deployment on record, a rule with no line, or no
             // earlier record of Vortex's for this folder to compare with.
             long rulesWere = Recorded("rules");
+            Dictionary<string, string> seenBefore = ReadVortexSeen(src);
             Scope scope = null;
             if (!KindsDue() && Recorded("deployment") != 0)
             {
@@ -1154,7 +1179,7 @@ namespace Thornswood
                 }
                 if (scope != null && DeploymentStamp(src) != Recorded("deployment"))
                 {
-                    scope.Vortex = VortexMoved(src, Staged(src), Deployed(src));
+                    scope.Vortex = VortexMoved(seenBefore, Staged(src), Deployed(src));
                     if (scope.Vortex == null) scope = null;
                 }
             }
@@ -1455,7 +1480,7 @@ namespace Thornswood
             // compare with (VortexMoved), after files.txt and before made.txt:
             // a refresh cut short before files.txt keeps the old one, so the
             // next start looks at the same files again.
-            WriteVortexSeen(src, Staged(src), failed);
+            WriteVortexSeen(src, Staged(src), failed, scope, seenBefore);
             // Sorted into the three kinds only when every record was here and
             // nothing was held open; otherwise the next start refreshes again
             // once it can finish (KindsDue).
