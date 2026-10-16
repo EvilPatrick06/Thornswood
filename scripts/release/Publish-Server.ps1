@@ -257,7 +257,7 @@ foreach ($t in 'ssh', 'scp') {
 
 # -------------------------------------------------------- committed only ----
 # A publish sends a commit or nothing (Patrick, 29 Sep, #1121). The files it
-# takes out of this repository are the installer and the log roller, sent
+# takes out of this repository are the installer and the log writer, sent
 # every time, and for a publish the gamemode it copies into the build and the
 # number of people records\most-online.json puts in the settings. Any of them
 # with uncommitted changes, or untracked, refuses it here, naming each, before
@@ -267,7 +267,7 @@ foreach ($t in 'ssh', 'scp') {
 . (Join-Path $Here '..\deploy\ServerArtifact.ps1')
 # What engine each server runs, for the site's credits page (#2303).
 . (Join-Path $Here '..\deploy\DeployedBuild.ps1')
-$committedOnly = @('scripts/deploy/Install-ThornswoodServer.ps1', 'scripts/deploy/ServerSettings.ps1', 'scripts/deploy/ServerBuild.ps1', 'scripts/deploy/ServerReadyWait.ps1', 'scripts/vps/Roll-Log.ps1', 'scripts/release/Read-JsonFile.ps1', 'scripts/release/RecordShape.ps1')
+$committedOnly = @('scripts/deploy/Install-ThornswoodServer.ps1', 'scripts/deploy/ServerSettings.ps1', 'scripts/deploy/ServerBuild.ps1', 'scripts/deploy/ServerReadyWait.ps1', 'scripts/vps/Server-Log.js', 'scripts/release/Read-JsonFile.ps1', 'scripts/release/RecordShape.ps1')
 if (-not $PutBack -and -not $TaskOnly) { $committedOnly += 'game/gamemode.js', 'records/most-online.json', 'records/server-build.json' }
 try { Assert-ThornswoodCommitted -RepoDir (Join-Path $Here '..\..') -Paths $committedOnly -What 'this publish' }
 catch { Die $_.Exception.Message }
@@ -278,10 +278,10 @@ catch { Die $_.Exception.Message }
 $installer = Join-Path $Here '..\deploy\Install-ThornswoodServer.ps1'
 if (-not (Test-Path -LiteralPath $installer)) { Die "not found: $installer" }
 # Beside the installer, which puts it in the server's folder for the task to
-# run in front of the server. See Roll-Log.ps1 for why a log can only be
-# rolled at start.
-$rollLog = Join-Path $Here '..\vps\Roll-Log.ps1'
-if (-not (Test-Path -LiteralPath $rollLog)) { Die "not found: $rollLog" }
+# run the server under: it writes server.log, rolls it at midnight and keeps
+# no line past 30 days (#2349). See Server-Log.js.
+$serverLog = Join-Path $Here '..\vps\Server-Log.js'
+if (-not (Test-Path -LiteralPath $serverLog)) { Die "not found: $serverLog" }
 # And ServerSettings.ps1 beside it, which says which settings come from the
 # payload and which stay the running server's (#1222). The installer refuses
 # without it rather than put the build's settings over the server's.
@@ -361,7 +361,7 @@ function Save-ServerRecords([switch]$PutBack) {
 function Send-InstallerOnly {
     Invoke-ThornswoodNative { & scp @ssh $installer "${target}:C:/Install-ThornswoodServer.ps1" }
     if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
-    Invoke-ThornswoodNative { & scp @ssh $rollLog "${target}:C:/Roll-Log.ps1" }
+    Invoke-ThornswoodNative { & scp @ssh $serverLog "${target}:C:/Server-Log.js" }
     if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
     Invoke-ThornswoodNative { & scp @ssh $settingsLib "${target}:C:/ServerSettings.ps1" }
     if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
@@ -703,7 +703,7 @@ Invoke-ThornswoodNative { & scp @ssh $Zip "${target}:C:/thornswood-server.zip" }
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. The server up there was not touched." }
 Invoke-ThornswoodNative { & scp @ssh $installer "${target}:C:/Install-ThornswoodServer.ps1" }
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. The server up there was not touched." }
-Invoke-ThornswoodNative { & scp @ssh $rollLog "${target}:C:/Roll-Log.ps1" }
+Invoke-ThornswoodNative { & scp @ssh $serverLog "${target}:C:/Server-Log.js" }
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. The server up there was not touched." }
 Invoke-ThornswoodNative { & scp @ssh $settingsLib "${target}:C:/ServerSettings.ps1" }
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. The server up there was not touched." }

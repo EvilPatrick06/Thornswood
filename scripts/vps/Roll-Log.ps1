@@ -2,8 +2,11 @@
   Roll-Log.ps1
 
   Rolls a log just before the service that writes it starts. It goes up beside
-  the game server, the voice service and the bot as roll-log.ps1, and each
-  one's scheduled task runs it in front of the service:
+  the voice service as roll-log.ps1, and its scheduled task runs it in front of
+  the service. The game server stopped using it on 15 Oct 2026 (#2349): its
+  log is written by Server-Log.js, which rolls by day and keeps nothing past
+  30 days, because the engine writes every connecting address there. The bot
+  rolls its own (BotService.cs). The shape, as the server's line used to be:
 
       cmd /c "powershell ... -File roll-log.ps1 -Path server.log & node ... >> server.log 2>&1"
 

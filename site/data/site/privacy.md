@@ -103,11 +103,16 @@ both are served from here now.
 
 ## How long it is kept
 
-- **Sign-in records**, which are the only thing here holding your address, are
+- **Sign-in records**, the only thing on the site holding your address, are
   deleted after 30 days. The address is the one your connection reached the
   site from, as our own front door saw it, not anything your browser claims
   about itself. That is enforced by the site rather than promised:
   old rows go whenever the log is written or read.
+
+- **The game server's log** records the address each connection to the game
+  came from, beside the Discord account it signed in as. It keeps nothing
+  older than 30 days: the server checks every hour and deletes each line as
+  it passes 30 days. Staff read it to look into a fault or a report.
 - **Session records and chat** are kept for 365 days, then dropped. That is
   the record of each session and the launcher log sent with it. The site
   checks every hour, so nothing waits for somebody to play first. A session

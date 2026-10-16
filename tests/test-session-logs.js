@@ -70,7 +70,7 @@ function sessionRows() { return ROWS; }
 
 eval([
   grab('slogFile'), grab('slogTrim'), grab('putSessionLogs'),
-  grab('retentionSay'), grab('pruneSessionLogs'), grab('serverLogSlice')
+  grab('retentionSay'), grab('pruneSessionLogs'), grab('serverLogGenerations'), grab('serverLogSlice')
 ].join('\n'));
 
 let pass = 0, fail = 0;
