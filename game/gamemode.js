@@ -29705,7 +29705,7 @@ log('gamemode loaded:',
   // scripts\release\Ship-Rules.ps1 calls ours ($ShipOursFiles), and
   // tests\test-1180-own-plugins.js holds the two lists to each other, so a
   // plugin the repo makes goes into both in one change.
-  var OURS = { 'thornswood-content.esp': 1 };
+  var OURS = { 'thornswood-content.esp': 1, 'thornswood-last.esp': 1 };
 
   // Returns '' once the manifest is published, otherwise why it was not.
   function publish() {
@@ -56154,7 +56154,16 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       poison counts the same because applying one to a blade and drinking it
       fire the same event and nothing here can tell them apart.
     */
-    potion: { def: 5 },
+    /*
+      THE POTION WINDOW (#1382). potions.md: "Inside 60 seconds, the first
+      potion does what it says. The second heals or buffs at 50%. The third
+      at 25%. The fourth and after do the sip of thirst and nothing else.
+      The window is from the first swallow." The server applies a potion's
+      effects itself (EatItemEvent in the engine) and the client's own heal
+      is cropped to regeneration, so the scale is handed to the engine in
+      onEatItem before anything lands, through eatItemScale (skymp #62).
+    */
+    potion: { def: 5, windowSeconds: 60, scales: [1, 0.5, 0.25, 0] },
 
     /*
       WATER YOU CARRY (#1382). drink.md's table: a well, an inn or a filled
@@ -57033,6 +57042,36 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     Something was eaten or drunk in the game. See the /ate command and the
     equip handler in thornswood-front.js.
   */
+  /*
+    WHAT THIS POTION IS WORTH, by how many came before it in the window.
+    Kept in memory: a window is a minute, and a restart inside it starts a
+    new one, which is the generous side. Food and drink are 1, always.
+  */
+  var potionWindow = {};
+
+  function isPotion(baseId) {
+    if (!baseId) { return false; }
+    if (baseId >= 0xff000000) { return true; }
+    // The food groups move a record's kind (#1382): Goodberry is a potion
+    // with the food flag, and consumed() reads the group first too.
+    var grouped = foodGroup(baseId);
+    if (grouped) { return grouped === 'potion'; }
+    return foodKind(baseId) === 'potion';
+  }
+
+  function potionScale(actorId, baseId) {
+    if (!isPotion(baseId)) { return 1; }
+    var now = Date.now();
+    var w = potionWindow[actorId];
+    if (!w || now - w.from >= NEEDS.potion.windowSeconds * 1000) {
+      w = potionWindow[actorId] = { from: now, n: 0 };
+    }
+    var scales = NEEDS.potion.scales;
+    var scale = scales[Math.min(w.n, scales.length - 1)];
+    w.n++;
+    return scale;
+  }
+
   function consumed(actorId, baseId) {
     if (!baseId) { return ''; }
     if (isWaterItem(baseId)) { return drankWater(actorId); }
@@ -58570,6 +58609,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     bandOf: bandOf, tempBand: tempBand, consumed: consumed, kindOf: foodKind, groupOf: foodGroup,
     // Water at a well and over a cooking fire, from mp.onActivate (#1382).
     activatedWater: activatedWater, drankWater: drankWater,
+    // The potion window (#1382), asked by mp.onEatItem before the engine applies it.
+    potionScale: potionScale,
     settle: settle, view: view, effects: effects,
     // The bars as a line of text, for /needs (#2267).
     textView: textView,
@@ -60237,6 +60278,21 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     engine takes the potion whatever this answers.
   */
   mp.onEatItem = guard('onEatItem', function (actorId, baseId) {
+    /*
+      THE POTION WINDOW (#1382) goes first, because the engine applies the
+      potion as soon as this returns. A second potion in the minute lands at
+      half, a third at a quarter, a fourth at nothing (the sip of thirst still
+      comes from the needs block). Nothing is taken back afterwards.
+      eatItemScale is the engine's (skymp #62). An engine without it does not
+      read it, and the potion lands whole, as it always has.
+    */
+    var needsApi = g.__thornswoodNeeds;
+    if (needsApi && needsApi.potionScale) {
+      try {
+        var scale = needsApi.potionScale(actorId, Number(baseId) || 0);
+        if (scale < 1) { mp.set(actorId, 'eatItemScale', scale); }
+      } catch (e) { hlog('the potion window threw:', e); }
+    }
     try { tell(actorId, swallowed(actorId, Number(baseId) || 0)); } catch (e) { hlog('the drink threw:', e); }
     // Withered (#1387), in the college block, on its own: five potions in an hour.
     var college = g.__thornswoodCollege;
