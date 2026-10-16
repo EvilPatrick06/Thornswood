@@ -349,6 +349,7 @@ jobs:
                  'test-1319-pass-switch.js',
                  'test-1319-pass-switch.ps1',
                  'test-2578-service-principals.ps1',
+                 'test-2612-backup-principal.ps1',
                  'test-1320-pass-one-session.js',
                  'test-1373-scarce-scene.js', 'test-quest-transactions.js', 'test-kill-contracts.js',
                  'test-nobody-makes.js', 'test-614-riekling-shift.js',
