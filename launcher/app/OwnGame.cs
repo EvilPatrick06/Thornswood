@@ -133,8 +133,14 @@ namespace Thornswood
         /// loop, killed 150 times, left files.txt missing 4 times through
         /// File.Replace and whole all 150 times through MoveFileEx
         /// (tests\test-2586-atomic-records.ps1 holds it to that).
+        ///
+        /// Internal, and the one way the launcher writes a record it keeps
+        /// in its Profile (#2591): Updater's release.txt and
+        /// release-files.txt (Sync.cs) and the news cache (FeedNews.cs) go
+        /// through it too. They deleted the old file and then moved the new
+        /// one in; killed 150 times, that left the record missing 30 times.
         /// </summary>
-        static void WriteRecord(string path, IEnumerable<string> lines)
+        internal static void WriteRecord(string path, IEnumerable<string> lines)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(path));
             string next = path + ".new";
@@ -147,6 +153,25 @@ namespace Thornswood
                     fs.Flush(true);
                 }
             }
+            SwapIn(next, path);
+        }
+
+        /// <summary>The same, for a record kept byte for byte (the news cache).</summary>
+        internal static void WriteRecord(string path, byte[] bytes)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            string next = path + ".new";
+            using (var fs = new FileStream(next, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                fs.Write(bytes, 0, bytes.Length);
+                fs.Flush(true);
+            }
+            SwapIn(next, path);
+        }
+
+        /// <summary>Renames next over path in one call, replacing it.</summary>
+        static void SwapIn(string next, string path)
+        {
             if (!MoveFileEx(next, path, MoveReplaceExisting | MoveWriteThrough))
                 throw new IOException(path + " could not be replaced by " + next + ": " +
                                       new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error()).Message);

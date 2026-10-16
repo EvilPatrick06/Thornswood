@@ -106,7 +106,9 @@ next number, never used twice.
 
 ## Stewards and rent
 
-A jarl names stewards. Only a steward can evict, and only at the
+A steward is whoever holds a hold's "Steward of <Hold>" Discord role,
+which that hold's Jarl gives, and the Jarl of a hold keeps it as its
+steward too (#2551, [Offices](offices.md)). Only a steward can evict, and only at the
 door: open it, then press Evict on the Office page of the K panel
 within a minute. Eviction ends the claim. It does not empty the house. It does not
 take a key back, so a tenant who kept one can still walk in. That is a
@@ -126,8 +128,8 @@ box pays rent owed by that person first. What is left is the hold's.
 Each hold has one box, and it is that hold's notice board. The nine
 mainland towns already have a spot each, the coordinates given for
 the boards, and Raven Rock's is at its inn. You are at the box when
-you are within 400 of that spot. A steward who moves the board moves
-the box with it. See [Notice boards](noticeboards.md).
+you are within 400 of that spot. A steward of that hold who moves the
+board moves the box with it. See [Notice boards](noticeboards.md).
 
 A price list is not dropped in as an item. Someone with the Prices
 permission on a faction or business book stands at the board and
@@ -222,7 +224,8 @@ not company wares.
 Claims, deeds, the 14 day lapse, locks, molds, keys, master keys,
 stewards, eviction, rent, and the gold-only box are in the server. The register
 is `private/property.json`. Eviction, the rent and marking a box are
-the Office page of the K panel, for a steward or a Jarl; see
+the Office page of the K panel, for a steward (the Steward or the Jarl
+of a hold, by the Discord role); see
 [Offices](offices.md). A container is made one of the ten holds' boxes
 and no other. The rent owed is on that page for the steward at the
 door, and on the property page of K for the holder.
