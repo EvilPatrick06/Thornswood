@@ -189,7 +189,8 @@ function grabRefresh() {
   const src = fs.readFileSync(GAME_SRC, 'utf8');
   const door = src.indexOf('// ==== thornswood door ====');
   if (door < 0) throw new Error('gamemode.js has no door block');
-  const at = src.indexOf('function refresh()', door);
+  // done since #2551: an office change in the game waits on one read.
+  const at = src.indexOf('function refresh(done)', door);
   if (at < 0) throw new Error('the door block has no refresh()');
   const b = src.indexOf('{', at);
   let d = 0;
