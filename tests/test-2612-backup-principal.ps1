@@ -24,6 +24,7 @@ $script:pass = 0; $script:fail = 0
 function Yes([string]$what, [bool]$ok) {
     if ($ok) { $script:pass++; Write-Host "PASS  $what" } else { $script:fail++; Write-Host "FAIL  $what" -ForegroundColor Red }
 }
+. (Join-Path $Repo 'scripts\deploy\ServiceAccount.ps1')  # Set-ThornswoodServiceAcl, for Windows PowerShell and pwsh
 function Text([string]$p) { return [IO.File]::ReadAllText((Join-Path $Repo $p)) }
 $sysRe = "-UserId\s+'SYSTEM'|-User\s+'SYSTEM'|-RunLevel\s+Highest"
 
@@ -73,7 +74,7 @@ try {
     $acl.SetAccessRuleProtection($true, $false)
     $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(
         (New-Object Security.Principal.SecurityIdentifier('S-1-5-18')), 'FullControl', 'ContainerInherit, ObjectInherit', 'None', 'Allow')))
-    (Get-Item -LiteralPath $locked).SetAccessControl($acl)
+    Set-ThornswoodServiceAcl $locked $acl
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     try {
         $said = @(& $ps51 -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $nightlyPath `
@@ -93,7 +94,7 @@ try {
         $acl = New-Object Security.AccessControl.DirectorySecurity
         $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(
             [Security.Principal.WindowsIdentity]::GetCurrent().User, 'FullControl', 'ContainerInherit, ObjectInherit', 'None', 'Allow')))
-        try { (Get-Item -LiteralPath $locked).SetAccessControl($acl) } catch { }
+        try { Set-ThornswoodServiceAcl $locked $acl } catch { }
     }
     Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
 }
