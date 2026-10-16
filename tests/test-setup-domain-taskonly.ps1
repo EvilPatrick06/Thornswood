@@ -53,6 +53,8 @@ try {
     Copy-Item -LiteralPath ([IO.Path]::Combine($Repo, 'scripts', 'vps')) -Destination (Join-Path $scratch 'scripts\vps') -Recurse
     Copy-Item -LiteralPath $SetupDomain -Destination (Join-Path $deploy 'Setup-Domain.ps1')
     Copy-Item -LiteralPath ([IO.Path]::Combine($Repo, 'scripts', 'deploy', 'Caddyfile')) -Destination (Join-Path $deploy 'Caddyfile')
+    # Setup-Domain.ps1 dot-sources the service account functions (#2578).
+    Copy-Item -LiteralPath ([IO.Path]::Combine($Repo, 'scripts', 'deploy', 'ServiceAccount.ps1')) -Destination (Join-Path $deploy 'ServiceAccount.ps1')
 
     # The box, as far as the script can tell: ssh runs what it is given and
     # says it went well, scp takes the file. A script sent as a file is read
