@@ -2319,7 +2319,10 @@ OFFICE_PANEL = ('**Hold offices**\n\n'
                 'its Guards here, for their own hold only. Press Add or Remove '
                 'beside the office, then pick the person. The roles are the '
                 'same ones the game reads, and a Jarl can change them there '
-                'too, on the Office page of K. Every change is said to staff.')
+                'too, on the Office page of K. In the game the office is held '
+                'by one character: the one the Jarl named there, or the one '
+                'its holder chooses on the Office page of K. Every change is '
+                'said to staff.')
 
 
 def office_role(office, town):
@@ -2498,7 +2501,8 @@ async def office_change(interaction, office, town, member, add):
         return
     log('office: %s (%s), Jarl of %s, %s %s (%s) the %s role'
         % (by, who.id, town, 'gave' if add else 'took from', shown, member.id, name))
-    await _say(interaction, ('%s holds the %s role now.' if add
+    await _say(interaction, ('%s holds the %s role now. In the game they choose which '
+                             'character holds it, on the Office page of K.' if add
                              else '%s no longer holds the %s role.') % (shown, name))
     await report_say(office_text({
         'did': 'office', 'from': 'panel', 'give': bool(add), 'office': office,
@@ -2588,6 +2592,59 @@ class OfficeTake(discord.ui.View):
     def __init__(self, office, town, holders):
         super().__init__(timeout=180)
         self.add_item(OfficeTakeSelect(office, town, holders))
+
+
+# The in-world roles the game reads, as Build-Discord.py makes them: name,
+# colour, shown as a group of its own. The office roles are never hoisted
+# (Patrick, 15 Oct); the Jarl roles are.
+JARL_COLOUR = 0xE0C56A
+OFFICE_COLOUR = 0xA8977A
+
+
+def office_roles_wanted():
+    out = [('Jarl of ' + t, JARL_COLOUR, True) for t in OFFICE_TOWNS]
+    for t in OFFICE_TOWNS:
+        for o, _ in OFFICES:
+            out.append((office_role(o, t), OFFICE_COLOUR, False))
+    return out
+
+
+async def ensure_office_roles(guild):
+    """
+    Make any Jarl or office role the game reads that is missing, the way the
+    hold panel makes its two ping roles, so the offices exist as soon as the
+    bot that gives them is running, without a run of Build-Discord.py (which
+    asks for the bot's token at a prompt). Raven Rock's included (#2551,
+    Patrick, 16 Oct). Nothing that is there is changed. A new Jarl role goes
+    under the lowest Jarl role there is, and a new office role under the
+    lowest Citizen role, where Build-Discord.py keeps them; a build later puts
+    every role in its exact place. Says in bot.log what it made.
+    """
+    if not guild.me.guild_permissions.manage_roles:
+        log('the office roles cannot be made: the bot has no Manage Roles.')
+        return []
+    made = []
+    for name, colour, hoist in office_roles_wanted():
+        if _role(guild, name) is not None:
+            continue
+        under = [r for r in guild.roles
+                 if r.name.startswith('Jarl of ' if hoist else 'Citizen of ')]
+        try:
+            role = await guild.create_role(name=name, colour=discord.Colour(colour), hoist=hoist,
+                                           mentionable=True, reason='Thornswood hold offices (#2551)')
+            made.append(name)
+            if under:
+                low = min(under, key=lambda r: r.position)
+                try:
+                    await role.edit(position=max(1, low.position))
+                except Exception:
+                    log('made %s, and could not move it under %s:\n' % (name, low.name)
+                        + traceback.format_exc())
+        except Exception:
+            log('could not make the %s role:\n' % name + traceback.format_exc())
+    if made:
+        log('made the office roles that were missing: %s' % ', '.join(made))
+    return made
 
 
 def _office_ids_wanted():
@@ -5199,6 +5256,7 @@ async def on_ready():
     for g in client.guilds:
         await ensure_panel(g)
         await ensure_hold_panel(g)
+        await ensure_office_roles(g)
         await ensure_office_panel(g)
     log('watching %d server(s)' % len(client.guilds))
     # Guilds are known here. Empty was already said in setup_hook. IDs

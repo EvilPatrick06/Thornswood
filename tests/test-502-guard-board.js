@@ -63,6 +63,10 @@ const PEOPLE = [GUARD_W, GUARD_R, ALICE, BOB, CAROL];
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-502-board-'));
 fs.writeFileSync(path.join(dir, 'server-settings.json'), JSON.stringify({ dataDir: 'data', privDir: 'private' }));
 fs.mkdirSync(path.join(dir, 'private'));
+// An office is one character's (#2551, Patrick, 16 Oct): the law register
+// names the character that holds each office for its account. A profile the
+// door ties to no account is an account of its own, 'p:<profile>'.
+fs.writeFileSync(path.join(dir, 'private', 'law.json'), JSON.stringify({ cells: {}, held: { 'guard:whiterun': { 'p:101': { pid: 101, name: 'Hrongar' } }, 'guard:riften': { 'p:202': { pid: 202, name: 'Maul' } } } }));
 const T = clock.t - 3600000;
 fs.writeFileSync(path.join(dir, 'private', 'property.json'), JSON.stringify({
   claims: {}, boxes: {},

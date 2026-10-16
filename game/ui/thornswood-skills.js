@@ -164,7 +164,8 @@
       for a new one. Nothing on it is picked or sent.
 
     officePage: { jarls: [ { hold, where, offices: { court | steward | guard:
-                    { role, label, holders: [ { pid, name } ], people: [ { pid, name } ] } } } ],
+                    { role, label, holders: [ { pid, name, was, chosen } ], people: [ { pid, name } ] } } } ],
+                  toHold: [ { office, hold, where, role, by } ],
                   clash: [ { hold, where } ], courtOf: [ { hold, where } ],
                   stewardOf: [ { hold, where } ], guardOf: [ { hold, where, jail } ],
                   steward: <bool>,
@@ -180,7 +181,12 @@
       stewardOf and guardOf are the offices it was given. steward: it keeps a
       hold (Steward of it, or its Jarl), so it evicts, sets rent, marks a box
       and moves its own hold's board; boards are those boards only. door and
-      box are what the steward opened in the last minute.
+      box are what the steward opened in the last minute. An office is one
+      character's (Patrick, 16 Oct): a holder row is the character that
+      holds it, or chosen false for an account none of whose characters
+      does yet, and toHold are the offices this account's roles give that
+      this character does not hold, with by the character that does, and
+      Hold it here sends /office hold <office> <hold>.
       Its buttons send the server's own lines through the chat line, the way
       the property page's Stop does: /office <court|steward|guard> <hold>
       <pid> (Name) and -<pid> (Remove), /evict, /rent <gold>, /rent -,
@@ -1528,6 +1534,7 @@
       if (first(ov.stewardOf)) return { t: 'Steward of ' + first(ov.stewardOf), c: 'set' };
       if (first(ov.courtOf)) return { t: first(ov.courtOf) + ' Court', c: 'set' };
       if (first(ov.guardOf)) return { t: 'Guard of ' + first(ov.guardOf), c: 'set' };
+      if (Array.isArray(ov.toHold) && ov.toHold.length) return { t: String(ov.toHold[0].role) + ', not held here', c: 'need' };
       return { t: 'an office', c: 'set' };
     }
     if (sec === 'staff') {
@@ -2067,7 +2074,10 @@
     if (!holders.length) card.appendChild(el('div', 'inn', 'Nobody holds it.'));
     holders.forEach(function (w) {
       var pid = Number(w.pid) || 0;
-      officeRow(card, w.name ? String(w.name) : 'Profile ' + pid, w.name ? 'profile ' + pid : 'not in the world now',
+      // The character that holds it (#2551), or an account whose role gives it and none of whose characters holds it yet.
+      var who = w.name ? String(w.name) : (w.was ? String(w.was) : 'Profile ' + pid);
+      var extra = w.chosen === false ? 'no character holds it yet' : (w.name ? 'profile ' + pid : 'not in the world now');
+      officeRow(card, who, extra,
         [officeButton('Remove', '/office ' + office + ' ' + hold + ' -' + pid, 'Press again to take ' + role + ' back')]);
     });
     var people = Array.isArray(o.people) ? o.people : [];
@@ -2092,13 +2102,27 @@
     // The Jarl of a hold (#2551): from their Jarl role, with its three offices.
     list(o.jarls).forEach(function (j) {
       var where = town(j);
-      officeHeld(wrap, 'Jarl of ' + where, 'Your Discord role makes you Jarl of ' + where + '. You name and remove its ' +
-        'Court, its Steward and its Guards here, and the same roles change in Discord. Every character on your ' +
-        'account holds the office.');
+      officeHeld(wrap, 'Jarl of ' + where, 'This character is Jarl of ' + where + ', by your Discord role. You name and ' +
+        'remove its Court, its Steward and its Guards here, and the same roles change in Discord. The office is ' +
+        'this character\'s; your other characters are ordinary.');
       var offices = (j && j.offices) || {};
       ['court', 'steward', 'guard'].forEach(function (k) {
         if (offices[k]) officeGiven(wrap, String(j.hold), k, offices[k]);
       });
+    });
+
+    // An office this account's role gives that this character does not hold
+    // (#2551, Patrick, 16 Oct: an office is one character's). Hold it here.
+    list(o.toHold).forEach(function (t) {
+      var card = el('div', 'card');
+      card.appendChild(el('div', 'name', String(t.role || t.office)));
+      card.appendChild(el('div', 'desc', (t.by
+        ? 'Your account holds the ' + String(t.role) + ' role, and ' + String(t.by) + ', another of your characters, holds the office.'
+        : 'Your account holds the ' + String(t.role) + ' role, and none of your characters holds the office yet.') +
+        ' One character holds it. Press Hold it here to make it this one.'));
+      officeRow(card, '', '', [officeButton('Hold it here', '/office hold ' + String(t.office) + ' ' + String(t.hold),
+        'Press again to hold ' + String(t.role) + ' with this character')]);
+      wrap.appendChild(card);
     });
 
     // A Jarl role another account holds too: neither acts (Patrick, 15 Oct).

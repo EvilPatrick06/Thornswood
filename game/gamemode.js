@@ -29228,6 +29228,21 @@ log('gamemode loaded:',
     one row per Discord account, with every profile of it the list knows, so
     the page can name whichever of its characters is in the world.
   */
+  /*
+    The Discord account a profile is on, as the site named it, or '' when the
+    list names no account for it. A hold office is one character's (#2551,
+    Patrick, 16 Oct): the role is the account's, and the property block keeps
+    which of the account's characters holds it.
+  */
+  /* Whether there is a list of the roles at all, read from the site (#2551). */
+  (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodRolesKnown = function () {
+    return !!load();
+  };
+  (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodAccountOf = function (profileId) {
+    var l = load();
+    var n = Number(profileId) || 0;
+    return (l && l.accounts && l.accounts[n]) ? String(l.accounts[n]) : '';
+  };
   (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodOfficeHolders = function (office, hold) {
     var l = load();
     var out = [];
@@ -29246,12 +29261,16 @@ log('gamemode loaded:',
     }
     return out;
   };
-  /* The holds whose Jarl role this profile's account holds with another account, so neither acts. */
-  (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodJarlClash = function (profileId) {
+  /*
+    The holds whose Jarl role this profile's account holds with another
+    account, so neither acts. onRecord: for a record the server holds, the
+    way __thornswoodOfficesOnRecord is, without the pass.
+  */
+  (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodJarlClash = function (profileId, onRecord) {
     var l = load();
     var n = Number(profileId) || 0;
     var out = [];
-    if (!l || !Array.isArray(l.clash) || !passProved(n)) return out;
+    if (!l || !Array.isArray(l.clash) || (!onRecord && !passProved(n))) return out;
     for (var i = 0; i < l.clash.length; i++) {
       if (l.clash[i].profiles.indexOf(n) !== -1 && out.indexOf(l.clash[i].hold) === -1) out.push(l.clash[i].hold);
     }
@@ -29752,6 +29771,15 @@ log('gamemode loaded:',
             note('list refreshed from the site, ' + doc.profiles.length + ' profiles, ' +
                  (Array.isArray(doc.devProfiles) ? doc.devProfiles.length : 0) + ' dev, ' +
                  (Array.isArray(doc.adminProfiles) ? doc.adminProfiles.length : 0) + ' admin');
+            /*
+              The roles may have changed, so whoever keeps which character
+              holds an office (the property block, #2551) reads them now: a
+              role taken in Discord ends that character's office at once.
+            */
+            var heard = (typeof globalThis !== 'undefined') ? globalThis.__thornswoodRolesRead : null;
+            if (typeof heard === 'function') {
+              try { heard(); } catch (e) { note('the offices could not read the new roles: ' + e); }
+            }
             tell(true);
           } catch (e) {
             note('could not write ' + FILE + ': ' + e);
@@ -36024,19 +36052,33 @@ log('gamemode loaded:',
         page of K, where the game asks the site and the bot's account sets
         the role, so the role stays the one truth.
 
-    So nothing in this block keeps a list of who holds an office. The door
-    reads every profile's offices from the site with the other roles
-    (__thornswoodOffices), and officeOf below is the one place anything asks.
+    So the role is the one truth for who may hold an office. The door reads
+    every account's roles from the site with the other roles
+    (__thornswoodOffices), this block keeps only which character of the
+    account holds it (below), and officeOf is the one place anything asks.
     The seat each hold's Jarl had in law.json (#2508), the hold chosen on the
     Office page (#2476), the stewards in property.json and the guards in
     law.json are gone; a law.json or property.json written before still
     carries them, nothing reads them, and the next write leaves them out.
 
-    THE OFFICE IS THE ACCOUNT'S. A Discord role is on the account, so every
-    character on it holds the office (until 15 October the Jarl role only
-    made an account eligible, and one character took the office, #397; that
-    needed the seat to say which character, and the seat went with the hold
-    choice).
+    THE OFFICE IS ONE CHARACTER'S (Patrick, 16 October: "it's character
+    based not account based"). A Discord role is on the account, and
+    Discord has no characters, so the role says which account may hold the
+    office and the law register says which one of its characters does
+    (law.held: office and hold, then account, to { pid, name, at }). Only
+    that character acts in the office; every other character on the
+    account is ordinary. The character is set in the game, never typed:
+      - the Jarl names a character on the Office page (officeCmd), and the
+        site sets the role on that character's account;
+      - a role given anywhere else (the bot's office panel, staff) names
+        only an account, and its holder presses Hold it on the character
+        that is to hold it (/office hold); pressing it on another of the
+        account's characters moves the office there.
+    The role and the character cannot disagree in silence: the office needs
+    both, so a role taken away ends it at once, and when the roles are read
+    again (rolesRead) a record whose account no longer holds the role is
+    deleted and said in the log, so a role given back later is chosen again.
+    A Jarl role two accounts hold is left alone while they clash.
 
     NOBODY IS AN OFFICER BY BEING STAFF. An admin without the role holds no
     office: the role decides who is Jarl. Patrick's rule of 21 September,
@@ -36048,18 +36090,23 @@ log('gamemode loaded:',
     taking a house back. They cannot make one, cannot lock one, and cannot see
     anybody's pack.
 
-    The ten holds are the ledgers' (HOLD_TOWN below): Build-Discord.py makes
-    the roles for the nine holds of Skyrim, and none for Raven Rock, so
-    Raven Rock has no officers until somebody makes its roles.
+    The ten holds are the ledgers' (HOLD_TOWN below), Raven Rock's with them
+    (Patrick, 16 October: Raven Rock gets its Jarl, Court, Steward and Guard
+    roles like the nine).
   */
   var OFFICE_KINDS = ['jarl', 'court', 'steward', 'guard'];
   // The three a Jarl gives and takes, and what each is called on the page.
   var OFFICE_GIVEN = { court: 'Court', steward: 'Steward', guard: 'Guard' };
 
-  /* Every office this profile holds, by its account's roles: { jarl, court, steward, guard }, each a list of holds. */
-  function officesOfProfile(profileId) {
+  /*
+    The office roles this profile's account holds, as the door read them:
+    { jarl, court, steward, guard }, each a list of holds. Only for a profile
+    the pass has proved, unless onRecord: a record the server already holds
+    (who held a jail claim, whose record is still good), never a press.
+  */
+  function rolesOfProfile(profileId, onRecord) {
     var out = { jarl: [], court: [], steward: [], guard: [] };
-    var fn = g['__thornswoodOffices'];
+    var fn = g[onRecord ? '__thornswoodOfficesOnRecord' : '__thornswoodOffices'];
     var got = null;
     try { got = (typeof fn === 'function') ? fn(Number(profileId) || 0) : null; } catch (e) { got = null; }
     for (var i = 0; got && i < OFFICE_KINDS.length; i++) {
@@ -36074,7 +36121,58 @@ log('gamemode loaded:',
     return out;
   }
 
-  /* Whether this profile holds this office of this hold. */
+  /* The Discord account a profile is on; a profile the list ties to no account is an account of its own. */
+  function officeAccountOf(profileId) {
+    var fn = g['__thornswoodAccountOf'];
+    var a = '';
+    try { a = (typeof fn === 'function') ? String(fn(Number(profileId) || 0) || '') : ''; } catch (e) { a = ''; }
+    return a || ('p:' + (Number(profileId) || 0));
+  }
+
+  /* Which character of this account holds this office of this hold: { pid, name, at }, or null. */
+  function officeHeldBy(office, hold, account) {
+    var row = law.held[office + ':' + hold];
+    return (row && Object.prototype.hasOwnProperty.call(row, account)) ? row[account] : null;
+  }
+
+  /*
+    Every office this character holds: the roles of its account, and of
+    those only the ones the register says this character holds.
+  */
+  function officesOfProfile(profileId, onRecord) {
+    var pid = Number(profileId) || 0;
+    var out = { jarl: [], court: [], steward: [], guard: [] };
+    if (!pid) { return out; }
+    var roles = rolesOfProfile(pid, onRecord);
+    var acct = officeAccountOf(pid);
+    for (var i = 0; i < OFFICE_KINDS.length; i++) {
+      var k = OFFICE_KINDS[i];
+      for (var j = 0; j < roles[k].length; j++) {
+        var rec = officeHeldBy(k, roles[k][j], acct);
+        if (rec && rec.pid === pid) { out[k].push(roles[k][j]); }
+      }
+    }
+    return out;
+  }
+
+  /* The offices this character's account holds that this character does not: the ones it may hold here. */
+  function officesToHold(profileId) {
+    var pid = Number(profileId) || 0;
+    var out = [];
+    if (!pid) { return out; }
+    var roles = rolesOfProfile(pid);
+    var acct = officeAccountOf(pid);
+    for (var i = 0; i < OFFICE_KINDS.length; i++) {
+      var k = OFFICE_KINDS[i];
+      for (var j = 0; j < roles[k].length; j++) {
+        var rec = officeHeldBy(k, roles[k][j], acct);
+        if (!rec || rec.pid !== pid) { out.push({ office: k, hold: roles[k][j], by: rec }); }
+      }
+    }
+    return out;
+  }
+
+  /* Whether this character holds this office of this hold. */
   function holdsOffice(profileId, office, hold) {
     var pid = Number(profileId) || 0;
     if (!pid || !hold) { return false; }
@@ -36171,13 +36269,15 @@ log('gamemode loaded:',
 
   /*
     The register off disk, rebuilt field by field the way load() rebuilds a
-    claim: a cell is a door in JAIL_DOOR with a yes or a no. Anything else is
-    dropped and counted, never trusted. A register written before #2551 also
-    carries the guards and each hold's Jarl seat; nothing reads them, the
-    roles say who holds an office, and they are not written back.
+    claim: a cell is a door in JAIL_DOOR with a yes or a no, and a held
+    office (#2551) is one of the four offices of one of the ten holds, by
+    account, naming a profile above 0. Anything else is dropped and counted,
+    never trusted. A register written before #2551 also carries the guards
+    and each hold's Jarl seat; nothing reads them, the roles and the held
+    offices say who holds an office, and they are not written back.
   */
   function loadLaw() {
-    var out = { cells: {} };
+    var out = { cells: {}, held: {} };
     var raw = null;
     try { raw = JSON.parse(require('fs').readFileSync(lawPath(), 'utf8')); }
     catch (e) { return out; }
@@ -36188,8 +36288,32 @@ log('gamemode loaded:',
       if (Object.prototype.hasOwnProperty.call(JAIL_DOOR, d)) { out.cells[d] = cs[d] === true; }
       else { dropped++; }
     }
-    if (dropped) { plog('law: dropped', dropped, 'row(s) that were not a cell door'); }
-    plog('law: read', Object.keys(out.cells).length, 'cell door(s) a guard has turned');
+    // Which character of an account holds each office (#2551). The ten
+    // holds are JAIL_NAME's here: HOLD_TOWN is set further down the block.
+    var hs = (raw && raw.held && typeof raw.held === 'object') ? raw.held : {};
+    var heldRows = 0;
+    for (var key in hs) {
+      if (!Object.prototype.hasOwnProperty.call(hs, key)) { continue; }
+      var bits = String(key).split(':');
+      var accounts = hs[key];
+      if (bits.length !== 2 || ['jarl', 'court', 'steward', 'guard'].indexOf(bits[0]) === -1 ||
+          !Object.prototype.hasOwnProperty.call(JAIL_NAME, bits[1]) || !accounts || typeof accounts !== 'object') {
+        dropped++;
+        continue;
+      }
+      for (var acct in accounts) {
+        if (!Object.prototype.hasOwnProperty.call(accounts, acct) || acct === '__proto__') { continue; }
+        var r = accounts[acct];
+        var rpid = r ? Number(r.pid) || 0 : 0;
+        if (!(rpid > 0)) { dropped++; continue; }
+        if (!out.held[key]) { out.held[key] = {}; }
+        out.held[key][acct] = { pid: rpid, name: String(r.name || 'somebody').slice(0, 60), at: Number(r.at) || 0 };
+        heldRows++;
+      }
+    }
+    if (dropped) { plog('law: dropped', dropped, 'row(s) that were not a cell door or a held office'); }
+    plog('law: read', Object.keys(out.cells).length, 'cell door(s) a guard has turned, and', heldRows,
+         'office(s) held by a character');
     return out;
   }
 
@@ -36197,7 +36321,7 @@ log('gamemode loaded:',
     try {
       var fs = require('fs');
       try { fs.mkdirSync(require('path').dirname(lawPath()), { recursive: true }); } catch (e) { }
-      fs.writeFileSync(lawPath(), JSON.stringify({ cells: law.cells }, null, 1));
+      fs.writeFileSync(lawPath(), JSON.stringify({ cells: law.cells, held: law.held }, null, 1));
     } catch (e) {
       plog('law: could not write the register:', e);
     }
@@ -36222,10 +36346,10 @@ log('gamemode loaded:',
   };
 
   /* The holds whose Jarl role this profile's account holds with another account (#2551). */
-  function jarlClashOf(profileId) {
+  function jarlClashOf(profileId, onRecord) {
     var fn = g['__thornswoodJarlClash'];
     var got = [];
-    try { got = (typeof fn === 'function') ? (fn(Number(profileId) || 0) || []) : []; } catch (e) { got = []; }
+    try { got = (typeof fn === 'function') ? (fn(Number(profileId) || 0, !!onRecord) || []) : []; } catch (e) { got = []; }
     var out = [];
     for (var i = 0; i < got.length; i++) {
       var h = String(got[i]);
@@ -36235,27 +36359,90 @@ log('gamemode loaded:',
   }
 
   /*
-    EVERY OFFICE A PERSON HOLDS, READ IN ONE PLACE. Since #2551 every office
-    is a Discord role on the account, which the door reads from the site.
+    EVERY OFFICE A CHARACTER HOLDS, READ IN ONE PLACE. Since #2551 every
+    office is a Discord role on the account, which the door reads from the
+    site, held by the one character of the account the register names.
     Anything outside this block that asks who holds what (the drop box, the
     jails, the board) asks this, through g.__thornswoodProperty.officeOf, and
     the readers above are the same rule inside the block, so a rule about
     who holds an office is written once.
 
-      jarlOf     the holds whose Jarl role this account holds, alone
-      courtOf    the holds whose Court role it holds
+      jarlOf     the holds this character is Jarl of: its account holds the
+                 role, alone, and this is the character that holds it
+      courtOf    the holds whose Court this character sits on
       stewardOf  the holds it keeps as a steward: Steward of, and Jarl of
-      guardOf    the holds whose Guard role it holds
-      clash      the holds whose Jarl role it holds with another account,
-                 so it does not act as their Jarl (Patrick, 15 October)
+      guardOf    the holds it guards
+      toHold     the offices its account holds that another of its
+                 characters, or none yet, holds: { office, hold, by }
+      clash      the holds whose Jarl role its account holds with another
+                 account, so it does not act as their Jarl (Patrick, 15 Oct)
       jarl, steward   whether jarlOf, stewardOf hold anything
   */
   function officeOf(profileId) {
     var o = officesOfProfile(profileId);
     var stewardOf = stewardHoldsOf(profileId);
     return { jarl: o.jarl.length > 0, jarlOf: o.jarl, courtOf: o.court, stewardOf: stewardOf,
-             steward: stewardOf.length > 0, guardOf: o.guard, clash: jarlClashOf(profileId) };
+             steward: stewardOf.length > 0, guardOf: o.guard, toHold: officesToHold(profileId),
+             clash: jarlClashOf(profileId) };
   }
+
+  /*
+    THE ROLES WERE READ AGAIN (#2551). The door calls this each time it has
+    written a new list from the site, and the block calls it once as it
+    loads. A held office whose account no longer holds the role, in Discord,
+    ends here: its record goes, the server log says whose and which, the
+    character is told if they are in the world, and the cells and pages
+    follow. So a role taken away in Discord, by the bot's panel or by hand,
+    takes the office from the character at the next read, and a role given
+    back later is held again only when somebody chooses the character. A
+    Jarl role two accounts hold is left as it is while they clash: neither
+    acts, and the one staff leave it with keeps their character.
+
+    It is not a timer and repairs nothing: it is the register reading the
+    one truth it hangs off, when that truth arrives.
+  */
+  function rolesRead() {
+    // Only against a list the door has: with none (no door.json, a file that
+    // will not read) nothing is known about the roles, and nothing ends.
+    var known = g['__thornswoodRolesKnown'];
+    var have = false;
+    try { have = typeof known === 'function' && !!known(); } catch (e) { have = false; }
+    if (!have) { return 0; }
+    var ended = [];
+    for (var key in law.held) {
+      if (!Object.prototype.hasOwnProperty.call(law.held, key)) { continue; }
+      var bits = key.split(':');
+      var row = law.held[key];
+      for (var acct in row) {
+        if (!Object.prototype.hasOwnProperty.call(row, acct)) { continue; }
+        var rec = row[acct];
+        var roles = rolesOfProfile(rec.pid, true);
+        var holds = roles[bits[0]].indexOf(bits[1]) !== -1 && officeAccountOf(rec.pid) === acct;
+        var clashed = bits[0] === 'jarl' && jarlClashOf(rec.pid, true).indexOf(bits[1]) !== -1;
+        if (holds || clashed) { continue; }
+        delete row[acct];
+        ended.push({ office: bits[0], hold: bits[1], pid: rec.pid, name: rec.name });
+      }
+      if (!Object.keys(row).length) { delete law.held[key]; }
+    }
+    if (!ended.length) { return 0; }
+    saveLaw();
+    pushAll();
+    for (var i = 0; i < ended.length; i++) {
+      var e = ended[i];
+      plog('law: the', officeRole(e.office, e.hold), 'role is no longer on the account of', e.name,
+           '(profile ' + e.pid + ') in Discord, so that character holds the office no more');
+      var them = onlineActorOf(e.pid);
+      var tell = g.__thornswoodToProfile;
+      if (them && typeof tell === 'function') {
+        tell(e.pid, 'Your account no longer holds the ' + officeRole(e.office, e.hold) +
+                     ' role in Discord, so this character is no longer ' + officeRole(e.office, e.hold) + '.');
+        redrawPanel(them);
+      }
+    }
+    return ended.length;
+  }
+  g.__thornswoodRolesRead = function () { rolesRead(); };
 
   /** The hold whose jail this door is in, or null. */
   function jailHoldOf(doorDesc) {
@@ -42011,40 +42198,56 @@ log('gamemode loaded:',
   }
 
   /*
-    A JARL GIVES OR TAKES AN OFFICE OF THEIR HOLD (#2551).
+    A JARL GIVES OR TAKES AN OFFICE OF THEIR HOLD, AND A CHARACTER HOLDS IT
+    (#2551).
 
-        /office <court|steward|guard> <hold> <id>      give it to that profile
-        /office <court|steward|guard> <hold> -<id>     take it back
+        /office <court|steward|guard> <hold> <id>      the Jarl names that character
+        /office <court|steward|guard> <hold> -<id>     the Jarl takes the office back
+        /office hold <office> <hold>                    this character holds an office
+                                                        its account's role gives
 
     Sent by the Office page of K, never typed (Patrick, 4 Oct: no chat
     commands for what people do): Name beside a person in the world, Remove
-    beside a holder. Patrick, 15 October: that hold's Jarl gives and takes its
-    Court, Steward and Guard, for their own hold only, and in the game "the
-    game asks the site, and the bot sets the Discord role, so the role stays
-    the one truth".
+    beside a holder, and Hold it here beside an office the account holds.
+    Patrick, 15 October: that hold's Jarl gives and takes its Court, Steward
+    and Guard, for their own hold only, and in the game "the game asks the
+    site, and the bot sets the Discord role, so the role stays the one
+    truth". And 16 October: the office is one character's.
 
-    So nothing is written here. The site checks the Jarl's role again and
-    sets the role with the bot's account; the door then reads the roles back
-    at once (__thornswoodDoorReadNow), which is when the office holds in the
-    world: the cells follow (pushAll) and both pages are written again.
+    NAMING A CHARACTER. The Jarl picks a character in the world, by its
+    profile id, because two characters can carry the same name. When its
+    account already holds the role, the office simply moves to that
+    character. Otherwise the site checks the Jarl's role again and sets the
+    role on the character's account with the bot's account, and once it has,
+    this character is the one that holds it. The door reads the roles back
+    at once (__thornswoodDoorReadNow), which is when it holds in the world:
+    the cells follow (pushAll) and both pages are written again.
 
-    A PROFILE ID AND NOT A NAME: two characters can carry the same name, and
-    the page sends the id of the person picked. The role goes to the Discord
-    account that character is on, so every character on it holds the office.
+    TAKING IT BACK takes the role off the account, and the character with it.
+
+    HOLDING IT HERE. A role given in Discord (the bot's panel, or staff for a
+    Jarl) names an account and no character, so its holder chooses: the
+    Office page offers it on each of the account's characters, and pressing
+    Hold it here makes this one the one that holds it, moving it off another.
 
     NOTHING IS RETRIED. A change the site or Discord refused is said to the
     Jarl in the site's own words, and pressing again is theirs.
   */
   function officeRole(office, hold) {
     var town = HOLD_TOWN[hold] || hold;
+    if (office === 'jarl') { return 'Jarl of ' + town; }
     if (office === 'court') { return town + ' Court'; }
     if (office === 'steward') { return 'Steward of ' + town; }
     return 'Guard of ' + town;
   }
 
-  /* What an office lets its holder do, said to them when it is given. */
+  /* What an office lets its holder do, said to them when it is theirs. */
   function officeDoes(office, hold) {
     var town = HOLD_TOWN[hold] || hold;
+    if (office === 'jarl') {
+      return 'You name and remove ' + town + '\'s Court, Steward and Guards on the Office page of K, claim its jail, ' +
+             'keep it as its steward, and take anything out of its drop box.';
+    }
     if (office === 'court') {
       return 'You take anything out of ' + town + '\'s drop box and read its records.';
     }
@@ -42056,8 +42259,50 @@ log('gamemode loaded:',
            town + '\'s notice board, and you take anything out of its drop box.';
   }
 
+  /* This character holds this office for its account, and no other character of the account does. */
+  function holdHere(office, hold, pid, name) {
+    var key = office + ':' + hold;
+    var acct = officeAccountOf(pid);
+    var had = officeHeldBy(office, hold, acct);
+    if (!law.held[key]) { law.held[key] = {}; }
+    law.held[key][acct] = { pid: Number(pid) || 0, name: String(name || 'somebody').slice(0, 60), at: Date.now() };
+    saveLaw();
+    return had;
+  }
+
+  /* /office hold <office> <hold>: this character holds an office its account's role gives. */
+  function officeHoldHere(parts, actorId, profileId, toProfile) {
+    var office = String((parts && parts[2]) || '').toLowerCase();
+    var hold = String((parts && parts[3]) || '').toLowerCase();
+    if (OFFICE_KINDS.indexOf(office) === -1 || !Object.prototype.hasOwnProperty.call(HOLD_TOWN, hold)) {
+      toProfile(profileId, 'Choose the office on the Office page of K.');
+      return true;
+    }
+    var role = officeRole(office, hold);
+    if (rolesOfProfile(profileId)[office].indexOf(hold) === -1) {
+      toProfile(profileId, office === 'jarl' && jarlClashOf(profileId).indexOf(hold) !== -1
+        ? 'Two Discord accounts hold the ' + role + ' role, so neither acts as Jarl until staff fix it. Staff have been told.'
+        : 'Your account does not hold the ' + role + ' role in Discord.');
+      return true;
+    }
+    if (holdsOffice(profileId, office, hold)) {
+      toProfile(profileId, 'This character holds ' + role + ' already.');
+      return true;
+    }
+    var name = personName(actorId);
+    var had = holdHere(office, hold, profileId, name);
+    pushAll();
+    officeRedraw(actorId, had ? had.pid : 0);
+    plog('law:', name, '(profile ' + profileId + ') holds', role, 'for their account' +
+         (had ? ', in place of ' + had.name + ' (profile ' + had.pid + ')' : ''));
+    toProfile(profileId, 'This character holds ' + role + ' now' + (had ? ', in place of ' + had.name : '') + '. ' +
+              officeDoes(office, hold));
+    return true;
+  }
+
   function officeCmd(parts, actorId, profileId, toProfile) {
     var office = String((parts && parts[1]) || '').toLowerCase();
+    if (office === 'hold') { return officeHoldHere(parts, actorId, profileId, toProfile); }
     var hold = String((parts && parts[2]) || '').toLowerCase();
     var arg = String((parts && parts[3]) || '').trim();
     if (!Object.prototype.hasOwnProperty.call(OFFICE_GIVEN, office) ||
@@ -42079,15 +42324,37 @@ log('gamemode loaded:',
       toProfile(profileId, 'Pick somebody on the Office page of K.');
       return true;
     }
+    var role = officeRole(office, hold);
+    var them = onlineActorOf(pid);
+    var who = them ? personName(them) : 'Profile ' + pid;
+    var jarlName = personName(actorId);
+    var told = function () {
+      pushAll();
+      officeRedraw(actorId, pid);
+      if (onlineActorOf(pid)) {
+        toProfile(pid, take ? 'The Jarl of ' + town + ' takes the ' + role + ' office back from you.'
+                            : 'The Jarl of ' + town + ' names this character ' + role + '. ' + officeDoes(office, hold));
+      }
+    };
+    // The account already holds the role: the office moves to this character, and Discord has nothing to change.
+    if (!take && rolesOfProfile(pid, true)[office].indexOf(hold) !== -1) {
+      if (holdsOffice(pid, office, hold) || (officeHeldBy(office, hold, officeAccountOf(pid)) || {}).pid === pid) {
+        toProfile(profileId, who + ' holds ' + role + ' already.');
+        return true;
+      }
+      var had = holdHere(office, hold, pid, who);
+      plog('law: the Jarl of', hold, '(' + jarlName + ', profile ' + profileId + ') names', who, '(profile ' + pid + ')',
+           role + ', a role their account holds' + (had ? ', in place of ' + had.name + ' (profile ' + had.pid + ')' : ''));
+      toProfile(profileId, who + ' holds ' + role + ' now' + (had ? ', in place of ' + had.name : '') + '.');
+      if (had && had.pid !== pid) { officeRedraw(actorId, had.pid); }
+      told();
+      return true;
+    }
     var ask = g['__thornswoodAskSite'];
     if (typeof ask !== 'function') {
       toProfile(profileId, 'This server cannot ask the site, so no office changes here.');
       return true;
     }
-    var role = officeRole(office, hold);
-    var them = onlineActorOf(pid);
-    var who = them ? personName(them) : 'Profile ' + pid;
-    var jarlName = personName(actorId);
     plog('law: the Jarl of', hold, '(' + jarlName + ', profile ' + profileId + ') asks the site to',
          take ? 'take ' + role + ' from' : 'give ' + role + ' to', who, '(profile ' + pid + ')');
     ask('/api/office', { by: Number(profileId) || 0, byName: jarlName, who: pid, whoName: who,
@@ -42098,21 +42365,23 @@ log('gamemode loaded:',
         toProfile(profileId, said || ('The office did not change: ' + (why || 'the site did not say why') + '.'));
         return;
       }
+      // Who holds it in the game: the character named; and nobody of that account once it is taken back.
+      if (take) {
+        var row = law.held[office + ':' + hold];
+        if (row && row[officeAccountOf(pid)]) { delete row[officeAccountOf(pid)]; saveLaw(); }
+      } else {
+        holdHere(office, hold, pid, who);
+      }
       plog('law: the Jarl of', hold, '(profile ' + profileId + ')', take ? 'took ' + role + ' from' : 'gave ' + role + ' to',
            who, '(profile ' + pid + '); the role is set in Discord');
       toProfile(profileId, said);
+      var readNow = g['__thornswoodDoorReadNow'];
       var after = function (read) {
         if (!read) {
           toProfile(profileId, 'The game reads the new role at its next look at the site, within five minutes.');
         }
-        pushAll();
-        officeRedraw(actorId, pid);
-        if (onlineActorOf(pid)) {
-          toProfile(pid, take ? 'The Jarl of ' + town + ' takes the ' + role + ' office back from you.'
-                              : 'The Jarl of ' + town + ' gives you the ' + role + ' office. ' + officeDoes(office, hold));
-        }
+        told();
       };
-      var readNow = g['__thornswoodDoorReadNow'];
       if (typeof readNow === 'function') { readNow(function (ok) { after(!!ok); }); } else { after(false); }
     });
     return true;
@@ -42215,8 +42484,11 @@ log('gamemode loaded:',
 
   /*
     Who holds one office of one hold, for the Jarl's page: one row an
-    account, by whichever of its characters is in the world (names, by
-    profile), or by its first profile with no name when none is.
+    account whose role gives it, by the character that holds it (#2551),
+    named when it is in the world and by the name it had when it took the
+    office when not; an account none of whose characters holds it yet is
+    shown by a character of it in the world, or its first profile, with
+    chosen false.
   */
   function officeHolders(office, hold, names) {
     var fn = g['__thornswoodOfficeHolders'];
@@ -42224,13 +42496,19 @@ log('gamemode loaded:',
     try { rows = (typeof fn === 'function') ? (fn(office, hold) || []) : []; } catch (e) { rows = []; }
     var out = [];
     for (var i = 0; i < rows.length; i++) {
-      var ps = Array.isArray(rows[i] && rows[i].profiles) ? rows[i].profiles : [];
+      var ps = Array.isArray(rows[i] && rows[i].profiles) ? rows[i].profiles.map(Number) : [];
       if (!ps.length) { continue; }
+      var rec = officeHeldBy(office, hold, String(rows[i].account));
+      if (rec && ps.indexOf(rec.pid) !== -1) {
+        out.push({ pid: rec.pid, name: Object.prototype.hasOwnProperty.call(names, rec.pid) ? names[rec.pid] : '',
+                   was: rec.name, chosen: true, profiles: ps });
+        continue;
+      }
       var shown = ps[0], name = '';
       for (var j = 0; j < ps.length; j++) {
         if (Object.prototype.hasOwnProperty.call(names, ps[j])) { shown = ps[j]; name = names[ps[j]]; break; }
       }
-      out.push({ pid: Number(shown) || 0, name: name, profiles: ps.map(Number) });
+      out.push({ pid: shown, name: name, was: '', chosen: false, profiles: ps });
     }
     return out;
   }
@@ -42241,7 +42519,10 @@ log('gamemode loaded:',
     var o = officesOfProfile(pid);
     var clash = jarlClashOf(pid);
     var keeps = stewardHoldsOf(pid);
-    if (!o.jarl.length && !o.court.length && !keeps.length && !o.guard.length && !clash.length) { return null; }
+    var toHold = officesToHold(pid);
+    if (!o.jarl.length && !o.court.length && !keeps.length && !o.guard.length && !clash.length && !toHold.length) {
+      return null;
+    }
 
     // Who is in the world, by profile, named the way a guest is named.
     var names = {};
@@ -42267,6 +42548,12 @@ log('gamemode loaded:',
     var view = { jarls: [], clash: clash.map(where), courtOf: o.court.map(where),
                  stewardOf: o.steward.map(where),
                  guardOf: o.guard.map(function (h) { return { hold: h, where: HOLD_TOWN[h], jail: JAIL_NAME[h] || null }; }),
+                 // The offices this character's account holds that another of
+                 // its characters, or none yet, holds (#2551): Hold it here.
+                 toHold: toHold.map(function (t) {
+                   return { office: t.office, hold: t.hold, where: HOLD_TOWN[t.hold], role: officeRole(t.office, t.hold),
+                            by: t.by ? t.by.name : null };
+                 }),
                  steward: keeps.length > 0, door: null, box: null, boards: [] };
     for (var j = 0; j < o.jarl.length; j++) {
       var hold = o.jarl[j];
@@ -42275,8 +42562,10 @@ log('gamemode loaded:',
         if (!Object.prototype.hasOwnProperty.call(OFFICE_GIVEN, office)) { continue; }
         var holders = officeHolders(office, hold, names);
         var holding = {};
+        // The characters that hold it are not offered; any other character
+        // may be named, which for an account holding the role moves it there.
         for (var hh = 0; hh < holders.length; hh++) {
-          for (var hp = 0; hp < holders[hh].profiles.length; hp++) { holding[holders[hh].profiles[hp]] = true; }
+          if (holders[hh].chosen) { holding[holders[hh].pid] = true; }
         }
         var people = [];
         for (var q = 0; q < order.length; q++) {
@@ -42286,7 +42575,8 @@ log('gamemode loaded:',
         people.sort(byName);
         row.offices[office] = {
           role: officeRole(office, hold), label: OFFICE_GIVEN[office],
-          holders: holders.map(function (x) { return { pid: x.pid, name: x.name }; }).sort(byName),
+          holders: holders.map(function (x) { return { pid: x.pid, name: x.name, was: x.was, chosen: x.chosen }; })
+                          .sort(byName),
           people: people.slice(0, OFFICE_PEOPLE_MAX)
         };
       }
@@ -42335,14 +42625,12 @@ log('gamemode loaded:',
   function endPreRuleJailClaims() {
     if (steps.jailRule) { return 0; }
     var ended = 0;
-    var onRecord = g['__thornswoodOfficesOnRecord'];
     for (var b in claims) {
       if (!Object.prototype.hasOwnProperty.call(claims, b)) { continue; }
       var hold = jailOfBuilding(b);
       if (!hold) { continue; }
-      var rec = null;
-      try { rec = (typeof onRecord === 'function') ? onRecord(claims[b].by) : null; } catch (e) { rec = null; }
-      if (rec && Array.isArray(rec.jarl) && rec.jarl.indexOf(hold) !== -1) { continue; }
+      // The character that holds the hold's Jarl office (#2551), read on record.
+      if (officesOfProfile(claims[b].by, true).jarl.indexOf(hold) !== -1) { continue; }
       plog('law: the jail rule ends', claims[b].name + '\'s claim (profile ' + claims[b].by + ') on',
            nameOf(b) + ', made before only the Jarl of', hold, 'could hold it');
       delete claims[b];
@@ -42353,6 +42641,7 @@ log('gamemode loaded:',
     plog('law: the jail rule was applied to the claims made before it once:', ended, 'claim(s) ended');
     return ended;
   }
+  rolesRead();
   endPreRuleJailClaims();
 
   ready();
@@ -42379,6 +42668,7 @@ log('gamemode loaded:',
     // The hold offices (#2551), every one a Discord role: officeOf is the one place.
     officeOf: officeOf, officeView: officeView, officeCmd: officeCmd, HOLD_TOWN: HOLD_TOWN,
     isJarl: isJarl, isJarlOf: isJarlOf, jarlHoldsOf: jarlHoldsOf, isCourtOf: isCourtOf,
+    rolesRead: rolesRead, held: function () { return JSON.parse(JSON.stringify(law.held)); },
     isSteward: isSteward, isStewardOf: isStewardOf, stewardHoldsOf: stewardHoldsOf,
     endPreRuleJailClaims: endPreRuleJailClaims, steps: function () { return Object.assign({}, steps); },
     isGuard: isGuard, guardHoldsOf: guardHoldsOf, jailHoldOf: jailHoldOf, cellLocked: cellLocked,

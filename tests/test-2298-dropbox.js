@@ -82,6 +82,10 @@ function officesOf(pid) {
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-2298-box-'));
 fs.writeFileSync(path.join(dir, 'server-settings.json'), JSON.stringify({ dataDir: 'data', privDir: 'private' }));
 fs.mkdirSync(path.join(dir, 'private'));
+// An office is one character's (#2551, Patrick, 16 Oct): the law register
+// names the character that holds each office for its account. A profile the
+// door ties to no account is an account of its own, 'p:<profile>'.
+fs.writeFileSync(path.join(dir, 'private', 'law.json'), JSON.stringify({ cells: {}, held: { 'guard:whiterun': { 'p:101': { pid: 101, name: 'Hrongar' } }, 'guard:riften': { 'p:202': { pid: 202, name: 'Maul' } }, 'steward:whiterun': { 'p:606': { pid: 606, name: 'Proventus' } }, 'jarl:whiterun': { 'p:707': { pid: 707, name: 'Balgruuf' } }, 'jarl:riften': { 'p:808': { pid: 808, name: 'Laila' } }, 'court:whiterun': { 'p:909': { pid: 909, name: 'Irileth' } }, 'steward:riften': { 'p:919': { pid: 919, name: 'Anuriel' } } } }));
 fs.writeFileSync(path.join(dir, 'private', 'property.json'), JSON.stringify({
   claims: {
     '1234:Skyrim.esm': { by: ALICE.pid, name: 'Alice', at: clock.t - 86400000,

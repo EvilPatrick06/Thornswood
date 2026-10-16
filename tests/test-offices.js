@@ -9,7 +9,9 @@
 // "Steward of <Hold>", "Guard of <Hold>"), read through the door from the
 // site. Nothing in the game keeps a list of who holds what, and nobody is an
 // officer by being staff. A steward is the Steward of one hold, and a Jarl
-// keeps their own hold too.
+// keeps their own hold too. Patrick, 16 October: an office is one
+// character's, not the whole account's, so the law register names which
+// character of the account holds it, and only that one acts.
 //
 // Read only.
 const REPO_DIR = require('path').join(__dirname, '..');
@@ -47,7 +49,8 @@ function fnSrc(name) {
   return null;
 }
 
-const READERS = ['officesOfProfile', 'holdsOffice', 'isJarlOf', 'jarlHoldsOf', 'isJarl', 'isCourtOf',
+const READERS = ['rolesOfProfile', 'officeAccountOf', 'officeHeldBy', 'officesOfProfile', 'officesToHold',
+                 'holdsOffice', 'isJarlOf', 'jarlHoldsOf', 'isJarl', 'isCourtOf',
                  'isStewardOf', 'stewardHoldsOf', 'isSteward'];
 const readerSrc = READERS.map(fnSrc);
 const tables = (lift('  var OFFICE_KINDS = [', ';') || '') + '\n' + (lift('  var HOLD_TOWN = {', '};') || '');
@@ -59,9 +62,27 @@ yes('and so is the eviction', evictBlock !== null);
 const JARL = 1, ALICE = 101, BOB = 202, COURT = 303, ADMIN = 404;
 const HOUSE = 'breezehome';
 
-/* The readers over a table of Discord roles, as the door hands them over. */
-function readers(roles) {
+/*
+  The readers over a table of Discord roles, as the door hands them over,
+  accounts (profile -> account, the door's), and which character of each
+  account holds each office (the law register). With no held table given,
+  every profile holds what its roles give, as if each had chosen.
+*/
+function readers(roles, accounts, held) {
+  if (!held) {
+    held = {};
+    Object.keys(roles).forEach(function (pid) {
+      ['jarl', 'court', 'steward', 'guard'].forEach(function (k) {
+        (roles[pid][k] || []).forEach(function (h) {
+          const key = k + ':' + h;
+          held[key] = held[key] || {};
+          held[key][(accounts && accounts[pid]) || 'p:' + pid] = { pid: Number(pid), name: 'x', at: 0 };
+        });
+      });
+    });
+  }
   const g = {
+    __thornswoodAccountOf: function (pid) { return (accounts && accounts[pid]) || ''; },
     __thornswoodOffices: function (pid) {
       const o = roles[pid] || {};
       return { jarl: o.jarl || [], court: o.court || [], steward: o.steward || [], guard: o.guard || [] };
@@ -70,8 +91,8 @@ function readers(roles) {
     // readers must never ask this.
     __thornswoodIsAdmin: function () { throw new Error('the office readers asked whether somebody is an admin'); }
   };
-  return new Function('g', tables + '\n' + readerSrc.join('\n') + '\nreturn { ' +
-                      READERS.map(function (n) { return n + ': ' + n; }).join(', ') + ' };')(g);
+  return new Function('g', 'law', tables + '\n' + readerSrc.join('\n') + '\nreturn { ' +
+                      READERS.map(function (n) { return n + ': ' + n; }).join(', ') + ' };')(g, { cells: {}, held: held });
 }
 
 /** Drive /evict with a given claim and caller. */
@@ -119,6 +140,26 @@ if (readerSrc.every(function (s) { return !!s; })) {
   yes('S5 an admin with no role holds no office, and the readers never ask who is an admin',
       !R.isJarl(ADMIN) && !R.isSteward(ADMIN) && !R.isCourtOf(ADMIN, 'whiterun'));
   yes('S5 nor does somebody with no role, or no profile', !R.isSteward(999) && !R.isJarlOf(0, 'whiterun'));
+
+  // One character holds the office (Patrick, 16 Oct). Profiles 11 and 12 are
+  // the same account, which holds the Jarl of Whiterun role; 11 holds it.
+  const C = readers({ 11: { jarl: ['whiterun'], guard: ['riften'] }, 12: { jarl: ['whiterun'], guard: ['riften'] } },
+                    { 11: 'acct-a', 12: 'acct-a' },
+                    { 'jarl:whiterun': { 'acct-a': { pid: 11, name: 'Balgruuf', at: 1 } } });
+  yes('C1 of two characters on an account with the Jarl role, only the one that holds the office is Jarl',
+      C.isJarlOf(11, 'whiterun') && !C.isJarlOf(12, 'whiterun') && C.isStewardOf(11, 'whiterun') && !C.isSteward(12));
+  yes('C2 a role no character holds yet is nobody\'s office, and both characters are offered it',
+      C.officesOfProfile(11).guard.length === 0 &&
+      C.officesToHold(11).map(function (t) { return t.office + ':' + t.hold; }).join() === 'guard:riften' &&
+      C.officesToHold(12).map(function (t) { return t.office + ':' + t.hold + ':' + (t.by ? t.by.pid : ''); }).join() ===
+        'jarl:whiterun:11,guard:riften:');
+  const G = readers({ 11: {}, 12: {} }, { 11: 'acct-a', 12: 'acct-a' },
+                    { 'jarl:whiterun': { 'acct-a': { pid: 11, name: 'Balgruuf', at: 1 } } });
+  yes('C3 a role taken in Discord ends the office, whatever the register says', !G.isJarlOf(11, 'whiterun') &&
+      G.officesToHold(11).length === 0);
+  const W = readers({ 11: { jarl: ['whiterun'] } }, { 11: 'acct-b' },
+                    { 'jarl:whiterun': { 'acct-a': { pid: 11, name: 'Balgruuf', at: 1 } } });
+  yes('C4 a record under another account is not this account\'s', !W.isJarlOf(11, 'whiterun'));
 }
 
 if (evictBlock !== null) {
@@ -168,9 +209,9 @@ if (evictBlock !== null) {
       /'\/evict', '\/box', '\/rent',/.test(code) && /'\/office',/.test(code));
   yes('and the dispatcher hands /office and /evict to the property block',
       /word === '\/office'/.test(code) && /word === '\/evict'/.test(code));
-  yes('the offices are read from outside and never kept in here: no stewards register, no guards or seats in law.json',
-      /g\['__thornswoodOffices'\]/.test(code) && !/claims: claims, stewards: stewards/.test(code) &&
-      /JSON\.stringify\(\{ cells: law\.cells \}/.test(code) && !/law\.jarls|law\.guards/.test(code));
+  yes('the roles are read from outside, and the register keeps only which character holds an office: no stewards register, no guards or seats',
+      /g\[onRecord \? '__thornswoodOfficesOnRecord' : '__thornswoodOffices'\]/.test(code) && !/claims: claims, stewards: stewards/.test(code) &&
+      /JSON\.stringify\(\{ cells: law\.cells, held: law\.held \}/.test(code) && !/law\.jarls|law\.guards/.test(code));
   yes('__thornswoodOffices is defined on the door loader (not only read), and the Jarl answer that came before it is gone',
       /__thornswoodOffices = function\s*\(/.test(code) && !/__thornswoodIsJarl/.test(code));
   yes('no office is on the character any more: nothing writes or reads s.office',

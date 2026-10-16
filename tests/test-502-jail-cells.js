@@ -145,7 +145,9 @@ const bogusCell = '999999:Skyrim.esm';
 fs.writeFileSync(path.join(dir, 'private', 'law.json'), JSON.stringify({
   guards: { '101': 'whiterun', '202': 'riften', '303': 'whiterun', 'x': 'whiterun' },
   jarls: { whiterun: { pid: 404, actor: 0xff000404, name: 'Ysolda', at: 1 } },
-  cells: { [bogusCell]: true }
+  cells: { [bogusCell]: true },
+  // Which character holds each office (#2551): the two guards.
+  held: { 'guard:whiterun': { 'p:101': { pid: 101, name: 'Hrongar' } }, 'guard:riften': { 'p:202': { pid: 202, name: 'Maul' } } }
 }));
 function inDir(f) {
   const was = process.cwd();
@@ -211,8 +213,8 @@ yes('R2 a guard the old register names and no role does is nobody (#2551)',
     !W.isGuard(303, 'whiterun') && W.guardHoldsOf(303).length === 0);
 yes('R3 and a cell that is not a jail door', W.cellLocked(bogusCell) === false && W.jailHoldOf(bogusCell) === null);
 yes('R4 the log says what was read and what was dropped',
-    S.logged.some(function (l) { return /law: dropped 1 row\(s\) that were not a cell door/.test(l); }) &&
-    S.logged.some(function (l) { return /law: read 0 cell door\(s\) a guard has turned/.test(l); }));
+    S.logged.some(function (l) { return /law: dropped 1 row\(s\) that were not a cell door or a held office/.test(l); }) &&
+    S.logged.some(function (l) { return /law: read 0 cell door\(s\) a guard has turned, and 2 office\(s\) held by a character/.test(l); }));
 yes('R5 a guard is a guard of their own hold and no other',
     W.isGuard(101, 'whiterun') && !W.isGuard(101, 'riften') && !W.isGuard(303, 'whiterun') && !W.isGuard(0, 'whiterun'));
 
@@ -318,9 +320,9 @@ W = S.W;
 yes('S1 after a restart the cell is still locked and the guards are still guards',
     W.cellLocked(CELL) === true && W.cellLocked(CELL2) === true && W.isGuard(101, 'whiterun') && W.isGuard(202, 'riften'));
 const saved = JSON.parse(fs.readFileSync(path.join(dir, 'private', 'law.json'), 'utf8'));
-yes('S2 the register on disk is the one cell a guard turned, and the old guards and seat are gone (#2551)',
+yes('S2 the register on disk is the one cell a guard turned and who holds the offices, and the old guards and seat are gone (#2551)',
     saved.cells[CELL] === true && Object.keys(saved.cells).length === 1 && !saved.guards && !saved.jarls &&
-    Object.keys(saved).join() === 'cells');
+    Object.keys(saved).join() === 'cells,held' && saved.held['guard:whiterun']['p:101'].pid === 101);
 yes('S3 property.json was not touched by any of it', !JSON.parse(fs.readFileSync(path.join(dir, 'private', 'property.json'), 'utf8')).guards);
 
 done();

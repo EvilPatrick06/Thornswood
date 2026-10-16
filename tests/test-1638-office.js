@@ -14,7 +14,10 @@
 // Guards on the page: Name and Remove send /office, the server asks the site,
 // the bot's account sets the role, and the page is written again once the
 // game has read it back. Two accounts holding one hold's Jarl role act as
-// neither.
+// neither. And 16 Oct: an office is one character's, not the whole
+// account's. The law register names the character; a role given in Discord
+// is held by the character its holder chooses with Hold it here, and a role
+// taken away ends the office when the roles are read again.
 //
 // The server half is lifted out of the property block and run together over
 // a small world, with the roles as a table the door would hand over and the
@@ -90,7 +93,8 @@ function line(re) {
 }
 
 const NAMES = ['officeView', 'officeHolders', 'officeRedraw', 'officeCmd', 'officeRole', 'officeDoes',
-               'officesOfProfile', 'holdsOffice', 'isJarlOf', 'jarlHoldsOf', 'isJarl', 'isCourtOf',
+               'rolesOfProfile', 'officeAccountOf', 'officeHeldBy', 'officesToHold', 'holdHere', 'officeHoldHere',
+               'rolesRead', 'officesOfProfile', 'holdsOffice', 'isJarlOf', 'jarlHoldsOf', 'isJarl', 'isCourtOf',
                'isStewardOf', 'stewardHoldsOf', 'isSteward', 'isGuard', 'guardHoldsOf', 'jarlClashOf', 'officeOf',
                'evict', 'rentCmd', 'boxCmd', 'moveBoard', 'board', 'command', 'holderOf', 'here', 'buildingOf',
                'boxAt', 'holdOfBox', 'rentDue', 'nameOf', 'profileOf', 'onlineActorOf', 'redrawPanel', 'personName',
@@ -152,8 +156,22 @@ function server() {
     set: function () { }
   };
   const blank = function () { return { jarl: [], court: [], steward: [], guard: [] }; };
+  // Every profile of the account a profile is on: a role is the account's.
+  const sameAccount = function (pid) {
+    const acct = account[pid] || ('p:' + pid);
+    const all = {};
+    Object.keys(people).forEach(function (a) { all[people[a].pid] = true; });
+    Object.keys(roles).forEach(function (k) { all[k] = true; });
+    return Object.keys(all).map(Number).filter(function (k) { return (account[k] || ('p:' + k)) === acct; })
+      .concat(Object.prototype.hasOwnProperty.call(all, pid) ? [] : [Number(pid)]);
+  };
+  const told = [];
   const g = {
     __thornswoodOffices: function (pid) { return JSON.parse(JSON.stringify(roles[pid] || blank())); },
+    __thornswoodOfficesOnRecord: function (pid) { return JSON.parse(JSON.stringify(roles[pid] || blank())); },
+    __thornswoodAccountOf: function (pid) { return account[pid] || ''; },
+    __thornswoodRolesKnown: function () { return true; },
+    __thornswoodToProfile: function (pid, m) { told.push([pid, m]); },
     __thornswoodOfficeHolders: function (office, hold) {
       const rows = {};
       const out = [];
@@ -176,8 +194,12 @@ function server() {
         done('', { ok: false, said: body.whoName + (has ? ' already holds ' : ' does not hold ') + role + '.' });
         return;
       }
-      if (body.give) { o[body.office].push(body.hold); }
-      else { o[body.office] = o[body.office].filter(function (h) { return h !== body.hold; }); }
+      // Discord puts the role on the account, so every character of it has the role.
+      sameAccount(body.who).forEach(function (k) {
+        const r = roles[k] || (roles[k] = blank());
+        if (body.give) { if (r[body.office].indexOf(body.hold) === -1) { r[body.office].push(body.hold); } }
+        else { r[body.office] = r[body.office].filter(function (h) { return h !== body.hold; }); }
+      });
       done('', { ok: true, said: body.whoName + (body.give ? ' holds ' : ' no longer holds ') + role + ' now.' });
     },
     __thornswoodDoorReadNow: function (done) { site.reads++; done(true); },
@@ -193,6 +215,9 @@ function server() {
   });
   const body = [
     'var claims = {}; var boxes = {}; var funds = {}; var notices = {};',
+    // Which character of an account holds each office (#2551, Patrick, 16 Oct).
+    'var law = { cells: {}, held: {} };',
+    'function saveLaw() { reg.lawSaves = (reg.lawSaves || 0) + 1; }',
     'var BUILDING_BY_DOOR = {}; BUILDING_BY_DOOR[' + JSON.stringify(DOOR) + '] = ' + JSON.stringify(HOUSE) + ';',
     'var BUILDING_NAME = { breezehome: "Breezehome" };',
     'function lapseDays() { return 14; }',
@@ -208,14 +233,26 @@ function server() {
   ].concat(VARS, NAMES.map(function (n) { return lifted[n]; }));
   body.push('return { command: command, officeView: officeView, officeOf: officeOf, isSteward: isSteward, ' +
             'isStewardOf: isStewardOf, isJarlOf: isJarlOf, claims: claims, boxes: boxes, boards: boards, ' +
+            'law: law, rolesRead: rolesRead, officesToHold: officesToHold, ' +
             'OFFICE_AT_DOOR: OFFICE_AT_DOOR };');
   const make = new Function('mp', 'g', 'boards', 'reg', body.join('\n'));
   const api = make(mp, g, boards, reg);
   api.people = people; api.writes = writes; api.roles = roles; api.account = account; api.clash = clash;
-  api.site = site; api.reg = reg;
-  api.give = function (pid, office, hold) {
-    const o = roles[pid] || (roles[pid] = blank());
-    if (o[office].indexOf(hold) === -1) { o[office].push(hold); }
+  api.site = site; api.reg = reg; api.toldOut = told;
+  /*
+    The role, given in Discord to the account of pid, and, unless noChar, this
+    character holding the office for it, as if named or chosen.
+  */
+  api.give = function (pid, office, hold, noChar) {
+    sameAccount(pid).forEach(function (k) {
+      const o = roles[k] || (roles[k] = blank());
+      if (o[office].indexOf(hold) === -1) { o[office].push(hold); }
+    });
+    if (!noChar) {
+      const key = office + ':' + hold;
+      api.law.held[key] = api.law.held[key] || {};
+      api.law.held[key][account[pid] || ('p:' + pid)] = { pid: pid, name: 'x', at: 1 };
+    }
   };
   api.add = function (actor, pid, name) {
     people[actor] = { pid: pid, name: name, cell: TAMRIEL, pos: [500, 500, 0] };
@@ -319,7 +356,7 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
     yes('C2 and once the game has read the roles back, the cells are pushed and both pages are written again',
         srv.site.reads === 1 && srv.reg.pushes === 1 && srv.writesFor(JARL) === 1 && srv.writesFor(ALICE2) === 1);
     yes('C2 and she is told what the office lets her do',
-        r.all.some(function (t) { return t[0] === P_ALICE2 && /gives you the Steward of Whiterun office\. You end claims/.test(t[1]); }));
+        r.all.some(function (t) { return t[0] === P_ALICE2 && /names this character Steward of Whiterun. You end claims/.test(t[1]); }));
     const v2 = srv.view(JARL);
     yes('C3 she is listed as its Steward by name, and is no longer offered',
         v2.jarls[0].offices.steward.holders.length === 1 && v2.jarls[0].offices.steward.holders[0].pid === P_ALICE2 &&
@@ -340,16 +377,18 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
     yes('C7 Remove asks the site to take it back, and both pages are written again',
         srv.site.asked.length === 2 && srv.site.asked[1][1].give === false && srv.writesFor(JARL) === 1 &&
         srv.writesFor(ALICE2) === 1 && srv.view(ALICE2) === null);
-    srv.give(99, 'guard', 'whiterun');
     srv.account[99] = 'acct-99';
+    srv.give(99, 'guard', 'whiterun');
     const off = srv.view(JARL).jarls[0].offices.guard.holders.filter(function (w) { return w.pid === 99; })[0];
-    yes('C8 a guard who is not in the world is listed by profile, with no name to show', !!off && off.name === '');
-    srv.give(P_ALICE, 'court', 'whiterun');
+    yes('C8 a guard who is not in the world is listed by profile, with the name it had, and no name to show now',
+        !!off && off.name === '' && off.was === 'x' && off.chosen === true);
     srv.account[P_ALICE] = 'acct-alice'; srv.account[P_ALICE2] = 'acct-alice';
-    srv.give(P_ALICE2, 'court', 'whiterun');
+    srv.give(P_ALICE, 'court', 'whiterun');
     const court = srv.view(JARL).jarls[0].offices.court;
-    yes('C9 one account is one row, by its character in the world, and neither of its characters is offered',
-        court.holders.length === 1 && court.people.every(function (p) { return p.pid !== P_ALICE && p.pid !== P_ALICE2; }));
+    yes('C9 one account is one row, by the character that holds it; the other character of it may be named, to move it',
+        court.holders.length === 1 && court.holders[0].pid === P_ALICE && court.holders[0].chosen === true &&
+        court.people.every(function (p) { return p.pid !== P_ALICE; }) &&
+        court.people.some(function (p) { return p.pid === P_ALICE2; }));
     srv.site.answer = { why: '', doc: { ok: false, said: 'Discord could not be asked just now. Try again in a minute.' } };
     srv.writes.length = 0;
     const refused = srv.say(JARL, '/office guard whiterun ' + P_NOBODY);
@@ -365,6 +404,60 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
         /Court, a Steward and Guards/.test(bad.told) &&
         /Court, a Steward and Guards/.test(srv.say(JARL, '/office guard narnia ' + P_NOBODY).told) &&
         /Pick somebody/.test(srv.say(JARL, '/office guard whiterun Alice').told) && srv.site.asked.length === 4);
+  }
+
+  // --------------------- K. an office is one character's (#2551, 16 Oct)
+  {
+    const srv = world();
+    const JARL2 = 0xff000211, P_JARL2 = 21;
+    srv.add(JARL2, P_JARL2, 'Hrongar');
+    srv.account[P_JARL] = 'acct-j'; srv.account[P_JARL2] = 'acct-j';
+    srv.law.held['jarl:whiterun'] = { 'acct-j': { pid: P_JARL, name: 'Balgruuf', at: 1 } };
+    srv.roles[P_JARL2] = { jarl: ['whiterun'], court: [], steward: [], guard: [] };
+    yes('K1 of two characters on the Jarl\'s account, only the one that holds the office is Jarl',
+        srv.isJarlOf(P_JARL, 'whiterun') && !srv.isJarlOf(P_JARL2, 'whiterun'));
+    const v = srv.view(JARL2);
+    yes('K2 the other character\'s page offers the office, naming the character that holds it, and no Jarl powers',
+        !!v && v.jarls.length === 0 && v.toHold.length === 1 && v.toHold[0].office === 'jarl' &&
+        v.toHold[0].role === 'Jarl of Whiterun' && v.toHold[0].by === 'Balgruuf' && v.steward === false);
+    const no = srv.say(JARL2, '/office guard whiterun ' + P_NOBODY);
+    yes('K3 and it names nobody', no.told === 'Only the Jarl of Whiterun gives its offices.' && srv.site.asked.length === 0);
+    srv.writes.length = 0;
+    const moved = srv.say(JARL2, '/office hold jarl whiterun');
+    yes('K4 Hold it here moves the office to this character, saved, and both pages are written again (' + moved.told + ')',
+        srv.isJarlOf(P_JARL2, 'whiterun') && !srv.isJarlOf(P_JARL, 'whiterun') && srv.reg.lawSaves >= 1 &&
+        srv.writesFor(JARL2) === 1 && srv.writesFor(JARL) === 1 && /in place of Balgruuf/.test(moved.told));
+    yes('K5 and nobody whose account does not hold the role can', /does not hold the Jarl of Whiterun role/.test(
+        srv.say(NOBODY, '/office hold jarl whiterun').told) && !srv.isJarlOf(P_NOBODY, 'whiterun'));
+
+    // A role given in Discord names an account and no character.
+    srv.give(P_NOBODY, 'guard', 'whiterun', true);
+    const nv = srv.view(NOBODY);
+    yes('K6 a role given in Discord, which names no character, is held by none until one is chosen',
+        !!nv && nv.guardOf.length === 0 && nv.toHold.length === 1 && nv.toHold[0].by === null);
+    srv.say(NOBODY, '/office hold guard whiterun');
+    yes('K7 and Hold it here makes this character its guard', srv.view(NOBODY).guardOf.length === 1);
+
+    // The Jarl names a character whose account already holds the role: it moves, and Discord is not asked.
+    const NOB2 = 0xff000212, P_NOB2 = 22;
+    srv.add(NOB2, P_NOB2, 'Nobody Two');
+    srv.account[P_NOBODY] = 'acct-n'; srv.account[P_NOB2] = 'acct-n';
+    srv.law.held['guard:whiterun'] = { 'acct-n': { pid: P_NOBODY, name: 'Nobody', at: 1 } };
+    srv.roles[P_NOB2] = { jarl: [], court: [], steward: [], guard: ['whiterun'] };
+    const asked = srv.site.asked.length;
+    const r = srv.say(JARL2, '/office guard whiterun ' + P_NOB2);
+    yes('K8 naming another character of an account that holds the role moves the office there, and Discord is not asked (' +
+        r.told + ')', srv.site.asked.length === asked && srv.law.held['guard:whiterun']['acct-n'].pid === P_NOB2 &&
+        /holds Guard of Whiterun now, in place of Nobody/.test(r.told));
+
+    // The role taken away in Discord: the next read of the roles ends the office, and says so.
+    srv.roles[P_NOBODY].guard = []; srv.roles[P_NOB2].guard = [];
+    srv.toldOut.length = 0;
+    const ended = srv.rolesRead();
+    yes('K9 when the roles are read again, an office whose role is gone ends: its record goes and its character is told',
+        ended === 1 && !srv.law.held['guard:whiterun'] &&
+        srv.toldOut.some(function (t) { return t[0] === P_NOB2 && /no longer holds the Guard of Whiterun role/.test(t[1]); }));
+    yes('K10 and a second read changes nothing', srv.rolesRead() === 0 && !!srv.law.held['jarl:whiterun']);
   }
 
   // ------------------------------- D. a Jarl role two accounts hold (#2551)
@@ -679,6 +772,22 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
     yes('H15 somebody on the Court has a page naming it and the drop box, with nothing to press',
         !!crow && /Whiterun Court/.test(crow.textContent) && /Whiterun Court/.test(body.textContent) &&
         /drop box/.test(body.textContent) && all(body).every(function (n) { return n.className !== 'stop'; }));
+
+    // Hold it here (#2551, 16 Oct): a role this character's account holds, held by none of its characters yet.
+    srv.give(P_NOBODY, 'steward', 'whiterun', true);
+    show(srv.view(NOBODY));
+    const hrow = goOffice();
+    lines.length = 0;
+    const hold = buttons('Hold it here');
+    yes('H17 an office the account holds and no character does is offered with Hold it here (' +
+        (hrow ? hrow.textContent : '') + ')', !!hrow && /Steward of Whiterun/.test(body.textContent) &&
+        /none of your characters holds the office yet/.test(body.textContent) && hold.length === 1);
+    if (hold.length) { hold[0].onclick({}); }
+    yes('H17 it asks first', lines.length === 0 && hold.length === 1 &&
+        hold[0].textContent === 'Press again to hold Steward of Whiterun with this character');
+    if (hold.length) { hold[0].onclick({}); }
+    yes('H17 and the second press sends /office hold steward whiterun (' + lines.join(' | ') + ')',
+        lines.join() === '/office hold steward whiterun');
 
     // A Jarl role held twice (#2551).
     srv.roles[P_JARL].jarl = [];

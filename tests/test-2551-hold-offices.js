@@ -452,9 +452,14 @@ function siteWith(opts) {
           req[0].headers['X-Thornswood-Key'] === 'door-key' && !/door-key/.test(req[0].path) &&
           JSON.parse(req[1]).office === 'guard');
       yes('D8 and hears the site\'s answer', !!got && got[0] === '' && got[1].ok === true);
+      yes('D8b the door says which account a profile is on, and that it has a list of the roles (#2551, an office is one character\'s)',
+          box.__thornswoodAccountOf(22) === 'B' && box.__thornswoodAccountOf(99) === '' && box.__thornswoodRolesKnown() === true);
       let readOk = null;
+      let heard = 0;
+      box.__thornswoodRolesRead = function () { heard++; };
       sent.answerGets = true;
       box.__thornswoodDoorReadNow(function (ok) { readOk = ok; });
+      yes('D9b and once the new list is written, whoever keeps which character holds an office reads it', heard === 1);
       const written = JSON.parse(files[allowedFile]);
       yes('D9 reading the list now fetches it once, writes it, and says so', readOk === true && sent.gets.length >= 1 &&
           same(written.offices['21'].guard, ['whiterun']) && Array.isArray(written.jarlClash) && !('jarlProfiles' in written));
@@ -480,6 +485,8 @@ function siteWith(opts) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-2551-'));
     fs.writeFileSync(path.join(dir, 'server-settings.json'), JSON.stringify({ dataDir: 'data', privDir: 'private' }));
     fs.mkdirSync(path.join(dir, 'private'));
+    // Which character holds each office (#2551, Patrick, 16 Oct).
+    fs.writeFileSync(path.join(dir, 'private', 'law.json'), JSON.stringify({ cells: {}, held: { 'jarl:whiterun': { 'p:101': { pid: 101, name: 'Balgruuf' } }, 'jarl:riften': { 'p:202': { pid: 202, name: 'Laila' } }, 'steward:riften': { 'p:303': { pid: 303, name: 'Anuriel' } } } }));
     const T = clock.t - 3600000;
     fs.writeFileSync(path.join(dir, 'private', 'property.json'), JSON.stringify({
       claims: {}, boxes: {},
@@ -574,6 +581,13 @@ function siteWith(opts) {
         /_h \+ ' Court'/.test(builder) && /'Steward of ' \+ _h/.test(builder) && /'Guard of ' \+ _h/.test(builder) &&
         /return town \+ ' Court';/.test(site) && /return 'Steward of ' \+ town;/.test(site) && /return 'Guard of ' \+ town;/.test(site) &&
         /return town \+ ' Court'/.test(botSrc) && /return 'Steward of ' \+ town/.test(botSrc) && /return 'Guard of ' \+ town/.test(botSrc));
+    // Raven Rock (Patrick, 16 Oct, B): its Jarl and its three offices are made like the nine, and the
+    // game's offices, its board and its drop box are of the same ten holds.
+    const ledger = (/var LEDGER_HOLDS = \[([^\]]+)\]/.exec(gm) || [])[1] || '';
+    const holdTown = (/var HOLD_TOWN = \{([^}]+)\}/.exec(gm) || [])[1] || '';
+    yes('T4 Raven Rock\'s Jarl and offices are made, and the game reads them for its board and its drop box',
+        /OFFICE_HOLDS = HOLDS \+ \['Raven Rock'\]/.test(builder) && /for _h in OFFICE_HOLDS:/.test(builder) &&
+        /ravenrock: 'Raven Rock'/.test(holdTown) && /'ravenrock'/.test(ledger) && /ravenrock: 'Raven Rock'/.test(siteTowns ? siteTowns[1] : ''));
     yes('T3 and the game names them the same way to people',
         /return town \+ ' Court';/.test(gm) && /return 'Steward of ' \+ town;/.test(gm) && /return 'Guard of ' \+ town;/.test(gm));
   }

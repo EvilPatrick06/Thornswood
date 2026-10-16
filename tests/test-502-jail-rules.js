@@ -139,6 +139,10 @@ const PEOPLE = [JARL_W, JARL_R, GUARD_W, PRISONER];
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-502-rules-'));
 fs.writeFileSync(path.join(dir, 'server-settings.json'), JSON.stringify({ dataDir: 'data', privDir: 'private' }));
 fs.mkdirSync(path.join(dir, 'private'));
+// An office is one character's (#2551, Patrick, 16 Oct): the law register
+// names the character that holds each office for its account. A profile the
+// door ties to no account is an account of its own, 'p:<profile>'.
+fs.writeFileSync(path.join(dir, 'private', 'law.json'), JSON.stringify({ cells: {}, held: { 'jarl:whiterun': { 'p:501': { pid: 501, name: 'Balgruuf' } }, 'jarl:riften': { 'p:502': { pid: 502, name: 'Laila' } }, 'guard:whiterun': { 'p:503': { pid: 503, name: 'Hrongar' } } } }));
 // The offices are Discord roles (#2551): Balgruuf holds the Jarl of Whiterun
 // role, Laila the Jarl of Riften, Hrongar the Guard of Whiterun.
 const ROLES = {
@@ -423,6 +427,7 @@ function startOn(folder) {
 const old = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-502-rule-once-'));
 fs.writeFileSync(path.join(old, 'server-settings.json'), JSON.stringify({ dataDir: 'data', privDir: 'private' }));
 fs.mkdirSync(path.join(old, 'private'));
+fs.writeFileSync(path.join(old, 'private', 'law.json'), JSON.stringify({ cells: {}, held: { 'jarl:riften': { 'p:502': { pid: 502, name: 'Laila' } } } }));
 const RIFTEN_JAIL = byHold.riften;
 const before = { claims: {
   [JAIL]: { by: 909, name: 'Erik', at: clock.t, touched: clock.t, locked: true },

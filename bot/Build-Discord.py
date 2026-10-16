@@ -235,7 +235,14 @@ ROLES = [
 # hoisted group in the member list when somebody in it is online, so the empty
 # ones are invisible until they are not. A Jarl outranks their own citizens in
 # the list because Jarl sits higher here.
-for _h in HOLDS:
+# RAVEN ROCK HAS ITS OFFICES TOO (#2551, Patrick, 16 Oct, B): its Jarl, Court,
+# Steward and Guards, like the nine, because the game has its board, its drop
+# box and its jail. Its Jarl is "Jarl of Raven Rock", the name the site and the
+# game read for every hold. It is not one of HOLDS: it has no Citizen role and
+# no hold channel, which nobody has asked for.
+OFFICE_HOLDS = HOLDS + ['Raven Rock']
+
+for _h in OFFICE_HOLDS:
     ROLES.append(('Jarl of ' + _h, 0xE0C56A, True, PLAIN))
 for _h in HOLDS:
     ROLES.append(('Citizen of ' + _h, 0x8FA9B8, True, PLAIN))
@@ -245,7 +252,13 @@ for _h in HOLDS:
 # truth for who holds one, in the game and here. That hold's Jarl gives and
 # takes them, from the bot's office panel or from the Office page in the game,
 # and the bot sets the role either way. "Steward of <Hold>" replaces the one
-# shared steward office the game kept by itself.
+# shared steward office the game kept by itself. The role is on the account,
+# and the game keeps which one character of the account holds the office
+# (Patrick, 16 Oct: character based, not account based).
+#
+# The running bot also makes any of these, and the Jarl roles, that are
+# missing when it starts (bot.py, ensure_office_roles), so they exist without
+# a build; a build then puts them in this order.
 #
 # NOT HOISTED (Patrick, 15 Oct: "they must not be shown separately in the
 # member list"). The only in-world roles shown in their own group are the
@@ -256,7 +269,7 @@ for _h in HOLDS:
 # so does the bot's panel (bot.py, office_role). A name changed here and not
 # there leaves the office with nobody in it.
 OFFICE_ROLES = []
-for _h in HOLDS:
+for _h in OFFICE_HOLDS:
     OFFICE_ROLES.append(_h + ' Court')
     OFFICE_ROLES.append('Steward of ' + _h)
     OFFICE_ROLES.append('Guard of ' + _h)
@@ -573,7 +586,7 @@ KEEP = (
     # never-delete list). Nothing in this script deletes a role today; these
     # are named so that nothing added later ever may. A role holds who is in
     # an office, and deleting one empties that office in the game as well.
-    ['Jarl of ' + _h for _h in HOLDS] + ['Citizen of ' + _h for _h in HOLDS] +
+    ['Jarl of ' + _h for _h in OFFICE_HOLDS] + ['Citizen of ' + _h for _h in HOLDS] +
     OFFICE_ROLES
 )
 

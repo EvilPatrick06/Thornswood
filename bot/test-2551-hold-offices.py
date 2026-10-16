@@ -16,8 +16,14 @@ The hold offices are Discord roles (#2551). Patrick, 15 Oct:
 
 Holds:
 
-  R1 every office role of every hold is in the builder's role list, not
-     hoisted, with plain permissions, and under the Citizen roles
+  R1 every office role of every hold, Raven Rock's included (Patrick,
+     16 Oct), is in the builder's role list, not hoisted, with plain
+     permissions, and under the Citizen roles
+  R5 Raven Rock has a Jarl role, hoisted like the others, and no Citizen
+     role or hold channel, which nobody asked for
+  E1 the running bot makes any Jarl or office role that is missing, the way
+     it makes its ping roles, hoisted as the builder says, under the lowest
+     Jarl or Citizen role, and touches none that is there
   R2 every one is in KEEP, with the Jarl and Citizen roles
   R3 the Jarl and Citizen roles are still hoisted, and nothing else in world is
   P1 the office panel is a persistent view of six buttons, Add and Remove for
@@ -77,13 +83,13 @@ bot.log = lambda *a: None
 # ------------------------------------------------------------ the builder --
 names = [r[0] for r in B.ROLES]
 office_names = []
-for h in B.HOLDS:
+for h in B.HOLDS + ['Raven Rock']:
     office_names += [h + ' Court', 'Steward of ' + h, 'Guard of ' + h]
 rows = dict((r[0], r) for r in B.ROLES)
 last_citizen = max(names.index('Citizen of ' + h) for h in B.HOLDS)
 yes('R1 every office role of every hold is made, not hoisted, plain, under the Citizen roles (%d)'
     % len(office_names),
-    len(office_names) == 27 and all(n in rows for n in office_names)
+    len(office_names) == 30 and all(n in rows for n in office_names)
     and all(rows[n][2] is False for n in office_names)
     and all(rows[n][3] == B.PLAIN for n in office_names)
     and all(names.index(n) > last_citizen for n in office_names))
@@ -95,7 +101,13 @@ yes('R3 the Jarl and Citizen roles are still hoisted, and no office role is',
     all(r[2] is True for r in in_world if r[0].startswith(('Jarl of', 'Citizen of')))
     and all(r[2] is False for r in in_world if r[0] in office_names))
 yes('R4 the bot spells each office the way the builder makes it',
-    all(bot.office_role(o, h) in rows for h in B.HOLDS for o, _ in bot.OFFICES))
+    all(bot.office_role(o, h) in rows for h in B.HOLDS + ['Raven Rock'] for o, _ in bot.OFFICES))
+yes('R5 Raven Rock has a Jarl role, hoisted, in KEEP, and no Citizen role and no hold of its own',
+    'Jarl of Raven Rock' in rows and rows['Jarl of Raven Rock'][2] is True and 'Jarl of Raven Rock' in B.KEEP
+    and 'Citizen of Raven Rock' not in rows and 'Raven Rock' not in B.HOLDS)
+yes('R6 the bot makes the same roles the builder does, hoisted the same way',
+    sorted((n, h) for n, _, h in bot.office_roles_wanted())
+    == sorted((r[0], r[2]) for r in B.ROLES if r[0] in office_names or r[0].startswith('Jarl of ')))
 
 
 # --------------------------------------------------------------- the panel --
@@ -300,6 +312,56 @@ async def main():
         and [o.value for o in pick.response.views[0].children[0].options] == ['Whiterun', 'Riften'])
 
 asyncio.run(main())
+
+
+# ------------------------------------------------- the roles the bot makes --
+class MadeRole(object):
+    def __init__(self, name, position, hoist=False):
+        self.name = name
+        self.position = position
+        self.hoist = hoist
+        self.moves = []
+
+    async def edit(self, position=None):
+        self.moves.append(position)
+        self.position = position
+
+
+class RoleGuild(object):
+    def __init__(self, names):
+        self.roles = [MadeRole(n, 50 - i) for i, n in enumerate(names)]
+        perms = discord.Permissions(manage_roles=True)
+        self.me = type('Me', (), {'guild_permissions': perms})()
+        self.created = []
+
+    async def create_role(self, name=None, colour=None, hoist=False, mentionable=False, reason=None):
+        r = MadeRole(name, 1, hoist)
+        self.roles.append(r)
+        self.created.append((name, hoist, reason))
+        return r
+
+
+async def roles_made():
+    have = ['Jarl of Whiterun', 'Jarl of Winterhold', 'Citizen of Whiterun', 'Citizen of Winterhold', 'Guard of Whiterun']
+    g = RoleGuild(have)
+    made = await bot.ensure_office_roles(g)
+    again = await bot.ensure_office_roles(g)
+    return g, made, again
+
+g2, made, again = asyncio.run(roles_made())
+by = dict((n, h) for n, h, _ in g2.created)
+low_jarl = [r for r in g2.roles if r.name == 'Jarl of Winterhold'][0]
+low_cit = [r for r in g2.roles if r.name == 'Citizen of Winterhold'][0]
+rr = [r for r in g2.roles if r.name == 'Jarl of Raven Rock'][0]
+court = [r for r in g2.roles if r.name == 'Raven Rock Court'][0]
+yes('E1 the bot makes every missing Jarl and office role, Raven Rock\'s included, and not the ones there (%d)' % len(made),
+    'Guard of Whiterun' not in made and 'Jarl of Whiterun' not in made and 'Jarl of Raven Rock' in made
+    and 'Raven Rock Court' in made and len(made) == len(bot.office_roles_wanted()) - 3)
+yes('E1 the Jarl roles hoisted, the office roles not', by.get('Jarl of Raven Rock') is True
+    and by.get('Steward of Riften') is False)
+yes('E1 a new Jarl role goes under the lowest Jarl role, and a new office role under the lowest Citizen role',
+    rr.moves and rr.moves[0] == 49 and court.moves and court.moves[0] == 47)
+yes('E1 and a second start makes nothing', again == [])
 
 # ---------------------------------------------------- the staff channel line --
 line = bot.moderation_text('site', {

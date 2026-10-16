@@ -44,7 +44,8 @@ const charBlock = slice(gm, '// ==== thornswood character ====', '// ==== end th
 const propCommand = slice(propBlock, HEAD, '\n  }\n');
 const charCommand = slice(charBlock, HEAD, '\n  }\n');
 const fn = function (name) { return slice(propBlock, '  function ' + name + '(', '\n  }\n'); };
-const officeSrc = ['officeCmd', 'officeRole', 'officeDoes', 'officesOfProfile', 'holdsOffice', 'isJarlOf', 'jarlClashOf']
+const officeSrc = ['officeCmd', 'officeHoldHere', 'holdHere', 'officeRole', 'officeDoes', 'rolesOfProfile', 'officeAccountOf',
+                   'officeHeldBy', 'officesOfProfile', 'holdsOffice', 'isJarlOf', 'jarlClashOf']
   .map(fn);
 yes('the property block\'s command is in the gamemode', propCommand !== null);
 yes('the character block\'s command is in the gamemode', charCommand !== null);
@@ -52,7 +53,10 @@ yes('officeCmd and what it reads are in the property block', officeSrc.every(fun
 const tables = slice(propBlock, '  var OFFICE_KINDS = [', ';') + '\n' +
                slice(propBlock, '  var OFFICE_GIVEN = {', '};') + '\n' +
                slice(propBlock, '  var HOLD_TOWN = {', '};') + '\n' +
-               'var JAIL_NAME = { whiterun: "Dragonsreach Dungeon" };\n';
+               'var JAIL_NAME = { whiterun: "Dragonsreach Dungeon" };\n' +
+               // The Jarl's character holds the office for the account (#2551, Patrick, 16 Oct).
+               'var law = { cells: {}, held: { "jarl:whiterun": { "p:1": { pid: 1, name: "Balgruuf", at: 1 } } } };\n' +
+               'function saveLaw() { }\n';
 
 const JARL = 1, NOBODY = 3, STEWARD = 4;
 const ACTOR = 0xff000101;
@@ -69,6 +73,9 @@ function world() {
   const pbox = {
     plog: function () { },
     __thornswoodOffices: function (pid) {
+      return { jarl: pid === JARL ? ['whiterun'] : [], court: [], steward: [], guard: [] };
+    },
+    __thornswoodOfficesOnRecord: function (pid) {
       return { jarl: pid === JARL ? ['whiterun'] : [], court: [], steward: [], guard: [] };
     },
     __thornswoodAskSite: function (route, body, done) {
@@ -118,7 +125,7 @@ if (propCommand && charCommand && officeSrc.every(function (s) { return !!s; }))
         w.asked[0][1].give === true && w.asked[0][1].byName === 'Balgruuf' && w.asked[0][1].whoName === 'Proventus');
     yes('J1 and the Jarl is told what the site said, and the steward what the office lets them do',
         r.told.some(function (t) { return t[0] === JARL && /holds Steward of Whiterun now/.test(t[1]); }) &&
-        r.told.some(function (t) { return t[0] === STEWARD && /gives you the Steward of Whiterun office/.test(t[1]); }));
+        r.told.some(function (t) { return t[0] === STEWARD && /names this character Steward of Whiterun./.test(t[1]); }));
     yes('J1 and no other property word ran', w.stubbed.length === 0);
   }
   {

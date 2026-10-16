@@ -23,9 +23,22 @@ See [Death](death.md).
 ## What the server already treats as an office
 
 Every office the server knows is a Discord role on the account (Patrick,
-15 October, #2551), and the role is the one truth: nothing in the game
-keeps a list of who holds what, and every character on the account holds
-the office.
+15 October, #2551), and the role is the one truth for who may hold it. The
+office itself is one character's (Patrick, 16 October: "it's character
+based not account based"): the server keeps which one character on the
+account holds each office, and only that character acts in it. Every other
+character on the account is ordinary.
+
+- The Jarl names a character on the Office page, and the role is set on
+  that character's account; that character holds the office.
+- A role given anywhere else (the bot's office panel, or staff for a
+  Jarl) names only an account. Each of its characters sees the office on
+  the Office page of K, and the one that presses Hold it here holds it.
+  Pressing it on another character moves the office there.
+- Without the role there is no office: a role taken away in Discord ends
+  the office at once, and the record of which character held it is
+  deleted the next time the game reads the roles, so a role given back
+  later is held again only when somebody chooses the character.
 
 - **The Jarl** of a hold holds its "Jarl of <Hold>" role, which staff
   give. Nobody takes the office or picks a hold in the game. A hold has
@@ -50,9 +63,11 @@ Discord's audit log keeps it with the reason. Staff hold no office by
 being staff. All of it is buttons, and nothing is typed. See
 [Property](property.md) and [Notice boards](noticeboards.md).
 
-The roles are made for the nine holds of Skyrim. Raven Rock has a board,
-a box and a jail, and no office roles yet, so nobody holds an office
-there.
+The roles are made for the nine holds of Skyrim and for Raven Rock
+(Patrick, 16 October): "Jarl of Raven Rock", "Raven Rock Court", "Steward
+of Raven Rock" and "Guard of Raven Rock". Raven Rock has no Citizen role
+or hold channel. Its board, its drop box and its jail answer to them like
+any hold's.
 
 The [Merchant's Guild](merchants-guild.md) is the merchant NPCs.
 It has no joinable roll or factor appointment for people.
@@ -162,9 +177,13 @@ game server for each profile (`/api/allowed`); the game reads every
 office through one function, `officeOf` in the property block. They are
 the Office page of the K panel, which only somebody who holds an office
 sees. The Jarl of a hold sees its Court, its Steward and its Guards:
-who holds each, by a character of theirs in the world or by profile when
-none is, with Remove, which asks twice, and the people in the world who
-do not, with Name. A row shows the profile beside the name, so two
+who holds each, by the character that holds it (named when in the world,
+and by profile with its name when not), or an account none of whose
+characters holds it yet, with Remove, which asks twice, and the people in
+the world who do not hold it, with Name. Naming another character of an
+account that already holds the role moves the office there, and Discord
+is not asked. Anybody whose account holds a role that this character does
+not hold sees it with Hold it here, which asks twice. A row shows the profile beside the name, so two
 characters with one name are told apart. Name and Remove send the change
 to the site (`/api/office`), which checks the Jarl's role again and sets
 the role in Discord with the bot's token; the game reads the roles back
