@@ -480,7 +480,11 @@ Steam's own console, after asking, since it takes over Steam's window and the
 keyboard; the question shows the three console lines
 (`Downgrade.cs:220 Commands()`). They go into Thornswood's own folder
 (`OwnGameShare.cs:451 TakePinned()`), or, before it has one, the folder is
-made from them. The Steam copy is never written (#1218).
+made from them. The Steam copy is never written (#1218). The ship root tool
+(`scripts\release\ShipRoot`) has a third way for a new root's folder, which
+the launcher does not offer: a folder that already holds those files, each
+checked against the list and then copied (`OwnGameKinds.cs SkyrimFrom()`,
+#2603).
 
 **SteamUpdates** (SteamUpdates.cs, with ShellSteamUpdates.cs for its
 question). Steam's Updates setting for Skyrim, `AutoUpdateBehavior` in
