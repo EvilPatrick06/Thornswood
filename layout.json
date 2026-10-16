@@ -1,17 +1,17 @@
 {
-  "version": 2,
+  "version": 3,
   "issue": 440,
-  "note": "Where each place is in the repository, read by scripts/release/Where.ps1 and where.js. Version 1 also carried the old C:/Thornswood-Dev folder and the old tools paths as fallbacks for the reorganisation; those went on 28 September, when no machine had the old layout any more.",
+  "note": "Where each place is in the repository, read by scripts/release/Where.ps1 and where.js. Version 1 also carried the old C:/Thornswood-Dev folder and the old tools paths as fallbacks for the reorganisation; those went on 28 September, when no machine had the old layout any more. Version 3 (#2019): the engine's build output comes from EngineBuild, the fork folder this machine records as its engine build (Where.ps1 and where.js answer it), which is the checkout's own engine/skymp when the machine records none.",
   "places": {
     "Engine": "engine/skymp",
     "Out": "out",
     "Local": "local"
   },
   "derived": {
-    "ServerDist": { "from": "Engine", "join": "build/dist/server" },
-    "ClientDist": { "from": "Engine", "join": "build/dist/client" },
-    "ServerSettings": { "from": "Engine", "join": "build/dist/server/server-settings.json" },
-    "ChangeForms": { "from": "Engine", "join": "build/dist/server/world/changeForms" },
+    "ServerDist": { "from": "EngineBuild", "join": "build/dist/server" },
+    "ClientDist": { "from": "EngineBuild", "join": "build/dist/client" },
+    "ServerSettings": { "from": "EngineBuild", "join": "build/dist/server/server-settings.json" },
+    "ChangeForms": { "from": "EngineBuild", "join": "build/dist/server/world/changeForms" },
     "Dist": { "from": "Out", "join": "dist" },
     "Package": { "from": "Out", "join": "dist/Thornswood/_dist" },
     "Payload": { "from": "Out", "join": "_payload" },

@@ -156,6 +156,11 @@ if ($Check) {
 foreach ($p in $todo) {
   $dir = Split-Path $p.Dst -Parent
   if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
+  # The old file's name comes off first (#2019). A game folder OwnGame made is
+  # mostly hard links, and a copy over a file with a second name writes the
+  # new bytes through every name it has (OwnGame.cs, Unshare). Removing a
+  # name takes only this folder's, so the copy is the folder's own.
+  if (Test-Path -LiteralPath $p.Dst) { Remove-Item -LiteralPath $p.Dst -Force }
   Copy-Item -LiteralPath $p.Src -Destination $p.Dst -Force
   if ((Sha256 $p.Dst) -ne $rec.files.($p.Rel).sha256) { Stop-Here "copy of $($p.Rel) does not hash as the record; the folder may be in use" }
   Say "  copied $($p.Rel)" 'Green'

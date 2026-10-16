@@ -168,7 +168,10 @@
   Launcher\Thornswood.exe in it, and for a dev release that folder with
   -DevBuild on the end, where the main launcher's Settings page installs the
   dev build. A folder Vortex deploys into is refused either way, before
-  anything is built.
+  anything is built. Then Update-ShipRoot.ps1 makes or brings its game
+  folder up to date with Vortex's deployment, with the launcher's own
+  OwnGame, and puts the recorded client in it, and the Ship stops there when
+  it cannot (#2019).
 
 .PARAMETER DistRoot
   Where releases are staged and zipped, passed straight through to
@@ -1075,6 +1078,25 @@ if (-not $DryRun -and (Test-Path (Join-Path $RepoDir '.git'))) {
     } elseif ($behind -gt 0) {
         Say "  this branch is $behind commit(s) behind origin; the dev build will not carry them" 'Yellow'
     }
+}
+
+# ------------------------------------------------------------ the ship root
+# Issue #2019. The folder this release is built from is a launcher install
+# whose launcher is never started (Patrick, 15 Oct: his own installs stay
+# apart from the build folders), so nothing else brings its game folder up to
+# date. On 15 Oct One's dev root was still the folder made on 3 Oct, at old
+# rules, from another install's game folder, with the old 3BBB.esp and the
+# 12 Oct client, and two dev Ships refused on it. Update-ShipRoot.ps1 makes
+# or refreshes it with the launcher's own OwnGame, built from this checkout,
+# holds it to Vortex's deployment and the current rules, and puts the
+# recorded client in it from the configured engine build. A dry run too: it
+# changes nothing outside the root. Before the version moves and before
+# anything is built, so a refusal here leaves nothing to put back.
+Head 'The ship root'
+$global:LASTEXITCODE = 0
+& (Join-Path $Here 'Update-ShipRoot.ps1') -Channel $Channel -Root $Root -NoPause
+if ($LASTEXITCODE -ne 0) {
+    Die ('The folder this release is built from, ' + $Root + ', is not current: Update-ShipRoot.ps1 says why above. Nothing was built or published.')
 }
 
 # ------------------------------------------------------------ version
