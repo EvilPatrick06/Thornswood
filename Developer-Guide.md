@@ -1934,6 +1934,24 @@ when that record is missing or stale: the mod list, a file either tool reads,
 `records\generated.json`, or a built file changed since. The fix is to run it
 again.
 
+**The folder a release is built from (issue #2019).** Each channel's ship root
+(`Where.ps1 ShipRoot` and `ShipRootDev`, recorded by `Setup-ShipMachine.ps1
+-Root`) is a launcher install whose launcher is never started: Patrick's own
+installs stay apart from the build folders, so he has the same files as
+everybody else. So every Ship first runs `scripts\release\Update-ShipRoot.ps1`,
+which builds `Thornswood-ShipRoot.exe` from `scripts\release\ShipRoot`
+(all of `launcher\app` with its own entry point, so OwnGame has one
+implementation) and runs OwnGame's own Make or Refresh on the root: a new root
+takes Thornswood's own files of the channel's release from its feed, as an
+install does, and a root made at older rules or from another folder is brought
+up to date with Vortex's deployment. Then the recorded client goes in from the
+engine build (`engine\README.md` "One engine"), and the Ship stops with a
+sentence, before anything is built or published, when either step cannot be
+done. Main has its own root (`local\release-main` on One), so no Ship packs
+`C:\Thornswood`. After a refresh that changed the bodies' or the animations'
+sources, `Build-Generated.ps1 -Channel <channel>` runs again, and Ship says so.
+`tests\test-2019-ship-roots.ps1` holds it.
+
 **The Skyrim build.** Steam updates the Steam copy by itself. With Thornswood's
 own folder, the Downgrade button works on the Steam copy the folder is made
 from, never on the folder's copies, and the folder is then brought up to date

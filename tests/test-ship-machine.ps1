@@ -300,14 +300,15 @@ try {
     # ------------------------------------------------ the script's own rules --
     $setupText = Get-Content -LiteralPath $Setup -Raw
     Yes 'Setup-ShipMachine never sets "enabled" on a signing config' ($setupText -notmatch '(?i)\.enabled\s*=' -and $setupText -notmatch '(?i)enabled\s*=\s*\$false')
-    # Two writers since #1692: New-SigningConfig, the one for signing.json,
-    # and Save-ShipRoot, which records the release folder outside the repository.
+    # Three writers since #2019: New-SigningConfig, the one for signing.json,
+    # Save-ShipRoot, which records the release folder outside the repository
+    # (#1692), and Save-EngineBuild, which records the engine build beside it.
     $writers = @(([System.Management.Automation.Language.Parser]::ParseInput($setupText, [ref]$null, [ref]$null)).FindAll({ param($n)
         $n -is [System.Management.Automation.Language.InvokeMemberExpressionAst] -and $n.Member.Extent.Text -eq 'WriteAllText' }, $true) | ForEach-Object {
         $p = $_.Parent; while ($p -and -not ($p -is [System.Management.Automation.Language.FunctionDefinitionAst])) { $p = $p.Parent }
         if ($p) { $p.Name } else { '(top level)' } })
-    Yes ('it writes signing.json only through New-SigningConfig, and nothing else but Save-ShipRoot writes a file (' + ($writers -join ', ') + ')') (
-        $writers.Count -eq 2 -and $writers -contains 'New-SigningConfig' -and $writers -contains 'Save-ShipRoot')
+    Yes ('it writes signing.json only through New-SigningConfig, and nothing else but Save-ShipRoot and Save-EngineBuild writes a file (' + ($writers -join ', ') + ')') (
+        $writers.Count -eq 3 -and $writers -contains 'New-SigningConfig' -and $writers -contains 'Save-ShipRoot' -and $writers -contains 'Save-EngineBuild')
     Yes 'it never prints the Azure token' ($setupText -notmatch 'Say[^\n]*\$t\b' -and $setupText -notmatch 'Write-Host[^\n]*\$t\b')
     Yes 'it runs Check-ShipReady for the verdict' ($setupText -match "Check-ShipReady\.ps1'\) @readyArgs")
     $declared = @($setupAst.ParamBlock.Parameters | ForEach-Object { $_.Name.VariablePath.UserPath })

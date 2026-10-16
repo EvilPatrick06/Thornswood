@@ -47,6 +47,27 @@ function getPlace(layout, name) {
   if (name === 'Releases' || name === 'ReleasesDev') {
     return path.join(process.env.LOCALAPPDATA || '', 'Thornswood', 'feed', name === 'Releases' ? 'main' : 'dev');
   }
+  // This machine's engine build (#2019), the same answer as Where.ps1's
+  // EngineBuild: the fork folder %LOCALAPPDATA%\Thornswood\engine-build.json
+  // names, or the checkout's own engine when it names none. A record naming
+  // a folder with no build in it throws rather than falling back.
+  if (name === 'EngineBuilds') {
+    return path.join(process.env.LOCALAPPDATA || '', 'Thornswood', 'engine-build.json');
+  }
+  if (name === 'EngineBuild') {
+    const file = getPlace(layout, 'EngineBuilds');
+    if (!fs.existsSync(file)) return getPlace(layout, 'Engine');
+    let rec;
+    try { rec = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^﻿/, '')); } catch (e) {
+      throw new Error(file + ' does not read as JSON, so which engine build this machine uses is not known.');
+    }
+    const fork = rec && typeof rec.fork === 'string' ? rec.fork : '';
+    if (!fork) throw new Error(file + ' names no fork folder.');
+    if (!fs.existsSync(path.join(fork, 'build', 'dist'))) {
+      throw new Error(file + ' names ' + fork + ' as this machine\'s engine build, and there is no build\\dist in it.');
+    }
+    return fork;
+  }
   const place = own(layout.places, name);
   if (place != null) return joinUnder(repo, place);
   const der = own(layout.derived, name);
@@ -55,7 +76,7 @@ function getPlace(layout, name) {
 }
 
 const PLACE_NAMES = [
-  'Repo', 'Engine', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms',
+  'Repo', 'Engine', 'EngineBuild', 'EngineBuilds', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms',
   'Out', 'Dist', 'Package', 'Payload', 'ServerZip', 'Local', 'Backups',
   'Releases', 'ReleasesDev'
 ];

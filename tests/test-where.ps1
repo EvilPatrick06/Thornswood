@@ -49,6 +49,12 @@ Yes 'scripts\release\Where.ps1 is there' (Test-Path -LiteralPath $where)
 if (-not (Test-Path -LiteralPath $where)) { Write-Host ''; Write-Host '0 passed, 1 failed'; exit 1 }
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-where-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+# This machine's own data stood in for (#2019): on a machine that recorded its
+# engine build, ClientDist and ServerDist follow that record, and "nothing
+# anywhere" below means nothing recorded either. tests\test-2019-ship-roots.ps1
+# holds the record.
+$oldLocalAppData = $env:LOCALAPPDATA
+$env:LOCALAPPDATA = Join-Path $work 'localappdata'
 try {
     $repo = Join-Path $work 'Thornswood-Repo'
     $old = Join-Path $work 'Thornswood-Dev'
@@ -88,7 +94,7 @@ try {
     $strictSaid = @{}
     & {
         Set-StrictMode -Version Latest
-        foreach ($p in 'ClientDist', 'ServerDist', 'ServerSettings', 'ChangeForms', 'Dist', 'Payload', 'ServerZip', 'Backups', 'Releases', 'ReleasesDev', 'ShipRoot', 'ShipRootDev', 'ShipRoots', 'Engine', 'Out', 'bot') {
+        foreach ($p in 'ClientDist', 'ServerDist', 'ServerSettings', 'ChangeForms', 'Dist', 'Payload', 'ServerZip', 'Backups', 'Releases', 'ReleasesDev', 'ShipRoot', 'ShipRootDev', 'ShipRoots', 'Engine', 'EngineBuild', 'EngineBuilds', 'Out', 'bot') {
             try { $strictSaid[$p] = [string](& $w $p) } catch { $strictSaid[$p] = 'THREW ' + $_.Exception.Message }
         }
     }
@@ -153,7 +159,7 @@ try {
     # ---- the scripts --------------------------------------------------------
     # A string naming C:\Thornswood-Dev: scripts\oneoff is parked history.
     $named = @()
-    $keys = @('Repo', 'Engine', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms', 'Out', 'Dist', 'Package', 'Payload', 'ServerZip', 'Local', 'Backups', 'Releases', 'ReleasesDev', 'ShipRoot', 'ShipRootDev', 'ShipRoots')
+    $keys = @('Repo', 'Engine', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms', 'Out', 'Dist', 'Package', 'Payload', 'ServerZip', 'Local', 'Backups', 'Releases', 'ReleasesDev', 'ShipRoot', 'ShipRootDev', 'ShipRoots', 'EngineBuild', 'EngineBuilds')
     $badKeys = @()
     $callers = 0
     $scriptsDir = Join-Path $realRepo 'scripts'
@@ -187,6 +193,7 @@ try {
     Yes ('and only for places it knows' + $(if ($badKeys.Count) { ': ' + ($badKeys -join ', ') } else { '' })) ($badKeys.Count -eq 0)
 }
 finally {
+    $env:LOCALAPPDATA = $oldLocalAppData
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
 }
 

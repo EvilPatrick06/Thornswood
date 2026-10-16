@@ -478,7 +478,7 @@ jobs:
                  'test-table-install.js',
                  'test-secrets-fail-closed.js',
                  'test-our-key-menus.js', 'test-slash-key.js', 'test-social-keys.js', 'test-server-pick-order.ps1',
-                 'test-2037-journal-new.js', 'test-2135-journal-press.js', 'test-social.js', 'test-2157-reconfigure.ps1', 'test-2210-links-attributes.ps1', 'test-2210-refresh-scope.ps1',
+                 'test-2037-journal-new.js', 'test-2135-journal-press.js', 'test-social.js', 'test-2157-reconfigure.ps1', 'test-2210-links-attributes.ps1', 'test-2210-refresh-scope.ps1', 'test-2019-ship-roots.ps1',
                  'test-site-auth.js',
                  'test-site-route-gaps.js', 'test-2215-play-pressed-by.ps1',
                  'test-docs-pwfile.ps1', 'test-docs-password.ps1', 'test-2317-rotate-config.ps1',
@@ -734,6 +734,22 @@ jobs:
           New-Item -ItemType Directory -Force -Path (Join-Path $root 'Launcher') | Out-Null
           .\scripts\release\Build-Launcher.ps1 -Root $root -NoPause
           if (-not (Test-Path (Join-Path $root 'Launcher\Thornswood.exe'))) { Write-Host '::error::no Thornswood.exe came out of the build'; exit 1 }
+
+      - name: Build the ship root tool
+        shell: pwsh
+        run: |
+          # Issue #2019. Every Ship builds Thornswood-ShipRoot.exe from
+          # scripts\release\ShipRoot\ShipRoot.csproj, which compiles all of
+          # launcher\app with its own entry point, and runs it on the folder
+          # the release is built from before anything is packed. A launcher
+          # change that stops it compiling would stop every Ship, so it is
+          # built here with the same MSBuild; tests\test-2019-ship-roots.ps1
+          # in the list above runs it on a pretend root.
+          $msb = & .\scripts\release\Find-MSBuild.ps1
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::MSBuild is not on this runner, so the ship root tool cannot be built'; exit 1 }
+          $out = Join-Path $env:RUNNER_TEMP 'shiproot'
+          & $msb scripts\release\ShipRoot\ShipRoot.csproj -nologo -v:minimal -nr:false -p:Configuration=Release ('-p:OutDir=' + $out + '\')
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path (Join-Path $out 'Thornswood-ShipRoot.exe'))) { Write-Host '::error file=scripts/release/ShipRoot/ShipRoot.csproj::the ship root tool did not build, see the lines above'; exit 1 }
 
       - name: Check the manifests in the built exes
         shell: pwsh
