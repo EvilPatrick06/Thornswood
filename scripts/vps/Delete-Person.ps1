@@ -48,7 +48,8 @@
                     (private\characters.json and the characters-before-*
                     copies), its mod menu choices (private\mod-settings.json),
                     its take counts (private\take-limit.json) and when it last
-                    left (data\last-left.json), live and dev
+                    left (private\last-left.json, and data\last-left.json in a
+                    folder set aside before #2582 moved it), live and dev
     voice           every chat line their characters wrote, out of each day's
                     file, live and dev. The voice service never edits a day
                     (voice\voice-server.js); these are the only edits, and the
@@ -596,10 +597,14 @@ for (const person of people) {
       if (want(take, 'object') && isObj(take.value.counts)) {
         for (const k of Object.keys(take.value.counts)) if (hasP(k.split('|')[0])) { delete take.value.counts[k]; take.dirty = true; removed(T + ': take counts', 1); }
       }
-      const lastLeft = json(path.join(data, 'last-left.json'), g.writer);
-      handled.add(path.join(data, 'last-left.json').toLowerCase());
-      if (want(lastLeft, 'object')) {
-        for (const k of Object.keys(lastLeft.value)) if (hasP(k)) { delete lastLeft.value[k]; lastLeft.dirty = true; removed(T + ': when they last left', 1); }
+      // The gamemode keeps it in private since #2582; a server folder set aside
+      // before that still has it in data, and is the person's record all the same.
+      for (const dir of [priv, data]) {
+        const lastLeft = json(path.join(dir, 'last-left.json'), g.writer);
+        handled.add(path.join(dir, 'last-left.json').toLowerCase());
+        if (want(lastLeft, 'object')) {
+          for (const k of Object.keys(lastLeft.value)) if (hasP(k)) { delete lastLeft.value[k]; lastLeft.dirty = true; removed(T + ': when they last left', 1); }
+        }
       }
       // Every other register: counted, never changed.
       if (P.size) {
