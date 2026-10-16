@@ -1924,7 +1924,7 @@ namespace Thornswood
                 File.Copy(path, own, true);
                 // One rename over the shared name, never a delete first (#2599).
                 try { SwapIn(own, path, false); }
-                catch { try { File.SetAttributes(own, FileAttributes.Normal); File.Delete(own); } catch { } throw; }
+                catch { try { File.SetAttributes(own, FileAttributes.Normal); File.Delete(own); } catch (Exception e2) { Swallow.Note("OwnGame.Separate, clean up " + own, e2); } throw; }
             }
             catch (Exception ex) { Swallow.Note("OwnGame.Separate, move", ex); }
         }
