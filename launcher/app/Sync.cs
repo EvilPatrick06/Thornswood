@@ -272,21 +272,67 @@ namespace Thornswood
             return Sync(cfg, at, r, v, log);
         }
 
-        class SyncItem
+        internal class SyncItem
         {
             public string Rel;
             public string Dest;
             public long Bytes;
             public string Sha;
             public bool InGame;
+            // The file as it was when it was found to match (OwnGame.Identity),
+            // so the write can tell whether anything changed it since.
+            public string Seen;
+        }
+
+        /// <summary>
+        /// A release checked and downloaded and not yet written (#2210): what
+        /// the check found, and every file it needs waiting in Profile\Sync.
+        /// </summary>
+        public sealed class SyncPlan
+        {
+            internal string At, Stage;
+            internal RecordRef Record;
+            internal VersionDoc Doc;
+            internal List<SyncItem> Items, Need;
+            internal List<KeyValuePair<string, string>> Gone;
+            internal HashSet<string> Listed, Client;
+            internal long Total;
+            internal int Fetched;
         }
 
         /// <summary>
         /// The sync itself. $at is the folder the record and its files are in
         /// (checked by the caller). tests\test-record-sync.ps1 calls this with
-        /// a copy of the site on this machine.
+        /// a copy of the site on this machine. The two halves are apart so an
+        /// update can download while the game folder is prepared and write
+        /// once it is done (#2210): PrepareSync writes nothing into the game
+        /// folder or the records it is told apart by, and WriteSync does the
+        /// rest.
         /// </summary>
         static bool Sync(Config cfg, string at, RecordRef r, VersionDoc v, Action<string> log)
+        {
+            SyncPlan plan = PrepareSync(cfg, at, r, v, log);
+            if (plan == null) return false;
+            WriteSync(cfg, plan, log);
+            return true;
+        }
+
+        /// <summary>
+        /// The update's first half for a release record (#2210): checks the
+        /// address, reads the record, compares the install with it and
+        /// downloads every file that differs into Profile\Sync. Null when the
+        /// record does not say its files are on the site, and the release goes
+        /// in pack by pack instead.
+        /// </summary>
+        public static SyncPlan PrepareRecord(Config cfg, RecordRef r, VersionDoc v, Action<string> log)
+        {
+            CheckUrl(r.url);
+            string at = AssetFolder(r);
+            ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072; // Tls12 added, never replaced (#1360)
+            return PrepareSync(cfg, at, r, v, log);
+        }
+
+        static SyncPlan PrepareSync(Config cfg, string at, RecordRef r, VersionDoc v, Action<string> log)
         {
             string stage = SyncDir;
             Directory.CreateDirectory(stage);
@@ -302,7 +348,7 @@ namespace Thornswood
                 WriteSyncState(state);
                 try { File.Delete(recFile); } catch (Exception ex) { Swallow.Note("Updater.Sync, record", ex); }
                 log("Release " + r.id + " does not have its files on the site one by one, so it goes in pack by pack.");
-                return false;
+                return null;
             }
 
             var items = new List<SyncItem>();
@@ -365,6 +411,9 @@ namespace Thornswood
             int looked = 0;
             foreach (SyncItem it in items)
             {
+                // Taken before the bytes are read, so a change made while they
+                // are is seen at the write.
+                it.Seen = OwnGame.Identity(it.Dest);
                 if (!Matches(it.Dest, it.Bytes, it.Sha)) need.Add(it);
                 PlayProgress.Files("Checking files", ++looked, items.Count);
             }
@@ -392,6 +441,63 @@ namespace Thornswood
                 }
                 log("Every file checked against its checksum.");
             }
+
+            var plan = new SyncPlan();
+            plan.At = at;
+            plan.Stage = stage;
+            plan.Record = r;
+            plan.Doc = v;
+            plan.Items = items;
+            plan.Need = need;
+            plan.Gone = gone;
+            plan.Listed = listed;
+            plan.Client = client;
+            plan.Total = total;
+            plan.Fetched = fetch.Count;
+            return plan;
+        }
+
+        /// <summary>
+        /// The update's second half (#2210): puts what PrepareSync downloaded
+        /// in place, takes out what the release says is gone, and records the
+        /// release. The caller holds the game folder (OwnGame.Alone), so a
+        /// refresh is not writing beside it. A file that matched at the check
+        /// and has been changed since, by a refresh that ran while the update
+        /// downloaded, is compared again, and fetched when it now differs.
+        /// </summary>
+        public static void WriteSync(Config cfg, SyncPlan plan, Action<string> log)
+        {
+            string stage = plan.Stage, at = plan.At;
+            RecordRef r = plan.Record;
+            VersionDoc v = plan.Doc;
+            List<SyncItem> items = plan.Items;
+            var need = new List<SyncItem>(plan.Need);
+            List<KeyValuePair<string, string>> gone = plan.Gone;
+            HashSet<string> listed = plan.Listed, client = plan.Client;
+            long total = plan.Total;
+            int fetched = plan.Fetched;
+            PlayProgress.Plan("Updating", 0, "files");
+
+            var wanted = new HashSet<SyncItem>(need);
+            int again = 0;
+            foreach (SyncItem it in items)
+            {
+                if (wanted.Contains(it) || OwnGame.Identity(it.Dest) == it.Seen) continue;
+                if (Matches(it.Dest, it.Bytes, it.Sha)) continue;
+                need.Add(it);
+                again++;
+                string blob = Path.Combine(stage, it.Sha);
+                if (!File.Exists(blob))
+                {
+                    FetchInto(at + it.Sha, it.Sha, it.Bytes, blob);
+                    total += it.Bytes;
+                    fetched++;
+                }
+            }
+            if (again > 0)
+                log(again + (again == 1 ? " file of this release was" : " files of this release were") +
+                    " changed while it downloaded, by Thornswood's own Skyrim folder being brought up to date, and " +
+                    (again == 1 ? "goes" : "go") + " in as the release has " + (again == 1 ? "it." : "them."));
 
             // ---- put them in place ------------------------------------------
             var newInGame = new List<string>();
@@ -495,7 +601,7 @@ namespace Thornswood
             // The list first, so an install that says it is on this release
             // always has the list of its files (#1232).
             WriteReleaseFiles(r, listed);
-            state = ReadSyncState();
+            SyncState state = ReadSyncState();
             state.Synced = r.sha256;
             state.SyncedId = r.id;
             if (state.PacksOnly == r.sha256) state.PacksOnly = "";
@@ -504,12 +610,11 @@ namespace Thornswood
 
             string msg = "Release " + r.id + ": " + items.Count + " files checked, " + need.Count +
                          (need.Count == 1 ? " file" : " files") + " put right";
-            if (fetch.Count > 0) msg += " (" + Mb(total) + " MB downloaded)";
+            if (fetched > 0) msg += " (" + Mb(total) + " MB downloaded)";
             if (removed.Count > 0) msg += ", " + removed.Count + " removed";
             msg += ".";
             if (shared > 0) msg += " " + shared + (shared == 1 ? " file this release no longer ships is" : " files this release no longer ships are") + " the collection's now and stayed.";
             log(msg);
-            return true;
         }
 
         static string Mb(long b)

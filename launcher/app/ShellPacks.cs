@@ -301,8 +301,13 @@ namespace Thornswood
             {
                 try
                 {
-                    if (installed) Updater.RemovePack(cfg, p, SafeLog);
-                    else Updater.ApplyPack(cfg, p, SafeLog);
+                    // An add-on writes into the game folder and Profile\Packs,
+                    // which a refresh reads, so one writer at a time (#2210).
+                    OwnGame.Alone(delegate
+                    {
+                        if (installed) Updater.RemovePack(cfg, p, SafeLog);
+                        else Updater.ApplyPack(cfg, p, SafeLog);
+                    }, delegate { SafeLog("The game folder is being prepared or updated. " + p.Title + " goes " + (installed ? "out" : "in") + " as soon as that is done."); });
                 }
                 catch (Exception ex)
                 {

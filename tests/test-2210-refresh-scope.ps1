@@ -21,14 +21,31 @@
        date or that has a second name; what was left out before outside the
        path stays on left-out.txt; made.txt is on the current rules after it;
        and the log line says what it looked at and how long it took.
-    3. The same folder on rules 12 (before the three kinds), or one Vortex has
-       deployed into since: the whole folder is walked. A file the folder
-       keeps as its own copy that has a second name is its own copy again, a
-       Distribution redistributable the folder held as a copy is a hard link
-       again, and the line says every file was looked at and why the copies
-       had another name.
+    3. Rules 5, 6 and 11 are one-time moves (decided by Patrick on 12 Oct): a
+       folder on rules 4 is walked whole, a copy it keeps that has a second
+       name is its own copy again (a Vortex file and the game's master), and a
+       Distribution redistributable it held as a copy is a hard link again. A
+       folder on rules 12, also walked whole, has none of that done again: no
+       file it does not change is asked for its names, and a file it does not
+       open keeps the L or C its record had.
     4. Every number from 14 to the current Rules has a line in RuleTouches, so
        raising Rules without saying what the rule is about fails here.
+    5. Vortex deployed since: the refresh compares Vortex's record with the
+       one it last took in (Profile\OwnGame\vortex.txt, written by Make and
+       Refresh) and looks only at the files whose entry moved: a newer mod's
+       file comes in, a new mod's file comes in, a file Vortex no longer
+       deploys goes, and every other line of the record is carried forward
+       untouched. The same record deployed again looks at no file. With no
+       vortex.txt, or one kept for another Vortex folder, everything is walked.
+    6. Vortex deploying into a Thornswood game folder (another install's, here
+       a pretend dev build) is refused: Choose Vortex's folder will not take
+       it, WhyNot names it with the Steam copy and the Forget button,
+       NeedsRefresh does not ask, Bring it up to date refuses it, and pointed
+       back at the Steam copy nothing is refused.
+    7. One writer at a time (decided by Patrick on 12 Oct: the folder is
+       prepared during the update's download): OwnGame.Alone makes a second
+       writer wait for the first and says so, a refresh started while an
+       update writes runs after it, and work under Alone may itself refresh.
 
   HOW. As test-own-folder-alone.ps1: the shipped OwnGame.cs and the files it
   needs, compiled with the .NET Framework csc the launcher builds with (C# 5),
@@ -213,13 +230,16 @@ namespace Thornswood
         // (.txt, kept as the folder's own copy), a redistributable under
         // Data\Platform\Distribution (linked though it is a .dll), and a file
         // of another menu under Data\Platform\UI that the rules leave out.
-        static readonly string[][] Files = {
-            new string[] { "TsOne.esp", "ModA", "VORTEX-TSONE" },
-            new string[] { "textures\\ts\\wood.dds", "ModA", "VORTEX-DDS" },
-            new string[] { "Nemesis_Engine\\mod\\tdm\\patch.txt", "ModN", "NEMESIS-PATCH" },
-            new string[] { "Platform\\Distribution\\libcef.dll", "ModD", "VORTEX-CEF" },
-            new string[] { "Platform\\UI\\app.js", "ModU", "OTHER-MENU" },
+        // Each: the path under Data, the mod, its bytes, and the time Vortex's
+        // record gives it. A scene starts from these and may change them.
+        static readonly string[][] BaseFiles = {
+            new string[] { "TsOne.esp", "ModA", "VORTEX-TSONE", "1" },
+            new string[] { "textures\\ts\\wood.dds", "ModA", "VORTEX-DDS", "1" },
+            new string[] { "Nemesis_Engine\\mod\\tdm\\patch.txt", "ModN", "NEMESIS-PATCH", "1" },
+            new string[] { "Platform\\Distribution\\libcef.dll", "ModD", "VORTEX-CEF", "1" },
+            new string[] { "Platform\\UI\\app.js", "ModU", "OTHER-MENU", "1" },
         };
+        static List<string[]> Files;
 
         static Scene NewScene(string name)
         {
@@ -267,6 +287,8 @@ namespace Thornswood
             s.Cfg.ExpectedExeBytes = ExeBytes;
             s.Cfg.NewerExeBytes = NewerExeBytes;
             s.Cfg.VortexGame = "";
+            Files = new List<string[]>();
+            foreach (string[] f in BaseFiles) Files.Add((string[])f.Clone());
 
             Exe(Path.Combine(s.Game, "SkyrimSE.exe"), "PIN-EXE", ExeBytes);
             Put(Path.Combine(s.Game, Master), "PIN-MASTER");
@@ -283,13 +305,13 @@ namespace Thornswood
             var sb = new StringBuilder();
             sb.Append("{\n  \"instance\": \"test\",\n  \"version\": 1,\n  \"deploymentMethod\": \"hardlink_activator\",\n  \"gameId\": \"skyrimse\",\n");
             sb.Append("  \"stagingPath\": \"" + J(s.Staging) + "\",\n  \"targetPath\": \"" + J(Path.Combine(s.Game, "Data")) + "\",\n  \"files\": [\n");
-            for (int i = 0; i < Files.Length; i++)
+            for (int i = 0; i < Files.Count; i++)
             {
                 string staged = Path.Combine(s.Staging, Files[i][1] + "\\" + Files[i][0]);
                 if (!File.Exists(staged)) Put(staged, Files[i][2]);
                 string at = Path.Combine(s.Game, "Data\\" + Files[i][0]);
                 if (!File.Exists(at)) { Directory.CreateDirectory(Path.GetDirectoryName(at)); CreateHardLink(at, staged, IntPtr.Zero); }
-                sb.Append("    { \"relPath\": \"" + J(Files[i][0]) + "\", \"source\": \"" + J(Files[i][1]) + "\", \"target\": \"\", \"time\": 1 }" + (i + 1 < Files.Length ? "," : "") + "\n");
+                sb.Append("    { \"relPath\": \"" + J(Files[i][0]) + "\", \"source\": \"" + J(Files[i][1]) + "\", \"target\": \"\", \"time\": " + Files[i][3] + " }" + (i + 1 < Files.Count ? "," : "") + "\n");
             }
             sb.Append("  ]\n}\n");
             string rec = Path.Combine(s.Game, "Data\\vortex.deployment.json");
@@ -362,6 +384,9 @@ namespace Thornswood
             string clone = Path.Combine(s.Dir, "release\\Game\\" + Patch);
             Directory.CreateDirectory(Path.GetDirectoryName(clone));
             CreateHardLink(clone, Path.Combine(own, Patch), IntPtr.Zero);
+            string masterClone = Path.Combine(s.Dir, "release\\Game\\" + Master);
+            Directory.CreateDirectory(Path.GetDirectoryName(masterClone));
+            CreateHardLink(masterClone, Path.Combine(own, Master), IntPtr.Zero);
 
             string cef = Path.Combine(own, Cef);
             DateTime t = File.GetLastWriteTimeUtc(cef);
@@ -381,6 +406,14 @@ namespace Thornswood
             Scene s = Prepared("scoped", "15");
             string own = OwnGame.Folder;
             Dictionary<string, string> before = Record();
+            // As if Make could not bring the plugin over: vortex.txt has no
+            // line for it, so the next refresh after a Vortex deploy looks at
+            // it again. A rules-only refresh in between must not write it down
+            // as taken in, since it does not look at it.
+            string vt = Path.Combine(OwnGame.Dir, "vortex.txt");
+            var vl = new List<string>();
+            foreach (string l in File.ReadAllLines(vt)) if (!l.EndsWith("|Data\\TsOne.esp", StringComparison.OrdinalIgnoreCase)) vl.Add(l);
+            File.WriteAllLines(vt, vl.ToArray());
             Yes("a folder on rules 15 that Vortex has not deployed into since asks for a refresh", OwnGame.NeedsRefresh(s.Cfg));
             string said = null;
             try { said = OwnGame.Refresh(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Refresh said: " + ex.Message); }
@@ -403,29 +436,224 @@ namespace Thornswood
             Yes("made.txt is on the current rules, so it does not ask again", Recorded("rules") == RulesNow() && !OwnGame.NeedsRefresh(s.Cfg));
             Yes("the line says what it looked at, why, and how long it took",
                 said != null && said.Contains("looking only at Data\\Platform\\UI\\") && said.Contains("only the rules about those changed") && said.Contains("It took "));
+            string seenNow = File.ReadAllText(vt);
+            Yes("vortex.txt gains only what the rules-only refresh looked at, not a file it did not take in",
+                seenNow.Contains("|" + Menu) && !seenNow.Contains("|Data\\TsOne.esp"));
+            Deploy(s, DateTime.UtcNow);
+            said = Refreshed(s);
+            Yes("so the next refresh after a Vortex deploy looks at that file again, and only it",
+                said != null && said.Contains("looking only at the 1 file whose entry in Vortex's record changed") && File.ReadAllText(vt).Contains("|Data\\TsOne.esp"));
+
+            // A folder made by a launcher before vortex.txt: the rules-only
+            // refresh writes none, and the first refresh after a Vortex deploy
+            // walks everything and writes it whole.
+            File.Delete(vt);
+            SetRecorded("rules", "15");
+            said = Refreshed(s);
+            Yes("a rules-only refresh of a folder with no vortex.txt writes none", said != null && said.Contains("looking only at Data\\Platform\\UI\\") && !File.Exists(vt));
+            Deploy(s, DateTime.UtcNow.AddMinutes(1));
+            said = Refreshed(s);
+            Yes("  then a Vortex deploy walks everything once and writes it whole",
+                said != null && said.Contains("looking at every file") && File.ReadAllText(vt).Contains("|Data\\TsOne.esp") && File.ReadAllText(vt).Contains("|" + Cef));
         }
 
-        static void Whole(string name, string rules, bool deploy)
+        static string Refreshed(Scene s)
         {
-            Scene s = Prepared(name, rules);
-            string own = OwnGame.Folder;
-            if (deploy) Deploy(s, DateTime.UtcNow);
             string said = null;
             try { said = OwnGame.Refresh(s.Cfg, null); } catch (Exception ex) { Console.WriteLine("      Refresh said: " + ex.Message); }
             if (said != null) Console.WriteLine("      Refresh said: " + said);
-            string why = deploy ? "Vortex deployed since" : "rules " + rules;
-            Yes(name + " (" + why + "): the whole folder is walked", said != null && said.Contains("looking at every file"));
+            return said;
+        }
+
+        // A folder older than rules 5, 6 and 11 is walked whole and has their
+        // one-time moves made: the copies it keeps that have a second name
+        // are its own again, the redistributable is a link again.
+        static void Old(string name, string rules)
+        {
+            Scene s = Prepared(name, rules);
+            string own = OwnGame.Folder;
+            string said = Refreshed(s);
+            Yes(name + " (rules " + rules + "): the whole folder is walked", said != null && said.Contains("looking at every file"));
             Yes(name + ": the other menu's file is taken out", !File.Exists(Path.Combine(own, Menu)));
-            Yes(name + ": the Nemesis patch is the folder's own copy again, and the other folder keeps its own", Names(Path.Combine(own, Patch)) == 1 &&
+            Yes(name + ": rule 5 once: the Nemesis patch is the folder's own copy again, and the other folder keeps its own", Names(Path.Combine(own, Patch)) == 1 &&
                 File.ReadAllText(Path.Combine(own, Patch)) == "NEMESIS-PATCH");
+            Yes(name + ": rule 11 once: the master is the folder's own copy again", Names(Path.Combine(own, Master)) == 1);
             Yes(name + ": the line says the copies had another name", said != null && said.Contains("had another name") && !said.Contains("animation file"));
-            Yes(name + ": the redistributable is a hard link to Vortex's again",
+            Yes(name + ": rule 6 once: the redistributable is a hard link to Vortex's again",
                 Id(Path.Combine(own, Cef)) == Id(Path.Combine(s.Staging, "ModD\\Platform\\Distribution\\libcef.dll")));
             string woodLine;
             Yes(name + ": the out of date record line is read again from Vortex's file", Record().TryGetValue(Wood, out woodLine) && !woodLine.Contains("|1|" + Wood));
             Yes(name + ": the record says L or C as the disk holds it",
                 Record()[Patch].StartsWith("C|") && Record()[Cef].StartsWith("L|") && Record()["Data\\TsOne.esp"].StartsWith("L|"));
             Yes(name + ": made.txt is on the current rules", Recorded("rules") == RulesNow() && !OwnGame.NeedsRefresh(s.Cfg));
+        }
+
+        // A folder past rules 11 (12, before the three kinds, so it is walked
+        // whole): the moves are not made again. Nothing asks a file it does
+        // not change how many names it has, and no copy is made its own again
+        // at every refresh (#2210, decided by Patrick on 12 Oct).
+        static void Past(string name, string rules)
+        {
+            Scene s = Prepared(name, rules);
+            string own = OwnGame.Folder;
+            string said = Refreshed(s);
+            Yes(name + " (rules " + rules + "): the whole folder is walked", said != null && said.Contains("looking at every file"));
+            Yes(name + ": the other menu's file is taken out", !File.Exists(Path.Combine(own, Menu)));
+            Yes(name + ": the Nemesis patch is not separated again: it keeps its second name", Names(Path.Combine(own, Patch)) == 2);
+            Yes(name + ": nor the master", Names(Path.Combine(own, Master)) == 2);
+            Yes(name + ": the redistributable is not relinked: still a copy", Names(Path.Combine(own, Cef)) == 1);
+            Yes(name + ": the line names no copies made its own", said != null && !said.Contains("had another name") && !said.Contains("hard links now"));
+            string woodLine;
+            Yes(name + ": the out of date record line is still read again from Vortex's file", Record().TryGetValue(Wood, out woodLine) && !woodLine.Contains("|1|" + Wood));
+            Yes(name + ": a file not opened keeps the L or C its record had", Record()[Cef].StartsWith("L|") && Record()[Patch].StartsWith("C|"));
+            Yes(name + ": made.txt is on the current rules", Recorded("rules") == RulesNow() && !OwnGame.NeedsRefresh(s.Cfg));
+        }
+
+        static string[] FileOf(string rel)
+        {
+            foreach (string[] f in Files) if (("Data\\" + f[0]).Equals(rel, StringComparison.OrdinalIgnoreCase)) return f;
+            return null;
+        }
+
+        // Vortex deployed since, on the current rules: the refresh looks only
+        // at the files whose entry in Vortex's record moved (#2210).
+        static void Moved()
+        {
+            Scene s = Prepared("moved", RulesNow());
+            string own = OwnGame.Folder;
+            Yes("(moved: Make kept Vortex's record as it took it in)", File.Exists(Path.Combine(OwnGame.Dir, "vortex.txt")));
+            Dictionary<string, string> before = Record();
+
+            // Vortex now deploys a new wood texture from a newer ModA, one
+            // file of a new mod, and no longer the Nemesis mod.
+            string[] wood = FileOf(Wood);
+            wood[1] = "ModA2"; wood[2] = "VORTEX-DDS-2"; wood[3] = "2000";
+            Files.Add(new string[] { "textures\\ts\\stone.dds", "ModB", "VORTEX-STONE", "3000" });
+            Files.Remove(FileOf(Patch));
+            File.Delete(Path.Combine(s.Game, Wood));
+            File.Delete(Path.Combine(s.Game, Patch));
+            Deploy(s, DateTime.UtcNow);
+            Yes("Vortex deployed since: a refresh is asked for", OwnGame.NeedsRefresh(s.Cfg));
+            string said = Refreshed(s);
+            Yes("the line says it looked only at the 3 files whose entry moved", said != null && said.Contains("looking only at the 3 files whose entry in Vortex's record changed, came or went"));
+            Yes("the new wood texture is in, from the newer mod", File.Exists(Path.Combine(own, Wood)) && File.ReadAllText(Path.Combine(own, Wood)) == "VORTEX-DDS-2" &&
+                Id(Path.Combine(own, Wood)) == Id(Path.Combine(s.Staging, "ModA2\\textures\\ts\\wood.dds")));
+            Yes("the new mod's file is in and on record", File.Exists(Path.Combine(own, "Data\\textures\\ts\\stone.dds")) && Record().ContainsKey("Data\\textures\\ts\\stone.dds"));
+            Yes("the Nemesis patch Vortex no longer deploys is taken out, and its other name kept", !File.Exists(Path.Combine(own, Patch)) && !Record().ContainsKey(Patch) &&
+                File.Exists(Path.Combine(s.Dir, "release\\Game\\" + Patch)));
+            Dictionary<string, string> after = Record();
+            bool same = true;
+            foreach (KeyValuePair<string, string> kv in before)
+            {
+                if (kv.Key.Equals(Wood, StringComparison.OrdinalIgnoreCase) || kv.Key.Equals(Patch, StringComparison.OrdinalIgnoreCase)) continue;
+                string now;
+                if (!after.TryGetValue(kv.Key, out now) || now != kv.Value) { same = false; Console.WriteLine("      moved: " + kv.Value + " -> " + now); }
+            }
+            Yes("every other line of the record is carried forward exactly", same);
+            Yes("the redistributable whose entry did not move was not touched: still a copy", Names(Path.Combine(own, Cef)) == 1);
+            Yes("the master was not touched: still its second name", Names(Path.Combine(own, Master)) == 2);
+            Yes("made.txt has the new deployment, so it does not ask again", !OwnGame.NeedsRefresh(s.Cfg));
+            string seen = File.ReadAllText(Path.Combine(OwnGame.Dir, "vortex.txt"));
+            Yes("vortex.txt has the record as this refresh took it in", seen.Contains("ModA2|2000|" + Wood) && seen.Contains("ModB|3000|Data\\textures\\ts\\stone.dds") && !seen.Contains(Patch));
+
+            // Vortex deploys again with the same record: the stamp moved, no entry did.
+            Deploy(s, DateTime.UtcNow.AddMinutes(1));
+            said = Refreshed(s);
+            Yes("Vortex deploying the same record again: no file is looked at", said != null && said.Contains("already matches") && said.Contains("looking at no file"));
+
+            // No vortex.txt (a folder made before this launcher): everything is walked once, and it is written.
+            File.Delete(Path.Combine(OwnGame.Dir, "vortex.txt"));
+            Deploy(s, DateTime.UtcNow.AddMinutes(2));
+            said = Refreshed(s);
+            Yes("with no earlier record of Vortex's to compare with, the whole folder is walked", said != null && said.Contains("looking at every file"));
+            Yes("and vortex.txt is written for the next one", File.Exists(Path.Combine(OwnGame.Dir, "vortex.txt")));
+
+            // A vortex.txt for another folder Vortex deployed into is not compared with.
+            var seenLines = new List<string>(File.ReadAllLines(Path.Combine(OwnGame.Dir, "vortex.txt")));
+            seenLines[0] = "source=" + Path.Combine(s.Dir, "elsewhere");
+            File.WriteAllLines(Path.Combine(OwnGame.Dir, "vortex.txt"), seenLines.ToArray());
+            Deploy(s, DateTime.UtcNow.AddMinutes(3));
+            said = Refreshed(s);
+            Yes("a record kept for another Vortex folder walks everything", said != null && said.Contains("looking at every file"));
+        }
+
+        // One writer at a time (#2210): an update downloads beside a refresh
+        // and writes under OwnGame.Alone, so its write waits for a refresh
+        // under way, and a refresh waits for an update's write.
+        static void OneWriter()
+        {
+            Scene s = Prepared("one-writer", RulesNow());
+            var held = new System.Threading.ManualResetEvent(false);
+            var order = new List<string>();
+            System.Threading.ThreadStart writer = delegate()
+            {
+                OwnGame.Alone(delegate
+                {
+                    held.Set();
+                    System.Threading.Thread.Sleep(400);
+                    lock (order) order.Add("first");
+                }, null);
+            };
+            var t = new System.Threading.Thread(writer);
+            t.Start();
+            held.WaitOne();
+            bool waited = false;
+            OwnGame.Alone(delegate { lock (order) order.Add("second"); }, delegate { waited = true; });
+            t.Join();
+            Yes("a second writer waits for the first, and is told it waits", waited && order.Count == 2 && order[0] == "first");
+
+            held.Reset();
+            order.Clear();
+            SetRecorded("rules", "15");
+            t = new System.Threading.Thread(writer);
+            t.Start();
+            held.WaitOne();
+            string said = Refreshed(s);
+            lock (order) order.Add("refresh");
+            t.Join();
+            Yes("a refresh started while an update writes runs after it", said != null && order.Count == 2 && order[0] == "first");
+            Yes("Alone runs work that itself refreshes, on the same thread", RanInside(s));
+        }
+
+        static bool RanInside(Scene s)
+        {
+            SetRecorded("rules", "15");
+            string said = null;
+            OwnGame.Alone(delegate { said = Refreshed(s); }, null);
+            return said != null;
+        }
+
+        // Vortex deploys into a Thornswood game folder: nothing is made or
+        // brought up to date from it (#2210, decided by Patrick on 12 Oct).
+        static void Refused()
+        {
+            Scene s = Prepared("refused", RulesNow());
+            string other = Path.Combine(s.Dir, "Thornswood-DevBuild");
+            string otherGame = Path.Combine(other, "Game");
+            Put(Path.Combine(other, "Profile\\OwnGame\\files.txt"), "L|V|1|1|Data\\TsOne.esp\r\n");
+            Exe(Path.Combine(otherGame, "SkyrimSE.exe"), "PIN-EXE", ExeBytes);
+            Put(Path.Combine(otherGame, "Data\\vortex.deployment.json"), File.ReadAllText(Path.Combine(s.Game, "Data\\vortex.deployment.json")));
+            Yes("ThornswoodInstallOf names the install whose game folder it is", string.Equals(OwnGame.ThornswoodInstallOf(otherGame), other, StringComparison.OrdinalIgnoreCase) &&
+                OwnGame.ThornswoodInstallOf(s.Game) == null);
+
+            bool ok;
+            string said = OwnGame.PointAt(s.Cfg, otherGame, out ok);
+            Console.WriteLine("      PointAt said: " + said);
+            Yes("Choose Vortex's folder refuses a Thornswood game folder and keeps the setting", !ok && s.Cfg.VortexGame == "" && said.Contains("game folder of the Thornswood install in " + other));
+
+            s.Cfg.VortexGame = otherGame;
+            string why = OwnGame.WhyNot(s.Cfg, OwnGame.DeploysInto(s.Cfg));
+            Console.WriteLine("      WhyNot said: " + why);
+            Yes("WhyNot refuses it, says why, and names the Steam copy and the Forget button", why != null && why.Contains("game folder of the Thornswood install in " + other) &&
+                why.Contains(s.Game) && why.Contains("Forget the chosen folder"));
+            Yes("NeedsRefresh does not ask for a refresh from it", !OwnGame.NeedsRefresh(s.Cfg));
+            Yes("RefusedSource says the same for the start of the launcher", OwnGame.RefusedSource(s.Cfg) == why);
+            string threw = null;
+            try { OwnGame.Refresh(s.Cfg, null); } catch (Exception ex) { threw = ex.Message; }
+            Yes("Bring it up to date refuses it too", threw != null && threw.Contains("game folder of the Thornswood install"));
+
+            s.Cfg.VortexGame = "";
+            Yes("pointed back at the Steam copy, nothing is refused", OwnGame.RefusedSource(s.Cfg) == null && OwnGame.WhyNot(s.Cfg, OwnGame.DeploysInto(s.Cfg)) == null);
         }
 
         static string RulesNow()
@@ -454,8 +682,11 @@ namespace Thornswood
             {
                 Scope();
                 Scoped();
-                Whole("rules-12", "12", false);
-                Whole("deployed", "15", true);
+                Old("rules-4", "4");
+                Past("rules-12", "12");
+                Moved();
+                Refused();
+                OneWriter();
             }
             catch (Exception ex)
             {

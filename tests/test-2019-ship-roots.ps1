@@ -186,9 +186,13 @@ namespace Thornswood
             Put(staged, plugin);
             CreateHardLink(at, staged, IntPtr.Zero);
             string rec = Path.Combine(Game, "Data\\vortex.deployment.json");
+            // The time Vortex's record gives a file is its staging copy's write
+            // time in milliseconds (measured on One, 16 Oct: 400 of 400), which
+            // a refresh compares with the last record's (#2210).
+            long time = (long)(File.GetLastWriteTimeUtc(staged) - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds;
             Put(rec, "{\n  \"instance\": \"test\",\n  \"version\": 1,\n  \"deploymentMethod\": \"hardlink_activator\",\n  \"gameId\": \"skyrimse\",\n" +
                      "  \"stagingPath\": \"" + J(Staging) + "\",\n  \"targetPath\": \"" + J(Path.Combine(Game, "Data")) + "\",\n" +
-                     "  \"files\": [ { \"relPath\": \"TsOne.esp\", \"source\": \"ModA\", \"target\": \"\", \"time\": 1 } ]\n}\n");
+                     "  \"files\": [ { \"relPath\": \"TsOne.esp\", \"source\": \"ModA\", \"target\": \"\", \"time\": " + time + " } ]\n}\n");
             File.SetLastWriteTimeUtc(rec, when);
         }
 

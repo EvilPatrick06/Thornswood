@@ -573,9 +573,10 @@ Any developer may run a main Ship from a machine that can sign (How work moves).
 
 Ship builds a channel's release from one folder on each machine: the main
 install for main and `<Root>-DevBuild` for dev, unless the machine has
-recorded another (issue #1692). On a machine whose Vortex deploys into the
-dev build's game folder (docs/COLLECTION-REVISION-2.md step 8), record the
-release folder once. On One it is `local\release-devbuild` in the
+recorded another (issue #1692). Vortex deploys into the Steam copy; the
+launcher refuses a Thornswood game folder as Vortex's folder since #2210
+(docs/COLLECTION-REVISION-2.md step 8). A machine that keeps its release
+folder apart from its installs records it once. On One it is `local\release-devbuild` in the
 repository folder since 5 Oct, because Thornswood work on One lives only in
 the repository, the vault and `C:\ThornswoodTemps&Worktrees` (Patrick); give
 the whole path, since every clone and worktree reads what is recorded:
