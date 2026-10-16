@@ -166,8 +166,7 @@ namespace Thornswood
             foreach (Shared s in d.Values)
                 lines.Add(s.Sha + "|" + s.At.Size + "|" + s.At.Id + "|" + s.At.Change + "|" + s.Rel);
             lines.Sort(StringComparer.OrdinalIgnoreCase);
-            Directory.CreateDirectory(Dir);
-            File.WriteAllLines(SharesFile, lines.ToArray());
+            WriteRecord(SharesFile, lines);
         }
 
         static Dictionary<string, string> ReadDiffers()
@@ -191,8 +190,7 @@ namespace Thornswood
             var lines = new List<string>();
             foreach (KeyValuePair<string, string> kv in d) lines.Add(kv.Value + "|" + kv.Key);
             lines.Sort(StringComparer.OrdinalIgnoreCase);
-            Directory.CreateDirectory(Dir);
-            File.WriteAllLines(DiffersFile, lines.ToArray());
+            WriteRecord(DiffersFile, lines);
         }
 
         /// <summary>
@@ -219,7 +217,7 @@ namespace Thornswood
             if (rels.Count == 0) { if (File.Exists(ChangedFile)) File.Delete(ChangedFile); return; }
             var l = new List<string>(rels);
             l.Sort(StringComparer.OrdinalIgnoreCase);
-            File.WriteAllLines(ChangedFile, l.ToArray());
+            WriteRecord(ChangedFile, l);
         }
 
         /// <summary>A folder made anew starts with no record of what an earlier one shared.</summary>
@@ -318,7 +316,7 @@ namespace Thornswood
             WriteShares(shares);
             WriteDiffers(differs);
             if (linked > 0)
-                try { File.WriteAllLines(FilesList, Relabel(File.ReadAllLines(FilesList), shares)); }
+                try { WriteRecord(FilesList, Relabel(File.ReadAllLines(FilesList), shares)); }
                 catch (Exception ex) { Swallow.Note("OwnGame.Share, files list", ex); }
 
             string said = null;
@@ -514,7 +512,7 @@ namespace Thornswood
                 var lines = new List<string>();
                 foreach (KeyValuePair<string, Rec> kv in files)
                     lines.Add(kv.Value.Kind + "|" + kv.Value.Origin + "|" + kv.Value.Size + "|" + kv.Value.Ticks + "|" + kv.Key);
-                File.WriteAllLines(FilesList, lines.ToArray());
+                WriteRecord(FilesList, lines);
 
                 Dictionary<string, Shared> shares = ReadShares();
                 Dictionary<string, string> differs = ReadDiffers();
