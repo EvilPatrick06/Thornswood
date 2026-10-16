@@ -50,6 +50,7 @@
 param()
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 if ($PSVersionTable.PSEdition -eq 'Core') {
     $winps = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
     if (-not (Test-Path -LiteralPath $winps)) {
@@ -161,26 +162,18 @@ function Find-Ref([string]$name) {
     }
     return $null
 }
-$tokens = $null; $errors = $null
-$ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $repo 'scripts\release\Build-Launcher.ps1'), [ref]$tokens, [ref]$errors)
-$assigns = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] }, $true))
-function ListIn([string]$name) {
-    $a = $assigns | Where-Object { $_.Left.Extent.Text -eq ('$' + $name) } | Select-Object -First 1
-    if (-not $a) { return @() }
-    return @($a.Right.FindAll({ param($n) $n -is [System.Management.Automation.Language.StringConstantExpressionAst] }, $true) | ForEach-Object { $_.Value })
-}
 $refs = @(); $missing = @()
-foreach ($n in @(ListIn 'needed')) { $p = Find-Ref $n; if ($p) { $refs += $p } else { $missing += $n } }
-foreach ($n in @(ListIn 'wv2Managed')) { $p = Join-Path $repo "launcher\lib\webview2\$n"; if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n } }
-Yes ('every reference Build-Launcher.ps1 names is here' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) ($missing.Count -eq 0 -and $refs.Count -gt 5)
+foreach ($n in @($LauncherNeeded)) { $p = Find-Ref $n; if ($p) { $refs += $p } else { $missing += $n } }
+foreach ($n in @($LauncherWv2Managed)) { $p = Join-Path $repo "launcher\lib\webview2\$n"; if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n } }
+Yes ('every reference Thornswood.csproj names is here' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) ($missing.Count -eq 0 -and $refs.Count -gt 5)
 if ($missing.Count) { Done }
 New-Item -ItemType Directory -Force -Path $T | Out-Null
 $dll = Join-Path $T 'Thornswood.dll'
-$cscArgs = @('/noconfig', '/nologo', '/target:library', '/platform:anycpu', '/langversion:5', "/out:$dll")
+$cscArgs = @('/noconfig', '/nologo', '/target:library', '/platform:anycpu', "/langversion:$LauncherLangVersion", "/out:$dll")
 foreach ($r in $refs) { $cscArgs += "/reference:$r" }
 foreach ($f in @(Get-ChildItem (Join-Path $app '*.cs') -File)) { $cscArgs += $f.FullName }
 $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-$said = & $csc @cscArgs 2>&1
+$said = & $LauncherCsc @cscArgs 2>&1
 $ErrorActionPreference = $old
 Yes 'the launcher compiles with the .NET Framework csc, as C# 5' ((Test-Path -LiteralPath $dll) -and $LASTEXITCODE -eq 0)
 if (-not (Test-Path -LiteralPath $dll)) { foreach ($l in @($said | Where-Object { "$_" -match 'error' } | Select-Object -First 10)) { Write-Host "      $l" }; Done }
@@ -636,7 +629,22 @@ $scrubPath = Join-Path $repo 'scripts\release\Scrub-Feed.ps1'
 $tk = $null; $er = $null
 $sast = [System.Management.Automation.Language.Parser]::ParseFile($scrubPath, [ref]$tk, [ref]$er)
 $own = @($sast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true) | ForEach-Object { $_.Name })
-$loaded = @([regex]::Matches([IO.File]::ReadAllText($scrubPath), "(?m)^\. \(Join-Path \`$Here '([^']+)'\)") | ForEach-Object { $_.Groups[1].Value })
+# What it loads, and what each of those loads at its own top level, all the
+# way down: a function a loaded file brings in with it is loaded too.
+# Write-FeedVersionFile is the case (#1050, #2450): Feed-Store.ps1, which
+# Scrub-Feed loads, loads Feed-Json.ps1 that defines it, so counting only the
+# files Scrub-Feed names itself failed on something that works. Only lines at
+# column 0 count; an indented load is inside a function and may never run.
+$loadRx = "(?m)^\. \(Join-Path \`$(?:Here|PSScriptRoot) '([^'\\]+\.ps1)'\)"
+$loaded = @()
+$queue = @([regex]::Matches([IO.File]::ReadAllText($scrubPath), $loadRx) | ForEach-Object { $_.Groups[1].Value })
+while ($queue.Count) {
+    $next = $queue[0]; $queue = @($queue | Select-Object -Skip 1)
+    if ($loaded -contains $next) { continue }
+    $loaded += $next
+    $lp = Join-Path $repo ('scripts\release\' + $next)
+    if (Test-Path -LiteralPath $lp) { $queue += @([regex]::Matches([IO.File]::ReadAllText($lp), $loadRx) | ForEach-Object { $_.Groups[1].Value }) }
+}
 $definedIn = @{}
 foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $repo 'scripts\release') -Filter '*.ps1' -File)) {
     $t2 = $null; $e2 = $null

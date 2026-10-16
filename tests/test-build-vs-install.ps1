@@ -163,6 +163,11 @@ try {
     Copy-Item -LiteralPath (Join-Path $realRepo 'scripts\release\Build-Launcher.ps1') -Destination (Join-Path $fakeRepo 'scripts\release')
     # Build-Launcher holds the embedded records to RecordShape.ps1 (#2180).
     foreach ($n in 'RecordShape.ps1', 'Read-JsonFile.ps1') { Copy-Item -LiteralPath (Join-Path $realRepo ('scripts\release\' + $n)) -Destination (Join-Path $fakeRepo 'scripts\release') -Force }
+    # The build is MSBuild and the two project files since #498's switch:
+    # Find-MSBuild.ps1 finds MSBuild, and the projects say what goes in.
+    Copy-Item -LiteralPath (Join-Path $realRepo 'scripts\release\Find-MSBuild.ps1') -Destination (Join-Path $fakeRepo 'scripts\release') -Force
+    Copy-Item -LiteralPath (Join-Path $realRepo 'launcher\app\Thornswood.csproj') -Destination (Join-Path $fakeRepo 'launcher\app')
+    Copy-Item -LiteralPath (Join-Path $realRepo 'installer\setup\Setup.csproj') -Destination (Join-Path $fakeRepo 'installer\setup')
     $haveInstall = Test-Path -LiteralPath (Join-Path $realRepo 'scripts\release\Install-Launcher.ps1')
     if ($haveInstall) { Copy-Item -LiteralPath (Join-Path $realRepo 'scripts\release\Install-Launcher.ps1') -Destination (Join-Path $fakeRepo 'scripts\release') }
     foreach ($f in 'app.ico', 'app-dev.ico', 'ui.xaml', 'logo.png', 'logo-dev.png', 'logo-192.png', 'launcher-header.jpg', 'launcher-header.mp4', 'Thornswood.ini', 'voice-host.html') {
@@ -180,6 +185,8 @@ try {
     Copy-Item -LiteralPath (Join-Path $realRepo 'records\skyrim-files.json') -Destination (Join-Path $fakeRepo 'records')
     Copy-Item -LiteralPath (Join-Path $realRepo 'records\ui-gone.json') -Destination (Join-Path $fakeRepo 'records')
     Set-Content -LiteralPath (Join-Path $repo 'launcher\app\Program.cs') -Value 'static class Program { [System.STAThread] static void Main() { } }' -Encoding ASCII
+    # Both projects read the version off Updater.cs, as the real one has it.
+    Set-Content -LiteralPath (Join-Path $repo 'launcher\app\Updater.cs') -Value 'static class Updater { public const string Version = "1.0.0"; }' -Encoding ASCII
     Set-Content -LiteralPath (Join-Path $repo 'installer\setup\Bootstrap.cs') -Value 'static class Setup { [System.STAThread] static void Main() { } }' -Encoding ASCII
     Set-Content -LiteralPath (Join-Path $repo 'scripts\dev\Close-Launcher.ps1') -Value $fakeClose -Encoding ASCII
 
@@ -376,7 +383,7 @@ try {
         Copy-Item -LiteralPath (Join-Path $Here 'scripts\release\Get-ScratchDir.ps1') -Destination $shipTools
         $sb = [scriptblock]::Create(
             'param($Root, $Here) ' +
-            '$ModsOnly = $false; $Dev = $true; $DryRun = $false; $LauncherWith = "csc"; $target = "1.0.0"; $current = "1.0.0"; $updaterCs = ""; ' +
+            '$ModsOnly = $false; $Dev = $true; $DryRun = $false; $target = "1.0.0"; $current = "1.0.0"; $updaterCs = ""; ' +
             'function Say($m, $c) { }; function Head($m) { }; ' +
             'function Die($m) { throw ("DIE: " + $m) }; ' +
             'function Unbump([string]$why) { Add-Content -LiteralPath $env:TS_TEST_CALLS -Value ("unbump|" + $why) }; ' +

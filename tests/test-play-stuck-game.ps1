@@ -24,6 +24,7 @@
 param([string]$AppDir)
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Repo = Split-Path -Parent $Here
@@ -219,7 +220,7 @@ $src = Join-Path $tmp 'drive.cs'
 $exe = Join-Path $tmp 'drive.exe'
 [IO.File]::WriteAllText($src, $driver, (New-Object Text.UTF8Encoding($false)))
 try {
-    $out = & $csc /nologo /langversion:5 /target:exe "/out:$exe" $src 2>&1
+    $out = & $LauncherCsc /nologo "/langversion:$LauncherLangVersion" /target:exe "/out:$exe" $src 2>&1
     Yes 'the lifted guards compile as C# 5' ($LASTEXITCODE -eq 0)
     if ($LASTEXITCODE -ne 0) { $out | Write-Host; Done }
     $lines = & $exe

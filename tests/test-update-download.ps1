@@ -37,6 +37,7 @@
 param([string]$AppDir)
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Repo = Split-Path -Parent $Here
@@ -477,7 +478,7 @@ namespace Thornswood
 $src = Join-Path $tmp 'drive.cs'
 [IO.File]::WriteAllText($src, $driver.Replace('/*BODIES*/', ($bodies -join "`r`n`r`n")), (New-Object Text.UTF8Encoding($false)))
 $exe = Join-Path $tmp 'drive.exe'
-$out = & $csc /nologo /langversion:5 /target:exe "/out:$exe" $src 2>&1
+$out = & $LauncherCsc /nologo "/langversion:$LauncherLangVersion" /target:exe "/out:$exe" $src 2>&1
 Yes 'the lifted methods compile as C# 5 beside the stand-ins' ($LASTEXITCODE -eq 0)
 if ($LASTEXITCODE -ne 0) { $out | ForEach-Object { Write-Host "    $_" }; Remove-Item -LiteralPath $tmp -Recurse -Force; Done }
 

@@ -3,45 +3,35 @@
 
       pwsh -NoProfile -File .\tests\test-498-msbuild.ps1
       pwsh -NoProfile -File .\tests\test-498-msbuild.ps1 -RequireMSBuild      (the build check)
-      pwsh -NoProfile -File .\tests\test-498-msbuild.ps1 -Scratch <folder>    keeps the two builds there
+      pwsh -NoProfile -File .\tests\test-498-msbuild.ps1 -Scratch <folder>    keeps the build there
 
-  Issue #498, Patrick's option C on 11 Oct: the launcher moves from the
-  in-box .NET Framework csc to MSBuild and a project file. Until the switch
-  both builds have to make the same two exes, so this builds the launcher and
-  the setup program both ways with scripts\release\Build-Launcher.ps1
-  (-With csc and -With msbuild, unsigned, into scratch) and holds the two
-  pairs to each other:
+  Issue #498, Patrick's option C on 11 Oct, switched 15 Oct: the launcher and
+  the setup program are built only by MSBuild from launcher\app\
+  Thornswood.csproj and installer\setup\Setup.csproj. Until the switch this
+  harness built them both ways and held the MSBuild pair to the in-box csc
+  pair; that comparison is done (the figures are on #498), so now it holds the
+  one build to what that comparison proved:
 
-    1. the project files name the same resources and references as
-       Build-Launcher.ps1's csc half, read as text (this part runs everywhere,
-       MSBuild or not, so a resource added to one and not the other is caught
-       on the VPS's nightly too);
-    2. the same manifest resources under the same names with the same bytes;
-    3. the same assembly references, names and versions;
-    4. the same types, methods (by name and signature), fields, properties
-       and events, leaving out what each compiler generates for itself
-       (lambda classes, iterators, cached delegates: names with < in them),
-       because the old csc and Roslyn name those differently;
-    5. the same assembly attributes, the same file details Windows shows
-       (FileVersion, ProductVersion, description, product, company,
-       copyright, OriginalFilename), the same entry point, the same PE kind
-       (AnyCPU, not 32 bit preferred, GUI subsystem 4.00, high entropy ASLR
-       off) and no TargetFrameworkAttribute in either, so the runtime's
-       compatibility defaults stay what they are;
-    6. the same win32 icon bytes and the same application manifest, compared
-       as XML without comments and spacing;
-    7. tests\test-app-manifest.ps1 passes on both pairs, and
-       scripts\dev\Check-Secrets.ps1 -Binary passes on the MSBuild pair;
-    8. sizes within five percent, and nothing but the exe and its pdb in the
-       MSBuild output folder (the update system ships one file).
+    1. as text, everywhere, MSBuild or not: both project files target .NET
+       Framework 4.8.1 at C# 13.0, write no TargetFrameworkAttribute, restore
+       nothing, keep WebView2 out of the output folder, embed exactly the
+       resources the launcher's code reads by name; and the build has one way
+       only (no -With, no in-box csc, no Ship -LauncherWith);
+    2. Build-Launcher.ps1 builds both exes, unsigned, into scratch;
+    3. each embedded resource is byte for byte its file in the repository;
+    4. the references are the framework assemblies and WebView2, and nothing
+       restored;
+    5. the PE kind (AnyCPU, not 32 bit preferred, GUI subsystem 4.00, high
+       entropy ASLR off), no TargetFrameworkAttribute, the entry point;
+    6. the file details Windows shows carry Updater.cs's version, and the
+       application manifest's identity carries it too;
+    7. a win32 icon, nothing beside the launcher but its pdb, and
+       tests\test-app-manifest.ps1 and scripts\dev\Check-Secrets.ps1 -Binary
+       pass on the pair.
 
-  What it prints but does not hold the two to: the methods each compiler
-  generates, and the outside members each one calls (Roslyn compiles a
-  switch on strings to a hash, the old csc to a Dictionary).
-
-  Without MSBuild on the machine (the VPS runners, 12 Oct) part 1 still runs
-  and the rest says SKIP; -RequireMSBuild makes that a failure instead, which
-  is how the build check on GitHub's runner calls it.
+  Without MSBuild on the machine part 1 still runs and the rest says SKIP;
+  -RequireMSBuild makes that a failure instead, which is how the build check
+  calls it.
 
   Builds into scratch and nowhere else: never signs (-NoSign), never touches
   out\setup-stub.exe (-StubOut), closes nothing, starts nothing.
@@ -73,7 +63,7 @@ function Done {
     exit 0
 }
 
-# ---- 1. the project files against Build-Launcher.ps1, as text -------------
+# ---- 1. the inputs, as text ----------------------------------------------
 $blPath = Join-Path $repo 'scripts\release\Build-Launcher.ps1'
 $bl = [IO.File]::ReadAllText($blPath)
 $appProjPath = Join-Path $repo 'launcher\app\Thornswood.csproj'
@@ -88,58 +78,67 @@ function Names($doc, [string]$xpath) { @(Select-Xml -Xml $doc -XPath $xpath -Nam
 function Attr($doc, [string]$xpath) { @(Select-Xml -Xml $doc -XPath $xpath -Namespace $ns | ForEach-Object { $_.Node.Value.Trim() }) }
 function Same([object[]]$a, [object[]]$b) { (@($a | Sort-Object) -join '|') -eq (@($b | Sort-Object) -join '|') }
 
-# The csc half's resources: each "/resource:<path>,<name>" it passes, and the
-# WebView2 files it passes by loop.
-$cscRes = @([regex]::Matches($bl, '/resource:\$\(\(Resolve-Path \$[A-Za-z]+\)\.Path\),([A-Za-z0-9.\-]+)"') | ForEach-Object { $_.Groups[1].Value })
-$wvm = [regex]::Match($bl, '\$wv2Managed\s*=\s*@\(([^)]*)\)')
-$wvl = [regex]::Match($bl, "\`$wv2Loader\s*=\s*'([^']+)'")
-$wv2 = @()
-if ($wvm.Success) { $wv2 += @([regex]::Matches($wvm.Groups[1].Value, "'([^']+)'") | ForEach-Object { $_.Groups[1].Value }) }
-if ($wvl.Success) { $wv2 += $wvl.Groups[1].Value }
-Yes 'Build-Launcher.ps1 still names the WebView2 files it embeds' ($wv2.Count -eq 3)
-$cscRes = @($cscRes) + $wv2
-# logo.png appears twice in the csc half: the launcher's, and the setup
-# program's logo-192.png under the same name, so the list is taken once each.
-$cscAppRes = @($cscRes | Select-Object -Unique)
-$projAppRes = @(Names $appProj '//m:EmbeddedResource/m:LogicalName')
-Yes ('the launcher project embeds the same resources as the csc build: ' + ($projAppRes -join ', ')) (Same $projAppRes $cscAppRes)
-$projSetupRes = @(Names $setupProj '//m:EmbeddedResource/m:LogicalName')
-Yes 'the setup project embeds logo-192.png as logo.png, as the csc build does' ((Same $projSetupRes @('logo.png')) -and
-    ($bl.Contains('$stubArgs += "/resource:$((Resolve-Path $logoSml).Path),logo.png"')) -and
-    (@(Attr $setupProj '//m:EmbeddedResource/@Include') -join '') -match 'logo-192\.png$')
+# The resources the launcher's code reads by name (Art.cs, Voice.cs,
+# ThornIni.cs, ClientRuntime.cs, OwnGame.cs, Shell.cs): the list the two
+# builds were compared on, and the file in the repository each one is.
+$appResources = [ordered]@{
+    'ui.xaml'                         = 'launcher\ui.xaml'
+    'logo.png'                        = 'launcher\logo.png'
+    'logo-dev.png'                    = 'launcher\logo-dev.png'
+    'launcher-header.jpg'             = 'launcher\launcher-header.jpg'
+    'launcher-header.mp4'             = 'launcher\launcher-header.mp4'
+    'app.ico'                         = 'launcher\app.ico'
+    'app-dev.ico'                     = 'launcher\app-dev.ico'
+    'Microsoft.Web.WebView2.Core.dll' = 'launcher\lib\webview2\Microsoft.Web.WebView2.Core.dll'
+    'Microsoft.Web.WebView2.Wpf.dll'  = 'launcher\lib\webview2\Microsoft.Web.WebView2.Wpf.dll'
+    'WebView2Loader.dll'              = 'launcher\lib\webview2\WebView2Loader.dll'
+    'voice-host.html'                 = 'launcher\voice-host.html'
+    'Thornswood.ini'                  = 'launcher\Thornswood.ini'
+    'client-build.json'               = 'records\client-build.json'
+    'skyrim-files.json'               = 'records\skyrim-files.json'
+    'ui-gone.json'                    = 'records\ui-gone.json'
+}
+$setupResources = [ordered]@{ 'logo.png' = 'launcher\logo-192.png' }
+$frameworkRefs = @('System', 'System.Core', 'System.Drawing', 'System.Runtime.Serialization', 'System.Xml', 'System.Security',
+                   'System.IO.Compression', 'System.IO.Compression.FileSystem', 'PresentationFramework', 'PresentationCore',
+                   'WindowsBase', 'System.Xaml', 'System.Windows.Forms')
 
-$needed = [regex]::Match($bl, '(?s)\$needed\s*=\s*@\((.*?)\n\)')
-$cscRefs = @()
-if ($needed.Success) { $cscRefs = @([regex]::Matches($needed.Groups[1].Value, "'([A-Za-z0-9.]+)\.dll'") | ForEach-Object { $_.Groups[1].Value }) }
-Yes 'Build-Launcher.ps1 still lists the framework assemblies it hands csc' ($cscRefs.Count -ge 10)
-$projAppRefs = @(Attr $appProj '//m:Reference/@Include')
-$wv2Managed = @($wv2 | Where-Object { $_ -like 'Microsoft.*.dll' } | ForEach-Object { $_ -replace '\.dll$', '' })
-Yes ('the launcher project references the same assemblies: ' + ($projAppRefs -join ', ')) (Same $projAppRefs (@($cscRefs) + $wv2Managed))
-Yes 'the setup project references the same framework assemblies' (Same @(Attr $setupProj '//m:Reference/@Include') $cscRefs)
+Yes ('the launcher project embeds exactly the resources the code reads: ' + (@(Names $appProj '//m:EmbeddedResource/m:LogicalName') -join ', ')) (
+    Same @(Names $appProj '//m:EmbeddedResource/m:LogicalName') @($appResources.Keys))
+Yes 'the setup project embeds logo-192.png as logo.png' ((Same @(Names $setupProj '//m:EmbeddedResource/m:LogicalName') @('logo.png')) -and
+    (@(Attr $setupProj '//m:EmbeddedResource/@Include') -join '') -match 'logo-192\.png$')
+Yes 'the launcher project references the framework assemblies and WebView2' (
+    Same @(Attr $appProj '//m:Reference/@Include') (@($frameworkRefs) + 'Microsoft.Web.WebView2.Core', 'Microsoft.Web.WebView2.Wpf'))
+Yes 'the setup project references the same framework assemblies' (Same @(Attr $setupProj '//m:Reference/@Include') $frameworkRefs)
 Yes 'WebView2 is never copied beside the exe (Private false on both)' (
     @(Select-Xml -Xml $appProj -XPath "//m:Reference[starts-with(@Include,'Microsoft.Web.WebView2')]/m:Private" -Namespace $ns | Where-Object { $_.Node.InnerText -eq 'false' }).Count -eq 2)
 foreach ($pair in @(@{ Doc = $appProj; Name = 'launcher' }, @{ Doc = $setupProj; Name = 'setup' })) {
     $d = $pair.Doc
-    Yes "the $($pair.Name) project keeps LangVersion 5 until the switch" ((Names $d '//m:LangVersion') -join '' -eq '5')
+    Yes "the $($pair.Name) project is at C# 13.0 (the C# 5 rule lifted with the switch)" ((Names $d '//m:LangVersion') -join '' -eq '13.0')
     Yes "the $($pair.Name) project targets .NET Framework 4.8.1" ((Names $d '//m:TargetFrameworkVersion') -join '' -eq 'v4.8.1')
     Yes "the $($pair.Name) project writes no TargetFrameworkAttribute" ((Names $d '//m:GenerateTargetFrameworkAttribute') -join '' -eq 'false')
     Yes "the $($pair.Name) project has no PackageReference (nothing restored, nothing loose)" (@(Select-Xml -Xml $d -XPath '//m:PackageReference' -Namespace $ns).Count -eq 0)
 }
 
+# One way to build.
+Yes 'Build-Launcher.ps1 has no -With: MSBuild is the only build' ($bl -notmatch '\$With\b' -and $bl -notmatch "ValidateSet\('csc'")
+Yes 'and no in-box csc and no hand-resolved references' ($bl -notmatch 'v4\.0\.30319' -and $bl -notmatch '\$refDirs' -and $bl -notmatch 'Find-Ref')
+Yes 'and builds both project files with the MSBuild Find-MSBuild.ps1 finds' (
+    $bl.Contains("& `$found.MSBuild (Resolve-Path -LiteralPath `$proj).Path") -and $bl.Contains("& `$found.MSBuild (Resolve-Path -LiteralPath `$stubProj).Path"))
 $ship = [IO.File]::ReadAllText((Join-Path $repo 'scripts\release\Ship.ps1'))
-Yes 'Ship builds a dev launcher the way -LauncherWith says, csc unless told' (
-    $ship.Contains("[ValidateSet('csc', 'msbuild')][string]`$LauncherWith = 'csc'") -and
-    $ship.Contains("'Build-Launcher.ps1') -Root `$Root -OutDir `$buildOut -NoPause -With `$LauncherWith"))
-Yes 'and refuses msbuild for main, which takes the exe CI built' ($ship.Contains("if (-not `$Dev -and `$LauncherWith -ne 'csc') { Die "))
-Yes 'Build-Launcher.ps1 builds with csc unless told, until the switch' ($bl.Contains("[string]`$With = 'csc'"))
+Yes 'Ship has no -LauncherWith any more and calls Build-Launcher.ps1 without -With' ($ship -notmatch 'LauncherWith' -and $ship -notmatch 'Build-Launcher\.ps1[^\r\n]*-With')
+foreach ($wf in 'release.yml', 'build.yml', 'build-pr.yml', 'nightly.yml') {
+    $t = [IO.File]::ReadAllText((Join-Path $repo ".github\workflows\$wf"))
+    Yes "$wf passes no -With to Build-Launcher.ps1" ($t -notmatch 'Build-Launcher\.ps1[^\r\n]*-With')
+}
 
-# ---- 2 to 8 need MSBuild --------------------------------------------------
+# ---- 2 to 7 need MSBuild --------------------------------------------------
 . (Join-Path $repo 'scripts\release\Find-MSBuild.ps1') -Load
 $found = Find-ThornswoodMSBuild
 if (-not $found.MSBuild -or -not $found.RefAssemblies) {
     $why = 'no MSBuild from Visual Studio 2022 or its Build Tools with the .NET Framework 4.8.1 targeting pack on this machine'
     if ($RequireMSBuild) { Yes "MSBuild is here ($why)" $false }
-    else { Skip "the two builds and their comparison: $why" }
+    else { Skip "the build and its checks: $why" }
     Done
 }
 Write-Host "      MSBuild $($found.MSBuild)"
@@ -148,20 +147,16 @@ $own = $false
 if (-not $Scratch) { $Scratch = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-498-' + [Guid]::NewGuid().ToString('N').Substring(0, 8)); $own = $true }
 New-Item -ItemType Directory -Force -Path $Scratch | Out-Null
 $pwsh = (Get-Process -Id $PID).Path
-$builds = @{}
-foreach ($way in 'csc', 'msbuild') {
-    $root = Join-Path $Scratch $way
-    $stub = Join-Path $root 'setup-stub.exe'
-    if (Test-Path -LiteralPath $root) { Remove-Item -LiteralPath $root -Recurse -Force }
-    $said = & $pwsh -NoProfile -File $blPath -With $way -Root $root -StubOut $stub -NoSign -NoPause 2>&1 | Out-String
-    $rc = $LASTEXITCODE
-    $exe = Join-Path $root 'Launcher\Thornswood.exe'
-    Yes "Build-Launcher.ps1 -With $way built both exes (exit $rc)" ($rc -eq 0 -and (Test-Path -LiteralPath $exe) -and (Test-Path -LiteralPath $stub))
-    if ($rc -ne 0) { Write-Host $said }
-    Yes "-With $way signed nothing (-NoSign)" ($said -match 'not signing: -NoSign')
-    $builds[$way] = @{ Exe = $exe; Stub = $stub; Root = $root }
-}
-if (-not (Test-Path -LiteralPath $builds.csc.Exe) -or -not (Test-Path -LiteralPath $builds.msbuild.Exe)) { Done }
+$root = Join-Path $Scratch 'build'
+$stub = Join-Path $root 'setup-stub.exe'
+$exe = Join-Path $root 'Launcher\Thornswood.exe'
+if (Test-Path -LiteralPath $root) { Remove-Item -LiteralPath $root -Recurse -Force }
+$said = & $pwsh -NoProfile -File $blPath -Root $root -StubOut $stub -NoSign -NoPause 2>&1 | Out-String
+$rc = $LASTEXITCODE
+Yes "Build-Launcher.ps1 built both exes (exit $rc)" ($rc -eq 0 -and (Test-Path -LiteralPath $exe) -and (Test-Path -LiteralPath $stub))
+if ($rc -ne 0) { Write-Host $said }
+Yes 'it signed nothing (-NoSign)' ($said -match 'not signing: -NoSign')
+if (-not (Test-Path -LiteralPath $exe) -or -not (Test-Path -LiteralPath $stub)) { Done }
 
 # ---- reading an exe -------------------------------------------------------
 # System.Reflection.Metadata, which pwsh 7 carries. Written in C# 5 like the
@@ -408,80 +403,60 @@ namespace Thornswood498 {
 '@
 }
 
-function Diff-Lines([string]$what, [string[]]$a, [string[]]$b) {
-    $onlyA = @($a | Where-Object { $b -notcontains $_ })
-    $onlyB = @($b | Where-Object { $a -notcontains $_ })
-    Yes $what ($onlyA.Count -eq 0 -and $onlyB.Count -eq 0)
-    foreach ($l in ($onlyA | Select-Object -First 20)) { Write-Host "      csc only:     $l" }
-    foreach ($l in ($onlyB | Select-Object -First 20)) { Write-Host "      msbuild only: $l" }
-}
-function Manifest-Xml([string]$exe) {
-    $b = [Thornswood498.Describe]::Win32One($exe, 24)
-    if (-not $b) { return '' }
+function Manifest-Xml([string]$path) {
+    $b = [Thornswood498.Describe]::Win32One($path, 24)
+    if (-not $b) { return $null }
     $t = [Text.Encoding]::UTF8.GetString($b).TrimStart([char]0xFEFF)
     $x = New-Object Xml.XmlDocument
     $x.PreserveWhitespace = $false
     $x.LoadXml($t)
-    foreach ($c in @($x.SelectNodes('//comment()'))) { [void]$c.ParentNode.RemoveChild($c) }
-    $x.DocumentElement.OuterXml
+    $x
 }
+function Sha([string]$path) { (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() }
 
-foreach ($kind in @(@{ Key = 'Exe'; Name = 'the launcher' }, @{ Key = 'Stub'; Name = 'the setup program' })) {
-    $a = $builds.csc[$kind.Key]; $b = $builds.msbuild[$kind.Key]
+$updater = [IO.File]::ReadAllText((Join-Path $repo 'launcher\app\Updater.cs'))
+$ver = [regex]::Match($updater, 'Version\s*=\s*"([0-9.]+)"').Groups[1].Value
+$verFour = $ver
+while (($verFour -split '\.').Count -lt 4) { $verFour = "$verFour.0" }
+
+foreach ($kind in @(@{ Path = $exe; Name = 'the launcher'; Res = $appResources; File = 'Thornswood.exe' },
+                    @{ Path = $stub; Name = 'the setup program'; Res = $setupResources; File = 'Thornswood-Setup.exe' })) {
+    $p = $kind.Path
     Write-Host ''
-    Write-Host "---- $($kind.Name): $([IO.Path]::GetFileName($a))"
-    $sa = [Thornswood498.Describe]::Surface($a); $sb = [Thornswood498.Describe]::Surface($b)
-    Diff-Lines "$($kind.Name): the same resources, bytes included" @($sa | Where-Object { $_ -like 'resource *' }) @($sb | Where-Object { $_ -like 'resource *' })
-    # The old csc keeps a second reference to System.IO.Compression 4.0.0.0
-    # beside 4.2.0.0, because System.IO.Compression.FileSystem was built
-    # against 4.0.0.0 (its CS1701 warning); Roslyn unifies the two into 4.2.0.0.
-    # The runtime unifies framework assemblies to the one installed either
-    # way. So: every MSBuild reference is in the csc exe, and a csc-only one
-    # is only an older version of an assembly MSBuild references, same key.
-    $ra = @($sa | Where-Object { $_ -like 'asmref *' }); $rb = @($sb | Where-Object { $_ -like 'asmref *' })
-    $extra = @($ra | Where-Object { $rb -notcontains $_ })
-    $unified = @($extra | Where-Object {
-        $p = $_ -split ' '
-        @($rb | Where-Object { $q = $_ -split ' '; $q[1] -eq $p[1] -and $q[3] -eq $p[3] -and [version]$q[2] -gt [version]$p[2] }).Count -gt 0 })
-    Yes "$($kind.Name): the same assembly references, apart from what Roslyn unifies" (@($rb | Where-Object { $ra -notcontains $_ }).Count -eq 0 -and $unified.Count -eq $extra.Count)
-    foreach ($l in $extra) { Write-Host "      csc only: $($l.Substring(7))" }
-    foreach ($l in @($rb | Where-Object { $ra -notcontains $_ })) { Write-Host "      msbuild only: $($l.Substring(7))" }
-    Diff-Lines "$($kind.Name): the same types, methods, fields, properties and events" @($sa | Where-Object { $_ -match '^(type|method|field|property|event) ' }) @($sb | Where-Object { $_ -match '^(type|method|field|property|event) ' })
-    Diff-Lines "$($kind.Name): the same assembly, attributes and entry point" @($sa | Where-Object { $_ -match '^(assembly|assembly-attr|entrypoint) ' }) @($sb | Where-Object { $_ -match '^(assembly|assembly-attr|entrypoint) ' })
-    Diff-Lines "$($kind.Name): the same PE kind" @($sa | Where-Object { $_ -like 'pe *' }) @($sb | Where-Object { $_ -like 'pe *' })
-    Yes "$($kind.Name): no TargetFrameworkAttribute in either" (@($sa + $sb | Where-Object { $_ -like '*TargetFrameworkAttribute*' }).Count -eq 0)
+    Write-Host "---- $($kind.Name): $([IO.Path]::GetFileName($p))"
+    $s = [Thornswood498.Describe]::Surface($p)
+    $want = @($kind.Res.Keys | ForEach-Object { 'resource ' + $_ + ' Public ' + (Get-Item -LiteralPath (Join-Path $repo $kind.Res[$_])).Length + ' ' + (Sha (Join-Path $repo $kind.Res[$_])) })
+    $have = @($s | Where-Object { $_ -like 'resource *' })
+    $off = @($want | Where-Object { $have -notcontains $_ }) + @($have | Where-Object { $want -notcontains $_ })
+    Yes "$($kind.Name): every embedded resource is byte for byte its file in the repository" ($off.Count -eq 0)
+    foreach ($l in ($off | Select-Object -First 20)) { Write-Host "      differs: $l" }
+    $refs = @($s | Where-Object { $_ -like 'asmref *' } | ForEach-Object { ($_ -split ' ')[1] })
+    $allowed = @('mscorlib') + $frameworkRefs + @('Microsoft.Web.WebView2.Core', 'Microsoft.Web.WebView2.Wpf')
+    Yes ("$($kind.Name): references only the framework and WebView2: " + ($refs -join ', ')) (@($refs | Where-Object { $allowed -notcontains $_ }).Count -eq 0)
+    Yes "$($kind.Name): no TargetFrameworkAttribute" (@($s | Where-Object { $_ -like '*TargetFrameworkAttribute*' }).Count -eq 0)
     Yes "$($kind.Name): AnyCPU, not 32 bit preferred, GUI subsystem 4.00, high entropy ASLR off" (
-        @($sb | Where-Object { $_ -eq 'pe corflags ILOnly' -or $_ -eq 'pe subsystem WindowsGui 4.0' -or $_ -eq 'pe highentropyva False' }).Count -eq 3)
-    $ia = [Thornswood498.Describe]::Icons($a)
-    Yes "$($kind.Name): the exe carries an icon group and its images" (@($ia | Where-Object { $_ -like 'group *' }).Count -eq 1 -and @($ia | Where-Object { $_ -like 'icon *' }).Count -ge 1)
-    Diff-Lines "$($kind.Name): the same win32 icon, image for image" $ia ([Thornswood498.Describe]::Icons($b))
-    $ma = Manifest-Xml $a; $mb = Manifest-Xml $b
-    Yes "$($kind.Name): the same application manifest, as XML" ($ma -ne '' -and $ma -eq $mb)
-    $va = (Get-Item -LiteralPath $a).VersionInfo; $vb = (Get-Item -LiteralPath $b).VersionInfo
-    foreach ($f in 'FileVersion', 'ProductVersion', 'FileDescription', 'ProductName', 'CompanyName', 'LegalCopyright', 'OriginalFilename', 'InternalName') {
-        Yes ("$($kind.Name): {0} is the same, '{1}'" -f $f, $vb.$f) ($va.$f -eq $vb.$f)
-    }
-    $la = (Get-Item -LiteralPath $a).Length; $lb = (Get-Item -LiteralPath $b).Length
-    Yes ("$($kind.Name): sizes within five percent, csc {0:n0} and MSBuild {1:n0} bytes" -f $la, $lb) ([Math]::Abs($la - $lb) -le 0.05 * $la)
-    $ga = [Thornswood498.Describe]::Generated($a); $gb = [Thornswood498.Describe]::Generated($b)
-    Write-Host ("      for the record, not held: compiler made methods csc {0}, MSBuild {1}; outside members called csc {2}, MSBuild {3}" -f
-        @($ga | Where-Object { $_ -like 'generated *' }).Count, @($gb | Where-Object { $_ -like 'generated *' }).Count,
-        @($ga | Where-Object { $_ -like 'calls *' }).Count, @($gb | Where-Object { $_ -like 'calls *' }).Count)
-    foreach ($l in @($ga | Where-Object { $_ -like 'calls *' -and $gb -notcontains $_ })) { Write-Host "      calls only from csc:     $($l.Substring(6))" }
-    foreach ($l in @($gb | Where-Object { $_ -like 'calls *' -and $ga -notcontains $_ })) { Write-Host "      calls only from MSBuild: $($l.Substring(6))" }
+        @($s | Where-Object { $_ -eq 'pe corflags ILOnly' -or $_ -eq 'pe subsystem WindowsGui 4.0' -or $_ -eq 'pe highentropyva False' }).Count -eq 3)
+    Yes "$($kind.Name): it has an entry point" (@($s | Where-Object { $_ -like 'entrypoint *' }).Count -eq 1)
+    $ic = [Thornswood498.Describe]::Icons($p)
+    Yes "$($kind.Name): the exe carries an icon group and its images" (@($ic | Where-Object { $_ -like 'group *' }).Count -eq 1 -and @($ic | Where-Object { $_ -like 'icon *' }).Count -ge 1)
+    $vi = (Get-Item -LiteralPath $p).VersionInfo
+    Yes ("$($kind.Name): FileVersion is Updater.cs's, {0}" -f $vi.FileVersion) ($vi.FileVersion -eq $verFour)
+    Yes ("$($kind.Name): ProductVersion is Updater.cs's, {0}" -f $vi.ProductVersion) ($vi.ProductVersion -eq $ver)
+    Yes ("$($kind.Name): OriginalFilename is the name it ships under, {0}" -f $vi.OriginalFilename) ($vi.OriginalFilename -eq $kind.File)
+    $m = Manifest-Xml $p
+    $ident = if ($m) { $m.DocumentElement.SelectSingleNode("*[local-name()='assemblyIdentity']") } else { $null }
+    Yes ("$($kind.Name): the manifest's identity carries the same version, {0}" -f $(if ($ident) { $ident.GetAttribute('version') } else { 'none' })) ($null -ne $ident -and $ident.GetAttribute('version') -eq $verFour)
 }
 
 Write-Host ''
-$left = @(Get-ChildItem -LiteralPath (Split-Path -Parent $builds.msbuild.Exe) -File | ForEach-Object { $_.Name } | Sort-Object)
-Yes ('nothing beside the MSBuild launcher but its pdb: ' + ($left -join ', ')) ((Same $left @('Thornswood.exe', 'Thornswood.pdb')))
+$left = @(Get-ChildItem -LiteralPath (Split-Path -Parent $exe) -File | ForEach-Object { $_.Name } | Sort-Object)
+Yes ('nothing beside the launcher but its pdb: ' + ($left -join ', ')) ((Same $left @('Thornswood.exe', 'Thornswood.pdb')))
 
-foreach ($way in 'csc', 'msbuild') {
-    $said = & $pwsh -NoProfile -File (Join-Path $repo 'tests\test-app-manifest.ps1') -Exe $builds[$way].Exe -Stub $builds[$way].Stub -Scratch (Join-Path $Scratch "manifest-$way") 2>&1 | Out-String
-    Yes "tests\test-app-manifest.ps1 passes on the $way pair" ($LASTEXITCODE -eq 0)
-    if ($LASTEXITCODE -ne 0) { Write-Host $said }
-}
-$said = & (Join-Path $repo 'scripts\dev\Check-Secrets.ps1') -Binary @($builds.msbuild.Exe, $builds.msbuild.Stub) 2>&1 | Out-String
-Yes 'scripts\dev\Check-Secrets.ps1 -Binary passes on the MSBuild pair' ($LASTEXITCODE -eq 0)
+$said = & $pwsh -NoProfile -File (Join-Path $repo 'tests\test-app-manifest.ps1') -Exe $exe -Stub $stub -Scratch (Join-Path $Scratch 'manifest') 2>&1 | Out-String
+Yes 'tests\test-app-manifest.ps1 passes on the pair' ($LASTEXITCODE -eq 0)
+if ($LASTEXITCODE -ne 0) { Write-Host $said }
+$said = & (Join-Path $repo 'scripts\dev\Check-Secrets.ps1') -Binary @($exe, $stub) 2>&1 | Out-String
+Yes 'scripts\dev\Check-Secrets.ps1 -Binary passes on the pair' ($LASTEXITCODE -eq 0)
 if ($LASTEXITCODE -ne 0) { Write-Host $said }
 
 if ($own) { Remove-Item -LiteralPath $Scratch -Recurse -Force -ErrorAction SilentlyContinue }

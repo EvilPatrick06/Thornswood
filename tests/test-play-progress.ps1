@@ -38,6 +38,7 @@
 param([string]$AppDir, [string]$Xaml)
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Repo = Split-Path -Parent $Here
@@ -282,10 +283,10 @@ namespace Thornswood
 $driverPath = Join-Path $tmp 'Drive.cs'
 [IO.File]::WriteAllText($driverPath, $driver, (New-Object Text.UTF8Encoding($false)))
 $exe = Join-Path $tmp 'drive.exe'
-$cscArgs = @('/noconfig', '/nologo', '/target:exe', '/platform:anycpu', '/langversion:5', "/out:$exe",
+$cscArgs = @('/noconfig', '/nologo', '/target:exe', '/platform:anycpu', "/langversion:$LauncherLangVersion", "/out:$exe",
              '/reference:System.dll', $progressPath, (Join-Path $AppDir 'Swallow.cs'), $driverPath)
 $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-$said = & $csc @cscArgs 2>&1
+$said = & $LauncherCsc @cscArgs 2>&1
 $ErrorActionPreference = $old
 Yes 'Progress.cs compiles with the .NET Framework csc, as C# 5' ((Test-Path -LiteralPath $exe) -and $LASTEXITCODE -eq 0)
 if (-not (Test-Path -LiteralPath $exe)) {

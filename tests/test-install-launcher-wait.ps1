@@ -18,6 +18,7 @@
   it writes is under its own temp folder.
 #>
 Set-StrictMode -Version Latest
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $ErrorActionPreference = 'Stop'
 
 $Here = $PSScriptRoot
@@ -139,7 +140,7 @@ Yes 'csc.exe is available for the stand-in launcher' (Test-Path -LiteralPath $cs
 $sleepSrc = Join-Path $work 'sleep.cs'
 $sleepExe = Join-Path $work 'sleep.exe'
 Set-Content -LiteralPath $sleepSrc -Value "using System; using System.Threading;`nclass P { static void Main() { Thread.Sleep(60000); } }`n" -Encoding ASCII
-& $csc /nologo /out:$sleepExe $sleepSrc | Out-Null
+& $LauncherCsc /nologo /out:$sleepExe $sleepSrc | Out-Null
 Yes 'stand-in sleeper exe compiled' (Test-Path -LiteralPath $sleepExe)
 
 Copy-Item -LiteralPath $sleepExe -Destination $destExe -Force

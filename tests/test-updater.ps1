@@ -49,6 +49,7 @@
 param([string]$Src)
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, the repository is one folder up.
@@ -114,27 +115,15 @@ function Find-Ref([string]$name) {
     $null
 }
 
-# The names are read off the build script rather than copied, so a reference
-# the launcher gains there is one this compile gains too.
-$builder = Join-Path $Here 'scripts\release\Build-Launcher.ps1'
-$tokens = $null; $errors = $null
-$ast = [System.Management.Automation.Language.Parser]::ParseFile($builder, [ref]$tokens, [ref]$errors)
-$assigns = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] }, $true))
-function ListIn([string]$name) {
-    $a = $assigns | Where-Object { $_.Left.Extent.Text -eq ('$' + $name) } | Select-Object -First 1
-    if (-not $a) { return @() }
-    return @($a.Right.FindAll({ param($n) $n -is [System.Management.Automation.Language.StringConstantExpressionAst] }, $true) |
-             ForEach-Object { $_.Value })
-}
-$needed = @(ListIn 'needed')
-$wv2 = @(ListIn 'wv2Managed')
+$needed = @($LauncherNeeded)
+$wv2 = @($LauncherWv2Managed)
 
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('tsupdater-' + [Guid]::NewGuid().ToString('N'))
 $null = New-Item -ItemType Directory -Force -Path $tmp
 
 function Run {
     Yes 'the .NET Framework 4 compiler is here' ($null -ne $csc)
-    Yes ('Build-Launcher.ps1 names the references the launcher compiles against, {0} of them' -f ($needed.Count + $wv2.Count)) (
+    Yes ('Thornswood.csproj names the references the launcher compiles against, {0} of them' -f ($needed.Count + $wv2.Count)) (
         $needed.Count -gt 5 -and $wv2.Count -gt 0)
     if (-not $csc -or $needed.Count -eq 0) { return }
 
@@ -164,7 +153,7 @@ function Run {
     foreach ($r in $refs) { $cscArgs += "/reference:$r" }
     foreach ($f in $cs) { $cscArgs += $f.FullName }
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    $said = & $csc @cscArgs 2>&1
+    $said = & $LauncherCsc @cscArgs 2>&1
     $rc = $LASTEXITCODE
     $ErrorActionPreference = $old
     $built = ($rc -eq 0) -and (Test-Path -LiteralPath $dll)

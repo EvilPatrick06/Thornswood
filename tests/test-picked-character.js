@@ -369,7 +369,7 @@ function partD() {
                  '        public static HashSet<int> ReadGone(string text, out DateTime at)']
     .map(function (h) { return lift(rosterCs, h); });
   yes('Roster.cs has Gone, Played and ReadGone', parts.every(Boolean));
-  const csc = path.join(process.env.WINDIR || 'C:\\Windows', 'Microsoft.NET', 'Framework64', 'v4.0.30319', 'csc.exe');
+  const csc = require('./launcher-csc').csc || path.join(require('os').tmpdir(), 'no-build-tools-roslyn-csc', 'csc.exe');
   if (parts.every(Boolean) && fs.existsSync(csc)) {
     const prog =
       'using System; using System.Collections.Generic; using System.Text.RegularExpressions;\n' +
@@ -395,11 +395,11 @@ function partD() {
     fs.writeFileSync(path.join(dir, 'g.cs'), prog);
     let out = '';
     try {
-      cp.execFileSync(csc, ['/nologo', '/langversion:5', '/out:' + path.join(dir, 'g.exe'), path.join(dir, 'g.cs')], { stdio: 'pipe' });
+      cp.execFileSync(csc, ['/nologo', '/langversion:' + require('./launcher-csc').langVersion, '/out:' + path.join(dir, 'g.exe'), path.join(dir, 'g.cs')], { stdio: 'pipe' });
       out = cp.execFileSync(path.join(dir, 'g.exe'), { encoding: 'utf8' });
     } catch (e) { out = 'ERROR ' + ((e.stdout || '') + (e.stderr || '') || e.message); }
     const has = function (re) { return re.test(out); };
-    yes('the lifted C# compiles as C# 5 with the .NET Framework csc and runs', !/ERROR/.test(out));
+    yes('the lifted C# compiles with the compiler the launcher builds with, and runs', !/ERROR/.test(out));
     yes('ReadGone reads both ids and the moment the server looked (2026-09-21T14:13:20Z)',
         has(/read 2 2026-09-21T14:13:20\.0000000Z/));
     yes('a character last played (20 Sep) before the server looked is gone', has(/before True/));

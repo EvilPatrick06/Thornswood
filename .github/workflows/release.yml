@@ -39,12 +39,11 @@
 # billing stop fails it before any step runs). tests\test-release-workflow.ps1
 # says which side of the switch-over this file is on.
 #
-# HOW IT BUILDS (#498, Patrick's option C). On GitHub's runner the launcher
-# and setup program are built by MSBuild from launcher\app\Thornswood.csproj
-# and installer\setup\Setup.csproj (Build-Launcher.ps1 -With msbuild). The
-# VPS runners have no MSBuild (measured 12 Oct, #498), so the fallback keeps
-# the in-box csc build until Patrick's decision on #498 (Build Tools on the
-# VPS, or not) is done; then the fallback moves to -With msbuild too.
+# HOW IT BUILDS (#498, Patrick's option C, switched 15 Oct). On both runners
+# the launcher and setup program are built by MSBuild from
+# launcher\app\Thornswood.csproj and installer\setup\Setup.csproj
+# (Build-Launcher.ps1, which has no other way). The VPS runners have MSBuild
+# from Bootstrap-VPS.ps1 -IncludeBuildTools (Patrick, 12 Oct, option A).
 #
 # HOW IT SIGNS (#2163 section 8). azure/login with a federated (OIDC)
 # identity, no secret stored anywhere: GitHub mints a short token for this
@@ -181,16 +180,14 @@ jobs:
         run: |
           # RUNNER_TEMP, not a real install root, so Install-Launcher is never
           # run and no Desktop shortcut, icon cache or Stop-Game is touched.
-          # MSBuild on GitHub's runner (#498); the in-box csc on the VPS,
-          # which has no MSBuild until #498's VPS decision is done. -NoSign:
-          # signing is its own step below, -Required, never "skip if no config".
-          $with = 'csc'
-          if ($env:RUNNER_KIND -eq 'github-hosted') { $with = 'msbuild' }
-          Write-Host ("building with {0} on a {1} runner" -f $with, $env:RUNNER_KIND)
+          # MSBuild and the two project files on either runner (#498).
+          # -NoSign: signing is its own step below, -Required, never "skip if
+          # no config".
+          Write-Host ("building with MSBuild on a {0} runner" -f $env:RUNNER_KIND)
           $root = Join-Path $env:RUNNER_TEMP 'Thornswood'
           New-Item -ItemType Directory -Force -Path (Join-Path $root 'Launcher') | Out-Null
-          .\scripts\release\Build-Launcher.ps1 -Root $root -With $with -NoSign -NoPause
-          if ($LASTEXITCODE -ne 0) { Write-Host "::error::Build-Launcher.ps1 -With $with failed"; exit 1 }
+          .\scripts\release\Build-Launcher.ps1 -Root $root -NoSign -NoPause
+          if ($LASTEXITCODE -ne 0) { Write-Host "::error::Build-Launcher.ps1 failed"; exit 1 }
           $exe = Join-Path $root 'Launcher\Thornswood.exe'
           if (-not (Test-Path $exe)) { Write-Host '::error::no Thornswood.exe came out of the build'; exit 1 }
           # The setup program the same build compiled (issue #932).
