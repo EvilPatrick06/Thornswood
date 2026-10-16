@@ -281,9 +281,8 @@ try {
 }
 cfg.discord = Object.assign({ clientId:'', clientSecret:'', botToken:'', guildId:'', invite:'' },
                             cfg.discord || {});
-// No jarl here: an empty list seeded here is an array, so the Jarl default
-// below never applied and a config.json without access.jarl let nobody hold
-// the office (#905). dev, jarl and slots3 get their defaults below.
+// dev, company and slots3 get their defaults below. The hold offices are not
+// a list here: they are read from the roles' own names (OFFICE_ROLE, #2551).
 cfg.access  = Object.assign({ admin:[], play:[], banned:[] }, cfg.access || {});
 // The one switch (#428). Only a real true opens it: "true", 1 or a typo does not.
 cfg.open = cfg.open === true;
@@ -297,11 +296,6 @@ cfg.access.play = playRoles(cfg.access.play, cfg.open);
 // Add role names here to widen it further.
 if (!Array.isArray(cfg.access.dev)) {
   cfg.access.dev = ['Owner', 'Dev', 'Gamemaster', 'Moderator', 'Loremaster'];
-}
-// Who may hold a Jarl office in the world. Discord role eligibility only;
-// the office itself sits on one named character (#397).
-if (!Array.isArray(cfg.access.jarl)) {
-  cfg.access.jarl = ['Jarl'];
 }
 // Who the Free Skyrim Trading Company has taken on (#1393): an application in
 // Discord, the same shape as a Jarl's, and a person gives the role. The game
@@ -2457,6 +2451,63 @@ function discordGet(path) {
   });
 }
 
+/*
+  The one write the site makes to Discord (#2551): give or take a member's
+  role, for a Jarl's office change made in the game (changeOffice). PUT or
+  DELETE on the member's role, with the reason Discord's audit log shows.
+  Discord answers 204 when it is done. A 429 sets the same quiet time
+  discordGet keeps, so no request is sent into a rate limit; nothing here
+  retries, and the Jarl is told to try again.
+*/
+function discordWrite(method, path, reason) {
+  return new Promise((resolve) => {
+    if (!cfg.discord.botToken || !cfg.discord.guildId) {
+      return resolve({ ok: false, status: 0, why: 'no bot token set' });
+    }
+    if (discordQuietMs() > 0) {
+      return resolve({ ok: false, status: 429, why: 'rate limited by Discord' });
+    }
+    let settled = false;
+    let timer = null;
+    const settle = (v) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (!v.ok) console.error('[thornswood] discord ' + method + ' ' + path + ': ' + v.why);
+      resolve(v);
+    };
+    const req = https.request({
+      hostname: 'discord.com', path: '/api/v10' + path, method: method,
+      headers: { Authorization: 'Bot ' + cfg.discord.botToken, 'Content-Length': 0,
+                 'X-Audit-Log-Reason': encodeURIComponent(String(reason || '').slice(0, 400)) }
+    }, (res) => {
+      let out = '';
+      res.on('data', (d) => out += d);
+      res.on('error', () => settle({ ok: false, status: 0, why: 'Discord stopped partway through its answer' }));
+      res.on('end', () => {
+        const hdr = res.headers || {};
+        if (res.statusCode === 429) {
+          const wait = discordWaitMs(hdr, out);
+          discordQuietUntil = Math.max(discordQuietUntil, Date.now() + (wait >= 0 ? wait : 1000));
+        }
+        if (res.statusCode === 204 || res.statusCode === 200) return settle({ ok: true, status: res.statusCode });
+        let why = 'Discord answered ' + res.statusCode;
+        if (res.statusCode === 401) why = 'the bot token is wrong or has been reset';
+        else if (res.statusCode === 403) why = 'the bot may not change that role';
+        else if (res.statusCode === 404) why = 'Discord does not know that member or role';
+        else if (res.statusCode === 429) why = 'rate limited by Discord';
+        settle({ ok: false, status: res.statusCode, why });
+      });
+    });
+    timer = setTimeout(() => {
+      settle({ ok: false, status: 0, why: 'Discord did not answer inside ten seconds' });
+      try { req.destroy(); } catch (e) { }
+    }, DISCORD_ASK_MS);
+    req.on('error', (e) => settle({ ok: false, status: 0, why: 'could not reach Discord: ' + e.message }));
+    req.end();
+  });
+}
+
 /* Role ids mean nothing on their own, so they are turned back into names once
    every five minutes and matched by name. */
 let roleCache = { at: 0, byId: {} };
@@ -3885,7 +3936,6 @@ async function standing(discordId) {
   if (has(cfg.access.admin)) out.admin = true;
   out.play = out.admin || has(cfg.access.play);
   out.dev = out.admin || has(cfg.access.dev);
-  out.jarl = out.admin || has(cfg.access.jarl);
   out.company = has(cfg.access.company);
   out.staffRole = holdsStaffRole(out.roles);
   out.businessOwner = holdsNamedRole(out.roles, 'Business Owner');
@@ -3910,6 +3960,251 @@ function holdsStaffRole(roles) {
 function holdsNamedRole(roles, name) {
   const mine = Array.isArray(roles) ? roles : [];
   return mine.indexOf(name) >= 0;
+}
+
+/*
+  THE HOLD OFFICES, FROM THE ROLES (#2551). Patrick, 15 Oct: a Jarl's hold
+  comes from their "Jarl of <Hold>" Discord role, and each hold has a Court,
+  a Steward and Guards, which are Discord roles too ("<Hold> Court",
+  "Steward of <Hold>", "Guard of <Hold>", made by bot\Build-Discord.py and
+  never hoisted). The role is the one truth: the game keeps no list of who
+  holds what, it reads this, through /api/allowed.
+
+  The key is the hold as the game names it (its ledger holds); the town is
+  how the role names it. Raven Rock is here although Build-Discord.py makes
+  no roles for it, so roles made for it by hand are read the same way.
+
+  OFFICE_ROLE says, for one office and one hold, the role's exact name. Only
+  the four offices are read, by exact name: a role somebody calls "Jarl of
+  Whiterun's dog" is nobody's office.
+*/
+const OFFICE_HOLDS = {
+  whiterun: 'Whiterun', solitude: 'Solitude', riften: 'Riften', markarth: 'Markarth',
+  windhelm: 'Windhelm', falkreath: 'Falkreath', morthal: 'Morthal', dawnstar: 'Dawnstar',
+  winterhold: 'Winterhold', ravenrock: 'Raven Rock'
+};
+const OFFICE_KINDS = ['jarl', 'court', 'steward', 'guard'];
+function OFFICE_ROLE(office, hold) {
+  const town = Object.prototype.hasOwnProperty.call(OFFICE_HOLDS, hold) ? OFFICE_HOLDS[hold] : '';
+  if (!town) return '';
+  if (office === 'jarl') return 'Jarl of ' + town;
+  if (office === 'court') return town + ' Court';
+  if (office === 'steward') return 'Steward of ' + town;
+  if (office === 'guard') return 'Guard of ' + town;
+  return '';
+}
+/* { jarl: [holds], court: [...], steward: [...], guard: [...] } for these role names. */
+function officesOf(roles) {
+  const mine = Array.isArray(roles) ? roles : [];
+  const out = { jarl: [], court: [], steward: [], guard: [] };
+  for (const office of OFFICE_KINDS) {
+    for (const hold of Object.keys(OFFICE_HOLDS)) {
+      if (mine.indexOf(OFFICE_ROLE(office, hold)) >= 0) out[office].push(hold);
+    }
+  }
+  return out;
+}
+/* Whether these offices hold anything at all. */
+function holdsAnOffice(o) {
+  return !!o && OFFICE_KINDS.some((k) => Array.isArray(o[k]) && o[k].length > 0);
+}
+
+/*
+  Who holds each hold's Jarl role, over the whole Discord: { hold: Map(id ->
+  name) }, or null when the member list cannot be read (guildMembers needs
+  the Server Members intent, and says null without it). Over the whole
+  Discord because a second holder who has never played still holds the role.
+*/
+async function jarlRoleHolders() {
+  const all = await guildMembers();
+  if (!all) return null;
+  const names = await roleNames();
+  const out = {};
+  for (const id of Object.keys(all)) {
+    const m = all[id] || {};
+    const o = officesOf((m.roles || []).map((r) => names[r]).filter(Boolean));
+    for (const h of o.jarl) {
+      if (!out[h]) out[h] = new Map();
+      out[h].set(String(id), m.nick || (m.user && (m.user.global_name || m.user.username)) || '');
+    }
+  }
+  return out;
+}
+
+/*
+  ONE JARL A HOLD, BY THE ROLE (#2551). Patrick, 15 Oct: "If two accounts hold
+  the same hold's Jarl role, neither acts as Jarl until staff fix it, and
+  staff are told which accounts clash."
+
+  Counted over the whole Discord when its member list can be read, and over
+  the accounts the door just asked about (answers, from standingsForDoor)
+  when it cannot. Each clash is { hold, people: [{ id, name }], profiles }:
+  profiles are every profile of those accounts that linked.json knows, so the
+  game can tell each of them why. The hold comes off those profiles' offices
+  in out (a copy: the offices in out are the cached standings' own), so
+  neither acts as its Jarl, in the game or anywhere that reads this.
+
+  Staff are told in the staff channel, through moderation.log, which the bot
+  says (bot.py, moderation_text): once when a clash starts and once when it
+  ends, not at every refresh. What was last said is kept in memory, so a
+  restart of the site says the clashes that stand once more.
+*/
+let clashSaid = {};       // hold -> the accounts last said to staff, joined
+let clashLast = [];       // the clashes last found, for an office change made when the list cannot be read
+async function jarlClashes(out, answers, linked) {
+  let holders = await jarlRoleHolders();
+  if (!holders) {
+    holders = {};
+    for (const [id, st] of (answers || new Map())) {
+      if (!st || st.lookupFailed || st.banned) continue;
+      for (const h of officesOf(st.roles).jarl) {
+        if (!holders[h]) holders[h] = new Map();
+        holders[h].set(String(id), st.name || '');
+      }
+    }
+  }
+  const clashes = [];
+  for (const hold of Object.keys(OFFICE_HOLDS)) {
+    const by = holders[hold];
+    if (!by || by.size < 2) continue;
+    const ids = Array.from(by.keys()).sort();
+    const profiles = [];
+    for (const id of ids) {
+      for (const n of (Array.isArray((linked[id] || {}).profiles) ? linked[id].profiles : [])) {
+        const p = Number(n);
+        if (p > 0 && profiles.indexOf(p) < 0) profiles.push(p);
+      }
+    }
+    clashes.push({ hold, people: ids.map((id) => ({ id, name: by.get(id) })), profiles });
+  }
+  if (out && out.offices) {
+    for (const c of clashes) {
+      for (const p of c.profiles) {
+        const o = out.offices[String(p)];
+        if (!o || o.jarl.indexOf(c.hold) < 0) continue;
+        const left = Object.assign({}, o, { jarl: o.jarl.filter((h) => h !== c.hold) });
+        if (holdsAnOffice(left)) out.offices[String(p)] = left;
+        else delete out.offices[String(p)];
+      }
+    }
+  }
+  clashLast = clashes;
+  const now = {};
+  for (const c of clashes) {
+    now[c.hold] = c.people.map((x) => x.id).join(',');
+    if (clashSaid[c.hold] !== now[c.hold]) {
+      modLog({ did: 'jarlclash', hold: c.hold, role: OFFICE_ROLE('jarl', c.hold), people: c.people });
+    }
+  }
+  for (const hold of Object.keys(clashSaid)) {
+    if (!Object.prototype.hasOwnProperty.call(now, hold)) {
+      modLog({ did: 'jarlclear', hold, role: OFFICE_ROLE('jarl', hold) });
+    }
+  }
+  clashSaid = now;
+  return clashes;
+}
+
+/*
+  out.offices for /api/allowed: each profile of every account the route let
+  in (out.people) gets its account's offices, read from the roles the door's
+  answer holds for it, and the clashes come off (jarlClashes). Answers the
+  clashes, for out.jarlClash.
+*/
+async function officesForDoor(out, answers, linked) {
+  for (const p of (out.people || [])) {
+    const st = answers.get(String(p.id)) || answers.get(p.id);
+    if (!st || st.lookupFailed || st.banned) continue;
+    const o = officesOf(st.roles);
+    if (!holdsAnOffice(o)) continue;
+    for (const n of p.profiles) out.offices[String(n)] = o;
+  }
+  return jarlClashes(out, answers, linked);
+}
+
+/* The Discord account a profile is linked to, or ''. */
+function accountOfProfile(linked, pid) {
+  const n = Number(pid) || 0;
+  if (n <= 0) return '';
+  for (const d of Object.keys(linked || {})) {
+    const ps = Array.isArray((linked[d] || {}).profiles) ? linked[d].profiles : [];
+    if (ps.some((x) => Number(x) === n)) return String(d);
+  }
+  return '';
+}
+
+/*
+  A JARL GIVES OR TAKES AN OFFICE FROM THE GAME (#2551). Patrick, 15 Oct:
+  "They still do it in game tho", and the game asks the site, and the bot
+  sets the Discord role, so the role stays the one truth.
+
+  The site asks Discord with the bot's own token (discord.botToken is the
+  same token as the bot's, Developer-Guide.md, the secrets table), so the
+  role is set by the bot's account, with the bot's Manage Roles, and Discord's
+  audit log names the bot and the reason. Nothing in the game or here keeps a
+  copy: the next /api/allowed reads the role back, and the game asks for that
+  at once after a change.
+
+  o: { by, byName, who, whoName, office, hold, give } from the game server,
+  by and who profiles. Answers { ok, said }: said is the sentence for the
+  Jarl, already in plain words. Every rule is checked here again, whatever
+  the game checked: the asker holds that hold's Jarl role, alone, and the
+  office is one of the three a Jarl gives.
+*/
+async function changeOffice(o, server) {
+  const office = String((o && o.office) || '');
+  const hold = String((o && o.hold) || '');
+  const give = !!(o && o.give === true);
+  const role = (office === 'court' || office === 'steward' || office === 'guard') ? OFFICE_ROLE(office, hold) : '';
+  if (!role) return { ok: false, said: 'A Jarl gives the Court, a Steward and Guards of a hold, and nothing else.' };
+  const town = OFFICE_HOLDS[hold];
+  const byName = String((o && o.byName) || '').slice(0, 60) || 'somebody';
+  const whoName = String((o && o.whoName) || '').slice(0, 60) || 'them';
+  const linked = jsonFile(LINKED, {});
+  const byAcct = accountOfProfile(linked, o && o.by);
+  const whoAcct = accountOfProfile(linked, o && o.who);
+  if (!byAcct) return { ok: false, said: 'Your character is not linked to a Discord account, so nobody can tell whether you are Jarl.' };
+  if (!whoAcct) return { ok: false, said: whoName + ' is not linked to a Discord account, so the role has nobody to go to.' };
+  // Asked fresh: a Jarl role taken a minute ago is taken now.
+  standCache.delete(byAcct);
+  const st = await standingCached(byAcct);
+  if (st.lookupFailed) return { ok: false, said: 'Discord could not be asked just now. Try again in a minute.' };
+  if (st.banned || officesOf(st.roles).jarl.indexOf(hold) < 0) {
+    return { ok: false, said: 'Only the Jarl of ' + town + ' gives its offices.' };
+  }
+  const holders = await jarlRoleHolders();
+  const twice = holders ? (holders[hold] ? holders[hold].size > 1 : false)
+    : clashLast.some((c) => c.hold === hold);
+  if (twice) {
+    return { ok: false, said: 'Two Discord accounts hold the Jarl of ' + town + ' role, so neither acts as Jarl until staff fix it. Staff have been told.' };
+  }
+  const names = await roleNames();
+  const roleId = Object.keys(names).filter((id) => names[id] === role)[0] || '';
+  if (!roleId) return { ok: false, said: 'There is no ' + role + ' role in the Discord yet. Staff make it with the Discord builder.' };
+  const m = await memberOf(whoAcct);
+  if (!m.ok) {
+    return { ok: false, said: m.status === 404 ? whoName + ' is not in the Discord, so the role has nobody to go to.'
+      : 'Discord could not be asked just now. Try again in a minute.' };
+  }
+  const has = (m.body.roles || []).map(String).indexOf(String(roleId)) >= 0;
+  if (give && has) return { ok: false, said: whoName + ' already holds ' + role + '.' };
+  if (!give && !has) return { ok: false, said: whoName + ' does not hold ' + role + '.' };
+  const reason = (give ? 'Given' : 'Taken') + ' by ' + byName + ', Jarl of ' + town + ', in the game';
+  const w = await discordWrite(give ? 'PUT' : 'DELETE',
+    '/guilds/' + cfg.discord.guildId + '/members/' + whoAcct + '/roles/' + roleId, reason);
+  if (!w.ok) {
+    return { ok: false, said: w.status === 403
+      ? 'The bot may not change ' + role + ': its own role has to sit above it in the Discord. Staff fix that.'
+      : 'Discord did not take the change (' + w.why + '). Try again in a minute.' };
+  }
+  // The next read of either account, and of the member list, is Discord's new answer.
+  standCache.delete(whoAcct);
+  standGood.delete(whoAcct);
+  membersCache = { at: 0, byId: null };
+  modLog({ did: 'office', from: server || 'main', give, office, hold, role,
+           by: Number(o.by) || 0, byName, byAccount: byAcct, who: Number(o.who) || 0, whoName, whoAccount: whoAcct });
+  return { ok: true, said: give ? whoName + ' holds ' + role + ' now. The role is set in Discord.'
+                                : whoName + ' no longer holds ' + role + '. The role is taken in Discord.' };
 }
 
 /*
@@ -6254,11 +6549,10 @@ async function handle(req, res) {
                   'September. The address form goes once no door says this.');
     }
     const linked = jsonFile(LINKED, {});
-    const out = { profiles: [], devProfiles: [], adminProfiles: [], jarlProfiles: [], staffRoleProfiles: [], businessOwnerProfiles: [], factionOwnerProfiles: [], devRoleProfiles: [], companyProfiles: [], people: [], lookupFailed: false, lookupFailedWhy: '', failedProfiles: [], at: Date.now() };
+    const out = { profiles: [], devProfiles: [], adminProfiles: [], offices: {}, jarlClash: [], staffRoleProfiles: [], businessOwnerProfiles: [], factionOwnerProfiles: [], devRoleProfiles: [], companyProfiles: [], people: [], lookupFailed: false, lookupFailedWhy: '', failedProfiles: [], at: Date.now() };
     const seen = new Set();
     const seenDev = new Set();
     const seenAdmin = new Set();
-    const seenJarl = new Set();
     const seenStaffRole = new Set();
     const seenBusiness = new Set();
     const seenFaction = new Set();
@@ -6307,9 +6601,6 @@ async function handle(req, res) {
       if (st.admin) {
         for (const n of profiles) if (!seenAdmin.has(n)) { seenAdmin.add(n); out.adminProfiles.push(n); }
       }
-      if (st.jarl) {
-        for (const n of profiles) if (!seenJarl.has(n)) { seenJarl.add(n); out.jarlProfiles.push(n); }
-      }
       // A Discord staff role itself, not the hand written admins list, for
       // the staff seats over the most the world holds (#481).
       if (st.staffRole) {
@@ -6330,6 +6621,11 @@ async function handle(req, res) {
       }
       out.people.push({ id: String(d), name: st.name || row.name || '', profiles });
     }
+    /* THE HOLD OFFICES (#2551), by profile, for every account let in above
+       (out.people), read from its roles: the game reads every office through
+       this and nothing else. And one Jarl a hold: a hold's Jarl role two
+       accounts hold comes off both, and staff are told (officesForDoor). */
+    out.jarlClash = await officesForDoor(out, answers, linked);
     /* STAFF BANS (#412), which are this site's own file and need no Discord.
        Every profile under an active ban is left out of every list, including
        a profile no account holds and one Discord could not be asked about,
@@ -6340,10 +6636,11 @@ async function handle(req, res) {
     // emptied and the door is told why.
     if (out.bans.broken) {
       out.bansBroken = true;
-      for (const k of ['profiles', 'devProfiles', 'adminProfiles', 'jarlProfiles', 'staffRoleProfiles', 'failedProfiles']) {
+      for (const k of ['profiles', 'devProfiles', 'adminProfiles', 'staffRoleProfiles', 'failedProfiles']) {
         if (Array.isArray(out[k])) out[k] = [];
       }
       if (Array.isArray(out.people)) out.people = [];
+      out.offices = {};
     }
     /* And every character staff have killed for good (#1010), left out the
        same way and sent as pk, so the game server ends it quietly if it is
@@ -6352,9 +6649,10 @@ async function handle(req, res) {
     const barred = new Set(out.pk);
     for (const b of out.bans) for (const n of b.profiles) barred.add(Number(n));
     if (barred.size) {
-      for (const k of ['profiles', 'devProfiles', 'adminProfiles', 'jarlProfiles', 'staffRoleProfiles', 'failedProfiles']) {
+      for (const k of ['profiles', 'devProfiles', 'adminProfiles', 'staffRoleProfiles', 'failedProfiles']) {
         out[k] = out[k].filter((n) => !barred.has(Number(n)));
       }
+      for (const n of Object.keys(out.offices)) if (barred.has(Number(n))) delete out.offices[n];
       for (const k of ['businessOwnerProfiles', 'factionOwnerProfiles', 'devRoleProfiles', 'companyProfiles']) {
         out[k] = out[k].filter((n) => !barred.has(Number(n)));
       }
@@ -6362,6 +6660,28 @@ async function handle(req, res) {
         .filter((p) => p.profiles.length);
     }
     return sendJson(res, 200, out);
+  }
+
+  /*
+    A Jarl's office change, from the game (#2551): the Office page of K, sent
+    by the game server with the door's key, the same key /api/allowed takes,
+    in the same header. Only a game server can ask. changeOffice checks every
+    rule again and sets the role in Discord; the game reads it back through
+    /api/allowed. The dev server's door names the site with /dev, so its
+    question lands on /dev/api/office: the roles are the same Discord's, so a
+    change made on dev is a real role.
+  */
+  if ((route === '/api/office' || route === '/dev/api/office') && req.method === 'POST') {
+    if (!cfg.botKey) return sendJson(res, 404, { error: 'not set up' });
+    const given = req.headers['x-thornswood-key'];
+    if (given === undefined || !sameSecret(String(given), String(cfg.botKey))) {
+      return sendJson(res, 401, { error: 'no' });
+    }
+    let o = {};
+    try { o = JSON.parse(await body(req, 4096)) || {}; } catch (e) {
+      return sendJson(res, 400, { ok: false, said: 'The site could not read that request.' });
+    }
+    return sendJson(res, 200, await changeOffice(o, route === '/dev/api/office' ? 'dev' : 'main'));
   }
 
   /*

@@ -88,6 +88,10 @@ BUTTONS = [
     ('thornswood:ticket', ANYBODY),    # the ticket panel: one open, a cooldown
     ('thornswood:hold:', ANYBODY),     # pick a hold: Member or staff, pick_hold
     ('thornswood:ping:', ANYBODY),     # ping roles: Member or staff, toggle_ping
+    # A Jarl's office buttons (#2551): only the Jarl of a hold, for their own
+    # hold, and nobody while two accounts hold that Jarl role: office_press
+    # and office_change. bot/test-2551-hold-offices.py presses them.
+    ('thornswood:office:', ANYBODY),
 ]
 
 # Staff, as the Developer Guide lists them, and the three who post a test
@@ -303,9 +307,9 @@ yes('and every command written down here is still registered%s'
 
 hook = inspect.getsource(bot.Thornswood.setup_hook)
 VIEWS = re.findall(r'add_view\((\w+)\(\)\)', hook)
-yes('setup_hook registers the ticket panel, the ticket tools, the hold panel '
-    'and no other panel (the Live smoke rows are gone)',
-    sorted(VIEWS) == ['HoldPanel', 'TicketPanel', 'TicketTools']
+yes('setup_hook registers the ticket panel, the ticket tools, the hold panel, '
+    'the office panel (#2551) and no other panel (the Live smoke rows are gone)',
+    sorted(VIEWS) == ['HoldPanel', 'OfficePanel', 'TicketPanel', 'TicketTools']
     and 'live_smoke' not in hook
     and hook.count('add_view(') == len(VIEWS))
 

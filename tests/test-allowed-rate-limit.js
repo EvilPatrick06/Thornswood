@@ -198,7 +198,7 @@ async function ask(linked, api, budget) {
   const run = new Function(
     'route', 'devDoor', 'req', 'res', 'cfg', 'url', 'sameSecret', 'sendJson',
     'jsonFile', 'LINKED', 'standingCached', 'keyInAddress', 'standingsForDoor', 'activeBans', 'pkProfiles',
-    'Date', 'setTimeout', 'clearTimeout',
+    'Date', 'setTimeout', 'clearTimeout', 'officesForDoor',
     'return (async function () {\n' + route + '\n})();');
   const t0 = clock.now;
   await onClock(run('/api/allowed', false,
@@ -211,7 +211,9 @@ async function ask(linked, api, budget) {
     api.standingCached, new Set(), standingsForDoor, function () { return []; },
     // Nobody killed for good here (#1010); test-bans-pk.js runs that.
     function () { return []; },
-    ClockDate, clockSetTimeout, clockClearTimeout));
+    ClockDate, clockSetTimeout, clockClearTimeout,
+    // No hold offices here (#2551); test-2551-hold-offices.js runs them.
+    async function () { return []; }));
   if (sent) sent.ms = clock.now - t0;
   return sent;
 }
@@ -290,7 +292,7 @@ function five() {
   api = discord(function (p) { return { ms: 100, status: 200, body: { user: { id: p } } }; });
   got = await ask(hundred, api);
   b = got ? got.body : {};
-  const doorAt = game.indexOf('  function refresh() {', game.indexOf('  var doorSaid = false;'));
+  const doorAt = game.indexOf('  function refresh(done) {', game.indexOf('  var doorSaid = false;'));
   const doorEnd = doorAt < 0 ? -1 : toClose(game, doorAt);
   const doorTimeout = Number(((doorAt >= 0 ? game.slice(doorAt, doorEnd) : '').match(/req\.setTimeout\((\d+)/) || [])[1] || 0);
   yes('the door gives up after ten seconds (gamemode.js refresh)', doorTimeout === 10000);
