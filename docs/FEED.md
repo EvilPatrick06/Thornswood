@@ -126,8 +126,12 @@ process write to both folders (#923), so only a publisher over ssh writes them.
   sha256s, and keeps the last twenty of each in `backup\`. `Send-FeedStore`
   sends a file back to `<name>.part` and, in one step on the VPS, checks that
   every file this folder read still has the sha256 it had, copies the one it
-  replaces into `history\`, and renames the `.part` over it (`File.Replace`, so
-  the site never answers 404 in between). If anything moved up there it
+  replaces into `history\`, and renames the `.part` over it in one call
+  (MoveFileEx with MOVEFILE_REPLACE_EXISTING, `Move-FeedStoreInto`), so the
+  site never answers 404 in between and a send stopped there leaves the old
+  file or the new one whole. Until #2591 (16 Oct) it was `File.Replace`, which
+  moves the old file aside first and left it missing when stopped between
+  the two. If anything moved up there it
   replaces nothing and throws: that is two publishers at once, the push git
   used to refuse.
 - **Who uses it.** Ship and Publish-Update receive both files at the start
