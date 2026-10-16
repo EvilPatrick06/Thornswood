@@ -54,6 +54,7 @@
 param([string]$AppPath, [string]$Scratch)
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, the repository is one folder up.
@@ -1024,7 +1025,7 @@ try {
     $cscArgs += $stubFile
     $cscArgs += $driverFile
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    $compiled = & $csc @cscArgs 2>&1
+    $compiled = & $LauncherCsc @cscArgs 2>&1
     $ErrorActionPreference = $old
     $built = ($LASTEXITCODE -eq 0) -and (Test-Path -LiteralPath $exe)
     Yes 'the real Steam.cs, OwnGame.cs and Verify.cs compile with the driver under the C# 5 compiler' $built

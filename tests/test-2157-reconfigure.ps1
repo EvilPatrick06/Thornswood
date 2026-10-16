@@ -36,7 +36,11 @@ try {
     # ------------------------------------------------------- A. real cmake --
     $cmake = (Get-Command cmake -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
     if (-not $cmake) {
-        $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+        # The folder from Windows itself, not the environment: the build runners
+        # thornswood-vps-2 and -3 run with no ProgramFiles(x86) variable, and
+        # Join-Path of nothing stopped this harness before it tested anything
+        # (main's build at de1a598d, 15 Oct).
+        $vswhere = Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Microsoft Visual Studio\Installer\vswhere.exe'
         if (Test-Path -LiteralPath $vswhere) {
             $vs = & $vswhere -latest -products * -property installationPath | Select-Object -First 1
             $c = Join-Path $vs 'Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe'

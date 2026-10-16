@@ -115,21 +115,23 @@ Yes 'and the else-branch that enables it when the control is missing is intact' 
 # moved onto out\setup-stub.exe, which packaging copies without recompiling.
 # A file icon (/win32icon) keeps the download from arriving as a blank mark.
 # FileVersion/ProductVersion come from a generated ThornswoodSetupVersion.cs
-# stamped from Updater.cs ($ver / $verFour), not from hardcoded Bootstrap attrs.
+# stamped from Updater.cs, not from hardcoded Bootstrap attrs.
+# Since #498's switch these live in installer\setup\Setup.csproj, which
+# Build-Launcher.ps1 builds with MSBuild, rather than in a csc line.
 $blPath = Join-Path $repoRoot 'scripts\release\Build-Launcher.ps1'
-if (Test-Path -LiteralPath $blPath) {
+$spPath = Join-Path $repoRoot 'installer\setup\Setup.csproj'
+if ((Test-Path -LiteralPath $blPath) -and (Test-Path -LiteralPath $spPath)) {
     $bl = [IO.File]::ReadAllText($blPath)
-    Yes 'the setup stub is compiled under its shipped name, Thornswood-Setup.exe' (
-        [regex]::IsMatch($bl, '(?m)\$stubNew\s*=\s*Join-Path[^\r\n]*Thornswood-Setup\.exe'))
-    Yes 'and that is the /out the compiler writes' ($bl.Contains('/out:$stubNew'))
-    Yes 'then moved onto the setup-stub.exe packaging copies from' ($bl.Contains('Move-Item $stubNew $stub'))
-    Yes 'the stub exe gets a file icon, so it is not a blank mark in the browser' ($bl.Contains('/win32icon:'))
-    Yes 'Build-Launcher generates ThornswoodSetupVersion.cs for the stub' ($bl.Contains('ThornswoodSetupVersion.cs'))
-    Yes 'that file stamps AssemblyFileVersion from $verFour' ($bl.Contains('AssemblyFileVersion("$verFour")'))
-    Yes 'and AssemblyInformationalVersion from $ver' ($bl.Contains('AssemblyInformationalVersion("$ver")'))
-    Yes 'and passes the version .cs to csc via $stubArgs' ($bl.Contains('$stubArgs += $stubVerCs'))
+    $sp = [IO.File]::ReadAllText($spPath)
+    Yes 'the setup stub is built under its shipped name, Thornswood-Setup.exe' ($sp.Contains('<AssemblyName>Thornswood-Setup</AssemblyName>'))
+    Yes 'and Build-Launcher picks up that exe from the build' ($bl.Contains("`$stubNew = Join-Path `$stubBuild 'Thornswood-Setup.exe'"))
+    Yes 'then moves it onto the setup-stub.exe packaging copies from' ($bl.Contains('Move-Item -LiteralPath $stubNew -Destination $stub'))
+    Yes 'the stub exe gets a file icon, so it is not a blank mark in the browser' ($sp -match '<ApplicationIcon>[^<]*app\.ico</ApplicationIcon>')
+    Yes 'Setup.csproj generates ThornswoodSetupVersion.cs for the stub' ($sp.Contains('ThornswoodSetupVersion.cs') -and $sp.Contains('<Compile Include="$(ThornswoodSetupVersionFile)" />'))
+    Yes 'that file stamps AssemblyFileVersion from the four part version' ($sp.Contains('AssemblyFileVersion(&quot;$(ThornswoodVersionFour)&quot;)'))
+    Yes 'and AssemblyInformationalVersion from Updater.cs''s version' ($sp.Contains('AssemblyInformationalVersion(&quot;$(ThornswoodVersion)&quot;)'))
 } else {
-    Yes 'Build-Launcher.ps1 is where this expects it' $false
+    Yes 'Build-Launcher.ps1 and Setup.csproj are where this expects them' $false
 }
 
 Write-Host ''

@@ -29,6 +29,7 @@
 param([string]$DoorPath, [string]$DiscordPath)
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, the repository is one folder up.
@@ -199,7 +200,7 @@ try {
     foreach ($r in $refs) { $cscArgs += "/reference:$r" }
     $cscArgs += (Resolve-Path -LiteralPath $DoorPath).Path
     $cscArgs += $driverFile
-    $compiled = & $csc @cscArgs
+    $compiled = & $LauncherCsc @cscArgs
     $built = ($LASTEXITCODE -eq 0) -and (Test-Path -LiteralPath $exe)
     Yes 'Door.cs compiles with the .NET Framework 4 csc, which is C# 5' $built
     if (-not $built) {

@@ -12,7 +12,7 @@
     - an assemblyIdentity (Thornswood.Launcher.Thornswood and
       Thornswood.Installer.Setup) whose version is the launcher's own, the
       Version in launcher\app\Updater.cs in four parts. The manifest files in
-      the repository hold a placeholder and Build-Launcher.ps1 stamps a copy,
+      the repository hold a placeholder and the project files stamp a copy,
       so the identity cannot drift the way a kept 1.1.101.0 did.
   Until then the launcher's identity sat at 1.1.101.0 while the launcher was
   1.1.102, and the setup program carried csc's default manifest, named
@@ -49,6 +49,7 @@ param(
 )
 
 Set-StrictMode -Version Latest
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
@@ -113,16 +114,21 @@ Yes 'installer\setup\Setup.manifest is there' (Test-Path -LiteralPath $tplSetup)
 if (Test-Path -LiteralPath $tplApp) { Check-Manifest 'the launcher manifest file' ([IO.File]::ReadAllText($tplApp)) 'Thornswood.Launcher.Thornswood' '0.0.0.0' }
 if (Test-Path -LiteralPath $tplSetup) { Check-Manifest 'the setup manifest file' ([IO.File]::ReadAllText($tplSetup)) 'Thornswood.Installer.Setup' '0.0.0.0' }
 
+# Since #498's switch the project files stamp and embed the manifests, and
+# Build-Launcher.ps1 signs only after MSBuild has built the exe.
+$appProjText = [IO.File]::ReadAllText((Join-Path $repo 'launcher\app\Thornswood.csproj'))
+$setupProjText = [IO.File]::ReadAllText((Join-Path $repo 'installer\setup\Setup.csproj'))
+$poke = 'Query="/asm:assembly/asm:assemblyIdentity/@version" Value="$(ThornswoodVersionFour)"'
+Yes 'the launcher project stamps Thornswood.manifest with the four part version' ($appProjText.Contains('SourceFiles="$(MSBuildThisFileDirectory)Thornswood.manifest"') -and $appProjText.Contains($poke))
+Yes 'and embeds that copy as the application manifest' ($appProjText.Contains('<ApplicationManifest>$(BaseIntermediateOutputPath)Thornswood.stamped.manifest</ApplicationManifest>'))
+Yes 'the setup project stamps Setup.manifest with the four part version' ($setupProjText.Contains('SourceFiles="$(MSBuildThisFileDirectory)Setup.manifest"') -and $setupProjText.Contains($poke))
+Yes 'and embeds it in the setup program' ($setupProjText.Contains('<ApplicationManifest>$(BaseIntermediateOutputPath)ThornswoodSetup.stamped.manifest</ApplicationManifest>'))
+Yes 'the setup program is compiled with WindowFit.cs' ($setupProjText.Contains('<Compile Include="..\..\launcher\app\WindowFit.cs">'))
+Yes 'no Win32Resource, which would fight the application manifest' ($appProjText -notmatch '<Win32Resource>' -and $setupProjText -notmatch '<Win32Resource>')
 $bl = [IO.File]::ReadAllText((Join-Path $repo 'scripts\release\Build-Launcher.ps1'))
-Yes 'Build-Launcher stamps the launcher manifest with $verFour' ($bl -match "New-StampedManifest \(Join-Path \`$Src 'Thornswood\.manifest'\) \`$verFour")
-Yes 'and embeds that copy with /win32manifest' ($bl.Contains('"/win32manifest:$((Resolve-Path $manifest).Path)"'))
-Yes 'Build-Launcher stamps the setup manifest with $verFour' ($bl -match "New-StampedManifest \(Join-Path \`$Here '\.\.\\\.\.\\installer\\setup\\Setup\.manifest'\) \`$verFour")
-Yes 'and embeds it in the setup program' ($bl.Contains('$stubArgs += "/win32manifest:$stubManifest"'))
-Yes 'the setup program is compiled with WindowFit.cs' ($bl.Contains("`$stubArgs += (Resolve-Path (Join-Path `$Src 'WindowFit.cs')).Path"))
-Yes 'no /win32res passed to csc, which would fight /win32manifest' ($bl -notmatch '"/win32res:')
-$stampAt = $bl.IndexOf('New-StampedManifest (Join-Path $Src')
+$buildAt = $bl.IndexOf('& $found.MSBuild (Resolve-Path -LiteralPath $proj).Path')
 $signAt = $bl.IndexOf('& $signer -Path $exe')
-Yes 'the manifest is embedded before the launcher is signed' ($stampAt -gt 0 -and $signAt -gt $stampAt)
+Yes 'the manifest is embedded by the build before the launcher is signed' ($buildAt -gt 0 -and $signAt -gt $buildAt)
 
 # The switch that lets Framework WPF rescale on a change of monitor scale is
 # read once and kept, so it has to be the first thing each Main does.
@@ -277,7 +283,7 @@ static class FitDriver
 '@)
 $fitExe = Join-Path $Scratch 'FitDriver.exe'
 if ($csc -and $wpf) {
-    $out = & $csc /nologo /target:exe "/out:$fitExe" `
+    $out = & $LauncherCsc /nologo /target:exe "/out:$fitExe" `
         "/reference:$wpf\PresentationFramework.dll" "/reference:$wpf\PresentationCore.dll" `
         "/reference:$wpf\WindowsBase.dll" "/reference:$(Split-Path $wpf)\System.Xaml.dll" `
         (Join-Path $repo 'launcher\app\WindowFit.cs') $driver 2>&1

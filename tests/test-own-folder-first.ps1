@@ -77,6 +77,7 @@
 param([string]$Repo, [string]$Scratch)
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 if (-not $Repo) { $Repo = Split-Path -Parent $Here }
@@ -281,19 +282,10 @@ function Find-Ref([string]$name) {
     }
     $null
 }
-$builder = Join-Path $Repo 'scripts\release\Build-Launcher.ps1'
-$tokens = $null; $errors = $null
-$ast = [System.Management.Automation.Language.Parser]::ParseFile($builder, [ref]$tokens, [ref]$errors)
-$assigns = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] }, $true))
-function ListIn([string]$name) {
-    $a = $assigns | Where-Object { $_.Left.Extent.Text -eq ('$' + $name) } | Select-Object -First 1
-    if (-not $a) { return @() }
-    return @($a.Right.FindAll({ param($n) $n -is [System.Management.Automation.Language.StringConstantExpressionAst] }, $true) | ForEach-Object { $_.Value })
-}
 $refs = @(); $missing = @()
-foreach ($n in @(ListIn 'needed')) { $p = Find-Ref $n; if ($p) { $refs += $p } else { $missing += $n } }
-foreach ($n in @(ListIn 'wv2Managed')) { $p = Join-Path $Repo ('launcher\lib\webview2\' + $n); if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n } }
-Yes ('every reference Build-Launcher.ps1 names is on this machine' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) ($refs.Count -gt 0 -and $missing.Count -eq 0)
+foreach ($n in @($LauncherNeeded)) { $p = Find-Ref $n; if ($p) { $refs += $p } else { $missing += $n } }
+foreach ($n in @($LauncherWv2Managed)) { $p = Join-Path $Repo ('launcher\lib\webview2\' + $n); if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n } }
+Yes ('every reference Thornswood.csproj names is on this machine' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) ($refs.Count -gt 0 -and $missing.Count -eq 0)
 if ($missing.Count -or $refs.Count -eq 0) { Done }
 
 $driver = @'
@@ -969,7 +961,7 @@ $driverCs = Join-Path $build 'OwnFolderFirstTest.cs'
 [IO.File]::WriteAllText($driverCs, $driver, (New-Object Text.UTF8Encoding($false)))
 $exe = Join-Path $build 'OwnFolderFirstTest.exe'
 $cs = @(Get-ChildItem (Join-Path $App '*.cs') -File | ForEach-Object { $_.FullName })
-$cscArgs = @('/noconfig', '/nologo', '/target:exe', '/platform:anycpu', '/langversion:5', '/nowarn:0649,1701,0414,0169', "/out:$exe", '/main:Thornswood.OwnFolderFirstTest')
+$cscArgs = @('/noconfig', '/nologo', '/target:exe', '/platform:anycpu', "/langversion:$LauncherLangVersion", '/nowarn:0649,1701,0414,0169', "/out:$exe", '/main:Thornswood.OwnFolderFirstTest')
 foreach ($r in $refs) { $cscArgs += "/reference:$r" }
 $cscArgs += ('/resource:' + (Join-Path $Repo 'launcher\Thornswood.ini') + ',Thornswood.ini')
 $cscArgs += ('/resource:' + $clientRecord + ',client-build.json')
@@ -984,7 +976,7 @@ $cscArgs += ('/resource:' + (Join-Path $Repo 'records\ui-gone.json') + ',ui-gone
 $cscArgs += $cs
 $cscArgs += $driverCs
 $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-$said = & $csc @cscArgs 2>&1
+$said = & $LauncherCsc @cscArgs 2>&1
 $rc = $LASTEXITCODE
 $ErrorActionPreference = $old
 Yes ('the launcher''s {0} source files and the driver compile as C# 5' -f $cs.Count) ($rc -eq 0 -and (Test-Path -LiteralPath $exe))

@@ -237,8 +237,6 @@
 
 .PARAMETER AllowStaleCheckout
     Go ahead from a checkout that is not exactly origin/main and clean, with a loud warning (#2118). Without it the script refuses a stale or dirty checkout before it sends anything.
-.PARAMETER LauncherWith
-    Which build makes a dev release's launcher: csc, the in-box compiler and the default, or msbuild, launcher\app\Thornswood.csproj, to try the MSBuild launcher on dev before the switch (#498). A main release takes the exe CI built and refuses msbuild.
 .EXAMPLE
   .\scripts\release\Ship.ps1 -Channel dev "The map marker points at the right door now"
 
@@ -312,11 +310,6 @@ param(
     ,[switch]$AllowUncoveredBodies
     # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
     ,[switch]$AllowStaleCheckout
-    # Which build makes a dev release's launcher: csc, the in-box compiler and
-    # the default, or msbuild, launcher\app\Thornswood.csproj (#498), so the
-    # MSBuild launcher can be tried on dev before the switch makes it the only
-    # build. A main release takes the exe CI built, so main refuses msbuild.
-    ,[ValidateSet('csc', 'msbuild')][string]$LauncherWith = 'csc'
 )
 . (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
@@ -869,7 +862,6 @@ $RepoDir = Split-Path -Parent (Split-Path -Parent $Here)
 # The release's one name and its tag (#444).
 . (Join-Path $Here 'Release-Name.ps1')
 $Dev = ($Channel -eq 'dev')
-if (-not $Dev -and $LauncherWith -ne 'csc') { Die 'A main release takes the launcher CI built, so -LauncherWith msbuild is for -Channel dev only (#498). Nothing was published.' }
 $ReleaseDir = Get-FeedStoreDir $Channel
 $MainReleaseDir = Get-FeedStoreDir 'main'
 
@@ -1491,7 +1483,7 @@ if (-not $ModsOnly) {
     }
     else {
         Head 'Building the launcher'
-        & (Join-Path $Here 'Build-Launcher.ps1') -Root $Root -OutDir $buildOut -NoPause -With $LauncherWith
+        & (Join-Path $Here 'Build-Launcher.ps1') -Root $Root -OutDir $buildOut -NoPause
         $buildCode = $LASTEXITCODE
 
         <#

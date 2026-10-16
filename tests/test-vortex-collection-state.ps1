@@ -1,5 +1,6 @@
 param([string]$Scratch)
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $repo=Split-Path -Parent $PSScriptRoot
 # A folder this run makes is removed in the finally below (#1992); one the
 # caller passed in is the caller's to keep.
@@ -54,7 +55,7 @@ $count=0
  }
  $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
  $dll=Join-Path $Scratch 'VortexCollectionState.dll'
- & $csc /noconfig /nologo /target:library /langversion:5 ("/out:"+$dll) /reference:System.dll /reference:System.Core.dll /reference:System.Xml.dll /reference:System.Runtime.Serialization.dll (Join-Path $repo 'launcher\app\VortexProfileState.cs')
+ & $LauncherCsc /noconfig /nologo /target:library "/langversion:$LauncherLangVersion" ("/out:"+$dll) /reference:System.dll /reference:System.Core.dll /reference:System.Xml.dll /reference:System.Runtime.Serialization.dll (Join-Path $repo 'launcher\app\VortexProfileState.cs')
  if($LASTEXITCODE){throw 'Framework compilation failed'}
  foreach($case in $cases.Keys | Sort-Object){
   $state=Join-Path (Join-Path $Scratch ('collection-'+$case)) 'Vortex\state.v2'

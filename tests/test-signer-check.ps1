@@ -64,6 +64,7 @@
 param([string]$Signed = 'C:\Thornswood-DevBuild\Launcher\Thornswood.exe')
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 
 if ($PSVersionTable.PSEdition -eq 'Core') {
     $winps = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
@@ -134,7 +135,7 @@ $made = @()
 
 function Compile([string[]]$cscArgs) {
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    $said = & $csc @cscArgs 2>&1
+    $said = & $LauncherCsc @cscArgs 2>&1
     $rc = $LASTEXITCODE
     $ErrorActionPreference = $old
     if ($rc -ne 0) { foreach ($l in @($said | Select-Object -First 20)) { Write-Host "      $l" } }
@@ -150,7 +151,7 @@ function Drop-Cert([string]$thumb) {
 
 try {
     $dll = Join-Path $tmp 'Signature.dll'
-    $ok = Compile @('/noconfig', '/nologo', '/langversion:5', '/target:library', '/platform:anycpu',
+    $ok = Compile @('/noconfig', '/nologo', "/langversion:$LauncherLangVersion", '/target:library', '/platform:anycpu',
                     "/reference:$fw\System.dll", "/out:$dll", $sigCs)
     Yes 'Signature.cs compiles on its own with the .NET Framework csc at C# 5' $ok
     if (-not $ok) { Finish }
