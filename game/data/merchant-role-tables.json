@@ -519,6 +519,11 @@
       "name": "Playable Rieklings.esp",
       "sha256": "f550ebbc44bb4b39f27cea379da2254bc31b06ddcaea1133877e2b0b86135ee1",
       "repository": false
+    },
+    {
+      "name": "Thornswood-Last.esp",
+      "sha256": "0c57943b5db6bda31e5186159501d3879b219fc5f0521b94225475c73035dcf4",
+      "repository": true
     }
   ],
   "records": {

@@ -484,6 +484,22 @@ if ($loadsLight) {
 
 $keep  = @($wanted | Where-Object { $info[$_] -and -not $drop.Contains($_) })
 
+# THE PLUGIN THAT LOADS LAST (#2468, #2486) is ours, built in this repository
+# and never in the collection, so no plugin list Vortex writes names it. When
+# the checkout holds it, it is the server's last plugin, read from the
+# repository (its path below), whatever the list says. It is light, so it
+# needs an engine that loads light plugins (#1715).
+$lastName = 'Thornswood-Last.esp'
+$lastRepo = [IO.Path]::GetFullPath((Join-Path $Here ('..\..\game\content\' + $lastName)))
+$lastHeld = Test-Path -LiteralPath $lastRepo -PathType Leaf
+if ($lastHeld) {
+    if (-not $loadsLight) {
+        throw "$lastName is a light plugin and the server build records\server-build.json names does not load light plugins, so it cannot be in this load order."
+    }
+    $info[$lastName] = Read-PluginHeader $lastRepo
+    $keep = @($keep | Where-Object { $_ -ine $lastName }) + $lastName
+}
+
 # A plugin the list names that is not in Data. It was collected and then
 # thrown away, so a list naming a plugin nobody has said nothing at all and
 # the server quietly shipped an order one shorter than the one being read.
@@ -597,7 +613,11 @@ if ($loadsLight) {
     Write-Host ("  masters first: {0} master-flagged, {1} position(s) changed" -f $masterCount, $movedMasters) -ForegroundColor Cyan
 }
 
-$paths = @($keep | ForEach-Object { (Join-Path $Data $_) -replace '\\', '/' })
+# And last after the server's own order was followed, whatever it held.
+if ($lastHeld) { $keep = @($keep | Where-Object { $_ -ine $lastName }) + $lastName }
+$paths = @($keep | ForEach-Object {
+    if ($lastHeld -and $_ -ieq $lastName) { $lastRepo -replace '\\', '/' } else { (Join-Path $Data $_) -replace '\\', '/' }
+})
 
 # ---- rewrite server-settings.json -----------------------------------------
 $settingsPath = Join-Path $Dist 'server-settings.json'

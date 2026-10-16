@@ -53,11 +53,17 @@ WHAT IT PUTS IN THE PLUGIN
 
   2. Every vanilla quest (Skyrim.esm, Update.esm, Dawnguard.esm,
      HearthFires.esm, Dragonborn.esm), except the ones the policy file keeps
-     while Patrick decides, is overridden so it can never start in anybody's
+     (Patrick's decisions on #2468), is overridden so it can never start in anybody's
      game: Start Game Enabled is cleared, and a condition that is never true
      is put first among its Story Manager conditions, as an AND, so no Story
      Manager event can start it. Everything else on the quest is the winning
      record's own. The gate, door and arrival talk is in these quests.
+
+  3. The mod quests the policy names (modQuestsStopped) are stopped the same
+     way: the collection's mods' own gate, door and arrival talk (Patrick,
+     12 October, decision 8 on #2468). A quest with such talk that the policy
+     neither stops nor keeps stops the build, so a new one is decided, not
+     missed.
 
   A placed actor's override needs the cell it stands in, and the worldspace
   for an exterior, so those are copied too, EXACTLY as the winning plugin has
@@ -85,8 +91,8 @@ WHAT IT READS
 
   The load order is the NPC catalogue's own (npc-population.json loadOrder),
   read from --data, and every plugin has to be the bytes the catalogue was
-  built from (sha256), except Thornswood-Content.esp, which has to be the
-  repository's game/content copy. A load order that moved means the catalogue
+  built from (sha256), except Thornswood-Content.esp, which is read from the
+  repository's game/content, where it is made and shipped from. A load order that moved means the catalogue
   is rebuilt first (scripts/dev/Build-NpcPopulation.py), then this. This
   plugin is never read as an input: it is what the catalogue and the policy
   produce, and the catalogue reads past it too.
@@ -107,12 +113,26 @@ WHAT IT WRITES
 
 HOW IT REACHES PEOPLE
 
-  Like Thornswood-Content.esp at revision 2, it goes into the Nexus collection
-  as a Thornswood mod, enabled and sorted last, which is Vortex window work for
-  Patrick or the Vortex lane; the collection's plugin record and the servers'
-  load order then carry it (docs and the steps are on #2468). Until it is in
-  the servers' load order, game/gamemode.js keeps handing the server the cut
-  list, and the test above holds that coupling both ways.
+  From this repository, exactly the way Thornswood-Content.esp goes (Patrick,
+  12 October, #2486 B), never through the collection:
+
+    servers  Deploy-DevGamemode.ps1 -LoadOrder (and the full Deploy-Server.ps1
+             for live) sends game/content/Thornswood-Last.esp and puts it at
+             the end of the server's load order.
+    people   every Ship places it in the release's Data (Ensure-ShipRequiredData
+             in Ship-Rules.ps1), the pack carries it, and the pack's plugin
+             list enables it last, in the server's order.
+    order    the server has it first, then the Ship (#2308): a release that
+             changes it is refused until the channel's server holds the same
+             bytes.
+    bytes    a release is refused when the plugin was built against other
+             bytes than the release's own plugins, or another load order
+             (Get-ShipLastPluginProblem): a new collection revision means
+             running this again, never shipping a plugin that would undo it.
+
+  The catalogue lists it in the servers' load order and the gamemode no longer
+  hands the server a cut list of its own; tests/test-2468-last-plugin.js holds
+  that coupling both ways.
 
 Usage:
     python scripts/mods/Build-LastPlugin.py --check
@@ -639,17 +659,16 @@ def load(data_dir, catalogue):
     canon = {n.lower(): n for n in order}
     plugins, problems = [], []
     for i, row in enumerate([r for r in catalogue['loadOrder'] if r['name'] != PLUGIN]):
-        path = os.path.join(data_dir, row['name'])
+        # The content plugin is read where it is made and shipped from, the
+        # repository: a game folder holds whichever release last reached it.
+        path = REPO_CONTENT if row['name'] == CONTENT else os.path.join(data_dir, row['name'])
         if not os.path.isfile(path):
             problems.append('%s is not in %s' % (row['name'], data_dir))
             continue
         p = Plugin(path, row['name'], i)
         sha = hashlib.sha256(p.buf).hexdigest()
         if row['name'] == CONTENT:
-            want = hashlib.sha256(open(REPO_CONTENT, 'rb').read()).hexdigest()
-            if sha != want:
-                problems.append('%s in %s is not the repository\'s game/content copy '
-                                '(put it in place with scripts/release/Go.ps1)' % (CONTENT, data_dir))
+            pass
         elif sha != row['sha256']:
             problems.append('%s in %s is not the bytes npc-population.json was built from '
                             '(rebuild the catalogue first: scripts/dev/Build-NpcPopulation.py)'
@@ -806,6 +825,19 @@ def build(data_dir):
     if missing:
         raise SystemExit('STOP. the policy keeps quests no master has: %s. Nothing was written.'
                          % ', '.join(desc_of(g, canon) for g in sorted(missing)))
+    mod_stopped = []
+    for q in policy.get('modQuestsStopped', []):
+        gid = ref_key(q['quest'])
+        e = win.get((b'QUST', gid))
+        if gid[0] in VANILLA or e is None:
+            raise SystemExit('STOP. the policy stops %s as a mod quest, and no mod has it. '
+                             'Nothing was written.' % q['quest'])
+        edid = dict(subrecords(plugins[e.pi].data(e))).get(b'EDID', b'').rstrip(b'\x00').decode('latin1')
+        if edid != q['edid']:
+            raise SystemExit('STOP. the policy stops %s as %s, and it is %s. Nothing was written.'
+                             % (q['quest'], q['edid'], edid))
+        mod_stopped.append({'quest': desc_of(gid, canon), 'edid': edid})
+        qentries.append(e)
 
     # The cells and worlds the actors stand in, each from its own winner.
     cells, worlds = {}, {}
@@ -879,12 +911,21 @@ def build(data_dir):
         'issue': 2468,
         'plugin': {'name': PLUGIN, 'size': len(plugin), 'sha256': hashlib.sha256(plugin).hexdigest()},
         'loadOrder': order,
+        # The exact bytes every plugin in that order had when this was built
+        # (#2486). The plugin copies their winning records, so it is only
+        # right for these bytes: a release (Ship-Rules.ps1,
+        # Get-ShipLastPluginProblem) and the build check
+        # (tests/test-2468-last-plugin.js, against the collection's record)
+        # refuse it for any other.
+        'builtAgainst': [{'name': p.name, 'size': len(p.buf),
+                          'sha256': hashlib.sha256(p.buf).hexdigest()} for p in plugins],
         'masters': masters,
         'counts': {'actorsOff': len(refs['disabled']), 'cells': len(made['cell']),
                    'worlds': len(made['wrld']), 'questsStopped': len(quests_cut),
+                   'modQuestsStopped': len(mod_stopped),
                    'questsKept': len(quests_kept)},
         'refs': {k: sorted(v, key=ref_key) for k, v in refs.items()},
-        'quests': {'stopped': quests_cut, 'kept': quests_kept},
+        'quests': {'stopped': quests_cut, 'kept': quests_kept, 'modStopped': mod_stopped},
         'arrivalTalk': arrival_talk(plugins, canon),
     }
     return plugin, manifest
@@ -1038,11 +1079,12 @@ def verify(data_dir, plugin_bytes, manifest):
         if not row['keep'] and row['ref'] != '14:Skyrim.esm' and row['ref'] not in off:
             fails.append('cut actor %s is in no list' % row['ref'])
     kept = {q['quest'] for q in manifest['quests']['kept']}
+    mods = {q['quest'] for q in manifest['quests']['modStopped']}
     for (tag, gid), e in win.items():
-        if tag != b'QUST' or gid[0] not in VANILLA:
+        if tag != b'QUST':
             continue
         d = desc_of(gid, canon)
-        if d in kept:
+        if (gid[0] not in VANILLA and d not in mods) or d in kept:
             continue
         pairs = subrecords(plugins[e.pi].data(e))
         tags = [t for t, _ in pairs]
@@ -1050,11 +1092,12 @@ def verify(data_dir, plugin_bytes, manifest):
         after = tags.index(b'NEXT') + 1 if b'NEXT' in tags else None
         if e.pi != last.index or struct.unpack_from('<H', dnam, 0)[0] & START_GAME_ENABLED or \
                 after is None or after >= len(pairs) or pairs[after] != (b'CTDA', NEVER_TRUE):
-            fails.append('vanilla quest %s is left able to start' % d)
-    stopped = {q['quest'] for q in manifest['quests']['stopped']}
+            fails.append('quest %s is left able to start' % d)
+    stopped = {q['quest'] for q in manifest['quests']['stopped']} | mods
     for row in manifest['arrivalTalk']:
-        if row['vanilla'] and row['quest'] not in stopped and row['quest'] not in kept:
-            fails.append('arrival talk %s %s is in neither list' % (row['quest'], row['edid']))
+        if row['quest'] not in stopped and row['quest'] not in kept:
+            fails.append('arrival talk %s %s is in no list: decide it in the policy'
+                         % (row['quest'], row['edid']))
     return fails
 
 
@@ -1088,7 +1131,8 @@ def main():
             return 1
         c = manifest['counts']
         print('  ok    %d cut actors are off and nothing can switch them on; %d vanilla quests '
-              'cannot start; %d kept for Patrick\'s decision' % (c['actorsOff'], c['questsStopped'], c['questsKept']))
+              'cannot start; %d kept by the policy; %d mod quests cannot start'
+              % (c['actorsOff'], c['questsStopped'], c['questsKept'], c['modQuestsStopped']))
         return 0
 
     plugin, manifest = build(args.data)
@@ -1098,7 +1142,8 @@ def main():
     print('  left as they are: %d deleted by a plugin, %d already off, %d authored corpses kept'
           % (len(manifest['refs']['deleted']), len(manifest['refs']['alreadyOff']),
              len(manifest['refs']['corpseKept'])))
-    print('  %d vanilla quests stopped, %d kept for a decision' % (c['questsStopped'], c['questsKept']))
+    print('  %d vanilla quests stopped, %d kept, %d mod quests stopped'
+          % (c['questsStopped'], c['questsKept'], c['modQuestsStopped']))
     fails = verify(args.data, plugin, manifest)
     if fails:
         for f in fails[:40]:

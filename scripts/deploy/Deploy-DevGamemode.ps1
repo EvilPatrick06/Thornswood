@@ -452,6 +452,24 @@ if ($LoadOrder) {
     Write-Host ('  load order: the dev server''s own, {0} plugins, kept as it is' -f $pluginNames.Count) -ForegroundColor DarkGray
   }
   # ==== end thornswood dev load order source ====
+
+  # THE PLUGIN THAT LOADS LAST (#2468). Sent from the repository like the
+  # content plugin (RepoPlugins.ps1, #2486), and the dev server's last plugin
+  # whatever order it had: every cut actor it switches off and every quest it
+  # stops is only right with nothing after it. When this moves the order, the
+  # order goes up the way a build's does (-Dist), so a plain -LoadOrder puts
+  # it there.
+  $lastName = 'Thornswood-Last.esp'
+  $lastRepo = Join-Path $Here ('..\..\game\content\' + $lastName)
+  $orderMoved = $false
+  if (Test-Path -LiteralPath $lastRepo) {
+    $wantNames = @(@($pluginNames | Where-Object { $_ -ine $lastName }) + $lastName)
+    if ((@($pluginNames) -join '|') -ne ($wantNames -join '|')) {
+      $orderMoved = $true
+      Write-Host ('  load order: {0} goes last, plugin {1}' -f $lastName, $wantNames.Count) -ForegroundColor Yellow
+    }
+    $pluginNames = $wantNames
+  }
   $ours = Join-Path $Here '..\..\game\content\Thornswood-Content.esp'
 
   # Name and size, the same question Deploy-Server.ps1 asks of the live box and
@@ -540,7 +558,7 @@ if ($LoadOrder) {
   # written from a local build, which is the rule this script is built on.
   # A name of its own each run, here and on the box, so two deploys at once
   # cannot read or remove each other's list (#1070).
-  if ($Dist) {
+  if ($Dist -or $orderMoved) {
     $orderName = 'thornswood-dev-loadorder-' + [Guid]::NewGuid().ToString('N') + '.txt'
     $orderFile = Join-Path $env:TEMP $orderName
     [IO.File]::WriteAllText($orderFile, (($pluginNames -join "`n") + "`n"), (New-Object Text.UTF8Encoding($false)))
@@ -930,6 +948,12 @@ Copy-Item -LiteralPath '$rootWin\server-settings.json' -Destination '$stageWin\s
   foreach ($f in @(Get-ChildItem -LiteralPath $Data -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in '.esp', '.esm', '.esl' })) {
     try { $isLightPlugin = Test-ThornswoodPluginLight $f.FullName } catch { continue }
     $lightRows += ("'{0}' = {1}" -f $f.Name.ToLowerInvariant().Replace("'", "''"), $(if ($isLightPlugin) { '$true' } else { '$false' }))
+  }
+  # The plugin that loads last is read from the repository, where it is made.
+  $lastRepoPath = Join-Path $Here '..\..\game\content\Thornswood-Last.esp'
+  if (Test-Path -LiteralPath $lastRepoPath) {
+    $lightRows = @($lightRows | Where-Object { $_ -notlike "'thornswood-last.esp' = *" })
+    $lightRows += ("'thornswood-last.esp' = {0}" -f $(if (Test-ThornswoodPluginLight $lastRepoPath) { '$true' } else { '$false' }))
   }
   $lightTable = $lightRows -join '; '
   $fullIndexDef = 'function Get-ThornswoodFullIndex {' + "`n" + (Get-Command Get-ThornswoodFullIndex).Definition + "`n}"

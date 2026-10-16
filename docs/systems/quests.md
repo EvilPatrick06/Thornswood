@@ -12,7 +12,8 @@ Quests this server runs. Papyrus quests do not run, so a vanilla
 quest journal does not open. The offer, the turn-in, and the unlock
 are the server's. The vanilla quests themselves, and the gate, door and
 arrival talk in them, are stopped from starting in each person's game by
-`Thornswood-Last.esp` (#2468), except the few kept while Patrick decides
+`Thornswood-Last.esp` (#2468), except the creature voices; so are the
+collection's own mod quests with that kind of talk
 (`game/data/last-plugin-policy.json`).
 
 A trader of that hold's [Merchant's Guild](merchants-guild.md) gives
