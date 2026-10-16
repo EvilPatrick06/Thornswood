@@ -16,9 +16,12 @@ every cut placed actor initially disabled, with no enable parent, built by
 skips a disabled reference too (measured on 12 Oct with the built server
 addon: 5,038 actors made with the plugin at the end of the load order, none
 of them a cut one, against 11,273 without it and without the cut list). The
-gamemode keeps handing the server the cut list until the plugin is in the
-servers' load order, and drops it in the same change that puts it there
-(`tests/test-2468-last-plugin.js`).
+plugin is the servers' last plugin and ships from this repository like the
+content plugin (#2486), so the gamemode no longer hands the server a cut list
+of its own (`tests/test-2468-last-plugin.js` holds the two together). The
+native acceptance run with the plugin and no list, 13 Oct: all 5,072 kept
+identities loaded and controlled before and after a gamemode reload, none of
+the 9,596 cut ones, peak 1,477 MiB.
 
 The 48-plugin catalogue contains 14,641 placements: 5,072 retained and 9,569
 excluded. Named pets and enemies are cut even without a Unique flag. Fourteen

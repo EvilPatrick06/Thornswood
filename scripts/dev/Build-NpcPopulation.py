@@ -439,8 +439,9 @@ def main():
 
 
 def write_runtime(payload):
+    # No cut list: Thornswood-Last.esp switches every cut actor off at the
+    # record, and the gamemode no longer hands the server one (#2468, #2486).
     compact = {'version': 1, 'plugins': [s['name'] for s in payload['loadOrder']],
-        'cut': [r['ref'] for r in payload['npcs'] if not r['keep'] and r['ref'] != '14:Skyrim.esm'],
         'keep': [[r['ref'], r['base'], r['world'] or r['cell'], r['pos'], r['leash'],
                   r['returnMinutes'], r['role'], r['habitat'], r['tier'], r.get('cap'),
                   r.get('populationBucket'),

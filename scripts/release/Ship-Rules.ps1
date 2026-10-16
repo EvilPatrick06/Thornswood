@@ -1819,3 +1819,113 @@ function Save-ShipSymbols([string]$FromDir, [string]$Version) {
     }
     return ,$written.ToArray()
 }
+
+# ---------------------------------------------------------------------------
+# THE PLUGIN THAT LOADS LAST (#2468, #2486).
+#
+# game\content\Thornswood-Last.esp switches off every placed actor the NPC
+# catalogue cuts and stops the vanilla quests, by copying the WINNING record
+# of each actor's cell and world and of each quest, from the exact bytes of
+# every plugin in the load order (scripts\mods\Build-LastPlugin.py,
+# game\data\last-plugin.json "builtAgainst"). Against any other bytes it would
+# undo whatever the newer plugin changes in those records. A new collection
+# revision therefore means building it again; it never means shipping the old
+# one. Patrick, 12 Oct, #2486: the release refuses a plugin built against
+# other bytes than its own, rather than ship a broken one.
+#
+# It ships from the repository the way the content plugin does (RepoPlugins.ps1,
+# #2486): placed into the release's Data and carried by the pack. What is here
+# makes it LOAD: the plugin list the pack carries enables it last
+# (Add-ShipLastPluginLine), which the server's own order then confirms, because
+# the deploys put it last there too (Deploy-DevGamemode.ps1 -LoadOrder,
+# Deploy-Gamemode.ps1). Every check here applies only when the checkout holds
+# the plugin.
+
+$ShipLastPlugin = 'Thornswood-Last.esp'
+$ShipLastManifest = 'game\data\last-plugin.json'
+# The five the game loads before it reads any list (LoadOrder.ps1 skips them).
+$ShipBaseMasters = @('Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm')
+
+function Test-ShipLastPluginHeld([string]$RepoDir) {
+    return (Test-Path -LiteralPath (Join-Path $RepoDir ('game\content\' + $ShipLastPlugin)) -PathType Leaf)
+}
+
+# A copy of a plugins.txt with *Thornswood-Last.esp as its last enabled line:
+# any line naming it is taken out and one is put after the last line. -Plain
+# is for loadorder.txt, whose lines carry no star. Written to $Out, never over
+# $Src, with $Src's line endings. Returns $Out.
+function Add-ShipLastPluginLine([string]$Src, [string]$Out, [switch]$Plain) {
+    $text = [IO.File]::ReadAllText($Src)
+    $nl = if ($text.Contains("`r`n")) { "`r`n" } else { "`n" }
+    $lines = @($text -split "`r?`n")
+    if ($lines.Count -and $lines[-1] -eq '') { $lines = @($lines[0..($lines.Count - 2)]) }
+    $kept = @($lines | Where-Object { $_.Trim().TrimStart('*').Trim() -ine $ShipLastPlugin })
+    $kept += $(if ($Plain) { $ShipLastPlugin } else { '*' + $ShipLastPlugin })
+    [IO.File]::WriteAllText($Out, (($kept -join $nl) + $nl), (New-Object Text.UTF8Encoding($false)))
+    return $Out
+}
+
+# Why this release may not carry Thornswood-Last.esp, or '' when it may.
+#   $RepoDir  the checkout
+#   $Enabled  the enabled plugin names of the list the pack carries, in order
+# Refused: no manifest, a plugin that is not the manifest's bytes, a load
+# order (the five masters, then the enabled names, without this plugin) that
+# is not the one it was built against, the plugin not enabled last, and any
+# plugin it was built against whose size or sha256 is not the one the release
+# gives people: records\collection-plugins.json for the collection's plugins
+# (what Vortex installs and the deploys hold the servers to, #2019) and the
+# checkout for the content plugin. The release's own game folder is not the
+# measure: a plugin Vortex deploys is never in a pack, and on One on 15 Oct
+# the dev release folder held a 3BBB.esp of 3,288 bytes from another
+# installer choice while the collection's is 20,257.
+function Get-ShipLastPluginProblem([string]$RepoDir, [string[]]$Enabled) {
+    $rebuild = 'Build it again for this load order: python scripts\mods\Build-LastPlugin.py --data <a Data folder holding the collection''s bytes>, then commit the plugin and game\data\last-plugin.json.'
+    $plugin = Join-Path $RepoDir ('game\content\' + $ShipLastPlugin)
+    $mpath = Join-Path $RepoDir $ShipLastManifest
+    if (-not (Test-Path -LiteralPath $mpath)) { return "the checkout has $ShipLastPlugin and no $ShipLastManifest saying what it was built against." }
+    try { $m = ([IO.File]::ReadAllText($mpath) -replace '^\uFEFF', '') | ConvertFrom-Json } catch { return "$ShipLastManifest does not read as JSON: " + $_.Exception.Message }
+    $rpath = Join-Path $RepoDir 'records\collection-plugins.json'
+    if (-not (Test-Path -LiteralPath $rpath)) { return "there is no records\collection-plugins.json, so nothing says which bytes the collection gives people." }
+    try { $record = ([IO.File]::ReadAllText($rpath) -replace '^\uFEFF', '') | ConvertFrom-Json } catch { return "records\collection-plugins.json does not read as JSON: " + $_.Exception.Message }
+    $rows = @{}
+    foreach ($r in @($record.plugins)) { $rows[([string]$r.name).ToLowerInvariant()] = $r }
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+        $hashOf = { param($f) $fs = [IO.File]::OpenRead($f); try { -join ($sha.ComputeHash($fs) | ForEach-Object { $_.ToString('x2') }) } finally { $fs.Dispose() } }
+        $own = & $hashOf $plugin
+        if ($own -ne ([string]$m.plugin.sha256).ToLowerInvariant()) {
+            return "game\content\$ShipLastPlugin is not the plugin $ShipLastManifest describes (sha256 $($own.Substring(0, 12)), the manifest says $(([string]$m.plugin.sha256).Substring(0, 12))). $rebuild"
+        }
+        $names = @($Enabled | Where-Object { $_ })
+        if (-not $names.Count -or $names[-1] -ine $ShipLastPlugin) {
+            return "the plugin list this release carries does not enable $ShipLastPlugin last."
+        }
+        $order = @($ShipBaseMasters) + @($names | Select-Object -First ($names.Count - 1) | Where-Object { $ShipBaseMasters -notcontains $_ })
+        $built = @($m.loadOrder | ForEach-Object { [string]$_ })
+        for ($i = 0; $i -lt [Math]::Max($order.Count, $built.Count); $i++) {
+            $a = if ($i -lt $order.Count) { $order[$i] } else { '(nothing)' }
+            $b = if ($i -lt $built.Count) { $built[$i] } else { '(nothing)' }
+            if ($a -ine $b) {
+                return "$ShipLastPlugin was built against another load order: at position $($i + 1) this release loads $a and the plugin was built with $b. $rebuild"
+            }
+        }
+        $revision = [string]$record.revision
+        foreach ($row in @($m.builtAgainst)) {
+            $n = [string]$row.name
+            if ($n -ieq 'Thornswood-Content.esp') {
+                $c = Join-Path $RepoDir 'game\content\Thornswood-Content.esp'
+                if (-not (Test-Path -LiteralPath $c) -or (& $hashOf $c) -ne ([string]$row.sha256).ToLowerInvariant()) {
+                    return "$ShipLastPlugin was built against another Thornswood-Content.esp than the one this checkout ships. $rebuild"
+                }
+                continue
+            }
+            $r = $rows[$n.ToLowerInvariant()]
+            if ($null -eq $r) { return "$ShipLastPlugin was built against $n, which collection revision $revision does not have. $rebuild" }
+            if ([int64]$r.size -ne [int64]$row.size -or ([string]$r.sha256).ToLowerInvariant() -ne ([string]$row.sha256).ToLowerInvariant()) {
+                return ("$ShipLastPlugin was built against other bytes of $n ({0:N0} bytes, sha256 {1}) than collection revision $revision gives people ({2:N0} bytes, sha256 {3}). $rebuild" -f
+                        [int64]$row.size, ([string]$row.sha256).Substring(0, 12), [int64]$r.size, ([string]$r.sha256).Substring(0, 12))
+            }
+        }
+    } finally { $sha.Dispose() }
+    return ''
+}

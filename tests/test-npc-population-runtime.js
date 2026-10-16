@@ -19,7 +19,10 @@ function fixture(){
 }
 const plain=x=>JSON.parse(JSON.stringify(x));
 const state={pos:[10,20,30],cellOrWorld:60,isHuman:false};
-const f=fixture();assert.deepEqual(f.excluded,[2]);
+// No cut list goes to the engine (#2468): Thornswood-Last.esp switches every
+// cut placement off at the record, so a catalogue row left out is simply not
+// configured.
+const f=fixture();assert.deepEqual(f.excluded,[]);
 assert.deepEqual(plain(f.policy.configure(1,state)),{home:[10,20,30],cell:60,leash:100,swims:false,ambush:false});
 // Row 11 (#2067): 1 a race that swims and cannot walk, kept below the depth it
 // was placed at; 2 an ambush placement.

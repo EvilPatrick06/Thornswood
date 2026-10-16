@@ -304,6 +304,14 @@ function Get-ReferenceInServerOrder([string]$src, [string]$Out = '', [switch]$Qu
     if ($null -ne $doc) { $manifest = $doc.Full; $script:serverLight = $doc.Light }
     $script:serverManifest = $manifest
     $script:referenceList = $src
+    # THE PLUGIN THAT LOADS LAST IS OURS, NOT VORTEX'S (#2468). The list is the
+    # Vortex profile's, which has never heard of it, so a copy of it enables
+    # Thornswood-Last.esp as its last line, and that copy is what is put into
+    # the server's order and packed. The server's own order has it last too
+    # (Deploy-DevGamemode.ps1 -LoadOrder), so it stays there.
+    if (Test-ShipLastPluginHeld $RepoDir) {
+        $src = Add-ShipLastPluginLine $src (Join-Path $DistDir 'reference-plugins-last.txt')
+    }
     if ($null -eq $manifest) {
         Die "The server at $url did not answer with its manifest, so the reference plugin list cannot be put into its order. Start the server, or check the address and port in $Root\config.json, then publish again."
     }
@@ -600,8 +608,24 @@ if (Test-Path $orderSrc) {
     try {
         $shippedList = Get-ReferenceInServerOrder $orderSrc $orderTmp -Quiet
         $now[':order:shippedPlugins'] = Get-ActiveOrderKey $shippedList (Join-Path $GameDir 'Data')
+        # THE LAST PLUGIN IS BUILT FOR THESE BYTES OR IT DOES NOT SHIP (#2468).
+        # It copies the winning records of this exact load order; against
+        # any other it would undo what the newer plugin changed. Refused
+        # here, before anything is packed, sent or posted.
+        if (Test-ShipLastPluginHeld $RepoDir) {
+            $lastEnabled = @(Get-Content -LiteralPath $shippedList | ForEach-Object { $_.Trim() } |
+                             Where-Object { $_.StartsWith('*') } | ForEach-Object { $_.Substring(1).Trim() })
+            $lastProblem = Get-ShipLastPluginProblem $RepoDir $lastEnabled
+            if ($lastProblem) { throw ('LASTPLUGIN ' + $lastProblem) }
+            Say ("  {0} was built against this release's load order and the collection's bytes" -f $ShipLastPlugin) 'DarkGray'
+        }
     }
-    catch { Say "  could not read the active plugin order from $orderSrc`: $($_.Exception.Message)" 'Yellow' }
+    catch {
+        if ($_.Exception.Message.StartsWith('LASTPLUGIN ')) {
+            Die ('Nothing was published, posted or told to a server: ' + $_.Exception.Message.Substring(11))
+        }
+        Say "  could not read the active plugin order from $orderSrc`: $($_.Exception.Message)" 'Yellow'
+    }
     finally { Remove-Item -LiteralPath $orderTmp -Force -ErrorAction SilentlyContinue }
 }
 
@@ -1139,6 +1163,9 @@ if ($changed.Count -or $removed.Count -or $profileChanged.Count) {
                     # Get-ReferenceInServerOrder. The file at $src is read and
                     # never written.
                     if ($f -eq 'plugins.txt') { $src = Get-ReferenceInServerOrder $src }
+                    elseif (Test-ShipLastPluginHeld $RepoDir) {
+                        $src = Add-ShipLastPluginLine $src (Join-Path $DistDir 'reference-loadorder-last.txt') -Plain
+                    }
                     [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $src, "profile/$f", 'Optimal')
                     # The same bytes go in the release record (#1050), so a
                     # launcher that syncs to it gets the list the pack carries.
@@ -1149,6 +1176,9 @@ if ($changed.Count -or $removed.Count -or $profileChanged.Count) {
         } finally {
             $zip.Dispose()
             Remove-Item -LiteralPath (Join-Path $DistDir 'reference-plugins.txt') -Force -ErrorAction SilentlyContinue
+            foreach ($t in 'reference-plugins-last.txt', 'reference-loadorder-last.txt') {
+                Remove-Item -LiteralPath (Join-Path $DistDir $t) -Force -ErrorAction SilentlyContinue
+            }
         }
 
         $bytes = (Get-Item $zipPath).Length

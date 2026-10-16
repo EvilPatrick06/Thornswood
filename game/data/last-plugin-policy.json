@@ -1,30 +1,32 @@
 {
- "version": 1,
+ "version": 2,
  "issue": 2468,
  "readBy": "scripts/mods/Build-LastPlugin.py",
- "why": "What Thornswood-Last.esp leaves alone while Patrick decides. Patrick, 12 Oct 2026: every vanilla quest can be cut, but a quest a kept Thornswood feature may still need is put to him first rather than broken. Each group below is one decision on issue 2468. Taking a quest off this list cuts it at the next build; adding one keeps it running.",
+ "why": "What Thornswood-Last.esp leaves alone, and the mod quests it stops as well. Patrick, 12 Oct 2026: every vanilla quest can be cut. His answers the same evening to the eight decisions on issue 2468 were 'all recommended': the barter, carriage, follower, courier and start-up quests are stopped with the rest, the creature voices and the authored corpses stay, and the sixteen mod quests with gate, door or arrival talk are stopped too.",
  "corpses": {
   "action": "keep",
-  "why": "The 1,361 authored corpses (startsDead) are cut from the living population, but they never flashed: the client's world cleaner leaves a dead placed actor where it lies, so they stand as scenery today. Whether they go too is a decision on issue 2468."
+  "why": "The 1,361 authored corpses (startsDead) are cut from the living population, but they never flashed: the client's world cleaner leaves a dead placed actor where it lies, so they stand as scenery. Patrick, 12 Oct 2026: keep them as scenery (decision 7 on issue 2468)."
  },
- "questsKept": [
-  {"quest": "13eb3:Skyrim.esm", "edid": "DialogueGeneric", "group": "barter: holds OfferServicesTopic, What have you got for sale?"},
-  {"quest": "17f01:Skyrim.esm", "edid": "DialogueCarriageSystem", "group": "carriages: the vanilla drivers' quest, named by CFTO's driver script"},
-  {"quest": "68d73:Skyrim.esm", "edid": "stables", "group": "carriages: the stables, named by 53 of CFTO's dialogue scripts"},
-  {"quest": "750ba:Skyrim.esm", "edid": "DialogueFollower", "group": "followers: the follower system, carrying CFTO and Playable Rieklings lines"},
-  {"quest": "5a6dc:Skyrim.esm", "edid": "DialogueFavorGeneric", "group": "followers: favours and commands"},
-  {"quest": "bcc94:Skyrim.esm", "edid": "HirelingQuest", "group": "followers: hired followers"},
-  {"quest": "1aa70:Dawnguard.esm", "edid": "DLC1HireableDogs", "group": "followers: hired dogs"},
-  {"quest": "38566:Dragonborn.esm", "edid": "DLC2HirelingQuest", "group": "followers: Solstheim hirelings"},
-  {"quest": "39f82:Skyrim.esm", "edid": "WICourier", "group": "courier: the vanilla courier"},
-  {"quest": "fc1a2:Skyrim.esm", "edid": "PlayerSleepQuest", "group": "start-up: sleeping"},
-  {"quest": "13e06:Skyrim.esm", "edid": "VoicePowers", "group": "start-up: shouts and powers"},
-  {"quest": "eafd5:Skyrim.esm", "edid": "PlayerVampireQuest", "group": "start-up: vampirism"},
-  {"quest": "2ba16:Skyrim.esm", "edid": "PlayerWerewolfQuest", "group": "start-up: lycanthropy"},
-  {"quest": "2c09:Dawnguard.esm", "edid": "DLC1Init", "group": "start-up: Dawnguard's set up"},
-  {"quest": "16e02:Dragonborn.esm", "edid": "DLC2Init", "group": "start-up: Dragonborn's set up"}
- ],
+ "questsKept": [],
  "questEditorIdPrefixesKept": {
-  "CreatureDialogue": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
- }
+  "CreatureDialogue": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
+ },
+ "modQuestsStopped": [
+  {"quest": "48bbc2:aaaGraniteHill.esp", "edid": "aaaGraniteHillDungeonQuest"},
+  {"quest": "364757:ElysiumEstate.esp", "edid": "EE_QuestKyne"},
+  {"quest": "37f320:Riften Expansion.esp", "edid": "RTBearheartVampireQuest"},
+  {"quest": "6058:Solitude Arena.esp", "edid": "LSDvaincrelechampion"},
+  {"quest": "a017:Solitude Arena.esp", "edid": "LSDworld"},
+  {"quest": "18431:Solitude Arena.esp", "edid": "FANAdetoi"},
+  {"quest": "1066c3:WindhelmSSE.esp", "edid": "0WHQuestRieklings"},
+  {"quest": "1066c4:WindhelmSSE.esp", "edid": "0WHQuestVampires"},
+  {"quest": "14ec74:WindhelmSSE.esp", "edid": "0WindhelmDialogueGeneral"},
+  {"quest": "1ee2e4:WindhelmSSE.esp", "edid": "0WHQuestTalosIntro"},
+  {"quest": "1f355a:WindhelmSSE.esp", "edid": "0WHQuestPoetry"},
+  {"quest": "29178e:WindhelmSSE.esp", "edid": "0WHQuestFurs"},
+  {"quest": "2c495c:WindhelmSSE.esp", "edid": "0WHQuestBuyHouse"},
+  {"quest": "2ddff3:WindhelmSSE.esp", "edid": "0WindhelmSceneGuardVampireAftermath"},
+  {"quest": "301e05:WindhelmSSE.esp", "edid": "OWindhelmDecorationMurder"},
+  {"quest": "3ec170:WindhelmSSE.esp", "edid": "0WHQuestArenaFightRepeating"}
+ ]
 }
