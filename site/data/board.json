@@ -1659,6 +1659,46 @@
               "c1rm": "Notice boards in every hold",
               "c2rm": "Pay coin to pin up work, warnings, rumours or a reward for a name. Guards can tear them down, and will"
             }
+          },
+          {
+            "id": "r15rm",
+            "done": false,
+            "at": 0,
+            "by": "",
+            "cells": {
+              "c1rm": "Guards, bounties and cells run by people",
+              "c2rm": "Get caught and somebody has to decide what to do with you, rather than a script deciding it for them"
+            }
+          },
+          {
+            "id": "rSurv1",
+            "done": false,
+            "at": 0,
+            "by": "",
+            "cells": {
+              "c1rm": "Food, drink, wet and cold",
+              "c2rm": "Eating, drinking, getting soaked and getting cold all count, and a warm bed or a fire puts it right"
+            }
+          },
+          {
+            "id": "rQst1",
+            "done": false,
+            "at": 0,
+            "by": "",
+            "cells": {
+              "c1rm": "Quests people write",
+              "c2rm": "Custom quests posted by people, with their own rewards and cooldowns that survive a restart"
+            }
+          },
+          {
+            "id": "rFare1",
+            "done": false,
+            "at": 0,
+            "by": "",
+            "cells": {
+              "c1rm": "Carriages and ferries you pay for",
+              "c2rm": "The fare is paid to the driver and lands on the hold's ledger, so the court sees what travel brings in"
+            }
           }
         ]
       },
@@ -1677,16 +1717,6 @@
           }
         ],
         "rows": [
-          {
-            "id": "rNPC1",
-            "done": false,
-            "at": 0,
-            "by": "",
-            "cells": {
-              "c8rm": "Thinning the crowd",
-              "c9rm": "Cutting the NPCs back to the ones a town needs, so the people who stay are worth talking to and you are still the reason things happen"
-            }
-          },
           {
             "id": "rNPC2",
             "done": false,
@@ -1708,16 +1738,6 @@
             }
           },
           {
-            "id": "r12rm",
-            "done": false,
-            "at": 0,
-            "by": "",
-            "cells": {
-              "c8rm": "Parties",
-              "c9rm": "Travel as a group in game, not a Discord call and a guess about who is where"
-            }
-          },
-          {
             "id": "r13rm",
             "done": false,
             "at": 0,
@@ -1728,23 +1748,33 @@
             }
           },
           {
-            "id": "r14rm",
+            "id": "rInj1",
             "done": false,
             "at": 0,
             "by": "",
             "cells": {
-              "c8rm": "The climb through the ranks",
-              "c9rm": "The professions, their two halves and the classes are in character creation now, and vanilla levelling is off. What is missing is the climb: four ranks, and what each one opens inside your own half and nowhere else"
+              "c8rm": "Injury, being downed and disease",
+              "c9rm": "A fight can leave you hurt or on the ground instead of simply dead, and sickness has to be treated"
             }
           },
           {
-            "id": "r15rm",
+            "id": "rWear1",
             "done": false,
             "at": 0,
             "by": "",
             "cells": {
-              "c8rm": "Guards, bounties and cells run by people",
-              "c9rm": "Get caught and somebody has to decide what to do with you, rather than a script deciding it for them"
+              "c8rm": "Wear and repair",
+              "c9rm": "Weapons and armour wear down with use, and repair kits and smiths put them right"
+            }
+          },
+          {
+            "id": "rFstc1",
+            "done": false,
+            "at": 0,
+            "by": "",
+            "cells": {
+              "c8rm": "The Free Skyrim Trading Company",
+              "c9rm": "It replaces the East Empire Company: hauls between the holds, with a cut for the people who run them"
             }
           }
         ]
@@ -1765,16 +1795,6 @@
         ],
         "rows": [
           {
-            "id": "r20rm",
-            "done": false,
-            "at": 0,
-            "by": "",
-            "cells": {
-              "c17rm": "Switch between servers from the launcher",
-              "c18rm": "One button for Thornswood, another RP server, or your own Skyrim, with nothing overwriting anything"
-            }
-          },
-          {
             "id": "r22rm",
             "done": false,
             "at": 0,
@@ -1785,13 +1805,13 @@
             }
           },
           {
-            "id": "r23rm",
+            "id": "rThal1",
             "done": false,
             "at": 0,
             "by": "",
             "cells": {
-              "c17rm": "Voice fallback relay",
-              "c18rm": "So two people who cannot connect to each other directly still hear each other"
+              "c17rm": "The Thalmor war",
+              "c18rm": "The Thalmor never signed the Accord. A remnant holds the embassy, and there is a war to have"
             }
           }
         ]
@@ -1919,6 +1939,76 @@
             "cells": {
               "c26rm": "Emote wheel",
               "c27rm": "G opens and closes it. Sixty emotes, eight quick slots in the middle of the wheel, a search and an alphabetical list beside it. Tab moves to the search while it is open, and N stops an emote you are stuck in. The number keys 1 to 8 play the slots with the wheel shut. The launcher's Controls page moves any of those keys"
+            }
+          },
+          {
+            "id": "rNPC1",
+            "done": false,
+            "at": 0,
+            "by": "",
+            "cells": {
+              "c26rm": "Thinning the crowd",
+              "c27rm": "The towns keep the people they need: guild traders, drivers and the animals. Bethesda's guards, courts and wandering townsfolk are gone, so the people you meet are people"
+            }
+          },
+          {
+            "id": "r12rm",
+            "done": false,
+            "at": 0,
+            "by": "",
+            "cells": {
+              "c26rm": "Parties",
+              "c27rm": "P on someone asks them, the P panel runs it, and the leader can kick, hand over the lead or disband. The party shows on a strip under the compass"
+            }
+          },
+          {
+            "id": "r23rm",
+            "done": false,
+            "at": 0,
+            "by": "",
+            "cells": {
+              "c26rm": "Voice through a relay",
+              "c27rm": "When two people cannot connect directly, voice goes through the server's relay instead, so they still hear each other"
+            }
+          },
+          {
+            "id": "rEcon1",
+            "done": false,
+            "at": 0,
+            "by": "",
+            "cells": {
+              "c26rm": "An economy with a bottom",
+              "c27rm": "Traders start with a purse and only have what people have spent with them. Prices come from a ledger, not from nowhere"
+            }
+          },
+          {
+            "id": "rSeas1",
+            "done": false,
+            "at": 0,
+            "by": "",
+            "cells": {
+              "c26rm": "Seasons",
+              "c27rm": "The sky turns with the season, and crops do not grow in winter"
+            }
+          },
+          {
+            "id": "rGath1",
+            "done": false,
+            "at": 0,
+            "by": "",
+            "cells": {
+              "c26rm": "Gathering, fishing and mining",
+              "c27rm": "Shared, ranked gathering. A fishery that needs a pole, traps, and rare seams that each sit in one place on their own clock"
+            }
+          },
+          {
+            "id": "rSpk1",
+            "done": false,
+            "at": 0,
+            "by": "",
+            "cells": {
+              "c26rm": "Speech you hear nearby",
+              "c27rm": "Chat is local and drawn above the speaker's head, with a voice mark, text mute and hidden names"
             }
           }
         ]
