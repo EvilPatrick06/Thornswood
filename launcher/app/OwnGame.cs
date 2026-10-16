@@ -630,7 +630,7 @@ namespace Thornswood
         ///    defaults, FNIS.pex) is copied, never linked, and a folder that
         ///    already has them as links gets its own copy of each, as they are
         ///    now. Folders parked at the game's root or in Data (a name that
-        ///    starts with an underscore, such as _Parked or _disabledByKzl) are
+        ///    starts with an underscore, such as _Parked or _disabledBy and a server's name) are
         ///    left out, and taken out of a folder that already has them. See
         ///    Generated and Parked.
         /// 6: Vortex's Data\Platform\Distribution redistributables (the 68 CEF
@@ -2312,7 +2312,8 @@ namespace Thornswood
         /// an underscore, at the game's root or directly in Data. Skyrim ships
         /// none, and nothing loads from one. What was in them on 26 September:
         /// _Parked (a whole multiplayer client with a voice token), _Solo Mods,
-        /// _Profile Switch (a switch script) and Data\_disabledByKzl. A file
+        /// _Profile Switch (a switch script) and another server's
+        /// Data\_disabledBy folder, its short name after it. A file
         /// whose own name starts with one, such as Data\_ResourcePack.esl, is
         /// the game's and is not matched: only a folder is.
         /// </summary>
