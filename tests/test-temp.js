@@ -304,11 +304,13 @@ if (block) {
             /const CELL_TYPES = \[24, 34, 36, 42\];/.test(FRONT));
         yes('a fire somebody switched off is still skipped',
             /off = !!r\.isDisabled\(\)/.test(FRONT));
-        yes('and a non-empty walk is kept for the cell rather than redone every probe',
+        yes('and a walk is kept for the cell rather than redone every probe',
             /if \(cellId !== fireCell\)/.test(FRONT) &&
-            /if \(fireHere && fireHere\.length\)/.test(FRONT));
-        yes('an empty fire walk is retried, not cached forever',
-            /FIRE_EMPTY_RETRY/.test(FRONT) && /fireEmptyAt/.test(FRONT));
+            /if \(!fireHere && !fireWalk\)/.test(FRONT));
+        // #2590: walked again when the cell says it has loaded, never on a clock.
+        yes('the cell underfoot is walked again when it finishes loading, not on a timer',
+            /sp\.on\('cellFullyLoaded', guard\('fire cell loaded', fireCellLoaded\)\)/.test(FRONT) &&
+            !/const FIRE_EMPTY_RETRY =/.test(FRONT) && !/const FIRE_IDS_RETRY =/.test(FRONT));
         yes('using a forge furniture counts as standing in the heat',
             /getFurnitureReference/.test(FRONT) &&
             /function fireDistance/.test(FRONT));
