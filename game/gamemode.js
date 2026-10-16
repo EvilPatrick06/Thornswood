@@ -50398,7 +50398,7 @@ function thornswoodBooks(env) {
   var path = env.path;
   if (!fs) { fs = require('fs'); }
   if (!path) { path = require('path'); }
-  var dataDir = env.dataDir || 'data';
+  var privDir = env.privDir || 'private';
   var OFFER_MS = 45000;
   var MAX_MEMBERS = 40;
   var MAX_PRICES = 100;
@@ -50510,8 +50510,17 @@ function thornswoodBooks(env) {
     fs.renameSync(tmp, file);
   }
 
-  function booksFile() { return path.join(dataDir, 'books.json'); }
-  function leftFile() { return path.join(dataDir, 'last-left.json'); }
+  /*
+    Both in the private folder, never data (#2582, 16 Oct). The resources
+    port hands anything under data to anybody who asks, and both name
+    people: every member of a book by profile id, and the moment each
+    profile last left the world. Measured that morning: last-left.json
+    answered 200 on 3000 (3 profile ids) and on 7788 (43). #541 moved the
+    property register, the farm claims and the door list out of data for
+    the same reason on 25 Sep. tests\test-2582-nothing-personal-served.js.
+  */
+  function booksFile() { return path.join(privDir, 'books.json'); }
+  function leftFile() { return path.join(privDir, 'last-left.json'); }
 
   function loadStore() {
     var doc = null;
@@ -51431,11 +51440,28 @@ function thornswoodBooks(env) {
     var fs = require('fs');
     var path = require('path');
     var dataDir = 'data';
+    var privDir = 'private';
     try {
       var cfg = JSON.parse(fs.readFileSync('server-settings.json', 'utf8'));
       if (cfg && cfg.dataDir) { dataDir = String(cfg.dataDir); }
+      if (cfg && cfg.privDir) { privDir = String(cfg.privDir); }
     } catch (e) { }
-    var api = thornswoodBooks({ fs: fs, path: path, dataDir: dataDir });
+    /*
+      The copies the gamemode before #2582 wrote into data are served to
+      anybody until they are gone, so they are removed, not carried across:
+      the alpha keeps no data over a change (Patrick, 15 Oct). One that
+      cannot be removed stops the books here with the reason in the log,
+      the same as saved books that cannot be verified.
+    */
+    var served = ['books.json', 'last-left.json'];
+    for (var si = 0; si < served.length; si++) {
+      var old = path.join(dataDir, served[si]);
+      if (fs.existsSync(old)) {
+        fs.unlinkSync(old);
+        log('books: removed ' + old + ', which the resources port served to anybody');
+      }
+    }
+    var api = thornswoodBooks({ fs: fs, path: path, privDir: privDir });
     g.__thornswoodBooks = api;
     g.__thornswoodBooksTimer = setInterval(function () {
       try { api.noteTick(); } catch (e3) { }

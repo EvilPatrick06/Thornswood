@@ -413,7 +413,7 @@ jobs:
                  'test-npc-shared-runtime.js', 'test-npc-navigation-equivalence.js', 'test-npc-population-runtime.js', 'test-npc-role-titles.js',
                  'test-shared-resource-stock.js', 'test-resource-stock-integration.js',
                  'test-npc-death-policy.js', 'test-vortex-profile-state.ps1',
-                 'test-books.js', 'test-guild-ledger-safety.js', 'test-book-review-regressions.js',
+                 'test-books.js', 'test-guild-ledger-safety.js', 'test-book-review-regressions.js', 'test-2582-nothing-personal-served.js',
                  'test-recipeless-craft.js',
                  'test-npc-merchant-purses.js', 'test-merchant-ledger-storage.js', 'test-npc-merchant-startup.js',
                  'test-npc-activation-staging.js', 'test-merchant-roster-runtime.js', 'test-merchant-retirement-inspection.js', 'test-merchant-ledger-inspection.js', 'test-merchant-ledger-native.js',
