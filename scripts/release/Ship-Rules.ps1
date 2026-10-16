@@ -1868,9 +1868,11 @@ function Add-ShipLastPluginLine([string]$Src, [string]$Out, [switch]$Plain) {
 # Why this release may not carry Thornswood-Last.esp, or '' when it may.
 #   $RepoDir  the checkout
 #   $Enabled  the enabled plugin names of the list the pack carries, in order
+#   $Ccc      Skyrim.ccc's names that are in the release's Data folder
 # Refused: no manifest, a plugin that is not the manifest's bytes, a load
-# order (the five masters, then the enabled names, without this plugin) that
-# is not the one it was built against, the plugin not enabled last, and any
+# order (the five masters, the Skyrim.ccc plugins, then the enabled names,
+# without this plugin) that is not the one it was built against, the plugin
+# not enabled last, and any
 # plugin it was built against whose size or sha256 is not the one the release
 # gives people: records\collection-plugins.json for the collection's plugins
 # (what Vortex installs and the deploys hold the servers to, #2019) and the
@@ -1878,7 +1880,13 @@ function Add-ShipLastPluginLine([string]$Src, [string]$Out, [switch]$Plain) {
 # measure: a plugin Vortex deploys is never in a pack, and on One on 15 Oct
 # the dev release folder held a 3BBB.esp of 3,288 bytes from another
 # installer choice while the collection's is 20,257.
-function Get-ShipLastPluginProblem([string]$RepoDir, [string[]]$Enabled) {
+# The Skyrim.ccc plugins are the game's to load straight after the five
+# masters, and a plugin list never names them, so they come from $Ccc: the
+# order the plugin is built against is the server's, which has them there
+# (ServerOrder.ps1, Get-ThornswoodGameSequence). Until 15 Oct this left them
+# out, and the first dev Ship carrying the plugin was refused on One for
+# loading Water for ENB.esm where the server loads _ResourcePack.esl.
+function Get-ShipLastPluginProblem([string]$RepoDir, [string[]]$Enabled, [string[]]$Ccc = @()) {
     $rebuild = 'Build it again for this load order: python scripts\mods\Build-LastPlugin.py --data <a Data folder holding the collection''s bytes>, then commit the plugin and game\data\last-plugin.json.'
     $plugin = Join-Path $RepoDir ('game\content\' + $ShipLastPlugin)
     $mpath = Join-Path $RepoDir $ShipLastManifest
@@ -1900,7 +1908,9 @@ function Get-ShipLastPluginProblem([string]$RepoDir, [string[]]$Enabled) {
         if (-not $names.Count -or $names[-1] -ine $ShipLastPlugin) {
             return "the plugin list this release carries does not enable $ShipLastPlugin last."
         }
-        $order = @($ShipBaseMasters) + @($names | Select-Object -First ($names.Count - 1) | Where-Object { $ShipBaseMasters -notcontains $_ })
+        $first = @($ShipBaseMasters)
+        foreach ($c in @($Ccc | ForEach-Object { "$_".Trim() } | Where-Object { $_ })) { if ($first -notcontains $c) { $first += $c } }
+        $order = $first + @($names | Select-Object -First ($names.Count - 1) | Where-Object { $first -notcontains $_ })
         $built = @($m.loadOrder | ForEach-Object { [string]$_ })
         for ($i = 0; $i -lt [Math]::Max($order.Count, $built.Count); $i++) {
             $a = if ($i -lt $order.Count) { $order[$i] } else { '(nothing)' }
