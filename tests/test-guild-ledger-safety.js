@@ -11,7 +11,7 @@ let hold = 'whiterun', brokenWrite = false;
 const testFs = Object.create(fs);
 testFs.writeFileSync = (...args) => { if (brokenWrite) throw new Error('disk full'); return fs.writeFileSync(...args); };
 function make() {
-  const ctx = { env: { fs: testFs, path, dataDir: dir, atBox: () => hold,
+  const ctx = { env: { fs: testFs, path, privDir: dir, atBox: () => hold,
     roles: () => ({ business: true, account: 'a' }), nameOf: () => 'Ada', refresh: () => {} } };
   vm.createContext(ctx);
   vm.runInContext(block + '\nthis.api = thornswoodBooks(env);', ctx);
@@ -78,7 +78,7 @@ try {
   const initializer = src.slice(initStart, src.indexOf('})();', initStart) + 5);
   const reloadFs = Object.create(fs);
   reloadFs.readFileSync = (file, ...args) => file === 'server-settings.json'
-    ? JSON.stringify({ dataDir: dir }) : fs.readFileSync(file, ...args);
+    ? JSON.stringify({ dataDir: path.join(dir, 'served'), privDir: dir }) : fs.readFileSync(file, ...args);
   const reload = { __thornswoodBooks: { command: () => 'old writable API' }, __thornswoodBooksTimer: 4,
     require: name => name === 'fs' ? reloadFs : path, log: () => {},
     clearInterval: id => { assert.strictEqual(id, 4); reload.cleared = true; },
