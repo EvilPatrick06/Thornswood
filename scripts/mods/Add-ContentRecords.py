@@ -27,9 +27,10 @@ scripts\\mods\\content-salvaged.json, with what became of each:
             (the Charburner and Edgewright pages); the register says which.
   dropped   the other server's other placements (Skyrim's own objects put
             where it chose, notice boards placed switched off), its changes to
-            Skyrim's own placements (80 switched off, 35 moved, turned or
-            resized, 4 that change nothing), the cells and worldspaces left
-            holding nothing of Thornswood's, and a chest of ore nothing names.
+            Skyrim's own placements (80 switched off, 32 moved, turned or
+            resized, 3 relinked, 4 that change nothing), the cells and
+            worldspaces left holding nothing of Thornswood's, and a chest
+            of ore nothing names.
   Bethesda's  the cells and worldspaces that hold the placements left, each
             written from the winning master's own record by
             Build-LastPlugin.py's copier, never the salvaged copy.
