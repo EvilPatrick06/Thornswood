@@ -680,10 +680,14 @@ namespace Thornswood
         ///    assets in records\ui-gone.json stay out either way. Once a
         ///    list exists, only names on it are ours. See Foreign, issue
         ///    #1318.
+        /// 17: five files under Data\Platform nothing uses (Images\lock.png,
+        ///    Images\speaking.png and the ChainLink, NoticeIcon and VoiceIcon
+        ///    sprite fonts) are left out, so a refresh cannot copy them back
+        ///    after a pack deletes them. See Foreign, issue #2177.
         ///
         /// Every number from 14 on also gets a line in RuleTouches below.
         /// </summary>
-        const int Rules = 16;
+        const int Rules = 17;
 
         /// <summary>
         /// What each rule from 14 on can decide differently, as the start of
@@ -705,6 +709,7 @@ namespace Thornswood
             { 14, new string[] { "Data\\ElysiumEstateSSE.esp" } },
             { 15, new string[] { "Data\\Platform\\UI\\" } },
             { 16, new string[] { "Data\\Platform\\UI\\" } },
+            { 17, new string[] { "Data\\Platform\\Images\\", "Data\\Platform\\Fonts\\" } },
         };
 
         /// <summary>
@@ -2029,6 +2034,15 @@ namespace Thornswood
             // carries the same rule and puts the path on $ShipDeleteAlways;
             // change them together.
             if (rel.Equals("Data\\Platform\\Plugins\\thornswood-chargen.js", StringComparison.OrdinalIgnoreCase)) return true;
+            // Five files under Data\Platform that nothing uses, issue #2177:
+            // two pictures in Images and three icon sprite fonts in Fonts,
+            // dated 12 and 14 Sep, which no script, page or font call names and
+            // nobody recorded the maker of. Patrick, 15 Oct: they stop shipping
+            // and every install loses them on the next release. Packs delete
+            // them, and this keeps a refresh from copying a Steam copy's old
+            // ones back in. Ship-Rules.ps1 carries the same five
+            // ($ShipPlatformUnused); change the two together.
+            if (Regex.IsMatch(rel, @"^Data\\Platform\\(Images\\(lock|speaking)\.png|Fonts\\(ChainLink|NoticeIcon|VoiceIcon)\.spritefont)$", I)) return true;
             // The bundle is on ClientFiles and answered above in WhyLeft, so
             // here it is simply not ours to take from the Steam copy either.
             if (Regex.IsMatch(rel, @"^Data\\Platform\\Plugins\\[^\\]+\.js$", I))

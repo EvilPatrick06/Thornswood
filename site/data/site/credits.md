@@ -108,6 +108,11 @@ one SkyMP script above. The licence texts come with it, in
 Paul J. Miller and Dieter Steffmann, under the SIL Open Font License. It comes
 with SkyMP.
 
+**Bankir-Retro**, the font SkyMP's in-game interface draws its buttons and
+text boxes in, is by Gophmann A.L. (2006). **icomoon**, the small icon font
+that interface draws the dots of a hidden password with, was made with
+IcoMoon. Both come with SkyMP, in its `skymp5-front`.
+
 **This site** is set in Cinzel, by the Cinzel Project Authors, and Spectral,
 by the Spectral Project Authors, both under the SIL Open Font License. It
 draws its written pages with marked, by Christopher Jeffrey, under the MIT

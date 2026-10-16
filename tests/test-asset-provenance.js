@@ -22,7 +22,9 @@
 //      stores them, with LF line endings), so a changed file is looked at
 //      again;
 //   4. a derived file names a registered source, and a withheld one names the
-//      record that keeps it out, which holds what the entry says;
+//      record that keeps it out, which holds what the entry says: a set in
+//      records\ui-gone.json, or a list in Ship-Rules.ps1 that holds every
+//      path the entry names (the five files nothing uses, #2177);
 //   5. no permission is copied in: no email address anywhere in it;
 //   6. it stays operator only: nothing that builds a pack, the installer, the
 //      launcher or the site names it, and it is not under site\public;
@@ -79,8 +81,14 @@ function tracked() {
   }
 }
 
+// The quoted paths of one list in Ship-Rules.ps1, $<name> = @( ... ).
+function shipList(text, name) {
+  const m = new RegExp('^\\$' + name + ' = @\\(([\\s\\S]*?)^\\)', 'm').exec(text || '');
+  return m ? (m[1].match(/'[^']+'/g) || []).map((q) => q.slice(1, -1)) : [];
+}
+
 // Each finding is one line saying what is wrong and what to do.
-function audit(reg, files, hash, uiGone) {
+function audit(reg, files, hash, uiGone, shipRules) {
   const bad = [];
   if (!reg || reg.version !== 1) { bad.push('the register is not version 1'); return bad; }
   const statuses = Object.keys(reg.statuses || {});
@@ -99,9 +107,18 @@ function audit(reg, files, hash, uiGone) {
     if (a.status === 'no-licence-found' && !(Number.isInteger(a.issue) && a.issue > 0)) bad.push(name + ': no licence found, and no issue that carries it');
     if (a.status === 'withheld') {
       const m = /^records\/ui-gone\.json#(\w+)$/.exec(a.record || '');
-      const held = m && uiGone ? uiGone[m[1]] : null;
-      const n = held ? (Array.isArray(held) ? held.length : Object.keys(held).length) : 0;
-      if (!n) bad.push(name + ': withheld, but names no record that holds it out');
+      const r = /^scripts\/release\/Ship-Rules\.ps1#(\w+)$/.exec(a.record || '');
+      if (r) {
+        const list = shipList(shipRules, r[1]);
+        const paths = Array.isArray(a.paths) ? a.paths : [];
+        const out = paths.filter((x) => list.indexOf(x) < 0);
+        if (!list.length || !paths.length) bad.push(name + ': withheld by Ship-Rules.ps1 $' + r[1] + ', but that list or the entry\'s paths are empty');
+        else if (out.length) bad.push(name + ': withheld by Ship-Rules.ps1 $' + r[1] + ', which does not hold ' + out.join(', '));
+      } else {
+        const held = m && uiGone ? uiGone[m[1]] : null;
+        const n = held ? (Array.isArray(held) ? held.length : Object.keys(held).length) : 0;
+        if (!n) bad.push(name + ': withheld, but names no record that holds it out');
+      }
     }
   }
   for (const a of assets) {
@@ -131,9 +148,11 @@ try { reg = JSON.parse(fs.readFileSync(REGISTER, 'utf8')); } catch (e) { console
 yes('records\\asset-provenance.json reads as JSON', reg !== null);
 let uiGone = null;
 try { uiGone = JSON.parse(fs.readFileSync(path.join(ROOT, 'records', 'ui-gone.json'), 'utf8')); } catch (e) { }
+let shipRules = '';
+try { shipRules = fs.readFileSync(path.join(ROOT, 'scripts', 'release', 'Ship-Rules.ps1'), 'utf8'); } catch (e) { }
 const files = tracked();
 yes('the repository\'s files can be listed (' + files.length + ')', files.length > 100);
-const found = audit(reg, files, hashOf, uiGone);
+const found = audit(reg, files, hashOf, uiGone, shipRules);
 for (const b of found) console.log('  ' + b);
 yes('every asset is registered with every field, its sha256 matches, and nothing in it is a permission (' + found.length + ' finding(s))', found.length === 0);
 if (reg) {
@@ -142,6 +161,10 @@ if (reg) {
   console.log('  ' + Object.keys(reg.statuses).map((s) => s + ' ' + count(s)).join(', '));
   yes('the register says what it is and that it is operator only', /Operator only/.test(reg.about || '') && /never written here/.test(reg.about || ''));
   yes('the 37 Daedric Online files are withheld by the record that deletes them', (reg.notInRepo || []).some((a) => a.status === 'withheld' && a.record === 'records/ui-gone.json#daedric') && uiGone && Object.keys(uiGone.daedric || {}).length === 37);
+  yes('the five files nothing uses are withheld by the Ship-Rules.ps1 list every pack deletes (#2177)',
+    (reg.notInRepo || []).filter((a) => a.status === 'withheld' && a.record === 'scripts/release/Ship-Rules.ps1#ShipPlatformUnused')
+      .reduce((n, a) => n + (Array.isArray(a.paths) ? a.paths.length : 0), 0) === 5 &&
+    shipList(shipRules, 'ShipPlatformUnused').length === 5);
   yes('community uploads and the collection\'s mods are dispositioned', (reg.dispositions || []).length >= 2 && (reg.dispositions || []).some((d) => /gallery/i.test(d.what)) && (reg.dispositions || []).some((d) => /collection/i.test(d.what)));
 }
 
@@ -166,19 +189,22 @@ yes('every sprite font THIRD-PARTY.md names is registered (' + sprites.length + 
 if (reg) {
   const copy = () => JSON.parse(JSON.stringify(reg));
   const some = (reg.assets || []).find((a) => a.status === 'unconfirmed');
-  let r = audit(copy(), files.concat(['site/public/new-picture.png']), hashOf, uiGone);
+  let r = audit(copy(), files.concat(['site/public/new-picture.png']), hashOf, uiGone, shipRules);
   yes('a new picture nobody registered is caught', r.some((b) => /^site\/public\/new-picture\.png: not in records/.test(b)));
-  r = audit(copy(), files, (p) => (p === some.path ? '0'.repeat(64) : hashOf(p)), uiGone);
+  r = audit(copy(), files, (p) => (p === some.path ? '0'.repeat(64) : hashOf(p)), uiGone, shipRules);
   yes('a registered picture that changed is caught', r.some((b) => b.indexOf(some.path + ': changed since it was registered') === 0));
   const c = copy(); delete c.assets.find((a) => a.path === some.path).ask;
-  r = audit(c, files, hashOf, uiGone);
+  r = audit(c, files, hashOf, uiGone, shipRules);
   yes('an unconfirmed entry with no ask is caught', r.some((b) => b.indexOf(some.path + ': unconfirmed with no ask') === 0));
   const d = copy(); d.assets[0].evidence = 'licence by email from someone@example.com';
-  r = audit(d, files, hashOf, uiGone);
+  r = audit(d, files, hashOf, uiGone, shipRules);
   yes('an email address copied in is caught', r.some((b) => /an email address is in the register/.test(b)));
   const e = copy(); e.notInRepo.find((a) => a.status === 'withheld').record = 'records/ui-gone.json#nothing';
-  r = audit(e, files, hashOf, uiGone);
+  r = audit(e, files, hashOf, uiGone, shipRules);
   yes('a withheld entry naming no real record is caught', r.some((b) => /withheld, but names no record/.test(b)));
+  const f = copy(); f.notInRepo.find((a) => a.record === 'scripts/release/Ship-Rules.ps1#ShipPlatformUnused').paths.push('Data\\Platform\\Fonts\\Tavern.ttf');
+  r = audit(f, files, hashOf, uiGone, shipRules);
+  yes('a withheld entry naming a path its Ship-Rules list does not hold is caught', r.some((b) => /which does not hold Data\\Platform\\Fonts\\Tavern\.ttf/.test(b)));
 }
 
 console.log('');
