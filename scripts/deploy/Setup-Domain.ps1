@@ -221,7 +221,7 @@ Remote @"
 # before Caddy is stopped: it goes onto LOCAL SERVICE only where LOCAL SERVICE
 # can read none of what no service may.
 $(Get-ThornswoodServiceAccountScript)
-`$asSystem = `$$(if ($AsSystem) { 'true' } else { 'false' })
+`$asSystem = [bool]$([int][bool]$AsSystem)
 if (-not `$asSystem) {
   `$cannot = @(Test-ThornswoodServiceCannotReach (Get-ThornswoodServiceNeverReach))
   if (`$cannot.Count) {

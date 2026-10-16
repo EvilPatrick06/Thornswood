@@ -74,6 +74,28 @@ $caddyfile = Text (Join-Path $Deploy 'Caddyfile')
 Yes 'the Caddyfile keeps certificates in C:/Thornswood-Caddy/data, the same under any account' (
     [regex]::IsMatch($caddyfile, '(?m)^\s*storage\s+file_system\s+C:/Thornswood-Caddy/data\s*$'))
 
+# The dev instance (vps-dev-instance.ps1) runs alone on the box, so it carries
+# its own copy too, and registers both dev tasks through it. The retired
+# Fix-Voice.ps1 names no SYSTEM principal either.
+$devInst = Text (Join-Path $Repo 'scripts\vps\vps-dev-instance.ps1')
+$devOwn = [regex]::Replace($devInst, '(?s)# ---- ServiceAccount\.ps1 \(copy\) ----.*?# ---- end ServiceAccount\.ps1 ----', '')
+$md = [regex]::Match($devInst.Replace("`r`n", "`n"), '(?s)# ---- ServiceAccount\.ps1 \(copy\) ----\n(.*?)# ---- end ServiceAccount\.ps1 ----')
+Yes 'vps-dev-instance.ps1 carries an exact copy of ServiceAccount.ps1' (
+    $md.Success -and $md.Groups[1].Value -eq (Get-ThornswoodServiceAccountScript).Replace("`r`n", "`n"))
+Yes 'vps-dev-instance.ps1 names no SYSTEM principal or Highest run level of its own' (-not [regex]::IsMatch($devOwn, $sysRe))
+Yes 'vps-dev-instance.ps1 no longer copies the live task principal' (-not $devOwn.Contains('-Principal $liveTask.Principal') -and -not $devOwn.Contains('-Principal $liveVoiceTask.Principal'))
+Yes 'vps-dev-instance.ps1 takes its principal from New-ThornswoodServicePrincipal, with -AsSystem as the way back' (
+    $devOwn.Contains('New-ThornswoodServicePrincipal -AsSystem:') -and $devOwn.Contains('(New-ThornswoodServicePrincipal -AsSystem)') -and
+    [regex]::IsMatch($devOwn, '\[switch\]\$AsSystem'))
+Yes 'vps-dev-instance.ps1 runs the fail-safe before any task is registered' (
+    $devOwn.IndexOf('Test-ThornswoodServiceCannotReach (Get-ThornswoodServiceNeverReach') -ge 0 -and
+    $devOwn.IndexOf('Test-ThornswoodServiceCannotReach (Get-ThornswoodServiceNeverReach') -lt $devOwn.IndexOf("Register-DevTask 'Thornswood Dev Server'"))
+Yes 'vps-dev-instance.ps1 registers both dev tasks with their grants' (
+    $devOwn.Contains("Register-DevTask 'Thornswood Dev Server'") -and $devOwn.Contains("Register-DevTask 'Thornswood Dev Voice'") -and
+    $devOwn.Contains('Grant-ThornswoodServiceFolder') -and $devOwn.Contains('Get-ThornswoodTaskSid'))
+$fixVoice = Text (Join-Path $Repo 'scripts\oneoff\Fix-Voice.ps1')
+Yes 'Fix-Voice.ps1 (retired) names no SYSTEM principal or Highest run level' (-not [regex]::IsMatch($fixVoice, $sysRe))
+
 # ---- the principal --------------------------------------------------------------
 $p = New-ThornswoodServicePrincipal
 Yes 'the principal is NT AUTHORITY\LOCAL SERVICE' ($p.UserId -match '(?i)LOCAL SERVICE$')

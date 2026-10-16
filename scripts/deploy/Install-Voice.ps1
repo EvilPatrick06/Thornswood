@@ -337,7 +337,7 @@ if (-not `$node) { 'node is not installed on this machine'; 'SWAP REFUSED'; exit
 # before anything is stopped or changed: voice goes onto LOCAL SERVICE only
 # where LOCAL SERVICE can read none of what no service may.
 $(Get-ThornswoodServiceAccountScript)
-`$AsSystem = `$$(if ($AsSystem) { 'true' } else { 'false' })
+`$AsSystem = [bool]$([int][bool]$AsSystem)
 if (-not `$AsSystem) {
     `$cannot = @(Test-ThornswoodServiceCannotReach (Get-ThornswoodServiceNeverReach -Own '$Root'))
     if (`$cannot.Count) {
