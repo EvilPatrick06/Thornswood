@@ -36,7 +36,9 @@ committed here together with the new build records (`.gitmodules:7-10`).
 Scripts ask `scripts\release\Where.ps1` where things are, and it reads
 `layout.json` at the repository root: `Engine` is `engine\skymp`, fetched or
 not (`layout.json:6`); `ServerDist` and `ClientDist` are `build\dist\server` and
-`build\dist\client` in it (`layout.json:10-11`); `Out` is the ignored `out`.
+`build\dist\client` under `EngineBuild` (`layout.json:11-12`), which is this
+machine's engine build (see "One engine") and `engine\skymp` on a machine that
+records none; `Out` is the ignored `out`.
 The old `C:\Thornswood-Dev\skymp` is not looked at any more (issue #440).
 
 ## Fetching it
@@ -301,6 +303,20 @@ A change to the engine goes like this:
    those is not the commit `records\server-build.json` names.
 5. After it merges: the server to the dev server with `Publish-Server.ps1
    -Channel dev`, the client with the next dev Ship.
+
+Which build a machine's scripts read (issue #2019). The build of step 2 is in
+the fork worktree, not in any checkout's `engine\skymp`, so a machine records
+that worktree once: `.\scripts\release\Setup-ShipMachine.ps1 -EngineBuild
+<that worktree>` writes `%LOCALAPPDATA%\Thornswood\engine-build.json`, and
+`Where.ps1` (and `where.js`) answer `ClientDist`, `ServerDist`,
+`ServerSettings` and `ChangeForms` under it for every clone and worktree on
+the machine. Until then each checkout read its own `engine\skymp\build`, and
+on 15 October a dev Ship from a worktree whose build was three days old
+refused against the record. A record naming a folder with no `build\dist`
+stops the script that asks, with a sentence; it never falls back to another
+folder. After building a new engine commit in another worktree, record that
+one. On One the recorded build is
+`C:\ThornswoodTemps&Worktrees\worktrees\claude-skymp-7feb5dc4`.
 
 Two harnesses hold it. `tests\test-one-engine.js`, in the build check on every
 pull request, is red when the pin and the two records do not name one commit,
