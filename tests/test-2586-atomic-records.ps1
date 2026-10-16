@@ -91,7 +91,7 @@ Yes 'installed-into-game.txt, which OwnGame rewrites when the Steam copy is clea
 
 # ---- 2 and 3: WriteRecord itself, compiled ---------------------------------------
 $og = [IO.File]::ReadAllText((Join-Path $App 'OwnGame.cs')) -replace "`r`n", "`n"
-$m = [regex]::Match($og, '(?s)\n(        static void WriteRecord\(string path, IEnumerable<string> lines\)\n        \{\n.*?\n        \}\n.*?static extern bool MoveFileEx\([^)]*\);\n)')
+$m = [regex]::Match($og, '(?s)\n(        (?:internal )?static void WriteRecord\(string path, IEnumerable<string> lines\)\n        \{\n.*?\n        \}\n.*?static extern bool MoveFileEx\([^)]*\);\n)')
 Yes 'OwnGame.WriteRecord is in OwnGame.cs, with the MoveFileEx it calls' $m.Success
 Yes '...and renames a file beside the record over it in one call, replacing it' ($m.Success -and $m.Groups[1].Value -match 'MoveFileEx\(next, path, MoveReplaceExisting \| MoveWriteThrough\)' -and
     $m.Groups[1].Value -match 'const int MoveReplaceExisting = 0x1;' -and $m.Groups[1].Value -match 'path \+ "\.new"')

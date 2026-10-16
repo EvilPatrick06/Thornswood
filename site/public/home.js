@@ -263,12 +263,10 @@ if (AGE_PATHS[here] && !ageOk()) {
     // Rendered by the server, like the written pages.
     if (b.introHtml) out += b.introHtml;
     else if (b.intro) out += '<p>' + esc(b.intro) + '</p>';
-    // Finished work is not a roadmap. The Done column stays on the board in
-    // the hub so the record is kept, it just does not belong on the public
-    // page, where the only question anybody has is what is coming next.
-    var live = (b.sections || []).filter(function (sec) {
-      return !/^\s*done\s*$/i.test(sec.name || '');
-    });
+    // Every section is drawn, Done included (#2560). Done used to be hidden
+    // here, so the finished work #2561 moved into it never reached the page.
+    // Done is last in the data, so it is drawn last.
+    var live = b.sections || [];
     live.forEach(function (sec) {
       var cols = sec.columns || [], rows = sec.rows || [];
       if (!rows.length) return;

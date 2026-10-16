@@ -16,7 +16,7 @@ function test(name, run) {
   const io = Object.create(fs);
   io.renameSync = (...args) => { if (failSave) throw new Error('rename denied'); return fs.renameSync(...args); };
   function make() {
-    const ctx = { env: { fs: io, path, dataDir: dir, atBox: () => 'whiterun',
+    const ctx = { env: { fs: io, path, privDir: dir, atBox: () => 'whiterun',
       roles: () => ({ business: true, account: 'a' }), nameOf: () => 'Ada',
       find: () => ({ pid: 2, actorId: 2, name: 'Ben' }), offer: () => '', refresh: () => {} } };
     vm.createContext(ctx); vm.runInContext(block + '\nthis.api = thornswoodBooks(env);', ctx);
@@ -71,7 +71,7 @@ test('failed price edit and failed membership acceptance roll back', ({ api, id,
 test('failed reload revokes a retained old API', ({ api, dir, file, id }) => {
   fs.writeFileSync(file, '{broken');
   const io = Object.create(fs);
-  io.readFileSync = (f, ...args) => f === 'server-settings.json' ? JSON.stringify({ dataDir: dir }) : fs.readFileSync(f, ...args);
+  io.readFileSync = (f, ...args) => f === 'server-settings.json' ? JSON.stringify({ dataDir: path.join(dir, 'served'), privDir: dir }) : fs.readFileSync(f, ...args);
   const ctx = { __thornswoodBooks: api, require: name => name === 'fs' ? io : path,
     log: () => {}, clearInterval: () => {}, setInterval: () => { throw new Error('no timer'); } };
   vm.createContext(ctx); vm.runInContext(block + '\n' + initializer, ctx);
