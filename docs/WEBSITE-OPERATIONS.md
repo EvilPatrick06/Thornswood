@@ -75,12 +75,70 @@ the omission policy does not remove storage costs. A successful backup task
 is not proof of recovery; periodically run the existing encrypted check and
 rehearse recovery into a restricted disposable destination.
 
-Keep completed deletion requests in restricted staff records with only the
-identity and action needed to reapply them. Before restoring an older backup,
-apply those deletions before reopening service. Do not restore deleted
-gallery content into public use. Old encrypted recovery copies expire under
-the documented retention schedule rather than being silently advertised as
-immediately rewritten. Verify the local key copy exists without printing it.
+Completed deletion requests are kept in a restricted record with only the
+identity and action needed to reapply them (Deletion requests, below).
+Before restoring an older backup, those deletions are applied again before
+service reopens. Do not restore deleted gallery content into public use. Old
+encrypted recovery copies expire under the documented retention schedule
+rather than being silently advertised as immediately rewritten. Verify the
+local key copy exists without printing it.
+
+## Deletion requests
+
+The privacy page promises that somebody who asks in the Discord has their
+Discord link, session records, chat and character deleted, by a person, and
+is told when it is done. `scripts\vps\Delete-Person.ps1` is the one action
+that does it across every store on the box (issue #2351, decided by Patrick
+on 12 October 2026). Any staff member with VPS access runs it, from their own
+clone, in PowerShell 7.
+
+1. **The request comes from the account itself**, in a private ticket that
+   account opened (**I need help** in the Discord). Never act on a request
+   about somebody else's account. Do not ask for a government identity
+   document.
+2. **Their Discord id**: on the hub's Linked accounts page, or in Discord
+   with Developer Mode on, right click the person and Copy User ID. It is 17
+   to 20 digits.
+3. **The dry run** changes nothing and prints, for every store, how many of
+   their records are there, which a real run removes and which it keeps:
+   ```powershell
+   .\scripts\vps\Remote.ps1 -File .\scripts\vps\Delete-Person.ps1 -Arguments '-DiscordId <their id>'
+   ```
+   It ends `DRY RUN: nothing was changed` and names the services a real run
+   stops for a moment.
+4. **The real run**, when nobody is on either game server (it refuses while
+   anybody is, unless `-Now` is added, which drops them):
+   ```powershell
+   .\scripts\vps\Remote.ps1 -File .\scripts\vps\Delete-Person.ps1 -Arguments '-DiscordId <their id> -Delete -By <your name>'
+   ```
+   It stops the site, the game servers, voice and the bot only where their
+   files hold something of the person's, removes it, starts each one again,
+   and ends `DELETED, and written down in C:\Thornswood-Deletions\requests.jsonl`.
+   `NOT FINISHED` names a file it could not change; run it again.
+5. **What is not on the box**, by hand: remove their approved gallery
+   pictures in the hub by name (the gallery keeps no account with an approved
+   picture).
+6. **Tell them** in the ticket that it is done, and what stays: staff's
+   records about them (bans, PKs, notes, the staff logs), reports they made or
+   that were made about them, a session staff marked kept, and what the game's
+   registers still say about a house or a bounty their character held (#2351
+   has the decision on those). Logs age out by their own rule, and the
+   encrypted backups expire on their schedule; the record below is why a
+   restore never brings the person back.
+7. **Then delete their ticket threads** in the Discord, which is the last
+   place on our side that holds what they wrote.
+
+**The record.** `C:\Thornswood-Deletions\requests.jsonl` on the box, one line
+for each completed request: the Discord id, the profile ids, when, who ran it
+and how many records each store lost. Nothing else about the person. The
+folder is SYSTEM's and Administrators' only. The nightly backup takes it as
+`deletions\requests.jsonl`, so it leaves the box with every backup and comes
+back with any of them. A request made after the last backup is only on the
+box until the next nightly run.
+
+**After a restore**, before anything starts, `Delete-Person.ps1 -Reapply`
+removes everybody in the record again. `Restore-Box.ps1` does it as its last
+step; [RESTORING.md](RESTORING.md) has the commands for every other restore.
 
 ## Accessibility scope
 

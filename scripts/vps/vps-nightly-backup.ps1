@@ -21,6 +21,9 @@
     the site's data       linked Discord accounts, the boards, the documents
     the bot's config      bot.env.json
     the bot's join record joins.json, which arrival each person was
+    the deletion record   requests.jsonl, every deletion request carried out
+                          (Delete-Person.ps1, #2351), so a restore reapplies
+                          them before anything starts
     the Caddyfile         whatever is answering on 443 for thornswood.net
 
     the dev server        its world, private, data, server-settings.json and
@@ -61,6 +64,8 @@ param(
   [string]$BotRoot    = 'C:\Thornswood-Bot',
   [string]$CaddyRoot  = 'C:\Thornswood-Caddy',
   [string]$VoiceRoot  = 'C:\Thornswood-Voice',
+  # The record of completed deletion requests (Delete-Person.ps1, #2351).
+  [string]$DeletionRoot = 'C:\Thornswood-Deletions',
   [string]$Out        = 'C:\Thornswood-Backup',
   # The passphrase. Created by Install-Backup.ps1 if it is not already there,
   # and the one thing in all of this that has to be kept somewhere else as
@@ -274,6 +279,11 @@ Grab (Join-Path $BotRoot  'bot.env.json')         'bot\bot.env.json'
 $joins = Join-Path $BotRoot 'data\joins.json'
 if (-not (Test-Path -LiteralPath $joins) -and (Test-Path -LiteralPath (Join-Path $BotRoot 'joins.json'))) { $joins = Join-Path $BotRoot 'joins.json' }
 Grab $joins                                       'bot\joins.json'
+# Every deletion request carried out (#2351). A backup put back holds the
+# people who asked before it was taken; this line is how a restore knows to
+# remove them again, and the copy here is the one that survives the box.
+# A box where nobody has asked yet has none, and that is a "missing" line.
+Grab (Join-Path $DeletionRoot 'requests.jsonl')  'deletions\requests.jsonl'
 # THE CHARACTER REGISTER IS GONE, 23 September, and so are the two files this
 # used to fetch for it: secret.txt, the shared secret it checked against, and
 # owners.json, the register itself. Nothing reads either any more, so backing

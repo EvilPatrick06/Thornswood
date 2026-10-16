@@ -13,7 +13,7 @@
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
     "scriptCount":  55,
-    "callCount":  238,
+    "callCount":  239,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -1913,6 +1913,15 @@
                       "does":  "install-time or outside-the-gate work",
                       "class":  "admin",
                       "reason":  "destructive or install-time work outside the gate verbs"
+                  },
+                  {
+                      "script":  "scripts/vps/Restore-Box.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "$has = Remote \"if (Test-Path -LiteralPath \u0027$far\\unpacked\\deletions\\requests.jsonl\u0027) { \u0027RECORD\u0027 } else { \u0027NONE\u0027 }\"",
+                      "does":  "reads files, settings, logs or status",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
                   },
                   {
                       "script":  "scripts/vps/Restore-Box.ps1",
