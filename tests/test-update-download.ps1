@@ -90,7 +90,9 @@ $sigs = @(
     'public static void ApplyPack(Config cfg, Pack p, Action<string> log)',
     'public static int Requeue()',
     'static void CheckSigner(string path, Action<string> log)',
-    'public static void SelfUpdate(Config cfg, VersionDoc v, Action<string> log)'
+    'public static void SelfUpdate(Config cfg, VersionDoc v, Action<string> log)',
+    'public static string FetchLauncher(Config cfg, VersionDoc v, Action<string> log)',
+    'public static void SwapIn(string tmp, Action<string> log)'
 )
 $bodies = @()
 foreach ($sig in $sigs) {
@@ -496,7 +498,8 @@ Yes 'the driver ran to the end' (($lines | Where-Object { $_ -like 'DRIVER *' })
 
 # Order in the real SelfUpdate: the signer check comes before anything is put
 # at .new, and the swap script is only written after the copy.
-$self = Body $up 'public static void SelfUpdate(Config cfg, VersionDoc v, Action<string> log)'
+# Since #2210 SelfUpdate is FetchLauncher then SwapIn; the swap is SwapIn's.
+$self = Body $up 'public static void SwapIn(string tmp, Action<string> log)'
 $iSign = $self.IndexOf('CheckSigner(tmp'); $iCopy = $self.IndexOf('File.Copy(tmp, neu'); $iBat = $self.IndexOf('SelfSwap.Script(')
 Yes 'SelfUpdate checks the signer before the copy to .new' ($iSign -gt 0 -and $iCopy -gt $iSign)
 Yes 'SelfUpdate writes the swap script only after the copy' ($iBat -gt $iCopy)

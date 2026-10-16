@@ -84,11 +84,16 @@ const startOwn = body(own, 'static void StartOwnGame(bool make, bool loud, Actio
 const startOwn2 = body(own, 'static void StartOwnGame(bool make, bool loud)');
 yes('StartOwnGame(make, loud) is StartOwnGame(make, loud, null), so the button and startup are unchanged',
     /^\{\s*StartOwnGame\(make, loud, null\);\s*\}$/.test(startOwn2));
-yes('StartOwnGame runs what comes after only when it worked, and never after a make',
-    /if \(fail == null && !make && then != null\) then\(\);/.test(startOwn));
+// Since #2210 the work runs in FolderWork, which StartOwnGame hands its
+// `then` to under OwnGame.Alone, so the finish is FolderWork's.
+const folderWork = body(own, 'static void FolderWork(bool make, bool loud, Action then, Config c, Action<string> say)');
+yes('StartOwnGame hands what comes after to FolderWork, under the folder\'s lock',
+    /OwnGame\.Alone\(delegate \{ FolderWork\(make, loud, then, c, say\); \}/.test(startOwn));
+yes('FolderWork runs what comes after only when it worked, and never after a make',
+    /if \(fail == null && !make && then != null\) then\(\);/.test(folderWork));
 yes('that line is inside the finish on the window\'s thread, after the status is drawn again',
-    startOwn.indexOf('then();') > startOwn.lastIndexOf('DrawOwnGame();') &&
-    startOwn.lastIndexOf('win.Dispatcher.BeginInvoke') < startOwn.indexOf('then();'));
+    folderWork.indexOf('then();') > folderWork.lastIndexOf('DrawOwnGame();') &&
+    folderWork.lastIndexOf('win.Dispatcher.BeginInvoke') < folderWork.indexOf('then();'));
 const cont = due.slice(due.indexOf('StartOwnGame(false, true,'));
 yes('what comes after is StartPlay from the top, not Play(), so Discord and the character list are not skipped',
     /StartPlay\(\);/.test(cont) && !/[^t]Play\(\);/.test(cont.replace(/StartPlay\(\);/g, '')));

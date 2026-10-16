@@ -154,10 +154,22 @@ revision adds no new full plugin to the 48-position order.
 
 ## 8. Refresh a separate own folder
 
-Vortex deploys into C:\Thornswood-DevBuild\Game. That is the collection
-source. Select that source explicitly in the launcher's Vortex folder
-setting so the stale Steam deployment cannot win discovery.
+Vortex deploys into the Steam copy of Skyrim Special Edition. That is the
+collection source for every own folder on the machine: Main's, the dev
+build's and each release folder. From 3 to 11 October Vortex deployed into
+C:\Thornswood-DevBuild\Game instead, as this step used to say. Vortex
+deploys by hard link, so every file there was a second name of Vortex's own
+copy, and each refresh of that folder made the 7,500 Nemesis patches it
+keeps as copies its own again until Vortex linked them at its next deploy
+(issue #2210). Since Patrick's decision of 12 October the launcher refuses a
+Thornswood game folder as Vortex's folder: it does not make or refresh from
+one, Choose Vortex's folder will not take one, and the log says at every
+start to point Vortex back at the Steam copy. Leave the launcher's Vortex
+folder setting empty unless Vortex deploys into another Steam folder.
 Refresh Main's own folder and a separate Dev own folder from that deployment.
+A release folder is made by OwnGame's own Make, through
+scripts\release\Update-ShipRoot.ps1 (issue #2019), never by hard linking an
+install's folder.
 Never generate directly inside a folder containing vortex.deployment.json.
 The release's Dev own folder is local\release-devbuild in the repository
 folder, C:\Users\you\Downloads\Thornswood-Repo\local\release-devbuild on
@@ -165,7 +177,7 @@ One since 5 October (C:\Thornswood-Release-DevBuild before); its launcher
 and server still use Dev's channel and ports. Record it once with
 scripts\release\Setup-ShipMachine.ps1 -Channel dev -Root C:\Users\you\Downloads\Thornswood-Repo\local\release-devbuild,
 so Ship, Check-ShipReady and Build-Generated take it without -Root; Ship
-refuses C:\Thornswood-DevBuild, Vortex's folder, before anything is built
+refuses any folder Vortex deploys into before anything is built
 (issue #1692). After the folder moves, run
 scripts\mods\Build-Generated.ps1 -Channel dev once: generated.txt records
 the game folder the generated files were built for, and they count as not

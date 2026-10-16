@@ -65,6 +65,29 @@ namespace Thornswood
         /// </summary>
         static readonly object folderWork = new object();
 
+        /// <summary>
+        /// Runs <paramref name="work"/> while nothing else writes into the game
+        /// folder or its records: a make or a refresh under way finishes first,
+        /// and none starts until the work is done (#2210). An update writes the
+        /// release it downloaded through this, so the download can run while
+        /// the folder is prepared and the writing waits for it, because both
+        /// keep records of the folder. <paramref name="waiting"/>, when given,
+        /// is called once before waiting, so the log can say why it waits.
+        /// The Monitor is the thread's own, so work that itself makes or
+        /// refreshes the folder runs on.
+        /// </summary>
+        public static void Alone(Action work, Action waiting)
+        {
+            bool held = System.Threading.Monitor.TryEnter(folderWork);
+            if (!held)
+            {
+                if (waiting != null) waiting();
+                System.Threading.Monitor.Enter(folderWork);
+            }
+            try { work(); }
+            finally { System.Threading.Monitor.Exit(folderWork); }
+        }
+
         // ------------------------------------------------------------ Skyrim's own
 
         static readonly object skyrimLock = new object();
