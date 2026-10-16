@@ -1666,8 +1666,8 @@
             "at": 0,
             "by": "",
             "cells": {
-              "c1rm": "Guards, bounties and cells run by people",
-              "c2rm": "Get caught and somebody has to decide what to do with you, rather than a script deciding it for them"
+              "c1rm": "Guards and cells run by people",
+              "c2rm": "Guards are people, not NPCs. A guard holds the jail cells and the notice board of their own hold, and decides what happens to you there"
             }
           },
           {
