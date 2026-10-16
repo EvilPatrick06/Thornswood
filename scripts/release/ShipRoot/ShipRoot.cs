@@ -18,6 +18,11 @@ namespace Thornswood
     ///       folder is current afterwards, 1 with a sentence when it is not
     ///   ... -Check
     ///       changes nothing; exit 0 when it is current, 1 with why not
+    ///   ... -SkyrimFrom &lt;folder&gt;
+    ///       for a root with no game folder yet: the game's own files are
+    ///       copied from &lt;folder&gt;, which must hold every one the folder
+    ///       takes byte for byte as records\skyrim-files.json lists them
+    ///       (OwnGame.SkyrimFrom, #2603), instead of from the Steam copy
     ///
     /// A NEW ROOT is made the way an install that chose its own folder is
     /// (#1226), which is what every ship root used to be: its config.json is
@@ -27,6 +32,17 @@ namespace Thornswood
     /// Vortex's deployment, the Steam copy's game and that Payload. So the
     /// first release from a new root starts from what everybody already has,
     /// not from a folder that would read as removing every file of ours.
+    ///
+    /// WHEN THE STEAM COPY IS NOT 1.6.1170 (#2603). Make takes the game's own
+    /// files from the Steam copy only when every one is that build's, and an
+    /// install otherwise gets them from the Downgrade, a Steam download under
+    /// the person's own account, which this cannot start. On 16 Oct the
+    /// machine that ships had a Steam copy with another bink2w64.dll and
+    /// Dawnguard.esm and the Anniversary Edition's Creation Club files, so
+    /// main's root could not be made. -SkyrimFrom names a folder that holds
+    /// them, such as the other channel's root's Game: each is checked against
+    /// the list before anything is placed, then copied, never linked, so the
+    /// new root never shares a file with that folder.
     ///
     /// WHAT IT DOES NOT DO. It never starts the launcher or the game, and
     /// refuses while either runs from the root. It does not run what the
@@ -41,7 +57,7 @@ namespace Thornswood
     {
         static int Main(string[] args)
         {
-            string root = null, channel = null;
+            string root = null, channel = null, skyrimFrom = null;
             bool check = false;
             for (int i = 0; i < args.Length; i++)
             {
@@ -49,16 +65,17 @@ namespace Thornswood
                 if (a.Equals("-Root", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length) root = args[++i];
                 else if (a.Equals("-Channel", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length) channel = args[++i];
                 else if (a.Equals("-Check", StringComparison.OrdinalIgnoreCase)) check = true;
+                else if (a.Equals("-SkyrimFrom", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length) skyrimFrom = args[++i];
                 else
                 {
-                    Console.WriteLine("STOP. " + a + " is not something this takes. Use: Thornswood-ShipRoot.exe -Root <folder> -Channel main|dev [-Check]");
+                    Console.WriteLine("STOP. " + a + " is not something this takes. Use: Thornswood-ShipRoot.exe -Root <folder> -Channel main|dev [-Check] [-SkyrimFrom <folder>]");
                     return 1;
                 }
             }
             Action<string> say = delegate(string m) { Console.WriteLine("  " + m); };
             try
             {
-                string why = Run(root, channel, check, say);
+                string why = Run(root, channel, check, skyrimFrom, say);
                 if (why != null)
                 {
                     Console.WriteLine("STOP. " + why);
@@ -79,6 +96,17 @@ namespace Thornswood
         /// sentence when Make, Refresh or the sync does.
         /// </summary>
         public static string Run(string root, string channel, bool check, Action<string> say)
+        {
+            return Run(root, channel, check, null, say);
+        }
+
+        /// <summary>
+        /// Run, with <paramref name="skyrimFrom"/> the folder a new root's
+        /// game files come from (#2603), or null for the Steam copy. Only
+        /// Make takes it: a root already made never takes the game's own files
+        /// again (#1218), so it is said and not used.
+        /// </summary>
+        public static string Run(string root, string channel, bool check, string skyrimFrom, Action<string> say)
         {
             if (string.IsNullOrEmpty(root)) return "-Root names no folder. Give the ship root, the folder Where.ps1 ShipRoot or ShipRootDev names.";
             if (channel != "main" && channel != "dev") return "-Channel is main or dev, and it was " + (channel ?? "not given") + ".";
@@ -131,7 +159,7 @@ namespace Thornswood
                 if (!Updater.Resync(cfg, v, say))
                     return "The " + channel + " feed names no release whose files are on the site one by one, so Thornswood's own files cannot be brought into " + root +
                            " the way a launcher brings them, and the folder was not made.";
-                say(OwnGame.Make(cfg, say));
+                say(OwnGame.Make(cfg, say, skyrimFrom));
                 Paths.Init(root);
             }
             else if (!OwnGame.Active)
@@ -141,6 +169,8 @@ namespace Thornswood
             }
             else
             {
+                if (!string.IsNullOrEmpty(skyrimFrom))
+                    say("-SkyrimFrom " + skyrimFrom + " was not used: " + game + " is made already, and a made folder never takes the game's own files again.");
                 say(OwnGame.Refresh(cfg, say));
             }
 

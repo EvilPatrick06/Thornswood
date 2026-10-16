@@ -1066,7 +1066,9 @@ from the board, none of these three puts an issue aside:
   until the folder exists (tests\test-own-folder-first.ps1).
   Decided by Patrick on 29 Sep (#1232): `Thornswood\Game` takes only
   Skyrim's own files (from the Steam copy when it is on the pinned build, or
-  the Downgrade's download), Vortex's deployed files by Vortex's own record,
+  the Downgrade's download; for a ship root, also from a folder that holds
+  that build's files byte for byte, checked file by file first, #2603),
+  Vortex's deployed files by Vortex's own record,
   and Thornswood's own files. Skyrim's own is the pinned build's file list,
   `records\skyrim-files.json`, read out of the depot manifests the Downgrade
   uses, never a guess by folder. A mod put into the Steam copy by hand stays
@@ -1962,6 +1964,26 @@ done. Main has its own root (`local\release-main` on One), so no Ship packs
 `C:\Thornswood`. After a refresh that changed the bodies' or the animations'
 sources, `Build-Generated.ps1 -Channel <channel>` runs again, and Ship says so.
 `tests\test-2019-ship-roots.ps1` holds it.
+
+A new root takes the game's own files from the Steam copy only when that copy
+is on 1.6.1170, and an install's other way, the Downgrade, is a Steam
+download under the person's own account that a script cannot run. One's
+Steam copy is not on it since 16 Oct (another `bink2w64.dll` and
+`Dawnguard.esm`, and the Anniversary Edition's Creation Club files), so
+`-SkyrimFrom` on `Setup-ShipMachine.ps1` or `Update-ShipRoot.ps1` names a
+folder that holds them, such as the other root's `Game` (#2603):
+
+```
+.\scripts\release\Setup-ShipMachine.ps1 -Channel main -Root C:\Users\you\Downloads\Thornswood-Repo\local\release-main -SkyrimFrom C:\Users\you\Downloads\Thornswood-Repo\local\release-devbuild\Game
+```
+
+Every one of the game's own files the new folder takes is checked against
+`records\skyrim-files.json` by size and SHA-1, the archives too, before
+anything is placed, and the root is not made when one is missing or
+different; the sentence names it. They are copied, never linked, so the two
+roots share no file, and Make stops if one of them changed while it worked.
+`made.txt` names the folder on its `skyrim=` line. Only the ship root tool
+does this: an install's way to 1.6.1170's own files stays the Downgrade.
 
 **The Skyrim build.** Steam updates the Steam copy by itself. With Thornswood's
 own folder, the Downgrade button works on the Steam copy the folder is made

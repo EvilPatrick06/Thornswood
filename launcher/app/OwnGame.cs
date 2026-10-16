@@ -51,6 +51,20 @@ namespace Thornswood
     /// writes into the Steam copy. Skyrim's archives are the one thing still
     /// kept on the disk once, and only while their bytes are the same as the
     /// folder's own record; OwnGameShare.cs checks that before every Play.
+    ///
+    /// A THIRD WAY IN, FOR THE SHIP ROOT TOOL ONLY (#2603). On 16 Oct the
+    /// machine that ships could not make main's ship root: its Steam copy has
+    /// 1.6.1170's exe but another bink2w64.dll and Dawnguard.esm and the
+    /// Anniversary Edition's Creation Club files, and the Downgrade is a Steam
+    /// download under the person's own account, which a script cannot start.
+    /// Its dev ship root's Game held 1.6.1170's own files already. So Make
+    /// can take the game's own files from a folder that holds them byte for
+    /// byte as records\skyrim-files.json lists them (SkyrimFrom,
+    /// OwnGameKinds.cs): every one Make takes is checked before anything is
+    /// placed, then copied, never linked, so the new folder never shares a
+    /// file with the folder it came from. The launcher does not offer it: an
+    /// install's way to 1.6.1170's own files is the Downgrade, under the
+    /// person's own Steam account, and nobody's install needs another.
     /// </summary>
     static partial class OwnGame
     {
@@ -508,6 +522,17 @@ namespace Thornswood
         /// </summary>
         public static string WhyNot(Config cfg, string src)
         {
+            return WhyNot(cfg, src, false);
+        }
+
+        /// <summary>
+        /// WhyNot, for a Make that is given the game's own files in a folder
+        /// of their own (<paramref name="skyrimGiven"/>, #2603): the Steam
+        /// copy's build is then not asked about, because none of the game's
+        /// own files comes from it. Everything else is asked as it always is.
+        /// </summary>
+        static string WhyNot(Config cfg, string src, bool skyrimGiven)
+        {
             // A folder that is made already holds the game itself, and a
             // refresh takes nothing but Vortex's files (#1218). So the Steam
             // copy's build, and whether there is a Steam copy at all, matter
@@ -531,7 +556,7 @@ namespace Thornswood
                 if (game.Length == 0)
                     return "Vortex deploys into " + src + ", but Thornswood takes the game itself only from Steam's own copy of Skyrim Special Edition, " +
                            "never from another folder, and this machine has none, so install Skyrim Special Edition in Steam and try again.";
-                string build = FirstBuild(cfg, game);
+                string build = skyrimGiven ? null : FirstBuild(cfg, game);
                 if (build != null) return build;
                 // Make takes Thornswood's own files from the Steam copy by
                 // Thornswood's records, the release's file list among them
@@ -1047,7 +1072,8 @@ namespace Thornswood
             public string From;
             public long Size, Ticks;
             // One of 1.6.1170's own files from the Downgrade's download, which
-            // is removed once the folder is made, so it is always copied.
+            // is removed once the folder is made, or from another folder that
+            // holds them (#2603), whose files stay its own: always copied.
             public bool Pinned;
             // Thornswood's own, from Profile\Payload (#1226): linked in and
             // then the Payload name removed, so it ends as the folder's own.
@@ -1067,13 +1093,32 @@ namespace Thornswood
         /// </summary>
         public static string Make(Config cfg, Action<string> say)
         {
-            lock (folderWork) return MakeNow(cfg, say);
+            return Make(cfg, say, null);
         }
 
-        static string MakeNow(Config cfg, Action<string> say)
+        /// <summary>
+        /// Make, with the game's own files taken from <paramref name="skyrimFrom"/>
+        /// instead of the Steam copy or the Downgrade's download, when it is
+        /// given (#2603): a folder that already holds 1.6.1170's own files,
+        /// each checked against the list before anything is placed and then
+        /// copied (SkyrimFrom). Only the ship root tool passes one; the
+        /// launcher's own Make is the one above.
+        /// </summary>
+        public static string Make(Config cfg, Action<string> say, string skyrimFrom)
+        {
+            string from = null;
+            if (!string.IsNullOrEmpty(skyrimFrom))
+            {
+                try { from = Path.GetFullPath(skyrimFrom.Trim().Trim('"')).TrimEnd('\\'); }
+                catch { throw new Exception(skyrimFrom + " is not a folder Thornswood can read, so the game's own files were not taken from it, and nothing was made."); }
+            }
+            lock (folderWork) return MakeNow(cfg, say, from);
+        }
+
+        static string MakeNow(Config cfg, Action<string> say, string skyrimFrom)
         {
             string src = DeploysInto(cfg);
-            string why = WhyNot(cfg, src);
+            string why = WhyNot(cfg, src, skyrimFrom != null);
             if (why != null) throw new Exception(why);
             if (Directory.Exists(Folder))
                 throw new Exception("There is already a Game folder at " + Folder + ", so nothing was made.");
@@ -1097,8 +1142,14 @@ namespace Thornswood
             var left = new List<string>();
             // The Steam copy is not the pinned build: the game comes from the
             // files the Downgrade downloaded (FirstBuild let it through only then).
+            // Or from a folder that holds them already, checked file by file
+            // before anything is placed (#2603); a refusal throws here, and
+            // nothing has been linked or copied.
             string game = GameFor(src);
-            List<string> pinned = FirstBuildWrong(cfg, game) ? Downgrade.Downloaded(cfg) : null;
+            Dictionary<string, Stamp> checkedAt = null;
+            List<Found> pinned = skyrimFrom != null
+                ? SkyrimFrom(skyrimFrom, deployed, say, out checkedAt)
+                : FirstBuildWrong(cfg, game) ? Downloads(Downgrade.Downloaded(cfg)) : null;
             int byHand = 0;
             List<Found> all = WithPayload(Gather(src, left, pinned, ours, ref byHand));
 
@@ -1153,6 +1204,15 @@ namespace Thornswood
                 if (say != null && pct >= shown + 10) { shown = pct - pct % 10; say("Making Thornswood's own Skyrim folder: " + shown + "%"); }
             }
             PlayProgress.Files(Phase, all.Count, all.Count);
+            // What was copied from skyrimFrom is the bytes that were checked
+            // only if nothing wrote to those files meanwhile (#2603). Before
+            // any record is written, so a refusal leaves no folder and no
+            // record of one; the next Make removes Game.new.
+            if (checkedAt != null)
+            {
+                string moved = SkyrimFromMoved(skyrimFrom, checkedAt);
+                if (moved != null) throw new Exception(moved);
+            }
 
             WriteRecord(FilesList, lines);
             WriteRecord(LeftOutFile, left);
@@ -1167,7 +1227,7 @@ namespace Thornswood
             // Vortex's record as the folder took it in, so the first refresh
             // after a Vortex deploy opens only what moved (VortexMoved).
             WriteVortexSeen(src, Staged(src), failed, null, null);
-            WriteMade(src, SumCopied(lines), 1);
+            WriteMade(src, SumCopied(lines), 1, skyrimFrom);
             SettleSettings(true);
             string payloadLeft = DropPayload();
 
@@ -1182,7 +1242,9 @@ namespace Thornswood
                 said += " " + fromPayload.ToString("n0") + " of Thornswood's own files came from " + Paths.Payload +
                         ", where the installer and the launcher kept them so that nothing was written into the Steam copy.";
             if (payloadLeft != null) said += " " + payloadLeft;
-            if (pinned != null)
+            if (skyrimFrom != null)
+                said += " The game itself is 1.6.1170's own files, copied from " + skyrimFrom + " after each was checked against that build's list; the Steam copy in " + game + " was not changed.";
+            else if (pinned != null)
             {
                 said += " The game itself is 1.6.1170's own files, downloaded from Steam; the Steam copy in " + game + " was not changed.";
                 Downgrade.ClearDownloads(cfg, say);
@@ -2818,7 +2880,7 @@ namespace Thornswood
         /// what Vortex deploying into the Steam copy does. The result is what
         /// somebody whose Vortex deploys into the Steam copy gets.
         /// </summary>
-        static List<Found> Gather(string src, List<string> left, List<string> pinned, HashSet<string> ours, ref int byHand)
+        static List<Found> Gather(string src, List<string> left, List<Found> pinned, HashSet<string> ours, ref int byHand)
         {
             string game = GameFor(src);
             if (SameFolder(game, src))
@@ -2884,13 +2946,6 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// 1.6.1170's own files, from the folders the Downgrade downloaded
-        /// them into, over the game's files in <paramref name="byRel"/>. Each
-        /// is copied (Found.Pinned), because the download is removed once the
-        /// folder is made. A path in <paramref name="keep"/> is the
-        /// collection's and is left to it.
-        /// </summary>
-        /// <summary>
         /// A listed file that is not the pinned build's does not come from
         /// the Steam copy. Pin puts the Downgrade's copy of it in its place,
         /// and a changed master never reaches the folder.
@@ -2905,18 +2960,36 @@ namespace Thornswood
             foreach (string rel in drop) byRel.Remove(rel);
         }
 
-        static void Pin(Dictionary<string, Found> byRel, List<string> pinned, HashSet<string> keep)
+        /// <summary>
+        /// 1.6.1170's own files, <paramref name="pinned"/> (the Downgrade's
+        /// download, or a folder that holds them, SkyrimFrom), over the game's
+        /// files in <paramref name="byRel"/>. Each is copied (Found.Pinned):
+        /// the download is removed once the folder is made, and another
+        /// folder's file must never be this one's too (#2603). A path in
+        /// <paramref name="keep"/> is the collection's and is left to it.
+        /// </summary>
+        static void Pin(Dictionary<string, Found> byRel, List<Found> pinned, HashSet<string> keep)
         {
-            foreach (string dir in pinned)
+            foreach (Found f in pinned)
             {
-                foreach (Found f in Walk(dir))
-                {
-                    if (f.Rel.StartsWith(".thornswood", StringComparison.OrdinalIgnoreCase)) continue;
-                    if (keep != null && keep.Contains(f.Rel)) continue;
-                    f.Pinned = true;
-                    byRel[f.Rel] = f;
-                }
+                if (keep != null && keep.Contains(f.Rel)) continue;
+                f.Pinned = true;
+                byRel[f.Rel] = f;
             }
+        }
+
+        /// <summary>
+        /// Every file in the folders the Downgrade downloaded into, but its
+        /// own markers (.thornswood...), or null when there are none.
+        /// </summary>
+        static List<Found> Downloads(List<string> dirs)
+        {
+            if (dirs == null) return null;
+            var l = new List<Found>();
+            foreach (string dir in dirs)
+                foreach (Found f in Walk(dir))
+                    if (!f.Rel.StartsWith(".thornswood", StringComparison.OrdinalIgnoreCase)) l.Add(f);
+            return l;
         }
 
         /// <summary>
@@ -3245,15 +3318,41 @@ namespace Thornswood
         /// </summary>
         static void WriteMade(string src, long copied, int kinds)
         {
-            WriteRecord(MadeFile, new string[] {
+            WriteMade(src, copied, kinds, RecordedText("skyrim"));
+        }
+
+        /// <summary>
+        /// made.txt, with skyrim= naming the folder the game's own files were
+        /// copied from when Make was given one (#2603). A refresh keeps the
+        /// line as it is, because a refresh never takes the game's own files
+        /// again; Make writes it or leaves it out.
+        /// </summary>
+        static void WriteMade(string src, long copied, int kinds, string skyrimFrom)
+        {
+            var lines = new List<string> {
                 "source=" + src,
                 "game=" + GameFor(src),
-                "deployment=" + DeploymentStamp(src),
-                "rules=" + Rules,
-                "kinds=" + kinds,
-                "copied=" + copied,
-                "at=" + DateTime.Now.ToString("o")
-            });
+            };
+            if (!string.IsNullOrEmpty(skyrimFrom)) lines.Add("skyrim=" + skyrimFrom);
+            lines.Add("deployment=" + DeploymentStamp(src));
+            lines.Add("rules=" + Rules);
+            lines.Add("kinds=" + kinds);
+            lines.Add("copied=" + copied);
+            lines.Add("at=" + DateTime.Now.ToString("o"));
+            WriteRecord(MadeFile, lines);
+        }
+
+        /// <summary>A text value from made.txt, such as source, or "".</summary>
+        static string RecordedText(string key)
+        {
+            try
+            {
+                if (!File.Exists(MadeFile)) return "";
+                foreach (string line in File.ReadAllLines(MadeFile))
+                    if (line.StartsWith(key + "=", StringComparison.Ordinal)) return line.Substring(key.Length + 1).Trim();
+            }
+            catch (Exception ex) { Swallow.Note("OwnGame.RecordedText, reading made.txt", ex); }
+            return "";
         }
 
         static long Recorded(string key)
