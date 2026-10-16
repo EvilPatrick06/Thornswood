@@ -1285,8 +1285,8 @@ function publicApiWait(req, now) {
 // ignored. An IPv6 address counts as its /64, because one home connection is
 // handed a whole /64 and would otherwise be millions of senders.
 //
-// NO ADDRESS IS KEPT. privacy.md says the sign-in log is the only thing here
-// holding one. This table holds a hash of it under a key made fresh at every
+// NO ADDRESS IS KEPT. privacy.md says the sign-in log is the only thing on
+// the site holding one. This table holds a hash of it under a key made fresh at every
 // start and never written anywhere, and forgets it after a day. That is also
 // why the cap per sender lives here at the door rather than in inbox.json:
 // capping the file per sender would mean writing who sent each report into it.
@@ -3501,14 +3501,17 @@ function noteTrouble(row, found) {
   dev and main are different servers with different logs; the session says
   which it was on.
 
-  ROLLED LOGS ARE READ TOO, entry 220. roll-log.ps1 runs in front of the game
-  server on every start, and a server.log of 4 MB or more becomes server.log.1
-  (an install rolls it whatever the size). Reading server.log alone, a restart
-  after a crash would leave every session before it with no server lines at
-  all, the crash session included, which is the one this page is opened for.
-  So when server.log is shorter than the window, the rest of the window is
-  taken off the end of server.log.1, then .2, and so on, oldest text first,
-  and the read is never more than the 4 MB it always was.
+  ROLLED LOGS ARE READ TOO, entry 220. Since #2349 the server runs under
+  server-log.js, which rolls server.log at midnight, at 4 MB and at a start
+  from another day into server.log.<when>, and keeps no line in any of them
+  past 30 days (an install rolls it whatever the size). Reading server.log
+  alone, a restart after a crash would leave every session before it with no
+  server lines at all, the crash session included, which is the one this
+  page is opened for. So when server.log is shorter than the window, the rest
+  of the window is taken off the end of the rolled ones, newest first
+  (serverLogGenerations), and the read is never more than the 4 MB it always
+  was. A session older than 30 days has no server lines left, which is the
+  privacy page's promise rather than a fault.
 */
 const SERVER_LOGS = {
   main: 'C:\\Thornswood-Server\\server.log',
@@ -3635,25 +3638,38 @@ function chatSlice(profileId, from, to, channel) {
            (dev ? ' from the dev voice service' : ''), lines: out };
 }
 
+/* The server's log and the rolled copies behind it, newest first (#2349).
+   server-log.js rolls server.log at midnight and at 4 MB into
+   server.log.<when it was rolled>, and the numbered ones Roll-Log.ps1 left
+   (server.log.1 to .5) are still there until their lines pass 30 days. Both
+   are server.log.<digits>, ordered by their last write, which is when each
+   stopped being the live file. */
+function serverLogGenerations(file) {
+  const dir = path.dirname(file), base = path.basename(file).toLowerCase() + '.';
+  let names = [];
+  try { names = fs.readdirSync(dir); } catch (e) { names = []; }
+  const rolled = [];
+  for (const n of names) {
+    if (n.toLowerCase().indexOf(base) !== 0 || !/^\d+$/.test(n.slice(base.length))) continue;
+    try { rolled.push({ f: path.join(dir, n), t: fs.statSync(path.join(dir, n)).mtimeMs }); } catch (e) { }
+  }
+  rolled.sort((a, b) => b.t - a.t);
+  return [file].concat(rolled.map((r) => r.f));
+}
+
 function serverLogSlice(channel, from, to) {
   const file = SERVER_LOGS[channel === 'dev' ? 'dev' : 'main'];
   /* Only the tail is read, 4 MB across the live file and the rolled ones
-     behind it. These grow, and a session is minutes long. Five rolled ones is
-     what roll-log.ps1 keeps. */
-  const keep = 5;
+     behind it, newest first. These grow, and a session is minutes long. */
   let left = 4 * 1024 * 1024;
   const parts = [];
   let found = 0;
   try {
-    for (let g = 0; g <= keep && left > 0; g++) {
-      const f = g === 0 ? file : file + '.' + g;
-      if (!fs.existsSync(f)) {
-        /* server.log itself can be missing for a moment, between the roll and
-           the server opening a new one, with last night's run in .1. A
-           missing rolled one means there are none older. */
-        if (g === 0) continue;
-        break;
-      }
+    for (const f of serverLogGenerations(file)) {
+      if (left <= 0) break;
+      /* server.log itself can be missing for a moment, between the roll and
+         the writer opening a new one. */
+      if (!fs.existsSync(f)) continue;
       found++;
       const size = fs.statSync(f).size;
       const fd = fs.openSync(f, 'r');

@@ -33,8 +33,9 @@
   rolled generations come down too, under the same names: the box is asked
   once which of them it has, and exactly those are read, so a pull never
   asks for a file that is not there. The rollers keep five, so that is .1
-  through .5 at most. door.log does not roll, so only the current file is
-  fetched.
+  through .5 at most, except server.log, which server-log.js rolls by its
+  time since #2349 (server.log.<when>, up to 30 days of them, newest first).
+  door.log does not roll, so only the current file is fetched.
 
   Nothing on the VPS is changed. Everything here is a read.
 #>
@@ -95,7 +96,8 @@ Say ("  reading the {0} server at {1}" -f $(if ($Dev) { 'DEV' } else { 'live' })
 
 $logs = @(
     # Rolls: the box keeps older copies beside it as Name.1, Name.2 and on
-    # (Roll-Log, the site's in-process roll), and they come down too.
+    # (Roll-Log, the site's in-process roll), or for server.log as
+    # server.log.<when> (server-log.js, #2349), and they come down too.
     # door.log has no Rolls: it does not roll.
     @{ Name = 'server.log'; Path = (Join-Path $srvRoot 'server.log'); What = 'the game server'; Rolls = $true }
     # Thornswood's own lines and nothing else. server.log is about four fifths
@@ -203,10 +205,15 @@ if ($box.Code -ne 0) {
             $rolled = @(foreach ($p in $onBox) {
                 if ($p.StartsWith($base.Path + '.', [StringComparison]::OrdinalIgnoreCase)) {
                     $n = $p.Substring($base.Path.Length + 1)
-                    if ($n -match '^\d+$') { [pscustomobject]@{ N = [int]$n; Path = $p } }
+                    if ($n -match '^\d{1,18}$') { [pscustomobject]@{ N = [long]$n; Path = $p } }
                 }
             })
-            foreach ($g in ($rolled | Sort-Object N)) {
+            # server.log rolls by its time since #2349, server.log.<when>,
+            # newest the biggest; the numbered ones the rollers keep, .1 the
+            # newest, sort after them.
+            $dated = { $_.N -ge 1000000000000 }
+            foreach ($g in ($rolled | Sort-Object @{ Expression = { if (& $dated) { 0 } else { 1 } } },
+                                                   @{ Expression = { if (& $dated) { -$_.N } else { $_.N } } })) {
                 [void]$files.Add(@{ Name = ($base.Name + '.' + $g.N); Path = $g.Path; What = ('older ' + $base.Name) })
             }
         }

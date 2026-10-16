@@ -123,6 +123,8 @@ try {
     }
     # The record contracts the installer loads from beside itself (#2180).
     foreach ($f in 'Read-JsonFile.ps1', 'RecordShape.ps1') { Copy-Item -LiteralPath (Join-Path $repo "scripts\release\$f") -Destination (Join-Path $installer $f) }
+    # The log writer the server's task runs (#2349), which the installer refuses without.
+    Copy-Item -LiteralPath (Join-Path $repo 'scripts\vps\Server-Log.js') -Destination (Join-Path $installer 'Server-Log.js')
     $ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
     function New-Payload([string]$name, [string[]]$order) {
         $d = Join-Path $T ('payload-' + $name)
