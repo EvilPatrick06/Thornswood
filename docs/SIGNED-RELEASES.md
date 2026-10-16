@@ -299,8 +299,10 @@ decisions relayed by Smeagle; recorded on #2163). None is pending.
    3 stays accepted.
 4. Signers holding Certificate Profile Signer on ThornswoodRelease: Patrick,
    Djinn and Four.
-5. Main builds are always signed. Dev builds stay unsigned to save signing
-   quota. Phase D runs only after Claude's signing pilot verifies on a clean
+5. Main builds are always signed, and so is every dev launcher: an installed
+   launcher refuses an unsigned one. (Until 16 Oct this line said dev builds
+   stay unsigned to save signing quota; Patrick took it out that day.) Phase
+   D runs only after Claude's signing pilot verifies on a clean
    machine (a signed draft from release.yml, checked away from One by its
    `verify` job, `Test-ReleaseFiles.ps1 -RequireSigned`), and its
    `minLauncher` is set to the first signed launcher.
@@ -355,11 +357,14 @@ client runtime, which only phases C and D (section 5) close.
 | Signing left on people's machines | Every dev launcher (Build-Launcher signs it during a dev Ship; dev 1.2.4.5 reads Authenticode Valid) and every installer (`Package-Thornswood.ps1` signs the finished Setup) | The same. Only the main launcher's signature moves |
 | Packs, the client runtime, `version.json` | sha256 only | sha256 only. The signed manifest (phases B to D) is needed either way |
 
-Section 8, decision 5, says dev builds stay unsigned. The dev feed does not
-match that wording: the launcher it serves, 1.2.4.5, is signed, as every
-dev launcher has to be, because an installed launcher refuses an unsigned
-one. What the
-decision was meant to cover is asked on #2163.
+Section 8, decision 5, said dev builds stay unsigned, while the dev feed's
+launcher, 1.2.4.5, was signed, as every dev launcher has to be. Patrick
+answered on 16 Oct: the line comes out (#2163).
+
+Who may start a signed run: Patrick, 16 Oct (#2163), "Anyone with repo
+access not just me". So no tag rule limits `v` tags to him and the `release`
+environment has no required reviewer; the accounts that can push start one,
+as the row above says.
 
 The hosted row's widening is not waiting on the switch-over. The federated
 credential has existed since 12 Oct (section 7), so a manual run on a `v`
