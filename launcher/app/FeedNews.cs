@@ -89,13 +89,9 @@ namespace Thornswood
                 using (var wc = Client(cfg, true, r.url)) raw = wc.DownloadData(r.url);
                 if (ShaOf(raw) != r.sha256)
                     throw new Exception("The news file did not match its checksum, so it was not read.");
-                if (cache != null)
-                {
-                    string tmp = cache + ".tmp";
-                    File.WriteAllBytes(tmp, raw);
-                    if (File.Exists(cache)) File.Delete(cache);
-                    File.Move(tmp, cache);
-                }
+                // One rename over the old copy (#2591), not a delete and then
+                // a move, which left no copy when stopped in between.
+                if (cache != null) OwnGame.WriteRecord(cache, raw);
             }
             NewsItem[] items = ParseNews(raw);
             lock (newsLock)
