@@ -85,8 +85,11 @@ if (RECIPES && KEPT) {
   yes('a steel sword burns Poor Charcoal', grade('Steel Sword') === 1);
   yes('a dwarven sword, an elven sword, an orcish sword, a falmer sword and a silver sword burn Charcoal',
       ['Dwarven Sword', 'Elven Sword', 'Orcish Sword', 'Falmer Sword', 'Silver Sword'].every(function (n) { return grade(n) === 2; }));
-  yes('a nordic bow, a glass sword and an ebony sword burn Charcoal Briquette',
-      ['Nordic Bow', 'Glass Sword', 'Ebony Sword'].every(function (n) { return grade(n) === 3; }));
+  yes('a nordic sword, a glass sword and an ebony sword burn Charcoal Briquette',
+      ['Nordic Sword', 'Glass Sword', 'Ebony Sword'].every(function (n) { return grade(n) === 3; }));
+  // #516: bows are made at the woodworking bench since #2529, which is not a forge and burns nothing.
+  yes('a nordic bow and a glass bow, made at the woodworking bench, burn nothing',
+      ['Nordic Bow', 'Glass Bow'].every(function (n) { return !!byName(n) && grade(n) === 0; }));
   yes('a stalhrim sword burns Coke', grade('Stalhrim Sword') === 4);
   yes('ancient nord at the skyforge takes Poor Charcoal, which does not get poorer',
       FUEL[byName('Ancient Nord Armor')] && FUEL[byName('Ancient Nord Armor')].join() === '1,ancient nord,skyforge');
