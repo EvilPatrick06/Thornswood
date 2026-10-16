@@ -76,6 +76,23 @@
   took out as <root>.undone-<stamp>. The renames keep every path the task and
   server-settings.json name the same, so nothing has to be rewritten.
 
+  -FromStore TAKES THE SERVER BUILD OUT OF THE BOX'S STORE (#459). The
+  payload Publish-Server.ps1 -FromStore sends carries no server build and no
+  plugins: the gamemode and its stamp, server-build.json (the record the
+  commit holds), the settings a release sets (how many it holds, and the
+  port, read only) and any plugin of ours the running order names. In step 1
+  the record's build is taken out of the store (-Store, C:\Thornswood-Deploys
+  \server) into the stage, held to the record exactly as a payload's own
+  files are (Expand-ThornswoodStoredServerBuild, ServerBuild.ps1), and every
+  plugin the running server's load order names under its plugins folder that
+  the payload did not bring is copied from the running root. The running
+  server keeps its own load order and start point, so it goes onto a running
+  server only, never a first install; an engine that reads light plugins
+  another way than the running one would move every form id in that order
+  (ServerOrder.ps1, #1715), so that is refused too; and a plugin of ours the
+  order does not name is refused, because changing the order is a full
+  publish's. Everything after is the same stage, swap and way back.
+
   -TaskOnly REGISTERS THE TASK AGAIN AND NOTHING ELSE (#2491). No zip, no
   stage, no swap, no setting: the server already in -Root is stopped, the
   task is registered with this installer's action and settings, with the
@@ -124,6 +141,12 @@ param(
     # Register the task again for the server already in -Root, stop it and
     # start it through the new task, and touch no file (#2491, the header).
     [switch]$TaskOnly,
+    # Take the server build out of the box's store instead of the payload, and
+    # the plugins from the running root (#459, the header). Publish-Server.ps1
+    # -FromStore passes it.
+    [switch]$FromStore,
+    # The store's server folder, for -FromStore.
+    [string]$Store = 'C:\Thornswood-Deploys\server',
     # Lets tests\test-install-server.ps1 run this on a machine with the game on
     # it, against a scratch root. Nothing else passes it.
     [switch]$AllowGamingPc
@@ -187,6 +210,12 @@ if ($PutBack -and $dropNames.Count) {
 }
 if ($PutBack -and $askedKeys.Count) {
     Say '-PutBack sets no setting: it puts the previous folder back with the running server''s own settings. Run it without -RequirePass. Nothing was changed.' 'Red'
+    Finish 'INSTALL REFUSED' 1
+}
+# -FromStore installs a build onto a running server (#459); a put-back and
+# -TaskOnly install none.
+if ($FromStore -and ($PutBack -or $TaskOnly)) {
+    Say '-FromStore installs a server build out of the store, and -PutBack and -TaskOnly install none. Nothing was changed.' 'Red'
     Finish 'INSTALL REFUSED' 1
 }
 # -TaskOnly touches the task and nothing else (#2491), so a switch that
@@ -650,6 +679,34 @@ if (-not $PutBack) {
     New-Item -ItemType Directory -Path $stageDir -Force | Out-Null
     Expand-Archive -LiteralPath $Zip -DestinationPath $stageDir -Force
     Say "unpacked to $stageDir" 'Cyan'
+    # -FromStore (#459, the header): the record's build out of the store, into
+    # the stage, before what the payload brought into data is listed, so the
+    # compiled Papyrus counts as shipped. Onto a running server only.
+    if ($FromStore) {
+        $runSettings = Join-Path $Root 'server-settings.json'
+        if (-not (Test-Path -LiteralPath $runSettings)) {
+            Refuse @("-FromStore keeps the running server's load order, start point and plugins, and there is no server in $Root to keep them from. A first install takes a whole payload: Publish-Server.ps1 with -Dist.")
+        }
+        $rp = Join-Path $stageDir 'server-build.json'
+        $want = $null
+        try { $want = Read-ThornswoodRecord -Path $rp -Kind server-build } catch { Refuse @("the payload's server-build.json cannot be trusted, so nothing says which build to take out of the store: $($_.Exception.Message)") }
+        $got = Expand-ThornswoodStoredServerBuild -Store $Store -Record $want -RecordSum (Get-ThornswoodRecordSum ([IO.File]::ReadAllBytes($rp))) -Into $stageDir
+        if ($got.Problem) { Refuse @($got.Problem) }
+        foreach ($l in $got.Said) { Say $l 'Cyan' }
+        # The light plugin rule of the engine the running order was written for
+        # (ServerOrder.ps1, #1715), against this one's: lightPlugins true or not.
+        $runRec = Join-Path $Root 'server-build.json'
+        $runLight = $false
+        if (Test-Path -LiteralPath $runRec) {
+            try { $rl = [IO.File]::ReadAllText($runRec) | ConvertFrom-Json; $runLight = ($rl.PSObject.Properties.Name -contains 'lightPlugins' -and $rl.lightPlugins -eq $true) } catch { $runLight = $false }
+        }
+        $newLight = ($want.PSObject.Properties.Name -contains 'lightPlugins' -and $want.lightPlugins -eq $true)
+        if ($runLight -ne $newLight) {
+            Refuse @(('the running server''s load order was written for an engine that ' + $(if ($runLight) { 'loads' } else { 'does not load' }) + ' light plugins, and this build ' +
+                      $(if ($newLight) { 'loads' } else { 'does not load' }) + ' them, so every form id after the first light plugin would move (ServerOrder.ps1, #1715). ' +
+                      'That goes with a load order written for it: Deploy-Gamemode.ps1, then Publish-Server.ps1 with -Dist.'))
+        }
+    }
     # What this payload brought into data, for Carry to leave alone.
     $sd = Join-Path $stageDir 'data'
     $shippedData = @()
@@ -708,6 +765,31 @@ if (-not $PutBack) {
         if ($first.Count) { Refuse $first }
         if ($askedKeys.Count) { [IO.File]::WriteAllText($settingsPath, (ConvertTo-Json -InputObject $s -Depth 30), (New-Object Text.UTF8Encoding($false))) }
         Say "there are no settings in $Root yet, so the payload's are its first" 'DarkGray'
+    }
+
+    # -FromStore (#459): the running server's plugins, by its own order, into
+    # the stage where the payload did not bring one (ours), and none of ours
+    # that the order does not name.
+    if ($FromStore) {
+        $plugDir = Join-Path $stageDir 'plugins'
+        $null = [IO.Directory]::CreateDirectory($plugDir)
+        $named = @{}
+        $taken = 0
+        foreach ($p in @($s.loadOrder)) {
+            $at = ([string]$p) -replace '/', '\'
+            $leaf = [IO.Path]::GetFileName($at)
+            if ($leaf) { $named[$leaf.ToLowerInvariant()] = $true }
+            if (-not $at.StartsWith($Root + '\plugins\', [StringComparison]::OrdinalIgnoreCase)) { continue }
+            $into = Join-Path $plugDir $leaf
+            if (Test-Path -LiteralPath $into) { continue }
+            $from = Join-Path (Join-Path $Root 'plugins') $leaf
+            if (Test-Path -LiteralPath $from) { Copy-Item -LiteralPath $from -Destination $into -Force; $taken++ }
+        }
+        $brought = @(Get-ChildItem -LiteralPath $plugDir -File -Force | Where-Object { -not $named.ContainsKey($_.Name.ToLowerInvariant()) } | ForEach-Object { $_.Name })
+        if ($brought.Count) {
+            Refuse @(('the payload carries ' + ($brought -join ', ') + ', which the running server''s load order does not name, and -FromStore keeps that order. A change to the order goes with a full publish.'))
+        }
+        Say ("$taken plugin(s) the running server's load order names taken from $Root\plugins into the stage") 'Cyan'
     }
 
     # The load order resolves, against the stage. The paths in it are written

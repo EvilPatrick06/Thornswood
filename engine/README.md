@@ -302,7 +302,11 @@ A change to the engine goes like this:
    `site\data\site\credits.md`. `tests\test-third-party.js` is red when any of
    those is not the commit `records\server-build.json` names.
 5. After it merges: the server to the dev server with `Publish-Server.ps1
-   -Channel dev`, the client with the next dev Ship.
+   -Channel dev`, the client with the next dev Ship. A machine without that
+   build puts it on from the store on the box, where the publish or deploy
+   that sent it kept it: `Publish-Server.ps1 -Channel dev -FromStore`, and
+   for live `Deploy-Server.ps1 -FromStore` (#459). `-ServerBuild <zip>` sends a
+   server build made elsewhere to the store first, held to the record.
 
 Which build a machine's scripts read (issue #2019). The build of step 2 is in
 the fork worktree, not in any checkout's `engine\skymp`, so a machine records

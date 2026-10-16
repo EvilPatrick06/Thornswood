@@ -177,7 +177,7 @@ try {
     $iDsSend = $ds.IndexOf('Send-ThornswoodArtifact -Artifact $serverArtifact')
     Yes 'Deploy-Server builds it once the build is held to the record' ($iDsBuild -gt $ds.IndexOf('$notBuild = @(Get-ThornswoodServerBuildProblems'))
     Yes '  and sends it before the stage, on a full deploy only' ($iDsSend -gt $iDsBuild -and $iDsSend -lt $ds.IndexOf('Staging in') -and
-        $ds -match '(?s)if \(-not \$GamemodeOnly\) \{\s+Write-Host ''The server build artifact, to the store on the box\.\.\.''\s+Send-ThornswoodArtifact -Artifact \$serverArtifact')
+        $ds -match '(?s)if \(-not \$noBuild\) \{\s+Write-Host ''The server build artifact, to the store on the box\.\.\.''\s+Send-ThornswoodArtifact -Artifact \$serverArtifact')
 } finally {
     Remove-Item -LiteralPath $T -Recurse -Force -ErrorAction SilentlyContinue
 }
