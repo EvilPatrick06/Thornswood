@@ -78,9 +78,10 @@
 
   -TaskOnly REGISTERS THE TASK AGAIN AND NOTHING ELSE (#2491). No zip, no
   stage, no swap, no setting: the server already in -Root is stopped, the
-  task is registered with this installer's action and settings, and the
-  server is started through it and given -Wait seconds to answer on both
-  ports. If it does not answer, the task it had goes back, exactly as it was
+  task is registered with this installer's action and settings, with the
+  log writer that action runs (server-log.js, #2349) put in the root beside
+  it, and the server is started through it and given -Wait seconds to
+  answer on both ports. If it does not answer, the task it had goes back, exactly as it was
   exported, and is started again: INSTALL ROLLED BACK. It is how a box takes a
   change to the task itself (its priority, #2491) without a release.
   Publish-Server.ps1 -TaskOnly sends this and runs it.
@@ -236,6 +237,14 @@ if (-not (Test-Path -LiteralPath $waitLib)) {
     Finish 'INSTALL REFUSED' 1
 }
 . $waitLib
+# The log writer the task runs the server under (#2349): beside this script,
+# sent with it, or in scripts\vps from a checkout. Without it the task could
+# not start the server, so nothing runs.
+if (-not (Test-Path -LiteralPath (Join-Path $here 'Server-Log.js')) -and
+    -not (Test-Path -LiteralPath (Join-Path $here '..\vps\Server-Log.js'))) {
+    Say "Server-Log.js is not beside this installer, and the server's task runs the server under it. Nothing was changed." 'Red'
+    Finish 'INSTALL REFUSED' 1
+}
 if (-not $PSBoundParameters.ContainsKey('Wait')) {
     $Wait = Get-ThornswoodServerReadyWait
 }
@@ -271,9 +280,10 @@ function MoveDir([string]$from, [string]$to) {
   running under this root is stopped outright and the handles are waited for.
 
   By this root and nothing else, because the live and the dev server are both
-  node. The task runs cmd.exe, which holds server.log open, and node under it
-  with a relative path on its command line, so cmd is found by the log path on
-  its line and node as cmd's child. The trailing backslash matters: C:\Thornswood-Server
+  node. The task runs cmd.exe, which starts server-log.js under node with this
+  root's paths on its line, and that node starts the server with a relative
+  path on its command line (#2349), so cmd and the writer are found by the
+  root on their lines and the server as the writer's child. The trailing backslash matters: C:\Thornswood-Server
   is a prefix of C:\Thornswood-Server-Dev.
 #>
 # Ours only: cmd.exe with this root's log on its line, the node it started
@@ -422,12 +432,18 @@ function Carry([string]$from, [string]$to, [bool]$skipWorld) {
         }
         if ($kept -gt 0) { Say ("kept $kept runtime file" + $(if ($kept -eq 1) { '' } else { 's' }) + ' in data, including the character book') 'Cyan' }
     }
+    # A log left behind is said, never passed over (#2349): server.log and
+    # its rolled copies hold the address of every connection, and the 30 days
+    # are kept by server-log.js in the folder the task runs, so one left in
+    # $from is outside them until somebody deletes it there. With the server
+    # stopped, only another program reading it can hold it.
     $moved = 0
     foreach ($f in @(Get-ChildItem -LiteralPath $from -File -Force -ErrorAction SilentlyContinue |
                      Where-Object { $_.Name -match '\.log(\.\d+)?$' })) {
         $dest = Join-Path $to $f.Name
         if (Test-Path -LiteralPath $dest) { continue }
-        try { Move-Item -LiteralPath $f.FullName -Destination $dest -Force -ErrorAction Stop; $moved++ } catch { }
+        try { Move-Item -LiteralPath $f.FullName -Destination $dest -Force -ErrorAction Stop; $moved++ }
+        catch { Say ("could not carry {0} across ({1}); it stays in {2}, where nothing keeps it to 30 days, so delete it there" -f $f.Name, $_.Exception.Message, $from) 'Yellow' }
     }
     if ($moved -gt 0) { Say 'logs carried across, to be rolled rather than deleted' 'Cyan' }
 }
@@ -441,32 +457,35 @@ function Prune([string]$kind, [int]$n) {
 
 # ---- the task --------------------------------------------------------------
 # What the task runs and how, registered over whatever task has the name.
-# $roller is roll-log.ps1 in the root.
-function Register-ServerTask([string]$roller) {
+# $writer is server-log.js in the root.
+function Register-ServerTask([string]$writer) {
     $existing = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
     if ($existing) { Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false }
 
-    # Through cmd rather than straight at node, purely so there is a log.
-    # A scheduled task throws its child's stdout and stderr away, so a server
-    # that refuses to start leaves nothing behind at all: the task reports it
-    # ran, the port never opens, and there is no way to find out why without
-    # sitting in an ssh session running it by hand. Redirecting is the whole
-    # reason cmd is in the chain.
+    # The server runs under server-log.js, which writes its log (#2349). A
+    # scheduled task throws its child's stdout and stderr away, so a server
+    # that refuses to start would leave nothing behind at all: the task
+    # reports it ran, the port never opens, and there is no way to find out
+    # why without sitting in an ssh session running it by hand. server-log.js
+    # starts the server with both streams piped to it and writes them to
+    # server.log, rolled at midnight and at 4 MB, and keeps no line in it or
+    # in any rolled copy for longer than 30 days (Patrick, 12 Oct 2026: the
+    # engine writes every connecting address there). Until then this was
+    # cmd's >> server.log 2>&1, which held the file open for as long as the
+    # server ran, so it could only be rolled by size in front of a start
+    # (Roll-Log.ps1) and never by age. See scripts\vps\Server-Log.js.
     #
-    # roll-log.ps1 goes first, because cmd holds server.log open for as long
-    # as node runs and nothing can move it until then (see Roll-Log.ps1). &
-    # rather than &&, so a roll that fails, or a roller that is not there,
-    # still starts the server.
-    #
-    # node goes through cmd's start /high, for the priority (below). /b keeps
-    # it in cmd's console, so the redirection to server.log holds, and /wait
-    # keeps cmd, and so the task, running until node ends. start leaves cmd's
-    # exit code 0 whatever node's was, so call exit %^errorlevel% hands node's
-    # back, and the task's last result says how node ended, as it did before
-    # (measured 12 Oct: 3 for a node that exited 3, 0 without it).
+    # It goes through cmd's start /high, for the priority (below), and
+    # server-log.js gives the server its own priority as it starts it. /b
+    # keeps it in cmd's console and /wait keeps cmd, and so the task, running
+    # until the server ends. server-log.js ends with the server's exit code,
+    # and start leaves cmd's exit code 0 whatever that was, so call exit
+    # %^errorlevel% hands it back, and the task's last result says how the
+    # server ended, as it did before (measured 12 Oct: 3 for a node that
+    # exited 3, 0 without it). The log path is on the line, which is how
+    # ServerProcesses finds this root's cmd.exe.
     $log = Join-Path $Root 'server.log'
-    $psExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    $cmd = ('/c ""{2}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{3}" -Path "{1}" & start "" /b /wait /high "{0}" dist_back/skymp5-server.js >> "{1}" 2>&1 & call exit %^errorlevel%"' -f $node.Source, $log, $psExe, $roller)
+    $cmd = ('/c "start "" /b /wait /high "{0}" "{1}" --log "{2}" dist_back/skymp5-server.js & call exit %^errorlevel%"' -f $node.Source, $writer, $log)
     $action = New-ScheduledTaskAction -Execute "$env:SystemRoot\System32\cmd.exe" `
                                       -Argument $cmd `
                                       -WorkingDirectory $Root
@@ -533,6 +552,33 @@ function Register-ServerTask([string]$roller) {
     Write-Host "scheduled task '$TaskName' registered, starts at boot, restarts every minute if it stops" -ForegroundColor Cyan
 }
 
+# ---- the log writer (#2349) -------------------------------------------------
+# Server-Log.js goes into the root as server-log.js, from beside this script
+# (Publish-Server sends the two together to C:\) or, run from a checkout,
+# from scripts\vps. The full path in the root, or '' when neither is there:
+# the task cannot start the server without it, so the callers refuse.
+function Copy-LogWriter {
+    $here = $PSScriptRoot
+    $src = $null
+    foreach ($cand in @((Join-Path $here 'Server-Log.js'), (Join-Path $here '..\vps\Server-Log.js'))) {
+        if (Test-Path -LiteralPath $cand) { $src = $cand; break }
+    }
+    if (-not $src) { return '' }
+    $to = Join-Path $Root 'server-log.js'
+    Copy-Item -LiteralPath $src -Destination $to -Force
+    return $to
+}
+
+# An install's roll: today's server.log moved aside whatever its size, so the
+# run this install starts has a file of its own and the tail read after it is
+# only this run, and every rolled file cut to the last 30 days. Never deleted
+# whole: deleting it is how the evidence for the last crash disappeared.
+function Roll-ServerLog([string]$writer) {
+    $log = Join-Path $Root 'server.log'
+    & $node.Source $writer --log $log --roll | ForEach-Object { Write-Host $_ -ForegroundColor DarkGray }
+    if ($LASTEXITCODE -ne 0) { Say ("server-log.js could not roll server.log (exit {0}); the server appends to it and rolls it at midnight" -f $LASTEXITCODE) 'Yellow' }
+}
+
 # The priority node runs at under this root, read back after a start (#2491).
 function Show-ServerPriority([string]$dir) {
     $nodes = @(ServerProcesses $dir | Where-Object { $_.Name -eq 'node.exe' })
@@ -550,8 +596,7 @@ if ($TaskOnly) {
         Say "there is no server in $Root (no dist_back\skymp5-server.js), so there is nothing for the task to start. Nothing was changed." 'Red'
         Finish 'INSTALL REFUSED' 1
     }
-    $roller = Join-Path $Root 'roll-log.ps1'
-    if (-not (Test-Path -LiteralPath $roller)) { Say "$roller is not there, so server.log will not be rolled at start" 'Yellow' }
+    $writer = Copy-LogWriter
     # The task as it is now, for the way back.
     $oldXml = $null
     if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) { $oldXml = (Export-ScheduledTask -TaskName $TaskName | Out-String) }
@@ -559,12 +604,8 @@ if ($TaskOnly) {
     $resPort = if ($gamePort -eq 7777) { 3000 } else { $gamePort + 1 }
     Say 'stopping the server' 'Cyan'
     StopServer $Root
-    Register-ServerTask $roller
-    $log = Join-Path $Root 'server.log'
-    if (Test-Path -LiteralPath $roller) {
-        try { & $roller -Path $log -Force | ForEach-Object { Write-Host $_ -ForegroundColor DarkGray } }
-        catch { Write-Host ("could not roll server.log: {0}" -f $_.Exception.Message) -ForegroundColor Yellow }
-    }
+    Register-ServerTask $writer
+    Roll-ServerLog $writer
     Start-ScheduledTask -TaskName $TaskName
     Say ("started through the new task, giving it {0} seconds to answer on UDP {1} and on {2}" -f $Wait, $gamePort, $resPort) 'DarkGray'
     if (Answers $Root) {
@@ -811,6 +852,9 @@ function GoBack([string]$keptAs) {
         Say "COULD NOT MOVE $aside BACK TO $Root. The new one is in $failedAs. Look at the box." 'Red'
         Finish 'INSTALL FAILED' 1
     }
+    # The task this install registered runs the server under server-log.js
+    # in the root (#2349), and a folder from before it has none.
+    $null = Copy-LogWriter
     if ($StartNow -and -not $NoTask) {
         Start-ScheduledTask -TaskName $TaskName
         $gp = GamePortOf $Root
@@ -960,32 +1004,16 @@ if ($siteTask -and $siteTask.Principal.UserId -and $siteTask.Principal.UserId -n
     if (-not $has.Count) { Say "the site's account has no rule on $Root yet, so it cannot read server.log: run .\scripts\deploy\Deploy-Docs.ps1 once" 'Yellow' }
 }
 
-# The roller the task runs in front of the server, from beside this script:
-# Publish-Server sends the two together, and run by hand from tools they are
-# already side by side. Without it the server still starts, the log just is
-# not rolled, so it is said here rather than stopped over.
-$here = $PSScriptRoot
-if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# Publish-Server scp's Roll-Log.ps1 to C:\ beside this installer. Repo layout
-# keeps it under scripts\vps\. Prefer the same folder, then the repo path.
-$rollSrc = $null
-foreach ($cand in @(
-    (Join-Path $here 'Roll-Log.ps1'),
-    (Join-Path $here '..\vps\Roll-Log.ps1')
-)) {
-    if (Test-Path -LiteralPath $cand) { $rollSrc = $cand; break }
-}
-$roller  = Join-Path $Root 'roll-log.ps1'
-if ($rollSrc) {
-    Copy-Item -LiteralPath $rollSrc -Destination $roller -Force
-} else {
-    Write-Host "Roll-Log.ps1 is not beside this installer, so server.log will not be rolled at start." -ForegroundColor Yellow
-}
-# ---- end of the roller copy
+# The log writer the task runs the server under (#2349), into the root.
+# Found before anything changed (the refusal near the top), so it is there.
+$writer = Copy-LogWriter
+# A box that had the old roller in its root keeps nothing that runs it.
+$oldRoller = Join-Path $Root 'roll-log.ps1'
+if (Test-Path -LiteralPath $oldRoller) { Remove-Item -LiteralPath $oldRoller -Force }
 
 # ---- scheduled task --------------------------------------------------------
 # Register-ServerTask, above, says what the task is and why.
-if (-not $NoTask) { Register-ServerTask $roller }
+if (-not $NoTask) { Register-ServerTask $writer }
 
 function Tidy {
     Prune '.prev-*' $Keep
@@ -999,14 +1027,9 @@ if (-not ($StartNow -and -not $NoTask)) {
     Finish 'INSTALL OK' 0
 }
 
-# Rolled whatever its size rather than deleted, so the run before this
-# install is server.log.1 and the tail below reads only this one.
-# Deleting it is how the evidence for the last crash disappeared.
-$log = Join-Path $Root 'server.log'
-if (Test-Path -LiteralPath $roller) {
-    try { & $roller -Path $log -Force | ForEach-Object { Write-Host $_ -ForegroundColor DarkGray } }
-    catch { Write-Host ("could not roll server.log: {0}" -f $_.Exception.Message) -ForegroundColor Yellow }
-}
+# Rolled whatever its size rather than deleted (Roll-ServerLog), so the run
+# this install starts has a file of its own and the tail below reads only it.
+Roll-ServerLog $writer
 
 Start-ScheduledTask -TaskName $TaskName
 
@@ -1026,7 +1049,7 @@ if (Answers $Root) {
     Say ("the server is answering on {0}, game port {1}" -f $resPort, $gamePort) 'Green'
     Show-ServerPriority $Root
     Tidy
-    Say ("the task appends everything it prints to {0}\server.log, rolled at 4 MB before each start, five kept" -f $Root) 'DarkGray'
+    Say ("the task writes everything the server prints to {0}\server.log through server-log.js, rolled at midnight and at 4 MB, nothing kept past 30 days" -f $Root) 'DarkGray'
     Finish 'INSTALL OK' 0
 }
 

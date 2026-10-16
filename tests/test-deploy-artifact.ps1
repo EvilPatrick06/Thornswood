@@ -480,8 +480,8 @@ if ($ps) {
     Yes 'Publish-Server refuses uncommitted files before its first scp' (
         $as.Count -eq 1 -and $firstScp.Count -ge 1 -and $as[0].Extent.StartOffset -lt $firstScp[0].Extent.StartOffset)
     $pt = $ps.Extent.Text
-    Yes '  and checks the installer, the log roller, the gamemode and the most online record' (
-        $pt.Contains("'scripts/deploy/Install-ThornswoodServer.ps1'") -and $pt.Contains("'scripts/vps/Roll-Log.ps1'") -and
+    Yes '  and checks the installer, the log writer, the gamemode and the most online record' (
+        $pt.Contains("'scripts/deploy/Install-ThornswoodServer.ps1'") -and $pt.Contains("'scripts/vps/Server-Log.js'") -and
         $pt.Contains("'game/gamemode.js'") -and $pt.Contains("'records/most-online.json'"))
 }
 

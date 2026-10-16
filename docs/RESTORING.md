@@ -260,7 +260,7 @@ the box has no repo:
 
 ```powershell
 scp .\scripts\deploy\Install-ThornswoodServer.ps1 .\scripts\deploy\ServerSettings.ps1 Administrator@192.135.112.23:C:/Thornswood-RestoreTest/scripts/deploy/
-scp .\scripts\vps\Restore-Server.ps1 .\scripts\vps\Restore-Backup.ps1 .\scripts\vps\Roll-Log.ps1 Administrator@192.135.112.23:C:/Thornswood-RestoreTest/scripts/vps/
+scp .\scripts\vps\Restore-Server.ps1 .\scripts\vps\Restore-Backup.ps1 .\scripts\vps\Server-Log.js Administrator@192.135.112.23:C:/Thornswood-RestoreTest/scripts/vps/
 ```
 
 and then, on the box:

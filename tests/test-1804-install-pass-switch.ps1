@@ -85,6 +85,8 @@ foreach ($f in 'Install-ThornswoodServer.ps1', 'ServerSettings.ps1', 'ServerBuil
 foreach ($f in 'Read-JsonFile.ps1', 'RecordShape.ps1') {
     Put (Join-Path $box $f) ([IO.File]::ReadAllText((Join-Path $repo "scripts\release\$f")))
 }
+# The log writer the server's task runs (#2349), which the installer refuses without.
+Put (Join-Path $box 'Server-Log.js') ([IO.File]::ReadAllText((Join-Path $repo 'scripts\vps\Server-Log.js')))
 $installer = Join-Path $box 'Install-ThornswoodServer.ps1'
 
 # A payload for $root, with $pass as its join pass switch ('' for none). It
