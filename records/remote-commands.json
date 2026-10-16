@@ -1441,7 +1441,7 @@
                       "script":  "scripts/release/Publish-Server.ps1",
                       "scope":  "Send-InstallerOnly",
                       "via":  "scp",
-                      "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh $rollLog \"${target}:C:/Roll-Log.ps1\" }",
+                      "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh $serverLog \"${target}:C:/Server-Log.js\" }",
                       "does":  "uploads the server zip or installer libraries to C:\\",
                       "class":  "admin",
                       "reason":  "consumed by Install-ThornswoodServer, which registers the SYSTEM task"
@@ -1495,7 +1495,7 @@
                       "script":  "scripts/release/Publish-Server.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "scp",
-                      "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh $rollLog \"${target}:C:/Roll-Log.ps1\" }",
+                      "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh $serverLog \"${target}:C:/Server-Log.js\" }",
                       "does":  "uploads the server zip or installer libraries to C:\\",
                       "class":  "admin",
                       "reason":  "consumed by Install-ThornswoodServer, which registers the SYSTEM task"

@@ -78,9 +78,10 @@
 
   -TaskOnly REGISTERS THE TASK AGAIN AND NOTHING ELSE (#2491). No zip, no
   stage, no swap, no setting: the server already in -Root is stopped, the
-  task is registered with this installer's action and settings, and the
-  server is started through it and given -Wait seconds to answer on both
-  ports. If it does not answer, the task it had goes back, exactly as it was
+  task is registered with this installer's action and settings, with the
+  log writer that action runs (server-log.js, #2349) put in the root beside
+  it, and the server is started through it and given -Wait seconds to
+  answer on both ports. If it does not answer, the task it had goes back, exactly as it was
   exported, and is started again: INSTALL ROLLED BACK. It is how a box takes a
   change to the task itself (its priority, #2491) without a release.
   Publish-Server.ps1 -TaskOnly sends this and runs it.
@@ -431,12 +432,18 @@ function Carry([string]$from, [string]$to, [bool]$skipWorld) {
         }
         if ($kept -gt 0) { Say ("kept $kept runtime file" + $(if ($kept -eq 1) { '' } else { 's' }) + ' in data, including the character book') 'Cyan' }
     }
+    # A log left behind is said, never passed over (#2349): server.log and
+    # its rolled copies hold the address of every connection, and the 30 days
+    # are kept by server-log.js in the folder the task runs, so one left in
+    # $from is outside them until somebody deletes it there. With the server
+    # stopped, only another program reading it can hold it.
     $moved = 0
     foreach ($f in @(Get-ChildItem -LiteralPath $from -File -Force -ErrorAction SilentlyContinue |
                      Where-Object { $_.Name -match '\.log(\.\d+)?$' })) {
         $dest = Join-Path $to $f.Name
         if (Test-Path -LiteralPath $dest) { continue }
-        try { Move-Item -LiteralPath $f.FullName -Destination $dest -Force -ErrorAction Stop; $moved++ } catch { }
+        try { Move-Item -LiteralPath $f.FullName -Destination $dest -Force -ErrorAction Stop; $moved++ }
+        catch { Say ("could not carry {0} across ({1}); it stays in {2}, where nothing keeps it to 30 days, so delete it there" -f $f.Name, $_.Exception.Message, $from) 'Yellow' }
     }
     if ($moved -gt 0) { Say 'logs carried across, to be rolled rather than deleted' 'Cyan' }
 }
@@ -845,6 +852,9 @@ function GoBack([string]$keptAs) {
         Say "COULD NOT MOVE $aside BACK TO $Root. The new one is in $failedAs. Look at the box." 'Red'
         Finish 'INSTALL FAILED' 1
     }
+    # The task this install registered runs the server under server-log.js
+    # in the root (#2349), and a folder from before it has none.
+    $null = Copy-LogWriter
     if ($StartNow -and -not $NoTask) {
         Start-ScheduledTask -TaskName $TaskName
         $gp = GamePortOf $Root

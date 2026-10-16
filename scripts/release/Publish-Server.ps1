@@ -56,8 +56,8 @@
   sends the installer and nothing to install, and the installer registers the
   server's scheduled task again with its own action and settings, stops the
   server and starts it through the new task (Install-ThornswoodServer.ps1
-  -TaskOnly). No zip, no file in the server's folder, no setting, no record
-  and no news: it is how the box takes a change to the task itself, the
+  -TaskOnly). No zip, no file in the server's folder but the log writer the
+  task runs (server-log.js, #2349), no setting, no record and no news: it is how the box takes a change to the task itself, the
   priority it starts node at (#2491), without a release. If the server does
   not answer under the new task, the task it had goes back and is started.
   -Channel dev for the dev server. It drops whoever is on that server, so

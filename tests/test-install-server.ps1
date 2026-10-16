@@ -753,8 +753,8 @@ try {
     Yes '  and the task is left as it was' (([IO.File]::ReadAllText($taskFile) | ConvertFrom-Json).Argument -notlike '*/high*')
     $out = RunWrapped ($taskOnly + "`r`nexit `$LASTEXITCODE`r`n")
     Yes '-TaskOnly is INSTALL OK, answering as a new process' (($out -contains 'INSTALL OK') -and (WaitUp $P) -and ((Owner $P) -ne $running))
-    Yes '  and the task starts node through start /high again, and hands its exit code back' (
-        [string](([IO.File]::ReadAllText($taskFile) | ConvertFrom-Json).Argument) -like '*start "" /b /wait /high "*" dist_back/skymp5-server.js >> *2>&1 & call exit %^errorlevel%"')
+    Yes '  and the task starts node through start /high again, on server-log.js running the server (#2349), and hands its exit code back' (
+        [string](([IO.File]::ReadAllText($taskFile) | ConvertFrom-Json).Argument) -like '*start "" /b /wait /high "*" "*\server-log.js" --log "*\server.log" dist_back/skymp5-server.js & call exit %^errorlevel%"')
     Yes '  and it reads node back at High' (($out -join "`n") -match 'node, pid \d+, runs at High priority')
     Yes '  and no file of the server changed, and nothing was set beside it' (
         (Get (Join-Path $root 'gamemode.js')) -eq $gmWas -and (Get (Join-Path $root 'server-settings.json')) -eq $setWas -and @(Beside '.*').Count -eq $besideWas)

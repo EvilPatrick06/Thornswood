@@ -246,10 +246,15 @@ function run(o) {
   const pending = [];
   const sayLine = (msg) => Buffer.from('[' + stampOf(new Date()) + '] [server-log] ' + msg + '\n');
 
+  // The day a file belongs to is the day of its first line, so one that
+  // could not be rolled stays due until it is, whoever opens it again.
   function open(now) {
     state.fd = fs.openSync(log, 'a');
-    state.bytes = fs.fstatSync(state.fd).size;
-    state.day = dayKey(now);
+    const st = fs.fstatSync(state.fd);
+    state.bytes = st.size;
+    let first = null;
+    if (st.size) { try { first = firstStamp(readHead(log)); } catch (e) { first = null; } }
+    state.day = dayKey(first !== null ? first : (st.size ? st.mtimeMs : now));
     state.atLineStart = true;
   }
   function raw(buf) {
@@ -285,17 +290,27 @@ function run(o) {
     return now >= state.rollAfter && (dayKey(now) !== state.day || state.bytes >= MAX_BYTES);
   }
   function roll(now) {
-    if (state.fd !== null) { fs.closeSync(state.fd); state.fd = null; }
     const lines = [];
+    if (state.fd !== null) {
+      try { fs.closeSync(state.fd); }
+      catch (e) { lines.push('could not let go of ' + path.basename(log) + ' to roll it: ' + (e.code || e.message)); }
+      state.fd = null;
+    }
+    const wasDay = state.day;
+    let rolled = true;
     try { rollFile(log, now); } catch (e) {
       // Another program holding server.log without letting it be renamed
       // (Get-Content over ssh does): outside our control, so it is said and
       // tried again a minute later, writing on in the same file meanwhile.
+      rolled = false;
       state.rollAfter = now + 60 * 1000;
       lines.push('could not roll ' + path.basename(log) + ': ' + (e.code || e.message) +
         '. Something else has it open; writing on in it, and trying again in a minute.');
     }
     try { open(now); } catch (e) { lose(Buffer.alloc(0), e); }
+    // Not rolled, it is still the earlier day's file, so the roll stays due
+    // (the size is counted from the file itself either way).
+    if (!rolled) state.day = wasDay;
     for (const l of lines.concat(sweep(log, now))) say(l);
   }
   function write(buf) {
@@ -315,7 +330,8 @@ function run(o) {
   const now = Date.now();
   if (rollAtStart(log, now)) {
     try { rollFile(log, now); } catch (e) {
-      pending.push('could not roll ' + path.basename(log) + ' at start: ' + (e.code || e.message) + '. Appending to it until midnight.');
+      pending.push('could not roll ' + path.basename(log) + ' at start: ' + (e.code || e.message) +
+        '. Something else has it open; writing on in it, and trying again with the next line, then once a minute.');
     }
   }
   pending.push(...sweep(log, now));

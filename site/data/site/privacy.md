@@ -2,7 +2,7 @@
 
 What Thornswood keeps about you, why, and how to have it deleted.
 
-Last changed: 15 October 2026.
+Last changed: 16 October 2026.
 
 Thornswood is a free fan project run by two people. It is not a company. This
 page is written plainly rather than legally, and it is meant to be the whole
@@ -134,8 +134,9 @@ server keeps seven daily and four weekly copies. Copies fetched to the
 operator's computer are kept for 30 days, with at least seven retained for
 recovery. These are private recovery copies, not public downloads. Removing
 a live record does not rewrite older backups; they expire through that
-retention schedule. Staff must reapply completed deletion requests before
-putting an older backup back into service.
+retention schedule. The game server's log is not in them. Staff must
+reapply completed deletion requests before putting an older backup back
+into service.
 
 ## Deleting it
 

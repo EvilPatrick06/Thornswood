@@ -23,7 +23,12 @@
       is the writer's, a server.log from another day is rolled at the start
       and today's is appended to, and the sweep's lines are in the log
     - the site reads the server's lines back across the dated rolled files
-      (serverLogSlice)
+      (serverLogSlice; tests\test-session-logs.js reads a crash back across
+      the writer's own rolls)
+    - the server ends when the writer is killed, as StopServer and a stopped
+      task rely on: node puts its child in a job that closes with it
+    - the privacy page says the game server's log holds the address for 30
+      days, and the nightly backup takes no server.log
 */
 const fs = require('fs');
 const path = require('path');
@@ -170,10 +175,60 @@ function runPart() {
     const at = site.indexOf('function serverLogSlice(');
     yes('the site still reads the server log for a session (serverLogSlice)', at >= 0);
     yes('  and lists the rolled files rather than counting .1 to .5', site.indexOf('const keep = 5;') < 0 && /serverLogGenerations/.test(site));
+    // ---- the privacy page and the backup -------------------------------------
+    const privacy = rd(path.join(REPO, 'site', 'data', 'site', 'privacy.md')) || '';
+    yes('the privacy page says the game server\'s log holds the address, and for 30 days',
+      /\*\*The game server's log\*\* records the address/.test(privacy) && /older than 30 days/.test(privacy) &&
+      /Sign-in records\*\*, the only thing on the site holding your address/.test(privacy));
+    yes('  and that the backups do not hold it', /The game server's log is not in them\./.test(privacy));
+    const nightly = rd(path.join(REPO, 'scripts', 'vps', 'vps-nightly-backup.ps1')) || '';
+    yes('the nightly backup takes no server.log from either game server',
+      nightly.indexOf('Grab (Join-Path $sv.Root') >= 0 && !/Grab[^\n]*server\.log/i.test(nightly) && !/Grab \(Join-Path \$sv\.Root\s*\)/.test(nightly));
   } catch (e) {
     fail++; console.log('FAIL  the harness stopped: ' + (e.stack || e.message));
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
-  done();
+  jobPart();
+}
+
+// The server goes when the writer goes. Install-ThornswoodServer's
+// StopServer ends both by id, but a writer ended any other way (the task
+// stopped, a crash) must not leave a server running with nothing writing
+// its log and nothing the task can see.
+function jobPart() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-2349-job-'));
+  const finish = () => { setTimeout(() => { fs.rmSync(dir, { recursive: true, force: true }); done(); }, 300); };
+  try {
+    fs.mkdirSync(path.join(dir, 'dist_back'));
+    fs.writeFileSync(path.join(dir, 'dist_back', 'skymp5-server.js'),
+      "console.log('[' + new Date().toISOString().slice(0, 10) + ' 00:00:00.000] server pid ' + process.pid);\nsetTimeout(function () { }, 60000);\n");
+    const log = path.join(dir, 'server.log');
+    const w = cp.spawn(process.execPath, [WRITER, '--log', log, 'dist_back/skymp5-server.js'], { cwd: dir, stdio: 'ignore' });
+    let tries = 0, pid = 0;
+    const look = setInterval(() => {
+      tries++;
+      const m = /server pid (\d+)/.exec(rd(log) || '');
+      if (m) pid = Number(m[1]);
+      if (!pid && tries < 100) return;
+      clearInterval(look);
+      yes('the writer started the server and wrote its first line', pid > 0);
+      if (!pid) { try { w.kill(); } catch (e) { } finish(); return; }
+      w.kill();
+      let left = 0;
+      const gone = setInterval(() => {
+        left++;
+        let alive = true;
+        try { process.kill(pid, 0); } catch (e) { alive = false; }
+        if (alive && left < 50) return;
+        clearInterval(gone);
+        yes('killing the writer ends the server too', !alive);
+        if (alive) { try { process.kill(pid); } catch (e) { } }
+        finish();
+      }, 100);
+    }, 100);
+  } catch (e) {
+    fail++; console.log('FAIL  the job part stopped: ' + (e.stack || e.message));
+    finish();
+  }
 }
