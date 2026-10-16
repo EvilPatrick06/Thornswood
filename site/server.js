@@ -5465,9 +5465,14 @@ async function handle(req, res) {
     const note = (url.searchParams.get('note') || '').slice(0, 300);
     return receiveUpload(req, res, asked, GALLERY_CAP, GALLERY_ALLOW, (name) => {
       // The uploads.json note too, so this shot reads the same as any other
-      // file in the uploads listing (the orig name, who by, the note).
+      // file in the uploads listing (the orig name, who by, the note). With
+      // the account that sent it (#2351): gallery.json keeps no account for a
+      // shot once it is approved, because /api/public hands that file out, so
+      // this note is how a deletion request finds an approved picture. It is
+      // never in the listing (listUploads names its own fields).
       const meta = jsonFile(UPMETA, {});
       meta[name] = { orig: asked, by: by, note: note, at: Date.now() };
+      if (discordId) meta[name].discordId = discordId;
       putJson(UPMETA, meta);
 
       withGalleryPending(() => {

@@ -226,6 +226,11 @@ const readJson = (f) => { try { return JSON.parse(fs.readFileSync(path.join(dir,
     const gameEntry = pend.find((x) => x.name === gameName);
     yes('it is queued, marked from the launcher, with the sender\'s discord id kept',
         !!gameEntry && gameEntry.from === 'launcher' && gameEntry.discordId === MEMBER_ID);
+    // gallery.json keeps no account once a shot is approved, because the site
+    // hands it out, so the uploads note is how a deletion request finds an
+    // approved picture (#2351, scripts\vps\Delete-Person.ps1).
+    const gameNote = (readJson(path.join('..', 'uploads', 'uploads.json')) || {})[gameName] || {};
+    yes('and the uploads note keeps the sending account too, for a deletion request', gameNote.discordId === MEMBER_ID);
 
     r = await ask('POST', upQ('bad.png') + '&ticket=' + encodeURIComponent('tk1.nope.nope'),
                   { 'content-type': 'image/png' }, PNG);
