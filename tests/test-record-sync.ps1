@@ -557,6 +557,41 @@ Put (Join-Path $vx 'Game\Data\vortex.deployment.json') '{"files":[{"relPath":"Pl
 Yes 'a file of ours a release dropped stays when Vortex deploys that path now' (
     (Test-Lands $vx $records[$R3] @('Data\Platform\UI\thornswood-old.esp', 'Data\vortex.deployment.json')) -and (Test-Path -LiteralPath (Join-Path $vx 'Game\Data\Platform\UI\thornswood-old.esp')) -and (Said 'collection''s now and stayed'))
 
+# ---- the download apart from the write (#2210) ------------------------------------
+# Patrick, 12 Oct: the game folder is prepared during the update's download. So
+# the sync's first half downloads and writes nothing into the game folder or the
+# records, and its second half writes, and checks again any file that changed
+# between the two (a refresh brought it up to date from Vortex meanwhile).
+Write-Host ''; Write-Host 'an update that downloads while the game folder is prepared (#2210)'
+$mPrep = $U.GetMethod('PrepareSync', $flags); $mWrite = $U.GetMethod('WriteSync', $flags)
+Yes 'the sync is two halves, PrepareSync and WriteSync' ($null -ne $mPrep -and $null -ne $mWrite)
+$side = New-Install 'beside' $installerFiles $ids
+Use-Install $side
+$vNow = Parse-Feed
+$before = Get-Game $side
+$script:said.Clear()
+$a = New-Object 'object[]' 5
+$a[0] = (Raw $cfg); $a[1] = [string]$at; $a[2] = (Raw $vNow.record); $a[3] = (Raw $vNow); $a[4] = $log
+$plan = $mPrep.Invoke($null, $a)
+$mid = Get-Game $side
+$same = ($before.Count -eq $mid.Count)
+foreach ($k in @($before.Keys)) { if (-not $mid.ContainsKey($k) -or $mid[$k] -ne $before[$k]) { $same = $false } }
+Yes 'the download half leaves the game folder exactly as it was' ($null -ne $plan -and $same)
+Yes '  and does not say the install is on the release' ((Synced $side) -notmatch [regex]::Escape($R3))
+$staged = @(Get-ChildItem -LiteralPath (Join-Path $side 'Profile\Sync') -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '^[0-9a-f]{64}$' })
+Yes ("  the files it fetched wait in Profile\Sync ({0})" -f $staged.Count) ($staged.Count -eq (Fetched) -and $staged.Count -gt 0)
+# A refresh beside the download puts other bytes at a path the check found right.
+$matched = @($records[$R3].Keys | Where-Object { -not ([string]$_).StartsWith(':') -and $before.ContainsKey([string]$_) -and $before[[string]$_] -eq $records[$R3][[string]$_] } | ForEach-Object { [string]$_ })
+Yes ("a file of ours the check found right is there to change ({0})" -f $matched.Count) ($matched.Count -gt 0)
+$moved = Join-Path (Join-Path $side 'Game') $matched[0]
+Remove-Item -LiteralPath $moved -Force
+[IO.File]::WriteAllText($moved, 'what a refresh brought from Vortex meanwhile', $ascii)
+$w = New-Object 'object[]' 3
+$w[0] = (Raw $cfg); $w[1] = $plan; $w[2] = $log
+[void]$mWrite.Invoke($null, $w)
+Yes 'the write half lands the release, the file changed meanwhile included' (Test-Lands $side $records[$R3])
+Yes '  and says that file changed while it downloaded' (Said 'changed while it downloaded')
+Yes '  and only then says the install is on the release, with Profile\Sync gone' (((Synced $side) -match [regex]::Escape($R3)) -and -not (Test-Path -LiteralPath (Join-Path $side 'Profile\Sync')))
 
 # ---- other authors' files we shipped leave only when the bytes match (#1261) ----
 Write-Host ''; Write-Host 'other authors files we shipped (#1261)'

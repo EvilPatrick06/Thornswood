@@ -1260,8 +1260,27 @@ namespace Thornswood
         /// <summary>Replaces the running exe and restarts, via a short detached script.</summary>
         public static void SelfUpdate(Config cfg, VersionDoc v, Action<string> log)
         {
+            SwapIn(FetchLauncher(cfg, v, log), log);
+        }
+
+        /// <summary>
+        /// The new launcher, downloaded and checked against its checksum, in
+        /// the temp folder; nothing is replaced yet. Apart from SwapIn so an
+        /// update can download while the game folder is prepared (#2210).
+        /// </summary>
+        public static string FetchLauncher(Config cfg, VersionDoc v, Action<string> log)
+        {
             log("Downloading launcher " + v.launcherVersion + "...");
-            string tmp = Download(cfg, v.launcherUrl, v.launcherSha256, log);
+            return Download(cfg, v.launcherUrl, v.launcherSha256, log);
+        }
+
+        /// <summary>
+        /// Puts the launcher FetchLauncher downloaded into place once this one
+        /// has gone, after the signer check, and deletes the download either
+        /// way.
+        /// </summary>
+        public static void SwapIn(string tmp, Action<string> log)
+        {
             string exe = System.Reflection.Assembly.GetExecutingAssembly().Location;
             string neu = exe + ".new";
             // Before the copy, not after. Once a file is sitting at exe.new the
@@ -1278,7 +1297,7 @@ namespace Thornswood
             }
             finally
             {
-                try { File.Delete(tmp); } catch (Exception ex) { Swallow.Note("Updater.SelfUpdate, delete", ex); }
+                try { File.Delete(tmp); } catch (Exception ex) { Swallow.Note("Updater.SwapIn, delete", ex); }
             }
 
             int me = System.Diagnostics.Process.GetCurrentProcess().Id;

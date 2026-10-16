@@ -255,13 +255,22 @@ namespace Thornswood
 
         static string J(string s) { return s.Replace("\\", "\\\\").Replace("\"", "\\\""); }
 
+        // The time Vortex's record gives a file is the file's own write time
+        // in milliseconds, as Vortex writes it; a refresh compares it with the
+        // last record's to tell which files moved (#2210).
+        static string VortexTime(string staged)
+        {
+            if (!File.Exists(staged)) return "1";
+            return ((long)(File.GetLastWriteTimeUtc(staged) - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds).ToString();
+        }
+
         static void Record(string path, string staging, string target, string[][] files, DateTime when)
         {
             var sb = new StringBuilder();
             sb.Append("{\n  \"instance\": \"test\",\n  \"version\": 1,\n  \"deploymentMethod\": \"hardlink_activator\",\n  \"gameId\": \"skyrimse\",\n");
             sb.Append("  \"stagingPath\": \"" + J(staging) + "\",\n  \"targetPath\": \"" + J(target) + "\",\n  \"files\": [\n");
             for (int i = 0; i < files.Length; i++)
-                sb.Append("    { \"relPath\": \"" + J(files[i][0]) + "\", \"source\": \"" + J(files[i][1]) + "\", \"target\": \"\", \"time\": 1 }" + (i + 1 < files.Length ? "," : "") + "\n");
+                sb.Append("    { \"relPath\": \"" + J(files[i][0]) + "\", \"source\": \"" + J(files[i][1]) + "\", \"target\": \"\", \"time\": " + VortexTime(Path.Combine(staging, files[i][1] + "\\" + files[i][0])) + " }" + (i + 1 < files.Length ? "," : "") + "\n");
             sb.Append("  ]\n}\n");
             Put(path, sb.ToString());
             File.SetLastWriteTimeUtc(path, when);
@@ -668,11 +677,15 @@ namespace Thornswood
                 !File.Exists(Path.Combine(own, "Data\\PersonsOwn.esp")) && !File.Exists(Path.Combine(own, "Data\\NewBuild.bsa")) && NoneIn(own, Hand));
             string files = File.ReadAllText(Path.Combine(OwnGame.Dir, "files.txt"));
             Yes("the game's own files are still on record after the refresh", files.Contains("|O|") && files.Contains("|" + Master) && files.Contains("|" + Loose));
-            bool packC = false;
+            // Its entry in Vortex's record did not move, so since #2210 the
+            // refresh does not open it and its line keeps the L or C it had
+            // (decided by Patrick on 12 Oct; only the installed size Windows
+            // shows reads it). The file itself stays the pack's.
+            bool packOnRecord = false;
             foreach (string line in files.Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
-                if (line.EndsWith("|Data\\TsOne.esp", StringComparison.OrdinalIgnoreCase)) packC = line.StartsWith("C|");
-            Yes("a pack's file over a Vortex name is on record as C after a refresh",
-                packC && Text(packAt) == "TS-PACK" && Id(packAt) != Id(Path.Combine(s.Staging, "ModA\\TsOne.esp")));
+                if (line.EndsWith("|Data\\TsOne.esp", StringComparison.OrdinalIgnoreCase)) packOnRecord = true;
+            Yes("a pack's file over a Vortex name stays the pack's own copy after a refresh, and on record",
+                packOnRecord && Text(packAt) == "TS-PACK" && Id(packAt) != Id(Path.Combine(s.Staging, "ModA\\TsOne.esp")));
             Yes("the check before Play still passes", OwnGame.CheckShared(OwnGame.Source(s.Cfg), null) == null);
         }
 
@@ -1049,7 +1062,7 @@ Yes 'nothing asks for the Steam copy to be downgraded any more (SourceNeeded and
     (($all -notmatch 'SourceNeeded\(') -and ($all -notmatch 'Downgrade\.Target\('))
 Yes 'WhyNot no longer refuses a made folder over the Steam copy''s build' ($own -notmatch 'most likely because Steam updated it')
 Yes 'a refresh takes only Vortex''s files (Refresh calls Vortex, not Gather)' `
-    (($own -match 'List<Found> all = Vortex\(src, left, scope\);') -and ($own -notmatch 'List<Found> all = Gather\(src, left\);'))
+    (($own -match 'List<Found> all = Vortex\(src, left, scope, failed\);') -and ($own -notmatch 'List<Found> all = Gather\(src, left\);'))
 Yes 'the Downgrade puts its files only through OwnGame.TakePinned, and never names the Steam copy (OwnGame.Source)' `
     (($down -match 'OwnGame\.TakePinned\(') -and ($down -notmatch 'OwnGame\.Source') -and ($down -notmatch 'File\.Copy\('))
 $run = $down.Substring($down.IndexOf('static bool Run(Config cfg'))

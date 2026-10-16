@@ -125,7 +125,7 @@ it says a pool thread.
 | 24 | `Shell.cs:529 win.ContentRendered` | Once the window has drawn, on a pool thread, `SelfSwap.cs:192 Settle()` deletes `Launcher\Thornswood.exe.old`, the copy of the previous launcher a self update keeps; that is how the update script knows this one started (see SelfSwap in section 2). A `Thornswood.exe.bad` left by a way back is deleted too, and the log says which version failed. Every start but the first after an update finds neither. |
 | 25 | `Shell.cs:571 Application` | A new WPF Application with `ShutdownMode.OnMainWindowClose`, because the hidden voice window would otherwise keep the process alive. `Shell.cs:573 app.Exit` stops voice and presence and releases Hold. `Shell.cs:580 DispatcherUnhandledException` logs a fault and keeps the launcher up. `Shell.cs:618 StartStallWatch` logs when the window stops answering. |
 | 26 | `Shell.cs:643 app.Run` | The message loop. Run does not return until the window closes. |
-| 27 | `ShellOwnGame.cs:46 ContentRendered` | Once the window is on screen: `ShellOwnGame.cs:65 OwnGameAtStart()` refreshes the game folder by itself when Vortex has deployed since it was made (`OwnGame.cs:662 NeedsRefresh()`), or offers to make it in the shared shape. Play also asks that same test now, through `OwnGameRefreshIfDue`. |
+| 27 | `ShellOwnGame.cs:46 ContentRendered` | Once the window is on screen: `ShellOwnGame.cs:65 OwnGameAtStart()` refreshes the game folder by itself when Vortex has deployed since it was made (`OwnGame.cs:662 NeedsRefresh()`), or offers to make it in the shared shape. When Vortex deploys into a Thornswood game folder it logs why nothing is refreshed and what to do (`OwnGame.RefusedSource`). Play also asks that same test now, through `OwnGameRefreshIfDue`. |
 
 An install made before the terms lock has no Profile\accepted.json. Run asks
 before it reads config, unless it was started to uninstall, and returns
@@ -195,7 +195,7 @@ for and the depots the Downgrade button asks Steam for), taken through
 `Downgrade.AdoptPin()` when the feed carries it; the numbers compiled into
 Downgrade.cs are the fallback until it does.
 
-**Updater** (Updater.cs). The update feed, the packs and the launcher's own
+**Updater** (Updater.cs, Sync.cs, UpdateStages.cs). The update feed, the packs and the launcher's own
 replacement. `Updater.cs:228 Check()` reads version.json from the site feed
 on thornswood.net, asking with the ETag of the copy it keeps in
 `Profile\feed-cache.txt` so an unchanged feed answers 304, and falls back to
@@ -235,7 +235,13 @@ this process has gone and keeps the old one until the new one has started
 (see SelfSwap below). `Version` at the top of the file is the launcher's
 version, moved by `scripts\release\Bump-Version.ps1` before a Ship. In the launcher,
 `ShellUpdate.cs:28 CheckUpdatesBackground()` asks, `OnVersionDoc` decides,
-`ShellUpdate.cs:372 RunUpdate()` installs, and `ShellUpdate.cs:51 CheckFailed()` keeps
+`ShellUpdate.cs:372 RunUpdate()` installs, in two halves (UpdateStages.cs,
+#2210): `FetchUpdate` downloads the release's files into `Profile\Sync`, the
+packs and the new launcher and writes nothing into Game or the records a
+refresh reads, so it runs while the game folder is being prepared;
+`WriteUpdate` then puts them in under `OwnGame.Alone`, after any refresh
+under way, and checks again any file a refresh changed in between; the new
+launcher goes in last (`SwapIn`). `ShellUpdate.cs:51 CheckFailed()` keeps
 Play shut and asks again every thirty seconds when the source does not answer.
 Every document that was read also goes to `ShellUpdate.cs:80 ShowNotice()`, which
 asks FeedNotice what the bar above Play says and whether Play is held.
@@ -247,6 +253,9 @@ between, `Updater.Download` reports the bytes of each download, Sync the files
 it checks and the bytes it fetches, OwnGame.Make and Refresh the files they
 bring over, and Verify.Bytes the plugins it checks. A report with nothing open
 is dropped, so the same code run by Fix or a Scan leaves the button alone.
+While the game folder is prepared (`FolderFirst`) the button is its own, and
+an update downloading beside it (a thread marked `Second`) shows itself again
+with its next report once the folder is done (#2210).
 `PlayBar` turns the reports into the words and the fill, never backwards
 within a phase, and a band that slides while the total is unknown;
 ShellProgress.cs redraws it at most every `PlayBar.DrawEveryMs`. It writes
@@ -405,12 +414,23 @@ when `Signature.MicrosoftRefusal` says Microsoft signed it (#1330).
 **OwnGame** (OwnGame.cs, OwnGameShare.cs, OwnGameKinds.cs and OwnGameClean.cs, with
 ShellOwnGame.cs for its card and offer). `<Root>\Game` itself. `OwnGame.cs:718 Make()` builds it in
 `<Root>\Game.new` and moves it into place; `OwnGame.cs:844 Refresh()` brings it
-up to date with Vortex. A refresh walks every file Vortex deployed and every
-file on record, except when Vortex has not deployed since and only the rules
-moved: then it looks only at the paths the new rules are about
-(RulesScope and RuleTouches in OwnGame.cs, which every new rule
-number joins) and carries the rest of the record forward (#2210). Its log line
-says which it did and how long it took. Once made, the folder needs nothing from the Steam copy
+up to date with Vortex. A refresh looks only at what can have changed and
+carries the rest of the record forward without opening it (#2210): when the
+rules moved, the paths the new rules are about (RulesScope and RuleTouches in
+OwnGame.cs, which every new rule number joins); when Vortex has deployed
+since, the files whose entry in Vortex's record (its mod and time) is not the
+one the folder last took in, which `Profile\OwnGame\vortex.txt` keeps
+(VortexMoved). A folder with no vortex.txt for that Vortex folder, files
+still to sort into the three kinds, or a rule with no line, is walked whole.
+The separations of rules 5, 6 and 11 are made once, by the refresh of a
+folder whose record is older than the rule, and never at every refresh. Its
+log line says which it did and how long it took. Vortex deploying into a
+Thornswood game folder, this install's or another's, is refused
+(`ThornswoodSource`, `RefusedSource`, said at every start), because Vortex
+links what it deploys and the two folders would undo each other. One writer
+at a time: Make, Refresh and the update's write all go through the folder's
+lock, and `OwnGameKinds.cs Alone()` is how the update and the add-on packs
+wait for it. Once made, the folder needs nothing from the Steam copy
 (#1218): a refresh takes only the files Vortex's record lists, the game's own
 files are the folder's own copies, and nothing writes into the Steam copy, so
 it can be on any build and modded freely. Skyrim's archives are shared with the
