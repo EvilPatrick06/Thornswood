@@ -126,11 +126,8 @@ namespace Thornswood
             try
             {
                 if (!File.Exists(file) || Names(file) <= 1) return;
-                string tmp = file + ".mine";
-                File.Copy(file, tmp, true);
                 // One rename over the shared name, never a delete first (#2599).
-                try { OwnGame.SwapIn(tmp, file, false); }
-                catch { try { File.SetAttributes(tmp, FileAttributes.Normal); File.Delete(tmp); } catch (Exception e2) { Swallow.Note("Enforce.MakeItOurs, clean up " + tmp, e2); } throw; }
+                OwnGame.SwapCopyIn(file, file + ".mine");
                 Said.Add("A setting this build writes was the same file as another launcher's copy of " +
                          Path.GetFileName(file) + ". It has its own copy now, so nothing outside " +
                          Paths.Game + " is written.");

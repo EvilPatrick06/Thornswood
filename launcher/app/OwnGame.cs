@@ -178,38 +178,148 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// Puts next in path's place in one rename (#2599), the same
-        /// MoveFileEx WriteRecord uses: until the call path is the old file,
-        /// after it the new one, and a launcher stopped anywhere never leaves
-        /// path missing. A delete and then a move left a moment with no file:
-        /// killed 150 times, that left it missing 30 times (#2591).
+        /// Puts next in path's place in one rename (#2599), the same MoveFileEx
+        /// the records use: until the call path is the old file, after it the
+        /// new one, and a launcher stopped anywhere never leaves path missing.
+        /// A delete and then a move left a moment with no file: killed 150
+        /// times, that left it missing 30 times (#2591). Not SwapIn, which is
+        /// the records' plain rename; this one also flushes, waits out a lock
+        /// and may clear a read only mark.
+        ///
+        /// next is flushed to the disk first, so the name never points at a
+        /// file whose bytes are still only in the cache.
+        ///
+        /// A lock (an antivirus scan, the indexer, Steam reading the file) is
+        /// waited out: the rename is tried again for about 600 ms while it is
+        /// refused with a sharing violation (32) or an access denied (5) that
+        /// is not a read only mark.
         ///
         /// Read only belongs to the file, not the name, and a rename over a
-        /// read only file is refused the same way a delete is. clearReadOnly
-        /// is DropName's rule, for a name this folder is letting go of: the
-        /// mark is cleared only when the rename was refused because of it.
-        /// Without it the refusal is thrown and path is left as it was, which
-        /// is what the delete did before on a file shared with Vortex's copy.
+        /// read only file is refused. clearReadOnly is DropName's rule, for a
+        /// name this folder is letting go of: the mark is cleared only when the
+        /// rename was refused because of it, and if the rename is refused even
+        /// then, the mark goes back on, on every name of the file, before the
+        /// refusal is thrown. Without clearReadOnly the refusal is thrown and
+        /// path is left as it was.
         /// </summary>
-        internal static void SwapIn(string next, string path, bool clearReadOnly)
+        internal static void ReplaceName(string next, string path, bool clearReadOnly)
         {
-            if (MoveFileEx(next, path, MoveReplaceExisting | MoveWriteThrough)) return;
-            int err = Marshal.GetLastWin32Error();
-            if (clearReadOnly && err == 5 && File.Exists(path) &&
-                (File.GetAttributes(path) & FileAttributes.ReadOnly) != 0)
+            FlushToDisk(next);
+            int err = MoveOver(next, path);
+            if (err == 0) return;
+            if (clearReadOnly && err == 5 && File.Exists(path))
             {
-                File.SetAttributes(path, File.GetAttributes(path) & ~FileAttributes.ReadOnly);
-                if (MoveFileEx(next, path, MoveReplaceExisting | MoveWriteThrough)) return;
-                err = Marshal.GetLastWin32Error();
+                FileAttributes was = File.GetAttributes(path);
+                if ((was & FileAttributes.ReadOnly) != 0)
+                {
+                    File.SetAttributes(path, was & ~FileAttributes.ReadOnly);
+                    err = MoveOver(next, path);
+                    if (err == 0) return;
+                    File.SetAttributes(path, was);
+                }
             }
             throw new IOException(path + " could not be replaced by " + next + ": " +
                                   new System.ComponentModel.Win32Exception(err).Message);
+        }
+
+        /// <summary>One MoveFileEx over path, tried again while a lock refuses it. 0, or the last Win32 error.</summary>
+        static int MoveOver(string next, string path)
+        {
+            for (int tries = 1; ; tries++)
+            {
+                if (MoveFileEx(next, path, MoveReplaceExisting | MoveWriteThrough)) return 0;
+                int err = Marshal.GetLastWin32Error();
+                if (err != 32 && err != 5) return err;
+                // A read only mark refuses with 5 as well, and waiting does not lift it.
+                if (err == 5 && File.Exists(path) && (File.GetAttributes(path) & FileAttributes.ReadOnly) != 0) return err;
+                if (tries >= MoveTries) return err;
+                System.Threading.Thread.Sleep(40 * tries);
+            }
+        }
+
+        const int MoveTries = 6;   // 40 + 80 + ... + 200 ms, 600 ms at most
+
+        /// <summary>
+        /// Flushes a file's bytes to the disk (FlushFileBuffers, through
+        /// FileStream.Flush(true)). A read only file here is a link to a file
+        /// already on the disk (the share step), so there is nothing to flush.
+        /// </summary>
+        static void FlushToDisk(string file)
+        {
+            if ((File.GetAttributes(file) & FileAttributes.ReadOnly) != 0) return;
+            using (var fs = new FileStream(file, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
+                fs.Flush(true);
         }
 
         const int MoveReplaceExisting = 0x1;
         const int MoveWriteThrough = 0x8;
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         static extern bool MoveFileEx(string existing, string replacement, int flags);
+
+        // ---- #2599: one name of the game folder replaced whole ------------------
+
+        /// <summary>
+        /// Takes one name off a file without touching the file's attributes
+        /// (#2599). A read only file's name cannot be deleted the ordinary way,
+        /// and clearing the mark to delete it clears it on every other name of
+        /// the file too: on a .thornswood-share link that is the Steam copy's
+        /// own file. So the name goes with FILE_DISPOSITION_IGNORE_READONLY_ATTRIBUTE
+        /// (Windows 10 1809 and later), which deletes the name and leaves the
+        /// mark. On an older Windows the mark is cleared and the name deleted,
+        /// which is what DropName does.
+        /// </summary>
+        internal static void DeleteName(string path)
+        {
+            if (!File.Exists(path)) return;
+            bool gone = false;
+            using (Microsoft.Win32.SafeHandles.SafeFileHandle h = OpenForDelete(path, 0x10000, 7, IntPtr.Zero, 3, 0x200000, IntPtr.Zero))
+            {
+                if (!h.IsInvalid)
+                {
+                    int flags = 0x1 | 0x2 | 0x10;   // DELETE, POSIX_SEMANTICS, IGNORE_READONLY_ATTRIBUTE
+                    gone = SetFileInformationByHandle(h, 21, ref flags, 4);   // FileDispositionInfoEx
+                }
+            }
+            if (gone) return;
+            File.SetAttributes(path, File.GetAttributes(path) & ~FileAttributes.ReadOnly);
+            File.Delete(path);
+        }
+
+        /// <summary>
+        /// A copy of path's own, put in path's place (Enforce.MakeItOurs and
+        /// Separate). A copy left by a stopped run goes first, read only or
+        /// not; File.Copy carries the source's read only mark, which would
+        /// refuse every copy over it after. The new copy is written, its mark
+        /// cleared so it can be flushed, and renamed over path in one call. If
+        /// that is refused (path read only, shared with Vortex's copy), path is
+        /// left as it was and the copy goes.
+        /// </summary>
+        internal static void SwapCopyIn(string path, string aside)
+        {
+            DeleteName(aside);
+            File.Copy(path, aside, false);
+            File.SetAttributes(aside, File.GetAttributes(aside) & ~FileAttributes.ReadOnly);
+            SwapNameIn(aside, path, false);
+        }
+
+        /// <summary>ReplaceName, and if it is refused, next goes, so nothing is left beside path.</summary>
+        internal static void SwapNameIn(string next, string path, bool clearReadOnly)
+        {
+            try { ReplaceName(next, path, clearReadOnly); }
+            catch
+            {
+                try { DeleteName(next); }
+                catch (Exception ex) { Swallow.Note("OwnGame.SwapNameIn, clean up " + next, ex); }
+                throw;
+            }
+        }
+
+        [DllImport("kernel32.dll", EntryPoint = "CreateFileW", CharSet = CharSet.Unicode, SetLastError = true)]
+        static extern Microsoft.Win32.SafeHandles.SafeFileHandle OpenForDelete(string name, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern bool SetFileInformationByHandle(Microsoft.Win32.SafeHandles.SafeFileHandle file, int infoClass, ref int info, int size);
+
+        // ---- end #2599 -----------------------------------------------------------
 
         /// <summary>A folder made anew has its Steam copy looked at again (Make).</summary>
         static void ForgetCleaned()
@@ -1945,11 +2055,8 @@ namespace Thornswood
             try
             {
                 if (!File.Exists(path) || Links(path) <= 1) return;
-                string own = path + ".own";
-                File.Copy(path, own, true);
                 // One rename over the shared name, never a delete first (#2599).
-                try { SwapIn(own, path, false); }
-                catch { try { File.SetAttributes(own, FileAttributes.Normal); File.Delete(own); } catch (Exception e2) { Swallow.Note("OwnGame.Separate, clean up " + own, e2); } throw; }
+                SwapCopyIn(path, path + ".own");
             }
             catch (Exception ex) { Swallow.Note("OwnGame.Separate, move", ex); }
         }

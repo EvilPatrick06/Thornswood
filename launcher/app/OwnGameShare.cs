@@ -296,9 +296,12 @@ namespace Thornswood
                     // copy's file. The new name is made first, so a stop part
                     // way never leaves the folder without the archive.
                     string next = own + ".thornswood-share";
-                    if (File.Exists(next)) File.Delete(next);
+                    // A .thornswood-share left by a stopped run is a link to the
+                    // Steam copy's file: its name goes without touching the
+                    // file's read only mark (#2599).
+                    DeleteName(next);
                     if (!CreateHardLink(next, theirs, IntPtr.Zero)) continue;
-                    SwapIn(next, own, true);   // one rename, never a delete first (#2599)
+                    SwapNameIn(next, own, true);   // one rename, never a delete first; next goes if it is refused
                     var sh = new Shared();
                     sh.Rel = rel;
                     sh.Sha = sha;
@@ -418,10 +421,10 @@ namespace Thornswood
             if ((o != null && t.Id == o.Id) || t.Size != s.At.Size) return false;
             if (!string.Equals(Sha256(theirs), s.Sha, StringComparison.Ordinal)) return false;
             string next = own + ".thornswood-share";
-            if (File.Exists(next)) File.Delete(next);
+            DeleteName(next);   // a stale one may be a read only link to the Steam copy's file (#2599)
             bool linked;
             Place(theirs, next, !SameVolume(steam, Folder), out linked);
-            SwapIn(next, own, true);   // one rename, never a delete first (#2599)
+            SwapNameIn(next, own, true);   // one rename, never a delete first; next goes if it is refused
             s.At = StampOf(own);
             return true;
         }
