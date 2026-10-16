@@ -99,7 +99,7 @@ none, the launcher downloads Microsoft's own bootstrapper from Microsoft's link
 
 The six files recorded in `records\client-build.json` correspond to
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
-commit `cdd84651` (in full, `cdd846514ae752d2ec70c5e87bf6f5ef76d4321e`). That
+commit `0714e444` (in full, `0714e444047a994b1013dfe4cac187aef29ad65a`). That
 is upstream skyrim-multiplayer/skymp at `2849e676` with Thornswood's changes on
 top. Check-Secrets.ps1 stops a release whose copy of any of the six is not the
 recorded sha256 (client-not-recorded-build), and Sync-Client.ps1 puts in the
@@ -518,7 +518,7 @@ with.
 
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`, is AGPL-3.0. That record and the client record
-  name `cdd846514ae752d2ec70c5e87bf6f5ef76d4321e` on the public fork. The
+  name `0714e444047a994b1013dfe4cac187aef29ad65a` on the public fork. The
   server module and the six client files were built from that commit, which
   adds the 5 October security fixes (the RPC route, request bodies, metrics,
   the login line, the settings files), the server's equipment write for a new
@@ -533,10 +533,15 @@ with.
   it at once, and stops a key let go after a panel closes from repeating into
   the page. Since `1afaf2ef` it also fences the server's delayed actor work
   by each actor's lifecycle and owner, so a queued combat or quest write
-  never lands on an actor that was unloaded or reused (Thornswood #1373). The
-  server module's SHA256 is
-  `c9031333a2e3e4aafd57393dfc46c2da6dbce56c5efae11da4a26d9610291485`, built
-  2026-10-12T09:06:15Z. This is the recorded next release, not a deployment
+  never lands on an actor that was unloaded or reused (Thornswood #1373).
+  Since `cdd84651` it also lets the gamemode weaken a potion before it lands
+  (Thornswood #1382), keeps a reference the server holds disabled when it
+  streams in again (#2328), names a brew's effects to the gamemode when it is
+  made (#1389), proves the offline login on the connection that logs in
+  (#1320) and plays a stagger that came over the network on that actor
+  (#489). The server module's SHA256 is
+  `04b4e40c02abe88efa1e05266c71fc755c5c89849fba91ae96bc74817cd7cb1d`, built
+  2026-10-16T02:17:08Z. This is the recorded next release, not a deployment
   claim. Main remains on `1afaf2ef01aa19b667c7b20c8a7b65b87e05921a`;
   dev runs that engine too, as reported by Claude on 11 October.
   It goes to the dev server (Publish-Server -Channel dev) and to the dev
@@ -571,7 +576,7 @@ For the six recorded client files and the recorded game server module, the
 Corresponding Source is the fork at the commit each record names. The six
 client files and the game server module, at the one commit both records name:
 
-https://github.com/EvilPatrick06/skymp/tree/cdd846514ae752d2ec70c5e87bf6f5ef76d4321e
+https://github.com/EvilPatrick06/skymp/tree/0714e444047a994b1013dfe4cac187aef29ad65a
 
 For the earlier engine reported deployed on Main and dev:
 
