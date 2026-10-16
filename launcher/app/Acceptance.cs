@@ -19,9 +19,10 @@ namespace Thornswood
     /// install says the three were accepted, so a later run of the launcher
     /// cannot treat silence as a yes. This asks the setup window's three
     /// questions once, when the record is missing, and writes that same
-    /// record. Declining writes nothing. A page whose text changes later is
-    /// not asked again (Patrick, 16 Oct 2026, #2616: asked once, and only if
-    /// the boxes were not ticked during the install).
+    /// record. Declining writes nothing. After that a page is asked again
+    /// only when its text has changed since it was accepted, and then only
+    /// that page (Patrick, 16 Oct 2026, #2616): nothing is asked on an update
+    /// or a start when nothing changed.
     ///
     /// tests\test-prior-acceptance.ps1 compiles this file and runs the decision
     /// without a window, a Skyrim install, or C:\Thornswood.
@@ -109,7 +110,65 @@ namespace Thornswood
         public static bool Ensure(string profileDir)
         {
             if (!NeedsAsk(Read(profileDir), null)) return true;
-            return Settle(profileDir, FetchShas(), delegate { return Ask(); });
+            return Settle(profileDir, FetchShas(), delegate { return Ask(null); });
+        }
+
+        /// <summary>
+        /// Which of the three pages changed since they were accepted: the
+        /// page's stored hash is not the one served now. A page the site did
+        /// not answer for now has not changed; a stored hash that is empty
+        /// (the site did not answer when it was written) and can be read now
+        /// counts as changed, as in NeedsAsk.
+        /// </summary>
+        public static bool[] Changed(string json, string[] current)
+        {
+            var changed = new bool[Pages.Length];
+            for (int i = 0; i < Pages.Length; i++)
+            {
+                string stored = StoredSha(json, Pages[i]);
+                string now = current != null && i < current.Length && current[i] != null ? current[i] : "";
+                if (stored == null || now.Length == 0) continue;
+                changed[i] = stored.Length == 0 || !string.Equals(stored, now, StringComparison.OrdinalIgnoreCase);
+            }
+            return changed;
+        }
+
+        /// <summary>The record to write after the changed pages were ticked: their new hash, and the stored one for the rest.</summary>
+        public static string[] Merge(string json, string[] current, bool[] changed)
+        {
+            var shas = new string[Pages.Length];
+            for (int i = 0; i < Pages.Length; i++)
+            {
+                bool took = changed != null && i < changed.Length && changed[i];
+                shas[i] = took ? (current != null && i < current.Length ? current[i] : "") : (StoredSha(json, Pages[i]) ?? "");
+            }
+            return shas;
+        }
+
+        static bool Any(bool[] flags)
+        {
+            if (flags == null) return false;
+            foreach (bool f in flags) if (f) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// A record already on disk (Patrick, 16 Oct 2026, #2616): asked again
+        /// only when a page's text has changed since it was accepted, and then
+        /// only that page. Nothing changed asks nothing, whatever the update or
+        /// start. ask is shown only the changed pages and returns true when
+        /// they were all ticked; a decline writes nothing and returns false.
+        /// The caller runs this off the window thread and shows Ask on it.
+        /// </summary>
+        public static bool Recheck(string profileDir, Func<bool[], bool> ask)
+        {
+            string json = Read(profileDir);
+            if (NeedsAsk(json, null)) return true;   // no complete record: Ensure asks at start
+            string[] current = FetchShas();
+            bool[] changed = Changed(json, current);
+            if (!Any(changed)) return true;
+            if (ask == null || !ask(changed)) return false;
+            return Write(profileDir, DateTime.UtcNow, Merge(json, current, changed));
         }
 
         public static bool Write(string profileDir, DateTime at, string[] shas)
@@ -141,8 +200,12 @@ namespace Thornswood
             return sb.ToString();
         }
 
-        /// <summary>The three boxes and links. True only when all three were ticked.</summary>
-        public static bool Ask()
+        /// <summary>
+        /// The boxes and links: all three when only is null (no record yet),
+        /// otherwise just the pages only marks (those that changed). True only
+        /// when every box shown was ticked.
+        /// </summary>
+        public static bool Ask(bool[] only)
         {
             bool yes = false;
             var boxes = new CheckBox[Pages.Length];
@@ -152,7 +215,7 @@ namespace Thornswood
             w.SizeToContent = SizeToContent.Height;
             w.ResizeMode = ResizeMode.NoResize;
             w.WindowStartupLocation = WindowStartupLocation.CenterScreen;
-            w.Content = Build(boxes, delegate
+            w.Content = Build(boxes, only, delegate
             {
                 if (!AllTicked(boxes)) return;
                 yes = true;
@@ -203,7 +266,25 @@ namespace Thornswood
             return false;
         }
 
-        static UIElement Build(CheckBox[] boxes, Action goOn)
+        /// <summary>What the window says above the boxes: no record yet, or which page changed.</summary>
+        public static string Saying(bool[] only)
+        {
+            if (only == null)
+                return "This install has no note that the terms, the privacy policy and the rules were accepted. Thornswood stays closed until all three are ticked.";
+            var names = new System.Collections.Generic.List<string>();
+            string[] nice = new string[] { "the Terms and Conditions", "the Privacy Policy", "the Rules" };
+            for (int i = 0; i < Pages.Length; i++) if (i < only.Length && only[i]) names.Add(nice[i]);
+            string list = names.Count == 1 ? names[0]
+                        : names.Count == 2 ? names[0] + " and " + names[1]
+                        : string.Join(", ", names.GetRange(0, names.Count - 1).ToArray()) + " and " + names[names.Count - 1];
+            return (list.Length > 0 ? char.ToUpper(list[0]) + list.Substring(1) : list) +
+                   (names.Count == 1 ? " has" : " have") +
+                   " changed since you accepted " + (names.Count == 1 ? "it" : "them") +
+                   ". Read what changed and tick to carry on. Thornswood stays closed until " +
+                   (names.Count == 1 ? "it is" : "they are") + " ticked.";
+        }
+
+        static UIElement Build(CheckBox[] boxes, bool[] only, Action goOn)
         {
             var root = new StackPanel();
             root.Margin = new Thickness(22);
@@ -211,7 +292,7 @@ namespace Thornswood
             var say = new TextBlock();
             say.TextWrapping = TextWrapping.Wrap;
             say.Margin = new Thickness(0, 0, 0, 14);
-            say.Text = "This install has no note that the terms, the privacy policy and the rules were accepted. Thornswood stays closed until all three are ticked.";
+            say.Text = Saying(only);
             root.Children.Add(say);
 
             var go = new Button();
@@ -224,6 +305,8 @@ namespace Thornswood
 
             for (int i = 0; i < Pages.Length; i++)
             {
+                // Only the pages that changed, when there is a record already.
+                if (only != null && !(i < only.Length && only[i])) continue;
                 string pageUrl = Site + "/" + Pages[i];
                 var row = new WrapPanel();
                 row.Margin = new Thickness(0, 0, 0, 8);
@@ -260,14 +343,18 @@ namespace Thornswood
             return root;
         }
 
+        /// <summary>Every box that is shown is ticked, and at least one is shown. A page not shown has no box.</summary>
         static bool AllTicked(CheckBox[] boxes)
         {
             if (boxes == null) return false;
+            int shown = 0;
             for (int i = 0; i < boxes.Length; i++)
             {
-                if (boxes[i] == null || boxes[i].IsChecked != true) return false;
+                if (boxes[i] == null) continue;
+                shown++;
+                if (boxes[i].IsChecked != true) return false;
             }
-            return true;
+            return shown > 0;
         }
 
         /// <summary>The page's sha256 when its url is the site's page, or null when that page is not in the record.</summary>

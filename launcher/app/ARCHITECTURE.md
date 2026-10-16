@@ -181,8 +181,10 @@ otherwise, and never a path anything writes to (#1235). Owns no files.
 setup program writes when the terms, the privacy policy and the rules are
 ticked. `Acceptance.cs:109 Ensure()` asks when that file has no complete
 record, which is an install made before the lock, and writes that file only
-after all three are ticked. That is the only time it asks: a page whose text
-changes later is not asked again (#2616, Patrick, 16 Oct 2026).
+after all three are ticked. After that `Recheck()` asks again only when a
+page's text has changed since it was accepted, shows only the changed pages,
+and writes their new hash beside the others' stored ones (#2616, Patrick,
+16 Oct 2026). Nothing changed asks nothing.
 
 **Config** (Config.cs). `<Root>\config.json`, read by `Config.cs:333 Load()`
 and written by Save, which encrypts the update token with Windows' DPAPI and

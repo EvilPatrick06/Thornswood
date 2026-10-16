@@ -207,6 +207,25 @@ try {
     } | ConvertTo-Json -Depth 5
     Yes 'the by-hand record reads back as the same three pages' (-not $T::NeedsAsk($byHand, $same))
 
+    # Only the page that changed (#2616, Patrick 16 Oct): asked again only
+    # when a page changed, and only that page.
+    $rec = $T::ToJson([datetime]'2026-10-16T00:00:00Z', $same)
+    $none = $T::Changed($rec, $same)
+    Yes 'nothing changed: no page is marked' (-not ($none -contains $true))
+    $onlyPriv = $T::Changed($rec, [string[]]@($hTerms, $hNew, $hRules))
+    Yes 'the privacy page changed: only privacy is marked' (
+        $onlyPriv[0] -eq $false -and $onlyPriv[1] -eq $true -and $onlyPriv[2] -eq $false)
+    $offline = $T::Changed($rec, [string[]]@('', '', ''))
+    Yes 'a site that does not answer marks nothing' (-not ($offline -contains $true))
+    $merged = $T::Merge($rec, [string[]]@($hNew, $hNew, $hNew), $onlyPriv)
+    Yes 'the record keeps the unchanged pages'' stored hashes and takes the new one for the changed page' (
+        $merged[0] -eq $hTerms -and $merged[1] -eq $hNew -and $merged[2] -eq $hRules)
+    $sayOne = $T::Saying($onlyPriv)
+    Yes 'the question names only the changed page' ($sayOne -match 'Privacy Policy has changed' -and -not ($sayOne -match 'Terms|Rules'))
+    $sayTwo = $T::Saying([bool[]]@($true, $false, $true))
+    Yes 'two changed pages are both named' ($sayTwo -match 'Terms and Conditions and the Rules have changed')
+    Yes 'no record yet still asks all three' ($T::Saying($null) -match 'no note that the terms, the privacy policy and the rules')
+
     Yes 'a link off the site is not opened' (-not $T::OpenPage('https://example.com/terms'))
     Yes 'a link to some other page on the site is not opened' (-not $T::OpenPage('https://thornswood.net/other'))
     Yes 'an empty link is not opened' (-not $T::OpenPage(''))
@@ -222,14 +241,15 @@ $ensureAt = $run.IndexOf('Acceptance.Ensure(')
 $loadAt = $run.IndexOf('Config.Load(')
 Yes 'Run asks before it reads config' ($ensureAt -gt 0 -and $loadAt -gt $ensureAt)
 Yes 'uninstall does not ask' ($run -match 'if \(!askedToUninstall && !termsOnFile && !Acceptance\.Ensure\(')
-# Asked once (#2616, Patrick 16 Oct): a record already on disk is never
-# asked again, whatever the pages say now.
-Yes 'a record already on disk is not asked again at start' (
-    -not $run.Contains('Acceptance.Recheck(') -and -not $acc.Contains('static bool Recheck(') -and
-    -not ($run -match 'if \(!askedToUninstall && termsOnFile\)'))
-Yes 'the question no longer says a page changed' (-not $acc.Contains('has changed since it was accepted'))
+# A record already on disk is rechecked off the window thread, and only the
+# changed pages are shown (#2616, Patrick 16 Oct).
+Yes 'a record already on disk is rechecked off the window thread' (
+    $run -match 'if \(!askedToUninstall && termsOnFile\)' -and $run.Contains('Acceptance.Recheck(') -and $run.Contains('Acceptance.Ask(which)'))
+Yes 'declining a change closes the launcher' ($run.Contains('Application.Current.Shutdown()'))
+Yes 'the recheck asks only when a page changed, and writes the merged record' (
+    $acc.Contains('if (!Any(changed)) return true;') -and $acc.Contains('Merge(json, current, changed)'))
 Yes 'the three questions are the only way Ensure writes' (
     $acc.Contains('if (!NeedsAsk(Read(profileDir), null)) return true;') -and
-    $acc.Contains('return Settle(profileDir, FetchShas(), delegate { return Ask(); });'))
+    $acc.Contains('return Settle(profileDir, FetchShas(), delegate { return Ask(null); });'))
 
 Done
