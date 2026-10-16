@@ -386,6 +386,7 @@ jobs:
                  'test-third-party.js',
                  'test-asset-provenance.js',
                  'test-ship-rules.ps1',
+                 'test-2454-fitted-outfits.ps1',
                  'test-chargen-gone.ps1',
                  'test-hand-install-retired.ps1',
                  'test-downgrade-steam-window.ps1', 'test-address-library.ps1', 'test-vortex-folder.ps1',

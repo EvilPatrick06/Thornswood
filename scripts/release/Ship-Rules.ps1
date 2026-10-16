@@ -1244,7 +1244,34 @@ $ShipGeneratedBodyFiles = @(
     'Data\meshes\actors\character\character assets\malebody_0.nif',
     'Data\meshes\actors\character\character assets\malebody_1.nif'
 )
-$ShipGeneratedPatterns = $ShipGeneratedBodyFiles + @(
+# THE OUTFITS FITTED TO THOSE BODIES ARE OURS (#2454), built by the same
+# scripted build from the collection's BodySlide projects named in
+# records\generated.json (bodyslide.outfits), at their own slider defaults and
+# with no RaceMenu morphs (#1004). Patrick, 15 October: Immersive Armours'
+# Bosmer armour is built from the deployed 'Immersive Armours SSE CBBE.osp'
+# sets, and the 18 .tri morphs built on some other machine stop shipping.
+# Exact paths, the OutputPath and OutputFile (_0 and _1) of each set.
+$ShipGeneratedOutfitFiles = @(
+    'Data\meshes\armor\bosmerarmormaty743\torsof_0.nif',
+    'Data\meshes\armor\bosmerarmormaty743\torsof_1.nif',
+    'Data\meshes\armor\bosmerarmormaty743\torsofengraved_0.nif',
+    'Data\meshes\armor\bosmerarmormaty743\torsofengraved_1.nif',
+    'Data\meshes\armor\bosmerarmormaty743\torsometalf_0.nif',
+    'Data\meshes\armor\bosmerarmormaty743\torsometalf_1.nif',
+    'Data\meshes\armor\bosmerarmormaty743\bracersf_0.nif',
+    'Data\meshes\armor\bosmerarmormaty743\bracersf_1.nif',
+    'Data\meshes\armor\bosmerarmormaty743\bracersengravedf_0.nif',
+    'Data\meshes\armor\bosmerarmormaty743\bracersengravedf_1.nif',
+    'Data\meshes\armor\bosmerarmormaty743\metalglovesf_0.nif',
+    'Data\meshes\armor\bosmerarmormaty743\metalglovesf_1.nif',
+    'Data\meshes\armor\bosmerarmormaty743\cape\fullcapef_0.nif',
+    'Data\meshes\armor\bosmerarmormaty743\cape\fullcapef_1.nif',
+    'Data\meshes\armor\bosmerarmormaty743\cape\shouldercapef_0.nif',
+    'Data\meshes\armor\bosmerarmormaty743\cape\shouldercapef_1.nif',
+    'Data\meshes\armor\bosmerarmormaty743\cape\shoulderengravedcapef_0.nif',
+    'Data\meshes\armor\bosmerarmormaty743\cape\shoulderengravedcapef_1.nif'
+)
+$ShipGeneratedPatterns = $ShipGeneratedBodyFiles + $ShipGeneratedOutfitFiles + @(
     'Data\meshes\animationdatasinglefile.txt',
     'Data\meshes\animationsetdatasinglefile.txt',
     'Data\meshes\actors\*\behaviors\*.hkx',
@@ -1419,9 +1446,9 @@ $ShipRequiredDataFiles = @(& {
     } catch { }
 })
 
-# OURS FOR NOW, UNTIL #1259: 140 outfit meshes built in BodySlide on some other
-# machine (Common Clothes' travel clothes, Immersive Armours' Bosmer armour,
-# More Craftable Equipment's executioner). Patrick, 29 September: Thornswood
+# OURS FOR NOW, UNTIL #1259: 122 outfit meshes built in BodySlide on some other
+# machine (Common Clothes' travel clothes, More Craftable Equipment's
+# executioner; the Bosmer armour is built by us now, #2454). Patrick, 29 September: Thornswood
 # builds the outfits itself from the collection's BodySlide projects, and until
 # that build replaces these they keep shipping so nothing looks broken. Exact
 # paths, in built-until-1259.txt beside this file; the build that closes #1259
@@ -1472,7 +1499,7 @@ function Assert-ShipGeneratedBodyFiles([string]$GameDir, [string]$ProfileDir) {
             [pscustomobject]@{ Sha=$matches[1]; Rel=$matches[2].Replace('/', '\'); Destination=[IO.Path]::GetFullPath((Join-Path $GameDir $matches[2])) }
         }
     })
-    foreach ($rel in $ShipGeneratedBodyFiles) {
+    foreach ($rel in @($ShipGeneratedBodyFiles) + @($ShipGeneratedOutfitFiles)) {
         $file = Join-Path $GameDir $rel
         $destination = [IO.Path]::GetFullPath($file)
         $matching = @($rows | Where-Object { $_.Destination -ieq $destination })

@@ -6,9 +6,10 @@
 #
 # Built on some other machine, for a body and preset nothing records: Common
 # Clothes' travel clothes from Common Clothes and Armors 3BA BodySlide (Nexus
-# 83980, 120 files), Immersive Armours' Bosmer armour from its 3BA BodySlide
-# project (22382, in the collection, 18 files) and More Craftable Equipment's
-# executioner from its CBBE BodySlide file (44666, 2 files). Built output is
+# 83980, 120 files) and More Craftable Equipment's executioner from its CBBE
+# BodySlide file (44666, 2 files). Immersive Armours' Bosmer armour (18 .tri
+# morphs) left this list in #2454: Build-Generated builds its .nif files from
+# the collection's 'Immersive Armours SSE CBBE.osp', and the morphs no longer ship. Built output is
 # ours only when we build it from the collection, as Nemesis's is.
 #
 # Patrick, 29 September: Thornswood builds the outfits itself from the
@@ -19,24 +20,6 @@
 #
 # Not here, on purpose: the 30 travel clothes that are byte for byte the ones
 # inside Common Clothes' own archive. The collection installs those.
-Data\meshes\armor\bosmerarmormaty743\1stpersonarmortorso.tri
-Data\meshes\armor\bosmerarmormaty743\boots.tri
-Data\meshes\armor\bosmerarmormaty743\bracers.tri
-Data\meshes\armor\bosmerarmormaty743\bracersengravedf.tri
-Data\meshes\armor\bosmerarmormaty743\cape\fullcape.tri
-Data\meshes\armor\bosmerarmormaty743\cape\fullcapef.tri
-Data\meshes\armor\bosmerarmormaty743\cape\shouldercape.tri
-Data\meshes\armor\bosmerarmormaty743\cape\shouldercapef.tri
-Data\meshes\armor\bosmerarmormaty743\cape\shoulderengravedcapef.tri
-Data\meshes\armor\bosmerarmormaty743\metalglovesm.tri
-Data\meshes\armor\bosmerarmormaty743\torso.tri
-Data\meshes\armor\bosmerarmormaty743\torsofengraved.tri
-Data\meshes\armor\bosmerarmormaty743\torsometal.tri
-Data\meshes\armor\bosmerarmormaty743\wildhunt\huntbootsm.tri
-Data\meshes\armor\bosmerarmormaty743\wildhunt\huntfemaletorsolight.tri
-Data\meshes\armor\bosmerarmormaty743\wildhunt\huntgloves.tri
-Data\meshes\armor\bosmerarmormaty743\wildhunt\huntlightglovesf.tri
-Data\meshes\armor\bosmerarmormaty743\wildhunt\hunttorso.tri
 Data\meshes\armor\travel clothes\beltedrobe\1beltedrobef_0.nif
 Data\meshes\armor\travel clothes\beltedrobe\1beltedrobef_1.nif
 Data\meshes\armor\travel clothes\beltedrobe\1beltedrobenhf_0.nif

@@ -163,10 +163,20 @@ function Get-GeneratedBuildList([string]$Path) {
     $sets = @()
     if ($doc.PSObject.Properties['bodyslide'] -and $doc.bodyslide.PSObject.Properties['sets']) { $sets = @($doc.bodyslide.sets | ForEach-Object { [string]$_ }) }
     foreach ($s in $sets) { if (-not $s.Trim()) { throw "$Path names an empty BodySlide slider set." } }
+    # Outfits fitted to those bodies (#2454): built the same way, under the
+    # same rules, and never a body as well.
+    $outfits = @()
+    if ($doc.PSObject.Properties['bodyslide'] -and $doc.bodyslide.PSObject.Properties['outfits']) { $outfits = @($doc.bodyslide.outfits | ForEach-Object { [string]$_ }) }
+    foreach ($s in $outfits) {
+        if (-not $s.Trim()) { throw "$Path names an empty BodySlide outfit set." }
+        if ($sets -contains $s) { throw "$Path names '$s' as a body and as an outfit; it is one or the other." }
+    }
+    $dupes = @($outfits | Group-Object | Where-Object { $_.Count -gt 1 } | ForEach-Object { $_.Name })
+    if ($dupes.Count) { throw "$Path names the outfit set '$($dupes[0])' more than once." }
     $sliders = @{}
     if ($doc.PSObject.Properties['bodyslide'] -and $doc.bodyslide.PSObject.Properties['sliders'] -and $doc.bodyslide.sliders) {
         foreach ($sp in $doc.bodyslide.sliders.PSObject.Properties) {
-            if ($sets -notcontains $sp.Name) { throw "$Path moves sliders of '$($sp.Name)', which is not one of the sets it builds." }
+            if ($sets -notcontains $sp.Name -and $outfits -notcontains $sp.Name) { throw "$Path moves sliders of '$($sp.Name)', which is not one of the sets it builds." }
             $one = @{}
             foreach ($sl in $sp.Value.PSObject.Properties) {
                 $v = @{}
@@ -178,8 +188,26 @@ function Get-GeneratedBuildList([string]$Path) {
             $sliders[$sp.Name] = $one
         }
     }
-    if (-not $patches.Count -and -not $sets.Count) { throw "$Path names nothing to build." }
-    return [pscustomobject]@{ Path = $Path; Patches = $patches; Sets = $sets; Sliders = $sliders }
+    if (-not $patches.Count -and -not $sets.Count -and -not $outfits.Count) { throw "$Path names nothing to build." }
+    return [pscustomobject]@{ Path = $Path; Patches = $patches; Sets = $sets; Outfits = $outfits; Sliders = $sliders }
+}
+
+# The files a slider set writes, under the game folder: OutputPath\OutputFile,
+# as _0 and _1 when it builds weights. An outfit that would write a body, or
+# anything outside meshes, is refused (#2454).
+function Get-BodySlideSetOutputs($Set) {
+    $dir = ([string]$Set.OutputPath).Trim().Trim('\').Replace('/', '\')
+    $name = ([string]$Set.OutputFile).Trim()
+    if (-not $dir -or -not $name) { throw "The slider set '$($Set.Name)' names no output, so what it builds cannot be told." }
+    if ($dir -notmatch '(?i)^meshes\\' -or $dir -match '\.\.') { throw "The slider set '$($Set.Name)' writes to $dir, outside meshes." }
+    if ($Set.GenWeights) { $files = @("$name`_0.nif", "$name`_1.nif") } else { $files = @("$name.nif") }
+    return , @($files | ForEach-Object { 'Data\' + $dir + '\' + $_ })
+}
+
+# Whether a path under the game folder is one of the bodies (#405 checks
+# those); an outfit set may not write one.
+function Test-GeneratedBodyPath([string]$Rel) {
+    return ($Rel -match '(?i)^Data\\meshes\\actors\\character\\character assets\\(female|male)body')
 }
 
 # The files of Pandora's mod when Vortex deployed its archive loose into Data.
