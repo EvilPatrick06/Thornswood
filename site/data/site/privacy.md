@@ -151,6 +151,11 @@ Discord message. Do not send a government identity document.
 What deletion means here: your Discord link, your session records, your chat
 and your character. What cannot be undone is something you said that somebody
 else has already quoted in a report, because that now belongs to the report.
+Staff's own records stay for the same reason: a ban, a note, a character
+killed for good, a report you made or one made about you, and a session staff
+marked kept because a report rests on it. A completed request is written down
+with your Discord id and character numbers and nothing else, so that an older
+backup put back into service has you removed again first.
 
 ## Who can see it
 
