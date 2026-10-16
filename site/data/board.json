@@ -373,7 +373,7 @@
       {
         "id": "sk12",
         "name": "What the collection took out",
-        "note": "Revision 5 of the collection, from 22 September, took out four mods that\nworked against the server and a patch that needs one of them, and swapped\nImmersive Armors for a version that does without a script. Each one is named\nby its plugin file as well, because that is what your plugin list shows.\nImmersive Armors, for one, is Hothtrooper44_ArmorCompilation.esp, and a\nsearch for the words Immersive Armors finds nothing.\n\nIf a file marked Out is still in your plugin list, your collection is out of\ndate. Update it in Vortex.",
+        "note": "Revision 5 of the collection, from 22 September, took out four mods that\nworked against the server and a patch that needs one of them, and swapped\nImmersive Armors for a version that does without a script. Each one is named\nby its plugin file as well, because that is what your plugin list shows.\nImmersive Armors, for one, is Hothtrooper44_ArmorCompilation.esp, and a\nsearch for the words Immersive Armors finds nothing.\n\nIf a file marked Out is still in your plugin list, your collection is out of\ndate. Update it in Vortex.\n\nSunHelm's diseases went with it. Disease comes back from the server\ninstead: Injury, being downed and disease is on the roadmap.",
         "columns": [
           {
             "id": "ck13",
@@ -1773,8 +1773,8 @@
             "at": 0,
             "by": "",
             "cells": {
-              "c8rm": "The Free Skyrim Trading Company",
-              "c9rm": "It replaces the East Empire Company: hauls between the holds, with a cut for the people who run them"
+              "c8rm": "A trading company of our own",
+              "c9rm": "The Free Skyrim Trading Company replaces the East Empire Company: hauls between the holds, with a cut for the people who run them"
             }
           }
         ]
