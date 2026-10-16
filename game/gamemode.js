@@ -61600,7 +61600,17 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     var s = stateOf(actorId);
     var j = findJournal(s, journalId);
     if (!j) { return 'No such journal.'; }
-    var body = String(text || '').slice(0, SOCIAL.pageChars);
+    /*
+      TOO LONG IS REFUSED, NOT CUT (#2563). A cut page was saved short and the
+      writer was never told. The panel holds the text box to pageChars and the
+      chat socket carries a page this long whole, so a longer one only comes
+      from a hand typed line, and it is told how long it is.
+    */
+    var body = String(text || '');
+    if (body.length > SOCIAL.pageChars) {
+      return 'That page is too long: ' + body.length + ' characters, and a page holds ' +
+             SOCIAL.pageChars + '. Nothing was saved.';
+    }
     var page = null;
     for (var i = 0; i < j.pages.length; i++) {
       if (j.pages[i].id === pageId) { page = j.pages[i]; break; }
