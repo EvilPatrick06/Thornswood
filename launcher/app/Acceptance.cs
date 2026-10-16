@@ -18,9 +18,10 @@ namespace Thornswood
     /// An install made before that lock has no file, and nothing else in the
     /// install says the three were accepted, so a later run of the launcher
     /// cannot treat silence as a yes. This asks the setup window's three
-    /// questions, once when the record is missing, and again when a page's
-    /// text is no longer the hash in the file, and writes that same record.
-    /// Declining writes nothing.
+    /// questions once, when the record is missing, and writes that same
+    /// record. Declining writes nothing. A page whose text changes later is
+    /// not asked again (Patrick, 16 Oct 2026, #2616: asked once, and only if
+    /// the boxes were not ticked during the install).
     ///
     /// tests\test-prior-acceptance.ps1 compiles this file and runs the decision
     /// without a window, a Skyrim install, or C:\Thornswood.
@@ -108,17 +109,7 @@ namespace Thornswood
         public static bool Ensure(string profileDir)
         {
             if (!NeedsAsk(Read(profileDir), null)) return true;
-            return Settle(profileDir, FetchShas(), delegate { return Ask(false); });
-        }
-
-        /// <summary>
-        /// A record already on disk, asked again only when a page's hash has
-        /// changed. The caller runs this off the window thread and shows Ask
-        /// on it.
-        /// </summary>
-        public static bool Recheck(string profileDir, Func<bool> ask)
-        {
-            return Settle(profileDir, FetchShas(), ask);
+            return Settle(profileDir, FetchShas(), delegate { return Ask(); });
         }
 
         public static bool Write(string profileDir, DateTime at, string[] shas)
@@ -151,7 +142,7 @@ namespace Thornswood
         }
 
         /// <summary>The three boxes and links. True only when all three were ticked.</summary>
-        public static bool Ask(bool changed)
+        public static bool Ask()
         {
             bool yes = false;
             var boxes = new CheckBox[Pages.Length];
@@ -161,7 +152,7 @@ namespace Thornswood
             w.SizeToContent = SizeToContent.Height;
             w.ResizeMode = ResizeMode.NoResize;
             w.WindowStartupLocation = WindowStartupLocation.CenterScreen;
-            w.Content = Build(changed, boxes, delegate
+            w.Content = Build(boxes, delegate
             {
                 if (!AllTicked(boxes)) return;
                 yes = true;
@@ -212,7 +203,7 @@ namespace Thornswood
             return false;
         }
 
-        static UIElement Build(bool changed, CheckBox[] boxes, Action goOn)
+        static UIElement Build(CheckBox[] boxes, Action goOn)
         {
             var root = new StackPanel();
             root.Margin = new Thickness(22);
@@ -220,9 +211,7 @@ namespace Thornswood
             var say = new TextBlock();
             say.TextWrapping = TextWrapping.Wrap;
             say.Margin = new Thickness(0, 0, 0, 14);
-            say.Text = changed
-                ? "One of the terms, the privacy policy or the rules has changed since it was accepted. Thornswood stays closed until all three are ticked again."
-                : "This install has no note that the terms, the privacy policy and the rules were accepted. Thornswood stays closed until all three are ticked.";
+            say.Text = "This install has no note that the terms, the privacy policy and the rules were accepted. Thornswood stays closed until all three are ticked.";
             root.Children.Add(say);
 
             var go = new Button();

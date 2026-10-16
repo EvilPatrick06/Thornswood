@@ -222,11 +222,14 @@ $ensureAt = $run.IndexOf('Acceptance.Ensure(')
 $loadAt = $run.IndexOf('Config.Load(')
 Yes 'Run asks before it reads config' ($ensureAt -gt 0 -and $loadAt -gt $ensureAt)
 Yes 'uninstall does not ask' ($run -match 'if \(!askedToUninstall && !termsOnFile && !Acceptance\.Ensure\(')
-Yes 'a record already on disk is rechecked off the window thread' (
-    $run -match 'if \(!askedToUninstall && termsOnFile\)' -and $run.Contains('Acceptance.Recheck('))
-Yes 'declining a change closes the launcher' ($run.Contains('Application.Current.Shutdown()'))
+# Asked once (#2616, Patrick 16 Oct): a record already on disk is never
+# asked again, whatever the pages say now.
+Yes 'a record already on disk is not asked again at start' (
+    -not $run.Contains('Acceptance.Recheck(') -and -not $acc.Contains('static bool Recheck(') -and
+    -not ($run -match 'if \(!askedToUninstall && termsOnFile\)'))
+Yes 'the question no longer says a page changed' (-not $acc.Contains('has changed since it was accepted'))
 Yes 'the three questions are the only way Ensure writes' (
     $acc.Contains('if (!NeedsAsk(Read(profileDir), null)) return true;') -and
-    $acc.Contains('return Settle(profileDir, FetchShas(), delegate { return Ask(false); });'))
+    $acc.Contains('return Settle(profileDir, FetchShas(), delegate { return Ask(); });'))
 
 Done

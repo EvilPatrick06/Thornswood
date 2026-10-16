@@ -622,30 +622,14 @@ namespace Thornswood
                 fault.Handled = true;
             };
             StartStallWatch();
-            if (!askedToUninstall && termsOnFile)
-            {
-                // The record is already there. A page whose text has changed
-                // is asked again, off this thread so startup does not wait
-                // on the site. Declining closes the launcher.
-                ThreadPool.QueueUserWorkItem(delegate
-                {
-                    try
-                    {
-                        bool ok = Acceptance.Recheck(Paths.ProfileDir, delegate
-                        {
-                            bool ticked = false;
-                            win.Dispatcher.Invoke((Action)delegate { ticked = Acceptance.Ask(true); });
-                            return ticked;
-                        });
-                        if (!ok)
-                        {
-                            try { win.Dispatcher.Invoke((Action)delegate { if (Application.Current != null) Application.Current.Shutdown(); }); }
-                            catch (Exception ex) { Swallow.Note("Shell.Run, closing after the terms were declined", ex); }
-                        }
-                    }
-                    catch (Exception ex) { Swallow.Note("Shell.Run, terms recheck", ex); }
-                });
-            }
+            // The terms, the privacy policy and the rules are asked once: by
+            // the setup program, or at the first start of an install that has
+            // no record (above). A page whose text changes later is not asked
+            // again. Patrick, 16 Oct 2026 (#2616): "this supposed to only be
+            // asked once on the launch not every update or launch and only if
+            // you didnt click these during the originial install". Until then
+            // every start fetched the three pages and asked again when any of
+            // them had changed, so a privacy page edit asked everybody again.
             app.Run(win);
         }
 
