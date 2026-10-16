@@ -682,8 +682,8 @@ $files = @($serverFiles) + @('gamemode.js', 'server-settings.json')
 # -FromStore's, whose server files come out of the store (#459).
 if ($noBuild) { $files = @('gamemode.js') }
 foreach ($f in $files) {
-  $p = Join-Path $Dist ($f -replace '/', '\')
-  if ($f -eq 'gamemode.js') { $p = $built }
+  # -GamemodeOnly and -FromStore have no -Dist, and send only the gamemode from here.
+  if ($f -eq 'gamemode.js') { $p = $built } else { $p = Join-Path $Dist ($f -replace '/', '\') }
   if (-not (Test-Path -LiteralPath $p)) { throw "not built: $p" }
   '{0,-22} {1:N0} bytes' -f $f, (Get-Item $p).Length | Write-Host
 }
@@ -984,9 +984,9 @@ $stageFar  = ($Root -replace '\\', '/') + '/' + $stageName
 $send = [ordered]@{}
 foreach ($p in $sendPlugins) { $send['plugins/' + (Split-Path $p -Leaf)] = $p }
 foreach ($f in $files) {
-  $src = Join-Path $Dist ($f -replace '/', '\')
   if ($f -eq 'gamemode.js') { $src = $built }
-  if ($f -eq 'server-settings.json') { $src = $settingsForVps }
+  elseif ($f -eq 'server-settings.json') { $src = $settingsForVps }
+  else { $src = Join-Path $Dist ($f -replace '/', '\') }
   $send[$f] = $src
 }
 # The record goes up with the server files, so the box itself answers what it
@@ -1052,7 +1052,7 @@ foreach ($rel in $send.Keys) {
 # stage, held to the record there (ServerBuild.ps1).
 if ($FromStore) {
   Write-Host 'Taking the server build out of the store on the box...'
-  $storeScript = [IO.File]::ReadAllText((Join-Path $Here 'ServerBuild.ps1')) + "`r`n" +
+  $storeScript = $ThornswoodRecordShapeText + [IO.File]::ReadAllText((Join-Path $Here 'ServerBuild.ps1')) + "`r`n" +
                  (SwapVars $Root $Task $stageName $prevName $Wait ([ordered]@{}) @()) +
                  ('$Store = ''' + ($script:ThornswoodDeployStore + '/server').Replace('/', '\') + '''' + "`r`n") + $ThornswoodStoreExpandBlock
   $storeOut = @(Remote $storeScript | ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })

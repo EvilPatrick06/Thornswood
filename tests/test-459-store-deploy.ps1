@@ -194,7 +194,8 @@ try {
     if (Test-Path -LiteralPath $ps51) {
         $probe = Join-Path $T 'probe51.ps1'
         $probeText = @'
-param([string]$Lib, [string]$Store, [string]$Rec, [string]$Into)
+param([string]$Lib, [string]$Json, [string]$Store, [string]$Rec, [string]$Into)
+. $Json
 . $Lib
 $r = Expand-ThornswoodStoredServerBuild -Store $Store -Record ([IO.File]::ReadAllText($Rec) | ConvertFrom-Json) -RecordSum (Get-ThornswoodRecordSum ([IO.File]::ReadAllBytes($Rec))) -Into $Into
 'NAME ' + $r.Name
@@ -203,11 +204,12 @@ $r = Expand-ThornswoodStoredServerBuild -Store $Store -Record ([IO.File]::ReadAl
 '@
         [IO.File]::WriteAllText($probe, $probeText, $utf8)
         $lib = Join-Path $Repo 'scripts\deploy\ServerBuild.ps1'
+        $jsonLib = Join-Path $Repo 'scripts\release\Read-JsonFile.ps1'
         $i1 = Join-Path $T 'into51a'; $null = [IO.Directory]::CreateDirectory($i1)
-        $o = @(& $ps51 -NoProfile -ExecutionPolicy Bypass -File $probe -Lib $lib -Store $sA.Dir -Rec $recA2 -Into $i1 2>&1 | ForEach-Object { "$_" })
+        $o = @(& $ps51 -NoProfile -ExecutionPolicy Bypass -File $probe -Lib $lib -Json $jsonLib -Store $sA.Dir -Rec $recA2 -Into $i1 2>&1 | ForEach-Object { "$_" })
         Yes 'under 5.1, the store''s build is taken: its name, all seven files, no problem' ($o -contains ('NAME ' + $sA.A.Name) -and $o -contains 'PROBLEM ' -and $o -contains 'FILES 7')
         $i2 = Join-Path $T 'into51b'; $null = [IO.Directory]::CreateDirectory($i2)
-        $o = @(& $ps51 -NoProfile -ExecutionPolicy Bypass -File $probe -Lib $lib -Store $sw -Rec $recA -Into $i2 2>&1 | ForEach-Object { "$_" })
+        $o = @(& $ps51 -NoProfile -ExecutionPolicy Bypass -File $probe -Lib $lib -Json $jsonLib -Store $sw -Rec $recA -Into $i2 2>&1 | ForEach-Object { "$_" })
         Yes '  and a swapped zip is refused there too, writing nothing' (@($o | Where-Object { $_ -match '^PROBLEM .*is not the zip its name' }).Count -eq 1 -and $o -contains 'FILES 0')
     } else { Write-Host 'SKIP  no Windows PowerShell 5.1 on this machine' }
 
@@ -248,13 +250,15 @@ $r = Expand-ThornswoodStoredServerBuild -Store $Store -Record ([IO.File]::ReadAl
     $null = [IO.Directory]::CreateDirectory((Join-Path $root '.stage-x'))
     Copy-Item -LiteralPath $recA -Destination (Join-Path $root '.stage-x\server-build.json')
     $block = Join-Path $T 'store-block.ps1'
-    [IO.File]::WriteAllText($block, ([IO.File]::ReadAllText((Join-Path $Repo 'scripts\deploy\ServerBuild.ps1')) + "`r`n" +
+    # What Deploy-Server puts in front of it: Read-JsonFile.ps1 and RecordShape.ps1 (Swap.ps1's $ThornswoodRecordShapeText).
+    $shapeText = [IO.File]::ReadAllText((Join-Path $Repo 'scripts\release\Read-JsonFile.ps1')) + "`r`n" + [IO.File]::ReadAllText((Join-Path $Repo 'scripts\release\RecordShape.ps1')) + "`r`n"
+    [IO.File]::WriteAllText($block, ($shapeText + [IO.File]::ReadAllText((Join-Path $Repo 'scripts\deploy\ServerBuild.ps1')) + "`r`n" +
         "`$Root = '" + $root + "'`r`n`$Stage = '.stage-x'`r`n`$Store = '" + $sA.Dir + "'`r`n" + $ThornswoodStoreExpandBlock), $utf8)
     $o = @(& $ps51 -NoProfile -ExecutionPolicy Bypass -File $block 2>&1 | ForEach-Object { "$_".Trim() })
     Yes 'Deploy-Server''s store block takes the build into the stage and ends STORED <name> (5.1)' (
         $o -contains ('STORED ' + $sA.A.Name) -and (Test-Path -LiteralPath (Join-Path $root '.stage-x\scam_native.node')) -and
         (Test-Path -LiteralPath (Join-Path $root '.stage-x\data\scripts\ActiveMagicEffect.pex')))
-    [IO.File]::WriteAllText($block, ([IO.File]::ReadAllText((Join-Path $Repo 'scripts\deploy\ServerBuild.ps1')) + "`r`n" +
+    [IO.File]::WriteAllText($block, ($shapeText + [IO.File]::ReadAllText((Join-Path $Repo 'scripts\deploy\ServerBuild.ps1')) + "`r`n" +
         "`$Root = '" + $root + "'`r`n`$Stage = '.stage-x'`r`n`$Store = '" + $sB.Dir + "'`r`n" + $ThornswoodStoreExpandBlock), $utf8)
     $o = @(& $ps51 -NoProfile -ExecutionPolicy Bypass -File $block 2>&1 | ForEach-Object { "$_".Trim() })
     Yes '  and with no build for the record it ends STORE REFUSED, the stage cleared' ($o -contains 'STORE REFUSED' -and -not (Test-Path -LiteralPath (Join-Path $root '.stage-x')))

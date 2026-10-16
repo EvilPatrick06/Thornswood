@@ -45,6 +45,8 @@
 
 . (Join-Path $PSScriptRoot 'Artifact.ps1')
 . (Join-Path $PSScriptRoot 'ServerBuild.ps1')
+# ConvertFrom-ThornswoodJson, which Expand-ThornswoodStoredServerBuild reads the store with (#459).
+. (Join-Path $PSScriptRoot '..\release\Read-JsonFile.ps1')
 
 # The bytes of every server file in a folder or a payload zip, rel -> byte[],
 # only the files ServerBuild.ps1 counts as the fork's build.

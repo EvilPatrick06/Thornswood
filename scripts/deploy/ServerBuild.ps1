@@ -215,6 +215,10 @@ function Get-ThornswoodBoxBuildProblem([string]$BoxSum, [string]$BoxCommit, [str
   Returns Name (the zip's, '' when nothing was taken), Said (lines to print)
   and Problem ('' or why nothing was taken). Only the record's files are
   written; on a problem some may be there, and the caller clears its stage.
+  A store .json for the commit that does not read is a problem too: the store
+  then cannot say which build it keeps. It reads them with
+  ConvertFrom-ThornswoodJson, so the caller has Read-JsonFile.ps1 loaded: the
+  installer does, and Deploy-Server sends its text in front of this file's.
 #>
 function Expand-ThornswoodStoredServerBuild([string]$Store, $Record, [string]$RecordSum, [string]$Into) {
     $r = [pscustomobject]@{ Name = ''; Said = @(); Problem = '' }
@@ -231,7 +235,11 @@ function Expand-ThornswoodStoredServerBuild([string]$Store, $Record, [string]$Re
     if (Test-Path -LiteralPath $Store) {
         foreach ($j in @(Get-ChildItem -LiteralPath $Store -Filter ('server-' + $short + '-*.json') -File -ErrorAction SilentlyContinue)) {
             $meta = $null
-            try { $meta = [IO.File]::ReadAllText($j.FullName) | ConvertFrom-Json } catch { $meta = $null }
+            try { $meta = ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($j.FullName)) $j.FullName }
+            catch {
+                $r.Problem = ('the store cannot say which build it keeps for ' + $commit.Substring(0, 8) + ': ' + $_.Exception.Message)
+                return $r
+            }
             $sum = ''
             if ($null -ne $meta) { $sum = ([string](Get-ThornswoodServerRecordValue $meta 'recordSha256')).ToLowerInvariant() }
             if ($sum -and $sum -eq $RecordSum -and ([string](Get-ThornswoodServerRecordValue $meta 'commit')).ToLowerInvariant() -eq $commit) { $mine += [pscustomobject]@{ Json = $j.FullName; Meta = $meta } }
@@ -297,8 +305,9 @@ function Expand-ThornswoodStoredServerBuild([string]$Store, $Record, [string]$Re
 <#
   Deploy-Server.ps1 -FromStore's half on the box (#459): the build the staged
   server-build.json names, out of the store into the stage, by
-  Expand-ThornswoodStoredServerBuild above. This file's text goes in front of
-  it, and $Root, $Stage and $Store in the lines before it. Ends with
+  Expand-ThornswoodStoredServerBuild above. Read-JsonFile.ps1's and
+  RecordShape.ps1's text and this file's go in front of it, and $Root, $Stage
+  and $Store in the lines before it. Ends with
   STORED <zip name> or STORE REFUSED, the stage cleared.
 #>
 $ThornswoodStoreExpandBlock = @'
@@ -306,10 +315,10 @@ $ProgressPreference = 'SilentlyContinue'
 $stageDir = Join-Path $Root $Stage
 $rp = Join-Path $stageDir 'server-build.json'
 $rec = $null
-try { $rec = [IO.File]::ReadAllText($rp) | ConvertFrom-Json } catch { $rec = $null }
+$why = ''
+try { $rec = Read-ThornswoodRecord -Path $rp -Kind server-build } catch { $why = ('the staged server-build.json cannot be trusted, so nothing says which build to take out of the store: ' + $_.Exception.Message) }
 $got = $null
-if ($null -eq $rec) { $why = 'the staged server-build.json cannot be read, so nothing says which build to take out of the store' }
-else {
+if (-not $why) {
   $got = Expand-ThornswoodStoredServerBuild -Store $Store -Record $rec -RecordSum (Get-ThornswoodRecordSum ([IO.File]::ReadAllBytes($rp))) -Into $stageDir
   $why = $got.Problem
 }
