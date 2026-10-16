@@ -8,6 +8,7 @@
       .\scripts\release\Build-Engine.ps1                first time: checks, configures, builds
       .\scripts\release\Build-Engine.ps1 -Check         says what is missing, changes nothing
       .\scripts\release\Build-Engine.ps1 -Jobs 2        two projects at a time, whatever is free
+      .\scripts\release\Build-Engine.ps1 -NoSkyrim      on a machine with no game (a build runner)
 
   WHY THIS EXISTS. Until 25 September a dev Ship worked only on Patrick's
   machine: Ship checks the client runtime against records\client-build.json,
@@ -42,6 +43,19 @@
     5. Compares the six client files with records\client-build.json, the check
        Ship makes, and says whether this build is the recorded one.
 
+  WITH NO GAME ON THE MACHINE (-NoSkyrim, #459). The engine build in CI
+  (.github\workflows\engine.yml) runs on a runner with no Skyrim. SKYRIM_DIR
+  is left out of the configure, and the fork then does what upstream's own CI
+  build does: no Creation Kit compiler is found, so the committed Papyrus
+  (skymp5-scripts\pex and TESModPlatform.pex) goes into the build as it is
+  (fork #31, #1220; New-ServerBuildRecord.ps1 holds data\scripts to it), and
+  the server-settings.json the configure writes names no plugin paths, which
+  no deploy takes from a build before Deploy-Gamemode.ps1 writes them. Every
+  recorded server file and the six client files are built from the fork's
+  source either way. On a runner, CI=true is taken out of the run's
+  environment first, so the fork builds with its own vcpkg (EngineJobs.ps1,
+  Clear-EngineCiSwitch).
+
   WHAT IT DOES NOT DO. It never changes a record: when the build is not the
   recorded one it says so, and New-ClientBuildRecord.ps1 is the step for a
   deliberate engine change (engine\README.md). It sends nothing anywhere and
@@ -56,6 +70,9 @@ param(
     # it out from the memory free when the build starts (EngineJobs.ps1).
     [ValidateRange(0, 64)]
     [int]$Jobs = 0,
+    # Configure with no SKYRIM_DIR, on a machine with no game (#459, the
+    # header's WITH NO GAME ON THE MACHINE).
+    [switch]$NoSkyrim,
     [switch]$NoPause
 )
 . (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
@@ -67,6 +84,9 @@ function Ok($m) { Write-Host ('  ok       ' + $m) -ForegroundColor Green }
 function Miss($m) { Write-Host ('  MISSING  ' + $m) -ForegroundColor Red }
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
 . (Join-Path $PSScriptRoot 'EngineJobs.ps1')
+# The fork's own vcpkg on a build runner too, before anything runs cmake (#459).
+$ciSaid = Clear-EngineCiSwitch
+if ($ciSaid) { Say ('  ' + $ciSaid) 'DarkGray' }
 # Native tools write progress to stderr; the exit code alone decides. Their
 # output is written to the screen, not returned: returned, every line cmake
 # printed came back with the code, "$code -ne 0" was true for any configure
@@ -241,7 +261,8 @@ foreach ($t in @(
     $g = Get-Command $t.Name -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($g) { Ok ($t.Name + ', ' + $g.Source) } else { Miss $t.How; $missing++ }
 }
-if (Test-Path -LiteralPath (Join-Path $SkyrimDir 'SkyrimSE.exe')) { Ok "SkyrimSE.exe in $SkyrimDir" }
+if ($NoSkyrim) { Ok 'no game needed: -NoSkyrim configures without SKYRIM_DIR, so the committed Papyrus goes in' }
+elseif (Test-Path -LiteralPath (Join-Path $SkyrimDir 'SkyrimSE.exe')) { Ok "SkyrimSE.exe in $SkyrimDir" }
 else { Miss "SkyrimSE.exe in $SkyrimDir. Install Thornswood first (the launcher makes that folder), or pass -SkyrimDir with the folder that has it."; $missing++ }
 if ($missing) { Die "$missing thing(s) missing, listed above. Nothing was built." }
 
@@ -327,7 +348,9 @@ elseif ($Check) { Miss "$build is not configured; this run would configure it (t
 else {
     $toolchain = Join-Path $Fork 'vcpkg\scripts\buildsystems\vcpkg.cmake'
     Say '  configuring. The first time builds every vcpkg library; expect it to take a long while.'
-    $code = Run $cmake -S $Fork -B $build -G 'Visual Studio 17 2022' -A x64 "-DCMAKE_TOOLCHAIN_FILE=$toolchain" '-DVCPKG_TARGET_TRIPLET=x64-windows-sp' '-DOFFLINE_MODE=ON' '-DBUILD_CLIENT=ON' '-DBUILD_SKYRIM_PLATFORM=ON' "-DSKYRIM_DIR=$SkyrimDir" @pwshArg
+    # -NoSkyrim leaves SKYRIM_DIR out (the header's WITH NO GAME ON THE MACHINE).
+    $skyrimArg = @(if (-not $NoSkyrim) { "-DSKYRIM_DIR=$SkyrimDir" })
+    $code = Run $cmake -S $Fork -B $build -G 'Visual Studio 17 2022' -A x64 "-DCMAKE_TOOLCHAIN_FILE=$toolchain" '-DVCPKG_TARGET_TRIPLET=x64-windows-sp' '-DOFFLINE_MODE=ON' '-DBUILD_CLIENT=ON' '-DBUILD_SKYRIM_PLATFORM=ON' @skyrimArg @pwshArg
     if ($code -ne 0) { Die "cmake configure exited with $code. The first error above is usually the real one." }
     Ok 'configured'
 }

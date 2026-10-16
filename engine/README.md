@@ -338,3 +338,65 @@ upstream has fixes the fork does not. It goes green when each is merged into
 the fork branch (a fork pull request, then the steps above), or when
 `records\upstream-not-taken.json` lists it with the reason it is not being
 taken and who decided.
+
+## The engine built in CI
+
+Decided by Patrick on 15 October (issue #459, "C, then B"): the engine is
+built in CI on GitHub's own runner first, and on the VPS runners when GitHub
+refuses it, the way the build check falls back (#2407). That is
+`.github\workflows\engine.yml`, whose header says each choice and why.
+
+It runs the steps of "One engine" above on a runner, from this repository's
+scripts: the fork checked out at one commit of `thornswood/engine-changes`,
+`Build-Engine.ps1 -NoSkyrim`, then `Build-Server.ps1`, which records the
+server, then `New-ClientBuildRecord.ps1`. A runner has no game, so
+`-NoSkyrim` configures without `SKYRIM_DIR`: the fork then puts its committed
+Papyrus into the build, as upstream's own CI build does, and the records
+hold the build to it. Every runner sets `CI=true`, which makes the fork's
+`CMakeLists.txt` take `C:/vcpkg` instead of its own vcpkg, so both scripts
+take it out of their own environment first (`EngineJobs.ps1`,
+`Clear-EngineCiSwitch`). There is no drive letter to keep and no Store
+PowerShell to lose on a runner: its checkout path has no `&` in it, and its
+pwsh is an installed one.
+
+Start it from the Actions tab, or from the repository folder:
+
+```powershell
+gh workflow run engine.yml --ref main -f commit=<the fork commit>
+```
+
+With no commit it builds the one the branch pins. It runs only when started
+by hand: a pull request's code reaches the box through the build check alone
+(#1306). One artifact of the run, `engine-<fork commit, 12>`,
+holds `records\server-build.json` and `records\client-build.json`, the server
+build as the store on the box keeps it (`server\server-<fork commit
+12>-<zip hash 16>.zip` and its `.json`, `scripts\deploy\ServerArtifact.ps1`),
+the six client files under `client\` at the paths the record names, and
+`SHA256SUMS` over all of it. The run commits nothing and sends nothing.
+
+The pin pull request from it, step 4 of "One engine" with the records CI
+made instead of a machine's own build, from the repository folder on a branch:
+
+```powershell
+gh run download <the run's id> -n engine-<fork commit 12> -D out\engine-<fork commit 12>
+Copy-Item out\engine-<fork commit 12>\records\server-build.json, out\engine-<fork commit 12>\records\client-build.json records\
+git -C engine/skymp fetch origin
+git -C engine/skymp checkout <the fork commit>
+git add engine/skymp records\server-build.json records\client-build.json
+```
+
+then the commit in `THIRD-PARTY.md` and `site\data\site\credits.md`, as step 4
+says. The six client files go into a game folder with
+`.\scripts\release\Sync-Client.ps1 -Dist out\engine-<fork commit 12>\client`,
+which holds each to the record first.
+
+A rebuild is never the same bytes ("Rebuilding the same commit", above), so a
+pin takes the records of the one build whose files are then sent: CI's, or
+one machine's, never a mix.
+
+On the VPS the fallback needs the C++ half of the Build Tools, CMake and
+yarn, which the box did not have on 16 October:
+`.\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeEngineTools -SkipFirewall'`
+puts them there. Until it has run, the fallback stops at Build-Engine's tool
+check and says what is missing. `tests\test-459-engine-workflow.ps1` holds the
+workflow's shape and these two scripts' part in it.
