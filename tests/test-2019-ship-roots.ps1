@@ -32,6 +32,19 @@
        d. refusals, each with nothing changed: the other channel's root, a
           folder Vortex deploys into, a Game folder OwnGame did not make,
           -Check on a root that is not there.
+       e. #2603, a Steam copy that is not 1.6.1170 (a cleaned master, as
+          One's has another Dawnguard.esm): a new root is refused as an
+          install's Make refuses it; -SkyrimFrom naming a folder with a
+          listed file missing, or an archive of the right size with other
+          bytes, is refused naming that file, with no game folder made; a
+          folder holding them all makes the root, with the game's own files
+          copied from it (a write into the new root's master leaves the
+          source's as it was), the Steam copy's cleaned master nowhere, a
+          Creation Club plugin the folder never takes not asked for, and
+          made.txt naming the folder; a refresh keeps that line, and
+          -SkyrimFrom on a made root is said and not used. A file of the
+          source that changes after it was checked stops Make (the stamp
+          check, called as Make calls it).
     2. Where.ps1 and where.js: with no record ClientDist and ServerDist are
        under the checkout's engine\skymp; with Setup-ShipMachine's record they
        are under the recorded fork's build, for every clone; a record naming
@@ -39,12 +52,14 @@
     3. Update-ShipRoot.ps1, the real script with a stand-in tool: a tool that
        refuses stops it, naming why; a client build that is not the record
        stops it; the recorded build goes in, through a file that had a second
-       name without writing through it, and it ends current.
+       name without writing through it, and it ends current. -SkyrimFrom is
+       handed to the tool, whole, and never with -Check (#2603).
     4. Setup-ShipMachine.ps1's Save-EngineBuild writes the record and refuses
        a folder with no build in it; Ship.ps1 runs Update-ShipRoot.ps1 for
        the channel's root before the version moves and before anything is
        built, and stops when it refuses (tests\test-ship-dry-run.ps1 runs that
-       Ship, N).
+       Ship, N). Setup-ShipMachine.ps1 takes -SkyrimFrom and hands it to
+       Update-ShipRoot.ps1, not with -Check.
 
   Nothing outside its own scratch folder is written. Needs the Build Tools'
   csc (tests\Launcher-Csc.ps1) and node.
@@ -158,9 +173,10 @@ namespace Thornswood
         }
         static string J(string s) { return s.Replace("\\", "\\\\").Replace("\"", "\\\""); }
 
-        // A Steam copy on the pinned build by the exe's size, which is all the
-        // list below pins (its sha1s are "0"), so the config's own default
-        // ExpectedExeBytes is the one Make holds it to.
+        // A Steam copy on the pinned build: the exe at the config's own
+        // default ExpectedExeBytes, and every file on the list below with the
+        // bytes its SHA-1 names (#2603 needs the hashes real, so a cleaned
+        // master can be told apart).
         static void Steam()
         {
             SteamDir = Path.Combine(T, "steam");
@@ -172,7 +188,21 @@ namespace Thornswood
             Directory.CreateDirectory(Game);
             using (var fs = new FileStream(Path.Combine(Game, "SkyrimSE.exe"), FileMode.Create)) fs.SetLength(new Config().ExpectedExeBytes);
             Put(Path.Combine(Game, "Data\\Skyrim.esm"), "PIN-MASTER");
+            Put(Path.Combine(Game, "Data\\Skyrim - Misc.bsa"), "PIN-ARCHIVE");
+            Put(Path.Combine(Game, "Data\\ccBGSSSE037-Curios.esl"), "CC-CURIOS");
             Deploy("VORTEX-TSONE-1", DateTime.UtcNow.AddMinutes(-30));
+        }
+
+        // A folder holding the listed files a new folder takes (#2603), as a
+        // ship root's Game does: no Creation Club plugin, which none takes.
+        static string SkyrimSource(string name, string master, string archive)
+        {
+            string d = Path.Combine(T, name);
+            Directory.CreateDirectory(d);
+            using (var fs = new FileStream(Path.Combine(d, "SkyrimSE.exe"), FileMode.Create)) fs.SetLength(new Config().ExpectedExeBytes);
+            if (master != null) Put(Path.Combine(d, "Data\\Skyrim.esm"), master);
+            Put(Path.Combine(d, "Data\\Skyrim - Misc.bsa"), archive);
+            return d;
         }
 
         // Vortex's deployment: one plugin, linked from its staging copy, and
@@ -222,6 +252,11 @@ namespace Thornswood
         static string Run(string root, string channel, bool check, List<string> said)
         {
             try { return ShipRootTool.Run(root, channel, check, delegate(string m) { said.Add(m); }); }
+            catch (Exception ex) { return "THREW " + ex.Message; }
+        }
+        static string RunFrom(string root, string skyrimFrom, List<string> said)
+        {
+            try { return ShipRootTool.Run(root, "main", false, skyrimFrom, delegate(string m) { said.Add(m); }); }
             catch (Exception ex) { return "THREW " + ex.Message; }
         }
 
@@ -291,6 +326,76 @@ namespace Thornswood
                 Yes("d.   and left as it was", File.ReadAllText(Path.Combine(handRoot, "Game\\Data\\Skyrim.esm")) == "A COPY BY HAND");
                 Config dev = Config.Load(Path.Combine(handRoot, "config.json"));
                 Yes("d.   its config.json was written for dev, as DevBuild.Install writes one", dev.IsDev && dev.ServerPort == DevBuild.DevPort && dev.UpdateFeedUrl.Contains("/feed-dev/"));
+
+                // ---- e. a Steam copy that is not 1.6.1170 (#2603) ----------
+                string steamMaster = Path.Combine(Game, "Data\\Skyrim.esm");
+                File.WriteAllText(steamMaster, "CLEANED-MA");
+                string rootE = Path.Combine(T, "repo\\local\\release-e");
+                string gameE = Path.Combine(rootE, "Game");
+                said.Clear();
+                why = Run(rootE, "main", false, said);
+                Yes("e. with a cleaned master in the Steam copy a new root is refused, as an install's Make is", why != null && why.Contains("one of its own files is not that build's") && !Directory.Exists(gameE));
+                Console.WriteLine("      it said: " + why);
+
+                string noMaster = SkyrimSource("skyrim-no-master", null, "PIN-ARCHIVE");
+                said.Clear();
+                why = RunFrom(rootE, noMaster, said);
+                Yes("e. -SkyrimFrom a folder without a listed file is refused, naming it", why != null && why.Contains(Path.Combine(noMaster, "Data\\Skyrim.esm") + " is not there") && why.Contains("nothing was made"));
+                Yes("e.   and no game folder is made, not even half of one", !Directory.Exists(gameE) && !Directory.Exists(gameE + ".new"));
+                Console.WriteLine("      it said: " + why);
+
+                string badArchive = SkyrimSource("skyrim-bad-archive", "PIN-MASTER", "PIN-ARCHIV3");
+                said.Clear();
+                why = RunFrom(rootE, badArchive, said);
+                Yes("e. an archive of the right size with other bytes is refused too, naming it: archives are hashed here", why != null && why.Contains(Path.Combine(badArchive, "Data\\Skyrim - Misc.bsa") + " has the build's size but not its bytes"));
+                Yes("e.   and no game folder is made, not even half of one", !Directory.Exists(gameE) && !Directory.Exists(gameE + ".new"));
+                Console.WriteLine("      it said: " + why);
+
+                string good = SkyrimSource("skyrim-good", "PIN-MASTER", "PIN-ARCHIVE");
+                said.Clear();
+                why = RunFrom(rootE, good, said);
+                Yes("e. -SkyrimFrom a folder that holds them makes the root (" + (why ?? "current") + ")", why == null);
+                if (why != null) foreach (string m in said) Console.WriteLine("      " + m);
+                string masterE = Path.Combine(gameE, "Data\\Skyrim.esm");
+                Yes("e.   the game's own master is the build's, from that folder, not the Steam copy's cleaned one",
+                    File.Exists(masterE) && File.ReadAllText(masterE) == "PIN-MASTER");
+                Yes("e.   the archive is in it", File.Exists(Path.Combine(gameE, "Data\\Skyrim - Misc.bsa")) && File.ReadAllText(Path.Combine(gameE, "Data\\Skyrim - Misc.bsa")) == "PIN-ARCHIVE");
+                Yes("e.   a Creation Club plugin no folder takes was not asked of that folder, and is not in the root",
+                    !File.Exists(Path.Combine(gameE, "Data\\ccBGSSSE037-Curios.esl")));
+                Yes("e.   Vortex's plugin is in it", File.ReadAllText(Path.Combine(gameE, "Data\\TsOne.esp")) == "VORTEX-TSONE-3");
+                Yes("e.   made.txt names the folder the game's own files came from", Same(Made(rootE, "skyrim"), good) && Same(Made(rootE, "source"), Game));
+                Yes("e.   the log says they were checked and copied from it", string.Join(" ", said.ToArray()).Contains("copied from " + good));
+                File.AppendAllText(masterE, "+WRITTEN");
+                Yes("e.   copied, not linked: a write into the root's master leaves the folder's own as it was", File.ReadAllText(Path.Combine(good, "Data\\Skyrim.esm")) == "PIN-MASTER");
+                Yes("e.   and the Steam copy's master as it was", File.ReadAllText(steamMaster) == "CLEANED-MA");
+                // An archive is linked when it comes from anywhere else, so
+                // this is the file that shows the copy: the folder's own has
+                // no second name in the root (or anywhere).
+                MethodInfo links = typeof(OwnGame).GetMethod("Links", BindingFlags.NonPublic | BindingFlags.Static);
+                Yes("e.   the folder's archive and master have no second name: nothing in the root is linked to them",
+                    (int)links.Invoke(null, new object[] { Path.Combine(good, "Data\\Skyrim - Misc.bsa") }) == 1 &&
+                    (int)links.Invoke(null, new object[] { Path.Combine(good, "Data\\Skyrim.esm") }) == 1 &&
+                    (int)links.Invoke(null, new object[] { Path.Combine(good, "SkyrimSE.exe") }) == 1);
+                said.Clear();
+                Yes("e.   -Check calls it current", Run(rootE, "main", true, said) == null);
+
+                Deploy("VORTEX-TSONE-4", DateTime.UtcNow.AddMinutes(1));
+                said.Clear();
+                why = RunFrom(rootE, good, said);
+                Yes("e. a refresh of it takes Vortex's new copy (" + (why ?? "current") + ")", why == null && File.ReadAllText(Path.Combine(gameE, "Data\\TsOne.esp")) == "VORTEX-TSONE-4");
+                Yes("e.   says -SkyrimFrom was not used, the folder being made already", string.Join(" ", said.ToArray()).Contains("was not used"));
+                Yes("e.   and keeps made.txt's skyrim line", Same(Made(rootE, "skyrim"), good));
+
+                // The stamp check Make runs once everything is placed, as Make
+                // calls it: a write into the source after it was checked is seen.
+                MethodInfo from = typeof(OwnGame).GetMethod("SkyrimFrom", BindingFlags.NonPublic | BindingFlags.Static);
+                MethodInfo moved = typeof(OwnGame).GetMethod("SkyrimFromMoved", BindingFlags.NonPublic | BindingFlags.Static);
+                object[] a = new object[] { good, new HashSet<string>(StringComparer.OrdinalIgnoreCase), null, null };
+                from.Invoke(null, a);
+                Yes("e. the stamps of what was checked: nothing moved, nothing said", a[3] != null && moved.Invoke(null, new object[] { good, a[3] }) == null);
+                File.WriteAllText(Path.Combine(good, "Data\\Skyrim.esm"), "PIN-MASTER");
+                string after = (string)moved.Invoke(null, new object[] { good, a[3] });
+                Yes("e. a file written after it was checked stops Make, naming it", after != null && after.Contains(Path.Combine(good, "Data\\Skyrim.esm") + " changed while the folder was being made"));
             }
             catch (Exception ex)
             {
@@ -322,9 +427,17 @@ $driverFile = Join-Path $work 'Driver.cs'
 [IO.File]::WriteAllText($stubFile, $stubs, $utf8)
 [IO.File]::WriteAllText($driverFile, $driver, $utf8)
 $skyrimList = Join-Path $work 'skyrim-files.json'
-[IO.File]::WriteAllText($skyrimList, ("{`n  ""build"": ""1.6.1170"",`n  ""files"": {`n" +
-    '    "SkyrimSE.exe": { "bytes": 37157144, "sha1": "0", "depot": "1" },' + "`n" +
-    '    "Data\\Skyrim.esm": { "bytes": 10, "sha1": "0", "depot": "1" }' + "`n  }`n}`n"), $utf8)
+# Real SHA-1s of what the driver puts in its Steam copy (#2603): the exe is
+# 37,157,144 zero bytes, the rest short texts.
+function Sha1Of([byte[]]$b) { return ([BitConverter]::ToString([Security.Cryptography.SHA1]::Create().ComputeHash($b)) -replace '-', '').ToLowerInvariant() }
+$listed = [ordered]@{
+    'SkyrimSE.exe' = @(37157144, (Sha1Of (New-Object byte[] 37157144)))
+    'Data\\Skyrim.esm' = @(10, (Sha1Of $utf8.GetBytes('PIN-MASTER')))
+    'Data\\Skyrim - Misc.bsa' = @(11, (Sha1Of $utf8.GetBytes('PIN-ARCHIVE')))
+    'Data\\ccBGSSSE037-Curios.esl' = @(9, (Sha1Of $utf8.GetBytes('CC-CURIOS')))
+}
+$rows = @($listed.Keys | ForEach-Object { '    "' + $_ + '": { "bytes": ' + $listed[$_][0] + ', "sha1": "' + $listed[$_][1] + '", "depot": "1" }' })
+[IO.File]::WriteAllText($skyrimList, ("{`n  ""build"": ""1.6.1170"",`n  ""files"": {`n" + ($rows -join ",`n") + "`n  }`n}`n"), $utf8)
 $exe = Join-Path $work 'ship-root-test.exe'
 $cscArgs = @('/noconfig', '/nologo', '/target:exe', '/warn:0', "/langversion:$LauncherLangVersion", '/main:Thornswood.ShipRootTest', "/out:$exe",
              "/resource:$skyrimList,skyrim-files.json", ("/resource:" + (Join-Path $Here 'records\ui-gone.json') + ",ui-gone.json"))
@@ -412,8 +525,8 @@ New-Item -ItemType Directory -Force -Path (Split-Path -Parent (Join-Path $shipRo
 $null = New-Item -ItemType HardLink -Path (Join-Path $shipRoot ('Game\' + $cA)) -Target (Join-Path $elsewhere $cA)
 $standIn = Join-Path $work 'stand-in-tool.ps1'
 [IO.File]::WriteAllText($standIn, @'
-param([string]$Root, [string]$Channel, [switch]$Check)
-[IO.File]::AppendAllText($env:TS_TOOL_CALLS, "tool -Root $Root -Channel $Channel" + $(if ($Check) { ' -Check' } else { '' }) + "`r`n")
+param([string]$Root, [string]$Channel, [switch]$Check, [string]$SkyrimFrom)
+[IO.File]::AppendAllText($env:TS_TOOL_CALLS, "tool -Root $Root -Channel $Channel" + $(if ($Check) { ' -Check' } else { '' }) + $(if ($SkyrimFrom) { " -SkyrimFrom $SkyrimFrom" } else { '' }) + "`r`n")
 if ($env:TS_TOOL_EXIT -eq '1') { Write-Output 'STOP. stand-in: the game folder was made from another folder.'; exit 1 }
 Write-Output '  stand-in: current.'
 exit 0
@@ -446,6 +559,12 @@ Yes '3.   the root holds the recorded client' (
 Yes '3.   and the file it replaced kept its other name''s bytes: nothing was written through the hard link' ([IO.File]::ReadAllText((Join-Path $elsewhere $cA)) -eq 'CLIENT-A-OLD')
 $r = Up @('-Check')
 Yes '3. -Check asks the tool with -Check and changes nothing' ($r.Code -eq 0 -and ([IO.File]::ReadAllText($env:TS_TOOL_CALLS)) -match '-Channel dev -Check')
+$skyFrom = Join-Path $work 'some root\Game'
+$r = Up @('-SkyrimFrom', $skyFrom)
+Yes '3. -SkyrimFrom is handed to the tool, whole (#2603)' ($r.Code -eq 0 -and ([IO.File]::ReadAllText($env:TS_TOOL_CALLS)) -match [regex]::Escape("-Channel dev -SkyrimFrom $skyFrom"))
+[IO.File]::WriteAllText($env:TS_TOOL_CALLS, '', $utf8)
+$r = Up @('-Check', '-SkyrimFrom', $skyFrom)
+Yes '3.   and not with -Check, which makes nothing' ($r.Code -eq 0 -and ([IO.File]::ReadAllText($env:TS_TOOL_CALLS)) -match '-Channel dev -Check' -and ([IO.File]::ReadAllText($env:TS_TOOL_CALLS)) -notmatch 'SkyrimFrom')
 
 # ============================================================= 4. Ship.ps1 ====
 $shipText = [IO.File]::ReadAllText((Join-Path $Release 'Ship.ps1'))
@@ -458,6 +577,9 @@ $genAt = $shipText.IndexOf("Head 'Generated files'")
 $buildAt = $shipText.IndexOf("Head 'Building the launcher'")
 Yes '4.   after it knows the root and has refused a folder Vortex deploys into' ($rootAt -ge 0 -and $vortexAt -ge 0 -and $callAt -gt $rootAt -and $callAt -gt $vortexAt)
 Yes '4.   and before the version moves, the generated files are read or the launcher is built' ($callAt -lt $versionAt -and $callAt -lt $genAt -and $callAt -lt $buildAt)
+$setupText = [IO.File]::ReadAllText($setup)
+Yes '4. Setup-ShipMachine.ps1 takes -SkyrimFrom and hands it to Update-ShipRoot.ps1, not with -Check (#2603)' (
+    $setupText -match '\[string\]\$SkyrimFrom' -and $setupText -match "(?s)if \(\`$Check\) \{ \`$upArgs\['Check'\] = \`$true \}\s*elseif \(\`$SkyrimFrom\) \{ \`$upArgs\['SkyrimFrom'\] = \`$SkyrimFrom \}")
 Yes '4.   and it stops when the root is not current' ($shipText -match "(?s)Update-ShipRoot\.ps1'\) -Channel \`$Channel -Root \`$Root -NoPause\s*if \(\`$LASTEXITCODE -ne 0\) \{\s*Die \(")
 }
 finally {
