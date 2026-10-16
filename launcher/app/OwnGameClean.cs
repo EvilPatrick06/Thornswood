@@ -140,8 +140,7 @@ namespace Thornswood
                 note.Add("steam=" + steam);
                 foreach (string r in removed) note.Add("removed|" + r);
                 foreach (string l in leftIn) note.Add("left|" + l);
-                Directory.CreateDirectory(Dir);
-                File.WriteAllLines(CleanedFile, note.ToArray());
+                WriteRecord(CleanedFile, note);
             }
 
             if (removed.Count > 0)
@@ -284,7 +283,7 @@ namespace Thornswood
                     if (rel.Length > 0 && still.Contains(rel.Replace('/', '\\').TrimStart('\\'))) keep.Add(rel);
                 }
                 if (keep.Count == 0) File.Delete(InstalledList);
-                else File.WriteAllLines(InstalledList, keep.ToArray());
+                else WriteRecord(InstalledList, keep);
             }
             catch (Exception ex) { Swallow.Note("OwnGame.ForgetInstalled", ex); }
         }

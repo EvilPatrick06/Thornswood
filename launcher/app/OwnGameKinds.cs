@@ -310,9 +310,7 @@ namespace Thornswood
                 if (rel.Length > 0 && Tidy(rel)) all.Add(rel);
             }
             if (all.Count == before && File.Exists(InstalledKept)) return;
-            Directory.CreateDirectory(Dir);
-            var lines = new List<string>(all);
-            File.WriteAllLines(InstalledKept, lines.ToArray());
+            WriteRecord(InstalledKept, all);
         }
 
         /// <summary>
