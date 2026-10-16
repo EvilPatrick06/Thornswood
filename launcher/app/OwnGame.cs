@@ -113,6 +113,50 @@ namespace Thornswood
         /// </summary>
         static string CleanedFile { get { return Path.Combine(Dir, "steam-copy-cleaned.txt"); } }
 
+        /// <summary>
+        /// Writes one of the records the launcher keeps about this folder
+        /// whole or not at all (#2586). Written straight over the old file, a
+        /// launcher killed during the write, or a disk that filled, left the
+        /// record cut short: files.txt is about 3 MB and the one record of
+        /// which files are Vortex's, and Publish-Update refuses an empty one
+        /// but would take a cut one as the truth. So the lines go to a file
+        /// beside the record, are flushed to the disk, and that file is
+        /// renamed over the record in one call, MoveFileEx with
+        /// MOVEFILE_REPLACE_EXISTING: until that call the record is the old
+        /// one, after it the new one, and a stop anywhere leaves at most a
+        /// .new beside it, which the next write replaces.
+        ///
+        /// Not File.Replace. ReplaceFile moves the old record aside to a
+        /// name of its own first (files.txt~RF....TMP) and then moves the new
+        /// one in, so a process killed between the two leaves no record at
+        /// all. Measured 16 Oct on One: a writer swapping a 3 MB record in a
+        /// loop, killed 150 times, left files.txt missing 4 times through
+        /// File.Replace and whole all 150 times through MoveFileEx
+        /// (tests\test-2586-atomic-records.ps1 holds it to that).
+        /// </summary>
+        static void WriteRecord(string path, IEnumerable<string> lines)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            string next = path + ".new";
+            using (var fs = new FileStream(next, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                using (var w = new StreamWriter(fs, new UTF8Encoding(false)))
+                {
+                    foreach (string line in lines) w.WriteLine(line);
+                    w.Flush();
+                    fs.Flush(true);
+                }
+            }
+            if (!MoveFileEx(next, path, MoveReplaceExisting | MoveWriteThrough))
+                throw new IOException(path + " could not be replaced by " + next + ": " +
+                                      new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error()).Message);
+        }
+
+        const int MoveReplaceExisting = 0x1;
+        const int MoveWriteThrough = 0x8;
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        static extern bool MoveFileEx(string existing, string replacement, int flags);
+
         /// <summary>A folder made anew has its Steam copy looked at again (Make).</summary>
         static void ForgetCleaned()
         {
@@ -142,7 +186,7 @@ namespace Thornswood
 
         public static void Decline()
         {
-            try { Directory.CreateDirectory(Dir); File.WriteAllText(DeclinedFile, DateTime.Now.ToString("o")); } catch (Exception ex) { Swallow.Note("OwnGame.Decline, write", ex); }
+            try { WriteRecord(DeclinedFile, new string[] { DateTime.Now.ToString("o") }); } catch (Exception ex) { Swallow.Note("OwnGame.Decline, write", ex); }
         }
 
         /// <summary>
@@ -878,7 +922,7 @@ namespace Thornswood
                 }
                 lines.Add(kv.Value + "|" + kv.Key);
             }
-            File.WriteAllLines(VortexSeenFile, lines.ToArray());
+            WriteRecord(VortexSeenFile, lines);
         }
 
         /// <summary>
@@ -1085,8 +1129,8 @@ namespace Thornswood
             }
             PlayProgress.Files(Phase, all.Count, all.Count);
 
-            File.WriteAllLines(FilesList, lines.ToArray());
-            File.WriteAllLines(LeftOutFile, left.ToArray());
+            WriteRecord(FilesList, lines);
+            WriteRecord(LeftOutFile, left);
             // A share record left by a folder of the same name that is gone
             // speaks for files that are not there any more.
             ForgetShares();
@@ -1474,8 +1518,8 @@ namespace Thornswood
                 left = leftBefore;
             }
 
-            File.WriteAllLines(FilesList, lines.ToArray());
-            File.WriteAllLines(LeftOutFile, left.ToArray());
+            WriteRecord(FilesList, lines);
+            WriteRecord(LeftOutFile, left);
             // Vortex's record as this refresh took it in, for the next one to
             // compare with (VortexMoved), after files.txt and before made.txt:
             // a refresh cut short before files.txt keeps the old one, so the
@@ -3176,7 +3220,7 @@ namespace Thornswood
         /// </summary>
         static void WriteMade(string src, long copied, int kinds)
         {
-            File.WriteAllLines(MadeFile, new string[] {
+            WriteRecord(MadeFile, new string[] {
                 "source=" + src,
                 "game=" + GameFor(src),
                 "deployment=" + DeploymentStamp(src),
