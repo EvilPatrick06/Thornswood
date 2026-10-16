@@ -1062,7 +1062,7 @@ Yes 'nothing asks for the Steam copy to be downgraded any more (SourceNeeded and
     (($all -notmatch 'SourceNeeded\(') -and ($all -notmatch 'Downgrade\.Target\('))
 Yes 'WhyNot no longer refuses a made folder over the Steam copy''s build' ($own -notmatch 'most likely because Steam updated it')
 Yes 'a refresh takes only Vortex''s files (Refresh calls Vortex, not Gather)' `
-    (($own -match 'List<Found> all = Vortex\(src, left, scope\);') -and ($own -notmatch 'List<Found> all = Gather\(src, left\);'))
+    (($own -match 'List<Found> all = Vortex\(src, left, scope, failed\);') -and ($own -notmatch 'List<Found> all = Gather\(src, left\);'))
 Yes 'the Downgrade puts its files only through OwnGame.TakePinned, and never names the Steam copy (OwnGame.Source)' `
     (($down -match 'OwnGame\.TakePinned\(') -and ($down -notmatch 'OwnGame\.Source') -and ($down -notmatch 'File\.Copy\('))
 $run = $down.Substring($down.IndexOf('static bool Run(Config cfg'))
