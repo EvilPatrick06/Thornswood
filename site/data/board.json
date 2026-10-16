@@ -1793,16 +1793,6 @@
               "c17rm": "Voice fallback relay",
               "c18rm": "So two people who cannot connect to each other directly still hear each other"
             }
-          },
-          {
-            "id": "r25rm",
-            "done": false,
-            "at": 0,
-            "by": "",
-            "cells": {
-              "c17rm": "Make the site yours",
-              "c18rm": "Colours, fonts and weight you set once and the site remembers"
-            }
           }
         ]
       },
