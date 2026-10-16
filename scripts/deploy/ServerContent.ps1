@@ -56,11 +56,15 @@
 
 $ThornswoodContentPlugin = 'Thornswood-Content.esp'
 $ThornswoodContentRel = 'Data\Thornswood-Content.esp'
+# Our other plugins are read off the box the same way (#2486).
+. (Join-Path $PSScriptRoot '..\release\RepoPlugins.ps1')
 
 # What the box says, in lines, for $root (set in front of it):
 #   CONTENT <bytes> <sha256>   or   CONTENT none
 #   ORDER <plugin file name>   one a line, in the server's own load order
 #   ORDER unreadable           when server-settings.json does not read
+#   OURS <name> <bytes> <sha256>   or   OURS <name> none
+#                              each other plugin of ours ($ours, RepoPlugins.ps1)
 #   DONE                       the end, so a cut off answer is never taken whole
 $ThornswoodServerContentText = @'
 $ep = Join-Path $root 'plugins\Thornswood-Content.esp'
@@ -77,6 +81,15 @@ $lo = $null
 if ($null -ne $s -and $null -ne $s.PSObject.Properties['loadOrder']) { $lo = $s.PSObject.Properties['loadOrder'].Value }
 if ($null -eq $lo) { 'ORDER unreadable' }
 else { foreach ($o in @($lo)) { 'ORDER ' + [IO.Path]::GetFileName(([string]$o).Replace('/', '\')) } }
+foreach ($n in @($ours)) {
+  $op = Join-Path $root ('plugins\' + $n)
+  if (Test-Path -LiteralPath $op -PathType Leaf) {
+    $h = [Security.Cryptography.SHA256]::Create()
+    $fs = [IO.File]::Open($op, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+    try { $sum = -join ($h.ComputeHash($fs) | ForEach-Object { $_.ToString('x2') }); $len = $fs.Length } finally { $fs.Dispose(); $h.Dispose() }
+    'OURS ' + $n + ' ' + $len + ' ' + $sum
+  } else { 'OURS ' + $n + ' none' }
+}
 'DONE'
 '@
 
@@ -114,7 +127,7 @@ function Get-ThornswoodServerContentStandIn([string]$Target) {
 #   OrderRead whether server-settings.json gave one
 #   Said      every line, for a refusal to show
 function ConvertFrom-ThornswoodServerContentLines($Lines) {
-    $o = [pscustomobject]@{ Answered = $false; Bytes = [int64]-1; Sha = ''; Order = @(); OrderRead = $false; Said = @() }
+    $o = [pscustomobject]@{ Answered = $false; Bytes = [int64]-1; Sha = ''; Order = @(); OrderRead = $false; Ours = @{}; Said = @() }
     $order = New-Object System.Collections.Generic.List[string]
     $sawContent = $false
     $unreadable = $false
@@ -124,6 +137,8 @@ function ConvertFrom-ThornswoodServerContentLines($Lines) {
         if ($t -eq 'DONE') { $o.Answered = $true }
         elseif ($t -match '^CONTENT none$') { $sawContent = $true }
         elseif ($t -match '^CONTENT (\d+) ([0-9a-fA-F]{64})$') { $sawContent = $true; $o.Bytes = [int64]$Matches[1]; $o.Sha = $Matches[2].ToLowerInvariant() }
+        elseif ($t -match '^OURS (\S+) none$') { $o.Ours[$Matches[1]] = [pscustomobject]@{ Bytes = [int64]-1; Sha = '' } }
+        elseif ($t -match '^OURS (\S+) (\d+) ([0-9a-fA-F]{64})$') { $o.Ours[$Matches[1]] = [pscustomobject]@{ Bytes = [int64]$Matches[2]; Sha = $Matches[3].ToLowerInvariant() } }
         elseif ($t -eq 'ORDER unreadable') { $unreadable = $true }
         elseif ($t -match '^ORDER (.+)$') { $order.Add($Matches[1].Trim()) }
     }
@@ -151,7 +166,9 @@ function Read-ThornswoodServerContent {
         $Target = (Get-ThornswoodVpsUser) + '@' + (Get-ThornswoodVpsAddress)
     }
     $standIn = Get-ThornswoodServerContentStandIn $Target
-    $text = "`$root = '" + $(if ($standIn) { $standIn } else { $Root }).Replace("'", "''") + "'`r`n" + $ThornswoodServerContentText
+    $others = @($ThornswoodRepoPlugins | Where-Object { $_ -ine $ThornswoodContentPlugin } | ForEach-Object { "'" + $_.Replace("'", "''") + "'" })
+    $text = "`$root = '" + $(if ($standIn) { $standIn } else { $Root }).Replace("'", "''") + "'`r`n" +
+            "`$ours = @(" + ($others -join ', ') + ")`r`n" + $ThornswoodServerContentText
     $lines = @()
     if ($standIn) {
         $lines = @(& ([scriptblock]::Create($text)) | ForEach-Object { [string]$_ })
@@ -172,18 +189,32 @@ function Get-ThornswoodLocalContent([string]$Path) {
     return [pscustomobject]@{ Bytes = $len; Sha = $sum }
 }
 
+# What the box said about one plugin of ours (RepoPlugins.ps1, #2486), in the
+# shape Test-ThornswoodContentSame and Get-ThornswoodContentShipProblem read.
+# The content plugin is the box answer itself. Another that the answer does
+# not name counts as not on the box, so it is sent, never taken as there.
+function Get-ThornswoodServerPlugin($Box, [string]$Name) {
+    if ($null -eq $Box) { return $null }
+    if (-not $Name -or $Name -ieq $ThornswoodContentPlugin) { return $Box }
+    $bytes = [int64]-1; $sha = ''
+    $ours = if ($Box.PSObject.Properties['Ours']) { $Box.Ours } else { $null }
+    if ($null -ne $ours -and $ours.ContainsKey($Name)) { $bytes = [int64]$ours[$Name].Bytes; $sha = [string]$ours[$Name].Sha }
+    return [pscustomobject]@{ Answered = [bool]$Box.Answered; Bytes = $bytes; Sha = $sha; Said = @($Box.Said) }
+}
+
 # Whether the box holds exactly these bytes.
 function Test-ThornswoodContentSame($Box, [int64]$Bytes, [string]$Sha) {
     if ($null -eq $Box -or -not $Box.Answered) { return $false }
     return ($Box.Bytes -eq $Bytes -and $Box.Sha -eq ([string]$Sha).ToLowerInvariant())
 }
 
-# Why a release may not send clients this content plugin, or '' when it may.
+# Why a release may not send clients this plugin of ours (-Plugin, the content
+# plugin when left out), or '' when it may.
 # -Entry is the release's own record of the file, '<bytes>:<sha256>', the
 # form published.json keeps (Get-BaselineEntry); -Box what the server said.
-function Get-ThornswoodContentShipProblem([string]$Channel, [string]$Entry, $Box) {
+function Get-ThornswoodContentShipProblem([string]$Channel, [string]$Entry, $Box, [string]$Plugin = $ThornswoodContentPlugin) {
     $m = [regex]::Match([string]$Entry, '^(\d+):([0-9a-fA-F]{64})$')
-    if (-not $m.Success) { return "this release's record of $ThornswoodContentRel ('$Entry') is not a size and a sha256, so it cannot be compared with the server's." }
+    if (-not $m.Success) { return "this release's record of Data\$Plugin ('$Entry') is not a size and a sha256, so it cannot be compared with the server's." }
     $bytes = [int64]$m.Groups[1].Value
     $sha = $m.Groups[2].Value.ToLowerInvariant()
     $what = if ($Channel -eq 'dev') { 'the dev server' } else { 'the live server' }
@@ -194,11 +225,11 @@ function Get-ThornswoodContentShipProblem([string]$Channel, [string]$Entry, $Box
                 "Check the ssh key with .\scripts\vps\Setup-SshKey.ps1 -Test, then Ship again.")
     }
     if ($Box.Bytes -lt 0) {
-        return ("this release sends clients $ThornswoodContentPlugin ({0:N0} bytes, sha256 {1}) and $what has none. " -f $bytes, $sha.Substring(0, 12)) +
+        return ("this release sends clients $Plugin ({0:N0} bytes, sha256 {1}) and $what has none. " -f $bytes, $sha.Substring(0, 12)) +
                "The server gets the content plugin first, then the Ship: $fix"
     }
     if ($Box.Bytes -ne $bytes -or $Box.Sha -ne $sha) {
-        return ("this release sends clients $ThornswoodContentPlugin ({0:N0} bytes, sha256 {1}) and $what holds another ({2:N0} bytes, sha256 {3}). " -f $bytes, $sha.Substring(0, 12), $Box.Bytes, $Box.Sha.Substring(0, 12)) +
+        return ("this release sends clients $Plugin ({0:N0} bytes, sha256 {1}) and $what holds another ({2:N0} bytes, sha256 {3}). " -f $bytes, $sha.Substring(0, 12), $Box.Bytes, $Box.Sha.Substring(0, 12)) +
                "The server gets the content plugin first, then the Ship: $fix"
     }
     return ''
