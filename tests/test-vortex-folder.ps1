@@ -852,7 +852,7 @@ namespace Thornswood
             Put(Path.Combine(steam, anim), "ANIMATION");
             Put(Path.Combine(steam, "_Parked\\Multiplayer\\Platform\\voice-token.txt"), "PARKED-TOKEN");
             Put(Path.Combine(steam, "_Profile Switch\\Switch.ps1"), "SWITCH");
-            Put(Path.Combine(steam, "Data\\_disabledByKzl\\ccParked.esm"), "PARKED-CC");
+            Put(Path.Combine(steam, "Data\\_disabledByOtherServer\\ccParked.esm"), "PARKED-CC");
             Put(Path.Combine(steam, "Data\\_ResourcePack.esl"), "GAME-RESOURCEPACK");
             // The behavior output is Thornswood's, from a pack, as the shipping
             // machine's Nemesis output is: since #1232 a file in the Steam copy

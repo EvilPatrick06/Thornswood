@@ -69,8 +69,9 @@ THE EXECUTION BLOCK, TAKEN OUT OF SOLITUDE (issue #400)
 The plugin came from another server, and the last trace of that server's name
 in it was a script: FURN 0x05DF7B34, ThornswoodExecutionerChoppingBlock, the
 headsman's block placed once in Solitude (REFR 0x05DFCC75), carried a VMAD
-attaching KzlChop, with one property pointing at Skyrim.esm's executioner
-swing, IDLE 0x0F95BE. KzlChop.pex was never in C:\\Thornswood\\Game, the
+attaching the other server's chopping script, named with its prefix, with one
+property pointing at Skyrim.esm's executioner swing, IDLE 0x0F95BE. That
+script was never in C:\\Thornswood\\Game, the
 Steam copy or any pack, measured 20 and 24 September, so it has never run for
 anybody here. It is the headsman's block, not a woodcutting one: firewood comes
 from the three vanilla chopping blocks, answered server side by chopWood.
@@ -116,16 +117,17 @@ stops and writes nothing.
 
 WHAT IT PROVES BEFORE IT WRITES
 
-The same discipline as Rename-ContentRecords.ps1, Remove-DeadRecords.ps1 and
-Remove-DeadConditions.py, whose parser this shares. It serialises the file back
+The same discipline as Remove-DeadRecords.ps1 and Remove-DeadConditions.py,
+whose parser this shares. It serialises the file back
 byte for byte before it edits anything. Afterwards it checks that every record
 that was there is still there, apart from the ones it was asked to take out, in
 the same order, with the same form id, type and flags; that the ones taken out
 are gone; that every record it was not asked to touch has the bytes it started with;
 that the new records parse back to exactly what was built; that no form id it
 allocates is already taken; that the header's record count matches what is
-actually in the file; that the other server's naming (Kzl, kzolivar) is on no
-editor id and no script, and its full name in no record and not in the header,
+actually in the file; that neither the other server's full name nor either of
+its short forms is in the header or in any record's editor id, attached script
+or text, and its full name and longer short form in no record's bytes at all,
 compressed records included; and that the header changed in its description
 and its record count and nowhere else.
 
@@ -294,20 +296,26 @@ import zlib
 
 COMPRESSED = 0x00040000
 
-# The headsman's block in Solitude, whose VMAD named KzlChop, and its one placed
-# reference. Both come out (see the top).
+# The headsman's block in Solitude, whose VMAD attached the other server's
+# script, and its one placed reference. Both come out (see the top).
 EXECUTION_BLOCK = 0x5DF7B34
 EXECUTION_BLOCK_REF = 0x5DFCC75
 
-# The other server's naming, in either spelling the plugin used. Lower case,
-# because the comparison is.
-OTHER_SERVER = (b'kzl', b'kzolivar')
-
 # The other server's full name, lower case. Written as its code points so that
 # this file does not carry the name either: it goes from everywhere in the
-# repository (Patrick, 12 October, #400), and scripts\dev\Check-Words.ps1
+# repository (Patrick, 12 October, #400), and tests\test-other-server-name-gone.js
 # refuses it in any file git tracks.
 OTHER_SERVER_NAME = bytes([107, 101, 105, 122, 97, 97, 108])
+
+# Its two short forms, lower case and written the same way (Patrick, 15
+# October, decision C on #400): the three letter prefix that was on 33 of this
+# plugin's editor ids, its script and its folders, and the six letter one that
+# was on its board and, with two letters in front, on its records. The longer
+# one is looked for in every byte of a record. The three letter one only in
+# text (an editor id, an attached script, a string), where it would be a name;
+# among a record's numbers any three letters can turn up by chance.
+OTHER_SERVER_SHORT = bytes([107, 122, 108])
+OTHER_SERVER_LONGER = bytes([111, 108, 105, 118, 97, 114])
 
 # What the header says the plugin is (SNAM), written by this tool (#400).
 DESCRIPTION = (b"Thornswood's crafting and gathering content: stations, salt, ore, "
@@ -420,7 +428,8 @@ RECIPE_REMEDY = 0x50154C7
 #
 # ThornswoodMessageBoard, the activator every board in the world is, named a
 # reworked copy of the board in Missives (Nexus 111375) that came with the other
-# server's records: olivar-messageboard/MissiveBoardCOTND.nif. Patrick, 12 Oct,
+# server's records, MissiveBoardCOTND.nif in a folder named with that server's
+# prefix. Patrick, 12 Oct,
 # chose Thornswood's own board built from vanilla pieces, with the hold's drop
 # box on a shelf on its right post, as two objects placed together: "when they
 # click on the Notice Board it does the Notice Board and when they click on the
@@ -848,23 +857,43 @@ def take_out(kids, fids):
     return out
 
 
+def is_text(body):
+    """A subrecord that is one string: printable ASCII ending in a zero, the
+    way an editor id, a model path or a description is written."""
+    return (len(body) > 1 and body.endswith(b'\x00') and
+            all(32 <= b < 127 for b in body[:-1]))
+
+
 def other_server_names(rec):
-    """Where the other server's name is in one record: its editor id, or a
-    script its VMAD attaches. A compressed record is inflated to be read, and
-    never written back from here."""
+    """Where the other server's name or one of its short forms is in one
+    record: its editor id, a script its VMAD attaches, any other string, or,
+    for the full name and the longer short form, any byte. A compressed record
+    is inflated to be read, and never written back from here."""
     data = rec.data
     if rec.compressed:
         data = zlib.decompress(data[4:])
     found = []
     for tag, body in subrecords(data):
         low = body.lower()
-        if tag == b'EDID' and low.startswith(OTHER_SERVER):
-            found.append('editor id ' + body.rstrip(b'\x00').decode('ascii', 'replace'))
-        elif tag == b'VMAD' and any(n in low for n in OTHER_SERVER):
-            found.append('a script it attaches')
-        elif OTHER_SERVER_NAME in low:
+        short = OTHER_SERVER_SHORT in low or OTHER_SERVER_LONGER in low
+        if OTHER_SERVER_NAME in low:
             found.append('its full name, in ' + tag.decode('ascii', 'replace'))
+        elif tag == b'EDID' and short:
+            found.append('editor id ' + body.rstrip(b'\x00').decode('ascii', 'replace'))
+        elif tag == b'VMAD' and short:
+            found.append('a script it attaches')
+        elif short and (is_text(body) or OTHER_SERVER_LONGER in low):
+            found.append('a short form, in ' + tag.decode('ascii', 'replace'))
     return found
+
+
+def other_server_in_header(head):
+    """Whether the header carries the other server's full name or either short
+    form, anywhere. It is a description, the masters' names and a handful of
+    numbers, and every run reads it, so a chance hit among the numbers would
+    be seen at once and not months later."""
+    low = bytes(head).lower()
+    return any(n in low for n in (OTHER_SERVER_NAME, OTHER_SERVER_SHORT, OTHER_SERVER_LONGER))
 
 
 def described(head):
@@ -1610,8 +1639,8 @@ def main():
     # the file is wrong and has been for as long as this repo has had the file.
     # Measured 21 September across three copies: before the conditions edit,
     # before the manual trim, and after, the header said 408 every time, while
-    # the file actually held 392, 392 and 376. So neither
-    # Rename-ContentRecords.ps1 nor Remove-DeadRecords.ps1 has ever touched it,
+    # the file actually held 392, 392 and 376. So neither the editor id rename
+    # of 21 September nor Remove-DeadRecords.ps1 has ever touched it,
     # and the plugin has been shipping and working at 408 against 392, which is
     # the evidence that the engine does not read it. Adding three to a wrong
     # number would keep it wrong; this writes what is actually there.
@@ -1632,11 +1661,12 @@ def main():
     print('')
     print('Does the result verify')
     after_records = list(every_record(parse(out, len(head), len(out))))
-    # The header: the other server's name nowhere in it, and nothing changed
-    # but the description and the record count.
+    # The header: the other server's name and short forms nowhere in it, and
+    # nothing changed but the description and the record count.
     out_head = out[:len(head)]
-    if OTHER_SERVER_NAME in out_head.lower():
-        print('  STOP. the header still carries the other server\'s name. Nothing was written.')
+    if other_server_in_header(out_head):
+        print('  STOP. the header still carries the other server\'s name or a short form of it. '
+              'Nothing was written.')
         return 1
     def header_rest(h):
         return [(t, b) for t, b in subrecords(h[24:]) if t not in (b'SNAM', b'HEDR')]
@@ -1699,7 +1729,8 @@ def main():
     print('  ok    %d added, %d edited, %d taken out, every other byte untouched'
           % (len(built), len(edited), len(removing)))
     print('  ok    the header record count reads %d, which is what is in the file' % count)
-    print('  ok    no record carries the other server\'s name, compressed ones included')
+    print('  ok    no record carries the other server\'s name or its short forms, '
+          'compressed ones included')
     print('  ok    the header carries Thornswood\'s description and not that name, '
           'and nothing else in it moved')
 

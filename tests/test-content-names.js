@@ -1,17 +1,20 @@
 // test-content-names.js
 //
 // Issue #400. Thornswood-Content.esp came from another server, and that
-// server's name (Kzl, kzolivar) was on 33 editor ids and one script. The
-// editor ids were renamed by scripts\mods\Rename-ContentRecords.ps1. The
-// script is KzlChop, attached by a VMAD to FURN 0x05DF7B34, the headsman's
-// block placed once in Solitude (REFR 0x05DFCC75). KzlChop.pex never shipped,
-// so it never ran. Patrick, 28 Sep: "3. Take it out of Solitude." So
-// scripts\mods\Add-ContentRecords.py takes the placed block out of its cell
-// and, since nothing else names it, the block's base record too.
+// server's short names (a three letter prefix, and a six letter one with two
+// letters in front) were on 33 editor ids and one script. The editor ids were
+// renamed on 21 September by a script that did that one job and is gone. The
+// script, named with the three letter prefix, was attached by a VMAD to FURN
+// 0x05DF7B34, the headsman's block placed once in Solitude (REFR 0x05DFCC75).
+// It never shipped, so it never ran. Patrick, 28 Sep: "3. Take it out of
+// Solitude." So scripts\mods\Add-ContentRecords.py takes the placed block out
+// of its cell and, since nothing else names it, the block's base record too.
+// Patrick, 15 Oct, decision C: the short names go from everything, so they are
+// written here as code points, and the fixture's script is OtherServerChop.
 //
 // This reads the plugin with its own reader, not the tool's, and proves:
-//   1. the committed plugin has no editor id beginning Kzl or kzolivar,
-//      compressed records included;
+//   1. the committed plugin has no editor id, script or string carrying the
+//      other server's short names, compressed records included;
 //   2. the tool, run over a copy, takes out the placed block and its base and
 //      nothing else: the other server's name is nowhere in the file, no record
 //      names either id, every other form id, type and flag is there in the
@@ -25,7 +28,9 @@
 //   5. the header's description is Thornswood's own and the other server's
 //      full name is nowhere in the committed plugin (Patrick, 12 Oct, B), and
 //      on a copy whose description still names it, the tool writes
-//      Thornswood's and changes nothing else.
+//      Thornswood's and changes nothing else;
+//   6. on a copy with a short name planted in an editor id, or the longer one
+//      in a model path, the tool writes nothing and says where it is.
 //
 // The copies are written to a temporary folder (TEST_TMP if set) and removed.
 // Nothing in the repo is written.
@@ -89,17 +94,27 @@ function subs(rec) {
   return out;
 }
 
-const OTHER = /^(kzl|kzolivar)/i;
+// The other server's short names, as code points: the three letter prefix,
+// and the six letter one, which its longer spelling contains.
+const SHORT3 = String.fromCharCode(107, 122, 108);
+const SHORT6 = String.fromCharCode(111, 108, 105, 118, 97, 114);
+const OTHER = new RegExp(SHORT3 + '|' + SHORT6, 'i');
 function edid(rec) {
   const e = subs(rec).find(s => s.tag === 'EDID');
   return e ? e.body.toString('latin1').replace(/\0+$/, '') : '';
+}
+// A subrecord that is one string: printable ASCII ending in a zero.
+function isText(body) {
+  return body.length > 1 && body[body.length - 1] === 0 && /^[ -~]+$/.test(body.toString('latin1', 0, body.length - 1));
 }
 function otherServer(rec) {
   const found = [];
   for (const s of subs(rec)) {
     const text = s.body.toString('latin1');
-    if (s.tag === 'EDID' && OTHER.test(text)) { found.push('editor id ' + text.replace(/\0+$/, '')); }
-    if (s.tag === 'VMAD' && /kzl|kzolivar/i.test(text)) { found.push('script ' + text.replace(/[^ -~]+/g, ' ').trim()); }
+    if (!OTHER.test(text)) { continue; }
+    if (s.tag === 'EDID') { found.push('editor id ' + text.replace(/\0+$/, '')); }
+    else if (s.tag === 'VMAD') { found.push('script ' + text.replace(/[^ -~]+/g, ' ').trim()); }
+    else if (isText(s.body) || new RegExp(SHORT6, 'i').test(text)) { found.push(s.tag + ' ' + text.replace(/[^ -~]+/g, ' ').trim()); }
   }
   return found;
 }
@@ -114,10 +129,11 @@ const committed = readPlugin(shipped);
 let before = committed;
 yes('the committed plugin reads to its last byte (' + before.records.length + ' records)',
     before.ends && before.records.length > 300);
-const badIds = committed.records.filter(r => OTHER.test(edid(r)));
-yes('no editor id in the committed plugin begins Kzl or kzolivar (' + before.records.length + ' read, compressed included)',
+const badIds = [];
+for (const r of committed.records) { for (const w of otherServer(r)) { badIds.push(r.tag + ' 0x' + r.fid.toString(16) + ' ' + w); } }
+yes('no editor id, script or string in the committed plugin carries the other server\'s short names (' + before.records.length + ' read, compressed included)',
     badIds.length === 0);
-for (const r of badIds) { console.log('      ' + r.tag + ' 0x' + r.fid.toString(16) + ' ' + edid(r)); }
+for (const l of badIds) { console.log('      ' + l); }
 yes('the shipped plugin no longer contains the execution block or its placement',
     !committed.records.some(r => r.fid === BLOCK || r.fid === BLOCK_REF));
 
@@ -169,7 +185,9 @@ yes('the other server\'s name is nowhere in the committed plugin, header and rec
 
 // Restore the two historical records only in a temporary fixture, in their
 // original group paths. This keeps removal and reference-safety coverage after
-// the cleaned plugin has shipped. The fixture bytes are from dbbbbcc396f8.
+// the cleaned plugin has shipped. The fixture bytes are from dbbbbcc396f8,
+// but for the name of the script the block's VMAD attaches, which carried the
+// other server's prefix and is OtherServerChop since 16 October (#400).
 const fixtureRecords = require('./fixtures/content-execution-block.json');
 function restoreFixture(buf) {
   const inserted = new Set();
@@ -270,7 +288,8 @@ try {
     for (const r of after.records) {
       inflatedText += (r.flags & COMPRESSED) ? zlib.inflateSync(r.raw.subarray(4)).toString('latin1') : r.raw.toString('latin1');
     }
-    yes('and "Kzl" is nowhere in any record\'s bytes', inflatedText.indexOf('Kzl') < 0);
+    yes('and the longer short name and the full name are nowhere in any record\'s bytes',
+        !new RegExp(SHORT6 + '|' + OTHER_NAME, 'i').test(inflatedText));
 
     yes('the placed block REFR 0x05DFCC75 is out of the world', !after.records.some(r => r.fid === BLOCK_REF));
     yes('its base FURN 0x05DF7B34 is out of the plugin, nothing else named it', !after.records.some(r => r.fid === BLOCK));
@@ -360,6 +379,51 @@ try {
     yes('the result is the committed plugin exactly', fs.readFileSync(copy).equals(shipped));
     const h2 = python([TOOL, '--data', dir]);
     yes('a second run changes nothing', h2.status === 0 && fs.readFileSync(copy).equals(shipped));
+
+    // ------------------------------------------- 6. a short name planted --
+    // The old description makes the tool write; a short name planted in a
+    // record it does not touch has to stop it. Planted in place, the same
+    // length, so every size in the file stays right.
+    const toolText = fs.readFileSync(TOOL, 'latin1');
+    function plantIn(tagWanted, choose, word) {
+      const buf = withDescription(shipped, oldText);
+      const p = readPlugin(buf);
+      for (const r of p.records) {
+        if (r.flags & COMPRESSED) { continue; }
+        let i = 0;
+        while (i + 6 <= r.raw.length) {
+          const t = r.raw.toString('latin1', i, i + 4);
+          const size = r.raw.readUInt16LE(i + 4);
+          const text = r.raw.toString('latin1', i + 6, i + 6 + size).replace(/\0+$/, '');
+          if (t === tagWanted && text.length > word.length && choose(text, r)) {
+            const at = r.raw.byteOffset - buf.byteOffset + i + 6;
+            buf.write(word, at, 'latin1');
+            return { buf, what: r.tag + ' 0x' + r.fid.toString(16).toUpperCase(), was: text };
+          }
+          i += 6 + size;
+        }
+      }
+      return null;
+    }
+    const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+    // Records the tool names are left alone, so the plant is in one it does
+    // not touch.
+    const leftAlone = (r) => toolText.indexOf(edid(r)) < 0 && toolText.indexOf(r.fid.toString(16).toUpperCase()) < 0;
+    const plants = [
+      ['EDID', (t, r) => /^Thornswood/.test(t) && leftAlone(r), cap(SHORT3), 'an editor id'],
+      ['MODL', (t, r) => !!edid(r) && leftAlone(r), SHORT6, 'a model path'],
+    ];
+    for (const [tag, choose, word, kind] of plants) {
+      const planted = plantIn(tag, choose, word);
+      yes('a copy with a short name planted in ' + kind + ' could be made' + (planted ? ' (' + planted.what + ', ' + planted.was + ')' : ''),
+          !!planted && readPlugin(planted.buf).ends);
+      if (!planted) { continue; }
+      fs.writeFileSync(copy, planted.buf);
+      const s6 = python([TOOL, '--data', dir]);
+      yes('  the tool exits 1 on it', s6.status === 1);
+      yes('  and says which record still carries it', s6.stdout.indexOf(planted.what + ' still carries') >= 0);
+      yes('  and writes nothing', fs.readFileSync(copy).equals(planted.buf));
+    }
   }
 } finally {
   fs.rmSync(dir, { recursive: true, force: true });
