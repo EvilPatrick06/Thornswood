@@ -43,7 +43,13 @@ foreach ($f in 'scripts\vps\Bootstrap-VPS.ps1', 'scripts\deploy\Install-Runner.p
 # ---- 1. Bootstrap-VPS.ps1 -IncludeBuildTools ---------------------------------
 Yes 'Bootstrap-VPS.ps1 takes -IncludeBuildTools' ($boot -match '\[switch\]\$IncludeBuildTools')
 Yes '  and installs only when asked' ($boot -match 'if \(\$IncludeBuildTools\)')
-$adds = @([regex]::Matches($boot, "'--add', '([^']+)'") | ForEach-Object { $_.Groups[1].Value })
+# The -IncludeBuildTools block alone: -IncludeEngineTools (#459) adds the C++
+# workload in a block of its own, below it, and test-459-engine-workflow.ps1
+# holds that one.
+$btFrom = $boot.IndexOf('if ($IncludeBuildTools) {')
+$btTo = $boot.IndexOf('# --- Engine tools', [Math]::Max(0, $btFrom))
+$btBlock = if ($btFrom -ge 0 -and $btTo -gt $btFrom) { $boot.Substring($btFrom, $btTo - $btFrom) } else { $boot }
+$adds = @([regex]::Matches($btBlock, "'--add', '([^']+)'") | ForEach-Object { $_.Groups[1].Value })
 Yes ("  exactly the MSBuild workload and the 4.8.1 targeting pack (found: " + ($adds -join ', ') + ')') (
     $adds.Count -eq 2 -and $adds -contains 'Microsoft.VisualStudio.Workload.MSBuildTools' -and $adds -contains 'Microsoft.Net.Component.4.8.1.TargetingPack')
 Yes '  quietly, waiting for it, with no restart' ($boot -match "'--quiet', '--wait', '--norestart'")
