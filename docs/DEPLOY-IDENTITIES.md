@@ -3,8 +3,9 @@
 Status: AUDIT AND DESIGN ONLY. Nothing on the box was changed to write this:
 no key was added, removed or rotated, no access was disabled, no account or
 task was created, and nothing was tried against production. Every fact in
-section 1 was read on the box over ssh, read-only, on 11 Oct 2026. Decisions
-Patrick made are in section 7.
+section 1 was read on the box over ssh, read-only, on 11 Oct 2026. Section 6
+sets doing nothing beside each change (16 Oct). Decisions Patrick made are in
+section 7.
 
 ## 1. What access looks like now (evidence)
 
@@ -65,7 +66,9 @@ function it sits in, what it sends, and its class: a gate verb, `admin`, or
 By class: 91 admin, 59 read-status, 25 stage, 9 feed-send, 8 swap,
 3 task-start-stop, 1 putback. `tests\test-remote-command-map.ps1` parses
 every script and fails when a remote call has no row, or a row has no call.
-Nothing on the box was read or changed for this.
+Nothing on the box was read or changed for this. Counted again on 16 Oct
+2026: 238 calls in 55 files, 98 admin, 62 read-status, 31 transport,
+26 stage, 9 feed-send, 8 swap, 3 task-start-stop, 1 putback.
 
 Where the evidence differs from section 2:
 
@@ -140,15 +143,130 @@ verb is refused rather than retrying as admin.
 Owner: the Installer lane builds steps 1 and the repo side of 2 to 4; Claude
 runs every box step; Patrick owns keys and step 5.
 
-## 6. Doing nothing
+## 6. Doing nothing, set beside each change
 
-Any of five admin keys, from any address, is full control of both game
-servers, every secret in `C:\Thornswood-Docs\config.json` and the bot files,
-the backups, and the feed every launcher trusts (docs\SIGNED-RELEASES.md:
-whoever writes the feed can change both a pack and its hash). A leaked
-developer laptop key is a full box compromise with no narrower blast radius.
-The likelihood is low today (password login is off, keys are ed25519), the
-impact is total, and four of the five keys showed no use in the sampled log.
+Decided by Patrick on 15 Oct 2026 (#2168, A): this doc sets what staying as
+we are costs and risks beside each change's own cost, migration and
+rollback. Everything below was read from the repository, GitHub and the
+public site on 16 Oct 2026, unless it names another date. The box facts are
+section 1's, read on 11 Oct; nothing on the box was read or changed for this
+section.
+
+### 6.1 Who holds Administrator ssh today
+
+- Five key lines (section 1). Three carry the comment `thornswood`, which
+  `Setup-SshKey.ps1` gives every key it makes. One's key (fingerprint
+  `SHA256:lJZoYUi5QcfocYYXKXG0wCSqdCVzQsDsYVE4m/RmyfA`, read 12 Oct) is one
+  of them; which machines hold the other two is not written down anywhere.
+  `claude-session-2026-09-16` and `zayde-thornswood` are decided for removal
+  (7.1) and are still on the box: the removal waits on Patrick's console
+  login check (vault note `claude-queue\2182-deploy-identities.md`, last
+  entry 12 Oct).
+- `Setup-SshKey.ps1` makes every key with an empty passphrase, on purpose,
+  so scripts run without a prompt. The private key file alone is the login.
+- No line carries `from=`, and the inbound rules on 22 take any address
+  (section 1).
+- What uses the key from One: every Ship and deploy; `Fetch-Backups.ps1`
+  every night, which pulls backups that hold every secret (an admin row in
+  the map); and `Watch-Outside.ps1` every five minutes, which logs in only
+  when it has an alert to hand to the watchdog's outbox.
+
+### 6.2 What a stolen key can do, now and after each change
+
+The columns are cumulative: each one assumes the changes to its left are
+done too. "Deploy identity" is section 3. "Own accounts" is the "Later" item
+at the end of this doc: the game servers, voice, web and backup tasks moved
+off SYSTEM onto accounts of their own.
+
+| A stolen key can | Today | After 7.1 and 7.2 (two keys gone, 22 limited) | After the deploy identity (a stolen deploy key) | After own accounts too |
+| --- | --- | --- | --- | --- |
+| Log in | Any of five keys, from any address | Three keys, from the listed addresses only | The deploy key, from the listed addresses | Same |
+| Run code as SYSTEM on the box | Yes | Yes | Yes, in one deploy: stage and swap a `gamemode.js` into a server folder. Both game server tasks run as SYSTEM at Highest (`Install-ThornswoodServer.ps1` registers the live one with `-UserId 'SYSTEM'`, and `vps-dev-instance.ps1` gives the dev one the live task's principal), and `gamemode.js` loads Node's `fs` and `http` | No. A gamemode runs as its own server's account, with its own folders |
+| Read the site's secrets (`C:\Thornswood-Docs\config.json`) | Yes | Yes | Yes, through SYSTEM above, or by swapping the site's `server.js`, which runs as LOCAL SERVICE and reads that file | Yes, through a site swap. The site needs those secrets to run |
+| Read every other secret, the backups and the backup passphrase | Yes | Yes | Yes, through SYSTEM above | No |
+| Change accounts, keys, the firewall or sshd | Yes | Yes | Through SYSTEM above only | No |
+| Read the four runners' `.credentials` and take their jobs, release builds included (docs\RUNNER-ISOLATION.md F4) | Yes | Yes | Through SYSTEM above only | No |
+| Write the feed, and through it the packs and the client runtime every launcher installs | Yes | Yes | Yes: feed-send is a deploy verb | Yes. Only #2163's signed manifest (docs\SIGNED-RELEASES.md, phases C and D) closes this |
+| Put a launcher exe on testers' machines | No. A launcher installs only a launcher signed by ThornswoodRelease (`Signature.cs`), and nothing on the box can sign | No | No | No |
+
+### 6.3 Each change against doing nothing
+
+**7.1 and 7.2, the two keys and port 22** (decided 11 Oct; waits on
+Patrick's console login check, not on work).
+- Doing nothing: two keys with no login in the sampled log stay valid admin
+  logins, and every key works from any address. Cost: none.
+- The change costs about ten commands, already written in the vault note.
+  `Set-SshScope.ps1` is built and tested (`tests\test-ssh-scope.ps1`, 56
+  checks). Nothing in the repository has to move.
+- Rollback: the saved `administrators_authorized_keys` copied back (vault
+  note), and `Set-SshScope.ps1 -From Any`. A port 22 change whose new login
+  fails is put back by the box itself within ten minutes.
+- Risk of the change: a machine whose address changes loses ssh until the
+  list is changed. If that is One, every Ship, deploy, backup fetch and
+  Watch-Outside login fails until someone in the list, or Patrick at the
+  console, runs `Set-SshScope.ps1` again.
+
+**7.4, the deploy identity** (undecided).
+- Doing nothing: no work. A stolen key stays a stolen box.
+- The change costs, measured from `records\remote-commands.json` on 16 Oct
+  (238 calls in 55 files, 98 of them admin): before any deploy can run as
+  deploy, the store ACL that `Artifact.ps1` sets on every send (three calls)
+  and that `Swap.ps1`'s record restore sets (one call) moves to install
+  time; the process stop in the swap blocks moves into a gate verb that runs
+  elevated; and the three admin calls on every `Deploy-Docs.ps1` run (the
+  firewall rule, the task's account, the site password) leave the deploy
+  path. Then `Remote.ps1 -As`, the gate itself, `Add-VpsKey.ps1 -Role`, the
+  account, the folder rights and task rights on the box, and a week on dev
+  (section 5). Nobody has put days on it; the issue says large.
+- What it buys, measured: while the game servers run as SYSTEM, very little
+  against someone who means it. The swap verb every deploy needs is a way to
+  run code as SYSTEM (6.2). It does stop a deploy script from changing
+  accounts, keys or the firewall by mistake, and a stolen deploy key needs a
+  deploy to get further, which leaves a `.prev` folder and a record in
+  `C:\Thornswood-Deploys`.
+- Migration and rollback: section 5 (`-As admin`; delete the account and the
+  gate folder).
+
+**Own accounts for the SYSTEM tasks** ("Later"; on the board as #2578
+since 16 Oct).
+- Doing nothing: any code the game servers, voice and web tasks load runs
+  as SYSTEM, so a gamemode fault that writes where it is told, or anyone who
+  can deploy, reaches the whole box.
+- The change: each install script registers its task under an account of
+  its own with rights on its own folders, as the site and the bot already
+  run. Its cost has not been measured. It touches at least
+  `Install-ThornswoodServer.ps1`, `vps-dev-instance.ps1`,
+  `Install-Voice.ps1`, `Setup-Domain.ps1` and `Lock-VpsFolders.ps1`.
+- Migration: one service at a time, dev first. Rollback: run that service's
+  install script as it is today, which registers the task as SYSTEM again.
+
+### 6.4 What the comparison concludes
+
+- 7.1 and 7.2 are the cheapest and largest step: two fewer keys, and a
+  stolen key that works only from known addresses. They wait on Patrick's
+  console check and his address list, not on work.
+- The deploy identity on its own, before own accounts, costs large work and
+  buys little against a deliberate attacker. Doing nothing on it is the
+  better choice until the SYSTEM tasks have their own accounts. This
+  replaces Claude's 12 Oct recommendation on #2182 (B, after items 2 and 3).
+- The feed's path to testers' machines is the same in every column. #2163's
+  signed manifest is the step that changes it.
+- Administrator ssh is never removed entirely: 98 calls would only work at
+  the console, and a broken gate would leave only the console.
+
+### 6.5 Not measured from here
+
+- Which machines hold the other two `thornswood` keys, and whether
+  `zayde-thornswood` is Djinn's: Patrick.
+- Whether One's address is fixed: Patrick's internet provider, or what
+  https://api.ipify.org shows on One over a week.
+- Logins beyond the 400 events read on 11 Oct: the main session, reading the
+  OpenSSH log on the box (agents are refused box reads).
+- Days of work for the deploy identity and for own accounts: whoever takes
+  own accounts first.
+- `Watch-Outside.ps1` reaches the box with ssh through a variable (`& $ssh`)
+  in two places, and `records\remote-commands.json` has no row for either:
+  the map test finds only commands named `ssh` or `scp`. Recorded on #2182.
 
 ## 7. Decisions (Patrick, 11 Oct 2026)
 
@@ -176,4 +294,5 @@ narrow port 22. No lane makes any of these changes.
 
 Moving the SYSTEM tasks (game servers, voice, web, backup) to per-service
 virtual accounts with only the folders they need, the way the site and bot
-already run.
+already run. Its own issue since 16 Oct, #2578, because section 6 found the
+deploy identity buys little until it is done.
