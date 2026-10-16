@@ -37980,6 +37980,14 @@ log('gamemode loaded:',
   var NOTICE_FEE = 20;
   var JOB_FEE = 30;
   /*
+    A POST HAS A TITLE AND A BODY (#2554). Patrick, 15 Oct: "the Jobs and
+    Notices need a title and a body", the title up to 60 characters and the
+    body up to 600, both required. The server checks both, not only the
+    page, and refuses before any gold is taken.
+  */
+  var POST_TITLE_CHARS = 60;
+  var POST_BODY_CHARS = 600;
+  /*
     A LETTER, #1374. 35 gold up front, the same for everybody. LETTER_FEE is
     the board's and stays on the hold's ledger like a notice's. LETTER_PAY is
     the courier's: it is counted on the same ledger while the letter is up and
@@ -38206,21 +38214,22 @@ log('gamemode loaded:',
     already in the world: this counts it off, and creates nothing.
 
     HELD PAY STAYS ON THE LEDGER. An open letter's 15 (#1374: letter, not
-    down, pay above 0) and an open haul's pay are counted here until they
-    are paid or handed back, and so is a haul's gold owed to somebody who was
-    away when it came down (owed, see handHaul). A withdrawal never takes
+    down, pay above 0), an open haul's pay and an open job's reward (#2554)
+    are counted here until they are paid or handed back, and so is gold owed
+    to somebody who was away when it came down (owed, see handHaul). A withdrawal never takes
     them: what is left after it is never less than what is still held, so a
     courier or a hauler is never refused because the ledger was spent.
-    `releasing` is the one letter or haul on this hold's board whose own held
+    `releasing` is the one letter, haul or job on this hold's board whose own held
     gold this is, so paying a haul out of its own pay is not refused for
     being held, and never more than it holds.
 
     mayWithdraw answers why not, or '' when it may. withdraw takes it off
     and answers true, or false with nothing changed.
   */
-  /** What one notice holds on its ledger: an open letter's or haul's pay, or a haul's owed gold. */
+  /** What one post holds on its ledger: an open letter's or haul's pay, a job's reward, or gold owed. */
   function noticeHolds(x) {
-    if (!x || !(x.letter || x.haul)) { return 0; }
+    // Letters and hauls are jobs too (job: true), so this is every one of them.
+    if (!x || !x.job) { return 0; }
     // Owed: a haul's gold, or a letter's 15 a guard sent back (#502), held
     // for somebody who was away.
     var owed = Math.floor(Number(x.owed)) || 0;
@@ -38251,7 +38260,7 @@ log('gamemode loaded:',
     var have = Number(funds[key]) || 0;
     var held = heldOn(key, releasing || null);
     if (have - n < held) {
-      return key + '\'s ledger has ' + have + ' gold, and ' + held + ' of it is held for letters and hauls.';
+      return key + '\'s ledger has ' + have + ' gold, and ' + held + ' of it is held for letters, hauls and jobs.';
     }
     return '';
   }
@@ -39919,11 +39928,21 @@ log('gamemode loaded:',
       if (n.down) { continue; }
       up++;
       if (rows.length >= 10) { continue; }
+      /*
+        A notice or a job (#2554) has a title, which is what the list shows,
+        and its body in text, which the panel shows when it is opened. A
+        job's reward is held on the ledger until its poster says it is done.
+        A letter and a haul keep their one line.
+      */
+      var plain = !n.letter && !n.haul;
       rows.push({
         n: i + 1,
         job: !!n.job,
         letter: !!n.letter,
         name: n.name || 'somebody',
+        title: plain ? String(n.title || '') : '',
+        reward: (plain && n.job) ? (Math.floor(Number(n.pay)) || 0) : 0,
+        at: Number(n.at) || 0,
         text: n.letter ? sealed(n) : (n.haul ? haulText(n) : (n.text || '')),
         taken: n.taken ? (n.takenName || 'somebody') : '',
         mine: Number(n.by) === Number(profileId),
@@ -40425,12 +40444,13 @@ log('gamemode loaded:',
   }
 
   /*
-    A letter's held pay, out of its hold's ledger into one pack. Answers what
-    was paid, 0 when nothing is held, or -1 when it could not be paid and
-    nothing changed. n.pay goes to 0 once paid, so it is paid once.
+    A letter's held pay, or a job's reward (#2554), out of its hold's ledger
+    into one pack. A haul's is handHaul's. Answers what was paid, 0 when
+    nothing is held, or -1 when it could not be paid and nothing changed.
+    n.pay goes to 0 once paid, so it is paid once.
   */
   function payHeld(hold, n, actorId) {
-    var amount = (n && n.letter) ? (Math.floor(Number(n.pay)) || 0) : 0;
+    var amount = (n && n.job && !n.haul) ? (Math.floor(Number(n.pay)) || 0) : 0;
     if (!(amount > 0)) { return 0; }
     if ((Number(funds[hold]) || 0) < amount) {
       plog('a letter in', hold, 'holds', amount, 'and the ledger has only', funds[hold], '; nothing paid');
@@ -40458,6 +40478,44 @@ log('gamemode loaded:',
     return b === a || b.indexOf(a + ' ') === 0;
   }
 
+  /*
+    THE LINE A POST ARRIVES ON (#2554). The board panel's Make a post sends
+
+        /notice <title> :: <body>
+        /job <reward> <title> :: <body>
+
+    with the separator the journal's pages use. The chat socket carries one
+    line, so the page sends a newline in the body as a backslash and n, a
+    backslash as two, and a colon in the title as a backslash and a colon.
+    So the first :: on the line is always the separator, and every character
+    somebody wrote comes back here as they wrote it, apart from runs of
+    spaces, which every line loses on the way (dispatch splits on them).
+    Answers { title, body }, trimmed; the title is one line.
+  */
+  function postWords(line) {
+    function unslash(s) {
+      var out = '';
+      for (var i = 0; i < s.length; i++) {
+        var c = s.charAt(i);
+        var d = s.charAt(i + 1);
+        if (c === '\\' && (d === 'n' || d === '\\' || d === ':')) {
+          out += d === 'n' ? '\n' : d;
+          i++;
+          continue;
+        }
+        out += c;
+      }
+      return out;
+    }
+    var all = String(line || '');
+    var cut = all.indexOf('::');
+    var head = cut < 0 ? all : all.slice(0, cut);
+    return {
+      title: unslash(head).replace(/\s+/g, ' ').trim(),
+      body: cut < 0 ? '' : unslash(all.slice(cut + 2)).trim()
+    };
+  }
+
   function post(parts, actorId, profileId, toProfile, isJob) {
     /*
       AT THE BOARD, because that is what makes it a board rather than a
@@ -40470,14 +40528,52 @@ log('gamemode loaded:',
       toProfile(profileId, 'Stand at a hold\'s notice board to put something on it.');
       return true;
     }
-    var text = (parts && parts.length > 1) ? parts.slice(1).join(' ').trim() : '';
-    if (!text) {
-      toProfile(profileId, isJob ? 'Say what the job is.' : 'Say what the notice says.');
+    /*
+      A JOB HAS A REWARD (#2554). Patrick, 15 Oct: posting a job takes the
+      reward and the board fee together; the reward is held for whoever does
+      the job, the way a haul's pay is held, and the fee is the board's. So
+      the reward is a whole number of gold above nothing, read before
+      anything is taken.
+    */
+    var reward = 0;
+    var from = 1;
+    if (isJob) {
+      var first = String((parts && parts[1]) || '').trim();
+      reward = /^\d+$/.test(first) ? Number(first) : 0;
+      if (!(reward > 0) || !Number.isSafeInteger(reward)) {
+        toProfile(profileId, 'A job\'s reward is a whole number of gold, above nothing. Nothing was taken.');
+        return true;
+      }
+      from = 2;
+    }
+    var words = postWords((parts && parts.length > from) ? parts.slice(from).join(' ') : '');
+    var what = isJob ? 'the job' : 'the notice';
+    if (!words.title) {
+      toProfile(profileId, 'Give ' + what + ' a title. Nothing was taken.');
+      return true;
+    }
+    if (words.title.length > POST_TITLE_CHARS) {
+      toProfile(profileId, 'A title is up to ' + POST_TITLE_CHARS + ' characters. That one is ' +
+                words.title.length + '. Nothing was taken.');
+      return true;
+    }
+    if (!words.body) {
+      toProfile(profileId, isJob ? 'Say what the job is. Nothing was taken.'
+                                 : 'Say what the notice says. Nothing was taken.');
+      return true;
+    }
+    if (words.body.length > POST_BODY_CHARS) {
+      toProfile(profileId, 'What ' + what + ' says is up to ' + POST_BODY_CHARS + ' characters. That is ' +
+                words.body.length + '. Nothing was taken.');
       return true;
     }
     var fee = isJob ? JOB_FEE : NOTICE_FEE;
-    if (!takeGold(actorId, fee)) {
-      toProfile(profileId, 'That costs ' + fee + ' gold and you do not have it.');
+    var cost = fee + reward;
+    if (!Number.isSafeInteger(cost) || !takeGold(actorId, cost)) {
+      toProfile(profileId, isJob
+        ? 'That costs ' + cost + ' gold, ' + fee + ' for the board and the ' + reward +
+          ' reward, and you do not have it. Nothing was taken.'
+        : 'That costs ' + fee + ' gold and you do not have it.');
       return true;
     }
     var who = 'somebody';
@@ -40487,13 +40583,20 @@ log('gamemode loaded:',
     } catch (e) { }
 
     if (!notices[hold]) { notices[hold] = []; }
-    notices[hold].push({ by: profileId, name: who, text: text, at: Date.now(),
-                         job: !!isJob, taken: 0 });
-    funds[hold] = (Number(funds[hold]) || 0) + fee;
+    var made = { by: profileId, name: who, title: words.title, text: words.body, at: Date.now(),
+                 job: !!isJob, taken: 0 };
+    // The reward is held on the ledger in pay, the way a letter's 15 and a
+    // haul's pay are (noticeHolds), until the poster says it is done.
+    if (isJob) { made.pay = reward; }
+    notices[hold].push(made);
+    funds[hold] = (Number(funds[hold]) || 0) + cost;
     save();
-    plog(who, isJob ? 'posted a job in' : 'posted a notice in', hold, 'for', fee, 'gold');
-    toProfile(profileId, (isJob ? 'Your job is on the board in ' : 'Your notice is on the board in ') +
-                         hold + '. That cost ' + fee + ' gold.');
+    plog(who, isJob ? 'posted a job in' : 'posted a notice in', hold, 'for', cost, 'gold:', words.title);
+    toProfile(profileId, isJob
+      ? 'Your job is on the board in ' + hold + '. That cost ' + cost + ' gold: ' + fee +
+        ' for the board, and the ' + reward + ' reward, held until you say the job is done. ' +
+        'Then it goes to whoever took it.'
+      : 'Your notice is on the board in ' + hold + '. That cost ' + fee + ' gold.');
     refreshPanel(actorId);
     return true;
   }
@@ -40563,11 +40666,12 @@ log('gamemode loaded:',
 
     WHAT THE SERVER DOES AND DOES NOT DO. It records who took what and when,
     and it takes the job off the open board so two people do not both go and
-    do it. It does NOT pay anybody, and there is no /done. The poster paid to
-    put the job up; what it is worth and whether it was done is between the
-    two of them, the same way rent is handed to a steward in person. A server
-    that judged whether a job was finished would be a server refereeing
-    roleplay, which is the one thing Patrick has been clear it should not do.
+    do it. It does not judge whether a job was done: a server that did would
+    be a server refereeing roleplay, which is the one thing Patrick has been
+    clear it should not do. Since #2554 a job carries a reward, held on the
+    ledger from the moment it is posted, and the poster says it is done with
+    Pay the reward (jobDone, below), the way the poster of a haul confirms
+    it. Then the reward goes to the taker.
 
     A taker can hand it back with /drop, because somebody who takes a job and
     then cannot do it should not leave it dead on the board for ever.
@@ -40627,9 +40731,83 @@ log('gamemode loaded:',
       refreshPanel(actorId);
       return true;
     }
-    plog(who, 'took a job in', hold + ':', n.text);
-    toProfile(profileId, 'You take it: ' + n.text + '. Go and see ' + n.name + ' about it.');
+    plog(who, 'took a job in', hold + ':', n.title);
+    toProfile(profileId, 'You take it: ' + n.title + '. Go and see ' + n.name + ' about it. The ' +
+              (Math.floor(Number(n.pay)) || 0) + ' gold reward is held until ' + n.name + ' says it is done.');
     refreshPanel(actorId);
+    return true;
+  }
+
+  /*
+    A JOB DONE, AND ITS REWARD PAID (#2554).
+
+        /job done 4      Pay the reward, on the poster's own taken job, at its board
+
+    NOBODY TYPES THIS. The board panel's Pay the reward sends it, on a job
+    of yours that somebody has taken, at the board it is on. Patrick, 15
+    Oct: the reward "is held for whoever does the job, as today's job pay
+    is", which is a haul's pay, and a haul is confirmed by the person who
+    posted it. So the poster says when it is done, and nobody else: the
+    server does not judge it. The taker is handed the whole reward out of the
+    ledger it was held on (handHaul), or, while they are away, it is held as
+    owed to them and haulTick hands it over when they are back. The job comes
+    down the way a take down does, keeping its number. The fee stays with
+    the hold.
+  */
+  function jobDone(parts, actorId, profileId, toProfile) {
+    var hold = boardHere(actorId);
+    if (!hold) {
+      toProfile(profileId, 'Stand at the board you put the job on.');
+      return true;
+    }
+    var list = notices[hold] || [];
+    var at = Number((parts && parts[2]) || 0) - 1;
+    if (!(Number.isInteger(at) && at >= 0 && at < list.length)) {
+      toProfile(profileId, 'That one is not on the board.');
+      return true;
+    }
+    var n = list[at];
+    if (n.down) {
+      toProfile(profileId, 'That one has been taken down.');
+      return true;
+    }
+    if (!n.job || n.letter || n.haul) {
+      toProfile(profileId, 'That is not a job with a reward.');
+      return true;
+    }
+    if (Number(n.by) !== Number(profileId)) {
+      toProfile(profileId, 'Only the person who posted a job says it is done.');
+      return true;
+    }
+    if (!n.taken) {
+      toProfile(profileId, 'Nobody has taken that job yet.');
+      return true;
+    }
+    var reward = Math.floor(Number(n.pay)) || 0;
+    var taker = n.takenName || 'Whoever took it';
+    var r = handHaul(hold, n, Number(n.taken), reward,
+                     'job ' + (at + 1) + ' done, the reward to ' + taker, 'reward');
+    if (r.why) {
+      plog('the reward of job', at + 1, 'in', hold, 'could not be paid:', r.why);
+      toProfile(profileId, 'That did not work: ' + r.why + ' Nothing was paid.');
+      return true;
+    }
+    n.paid = reward;
+    n.done = Date.now();
+    n.doneBy = profileId;
+    takedown(hold, at, profileId);
+    if (r.owed) {
+      plog(taker, 'is owed', reward, 'for job', at + 1, 'in', hold + ':', n.title);
+      toProfile(profileId, 'Done: ' + n.title + '. ' + taker + ' is away, so the ' + reward +
+                ' gold reward is held for them until they are next in the world.');
+    } else {
+      plog(taker, 'was paid', reward, 'for job', at + 1, 'in', hold + ':', n.title);
+      toProfile(profileId, 'Done: ' + n.title + '. ' + taker + ' is paid the ' + reward + ' gold reward.');
+      toProfile(n.taken, n.name + ' says your job is done: ' + n.title + '. The ' + reward +
+                ' gold reward is in your pack.');
+    }
+    refreshPanel(actorId);
+    if (r.to) { refreshPanel(r.to); }
     return true;
   }
 
@@ -40648,8 +40826,12 @@ log('gamemode loaded:',
       for (var i = 0; i < list.length; i++) {
         var n = list[i];
         if (n.job && Number(n.taken) === Number(profileId) && !n.down) {
+          // A job's title, reward and body (#2554); a letter and a haul keep their one line.
+          var plain = !n.letter && !n.haul;
           out.push({ hold: hold, where: (boards[hold] && boards[hold].where) || hold, n: i + 1,
                      name: n.name || 'somebody',
+                     title: plain ? String(n.title || '') : '',
+                     reward: plain ? (Math.floor(Number(n.pay)) || 0) : 0,
                      text: n.letter ? sealed(n) : (n.haul ? haulText(n) : (n.text || '')),
                      letter: !!n.letter, haul: !!n.haul });
         }
@@ -40769,14 +40951,16 @@ log('gamemode loaded:',
                         actorId, profileId, toProfile);
     }
     /*
-      A LETTER'S PAY COMES BACK, #1374. The board fee stays, like any
-      notice's. The courier's 15 was only held, and with nobody to carry it
-      it is the sender's again. Paid before it comes down, so a pack that
-      cannot be written leaves the letter up and the 15 still held.
+      A LETTER'S PAY COMES BACK, #1374, and so does a job's reward, #2554.
+      The board fee stays, like any notice's. The courier's 15 and the
+      reward were only held, and with nobody to carry the letter or do the
+      job they are the poster's again. Paid before it comes down, so a pack
+      that cannot be written leaves it up and the gold still held. A job
+      somebody has taken was refused above, so its taker never loses it.
     */
-    var back = n.letter ? payHeld(hold, n, actorId) : 0;
+    var back = n.job ? payHeld(hold, n, actorId) : 0;
     if (back < 0) {
-      toProfile(profileId, 'That did not work. The letter is still up.');
+      toProfile(profileId, 'That did not work. The ' + (n.letter ? 'letter' : 'job') + ' is still up.');
       return true;
     }
     takedown(hold, at, profileId);
@@ -40787,8 +40971,10 @@ log('gamemode loaded:',
       refreshPanel(actorId);
       return true;
     }
-    plog(n.name, 'took down', n.job ? 'a job' : 'a notice', 'in', hold + ':', n.text);
-    toProfile(profileId, 'You take it down. The fee stays with ' + hold + '.');
+    plog(n.name, 'took down', n.job ? 'a job' : 'a notice', 'in', hold + ':', n.title,
+         n.job ? 'and had the ' + back + ' reward back' : '');
+    toProfile(profileId, 'You take it down. ' + (n.job ? 'The ' + back + ' gold reward comes back to you. ' : '') +
+              'The fee stays with ' + hold + '.');
     refreshPanel(actorId);
     return true;
   }
@@ -40809,14 +40995,17 @@ log('gamemode loaded:',
       return cancelHaul(hold, at, n, 'guard', actorId, profileId, toProfile);
     }
     var back = 0, owed = false;
-    if (n.letter) {
+    // A letter's 15, or a job's reward (#2554): what the post holds goes back to its poster.
+    if (n.job) {
       var pay = Math.floor(Number(n.pay)) || 0;
       if (pay > 0) {
         var r = handHaul(hold, n, Number(n.by), pay,
-                         'a letter for ' + (n.to || 'somebody') + ' taken down by a guard, the pay back to ' +
-                         (n.name || 'its sender'), 'letter');
+                         (n.letter ? 'a letter for ' + (n.to || 'somebody') : 'job ' + (at + 1)) +
+                         ' taken down by a guard, the pay back to ' + (n.name || 'its poster'),
+                         n.letter ? 'letter' : 'job');
         if (r.why) {
-          toProfile(profileId, 'That did not work: ' + r.why + ' The letter is still up.');
+          toProfile(profileId, 'That did not work: ' + r.why + ' The ' + (n.letter ? 'letter' : 'job') +
+                    ' is still up.');
           return true;
         }
         back = pay;
@@ -40826,15 +41015,17 @@ log('gamemode loaded:',
     takedown(hold, at, profileId);
     var kind = n.letter ? 'letter' : (n.job ? 'job' : 'notice');
     var fee = 'The fee stays with ' + hold + '.';
+    var held = n.letter ? 'gold for the courier' : 'gold reward';
     // A letter's words are sealed, and the log does not record them either.
     plog('law: a guard of', hold, '(' + personName(actorId) + ', profile ' + profileId + ') took down',
-         (n.name || 'somebody') + '\'s', kind, at + 1, 'in', hold + (n.letter ? '' : ': ' + (n.text || '')));
+         (n.name || 'somebody') + '\'s', kind, at + 1, 'in',
+         hold + (n.letter ? '' : ': ' + (n.title || '') + ': ' + (n.text || '')));
     toProfile(profileId, 'You take ' + (n.name || 'somebody') + '\'s ' + kind + ' down.' +
-              (back ? ' The ' + back + ' gold for the courier goes back to them' +
+              (back ? ' The ' + back + ' ' + held + ' goes back to them' +
                       (owed ? ' when they are next in the world' : '') + '.' : '') + ' ' + fee);
     if (onlineActorOf(Number(n.by))) {
       toProfile(n.by, 'A guard took your ' + kind + ' in ' + hold + ' down.' +
-                (back && !owed ? ' The ' + back + ' gold for the courier is back in your pack.' : '') + ' ' + fee);
+                (back && !owed ? ' The ' + back + ' ' + held + ' is back in your pack.' : '') + ' ' + fee);
     }
     if (n.taken && Number(n.taken) !== Number(profileId) && onlineActorOf(Number(n.taken))) {
       toProfile(n.taken, 'The ' + kind + ' in ' + hold + ' you took was taken down by a guard. It is off your list.');
@@ -41099,8 +41290,8 @@ log('gamemode loaded:',
     It is the poster's gold moving, never new gold.
 
     AN ORDINARY JOB IS NOT A HAUL. A confirm answers only a job posted as a
-    haul, and the taker of an ordinary job is still paid nothing by the
-    server.
+    haul. An ordinary job's reward (#2554) is paid by its poster's Pay the
+    reward, at the board it is on (jobDone), and no company tenth is kept.
 
     SOMEBODY AWAY IS PAID WHEN THEY ARE BACK. The server hands gold to a pack,
     and a pack is written only while its owner is in the world. When the
@@ -41212,8 +41403,8 @@ log('gamemode loaded:',
       return true;
     }
     if (!n.haul) {
-      toProfile(profileId, 'That is not a haul. What an ordinary job is worth is between the two people, ' +
-                'and the server pays nothing for it.');
+      toProfile(profileId, 'That is not a haul. A job\'s reward is paid by whoever posted it, ' +
+                'with Pay the reward on the job at its own board.');
       return true;
     }
     if (n.down) {
@@ -41304,8 +41495,8 @@ log('gamemode loaded:',
   }
 
   /*
-    What a haul owes somebody who was away, into their pack now they are in
-    the world, and off the ledger it was held on. A ledger that cannot pay it
+    What a haul, a letter or a job (#2554) owes somebody who was away, into
+    their pack now they are in the world, and off the ledger it was held on. A ledger that cannot pay it
     is written to the log once a boot, and the gold stays held.
   */
   var haulShort = {};
@@ -41323,31 +41514,41 @@ log('gamemode loaded:',
       var list = notices[hold] || [];
       for (var j = 0; j < list.length; j++) {
         var n = list[j];
-        var owed = (n && (n.haul || n.letter)) ? (Math.floor(Number(n.owed)) || 0) : 0;
+        // Letters and hauls are jobs, and so is a job with a reward (#2554).
+        var owed = (n && n.job) ? (Math.floor(Number(n.owed)) || 0) : 0;
         if (!(owed > 0) || !here[Number(n.owedTo)]) { continue; }
         var to = here[Number(n.owedTo)];
         var why = mayWithdraw(hold, owed, n);
         if (why) {
           if (!haulShort[hold + ':' + j]) {
             haulShort[hold + ':' + j] = true;
-            plog(n.letter ? 'letter' : 'haul', j + 1, 'in', hold, 'owes', owed, 'and cannot pay it:', why);
+            plog(n.letter ? 'letter' : (n.haul ? 'haul' : 'job'), j + 1, 'in', hold, 'owes', owed,
+                 'and cannot pay it:', why);
           }
           continue;
         }
         if (!payOut(to, owed)) { continue; }
         withdraw(hold, owed, (n.letter ? 'letter ' + (j + 1) + ' for ' + (n.to || 'somebody')
-                                        : 'haul ' + (j + 1) + ' to ' + n.dest) + ', held for somebody who was away', n);
+                              : n.haul ? 'haul ' + (j + 1) + ' to ' + n.dest
+                              : 'job ' + (j + 1)) + ', held for somebody who was away', n);
         n.owed = 0;
         save();
         var line = n.owedFor === 'letter'
           ? 'While you were away, a guard took your letter for ' + (n.to || 'somebody') + ' in ' + hold +
             ' down. The ' + owed + ' gold for the courier is back in your pack. The fee stays with ' + hold + '.'
+          : n.owedFor === 'job'
+          ? 'While you were away, a guard took your job in ' + hold + ' down: ' + (n.title || '') + '. The ' +
+            owed + ' gold reward is back in your pack. The fee stays with ' + hold + '.'
+          : n.owedFor === 'reward'
+          ? 'While you were away, ' + (n.name || 'the person who posted it') + ' said the job you took in ' + hold +
+            ' is done: ' + (n.title || '') + '. The ' + owed + ' gold reward is in your pack.'
           : n.owedFor === 'hauled'
           ? 'While you were away, your haul to ' + n.dest + ' was confirmed. ' + owed + ' gold is in your pack.' +
             ((Number(n.kept) || 0) ? ' The company kept ' + n.kept + '.' : '')
           : 'While you were away, your haul to ' + n.dest + ' came down. The ' + owed +
             ' gold pay is back in your pack. The fee stays with ' + hold + '.';
-        plog('handed', owed, 'gold of a', n.letter ? 'letter' : 'haul', 'in', hold, 'to', personName(to));
+        plog('handed', owed, 'gold of a', n.letter ? 'letter' : (n.haul ? 'haul' : 'job'), 'in', hold,
+             'to', personName(to));
         try { notify(to, line); } catch (e2) { }
         try { say(to, line); } catch (e3) { }
       }
@@ -41512,7 +41713,13 @@ log('gamemode loaded:',
     if (word === '/rent') { return rentCmd(parts, actorId, profileId, toProfile); }
     if (word === '/sleephere') { return sleepHere(parts, actorId, profileId, toProfile); }
     if (word === '/notice') { return post(parts, actorId, profileId, toProfile, false); }
-    if (word === '/job') { return post(parts, actorId, profileId, toProfile, true); }
+    if (word === '/job') {
+      // Pay the reward sends /job done <n> (#2554); a reward is a number, so the two never meet.
+      if (String((parts && parts[1]) || '').toLowerCase() === 'done') {
+        return jobDone(parts, actorId, profileId, toProfile);
+      }
+      return post(parts, actorId, profileId, toProfile, true);
+    }
     if (word === '/board') { return board(parts, actorId, profileId, toProfile); }
     if (word === '/take') { return take(parts, actorId, profileId, toProfile); }
     if (word === '/dropjob') { return dropJob(parts, actorId, profileId, toProfile); }
@@ -51207,7 +51414,9 @@ const WORDS = ['/ooc', '/o',
                // The notice board (#1627). Sent by the board panel's buttons
                // and J's Boards tab, never typed, and so NOT in PLAYER_WORDS:
                // Patrick, 4 October, nothing people do is a chat command. A
-               // steward's /board move and /board here are #1638's.
+               // steward's /board move and /board here are #1638's. Make a
+               // post sends /notice and /job with a title and a body, and Pay
+               // the reward sends /job done (#2554).
                '/notice', '/job', '/board', '/take', '/dropjob', '/unpin',
                // A letter (#1595): Write a letter on the board panel sends
                // /letter, and the look prompt's Hand over the letter sends

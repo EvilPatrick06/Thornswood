@@ -324,6 +324,31 @@ const notices = (p) => p.chat.filter((m) => m.from === 0);
   yes('and a new flood after that is told once more, so the notice is per time slowed',
       notices(loud).length === 2);
 
+  // ---- a long command reaches the game server whole (#2554) -----------------
+  /*
+    The notice board's Make a post sends a title and a body of up to 600 on
+    one line, a newline as two characters, so a post is longer than the 400
+    a line said to the room keeps. A slash line that is not speech keeps up
+    to COMMAND_CHARS; speech and a plain line still keep 400.
+  */
+  const longPost = '/job 50 ' + 'T'.repeat(60) + ' :: ' + 'b\\n'.repeat(200) + 'B'.repeat(600 - 400);
+  say(loud, longPost);
+  await settle(loud);
+  const longCmds = (await (await fetch('http://127.0.0.1:' + PORT + '/commands')).json()).commands;
+  yes('a post of ' + longPost.length + ' characters reaches the game server whole',
+      longPost.length > 800 && longCmds.length === 1 && longCmds[0].text === longPost);
+  const tooLong = '/notice ' + 'x'.repeat(3000);
+  say(loud, tooLong);
+  await settle(loud);
+  const cut = (await (await fetch('http://127.0.0.1:' + PORT + '/commands')).json()).commands;
+  yes('a command longer than 2,000 is cut at 2,000, not kept whole', cut.length === 1 && cut[0].text.length === 2000);
+  const heardBefore = from(quiet, quiet).length;
+  say(quiet, '/me ' + 'w'.repeat(1000));
+  await settle(quiet);
+  const me = from(quiet, quiet).slice(heardBefore);
+  yes('a /me is still speech, and keeps no more than the 400 a said line keeps',
+      me.length === 1 && me[0].kind === 'me' && me[0].text.length <= 400 - '/me '.length);
+
   // Once the service has answered both closes, not 200 ms after them.
   await shut(loud);
   await shut(quiet);

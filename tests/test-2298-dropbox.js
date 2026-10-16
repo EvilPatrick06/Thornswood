@@ -194,7 +194,8 @@ r = box(ALICE, ['gold', '500']);
 yes('  and more than she carries is refused', /do not have 500 gold/.test(r.view.said) && gold(ALICE) === 60);
 
 // --------------------------------------------------------------- fees never go in
-inDir(function () { W.command('/notice', ['/notice', 'Lost', 'cat'], ALICE.a, ALICE.pid, function () { }); });
+// A post has a title and a body (#2554): the title, ::, then the body.
+inDir(function () { W.command('/notice', ['/notice', 'Lost', 'cat', '::', 'Grey,', 'answers', 'to', 'Tib.'], ALICE.a, ALICE.pid, function () { }); });
 yes('D2 a notice fee is taken and kept as a record (funds), not put in the box', gold(ALICE) === 40 &&
     W.funds().whiterun === 20 && W.dropbox().whiterun.items.length === 1);
 
