@@ -24,6 +24,17 @@
 // and a fake sp. The fire table is a stub of two real Skyrim.esm bases, because
 // the table is data and the walk is what is under test.
 //
+// THE CLOCK IS THE HARNESS'S (#2581). The walk stops once FIRE_SLICE_MS (2 ms)
+// has gone by performance.now, which is right in the game, where the slice is
+// a frame's budget. Run on the real clock here, a busy machine spent the 2 ms
+// before the walk had read the fake cell's four references, and S1 read a walk
+// that had not finished: 11 passed 8 failed one run, 19 passed the next. So
+// the lifted code is handed a performance of the harness's own, whose time
+// moves only when the harness moves it. S1 to S4 test the walk on a clock that
+// stands still; S5 moves it a millisecond for each reference read and checks
+// that the slice does stop once its time is spent, and that the walk finishes
+// over the next slices with the same answer.
+//
 // Read only.
 const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
@@ -64,9 +75,19 @@ const FXFIRE01 = 0x13b40;
 const EMBERS_HEAVY = 0x33da4;
 const NOT_A_FIRE = 0x999;
 
-function harness() {
+// The time the lifted code reads, in milliseconds. It starts well above zero,
+// as performance.now does in a game that has been running, and moves only
+// when a test moves it.
+function standingClock() {
+  const c = { t: 1000 };
+  c.performance = { now: function () { return c.t; } };
+  return c;
+}
+
+function harness(clock) {
   const logs = [];
   const log = function () { logs.push(Array.prototype.join.call(arguments, ' ')); };
+  const time = clock || standingClock();
   const sp = {
     Game: {
       getFormEx: function (id) { return { id: id }; },
@@ -79,19 +100,23 @@ function harness() {
     }
   };
   const fn = new Function('sp', 'log', 'FIRE_BASES', 'FIRE_FILES',
-    'FIRE_REACH', 'FIRE_INSIDE', walk + fires +
+    'FIRE_REACH', 'FIRE_INSIDE', 'performance', walk + fires +
     '\nreturn {' +
     '  spots: fireSpotsHere,' +
     '  distance: fireDistance,' +
     '  walked: function () { return fireWalked; },' +
     '  hits: function () { return fireHits; },' +
     '  threw: function () { return fireThrew; },' +
-    '  bases: function () { return fireBases; }' +
+    '  bases: function () { return fireBases; },' +
+    '  precise: SLICE_PRECISE,' +
+    '  sliceMs: FIRE_SLICE_MS' +
     '};');
   const api = fn(sp, log,
     [['Skyrim.esm', FXFIRE01], ['Skyrim.esm', EMBERS_HEAVY]], ['Skyrim.esm'],
-    Number(reach[1]), Number(inside[1]));
+    Number(reach[1]), Number(inside[1]), time.performance);
   api.logs = logs;
+  api.clock = time;
+  api.sp = sp;
   return api;
 }
 
@@ -107,7 +132,8 @@ function ref(base, x, y, z, off) {
 
 // A cell whose references are listed by form type. 'throw' makes asking for
 // that type throw, the way a native call does on a bad cell.
-function cell(id, byType, calls) {
+// onRead, when given, runs at each reference read: S5 moves the clock there.
+function cell(id, byType, calls, onRead) {
   return {
     getFormID: function () { return id; },
     getNumRefs: function (t) {
@@ -115,7 +141,7 @@ function cell(id, byType, calls) {
       if (byType[t] === 'throw') { throw new Error('no count for type ' + t); }
       return (byType[t] || []).length;
     },
-    getNthRef: function (i, t) { return byType[t][i]; }
+    getNthRef: function (i, t) { if (onRead) { onRead(); } return byType[t][i]; }
   };
 }
 
@@ -186,6 +212,60 @@ if (walk !== null && fires !== null && reach && inside) {
     const h = harness();
     const r = tryIt(function () { return h.distance(0, 0, 0, standingIn(null)); });
     yes('S4 no cell is no fire and no throw', r.err === null && r.value === -1);
+  }
+
+  // S5: THE SLICE STOPS. Each reference read takes a millisecond of the
+  // harness's clock, so a slice has time for FIRE_SLICE_MS of them. Five fires
+  // take three slices, two, two and one, and a walk that ignored its slice
+  // would read all five in the first.
+  {
+    const h = harness();
+    yes('S5 the walk measures its slice on the clock the harness hands it',
+        h.precise === true && h.sliceMs === 2);
+    const fires5 = [];
+    for (let k = 0; k < 5; k++) { fires5.push(ref(FXFIRE01, 100 * (k + 1), 0, 0)); }
+    const calls = { n: 0 };
+    const hall = cell(0x2a6f1, { 24: fires5 }, calls, function () { h.clock.t += 1; });
+    const me = standingIn(hall);
+
+    const first = tryIt(function () { return h.distance(100, 0, 0, me); });
+    yes('S5 the first slice stops once its time is spent: ' + h.walked() + ' of 5 read, ' +
+        h.sliceMs + ' fit', first.err === null && h.walked() === h.sliceMs);
+    yes('S5 and a walk not finished is no fire yet, with nothing logged about it',
+        first.value === -1 && h.logs.every(function (l) { return l.indexOf('in this cell') < 0; }));
+
+    const read = [h.walked()];
+    let last = first;
+    while (last.err === null && last.value === -1 && read.length < 20) {
+      last = tryIt(function () { return h.distance(100, 0, 0, me); });
+      read.push(h.walked());
+    }
+    yes('S5 the next slices carry it on where it stopped, read so far after each: ' + read.join(', '),
+        last.err === null && read.join(',') === '2,4,5');
+    yes('S5 and it ends with every fire, each read once',
+        last.value === 0 && h.walked() === 5 && h.hits() === 5 &&
+        h.logs.indexOf('fires: 5 of ours in this cell, out of 5 thing(s) looked at') >= 0);
+  }
+
+  // S6: ONE SLICE FOR BOTH. Resolving the bases comes out of the same slice
+  // as the walk. When asking for a base takes 3 ms, the first slice resolves
+  // one base and stops, the second resolves the other and leaves the walk
+  // nothing, and the walk starts in the third.
+  {
+    const h = harness();
+    const ask = function (id) { h.clock.t += 3; return { id: id }; };
+    // The lifted code holds the sp it was made with, so the stub is swapped
+    // on that object.
+    const calls = { n: 0 };
+    const yard = cell(0x9a7c, { 24: [ref(EMBERS_HEAVY, 30, 0, 0)] }, calls);
+    const me = standingIn(yard);
+    h.sp.Game.getFormEx = ask;
+    tryIt(function () { return h.distance(0, 0, 0, me); });
+    yes('S6 a slice spent on one base resolves no more', h.bases() === 0 && calls.n === 0);
+    tryIt(function () { return h.distance(0, 0, 0, me); });
+    yes('S6 the slice that resolves the last base leaves the walk nothing', h.bases() === 2 && calls.n === 0);
+    const third = tryIt(function () { return h.distance(0, 0, 0, me); });
+    yes('S6 the walk has the next slice to itself', third.err === null && third.value === 30 && calls.n === 4);
   }
 }
 
