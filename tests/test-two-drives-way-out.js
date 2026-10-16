@@ -59,7 +59,9 @@ yes('nothing the launcher says ends at "has to be installed on the same drive"',
 
 // ---- 2. it is still a refusal, and both sides go through one answer ---------
 
-const whyNot = /public static string WhyNot\(Config[^)]*\)\s*\{([\s\S]*?)\n        \}/.exec(own);
+// The public WhyNot hands on to the overload that has the body, which a Make
+// given the game's own files in a folder of their own calls too (#2603).
+const whyNot = /static string WhyNot\(Config cfg, string src, bool skyrimGiven\)\s*\{([\s\S]*?)\n        \}/.exec(own);
 yes('OwnGame.WhyNot is still the one place that says why not', !!whyNot);
 const body = whyNot ? whyNot[1] : '';
 

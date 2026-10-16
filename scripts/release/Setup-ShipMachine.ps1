@@ -61,7 +61,10 @@
   release from its feed, as an install does), and the recorded client goes
   in from the engine build. So a main root of its own, such as
   local\release-main in the repository, is one command, and no main Ship
-  packs C:\Thornswood, the install Patrick plays from.
+  packs C:\Thornswood, the install Patrick plays from. A new root takes the
+  game's own files from the Steam copy when it is on 1.6.1170; on a machine
+  whose Steam copy is not, -SkyrimFrom names a folder that holds them, such
+  as the other channel's root's Game (#2603).
 
   WHICH ENGINE BUILD (#2019). -EngineBuild records the fork folder whose
   build\dist is this machine's engine build, in the file Where.ps1
@@ -99,6 +102,13 @@
 .PARAMETER EngineBuild
   The fork folder whose build\dist is this machine's engine build (see WHICH
   ENGINE BUILD), recorded for Where.ps1. With -Check it is only shown.
+
+.PARAMETER SkyrimFrom
+  With -Root, for a root that has no game folder yet: the folder Skyrim
+  1.6.1170's own files are copied from instead of the Steam copy, passed to
+  Update-ShipRoot.ps1 (#2603). Every file the new folder takes is checked
+  against records\skyrim-files.json first, and the root is not made when
+  one is not the build's. A root that is made already does not use it.
 
 .PARAMETER Check
   Report only. Nothing is fetched or written; each step says what it would do.
@@ -144,6 +154,12 @@
   folder whose build is this machine's engine build (#2019). Then
   .\scripts\mods\Build-Generated.ps1 -Channel main builds its generated
   files.
+
+.EXAMPLE
+  .\scripts\release\Setup-ShipMachine.ps1 -Channel main -Root C:\Users\evilp\Downloads\Thornswood-Repo\local\release-main -SkyrimFrom C:\Users\evilp\Downloads\Thornswood-Repo\local\release-devbuild\Game
+  The same on a machine whose Steam copy is not on 1.6.1170, as One's is
+  not since 16 Oct: the game's own files are copied from the dev root's
+  Game, each checked against records\skyrim-files.json first (#2603).
 #>
 [CmdletBinding()]
 param(
@@ -155,7 +171,8 @@ param(
   [switch]$NoPause,
   [string]$Site = 'https://thornswood.net',
   [string]$Root = '',
-  [string]$EngineBuild = ''
+  [string]$EngineBuild = '',
+  [string]$SkyrimFrom = ''
 )
 . (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
@@ -635,6 +652,7 @@ if (Test-Path -LiteralPath (Join-Path $shipRoot 'Game\Data\vortex.deployment.jso
 } else {
   $upArgs = @{ Channel = $Channel; Root = $shipRoot; NoPause = $true }
   if ($Check) { $upArgs['Check'] = $true }
+  elseif ($SkyrimFrom) { $upArgs['SkyrimFrom'] = $SkyrimFrom }
   $global:LASTEXITCODE = 0
   & (Join-Path $Here 'Update-ShipRoot.ps1') @upArgs
   $upCode = $LASTEXITCODE
