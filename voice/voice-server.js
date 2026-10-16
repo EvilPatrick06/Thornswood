@@ -60,7 +60,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1-tls-only-1-ice-socket-1-no-page-1-most-1-roster-once-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1-tls-only-1-ice-socket-1-no-page-1-most-1-roster-once-1-long-command-1';
 
 // ==== thornswood deploy record ====
 // Which commit this copy came from (#459): Install-Voice.ps1 leaves the deploy
@@ -219,6 +219,20 @@ const COMMAND_OFFERS = 5;
 */
 const COMMAND_CAP = 200;
 const COMMAND_REFUSED_EVERY_MS = 10000;
+
+/*
+  HOW LONG ONE LINE MAY BE (#2554). A line said to the room is cut at 400
+  characters, the cap it always had. A slash line for the game server may be
+  longer: the notice board's Make a post sends a title of up to 60
+  characters and a body of up to 600 on one line, with a newline in the body
+  and a backslash sent as two characters each and a colon in the title as
+  two, so a job at its longest is about 1,350. A command cut at 400 lost
+  the end of the body without a word, and the gamemode, which checks the
+  lengths, could never see what was missing. 2,000 covers it; the queue
+  still holds at most COMMAND_CAP of them.
+*/
+const SAID_CHARS = 400;
+const COMMAND_CHARS = 2000;
 
 // What the gamemode is handed. The offer count is this service's business.
 // proven says this connection's join token checked out, which the gamemode's
@@ -2479,7 +2493,10 @@ server.on('upgrade', (req, socket, head) => {
     // missing, not a reason to build a second channel.
     if (msg.t === 'chat') {
       const me = peers.get(myId);
-      const text = String(msg.text == null ? '' : msg.text).slice(0, 400);
+      // A slash line that is not speech (/me, /do, /w, /s and /ooc are) is a
+      // command, and keeps up to COMMAND_CHARS. Everything said keeps 400.
+      const long = String(msg.text == null ? '' : msg.text).slice(0, COMMAND_CHARS);
+      const text = (long.charAt(0) === '/' && !headlines.floatLine(long)) ? long : long.slice(0, SAID_CHARS);
       if (!text) return;
 
       // /me, /do, /w, /s and /ooc are speech. They float, and the box for

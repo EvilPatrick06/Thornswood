@@ -12,21 +12,48 @@
   window.thornswoodNet.say. There is no second protocol. The labels are
   words. The lines are how the panel talks to the server, and nobody is told
   to type one (Patrick, 4 Oct: no chat commands for anything people do).
-  Posting, Take, Take down and Put it back send /notice, /job, /take, /unpin
-  and /dropjob (#1627); Send a haul and Confirm send /haul (#1393); Write a
-  letter sends /letter (#1595).
+  Make a post sends /notice and /job (#2554); Take, Take down, Put it back
+  and Pay the reward send /take, /unpin, /dropjob and /job done (#1627,
+  #2554); Send a haul and Confirm send /haul (#1393); Write a letter sends
+  /letter (#1595).
 
   setData never opens the panel. E on the board does: the server answers it
   (#2516) on thornswoodBoardOpen, which calls open(). A later setData redraws
   what is already open, and the plugin closes it once you walk away.
+
+  A POST HAS A TITLE AND A BODY (#2554). Patrick, 15 Oct: a Make a post
+  button, apart from the list and pinned to the bottom of the board, so the
+  posts above it scroll freely. It asks for a title, the body, and Job or
+  Notice, and a job also asks for its reward. The list shows each post's
+  title, Job or Notice, a job's reward, who posted it and when; Read opens
+  it, which shows its body and, on a job, Take.
 */
 (function () {
   if (window.thornswoodBoard) { return; }
 
   var ID = 'ts-board';
+  var TITLE_CHARS = 60;
+  var BODY_CHARS = 600;
   var data = null;
   var shown = false;
   var root = null;
+
+  /*
+    WHAT MAKE A POST KEEPS. The draft is kept here as it is typed, so a
+    redraw, a walk away or Back loses nothing. The form is drawn once when
+    it opens and left alone after that: a push from the server while
+    somebody is typing would otherwise rebuild the box under the cursor.
+    `pending` is the title just sent and the newest number on the wall at
+    that moment; the post is up once a post of yours with that title and a
+    higher number is on the wall, and then the form closes. A refusal is
+    answered in the chat and the draft stays to be fixed.
+  */
+  var composing = false;
+  var formDrawn = false;
+  var draft = { kind: 'notice', title: '', body: '', reward: '' };
+  var pending = null;
+  var said = '';
+  var opened = {};
 
   function tell(what) {
     try { window.skyrimPlatform.sendMessage('thornswood-front', 'board:' + what); }
@@ -47,6 +74,33 @@
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+  }
+
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  /* When a post went up, on this machine's clock: 6:43 PM, 15 Oct. */
+  function when(at) {
+    var t = Number(at);
+    if (!(t > 0)) { return ''; }
+    var d = new Date(t);
+    var h = d.getHours();
+    var m = d.getMinutes();
+    var half = h < 12 ? 'AM' : 'PM';
+    h = h % 12;
+    if (h === 0) { h = 12; }
+    return h + ':' + (m < 10 ? '0' : '') + m + ' ' + half + ', ' + d.getDate() + ' ' + MONTHS[d.getMonth()];
+  }
+
+  /*
+    THE LINE IS ONE LINE (#2554), as the journal's pages are: the server
+    splits the title from the body at the first ::, so a newline in the body
+    goes over as a backslash and n, a backslash as two, and a colon in the
+    title as a backslash and a colon. postWords in the gamemode puts them back.
+  */
+  function slashBody(s) {
+    return String(s).replace(/\\/g, '\\\\').replace(/\r\n|\r|\n/g, '\\n');
+  }
+  function slashTitle(s) {
+    return String(s).replace(/\\/g, '\\\\').replace(/:/g, '\\:');
   }
 
   /*
@@ -70,12 +124,18 @@
     '  font-size:16px}',
     '#' + ID + ' .foot{padding:12px 24px;border-top:1px solid rgba(198,170,109,.22);',
     '  display:flex;gap:10px;align-items:center;justify-content:flex-end}',
+    '#' + ID + ' .foot .make{margin-right:auto}',
     '#' + ID + ' h3{margin:16px 0 8px;padding-bottom:6px;font-size:11.5px;letter-spacing:.24em;text-transform:uppercase;',
     '  color:rgba(198,170,109,.85);font-weight:normal;border-bottom:1px solid rgba(198,170,109,.22)}',
     '#' + ID + ' h3:first-child{margin-top:0}',
     '#' + ID + ' .row{display:flex;align-items:center;gap:10px;padding:10px 12px;flex-wrap:wrap;',
     '  border:1px solid rgba(198,170,109,.30);background:rgba(0,0,0,.20);margin-bottom:8px}',
     '#' + ID + ' .row .nm{flex:1;min-width:160px;font-size:16px;line-height:1.35}',
+    '#' + ID + ' .row .nm.open{cursor:pointer}',
+    '#' + ID + ' .row .meta{font-size:13.5px;color:rgba(217,207,180,.7)}',
+    '#' + ID + ' .row .read{flex-basis:100%;white-space:pre-wrap;line-height:1.55;font-size:16px;',
+    '  padding:8px 2px 2px;border-top:1px solid rgba(198,170,109,.18)}',
+    '#' + ID + ' .row .acts{flex-basis:100%;display:flex;gap:8px;justify-content:flex-end}',
     '#' + ID + ' .tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}',
     '#' + ID + ' button{font-family:inherit;font-style:normal;font-weight:normal;cursor:pointer;',
     '  border:1px solid rgba(198,170,109,.55);background:rgba(0,0,0,.25);color:#e9d19b;',
@@ -83,9 +143,11 @@
     '#' + ID + ' button.go{background:#c6aa6d;border-color:#e9d19b;color:#1b1205}',
     '#' + ID + ' .none{color:rgba(217,207,180,.6);font-style:italic;padding:6px 2px}',
     '#' + ID + ' .note{color:rgba(217,207,180,.7);font-size:12.5px;line-height:1.5;margin-top:8px}',
+    '#' + ID + ' .said{color:#e9d19b;font-size:14px;line-height:1.5;margin-top:8px}',
     '#' + ID + ' .line{display:flex;gap:8px;align-items:center;margin-bottom:8px}',
-    '#' + ID + ' input{font-family:inherit;font-size:16px;color:#d9cfb4;background:rgba(0,0,0,.25);',
+    '#' + ID + ' input,#' + ID + ' textarea{font-family:inherit;font-size:16px;color:#d9cfb4;background:rgba(0,0,0,.25);',
     '  border:1px solid rgba(198,170,109,.42);padding:8px 10px;width:100%;box-sizing:border-box}',
+    '#' + ID + ' textarea{resize:none;height:220px;line-height:1.5}',
     '#' + ID + ' input.pay{width:110px;flex:none}',
     '#' + ID + ' select{font-family:inherit;font-size:16px;color:#d9cfb4;background:rgba(11,10,8,.94);',
     '  border:1px solid rgba(198,170,109,.42);padding:8px 10px;flex:none}',
@@ -104,9 +166,12 @@
     document.head.appendChild(style);
     root = document.createElement('div');
     root.id = ID;
+    // Make a post is in the foot, apart from the list, so it stays put while
+    // the posts above it scroll (#2554).
     root.innerHTML =
       '<div class="panel"><h2>Notice board</h2><div class="body"></div>' +
-      '<div class="foot"><button data-do="close">Close</button></div></div>';
+      '<div class="foot"><button class="go make" data-do="compose">Make a post</button>' +
+      '<button class="shut" data-do="close">Close</button></div></div>';
     document.body.appendChild(root);
     root.addEventListener('click', function (e) {
       if (e.target === root) { close(); }
@@ -118,46 +183,108 @@
     return el ? String(el.value || '').trim() : '';
   }
 
+  /* The newest number on the wall: what a post sent now will be above. */
+  function topN(b) {
+    var wall = (b && b.wall) || [];
+    var top = 0;
+    for (var i = 0; i < wall.length; i++) { top = Math.max(top, Number(wall[i].n) || 0); }
+    return top;
+  }
+
+  function isUp(b) {
+    if (!pending) { return false; }
+    var wall = (b && b.wall) || [];
+    for (var i = 0; i < wall.length; i++) {
+      var r = wall[i];
+      if (r.mine && !r.letter && !r.haul && r.title === pending.title && Number(r.n) > pending.top) { return true; }
+    }
+    return false;
+  }
+
+  /* A notice or a job (#2554); a letter and a haul keep their one line. */
+  function plain(row) { return !row.letter && !row.haul; }
+
   function draw() {
     if (!root) { return; }
-    var keptNotice = field(ID + '-notice');
-    var keptJob = field(ID + '-job');
+    var title = root.querySelector('h2');
+    var body = root.querySelector('.body');
+    var make = root.querySelector('.make');
+    var b = data && data.board;
+    if (!b || !b.here) {
+      title.innerHTML = 'Notice board';
+      body.innerHTML = '<div class="none">Step up to the board.</div>';
+      formDrawn = false;
+      if (make) { make.style.display = 'none'; }
+      return;
+    }
+    title.innerHTML = esc(b.where || 'Notice board') +
+      ' <span class="sub">' + esc(String(b.paid || 0)) + ' gold paid in</span>';
+    if (isUp(b)) {
+      pending = null;
+      said = '';
+      composing = false;
+      draft = { kind: draft.kind, title: '', body: '', reward: '' };
+    }
+    if (make) { make.style.display = composing ? 'none' : ''; }
+    if (composing) { drawForm(body); return; }
+    formDrawn = false;
+    drawList(b, body);
+  }
+
+  function drawList(b, body) {
     var keptPay = field(ID + '-pay');
     var keptDest = field(ID + '-dest');
     var keptHaul = field(ID + '-haul');
     var keptTo = field(ID + '-to');
     var keptLetter = field(ID + '-letter');
-    var title = root.querySelector('h2');
-    var body = root.querySelector('.body');
-    var b = data && data.board;
-    if (!b || !b.here) {
-      title.innerHTML = 'Notice board';
-      body.innerHTML = '<div class="none">Step up to the board.</div>';
-      return;
-    }
-    title.innerHTML = esc(b.where || 'Notice board') +
-      ' <span class="sub">' + esc(String(b.paid || 0)) + ' gold paid in</span>';
     var out = '<h3>On the board</h3>';
     var wall = b.wall || [];
     if (!wall.length) { out += '<div class="none">Nothing on it.</div>'; }
     for (var i = 0; i < wall.length; i++) {
       var row = wall[i];
-      var kind = row.letter ? 'Letter' : (row.haul ? 'Haul' : (row.job ? 'Job' : 'Notice'));
-      var who = row.taken ? ', taken by ' + esc(row.taken) : '';
-      out += '<div class="row"><span class="nm"><b>' + esc(row.n) + '.</b> ' + kind +
-        ', ' + esc(row.name) + who + '<br>' + esc(row.text) + '</span><span class="tools">';
-      if (row.job && !row.taken && !row.mine) {
-        out += '<button class="go" data-do="take" data-n="' + esc(row.n) + '">Take</button>';
+      var tools = '';
+      /*
+        Take down stays on the row, for the poster and for a guard of this
+        hold, who takes down any post on its board (#502). Pay the reward is
+        the poster's, once somebody has taken the job (#2554).
+      */
+      if (plain(row) && row.job && row.mine && row.taken) {
+        tools += '<button class="go" data-do="paid" data-n="' + esc(row.n) + '">Pay the reward</button>';
       }
-      // A guard of this hold takes down any post on its board (#502).
       if ((row.mine && !(row.job && row.taken)) || (row.haul && b.steward) || b.guard) {
-        out += '<button data-do="unpin" data-n="' + esc(row.n) + '">Take down</button>';
+        tools += '<button data-do="unpin" data-n="' + esc(row.n) + '">Take down</button>';
       }
       if (row.held) {
-        out += '<button data-do="drop" data-n="' + esc(row.n) + '">' +
+        tools += '<button data-do="drop" data-n="' + esc(row.n) + '">' +
           (row.haul ? 'Hand it back' : 'Put it back') + '</button>';
       }
-      out += '</span></div>';
+      var who = row.taken ? ', taken by ' + esc(row.taken) : '';
+      if (!plain(row)) {
+        var kind = row.letter ? 'Letter' : 'Haul';
+        if (row.job && !row.taken && !row.mine) {
+          tools = '<button class="go" data-do="take" data-n="' + esc(row.n) + '">Take</button>' + tools;
+        }
+        out += '<div class="row"><span class="nm"><b>' + esc(row.n) + '.</b> ' + kind +
+          ', ' + esc(row.name) + who + '<br>' + esc(row.text) + '</span><span class="tools">' + tools +
+          '</span></div>';
+        continue;
+      }
+      var key = 'w' + row.n;
+      var isOpen = !!opened[key];
+      var meta = (row.job ? 'Job, ' + esc(String(Number(row.reward) || 0)) + ' gold reward' : 'Notice') +
+        ', ' + esc(row.name) + (row.at ? ', ' + esc(when(row.at)) : '') + who;
+      out += '<div class="row"><span class="nm open" data-do="open" data-key="' + key + '"><b>' + esc(row.n) +
+        '.</b> ' + esc(row.title) + '<br><span class="meta">' + meta + '</span></span><span class="tools">' +
+        '<button data-do="open" data-key="' + key + '">' + (isOpen ? 'Hide' : 'Read') + '</button>' + tools +
+        '</span>';
+      if (isOpen) {
+        out += '<div class="read">' + esc(row.text) + '</div>';
+        // Opening a job shows Take (Patrick, 15 Oct, #2554).
+        if (row.job && !row.taken && !row.mine) {
+          out += '<div class="acts"><button class="go" data-do="take" data-n="' + esc(row.n) + '">Take</button></div>';
+        }
+      }
+      out += '</div>';
     }
     var older = Number(b.older) || 0;
     if (older > 0) {
@@ -175,29 +302,32 @@
     for (var j = 0; j < jobs.length; j++) {
       var mine = jobs[j];
       var what = mine.letter ? 'Letter' : (mine.haul ? 'Haul' : 'Job');
+      var jkey = 'j' + mine.hold + ':' + mine.n;
+      var jopen = !!opened[jkey];
+      var line = plain(mine)
+        ? esc(mine.title) + '<br><span class="meta">' + esc(String(Number(mine.reward) || 0)) + ' gold reward</span>'
+        : esc(mine.text);
       out += '<div class="row"><span class="nm"><b>' + esc(mine.n) + '.</b> ' + what + ', ' +
-        esc(mine.where || mine.hold) + ', for ' + esc(mine.name) + '<br>' + esc(mine.text) +
+        esc(mine.where || mine.hold) + ', for ' + esc(mine.name) + '<br>' + line +
         '</span><span class="tools">';
+      if (plain(mine)) {
+        out += '<button data-do="open" data-key="' + jkey + '">' + (jopen ? 'Hide' : 'Read') + '</button>';
+      }
       if (mine.hold === b.hold) {
         out += '<button data-do="drop" data-n="' + esc(mine.n) + '">' +
           (mine.haul ? 'Hand it back' : 'Put it back') + '</button>';
       } else {
         out += '<span class="none">Back at ' + esc(mine.where || mine.hold) + '</span>';
       }
-      out += '</span></div>';
+      out += '</span>';
+      if (plain(mine) && jopen) { out += '<div class="read">' + esc(mine.text) + '</div>'; }
+      out += '</div>';
     }
-    out += '<h3>Put something up</h3>';
-    out += '<div class="line"><input id="' + ID + '-notice" placeholder="the notice">' +
-      '<button class="go" data-do="notice">Post a notice</button></div>';
-    out += '<div class="line"><input id="' + ID + '-job" placeholder="the job">' +
-      '<button class="go" data-do="job">Post a job</button></div>';
-    out += '<div class="note">A notice is 20 gold. A job is 30 gold. The gold stays with the hold.</div>';
     /*
       A LETTER (#1595, docs/systems/noticeboards.md): who it is for and the
       words, up to 300 characters, which was /letter. The name goes over in
-      double quotes so a name of several words stays one name. The chat
-      socket carries a line of up to 400 characters (voice/voice-server.js),
-      so the name is held to 60: /letter, the quotes, 60 and 300 fit whole.
+      double quotes so a name of several words stays one name. The name is
+      held to 60, the same as a post's title.
     */
     out += '<h3>Write a letter</h3>';
     out += '<div class="line"><input id="' + ID + '-to" maxlength="60" placeholder="who it is for"></div>';
@@ -248,10 +378,6 @@
         esc(lists[s].id) + '">Leave the list</button></span></div>';
     }
     body.innerHTML = out;
-    var noticeBox = document.getElementById(ID + '-notice');
-    var jobBox = document.getElementById(ID + '-job');
-    if (noticeBox && keptNotice) { noticeBox.value = keptNotice; }
-    if (jobBox && keptJob) { jobBox.value = keptJob; }
     var payBox = document.getElementById(ID + '-pay');
     var destBox = document.getElementById(ID + '-dest');
     var haulBox = document.getElementById(ID + '-haul');
@@ -262,21 +388,125 @@
     var letterBox = document.getElementById(ID + '-letter');
     if (toBox && keptTo) { toBox.value = keptTo; }
     if (letterBox && keptLetter) { letterBox.value = keptLetter; }
-    var buttons = body.querySelectorAll('button[data-do]');
+    wire(body);
+  }
+
+  function wire(body) {
+    var buttons = body.querySelectorAll('[data-do]');
     for (var k = 0; k < buttons.length; k++) { buttons[k].onclick = onDo; }
+  }
+
+  /* What a post costs, said under the form for the kind picked. */
+  function costLine() {
+    return draft.kind === 'job'
+      ? 'A job is 30 gold for the board, and the reward. The reward is held until you say the job is done, ' +
+        'with Pay the reward on it, and then it goes to whoever took it. Taken down before anybody takes ' +
+        'it, the reward comes back to you. The 30 stays with the hold.'
+      : 'A notice is 20 gold. The gold stays with the hold.';
+  }
+
+  /*
+    MAKE A POST (#2554): the title, the body, Job or Notice, and a job's
+    reward. Drawn once when it opens; picking Job or Notice changes only
+    what shows, so nothing typed is lost.
+  */
+  function drawForm(body) {
+    if (formDrawn) { showKind(); return; }
+    formDrawn = true;
+    body.innerHTML =
+      '<h3>Make a post</h3>' +
+      '<div class="line"><button data-do="kind" data-kind="notice" id="' + ID + '-k-notice">Notice</button>' +
+      '<button data-do="kind" data-kind="job" id="' + ID + '-k-job">Job</button></div>' +
+      '<div class="line"><input id="' + ID + '-title" maxlength="' + TITLE_CHARS + '" placeholder="the title"></div>' +
+      '<div class="line"><textarea id="' + ID + '-text" maxlength="' + BODY_CHARS +
+      '" placeholder="what it says"></textarea></div>' +
+      '<div class="line" id="' + ID + '-rewardline"><input class="pay" id="' + ID +
+      '-reward" placeholder="reward"><span class="note">gold, for whoever does the job</span></div>' +
+      '<div class="note">The title is up to ' + TITLE_CHARS + ' characters and what it says up to ' +
+      BODY_CHARS + '.</div>' +
+      '<div class="note" id="' + ID + '-cost"></div>' +
+      '<div class="said" id="' + ID + '-said"></div>' +
+      '<div class="line" style="justify-content:flex-end;margin-top:12px">' +
+      '<button data-do="back">Back</button><button class="go" data-do="send">Post it</button></div>';
+    var boxes = [['-title', 'title'], ['-text', 'body'], ['-reward', 'reward']];
+    for (var i = 0; i < boxes.length; i++) {
+      var el = document.getElementById(ID + boxes[i][0]);
+      if (!el) { continue; }
+      el.value = draft[boxes[i][1]];
+      el.addEventListener('input', keep(boxes[i][1]));
+    }
+    wire(body);
+    showKind();
+  }
+
+  function keep(name) {
+    return function () { draft[name] = String(this.value || ''); };
+  }
+
+  function showKind() {
+    var isJob = draft.kind === 'job';
+    var n = document.getElementById(ID + '-k-notice');
+    var j = document.getElementById(ID + '-k-job');
+    if (n) { n.className = isJob ? '' : 'go'; }
+    if (j) { j.className = isJob ? 'go' : ''; }
+    var line = document.getElementById(ID + '-rewardline');
+    if (line) { line.style.display = isJob ? '' : 'none'; }
+    var cost = document.getElementById(ID + '-cost');
+    if (cost) { cost.textContent = costLine(); }
+    var told = document.getElementById(ID + '-said');
+    if (told) { told.textContent = said; }
+  }
+
+  function say(line) {
+    said = line;
+    showKind();
+  }
+
+  /*
+    The page says what is missing before anything is sent, so nobody waits
+    on the server for an empty title. The server checks every one of these
+    again and refuses before any gold is taken.
+  */
+  function send() {
+    var b = data && data.board;
+    if (!b || !b.here) { return; }
+    var title = draft.title.replace(/\s+/g, ' ').trim();
+    var text = draft.body.trim();
+    if (!title) { say('Give it a title.'); return; }
+    if (title.length > TITLE_CHARS) { say('A title is up to ' + TITLE_CHARS + ' characters.'); return; }
+    if (!text) { say('Write what it says.'); return; }
+    if (text.length > BODY_CHARS) { say('What it says is up to ' + BODY_CHARS + ' characters.'); return; }
+    var line;
+    if (draft.kind === 'job') {
+      var reward = draft.reward.trim();
+      if (!/^\d+$/.test(reward) || !(Number(reward) > 0)) {
+        say('A job\'s reward is a whole number of gold, above nothing.');
+        return;
+      }
+      line = '/job ' + Number(reward) + ' ' + slashTitle(title) + ' :: ' + slashBody(text);
+    } else {
+      line = '/notice ' + slashTitle(title) + ' :: ' + slashBody(text);
+    }
+    pending = { title: title, top: topN(b) };
+    say('Putting it up. If it cannot go up, the chat says why.');
+    net(line);
   }
 
   function onDo() {
     var verb = this.getAttribute('data-do');
     var n = this.getAttribute('data-n');
-    if (verb === 'notice') {
-      var notice = field(ID + '-notice');
-      if (notice) { net('/notice ' + notice); }
+    if (verb === 'compose') { composing = true; said = ''; draw(); return; }
+    if (verb === 'close') { close(); return; }
+    if (verb === 'back') { composing = false; pending = null; said = ''; draw(); return; }
+    if (verb === 'kind') {
+      draft.kind = this.getAttribute('data-kind') === 'job' ? 'job' : 'notice';
+      showKind();
       return;
     }
-    if (verb === 'job') {
-      var job = field(ID + '-job');
-      if (job) { net('/job ' + job); }
+    if (verb === 'send') { send(); return; }
+    if (verb === 'open') {
+      var key = this.getAttribute('data-key');
+      if (key) { opened[key] = !opened[key]; draw(); }
       return;
     }
     if (verb === 'letter') {
@@ -298,6 +528,7 @@
       return;
     }
     if (verb === 'take' && n) { net('/take ' + n); return; }
+    if (verb === 'paid' && n) { net('/job done ' + n); return; }
     if (verb === 'unpin' && n) { net('/unpin ' + n); return; }
     if (verb === 'drop' && n) { net('/dropjob ' + n); return; }
     if (verb === 'submit') {
@@ -311,6 +542,7 @@
     if (shown) { draw(); return; }
     shown = true;
     root.className = 'on';
+    formDrawn = false;
     draw();
     tell('opened');
   }
@@ -331,8 +563,12 @@
   function wireFoot() {
     build();
     if (foot) { return; }
-    foot = root.querySelector('.foot button');
-    if (foot) { foot.onclick = function () { close(); }; }
+    foot = root.querySelector('.foot');
+    if (!foot) { return; }
+    var make = root.querySelector('.make');
+    var shut = root.querySelector('.shut');
+    if (make) { make.onclick = onDo; }
+    if (shut) { shut.onclick = function () { close(); }; }
   }
 
   window.thornswoodBoard = {

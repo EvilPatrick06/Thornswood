@@ -54,7 +54,7 @@ function fn(name) {
   return b < 0 ? null : prop.slice(a + 1, b + 4);
 }
 
-const NAMES = ['takeGold', 'payOut', 'payHeld', 'sealed', 'nameIs', 'post', 'board', 'take',
+const NAMES = ['takeGold', 'payOut', 'payHeld', 'sealed', 'nameIs', 'postWords', 'post', 'board', 'take',
                'jobsOf', 'dropJob', 'takedown', 'unpin', 'postLetter', 'deliver', 'letterReach',
                'boardHere', 'nearestBoard', 'wallOf', 'boardPanel', 'boardsView', 'moveBoard', 'command',
                // The panel also lists the towns a haul can go to and the hauls that came here (#1393).
@@ -444,7 +444,7 @@ if (missing.length === 0 && fees && seeding && PASSAGES) {
     yes('U7 packs plus ledger are what they were', total(w, s) === start);
     yes('U8 a notice taken down still pays nothing back',
         (function () {
-          s.say(ALICE, '/notice Room to let');
+          s.say(ALICE, '/notice Room to let :: Above the smithy.');
           const before = w.gold(ALICE);
           s.say(ALICE, '/unpin 3');
           return w.gold(ALICE) === before && !!s.notices().whiterun[2].down;
@@ -458,8 +458,11 @@ if (missing.length === 0 && fees && seeding && PASSAGES) {
     yes('F1 34 gold does not buy a letter, and nothing is taken or posted',
         /A letter costs 35 gold and you do not have it/.test(s.say(poor, '/letter Lydia hi')) &&
         w.gold(poor) === 34 && !(s.notices().whiterun || []).length && !s.funds().whiterun);
-    yes('F2 a notice is 20 and a job 30',
-        /cost 20 gold/.test(s.say(poor, '/notice hi')) && w.gold(poor) === 14);
+    yes('F2 a notice is 20',
+        /cost 20 gold/.test(s.say(poor, '/notice hi :: hello')) && w.gold(poor) === 14);
+    // A job is 30 and its reward (#2554): 14 gold buys neither, and nothing is taken.
+    yes('F3 a job is 30 and its reward, and 14 gold does not buy one',
+        /costs 31 gold, 30 for the board and the 1 reward/.test(s.say(poor, '/job 1 a job :: do it')) && w.gold(poor) === 14);
   });
 
   {

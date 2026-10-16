@@ -68,7 +68,7 @@ function fn(name) {
   const b = prop.indexOf('\n  }\n', a + 1);
   return b < 0 ? null : prop.slice(a + 1, b + 4);
 }
-const NAMES = ['takeGold', 'payOut', 'payHeld', 'sealed', 'nameIs', 'post', 'board', 'take',
+const NAMES = ['takeGold', 'payOut', 'payHeld', 'sealed', 'nameIs', 'postWords', 'post', 'board', 'take',
                'jobsOf', 'dropJob', 'takedown', 'unpin', 'postLetter', 'deliver', 'letterReach', 'lettersCarried',
                'boardHere', 'nearestBoard', 'wallOf', 'boardPanel', 'boardsView', 'moveBoard', 'command',
                'haulTenth', 'haulText'];
@@ -210,7 +210,7 @@ attempt('who carries a letter for whom', function () {
   const posted = s.say(ALICE, '/letter "Lydia" ' + WORDS_OF_IT);
   yes('M2 the panel\'s line posts the letter, for the name in the quotes', /Your letter for Lydia is on the board/.test(posted) &&
       s.notices().whiterun[0].to === 'Lydia' && s.notices().whiterun[0].text === WORDS_OF_IT && w.gold(ALICE) === 165);
-  s.say(ALICE, '/job Clear the cellar');
+  s.say(ALICE, '/job 5 Clear the cellar :: Rats, and a lot of them.');
   yes('M3 a letter on the board that nobody has taken is carried by nobody',
       !s.lettersCarried().carries(BOB.pid, 'Lydia Stormblade') && !s.near(BOB, LYDIA).d);
 
@@ -374,11 +374,12 @@ attempt('Write a letter', function () {
   const branch = slice(page, "    if (verb === 'letter') {", '\n    }\n');
   yes('B3 it sends /letter with the name in double quotes, quotes taken out of the name', !!branch &&
       /field\(ID \+ '-to'\)\.replace\(\/"\/g, ''\)/.test(branch) && branch.indexOf("net('/letter \"' + to + '\" ' + words);") !== -1);
-  // The chat socket cuts a line at 400 (voice/voice-server.js).
+  // The chat socket cuts a command at COMMAND_CHARS, and a line said at 400 (voice/voice-server.js, #2554).
   const voice = read('voice/voice-server.js');
   const longest = ('/letter "' + 'x'.repeat(60) + '" ' + 'y'.repeat(300)).length;
-  yes('B4 the longest line the form can send fits the 400 the chat socket carries',
-      /String\(msg\.text == null \? '' : msg\.text\)\.slice\(0, 400\)/.test(voice) && longest <= 400);
+  const cap = Number((/const COMMAND_CHARS = (\d+);/.exec(voice) || [])[1]);
+  yes('B4 the longest line the form can send fits what the chat socket carries for a command (' + cap + ')',
+      /String\(msg\.text == null \? '' : msg\.text\)\.slice\(0, COMMAND_CHARS\)/.test(voice) && longest <= 400 && cap >= 400);
   // Run the branch: what it sends for a name with quotes and spaces in it.
   if (branch) {
     const sent = [];

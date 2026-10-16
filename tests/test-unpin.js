@@ -73,6 +73,11 @@ const PIECES = {
   loadPart: 'function loadPart(key, fallback) {',
   save: 'function save() {',
   takeGold: 'function takeGold(actorId, amount) {',
+  // A job's reward comes back to its poster on a take down (#2554).
+  payOut: 'function payOut(actorId, amount) {',
+  payHeld: 'function payHeld(hold, n, actorId) {',
+  // The line a post arrives on: a title and a body (#2554).
+  postWords: 'function postWords(line) {',
   post: 'function post(parts, actorId, profileId, toProfile, isJob) {',
   board: 'function board(parts, actorId, profileId, toProfile) {',
   // What the wall shows, on the board's panel and on J (#1627).
@@ -98,8 +103,10 @@ yes('every piece of the board is in the gamemode, once' +
 const GOLD = number(/var GOLD_ID = (0x[0-9A-Fa-f]+);/);
 const NOTICE_FEE = number(/var NOTICE_FEE = (\d+);/);
 const JOB_FEE = number(/var JOB_FEE = (\d+);/);
-yes('the gold id and both fees are read out of the file',
-    GOLD === 15 && NOTICE_FEE > 0 && JOB_FEE > 0);
+const TITLE_CHARS = number(/var POST_TITLE_CHARS = (\d+);/);
+const BODY_CHARS = number(/var POST_BODY_CHARS = (\d+);/);
+yes('the gold id, both fees and a post\'s two lengths are read out of the file',
+    GOLD === 15 && NOTICE_FEE > 0 && JOB_FEE > 0 && TITLE_CHARS === 60 && BODY_CHARS === 600);
 
 const ALICE = { actor: 0xff000058, pid: 101, name: 'Alice' };
 const BOB = { actor: 0xff000059, pid: 202, name: 'Bob' };
@@ -158,6 +165,8 @@ function boot(dir, eng) {
     'var GOLD_ID = ' + GOLD + ';',
     'var NOTICE_FEE = ' + NOTICE_FEE + ';',
     'var JOB_FEE = ' + JOB_FEE + ';',
+    'var POST_TITLE_CHARS = ' + TITLE_CHARS + ';',
+    'var POST_BODY_CHARS = ' + BODY_CHARS + ';',
     'var boardReads = {};',
     // The register's one-shot marks (#502), which save() writes with the rest.
     'var steps = loadPart(\'steps\', {});',
@@ -198,7 +207,7 @@ function row(w, n) {
   for (let i = 0; i < w.rows.length; i++) { if (w.rows[i].n === n) { return w.rows[i]; } }
   return null;
 }
-function shows(w, text) { return w.rows.some(function (r) { return r.text === text; }); }
+function shows(w, text) { return w.rows.some(function (r) { return r.text === text || r.title === text; }); }
 
 let dir = null;
 if (missing.length === 0) {
@@ -212,7 +221,7 @@ try {
     // U1: THE DONE-WHEN. Pin a notice, restart, read it back.
     {
       const s1 = boot(dir, eng);
-      const said = s1.say(ALICE, '/notice', 'Room to let at the Bannered Mare');
+      const said = s1.say(ALICE, '/notice', 'Room to let at the Bannered Mare :: Ask Hulda.');
       yes('U1 a notice goes up and says what it cost',
           said.indexOf(NOTICE_FEE + ' gold') !== -1);
       yes('U1 the coin was taken from the pack', eng.gold(ALICE) === 200 - NOTICE_FEE);
@@ -223,15 +232,15 @@ try {
       const read = wall(s2, BOB);
       yes('U1 after a restart the notice is still on the board',
           !!row(read, 1) && row(read, 1).name === 'Alice' && !row(read, 1).job &&
-          row(read, 1).text === 'Room to let at the Bannered Mare');
+          row(read, 1).title === 'Room to let at the Bannered Mare' && row(read, 1).text === 'Ask Hulda.');
       yes('U1 and the hold still has the fee', s2.funds().whiterun === NOTICE_FEE);
       yes('U1 and the coin stayed taken', eng.gold(ALICE) === 200 - NOTICE_FEE);
     }
 
     // A job of Alice's at [2] and a job of Bob's at [3].
     let s = boot(dir, eng);
-    s.say(ALICE, '/job', 'Clear the cellar');
-    s.say(BOB, '/job', 'Fetch firewood');
+    s.say(ALICE, '/job', '10 Clear the cellar :: Rats.');
+    s.say(BOB, '/job', '10 Fetch firewood :: Ten logs, split.');
     const aliceGold = eng.gold(ALICE);
     const funds = s.funds().whiterun;
 
@@ -261,8 +270,10 @@ try {
           !!s.notices().whiterun[1].down);
       yes('U4 and it says the fee stays with the hold',
           said.indexOf('fee stays') !== -1);
-      yes('U4 with no refund to the pack', eng.gold(ALICE) === aliceGold);
-      yes('U4 and none out of the hold', s.funds().whiterun === funds);
+      // The fee is never refunded; the reward was only held, and comes back (#2554).
+      yes('U4 with no refund of the fee, and the 10 reward back in the pack',
+          eng.gold(ALICE) === aliceGold + 10 && said.indexOf('The 10 gold reward comes back to you.') !== -1);
+      yes('U4 and only the reward out of the hold', s.funds().whiterun === funds - 10);
     }
 
     // U5: THE NUMBERS DO NOT MOVE. [3] still means Bob's job.
@@ -272,8 +283,8 @@ try {
           !shows(read, 'Clear the cellar') && !row(read, 2));
       yes('U5 and the others keep the numbers they had',
           !!row(read, 3) && row(read, 3).job && !row(read, 3).taken && row(read, 3).name === 'Bob' &&
-          row(read, 3).text === 'Fetch firewood' &&
-          !!row(read, 1) && row(read, 1).name === 'Alice' && /^Room to let/.test(row(read, 1).text));
+          row(read, 3).title === 'Fetch firewood' && row(read, 3).reward === 10 &&
+          !!row(read, 1) && row(read, 1).name === 'Alice' && /^Room to let/.test(row(read, 1).title));
       const gap = s.say(CYRUS, '/take', '2');
       yes('U5 the number that came down cannot be taken',
           gap.indexOf('taken down') !== -1 && !s.notices().whiterun[1].taken);
@@ -333,7 +344,7 @@ try {
       try {
         const e2 = engine(1000);
         const b = boot(dir2, e2);
-        for (let i = 1; i <= 12; i++) { b.say(ALICE, '/notice', 'Notice ' + i); }
+        for (let i = 1; i <= 12; i++) { b.say(ALICE, '/notice', 'Notice ' + i + ' :: Number ' + i + '.'); }
         b.say(ALICE, '/unpin', '12');
         const read = wall(b, BOB);
         yes('U9 the newest one taken down is not shown', !row(read, 12));
@@ -355,7 +366,7 @@ try {
       try {
         const e3 = engine(200);
         const b = boot(dir3, e3);
-        b.say(BOB, '/notice', 'Wanted: the man who stole my goat');
+        b.say(BOB, '/notice', 'Wanted: the man who stole my goat :: Reward offered.');
         const first = b.takedown('whiterun', 0, 999);
         yes('U10 takedown takes anybody\'s notice down and records by whom',
             !!first && first.down > 0 && first.downBy === 999);

@@ -47,9 +47,11 @@ function lift(from, to) {
 
 const putBlock = lift('  function putIn(containerRefrId, actorId, baseId, count) {', '\n  }\n');
 const postBlock = lift('  function post(parts, actorId, profileId, toProfile, isJob) {', '\n  }\n');
+// The line a post arrives on, a title and a body (#2554).
+const wordsBlock = lift('  function postWords(line) {', '\n  }\n');
 
 yes('the drop box answer is in the gamemode', putBlock !== null);
-yes('and posting to a board is too', postBlock !== null);
+yes('and posting to a board is too', postBlock !== null && wordsBlock !== null);
 
 const GOLD = 0x0000000F;
 const SWORD = 0x12eb7;
@@ -145,7 +147,7 @@ if (putBlock !== null) {
   }
 }
 
-if (postBlock !== null) {
+if (postBlock !== null && wordsBlock !== null) {
   /** Drive post with a pack and a hold that has a box. */
   function posting(opts) {
     const told = [];
@@ -156,8 +158,8 @@ if (postBlock !== null) {
     const fn = new Function(
       'parts', 'actorId', 'profileId', 'toProfile', 'isJob',
       'boxes', 'notices', 'funds', 'takeGold', 'save', 'plog', 'mp',
-      'NOTICE_FEE', 'JOB_FEE', 'Number', 'boardHere', 'refreshPanel',
-      postBlock + '\nreturn post;');
+      'NOTICE_FEE', 'JOB_FEE', 'POST_TITLE_CHARS', 'POST_BODY_CHARS', 'Number', 'boardHere', 'refreshPanel',
+      wordsBlock + '\n' + postBlock + '\nreturn post;');
     const call = fn(
       null, null, null, null, null,
       boxes, notices, funds,
@@ -168,7 +170,7 @@ if (postBlock !== null) {
       },
       function () { }, function () { },
       { get: function () { return { name: 'Alice' }; } },
-      20, 30, Number,
+      20, 30, 60, 600, Number,
       // Standing at Whiterun's board unless the test says otherwise. The
       // board is what makes /notice a board rather than a command.
       function () { return opts.noBoard ? null : 'whiterun'; },
@@ -183,26 +185,27 @@ if (postBlock !== null) {
 
   // S6: a notice costs twenty and lands on the board.
   {
-    const r = posting({ parts: ['/notice', 'Room', 'to', 'let'] });
+    const r = posting({ parts: ['/notice', 'Room', 'to', 'let', '::', 'Above', 'the', 'smithy.'] });
     yes('S6 a notice costs twenty gold', r.took === 20);
     yes('S6 and it is on the board', r.notices.whiterun.length === 1);
     yes('S6 and the poster\'s board panel is drawn again', r.drawn.length === 1 && r.drawn[0] === 0xff000058);
-    yes('S6 with the words that were said',
-        r.notices.whiterun[0].text === 'Room to let');
+    yes('S6 with the title and the body that were said (#2554)',
+        r.notices.whiterun[0].title === 'Room to let' && r.notices.whiterun[0].text === 'Above the smithy.');
     yes('S6 and the fee goes to the hold', r.funds.whiterun === 20);
   }
 
-  // S7: a job costs thirty and is marked as one, because a job goes on the
-  //     taker's list and a notice is read only.
+  // S7: a job costs thirty and its reward, and is marked as one, because a
+  //     job goes on the taker's list and a notice is read only (#2554).
   {
-    const r = posting({ parts: ['/job', 'Clear', 'the', 'cellar'], isJob: true });
-    yes('S7 a job costs thirty gold', r.took === 30);
-    yes('S7 and is marked as a job', r.notices.whiterun[0].job === true);
+    const r = posting({ parts: ['/job', '12', 'Clear', 'the', 'cellar', '::', 'Rats.'], isJob: true });
+    yes('S7 a job costs thirty gold and its reward, taken together', r.took === 42);
+    yes('S7 and is marked as a job, with its reward held in pay', r.notices.whiterun[0].job === true &&
+        r.notices.whiterun[0].pay === 12 && r.funds.whiterun === 42);
   }
 
   // S8: no gold, no notice. Nothing is posted on credit.
   {
-    const r = posting({ parts: ['/notice', 'Room'], broke: true });
+    const r = posting({ parts: ['/notice', 'Room', '::', 'to', 'let'], broke: true });
     yes('S8 somebody who cannot pay posts nothing',
         !r.notices.whiterun || r.notices.whiterun.length === 0);
     yes('S8 and is told the price', r.told[0].indexOf('20 gold') !== -1);
@@ -211,7 +214,7 @@ if (postBlock !== null) {
   // S9: AWAY FROM A BOARD NOTHING IS POSTED AND NOTHING IS CHARGED. This is
   //     what makes it a board rather than a command you can say anywhere.
   {
-    const r = posting({ parts: ['/notice', 'Room'], noBoard: true });
+    const r = posting({ parts: ['/notice', 'Room', '::', 'to', 'let'], noBoard: true });
     yes('S9 away from a board the fee is not taken', r.took === 0);
     yes('S9 and it says to stand at one',
         r.told[0].indexOf('notice board') !== -1);
@@ -229,10 +232,10 @@ if (postBlock !== null) {
 // Patrick: thirty gold for a job, "which goes on the taker's list". A job is
 // the one thing on a board with a second half. The server records who took
 // what and takes it off the open board so two people do not both go and do it.
-// It does NOT pay anybody and there is no /done: the poster paid to put it up,
-// and whether it was done is between the two of them, the same way rent is
-// handed to a steward in person. A server that judged whether a job was
-// finished would be refereeing roleplay.
+// It does not judge whether a job was done: a server that did would be
+// refereeing roleplay. Since #2554 a job's reward is held from the moment it
+// is posted and paid when its poster says it is done, which
+// tests/test-2554-board-posts.js drives.
 {
   const takeBlock = lift('  function take(parts, actorId, profileId, toProfile) {', '\n  }\n');
   yes('the taker\'s list is in the gamemode', takeBlock !== null);
@@ -256,9 +259,9 @@ if (postBlock !== null) {
   }
 
   if (takeBlock !== null) {
-    const job = () => ({ by: ALICE, name: 'Alice', text: 'Clear the cellar',
-                         at: 1, job: true, taken: 0 });
-    const notice = () => ({ by: ALICE, name: 'Alice', text: 'Room to let',
+    const job = () => ({ by: ALICE, name: 'Alice', title: 'Clear the cellar', text: 'Rats.',
+                         at: 1, job: true, pay: 12, taken: 0 });
+    const notice = () => ({ by: ALICE, name: 'Alice', title: 'Room to let', text: 'Above the smithy.',
                             at: 1, job: false, taken: 0 });
 
     // S11: taking a job puts your name on it.
@@ -268,6 +271,8 @@ if (postBlock !== null) {
       yes('S11 and the taker is named on it', r.list[0].takenName === 'Bob');
       yes('S11 and is sent to the person who posted it',
           r.told[0].indexOf('Alice') !== -1);
+      yes('S11 and told the reward is held until they say it is done',
+          r.told[0].indexOf('The 12 gold reward is held until Alice says it is done.') !== -1);
     }
 
     // S12: and only one person gets it.
