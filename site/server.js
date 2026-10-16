@@ -4116,7 +4116,7 @@ function plainPage(title, lines) {
     '<meta name="description" content="Find your way back to Thornswood, the Skyrim roleplay community.">' +
     '<meta name="robots" content="noindex"><link rel="icon" href="/favicon.ico">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
-    '<link rel="stylesheet" href="/door.css">' +
+    '<script src="/looks.js"></script><link rel="stylesheet" href="/door.css"><link rel="stylesheet" href="/looks.css">' +
     '</head><body class="door">' +
     '<main class="door-box">' +
     '<h1>' + esc(title) + '</h1>' +
@@ -4158,7 +4158,7 @@ function notAllowedPage(me, st) {
           '.<br>It needs one of: <b>' + (cfg.access.play || []).map(esc).join(', ') + '</b>.</p>';
   }
   return '<!doctype html><meta charset=utf-8><title>Not allowed in</title>' +
-    '<link rel="stylesheet" href="/door.css">' +
+    '<script src="/looks.js"></script><link rel="stylesheet" href="/door.css"><link rel="stylesheet" href="/looks.css">' +
     '<body class="door">' +
     '<div class="door-box"><h1>Not allowed in</h1>' +
     why +
@@ -5215,6 +5215,57 @@ async function handle(req, res) {
       { 'Cache-Control': 'no-cache', 'ETag': vtag });
   }
 
+
+  // --------------------------------------------------------------- feed watch (#2440)
+  // Long-poll tip for open launchers. A launcher holding the ETag of its last
+  // version.json waits here until the file changes (or the wait times out),
+  // then runs one ordinary conditional feed check. Anonymous, same /feed and
+  // /feed-dev folders as version.json. No new timer on the launcher that
+  // hammers the document: the tip is quiet until a Ship writes the feed.
+  const feedWatch = p.match(/^\/(feed(?:-dev)?)\/watch$/);
+  if (feedWatch && req.method === 'GET') {
+    const dir = path.join(ROOT, feedWatch[1]);
+    const file = path.join(dir, 'version.json');
+    if (!file.startsWith(dir + path.sep) || !fs.existsSync(file)) {
+      return send(res, 404, 'no such file', 'text/plain');
+    }
+    const have = String(req.headers['if-none-match'] || '');
+    const WAIT_MS = 50000;
+    const started = Date.now();
+    const tick = () => {
+      if (res.writableEnded || res.destroyed) return;
+      let st;
+      try { st = fs.statSync(file); }
+      catch (e) {
+        if (!res.headersSent) return send(res, 404, 'no such file', 'text/plain');
+        return;
+      }
+      const tag = '"' + st.size.toString(16) + '-' + Math.floor(st.mtimeMs).toString(16) + '"';
+      if (!have || have !== tag) {
+        if (res.headersSent) return;
+        res.writeHead(200, {
+          'content-type': 'application/json; charset=utf-8',
+          'cache-control': 'no-store',
+          'etag': tag,
+          'x-content-type-options': 'nosniff'
+        });
+        return res.end(JSON.stringify({ etag: tag }));
+      }
+      if (Date.now() - started >= WAIT_MS) {
+        if (res.headersSent) return;
+        res.writeHead(204, {
+          'cache-control': 'no-store',
+          'etag': tag,
+          'x-content-type-options': 'nosniff'
+        });
+        return res.end();
+      }
+      const t = setTimeout(tick, 500);
+      if (t && typeof t.unref === 'function') t.unref();
+    };
+    tick();
+    return;
+  }
   const feedAsset = p.match(/^\/(feed(?:-dev)?)\/assets\/([0-9a-f]{64})$/);
   if (feedAsset && req.method === 'GET') {
     const dir = path.join(ROOT, feedAsset[1], 'assets');
