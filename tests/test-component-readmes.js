@@ -315,8 +315,11 @@ SIX.forEach(function (d) {
   // page: the source, the window, the icon and art, the voice page, WebView2.
   yes('launcher: holds the source folder, the window and the voice page (' + held.join(', ') + ')',
       held.indexOf('ui.xaml') >= 0 && held.indexOf('voice-host.html') >= 0 && exists('launcher/app/Shell.cs'));
-  yes('launcher: Build-Launcher.ps1 embeds the voice page by name',
-      bl.indexOf("'.." + BS + ".." + BS + "launcher" + BS + "voice-host.html'") >= 0);
+  // Since #498's switch the project file says what goes in, and Build-Launcher.ps1 builds it.
+  const appProj = read('launcher/app/Thornswood.csproj') || '';
+  yes('launcher: Thornswood.csproj embeds the voice page by name, and Build-Launcher.ps1 builds that project',
+      /<EmbeddedResource Include="\.\.\\voice-host\.html"><LogicalName>voice-host\.html<\/LogicalName>/.test(appProj) &&
+      bl.indexOf("Join-Path $Src 'Thornswood.csproj'") >= 0);
   yes('launcher: Voice.cs loads it by that name', voice.indexOf('"voice-host.html"') >= 0);
   yes('launcher: the README says where the source and the window are',
       t.indexOf('`launcher' + BS + 'app`') >= 0 && t.indexOf('ui.xaml') >= 0 && t.indexOf('voice-host.html') >= 0);
@@ -334,8 +337,10 @@ SIX.forEach(function (d) {
   yes('installer' + BS + 'setup: holds the three files its README says, Bootstrap.cs, Setup.manifest and Setup.csproj (' + held.join(', ') + ')',
       held.length === 3 && held.indexOf('Bootstrap.cs') >= 0 && held.indexOf('Setup.manifest') >= 0 && held.indexOf('Setup.csproj') >= 0 &&
       t.indexOf('`Bootstrap.cs`') >= 0 && t.indexOf('`Setup.manifest`') >= 0 && t.indexOf('`Setup.csproj`') >= 0);
-  yes('installer' + BS + 'setup: Build-Launcher.ps1 compiles Bootstrap.cs by name into setup-stub.exe',
-      bl.indexOf("'.." + BS + ".." + BS + "installer" + BS + "setup" + BS + "Bootstrap.cs'") >= 0 && bl.indexOf("setup-stub.exe'") >= 0 &&
+  const setupProj = read('installer/setup/Setup.csproj') || '';
+  yes('installer' + BS + 'setup: Setup.csproj compiles Bootstrap.cs by name, and Build-Launcher.ps1 builds it into setup-stub.exe',
+      /<Compile Include="Bootstrap\.cs"/.test(setupProj) &&
+      bl.indexOf("installer\\setup\\Setup.csproj'") >= 0 && bl.indexOf("'setup-stub.exe'") >= 0 &&
       t.indexOf('setup-stub.exe') >= 0);
   const inst = (/installRoot = @"([^"]+)"/.exec(boot) || [])[1];
   yes('installer' + BS + 'setup: the README gives the install folder Bootstrap.cs offers, ' + inst,

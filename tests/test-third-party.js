@@ -88,32 +88,23 @@ const OURS = {
   'ui-gone.json': 'the Daedric menu set and unused fork assets a refresh must not copy back'
 };
 
-const build = read(path.join(REPO, 'scripts', 'release', 'Build-Launcher.ps1')) || '';
-yes('Build-Launcher.ps1 is there to read', build.length > 0);
-
-// The WebView2 names come out of two arrays and go in through a loop as $n,
-// so they are read from the arrays rather than from the /resource: line.
-const wv2 = [];
-const mm = /\$wv2Managed\s*=\s*@\(([^)]*)\)/.exec(build);
-if (mm) { mm[1].replace(/'([^']+)'/g, function (_, n) { wv2.push(n); return _; }); }
-const ml = /\$wv2Loader\s*=\s*'([^']+)'/.exec(build);
-if (ml) { wv2.push(ml[1]); }
-yes('Build-Launcher.ps1 names the WebView2 files it embeds (' + wv2.join(', ') + ')', wv2.length === 3);
+// What goes into the launcher is written in its project file since #498's
+// switch (Build-Launcher.ps1 only runs MSBuild on it): every EmbeddedResource
+// by the LogicalName the code reads it under.
+const proj = read(path.join(REPO, 'launcher', 'app', 'Thornswood.csproj')) || '';
+yes('launcher\\app\\Thornswood.csproj is there to read', proj.length > 0);
 
 const resources = [];
 const unreadable = [];
-build.split('\n').forEach(function (line) {
-  if (line.indexOf('/resource:') < 0) { return; }
-  const m = /"\/resource:(.*),([^,"]+)"/.exec(line);
-  if (!m) { unreadable.push(line.trim()); return; }
-  const name = m[2];
-  if (name.charAt(0) !== '$') { resources.push(name); return; }
-  if (m[1].indexOf('$wv2Dir') >= 0) { wv2.forEach(function (n) { resources.push(n); }); return; }
-  unreadable.push(line.trim());
+(proj.match(/<EmbeddedResource\b[\s\S]*?<\/EmbeddedResource>/g) || []).forEach(function (el) {
+  const m = /<LogicalName>([^<]+)<\/LogicalName>/.exec(el);
+  if (m) { resources.push(m[1].trim()); } else { unreadable.push(el.replace(/\s+/g, ' ')); }
 });
-unreadable.forEach(function (l) { console.log('      cannot read the name in: ' + l); });
-yes('every /resource: line in Build-Launcher.ps1 has a name this can read', unreadable.length === 0);
-yes('Build-Launcher.ps1 embeds resources to check (' + resources.length + ' lines)', resources.length >= 10);
+unreadable.forEach(function (l) { console.log('      no LogicalName in: ' + l); });
+yes('every EmbeddedResource in Thornswood.csproj names the resource it becomes', unreadable.length === 0);
+const wv2 = resources.filter(function (n) { return /WebView2/i.test(n); });
+yes('Thornswood.csproj embeds the WebView2 files (' + wv2.join(', ') + ')', wv2.length === 3);
+yes('Thornswood.csproj embeds resources to check (' + resources.length + ')', resources.length >= 10);
 
 const seen = {};
 resources.forEach(function (name) {

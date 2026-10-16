@@ -33,6 +33,7 @@
 param([string]$CharsPath, [string]$SlotsPath, [string]$DiscordPath)
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 if (-not $CharsPath) { $CharsPath = Join-Path $Here '..\launcher\app\Chars.cs' }
@@ -364,7 +365,7 @@ try {
     $cscArgs += (Resolve-Path -LiteralPath $CharsPath).Path
     $cscArgs += (Resolve-Path -LiteralPath $SlotsPath).Path
     $cscArgs += $driverFile
-    $compiled = & $csc @cscArgs
+    $compiled = & $LauncherCsc @cscArgs
     $built = ($LASTEXITCODE -eq 0) -and (Test-Path -LiteralPath $exe)
     Yes 'Chars.cs and the lifted ticket reading compile with the .NET Framework 4 csc, which is C# 5' $built
     if (-not $built) {

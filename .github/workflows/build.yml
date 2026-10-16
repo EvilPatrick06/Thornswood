@@ -1,9 +1,9 @@
 # Every pull request and every push to main gets the checks a release starts
 # with: do all the PowerShell scripts parse, does every game script parse,
 # does the bot parse, do the test harnesses still pass, and does the launcher
-# compile with the .NET Framework 4 csc (so C# 5, until #498 moves the build
-# to MSBuild; on GitHub's runner the MSBuild build is held to it, the step
-# "Build the launcher with MSBuild too, and compare"). A red mark here means the
+# build with MSBuild from its project files (#498, switched 15 Oct; the step
+# "Check the MSBuild launcher against its sources" holds that build to the
+# repository, resource by resource). A red mark here means the
 # branch would stop Ship.ps1; a green one means it is worth a person's time
 # to read. It builds only; nothing is published.
 #
@@ -827,21 +827,19 @@ jobs:
           .\scripts\dev\Check-Secrets.ps1 -Binary $built
           exit $LASTEXITCODE
 
-      - name: Build the launcher with MSBuild too, and compare
-        if: runner.environment == 'github-hosted'
+      - name: Check the MSBuild launcher against its sources
         shell: pwsh
         run: |
-          # Issue #498 (Patrick's option C, 11 Oct): the launcher moves to
-          # MSBuild and launcher\app\Thornswood.csproj. Until the switch the
-          # step above is the build that ships, and this holds the project
-          # files to it: both ways, both exes, the same resources, references,
-          # types, file details, icon and manifest. GitHub's image has Visual
-          # Studio (windows-2025-vs2026, Visual Studio 18 Enterprise, on
-          # 12 Oct); the VPS runners have no MSBuild (12 Oct), so the
-          # fallback job leaves this step out, and the nightly runs the same
-          # harness there with the builds said SKIP.
+          # Issue #498 (Patrick's option C, 11 Oct; switched 15 Oct): the
+          # launcher is built only by MSBuild from launcher\app\Thornswood.csproj
+          # and installer\setup\Setup.csproj. This holds that build to what the
+          # comparison with the old csc build proved: every resource byte for
+          # byte its file, the references, the PE kind, the version in the
+          # file details and the manifest, the icon, nothing beside the exe.
+          # GitHub's image has Visual Studio; the VPS runners have the Build
+          # Tools from Bootstrap-VPS.ps1 -IncludeBuildTools (option A, 12 Oct).
           & pwsh -NoProfile -File tests\test-498-msbuild.ps1 -RequireMSBuild -Scratch (Join-Path $env:RUNNER_TEMP 'msbuild-498')
-          if ($LASTEXITCODE -ne 0) { Write-Host '::error file=tests/test-498-msbuild.ps1::the MSBuild build does not make the same launcher as the csc build, see the lines above'; exit 1 }
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error file=tests/test-498-msbuild.ps1::the MSBuild launcher does not match its sources, see the lines above'; exit 1 }
 
       - name: Keep the exe from this build
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

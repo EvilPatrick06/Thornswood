@@ -342,12 +342,11 @@ if ($hasGame) {
 
 # ------------------------------------------------------------- the compiler --
 Head 'The build'
-$csc = @(
-  "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
-  "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe"
-) | Where-Object { Test-Path $_ } | Select-Object -First 1
-Ready 'the .NET Framework 4 compiler is here' ($null -ne $csc) $csc `
-  'Install the .NET Framework 4, which is unusual to be missing on Windows 10 or 11'
+# The launcher builds only with MSBuild from its project files (#498).
+. (Join-Path $PSScriptRoot 'Find-MSBuild.ps1') -Load
+$msb = Find-ThornswoodMSBuild
+Ready 'MSBuild and the .NET Framework 4.8.1 reference assemblies are here' ([bool]($msb.MSBuild -and $msb.Csc -and $msb.RefAssemblies)) $msb.MSBuild `
+  'Developer-Guide.md "Setting up a machine" has the one install line (Visual Studio 2022 Build Tools with the MSBuild workload and the 4.8.1 targeting pack)'
 
 $node = $null
 try { $node = (Get-Command node -EA Stop).Source } catch { }
