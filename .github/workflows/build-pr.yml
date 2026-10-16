@@ -482,7 +482,7 @@ jobs:
                  'test-docs-pwfile.ps1', 'test-docs-password.ps1', 'test-2317-rotate-config.ps1',
                  'test-site-credits-fill.js', 'test-deployed-build.ps1', 'test-459-publish-record.ps1',
                  'test-site-headers.js', 'test-generated-source-chain.ps1',
-                 'test-site-render.js', 'test-site-discovery.js',
+                 'test-site-render.js', 'test-site-discovery.js', 'test-515-site-looks.js',
                  'test-home-status.js', 'test-seats.js', 'test-age-gate.js', 'test-download-hash.js', 'test-2233-inuse-image.ps1',
                  'test-download-button.js', 'test-gallery-ux.js', 'test-gallery.js', 'test-site-local.js',
                  'test-release-baseline.ps1', 'test-publish-refusals.ps1', 'test-2513-every-harness-listed.ps1', 'test-release-workflow.ps1',
