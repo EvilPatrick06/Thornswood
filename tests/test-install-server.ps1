@@ -1147,6 +1147,80 @@ try {
         Yes '  having changed no file and no record' ((Get (Join-Path $devRoot 'data\shipped.txt')) -eq $shippedWas -and (Get $devCur) -eq $curWas)
         Yes '  and node reads back at High' ((@($script:lastOut) -join "`n") -match 'node, pid \d+, runs at High priority')
         if ($script:fail -gt $failed) { Show }
+
+        # ---- Publish-Server -FromStore (#459) -------------------------------------
+        # The recorded build out of the box's store, with no engine build here:
+        # no -Dist and no -SkipBuild, the payload made by the publish itself.
+        # The store has kept the 'binary v2' build since the first publish
+        # above. 'binary v3' is a build of the same commit made elsewhere (the
+        # way engine.yml makes one), sent with -ServerBuild.
+        function PublishStore([string]$record, [hashtable]$more = @{}) {
+            $a = @{ Channel = 'dev'; VpsRoot = $devRoot; TaskName = ($TaskPrefix + ' Dev'); VpsHost = '127.0.0.1'; VpsUser = 'nobody'
+                    Zip = (Join-Path $work 'store-payload.zip'); NoPause = $true; Wait = 8; Record = $record; NoNews = $true; NoPush = $true
+                    GamePort = $D; ResourcesPort = ($D + 1); FromStore = $true }
+            foreach ($k in $more.Keys) { $a[$k] = $more[$k] }
+            $global:TsSshSeen.Clear()
+            $global:LASTEXITCODE = 0
+            $said = @(& $publish @a *>&1 | ForEach-Object { "$_" })
+            $script:lastOut = $said
+            return $global:LASTEXITCODE
+        }
+        # A build folder and its record, and the artifact engine.yml would keep.
+        function StoreBuild([string]$binary, [switch]$Light) {
+            $b = Join-Path $work ('store-build-' + ($binary -replace '\W', ''))
+            Put (Join-Path $b 'scam_native.node') $binary
+            Put (Join-Path $b 'dist_back\skymp5-server.js') $stubJs
+            foreach ($k in $forkRest.Keys) { Put (Join-Path $b ($k -replace '/', '\')) $forkRest[$k] }
+            $r = RecordText $binary | ConvertFrom-Json
+            if ($Light) { $r | Add-Member -NotePropertyName lightPlugins -NotePropertyValue $true -Force }
+            $rp = Join-Path $b 'record.json'
+            Put $rp ($r | ConvertTo-Json -Depth 5)
+            $z = & { . (Join-Path $Here 'scripts\deploy\ServerArtifact.ps1'); New-ThornswoodServerBuildArtifact -From $b -Record $rp -OutDir (Join-Path $b 'ci') }
+            return [pscustomobject]@{ Record = $rp; Zip = $z.Zip; Name = $z.Name }
+        }
+        # What a stage and a root are held to (ServerBuild.ps1), to read the result.
+        . (Join-Path $Here 'scripts\deploy\ServerBuild.ps1')
+        $v3 = StoreBuild 'binary v3'
+        $devBefore = Tree $devRoot
+        $devPid = Owner $D
+        $orderWas = (Js (SettingsOf $devRoot).loadOrder)
+
+        $code = PublishStore $v3.Record
+        $failed = $script:fail
+        Yes 'Publish-Server -FromStore whose build the store does not keep exits 1, saying so (#459)' (
+            $code -ne 0 -and (($script:lastOut) -join "`n") -match 'keeps no server build of abcdef01 with the record this commit holds')
+        Yes '  naming the build of that commit it does keep' ((($script:lastOut) -join "`n") -match 'server-abcdef012345-[0-9a-f]{16}, from that commit with another record')
+        Yes '  before anything is sent: the installer never ran, the same process, the root as it was' (
+            @($global:TsSshSeen | Where-Object { $_ -match '-File' }).Count -eq 0 -and ((Owner $D) -eq $devPid) -and ((Tree $devRoot) -eq $devBefore))
+        if ($script:fail -gt $failed) { Show }
+
+        $devOwn = SettingsOf $devRoot
+        $code = PublishStore $v3.Record @{ ServerBuild = $v3.Zip }
+        $failed = $script:fail
+        Yes 'Publish-Server -FromStore -ServerBuild sends the build to the store and puts it on: exit 0, answering' ($code -eq 0 -and (WaitUp $D))
+        Yes '  the build in the store by name, as it was made' (
+            (Test-Path -LiteralPath (Join-Path $deploys ('server\' + $v3.Name))) -and (Sha (Join-Path $deploys ('server\' + $v3.Name))) -eq (Sha $v3.Zip))
+        Yes '  the server runs it: the binary, and the record beside it' (
+            (Get (Join-Path $devRoot 'scam_native.node')) -eq 'binary v3' -and (Sha (Join-Path $devRoot 'server-build.json')) -eq (Sha $v3.Record))
+        Yes '  every other file the record lists is there as recorded' (
+            @(Get-ThornswoodServerBuildProblems (Rec $v3.Record) (Get-ThornswoodServerFolderSums $devRoot) 'the dev root' 'v3').Count -eq 0)
+        Yes '  the load order and the plugins it names are the running server''s' (
+            (Js (SettingsOf $devRoot).loadOrder) -eq $orderWas -and (Test-Path -LiteralPath (Join-Path $devRoot 'plugins\Skyrim.esm')) -and (Test-Path -LiteralPath (Join-Path $devRoot 'plugins\A.esp')))
+        Yes ('  and every setting of its own stays (#1222): ' + ((Carried $devOwn (SettingsOf $devRoot)) -join ', ')) ((Carried $devOwn (SettingsOf $devRoot)).Count -eq 0)
+        Yes '  and the box records the gamemode it runs and the engine (#459, #2303)' ((Get $devBeside) -eq (Get $devCur) -and (Rec $devCur).name -eq $art.Name -and (Rec $siteBuild).dev.commit -eq 'abcdef0123456789abcdef0123456789abcdef01')
+        if ($script:fail -gt $failed) { Show }
+
+        # An engine that reads light plugins another way than the running one
+        # would move every form id after the first light plugin (#1715).
+        $v4 = StoreBuild 'binary v4' -Light
+        $devBefore = Tree $devRoot
+        $devPid = Owner $D
+        $code = PublishStore $v4.Record @{ ServerBuild = $v4.Zip }
+        $failed = $script:fail
+        Yes 'Publish-Server -FromStore of an engine that reads light plugins another way is refused by the installer (#1715)' (
+            $code -ne 0 -and (($script:lastOut) -join "`n") -match 'written for an engine that does not load light plugins')
+        Yes '  with the server not stopped or changed' (((Owner $D) -eq $devPid) -and ((Tree $devRoot) -eq $devBefore))
+        if ($script:fail -gt $failed) { Show }
     }
 
     # ---- Publish-Server.ps1, whole, on the live channel (#1222) --------------------
