@@ -147,6 +147,10 @@ param(
     [switch]$FromStore,
     # The store's server folder, for -FromStore.
     [string]$Store = 'C:\Thornswood-Deploys\server',
+    # Register the task as SYSTEM, Highest, the way it was before #2578, and
+    # grant nothing. The way back if the server will not run as LOCAL SERVICE
+    # (ServiceAccount.ps1 says what it is given).
+    [switch]$AsSystem,
     # Lets tests\test-install-server.ps1 run this on a machine with the game on
     # it, against a scratch root. Nothing else passes it.
     [switch]$AllowGamingPc
@@ -266,6 +270,26 @@ if (-not (Test-Path -LiteralPath $waitLib)) {
     Finish 'INSTALL REFUSED' 1
 }
 . $waitLib
+# The account the task runs as and what it may reach (#2578): beside this
+# script too, sent with it. Without it the task could not be registered.
+$serviceLib = Join-Path $here 'ServiceAccount.ps1'
+if (-not (Test-Path -LiteralPath $serviceLib)) {
+    Say "ServiceAccount.ps1 is not beside this installer, so the account the server runs as has no source. Nothing was changed." 'Red'
+    Finish 'INSTALL REFUSED' 1
+}
+. $serviceLib
+# The fail-safe (#2578), before anything is stopped or changed: the server
+# goes onto LOCAL SERVICE only where LOCAL SERVICE can read none of what no
+# service may.
+if (-not $AsSystem -and -not $NoTask) {
+    $cannot = @(Test-ThornswoodServiceCannotReach (Get-ThornswoodServiceNeverReach -Own $Root))
+    if ($cannot.Count) {
+        Say 'LOCAL SERVICE could read what no service may, so the server is not moved onto it:' 'Red'
+        foreach ($c in $cannot) { Say ('  ' + $c) 'Red' }
+        Say 'Lock those (scripts\vps\Lock-VpsFolders.ps1), or pass -AsSystem. Nothing was changed.' 'Red'
+        Finish 'INSTALL REFUSED' 1
+    }
+}
 # The log writer the task runs the server under (#2349): beside this script,
 # sent with it, or in scripts\vps from a checkout. Without it the task could
 # not start the server, so nothing runs.
@@ -574,10 +598,31 @@ function Register-ServerTask([string]$writer) {
                                              -RestartInterval (New-TimeSpan -Minutes 1) `
                                              -ExecutionTimeLimit ([TimeSpan]::Zero) `
                                              -Priority 1
-    $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+    # LOCAL SERVICE, Limited, with a SID of its own, and the grants on its
+    # folder that go to that SID (#2578, ServiceAccount.ps1). -AsSystem is
+    # SYSTEM, Highest, as it was. A task whose SID cannot be looked up, or
+    # whose grants cannot be written, goes back on SYSTEM rather than start a
+    # server that cannot write its world.
+    $principal = New-ThornswoodServicePrincipal -AsSystem:$AsSystem
 
     Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $triggers `
                            -Settings $settings -Principal $principal | Out-Null
+    if (-not $AsSystem) {
+        $why = ''
+        $sid = Get-ThornswoodTaskSid $TaskName
+        if (-not $sid) { $why = "the task's own SID, NT TASK\$TaskName, could not be looked up" }
+        else {
+            try {
+                foreach ($l in @(Grant-ThornswoodServiceFolder -Root $Root -Sid $sid -Writable 'world', 'data', 'private', 'for-bot' -Files '*.log', '*.log.*')) { Say $l 'DarkGray' }
+            } catch { $why = 'its folder could not be granted to it: ' + $_.Exception.Message }
+        }
+        if ($why) {
+            Say ("$why, so the task goes back on SYSTEM") 'Red'
+            Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
+            Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $triggers `
+                                   -Settings $settings -Principal (New-ThornswoodServicePrincipal -AsSystem) | Out-Null
+        } else { Say "the task runs as LOCAL SERVICE, Limited, as NT TASK\$TaskName" 'Cyan' }
+    }
     Write-Host "scheduled task '$TaskName' registered, starts at boot, restarts every minute if it stops" -ForegroundColor Cyan
 }
 

@@ -48,7 +48,10 @@ param(
   # exist, so changing the settings above in this file does nothing at all to
   # a box that is already set up, and running the whole script to fix a task
   # redoes the certificate and the firewall for no reason.
-  [switch]$TaskOnly
+  [switch]$TaskOnly,
+  # Register Thornswood Web as SYSTEM, Highest, the way it was before #2578,
+  # and grant nothing. The way back if Caddy will not run as LOCAL SERVICE.
+  [switch]$AsSystem
 )
 
 $ErrorActionPreference = 'Stop'
@@ -93,6 +96,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Script.ps1')
 . (Join-Path $Here '..\vps\Lock-Folder.ps1')
+. (Join-Path $Here 'ServiceAccount.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 
@@ -213,6 +217,33 @@ Remote @"
 `$dir = '$caddyWin'
 `$exe = Join-Path `$dir 'caddy.exe'
 
+# The account Caddy runs as (#2578, ServiceAccount.ps1). The fail-safe comes
+# before Caddy is stopped: it goes onto LOCAL SERVICE only where LOCAL SERVICE
+# can read none of what no service may.
+$(Get-ThornswoodServiceAccountScript)
+`$asSystem = `$$(if ($AsSystem) { 'true' } else { 'false' })
+if (-not `$asSystem) {
+  `$cannot = @(Test-ThornswoodServiceCannotReach (Get-ThornswoodServiceNeverReach))
+  if (`$cannot.Count) {
+    'LOCAL SERVICE could read what no service may, so Caddy is not moved onto it:'
+    `$cannot
+    'Lock those (scripts\vps\Lock-VpsFolders.ps1), or pass -AsSystem. Caddy was not stopped or changed.'
+    exit 1
+  }
+}
+
+# Caddy keeps its certificates and ACME account in data beside it (the
+# Caddyfile's storage line, #2578), not in the profile of whichever account
+# runs it, so they are the same under SYSTEM and LOCAL SERVICE. What it kept
+# as SYSTEM is copied in once, so the move does not ask Let's Encrypt again.
+`$data = Join-Path `$dir 'data'
+if (-not (Test-Path -LiteralPath `$data)) { `$null = New-Item -ItemType Directory -Path `$data -Force }
+`$kept = Join-Path `$env:SystemRoot 'System32\config\systemprofile\AppData\Roaming\Caddy'
+if ((Test-Path -LiteralPath `$kept) -and -not (Test-Path -LiteralPath (Join-Path `$data 'certificates'))) {
+  Copy-Item -Path (Join-Path `$kept '*') -Destination `$data -Recurse -Force
+  'copied what Caddy kept as SYSTEM into ' + `$data
+}
+
 Stop-ScheduledTask -TaskName 'Thornswood Web' -EA SilentlyContinue
 Get-Process caddy -EA SilentlyContinue | Stop-Process -Force -EA SilentlyContinue
 
@@ -260,9 +291,12 @@ Get-Process caddy -EA SilentlyContinue | Stop-Process -Force -EA SilentlyContinu
       -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable ``
       -MultipleInstances IgnoreNew -Priority 4
 
+# LOCAL SERVICE, Limited, with a SID of its own (#2578); -AsSystem is SYSTEM,
+# Highest, as it was. Given on an existing task too, for the reason below.
+`$who = New-ThornswoodServicePrincipal -AsSystem:`$asSystem
 if (-not (Get-ScheduledTask -TaskName 'Thornswood Web' -EA SilentlyContinue)) {
   Register-ScheduledTask -TaskName 'Thornswood Web' -Action `$a -Trigger @(`$boot, `$again) ``
-    -Settings `$s -RunLevel Highest -User 'SYSTEM' | Out-Null
+    -Settings `$s -Principal `$who | Out-Null
   'scheduled task created'
 } else {
   # -Trigger and -Settings as well as -Action. An existing task keeps whatever
@@ -270,8 +304,24 @@ if (-not (Get-ScheduledTask -TaskName 'Thornswood Web' -EA SilentlyContinue)) {
   # a three day limit through every run of this script that was meant to change
   # them. Deploy-Docs.ps1 learned the same thing on its own task.
   Set-ScheduledTask -TaskName 'Thornswood Web' -Action `$a -Trigger @(`$boot, `$again) ``
-    -Settings `$s | Out-Null
+    -Settings `$s -Principal `$who | Out-Null
   'scheduled task updated'
+}
+# Read and run in the Caddy folder, change only data (ServiceAccount.ps1).
+# Back on SYSTEM when the SID cannot be looked up or the grants cannot be
+# written, rather than a Caddy that cannot keep its certificates.
+if (-not `$asSystem) {
+  `$why = ''
+  `$sid = Get-ThornswoodTaskSid 'Thornswood Web'
+  if (-not `$sid) { `$why = 'the task SID NT TASK\Thornswood Web could not be looked up' }
+  else {
+    try { Grant-ThornswoodServiceFolder -Root `$dir -Sid `$sid -Writable 'data' }
+    catch { `$why = 'its folder could not be granted to it: ' + `$_.Exception.Message }
+  }
+  if (`$why) {
+    `$why + ', so the task goes back on SYSTEM'
+    Set-ScheduledTask -TaskName 'Thornswood Web' -Principal (New-ThornswoodServicePrincipal -AsSystem) | Out-Null
+  } else { 'the task runs as LOCAL SERVICE, Limited, as NT TASK\Thornswood Web' }
 }
 
 # Read back rather than assumed. Set-ScheduledTask is quiet about settings it

@@ -383,7 +383,7 @@ function Scps([string]$pageText) {
 $beside = Beside (Join-Path $scriptsDir 'deploy\Install-ThornswoodServer.ps1')
 Yes ('the installer loads {0} from beside itself, read off its syntax tree' -f ($beside -join ', ')) (
     $beside -contains 'ServerSettings.ps1' -and $beside -contains 'ServerBuild.ps1' -and
-    $beside -contains 'ServerReadyWait.ps1')
+    $beside -contains 'ServerReadyWait.ps1' -and $beside -contains 'ServiceAccount.ps1')
 function Short-Of($scps) {
     $miss = @()
     foreach ($sc in $scps) {
@@ -399,7 +399,7 @@ $caughtScp = Short-Of (Scps $wasStep6)
 $caughtNames = @($caughtScp | ForEach-Object { ($_ -split ' ')[0] })
 Yes 'the check catches step 6 as it was, which left ServerBuild.ps1 behind' (
     $caughtNames -contains 'ServerBuild.ps1' -and $caughtNames -contains 'ServerReadyWait.ps1' -and
-    $caughtNames -contains 'RecordShape.ps1' -and $caughtNames -contains 'Server-Log.js' -and $caughtScp.Count -eq 4)
+    $caughtNames -contains 'RecordShape.ps1' -and $caughtNames -contains 'Server-Log.js' -and $caughtNames -contains 'ServiceAccount.ps1' -and $caughtScp.Count -eq 5)
 $carries = 0; $short = @()
 foreach ($page in $pages.Keys) {
     $sc = Scps $pages[$page]

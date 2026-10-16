@@ -117,7 +117,7 @@ try {
     # box holds them. Not named tools: that folder is retired, and
     # test-tools-retired.ps1 refuses any code that builds a path into it.
     $installer = Join-Path $T 'installer'
-    foreach ($f in 'Install-ThornswoodServer.ps1', 'ServerSettings.ps1', 'ServerBuild.ps1', 'ServerReadyWait.ps1') {
+    foreach ($f in 'Install-ThornswoodServer.ps1', 'ServerSettings.ps1', 'ServerBuild.ps1', 'ServerReadyWait.ps1', 'ServiceAccount.ps1') {
         New-Item -ItemType Directory -Force -Path $installer | Out-Null
         Copy-Item -LiteralPath (Join-Path $repo "scripts\deploy\$f") -Destination (Join-Path $installer $f)
     }

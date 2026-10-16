@@ -72,7 +72,10 @@ param(
     # before the old files and the old task go back.
     [int]$Wait = 30,
     # Put the files the last install replaced back in, and send nothing.
-    [switch]$PutBack
+    [switch]$PutBack,
+    # Register the task as SYSTEM, Highest, the way it was before #2578, and
+    # grant nothing. The way back if voice will not run as LOCAL SERVICE.
+    [switch]$AsSystem
 )
 
 $ErrorActionPreference = 'Stop'
@@ -83,6 +86,9 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 . (Join-Path $Here 'Swap.ps1')
+# The account the task runs as and what it may reach (#2578), sent inside
+# the script that installs it.
+. (Join-Path $Here 'ServiceAccount.ps1')
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
@@ -327,6 +333,21 @@ if (-not `$node) {
 }
 if (-not `$node) { 'node is not installed on this machine'; 'SWAP REFUSED'; exit 1 }
 
+# The account voice runs as (#2578, ServiceAccount.ps1). The fail-safe comes
+# before anything is stopped or changed: voice goes onto LOCAL SERVICE only
+# where LOCAL SERVICE can read none of what no service may.
+$(Get-ThornswoodServiceAccountScript)
+`$AsSystem = `$$(if ($AsSystem) { 'true' } else { 'false' })
+if (-not `$AsSystem) {
+    `$cannot = @(Test-ThornswoodServiceCannotReach (Get-ThornswoodServiceNeverReach -Own '$Root'))
+    if (`$cannot.Count) {
+        'LOCAL SERVICE could read what no service may, so voice is not moved onto it:'
+        `$cannot
+        'Lock those (scripts\vps\Lock-VpsFolders.ps1), or pass -AsSystem. Nothing was stopped or changed.'
+        'SWAP REFUSED'; exit 1
+    }
+}
+
 # The port, opened only for a service that answers every interface. On
 # loopback (the default since #1304) nothing outside has any business with it,
 # so a rule an earlier install made for it goes. The position feed is
@@ -512,8 +533,25 @@ function StartIt {
             # server's reads back (#1931). tests\test-service-task-priority.ps1
             # measures all three.
             `$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) -Priority 1
-            `$principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+            # LOCAL SERVICE, Limited, with a SID of its own and the grants on
+            # this root that go to it (#2578). Back on SYSTEM when the SID
+            # cannot be looked up or the grants cannot be written.
+            `$principal = New-ThornswoodServicePrincipal -AsSystem:`$AsSystem
             Register-ScheduledTask -TaskName '$TaskName' -Action `$action -Trigger (New-ScheduledTaskTrigger -AtStartup) -Settings `$settings -Principal `$principal | Out-Null
+            if (-not `$AsSystem) {
+                `$why = ''
+                `$sid = Get-ThornswoodTaskSid '$TaskName'
+                if (-not `$sid) { `$why = 'the task SID NT TASK\$TaskName could not be looked up' }
+                else {
+                    try { Grant-ThornswoodServiceFolder -Root '$Root' -Sid `$sid -Writable 'chat' -Files 'voice.log', 'voice.log.*', 'token-key.txt' }
+                    catch { `$why = 'its folder could not be granted to it: ' + `$_.Exception.Message }
+                }
+                if (`$why) {
+                    `$why + ', so the task goes back on SYSTEM'
+                    Unregister-ScheduledTask -TaskName '$TaskName' -Confirm:`$false
+                    Register-ScheduledTask -TaskName '$TaskName' -Action `$action -Trigger (New-ScheduledTaskTrigger -AtStartup) -Settings `$settings -Principal (New-ThornswoodServicePrincipal -AsSystem) | Out-Null
+                } else { 'the task runs as LOCAL SERVICE, Limited, as NT TASK\$TaskName' }
+            }
             RemoveStrayTasks
         }
     }

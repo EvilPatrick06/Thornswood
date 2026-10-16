@@ -309,7 +309,7 @@ foreach ($t in 'ssh', 'scp') {
 . (Join-Path $Here '..\deploy\ServerArtifact.ps1')
 # What engine each server runs, for the site's credits page (#2303).
 . (Join-Path $Here '..\deploy\DeployedBuild.ps1')
-$committedOnly = @('scripts/deploy/Install-ThornswoodServer.ps1', 'scripts/deploy/ServerSettings.ps1', 'scripts/deploy/ServerBuild.ps1', 'scripts/deploy/ServerReadyWait.ps1', 'scripts/vps/Server-Log.js', 'scripts/release/Read-JsonFile.ps1', 'scripts/release/RecordShape.ps1')
+$committedOnly = @('scripts/deploy/Install-ThornswoodServer.ps1', 'scripts/deploy/ServerSettings.ps1', 'scripts/deploy/ServerBuild.ps1', 'scripts/deploy/ServerReadyWait.ps1', 'scripts/deploy/ServiceAccount.ps1', 'scripts/vps/Server-Log.js', 'scripts/release/Read-JsonFile.ps1', 'scripts/release/RecordShape.ps1')
 if (-not $PutBack -and -not $TaskOnly) { $committedOnly += 'game/gamemode.js', 'records/most-online.json', 'records/server-build.json' }
 # -FromStore sends our plugins from game\content (#459).
 . (Join-Path $Here 'RepoPlugins.ps1')
@@ -342,6 +342,10 @@ if (-not (Test-Path -LiteralPath $buildLib)) { Die "not found: $buildLib" }
 $waitLib = Join-Path $Here '..\deploy\ServerReadyWait.ps1'
 if (-not (Test-Path -LiteralPath $waitLib)) { Die "not found: $waitLib" }
 . $waitLib
+# The account the server's task runs as (#2578). The installer loads it from
+# beside itself on the box and refuses without it.
+$serviceLib = Join-Path $Here '..\deploy\ServiceAccount.ps1'
+if (-not (Test-Path -LiteralPath $serviceLib)) { Die "not found: $serviceLib" }
 # And the record contracts (#2180, slice 4), which the installer holds the
 # payload's settings and server-build.json to. It refuses without them.
 $shapeLibs = @((Join-Path $Here 'Read-JsonFile.ps1'), (Join-Path $Here 'RecordShape.ps1'))
@@ -414,6 +418,8 @@ function Send-InstallerOnly {
     Invoke-ThornswoodNative { & scp @ssh $buildLib "${target}:C:/ServerBuild.ps1" }
     if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
     Invoke-ThornswoodNative { & scp @ssh $waitLib "${target}:C:/ServerReadyWait.ps1" }
+    if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
+    Invoke-ThornswoodNative { & scp @ssh $serviceLib "${target}:C:/ServiceAccount.ps1" }
     if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
     Send-ShapeLibs 'Nothing up there was changed.'
 }
@@ -837,6 +843,8 @@ if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. The server up the
 Invoke-ThornswoodNative { & scp @ssh $buildLib "${target}:C:/ServerBuild.ps1" }
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. The server up there was not touched." }
 Invoke-ThornswoodNative { & scp @ssh $waitLib "${target}:C:/ServerReadyWait.ps1" }
+if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. The server up there was not touched." }
+Invoke-ThornswoodNative { & scp @ssh $serviceLib "${target}:C:/ServiceAccount.ps1" }
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. The server up there was not touched." }
 Send-ShapeLibs 'The server up there was not touched.'
 Say 'copied' 'Green'
