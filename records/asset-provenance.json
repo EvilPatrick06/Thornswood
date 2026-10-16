@@ -839,15 +839,15 @@
       "record": "records/ui-gone.json#unused"
     },
     {
-      "path": "Data\\meshes\\olivar-messageboard\\missiveboardcotnd.nif",
-      "what": "The message board mesh Thornswood-Content.esp used to place, a reworked copy of the Missives board (Nexus 111375) that came with the other server's records. Since #2502 the plugin names game/ours/Data/meshes/thornswood/noticeboard01.nif instead, so the held line holds nothing and the next release lists this mesh as gone.",
-      "published": "Dev packs until #2502; the next release lists it as gone",
+      "path": "Data\\meshes\\ (the other server's board folder, named with its prefix)\\missiveboardcotnd.nif",
+      "what": "The message board mesh Thornswood-Content.esp used to place, a reworked copy of the Missives board (Nexus 111375) that came with the other server's records. Since #2502 the plugin names game/ours/Data/meshes/thornswood/noticeboard01.nif instead, so its held line held nothing, and it came out on 16 October (#400). The mesh is somebody else's file and never ships.",
+      "published": "Dev packs until #2502; not since",
       "source": "Another server's files",
       "creator": "not recorded",
       "licence": "None found",
       "attribution": "not applicable",
-      "approved": "Ships under -WhileContentNamesIt (#2298)",
-      "evidence": "scripts\\release\\Ship-Rules.ps1 New-ShipHeld lines; #1258; #2298.",
+      "approved": "Shipped under -WhileContentNamesIt (#2298) until #2502; that line is gone (#400)",
+      "evidence": "scripts\\release\\Ship-Rules.ps1, the comment closing $ShipHeldForCollection; #1258; #2298; #400.",
       "status": "no-licence-found",
       "issue": 2298
     },

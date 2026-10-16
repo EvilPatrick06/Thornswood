@@ -171,13 +171,16 @@ Yes 'a folder whose name only ends the same way is not taken for it' (-not (Test
 # ---- another server's folders ------------------------------------------------
 Yes 'NirnLab UI Platform is kept out' (Test-ShipOtherServer 'Data\NirnLabUIPlatform\CEFSubprocess.exe')
 Yes '  and its plugin' (Test-ShipOtherServer 'Data\SKSE\Plugins\NirnLabUIPlugin.dll')
-Yes "another server's parked Creation Club archives are kept out" (Test-ShipOtherServer 'Data\_disabledByKzl\ccBGSSSE001-Fish.bsa')
+Yes "another server's parked Creation Club archives are kept out" (Test-ShipOtherServer 'Data\_disabledByOtherServer\ccBGSSSE001-Fish.bsa')
+Yes '  by their shape, whatever the server''s short name is' ((Test-ShipOtherServer 'Data\_disabledByXyz\ccBGSSSE001-Fish.bsa') -and (Test-ShipOtherServer 'Data\_disabledByAnyName'))
 Yes "  and another server's backup beside the game" (Test-ShipOtherServer 'otherserver-backup-1.7.104.0\Data\Dawnguard.esm')
 Yes "  and its plugin list, switched off beside the game" (Test-ShipOtherServer '_otherserver-plugins-off\plugins.txt')
 Yes '  by their shape, whatever the server is called' ((Test-ShipOtherServer 'anyname-backup-1.6.1170\SkyrimSE.exe') -and (Test-ShipOtherServer '_anyname-plugins-off'))
 Yes '  but not a backup folder under Data, which is the other rules''' (-not (Test-ShipOtherServer 'Data\x-backup-1\y.esp'))
 Yes '  and the Daedric launcher''s folder' (Test-ShipOtherServer 'DaedricData\skymp-disabled\files\Data\x.bsa')
-Yes '  but not a Data file that merely starts the same way' (-not (Test-ShipOtherServer 'Data\_disabledByKzlNot\x.esp'))
+Yes '  but not a parking folder deeper than Data, nor one with no name after it' (
+    -not (Test-ShipOtherServer 'Data\textures\_disabledByOtherServer\x.dds') -and -not (Test-ShipOtherServer 'Data\_disabledBy\x.esp'))
+Yes '  nor a Data folder that only starts with an underscore' (-not (Test-ShipOtherServer 'Data\_disabled\x.esp'))
 
 # ---- the loose map.swf and SkyUI's ERROR CODE 5 --------------------------------
 #
