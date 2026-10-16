@@ -511,6 +511,7 @@ jobs:
                  'test-1628-social-gui.js',
                  'test-1630-journal-gui.js',
                  'test-fire-walk.js',
+                 'test-2302-placed-water.js',
                  'test-1629-party-gui.js',
                  'test-1695-party-ask-id.js',
                  'test-1640-jarl-word.js',
