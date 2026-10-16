@@ -34,8 +34,12 @@
 //      SPEC.md measured (y = 60) no flat band is anywhere near DXT1's 204
 //      texels.
 //   6. Build-Backdrop.py's default paths exist, it pins texconv by release
-//      and sha256, THIRD-PARTY.md names that same file, and --blank-logo
-//      reproduces logo01ae.nif byte for byte (needs python; SKIP without it).
+//      and sha256, THIRD-PARTY.md names that same file, --logo reproduces
+//      logo.nif and --blank-logo logo01ae.nif byte for byte (needs python;
+//      SKIP without it). Issue #2177: logo.nif is Thornswood's own since
+//      16 Oct, one flat plate the script writes from its own numbers, so
+//      neither mesh carries anything of the wallpaper replacer it replaced
+//      (its root name, its author string, its optimizer's stamp).
 //      With THORNSWOOD_REBUILD_BACKDROP=1 it also rebuilds the texture from
 //      the picture and holds it to game\menu byte for byte (about half an
 //      hour of processor, so not by default).
@@ -329,6 +333,16 @@ const aeShapes = ae.blocks.filter(x => isShape(x.type)).length;
 console.log('      shapes drawn: logo.nif ' + logoDrawn.length + ', logo01ae.nif ' + aeDrawn.length +
   ' (blocks: ' + logo.blocks.length + ' and ' + ae.blocks.length + ')');
 yes('logo.nif draws one shape, at a scale above zero', logoDrawn.length === 1 && logoDrawn[0].scale > 0);
+// Issue #2177: Thornswood's own plate, written by Build-Backdrop.py --logo.
+// The replacer it replaced named its root CivilWarMap01, carried the author
+// string npurkeypile and the stamp of SSE NIF Optimizer; none of that is in
+// either mesh now, and both say Thornswood made them.
+for (const [name, nif] of [['logo.nif', logo], ['logo01ae.nif', ae]]) {
+  const text = nif.bytes.toString('latin1');
+  yes(name + ' carries nothing of the old wallpaper replacer (CivilWarMap01, npurkeypile, NIF Optimizer)',
+    !/CivilWarMap|npurkeypile|NIF Optimizer/i.test(text));
+  yes(name + "'s export info names Thornswood", text.indexOf('\x0bThornswood\0') > 0);
+}
 // Issue #1158. The Anniversary menu reads the first child of logo01ae.nif's
 // root as the logo's shape (vanilla: BSFadeNode 'Logo' over one BSTriShape,
 // 'actualLogoMirrorLow'). With no child the game crashed at the main menu:
@@ -403,6 +417,8 @@ for (const p of V) {
 }
 console.log('      worst UV departure from a flat mapping: ' + worst.toFixed(3) + ' texels over ' + V.length + ' vertices');
 yes('the UVs map the plate flat and straight (every vertex within 2 texels)', worst <= 2);
+const [z0, z1] = span('z');
+yes('the plate is flat: every corner at one depth (' + V.length + ' vertices, z ' + z0 + ' to ' + z1 + ')', z0 === z1);
 
 // ----------------------------------------------------------- the texture --
 const DDS = path.join(MENU, 'Mainmenuwallpaper.dds');
@@ -505,9 +521,14 @@ if (fs.existsSync(art)) {
 
 const py = spawnSync('python', ['--version'], { encoding: 'utf8' });
 if (py.error || py.status !== 0) {
-  console.log('SKIP  --blank-logo reproduces logo01ae.nif (no python here)');
+  console.log('SKIP  --logo and --blank-logo reproduce logo.nif and logo01ae.nif (no python here)');
 } else {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'backdrop-'));
+  const plateOut = path.join(tmp, 'logo.nif');
+  const p = spawnSync('python', [BUILD, '--logo', plateOut], { encoding: 'utf8' });
+  const built = fs.existsSync(plateOut) ? fs.readFileSync(plateOut) : null;
+  yes('Build-Backdrop.py --logo reproduces game\\menu\\logo.nif byte for byte (#2177)',
+    p.status === 0 && built && built.equals(logo.bytes));
   const out = path.join(tmp, 'logo01ae.nif');
   const r = spawnSync('python', [BUILD, '--blank-logo', out], { encoding: 'utf8' });
   const made = fs.existsSync(out) ? fs.readFileSync(out) : null;

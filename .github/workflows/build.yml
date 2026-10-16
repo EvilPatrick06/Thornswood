@@ -375,6 +375,12 @@ jobs:
           # register, recordsasset-provenance.json, by its sha256, so a
           # new or changed one is red until its source, maker, licence and
           # approval are written down, or what is missing is. Under a second.
+          # Issue #2177 again: the two pictures in Data\Platform\Images and
+          # the ChainLink, NoticeIcon and VoiceIcon sprite fonts nothing
+          # uses never ship and every pack deletes them, and OwnGame.Foreign
+          # keeps a refresh from bringing them back.
+          # tests\test-2177-platform-unused.ps1 holds both lists to the same
+          # five. About twenty seconds.
           # Issue #485: the whose-game gate is one copy, in
           # thornswood-front.js, and every other plugin reads it on the first
           # tick and stays idle without it. tests\test-whose-game-gate.js
@@ -387,6 +393,7 @@ jobs:
                  'test-asset-provenance.js',
                  'test-ship-rules.ps1',
                  'test-chargen-gone.ps1',
+                 'test-2177-platform-unused.ps1',
                  'test-hand-install-retired.ps1',
                  'test-downgrade-steam-window.ps1', 'test-address-library.ps1', 'test-vortex-folder.ps1',
                  'test-new-box-runbook.ps1', 'test-remote-header.ps1',
