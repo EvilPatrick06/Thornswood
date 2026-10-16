@@ -276,16 +276,10 @@ refs[ALICE.a].pos = [1100, 1000, 0];
   yes('N3 the key cut at the forge is one entry, count 1, named "' + (k[0] && k[0].name) + '"' + (k.length ? '' : ' (' + r.told + ')'),
       k.length === 1 && k[0].count === 1 && k[0].name === KEY_NAME);
 }
-give(ALICE, KEY_DESC, 2);
-{
-  const ok = inDir(function () { return W.nameFreshKey(ALICE.a, HOME); });
-  const k = entriesOf(ALICE, KEY_DESC);
-  const named = k.filter(function (e) { return e.name === KEY_NAME; });
-  const plain = k.filter(function (e) { return !e.name; });
-  yes('N4 a key the crafting menu made plain is named off the mold, one at a time',
-      ok === true && named.length === 2 && named.every(function (e) { return e.count === 1; }) &&
-      plain.length === 1 && plain[0].count === 1);
-}
+// A plain key beside a second named one, for the drops below (the crafting menu's
+// plain key and its timer are gone since #2487, so the test gives them).
+give(ALICE, KEY_DESC, 1);
+give(ALICE, KEY_DESC, 1, KEY_NAME);
 {
   const inv = refs[ALICE.a].inventory;
   const back = JSON.parse(JSON.stringify(inv));

@@ -354,8 +354,8 @@ collection and Vortex's staging folder on the shipping machine:
   drop box, house parts, and their recipes." The collection's copy keeps the
   old one until a later revision patches it. Since 16 October (#2553, Patrick,
   15 October, option B on #2177) the repository's plugin is remade as
-  Thornswood's own: 132,868 bytes, sha256
-  `56efd81b767e12d2e736b841abb395b3ca6a9c8c15a587bbce00cd6502be3b89`, 205
+  Thornswood's own: 132,906 bytes, sha256
+  `e01025a8d605fef036ecfe82836e683677c7c26096027de5c2e0ea16473bf762`, 205
   records. `scripts\mods\Add-ContentRecords.py` writes every record of it from
   its own numbers, or copies Bethesda's own, except 57 placements of the kiln,
   the salt quarry, the hive and the alchemy lab, which stand where the other

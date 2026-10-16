@@ -64,7 +64,11 @@ a woodworker, so a smith could make every tool in the game on their own.
 So this adds:
 
     ThornswoodRecipeKeyMold       one iron ingot into a blank key mold.
-    ThornswoodRecipeKey           one iron ingot into a key, named server side
+    ThornswoodRecipeKey           one iron ingot into a key. Since #2487 it carries
+                                  NEVER_TRUE, so no forge lists it: a key is cut
+                                  and named by the server at the forge's lock key.
+                                  Kept, not deleted, so its form id stays taken.
+                                  Before that: named server side
                                   for whichever stamped mold is in the pack.
 
                                   Both added 23 September, at a forge. The
@@ -764,10 +768,12 @@ def misc(fid, edid, name, model, box, value, weight, kws=(VENDOR_ITEM_TOOL,)):
         (b'DATA', struct.pack('<If', value, weight))])
 
 
-def cobj(fid, edid, inputs, out, bench, makes=1):
-    """A recipe: what goes in, what comes out and how many, at which bench."""
+def cobj(fid, edid, inputs, out, bench, makes=1, conditions=()):
+    """A recipe: what goes in, what comes out and how many, at which bench.
+    conditions are CTDA bodies, written before the output where the game reads them."""
     return own_record(b'COBJ', fid, [(b'EDID', zstr(edid)), (b'COCT', struct.pack('<I', len(inputs)))] +
                       [(b'CNTO', cnto(base, count)) for base, count in inputs] +
+                      [(b'CTDA', c) for c in conditions] +
                       [(b'CNAM', struct.pack('<I', out)), (b'BNAM', struct.pack('<I', bench)),
                        (b'NAM1', struct.pack('<H', makes))])
 
@@ -843,7 +849,9 @@ def thornswood_records(passage, clam):
         misc(KEY, 'ThornswoodMiscKey', 'Key', KEY_MODEL, KEY_BOUNDS, 0, 0.0),
         misc(MOLD, 'ThornswoodMiscKeyMold', 'Key Mold', MOLD_MODEL, MOLD_BOUNDS, 25, 1.0),
         cobj(RECIPE_MOLD, 'ThornswoodRecipeKeyMold', [(IRON_INGOT, 1)], MOLD, FORGE_KEYWORD),
-        cobj(RECIPE_KEY, 'ThornswoodRecipeKey', [(IRON_INGOT, 1)], KEY, FORGE_KEYWORD),
+        # Never listed (#2487): a key is cut by the server, named, at the forge's lock key.
+        cobj(RECIPE_KEY, 'ThornswoodRecipeKey', [(IRON_INGOT, 1)], KEY, FORGE_KEYWORD,
+             conditions=(NEVER_TRUE,)),
         stick(POLE_CRUDE, 'ThornswoodMiscPoleCrude', 'Crude Fishing Pole', 25, 1.0),
         stick(POLE_FINE, 'ThornswoodMiscPoleFine', 'Fine Fishing Pole', 80, 1.0),
         stick(POLE_MASTER, 'ThornswoodMiscPoleMaster', 'Master Fishing Pole', 200, 1.0),

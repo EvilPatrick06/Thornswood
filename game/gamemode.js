@@ -27980,16 +27980,15 @@ function soulGemRefusal(actorId, inputs) {
 }
 
 /*
-  The recipe that makes a key, and how long to wait before naming what it made.
+  The forge list's Key recipe, which nobody may craft (#2487).
 
-  ThornswoodRecipeKey is added to Thornswood-Content.esp by
-  scripts\mods\Add-ContentRecords.py, one iron ingot at a forge. The delay is a tick
-  rather than a measurement: the output lands as soon as this handler returns
-  and nobody blocked, so anything above zero is enough and a quarter second is
-  well clear of a slow frame.
+  ThornswoodRecipeKey is in Thornswood-Content.esp (scripts\mods\Add-ContentRecords.py)
+  with a condition that is never true, so the forge menu does not list it. A key
+  is cut by the server instead (the lock key at a forge, cutKey in the property
+  block), which takes the ingot and hands the key over already named in one step.
+  This refusal is for a client still on a plugin from before the condition.
 */
 const KEY_RECIPE = '15497:Thornswood-Content.esp';
-const KEY_NAME_DELAY = 250;
 
 /*
   FIT TO MAKE ANYTHING (#1733): the one gate every way of making something
@@ -28135,46 +28134,22 @@ mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recip
   }
 
   /*
-    A KEY COMES OUT NAMED FOR THE HOUSE ITS MOLD WAS STAMPED AT.
+    A KEY IS CUT BY THE SERVER, NEVER CRAFTED FROM THE MENU (#2487).
 
-    Patrick, 23 September, giving the whole shape at once: "you make a mold,
-    mold gets used on door to assign mold to the door, than key uses that mold
-    during crafting to make a key to specifically that house and it can be
-    reused". And, separately, "Each door in a property should take the same
-    key", which is already true and was checked rather than assumed: 4,891
-    doors map to 852 properties in BUILDING_BY_DOOR, 832 of them with more
-    than one door, and a key is named for the property rather than the door.
-
-    THE MOLD IS A CONDITION, NOT AN INPUT. It is not a CNTO on the recipe
-    because the engine takes an input away before the server is ever asked,
-    and he asked for the mold to be reusable. So the recipe costs an iron
-    ingot, this decides whether it may happen at all, and the mold stays.
-
-    NAMED AFTERWARDS, on a short timer, because the output is added after this
-    handler returns: OnFireSuccess is what removes the inputs and adds the
-    key, and it only runs when nobody blocked. Refusing here instead and
-    handing over a named key would leave the ingot in their pack.
+    The menu's craft cannot name what it makes: the engine adds the output in
+    OnFireSuccess, after this handler returns, and hands nothing back, so the
+    only way to name it was a timer that hoped the key had landed. The lock
+    key at a forge (cutKey) takes the ingot and gives the key already named for
+    its building in the same step, so the recipe is taken off the forge list in
+    the plugin and refused here for anybody whose plugin still lists it. The
+    ingot stays in their pack.
   */
   if (desc === KEY_RECIPE) {
-    const prop = globalThis.__thornswoodProperty;
-    let stampedAt = null;
-    try {
-      stampedAt = (prop && prop.moldInHand) ? prop.moldInHand(actorId) : null;
-    } catch (e) { stampedAt = null; }
-    if (!stampedAt) {
-      const no = 'A key is cut from a mold, and you are carrying none that has been stamped. ' +
-                 'Forge a blank key mold, take it to the door with whoever holds the place, ' +
-                 'and press it into the lock there.';
-      notify(actorId, no);
-      say(actorId, no);
-      return false;
-    }
-    const named = stampedAt;
-    setTimeout(function () {
-      try { prop.nameFreshKey(actorId, named); } catch (e) {
-        log('the fresh key could not be named:', e);
-      }
-    }, KEY_NAME_DELAY);
+    const no = 'A key is cut at the forge with its lock key, not from the list. Look at the forge ' +
+               'and press the key the line under the crosshair names, with the stamped mold in your pack.';
+    notify(actorId, no);
+    say(actorId, no);
+    return false;
   }
   /*
     THE HANDLE, AND EVERY OTHER HAFTED THING.
@@ -37743,41 +37718,6 @@ log('gamemode loaded:',
     return false;
   }
 
-  /*
-    Name a key that was just crafted, for the house whose mold is in the pack.
-
-    The crafting menu makes a plain Key, because a COBJ has one output record
-    and there is one key record for the whole game. Which house it opens is the
-    name on the entry, the same way a deed and a mold work, so this finds the
-    unnamed one that just arrived and names it.
-
-    THE MOLD IS NOT TOUCHED, because Patrick asked for it to be reusable: "it
-    can be reused". That is also why the mold is not an input on the recipe. An
-    input is taken by the engine before the server is ever asked.
-  */
-  function nameFreshKey(actorId, building) {
-    var baseId = idOf(KEY);
-    if (!baseId || !building) { return false; }
-    var inv = null;
-    try { inv = mp.get(actorId, 'inventory'); } catch (e) { return false; }
-    var entries = (inv && inv.entries) || [];
-    for (var i = 0; i < entries.length; i++) {
-      var e = entries[i];
-      if (!e || !(e.count > 0) || e.baseId !== baseId) { continue; }
-      if (e.name) { continue; }
-      if (e.count > 1) {
-        e.count = e.count - 1;
-        entries.push({ baseId: baseId, count: 1, name: keyLabel(building) });
-      } else {
-        e.name = keyLabel(building);
-      }
-      try { mp.set(actorId, 'inventory', { entries: entries }); } catch (e2) { return false; }
-      plog('a key to', nameOf(building), 'came off the mold at a forge');
-      return true;
-    }
-    return false;
-  }
-
   /** The building whose mold is in this pack, or null. One at a time is enough. */
   function moldInHand(actorId) {
     var baseId = idOf(MOLD);
@@ -42348,7 +42288,7 @@ log('gamemode loaded:',
     giveNamed: giveNamed, doorsOf: doorsOf, shutFor: shutFor, push: push,
     wayOut: wayOut,
     pushAll: pushAll, touchedBench: touchedBench, moldInHand: moldInHand,
-    takeBlankMold: takeBlankMold, nameFreshKey: nameFreshKey, blankMoldsExist: blankMoldsExist,
+    takeBlankMold: takeBlankMold, blankMoldsExist: blankMoldsExist,
     keyLabel: keyLabel, moldLabel: moldLabel, deedLabel: deedLabel,
     KEY: KEY, MOLD: MOLD, LOCK_PROPERTY: LOCK_PROPERTY,
     BENCH_PROPERTY: BENCH_PROPERTY, FORGE: FORGE,
