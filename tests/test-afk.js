@@ -235,7 +235,7 @@ yes('another character takes the place with "/line hand" before the connection b
     /say\(' \+ JSON\.stringify\('\/line hand ' \+ id\) \+ ',true\)/.test(front) &&
     /thornswoodNet\.rejoinAs\(' \+ lineId \+ ','/.test(front));
 yes('the window is one of the overlays, and one the two minute rescue can close by name',
-    /'thornswood-afk\.js'\];/.test(front) && /afk: 'thornswoodAfk'/.test(front));
+    (function () { const m = /const OVERLAYS = (\[[\s\S]*?\]);/.exec(front); const list = m ? new Function('return ' + m[1])() : []; return list.indexOf('thornswood-afk.js') >= 0; })() && /afk: 'thornswoodAfk'/.test(front));
 
 // =================================================================== the window
 function windowPage(preset) {

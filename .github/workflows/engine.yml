@@ -1,0 +1,318 @@
+# The engine built in CI: the SkyMP server and the client runtime, out of the
+# fork at one commit, recorded the way One records them, so a pin pull request
+# can be made from this run's output instead of one machine's disk. Issue #459.
+#
+# WHAT IT MAKES. The steps One runs for an engine change (engine\README.md,
+# One engine, steps 2 and 3), run on a runner: Build-Engine.ps1 builds
+# everything in Release, Build-Server.ps1 builds every server file again and
+# records it into records\server-build.json (New-ServerBuildRecord.ps1, which
+# ties each file to the fork's source), and New-ClientBuildRecord.ps1 records
+# the six client files into records\client-build.json. Then the server build
+# becomes the artifact the box's store keeps by name (ServerArtifact.ps1,
+# server-<fork commit 12>-<zip hash 16>.zip). One artifact of this run,
+# engine-<fork commit 12>, holds:
+#   records\server-build.json and records\client-build.json, for the pin
+#     pull request (engine\README.md, One engine, step 4);
+#   server\server-<...>.zip and its .json, which Publish-Server.ps1 and
+#     Deploy-Server.ps1 -FromStore -ServerBuild send to the store and deploy
+#     on a machine with no engine build;
+#   client\, the six client files at the paths the record names, which
+#     Sync-Client.ps1 -Dist puts in a game folder;
+#   SHA256SUMS over all of it.
+# Nothing is sent anywhere and nothing is committed: the records reach main
+# only through a pull request a person opens, and the server build reaches a
+# server only through a deploy that names it.
+#
+# WHERE IT RUNS (Patrick's decision on #459, 15 Oct: C, then B): "just like
+# everything else GitHub runner are always used for everything first than if
+# it fails due to billing issues than it goes to the VPS runners". So the job
+# "engine", GitHub's hosted windows-2022, goes first, and "engine-vps" builds
+# it on the box only when that did not succeed, the way build.yml's
+# "Launcher builds" falls back (#2407):
+#   - the repository variable BUILD_RUNNER is vps, which skips the hosted job
+#     outright (set since 12 Oct, measured 16 Oct), or
+#   - a manual run asked for runner: vps, or
+#   - the hosted job failed: a quota or billing stop fails it before any step
+#     runs (#2393). A real red fails on the box too.
+# The steps are one list, the YAML anchor engine, so the two cannot build
+# differently. windows-2022 and not windows-latest: the fork's CMakeLists.txt
+# stops any generator but "Visual Studio 17 2022" (CMakeLists.txt:78-83), and
+# windows-2022 is the image the fork's own pull request build uses.
+#
+# WHAT THE BOX NEEDS FOR THE FALLBACK. Measured on 16 Oct, read only: the
+# four runners' box has MSBuild from the Build Tools (#498) but no C++
+# compiler, no CMake and no yarn, 16 GB of memory (8.7 GB free) and 6 cores,
+# and 117 GB free on C:. Until
+#   .\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeEngineTools -SkipFirewall'
+# has put them there, the fallback stops at Build-Engine.ps1's tool check,
+# naming what is missing, and builds nothing.
+#
+# THE TWO TRAPS ONE HAS, AND WHY A RUNNER DOES NOT. (1) vcpkg runs its
+# applocal.ps1 through the PowerShell the configure found (#2562): Build-Engine
+# passes Z_VCPKG_POWERSHELL_PATH as the pwsh Get-Command names on every
+# configure, and on a runner that is the installed pwsh, whose folder no Store
+# update moves. (2) Build-Server.ps1 needs the drive letter the CMake cache was
+# configured through: that letter exists only for a fork under a path with an
+# & in it (Build-Engine.ps1, subst), and a runner's checkout path has none, so
+# the cache is configured and built on the one real path, in one job. And one
+# trap a runner has that One does not: every runner sets CI=true, which makes
+# the fork's CMakeLists.txt take C:/vcpkg instead of its own vcpkg submodule;
+# both scripts take CI out of their own environment first (EngineJobs.ps1,
+# Clear-EngineCiSwitch). No SKYRIM_DIR either: there is no game on a runner
+# (Build-Engine.ps1 -NoSkyrim says what that changes, and what it does not).
+#
+# THE LIBRARIES ARE KEPT, THE BUILD IS NOT. vcpkg keeps every library it built
+# in a files cache, VCPKG_BINARY_SOURCES, in the runner workspace beside the
+# checkout: on GitHub's runner that folder goes into the Actions cache, keyed
+# on the fork's vcpkg commit and its manifest and overlays; on the box it
+# simply stays, one per runner. On the box the fork's checkout and its build
+# folder are then removed, whatever the run did, because four runners each
+# keeping a build folder of their own would take most of the disk the game
+# servers write to. So a build on the box compiles the engine itself every
+# time, and the libraries only the first time on each runner.
+#
+# HOW LONG. The fork's own pull request build on GitHub's runner took 30
+# minutes on 16 Oct with its libraries cached (run 38863283694), and its first
+# build 96, of which 43 were a coverage run this does not do (fork workflow
+# thornswood-pr-windows.yml). Those runners have four cores; this repository's
+# private hosted runner has two, so the hosted job gets 300 minutes. The box
+# is shared with both game servers, which run at High priority above it
+# (#2491), and its first build on each runner builds every library, so the
+# fallback gets 360. Past either it is stuck, not slow.
+#
+# WHEN. A manual run, from the Actions tab or
+#   gh workflow run engine.yml --ref main -f commit=<fork commit>
+# with no commit, the one this branch pins. A manual run only: a pull
+# request's code reaches the box through build-pr.yml alone (#1306,
+# tests\test-1306-pr-workflow.js), so a change to this file is first built by
+# a manual run once it is on main.
+#
+# WHY THE ACTIONS ARE PINNED. Each is a full commit SHA with its tag in a
+# comment, as in build.yml and release.yml: these steps run on the VPS.
+# tests\test-459-engine-workflow.ps1 holds this file's shape.
+name: Engine build
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: 'The fork commit to build, 40 hex, on thornswood/engine-changes. Empty: the commit this branch pins engine/skymp to.'
+        required: false
+        default: ''
+      runner:
+        description: 'hosted (GitHub, the default) or vps (the box, the fallback)'
+        type: choice
+        options: [hosted, vps]
+        default: hosted
+permissions:
+  contents: read
+# One build of one commit at a time, never cancelled by another: a second run
+# for the same commit waits for the first.
+concurrency:
+  group: engine-${{ github.event.inputs.commit || github.ref }}
+  cancel-in-progress: false
+jobs:
+  # The VPS FALLBACK (header, WHERE IT RUNS). A manual run only, so nothing a
+  # pull request carries reaches the box through it.
+  engine-vps:
+    name: Engine build (VPS fallback)
+    needs: engine
+    if: ${{ !cancelled() && needs.engine.result != 'success' && needs.engine.result != 'cancelled' }}
+    runs-on: [self-hosted, Windows, thornswood-vps]
+    timeout-minutes: 360
+    steps: &engine
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          submodules: false
+
+      # The hosted image's node is whatever it has this month; the box has its
+      # own (Bootstrap-VPS.ps1), as in build.yml.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: runner.environment == 'github-hosted'
+        with:
+          node-version: '24'
+
+      - name: Which fork commit
+        id: which
+        shell: pwsh
+        env:
+          INPUT_COMMIT: ${{ github.event.inputs.commit }}
+        run: |
+          # The commit asked for, or the one this branch pins. Through env,
+          # never pasted into the script.
+          $pin = "$(@(git ls-tree HEAD engine/skymp) -split '\s+' | Select-Object -Index 2)".Trim()
+          $asked = "$env:INPUT_COMMIT".Trim().ToLowerInvariant()
+          $commit = if ($asked) { $asked } else { $pin }
+          if ($commit -notmatch '^[0-9a-f]{40}$') { Write-Host "::error::'$commit' is not a fork commit (40 hex)"; exit 1 }
+          Write-Host ("fork commit {0}{1}" -f $commit, $(if ($commit -eq $pin) { ', the one this branch pins' } else { ', asked for; this branch pins ' + $pin }))
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("commit=" + $commit)
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("short=" + $commit.Substring(0, 12))
+
+      - name: Fetch the fork at that commit
+        shell: pwsh
+        env:
+          COMMIT: ${{ steps.which.outputs.commit }}
+        run: |
+          git submodule update --init engine/skymp
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::could not fetch engine/skymp'; exit 1 }
+          git -C engine/skymp fetch origin thornswood/engine-changes
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::could not fetch thornswood/engine-changes'; exit 1 }
+          git -C engine/skymp cat-file -e "$env:COMMIT^{commit}" 2>$null
+          if ($LASTEXITCODE -ne 0) { git -C engine/skymp fetch origin $env:COMMIT }
+          git -C engine/skymp checkout --force --detach $env:COMMIT
+          if ($LASTEXITCODE -ne 0) { Write-Host "::error::could not check the fork out at $env:COMMIT"; exit 1 }
+          git -C engine/skymp clean -ffdx
+          # One engine (engine\README.md): the engine is the fork's branch, so
+          # a commit that is not on it is never built here as a pin.
+          git -C engine/skymp merge-base --is-ancestor $env:COMMIT origin/thornswood/engine-changes
+          if ($LASTEXITCODE -ne 0) { Write-Host "::error::$env:COMMIT is not on the fork's thornswood/engine-changes, so it is not an engine a pin can name"; exit 1 }
+          $head = "$(git -C engine/skymp rev-parse HEAD)".Trim()
+          if ($head -ne $env:COMMIT) { Write-Host "::error::the fork is at $head, not $env:COMMIT"; exit 1 }
+          # The upstream the records measure the fork against (upstreamBase).
+          git -C engine/skymp remote get-url upstream 2>$null
+          if ($LASTEXITCODE -ne 0) { git -C engine/skymp remote add upstream https://github.com/skyrim-multiplayer/skymp.git }
+          git -C engine/skymp fetch upstream main
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::could not fetch upstream main'; exit 1 }
+          Write-Host "the fork is at $head, on thornswood/engine-changes"
+
+      - name: Where vcpkg keeps the libraries it built
+        id: vcpkg
+        shell: pwsh
+        run: |
+          # Beside the checkout, the runner's own (header, THE LIBRARIES ARE
+          # KEPT). The key is the fork's vcpkg commit and every file that says
+          # which libraries are built and how.
+          $dir = Join-Path $env:RUNNER_WORKSPACE 'engine-vcpkg-cache'
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          Add-Content -LiteralPath $env:GITHUB_ENV -Value ("VCPKG_BINARY_SOURCES=clear;files," + $dir + ",readwrite")
+          $vc = "$(git -C engine/skymp rev-parse HEAD:vcpkg)".Trim()
+          $files = @(Get-Item -LiteralPath engine/skymp/vcpkg.json) + @(Get-ChildItem -LiteralPath engine/skymp/overlay_ports, engine/skymp/overlay_triplets -Recurse -File | Sort-Object FullName)
+          $sha = [Security.Cryptography.SHA256]::Create()
+          $all = New-Object IO.MemoryStream
+          foreach ($f in $files) { $b = [IO.File]::ReadAllBytes($f.FullName); $all.Write($b, 0, $b.Length) }
+          $sum = -join ($sha.ComputeHash($all.ToArray()) | ForEach-Object { $_.ToString('x2') })
+          $kb = [Math]::Round((@(Get-ChildItem -LiteralPath $dir -Recurse -File -ErrorAction SilentlyContinue) | Measure-Object Length -Sum).Sum / 1KB)
+          Write-Host ("vcpkg {0}, manifest and overlays {1}, cache {2} holds {3:N0} KB" -f $vc.Substring(0, 12), $sum.Substring(0, 16), $dir, $kb)
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("dir=" + $dir)
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("key=engine-vcpkg-" + $vc + "-" + $sum)
+
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: runner.environment == 'github-hosted'
+        with:
+          path: ${{ steps.vcpkg.outputs.dir }}
+          key: ${{ steps.vcpkg.outputs.key }}
+          restore-keys: engine-vcpkg-
+
+      - name: Build the engine
+        id: build
+        shell: pwsh
+        run: |
+          # Exit 2 is "built, and the six client files are not the ones
+          # records\client-build.json names", which a build of a new commit
+          # always is; the records are made below. Anything else is a failure.
+          .\scripts\release\Build-Engine.ps1 -NoSkyrim -NoPause
+          $code = $LASTEXITCODE
+          if ($code -ne 0 -and $code -ne 2) { Write-Host "::error::Build-Engine.ps1 exited with $code; the lines above say why"; exit 1 }
+          exit 0
+
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: runner.environment == 'github-hosted' && steps.build.outcome == 'success'
+        with:
+          path: ${{ steps.vcpkg.outputs.dir }}
+          key: ${{ steps.vcpkg.outputs.key }}
+
+      - name: Build every server file again and record it
+        shell: pwsh
+        run: |
+          # Writes records\server-build.json in this checkout, every file tied
+          # to the fork's source by New-ServerBuildRecord.ps1.
+          .\scripts\release\Build-Server.ps1 -NoPause
+          if ($LASTEXITCODE -ne 0) { Write-Host "::error::Build-Server.ps1 exited with $LASTEXITCODE; the lines above say why"; exit 1 }
+
+      - name: Record the client
+        shell: pwsh
+        run: |
+          .\scripts\release\New-ClientBuildRecord.ps1 -Dist engine\skymp\build\dist\client -Clone engine\skymp
+          if (-not $?) { exit 1 }
+
+      - name: Check the records name this commit
+        shell: pwsh
+        env:
+          COMMIT: ${{ steps.which.outputs.commit }}
+        run: |
+          .\scripts\release\Check-Records.ps1
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $s = [IO.File]::ReadAllText('records\server-build.json') | ConvertFrom-Json
+          $c = [IO.File]::ReadAllText('records\client-build.json') | ConvertFrom-Json
+          if ([string]$s.source.commit -ne $env:COMMIT) { Write-Host "::error::the server record names $($s.source.commit), not $env:COMMIT"; exit 1 }
+          if (-not $env:COMMIT.StartsWith([string]$c.forkCommit)) { Write-Host "::error::the client record names $($c.forkCommit), not $env:COMMIT"; exit 1 }
+          Write-Host ("both records name {0}; server scam_native.node {1}" -f $env:COMMIT.Substring(0, 12), ([string]$s.sha256).Substring(0, 16))
+
+      - name: Gather what this run made
+        id: out
+        shell: pwsh
+        env:
+          SHORT: ${{ steps.which.outputs.short }}
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'engine-out'
+          if (Test-Path -LiteralPath $out) { Remove-Item -LiteralPath $out -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path (Join-Path $out 'records'), (Join-Path $out 'server'), (Join-Path $out 'client') | Out-Null
+          foreach ($r in 'server-build.json', 'client-build.json') { Copy-Item -LiteralPath (Join-Path 'records' $r) -Destination (Join-Path $out "records\$r") }
+          # The server build as the store keeps it, held to the record as it
+          # is read (ServerArtifact.ps1).
+          . .\scripts\deploy\ServerArtifact.ps1
+          $a = New-ThornswoodServerBuildArtifact -From engine\skymp\build\dist\server -Record records\server-build.json -OutDir (Join-Path $out 'server')
+          Write-Host ("server build {0}, {1:N0} bytes" -f $a.Name, $a.Size)
+          # The six client files, at the paths the record names.
+          $c = [IO.File]::ReadAllText('records\client-build.json') | ConvertFrom-Json
+          foreach ($rel in @($c.files.PSObject.Properties.Name)) {
+            $to = Join-Path (Join-Path $out 'client') $rel
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $to) | Out-Null
+            Copy-Item -LiteralPath (Join-Path 'engine\skymp\build\dist\client' $rel) -Destination $to
+            if ((Get-FileHash -LiteralPath $to -Algorithm SHA256).Hash.ToLowerInvariant() -ne [string]$c.files.$rel.sha256) { Write-Host "::error::$rel is not the file the client record names"; exit 1 }
+          }
+          # SHA256SUMS in the sha256sum shape, every file above.
+          $base = (Resolve-Path -LiteralPath $out).ProviderPath.TrimEnd('\')
+          $lines = foreach ($f in @(Get-ChildItem -LiteralPath $out -Recurse -File | Sort-Object FullName)) {
+            ((Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + $f.FullName.Substring($base.Length + 1).Replace('\', '/'))
+          }
+          Set-Content -LiteralPath (Join-Path $out 'SHA256SUMS') -Value $lines -Encoding ascii
+          $lines | ForEach-Object { Write-Host $_ }
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("dir=" + $out)
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("name=engine-" + $env:SHORT)
+
+      - name: Keep what this run made
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ${{ steps.out.outputs.name }}
+          path: ${{ steps.out.outputs.dir }}
+          if-no-files-found: error
+          retention-days: 30
+
+      # On the box only, however the run ended (header, THE LIBRARIES ARE
+      # KEPT, THE BUILD IS NOT): the fork's checkout and build folder go, the
+      # library cache stays. !cancelled() would leave a cancelled run's build
+      # behind, so this one is always().
+      - name: Free the box's disk
+        if: always() && runner.environment == 'self-hosted'
+        shell: pwsh
+        run: |
+          git submodule deinit --force engine/skymp 2>$null | Out-Null
+          if (Test-Path -LiteralPath engine/skymp) {
+            Get-ChildItem -LiteralPath engine/skymp -Force | Remove-Item -Recurse -Force -ErrorAction Continue
+          }
+          $left = @(Get-ChildItem -LiteralPath engine/skymp -Force -ErrorAction SilentlyContinue).Count
+          $cache = Join-Path $env:RUNNER_WORKSPACE 'engine-vcpkg-cache'
+          $kb = [Math]::Round((@(Get-ChildItem -LiteralPath $cache -Recurse -File -ErrorAction SilentlyContinue) | Measure-Object Length -Sum).Sum / 1KB)
+          $free = [Math]::Round((Get-PSDrive -Name ($env:RUNNER_WORKSPACE.Substring(0, 1))).Free / 1GB, 1)
+          Write-Host ("engine/skymp holds {0} item(s) now; the library cache keeps {1:N0} KB; {2} GB free on the runner's drive" -f $left, $kb, $free)
+          if ($left) { Write-Host '::warning::engine/skymp could not be emptied; the lines above say which file was held' }
+
+  # GitHub's hosted runner, first (header, WHERE IT RUNS). Skipped when
+  # BUILD_RUNNER is vps or a manual run asked for the box, and then the
+  # fallback above builds it.
+  engine:
+    name: Engine build
+    if: ${{ vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}
+    runs-on: windows-2022
+    timeout-minutes: 300
+    steps: *engine
