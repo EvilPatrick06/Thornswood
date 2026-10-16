@@ -615,7 +615,13 @@ if (Test-Path $orderSrc) {
         if (Test-ShipLastPluginHeld $RepoDir) {
             $lastEnabled = @(Get-Content -LiteralPath $shippedList | ForEach-Object { $_.Trim() } |
                              Where-Object { $_.StartsWith('*') } | ForEach-Object { $_.Substring(1).Trim() })
-            $lastProblem = Get-ShipLastPluginProblem $RepoDir $lastEnabled
+            $lastCcc = @()
+            $lastCccPath = Join-Path $GameDir 'Skyrim.ccc'
+            if (Test-Path -LiteralPath $lastCccPath) {
+                $lastCcc = @(Get-Content -LiteralPath $lastCccPath | ForEach-Object { "$_".Trim() } |
+                             Where-Object { $_ -and (Test-Path -LiteralPath (Join-Path $GameDir ('Data\' + $_))) })
+            }
+            $lastProblem = Get-ShipLastPluginProblem $RepoDir $lastEnabled $lastCcc
             if ($lastProblem) { throw ('LASTPLUGIN ' + $lastProblem) }
             Say ("  {0} was built against this release's load order and the collection's bytes" -f $ShipLastPlugin) 'DarkGray'
         }

@@ -129,6 +129,28 @@ try {
     Put (Join-Path $fake 'game\content\Thornswood-Last.esp') 'the last plugin, edited'
     $p = Get-ShipLastPluginProblem $fake $enabled
     Yes 'a plugin that is not the one the manifest describes is refused' ($p -match 'is not the plugin')
+    Put (Join-Path $fake 'game\content\Thornswood-Last.esp') 'the last plugin'
+
+    # The Skyrim.ccc plugins load straight after the masters and no plugin
+    # list names them; the server's order, and so the built one, has them
+    # there. On One on 15 Oct that was _ResourcePack.esl at position 6.
+    $cccOrder = @('Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm', '_ResourcePack.esl', 'A.esp', 'Thornswood-Content.esp', 'B.esp')
+    $rp = Join-Path $data '_ResourcePack.esl'; Put $rp 'bytes of _ResourcePack.esl'
+    $rpRow = [ordered]@{ name = '_ResourcePack.esl'; size = (Get-Item -LiteralPath $rp).Length; sha256 = (ShaFile $rp) }
+    Record (@($recRows) + @($rpRow))
+    $manifest.loadOrder = $cccOrder; $manifest.builtAgainst = @($rows) + @($rpRow)
+    Put (Join-Path $fake 'game\data\last-plugin.json') ($manifest | ConvertTo-Json -Depth 5)
+    $p = Get-ShipLastPluginProblem $fake $enabled
+    Yes 'built with a Skyrim.ccc plugin after the masters, a release not told of it is refused at that place' ($p -match 'position 6 this release loads A\.esp and the plugin was built with _ResourcePack\.esl')
+    Yes '  and one whose Data holds it passes' ((Get-ShipLastPluginProblem $fake $enabled @('_ResourcePack.esl')) -eq '')
+    Yes '  a list that also names it passes once, not twice' ((Get-ShipLastPluginProblem $fake (@('_ResourcePack.esl') + $enabled) @('_ResourcePack.esl')) -eq '')
+    $p = Get-ShipLastPluginProblem $fake $enabled @('_ResourcePack.esl', 'ccBGSSSE001-Fish.esm')
+    Yes '  and a Skyrim.ccc plugin it was not built with is refused' ($p -match 'position 7 this release loads ccBGSSSE001-Fish\.esm')
+    Record $recRows
+    $manifest.loadOrder = $order; $manifest.builtAgainst = $rows
+    Put (Join-Path $fake 'game\data\last-plugin.json') ($manifest | ConvertTo-Json -Depth 5)
+    Yes '  and the order without one still passes with none' ((Get-ShipLastPluginProblem $fake $enabled @()) -eq '')
+
     Remove-Item -LiteralPath (Join-Path $fake 'game\data\last-plugin.json')
     $p = Get-ShipLastPluginProblem $fake $enabled
     Yes '  and so is one with no manifest' ($p -match 'no game\\data\\last-plugin\.json')
@@ -141,6 +163,8 @@ try {
     $bytes = $pu.IndexOf('Get-ShipLastPluginProblem $RepoDir $lastEnabled'); $server = $bytes
     $pack = $pu.IndexOf('CreateEntryFromFile($zip')
     Yes '  the bytes check comes before the pack' ($bytes -gt 0 -and $server -gt 0 -and $pack -gt $bytes -and $pack -gt $server)
+    $cccRead = $pu.LastIndexOf("Join-Path `$GameDir 'Skyrim.ccc'", $bytes)
+    Yes '  and is handed the Skyrim.ccc plugins in the release''s Data' ($pu.Contains('Get-ShipLastPluginProblem $RepoDir $lastEnabled $lastCcc') -and $cccRead -gt 0 -and $bytes - $cccRead -lt 600)
     $dd = [IO.File]::ReadAllText((Join-Path $repo 'scripts\deploy\Deploy-DevGamemode.ps1'))
     Yes 'Deploy-DevGamemode -LoadOrder puts it last, and sends that order even without -Dist' ($dd.Contains('@($pluginNames | Where-Object { $_ -ine $lastName }) + $lastName') -and $dd.Contains('if ($Dist -or $orderMoved)'))
     $ds = [IO.File]::ReadAllText((Join-Path $repo 'scripts\deploy\Deploy-Server.ps1'))
