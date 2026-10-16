@@ -47,6 +47,10 @@
     .\Deploy-Server.ps1 -GamemodeOnly    the committed gamemode alone, from
                                          any machine, with no server build
                                          here (see GAMEMODE ONLY below)
+    .\Deploy-Server.ps1 -FromStore       the server build the commit records,
+                                         out of the store on the box, and the
+                                         gamemode, with no server build here
+                                         (see FROM THE STORE below)
 
   GAMEMODE ONLY (#1089). Every run above needs this machine's fork build: the
   server files, the build's settings and the load order are all read from
@@ -70,6 +74,27 @@
   names them) goes the full way too. The notice, the stage, the check, the
   swap and -PutBack are the same as every other run. Patrick, 5 Oct: any
   machine may do it.
+
+  FROM THE STORE (#459). Since #2467 every full deploy and every
+  Publish-Server.ps1 keeps the server build it sends in the box's store,
+  C:\Thornswood-Deploys\server, by name. -FromStore puts the one
+  records\server-build.json names onto the live server from there, with the
+  gamemode, from a machine with no engine build:
+    - before anything is sent the box says which zip its store keeps for this
+      record, its live record, port, join pass switch and load order; with no
+      zip for the record it stops there. -ServerBuild <zip> sends one first
+      (engine.yml's, held to the record here and by its bytes there);
+    - the record, the gamemode and its stamp, and our plugins when they are
+      not the box's bytes, go up into the stage as -GamemodeOnly sends them;
+      the box takes the zip's files into the stage, held to the record
+      (Expand-ThornswoodStoredServerBuild, ServerBuild.ps1), and the stage
+      check holds every one again by the record's hashes;
+    - the live server keeps its own settings, copied into the stage as they
+      are, and its load order and start point, so no key moves at the swap,
+      and an engine that reads light plugins another way than the running one
+      is refused (ServerOrder.ps1, #1715). It takes none of -RequirePass,
+      -Devs, -Playtesters and -DropPlugins.
+  The notice, the swap and -PutBack are the same as every other run.
 
   THE LIVE SERVER KEEPS ITS OWN SETTINGS (#1221, #1222). A build whose
   server-settings.json is not the live server's (port 7777, not the dev voice
@@ -173,6 +198,12 @@ param(
   # an order that drops any plugin the live server loads (ServerSettings.ps1,
   # Test-ThornswoodLoadOrderDrop). A full deploy's, like the switches above.
   [string[]]$DropPlugins = @(),
+  # The server build records\server-build.json names, out of the store on the
+  # box, with no server build on this machine (#459). See FROM THE STORE.
+  [switch]$FromStore,
+  # A server build zip (engine.yml's server-<...>.zip, its .json beside it) to
+  # send to the store first, for -FromStore.
+  [string]$ServerBuild = '',
     # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
     [switch]$AllowStaleCheckout
 )
@@ -185,7 +216,10 @@ $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # Resolved here, not as the parameter's default: 5.1 leaves $PSScriptRoot empty in an advanced script's defaults (#2229).
-if (-not $Dist) { $Dist = & (Join-Path $Here '..\release\Where.ps1') ServerDist }
+# -GamemodeOnly and -FromStore read no build here, so they never ask for one (#459).
+$DistGiven = [bool]$Dist
+$noBuild = [bool]($GamemodeOnly -or $FromStore)
+if (-not $Dist -and -not $noBuild) { $Dist = & (Join-Path $Here '..\release\Where.ps1') ServerDist }
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Script.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
@@ -449,8 +483,22 @@ if ($GamemodeOnly -and $asked.Count) {
   Write-Host '  -RequirePass, -Devs and -Playtesters go with a full deploy, from a machine with the server build.' -ForegroundColor Yellow
   throw '-GamemodeOnly was given -RequirePass, -Devs or -Playtesters. Nothing was sent and the server was not touched.'
 }
-if (@($DropPlugins).Count -and ($PutBack -or $GamemodeOnly)) {
-  throw '-DropPlugins goes with a full deploy, whose build carries a load order: -PutBack and -GamemodeOnly send none. Nothing was sent and the server was not touched.'
+if (@($DropPlugins).Count -and ($PutBack -or $GamemodeOnly -or $FromStore)) {
+  throw '-DropPlugins goes with a full deploy, whose build carries a load order: -PutBack, -GamemodeOnly and -FromStore send none. Nothing was sent and the server was not touched.'
+}
+# -FromStore (#459): the build out of the store onto the running server, which
+# keeps its settings and its load order.
+if ($ServerBuild -and -not $FromStore) {
+  throw '-ServerBuild sends a server build to the store for -FromStore to deploy. Give -FromStore with it. Nothing was sent and the server was not touched.'
+}
+if ($FromStore -and ($GamemodeOnly -or $PutBack)) {
+  throw '-FromStore deploys the recorded server build and the gamemode; -GamemodeOnly sends no build, and -PutBack puts back what the last deploy replaced. Use one. Nothing was sent and the server was not touched.'
+}
+if ($FromStore -and $asked.Count) {
+  throw '-FromStore sets no setting: the live server keeps its own. -RequirePass, -Devs and -Playtesters go with a full deploy. Nothing was sent and the server was not touched.'
+}
+if ($FromStore -and $DistGiven) {
+  throw '-FromStore takes the server build out of the store, not from -Dist. Run it without -Dist. Nothing was sent and the server was not touched.'
 }
 if ($PutBack) { Invoke-PutBack }
 
@@ -463,8 +511,9 @@ if ($PutBack) { Invoke-PutBack }
 # Unlike that script this one DOES reach the VPS, so it stops before anything
 # leaves the machine rather than part way through a copy.
 #
-# -GamemodeOnly reads nothing out of -Dist (#1089), so it does not ask for it.
-if (-not $GamemodeOnly -and -not (Test-Path -LiteralPath $Dist)) {
+# -GamemodeOnly reads nothing out of -Dist (#1089), so it does not ask for it,
+# and nor does -FromStore (#459).
+if (-not $noBuild -and -not (Test-Path -LiteralPath $Dist)) {
   throw (
     "No skymp server build at $Dist, so there is nothing to send." + [Environment]::NewLine +
     [Environment]::NewLine +
@@ -477,6 +526,10 @@ if (-not $GamemodeOnly -and -not (Test-Path -LiteralPath $Dist)) {
     "If only the gamemode changed, this machine needs no build: the committed gamemode goes" + [Environment]::NewLine +
     "live on its own, onto the server build that is running, with" + [Environment]::NewLine +
     "    .\scripts\deploy\Deploy-Server.ps1 -GamemodeOnly" + [Environment]::NewLine +
+    [Environment]::NewLine +
+    "If the server build this commit records is in the store on the box, it goes live from" + [Environment]::NewLine +
+    "there with the gamemode, with no build here:" + [Environment]::NewLine +
+    "    .\scripts\deploy\Deploy-Server.ps1 -FromStore" + [Environment]::NewLine +
     [Environment]::NewLine +
     "A new server build needs the fork built. .\scripts\release\Build-Engine.ps1 builds it, and" + [Environment]::NewLine +
     ".\scripts\release\Check-ShipReady.ps1 says what this machine is missing."
@@ -496,9 +549,9 @@ $artifact = New-ThornswoodArtifact -Component gamemode -RepoDir (Join-Path $Here
   -AlsoSends 'game/content/Thornswood-Content.esp', 'game/content/Thornswood-Last.esp', 'records/server-build.json'
 '{0,-22} {1}' -f 'artifact', (Format-ThornswoodArtifact $artifact) | Write-Host
 $src = Join-Path $artifact.Folder 'game\gamemode.js'
-# -GamemodeOnly has no build to copy it into, and sends the artifact's own.
+# -GamemodeOnly and -FromStore have no build to copy it into, and send the artifact's own.
 $built = $src
-if (-not $GamemodeOnly) {
+if (-not $noBuild) {
   $built = Join-Path $Dist 'gamemode.js'
   if (-not (Test-Path -LiteralPath $built) -or
       (Get-FileHash -LiteralPath $src).Hash -ne (Get-FileHash -LiteralPath $built).Hash) {
@@ -517,7 +570,7 @@ if (Test-Path -LiteralPath $built) {
   Write-Host '  gamemode.js parses'
 }
 
-if (-not $GamemodeOnly) {
+if (-not $noBuild) {
   foreach ($f in 'gamemode.js', 'server-settings.json') {
     if (-not (Test-Path -LiteralPath (Join-Path $Dist $f))) { throw "not built: $(Join-Path $Dist $f)" }
   }
@@ -548,8 +601,9 @@ if (-not $GamemodeOnly) {
 # stamp naming a different gamemode is worse than none. When it is the same
 # file, use it so git can say whether the commit holds it. See BuildStamp.ps1.
 . (Join-Path $Here '..\release\BuildStamp.ps1')
-$stampPath = Join-Path $Dist 'thornswood-build.json'
-if ($GamemodeOnly) {
+$stampPath = ''
+if (-not $noBuild) { $stampPath = Join-Path $Dist 'thornswood-build.json' }
+if ($noBuild) {
   # No build to leave one in, so it is made every run from the artifact,
   # beside the artifact's zip, and never taken from an earlier run (#1089).
   $stampPath = [IO.Path]::ChangeExtension($artifact.Zip, '.main-build.json')
@@ -590,7 +644,13 @@ if (-not (Test-Path -LiteralPath $recordPath)) {
 . (Join-Path $Here '..\release\RecordShape.ps1')
 $rec = Read-ThornswoodRecord -Path $recordPath -Kind server-build
 $serverFiles = @()
-if ($GamemodeOnly) {
+if ($FromStore) {
+  # No server file goes from here: the box takes them out of its store and the
+  # stage is held to the record's hashes (#459). The record goes up.
+  $recordSum = Get-ThornswoodRecordSum ([IO.File]::ReadAllBytes($recordPath))
+  $recFiles = Get-ThornswoodServerRecordFiles $rec
+  $serverFiles = @($recFiles.Keys)
+} elseif ($GamemodeOnly) {
   # No server file goes, so there is none here to hold to the record. The
   # record is held to the box instead, below, before anything is sent: the
   # server running there must be the build this commit records (#1089).
@@ -618,8 +678,9 @@ if ($GamemodeOnly) {
 }
 
 $files = @($serverFiles) + @('gamemode.js', 'server-settings.json')
-# -GamemodeOnly's settings are the box's own, made there (#1089).
-if ($GamemodeOnly) { $files = @('gamemode.js') }
+# -GamemodeOnly's settings are the box's own, made there (#1089), and so are
+# -FromStore's, whose server files come out of the store (#459).
+if ($noBuild) { $files = @('gamemode.js') }
 foreach ($f in $files) {
   $p = Join-Path $Dist ($f -replace '/', '\')
   if ($f -eq 'gamemode.js') { $p = $built }
@@ -627,7 +688,7 @@ foreach ($f in $files) {
   '{0,-22} {1:N0} bytes' -f $f, (Get-Item $p).Length | Write-Host
 }
 
-if ($GamemodeOnly) {
+if ($noBuild) {
   # ------------------------------------------ which build the live server runs
   #
   # -GamemodeOnly (#1089). Asked of the box before anything is sent, and only
@@ -652,6 +713,7 @@ $rp = Join-Path $root 'server-build.json'
 if (Test-Path -LiteralPath $rp) {
   'RECORD ' + (Get-ThornswoodRecordSum ([IO.File]::ReadAllBytes($rp)))
   try { 'RECORDCOMMIT ' + [string](([IO.File]::ReadAllText($rp) | ConvertFrom-Json).source.commit) } catch { }
+  try { $rj = [IO.File]::ReadAllText($rp) | ConvertFrom-Json; 'RECORDLIGHT ' + [bool]($rj.PSObject.Properties.Name -contains 'lightPlugins' -and $rj.lightPlugins -eq $true) } catch { }
 } else { 'RECORD none' }
 '@
   # The content plugin the box holds, by size and sha256, rides in the same
@@ -662,11 +724,13 @@ if (Test-Path -LiteralPath $rp) {
   $boxPass = ''
   $boxRecord = ''
   $boxRecordCommit = ''
+  $boxLight = $false
   foreach ($l in $boxSaid) {
     if ($l -match '^PORT (\d+)$') { $livePort = [int]$Matches[1] }
     elseif ($l -match '^PASS (set|missing|neither)$') { $boxPass = $Matches[1] }
     elseif ($l -match '^RECORD ([0-9a-f]{64}|none)$') { $boxRecord = $Matches[1] }
     elseif ($l -match '^RECORDCOMMIT ([0-9a-f]*)$') { $boxRecordCommit = $Matches[1] }
+    elseif ($l -match '^RECORDLIGHT (True|False)$') { $boxLight = ($Matches[1] -eq 'True') }
   }
   $boxContent = ConvertFrom-ThornswoodServerContentLines $boxSaid
   $refusals = @()
@@ -683,7 +747,15 @@ if (Test-Path -LiteralPath $rp) {
     elseif ($boxPass -eq 'neither') { $refusals += (Get-ThornswoodPassSwitchProblem ([pscustomobject]@{ thornswoodRequirePass = $null })) }
     $ours8 = ([string]$rec.source.commit)
     if ($ours8.Length -gt 8) { $ours8 = $ours8.Substring(0, 8) }
-    if ($boxRecord -eq 'none') {
+    if ($FromStore) {
+      # The engine moves; the load order the live server keeps must still mean
+      # what it meant (ServerOrder.ps1, #1715).
+      $ourLight = ($rec.PSObject.Properties.Name -contains 'lightPlugins' -and $rec.lightPlugins -eq $true)
+      if ($boxRecord -ne 'none' -and $boxLight -ne $ourLight) {
+        $refusals += ('the live load order was written for an engine that ' + $(if ($boxLight) { 'loads' } else { 'does not load' }) + ' light plugins, and the build this commit records ' +
+                      $(if ($ourLight) { 'loads' } else { 'does not load' }) + ' them, so every form id after the first light plugin would move (ServerOrder.ps1, #1715). That goes the full way: Deploy-Gamemode.ps1, then this without -FromStore, from a machine with the build.')
+      }
+    } elseif ($boxRecord -eq 'none') {
       $refusals += 'the live server has no server-build.json, so nothing says which server build it runs. A full deploy, from a machine with the build, puts one there.'
     } elseif ($boxRecord -ne $recordSum) {
       $theirs8 = 'an unreadable one'
@@ -692,13 +764,36 @@ if (Test-Path -LiteralPath $rp) {
                $ours8 + '). A gamemode goes live onto the server build its commit records; one that needs another goes the full way, from a machine with the build.')
     }
   }
+  $how = if ($FromStore) { '-FromStore' } else { '-GamemodeOnly' }
   if ($refusals.Count) {
     Write-Host ''
-    Write-Host '  -GamemodeOnly is refused:' -ForegroundColor Red
+    Write-Host ('  ' + $how + ' is refused:') -ForegroundColor Red
     foreach ($w in $refusals) { Write-Host ('    ' + $w) -ForegroundColor Red }
-    throw '-GamemodeOnly was refused. Nothing was sent and the server was not touched.'
+    throw ($how + ' was refused. Nothing was sent and the server was not touched.')
   }
-  Write-Host ('{0,-22} the live server runs the build this commit records, commit {1}, so only the gamemode goes' -f 'build', $ours8) -ForegroundColor DarkGray
+  if ($FromStore) {
+    # Which zip the store keeps for this record (#459); a CI build first goes
+    # there, held to the record here and by its bytes on the box.
+    if ($ServerBuild) {
+      $sent = Test-ThornswoodServerBuildArtifact -Zip $ServerBuild -Record $recordPath
+      Write-Host ('{0,-22} {1}' -f 'server build artifact', (Format-ThornswoodArtifact $sent)) -ForegroundColor DarkGray
+      Write-Host 'The server build, to the store on the box...'
+      Send-ThornswoodArtifact -Artifact $sent -Target "$User@$Vps" -SshArgs $ssh
+    }
+    $stored = Get-ThornswoodStoredServerBuild -Record $recordPath -Target "$User@$Vps" -SshArgs $ssh
+    if (-not $stored.Answered) { throw ('the box did not say what its store keeps: ' + ((@($stored.Said | Where-Object { $_ }) | Select-Object -Last 3) -join ' | ') + '. Nothing was sent and the server was not touched.') }
+    if ($stored.Many) { throw 'the store on the box keeps more than one server build for this record, and one record makes one zip, so the store is not what its records say. Look at C:\Thornswood-Deploys\server. Nothing was sent and the server was not touched.' }
+    if (-not $stored.Name) {
+      throw ('the store on the box keeps no server build of ' + $stored.Commit.Substring(0, 8) + ' with the record this commit holds' +
+             $(if (@($stored.Others).Count) { ' (it has ' + (@($stored.Others) -join ', ') + ', from that commit with another record)' } else { '' }) +
+             '. Put it there with a full deploy or a publish from a machine that has that build, or with -ServerBuild and the zip engine.yml made. Nothing was sent and the server was not touched.')
+    }
+    $theirs = if ($boxRecordCommit) { $boxRecordCommit.Substring(0, [Math]::Min(8, $boxRecordCommit.Length)) } else { 'none recorded' }
+    Write-Host ('{0,-22} {1} out of the store on the box, commit {2}; the live server runs {3}{4}' -f 'build', $stored.Name, $ours8, $theirs,
+                $(if ($boxRecord -eq $recordSum) { ', the same build, so its files are the same again' } else { '' })) -ForegroundColor DarkGray
+  } else {
+    Write-Host ('{0,-22} the live server runs the build this commit records, commit {1}, so only the gamemode goes' -f 'build', $ours8) -ForegroundColor DarkGray
+  }
 
   # OUR PLUGIN GOES WITH IT WHEN IT CHANGED. Patrick, 5 Oct: a gamemode change
   # often calls for new records in it. It comes from the repository, not the
@@ -915,13 +1010,18 @@ $hashes = [ordered]@{}
 foreach ($rel in $send.Keys) {
   $hashes[$rel] = (Get-FileHash -LiteralPath $send[$rel] -Algorithm SHA256).Hash.ToLowerInvariant()
 }
+# -FromStore's server files are not sent from here: the box takes them out of
+# its store, and the stage is held to them by the record's own hashes (#459).
+if ($FromStore) {
+  foreach ($rel in $serverFiles) { $hashes[$rel] = ([string](Get-ThornswoodServerRecordValue $recFiles[$rel] 'sha256')).ToLowerInvariant() }
+}
 
 Write-Host ''
 Write-Host 'The gamemode artifact, to the store on the box...'
 Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
 # And the server build, on a full deploy (#459). -GamemodeOnly sends no server
-# file, and the box keeps the build it runs.
-if (-not $GamemodeOnly) {
+# file, and the box keeps the build it runs; -FromStore's is in the store.
+if (-not $noBuild) {
   Write-Host 'The server build artifact, to the store on the box...'
   Send-ThornswoodArtifact -Artifact $serverArtifact -Target "$User@$Vps" -SshArgs $ssh
 }
@@ -948,6 +1048,21 @@ foreach ($rel in $send.Keys) {
   if ($LASTEXITCODE -ne 0) { throw "scp failed for $rel. The server has not been touched." }
   Write-Host "  $rel"
 }
+# -FromStore (#459): the box takes the record's build out of its store into the
+# stage, held to the record there (ServerBuild.ps1).
+if ($FromStore) {
+  Write-Host 'Taking the server build out of the store on the box...'
+  $storeScript = [IO.File]::ReadAllText((Join-Path $Here 'ServerBuild.ps1')) + "`r`n" +
+                 (SwapVars $Root $Task $stageName $prevName $Wait ([ordered]@{}) @()) +
+                 ('$Store = ''' + ($script:ThornswoodDeployStore + '/server').Replace('/', '\') + '''' + "`r`n") + $ThornswoodStoreExpandBlock
+  $storeOut = @(Remote $storeScript | ForEach-Object { Write-Host ('  ' + $_); "$_".Trim() })
+  if (-not @($storeOut | Where-Object { $_ -match '^STORED server-[0-9a-f]{12}-[0-9a-f]{16}\.zip$' }).Count) {
+    Write-Host ''
+    Write-Host '  THE SERVER BUILD COULD NOT BE TAKEN OUT OF THE STORE, so nothing was stopped and nobody was warned.' -ForegroundColor Red
+    Write-Host '  The server is still running exactly as it was. The lines above say why.' -ForegroundColor Red
+    exit 1
+  }
+}
 
 # The running server's own settings, carried into the staged file on the box,
 # with only the keys Deploy-Gamemode writes for live taken from the build
@@ -957,7 +1072,14 @@ foreach ($rel in $send.Keys) {
 # exactly those keys differ from what the server had.
 Write-Host ''
 Write-Host 'Keeping the live server''s own settings...'
-if ($GamemodeOnly) {
+if ($FromStore) {
+  # The running server's own file, copied into the stage unchanged, after the
+  # box's record is read again: still what this run read before it sent
+  # anything (#459, ServerSettings.ps1's $settingsStoreBlock). No key moves.
+  $liveKeys = @()
+  $carryScript = [IO.File]::ReadAllText((Join-Path $Here 'ServerSettings.ps1')) + "`r`n" + $ThornswoodRecordSumText + "`r`n" +
+                 (SwapVars $Root $Task $stageName $prevName $Wait $hashes $liveKeys) + ('$WasRecord = ''' + $boxRecord + '''' + "`r`n") + $settingsStoreBlock
+} elseif ($GamemodeOnly) {
   # The running server's own file, copied into the stage unchanged, after the
   # box's record and join pass switch are read again; no key may move at the
   # swap (#1089, ServerSettings.ps1's $settingsKeepBlock).
@@ -1033,7 +1155,7 @@ $null = Save-ThornswoodDeployedBuild "$User@$Vps" $ssh $Root
 # And from here, the shape Publish-Server.ps1 uses. The box answering itself
 # on 127.0.0.1 is not the same as it answering the rest of the world; this is
 # the one a firewall rule shows up in.
-$port = if ($GamemodeOnly) { $livePort } else { [int]$settings.port }
+$port = if ($noBuild) { $livePort } else { [int]$settings.port }
 $resPort = if ($port -eq 7777) { 3000 } else { $port + 1 }
 $seen = $false
 for ($i = 0; $i -lt 10; $i++) {

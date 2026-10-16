@@ -527,6 +527,7 @@ jobs:
                  'test-2309-loadorder-fresh.ps1',
                  'test-459-publish-dist.ps1',
                  'test-459-server-artifact.ps1',
+                 'test-459-store-deploy.ps1',
                  'test-2320-short-load-order.ps1',
                  'test-1929-dev-gamemode-note.ps1',
                  'test-1938-server-ready-wait.ps1',

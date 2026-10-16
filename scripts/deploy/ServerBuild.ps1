@@ -189,3 +189,137 @@ function Get-ThornswoodBoxBuildProblem([string]$BoxSum, [string]$BoxCommit, [str
   }
   return $null
 }
+
+<#
+  A RECORDED BUILD OUT OF THE BOX'S STORE (#459). Since #2467 every
+  Publish-Server.ps1 and full Deploy-Server.ps1 keeps the server build it sends
+  in the box's store, C:\Thornswood-Deploys\server, as
+  server-<fork commit 12>-<zip hash 16>.zip with its .json (ServerArtifact.ps1
+  makes them). Publish-Server.ps1 -FromStore and Deploy-Server.ps1 -FromStore
+  put the build records\server-build.json names onto a server from there, so a
+  machine with no engine build can deploy one. This runs on the box, in the
+  installer's stage or Deploy-Server's, and puts that build's files into
+  $Into, held to the record exactly as a build sent from a machine is:
+
+    - the store's .json for the record's commit whose recordSha256 is the
+      record's own sum (Get-ThornswoodRecordSum, so CR LF and LF are one
+      record), and exactly one: the same record and build always make the
+      same zip (ServerArtifact.ps1), so two would be a store that lies;
+    - the zip's sha256 is its .json's and begins as its name says;
+    - the zip holds the record's files and server-build.json, nothing else;
+      each file's sha256 is the record's, and the server-build.json in it
+      sums to the record;
+    - written into $Into, the files are read again and held to the record
+      with Get-ThornswoodServerBuildProblems, the check every stage gets.
+
+  Returns Name (the zip's, '' when nothing was taken), Said (lines to print)
+  and Problem ('' or why nothing was taken). Only the record's files are
+  written; on a problem some may be there, and the caller clears its stage.
+#>
+function Expand-ThornswoodStoredServerBuild([string]$Store, $Record, [string]$RecordSum, [string]$Into) {
+    $r = [pscustomobject]@{ Name = ''; Said = @(); Problem = '' }
+    $commit = ([string](Get-ThornswoodServerRecordValue (Get-ThornswoodServerRecordValue $Record 'source') 'commit')).ToLowerInvariant()
+    $files = Get-ThornswoodServerRecordFiles $Record
+    if ($commit -notmatch '^[0-9a-f]{40}$' -or $null -eq $files -or $files.Count -eq 0) {
+        $r.Problem = 'server-build.json names no fork commit or no server files, so no build in the store can be held to it'
+        return $r
+    }
+    $RecordSum = ([string]$RecordSum).ToLowerInvariant()
+    $short = $commit.Substring(0, 12)
+    $mine = @()
+    $others = @()
+    if (Test-Path -LiteralPath $Store) {
+        foreach ($j in @(Get-ChildItem -LiteralPath $Store -Filter ('server-' + $short + '-*.json') -File -ErrorAction SilentlyContinue)) {
+            $meta = $null
+            try { $meta = [IO.File]::ReadAllText($j.FullName) | ConvertFrom-Json } catch { $meta = $null }
+            $sum = ''
+            if ($null -ne $meta) { $sum = ([string](Get-ThornswoodServerRecordValue $meta 'recordSha256')).ToLowerInvariant() }
+            if ($sum -and $sum -eq $RecordSum -and ([string](Get-ThornswoodServerRecordValue $meta 'commit')).ToLowerInvariant() -eq $commit) { $mine += [pscustomobject]@{ Json = $j.FullName; Meta = $meta } }
+            else { $others += $j.BaseName }
+        }
+    }
+    if ($mine.Count -eq 0) {
+        $r.Problem = ('the store (' + $Store + ') holds no server build of ' + $commit.Substring(0, 8) + ' with this record' +
+                      $(if ($others.Count) { '; it has ' + ($others -join ', ') + ', built from the same commit with another record' } else { '' }) +
+                      '. A Publish-Server.ps1 or full Deploy-Server.ps1 from a machine with that build puts it there, or -ServerBuild sends one CI made')
+        return $r
+    }
+    if ($mine.Count -gt 1) {
+        $r.Problem = ('the store holds ' + $mine.Count + ' server builds for one record (' + (($mine | ForEach-Object { [IO.Path]::GetFileNameWithoutExtension($_.Json) }) -join ', ') +
+                      '), and one record makes one zip, so the store is not what its records say')
+        return $r
+    }
+    $zip = [IO.Path]::ChangeExtension($mine[0].Json, '.zip')
+    $name = [IO.Path]::GetFileName($zip)
+    $r.Name = $name
+    if (-not (Test-Path -LiteralPath $zip)) { $r.Problem = ($name + ' is named in the store and is not there'); return $r }
+    $m = [regex]::Match($name, '^server-([0-9a-f]{12})-([0-9a-f]{16})\.zip$')
+    $have = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+    $want = ([string](Get-ThornswoodServerRecordValue $mine[0].Meta 'sha256')).ToLowerInvariant()
+    if (-not $m.Success -or $have -ne $want -or -not $have.StartsWith($m.Groups[2].Value)) {
+        $r.Problem = ($name + ' is not the zip its name and its .json say (its sha256 is ' + $have.Substring(0, 16) + ')')
+        return $r
+    }
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $why = @()
+    $za = [IO.Compression.ZipFile]::OpenRead($zip)
+    try {
+        $seen = @{}
+        foreach ($ze in $za.Entries) {
+            if (-not $ze.Name) { continue }
+            $rel = ConvertTo-ThornswoodServerRel $ze.FullName
+            $seen[$rel] = $true
+            $ms = New-Object IO.MemoryStream
+            $zs = $ze.Open()
+            try { $zs.CopyTo($ms) } finally { $zs.Dispose() }
+            $bytes = $ms.ToArray()
+            if ($rel -eq 'server-build.json') {
+                if ((Get-ThornswoodRecordSum $bytes) -ne $RecordSum) { $why += 'its server-build.json is not this record' }
+                continue
+            }
+            if (-not $files.Contains($rel)) { $why += ($rel + ' is in it and the record does not list it'); continue }
+            $h = [Security.Cryptography.SHA256]::Create()
+            try { $sum = (($h.ComputeHash($bytes) | ForEach-Object { $_.ToString('x2') }) -join '') } finally { $h.Dispose() }
+            if ($sum -ne ([string](Get-ThornswoodServerRecordValue $files[$rel] 'sha256')).ToLowerInvariant()) { $why += ($rel + ' in it is not the build the record names'); continue }
+            $to = Join-Path $Into ($rel -replace '/', '\')
+            $null = [IO.Directory]::CreateDirectory((Split-Path -Parent $to))
+            [IO.File]::WriteAllBytes($to, $bytes)
+        }
+        foreach ($rel in @($files.Keys)) { if (-not $seen.ContainsKey($rel)) { $why += ($rel + ' is listed in the record and not in it') } }
+        if (-not $seen.ContainsKey('server-build.json')) { $why += 'it carries no server-build.json' }
+    } finally { $za.Dispose() }
+    if (-not $why.Count) { $why = @(Get-ThornswoodServerBuildProblems $Record (Get-ThornswoodServerFolderSums $Into) 'the stage' 'server-build.json') }
+    if ($why.Count) { $r.Problem = ($name + ': ' + ($why -join '; ')); return $r }
+    $r.Said = @(('the server build ' + $name + ' out of the store: ' + $files.Count + ' files, each the build server-build.json names, from ' + $commit.Substring(0, 8)))
+    return $r
+}
+
+<#
+  Deploy-Server.ps1 -FromStore's half on the box (#459): the build the staged
+  server-build.json names, out of the store into the stage, by
+  Expand-ThornswoodStoredServerBuild above. This file's text goes in front of
+  it, and $Root, $Stage and $Store in the lines before it. Ends with
+  STORED <zip name> or STORE REFUSED, the stage cleared.
+#>
+$ThornswoodStoreExpandBlock = @'
+$ProgressPreference = 'SilentlyContinue'
+$stageDir = Join-Path $Root $Stage
+$rp = Join-Path $stageDir 'server-build.json'
+$rec = $null
+try { $rec = [IO.File]::ReadAllText($rp) | ConvertFrom-Json } catch { $rec = $null }
+$got = $null
+if ($null -eq $rec) { $why = 'the staged server-build.json cannot be read, so nothing says which build to take out of the store' }
+else {
+  $got = Expand-ThornswoodStoredServerBuild -Store $Store -Record $rec -RecordSum (Get-ThornswoodRecordSum ([IO.File]::ReadAllBytes($rp))) -Into $stageDir
+  $why = $got.Problem
+}
+if ($why) {
+  'REFUSED: ' + $why
+  Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue
+  'the stage is cleared and the server was not touched'
+  'STORE REFUSED'
+} else {
+  foreach ($l in $got.Said) { $l }
+  'STORED ' + $got.Name
+}
+'@

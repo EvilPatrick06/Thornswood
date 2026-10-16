@@ -938,6 +938,53 @@ function Start-ScheduledTask { [CmdletBinding()] param([string]`$TaskName)
             [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $root 'server-settings.json'))) -eq [Convert]::ToBase64String($ownSettings) -and
             (WaitUp $P) -and ((Owner $Q) -eq $otherPid))
         if ($script:fail -gt $failed) { Show }
+
+        # ---- -FromStore, the whole script (#459) -------------------------------
+        # The server build the commit records, out of the box's store, with no
+        # build on this machine. The commit now records a build of every
+        # server file (ServerBuild.ps1); the box runs the earlier record.
+        . (Join-Path $Here 'scripts\deploy\ServerArtifact.ps1')
+        $sbDir = Join-Path $work 'store-build'
+        foreach ($kv in @(@('scam_native.node', 'the store''s binary'), @('dist_back\skymp5-server.js', '// the store''s JavaScript half'),
+                          @('dist_back\skymp5-server.js.map', '{ "version": 3 }'), @('package.json', '{ "name": "skymp5-server" }'),
+                          @('yarn.lock', '# yarn lockfile v1'), @('launch_server.bat', 'node dist_back/skymp5-server.js'),
+                          @('data\scripts\ActiveMagicEffect.pex', 'compiled papyrus'))) { Put (Join-Path $sbDir $kv[0]) $kv[1] }
+        $sbSums = Get-ThornswoodServerFolderSums $sbDir
+        $sbFiles = [ordered]@{}
+        foreach ($k in @($sbSums.Keys | Sort-Object)) { $sbFiles[$k] = [ordered]@{ sha256 = $sbSums[$k]; bytes = 1; commit = '1234567890abcdef1234567890abcdef12345678' } }
+        $sbRecord = ([ordered]@{ binary = 'scam_native.node'; sha256 = $sbSums['scam_native.node']; bytes = 1
+                                 source = [ordered]@{ commit = '1234567890abcdef1234567890abcdef12345678' }; files = $sbFiles } | ConvertTo-Json -Depth 5) + "`n"
+        Put (Join-Path $gmRepo 'records\server-build.json') $sbRecord
+        GmCommit
+        $sbArt = New-ThornswoodServerBuildArtifact -From $sbDir -Record (Join-Path $gmRepo 'records\server-build.json') -OutDir (Join-Path $work 'store-ci')
+
+        $before = Tree $root
+        $running = Owner $P
+        $r = GmDeploy @{ GamemodeOnly = $null; FromStore = $true }
+        $failed = $script:fail
+        Yes '-FromStore whose build the store does not keep is refused, saying so' (
+            (-not $r.Ok) -and $r.Said -match 'keeps no server build of 12345678 with the record this commit holds' -and $r.Said -match 'Nothing was sent and the server was not touched')
+        Yes '  after reading the box, with nothing sent: no scp, the live folder and the server as they were' (
+            $r.Scp -eq 0 -and (Tree $root) -eq $before -and (Owner $P) -eq $running)
+        if ($script:fail -gt $failed) { Show }
+
+        $prevsBefore = Prevs
+        $r = GmDeploy @{ GamemodeOnly = $null; FromStore = $true; ServerBuild = $sbArt.Zip }
+        $said = $r.Said
+        $failed = $script:fail
+        Yes '-FromStore -ServerBuild sends the build to the store, takes it into the stage there, and is SWAP OK and PASS' (
+            $r.Ok -and $said -match ([regex]::Escape('STORED ' + $sbArt.Name)) -and $said -match 'SWAP OK' -and $said -match 'PASS\. The server is up at 127\.0\.0\.1')
+        Yes '  the build kept in the store by name, the bytes it was made with' ((Sha (Join-Path $gmStore ('server\' + $sbArt.Name))) -eq $sbArt.Sha256)
+        $rootSums = Get-ThornswoodServerFolderSums $root
+        Yes '  every server file live is the build the commit records, and so is the record' (
+            @($sbFiles.Keys | Where-Object { $rootSums[$_] -ne $sbFiles[$_].sha256 }).Count -eq 0 -and (Text (Join-Path $root 'server-build.json')) -eq $sbRecord)
+        Yes '  and the settings live are the server''s own, byte for byte, with no key allowed to move' (
+            [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $root 'server-settings.json'))) -eq [Convert]::ToBase64String($ownSettings) -and
+            $said -match 'a server build out of the store changes none of them')
+        $new = @(Prevs | Where-Object { $prevsBefore -notcontains $_ })
+        Yes '  and what it replaced is in .prev, the old record among it' ($new.Count -eq 1 -and (Text (Join-Path $new[0] 'server-build.json')) -eq $gmRecordLf.Replace("`n", "`r`n"))
+        Yes '  the server answering as a new process, the other untouched' ((WaitUp $P) -and ((Owner $P) -ne $running) -and ((Owner $Q) -eq $otherPid))
+        if ($script:fail -gt $failed) { Show }
     } finally {
         Remove-Item -Path function:global:ssh, function:global:scp, function:global:TsGmMap -ErrorAction SilentlyContinue
         Remove-Variable -Name TsGm -Scope Global -ErrorAction SilentlyContinue
