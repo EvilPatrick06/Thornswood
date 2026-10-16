@@ -550,7 +550,8 @@ jobs:
                  'test-launcher-icons.js',
                  'test-whose-game-gate.js',
                  'test-gate-list.ps1',
-                 'test-storage-forecast.ps1'
+                 'test-storage-forecast.ps1',
+                  'test-jump-sprint-no-timers.js'
           $failed = @()
           foreach ($n in $six) {
             $p = Join-Path 'tests' $n
