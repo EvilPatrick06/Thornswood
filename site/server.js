@@ -801,7 +801,8 @@ function publicPageBody(route) {
     if (rm.intro) body += pageHtml(rm.intro).replace(/<h1\b/g, '<h2').replace(/<\/h1>/g, '</h2>');
     let count = 0;
     for (const section of (rm.sections || [])) {
-      if (/^\s*done\s*$/i.test(section.name || '') || !(section.rows || []).length) continue;
+      // Done is drawn too (#2560), last, as it sits in the data.
+      if (!(section.rows || []).length) continue;
       body += '<section class="lane"><h2>' + escAttr(section.name || '') + '</h2><ul>';
       for (const row of section.rows) {
         const text = (section.columns || []).map(col => (row.cells || {})[col.id]).filter(Boolean).join(' · ');
