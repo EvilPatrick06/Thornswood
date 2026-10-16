@@ -185,7 +185,9 @@ function Build {
         Put (Join-Path $PV 'property.json') ('{"houses":[{"id":"h1","owner":' + $P1 + '},{"id":"h2","owner":' + $PY + '}]}')
         Put (Join-Path $PV 'moderation.log') ('{"what":"stuck","pid":' + $P1 + '}' + "`n")
         Put (Join-Path $PV 'door.log') ("2026-10-01 WOULD TURN AWAY profile $P1`n")
-        Put (Join-Path $R 'data\last-left.json') ('{"' + $P1 + '":1790000000000,"' + $PY + '":1790000000001}')
+        Put (Join-Path $PV 'last-left.json') ('{"' + $P1 + '":1790000000000,"' + $PY + '":1790000000001}')
+        # Where the gamemode kept it before #2582, as a folder set aside then still has it.
+        Put (Join-Path $R 'data\last-left.json') ('{"' + $P1 + '":1780000000000,"' + $PY + '":1780000000001}')
         Put (Join-Path $R 'data\online.json') '{"now":0}'
     }
     Put (Join-Path $Box 'Thornswood-Server.prev-20261001-000000\world\changeForms\ff000a07.json') ('{"profileId":' + $P1 + '}')
@@ -307,6 +309,7 @@ try {
         Yes "$tag`: their mod menu choices, take counts and last-left time are gone" (
             $null -eq (J (Join-Path $PV 'mod-settings.json')).who."$P1" -and $null -ne (J (Join-Path $PV 'mod-settings.json')).who."$PY" -and
             $null -eq (J (Join-Path $PV 'take-limit.json')).counts."$P1|1a2b3" -and $null -ne (J (Join-Path $PV 'take-limit.json')).counts."$PY|1a2b3" -and
+            $null -eq (J (Join-Path $PV 'last-left.json'))."$P1" -and $null -ne (J (Join-Path $PV 'last-left.json'))."$PY" -and
             $null -eq (J (Join-Path $R 'data\last-left.json'))."$P1" -and $null -ne (J (Join-Path $R 'data\last-left.json'))."$PY")
         $rel = $R.Substring($Box.Length)
         Yes "$tag`: the property register, the staff log and the door log are as they were" (
