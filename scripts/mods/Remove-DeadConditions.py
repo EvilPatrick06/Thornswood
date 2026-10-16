@@ -30,8 +30,8 @@ rank on each rung.
 
 WHAT IT PROVES BEFORE IT WRITES
 
-The same discipline as Rename-ContentRecords.ps1 and Remove-DeadRecords.ps1,
-which this borrows its parser shape from. It parses the file to a tree and
+The same discipline as Remove-DeadRecords.ps1, which this borrows its parser
+shape from. It parses the file to a tree and
 serialises it back byte for byte first, because a parser that cannot reproduce
 what it was given has no business editing it. Afterwards it checks the result:
 every record is still there, in the same order, with the same form id, type and

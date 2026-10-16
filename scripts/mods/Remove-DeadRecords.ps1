@@ -37,8 +37,8 @@
 
   WHAT IT PROVES BEFORE IT WRITES
 
-  Same discipline as Rename-ContentRecords.ps1, which this borrows its parser
-  from. It reads the file and writes it back byte for byte first, because a
+  Same discipline as the editor id rename of 21 September, whose parser this
+  borrowed (that script did its one job and is gone, #400). It reads the file and writes it back byte for byte first, because a
   parser that cannot reproduce what it was given has no business editing it.
   Then, for every record it is about to delete, it searches every other record
   in the file for that form id, INCLUDING the hundred compressed ones, which it

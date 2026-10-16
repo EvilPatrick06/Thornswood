@@ -854,8 +854,15 @@ Two names are in no tracked file at all, code, tests, records, data,
 comes back: the multiplayer mod this build replaced (#497,
 `tests\test-old-name-gone.js`), and the SkyMP server `Thornswood-Content.esp`
 was salvaged from (#400, Patrick, 12 Oct: "no records may keep it";
-`tests\test-other-server-name-gone.js`). Say "the other server" in prose and
-OtherServer in a file, folder or code name.
+`tests\test-other-server-name-gone.js`), along with that server's two short
+forms, the prefix its editor ids, scripts and folders carried (Patrick,
+15 Oct, decision C). Say "the other server" in prose and OtherServer in a
+file, folder or code name. A check that has to find that server's leftovers
+on a machine matches them by their shape, never by its name: its parking
+folder in Data is `_disabledBy` and a name, its backup and plugin list
+beside the game are `<name>-backup-<version>` and `_<name>-plugins-off`
+(`scripts\release\Ship-Rules.ps1`, Test-ShipOtherServer), and any other file
+of its is simply not on the list of ours.
 
 No machine checks these, so the person writing keeps them: plain, direct
 sentences with no filler; the text inside code (the launcher's messages, the

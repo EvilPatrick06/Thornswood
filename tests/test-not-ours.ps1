@@ -91,7 +91,7 @@ $theirs = @(
     # The Creation Kit's face tint export; Thornswood Content carries the .dds.
     'Data\textures\actors\character\facegendata\facetint\fishinginskyrim.esp\00025905.tga',
     # Another server's.
-    'Data\meshes\weapons\kzl\kzl_haybale.nif', 'Data\SKSE\Plugins\TrueHUD\RP_Bosses.ini',
+    'Data\meshes\weapons\otherserver\otherserver_haybale.nif', 'Data\SKSE\Plugins\TrueHUD\RP_Bosses.ini',
     # Settings a mod or the launcher writes on each machine, and a mod nobody has.
     'Data\Interface\skyui\config.shipped.txt', 'Data\SKSE\Plugins\OpenAnimationReplacer_ImGui.ini',
     'Data\SKSE\Plugins\CommunityShaders\SettingsUser.json', 'Data\SKSE\Plugins\ImGuiVRHelper.toml',
@@ -266,10 +266,10 @@ try {
         $filter = $roll.Substring($a, $b - $a)
         function Say($m, $c) { }
         $curMap = @{ 'Data\Platform\UI\index.html' = '1:aa'; 'Data\Interface\racesex_menu.swf' = '2:bb'; ':gone:Data\meshes\LostArk\KamenSword.nif' = 'removed' }
-        $tgtMap = @{ 'Data\Platform\UI\index.html' = '1:cc'; 'Data\Interface\racesex_menu.swf' = '2:dd'; 'Data\meshes\weapons\kzl\kzl_haybale.nif' = '3:ee';
+        $tgtMap = @{ 'Data\Platform\UI\index.html' = '1:cc'; 'Data\Interface\racesex_menu.swf' = '2:dd'; 'Data\meshes\weapons\otherserver\otherserver_haybale.nif' = '3:ee';
                      'Data\meshes\actors\character\behaviors\0_master.hkx' = '4:ff' }
         Invoke-Expression $filter
-        Yes 'going back to an old record hands none of them out' (-not $tgtMap.ContainsKey('Data\Interface\racesex_menu.swf') -and -not $tgtMap.ContainsKey('Data\meshes\weapons\kzl\kzl_haybale.nif'))
+        Yes 'going back to an old record hands none of them out' (-not $tgtMap.ContainsKey('Data\Interface\racesex_menu.swf') -and -not $tgtMap.ContainsKey('Data\meshes\weapons\otherserver\otherserver_haybale.nif'))
         Yes '  nor lists them as gone going forward' (-not $curMap.ContainsKey('Data\Interface\racesex_menu.swf'))
         Yes '  while what an earlier release took out stays gone' ($curMap.ContainsKey(':gone:Data\meshes\LostArk\KamenSword.nif'))
         Yes '  and ours stays, Nemesis''s output with it' ($tgtMap.ContainsKey('Data\Platform\UI\index.html') -and $tgtMap.ContainsKey('Data\meshes\actors\character\behaviors\0_master.hkx'))

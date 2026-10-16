@@ -10,7 +10,9 @@
 //   1. Both meshes are whole Skyrim SE NIFs: the header's version, the block
 //      table adding up to the end of the file, one root, a BSFadeNode.
 //   2. Every texture they name is one of the vanilla paths the build read, and
-//      nothing in either file is the Missives board's (no olivar, no missive).
+//      nothing in either file is the Missives board's (no missive). The other
+//      server's short names, which its folder carried, are refused in every
+//      tracked file by tests/test-other-server-name-gone.js.
 //   3. Each has its own static collision, and none of the board's reaches over
 //      the box where it stands beside the board; the box's covers only the box.
 //   4. Thornswood-Content.esp's board names the new mesh, the drop box is a
@@ -129,7 +131,7 @@ for (const [name, rel] of [['the board', BOARD], ['the drop box', BOX]]) {
   yes(name + ' names only vanilla textures (' + tex.length + ' paths)', tex.length > 0 && odd.length === 0);
   if (odd.length) { console.log('      not on the list: ' + odd.join(', ')); }
   const low = b.toString('latin1').toLowerCase();
-  yes(name + ' carries nothing of the Missives board', low.indexOf('missive') < 0 && low.indexOf('olivar') < 0);
+  yes(name + ' carries nothing of the Missives board', low.indexOf('missive') < 0);
 }
 
 {

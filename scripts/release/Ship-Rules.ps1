@@ -522,15 +522,18 @@ function Test-ShipOtherServer([string]$rel) {
     if ((Split-Path $rel -Leaf) -ieq 'NirnLabUIPlugin.dll') { return $true }
     # Other launchers' parking folders inside our own game folder, Djinn, 25
     # September. Another SkyMP server's launcher moves the Creation Club archives it turns
-    # off into Data\_disabledByKzl and keeps its own backup and plugin list
-    # beside the game; the Daedric server's launcher keeps DaedricData. They
-    # came back after a Play and put 2.4 GB of somebody else's files into a dev
-    # release. Never shipped, never removed. Anchored, with a boundary.
-    # The backup and the plugin list are matched by their shape, a folder at
-    # the root named <name>-backup-<version> or _<name>-plugins-off, not by
-    # the server's name, which no file here carries (Patrick, 12 October,
-    # #400). Nothing of ours sits at the game's root under either shape.
-    if ($rel -match '^Data\\_disabledByKzl($|\\)') { return $true }
+    # off into a folder in Data named _disabledBy and its own short name, and
+    # keeps its own backup and plugin list beside the game; the Daedric
+    # server's launcher keeps DaedricData. They came back after a Play and put
+    # 2.4 GB of somebody else's files into a dev release. Never shipped, never
+    # removed. Anchored, with a boundary.
+    # All three are matched by their shape, not by the server's name or its
+    # short forms, which no file here carries (Patrick, 12 October, and
+    # decision C of 15 October, #400): a folder directly in Data named
+    # _disabledBy<name>, and a folder at the root named <name>-backup-<version>
+    # or _<name>-plugins-off. Nothing of ours sits in either place under any
+    # of those shapes.
+    if ($rel -match '^Data\\_disabledBy[^\\]+($|\\)') { return $true }
     if ($rel -match '^(DaedricData|_[^\\]+-plugins-off|[^\\]+-backup-[^\\]+)($|\\)') { return $true }
     # See $ShipDeleteAlways below for why this one also has to be DELETED from
     # machines that already have it, and not merely left out of new packs.
@@ -1205,7 +1208,8 @@ function Get-ShipLooseArt($files) {
 #     Unofficial Patch and interior mods' scripts without their plugins, old
 #     MCM Helper scripts that override the collection's newer ones, and
 #     retextures with no mod found.
-#   - Another server's files: kzl_haybale.nif, Daedric Online's
+#   - Another server's files: the other server's haybale mesh (a weapon mesh
+#     in a folder named with its prefix), Daedric Online's
 #     TrueHUD boss list (RP_Bosses.ini, "Daedric Online boss health bars" by
 #     its first line; Patrick, 29 September, #1253: it goes).
 #   - Settings a mod or the launcher writes on each machine: ImGui window state,
@@ -1308,7 +1312,11 @@ $ShipGeneratedPatterns = $ShipGeneratedBodyFiles + @(
 # (records\collection-plugins.json), so dev 1.2.3 listed the board mesh as gone
 # and every board the plugin places lost its model while the plugin still named
 # it. A line now refuses to be made without a way out, and the board's way out
-# is the plugin itself.
+# was the plugin itself. Since #2298 the plugin's board is Thornswood's own
+# mesh, so the board's line held nothing, and it came out on 16 October (#400):
+# the old mesh is somebody else's file like any other, which never ships. No
+# line holds this way today; it stays for the next mesh the plugin names that
+# no revision carries (tests\test-2298-held-board.ps1).
 function New-ShipHeld {
     param(
         [Parameter(Mandatory = $true, Position = 0)][string]$Path,
@@ -1403,20 +1411,16 @@ $ShipHeldForCollection = @(
     (New-ShipHeld 'Data\meshes\clothes\childrenclothes\' 'Styles of Skyrim Mashups - Children Clothes Variations and Mesh Fixes (154063)' -Revision 2),
     (New-ShipHeld 'Data\meshes\_byoh\clothes\childrenclothesvariants\' 'Styles of Skyrim Mashups - Children Clothes Variations and Mesh Fixes (154063)' -Revision 2),
     # A noble end table's mesh fix: Assorted Mesh Fixes (Nexus 32117).
-    (New-ShipHeld 'Data\meshes\furniture\noble\nobleendtable04.nif' 'Assorted Mesh Fixes (32117)' -Revision 2),
-    # The message board Thornswood-Content.esp itself places, from the other
-    # server's kzolivar records Patrick kept. Dev packs carry it (main never
-    # has) and no mod in the collection has it at this path; a board of the
-    # same name is in Missives - Unique Missive Boards (Nexus 111375, a quest
-    # mod with a plugin of its own) at meshes\clutter\missives, and its bytes
-    # are not this one's (#1258). No collection revision carries this path, so
-    # it ships while the plugin names it, and leaves the release the plugin's
-    # board points at a mesh the collection installs or one Thornswood ships
-    # as its own (#2298). Since #2298 the board names Thornswood's own
-    # meshes\thornswood\noticeboard01.nif, so this line holds nothing any
-    # more: the next release lists the old mesh as gone and every launcher
-    # takes it off. It stays so the record of why reads in one place.
-    (New-ShipHeld 'Data\meshes\olivar-messageboard\missiveboardcotnd.nif' 'none yet: Thornswood Content must point its board at a mesh the collection installs' -WhileContentNamesIt)
+    (New-ShipHeld 'Data\meshes\furniture\noble\nobleendtable04.nif' 'Assorted Mesh Fixes (32117)' -Revision 2)
+    # The message board Thornswood-Content.esp used to place, a reworked copy
+    # of the board in Missives - Unique Missive Boards (Nexus 111375) that came
+    # with the other server's records, in a folder named with that server's
+    # prefix (#1258), was held here while the plugin named it. Since #2298 the
+    # board names Thornswood's own meshes\thornswood\noticeboard01.nif, so its
+    # line held nothing, and it came out on 16 October (#400, decision C: the
+    # other server's short forms are named nowhere). The old mesh is now
+    # somebody else's file like any other, kept out of every pack because it
+    # is not on the list of ours.
 )
 
 # The collection revision this release is built against: what the feed's
