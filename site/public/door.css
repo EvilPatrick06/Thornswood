@@ -1,15 +1,8 @@
 /* Server-written door / notice pages.
    External so CSP style-src 'self' works without unsafe-inline
    (#1474 follow-up after #1479). */
-/* Tokens named as in hub.css, so looks.css themes these pages too (#515). */
-:root{
-  --ink:#12150F; --text:#DDE3D5; --gold:#C9A24B; --dim:#8D9682;
-  --sans:system-ui,sans-serif;
-  /* Weights, so "Heavier" in looks.css has one place to change (#515). */
-  --w-light:300; --w-body:400; --w-mid:500; --w-strong:600; --w-bold:700;
-}
-body.door{background:var(--ink);color:var(--text);font:var(--w-body) 15px/1.6 var(--sans);display:grid;place-items:center;height:100vh;margin:0;text-align:center;padding:20px;box-sizing:border-box}
+body.door{background:#12150F;color:#DDE3D5;font:15px/1.6 system-ui,sans-serif;display:grid;place-items:center;height:100vh;margin:0;text-align:center;padding:20px;box-sizing:border-box}
 .door-box{max-width:32em}
-.door h1{color:var(--gold);font-weight:var(--w-strong)}
-.door a{color:var(--gold)}
-.door-note{color:var(--dim);font-size:13px}
+.door h1{color:#C9A24B;font-weight:600}
+.door a{color:#C9A24B}
+.door-note{color:#8D9682;font-size:13px}
