@@ -270,14 +270,104 @@ if (-not (Test-Path -LiteralPath $waitLib)) {
     Finish 'INSTALL REFUSED' 1
 }
 . $waitLib
-# The account the task runs as and what it may reach (#2578): beside this
-# script too, sent with it. Without it the task could not be registered.
-$serviceLib = Join-Path $here 'ServiceAccount.ps1'
-if (-not (Test-Path -LiteralPath $serviceLib)) {
-    Say "ServiceAccount.ps1 is not beside this installer, so the account the server runs as has no source. Nothing was changed." 'Red'
-    Finish 'INSTALL REFUSED' 1
+# The account the task runs as and what it may reach (#2578). A copy of the
+# functions in ServiceAccount.ps1, kept here rather than sent beside this
+# installer, because every file Publish-Server.ps1 sends is a call in
+# records\remote-commands.json. tests\test-2578-service-principals.ps1 fails
+# when this copy and ServiceAccount.ps1 differ.
+# ---- ServiceAccount.ps1 (copy) ----
+function New-ThornswoodServicePrincipal {
+    param([switch]$AsSystem)
+    if ($AsSystem) {
+        return New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+    }
+    return New-ScheduledTaskPrincipal -UserId 'NT AUTHORITY\LOCAL SERVICE' -LogonType ServiceAccount -RunLevel Limited `
+        -RequiredPrivilege 'SeChangeNotifyPrivilege' -ProcessTokenSidType Unrestricted
 }
-. $serviceLib
+function Get-ThornswoodTaskSid {
+    param([string]$TaskName)
+    try {
+        return (New-Object Security.Principal.NTAccount('NT TASK', $TaskName)).Translate([Security.Principal.SecurityIdentifier]).Value
+    } catch { return '' }
+}
+function Get-ThornswoodServiceNeverReach {
+    param([string]$Own = '')
+    $own = $Own.TrimEnd('\')
+    $list = @('C:\Thornswood-Backup', 'C:\Thornswood-Deploys', 'C:\Thornswood-Watch', 'C:\Thornswood-Maint')
+    foreach ($r in 'C:\Thornswood-Server', 'C:\Thornswood-Server-Dev') {
+        if ($r -ine $own) { $list += (Join-Path $r 'private') }
+    }
+    foreach ($r in 'C:\Thornswood-Voice', 'C:\Thornswood-Voice-Dev') {
+        if ($r -ine $own) { $list += (Join-Path $r 'token-key.txt') }
+    }
+    return $list
+}
+function Test-ThornswoodServiceCannotReach {
+    param([string[]]$Paths, [string[]]$Sids = @())
+    $who = @('S-1-1-0', 'S-1-5-11', 'S-1-5-32-545', 'S-1-5-19') + @($Sids | Where-Object { $_ })
+    # ReadData (ListDirectory on a folder), GENERIC_READ and GENERIC_ALL.
+    $read = [long]0x90000001
+    $problems = @()
+    foreach ($p in @($Paths)) {
+        if (-not $p -or -not (Test-Path -LiteralPath $p)) { continue }
+        try { $acl = Get-Acl -LiteralPath $p }
+        catch { $problems += ($p + ': its rules could not be read (' + $_.Exception.Message + ')'); continue }
+        foreach ($r in @($acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]))) {
+            if ([string]$r.AccessControlType -ne 'Allow') { continue }
+            if ($who -notcontains $r.IdentityReference.Value) { continue }
+            if (([long][int]$r.FileSystemRights -band $read) -eq 0) { continue }
+            $problems += ($p + ': ' + $r.IdentityReference.Value + ' may read it (' + $r.FileSystemRights + ')')
+        }
+    }
+    # Unrolled: callers wrap it in @(), so none is a count of 0.
+    return $problems
+}
+function Set-ThornswoodServiceAcl {
+    param([string]$Path, $Acl)
+    $item = Get-Item -LiteralPath $Path -Force
+    if ($PSVersionTable.PSEdition -eq 'Core') {
+        if ($item -is [IO.DirectoryInfo]) { [IO.FileSystemAclExtensions]::SetAccessControl([IO.DirectoryInfo]$item, [Security.AccessControl.DirectorySecurity]$Acl) }
+        else { [IO.FileSystemAclExtensions]::SetAccessControl([IO.FileInfo]$item, [Security.AccessControl.FileSecurity]$Acl) }
+    } else { $item.SetAccessControl($Acl) }
+}
+function Grant-ThornswoodServiceFolder {
+    param([string]$Root, [string]$Sid, [string[]]$Writable = @(), [string[]]$Files = @())
+    if (-not $Root -or -not (Test-Path -LiteralPath $Root)) { throw ('not here: ' + $Root) }
+    if (-not $Sid) { throw 'no SID to grant to' }
+    $fsr  = [Security.AccessControl.FileSystemRights]
+    $inh  = [Security.AccessControl.InheritanceFlags]
+    $prop = [Security.AccessControl.PropagationFlags]
+    $tree = $inh::ContainerInherit -bor $inh::ObjectInherit
+    $who  = New-Object Security.Principal.SecurityIdentifier($Sid)
+    $made = New-Object Security.Principal.SecurityIdentifier('S-1-3-0')
+    $said = @()
+
+    $acl = Get-Acl -LiteralPath $Root
+    $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($who, $fsr::ReadAndExecute, $tree, $prop::None, 'Allow')))
+    $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($who, ($fsr::CreateFiles -bor $fsr::CreateDirectories), $inh::None, $prop::None, 'Allow')))
+    $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($made, $fsr::Modify, $tree, $prop::InheritOnly, 'Allow')))
+    Set-ThornswoodServiceAcl $Root $acl
+    $said += ('read and run in ' + $Root + ', make files there, change only what it made')
+
+    foreach ($w in @($Writable | Where-Object { $_ })) {
+        $d = Join-Path $Root $w
+        if (-not (Test-Path -LiteralPath $d)) { continue }
+        $a = Get-Acl -LiteralPath $d
+        $a.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($who, $fsr::Modify, $tree, $prop::None, 'Allow')))
+        Set-ThornswoodServiceAcl $d $a
+        $said += ('change ' + $d)
+    }
+    foreach ($pat in @($Files | Where-Object { $_ })) {
+        foreach ($f in @(Get-ChildItem -LiteralPath $Root -File -Force -Filter $pat -ErrorAction SilentlyContinue)) {
+            $a = Get-Acl -LiteralPath $f.FullName
+            $a.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($who, $fsr::Modify, 'Allow')))
+            Set-ThornswoodServiceAcl $f.FullName $a
+            $said += ('change ' + $f.FullName)
+        }
+    }
+    return $said
+}
+# ---- end ServiceAccount.ps1 ----
 # The fail-safe (#2578), before anything is stopped or changed: the server
 # goes onto LOCAL SERVICE only where LOCAL SERVICE can read none of what no
 # service may.

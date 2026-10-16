@@ -197,7 +197,7 @@ typed on a command line or written on this page.
    .\scripts\deploy\Deploy-Gamemode.ps1
    .\scripts\release\Export-ServerPayload.ps1
    scp (.\scripts\release\Where.ps1 ServerZip) Administrator@<new address>:C:/thornswood-server.zip
-   scp .\scripts\deploy\Install-ThornswoodServer.ps1 .\scripts\deploy\ServerSettings.ps1 .\scripts\deploy\ServerBuild.ps1 .\scripts\deploy\ServerReadyWait.ps1 .\scripts\deploy\ServiceAccount.ps1 .\scripts\release\Read-JsonFile.ps1 .\scripts\release\RecordShape.ps1 .\scripts\vps\Server-Log.js Administrator@<new address>:C:/
+   scp .\scripts\deploy\Install-ThornswoodServer.ps1 .\scripts\deploy\ServerSettings.ps1 .\scripts\deploy\ServerBuild.ps1 .\scripts\deploy\ServerReadyWait.ps1 .\scripts\release\Read-JsonFile.ps1 .\scripts\release\RecordShape.ps1 .\scripts\vps\Server-Log.js Administrator@<new address>:C:/
    ssh Administrator@<new address> "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Install-ThornswoodServer.ps1 -RequirePass on"
    ```
    The last one prints `load order: all <n> plugins present` and registers the

@@ -316,8 +316,6 @@ long a start may take to answer on both ports (issue #1938); without it the
 installer stops the same way. And it carries `.\scripts\release\Read-JsonFile.ps1`
 and `.\scripts\release\RecordShape.ps1`, which hold the payload's settings and
 server-build.json to their shape (issue #2180); without them the installer
-stops the same way. And it carries `.\scripts\deploy\ServiceAccount.ps1`, the
-account the server's task runs as (issue #2578); without it the installer
 stops the same way.
 
 The whole thing, typing included, is well under the hour this section used to

@@ -14,7 +14,7 @@
       the task back on SYSTEM when the grants cannot be made;
     - the grants on a scratch folder are what the header says, and the
       fail-safe finds a folder Users may read and passes a locked one;
-    - Publish-Server.ps1 sends ServiceAccount.ps1 beside the installer, and
+    - the server's installer carries an exact copy of the functions, and
       the Caddyfile keeps Caddy's certificates beside it.
   Windows only (ScheduledTasks and NTFS rules). A few seconds.
 #>
@@ -38,7 +38,10 @@ $server = Text (Join-Path $Deploy 'Install-ThornswoodServer.ps1')
 $voice  = Text (Join-Path $Deploy 'Install-Voice.ps1')
 $domain = Text (Join-Path $Deploy 'Setup-Domain.ps1')
 $sysRe  = "-UserId\s+'SYSTEM'|-User\s+'SYSTEM'|-RunLevel\s+Highest"
-foreach ($pair in @(@('Install-ThornswoodServer.ps1', $server), @('Install-Voice.ps1', $voice), @('Setup-Domain.ps1', $domain))) {
+# The server's own text, without its copy of ServiceAccount.ps1 (held to the
+# original below), which names SYSTEM for -AsSystem.
+$serverOwn = [regex]::Replace($server, '(?s)# ---- ServiceAccount\.ps1 \(copy\) ----.*?# ---- end ServiceAccount\.ps1 ----', '')
+foreach ($pair in @(@('Install-ThornswoodServer.ps1', $serverOwn), @('Install-Voice.ps1', $voice), @('Setup-Domain.ps1', $domain))) {
     $n = $pair[0]; $t = $pair[1]
     Yes "$n names no SYSTEM principal or Highest run level of its own" (-not [regex]::IsMatch($t, $sysRe))
     Yes "$n takes its principal from New-ThornswoodServicePrincipal" ($t.Contains('New-ThornswoodServicePrincipal -AsSystem:'))
@@ -53,7 +56,12 @@ foreach ($pair in @(@('Install-ThornswoodServer.ps1', $server), @('Install-Voice
 # Stop-ScheduledTask in Caddy's.
 Yes 'the server installer checks before it stages or stops anything' (
     $server.IndexOf('Test-ThornswoodServiceCannotReach') -lt $server.IndexOf('# ---- the stage: nothing running is touched'))
-Yes "the server installer refuses without ServiceAccount.ps1 beside it" ($server.Contains("Join-Path `$here 'ServiceAccount.ps1'"))
+# The server's installer carries the functions itself (nothing new is sent
+# beside it, so records\remote-commands.json is unchanged); the copy must be
+# ServiceAccount.ps1's exactly.
+$m = [regex]::Match($server.Replace("`r`n", "`n"), '(?s)# ---- ServiceAccount\.ps1 \(copy\) ----\n(.*?)# ---- end ServiceAccount\.ps1 ----')
+Yes 'the server installer carries an exact copy of ServiceAccount.ps1' (
+    $m.Success -and $m.Groups[1].Value -eq (Get-ThornswoodServiceAccountScript).Replace("`r`n", "`n"))
 Yes 'voice checks before the firewall rule or the task is touched' (
     $voice.IndexOf('Test-ThornswoodServiceCannotReach') -lt $voice.IndexOf("if ('`$Bind' -eq '127.0.0.1')"))
 Yes 'voice sends the functions inside the script it runs on the box' ($voice.Contains('$(Get-ThornswoodServiceAccountScript)'))
@@ -65,11 +73,6 @@ Yes 'an existing Thornswood Web task is given the principal too' ($domain.Contai
 $caddyfile = Text (Join-Path $Deploy 'Caddyfile')
 Yes 'the Caddyfile keeps certificates in C:/Thornswood-Caddy/data, the same under any account' (
     [regex]::IsMatch($caddyfile, '(?m)^\s*storage\s+file_system\s+C:/Thornswood-Caddy/data\s*$'))
-
-$pub = Text (Join-Path $Repo 'scripts\release\Publish-Server.ps1')
-Yes 'Publish-Server sends ServiceAccount.ps1 beside the installer, and refuses an uncommitted copy' (
-    $pub.Contains("'scripts/deploy/ServiceAccount.ps1'") -and
-    ([regex]::Matches($pub, [regex]::Escape('scp @ssh $serviceLib "${target}:C:/ServiceAccount.ps1"'))).Count -eq 2)
 
 # ---- the principal --------------------------------------------------------------
 $p = New-ThornswoodServicePrincipal

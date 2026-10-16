@@ -37,8 +37,9 @@
   one. -AsSystem on each installer registers the task as it was, SYSTEM and
   Highest, and is the way back.
 
-  Dot-sourced by Install-ThornswoodServer.ps1 on the box, from beside it
-  (Publish-Server.ps1 sends it up with the others). Install-Voice.ps1 and
+  Install-ThornswoodServer.ps1 runs on the box and carries a copy of these
+  functions (every file Publish-Server.ps1 sends is a recorded remote call);
+  the test fails when the copy differs. Install-Voice.ps1 and
   Setup-Domain.ps1 run on this machine, so they send the functions as text
   inside the script they run on the box (Get-ThornswoodServiceAccountScript).
   tests\test-2578-service-principals.ps1 runs it on scratch folders.
