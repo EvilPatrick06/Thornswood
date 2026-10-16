@@ -4116,7 +4116,7 @@ function plainPage(title, lines) {
     '<meta name="description" content="Find your way back to Thornswood, the Skyrim roleplay community.">' +
     '<meta name="robots" content="noindex"><link rel="icon" href="/favicon.ico">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
-    '<link rel="stylesheet" href="/door.css">' +
+    '<script src="/looks.js"></script><link rel="stylesheet" href="/door.css"><link rel="stylesheet" href="/looks.css">' +
     '</head><body class="door">' +
     '<main class="door-box">' +
     '<h1>' + esc(title) + '</h1>' +
@@ -4158,7 +4158,7 @@ function notAllowedPage(me, st) {
           '.<br>It needs one of: <b>' + (cfg.access.play || []).map(esc).join(', ') + '</b>.</p>';
   }
   return '<!doctype html><meta charset=utf-8><title>Not allowed in</title>' +
-    '<link rel="stylesheet" href="/door.css">' +
+    '<script src="/looks.js"></script><link rel="stylesheet" href="/door.css"><link rel="stylesheet" href="/looks.css">' +
     '<body class="door">' +
     '<div class="door-box"><h1>Not allowed in</h1>' +
     why +

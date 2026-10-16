@@ -21,11 +21,19 @@
   --carve:Cinzel,Spectral,Georgia,serif;
   --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   --mono:ui-monospace,"Cascadia Mono",Consolas,monospace;
+  /* One-off colours given names for the looks in looks.css (#515). */
+  --on-gold:#120F07;     /* text on a gold button */
+  --body-text:#CFD6C3;   /* written-page paragraphs */
+  --code-bg:#070A06; --code-text:#CFE0BE;
+  --heading-hi:#F0E6CE;  /* top of the written-page heading gradient */
+  --live:#79B05F;        /* the server-up dot */
+  /* Weights, so "Heavier" in looks.css has one place to change (#515). */
+  --w-light:300; --w-body:400; --w-mid:500; --w-strong:600; --w-bold:700;
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
 body{margin:0;background:var(--night);color:var(--page);
-  font:400 17px/1.7 var(--serif);overflow-x:hidden;
+  font:var(--w-body) 17px/1.7 var(--serif);overflow-x:hidden;
   -webkit-font-smoothing:antialiased}
 img{max-width:100%;height:auto;display:block}
 a{color:var(--gold);text-decoration:none}
@@ -33,7 +41,7 @@ a:hover{color:var(--gold-hot)}
 :focus-visible{outline:2px solid var(--gold);outline-offset:3px}
 /* Skip link: first focusable, off-screen until Tab. Gold on night ground. */
 .skip{position:absolute;left:12px;top:12px;z-index:100;padding:10px 14px;
-  background:var(--gold);color:var(--night);font:600 14px/1 var(--sans);
+  background:var(--gold);color:var(--night);font:var(--w-strong) 14px/1 var(--sans);
   letter-spacing:.04em;text-decoration:none;
   clip:rect(0 0 0 0);clip-path:inset(50%);width:1px;height:1px;overflow:hidden;
   white-space:nowrap}
@@ -46,18 +54,18 @@ a:hover{color:var(--gold-hot)}
 /* ------------------------------------------------------------------ nav -- */
 header{position:sticky;top:0;z-index:40;
   padding-top:env(safe-area-inset-top,0px);
-  background:rgba(11,14,10,.82);backdrop-filter:blur(14px);
+  background:color-mix(in srgb,var(--night) 82%,transparent);backdrop-filter:blur(14px);
   border-bottom:1px solid var(--edge)}
 header .bar{display:flex;align-items:center;gap:26px;height:64px}
-.mark{display:flex;align-items:center;gap:11px;font:600 19px/1 var(--carve);
+.mark{display:flex;align-items:center;gap:11px;font:var(--w-strong) 19px/1 var(--carve);
   letter-spacing:.11em;text-transform:uppercase;color:var(--page);white-space:nowrap}
 .mark img{width:28px;height:28px;border-radius:6px}
 nav.top{display:flex;gap:24px;margin-left:auto;align-items:center}
-nav.top a{font:400 14px/1 var(--sans);letter-spacing:.07em;text-transform:uppercase;
+nav.top a{font:var(--w-body) 14px/1 var(--sans);letter-spacing:.07em;text-transform:uppercase;
   color:var(--quiet)}
 nav.top a:hover{color:var(--page)}
 .enter{padding:9px 17px;border:1px solid var(--gold);border-radius:2px;
-  color:var(--gold);font:600 13px/1 var(--sans);letter-spacing:.11em;
+  color:var(--gold);font:var(--w-strong) 13px/1 var(--sans);letter-spacing:.11em;
   text-transform:uppercase}
 .enter:hover{background:var(--gold);color:var(--night)}
 .burger{display:none;margin-left:auto;background:none;border:1px solid var(--edge2);
@@ -73,7 +81,7 @@ nav.top a:hover{color:var(--page)}
   header .bar{gap:12px}
   .mark{font-size:15px;letter-spacing:.04em;gap:7px}
   .mobile-cta{display:flex;align-items:center;min-height:44px;margin-left:auto;
-    padding:0 10px;border:1px solid var(--gold);font:600 13px/1 var(--sans);color:var(--gold)}
+    padding:0 10px;border:1px solid var(--gold);font:var(--w-strong) 13px/1 var(--sans);color:var(--gold)}
   .burger{margin-left:0;flex-shrink:0}
 }
 /* Keep anchor destinations visible below the sticky header. */
@@ -91,12 +99,12 @@ nav.top a:hover{color:var(--page)}
 /* --------------------------------------------------------------- notice -- */
 /* Above the fold and above the hero, because "you cannot just join" is the
    single most useful thing to know before reading any of the rest. */
-.notice{background:linear-gradient(90deg,rgba(180,81,44,.20),rgba(180,81,44,.09));
-  border-bottom:1px solid rgba(201,162,75,.30);font:400 14.5px/1.55 var(--sans);
+.notice{background:linear-gradient(90deg,color-mix(in srgb,var(--ember) 20%,transparent),color-mix(in srgb,var(--ember) 9%,transparent));
+  border-bottom:1px solid color-mix(in srgb,var(--gold) 30%,transparent);font:var(--w-body) 14.5px/1.55 var(--sans);
   color:var(--page)}
 .notice .wrap{padding:13px 0}
-.notice b{color:var(--gold-hot);font-weight:600}
-.notice a{margin-left:8px;white-space:nowrap;border-bottom:1px solid rgba(201,162,75,.4)}
+.notice b{color:var(--gold-hot);font-weight:var(--w-strong)}
+.notice a{margin-left:8px;white-space:nowrap;border-bottom:1px solid color-mix(in srgb,var(--gold) 40%,transparent)}
 @media(max-width:560px){ .notice{font-size:13.5px} }
 
 /* ----------------------------------------------------------------- hero -- */
@@ -138,7 +146,7 @@ nav.top a:hover{color:var(--page)}
   object-fit:cover;object-position:50% 25%}
 .hero::before{content:"";position:absolute;left:0;right:0;bottom:0;height:64%;z-index:-1;
   pointer-events:none;
-  background:linear-gradient(180deg,rgba(11,9,7,0) 0%,rgba(11,9,7,.48) 40%,rgba(11,9,7,.9) 100%)}
+  background:linear-gradient(180deg,rgba(11,9,7,0) 0%,rgba(11,9,7,.48) 40%,rgba(11,9,7,.9) 100%)} /* look: fixed, over the painting */
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 /* Grain over the whole thing, because a flat gradient reads as a web page and
    a grained one reads as a place. */
@@ -153,33 +161,33 @@ nav.top a:hover{color:var(--page)}
   .hero .art{animation:drift 60s ease-in-out infinite alternate}
   @keyframes drift{ from{transform:scale(1.04) translateY(0)} to{transform:scale(1.09) translateY(-14px)} }
 }
-h1{font:700 clamp(46px,9vw,92px)/0.97 var(--carve);letter-spacing:.055em;
+h1{font:var(--w-bold) clamp(46px,9vw,92px)/0.97 var(--carve);letter-spacing:.055em;
   text-transform:uppercase;margin:0;text-wrap:balance;
-  background:linear-gradient(180deg,#F0E6CE 12%,var(--gold) 92%);
+  background:linear-gradient(180deg,#F0E6CE 12%,var(--gold) 92%); /* look: fixed, over the painting */
   -webkit-background-clip:text;background-clip:text;color:transparent}
 /* Over the painting rather than over the dark page, so lighter than the
    page's own faint and with a shadow behind, or the sky eats them. */
-.era{margin:0 auto;font:400 13px/1 var(--sans);letter-spacing:.34em;
-  text-transform:uppercase;color:rgba(240,230,206,.78);text-shadow:0 1px 10px rgba(0,0,0,.8)}
-.pitch{max-width:30ch;margin:18px auto 0;font:300 clamp(19px,2.3vw,25px)/1.5 var(--serif);
-  color:#F5EEDD;text-wrap:balance;text-shadow:0 2px 14px rgba(0,0,0,.75)}
+.era{margin:0 auto;font:var(--w-body) 13px/1 var(--sans);letter-spacing:.34em;
+  text-transform:uppercase;color:rgba(240,230,206,.78);text-shadow:0 1px 10px rgba(0,0,0,.8)} /* look: fixed, over the painting */
+.pitch{max-width:30ch;margin:18px auto 0;font:var(--w-light) clamp(19px,2.3vw,25px)/1.5 var(--serif);
+  color:#F5EEDD;text-wrap:balance;text-shadow:0 2px 14px rgba(0,0,0,.75)} /* look: fixed, over the painting */
 .pitch em{font-style:italic;color:var(--gold)}
 .acts{display:flex;gap:13px;justify-content:center;flex-wrap:wrap;margin-top:38px}
 .btn{display:inline-block;padding:15px 34px;border-radius:2px;
-  font:600 13px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;
+  font:var(--w-strong) 13px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;
   border:1px solid transparent;cursor:pointer}
-.btn.first{background:var(--gold);color:#120F07;
-  box-shadow:0 14px 36px -14px rgba(201,162,75,.6)}
-.btn.first:hover{background:var(--gold-hot);color:#120F07}
+.btn.first{background:var(--gold);color:var(--on-gold);
+  box-shadow:0 14px 36px -14px color-mix(in srgb,var(--gold) 60%,transparent)}
+.btn.first:hover{background:var(--gold-hot);color:var(--on-gold)}
 .btn.ghost{background:transparent;border-color:var(--edge2);color:var(--page)}
 .btn.ghost:hover{border-color:var(--gold);color:var(--gold)}
-.live{margin-top:30px;font:400 13px/1 var(--sans);letter-spacing:.1em;
-  text-transform:uppercase;color:rgba(240,230,206,.7);display:flex;gap:9px;
-  align-items:center;justify-content:center;text-shadow:0 1px 8px rgba(0,0,0,.8)}
+.live{margin-top:30px;font:var(--w-body) 13px/1 var(--sans);letter-spacing:.1em;
+  text-transform:uppercase;color:rgba(240,230,206,.7);display:flex;gap:9px; /* look: fixed, over the painting */
+  align-items:center;justify-content:center;text-shadow:0 1px 8px rgba(0,0,0,.8)} /* look: fixed, over the painting */
 .live a{color:inherit;text-decoration:underline;text-underline-offset:3px}
 .live a:hover{color:var(--gold)}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--faint)}
-.dot.on{background:#79B05F;box-shadow:0 0 0 4px rgba(121,176,95,.16)}
+.dot.on{background:var(--live);box-shadow:0 0 0 4px color-mix(in srgb,var(--live) 16%,transparent)}
 
 /* -------------------------------------------------------------- figures -- */
 .figures{border-top:1px solid var(--edge);border-bottom:1px solid var(--edge);
@@ -187,8 +195,8 @@ h1{font:700 clamp(46px,9vw,92px)/0.97 var(--carve);letter-spacing:.055em;
 .figures .wrap{display:grid;grid-auto-flow:column;grid-auto-columns:1fr}
 .figures .fig{padding:30px 22px;text-align:center;border-left:1px solid var(--edge)}
 .figures .fig:first-child{border-left:0}
-.figures b{display:block;font:600 27px/1.1 var(--carve);letter-spacing:.04em;color:var(--gold)}
-.figures span{display:block;margin-top:7px;font:400 12px/1.4 var(--sans);
+.figures b{display:block;font:var(--w-strong) 27px/1.1 var(--carve);letter-spacing:.04em;color:var(--gold)}
+.figures span{display:block;margin-top:7px;font:var(--w-body) 12px/1.4 var(--sans);
   letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
 @media(max-width:640px){
   .figures .wrap{grid-template-columns:1fr}
@@ -199,17 +207,17 @@ h1{font:700 clamp(46px,9vw,92px)/0.97 var(--carve);letter-spacing:.055em;
 
 /* ---------------------------------------------------------------- bands -- */
 section{padding:86px 0;border-top:1px solid var(--edge)}
-.eyebrow{font:400 12px/1 var(--sans);letter-spacing:.28em;text-transform:uppercase;
+.eyebrow{font:var(--w-body) 12px/1 var(--sans);letter-spacing:.28em;text-transform:uppercase;
   color:var(--gold);margin-bottom:18px}
-h2{font:600 clamp(28px,4.2vw,42px)/1.15 var(--carve);letter-spacing:.035em;
+h2{font:var(--w-strong) clamp(28px,4.2vw,42px)/1.15 var(--carve);letter-spacing:.035em;
   margin:0 0 18px;text-wrap:balance}
-h3{font:600 20px/1.3 var(--carve);letter-spacing:.03em;margin:0 0 9px;color:var(--page)}
+h3{font:var(--w-strong) 20px/1.3 var(--carve);letter-spacing:.03em;margin:0 0 9px;color:var(--page)}
 .lede{max-width:62ch;color:var(--quiet);font-size:18px}
-.lede strong{color:var(--page);font-weight:400}
+.lede strong{color:var(--page);font-weight:var(--w-body)}
 
 .three{display:grid;gap:40px;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
   margin-top:52px}
-.three .num{font:400 12px/1 var(--mono);letter-spacing:.2em;color:var(--faint);
+.three .num{font:var(--w-body) 12px/1 var(--mono);letter-spacing:.2em;color:var(--faint);
   margin-bottom:14px}
 .three p{margin:0;color:var(--quiet);font-size:16px}
 
@@ -217,9 +225,9 @@ h3{font:600 20px/1.3 var(--carve);letter-spacing:.03em;margin:0 0 9px;color:var(
 @media(max-width:860px){ .split{grid-template-columns:1fr;gap:40px} }
 
 blockquote.chron{margin:0;padding:26px 30px;border-left:2px solid var(--gold);
-  background:linear-gradient(90deg,rgba(201,162,75,.07),transparent 80%);
-  font:300 italic 19px/1.65 var(--serif);color:var(--page)}
-blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
+  background:linear-gradient(90deg,color-mix(in srgb,var(--gold) 7%,transparent),transparent 80%);
+  font:var(--w-light) italic 19px/1.65 var(--serif);color:var(--page)}
+blockquote.chron cite{display:block;margin-top:14px;font:var(--w-body) 12px/1 var(--sans);
   letter-spacing:.2em;text-transform:uppercase;color:var(--faint);font-style:normal}
 
 .feats{display:grid;gap:1px;background:var(--edge);border:1px solid var(--edge);
@@ -231,7 +239,7 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
 
 .being-built{margin-top:40px;padding-top:28px;border-top:1px solid var(--edge)}
 .being-built .eyebrow{margin-bottom:10px}
-.being-built h3.built-title{margin:0 0 8px;font:500 22px/1.25 var(--carve);color:var(--page)}
+.being-built h3.built-title{margin:0 0 8px;font:var(--w-mid) 22px/1.25 var(--carve);color:var(--page)}
 .being-built .built-lead{margin:0 0 22px;max-width:62ch;color:var(--quiet);font-size:15.5px;line-height:1.65}
 .being-built .built-lead a{color:var(--gold);text-decoration:none;border-bottom:1px solid var(--edge2)}
 .being-built .built-lead a:hover{border-bottom-color:var(--gold)}
@@ -241,7 +249,7 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
    Inside one it only has to clear the paragraph it follows. */
 .grab{margin:18px 0 2px}
 .grab .btn{margin:0}
-.grab .also{margin:16px 0 0;max-width:56ch;font:400 15px/1.65 var(--serif,var(--carve));
+.grab .also{margin:16px 0 0;max-width:56ch;font:var(--w-body) 15px/1.65 var(--serif,var(--carve));
   color:var(--page)}
 .grab .also a{color:var(--gold);text-decoration:none;border-bottom:1px solid var(--edge2)}
 .grab .also a:hover{border-bottom-color:var(--gold)}
@@ -249,15 +257,15 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
 .step{counter-increment:s;display:grid;grid-template-columns:70px 1fr;gap:26px;
   padding:30px 0;border-bottom:1px solid var(--edge);align-items:start}
 .step::before{content:counter(s,decimal-leading-zero);
-  font:400 26px/1 var(--carve);color:var(--gold);letter-spacing:.04em}
+  font:var(--w-body) 26px/1 var(--carve);color:var(--gold);letter-spacing:.04em}
 .step p{margin:7px 0 0;color:var(--quiet);font-size:16px}
 @media(max-width:560px){ .step{grid-template-columns:44px 1fr;gap:16px} }
 
 /* -------------------------------------------------------------- report -- */
 .form{display:grid;gap:18px;max-width:640px;margin-top:26px}
-.form label{display:block;font:600 13px/1.5 var(--sans);letter-spacing:.04em;
+.form label{display:block;font:var(--w-strong) 13px/1.5 var(--sans);letter-spacing:.04em;
   text-transform:uppercase;color:var(--quiet)}
-.form .hint{display:block;font:400 13.5px/1.6 var(--serif);text-transform:none;
+.form .hint{display:block;font:var(--w-body) 13.5px/1.6 var(--serif);text-transform:none;
   letter-spacing:0;color:var(--faint);margin:3px 0 8px}
 .form input[type=text],.form textarea{width:100%;box-sizing:border-box;
   padding:12px 14px;background:var(--stone);color:var(--page);
@@ -268,15 +276,15 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
   border-color:var(--gold);background:var(--iron)}
 .form textarea{min-height:160px;resize:vertical}
 .form .check{display:flex;gap:10px;align-items:center;text-transform:none;
-  letter-spacing:0;font:400 15px/1.6 var(--serif);color:var(--page)}
+  letter-spacing:0;font:var(--w-body) 15px/1.6 var(--serif);color:var(--page)}
 .form .check input{width:16px;height:16px;accent-color:var(--gold)}
-.said{font:400 15px/1.6 var(--serif);color:var(--gold)}
+.said{font:var(--w-body) 15px/1.6 var(--serif);color:var(--gold)}
 
 .gallery{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
   margin-top:44px;width:100%;justify-items:stretch}
 .shot{aspect-ratio:16/10;background:var(--iron);border:1px solid var(--edge);
   display:grid;place-items:center;color:var(--faint);
-  font:400 12px/1.5 var(--sans);letter-spacing:.14em;text-transform:uppercase;
+  font:var(--w-body) 12px/1.5 var(--sans);letter-spacing:.14em;text-transform:uppercase;
   text-align:center;padding:16px}
 .shot img,.shot video{width:100%;height:100%;object-fit:cover}
 .shot-card{display:flex;flex-direction:column;gap:8px}
@@ -285,31 +293,31 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
    not a separate olive slab. Staff queue lives on the hub only. */
 .gal-box{margin-top:28px;padding:26px 28px;border:1px solid var(--edge);
   background:var(--stone);border-radius:2px;
-  box-shadow:inset 0 1px 0 rgba(201,162,75,.08)}
-.gal-box h2{font:600 clamp(20px,2.4vw,26px)/1.22 var(--carve);letter-spacing:.03em;
+  box-shadow:inset 0 1px 0 color-mix(in srgb,var(--gold) 8%,transparent)}
+.gal-box h2{font:var(--w-strong) clamp(20px,2.4vw,26px)/1.22 var(--carve);letter-spacing:.03em;
   margin:0 0 10px;color:var(--gold)}
-.gal-box .hint{color:var(--quiet);margin:0 0 16px;font:400 15.5px/1.55 var(--serif)}
+.gal-box .hint{color:var(--quiet);margin:0 0 16px;font:var(--w-body) 15.5px/1.55 var(--serif)}
 .gal-box .form{gap:22px}
 .gal-box .form .gal-field{display:flex;flex-direction:column;gap:8px;min-width:0}
-.gal-box .form .gal-label{display:block;font:600 13px/1.5 var(--sans);letter-spacing:.04em;
+.gal-box .form .gal-label{display:block;font:var(--w-strong) 13px/1.5 var(--sans);letter-spacing:.04em;
   text-transform:uppercase;color:var(--page);margin:0}
-.gal-box .form .gal-label .gal-opt{font:400 12px/1.5 var(--serif);letter-spacing:0;
+.gal-box .form .gal-label .gal-opt{font:var(--w-body) 12px/1.5 var(--serif);letter-spacing:0;
   text-transform:none;color:var(--faint);margin-left:6px}
 .gal-box .form label{color:var(--page)}
 /* Native file control stays white on Windows; hide it and paint our own. */
 .gal-box .form input[type=file]{position:absolute;width:1px;height:1px;padding:0;
   margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;opacity:0}
 .gal-box .form .gal-drop{position:relative;padding:26px 22px;text-align:center;
-  border:1.5px dashed var(--edge2);border-radius:2px;background:rgba(11,14,10,.55);
+  border:1.5px dashed var(--edge2);border-radius:2px;background:color-mix(in srgb,var(--night) 55%,transparent);
   transition:border-color .12s,background .12s,box-shadow .12s}
-.gal-box .form .gal-drop-lead{margin:0 0 16px;font:400 15.5px/1.45 var(--serif);
+.gal-box .form .gal-drop-lead{margin:0 0 16px;font:var(--w-body) 15.5px/1.45 var(--serif);
   color:var(--quiet);text-transform:none;letter-spacing:0}
 .gal-box .form .file-pick{display:flex;flex-wrap:wrap;align-items:center;
   justify-content:center;gap:12px}
 .gal-box .form .btn.gal-pick{padding:12px 22px;background:var(--iron);
   border-color:var(--gold);color:var(--gold)}
-.gal-box .form .btn.gal-pick:hover{background:var(--gold);color:#120F07}
-.gal-box .form .file-name{font:400 14px/1.4 var(--serif);color:var(--quiet);
+.gal-box .form .btn.gal-pick:hover{background:var(--gold);color:var(--on-gold)}
+.gal-box .form .file-name{font:var(--w-body) 14px/1.4 var(--serif);color:var(--quiet);
   text-transform:none;letter-spacing:0}
 .gal-box .form .gal-chosen{list-style:none;margin:16px 0 0;padding:0;
   display:flex;flex-direction:column;gap:8px;text-align:left}
@@ -322,15 +330,15 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
 .gal-box .form .gal-chosen-thumb img{display:block;width:100%;height:100%;
   object-fit:cover}
 .gal-box .form .gal-chosen-meta{flex:1 1 auto;min-width:0}
-.gal-box .form .gal-chosen-name{font:500 14px/1.35 var(--sans);color:var(--page);
+.gal-box .form .gal-chosen-name{font:var(--w-mid) 14px/1.35 var(--sans);color:var(--page);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   text-transform:none;letter-spacing:0}
-.gal-box .form .gal-chosen-size{font:400 12px/1.4 var(--serif);color:var(--quiet);
+.gal-box .form .gal-chosen-size{font:var(--w-body) 12px/1.4 var(--serif);color:var(--quiet);
   text-transform:none;letter-spacing:0;margin-top:2px}
 .gal-box .form .btn.gal-chosen-x{flex:0 0 auto;padding:6px 12px;font-size:12px;
   border-color:var(--edge2);color:var(--gold)}
 .gal-box .form .btn.gal-chosen-x:hover{border-color:var(--gold);
-  background:rgba(201,162,75,.12);color:var(--gold)}
+  background:color-mix(in srgb,var(--gold) 12%,transparent);color:var(--gold)}
 .gal-box .form input[type=text]{width:100%;box-sizing:border-box;padding:12px 14px;
   background:var(--iron);color:var(--page);border:1px solid var(--faint);
   border-radius:2px;font:15px/1.6 var(--serif);
@@ -339,17 +347,17 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
 .gal-box .form input[type=text]::placeholder{color:var(--faint);opacity:1}
 .gal-box .form input[type=text]:hover{border-color:var(--edge2);background:var(--night)}
 .gal-box .form input[type=text]:focus{outline:none;border-color:var(--gold);
-  background:var(--night);box-shadow:0 0 0 1px rgba(201,162,75,.28)}
-.gal-box .form .gal-drop.drag{border-color:var(--gold);background:rgba(201,162,75,.1);
-  box-shadow:inset 0 0 0 1px rgba(201,162,75,.28)}
+  background:var(--night);box-shadow:0 0 0 1px color-mix(in srgb,var(--gold) 28%,transparent)}
+.gal-box .form .gal-drop.drag{border-color:var(--gold);background:color-mix(in srgb,var(--gold) 10%,transparent);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--gold) 28%,transparent)}
 
 /* Eighteen-and-over door for /downloads and /join only. Statement, not a check. */
 .age-gate{max-width:34rem;margin:48px auto;padding:32px 34px;border:1px solid var(--edge);
   background:var(--stone);border-radius:2px;
-  box-shadow:inset 0 1px 0 rgba(201,162,75,.08)}
-.age-gate h1{font:600 clamp(26px,3vw,34px)/1.2 var(--carve);letter-spacing:.03em;
+  box-shadow:inset 0 1px 0 color-mix(in srgb,var(--gold) 8%,transparent)}
+.age-gate h1{font:var(--w-strong) clamp(26px,3vw,34px)/1.2 var(--carve);letter-spacing:.03em;
   margin:0 0 14px;color:var(--gold)}
-.age-gate p{font:400 16.5px/1.55 var(--serif);color:var(--page);margin:0 0 12px}
+.age-gate p{font:var(--w-body) 16.5px/1.55 var(--serif);color:var(--page);margin:0 0 12px}
 .age-gate .quiet{color:var(--quiet)}
 .age-gate .acts{justify-content:flex-start;margin-top:26px}
 
@@ -361,13 +369,13 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
   opacity:0;transition:opacity .7s ease}
 .gal-show img.on{opacity:1}
 .gal-show .gal-cap{position:absolute;left:0;right:0;bottom:0;padding:18px 22px;
-  background:linear-gradient(180deg,transparent,rgba(11,14,10,.88));
-  color:var(--page);font:400 15px/1.4 var(--serif);z-index:2}
-.gal-show .gal-cap a{border-bottom:1px solid rgba(201,162,75,.45)}
+  background:linear-gradient(180deg,transparent,color-mix(in srgb,var(--night) 88%,transparent));
+  color:var(--page);font:var(--w-body) 15px/1.4 var(--serif);z-index:2}
+.gal-show .gal-cap a{border-bottom:1px solid color-mix(in srgb,var(--gold) 45%,transparent)}
 .gal-show .gal-nav{position:absolute;top:50%;transform:translateY(-50%);
   z-index:3;width:44px;height:44px;padding:0;border-radius:2px;
-  border:1px solid var(--gold);background:rgba(11,14,10,.82);
-  color:var(--gold);cursor:pointer;font:600 22px/1 var(--carve);
+  border:1px solid var(--gold);background:color-mix(in srgb,var(--night) 82%,transparent);
+  color:var(--gold);cursor:pointer;font:var(--w-strong) 22px/1 var(--carve);
   display:grid;place-items:center;line-height:1}
 .gal-show .gal-nav:hover,.gal-show .gal-nav:focus-visible{
   background:var(--gold);color:var(--night)}
@@ -386,28 +394,28 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
 
 .release{display:flex;gap:22px;align-items:baseline;flex-wrap:wrap;
   padding:22px 0;border-bottom:1px solid var(--edge)}
-.release .when{font:400 12px/1 var(--mono);letter-spacing:.1em;color:var(--faint);
+.release .when{font:var(--w-body) 12px/1 var(--mono);letter-spacing:.1em;color:var(--faint);
   flex:0 0 108px}
 .release .what{flex:1;min-width:230px}
 
 .call{text-align:center;padding:104px 0;border-top:1px solid var(--edge);
-  background:radial-gradient(60% 100% at 50% 100%, rgba(201,162,75,.09), transparent 70%)}
+  background:radial-gradient(60% 100% at 50% 100%, color-mix(in srgb,var(--gold) 9%,transparent), transparent 70%)}
 .call h2{margin-bottom:14px}
 .call .lede{margin:0 auto 34px}
 
 /* ----------------------------------------------------------- read page -- */
 .page{padding:64px 0 96px}
 .page .wrap{width:min(1120px,100% - 48px)}
-.page h1{font:600 clamp(34px,5vw,52px)/1.12 var(--carve);letter-spacing:.035em;
+.page h1{font:var(--w-strong) clamp(34px,5vw,52px)/1.12 var(--carve);letter-spacing:.035em;
   margin:0 0 30px;text-wrap:balance;
-  background:linear-gradient(180deg,#F0E6CE 18%,var(--gold) 96%);
+  background:linear-gradient(180deg,var(--heading-hi) 18%,var(--gold) 96%);
   -webkit-background-clip:text;background-clip:text;color:transparent}
-.page h2{font:600 clamp(23px,3vw,31px)/1.22 var(--carve);letter-spacing:.03em;
+.page h2{font:var(--w-strong) clamp(23px,3vw,31px)/1.22 var(--carve);letter-spacing:.03em;
   margin:58px 0 16px;padding-bottom:12px;border-bottom:1px solid var(--edge)}
-.page h3{font:600 18px/1.35 var(--carve);letter-spacing:.03em;margin:34px 0 10px;
+.page h3{font:var(--w-strong) 18px/1.35 var(--carve);letter-spacing:.03em;margin:34px 0 10px;
   color:var(--gold)}
-.page p,.page li{color:#CFD6C3;font-size:17.5px}
-.page strong{color:var(--page);font-weight:600}
+.page p,.page li{color:var(--body-text);font-size:17.5px}
+.page strong{color:var(--page);font-weight:var(--w-strong)}
 .page em{color:var(--gold)}
 .page ul,.page ol{padding-left:24px}
 .page li{margin:7px 0}
@@ -416,34 +424,34 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
   color:var(--quiet);font-style:italic}
 .page code{font:14px var(--mono);background:var(--iron);padding:2px 6px;border-radius:3px;
   color:var(--gold)}
-.page pre{background:#070A06;border:1px solid var(--edge);padding:18px 20px;
+.page pre{background:var(--code-bg);border:1px solid var(--edge);padding:18px 20px;
   overflow-x:auto;border-radius:3px}
-.page pre code{background:none;padding:0;color:#CFE0BE;font-size:13.5px;line-height:1.7}
+.page pre code{background:none;padding:0;color:var(--code-text);font-size:13.5px;line-height:1.7}
 .page table{width:100%;border-collapse:collapse;margin:22px 0;display:block;overflow-x:auto}
 .page th{text-align:left;padding:11px 14px;background:var(--iron);color:var(--gold);
-  font:600 13px var(--sans);letter-spacing:.06em;text-transform:uppercase;
+  font:var(--w-strong) 13px var(--sans);letter-spacing:.06em;text-transform:uppercase;
   border-bottom:1px solid var(--edge);white-space:nowrap}
 .page td{padding:11px 14px;border-bottom:1px solid var(--edge);vertical-align:top;
-  color:#CFD6C3;font-size:16px}
-.page a{border-bottom:1px solid rgba(201,162,75,.35)}
+  color:var(--body-text);font-size:16px}
+.page a{border-bottom:1px solid color-mix(in srgb,var(--gold) 35%,transparent)}
 
 /* roadmap and releases */
 .lane{margin:44px 0}
 .lane h2{margin-top:0}
 .card-row{display:grid;gap:1px;background:var(--edge);border:1px solid var(--edge)}
 .card-row .r{background:var(--stone);padding:20px 22px;display:grid;gap:5px}
-.card-row .r b{font:600 17px/1.35 var(--serif);color:var(--page);font-weight:600}
+.card-row .r b{font:var(--w-strong) 17px/1.35 var(--serif);color:var(--page);font-weight:var(--w-strong)}
 .card-row .r span{color:var(--quiet);font-size:15.5px}
 .rel{border-bottom:1px solid var(--edge);padding:26px 0}
-.rel .when{font:400 12px/1 var(--mono);letter-spacing:.1em;color:var(--faint)}
+.rel .when{font:var(--w-body) 12px/1 var(--mono);letter-spacing:.1em;color:var(--faint)}
 .rel h2,.rel h3{margin:9px 0 8px;font-size:21px;color:var(--page)}
 .rel ul{margin:8px 0 0;color:var(--quiet);font-size:15px}
 
 footer{border-top:1px solid var(--edge);padding:52px 0 64px;
   padding-bottom:calc(64px + env(safe-area-inset-bottom,0px));color:var(--faint);
-  font:400 14px/1.9 var(--sans)}
+  font:var(--w-body) 14px/1.9 var(--sans)}
 footer .cols{display:grid;gap:36px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
-footer h2{font:600 11px/1 var(--sans);letter-spacing:.2em;text-transform:uppercase;
+footer h2{font:var(--w-strong) 11px/1 var(--sans);letter-spacing:.2em;text-transform:uppercase;
   color:var(--quiet);margin:0 0 14px}
 footer a{color:var(--faint);display:block}
 footer a:hover{color:var(--gold)}
@@ -480,3 +488,17 @@ footer .base{margin-top:44px;padding-top:24px;border-top:1px solid var(--edge);
   height: 1px;
   overflow: hidden;
 }
+
+/* ------------------------------------------------- make it yours -- */
+/* The footer picker (#515). looks.js fills .look-pick. */
+footer .look{margin-top:40px;padding-top:24px;border-top:1px solid var(--edge)}
+footer .look-note{margin:8px 0 14px;color:var(--faint);font:var(--w-body) 14px/1.5 var(--sans)}
+footer .look-pick{display:flex;flex-wrap:wrap;gap:14px 22px;align-items:flex-end}
+footer .look-pick label{display:flex;flex-direction:column;gap:6px;color:var(--quiet);
+  font:var(--w-strong) 11px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase}
+footer .look-pick select{min-width:160px;padding:9px 11px;background:var(--stone);color:var(--page);
+  border:1px solid var(--edge2);border-radius:6px;font:var(--w-body) 15px/1.2 var(--sans);
+  letter-spacing:0;text-transform:none}
+footer .look-reset{padding:9px 14px;background:none;color:var(--gold);border:1px solid var(--edge2);
+  border-radius:6px;font:var(--w-strong) 13px/1.2 var(--sans);cursor:pointer}
+footer .look-reset:hover{border-color:var(--gold);color:var(--gold-hot)}
