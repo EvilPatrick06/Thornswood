@@ -127,9 +127,12 @@ Yes 'nothing is sent and nothing committed: no ssh, scp, push or Deploy' ($code 
 Yes 'the header names the box''s one step for the fallback' ($wf -match "Bootstrap-VPS\.ps1 -Arguments '-IncludeEngineTools -SkipFirewall'")
 
 # ---- 4. the scripts' part -----------------------------------------------------
-$engine = [IO.File]::ReadAllText((Join-Path $root 'scripts/release/Build-Engine.ps1'))
-$server = [IO.File]::ReadAllText((Join-Path $root 'scripts/release/Build-Server.ps1'))
-$jobsLib = [IO.File]::ReadAllText((Join-Path $root 'scripts/release/EngineJobs.ps1'))
+# Read with LF line ends: a checkout with core.autocrlf has CR LF, and a
+# pattern that ends a line with $ would not see the end of it.
+function ReadLf([string]$rel) { return [IO.File]::ReadAllText((Join-Path $root $rel)).Replace("`r`n", "`n") }
+$engine = ReadLf 'scripts/release/Build-Engine.ps1'
+$server = ReadLf 'scripts/release/Build-Server.ps1'
+$jobsLib = ReadLf 'scripts/release/EngineJobs.ps1'
 Yes 'Build-Engine.ps1 takes -NoSkyrim' ($engine -match '\[switch\]\$NoSkyrim')
 Yes '  and leaves SKYRIM_DIR out of the configure with it, and only with it' ($engine -match '\$skyrimArg = @\(if \(-not \$NoSkyrim\) \{ "-DSKYRIM_DIR=\$SkyrimDir" \}\)' -and $engine -match "'-DBUILD_SKYRIM_PLATFORM=ON' @skyrimArg @pwshArg")
 Yes '  and asks for no SkyrimSE.exe with it' ($engine -match '(?m)^if \(\$NoSkyrim\) \{ Ok ')
@@ -179,7 +182,7 @@ try {
 }
 
 # ---- 5. the box's tools for the fallback --------------------------------------
-$boot = [IO.File]::ReadAllText((Join-Path $root 'scripts/vps/Bootstrap-VPS.ps1'))
+$boot = ReadLf 'scripts/vps/Bootstrap-VPS.ps1'
 Yes 'Bootstrap-VPS.ps1 takes -IncludeEngineTools' ($boot -match '\[switch\]\$IncludeEngineTools')
 Yes '  which takes -IncludeBuildTools with it' ($boot -match '(?m)^if \(\$IncludeEngineTools\) \{ \$IncludeBuildTools = \$true \}')
 Yes '  adds the C++ workload and Visual Studio''s CMake to the Build Tools install' ($boot -match "'Microsoft\.VisualStudio\.Workload\.VCTools', '--includeRecommended'" -and $boot -match "'Microsoft\.VisualStudio\.Component\.VC\.CMake\.Project'" -and $boot -match "@\('modify', '--installPath'")
@@ -188,7 +191,7 @@ Yes '  and a pinned classic yarn into Node''s own folder' ($boot -match "\[strin
 Yes '  and finds them where Build-Engine.ps1 looks' ($boot -match 'Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\bin\\cmake\.exe' -and $engine -match 'Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\bin\\cmake\.exe')
 
 # ---- 6. the page -------------------------------------------------------------
-$readme = [IO.File]::ReadAllText((Join-Path $root 'engine/README.md'))
+$readme = ReadLf 'engine/README.md'
 Yes 'engine\README.md has the engine built in CI, naming engine.yml' ($readme -match '(?m)^## The engine built in CI$' -and $readme -match 'engine\.yml')
 Yes '  and the run that starts it and the artifact a pin pull request takes' ($readme -match 'gh workflow run engine\.yml' -and $readme -match 'gh run download')
 
