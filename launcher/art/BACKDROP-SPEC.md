@@ -80,7 +80,7 @@ as drawn               151.093916699 x 102.038374163   ratio 1.4807558229
 
 The plane is 1.282945 percent narrower than the 3:2 the 16 Sep script and its docstring assumed. The nearest clean integer ratio is 77:52 at 0.000905 percent off, which is why the deliverable is 4466 x 3016 rather than the bare floor.
 
-The same file is in the repo as `game\menu\logo.nif` (md5 `5c3cf588`), and `tests\test-menu-backdrop.js` reads the same aspect from it to 1e-6.
+The same file was in the repo as `game\menu\logo.nif` (md5 `5c3cf588`) until 16 Oct. Since then `game\menu\logo.nif` is Thornswood's own plate, which `scripts\dev\Build-Backdrop.py --logo` writes from these same numbers: one flat rectangle of the model sheet's size, with the two matrix scales, so it draws at the same 1.4807558229 (#2177). `tests\test-menu-backdrop.js` reads that aspect from it to 1e-6.
 
 This rests on the NIF Matrix33 convention. The first agent's proof of that convention was circular and its checker marked it WRONG, then proved the same conclusion properly against `meshes\landscape\trees\treepineforestlog01.nif`, where one block has identity rotation and gives an unambiguous world box. So the value stands, but on the second proof, not the first.
 
@@ -381,7 +381,7 @@ The texture is written into the repo, where `scripts\release\Go.ps1` copies it i
 
 ## E. WHAT IS STILL UNKNOWN
 
-**1. The 105 percent of screen width figure.** Unverified by four agents and four checkers. It came from one place, the 16 Sep `Build-Backdrop.py` docstring at line 9, recorded as measured on 2026-09-16 with a calibration grid, and that docstring was rewritten on 20 Sep without it. `logo.nif` holds five blocks and no camera, so nothing in the mesh places it on screen, and the menu is `interface\startmenu.swf`. Every percentage and every rectangle in section B scales with it. What would settle it: one dev channel build carrying a backdrop with a ruler burned into it, opened at a known resolution and counted. Nothing short of a run settles it.
+**1. The 105 percent of screen width figure.** Unverified by four agents and four checkers. It came from one place, the 16 Sep `Build-Backdrop.py` docstring at line 9, recorded as measured on 2026-09-16 with a calibration grid, and that docstring was rewritten on 20 Sep without it. `logo.nif` holds four blocks (five until 16 Oct) and no camera, so nothing in the mesh places it on screen, and the menu is `interface\startmenu.swf`. Every percentage and every rectangle in section B scales with it. What would settle it: one dev channel build carrying a backdrop with a ruler burned into it, opened at a known resolution and counted. Nothing short of a run settles it.
 
 **2. Whether the plane's world aspect is its screen aspect.** 1.4807558229 is measured from the mesh transform. Turning that into a screen shape assumes square pixels and a camera that is not anamorphic, looking at a plane that faces it. Nothing here tests that.
 
@@ -389,9 +389,9 @@ The texture is written into the repo, where `scripts\release\Go.ps1` copies it i
 
 **4. Whether BC7 loads for an interface texture in this install.** Measured: 353 BC7 files work here, including Cathedral Weathers' 13 sunset gradients at 4096 x 1024 with full chains and an 8192 x 4096 galaxy, which is the same job as this backdrop. Also measured: there is zero BC7 anywhere under `interface`, the only loose texture in that folder is this one, and vanilla `Skyrim - Interface.bsa` is 145 DXT3 and 2 DXT1 with no DX10 headers at all. One dev Ship and one look at the menu settles it; #994 stays open for that look.
 
-**5. Where `logo.nif` came from.** Its author string is `npurkeypile` and it was processed with SSE NIF Optimizer v3.0.10. None of the 157 Vortex staging folders holds it, so it was dropped into the Steam Data folder by hand. On 17 Sep six copies were on that machine, five sharing md5 `5c3cf5882818bbb0bfe2eefec4344f2a` plus the quarantined one. Since 20 Sep the repo carries it as `game\menu\logo.nif`, the same md5, and Go.ps1 copies it into every game folder, so a machine losing it no longer loses it. Who made it is still not known.
-
 ### Settled since 17 Sep
+
+**Where `logo.nif` came from** (was E.5). Its author string was `npurkeypile` and it was processed with SSE NIF Optimizer v3.0.10. None of the 157 Vortex staging folders held it, so it was dropped into the Steam Data folder by hand. On 17 Sep six copies were on that machine, five sharing md5 `5c3cf5882818bbb0bfe2eefec4344f2a` plus the quarantined one. From 20 Sep the repo carried it as `game\menu\logo.nif`, the same md5. On 15 Oct it was measured again: one crumpled map shape named `CivilWarMap01` (a vanilla shape name), 256 vertices up to 5.3 units deep, the usual wallpaper replacer pattern, and a search found no mod with it. Who made it was never found, so Patrick decided Thornswood builds its own (#2177): since 16 Oct `scripts\dev\Build-Backdrop.py --logo` writes `game\menu\logo.nif` as one flat plate at the same size and placement, and `--blank-logo` makes `logo01ae.nif` from that. Nothing of the replacer's file is in either.
 
 **The texconv command line** (was E.5). texconv was not on the measuring machine, so no flag had been checked against its own help output. Settled on 28 Sep by #994: D.4 has the command that runs.
 

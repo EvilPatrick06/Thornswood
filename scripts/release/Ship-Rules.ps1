@@ -484,6 +484,32 @@ function Save-ShipUiHashedAssets([string]$GameFolder) {
     }
 }
 
+# FIVE FILES UNDER Data\Platform THAT NOTHING USES, issue #2177. Patrick,
+# 15 Oct: they stop shipping and every install loses them on the next
+# release. Two pictures in Images (lock.png, a red broken padlock, and
+# speaking.png, a white speaker), dated 12 Sep, and three DirectXTK icon fonts
+# in Fonts (four, one and one glyphs in the private use range), dated 14 Sep.
+# None is in the SkyMP fork or its history. Searched 16 Oct: no file in this
+# repository, the game folder's skymp5-client.js, build.js or Modules, or the
+# fork names any of them. Skyrim Platform loads every sprite font in Fonts by
+# its name (DX11RenderHandler.cpp), and a font is drawn only when a script
+# names it: ours names DIN-Pro-bold, and Tavern is the default. Nothing
+# reads Images. Nobody recorded who made them or on what terms.
+#
+# Test-ShipOtherServer calls them not ours, so no pack or installer carries
+# them, and they are on $ShipDeleteAlways below, so every pack deletes them
+# from the installs that have them. The other sprite fonts (Tavern,
+# DIN-Pro-bold, Futura) still ship. OwnGame.Foreign carries the same five so
+# a refresh cannot copy them back from a Steam copy; change the two together.
+# tests\test-2177-platform-unused.ps1 holds both.
+$ShipPlatformUnused = @(
+    'Data\Platform\Images\lock.png',
+    'Data\Platform\Images\speaking.png',
+    'Data\Platform\Fonts\ChainLink.spritefont',
+    'Data\Platform\Fonts\NoticeIcon.spritefont',
+    'Data\Platform\Fonts\VoiceIcon.spritefont'
+)
+
 function Test-ShipOtherServer([string]$rel) {
     # The client runtime, before anything else is asked: ours when it is the
     # recorded build, and not ours when it is anything else or is not there.
@@ -533,6 +559,8 @@ function Test-ShipOtherServer([string]$rel) {
     # pack takes it off the machines that have it. OwnGame.Foreign carries the
     # same rule; change the two together.
     if ($rel -ieq 'Data\Platform\Plugins\thornswood-chargen.js') { return $true }
+    # The five files nothing uses (#2177, $ShipPlatformUnused above).
+    foreach ($u in $ShipPlatformUnused) { if ($rel -ieq $u) { return $true } }
     # In Plugins only our overlays belong. The bundle was decided by its hash above.
     if ($rel -like 'Data\Platform\Plugins\*.js') {
         if ($leaf -like 'thornswood-*.js') { return $false }
@@ -932,7 +960,8 @@ function Test-ShipBethesda([string]$rel) {
 #     join pass, the voice port, status and token, the character list and the
 #     pick, the load order the game saw, the spots file, the plugins' logs.
 #     Every file the build ships under Data\Platform is in a folder (Plugins,
-#     UI, Modules, Distribution, Fonts, Images); nothing ships straight in it.
+#     UI, Modules, Distribution, Fonts; Images held two pictures until
+#     #2177); nothing ships straight in it.
 #   - The SkyMP client's saved sign in, Data\Platform\PluginsNoLoad.
 #   - Logs and crash dumps (*.log, *.dmp), anywhere.
 #   - Backups (Test-ShipBackup, *.bak) and Vortex's own records: its
@@ -1653,6 +1682,9 @@ $ShipDeleteAlways += $ShipOldSkyUIScripts
 $ShipUiGonePaths = @($ShipDaedricMenu.Keys | ForEach-Object { 'Data\Platform\UI\' + $_ })
 $ShipUiGonePaths += @($ShipUnusedFrontAssets | ForEach-Object { 'Data\Platform\UI\' + $_ })
 $ShipDeleteAlways += $ShipUiGonePaths
+# The five files under Data\Platform nothing uses, issue #2177: every pack
+# deletes them, so the next release takes them off every install.
+$ShipDeleteAlways += $ShipPlatformUnused
 
 function Get-ShipDeleteAlways {
     $list = New-Object 'System.Collections.Generic.List[string]'
