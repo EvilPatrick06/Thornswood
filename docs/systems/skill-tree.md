@@ -33,6 +33,14 @@ nothing for someone who holds no school. They spread across the schools
 that character has, under that school's own power and skill, because the
 game has no single "spell damage" value.
 
+Might is also strength (#2262, Patrick, 16 Oct 2026). A weapon weighing
+30 to 44 needs Might 3, and one weighing 45 or more, the Giant's Club
+among them, needs Might 5. Every other weapon needs none. It goes by the
+weapon's own weight, not a list of records. Equipping one without the
+Might is refused by the server before it is saved: the weapon stays in your
+pack and you are told "You are not strong enough to wield this." and
+"Needs Might N". The K panel's Might row shows both thresholds.
+
 Critical chance is promised by Precision. The point is recorded and put
 on your character, and the game ignores it. The server works out what
 every blow deals, and there is no critical hit in that sum. Spending a

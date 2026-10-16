@@ -54923,6 +54923,144 @@ mp.onUpdateEquipmentAttempt = guard('onUpdateEquipmentAttempt', function (actorI
 });
 // ==== end thornswood college ====
 
+// ==== thornswood strength weapons ====
+/*
+  STRENGTH AND THE HEAVY WEAPONS (#2262).
+
+  Patrick, 16 Oct 2026 on #2262: Might (the skill tree sub-skill, 0 to 5,
+  docs/systems/skill-tree.md) is the strength stat. A weapon weighing 30 to
+  44 needs Might 3, and the Giant's Club or anything weighing 45 or more
+  needs Might 5. Keyed off the weapon's own weight, never a record id, so a
+  playable Giant's Club the collection adds later is gated the moment it is
+  in the load order, with nothing here to edit.
+
+  WHY THE ENGINE EVENT AND NOT onUpdateEquipmentAttempt. That one fires after
+  the engine has already saved the equipment, and its OnFireBlocked is not
+  written, so a false there changes nothing; mp.set of 'equipment' throws for
+  an actor a client owns; and an unequip snippet sent to the client is skipped
+  by a modified client while the server record still says the club is worn.
+  So the gate is onEquipItemAttempt(actorId, baseId), added on the fork
+  (Codex's half of #2262, riding the #2060 pin bump): it fires once for each
+  item newly worn, BEFORE the save, and a false drops that item from the
+  update, the client unequips it and it stays in the pack. With no handler
+  the engine behaves as it always has, so this block is inert on an engine
+  that does not yet raise the event.
+
+  Login with a heavy weapon already worn goes through the same event (the
+  client's first equipment report after spawn), so there is no second path.
+
+  The weight is the WEAP record's DATA: value u32 at 0, weight float at 4,
+  damage u16 at 8 (libespm WEAP.h). A record that is not a WEAP, or has no
+  readable DATA, is never refused: armour, spells and torches are not this
+  rule's business, and a weapon whose weight cannot be read is not guessed.
+
+  Only an actor with a character record is gated. An NPC has no Might.
+
+  The K panel (game/ui/thornswood-skills.js, the Might row) shows the same
+  two thresholds; tests/test-2262-strength-weapons.js holds the two equal.
+*/
+(function () {
+  'use strict';
+  var g = globalThis;
+
+  var STRENGTH = {
+    // Heaviest first: the first row a weapon reaches is its requirement.
+    tiers: [
+      { weight: 45, might: 5 },
+      { weight: 30, might: 3 }
+    ],
+    refused: 'You are not strong enough to wield this.'
+  };
+
+  function slog() {
+    var a = ['[thornswood strength]'].concat([].slice.call(arguments));
+    try { console.log(a.join(' ')); } catch (e) { }
+  }
+  function hex(id) { return (Number(id) >>> 0).toString(16); }
+
+  var weights = {};
+  /* The weapon's weight, or null when the record is not a WEAP or cannot be read. */
+  function weightOf(baseId) {
+    var id = Number(baseId) >>> 0;
+    if (!id) { return null; }
+    if (Object.prototype.hasOwnProperty.call(weights, id)) { return weights[id]; }
+    var w = null;
+    var res = null;
+    try { res = mp.lookupEspmRecordById(id) || null; } catch (e) { res = null; }
+    var rec = res && res.record;
+    if (rec && String(rec.type) === 'WEAP') {
+      var fields = rec.fields || [];
+      for (var i = 0; i < fields.length; i++) {
+        if (!fields[i] || String(fields[i].type) !== 'DATA') { continue; }
+        var b = fields[i].data || [];
+        if (b.length >= 8) {
+          var view = new DataView(new ArrayBuffer(4));
+          for (var k = 0; k < 4; k++) { view.setUint8(k, b[4 + k] & 0xff); }
+          var f = view.getFloat32(0, true);
+          if (isFinite(f) && f >= 0) { w = f; }
+        }
+        break;
+      }
+    }
+    weights[id] = w;
+    return w;
+  }
+
+  /* Might a weight needs: 0 for every ordinary weapon. */
+  function needFor(weight) {
+    if (weight === null || weight === undefined || !isFinite(weight)) { return 0; }
+    for (var i = 0; i < STRENGTH.tiers.length; i++) {
+      if (weight >= STRENGTH.tiers[i].weight) { return STRENGTH.tiers[i].might; }
+    }
+    return 0;
+  }
+  function needOf(baseId) { return needFor(weightOf(baseId)); }
+
+  /* The person's Might points, or null for an actor with no character record. */
+  function mightOf(actorId) {
+    var ch = g.__thornswoodCharacter;
+    if (!ch || !ch.stateOf || !ch.PROPERTY) { return null; }
+    var raw = null;
+    try { raw = mp.get(actorId, ch.PROPERTY); } catch (e) { raw = null; }
+    if (!raw) { return null; }
+    var s = null;
+    try { s = ch.stateOf(actorId); } catch (e) { s = null; }
+    if (!s) { return null; }
+    return Math.max(0, Number((s.tree || {}).might) || 0);
+  }
+
+  function lines(need) { return [STRENGTH.refused, 'Needs Might ' + need]; }
+
+  /*
+    The answer to onEquipItemAttempt: true lets the item be worn, false drops
+    it from the update and leaves it in the pack. Told in the world (the
+    notification and the chat line), never through a command.
+  */
+  function allow(actorId, baseId) {
+    var need = needOf(baseId);
+    if (!need) { return true; }
+    var might = mightOf(actorId);
+    if (might === null) { return true; }
+    if (might >= need) { return true; }
+    var l = lines(need);
+    slog(hex(actorId), 'refused', hex(baseId), '(weight ' + weightOf(baseId) + ', Might ' + might + ' of ' + need + ')');
+    try { notify(actorId, l[0]); notify(actorId, l[1]); } catch (e) { }
+    try { say(actorId, l[0] + ' ' + l[1] + '.'); } catch (e) { }
+    return false;
+  }
+
+  mp.onEquipItemAttempt = guard('onEquipItemAttempt', function (actorId, baseId) {
+    return allow(actorId, baseId);
+  });
+
+  g.__thornswoodStrength = {
+    STRENGTH: STRENGTH, weightOf: weightOf, needFor: needFor, needOf: needOf,
+    mightOf: mightOf, allow: allow, lines: lines
+  };
+  slog('ready');
+})();
+// ==== end thornswood strength weapons ====
+
 // ==== thornswood staff spells ====
 /*
   THE STAFF SPELLS: WHAT A STAFF BINDS, AND WHO HAS UNLOCKED IT.
