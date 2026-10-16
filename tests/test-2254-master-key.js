@@ -82,7 +82,7 @@ const z = (b) => b ? b.toString('latin1').replace(/\0+$/, '') : '';
   yes('R3 no recipe makes one: it is handed at a claim and cut at a forge by the server', makers.length === 0);
   const tool = fs.readFileSync(path.join(ROOT, 'scripts', 'mods', 'Add-ContentRecords.py'), 'utf8');
   yes('R4 the content tool builds it, so the plugin is the tool\'s output',
-      /MASTER_KEY = 0x50154E0/.test(tool) && /'ThornswoodMiscMasterKey', MASTER_KEY/.test(tool));
+      /MASTER_KEY = 0x50154E0/.test(tool) && /misc\(MASTER_KEY, 'ThornswoodMiscMasterKey',/.test(tool));
   yes('R5 and the gamemode names the same record', /var MASTER_KEY = '154e0:Thornswood-Content\.esp';/.test(gm));
 }
 
