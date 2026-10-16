@@ -90,12 +90,18 @@ try {
     $c = RunStep $true $false
     Yes ('B1: a configured build is generated again, once: ' + $c.Count + ' call(s)') ($c.Count -eq 1)
     $line = if ($c.Count) { ($c[0] | ForEach-Object { [string]$_ }) -join ' ' } else { '' }
-    Yes ('B2: with cmake <build folder> and nothing else, so the cache keeps every setting: ' + $line) ($c.Count -eq 1 -and @($c[0]).Count -eq 2 -and [string]$c[0][0] -eq 'C:\cm\cmake.exe' -and ([string]$c[0][1]).StartsWith($scratch))
+    $pw = Get-Command pwsh -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
+    Yes ('B2: with cmake, the pwsh setting and the build folder, so the cache keeps every other setting: ' + $line) ($c.Count -eq 1 -and @($c[0]).Count -eq 3 -and [string]$c[0][0] -eq 'C:\cm\cmake.exe' -and [string]$c[0][1] -eq "-DZ_VCPKG_POWERSHELL_PATH=$pw" -and ([string]$c[0][2]).StartsWith($scratch))
+    # #2157 follow-up, 15 Oct: the Store moved pwsh 7.6.6 to 7.6.7 and removed
+    # the folder the cache named, so vcpkg's after-link step could not start.
+    # The path given is the one Get-Command names, never a WindowsApps
+    # version folder.
+    Yes ('B2b: the pwsh given is not a Store version folder: ' + $pw) ($pw -and $pw -notmatch 'PowerShell_\d+\.\d+\.\d+\.\d+_')
     $c = RunStep $true $true
     Yes 'B3: -Check generates nothing' ($c.Count -eq 0)
     $c = RunStep $false $false
     $line = if ($c.Count) { ($c[0] | ForEach-Object { [string]$_ }) -join ' ' } else { '' }
-    Yes 'B4: a build never configured still gets the full configure line' ($c.Count -eq 1 -and $line -match '-G Visual Studio 17 2022' -and $line -match 'VCPKG_TARGET_TRIPLET=x64-windows-sp')
+    Yes 'B4: a build never configured still gets the full configure line' ($c.Count -eq 1 -and $line -match '-G Visual Studio 17 2022' -and $line -match 'VCPKG_TARGET_TRIPLET=x64-windows-sp' -and $line.Contains("-DZ_VCPKG_POWERSHELL_PATH=$pw"))
 
     # ------------------------------------------- C. Build-Server.ps1 ---------
     $server = Get-Content -LiteralPath (Join-Path $root 'scripts\release\Build-Server.ps1') -Raw
