@@ -91,3 +91,27 @@ function Get-EngineOutOfMemoryAdvice([string]$Code, [int]$Jobs, [double]$FreeByt
             ' compilers each, with ' + $free + ' free when it started. Close what else is building, or build with fewer at once: ' +
             $Script + ' -Jobs ' + $fewer + '  (what finished is not built again).')
 }
+
+<#
+  THE FORK'S OWN VCPKG ON A BUILD RUNNER TOO (#459). The fork's CMakeLists.txt
+  sets CMAKE_TOOLCHAIN_FILE itself before project() (lines 28-35), whatever a configure
+  passes: its own vcpkg submodule, or C:/vcpkg when the environment has
+  CI=true on Windows, which is upstream's CI layout (upstream's pr_base action
+  moves the submodule to C:/vcpkg first). Every GitHub Actions runner sets
+  CI=true, so on one the configure Build-Engine.ps1 asks for, and every later
+  cmake run over that cache (Build-Server.ps1 generates again over it, and
+  MSBuild runs cmake again when a CMakeLists.txt changes), would take
+  C:/vcpkg: on the VPS runners nothing is there and the configure stops, and
+  on GitHub's image it is the image's own vcpkg, not the commit the fork pins.
+  CI=true also leaves out vcpkg's --clean-after-build (CMakeLists.txt:22-26),
+  so every library's build tree would stay on the runner's disk. The engine is
+  built with the fork's own vcpkg on every machine, the way One builds it, so
+  both scripts take CI out of their own environment before cmake runs, and
+  the cmake and MSBuild they start inherit that. Nothing outside the script's
+  own process changes. Returns the line to print, or '' when CI was not true.
+#>
+function Clear-EngineCiSwitch {
+    if ([string]$env:CI -ne 'true') { return '' }
+    Remove-Item -LiteralPath 'Env:CI' -ErrorAction SilentlyContinue
+    return 'CI=true was set, as every build runner sets it; taken out of this run''s environment, so the fork builds with its own vcpkg submodule as it does on any machine (EngineJobs.ps1, Clear-EngineCiSwitch)'
+}
