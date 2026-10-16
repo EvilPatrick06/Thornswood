@@ -10385,5 +10385,61 @@
     }
   }));
 
+  /*
+    WHERE THIS GAME DRAWS EACH NOTICE BOARD AND DROP BOX (#2516). A measurement,
+    not a fix. The server stands every board and box (standBoard in
+    gamemode.js) and logs its point and angle in its 'boards: stood' line.
+    Patrick on dev, 15 Oct, saw the boards each wrong by a different amount
+    and some boxes off their shelves. This writes, once per reference, where
+    this game drew it: when its 3D first loads near the person, and again two
+    seconds later, once skymp5-client's FormView has moved it from where it
+    is made (at the person) to the server's point. Set the two lines beside
+    the server's to read the angle and the box's point as drawn.
+  */
+  const DRAWN_FILE = 'Thornswood-Content.esp';
+  const DRAWN_BOARD = 0x593b;    // BOARD_BASE_DESC in gamemode.js, the message board
+  const DRAWN_BOX = 0x154d0;     // BOX_BASE_DESC, the drop box
+  let drawnBases = null;         // { board, box } runtime base ids, once read
+  const drawnSeen = {};          // reference id -> true once it has been written
+  const drawnLater = [];         // { id, what, at } to be written again once settled
+
+  function drawnLine(ref, what, when) {
+    let cell = 0, world = 0;
+    try { const c = ref.getParentCell(); cell = c ? c.getFormID() : 0; } catch (e) { }
+    try { const w = ref.getWorldSpace(); world = w ? w.getFormID() : 0; } catch (e) { }
+    const f = function (n) { return Math.round(Number(n) * 10) / 10; };
+    log('board drawn:', what, (ref.getFormID() >>> 0).toString(16), when, 'at',
+        f(ref.getPositionX()) + ',' + f(ref.getPositionY()) + ',' + f(ref.getPositionZ()),
+        'angle', f(ref.getAngleX()) + ',' + f(ref.getAngleY()) + ',' + f(ref.getAngleZ()),
+        'cell', cell.toString(16), 'world', world.toString(16));
+  }
+
+  sp.on('objectLoaded', guard('board drawn', (e) => {
+    if (!e || !e.isLoaded || !e.object) { return; }
+    const ref = sp.ObjectReference.from(e.object);
+    if (!ref) { return; }
+    const id = ref.getFormID() >>> 0;
+    if (drawnSeen[id]) { return; }
+    if (!drawnBases) {
+      const b = sp.Game.getFormFromFile(DRAWN_BOARD, DRAWN_FILE);
+      const x = sp.Game.getFormFromFile(DRAWN_BOX, DRAWN_FILE);
+      drawnBases = { board: b ? b.getFormID() >>> 0 : 0, box: x ? x.getFormID() >>> 0 : 0 };
+    }
+    const base = ref.getBaseObject();
+    const bid = base ? base.getFormID() >>> 0 : 0;
+    const what = !bid ? '' : bid === drawnBases.board ? 'board' : bid === drawnBases.box ? 'drop box' : '';
+    if (!what) { return; }
+    drawnSeen[id] = true;
+    drawnLine(ref, what, 'loaded');
+    drawnLater.push({ id: id, what: what, at: Date.now() });
+  }));
+
+  sp.on('update', guard('board drawn later', () => {
+    if (!drawnLater.length || Date.now() - drawnLater[0].at < 2000) { return; }
+    const one = drawnLater.shift();
+    const ref = sp.ObjectReference.from(sp.Game.getFormEx(one.id));
+    if (ref) { drawnLine(ref, one.what, 'settled'); }
+  }));
+
   log('loaded. browser:', typeof sp.browser, 'chat key', CHAT_KEY);
 })();
