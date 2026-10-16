@@ -42255,7 +42255,8 @@ log('gamemode loaded:',
       return 'You end claims and set rent at a door, move ' + town + '\'s notice board, and take anything out of ' +
              'its drop box.';
     }
-    return 'The cells of ' + (JAIL_NAME[hold] || 'the hold\'s jail') + ' are yours to lock, you take down posts on ' +
+    return 'The cells of ' + (JAIL_NAME[hold] || 'the hold\'s jail') + ' are yours to lock, you bind and free people in ' +
+           town + '\'s hold with the bind key, you take down posts on ' +
            town + '\'s notice board, and you take anything out of its drop box.';
   }
 
@@ -45896,6 +45897,30 @@ log('gamemode loaded:',
     return out;
   }
 
+  /*
+    And being bound (#2573): the bonds block's SPEED off the speed while a
+    guard has their hands bound, folded in last for the same reason as the
+    maneuvers, and asked at write time because that block loads after this
+    one. The game has no switch for sprinting the server can send, so this
+    is what keeps somebody bound to a walk.
+  */
+  function withBonds(actorId, base) {
+    var b = g.__thornswoodBonds;
+    if (!b || !b.effects || !actorId) { return base; }
+    var add = null;
+    try { add = b.effects(actorId); } catch (e) { return base; }
+    if (!add) { return base; }
+    var out = {};
+    for (var k in base) {
+      if (Object.prototype.hasOwnProperty.call(base, k)) { out[k] = base[k]; }
+    }
+    for (var av in add) {
+      if (!Object.prototype.hasOwnProperty.call(add, av)) { continue; }
+      out[av] = (Object.prototype.hasOwnProperty.call(out, av) ? out[av] : 0) + add[av];
+    }
+    return out;
+  }
+
   /* The College page on K (#1387): what a semester hands this character and when the next one opens. */
   function collegeView(s) {
     var co = g.__thornswoodCollege;
@@ -45911,7 +45936,7 @@ log('gamemode loaded:',
     forPanel is a change here too.
   */
   function effectsOf(actorId) {
-    return withCollege(actorId, withPerks(actorId, withManeuvers(actorId, withNeeds(actorId, P.treeApplies(stateOf(actorId))))));
+    return withBonds(actorId, withCollege(actorId, withPerks(actorId, withManeuvers(actorId, withNeeds(actorId, P.treeApplies(stateOf(actorId)))))));
   }
 
   /*
@@ -46033,6 +46058,8 @@ log('gamemode loaded:',
     view.effects = withPerks(actorId, view.effects);
     // And restoration strain while it lasts (#1387): see withCollege.
     view.effects = withCollege(actorId, view.effects);
+    // And being bound (#2573): see withBonds.
+    view.effects = withBonds(actorId, view.effects);
     /*
       The recipe book, and only in the world. Creation is about choosing who
       you are, and a page counting what a half you have not picked yet could
@@ -49246,6 +49273,12 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
     try { hurt.blow(targetId, aggressor, source, projectile, power, sneak, bash, blocked); }
     catch (e) { log('injury: the blow threw:', e); }
   }
+  // A blow from somebody bound (#2573), said to staff: it cannot be refused.
+  // On its own, last, so it can stop none of the above.
+  var bonds = globalThis.__thornswoodBonds;
+  if (bonds && bonds.fought && aggressor && aggressor.desc) {
+    try { bonds.fought(idOf(aggressor.desc), 'A blow'); } catch (e) { log('bonds: the hit threw:', e); }
+  }
 });
 // ==== end thornswood warrior maneuvers ====
 
@@ -51892,6 +51925,9 @@ const WORDS = ['/ooc', '/o',
                // A wound, a disease or an agreed loss written onto somebody
                // by staff (#1383). See the injury and disease block.
                '/hurt',
+               // Staff freeing somebody bound whose guard is not there (#2573).
+               // See the bonds block.
+               '/unbind',
                /*
                  NOT A COMMAND ANYBODY TYPES. The client reports each fall of
                  the axe with it, because the server sees a press and Skyrim's
@@ -51920,6 +51956,10 @@ const WORDS = ['/ooc', '/o',
                // so deliberately NOT in PLAYER_WORDS. See the injury and
                // disease block.
                '/treat',
+               // A guard binding or freeing the person under the crosshair
+               // (#2573): sent by the look prompt's bind key, never typed, and
+               // so deliberately NOT in PLAYER_WORDS. See the bonds block.
+               '/bind',
                // The client's weather report and its "I am on fire". Never typed; see
                // the branches.
                '/place', '/burn', '/ate',
@@ -52186,7 +52226,7 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
   // The words handle() refuses to anybody on no list (isPlaytester covers dev,
   // staff and admin too), before it ever asks for a character.
   var GATED_WORDS = ['/give', '/spawn', '/tp', '/goto', '/where', '/kick', '/freeze',
-    '/unfreeze', '/bring', '/silence', '/unsilence', '/warn', '/spawnat', '/ban', '/unban', '/pk'];
+    '/unfreeze', '/bring', '/silence', '/unsilence', '/warn', '/spawnat', '/ban', '/unban', '/pk', '/unbind'];
 
   /* With thornswoodRequirePass on, no pass shown yet for this profile (#410). */
   function passHeld(profileId) {
@@ -54050,6 +54090,18 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
       return;
     }
 
+    // A guard binding or freeing somebody (#2573), from the look prompt's
+    // bind key. The work is in the bonds block, which measures the reach and
+    // who may again; this only hands it the character, the id and the staff test.
+    if (word === '/bind') {
+      if (!needCharacter()) { return; }
+      var bonds = g.__thornswoodBonds;
+      if (!bonds || !bonds.press) { toProfile(profileId, 'Binding is not running on this server.'); return; }
+      var bindSaid = bonds.press(actorId, profileId, parts.slice(1), isStaff);
+      if (bindSaid) { toProfile(profileId, bindSaid); }
+      return;
+    }
+
     // Out of a wedged spot (#414). The work is in the stuck block at the end
     // of this file; this only hands it the character.
     if (word === '/stuck') {
@@ -54267,6 +54319,8 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
   function isStaff(profileId) {
     return isDev(profileId);
   }
+  // The look prompt's Free for staff (#2573): the bonds block asks this.
+  g.__thornswoodStaffTest = isStaff;
 
   function isPlaytester(profileId) {
     if (!passTrusts(profileId)) { return false; }
@@ -61039,6 +61093,11 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     if (college && college.cast) {
       try { college.cast(casterId, spell); } catch (e) { hlog('the strain threw:', e); }
     }
+    // A cast from somebody bound (#2573), said to staff: it cannot be refused.
+    var bonds = g.__thornswoodBonds;
+    if (bonds && bonds.fought) {
+      try { bonds.fought(casterId, 'A spell'); } catch (e) { hlog('the bound cast threw:', e); }
+    }
   });
 
   if (g.__thornswoodHurtTimer) { try { clearInterval(g.__thornswoodHurtTimer); } catch (e) { } }
@@ -61375,7 +61434,16 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       // prompt's Tend their wounds.
       var care = false;
       try { care = !!(g.__thornswoodHurt && g.__thornswoodHurt.careOf && g.__thornswoodHurt.careOf(id)); } catch (eCare) { care = false; }
-      at.push({ id: id, pos: pos, cell: cell, pid: profileOf(id), name: nameOfPerson(id), scar: scar, care: care });
+      // And whether they are bound, where they stand, and which holds they
+      // guard (#2573): the look prompt's bind key, read once a pass.
+      var bonds = g.__thornswoodBonds;
+      var bound = false, bHold = '', bGuards = [];
+      if (bonds) {
+        try { bound = !!bonds.boundOf(id); bHold = bonds.holdOfPlace(cell, pos); bGuards = bonds.guardsOf(profileOf(id)); }
+        catch (eBond) { bound = false; bHold = ''; bGuards = []; }
+      }
+      at.push({ id: id, pos: pos, cell: cell, pid: profileOf(id), name: nameOfPerson(id), scar: scar, care: care,
+                bound: bound, hold: bHold, guards: bGuards });
     }
 
     var reach = SOCIAL.nearReach * SOCIAL.nearReach;
@@ -61421,6 +61489,13 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
         if (canTake) { w[them.id.toString(16)].a = canTake; }
         // t: they have a wound to tend, and the prompt offers it (#1383).
         if (them.care) { w[them.id.toString(16)].t = 1; }
+        // k: the bind key binds them (1) or frees them (2); b: they are bound (#2573).
+        if (g.__thornswoodBonds) {
+          var kb = 0;
+          try { kb = g.__thornswoodBonds.markOf(me, them); } catch (eK) { kb = 0; }
+          if (kb) { w[them.id.toString(16)].k = kb; }
+          if (them.bound) { w[them.id.toString(16)].b = 1; }
+        }
       }
       var sig = JSON.stringify(w) + (s.namesAll ? ':all' : '');
       if (nearWas[me.id] === sig) { continue; }
@@ -62316,6 +62391,397 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
        'nearby list every', SOCIAL.nearEvery + 'ms within', SOCIAL.nearReach + ' units');
 })();
 // ==== end thornswood social ====
+// ==== thornswood bonds ====
+/*
+  BINDING SOMEBODY: A GUARD'S CUFFS (#2573).
+
+  Patrick, 16 October, on #2573: A and B. A: cuffs as an action, a guard
+  binds somebody and they stay bound until a guard of that hold frees them.
+  B: only a guard may put the Prisoner's Cuffs on somebody. Both are the
+  Guard role's: the "Guard of <Hold>" Discord role, held by one character
+  (#2551), read through the property block's officeOf.
+
+  WHO BINDS AND WHO FREES.
+    - A guard of a hold binds a person standing within REACH of them, in the
+      same cell, where the place they stand answers to that hold (holdHere).
+      Nobody else binds anybody, staff included.
+    - A guard of the hold where the bound person is standing frees them, and
+      staff free anybody. The hold that bound them does not matter: a person
+      bound in Whiterun and walked to Riften is freed by Riften's guards.
+    - Somewhere no hold answers for (a place the load order maps to no hold)
+      only staff free them. Hands that are bound bind and free nobody.
+    - Both are the look prompt's bind key on the person (BindKey in
+      Thornswood.ini, 0 unless it was moved), which sends /bind with their
+      form id; nobody is told to type it. Staff also have /unbind <person>
+      in the staff block, for somebody whose guard is not in the world.
+
+  WHAT BOUND IS, AND WHICH PART THE SERVER CAN HOLD. Measured, and written
+  over mp.onTakeItem in the chat commands block: the engine answers hits,
+  casts, movement and animation itself, and onPapyrusEvent:OnHit and
+  OnSpellCast fire only after a hit has landed or a cast has gone out, so a
+  false refuses nothing. The fork's own Game.DisablePlayerControls
+  (PapyrusGame.cpp) is a snippet the client runs. So no part of being bound
+  can be refused by the server; each is the engine's own control, switched
+  in the bound person's game, once, when the record says so:
+    - fighting: the game's own DisablePlayerControls, fighting only, so no
+      weapon is drawn, no blow is swung and no spell or shout is cast; and
+      a weapon already out is sheathed, once;
+    - running: the game has no switch for sprinting the server can send
+      (injury.md says the same of a broken leg), so the record takes SPEED
+      off their speed, an actor value the client sets to the total it is
+      given (effectsOf in the character block): about a walk, sprinting
+      included;
+    - the cuffs: a guard carrying a Prisoner's Cuffs hands that pair over
+      with the binding, into the bound person's pack, and their game puts
+      it on with the engine's own "cannot be taken off" flag. Without a pair
+      the binding is the same and nothing is shown on the hands.
+  The server's part is the record, who may change it, and hearing a blow or
+  a cast from somebody bound (fought below): it cannot stop one, so each is
+  logged for staff, at most once a minute a person, as a game that did not
+  hold the binding.
+
+  ON THE CHARACTER, SO A RELOG KEEPS IT. BOUND_PROPERTY is saved with the
+  character the way thornswoodCameIn is, so a relog or a restart finds them
+  still bound, and their game switches the same controls on arriving. It is
+  one value: { v, hold, by, byName, at, cuffs } while bound, and
+  { v, free: true, by, byName, at } once freed, so their game sees the
+  change. No carry-over: in alpha there was nothing before it.
+
+  NOTHING HERE RUNS ON A TIMER. A binding lasts until somebody frees it.
+  Wearing a pair of Prisoner's Cuffs on yourself does nothing at all: only
+  this record binds.
+*/
+(function () {
+  'use strict';
+  var g = globalThis;
+
+  var BOUND_PROPERTY = 'thornswoodBound';
+  var CUFFS = '10e039:Skyrim.esm';     // Prisoner's Cuffs, PrisonerCuffsPlayer
+  var REACH = 300;                     // units, the same 4 metres as tending wounds
+  var SPEED = -60;                     // speedMult while bound: about a walk
+  var FOUGHT_SAY_MS = 60000;           // one line a person a minute for staff
+
+  /* The load order's hold locations, to the holds the offices are of. */
+  var LOCATION_HOLD = {
+    WhiterunHoldLocation: 'whiterun', HaafingarHoldLocation: 'solitude',
+    RiftHoldLocation: 'riften', ReachHoldLocation: 'markarth',
+    EastmarchHoldLocation: 'windhelm', FalkreathHoldLocation: 'falkreath',
+    HjaalmarchHoldLocation: 'morthal', PaleHoldLocation: 'dawnstar',
+    WinterholdHoldLocation: 'winterhold', DLC2SolstheimLocation: 'ravenrock'
+  };
+  var SOLSTHEIM = '800:dragonborn.esm';
+
+  var foughtSaid = {};
+
+  function blog() {
+    var a = Array.prototype.slice.call(arguments);
+    log.apply(null, ['bonds:'].concat(a));
+  }
+  function hex(id) { return (Number(id) >>> 0).toString(16); }
+  function tell(pid, text) {
+    var t = g.__thornswoodToProfile;
+    if (t && pid) { try { t(pid, text); } catch (e) { } }
+  }
+  function profileOf(actorId) {
+    try { return Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { return 0; }
+  }
+  function nameOf(actorId) {
+    try {
+      var ap = mp.get(actorId, 'appearance');
+      var n = String((ap && ap.name) || '');
+      if (n) { return n; }
+    } catch (e) { }
+    return 'somebody';
+  }
+  function townOf(hold) {
+    var p = g.__thornswoodProperty;
+    var t = (p && p.HOLD_TOWN) ? p.HOLD_TOWN[hold] : '';
+    return t || hold;
+  }
+
+  /* The hold the place this person stands in answers to, or ''. */
+  function holdHere(actorId) {
+    var desc = '', pos = null;
+    try { desc = String(mp.get(actorId, 'worldOrCellDesc') || ''); pos = mp.get(actorId, 'pos'); }
+    catch (e) { return ''; }
+    return holdOfPlace(desc, pos);
+  }
+
+  /* The same from a cell and a point already read (the near list has them). */
+  function holdOfPlace(desc, pos) {
+    desc = String(desc || '');
+    if (!desc) { return ''; }
+    if (desc.toLowerCase() === SOLSTHEIM) { return 'ravenrock'; }
+    var loc = null;
+    try { loc = holdAt({ desc: desc, pos: pos }); } catch (e) { loc = null; }
+    return (loc && Object.prototype.hasOwnProperty.call(LOCATION_HOLD, loc)) ? LOCATION_HOLD[loc] : '';
+  }
+
+  /* The holds this character guards, by the role and the held record (#2551). */
+  function guardsOf(profileId) {
+    var p = g.__thornswoodProperty;
+    if (!p || !p.officeOf || !profileId) { return []; }
+    try { return (p.officeOf(profileId).guardOf || []).slice(); } catch (e) { return []; }
+  }
+
+  /*
+    The record while bound, or null. The near list asks this of everybody in
+    the world every pass, and the server's tick budget has no read a person
+    to spare (tests/test-server-tick-cost.js), so each character's record is
+    read from the engine once and kept: nothing but write() below changes
+    it, and write() keeps the copy with it.
+  */
+  var known = {};
+
+  function boundOf(actorId) {
+    var id = Number(actorId) || 0;
+    var v = null;
+    if (Object.prototype.hasOwnProperty.call(known, id)) { v = known[id]; }
+    else {
+      try { v = mp.get(id, BOUND_PROPERTY); } catch (e) { return null; }
+      known[id] = v || null;
+    }
+    if (!v || typeof v !== 'object' || v.free || !v.hold) { return null; }
+    return v;
+  }
+
+  /* The one write of the record: the engine's, and the copy kept above. */
+  function write(actorId, value) {
+    mp.set(actorId, BOUND_PROPERTY, value);
+    known[Number(actorId) || 0] = JSON.parse(JSON.stringify(value));
+  }
+
+  /* Two people in one cell within REACH of each other. */
+  function within(a, b) {
+    try {
+      if (String(mp.get(a, 'worldOrCellDesc') || '') !== String(mp.get(b, 'worldOrCellDesc') || '')) { return false; }
+      var p = mp.get(a, 'pos'), q = mp.get(b, 'pos');
+      if (!p || !q) { return false; }
+      var dx = p[0] - q[0], dy = p[1] - q[1], dz = p[2] - q[2];
+      return dx * dx + dy * dy + dz * dz <= REACH * REACH;
+    } catch (e) { return false; }
+  }
+
+  function staffTest(isStaff, profileId) {
+    var f = isStaff || g.__thornswoodStaffTest;
+    try { return typeof f === 'function' && !!f(profileId); } catch (e) { return false; }
+  }
+
+  /*
+    What the look prompt offers this person on that one (the social block's
+    near list asks, a pair at a time): 1 Bind, 2 Free, 0 nothing. The reach
+    is left to the press: the near list is drawn for anybody in sight.
+  */
+  function mark(meActor, mePid, themActor, isStaff) {
+    if (!meActor || !themActor || meActor === themActor) { return 0; }
+    return markOf({ pid: mePid, bound: !!boundOf(meActor), guards: guardsOf(mePid) },
+                  { bound: !!boundOf(themActor), hold: holdHere(themActor) }, isStaff);
+  }
+
+  /*
+    The same answer from what the near list read once a pass: me is
+    { pid, bound, guards }, them is { bound, hold }. Staff is asked only
+    about somebody bound.
+  */
+  function markOf(me, them, isStaff) {
+    // Hands that are bound bind and free nobody; staff have /unbind.
+    if (me.bound) { return 0; }
+    if (them.bound) {
+      if (them.hold && me.guards.indexOf(them.hold) !== -1) { return 2; }
+      return staffTest(isStaff, me.pid) ? 2 : 0;
+    }
+    return (them.hold && me.guards.indexOf(them.hold) !== -1) ? 1 : 0;
+  }
+
+  function countOf(actorId, desc) {
+    var id = 0;
+    try { id = idOf(desc); } catch (e) { id = 0; }
+    if (!id) { return 0; }
+    try {
+      var inv = mp.get(actorId, 'inventory');
+      var es = (inv && inv.entries) || [];
+      var n = 0;
+      for (var i = 0; i < es.length; i++) { if (es[i] && es[i].baseId === id) { n += Number(es[i].count) || 0; } }
+      return n;
+    } catch (e) { return 0; }
+  }
+
+  /* The character redrawn, so their game is sent the speed with or without SPEED. */
+  function redraw(actorId) {
+    var c = g.__thornswoodCharacter;
+    if (!c || !c.stateOf || !c.writeState) { return; }
+    try { var s = c.stateOf(actorId); if (s) { c.writeState(actorId, s, true); } }
+    catch (e) { blog('could not redraw', hex(actorId) + ':', e); }
+  }
+
+  /* One line for the staff channel, in for-bot beside private (#2321). */
+  function record(did, by, byName, who, whoName, why) {
+    blog(byName + ' (profile ' + by + ') ' + did + ' ' + whoName + ' (profile ' + who + ')' + (why ? ': ' + why : ''));
+    var fs = null, path = null;
+    try { fs = require('fs'); path = require('path'); } catch (e) { return; }
+    var s = {};
+    try { s = mp.getServerSettings() || {}; } catch (e) { s = {}; }
+    var row = { at: new Date().toISOString(),
+                server: String(s.thornswoodServer || '').trim().toLowerCase() || 'main',
+                did: did, by: by, byName: byName, who: who, whoName: whoName,
+                why: String(why || '').slice(0, 300) };
+    var dir = String(s.forBotDir || path.join(path.dirname(String(s.privDir || 'private')), 'for-bot'));
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      fs.appendFileSync(path.join(dir, 'moderation.log'), JSON.stringify(row) + '\n');
+    } catch (e) {
+      blog('could not write moderation.log, so the staff channel will not hear of it:', e);
+    }
+  }
+
+  /* Bind them. The caller has checked who may; this writes it. */
+  function bind(guardActor, guardPid, themActor, hold) {
+    var themPid = profileOf(themActor);
+    var guardName = nameOf(guardActor), themName = nameOf(themActor);
+    // B: a pair the guard carries goes on them; the binding is the same without one.
+    var cuffs = 0;
+    if (countOf(guardActor, CUFFS) > 0) {
+      var took = false;
+      try { took = takeItem(guardActor, CUFFS, 1); } catch (e) { took = false; }
+      if (took) {
+        var gave = false;
+        try { gave = addItem(themActor, CUFFS, 1); } catch (e) { gave = false; }
+        if (gave) { cuffs = 1; }
+        else {
+          // Back where it came from, said, and the binding goes on without it.
+          try { addItem(guardActor, CUFFS, 1); } catch (e) { }
+          blog('could not put the cuffs in the pack of', hex(themActor) + '; the pair stays with', hex(guardActor));
+        }
+      }
+    }
+    write(themActor, { v: 1, hold: hold, by: guardPid, byName: guardName, at: Date.now(), cuffs: cuffs });
+    redraw(themActor);
+    tell(themPid, guardName + ', a guard of ' + townOf(hold) + ', has bound your hands' +
+         (cuffs ? ' with a pair of Prisoner\'s Cuffs' : '') + '. You cannot draw a weapon, fight or cast, and ' +
+         'you can only walk, until a guard of the hold you are in frees you. Logging out does not end it.');
+    tell(guardPid, 'You bind ' + themName + (cuffs ? ' with a pair of Prisoner\'s Cuffs' : '') +
+         '. A guard of the hold they stand in frees them with the same key.');
+    record('bind', guardPid, guardName, themPid, themName,
+           'in ' + townOf(hold) + (cuffs ? ', with a pair of Prisoner\'s Cuffs' : ', with no cuffs'));
+    return true;
+  }
+
+  /* Free them. by is who did it; asStaff says which right they used. */
+  function free(byActor, byPid, byName, themActor, asStaff) {
+    var b = boundOf(themActor);
+    if (!b) { return false; }
+    var themPid = profileOf(themActor), themName = nameOf(themActor);
+    write(themActor, { v: 1, free: true, by: byPid, byName: byName, at: Date.now() });
+    redraw(themActor);
+    tell(themPid, (asStaff ? 'Staff have' : byName + ' has') + ' freed your hands. You can fight and run again.' +
+         (b.cuffs ? ' The cuffs come off and stay in your pack.' : ''));
+    tell(byPid, 'You free ' + themName + '.');
+    record('unbind', byPid, byName, themPid, themName,
+           (asStaff ? 'as staff, ' : '') + 'bound in ' + townOf(b.hold) + ' by ' + String(b.byName || 'somebody'));
+    return true;
+  }
+
+  /*
+    The look prompt's bind key: /bind <form id of the person>. Measured again
+    here, whatever the prompt said: the same cell and REACH, and who may.
+    Answers the line to say to the presser, or '' when there is none.
+  */
+  function press(actorId, profileId, words, isStaff) {
+    var raw = String((words && words[0]) || '').trim();
+    var them = /^[0-9a-f]{1,8}$/i.test(raw) ? parseInt(raw, 16) : 0;
+    if (!them || them === actorId) { return 'Look at somebody and press the key to bind or free them.'; }
+    if (!(profileOf(them) > 0)) { return 'Only a person can be bound.'; }
+    if (!within(actorId, them)) { return nameOf(them) + ' is too far away. Stand next to them.'; }
+    if (boundOf(actorId)) { return 'Your own hands are bound.'; }
+    var here = holdHere(them);
+    var mine = guardsOf(profileId);
+    if (boundOf(them)) {
+      if (here && mine.indexOf(here) !== -1) { free(actorId, profileId, nameOf(actorId), them, false); return ''; }
+      if (staffTest(isStaff, profileId)) { free(actorId, profileId, nameOf(actorId), them, true); return ''; }
+      return here ? 'Only a guard of ' + townOf(here) + ' frees somebody here.'
+                  : 'No hold answers for this place, so only staff free somebody here.';
+    }
+    if (!here) { return 'No hold answers for this place, so no guard binds anybody here.'; }
+    if (mine.indexOf(here) === -1) {
+      return mine.length ? 'You guard ' + mine.map(townOf).join(' and ') + ', not ' + townOf(here) + '.'
+                         : 'Only a guard of ' + townOf(here) + ' binds somebody here.';
+    }
+    bind(actorId, profileId, them, here);
+    return '';
+  }
+
+  /* Staff's /unbind <person>, from the staff block, which found them. */
+  function staffFree(byPid, byName, themActor) {
+    if (!boundOf(themActor)) { return nameOf(themActor) + ' is not bound.'; }
+    free(0, byPid, byName, themActor, true);
+    return '';
+  }
+
+  /* What being bound adds to the speed the client sets (the character block's effectsOf). */
+  function effects(actorId) {
+    return boundOf(actorId) ? { speedMult: SPEED } : null;
+  }
+
+  /*
+    A blow or a cast from somebody bound, heard after the engine let it
+    through (onPapyrusEvent:OnHit and OnSpellCast). Their own game should
+    not have let it go: said in the log and to staff, once a minute a
+    person, and nothing is changed.
+  */
+  function fought(actorId, what) {
+    var id = Number(actorId) || 0;
+    if (!id || !boundOf(id)) { return false; }
+    var now = Date.now();
+    if (foughtSaid[id] && now - foughtSaid[id] < FOUGHT_SAY_MS) { return true; }
+    foughtSaid[id] = now;
+    var pid = profileOf(id);
+    record('boundfought', pid, nameOf(id), pid, nameOf(id),
+           String(what || 'a blow') + ' while bound. Their game did not hold the binding.');
+    return true;
+  }
+
+  /*
+    The client's side, run by the bound person's own game every frame (as
+    every updateOwner is), so it is edge triggered on the stamp: it hands the
+    record to thornswood-front.js once per change, and the plugin switches
+    the engine's controls once per change.
+  */
+  function boundScript() {
+    return [
+      '(function(){',
+      '  try {',
+      '    var v = ctx.value;',
+      '    var st = ctx.state;',
+      '    if (!st) { return; }',
+      '    var at = (v && v.at) ? v.at : 0;',
+      '    if (st.thornswoodBoundAt === at) { return; }',
+      '    st.thornswoodBoundAt = at;',
+      '    try { globalThis.thornswoodBound = (v && typeof v === "object") ? v : null; } catch (e) { }',
+      '  } catch (e) { }',
+      '})();'
+    ].join('\n');
+  }
+
+  try {
+    mp.makeProperty(BOUND_PROPERTY, {
+      isVisibleByOwner: true,
+      isVisibleByNeighbors: false,
+      updateOwner: boundScript(),
+      updateNeighbor: ''
+    });
+  } catch (e) {
+    // Already made by a previous load. The script cannot be changed after the
+    // fact, so a changed one needs a restart, which a deploy is.
+  }
+
+  g.__thornswoodBonds = {
+    BOUND_PROPERTY: BOUND_PROPERTY, CUFFS: CUFFS, REACH: REACH, SPEED: SPEED, LOCATION_HOLD: LOCATION_HOLD,
+    holdHere: holdHere, holdOfPlace: holdOfPlace, boundOf: boundOf, guardsOf: guardsOf, mark: mark, markOf: markOf, press: press, bind: bind, free: free,
+    staffFree: staffFree, effects: effects, fought: fought, boundScript: boundScript
+  };
+  blog('ready: a guard binds somebody in their own hold, a guard of the hold they stand in or staff free them');
+})();
+// ==== end thornswood bonds ====
 
 // ==== thornswood trade ====
 /*
@@ -64610,7 +65076,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   var WORDS_STAFF = ['/kick', '/freeze', '/unfreeze', '/bring', '/goto',
                      '/silence', '/unsilence', '/warn', '/spawnat',
                      '/ban', '/unban', '/note', '/banaccount', '/unbanaccount', '/pk', '/unpk',
-                     '/hurt'];
+                     '/hurt', '/unbind'];
   var BAN_SWEEP_MS = 10000;        // how often online people are checked against bans
   var SITE_WAIT_MS = 8000;
   // Everybody's (or a playtester's) words that staff can also aim at a person.
@@ -65374,6 +65840,14 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       tell(them.pid, 'Staff have let you speak again.');
       tell(pid, them.name + ' can speak again.');
       record('unsilence', pid, me, them.pid, them.name, '', 0);
+      return true;
+    }
+    if (word === '/unbind') {
+      if (!them.actorId) { tell(pid, them.why || (them.name + ' is not in the world.')); return true; }
+      var bonds = g.__thornswoodBonds;
+      if (!bonds || !bonds.staffFree) { tell(pid, 'Binding is not running on this server.'); return true; }
+      var unbound = bonds.staffFree(pid, me, them.actorId);
+      if (unbound) { tell(pid, unbound); }
       return true;
     }
     if (word === '/unfreeze') {

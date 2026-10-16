@@ -2145,8 +2145,9 @@
     list(o.guardOf).forEach(function (h) {
       officeHeld(wrap, 'Guard of ' + town(h), 'The Jarl of ' + town(h) + ' named you a guard. Every cell of ' +
         String(h.jail || 'the jail') + ' opens for you, and the lock key at a cell door locks or unlocks it for ' +
-        'everybody else. At ' + town(h) + '\'s notice board you can take down any post, and you take anything out ' +
-        'of its drop box.');
+        'everybody else. Looking at somebody in ' + town(h) + '\'s hold, the bind key under your crosshair binds ' +
+        'their hands until a guard of the hold they are in frees them, and frees somebody bound. At ' +
+        town(h) + '\'s notice board you can take down any post, and you take anything out of its drop box.');
     });
 
     if (o.steward) {

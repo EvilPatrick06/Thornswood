@@ -27,7 +27,7 @@ of these:
 - a key named on the look prompt, the panel that names who or what is
   under the crosshair: Y for a friend, H to trade, L to mute, U to
   press a key mold into a door, E to hand over a letter you carry for
-  them, X to tend their wounds;
+  them, X to tend their wounds, and for a guard 0 to bind or free them;
 - a key of its own, the way X claims, locks or unlocks the door you
   just opened, cuts a key at a forge and claims a farm at a crop;
 - the prompt that answers an offer with Accept and Refuse, and the P

@@ -43,7 +43,7 @@
   /* A fresh install's keys: Thornswood.ini's, and the game's own E. */
   var keys = {
     help: 'F7', chat: 'Enter', command: '/', skills: 'K', party: 'P', journal: 'J',
-    friend: 'Y', trade: 'H', mute: 'L', mold: 'U', lock: 'X', maneuver: '9',
+    friend: 'Y', trade: 'H', mute: 'L', mold: 'U', lock: 'X', maneuver: '9', bind: '0',
     talk: 'V', voiceMode: 'B', wheel: 'G', activate: 'E'
   };
 
@@ -76,6 +76,11 @@
           'on its prompt.',
         k.party + ' opens your friends and party. Work done with your party in the same ' +
           'place counts for more.',
+        'A guard looking at somebody in the hold they guard binds their hands with ' + k.bind +
+          ' when the prompt says so. A bound person cannot draw a weapon, fight or cast, and ' +
+          'can only walk, until a guard of the hold they are in frees them with the same key. ' +
+          'Logging out does not end it. A guard carrying Prisoner\'s Cuffs puts them on the ' +
+          'wrists; wearing a pair yourself does nothing.',
         k.journal + ' opens your journals, and a group book beside them when this character ' +
           'is in one or the Discord account may found one. A Dev may found one of each. ' +
           'New business and New faction on that tab start one, and Leave there drops this ' +

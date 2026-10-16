@@ -254,6 +254,30 @@ try:
     yes('M12 no em dash and never the forbidden word',
         chr(0x2014) not in idle and ('pla' + 'yer') not in idle.lower())
 
+    # M14: a guard binding and freeing somebody, and a blow from somebody
+    # bound (#2573), from the gamemode's bonds block. Not staff actions, so
+    # they are not headed as staff, and nothing in them pings anybody.
+    bound = bot.moderation_text('dev', {'did': 'bind', 'by': 503, 'byName': 'Hrongar', 'who': 504,
+                                        'whoName': 'Lucan', 'why': 'in Whiterun, with no cuffs'})
+    yes('M14 a binding says the server, the guard, who and where',
+        bound == '**Bound on the dev server:** Hrongar (profile 503) bound the hands of Lucan (profile 504) '
+                 'in Whiterun, with no cuffs.')
+    freed = bot.moderation_text('live', {'did': 'unbind', 'by': 9, 'byName': 'Aela', 'who': 504,
+                                         'whoName': 'Lucan', 'why': 'as staff, bound in Whiterun by Hrongar'})
+    yes('M14 a freeing says who freed whom',
+        freed == '**Bound on the live server:** Aela (profile 9) freed the hands of Lucan (profile 504) '
+                 'as staff, bound in Whiterun by Hrongar.')
+    fought = bot.moderation_text('dev', {'did': 'boundfought', 'by': 504, 'byName': '@everyone', 'who': 504,
+                                         'whoName': '@everyone',
+                                         'why': 'A blow while bound. Their game did not hold the binding.'})
+    yes('M14 a blow from somebody bound is said, and pings nobody',
+        fought.startswith('**Bound on the dev server:**') and 'did not hold the binding' in fought and
+        '@everyone' not in fought)
+    yes('M14 the gamemode writes all three',
+        all(("record('" + d + "'") in gm for d in ('bind', 'unbind', 'boundfought')))
+    yes('M14 no em dash and never the forbidden word',
+        all(chr(0x2014) not in t and ('pla' + 'yer') not in t.lower() for t in (bound, freed, fought)))
+
     # M9: started with the others, and sent through report_say (mentions off).
     src = inspect.getsource(bot.on_ready)
     yes('M9 on_ready starts it', 'asyncio.create_task(watch_moderation())' in src)

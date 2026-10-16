@@ -121,9 +121,54 @@ and takes (Patrick, 15 October, #2551), from the office panel in Discord
 or with Name and Remove on the Office page of K. A Jarl names and removes
 only their own hold's guards, themselves included.
 
-The Guard role is also to give handcuff access. There are no handcuffs
-in the game yet; what they do is a question for Patrick on #2551, and the
-role is what will open them.
+A guard of a hold also binds people in that hold, below.
+
+## Binding
+
+Patrick, 16 October (#2573): a guard binds somebody, and they stay bound
+until a guard of the hold frees them; and only a guard puts the
+Prisoner's Cuffs on somebody. Both are the Guard role's.
+
+- **Who binds.** A guard of a hold, looking at somebody standing next to
+  them (about 4 metres, the same room or the same stretch of road) in a
+  place that hold answers for. The line under the crosshair names the
+  bind key, 0 unless it was moved on the launcher's Controls page, as
+  "Bind their hands". Nobody else binds anybody, staff included, and
+  nobody is bound in a place no hold answers for. A bound person binds
+  nobody.
+- **Who frees.** A guard of the hold the bound person is standing in
+  now, with the same key ("Free their hands"). The hold that bound them
+  does not matter: somebody bound in Whiterun and walked to Riften is
+  freed by Riften's guards. Staff free anybody, with the same key or
+  with `/unbind <person>`. Somewhere no hold answers for, only staff free
+  them.
+- **What bound is.** They cannot draw a weapon, swing, block, cast or
+  shout, and a weapon already out is put away. They can walk, talk, open
+  doors and pick a lock, and their speed is cut to about a walk, sprint
+  included. Everybody looking at them sees "bound" beside their name.
+- **The cuffs.** A guard carrying a pair of Prisoner's Cuffs puts them on
+  with the binding: the pair goes from the guard's pack into theirs and
+  onto their wrists, and they cannot take it off while bound. Freed, the
+  cuffs come off and stay in their pack. A guard with no pair binds the
+  same way, with nothing on the wrists. Wearing a pair yourself does
+  nothing.
+- **It lasts.** There is no timer. Logging out, a restart or dying does
+  not end it; the character is still bound when they come back.
+- **Staff hear of it.** Each binding and freeing is said in the staff
+  channel, with who, whom and where.
+
+What the server can and cannot hold. The engine decides a blow, a spell
+and a step in the bound person's own game and tells the server after, so
+the server cannot refuse one (measured, and written over `mp.onTakeItem`
+in `game/gamemode.js`). Being bound is the engine's own controls,
+switched in their game once when they are bound and once when they are
+freed: fighting off, and the speed the server sends. The game has no
+switch for sprinting that the server can send, which is why the speed is
+cut instead. A blow or a spell from somebody bound, which their game
+should not have let go, is said in the staff channel, once a minute a
+person. Being led or carried is not built: Skyrim has no way to move
+somebody else's character that the server can send, so a guard walks
+beside a prisoner, or staff use `/bring`.
 
 ## Ambassador
 

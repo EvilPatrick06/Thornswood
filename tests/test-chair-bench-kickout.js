@@ -43,7 +43,12 @@ const START = '  const CONTROLS = [';
 const END_MARK = "  sp.on('update', guard('controls', controlsTick));";
 const a = front.indexOf(START);
 const b = a < 0 ? -1 : front.indexOf(END_MARK, a);
-const block = (a >= 0 && b >= 0) ? front.slice(a, b) : null;
+// While bound (#2573) the watchdog leaves fighting off: boundOn and
+// controlsBackOn sit just above the extract in the plugin, so they are lifted
+// with it, as the plugin has them, nobody bound.
+const BOUND_FROM = front.indexOf('  function controlsBackOn() {');
+const BOUND_PIECE = BOUND_FROM < 0 ? '' : front.slice(BOUND_FROM, front.indexOf('\n  }\n', BOUND_FROM) + 4);
+const block = (a >= 0 && b >= 0 && BOUND_PIECE) ? 'let boundOn = false;\n' + BOUND_PIECE + front.slice(a, b) : null;
 yes('controls watchdog block still extracts', !!block);
 
 function harness(opts) {

@@ -798,7 +798,8 @@ function goldDescriptors(text) {
     'row.out': 'Grand Chef\'s second batch, the output of a Cook row of RECIPES_BY_ID (#1398), and section 5 says no recipe makes gold',
     'KEY_INGOT': 'puts back the iron ingot a key at a forge took a line before, when the key could not be handed over (#1637); an iron ingot, not a coin',
     'NEEDS.waterItems.full': 'a bottle of water for the empty bottle a well took a line before, a constant of the needs block (#1382); Glacier Water, not a coin',
-    'NEEDS.waterItems.empty': 'puts back the empty bottle a well took, when the water could not be handed over (#1382); not a coin'
+    'NEEDS.waterItems.empty': 'puts back the empty bottle a well took, when the water could not be handed over (#1382); not a coin',
+    'CUFFS': 'the pair of Prisoner\'s Cuffs a guard\'s pack gave up a line before, moved into the pack of the person they bind, or put back when it could not be (#2573); not a coin'
   };
   const re = /\baddItem\(\s*[^,()]+,\s*([^,]+?),/g;
   const unknown = [];

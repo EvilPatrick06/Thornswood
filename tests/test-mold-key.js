@@ -310,6 +310,10 @@ function client(opt) {
     // is looked at here; test-1634-apprentice-gui.js has what it does.
     'const APPRENTICE_KEY = SKILLS_KEY;',
     'function apprenticePress() { return false; }',
+    // A guard's bind key (#2573), 0, scan code 11. Nobody is looked at
+    // here; test-2573-bonds.js has what it does.
+    'const BIND_KEY = iniNumber(iniText, "BindKey", 11);',
+    'function bindPress() { return false; }',
     PIECES_FRONT.keys,
     'return { MOLD_KEY: MOLD_KEY, MOLD_NAME: MOLD_NAME, moldPress: moldPress };'
   ].join('\n');

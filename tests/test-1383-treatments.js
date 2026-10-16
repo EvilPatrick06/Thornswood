@@ -713,7 +713,7 @@ yes('Tend their wounds is the lock key, X, and Tend your wounds the trade key, H
     !/iniNumber\(ini, 'Treat/.test(front));
 yes('the look prompt draws the row only for somebody the near list marks t, and the key sends /treat with their id',
     /\(row\.t \? keyRow\(TREAT_NAME, 'Tend their wounds', false\) : ''\)/.test(front) &&
-    /'\|' \+ \(row\.t \|\| 0\)\) : ''/.test(front) &&
+    /'\|' \+ \(row\.t \|\| 0\)/.test(front) &&
     /function treatPress\(\) \{[\s\S]*?if \(!row \|\| !row\.t\) \{ return false; \}\s*return lookVerb\('treat'\);/.test(front));
 yes('the inventory line is up only while there is something to tend, and its key shuts the inventory and asks for /treat',
     /drawTreatSelfLine\(!!T\.ready && hurtCare\(\)\)/.test(front) &&

@@ -4745,6 +4745,40 @@ _MOD_DID = {
 }
 
 
+# A guard binding or freeing somebody, and a blow or a cast from somebody
+# bound, which the server can hear and not stop (#2573). Not staff actions:
+# the gamemode's bonds block writes them to the same moderation.log.
+_BOND_DID = {
+    'bind': 'bound the hands of %s',
+    'unbind': 'freed the hands of %s',
+    'boundfought': '',
+}
+
+
+def bond_text(where, row):
+    """One bonds line as the staff channel reads it. Escaped like the rest."""
+    clean = as_typed
+
+    def person(name, pid):
+        try:
+            pid = int(pid)
+        except (TypeError, ValueError):
+            pid = 0
+        if pid <= 0:
+            return clean(name, 40) or 'somebody'
+        return '%s (profile %d)' % (clean(name, 40) or 'somebody', pid)
+
+    why = clean(row.get('why'), 300)
+    if row.get('did') == 'boundfought':
+        return ('**Bound on the %s server:** %s %s'
+                % (where, person(row.get('whoName'), row.get('who')),
+                   why or 'fought while bound.'))[:1900]
+    did = _BOND_DID[row['did']] % person(row.get('whoName'), row.get('who'))
+    return ('**Bound on the %s server:** %s %s%s'
+            % (where, person(row.get('byName'), row.get('by')), did,
+               (' ' + why + '.') if why else '.'))[:1900]
+
+
 def moderation_text(where, row):
     """
     One line of moderation.log as the staff channel reads it, or None for a
@@ -4753,6 +4787,8 @@ def moderation_text(where, row):
     """
     if isinstance(row, dict) and row.get('did') in ('office', 'jarlclash', 'jarlclear'):
         return office_text(row)
+    if isinstance(row, dict) and row.get('did') in _BOND_DID:
+        return bond_text(where, row)
     if not isinstance(row, dict) or row.get('did') not in _MOD_DID:
         return None
 

@@ -555,6 +555,12 @@ namespace Thornswood
             l.Add(Dx("maneuvers", "ThornsWood", "A warrior's maneuvers",
                      "Opens a small panel with the maneuvers you hold. Press a number or click one to start it. This key or Escape closes the panel.",
                      ThornIni, "ManeuverKey", 10));
+            // A guard binding or freeing somebody (#2573). A key of its own,
+            // 0: every key a person under the crosshair can already have would
+            // meet it, and nothing of Skyrim's, the mods' or ours answers to 0.
+            l.Add(Dx("bindkey", "ThornsWood", "Bind or free somebody",
+                     "For a guard: while you are looking at somebody in the hold you guard, binds their hands, so they cannot fight and can only walk, until a guard of the hold they are in frees them. A pair of Prisoner's Cuffs in your pack goes on their wrists. On somebody bound, frees them. Staff can free anybody bound.",
+                     ThornIni, "BindKey", 11));
 
             l.Add(Dx("cyclehold", "Reaching things", "Cycle modifier",
                      "Held down, the two keys below step through everything you could reach instead of the game picking for you.",

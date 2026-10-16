@@ -169,7 +169,7 @@ attempt('B', function () {
       ' VOICE_MODE_KEY = iniNumber(ini, "VoiceModeKey", 48), WHEEL_KEY = iniNumber(ini, "WheelKey", 34);\n' +
       'const HELP_NAME = keyName(HELP_KEY), PARTY_NAME = keyName(iniNumber(ini, "PartyKey", 25)),' +
       ' FRIEND_NAME = keyName(21), TRADE_NAME = keyName(35), MUTE_NAME = keyName(38), MOLD_NAME = keyName(22),' +
-      ' LOCK_NAME = keyName(45), MANEUVER_NAME = keyName(10);\n' +
+      ' LOCK_NAME = keyName(45), MANEUVER_NAME = keyName(10), BIND_NAME = keyName(11);\n' +
       'function deliverName() { return "E"; }\n';
     const api = new Function('T', 'claims', 'say', 'busyMenuOpen',
       pieces.join('\n') + consts + 'return { press: helpKeyPressed, keys: helpKeys };')(

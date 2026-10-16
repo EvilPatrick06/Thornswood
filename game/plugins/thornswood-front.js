@@ -398,6 +398,18 @@
   */
   const TREAT_SELF_KEY = TRADE_KEY;
   /*
+    A guard binding or freeing the person under the crosshair (#2573). A key
+    of its own, BindKey, because every key a person under the crosshair can
+    already have would meet this one: X tends a wound, U lets them sleep in
+    a building you hold, K takes them on as an apprentice, E hands over a
+    letter, and a guard can be any of those at once. 0, scan code 11: 1 to 8
+    are the game's favourites hotkeys and 9 the maneuvers, and nothing of
+    Skyrim's, the mods' on the Controls page or ours answers to 0
+    (tests/test-thornswood-keys.js and test-2573-bonds.js hold it there).
+    Like Y, H and L it means nothing unless the prompt names it.
+  */
+  const BIND_KEY = iniNumber(ini, 'BindKey', 11);          // 0
+  /*
     A warrior's maneuvers (#1386): opens the maneuver panel. 9, scan code 10:
     1 to 8 are the game's own favourites hotkeys (and the emote slots while
     the wheel is open), and every letter is already one of ours or the game's.
@@ -449,6 +461,7 @@
   const HELP_NAME = keyName(HELP_KEY);
   const TREAT_NAME = keyName(TREAT_KEY);
   const TREAT_SELF_NAME = keyName(TREAT_SELF_KEY);
+  const BIND_NAME = keyName(BIND_KEY);
   /*
     HANDING OVER A LETTER (#1595). Patrick, 4 Oct: /deliver becomes a key on
     the look prompt, shown while you carry a letter for the person under the
@@ -3614,6 +3627,105 @@
    * the game switches controls off for its own menus and race creation, and
    * those turn themselves back on.
    */
+  /*
+    ------------------------------------------ bound by a guard (#2573)
+
+    The server keeps whether this character is bound, on the character, and
+    the owner's script hands it over as globalThis.thornswoodBound whenever
+    it changes (the bonds block in the gamemode). The server cannot refuse a
+    blow, a cast or a step (measured, over mp.onTakeItem there), so being
+    bound is the engine's own controls, switched here in this game:
+      - DisablePlayerControls with fighting alone: no weapon drawn, no blow,
+        no spell or shout. A weapon already out is sheathed.
+      - The Prisoner's Cuffs, when a guard handed a pair over, put on with
+        the engine's flag that keeps them from being taken off. The pair may
+        reach the pack a moment after the record, so it is put on when the
+        pack says it arrived (containerChanged), and not looked for again.
+      - The speed is the server's: the character's totals carry it.
+    EACH ONCE, ON THE CHANGE, AND NEVER AGAIN. Nothing here checks whether
+    they are still off and puts them back: the record changing is the only
+    thing that switches anything. A new session of the game is a change
+    (the engine's controls start on), so a relog binds again, once.
+    Freeing is the reverse, once: fighting back on, the cuffs taken off and
+    left in the pack.
+  */
+  const CUFFS_FORM = 0x10e039;     // Prisoner's Cuffs, 10e039:Skyrim.esm
+  let boundSig = '';               // 'on:<stamp>' or 'off', as last switched
+  let boundOn = false;             // fighting is off because of a binding
+  let cuffsWanted = false;         // a pair is due, and has not reached the pack yet
+
+  function boundRecord() {
+    try {
+      const b = globalThis.thornswoodBound;
+      return (b && typeof b === 'object' && b.hold && !b.free) ? b : null;
+    } catch (e) { return null; }
+  }
+
+  function putCuffsOn(pc) {
+    let f = null;
+    try { f = sp.Game.getFormEx(CUFFS_FORM); } catch (e) { f = null; }
+    if (!f) { say('bound: the game has no Prisoner\'s Cuffs record'); cuffsWanted = false; return; }
+    let n = 0;
+    try { n = Number(pc.getItemCount(f)) || 0; } catch (e) { n = 0; }
+    if (n < 1) { cuffsWanted = true; say('bound: the cuffs are not in the pack yet, they go on when they arrive'); return; }
+    cuffsWanted = false;
+    try { pc.equipItem(f, true, true); say('bound: the cuffs are on'); }
+    catch (e) { say('bound: equipItem threw on the cuffs: ' + e); }
+  }
+
+  function bindSelf(pc, b) {
+    try { sp.Game.disablePlayerControls(false, true, false, false, false, false, false, false, 0); }
+    catch (e) { say('bound: disablePlayerControls threw: ' + e); }
+    boundOn = true;
+    try { if (pc.isWeaponDrawn()) { pc.sheatheWeapon(); } } catch (e) { say('bound: could not sheathe: ' + e); }
+    if (b.cuffs) { putCuffsOn(pc); } else { cuffsWanted = false; }
+    say('bound by ' + String(b.byName || 'a guard') + ' in ' + String(b.hold) + ': fighting off' +
+        (b.cuffs ? ', the cuffs going on' : ', no cuffs'));
+  }
+
+  function freeSelf(pc) {
+    boundOn = false;
+    cuffsWanted = false;
+    try { sp.Game.enablePlayerControls(false, true, false, false, false, false, false, false, 0); }
+    catch (e) { say('freed: enablePlayerControls threw: ' + e); }
+    try {
+      const f = sp.Game.getFormEx(CUFFS_FORM);
+      if (f && pc.isEquipped(f)) { pc.unequipItem(f, false, true); }
+    } catch (e) { say('freed: could not take the cuffs off: ' + e); }
+    say('freed: fighting on');
+  }
+
+  sp.on('update', guard('bound', () => {
+    const b = boundRecord();
+    const sig = b ? 'on:' + String(b.at || 0) : 'off';
+    if (sig === boundSig) { return; }
+    let pc = null;
+    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
+    if (!pc) { return; }
+    boundSig = sig;
+    if (b) { bindSelf(pc, b); } else if (boundOn) { freeSelf(pc); }
+  }));
+
+  sp.on('containerChanged', guard('bound cuffs', (e) => {
+    if (!cuffsWanted || !boundOn || !e) { return; }
+    let base = 0, to = 0, mine = 0;
+    try { base = e.baseObj ? e.baseObj.getFormID() : 0; } catch (err) { return; }
+    if (base !== CUFFS_FORM) { return; }
+    try { to = e.newContainer ? e.newContainer.getFormID() : 0; mine = sp.Game.getPlayer().getFormID(); }
+    catch (err) { return; }
+    if (!mine || to !== mine) { return; }
+    putCuffsOn(sp.Game.getPlayer());
+  }));
+
+  /*
+    The two watchdogs below turn every control back on when they think the
+    game is stuck. While bound, fighting being off is this file's doing, so
+    both leave it off: they switch on only what is not the binding's.
+  */
+  function controlsBackOn() {
+    sp.Game.enablePlayerControls(true, !boundOn, true, true, true, true, true, true, true);
+  }
+
   const CONTROLS = [
     ['movement', 'isMovementControlsEnabled'],
     ['fighting', 'isFightingControlsEnabled'],
@@ -3729,7 +3841,8 @@
     const theirs = notOurs();
     if (theirs) { controlsOffNow = []; controlsSince = 0; return; }
 
-    const off = readControls();
+    // Fighting off while bound is the binding (#2573), not a stuck control.
+    const off = readControls().filter((c) => !(boundOn && c === 'fighting'));
     controlsOffNow = off;
     if (!off.length) { controlsSince = 0; return; }
 
@@ -3742,7 +3855,7 @@
       // EnablePlayerControls and DisablePlayerControls, and the binding counts
       // them. Passing eight threw every single time this ran, so the watchdog
       // has been reporting the problem and never once fixing it.
-      sp.Game.enablePlayerControls(true, true, true, true, true, true, true, true, true);
+      controlsBackOn();
       try { sp.Game.setPlayerAIDriven(false); } catch (e) { }
       say('the game had controls switched off with no menu open (' +
           off.join(', ') + '). turned them back on.');
@@ -4953,7 +5066,8 @@
   /** Draw or clear the little panel that names them and the three keys. */
   function drawPrompt(row) {
     const sig = row ? (row.n + '|' + row.f + '|' + row.m + '|' + row.y + '|' + (row.s || 0) + '|' + (row.c || '') +
-                       '|' + (row.d || 0) + '|' + (row.a ? JSON.stringify(row.a) : '') + '|' + (row.t || 0)) : '';
+                       '|' + (row.d || 0) + '|' + (row.a ? JSON.stringify(row.a) : '') + '|' + (row.t || 0) +
+                       '|' + (row.k || 0) + '|' + (row.b || 0)) : '';
     if (sig === lookingSig) { return; }
     lookingSig = sig;
     if (!row) {
@@ -4975,6 +5089,8 @@
     const html =
       '<div style="font-size:26px;color:#efe4cc;margin-bottom:4px">' + row.n +
       (row.y ? '<span style="color:#8fb85e;font-size:18px"> &middot; your party</span>' : '') +
+      // Their hands are bound (#2573): the near list's b.
+      (row.b ? '<span style="color:#d9ab52;font-size:18px"> &middot; bound</span>' : '') +
       '</div>' +
       /*
         A scar they agreed to (#1383): injury.md, "a line other people can be
@@ -5000,7 +5116,10 @@
       (Array.isArray(row.a) && row.a.length ? keyRow(APPRENTICE_NAME, 'Take on as apprentice', false) : '') +
       // Only while they have a wound somebody could tend: the near list's t
       // (#1383). See treatPress.
-      (row.t ? keyRow(TREAT_NAME, 'Tend their wounds', false) : '');
+      (row.t ? keyRow(TREAT_NAME, 'Tend their wounds', false) : '') +
+      // Only for a guard of the hold they stand in, or staff to free them:
+      // the near list's k, 1 Bind and 2 Free (#2573). See bindPress.
+      (row.k ? keyRow(BIND_NAME, row.k === 2 ? 'Free their hands' : 'Bind their hands', row.k === 2) : '');
 
     T.js('(function(){try{' +
          'var d=document.getElementById("ts-look");' +
@@ -5259,6 +5378,24 @@
     const row = (near && Object.prototype.hasOwnProperty.call(near, lookingAt)) ? near[lookingAt] : null;
     if (!row || !row.t) { return false; }
     return lookVerb('treat');
+  }
+
+  /*
+    Bind or free the person under the crosshair (#2573). Only while the
+    prompt offers it, which is the server's near list saying this character
+    guards the hold they stand in, or is staff and they are bound. It sends
+    /bind with their form id, and the server measures the reach, the hold
+    and the office again when the line arrives. Answers whether it was used,
+    so the key falls through when it was not.
+  */
+  function bindPress() {
+    if (!lookingAt) { return false; }
+    if (claims.chat) { return false; }
+    if (busyMenuOpenNow()) { return false; }
+    const near = nearList();
+    const row = (near && Object.prototype.hasOwnProperty.call(near, lookingAt)) ? near[lookingAt] : null;
+    if (!row || !row.k) { return false; }
+    return lookVerb('bind');
   }
 
   /*
@@ -6653,7 +6790,7 @@
         '. Switching controls on and taking the character back off the AI.');
 
     try {
-      sp.Game.enablePlayerControls(true, true, true, true, true, true, true, true, true);
+      controlsBackOn();
     } catch (e) {
       say('enablePlayerControls threw: ' + e);
     }
@@ -8410,6 +8547,8 @@
     if (e.code === LOCK_KEY && lockPress()) { return; }
     // The same key on a hurt person under the crosshair (#1383). See TREAT_KEY.
     if (e.code === TREAT_KEY && treatPress()) { return; }
+    // A guard on somebody in their hold, or staff on somebody bound (#2573).
+    if (e.code === BIND_KEY && bindPress()) { return; }
     // The trade key in the inventory, with a wound to tend (#1383). See TREAT_SELF_KEY.
     if (e.code === TREAT_SELF_KEY && treatSelfPress()) { return; }
     /*
@@ -10076,7 +10215,7 @@
       help: HELP_NAME, chat: keyName(CHAT_KEY), command: keyName(COMMAND_KEY),
       skills: keyName(SKILLS_KEY), party: PARTY_NAME, journal: keyName(JOURNAL_KEY),
       friend: FRIEND_NAME, trade: TRADE_NAME, mute: MUTE_NAME, mold: MOLD_NAME,
-      lock: LOCK_NAME, maneuver: MANEUVER_NAME, talk: keyName(TALK_KEY),
+      lock: LOCK_NAME, maneuver: MANEUVER_NAME, bind: BIND_NAME, talk: keyName(TALK_KEY),
       voiceMode: keyName(VOICE_MODE_KEY), wheel: keyName(WHEEL_KEY), activate: deliverName()
     };
   }

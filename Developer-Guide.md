@@ -2752,6 +2752,7 @@ Staff.
 | `/warn <person> <why>` | Tells them that staff have warned them, why, and that the next step is being removed from the world |
 | `/freeze <person> [why]` | Holds them where they stand, across a reconnect |
 | `/unfreeze <person>` | Lets them go |
+| `/unbind <person>` | Frees somebody a guard bound, wherever they are. Staff also free them with the bind key, 0, looking at them ([Offices](docs/systems/offices.md), Binding) |
 | `/silence <person> [minutes] [why]` | Stops their voice, what they type, the words above their head and the speaking mark. 30 minutes unless you say, a day at most. Their name stays |
 | `/unsilence <person>` | Lets them speak again |
 | `/kick <person> [why]` | Tells them, then ends their session four seconds later |

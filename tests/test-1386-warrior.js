@@ -1029,7 +1029,7 @@ later(200000);
   const effectsOf = slice(gm, '  function effectsOf(actorId) {', '\n  }\n');
   const maneuversView = slice(gm, '  function maneuversView(actorId, s) {', '\n  }\n');
   const logged = [];
-  const fn = new Function('g', 'P', 'stateOf', 'withNeeds', 'withManeuvers', 'clog', 'withPerks', 'withCollege',
+  const fn = new Function('g', 'P', 'stateOf', 'withNeeds', 'withManeuvers', 'clog', 'withPerks', 'withCollege', 'withBonds',
     effectsOf + '\n' + maneuversView + '\nreturn { effectsOf: effectsOf, maneuversView: maneuversView };');
   const C = fn({ __thornswoodManeuvers: { view: function (id, s) { if (id === 9) { throw new Error('boom'); } return id === 1 ? [{ key: 'rush' }] : null; } } },
     { treeApplies: function (s) { return { stamina: 10 * s.endurance }; } },
@@ -1038,6 +1038,8 @@ later(200000);
     function (id, base) { return base; },
     function () { logged.push(Array.prototype.slice.call(arguments).join(' ')); },
     function (id, base) { return Object.assign({}, base, { DestructionMod: 100 }); },
+    function (id, base) { return base; },
+    // Being bound (#2573) adds nothing to anybody here.
     function (id, base) { return base; });
   yes('the map is the tree, less the needs, with a running perk on top: the same fold forPanel makes',
     C.effectsOf(3).stamina === 10 && C.effectsOf(3).DestructionMod === 100);
