@@ -411,9 +411,12 @@ try {
         $pattern = $pattern.Replace('\\', '\').Replace('\"', '"')
         $readBack = @([regex]::Matches($filesText, $pattern) | ForEach-Object { $_.Groups[1].Value.Replace('\\', '\') })
         Yes "P10 the launcher's own pattern reads every path back out of it ($($readBack.Count))" ($pattern.Length -gt 0 -and (Same @($readBack | Sort-Object) @($paths | Sort-Object)))
-        $builder = Read-Text (Join-Path $Root 'scripts\release\Build-Launcher.ps1')
-        Yes 'P10 Build-Launcher.ps1 puts it inside the launcher as skyrim-files.json, and stops without it' (
-            $builder -match '\.\.\\\.\.\\records\\skyrim-files\.json' -and $builder -match ',skyrim-files\.json"' -and $builder -match 'Die "skyrim-files\.json is not at')
+        # Since #498's switch the launcher's project file embeds it, and its
+        # check stops the build by name when an embedded file is missing.
+        $appProj = Read-Text (Join-Path $Root 'launcher\app\Thornswood.csproj')
+        Yes 'P10 Thornswood.csproj puts it inside the launcher as skyrim-files.json, and stops without it' (
+            $appProj -match '<EmbeddedResource Include="\.\.\\\.\.\\records\\skyrim-files\.json"><LogicalName>skyrim-files\.json</LogicalName>' -and
+            $appProj.Contains('<Error Condition="!Exists(''%(EmbeddedResource.FullPath)'')"'))
         $gen = Join-Path $Root 'scripts\release\New-SkyrimFilesRecord.ps1'
         Yes 'P10 New-SkyrimFilesRecord.ps1, which writes it, is there' (Test-Path -LiteralPath $gen)
         # On a machine whose Steam has the three manifests, the record is what

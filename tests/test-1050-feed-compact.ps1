@@ -38,6 +38,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Repo = Split-Path -Parent $Here
@@ -92,22 +93,11 @@ if ($ParseFeed) {
         }
         $null
     }
-    # The references Build-Launcher.ps1 names, read from it, never copied.
-    $builder = Join-Path $Repo 'scripts\release\Build-Launcher.ps1'
-    $tokens = $null; $errors = $null
-    $ast = [System.Management.Automation.Language.Parser]::ParseFile($builder, [ref]$tokens, [ref]$errors)
-    $assigns = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] }, $true))
-    function ListIn([string]$name) {
-        $a = $assigns | Where-Object { $_.Left.Extent.Text -eq ('$' + $name) } | Select-Object -First 1
-        if (-not $a) { return @() }
-        return @($a.Right.FindAll({ param($n) $n -is [System.Management.Automation.Language.StringConstantExpressionAst] }, $true) |
-                 ForEach-Object { $_.Value })
-    }
-    $needed = @(ListIn 'needed')
-    $wv2 = @(ListIn 'wv2Managed')
+    $needed = @($LauncherNeeded)
+    $wv2 = @($LauncherWv2Managed)
 
     Yes 'the .NET Framework 4 compiler is here' ($null -ne $csc)
-    if (-not $csc -or $needed.Count -eq 0) { Yes 'Build-Launcher.ps1 names the references' $false; Done }
+    if (-not $csc -or $needed.Count -eq 0) { Yes 'Thornswood.csproj names the references' $false; Done }
     $refs = @(); $missing = @()
     foreach ($n in $needed) { $p = Find-Ref $n; if ($p) { $refs += $p } else { $missing += $n } }
     foreach ($n in $wv2) {
@@ -124,11 +114,11 @@ if ($ParseFeed) {
         Yes ('{0} holds launcher source' -f $Src) ($cs.Count -gt 0)
         if (-not $cs.Count) { Done }
         $dll = Join-Path $tmp 'Thornswood.dll'
-        $cscArgs = @('/noconfig', '/nologo', '/target:library', '/platform:anycpu', '/langversion:5', "/out:$dll")
+        $cscArgs = @('/noconfig', '/nologo', '/target:library', '/platform:anycpu', "/langversion:$LauncherLangVersion", "/out:$dll")
         foreach ($r in $refs) { $cscArgs += "/reference:$r" }
         foreach ($f in $cs) { $cscArgs += $f.FullName }
         $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-        $said = & $csc @cscArgs 2>&1
+        $said = & $LauncherCsc @cscArgs 2>&1
         $rc = $LASTEXITCODE
         $ErrorActionPreference = $old
         $built = ($rc -eq 0) -and (Test-Path -LiteralPath $dll)

@@ -51,6 +51,7 @@ param()
 $env:THORNSWOOD_HARNESS = '1'
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 if ($PSVersionTable.PSEdition -eq 'Core') {
     $winps = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
     if (-not (Test-Path -LiteralPath $winps)) {
@@ -258,26 +259,17 @@ function Find-Ref([string]$name) {
     }
     return $null
 }
-# The references are read off Build-Launcher.ps1, as test-updater.ps1 does.
-$tokens = $null; $errors = $null
-$ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $repo 'scripts\release\Build-Launcher.ps1'), [ref]$tokens, [ref]$errors)
-$assigns = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] }, $true))
-function ListIn([string]$name) {
-    $a = $assigns | Where-Object { $_.Left.Extent.Text -eq ('$' + $name) } | Select-Object -First 1
-    if (-not $a) { return @() }
-    return @($a.Right.FindAll({ param($n) $n -is [System.Management.Automation.Language.StringConstantExpressionAst] }, $true) | ForEach-Object { $_.Value })
-}
 $refs = @(); $missing = @()
-foreach ($n in @(ListIn 'needed')) { $p = Find-Ref $n; if ($p) { $refs += $p } else { $missing += $n } }
-foreach ($n in @(ListIn 'wv2Managed')) { $p = Join-Path $repo "launcher\lib\webview2\$n"; if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n } }
-Yes ('every reference Build-Launcher.ps1 names is here' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) ($missing.Count -eq 0 -and $refs.Count -gt 5)
+foreach ($n in @($LauncherNeeded)) { $p = Find-Ref $n; if ($p) { $refs += $p } else { $missing += $n } }
+foreach ($n in @($LauncherWv2Managed)) { $p = Join-Path $repo "launcher\lib\webview2\$n"; if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n } }
+Yes ('every reference Thornswood.csproj names is here' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) ($missing.Count -eq 0 -and $refs.Count -gt 5)
 if ($missing.Count) { Done }
 $dll = Join-Path $T 'Thornswood.dll'
 $cscArgs = @('/noconfig', '/nologo', '/target:library', '/platform:anycpu', "/out:$dll")
 foreach ($r in $refs) { $cscArgs += "/reference:$r" }
 foreach ($f in @(Get-ChildItem (Join-Path $app '*.cs') -File)) { $cscArgs += $f.FullName }
 $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-$said = & $csc @cscArgs 2>&1
+$said = & $LauncherCsc @cscArgs 2>&1
 $ErrorActionPreference = $old
 Yes 'the launcher compiles with the .NET Framework csc' ((Test-Path -LiteralPath $dll) -and $LASTEXITCODE -eq 0)
 if (-not (Test-Path -LiteralPath $dll)) { foreach ($l in @($said | Where-Object { "$_" -match 'error' } | Select-Object -First 10)) { Write-Host "      $l" }; Done }

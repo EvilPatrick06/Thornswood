@@ -69,6 +69,7 @@
 param([string]$AppPath)
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, the repository is one folder up.
@@ -103,7 +104,7 @@ if (-not $csc) { Done }
 $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-steam-updates-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $null = New-Item -ItemType Directory -Force -Path $work
 $dll = Join-Path $work 'SteamUpdates.dll'
-$said = & $csc /nologo /target:library "/out:$dll" $src 2>&1
+$said = & $LauncherCsc /nologo /target:library "/out:$dll" $src 2>&1
 $built = ($LASTEXITCODE -eq 0) -and (Test-Path -LiteralPath $dll)
 Yes 'it compiles on its own with the C# 5 compiler' $built
 if (-not $built) { $said | ForEach-Object { Write-Host "      $_" }; Done }

@@ -52,6 +52,7 @@
 param()
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Repo = Split-Path -Parent $Here
@@ -235,7 +236,7 @@ function Build([string]$out, [string]$target, [string]$define, [string[]]$src) {
     $a += $src
     $old = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
-    $o = & $csc @a 2>&1
+    $o = & $LauncherCsc @a 2>&1
     $rc = $LASTEXITCODE
     $ErrorActionPreference = $old
     if ($rc -ne 0) { $o | Where-Object { $_ -match 'error' } | ForEach-Object { Write-Host "      $_" } }

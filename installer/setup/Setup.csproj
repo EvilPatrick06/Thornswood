@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  The setup program as an MSBuild project (issue #498), the same program
-  scripts\release\Build-Launcher.ps1 compiles with the .NET Framework csc:
-  Bootstrap.cs and the launcher's WindowFit.cs, the emblem as logo.png, the
-  launcher's icon, Setup.manifest stamped with the launcher's version, and
+  The setup program as an MSBuild project (issue #498). Since the switch
+  (15 Oct) this is the only way it is built: scripts\release\Build-Launcher.ps1
+  runs MSBuild on it. It holds Bootstrap.cs and the launcher's WindowFit.cs,
+  the emblem as logo.png, the launcher's icon, Setup.manifest stamped with
+  the launcher's version, and
   FileVersion and ProductVersion from Updater.cs. Title, Product, Company and
   Copyright stay in Bootstrap.cs.
 
@@ -11,8 +12,8 @@
   reads OriginalFilename and InternalName from the name it was built as; the
   build then puts it at out\setup-stub.exe, which packaging copies from.
 
-  What is left as the csc build has it, and why, is the same list as
-  launcher\app\Thornswood.csproj.
+  Built the way launcher\app\Thornswood.csproj is, for the same reasons:
+  that file's header has them.
 -->
 <Project ToolsVersion="Current" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
@@ -27,7 +28,7 @@
     <AssemblyName>Thornswood-Setup</AssemblyName>
     <RootNamespace>Thornswood</RootNamespace>
     <TargetFrameworkVersion>v4.8.1</TargetFrameworkVersion>
-    <LangVersion>5</LangVersion>
+    <LangVersion>13.0</LangVersion>
     <PlatformTarget>AnyCPU</PlatformTarget>
     <Prefer32Bit>false</Prefer32Bit>
     <Optimize>true</Optimize>

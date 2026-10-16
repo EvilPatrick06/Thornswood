@@ -34,6 +34,7 @@
   its temp folder.
 #>
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $root = Split-Path -Parent $PSScriptRoot
 $app = Join-Path $root 'launcher\app'
 
@@ -121,7 +122,7 @@ try {
     $cscArgs = @('/noconfig', '/nologo', '/target:exe', '/warn:4', "/out:$exe",
                  "/reference:$(Join-Path $fw 'System.dll')", "/reference:$(Join-Path $fw 'System.Core.dll')",
                  (Join-Path $app 'CrashDump.cs'), (Join-Path $app 'Enforce.cs'), $driverFile)
-    $out = & $csc @cscArgs 2>&1
+    $out = & $LauncherCsc @cscArgs 2>&1
     $built = ($LASTEXITCODE -eq 0) -and (Test-Path -LiteralPath $exe)
     if (-not $built) { $out | ForEach-Object { Write-Host "      $_" } }
     Yes 'CrashDump.cs and Enforce.cs compile with the launcher''s .NET Framework 4 csc (C# 5)' $built

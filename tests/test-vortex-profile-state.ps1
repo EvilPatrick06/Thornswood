@@ -1,5 +1,6 @@
 param([string]$Scratch)
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $repo=Split-Path -Parent $PSScriptRoot
 if(-not $Scratch){$Scratch=Join-Path ([IO.Path]::GetTempPath()) ('thornswood-vortex-state-'+[guid]::NewGuid().ToString('N'))}
 New-Item -ItemType Directory -Path $Scratch -Force | Out-Null
@@ -46,7 +47,7 @@ try {
     # Compile the same helper with the launcher's C# 5 compiler as well.
     $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
     $dll=Join-Path $Scratch 'VortexProfileState.dll'
-    & $csc /noconfig /nologo /target:library /langversion:5 ("/out:"+$dll) /reference:System.dll /reference:System.Core.dll /reference:System.Xml.dll /reference:System.Runtime.Serialization.dll (Join-Path $repo 'launcher\app\VortexProfileState.cs')
+    & $LauncherCsc /noconfig /nologo /target:library "/langversion:$LauncherLangVersion" ("/out:"+$dll) /reference:System.dll /reference:System.Core.dll /reference:System.Xml.dll /reference:System.Runtime.Serialization.dll (Join-Path $repo 'launcher\app\VortexProfileState.cs')
     if($LASTEXITCODE -or -not(Test-Path -LiteralPath $dll)){throw 'Framework compilation failed'}
     Write-Host ($count.ToString()+' profile cases and framework compilation passed')
 } finally {$env:APPDATA=$oldAppData}

@@ -437,19 +437,12 @@ if (Has 'gh') {
 Row 'PowerShell 7' (Has 'pwsh') '' 'winget install --id Microsoft.PowerShell -e'
 Row 'node' (Has 'node') '' 'winget install --id OpenJS.NodeJS.LTS -e'
 Row 'ssh' (Has 'ssh') '' 'Settings, System, Optional features, add OpenSSH Client'
-$csc = @("$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe", "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe") |
-       Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-Row 'the .NET Framework 4 compiler' ([bool]$csc) $csc 'Turn on .NET Framework 4.8 in Windows Features'
-# MSBuild (#498): not needed to Ship yet, so it is never a gap here. The
-# launcher builds with the compiler above until the switch to the project
-# files; this says now whether this machine is ready for that day.
+# MSBuild (#498): since the switch (15 Oct) the launcher is built only from
+# its project files, so a machine without it cannot Ship a launcher.
 . (Join-Path $Here 'Find-MSBuild.ps1') -Load
 $msb = Find-ThornswoodMSBuild
-if ($msb.MSBuild -and $msb.RefAssemblies) {
-  Say ('  yes   MSBuild and the .NET Framework 4.8.1 reference assemblies, for the launcher build after #498  (' + $msb.MSBuild + ')') 'Green'
-} else {
-  Say '  later MSBuild and the .NET Framework 4.8.1 reference assemblies are not here. Not needed to Ship yet; the launcher build moves to them (#498). Developer-Guide.md "Setting up a machine" has the install line.' 'Yellow'
-}
+Row 'MSBuild and the .NET Framework 4.8.1 reference assemblies, which build the launcher' ([bool]($msb.MSBuild -and $msb.Csc -and $msb.RefAssemblies)) $msb.MSBuild `
+    'Developer-Guide.md "Setting up a machine" has the one install line (Visual Studio 2022 Build Tools with the MSBuild workload and the 4.8.1 targeting pack)'
 $signtool = Find-Signtool
 Row 'signtool, from the Windows SDK' ([bool]$signtool) $signtool 'winget install --id Microsoft.WindowsSDK.10.0.26100 -e   (its signing tools are what matter)'
 Row 'az, the Azure command line' (Has 'az') '' 'winget install --id Microsoft.AzureCLI -e'

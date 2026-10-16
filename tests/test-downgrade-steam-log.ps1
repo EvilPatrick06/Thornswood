@@ -38,6 +38,7 @@
 param([string]$AppPath)
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, the repository is one folder up.
@@ -182,7 +183,7 @@ try {
     $probeCs = Join-Path $work 'Probe.cs'
     [IO.File]::WriteAllText($probeCs, $probe)
     $dll = Join-Path $work 'Probe.dll'
-    $out = & $csc /nologo /target:library "/out:$dll" $probeCs 2>&1
+    $out = & $LauncherCsc /nologo /target:library "/out:$dll" $probeCs 2>&1
     $built = ($LASTEXITCODE -eq 0) -and (Test-Path -LiteralPath $dll)
     Yes 'the lifted text compiles with the C# 5 compiler' $built
     if (-not $built) { $out | ForEach-Object { Write-Host "      $_" }; Done }

@@ -75,6 +75,7 @@ param(
 $env:THORNSWOOD_HARNESS = '1'
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, the repository is one folder up.
@@ -557,7 +558,7 @@ namespace $emptyNs {
             $csFile,
             $driverFile
         )
-        $cscOut = & $csc @cscArgs 2>&1
+        $cscOut = & $LauncherCsc @cscArgs 2>&1
         $emptyBuilt = ($LASTEXITCODE -eq 0) -and (Test-Path -LiteralPath $emptyExe)
         if (-not $emptyBuilt) { Write-Host ('      ' + ($cscOut | Out-String).Trim()) }
     }

@@ -64,7 +64,7 @@ $sr = Src 'scripts\release\Ship-Rules.ps1'
 Yes 'Ship-Rules holds ui-gone.json to its shape right after it parses, before the lists are built' ($sr.IndexOf('Get-ThornswoodRecordProblems -Doc $script:ShipUiGoneDoc -Kind ui-gone') -gt $sr.IndexOf('$script:ShipUiGoneDoc = $ShipUiGoneText') -and $sr.IndexOf('Get-ThornswoodRecordProblems -Doc $script:ShipUiGoneDoc -Kind ui-gone') -lt $sr.IndexOf('$ShipDaedricMenu = [ordered]@{}'))
 $bl = Src 'scripts\release\Build-Launcher.ps1'
 $i = $bl.IndexOf('Read-ThornswoodRecord -Path $embedded.Path -Kind $embedded.Kind')
-Yes 'Build-Launcher reads both embedded records through Read-ThornswoodRecord before either is compiled in' ($i -gt 0 -and $i -lt $bl.IndexOf('skyrim-files.json"') -and $bl.Contains("Kind = 'skyrim-files'") -and $bl.Contains("Kind = 'ui-gone'") -and $bl.Contains("Die (`$_.Exception.Message + ' Nothing was built.')"))
+Yes 'Build-Launcher reads both embedded records through Read-ThornswoodRecord before MSBuild compiles them in' ($i -gt 0 -and $i -lt $bl.IndexOf('& $found.MSBuild (Resolve-Path -LiteralPath $proj).Path') -and $bl.Contains("Kind = 'skyrim-files'") -and $bl.Contains("Kind = 'ui-gone'") -and $bl.Contains("Die (`$_.Exception.Message + ' Nothing was built.')"))
 $pu = Src 'scripts\release\Publish-Update.ps1'
 $i = $pu.IndexOf('Get-ThornswoodRecordProblems -Doc $pin -Kind skyrim-pin')
 Yes 'Publish-Update holds skyrim-pin.json to its shape before anything goes into the feed (and keeps the feed''s pin on a problem)' ($i -gt 0 -and $i -lt $pu.IndexOf("Set-Prop `$doc 'expectedExeBytes'") -and $i -gt $pu.IndexOf('$pin = (Get-Content -LiteralPath $pinPath'))
