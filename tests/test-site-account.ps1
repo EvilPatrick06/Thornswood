@@ -4,8 +4,15 @@
       pwsh -NoProfile -File .\tests\test-site-account.ps1
 
   Deploy-Docs.ps1 -RunAs chooses the account the site's scheduled task runs
-  as. Left out, the task keeps the account it already has, and a task made
-  for the first time is SYSTEM.
+  as. Left out, the site runs as LOCAL SERVICE (#2613): a new task is made on
+  it, a task still on SYSTEM is moved onto it behind the #2578 fail-safe, and
+  an account set by hand is left alone. -RunAs SYSTEM is the way back, built
+  by ServiceAccount.ps1's New-ThornswoodServicePrincipal -AsSystem.
+
+  #2613: until then a task made for the first time was SYSTEM and no -RunAs
+  kept whatever the task had, so the VPS site, made as SYSTEM, stayed SYSTEM
+  through every routine deploy. The checks below that said so now say the
+  opposite, and the fail-safe is run against a scratch folder Users may read.
 
   WHY THIS EXISTS. Entry 219 on the To Do List: "A real service as a low
   privilege account". The log half of that entry is done. What was left is
@@ -80,6 +87,13 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 # The tests are in tests\, the repository is one folder up.
 $Here = Split-Path -Parent $Here
 if (-not $RepoPath) { $RepoPath = $Here }
+# The principal and the fail-safe the account block calls (#2578, #2613).
+# Deploy-Docs sends these up as text in front of the setup script.
+. (Join-Path $RepoPath 'scripts\deploy\ServiceAccount.ps1')
+# The places no service may read, swapped for scratch ones the test sets, so
+# the fail-safe never reads this machine's own C:\Thornswood-* folders.
+$script:neverReach = @()
+function Get-ThornswoodServiceNeverReach { param([string]$Own = '') return $script:neverReach }
 
 $script:pass = 0
 $script:fail = 0
@@ -106,7 +120,7 @@ $runAsParam = $params['RunAs']
 Yes 'Deploy-Docs.ps1 takes -RunAs' ($null -ne $runAsParam)
 # Any default at all would be put on the task at every deploy that left
 # -RunAs out, which is how SYSTEM came back after the switch.
-Yes '-RunAs has no default, so a deploy without it keeps the account the task has' (
+Yes '-RunAs has no default on the parameter, so the block tells left out from asked for' (
     $runAsParam -and $null -eq $runAsParam.DefaultValue)
 # Kept for Build below, so a deploy that leaves -RunAs out is built with
 # whatever the script would really put there.
@@ -294,7 +308,24 @@ function ArgOf($cmd, [string]$name) {
     return $null
 }
 $sentLs = [System.Management.Automation.Language.Parser]::ParseInput((Build 'LOCAL SERVICE' 'C:\Thornswood-Docs'), [ref]$null, [ref]$null)
-$made    = @(CallsOf $sentLs 'New-ScheduledTaskPrincipal')
+# #2613: the setup script builds no principal of its own. Both come from
+# ServiceAccount.ps1, whose functions Deploy-Docs sends up in front of it.
+Yes 'the setup script builds no principal of its own (#2613)' (@(CallsOf $sentLs 'New-ScheduledTaskPrincipal').Count -eq 0)
+$shared = @(CallsOf $sentLs 'New-ThornswoodServicePrincipal')
+Yes 'it takes two from ServiceAccount.ps1: -AsSystem for -RunAs SYSTEM, and LOCAL SERVICE' (
+    $shared.Count -eq 2 -and @($shared | Where-Object { (NamesOf $_) -contains 'AsSystem' }).Count -eq 1)
+$ddText = Get-Content -LiteralPath $deploy -Raw
+Yes 'Deploy-Docs sends ServiceAccount.ps1''s functions up in front of the setup script' (
+    $ddText.Contains(". (Join-Path `$Here 'ServiceAccount.ps1')") -and
+    $ddText.Contains('$siteAccountHelpers = (Get-ThornswoodServiceAccountScript)') -and
+    $ddText.Contains('$setup = @(Remote ($siteAccountHelpers + @"'))
+Yes 'and the functions it sends define both the principal and the fail-safe' (
+    (Get-ThornswoodServiceAccountScript) -match 'function New-ThornswoodServicePrincipal' -and
+    (Get-ThornswoodServiceAccountScript) -match 'function Test-ThornswoodServiceCannotReach')
+Yes 'Deploy-Docs names no SYSTEM principal or Highest run level itself (#2613)' (
+    $ddText -notmatch "-UserId\s+'SYSTEM'|-User\s+'SYSTEM'|-RunLevel\s+Highest")
+$saAst = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $RepoPath 'scripts\deploy\ServiceAccount.ps1'), [ref]$null, [ref]$null)
+$made    = @(CallsOf $saAst 'New-ScheduledTaskPrincipal')
 $sysMade = @($made | Where-Object { $_.Extent.Text -match "-UserId 'SYSTEM'" })
 $lsMade  = @($made | Where-Object { $_.Extent.Text -notmatch "-UserId 'SYSTEM'" })
 Yes 'there are two principals, one for SYSTEM and one for any other account' (
@@ -572,16 +603,48 @@ try {
     # Folders the scratch box has, so the grants the block should give.
     $there = @($map.Values | Where-Object { Test-Path -LiteralPath $_ }).Count + 1
 
+    function IsCutP($p) {
+        return [bool]($p -and $p.UserId -match 'LOCAL SERVICE$' -and "$($p.RunLevel)" -eq 'Limited' -and
+            (@($p.RequiredPrivilege) -join ',') -eq 'SeChangeNotifyPrivilege' -and "$($p.ProcessTokenSidType)" -eq 'Unrestricted')
+    }
+    # #2613: no -RunAs is LOCAL SERVICE, for a new task and for one on SYSTEM.
     $r = Against '' $null
-    Yes 'no -RunAs and no task yet: a new task is SYSTEM, as it always was' (
-        $r.principal -and $r.principal.UserId -eq 'SYSTEM' -and "$($r.principal.RunLevel)" -eq 'Highest' -and $r.sid -eq 'S-1-5-18')
-    Yes 'and nothing is granted' ($script:icaclsCalls -eq 0)
-    Yes 'and it says which account it kept' (($r.said -join "`n") -match 'no -RunAs, so the task keeps the account it has: SYSTEM')
+    Yes 'no -RunAs and no task yet: a new task is LOCAL SERVICE, cut, not SYSTEM (#2613)' ((IsCutP $r.principal) -and $r.sid -eq 'S-1-5-19')
+    Yes 'and its folders are granted' ($script:icaclsCalls -eq $there)
+    Yes 'and it says so' (($r.said -join "`n") -match 'no -RunAs and no task yet: a new task runs as LOCAL SERVICE')
 
     $r = Against '' 'SYSTEM'
-    Yes 'no -RunAs, task on SYSTEM: it stays SYSTEM at Highest, nothing granted' (
-        $r.principal -and $r.principal.UserId -eq 'SYSTEM' -and "$($r.principal.RunLevel)" -eq 'Highest' -and
-        $r.sid -eq 'S-1-5-18' -and $script:icaclsCalls -eq 0)
+    Yes 'no -RunAs, task on SYSTEM: it moves to LOCAL SERVICE, cut, and its folders are granted (#2613)' (
+        (IsCutP $r.principal) -and $r.sid -eq 'S-1-5-19' -and $script:icaclsCalls -eq $there)
+    Yes 'no -RunAs, task on SYSTEM: it says it moves, and how to go back' (
+        ($r.said -join "`n") -match 'the task ran as SYSTEM: it moves to LOCAL SERVICE \(#2613\)\. -RunAs SYSTEM is the way back')
+
+    # -- the fail-safe (#2578), before the site leaves SYSTEM -------------------
+    # A scratch folder Users may read stands in for one no service may.
+    $secret = Join-Path $tmp 'Thornswood-Backup'
+    Put (Join-Path $secret 'x.txt') 'x'
+    $script:neverReach = @($secret)
+    $sa = Get-Acl -LiteralPath $secret
+    $sa.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($usersSid, 'ReadAndExecute',
+        [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit', [Security.AccessControl.PropagationFlags]::None, 'Allow')))
+    Set-Acl -LiteralPath $secret -AclObject $sa
+    foreach ($case in @(@('', 'SYSTEM', 'no -RunAs, task on SYSTEM'), @('', $null, 'no -RunAs, no task yet'), @('LOCAL SERVICE', 'SYSTEM', '-RunAs LOCAL SERVICE'))) {
+        $r = Against $case[0] $case[1]
+        $s = $r.said -join "`n"
+        Yes "fail-safe, $($case[2]): refused with no principal and nothing granted" ($null -eq $r.principal -and $script:icaclsCalls -eq 0)
+        Yes "fail-safe, $($case[2]): it says what could be read and the two ways on" (
+            $s -match 'LOCAL SERVICE COULD READ WHAT NO SERVICE MAY' -and $s -match [regex]::Escape($secret) -and
+            $s -match 'or pass -RunAs SYSTEM\. Nothing was stopped or changed\.')
+    }
+    $r = Against '' 'LOCAL SERVICE'
+    Yes 'fail-safe: a task already on LOCAL SERVICE is not asked again, and deploys as before' ((IsCutP $r.principal) -and $script:icaclsCalls -eq $there)
+    $r = Against 'SYSTEM' $null
+    Yes 'fail-safe: -RunAs SYSTEM is the way past it, Highest, nothing granted' (
+        $r.principal -and $r.principal.UserId -eq 'SYSTEM' -and "$($r.principal.RunLevel)" -eq 'Highest' -and $script:icaclsCalls -eq 0)
+    $whole = Build '' 'C:\Thornswood-Docs'
+    Yes 'fail-safe: the refusal returns before SETUP DONE, so Deploy-Docs stops and swaps nothing' (
+        $whole.IndexOf('Nothing was stopped or changed.''') -gt 0 -and $whole.IndexOf("'SETUP DONE'") -gt $whole.LastIndexOf('Nothing was stopped or changed.'''))
+    $script:neverReach = @()
 
     foreach ($name in @('LOCAL SERVICE', 'NT AUTHORITY\LOCAL SERVICE')) {
         $r = Against '' $name
@@ -757,10 +820,14 @@ try {
             try {
                 $r = OnTask '' 1
                 Yes 'real task: no -RunAs and no task yet registers one' ($r.said -match 'scheduled task created' -and $null -ne $r.task)
-                Yes 'real task: on SYSTEM at Highest, with no privilege list and token SID type Default' (IsSystem $r.p)
+                Yes 'real task: on LOCAL SERVICE at Limited, SeChangeNotifyPrivilege only, token SID type Unrestricted (#2613)' (IsCut $r.p)
                 Yes 'real task: with its start-up trigger, ten restarts and the action it was given' (
                     (Kept $r.task) -and (ArgsOf $r.task) -eq '/c exit 1')
-                Yes 'real task: and the read-back says SYSTEM' ($r.said -match 'task runs as SYSTEM, run level Highest')
+                Yes 'real task: and the read-back says LOCAL SERVICE' ($r.said -match 'task runs as LOCAL SERVICE, run level Limited')
+
+                # Put on SYSTEM first, so the next one moves it as a SYSTEM task on the box would be.
+                $r = OnTask 'SYSTEM' 6
+                Yes 'real task: -RunAs SYSTEM on it updates it to SYSTEM at Highest' ($r.said -match 'scheduled task updated' -and (IsSystem $r.p))
 
                 $r = OnTask 'LOCAL SERVICE' 2
                 Yes 'real task: -RunAs LOCAL SERVICE updates it without an error' (
@@ -791,8 +858,9 @@ try {
                     $r.said -match 'task runs as SYSTEM, run level Highest' -and $r.said -notmatch 'THE TASK RUNS AS')
 
                 $r = OnTask '' 5
-                Yes 'real task: and a deploy without -RunAs after that keeps SYSTEM' (
-                    $r.said -match 'keeps the account it has: SYSTEM' -and (IsSystem $r.p) -and (ArgsOf $r.task) -eq '/c exit 5')
+                Yes 'real task: and a deploy without -RunAs after that moves it back to LOCAL SERVICE, cut (#2613)' (
+                    $r.said -match 'it moves to LOCAL SERVICE' -and (IsCut $r.p) -and (ArgsOf $r.task) -eq '/c exit 5' -and
+                    $r.said -notmatch 'COULD NOT UPDATE')
             }
             finally {
                 Unregister-ScheduledTask -TaskName $scratchTask -Confirm:$false -ErrorAction SilentlyContinue
