@@ -292,8 +292,9 @@ different servers stitched together.
 | Server Booster | pink | Boosted the server. Discord's own role, never made here |
 | Playtester | copper | Tests the builds |
 | Milk Drinker, Talos Worshiper, Thalmor Boot-Licker | | The three Patreon tiers |
-| Jarl of *hold* | bright gold | Holds that hold. Nine of them, one each |
+| Jarl of *hold* | bright gold | Holds that hold. Ten of them, one each: the nine holds and Raven Rock |
 | Citizen of *hold* | slate | Where your character lives |
+| *Hold* Court, Steward of *hold*, Guard of *hold* | tan | The offices that hold's Jarl gives (#2551): an officer at its drop box; its Steward; its Guards. Three for each of the nine holds and Raven Rock, never hoisted, so they never show as a group of their own. In the game one character of the account holds each |
 | Member | grey | Given by staff after an application is accepted |
 | Banned | grey | What the site keys a ban off. No permissions, not hoisted |
 | Patreon, News Pings, Updates Pings | | Made by Patreon and by the bot, never here. They are in the builder's list for their place in the order and nothing else |
@@ -328,9 +329,29 @@ Staff roles are job titles on purpose. Thane, Steward, Warden and Housecarl are
 all things somebody should be able to play, and a moderator wearing one makes
 every in-world use of the word ambiguous.
 
-The hold roles grant nothing at all. Somebody playing a Jarl still needs Member
-to get through the door, which means a Jarl can be banned like anyone else
-without unpicking their title first.
+The hold roles grant nothing in Discord. Somebody playing a Jarl still needs
+Member to get through the door, which means a Jarl can be banned like anyone
+else without unpicking their title first. In the game they are the offices
+(#2551): the site reads them with the other roles, and the game reads the
+Jarl, the Court, the Steward and the Guards of each hold from them and
+nothing else. The builder never deletes any of them (KEEP). The running bot
+makes any Jarl or office role that is missing when it starts
+(`ensure_office_roles`), so they exist without a build, which would ask for
+the token at a prompt. In the game the office is held by one character of the
+account: the one the Jarl named there, or the one its holder chooses on the
+Office page of K.
+
+The office panel is a second message in `#choose-your-hold`, under the hold
+panel: Add and Remove beside the Court, the Steward and the Guard. They work
+only for whoever holds a hold's Jarl role, and only for that hold. Add asks
+who, Remove offers who holds it, and the bot gives or takes the role with the
+reason in Discord's audit log. If two accounts hold the same hold's Jarl
+role, neither can use it until staff take it from all but one. Each change is
+said in the staff channel with who changed what (`office_change`). A Jarl's
+change from the game's Office page is made by the site with the bot's token
+and comes to the same channel through the site's `moderation.log`, and so do
+two accounts holding one Jarl role and the end of that (`office_text`).
+`test-2551-hold-offices.py` holds the roles and the panel.
 
 Eighteen hold roles sounds like a lot for a small server. Discord only shows a
 hoisted group in the member list when somebody in it is online, so the empty

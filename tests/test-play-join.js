@@ -255,6 +255,8 @@ async function allowed(table, over) {
     // Staff bans kept on the site (#412); none here. test-staff-bans.js runs them.
     activeBans: function () { return []; },
     pkProfiles: function () { return []; },
+    // The hold offices (#2551); none here. test-2551-hold-offices.js runs them.
+    officesForDoor: async function () { return []; },
     sendJson: null
   });
 }

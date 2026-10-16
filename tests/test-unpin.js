@@ -151,12 +151,14 @@ function engine(startGold) {
 function boot(dir, eng) {
   const body = [
     'var claims = {};',
-    'var stewards = [];',
     // The master key counter save() writes beside the claims (#2254).
     'var masterCut = 0;',
-    // Nobody guards this board; a guard's take down (#502) is
-    // tests/test-502-guard-board.js.
+    // Nobody guards this board, keeps it or is its Jarl; a guard's take down
+    // (#502) is tests/test-502-guard-board.js, the offices (#2551)
+    // tests/test-2551-hold-offices.js.
     'function isGuard() { return false; }',
+    'function isJarlOf() { return false; }',
+    'function isStewardOf() { return false; }',
     'var boxes = loadPart(\'boxes\', {});',
     'var dropbox = loadPart(\'dropbox\', {});',
     'var funds = loadPart(\'funds\', {});',

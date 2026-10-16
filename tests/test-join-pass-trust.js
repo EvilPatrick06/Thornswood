@@ -302,7 +302,9 @@ section(function () {
   yes('the door is in gamemode.js between its markers', d0 >= 0 && d1 > d0);
   const files = {};
   files[path.join('private', 'allowed.json')] = JSON.stringify({ enforce: false, profiles: [500, 501], devProfiles: [500],
-    adminProfiles: [500], staffRoleProfiles: [500], jarlProfiles: [500],
+    adminProfiles: [500], staffRoleProfiles: [500],
+    // The hold offices by profile (#2551), from the Discord roles.
+    offices: { 500: { jarl: ['whiterun'], court: [], steward: [], guard: ['riften'] } },
     devRoleProfiles: [500], businessOwnerProfiles: [500], factionOwnerProfiles: [500] });
   const fakeFs = {
     readFileSync: function (p) { if (!Object.prototype.hasOwnProperty.call(files, p)) { const e = new Error('ENOENT'); e.code = 'ENOENT'; throw e; } return files[p]; },
@@ -324,12 +326,20 @@ section(function () {
   try { vm.runInContext(src.slice(d0, d1), box, { filename: 'gamemode.js (door)' }); } catch (e) { ran = false; console.log('      ' + e); }
   yes('the door block runs over a stand-in server', ran && typeof box.__thornswoodIsDev === 'function');
   if (ran && typeof box.__thornswoodIsDev === 'function') {
-    const asks = ['__thornswoodIsDev', '__thornswoodIsAdmin', '__thornswoodHoldsStaffRole', '__thornswoodIsJarl', '__thornswoodIsAllowed'];
+    const asks = ['__thornswoodIsDev', '__thornswoodIsAdmin', '__thornswoodHoldsStaffRole', '__thornswoodIsAllowed'];
     const list = asks.filter(function (n) { return typeof box[n] === 'function'; });
-    yes('all five role answers are there (' + list.length + ')', list.length === 5);
-    yes('none of them is yes for a profile the pass has not proved', list.every(function (n) { return box[n](500) === false; }));
+    // The hold offices (#2551) replace the Jarl answer: one answer, every office.
+    const offices = function () {
+      const o = typeof box.__thornswoodOffices === 'function' ? box.__thornswoodOffices(500) : null;
+      return !!o && o.jarl.join() === 'whiterun' && o.guard.join() === 'riften';
+    };
+    yes('all four role answers and the hold offices are there (' + list.length + ')',
+        list.length === 4 && typeof box.__thornswoodOffices === 'function');
+    yes('none of them is yes, and no office is held, for a profile the pass has not proved',
+        list.every(function (n) { return box[n](500) === false; }) && !offices());
     trusted[500] = true;
-    yes('every one is yes for the same profile once proved', list.every(function (n) { return box[n](500) === true; }));
+    yes('every one is yes, and the offices are there, for the same profile once proved',
+        list.every(function (n) { return box[n](500) === true; }) && offices());
     trusted[501] = true;
     yes('and a proved profile still needs the role itself', box.__thornswoodIsAdmin(501) === false && box.__thornswoodIsAllowed(501) === true);
   }

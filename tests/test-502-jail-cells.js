@@ -7,11 +7,14 @@
   will be players no NPC guards".
 
   The real property block runs over a pretend engine with the real door,
-  building and jail tables out of the gamemode, and a law register with a
-  guard of Whiterun and a guard of Riften in it. It checks:
+  building and jail tables out of the gamemode, a guard of Whiterun and a
+  guard of Riften (each by their Discord role since #2551, which the door
+  hands the block as __thornswoodOffices), and a law register written before
+  #2551, still carrying guards and a Jarl's seat. It checks:
     - the jail table: ten holds, every jail door a door of its jail building
       and a way out of it, and game/data/jails.json saying the same;
-    - the register is read, and a row that is not a guard or a cell dropped;
+    - the register is read, a row that is not a cell dropped, and the old
+      guards and seat neither read nor written back;
     - at a cell door the lock key offers the cell to a guard of that hold and
       to nobody else, and only a guard of that hold turns it;
     - what each person's game is told: the cells a guard locked are shut to
@@ -138,9 +141,13 @@ fs.writeFileSync(path.join(dir, 'private', 'property.json'), JSON.stringify({ cl
   [JAIL]: { by: 909, name: 'Somebody', at: clock.t, touched: clock.t, locked: true }
 } }));
 const bogusCell = '999999:Skyrim.esm';
+// Written before #2551: guards and a Jarl's seat, which the roles replace.
 fs.writeFileSync(path.join(dir, 'private', 'law.json'), JSON.stringify({
-  guards: { '101': 'whiterun', '202': 'riften', '505': 'narnia', 'x': 'whiterun' },
-  cells: { [bogusCell]: true }
+  guards: { '101': 'whiterun', '202': 'riften', '303': 'whiterun', 'x': 'whiterun' },
+  jarls: { whiterun: { pid: 404, actor: 0xff000404, name: 'Ysolda', at: 1 } },
+  cells: { [bogusCell]: true },
+  // Which character holds each office (#2551): the two guards.
+  held: { 'guard:whiterun': { 'p:101': { pid: 101, name: 'Hrongar' } }, 'guard:riften': { 'p:202': { pid: 202, name: 'Maul' } } }
 }));
 function inDir(f) {
   const was = process.cwd();
@@ -181,7 +188,12 @@ function boot() {
     guard: function (n, f) { return f; },
     setInterval: function () { return 1; }, clearInterval: function () { },
     log: function () { },
-    __thornswoodCharacter: { stateOf: function () { return { prof: 'cook' }; }, writeState: function () { } }
+    __thornswoodCharacter: { stateOf: function () { return { prof: 'cook' }; }, writeState: function () { } },
+    // The Guard of Whiterun and Guard of Riften roles (#2551).
+    __thornswoodOffices: function (pid) {
+      return { jarl: [], court: [], steward: [],
+               guard: pid === GUARD_W.pid ? ['whiterun'] : (pid === GUARD_R.pid ? ['riften'] : []) };
+    }
   };
   box.globalThis = box;
   inDir(function () { vm.runInNewContext(propBlock, box, { filename: 'gamemode.js property' }); });
@@ -195,14 +207,14 @@ yes('the property block runs and publishes the guards and cells', !!W && typeof 
 if (!W) { done(); }
 
 // ------------------------------------------------------------ the register
-const g0 = W.guards();
-yes('R1 the register\'s two guards are read, each with their hold',
-    g0['101'] === 'whiterun' && g0['202'] === 'riften');
-yes('R2 a guard of no hold and a guard with no profile are dropped', !g0['505'] && Object.keys(g0).length === 2);
+yes('R1 the two guards are guards by their roles, each of their hold',
+    W.guardHoldsOf(101).join() === 'whiterun' && W.guardHoldsOf(202).join() === 'riften');
+yes('R2 a guard the old register names and no role does is nobody (#2551)',
+    !W.isGuard(303, 'whiterun') && W.guardHoldsOf(303).length === 0);
 yes('R3 and a cell that is not a jail door', W.cellLocked(bogusCell) === false && W.jailHoldOf(bogusCell) === null);
 yes('R4 the log says what was read and what was dropped',
-    S.logged.some(function (l) { return /law: dropped 3 row\(s\)/.test(l); }) &&
-    S.logged.some(function (l) { return /law: read 2 guard\(s\), 0 cell door\(s\) a guard has turned, and 0 seated Jarl\(s\)/.test(l); }));
+    S.logged.some(function (l) { return /law: dropped 1 row\(s\) that were not a cell door or a held office/.test(l); }) &&
+    S.logged.some(function (l) { return /law: read 0 cell door\(s\) a guard has turned, and 2 office\(s\) held by a character/.test(l); }));
 yes('R5 a guard is a guard of their own hold and no other',
     W.isGuard(101, 'whiterun') && !W.isGuard(101, 'riften') && !W.isGuard(303, 'whiterun') && !W.isGuard(0, 'whiterun'));
 
@@ -308,8 +320,9 @@ W = S.W;
 yes('S1 after a restart the cell is still locked and the guards are still guards',
     W.cellLocked(CELL) === true && W.cellLocked(CELL2) === true && W.isGuard(101, 'whiterun') && W.isGuard(202, 'riften'));
 const saved = JSON.parse(fs.readFileSync(path.join(dir, 'private', 'law.json'), 'utf8'));
-yes('S2 the register on disk is the guards and the one cell a guard turned',
-    saved.cells[CELL] === true && Object.keys(saved.cells).length === 1 && saved.guards['101'] === 'whiterun');
+yes('S2 the register on disk is the one cell a guard turned and who holds the offices, and the old guards and seat are gone (#2551)',
+    saved.cells[CELL] === true && Object.keys(saved.cells).length === 1 && !saved.guards && !saved.jarls &&
+    Object.keys(saved).join() === 'cells,held' && saved.held['guard:whiterun']['p:101'].pid === 101);
 yes('S3 property.json was not touched by any of it', !JSON.parse(fs.readFileSync(path.join(dir, 'private', 'property.json'), 'utf8')).guards);
 
 done();
