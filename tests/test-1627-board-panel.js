@@ -91,7 +91,7 @@ function fn(name) {
   return b < 0 ? null : prop.slice(a + 1, b + 4);
 }
 
-const NAMES = ['takeGold', 'payOut', 'payHeld', 'sealed', 'nameIs', 'post', 'board', 'take',
+const NAMES = ['takeGold', 'payOut', 'payHeld', 'sealed', 'nameIs', 'postWords', 'post', 'board', 'take',
                'jobsOf', 'dropJob', 'takedown', 'unpin', 'postLetter', 'deliver', 'letterReach',
                'boardHere', 'nearestBoard', 'wallOf', 'boardPanel', 'boardsView', 'moveBoard', 'command',
                'haulTenth', 'haulText'];
@@ -291,8 +291,9 @@ attempt('J\'s Boards tab', function () {
       before.read === null && before.jobs === null);
 
   // A wall in Whiterun: twelve notices, a job, a letter, one taken down.
-  for (let i = 1; i <= 11; i++) { s.say(ALICE, '/notice Notice ' + i); }
-  s.say(ALICE, '/job Clear the cellar');
+  // A post has a title and a body, and a job a reward (#2554).
+  for (let i = 1; i <= 11; i++) { s.say(ALICE, '/notice Notice ' + i + ' :: Notice number ' + i + '.'); }
+  s.say(ALICE, '/job 5 Clear the cellar :: Rats, and a lot of them.');
   s.say(ALICE, '/unpin 11');
   yes('J2 the wall was put up at the board', s.notices().whiterun.length === 12 && !!s.notices().whiterun[10].down);
   s.say(BOB, '/take 12');
@@ -309,7 +310,8 @@ attempt('J\'s Boards tab', function () {
   yes('J5 the wall is the newest ten still up, numbered by their real place, with the gap kept',
       ns === '12,10,9,8,7,6,5,4,3,2' && v.read.older === 1);
   yes('J6 a job says who took it', v.read.wall[0].job === true && v.read.wall[0].taken === 'Bob' &&
-      v.read.wall[0].text === 'Clear the cellar' && v.read.wall[0].name === 'Alice');
+      v.read.wall[0].title === 'Clear the cellar' && v.read.wall[0].text === 'Rats, and a lot of them.' &&
+      v.read.wall[0].reward === 5 && v.read.wall[0].name === 'Alice');
 
   const where = s.say(CYRUS, '/board');
   yes('J7 /board alone reads nothing into the chat and says where the boards are',
@@ -324,9 +326,9 @@ attempt('J\'s Boards tab', function () {
 
   // Bob reads another town; his jobs are under it, from every town.
   w.move(BOB, RIFTEN_WORLD, s.boards.riften.pos);
-  s.say(ALICE, '/notice nothing');   // Alice is still in Whiterun.
+  s.say(ALICE, '/notice nothing :: nothing');   // Alice is still in Whiterun.
   w.move(ALICE, RIFTEN_WORLD, s.boards.riften.pos);
-  s.say(ALICE, '/job Guard the gate');
+  s.say(ALICE, '/job 5 Guard the gate :: Until the bells.');
   s.say(BOB, '/take 1');
   w.move(BOB, TAMRIEL, FAR);
   s.say(BOB, '/board solitude');
@@ -349,11 +351,11 @@ attempt('the board panel', function () {
   const w = world();
   [ALICE, BOB, CYRUS].forEach(w.add);
   const s = boot({}, w);
-  s.say(ALICE, '/job Fetch firewood');
+  s.say(ALICE, '/job 5 Fetch firewood :: Ten logs, split.');
   s.say(BOB, '/take 1');
-  for (let i = 1; i <= 11; i++) { s.say(ALICE, '/notice Notice ' + i); }
+  for (let i = 1; i <= 11; i++) { s.say(ALICE, '/notice Notice ' + i + ' :: Notice number ' + i + '.'); }
   w.move(ALICE, RIFTEN_WORLD, s.boards.riften.pos);
-  s.say(ALICE, '/job Guard the gate');
+  s.say(ALICE, '/job 5 Guard the gate :: Until the bells.');
   w.move(BOB, RIFTEN_WORLD, s.boards.riften.pos);
   s.say(BOB, '/take 1');
   w.move(BOB, WHITERUN_WORLD, WHITERUN);
@@ -364,7 +366,10 @@ attempt('the board panel', function () {
   const mine = panel.jobs.map(function (j) { return j.hold + ' ' + j.n; }).sort().join(',');
   yes('P2 Your jobs on the panel still has it, and Riften\'s too, with where each one is',
       mine === 'riften 1,whiterun 1' &&
-      panel.jobs.some(function (j) { return j.hold === 'riften' && j.where === 'Riften' && j.text === 'Guard the gate'; }));
+      panel.jobs.some(function (j) {
+        return j.hold === 'riften' && j.where === 'Riften' && j.title === 'Guard the gate' &&
+               j.text === 'Until the bells.' && j.reward === 5;
+      }));
   const back = s.say(BOB, '/dropjob 1');
   yes('P3 Put it back on that row hands it back at this board', /You put it back on the board/.test(back) &&
       !s.notices().whiterun[0].taken);
@@ -395,7 +400,8 @@ attempt('the panels', function () {
   yes('U3 and the line that counts the older ones', /var older = Number\(b\.older\) \|\| 0;/.test(page) &&
       /older ones are/.test(page));
   yes('U4 the panel still posts, takes and takes down with its buttons',
-      page.indexOf("net('/notice ") !== -1 && page.indexOf("net('/job ") !== -1 &&
+      page.indexOf("line = '/notice ' + slashTitle(title)") !== -1 &&
+      page.indexOf("line = '/job ' + Number(reward) + ' ' + slashTitle(title)") !== -1 && page.indexOf('net(line);') !== -1 &&
       page.indexOf("net('/take ") !== -1 && page.indexOf("net('/unpin ") !== -1);
   yes('U5 J lists the towns under Boards and picking one sends /board and the town',
       /'<h3>Boards<\/h3>'/.test(journal) && /data-board="/.test(journal) &&
