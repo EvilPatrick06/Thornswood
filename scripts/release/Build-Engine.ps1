@@ -305,10 +305,20 @@ $solution = Join-Path $build 'ALL_BUILD.vcxproj'
 # LNK2019 until somebody configured by hand. Given only the build folder,
 # cmake takes the source, the generator and every setting from the cache, so
 # nothing is rebuilt in vcpkg; it took 16 s on One.
+# vcpkg runs its applocal.ps1 after each link through the PowerShell its
+# toolchain found at the first configure, kept in the cache. find_program
+# turns the Store's pwsh alias into the version's own folder
+# (WindowsApps\Microsoft.PowerShell_7.6.6.0_x64__...), and a Store update
+# removes that folder: on 15 Oct 7.6.6 became 7.6.7 and every link stopped
+# with "The system cannot find the path specified" (MSB3073, exit 3). So the
+# build is given the pwsh this machine runs by the path Get-Command names,
+# the alias itself, which stays put across updates, on every configure.
+$vcpkgPwsh = Get-Command pwsh -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
+$pwshArg = @(if ($vcpkgPwsh) { "-DZ_VCPKG_POWERSHELL_PATH=$vcpkgPwsh" })
 if ((Test-Path -LiteralPath $solution) -and $Check) { Ok "already configured: $build; this run would generate it again over its cache, so a source file the fork added is built" }
 elseif (Test-Path -LiteralPath $solution) {
     Say '  already configured; generating again over its cache, so a source file the fork added since is in the build'
-    $code = Run $cmake $build
+    $code = Run $cmake @pwshArg $build
     if ($code -ne 0) { Die "cmake exited with $code generating $build again over its cache. The first error above is usually the real one." }
     Ok "generated again: $build"
 }
@@ -317,7 +327,7 @@ elseif ($Check) { Miss "$build is not configured; this run would configure it (t
 else {
     $toolchain = Join-Path $Fork 'vcpkg\scripts\buildsystems\vcpkg.cmake'
     Say '  configuring. The first time builds every vcpkg library; expect it to take a long while.'
-    $code = Run $cmake -S $Fork -B $build -G 'Visual Studio 17 2022' -A x64 "-DCMAKE_TOOLCHAIN_FILE=$toolchain" '-DVCPKG_TARGET_TRIPLET=x64-windows-sp' '-DOFFLINE_MODE=ON' '-DBUILD_CLIENT=ON' '-DBUILD_SKYRIM_PLATFORM=ON' "-DSKYRIM_DIR=$SkyrimDir"
+    $code = Run $cmake -S $Fork -B $build -G 'Visual Studio 17 2022' -A x64 "-DCMAKE_TOOLCHAIN_FILE=$toolchain" '-DVCPKG_TARGET_TRIPLET=x64-windows-sp' '-DOFFLINE_MODE=ON' '-DBUILD_CLIENT=ON' '-DBUILD_SKYRIM_PLATFORM=ON' "-DSKYRIM_DIR=$SkyrimDir" @pwshArg
     if ($code -ne 0) { Die "cmake configure exited with $code. The first error above is usually the real one." }
     Ok 'configured'
 }
