@@ -264,7 +264,9 @@ repository folder, as docs\RESTORING.md "The box is gone" says.
     carries the backup, the passphrase file and the restore scripts to the new
     box; puts back both worlds (Restore-Server.ps1) and the site's data,
     config, uploads and feed store, the bot's settings and join record and the
-    Caddyfile (vps-restore-services.ps1); and deletes its copy from the box
+    Caddyfile (vps-restore-services.ps1); removes again everybody in the
+    record of deletion requests, the backup's merged into the box's
+    (Delete-Person.ps1 -Reapply, #2351); and deletes its copy from the box
     again. It should end `RESTORE BOX OK`. A `GAMEMODE DIFFERS` line means
     step 6 installed a gamemode the old box was not running: ask Patrick
     before step 16.

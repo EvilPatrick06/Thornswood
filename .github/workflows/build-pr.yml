@@ -319,6 +319,10 @@ jobs:
           # stand-in server in a temp folder: the roll, the cut, the exit code
           # handed back, the server ending with the writer, and the privacy
           # page saying it. A few seconds.
+          # Issue #2351: tests\test-2351-delete-person.ps1 runs the real
+          # Delete-Person.ps1 under Windows PowerShell 5.1 on stand-ins of
+          # every store in a temp folder: the dry run, the deletion, the
+          # record and its reapply after a restore. About half a minute.
           $six ='test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
@@ -535,6 +539,7 @@ jobs:
                  'test-member-role-wording.js',
                  'test-page-changed.js',
                  'test-2349-server-log.js',
+                 'test-2351-delete-person.ps1',
                  'test-missing-files-stop.ps1',
                  'test-ship-launcher-drift.ps1',
                  'test-client-by-hash.ps1',
