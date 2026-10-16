@@ -15,6 +15,10 @@ namespace Thornswood
         static bool selfUpdateOffered;
         static bool retryQueued;
         static bool checkingInPlay = false;
+        // #2440: one long-poll tip to /feed/watch while the shell is up.
+        static bool feedWatchStarted;
+        static volatile bool feedWatchStop;
+
         // Said once in launcher.log, not every thirty seconds: which feed the
         // checks read, and the first in play check that could not be made.
         // Both were invisible before (#445): the address was nowhere in the
@@ -25,6 +29,50 @@ namespace Thornswood
         static bool inPlayFailSaid;
         static bool notChangedSaid;
 
+        /// <summary>
+        /// Keeps one long-poll open against the site's /feed/watch (#2440).
+        /// When the tip says the feed moved, runs the same full check the
+        /// start path uses, so an open launcher shows a Ship without Restart
+        /// or Check now. Started once; stopped when the window closes.
+        /// </summary>
+        static void StartFeedWatch()
+        {
+            if (feedWatchStarted) return;
+            feedWatchStarted = true;
+            feedWatchStop = false;
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                int failSleep = 5000;
+                LogOnly("Watching " + Updater.WatchUrl(cfg) + " for a release while this launcher stays open.");
+                while (!feedWatchStop)
+                {
+                    try
+                    {
+                        bool changed = Updater.WaitForFeedChange(cfg);
+                        failSleep = 5000;
+                        if (feedWatchStop) break;
+                        if (changed)
+                        {
+                            LogOnly("The update feed tip said the feed moved; checking now.");
+                            CheckUpdatesBackground(false);
+                        }
+                        // 204 / timeout: tip again immediately.
+                    }
+                    catch (Exception ex)
+                    {
+                        if (feedWatchStop) break;
+                        LogOnly("The update feed tip could not be kept open (" + ex.Message + "). Trying again in " + (failSleep / 1000) + " seconds.");
+                        Thread.Sleep(failSleep);
+                        failSleep = Math.Min(failSleep * 2, 60000);
+                    }
+                }
+            });
+        }
+
+        static void StopFeedWatch()
+        {
+            feedWatchStop = true;
+        }
         static void CheckUpdatesBackground(bool loud)
         {
             try

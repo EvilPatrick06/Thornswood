@@ -499,6 +499,7 @@ namespace Thornswood
             // Always: config.json cannot switch the check off (#937), and Play
             // stays shut until it has answered (Updater.FeedUrl).
             ThreadPool.QueueUserWorkItem(delegate { CheckUpdatesBackground(false); });
+            StartFeedWatch();
 
             /*
               Voice comes up with the launcher, not with the game.
@@ -575,7 +576,7 @@ namespace Thornswood
             */
             var app = new Application();
             app.ShutdownMode = ShutdownMode.OnMainWindowClose;
-            app.Exit += delegate { Voice.Stop(); try { Presence.Stop(); } catch (Exception ex) { Swallow.Note("Shell.Run, dispose", ex); } try { Hold.Release(); } catch (Exception ex) { Swallow.Note("Shell.Run, dispose", ex); } };
+            app.Exit += delegate { StopFeedWatch(); Voice.Stop(); try { Presence.Stop(); } catch (Exception ex) { Swallow.Note("Shell.Run, dispose", ex); } try { Hold.Release(); } catch (Exception ex) { Swallow.Note("Shell.Run, dispose", ex); } };
 
             // A fault on the launcher's own thread used to take the window
             // down with no line in the log, or leave it standing and deaf.
