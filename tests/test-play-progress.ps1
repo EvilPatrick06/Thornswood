@@ -254,6 +254,40 @@ namespace Thornswood
             PlayProgress.End();
             Yes("the second puts it back", !bar.Active);
 
+            // ---- an update downloading while the folder is prepared (#2210) --
+            PlayProgress.FolderFirst(true);
+            PlayProgress.Begin("Preparing the game folder", 0);
+            PlayProgress.Files("Preparing the game folder", 300, 1000);
+            Is("the folder has the button", "Preparing the game folder 30%, 300 of 1,000 files");
+            var update = new System.Threading.Thread(delegate()
+            {
+                PlayProgress.Second(true);
+                PlayProgress.Begin("Updating", 1);
+                PlayProgress.Part(5 * MB, 20 * MB);
+                PlayProgress.Bytes("Updating", 5 * MB, 20 * MB);
+                PlayProgress.Second(false);
+            });
+            update.Start(); update.Join();
+            Is("the update's reports beside it stay off the button", "Preparing the game folder 30%, 300 of 1,000 files");
+            PlayProgress.Files("Preparing the game folder", 1000, 1000);
+            PlayProgress.FolderFirst(false);
+            PlayProgress.End();
+            Yes("the folder done, the update still holds the button", bar.Active);
+            update = new System.Threading.Thread(delegate()
+            {
+                PlayProgress.Second(true);
+                PlayProgress.Part(10 * MB, 20 * MB);
+                PlayProgress.Second(false);
+            });
+            update.Start(); update.Join();
+            Is("then the update shows itself with its next report", "Updating 50%, 10 of 20 MB");
+            PlayProgress.FolderFirst(true);
+            PlayProgress.Bytes("Updating", 15 * MB, 20 * MB);
+            Is("a thread not marked second still shows", "Updating 75%, 15 of 20 MB");
+            PlayProgress.FolderFirst(false);
+            PlayProgress.End();
+            Yes("and the last End puts the button back", !bar.Active);
+
             // ---- a failure ---------------------------------------------------
             PlayProgress.Begin("Updating", 1);
             PlayProgress.Part(10 * MB, 20 * MB);
@@ -361,7 +395,9 @@ Yes 'Sync: packs after a record without its files are planned as downloads' ($sy
 $su = Read-Text (Join-Path $AppDir 'ShellUpdate.cs')
 $run = Body $su 'static void RunUpdate()'
 Yes 'RunUpdate opens the button with one download per pack' ($run -match 'PlayProgress\.Begin\("Updating", downloads\)')
-Yes 'RunUpdate: the self-update is its own phase' ($run -match 'PlayProgress\.Plan\("Updating the launcher", 1, "updates"\)')
+$stages = Read-Text (Join-Path $AppDir 'UpdateStages.cs')
+Yes 'the update''s download: the self-update is its own phase' ((Body $stages 'public static Fetched FetchUpdate(') -match 'PlayProgress\.Plan\("Updating the launcher", 1, "updates"\)')
+Yes 'RunUpdate marks its thread second, so a folder being prepared keeps the button (#2210)' ($run -match 'PlayProgress\.Second\(true\);' -and $run -match 'finally \{ PlayProgress\.Second\(false\); \}')
 Yes 'RunUpdate closes it when it finishes and when it fails, before DrawStatus' (([regex]::Matches($run, 'PlayProgress\.End\(\);\s*(updatePending = false;\s*)?DrawStatus\(\)')).Count -eq 2)
 
 $sog = Read-Text (Join-Path $AppDir 'ShellOwnGame.cs')
@@ -370,7 +406,9 @@ $sog = Read-Text (Join-Path $AppDir 'ShellOwnGame.cs')
 # bring-up-to-date Play asked for has finished.
 $start = Body $sog 'static void StartOwnGame(bool make, bool loud, Action then)'
 Yes 'StartOwnGame opens the button' ($start -match 'PlayProgress\.Begin\(OwnGame\.Phase, 0\)')
-Yes 'StartOwnGame closes it as soon as the work is over' ($start -match 'ownGameBusy = false;\s*PlayProgress\.End\(\);')
+$work = Body $sog 'static void FolderWork('
+Yes 'the folder work closes it as soon as the work is over' ($work -match 'ownGameBusy = false;\s*PlayProgress\.End\(\);')
+Yes 'the folder work holds the button while it runs and lets go before it finishes (#2210)' ($work -match 'PlayProgress\.FolderFirst\(true\);' -and $work -match 'PlayProgress\.FolderFirst\(false\);\s*try\s*\{\s*win\.Dispatcher\.BeginInvoke')
 
 $og = Read-Text (Join-Path $AppDir 'OwnGame.cs')
 Yes 'OwnGame: the phase is "Preparing the game folder"' ($og -match 'public const string Phase = "Preparing the game folder";')

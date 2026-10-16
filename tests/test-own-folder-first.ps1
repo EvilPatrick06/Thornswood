@@ -360,6 +360,15 @@ namespace Thornswood
         }
         static string J(string s) { return s.Replace("\\", "\\\\").Replace("\"", "\\\""); }
 
+        // The time Vortex's record gives a file is the file's own write time
+        // in milliseconds, as Vortex writes it; a refresh compares it with the
+        // last record's to tell which files moved (#2210).
+        static string VortexTime(string staged)
+        {
+            if (!File.Exists(staged)) return "1";
+            return ((long)(File.GetLastWriteTimeUtc(staged) - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds).ToString();
+        }
+
         static Dictionary<string, string> Snap(string dir)
         {
             var d = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -450,7 +459,7 @@ namespace Thornswood
                 if (!File.Exists(staged)) Put(staged, files[i][2]);
                 string at = Path.Combine(s.Game, "Data\\" + files[i][0]);
                 if (!File.Exists(at)) { Directory.CreateDirectory(Path.GetDirectoryName(at)); CreateHardLink(at, staged, IntPtr.Zero); }
-                sb.Append("    { \"relPath\": \"" + J(files[i][0]) + "\", \"source\": \"" + J(files[i][1]) + "\", \"target\": \"\", \"time\": 1 }" + (i + 1 < files.Length ? "," : "") + "\n");
+                sb.Append("    { \"relPath\": \"" + J(files[i][0]) + "\", \"source\": \"" + J(files[i][1]) + "\", \"target\": \"\", \"time\": " + VortexTime(staged) + " }" + (i + 1 < files.Length ? "," : "") + "\n");
             }
             sb.Append("  ]\n}\n");
             string rec = Path.Combine(s.Game, "Data\\vortex.deployment.json");

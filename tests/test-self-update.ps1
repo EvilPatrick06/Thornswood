@@ -77,8 +77,11 @@ $haveSwap = Test-Path -LiteralPath $swapCs
 Yes 'launcher\app\SelfSwap.cs exists' $haveSwap
 
 $upd = Get-Content -LiteralPath (Join-Path $App 'Updater.cs') -Raw
-$at = $upd.IndexOf('public static void SelfUpdate(')
-Yes 'Updater.SelfUpdate is there' ($at -ge 0)
+# Since #2210 SelfUpdate is FetchLauncher then SwapIn, so an update can
+# download while the game folder is prepared; SwapIn is what writes the script.
+Yes 'Updater.SelfUpdate is FetchLauncher then SwapIn' ($upd -match 'public static void SelfUpdate\(Config cfg, VersionDoc v, Action<string> log\)\s*\{\s*SwapIn\(FetchLauncher\(cfg, v, log\), log\);\s*\}')
+$at = $upd.IndexOf('public static void SwapIn(')
+Yes 'Updater.SwapIn is there' ($at -ge 0)
 $body = ''
 if ($at -ge 0) {
     # To the brace that closes the method, at its own indentation.
