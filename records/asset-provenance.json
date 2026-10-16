@@ -522,17 +522,17 @@
     },
     {
       "path": "game/content/Thornswood-Last.esp",
-      "sha256": "7457d64514b9cf122e805681732c7f850e41f50dbc6690f6960d3df6a47f44d7",
-      "what": "The light plugin that loads last (#2468): 6,757 cut placed actors overridden initially disabled, with their cells and worldspaces copied exactly from the plugin that wins each, and 2,211 vanilla quests stopped. 5,922,590 bytes. On 12 Oct no release carries it: Ship-Rules.ps1 does not name it and it is not in the servers' load order yet.",
-      "published": "not yet: it ships once it is put in the load order",
+      "sha256": "0c57943b5db6bda31e5186159501d3879b219fc5f0521b94225475c73035dcf4",
+      "what": "The light plugin that loads last (#2468): 6,757 cut placed actors overridden initially disabled, with their cells and worldspaces copied exactly from the plugin that wins each, 2,226 vanilla quests and 16 of the collection's mod quests with gate, door or arrival talk stopped. 5,984,128 bytes on 15 Oct.",
+      "published": "Every pack and the installer on both channels, and handed out by both game servers, since #2486 (Patrick, 12 Oct: it ships from the repository like the content plugin)",
       "source": "Built by scripts\\mods\\Build-LastPlugin.py from the load order's own plugins (Skyrim's and the collection's), as overrides of their records",
       "creator": "Built here; the records it overrides and copies are those plugins' authors'",
-      "licence": "not recorded: the permissions of the collection plugins whose cell and worldspace records it copies were not read",
+      "licence": "not recorded: it carries whole records (cells, worldspaces, quests) copied from the plugins that win them, among its 32 masters (game\\data\\last-plugin.json): Skyrim's five and RaceCompatibility.esm, JKs Skyrim.esp, JK's Castle Volkihar.esp, WindhelmSSE.esp, JK's Markarth Outskirts.esp, JK's Whiterun's Outskirts.esp, The Great City of Solitude.esp, Riften Expansion.esp, Odin - Skyrim Magic Overhaul.esp, MoreCraftableEquipment.esp, AnotherOakwood.esp, aaaGraniteHill.esp, ElysiumEstate.esp, FishingInSkyrim.esp, Populated Cities Towns Villages Legendary.esp, SkyrimSewers.esp, Solitude Arena.esp, CFTO.esp, Arena - Markarth Side.esp, Immersive Weapons.esp, DIS_Heavy_Legion.esp, OarsRest.esp, North Keep.esp, Immersive Patrols II.esp, YokuWeapons.esp, Skyrim Unbound.esp, Water for ENB (Shades of Skyrim).esp; their permissions for handing on overrides of their records were not read",
       "attribution": "not recorded",
-      "approved": "not recorded: Patrick decides the 63 quests kept (game\\data\\last-plugin-policy.json)",
-      "evidence": "Commit f32f3364 (#2482); docs\\NPC-SERVER-ACTIVITY.md; tests\\test-2468-last-plugin.js.",
-      "status": "not-published",
-      "ask": "Whoever puts it in the load order: list which plugins' records it copies and read their permissions for redistributing overrides, before the first release that carries it."
+      "approved": "Patrick, 12 Oct: #2468 'all recommended' and #2486 B, ship it from the repository",
+      "evidence": "Commit f32f3364 (#2482) and pull request #2522; docs\\NPC-SERVER-ACTIVITY.md; tests\\test-2468-last-plugin.js; tests\\test-2486-last-ships.ps1.",
+      "status": "unconfirmed",
+      "ask": "Patrick (#2177): whether the authors of the collection plugins named under licence allow an override plugin that carries copies of their cell, worldspace and quest records, the way their Nexus permissions read, and where that is kept."
     },
     {
       "path": "game/ours/Data/meshes/thornswood/noticeboard01.nif",

@@ -276,18 +276,19 @@ yes('the mentions left are all in tables that only describe a record or list it 
 }
 
 // The twenty bone wolf rows are what keeps those refs out of the world: each is
-// a cut row, and the gamemode hands every cut ref to the engine to leave out.
+// a cut row, and Thornswood-Last.esp keeps every cut ref out (#2468): each is
+// switched off there, or already deleted or off in the plugins.
 {
   let pop = null;
   try { pop = JSON.parse(read('game/data/npc-population.json').replace(/^\uFEFF/, '')); } catch (e) { pop = null; }
   const wolves = pop ? pop.npcs.filter(function (r) { return r.base === '3025:Update.esm'; }) : [];
   yes('npc-population.json reads, and every row with the bone wolf as its base is left out (' + wolves.length + ')',
       !!pop && wolves.length > 0 && wolves.every(function (r) { return r.keep === false && r.role === 'cut'; }));
-  const gm = read('game/gamemode.js');
-  const cut = /"cut":\[([^\]]*)\]/.exec(gm);
-  yes('...and every one of their refs is on the gamemode\'s cut list, which goes to setNpcPlacementExclusions',
-      !!cut && wolves.every(function (r) { return cut[1].indexOf('"' + r.ref + '"') >= 0; }) &&
-      /api\.setNpcPlacementExclusions\(excluded\)/.test(gm) && /const excluded=data\.cut\.map\(resolve\);/.test(gm));
+  let last = null;
+  try { last = JSON.parse(read('game/data/last-plugin.json').replace(/^\uFEFF/, '')); } catch (e) { last = null; }
+  const off = last ? [].concat(last.refs.disabled, last.refs.deleted, last.refs.alreadyOff) : [];
+  yes('...and every one of their refs is kept out by Thornswood-Last.esp: switched off there, or already deleted or off',
+      !!last && wolves.every(function (r) { return off.indexOf(r.ref) >= 0; }));
 }
 
 // The table scripts skip the list, so running one again cannot bring a row back.
