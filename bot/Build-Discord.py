@@ -240,6 +240,29 @@ for _h in HOLDS:
 for _h in HOLDS:
     ROLES.append(('Citizen of ' + _h, 0x8FA9B8, True, PLAIN))
 
+# THE OFFICES A JARL GIVES (#2551). Patrick, 15 Oct: each hold has a Court, a
+# Steward and its Guards, and they are Discord roles, so the role is the one
+# truth for who holds one, in the game and here. That hold's Jarl gives and
+# takes them, from the bot's office panel or from the Office page in the game,
+# and the bot sets the role either way. "Steward of <Hold>" replaces the one
+# shared steward office the game kept by itself.
+#
+# NOT HOISTED (Patrick, 15 Oct: "they must not be shown separately in the
+# member list"). The only in-world roles shown in their own group are the
+# Jarl and Citizen roles above. They sit under the Citizen roles, so a
+# citizen who also holds one keeps their Citizen colour.
+#
+# The site reads them by these exact names (site\server.js, OFFICE_ROLE), and
+# so does the bot's panel (bot.py, office_role). A name changed here and not
+# there leaves the office with nobody in it.
+OFFICE_ROLES = []
+for _h in HOLDS:
+    OFFICE_ROLES.append(_h + ' Court')
+    OFFICE_ROLES.append('Steward of ' + _h)
+    OFFICE_ROLES.append('Guard of ' + _h)
+for _name in OFFICE_ROLES:
+    ROLES.append((_name, 0xA8977A, False, PLAIN))
+
 # The Free Skyrim Trading Company (#1393, docs/systems/trading-company.md).
 # Applied for in Discord, the same shape as a Jarl, and given by a person.
 # The site's access.company names it, and the game lets a character on an
@@ -545,6 +568,13 @@ KEEP = (
     'staff-updates',
     # Gamemasters category (#2519). Named so -Prune cannot take them.
     'gm', 'gm-discipline', 'gm voice',
+) + tuple(
+    # The in-world roles (#2551, Patrick, 15 Oct: the office roles go in the
+    # never-delete list). Nothing in this script deletes a role today; these
+    # are named so that nothing added later ever may. A role holds who is in
+    # an office, and deleting one empties that office in the game as well.
+    ['Jarl of ' + _h for _h in HOLDS] + ['Citizen of ' + _h for _h in HOLDS] +
+    OFFICE_ROLES
 )
 
 

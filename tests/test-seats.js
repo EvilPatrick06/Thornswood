@@ -549,7 +549,8 @@ yes('standing() sets staffRole from the roles in both of its paths, the hand wri
     (site.match(/out\.staffRole = holdsStaffRole\(out\.roles\);/g) || []).length === 2);
 yes('/api/allowed sends staffRoleProfiles from staffRole, and a ban takes a profile off it',
     /if \(st\.staffRole\) \{\s*for \(const n of profiles\) if \(!seenStaffRole\.has\(n\)\) \{ seenStaffRole\.add\(n\); out\.staffRoleProfiles\.push\(n\); \}/.test(site) &&
-    /\['profiles', 'devProfiles', 'adminProfiles', 'jarlProfiles', 'staffRoleProfiles', 'failedProfiles'\]/.test(site));
+    // jarlProfiles went in #2551: the hold offices are a map by profile now.
+    /\['profiles', 'devProfiles', 'adminProfiles', 'staffRoleProfiles', 'failedProfiles'\]/.test(site));
 yes('the count poll reads max, line and full out of online.json',
     /o\.max > 0\) max = o\.max/.test(site) && /o\.line > 0\) line = o\.line/.test(site) && /o\.full === true\) full = true/.test(site));
 yes('/api/public carries max from the server, or else from the record, and the line',

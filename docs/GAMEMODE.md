@@ -192,8 +192,10 @@ The rules are in progression and the three blocks after the character block.
 The register is `private\property.json` (`gamemode.js:registerPath`;
 `save`). A claim is made at the door (`touched`, `claim`)
 and carried by the deed (`giveDeed`). Locks and keys follow
-(`lockScript`, `mold`, `cutKey`). A Jarl, the one admin
-grant, names stewards (`loadStewards`, `stewardCmd`), and only a
+(`lockScript`, `mold`, `cutKey`). The offices are Discord roles the
+door reads from the site (`__thornswoodOffices`, read through `officeOf`,
+#2551): a Jarl gives their hold's Court, Steward and Guard on the Office
+page (`officeCmd`, which asks the site to set the role), and only a
 steward can `evict`. A hold's box takes gold only (`putIn`);
 rent (`rentDue`, `rentCmd`) and board fees (`takeGold`)
 land in it. Notice boards come after them. Coin enters the world in one

@@ -79,7 +79,7 @@ fs.writeFileSync(path.join(dir, 'server-settings.json'), JSON.stringify({ dataDi
 fs.mkdirSync(path.join(dir, 'private'));
 function writeRegister(boards) {
   fs.writeFileSync(path.join(dir, 'private', 'property.json'), JSON.stringify({
-    claims: {}, stewards: [STEWARD.pid], boxes: {}, funds: {}, notices: {}, boards: boards
+    claims: {}, boxes: {}, funds: {}, notices: {}, boards: boards
   }));
 }
 writeRegister({
@@ -172,7 +172,11 @@ function makeBlock() {
     guard: function (n, f) { return f; },
     setInterval: function () { return 1; }, clearInterval: function () { },
     log: function () { },
-    __thornswoodCharacter: { stateOf: function () { return {}; }, writeState: function () { } }
+    __thornswoodCharacter: { stateOf: function () { return {}; }, writeState: function () { } },
+    // Proventus holds the Steward of Whiterun role (#2551), and nobody else holds an office.
+    __thornswoodOffices: function (pid) {
+      return { jarl: [], court: [], guard: [], steward: pid === STEWARD.pid ? ['whiterun'] : [] };
+    }
   };
   box.globalThis = box;
   inDir(function () { vm.runInNewContext(propBlock, box, { filename: 'gamemode.js property' }); });
