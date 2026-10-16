@@ -810,7 +810,9 @@ yes('a press reaches the durability block, after the box is remembered',
     /wear\.pressed\(casterRefrId, refrId, baseDesc\)/.test(onActivate) &&
     onActivate.indexOf('touchedBox(casterRefrId, refrId)') < onActivate.indexOf('wear.pressed('));
 yes('a drop no longer reaches it, and the drop watcher still returns nothing',
-    onDrop !== '' && !/wear\.dropped\(/.test(onDrop) && !/\breturn\b/.test(onDrop));
+    onDrop !== '' && !/wear\.dropped\(/.test(onDrop) &&
+    // the only refusal is the locked pair of Prisoner's Cuffs (#2573)
+    !/\breturn\b/.test(onDrop.replace(/if \(cuffsDrop && !cuffsDrop\.mayLetGo\(actorId, baseId, count\)\) \{ return false; \}/, '')));
 const onHitLines = gm.split('\n').filter(function (l) { return /^mp\['onPapyrusEvent:OnHit'\] = guard\('onPapyrusEvent:OnHit', function/.test(l); });
 yes('a hit reaches it through the one OnHit handler, under guard(), beside the warrior maneuvers, with the blocked flag',
     onHitLines.length === 1 &&

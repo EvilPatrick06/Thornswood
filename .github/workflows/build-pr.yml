@@ -394,7 +394,7 @@ jobs:
                  'test-1603-beds.js',
                  'test-1606-logout-fill.js',
                  'test-1382-potion-window.js',
-                 'test-1382-water.js',
+                 'test-1382-water.js', 'test-2573-cuffs.js',
                  'test-1734-rest-reconnect.js',
                  'test-1676-rest-gate.js',
                  'test-1677-ale-curve.js',
