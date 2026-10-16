@@ -66,8 +66,9 @@ const WORLDSPACES = new Set(DATA.worldspaces);
   Nothing rolled this file, so it grew until reading last night's crash meant
   opening a file nothing could open. appendFileSync opens, writes and closes
   on every line, so between lines this process holds nothing and a rename
-  works. server.log is different: cmd holds it open for as long as the server
-  runs, so roll-log.ps1 rolls that one before the server starts. The size is
+  works. server.log is different: server-log.js beside the server writes it
+  and rolls it at midnight and at 4 MB, keeping nothing past 30 days (#2349).
+  The size is
   read once per load and counted after that, so a busy tick does not ask the
   disk about the file for every line.
 */

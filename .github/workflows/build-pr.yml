@@ -314,6 +314,11 @@ jobs:
           # tick and stays idle without it. tests\test-whose-game-gate.js
           # runs each plugin in a sandbox and fails on a second copy or a
           # reader that wakes without the check. Under a second.
+          # Issue #2349: the game server's log keeps nothing past 30 days.
+          # tests\test-2349-server-log.js runs the real server-log.js on a
+          # stand-in server in a temp folder: the roll, the cut, the exit code
+          # handed back, the server ending with the writer, and the privacy
+          # page saying it. A few seconds.
           $six ='test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
@@ -529,6 +534,7 @@ jobs:
                  'test-discord-callback-hang.js',
                  'test-member-role-wording.js',
                  'test-page-changed.js',
+                 'test-2349-server-log.js',
                  'test-missing-files-stop.ps1',
                  'test-ship-launcher-drift.ps1',
                  'test-client-by-hash.ps1',

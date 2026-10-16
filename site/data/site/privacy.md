@@ -2,7 +2,7 @@
 
 What Thornswood keeps about you, why, and how to have it deleted.
 
-Last changed: 15 October 2026.
+Last changed: 16 October 2026.
 
 Thornswood is a free fan project run by two people. It is not a company. This
 page is written plainly rather than legally, and it is meant to be the whole
@@ -103,11 +103,16 @@ both are served from here now.
 
 ## How long it is kept
 
-- **Sign-in records**, which are the only thing here holding your address, are
+- **Sign-in records**, the only thing on the site holding your address, are
   deleted after 30 days. The address is the one your connection reached the
   site from, as our own front door saw it, not anything your browser claims
   about itself. That is enforced by the site rather than promised:
   old rows go whenever the log is written or read.
+
+- **The game server's log** records the address each connection to the game
+  came from, beside the Discord account it signed in as. It keeps nothing
+  older than 30 days: the server checks every hour and deletes each line as
+  it passes 30 days. Staff read it to look into a fault or a report.
 - **Session records and chat** are kept for 365 days, then dropped. That is
   the record of each session and the launcher log sent with it. The site
   checks every hour, so nothing waits for somebody to play first. A session
@@ -129,8 +134,9 @@ server keeps seven daily and four weekly copies. Copies fetched to the
 operator's computer are kept for 30 days, with at least seven retained for
 recovery. These are private recovery copies, not public downloads. Removing
 a live record does not rewrite older backups; they expire through that
-retention schedule. Staff must reapply completed deletion requests before
-putting an older backup back into service.
+retention schedule. The game server's log is not in them. Staff must
+reapply completed deletion requests before putting an older backup back
+into service.
 
 ## Deleting it
 
