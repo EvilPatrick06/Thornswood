@@ -361,7 +361,7 @@ const readJson = (f) => { try { return JSON.parse(fs.readFileSync(path.join(dir,
     yes('a play member cannot delete an approved shot (' + r.status + ')', r.status === 403);
     yes('the approved file is on disk before delete',
         fs.existsSync(path.join(dir, 'uploads', webName)));
-    // Put a report back so delete clears it.
+    // Put a report back so delete clears it (and holds the file for it).
     r = await ask('POST', '/api/gallery/report', { cookie: playCookie(), 'content-type': 'application/json' },
                   JSON.stringify({ name: webName, why: 'clear me' }));
     const clearId = r.json ? r.json.id : '';
@@ -370,7 +370,12 @@ const readJson = (f) => { try { return JSON.parse(fs.readFileSync(path.join(dir,
     yes('staff deletes an approved shot (' + r.status + ')', r.status === 200 && r.json && r.json.removed === 1);
     gal = readJson('gallery.json') || [];
     yes('it is off gallery.json', !gal.find((g) => g.name === webName));
-    yes('the upload file was unlinked', !fs.existsSync(path.join(dir, 'uploads', webName)));
+    // It had an open report, so it was taken down after a report: the file is
+    // kept out of sight for 30 days for staff, then deleted (#2352, option C).
+    const heldNote = (readJson(path.join('..', 'uploads', 'uploads.json')) || {})[webName] || {};
+    yes('the upload file is held for the report it had, marked removed, for 30 days',
+        fs.existsSync(path.join(dir, 'uploads', webName)) && r.json.heldForReport === true &&
+        !!heldNote.removed && Number(heldNote.heldUntil) > Date.now() + 29 * 86400000);
     yes('reports against that name were cleared too',
         !(readJson('gallery-reports.json') || []).some((x) => x.id === clearId || x.name === webName));
     shot = await ask('GET', '/shot/' + webName);

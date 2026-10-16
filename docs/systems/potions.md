@@ -53,5 +53,10 @@ Waiting the 30 minutes clears it. Eating a cooked meal and resting in a
 bed does not clear it yet: the server does not know a cooked meal from
 any other until the meals on [Food](food.md) are in it.
 
-The diminishing potions are not in the server. Potions currently stack
-as the game allows, plus thirst.
+The diminishing potions are written in the server, waiting on an engine
+build. The server counts the potions in your minute and tells the engine
+how much of the next one to apply before it lands: the second at half, the
+third at a quarter, the fourth and after at nothing but the sip. A brewed
+potion counts. A restart starts a new minute. Until the engine build that
+reads it is on the server (skymp #62), potions still stack as the game
+allows, plus thirst.

@@ -1563,6 +1563,46 @@ function uploadRemoved(name) {
   return !!(m && m.removed);
 }
 
+/*
+  HOW LONG A REMOVED SUBMISSION'S FILE STAYS (#2352). Decided by Patrick on
+  12 October, option C: removing a submission deletes its file, and a picture
+  taken down after a report is kept, unshown, for GALLERY_HOLD_DAYS so staff
+  can look into the report, then deleted. "After a report" is read off the
+  site's own record rather than off whichever button was pressed: a
+  submission with an open report against it in gallery-reports.json when it
+  is removed is held, with those reports beside it on uploads.json, and every
+  other removal deletes the file there and then. The hub, the launcher's
+  Delete and its Take down all reach the same door, so the rule is the same
+  whichever one staff use.
+
+  pruneRemovedUploads is the other half, run by the retention timer: a
+  removed file whose hold has ended, or that was never held (one kept by the
+  hub's old Cancel, or one whose delete failed at the time), is deleted, and
+  a delete that fails is said in the site's log by deleteUpload, file and
+  code, never what it holds. Failing to delete a file that the nightly backup
+  or a virus scan has open is outside our control; the next hour asks again
+  and says so again, rather than going quiet.
+*/
+const GALLERY_HOLD_DAYS = 30;
+function pruneRemovedUploads(now) {
+  const at = Number(now) || Date.now();
+  const meta = jsonFile(UPMETA, {});
+  const out = { deleted: 0, held: 0, failed: [] };
+  let changed = false;
+  for (const name of Object.keys(meta)) {
+    const m = meta[name];
+    if (!m || !m.removed) continue;
+    if (Number(m.heldUntil) > at) { out.held++; continue; }
+    const gone = deleteUpload(name);
+    if (gone.ok) { delete meta[name]; changed = true; out.deleted++; }
+    else out.failed.push({ file: name, code: gone.code });
+  }
+  if (changed && !putJson(UPMETA, meta)) {
+    retentionSay('gallery', { event: 'note-write-failed', deleted: out.deleted });
+  }
+  return out;
+}
+
 function listUploads() {
   const meta = jsonFile(UPMETA, {});
   const out = [];
@@ -3152,12 +3192,14 @@ function pruneSessionLogs() {
   on 12 October: run them on a timer too. Once as the site comes up and then
   every hour; each says its own failures (retentionSay) and neither throws.
   The rows go first, so the log prune reads which rows are still kept from
-  the file as it now stands.
+  the file as it now stands. Removed gallery files whose hold has ended go
+  in the same pass (#2352, pruneRemovedUploads).
 */
 const RETENTION_EVERY_MS = 60 * 60 * 1000;
 function retentionSweep() {
   const now = Date.now();
-  return { sessions: sweepSessions(now), sessionLogs: pruneSessionLogs() };
+  return { sessions: sweepSessions(now), sessionLogs: pruneSessionLogs(),
+           removedUploads: pruneRemovedUploads(now) };
 }
 setInterval(retentionSweep, RETENTION_EVERY_MS).unref?.();
 
@@ -4074,7 +4116,7 @@ function plainPage(title, lines) {
     '<meta name="description" content="Find your way back to Thornswood, the Skyrim roleplay community.">' +
     '<meta name="robots" content="noindex"><link rel="icon" href="/favicon.ico">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
-    '<link rel="stylesheet" href="/door.css">' +
+    '<script src="/looks.js"></script><link rel="stylesheet" href="/door.css"><link rel="stylesheet" href="/looks.css">' +
     '</head><body class="door">' +
     '<main class="door-box">' +
     '<h1>' + esc(title) + '</h1>' +
@@ -4116,7 +4158,7 @@ function notAllowedPage(me, st) {
           '.<br>It needs one of: <b>' + (cfg.access.play || []).map(esc).join(', ') + '</b>.</p>';
   }
   return '<!doctype html><meta charset=utf-8><title>Not allowed in</title>' +
-    '<link rel="stylesheet" href="/door.css">' +
+    '<script src="/looks.js"></script><link rel="stylesheet" href="/door.css"><link rel="stylesheet" href="/looks.css">' +
     '<body class="door">' +
     '<div class="door-box"><h1>Not allowed in</h1>' +
     why +
@@ -5173,6 +5215,57 @@ async function handle(req, res) {
       { 'Cache-Control': 'no-cache', 'ETag': vtag });
   }
 
+
+  // --------------------------------------------------------------- feed watch (#2440)
+  // Long-poll tip for open launchers. A launcher holding the ETag of its last
+  // version.json waits here until the file changes (or the wait times out),
+  // then runs one ordinary conditional feed check. Anonymous, same /feed and
+  // /feed-dev folders as version.json. No new timer on the launcher that
+  // hammers the document: the tip is quiet until a Ship writes the feed.
+  const feedWatch = p.match(/^\/(feed(?:-dev)?)\/watch$/);
+  if (feedWatch && req.method === 'GET') {
+    const dir = path.join(ROOT, feedWatch[1]);
+    const file = path.join(dir, 'version.json');
+    if (!file.startsWith(dir + path.sep) || !fs.existsSync(file)) {
+      return send(res, 404, 'no such file', 'text/plain');
+    }
+    const have = String(req.headers['if-none-match'] || '');
+    const WAIT_MS = 50000;
+    const started = Date.now();
+    const tick = () => {
+      if (res.writableEnded || res.destroyed) return;
+      let st;
+      try { st = fs.statSync(file); }
+      catch (e) {
+        if (!res.headersSent) return send(res, 404, 'no such file', 'text/plain');
+        return;
+      }
+      const tag = '"' + st.size.toString(16) + '-' + Math.floor(st.mtimeMs).toString(16) + '"';
+      if (!have || have !== tag) {
+        if (res.headersSent) return;
+        res.writeHead(200, {
+          'content-type': 'application/json; charset=utf-8',
+          'cache-control': 'no-store',
+          'etag': tag,
+          'x-content-type-options': 'nosniff'
+        });
+        return res.end(JSON.stringify({ etag: tag }));
+      }
+      if (Date.now() - started >= WAIT_MS) {
+        if (res.headersSent) return;
+        res.writeHead(204, {
+          'cache-control': 'no-store',
+          'etag': tag,
+          'x-content-type-options': 'nosniff'
+        });
+        return res.end();
+      }
+      const t = setTimeout(tick, 500);
+      if (t && typeof t.unref === 'function') t.unref();
+    };
+    tick();
+    return;
+  }
   const feedAsset = p.match(/^\/(feed(?:-dev)?)\/assets\/([0-9a-f]{64})$/);
   if (feedAsset && req.method === 'GET') {
     const dir = path.join(ROOT, feedAsset[1], 'assets');
@@ -5443,7 +5536,8 @@ async function handle(req, res) {
 
   // Delete: take a shot off the public gallery and/or the pending queue.
   // Staff only (access.dev). Pending items that staff do not want go this
-  // way; there is no separate Reject door. Same deleteFile option as before.
+  // way; there is no separate Reject door. Whether the file goes now or is
+  // held for a report is the site's to decide (#2352), not the caller's.
   if (p === '/api/gallery/approved' && req.method === 'DELETE') {
     const gs = await galleryStaff(url, w);
     if (!gs.ok) return sendJson(res, gs.code, gs.body);
@@ -5466,15 +5560,23 @@ async function handle(req, res) {
     // keep asking about a picture that is already gone.
     const reports = jsonFile(GREPORTS, []);
     const kept = reports.filter((r) => String(r.name) !== name);
+    const itsReports = reports.filter((r) => String(r.name) === name);
     if (kept.length !== reports.length) putJson(GREPORTS, kept);
 
     /*
-      The file (#2352). Deleted when staff ask (deleteFile); otherwise it
-      stays on the site's disk and is marked removed on uploads.json, which
-      /up/<name> refuses, so a removed submission is not served to anybody
-      either way. A delete that fails is said, never answered ok: the entry
-      is still off both lists, the file is marked removed so it is not
-      served, and the answer and the site's log say it is still there.
+      The file (#2352, option C). Deleted, unless the submission had an open
+      report against it: then it is taken down after a report, and its file
+      stays on the site's disk, unshown, for GALLERY_HOLD_DAYS with those
+      reports beside it on uploads.json, and pruneRemovedUploads deletes it
+      once that time is up. deleteFile from a client is no longer read: the
+      hub asked it as a second question and the launcher never sent it, so
+      the same removal kept or deleted the file depending on the button.
+      Either way the file is marked removed while it is on disk, which
+      /up/<name> refuses, so a removed submission is not served to anybody.
+      A delete that fails is said, never answered ok: the entry is still off
+      both lists, the file is marked removed so it is not served, the answer
+      and the site's log say it is still there, and the retention timer
+      deletes it once it can.
     */
     const answer = {
       ok: true,
@@ -5486,13 +5588,21 @@ async function handle(req, res) {
     };
     const file = path.join(UP, name);
     if (file.startsWith(UP + path.sep) && fs.existsSync(file)) {
-      const gone = o.deleteFile ? deleteUpload(name) : { ok: false, code: '' };
+      const now = Date.now();
+      const hold = itsReports.length > 0;
+      const gone = hold ? { ok: false, code: '' } : deleteUpload(name);
       const meta = jsonFile(UPMETA, {});
       if (gone.ok) {
         delete meta[name];
         answer.fileDeleted = true;
       } else {
-        meta[name] = Object.assign({}, meta[name] || {}, { removed: Date.now() });
+        meta[name] = Object.assign({}, meta[name] || {}, { removed: now });
+        if (hold) {
+          meta[name].heldUntil = now + GALLERY_HOLD_DAYS * 86400000;
+          meta[name].heldReports = itsReports.slice(-20);
+          answer.heldForReport = true;
+          answer.heldUntil = meta[name].heldUntil;
+        }
       }
       if (!putJson(UPMETA, meta)) {
         // Unmarked, a kept file would still be served at /up/<name>.
@@ -5503,12 +5613,12 @@ async function handle(req, res) {
                        (gone.ok ? 'its note is still listed.' : 'its file can still be opened by staff. Try again.');
         return sendJson(res, 500, answer);
       }
-      if (o.deleteFile && !gone.ok) {
+      if (!hold && !gone.ok) {
         answer.ok = false;
         answer.fileKept = true;
         answer.code = gone.code;
         answer.error = 'Taken off the gallery, but its file could not be deleted (' + gone.code +
-                       '). It is no longer shown anywhere and is still on the site.';
+                       '). It is no longer shown anywhere, and the site deletes it within the hour once it can.';
         return sendJson(res, 500, answer);
       }
     }

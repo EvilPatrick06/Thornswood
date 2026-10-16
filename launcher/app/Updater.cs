@@ -242,6 +242,75 @@ namespace Thornswood
         }
 
         /// <summary>
+        /// The long-poll tip beside version.json (#2440). Same host and channel
+        /// as FeedUrl: /feed/watch or /feed-dev/watch. A launcher keeps one of
+        /// these open so a Ship is seen without restarting or pressing Check now.
+        /// </summary>
+        public static string WatchUrl(Config cfg)
+        {
+            string feed = FeedUrl(cfg);
+            const string leaf = "/version.json";
+            if (feed.EndsWith(leaf, StringComparison.OrdinalIgnoreCase))
+                return feed.Substring(0, feed.Length - leaf.Length) + "/watch";
+            // FeedUrl always ends in version.json today; if a moved feed uses
+            // another leaf, tip at the same folder.
+            int slash = feed.LastIndexOf('/');
+            if (slash > 0) return feed.Substring(0, slash) + "/watch";
+            return feed + "/watch";
+        }
+
+        /// <summary>
+        /// Long-poll /feed/watch with the ETag of the copy already in hand
+        /// (#2440). True when the tip says the feed moved (HTTP 200); false
+        /// when the wait timed out unchanged (HTTP 204). Throws when the tip
+        /// cannot be reached, so the caller backs off and tries again.
+        /// </summary>
+        public static bool WaitForFeedChange(Config cfg)
+        {
+            ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072; // Tls12 added, never replaced (#1360)
+            string tip = WatchUrl(cfg);
+            CheckUrl(tip);
+
+            Cached have = cached;
+            if (have == null && !cacheRead)
+            {
+                cacheRead = true;
+                have = ReadCache();
+                if (have != null) cached = have;
+            }
+            string tag = "";
+            if (have != null && !string.IsNullOrEmpty(have.Etag)
+                && string.Equals(have.Url, FeedUrl(cfg), StringComparison.Ordinal))
+                tag = have.Etag.Trim();
+
+            // The tip holds the socket for up to fifty seconds on the site.
+            // Ten seconds (Quick's default) would make every quiet tip look
+            // like a failure and hammer reconnects.
+            using (var wc = Client(cfg, false, tip))
+            {
+                var q = wc as Quick;
+                if (q != null) { q.Ms = 60000; q.Gzip = true; }
+                if (tag.Length > 0) wc.Headers["If-None-Match"] = tag;
+                try
+                {
+                    wc.DownloadData(tip);
+                    // 200: feed moved, or the tip had no prior tag to compare.
+                    return true;
+                }
+                catch (WebException wex)
+                {
+                    HttpWebResponse resp = wex.Response as HttpWebResponse;
+                    if (resp != null && (int)resp.StatusCode == 204)
+                        return false;
+                    // A quiet tip that hits the client timeout is "unchanged,
+                    // try again", not a hard fail.
+                    if (wex.Status == WebExceptionStatus.Timeout)
+                        return false;
+                    throw WrapFeedFail(wex, true);
+                }
+            }
+        }
+        /// <summary>
         /// version.json straight off the site feed, asking with the ETag of the
         /// copy already in hand so an unchanged document is not downloaded
         /// again (#445). The answer is the same VersionDoc either way, so
