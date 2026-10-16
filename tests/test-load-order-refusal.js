@@ -92,7 +92,9 @@ yes('and so is the name alone', mark('Riften Expansion.esp') !== mark('Riften Ex
   const chunk = /const LOAD_ORDER_CHUNK = (\d+);/.exec(front);
   const n = chunk ? Number(chunk[1]) : 0;
   const voice = fs.readFileSync(VOICE, 'utf8');
-  const cap = /msg\.text == null \? '' : msg\.text\)\.slice\(0, (\d+)\)/.exec(voice);
+  // A load order line is a command, so it keeps COMMAND_CHARS (#2554); held to 400 still, the cap a said line keeps.
+  const cap = /msg\.text == null \? '' : msg\.text\)\.slice\(0, COMMAND_CHARS\)/.test(voice) &&
+              /const SAID_CHARS = (\d+);/.test(voice) ? /const SAID_CHARS = (\d+);/.exec(voice) : null;
   const longest = '/loadorderlight 4096 4032 ' + new Array(n + 1).join('fffff');
   yes('a full line fits under the voice service\u2019s chat cap (' + longest.length + ' of ' +
       (cap ? cap[1] : '?') + ')', n > 0 && !!cap && longest.length < Number(cap[1]));

@@ -498,11 +498,13 @@ for (const at of Object.keys(WRITERS)) {
     server takes no price for one.
   */
   // And gold put in the drop box (#2298): n, a whole number above nothing, or refused first.
-  yes('its five callers pass the fee, NOTICE_FEE or JOB_FEE, a letter\'s cost, LETTER_FEE and LETTER_PAY, a haul\'s cost, ' +
-      'JOB_FEE and the pay, a ride\'s fare, and gold put in the drop box',
-      callers.slice().sort().join(',') === 'cost,cost,fee,n,price' &&
+  // A post's cost (#2554) is its fee, NOTICE_FEE or JOB_FEE, and a job's reward, a whole number above nothing.
+  yes('its five callers pass a post\'s cost, NOTICE_FEE, or JOB_FEE and the reward, a letter\'s cost, LETTER_FEE and ' +
+      'LETTER_PAY, a haul\'s cost, JOB_FEE and the pay, a ride\'s fare, and gold put in the drop box',
+      callers.slice().sort().join(',') === 'cost,cost,cost,n,price' &&
       /var n = Math\.floor\(Number\(amount\)\);\s*\n\s*if \(!\(n > 0\)/.test(code) &&
-      /\bvar fee = isJob \? JOB_FEE : NOTICE_FEE;/.test(code) &&
+      /\bvar fee = isJob \? JOB_FEE : NOTICE_FEE;\s*\n\s*var cost = fee \+ reward;/.test(code) &&
+      /reward = \/\^\\d\+\$\/\.test\(first\) \? Number\(first\) : 0;\s*\n\s*if \(!\(reward > 0\)/.test(code) &&
       /\bvar cost = LETTER_FEE \+ LETTER_PAY;/.test(code) &&
       /\bvar cost = JOB_FEE \+ pay;/.test(code));
   const fares = ['FARE_FERRY', 'FARE_CARRIAGE_IN_HOLD', 'FARE_CARRIAGE', 'FARE_CROSSING'].map(function (n) {
@@ -639,7 +641,7 @@ for (const at of Object.keys(WRITERS)) {
         pay + '\n' + held + '\nreturn { payHeld: payHeld, payOut: payOut };')(
         fakeMp(store), GOLD, ledger, function () { });
       const api2 = api.payHeld;
-      const letter = { letter: true, pay: 15 };
+      const letter = { letter: true, job: true, pay: 15 };
       const before = goldIn(store[A].inventory) + ledger.riften;
       yes('a letter\'s 15 goes from the ledger to the pack, and the total is the same',
           api2('riften', letter, A) === 15 && goldIn(store[A].inventory) === 20 &&
@@ -649,12 +651,19 @@ for (const at of Object.keys(WRITERS)) {
       const api3 = new Function('mp', 'GOLD_ID', 'funds', 'plog',
         pay + '\n' + held + '\nreturn payHeld;')(fakeMp(store), GOLD, short, function () { });
       yes('a ledger short of the pay pays nothing',
-          api3('riften', { letter: true, pay: 15 }, A) === -1 &&
+          api3('riften', { letter: true, job: true, pay: 15 }, A) === -1 &&
           goldIn(store[A].inventory) === 20 && short.riften === 10);
       yes('a notice holds nothing to pay', api2('riften', { pay: 15 }, A) === 0 &&
           goldIn(store[A].inventory) === 20);
+      // A job's reward (#2554) is held the same way and comes back the same way; a haul's is handHaul's.
+      yes('a haul\'s pay is not payHeld\'s to pay', api2('riften', { haul: true, job: true, pay: 15 }, A) === 0 &&
+          goldIn(store[A].inventory) === 20 && ledger.riften === 20);
+      const job = { job: true, title: 'Clear the cellar', pay: 12 };
+      yes('a job\'s 12 reward goes from the ledger to the pack, once, and the total is the same',
+          api2('riften', job, A) === 12 && goldIn(store[A].inventory) === 32 && ledger.riften === 8 &&
+          api2('riften', job, A) === 0 && goldIn(store[A].inventory) === 32);
       yes('payOut refuses a count that is not more than nothing',
-          api.payOut(A, 0) === false && api.payOut(A, -5) === false && goldIn(store[A].inventory) === 20);
+          api.payOut(A, 0) === false && api.payOut(A, -5) === false && goldIn(store[A].inventory) === 32);
     });
   }
 }

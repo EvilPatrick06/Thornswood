@@ -257,9 +257,11 @@ if (block !== null) {
         src.indexOf("var BOARD_BASE_DESC = '593b:Thornswood-Content.esp';") !== -1 &&
         /function standBoard\(hold, anchor\)/.test(src) &&
         front.indexOf('0x593B') === -1 && front.indexOf('ensureBoards') === -1);
+    // Make a post sends a notice or a job with its title and body (#2554).
     yes('the panel is how a notice, a job, and a price list go up',
-        page.indexOf("net('/notice ") !== -1 &&
-        page.indexOf("net('/job ") !== -1 &&
+        page.indexOf("line = '/notice ' + slashTitle(title)") !== -1 &&
+        page.indexOf("line = '/job ' + Number(reward) + ' ' + slashTitle(title)") !== -1 &&
+        page.indexOf("net('/job done ") !== -1 &&
         page.indexOf("net('/take ") !== -1 &&
         page.indexOf("net('/unpin ") !== -1 &&
         page.indexOf("net('/dropjob ") !== -1 &&

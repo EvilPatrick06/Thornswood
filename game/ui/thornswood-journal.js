@@ -428,6 +428,20 @@
     return html;
   }
 
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  /* When a post went up, as the board panel says it: 6:43 PM, 15 Oct (#2554). */
+  function postedAt(at) {
+    var t = Number(at);
+    if (!(t > 0)) { return ''; }
+    var d = new Date(t);
+    var h = d.getHours();
+    var m = d.getMinutes();
+    var half = h < 12 ? 'AM' : 'PM';
+    h = h % 12;
+    if (h === 0) { h = 12; }
+    return h + ':' + (m < 10 ? '0' : '') + m + ' ' + half + ', ' + d.getDate() + ' ' + MONTHS[d.getMonth()];
+  }
+
   function drawBoards(main) {
     var bv = data && data.boards;
     var read = bv && bv.read;
@@ -442,6 +456,19 @@
     for (var i = 0; i < wall.length; i++) {
       var row = wall[i];
       var kind = row.letter ? 'Letter' : (row.haul ? 'Haul' : (row.job ? 'Job' : 'Notice'));
+      /*
+        A notice or a job has a title and a body (#2554): the title heads
+        it, with Job or Notice, a job's reward, who and when, and the body is
+        under it. This page is only for reading, so nothing is folded away.
+      */
+      if (!row.letter && !row.haul) {
+        out += '<div style="margin-bottom:14px"><b>' + esc(row.n) + '. ' + esc(row.title) + '</b><br>' +
+               kind + (row.job ? ', ' + esc(String(Number(row.reward) || 0)) + ' gold reward' : '') + ', ' +
+               esc(row.name) + (row.at ? ', ' + esc(postedAt(row.at)) : '') +
+               (row.taken ? ', taken by ' + esc(row.taken) : '') +
+               '<div class="read">' + esc(row.text) + '</div></div>';
+        continue;
+      }
       out += '<div style="margin-bottom:14px"><b>' + esc(row.n) + '. ' + kind + ', ' + esc(row.name) +
              (row.taken ? ', taken by ' + esc(row.taken) : '') + '</b>' +
              '<div class="read">' + esc(row.text) + '</div></div>';
@@ -457,8 +484,12 @@
     for (var j = 0; j < jobs.length; j++) {
       var job = jobs[j];
       var what = job.letter ? 'Letter' : (job.haul ? 'Haul' : 'Job');
+      var head = (!job.letter && !job.haul)
+        ? esc(job.title) + '</b><br>' + esc(String(Number(job.reward) || 0)) + ' gold reward'
+        : '</b>';
       out += '<div style="margin-bottom:14px"><b>' + esc(job.where || job.hold) + ', ' + esc(job.n) + '. ' +
-             what + ', for ' + esc(job.name) + '</b><div class="read">' + esc(job.text) + '</div></div>';
+             what + ', for ' + esc(job.name) + (job.letter || job.haul ? '' : ': ') + head +
+             '<div class="read">' + esc(job.text) + '</div></div>';
     }
     if (jobs.length) {
       out += '<div class="none">A job is handed back at the board it came from.</div>';
