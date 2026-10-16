@@ -39654,6 +39654,26 @@ log('gamemode loaded:',
     A steward standing where a board should be and pressing Move it here on
     the Office page still moves it anywhere in one press: moveBoard records
     the cell or worldspace, the point and the facing where they stand.
+
+    EACH SPOT OUTSIDE TAMRIEL CARRIES AN ANCHOR (#2516, 15 Oct). The server
+    stands a board with the fork's ObjectReference.MoveTo, which can only take
+    a reference into another worldspace or cell next to a reference that is
+    already there. Until now that was a person who happened to be in the city,
+    so a city board appeared only once somebody walked in. The anchor is a
+    vanilla reference near the spot that never moves, so every board stands at
+    server start. It has to be a kind of reference the server loads at all:
+    the fork's WorldState::AttachEspmRecord loads only NPCs, furniture,
+    activators, doors, containers, items and harvestables, and skips every
+    STAT, so an XMarker cannot be one. Each anchor below is a persistent,
+    enabled door, container or furniture reference, read out of the plugins
+    on One and checked against every plugin in game/data/last-plugin.json's
+    load order (only JKs Skyrim.esp touches one, moving Windhelm's wood pile
+    25 units). standBoard reads where the server has the anchor and moves the
+    board by the difference, so a mod moving an anchor moves no board.
+    FACING IS THE WAY A READER LOOKS. Djinn's nine numbers are the direction
+    somebody reading the board faces, so the board itself is turned the other
+    way, facing + 180 (boardAngle; Patrick, 15 Oct, A on #2516). Raven Rock's
+    inn has no number, so 0, and its board faces south.
   */
   var BOARD_SITES = {
     /*
@@ -39684,11 +39704,16 @@ log('gamemode loaded:',
       somebody in the world can say whether it is a wall. /board move solitude
       settles it for good and a deploy will never touch it again.
     */
-    solitude:   { cell: '37edf:Skyrim.esm', pos: [-64867, 104407.2, -8405.9], facing: 9.9, where: 'Solitude' },
-    whiterun:   { cell: '1a26f:Skyrim.esm', pos: [23139.4, -7891.7, -3494.4], facing: 188.4, where: 'Whiterun' },
-    riften:     { cell: '16bb4:Skyrim.esm', pos: [174559.5, -94337, 11130.2], facing: 38, where: 'Riften' },
-    windhelm:   { cell: '1691d:Skyrim.esm', pos: [134265.1, 35842.3, -12397.5], facing: 85.8, where: 'Windhelm' },
-    markarth:   { cell: '16d71:Skyrim.esm', pos: [-173494.7, 5049.1, -3447.6], facing: 72, where: 'Markarth' },
+    solitude:   { cell: '37edf:Skyrim.esm', pos: [-64867, 104407.2, -8405.9], facing: 9.9, where: 'Solitude',
+                  anchor: '101d9d:Skyrim.esm' },   // SDoorFrontGate, the enabled city gate, 639 away
+    whiterun:   { cell: '1a26f:Skyrim.esm', pos: [23139.4, -7891.7, -3494.4], facing: 188.4, where: 'Whiterun',
+                  anchor: 'cdd7a:Skyrim.esm' },    // WoodChoppingBlock, 550 away
+    riften:     { cell: '16bb4:Skyrim.esm', pos: [174559.5, -94337, 11130.2], facing: 38, where: 'Riften',
+                  anchor: '4227f:Skyrim.esm' },    // RiftenDoorLoad01, 550 away
+    windhelm:   { cell: '1691d:Skyrim.esm', pos: [134265.1, 35842.3, -12397.5], facing: 85.8, where: 'Windhelm',
+                  anchor: '23592:Skyrim.esm' },    // WoodPile, 876 away (JKs Skyrim.esp moves it 25)
+    markarth:   { cell: '16d71:Skyrim.esm', pos: [-173494.7, 5049.1, -3447.6], facing: 72, where: 'Markarth',
+                  anchor: '1c38b:Skyrim.esm' },    // DweDoorLarge01Load, 472 away
     falkreath:  { cell: '3c:Skyrim.esm', pos: [-30342.2, -87022.7, -3119.1], facing: 56.6, where: 'Falkreath' },
     morthal:    { cell: '3c:Skyrim.esm', pos: [-38766.1, 64411.9, -13920.9], facing: 251.2, where: 'Morthal' },
     dawnstar:   { cell: '3c:Skyrim.esm', pos: [32216.4, 102314, -13263], facing: 110, where: 'Dawnstar' },
@@ -39714,7 +39739,8 @@ log('gamemode loaded:',
     board, because seedBoards keeps a placed board whatever the seeding says.
   */
   var BOARD_INNS = {
-    ravenrock: { cell: '17ec0:Dragonborn.esm', pos: [-39, -178.2, 0], where: 'Raven Rock' }
+    ravenrock: { cell: '17ec0:Dragonborn.esm', pos: [-39, -178.2, 0], where: 'Raven Rock',
+                 anchor: '25029:Dragonborn.esm' }   // DLC2RRGeldisVendorChest, 226 away
   };
 
   /*
@@ -39735,8 +39761,9 @@ log('gamemode loaded:',
     it. The next time these coordinates change, this number goes up and the
     boards follow, except the ones people have moved on purpose.
   */
+  // 5: each board turned to face its readers, facing + 180, 15 October (#2516).
   // 4: the five walled cities in their own worldspaces, 15 October (#2516).
-  var BOARD_SEED = 4;   // 3: Solitude's X, 23 September. See BOARD_SITES above.
+  var BOARD_SEED = 5;   // 3: Solitude's X, 23 September. See BOARD_SITES above.
 
   var boards = seedBoards(loadPart('boards', null));
 
@@ -40071,8 +40098,8 @@ log('gamemode loaded:',
       moved twice does not lose 'Whiterun' and become 'whiterun'.
     */
     var was = boards[hold];
-    // The facing too (#2516): the board faces the way the steward does, so
-    // they stand where it should be, facing the way its notices should face.
+    // The facing too (#2516): the way the steward looks is the way a reader
+    // looks, so the board is turned to face them (boardAngle, facing + 180).
     var face = null;
     try { var ang = mp.get(actorId, 'angle'); face = ang ? Number(ang[2]) : null; } catch (e) { face = null; }
     boards[hold] = { cell: cell, pos: [pos[0], pos[1], pos[2]],
@@ -40106,27 +40133,44 @@ log('gamemode loaded:',
     its cell or worldspace at its point (PapyrusObjectReference::MoveTo: for
     an object it sets the cell, the angle and the point, and the point is
     saved). mp.set cannot: it refuses 'locationalData' for anything but an
-    actor. MoveTo moves a reference next to another one, with an offset:
-      - a board in Tamriel moves next to itself, by the spot's own numbers,
-        because a new reference starts at Tamriel's 0, 0, 0;
-      - a board in any other cell or worldspace (Raven Rock's inn, one a
-        steward walked indoors or into a walled city) moves next to somebody
-        standing in that cell, the first time somebody is (boardTick), or
-        next to the steward who moved it;
-      - the box moves next to its board, at BOX_AT turned with the board
-        (scripts/mods/Build-NoticeBoard.py prints it).
-    Then SetAngle turns both to the board's facing.
+    actor. MoveTo moves a reference next to another one, by an offset from
+    where that other one is, and into its cell or worldspace. So each board
+    moves next to an anchor that is already where it should go:
+      - the steward who moved it, when one did;
+      - else its spot's anchor (BOARD_SITES, BOARD_INNS), a vanilla door,
+        container or bench that never moves, for the five walled cities and
+        Raven Rock's inn;
+      - else, in Tamriel or a board already in its own cell, the board itself.
+    The offset is always the spot less where the server has the anchor NOW.
+    It used to be the spot's own numbers for a board moved next to itself,
+    which is right only for a reference still at Tamriel's 0, 0, 0, where
+    mp.place makes it: a board already standing moved again went to twice
+    its point. The box moves next to its board, at BOX_AT turned with the
+    board (scripts/mods/Build-NoticeBoard.py prints it).
+
+    THE ANGLE IS SET BEFORE THE MOVE. The fork's MpObjectReference::SetAngle
+    only writes the change form and tells nobody: a client is sent an object's
+    angle in the message that streams it to them, which a move into their
+    area sends, and never again while it stays in their area. Turning after
+    the move left everybody already near it seeing the reference at its old
+    angle, 0 for a new one. That is what Patrick saw on dev on 15 Oct: the
+    city boards, stood once he walked in, drawn at 0 instead of their facing,
+    each wrong by a different amount, and the box, placed by the turned
+    offset, off its shelf. MoveTo keeps the reference's own angle (no
+    matchRotation), so turning first puts the right angle in that message.
+
+    All of them stand when the server starts (standBoards). Nothing checks
+    them again on a timer: a reference the server placed is kept with the
+    world, and one that is not there at start is stood then.
 
     E on either is the server's to answer (boardActivated, from onActivate):
     the board opens only the board, the box only the box (Patrick, 12 Oct).
-    The ids are kept on boards[hold] (ref, boxRef), saved with the register;
-    one that is gone or in the wrong cell is stood again.
+    The ids are kept on boards[hold] (ref, boxRef), saved with the register.
   */
   var BOARD_BASE_DESC = '593b:Thornswood-Content.esp';
   var BOX_BASE_DESC = '154d0:Thornswood-Content.esp';
   var BOX_AT = [-134.52, 4.0, 80.0];
   var TAMRIEL_DESC = '3c:Skyrim.esm';
-  var BOARD_CHECK_MS = 10000;
 
   function refSelf(id) { return { type: 'form', desc: mp.getDescFromId(id) }; }
   function refCall(fn, id, args) {
@@ -40142,6 +40186,19 @@ log('gamemode loaded:',
     } catch (e) { return false; }
   }
 
+  /* The reference stands in this cell, within a unit of this point, turned to this angle. */
+  function refAt(id, baseDesc, cell, pos, turn) {
+    if (!refStands(id, baseDesc, cell)) { return false; }
+    try {
+      var p = mp.get(id, 'pos'), a = mp.get(id, 'angle');
+      if (!p || !a) { return false; }
+      for (var i = 0; i < 3; i++) { if (Math.abs(p[i] - pos[i]) > 1) { return false; } }
+      var d = Math.abs((((Number(a[2]) - turn) % 360) + 540) % 360 - 180);
+      return Number(a[0]) === 0 && Number(a[1]) === 0 && d < 0.5;
+    } catch (e) { return false; }
+  }
+
+  /* Which way a reader of this board looks: its own facing, else its town's, else 0. */
   function boardFacing(hold) {
     var b = boards[hold];
     var f = Number(b && b.facing);
@@ -40151,21 +40208,28 @@ log('gamemode loaded:',
     return isFinite(f) ? f : 0;
   }
 
-  /* Where the box stands from its board's point: BOX_AT turned by the board's facing. */
+  /* The board's own angle: it faces its reader, so the other way from where they look. */
+  function boardAngle(hold) {
+    return (((boardFacing(hold) + 180) % 360) + 360) % 360;
+  }
+
+  /* Where the box stands from its board's point: BOX_AT turned by the board's angle. */
   function boxOffset(face) {
     var h = face * Math.PI / 180;
     var c = Math.cos(h), s = Math.sin(h);
     return [BOX_AT[0] * c + BOX_AT[1] * s, -BOX_AT[0] * s + BOX_AT[1] * c, BOX_AT[2]];
   }
 
-  /* Somebody standing in this cell or worldspace now, or 0. */
-  function somebodyIn(cell) {
-    var online = [];
-    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { online = []; }
-    for (var i = 0; i < online.length; i++) {
-      try { if (String(mp.get(online[i], 'worldOrCellDesc')) === cell) { return online[i]; } } catch (e2) { }
-    }
-    return 0;
+  /* The spot's anchor, when the board is still in that spot's cell or worldspace. 0 otherwise. */
+  function siteAnchor(hold, cell) {
+    var site = Object.prototype.hasOwnProperty.call(BOARD_SITES, hold) ? BOARD_SITES[hold]
+      : (Object.prototype.hasOwnProperty.call(BOARD_INNS, hold) ? BOARD_INNS[hold] : null);
+    if (!site || !site.anchor || site.cell !== cell) { return 0; }
+    var id = 0;
+    try { id = mp.getIdFromDesc(site.anchor) >>> 0; } catch (e) { id = 0; }
+    if (!id) { return 0; }
+    try { if (String(mp.get(id, 'worldOrCellDesc') || '') !== cell) { return 0; } } catch (e2) { return 0; }
+    return id;
   }
 
   function placedBase(desc) {
@@ -40177,40 +40241,44 @@ log('gamemode loaded:',
     return id;
   }
 
+  /* Move a reference next to anchor so that it lands on pos: the offset is from where the anchor is now. */
+  function moveOnto(id, anchor, pos) {
+    var at = mp.get(anchor, 'pos');
+    refCall('MoveTo', id, [refSelf(anchor), pos[0] - at[0], pos[1] - at[1], pos[2] - at[2], false]);
+  }
+
   /*
     Stand this hold's board and box where boards[hold] says, or move them
-    there. anchor is somebody standing in the board's cell, when the caller
-    has one (the steward who moved it). Answers whether the board stands.
+    there. anchor is the steward who just moved it, standing where it goes,
+    when there is one. Answers whether the board stands.
   */
   function standBoard(hold, anchor) {
     var b = boards[hold];
     if (!b || typeof b.cell !== 'string' || !b.pos || b.pos.length !== 3) { return false; }
-    var face = boardFacing(hold);
+    var turn = boardAngle(hold);
     var changed = false;
-    var boardOk = refStands(b.ref, BOARD_BASE_DESC, b.cell) && !anchor;
-    if (!boardOk) {
-      var by = 0;
-      var at = null;
-      if (anchor) {
-        by = anchor;
-      } else if (b.cell !== TAMRIEL_DESC) {
-        by = somebodyIn(b.cell);
-        if (!by) { return false; }
-      }
+    if (anchor || !refAt(b.ref, BOARD_BASE_DESC, b.cell, b.pos, turn)) {
       var id = refStands(b.ref, BOARD_BASE_DESC, '') ? b.ref : 0;
+      // A new reference is made in Tamriel (mp.place), so in Tamriel it can
+      // be its own anchor, the same as one already standing in its cell.
+      var nextTo = anchor || siteAnchor(hold, b.cell) ||
+        ((id ? refStands(id, BOARD_BASE_DESC, b.cell) : b.cell === TAMRIEL_DESC) ? -1 : 0);
+      if (!nextTo) {
+        // Only a board a steward put down in a cell with no anchor, whose
+        // reference the server no longer has. Said, not guessed at.
+        plog('boards: nothing to stand', hold + '\'s board next to in', b.cell + ';',
+             'its reference', Number(b.ref || 0).toString(16), 'is not there');
+        return false;
+      }
       try {
         if (!id) {
           var base = placedBase(BOARD_BASE_DESC);
           if (!base) { plog('boards: the message board record is not in the load order'); return false; }
           id = mp.place(base);
         }
-        if (by) {
-          at = mp.get(by, 'pos');
-          refCall('MoveTo', id, [refSelf(by), b.pos[0] - at[0], b.pos[1] - at[1], b.pos[2] - at[2], false]);
-        } else {
-          refCall('MoveTo', id, [refSelf(id), b.pos[0], b.pos[1], b.pos[2], false]);
-        }
-        refCall('SetAngle', id, [0, 0, face]);
+        if (nextTo === -1) { nextTo = id; }
+        refCall('SetAngle', id, [0, 0, turn]);
+        moveOnto(id, nextTo, b.pos);
       } catch (e) {
         plog('boards: could not stand', hold + '\'s board:', e);
         return false;
@@ -40218,9 +40286,11 @@ log('gamemode loaded:',
       b.ref = id;
       changed = true;
       plog('boards: stood', hold + '\'s board', Number(id).toString(16), 'in', b.cell, 'at',
-           b.pos.join(','), 'facing', face);
+           b.pos.join(','), 'turned', turn, 'for a reader facing', boardFacing(hold));
     }
-    if (!refStands(b.boxRef, BOX_BASE_DESC, b.cell) || changed) {
+    var off = boxOffset(turn);
+    var boxPos = [b.pos[0] + off[0], b.pos[1] + off[1], b.pos[2] + off[2]];
+    if (changed || !refAt(b.boxRef, BOX_BASE_DESC, b.cell, boxPos, turn)) {
       var bid = refStands(b.boxRef, BOX_BASE_DESC, '') ? b.boxRef : 0;
       try {
         if (!bid) {
@@ -40229,9 +40299,8 @@ log('gamemode loaded:',
           else { bid = mp.place(boxBase); }
         }
         if (bid) {
-          var off = boxOffset(face);
-          refCall('MoveTo', bid, [refSelf(b.ref), off[0], off[1], off[2], false]);
-          refCall('SetAngle', bid, [0, 0, face]);
+          refCall('SetAngle', bid, [0, 0, turn]);
+          moveOnto(bid, b.ref, boxPos);
           b.boxRef = bid;
           changed = true;
         }
@@ -40243,12 +40312,10 @@ log('gamemode loaded:',
     return true;
   }
 
-  /* Every board that is not standing where it should, stood: Tamriel's at once, any other once somebody is in its cell. */
-  function boardTick() {
+  /* Every board and box stood where it should be, once, when the server starts. */
+  function standBoards() {
     for (var hold in boards) {
       if (!Object.prototype.hasOwnProperty.call(boards, hold)) { continue; }
-      var b = boards[hold];
-      if (refStands(b.ref, BOARD_BASE_DESC, b.cell) && refStands(b.boxRef, BOX_BASE_DESC, b.cell)) { continue; }
       standBoard(hold, 0);
     }
   }
@@ -41291,10 +41358,11 @@ log('gamemode loaded:',
   g.__thornswoodHaulTimer = setInterval(
     (typeof guard === 'function') ? guard('haulTick', haulTick) : haulTick, HAUL_EVERY_MS);
 
-  // The boards and boxes stood where they should be (#2516), checked every ten seconds.
+  // The boards and boxes stood where they should be (#2516), once, at start.
+  // The ten second check that was here is gone: a timer repairing state.
   if (g.__thornswoodBoardTimer) { try { clearInterval(g.__thornswoodBoardTimer); } catch (e) { } }
-  g.__thornswoodBoardTimer = setInterval(
-    (typeof guard === 'function') ? guard('boardTick', boardTick) : boardTick, BOARD_CHECK_MS);
+  g.__thornswoodBoardTimer = null;
+  standBoards();
 
   /*
     A haul comes down before it is delivered: the hauler's /dropjob, the
@@ -41990,7 +42058,8 @@ log('gamemode loaded:',
     boxes: function () { return boxes; },
     notices: function () { return notices; }, takedown: takedown,
     boards: function () { return boards; }, boardHere: boardHere, boardPanel: boardPanel,
-    standBoard: standBoard, boardTick: boardTick, boardActivated: boardActivated, boxOffset: boxOffset,
+    standBoard: standBoard, standBoards: standBoards, boardActivated: boardActivated,
+    boxOffset: boxOffset, boardAngle: boardAngle,
     boardsView: boardsView, lettersCarried: lettersCarried,
     stewards: function () { return stewards.slice(); }
   };
