@@ -5,7 +5,7 @@
  "plugin": {
   "name": "Thornswood-Last.esp",
   "size": 5984128,
-  "sha256": "0c57943b5db6bda31e5186159501d3879b219fc5f0521b94225475c73035dcf4"
+  "sha256": "6354c54806a90e95ddc1c61ca622e18497e757abd7fc18bf029035a4765dae6f"
  },
  "loadOrder": [
   "Skyrim.esm",
@@ -369,8 +369,8 @@
   },
   {
    "name": "Thornswood-Content.esp",
-   "size": 151225,
-   "sha256": "37aa6a4531ae796d8e371afa4486305193c6e96a2e650abc55c93ed4542d80a8"
+   "size": 132868,
+   "sha256": "56efd81b767e12d2e736b841abb395b3ca6a9c8c15a587bbce00cd6502be3b89"
   },
   {
    "name": "Populated Cities Towns Villages Legendary.esp",

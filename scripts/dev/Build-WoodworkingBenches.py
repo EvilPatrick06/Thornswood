@@ -131,28 +131,33 @@ LARGE = {'STAT', 'SCOL', 'MSTT', 'TREE'}
 # each was chosen is in game\data\woodworking-benches.json under "why".
 SITES = {
     'whiterun': {
-        'where': 'Whiterun', 'forge': 'c430a:Skyrim.esm', 'cell': '1a26f:Skyrim.esm', 'offset': (-600, 500), 'turn': 0,
+        'where': 'Whiterun', 'forge': 'c430a:Skyrim.esm', 'cell': '1a26f:Skyrim.esm', 'offset': (-668, -23), 'turn': 315,
         'why': 'Warmaiden\'s forge, not the Skyforge. The smithing yard round it is cut up by the tanning rack, the '
                'armour bench, the grindstone, the smelter and JK\'s Skyrim\'s railings, and searched every 20 units '
-               'in eight turns no clear spot on the forge\'s own floor is nearer. This one is north of Warmaiden\'s '
-               'shop, by its wall, on the forge\'s floor, facing the way the forge does.'},
+               'in four turns no clear spot within 640 units is on the forge\'s own floor. This one is north of '
+               'Warmaiden\'s shop, by its wall, on the forge\'s floor, facing north. It is the same spot as before '
+               '#2553, measured now from where Skyrim stands the forge: until then the forge stood where the other '
+               'server\'s plugin had moved and turned it.'},
     'solitude': {
         'where': 'Solitude', 'forge': '4e3e9:Skyrim.esm', 'cell': '37edf:Skyrim.esm', 'offset': (20, -200), 'turn': 0,
         'why': 'Beirand\'s forge. Behind the smith, in the open yard between the smelter, '
                'the armour bench and the forge, on the forge\'s floor, facing the way the forge does.'},
     'windhelm': {
-        'where': 'Windhelm', 'forge': 'f7798:Skyrim.esm', 'cell': '1691d:Skyrim.esm', 'offset': (-260, 120), 'turn': 0,
-        'why': 'The blacksmith yard\'s forge, Skyrim\'s own and untouched by any plugin. To the smith\'s '
-               'left, clear of the smelter and the armour bench, the smithy sign nearest at 97 units.'},
+        'where': 'Windhelm', 'forge': 'f7798:Skyrim.esm', 'cell': '1691d:Skyrim.esm', 'offset': (-100, -240), 'turn': 180,
+        'why': 'The blacksmith yard\'s forge, Skyrim\'s own and untouched by any plugin. Behind the smith, '
+               'facing away from the forge, the grindstone nearest at 53 units. Until #2553 it stood to the '
+               'smith\'s left; Skyrim\'s tanning rack there is back at its own size and place, 15 units from that '
+               'table, since the other server\'s plugin no longer shrinks and moves it.'},
     'markarth': {
         'where': 'Markarth', 'forge': '514d8:Skyrim.esm', 'cell': '16d71:Skyrim.esm', 'offset': (680, -300), 'turn': 0,
         'why': 'Ghorza\'s forge. Markarth is built in tiers and JK\'s Skyrim fills the forge\'s '
                'own ledge; searched every 20 units in eight turns, the nearest clear spot on flat ground is this '
                'one, on the walk a step below the forge to the smith\'s right.'},
     'riften': {
-        'where': 'Riften', 'forge': '53481:Skyrim.esm', 'cell': '16bb4:Skyrim.esm', 'offset': (280, -40), 'turn': 0,
-        'why': 'The Scorched Hammer\'s forge. To the smith\'s right on the same boards, past the smelter, facing '
-               'the way the forge does.'},
+        'where': 'Riften', 'forge': '53481:Skyrim.esm', 'cell': '16bb4:Skyrim.esm', 'offset': (240, 100), 'turn': 270,
+        'why': 'The Scorched Hammer\'s forge, where Skyrim stands it since #2553 (the other server\'s plugin had '
+               'moved it 101 units and turned it a quarter turn, onto the spot the bench had). To the smith\'s '
+               'right on the same boards, a signpost nearest at 70 units.'},
     'falkreath': {
         'where': 'Falkreath', 'forge': '99b8a:Skyrim.esm', 'cell': '3c:Skyrim.esm', 'offset': (-380, 80), 'turn': 0,
         'why': 'Lod\'s forge. To the smith\'s left, on the flat yard in front of the smithy, facing the way the '
@@ -179,8 +184,9 @@ SKIPPED = {
     'rorikstead': 'no forge of Skyrim\'s own. JK\'s Skyrim\'s anvil yard (62b1:JKs Skyrim.esp) sits on a raised '
                   'ledge, and no clear flat ground of the bench\'s size lies within 640 units of it on that ledge.',
     'ivarstead': 'no forge and no anvil: no placed reference carrying CraftingSmithingForge stands in Ivarstead.',
-    'dragonbridge': 'both forges (aa57:Thornswood-Content.esp and 531b:JKs Skyrim.esp) stand on sloping ground; '
-                    'the nearest clear flat spot is 725 units away out in the field, which is not beside a forge.',
+    'dragonbridge': 'its forge (531b:JKs Skyrim.esp) stands on sloping ground; the nearest clear flat spot is '
+                    '725 units away out in the field, which is not beside a forge. The second forge, aa57 in '
+                    'Thornswood-Content.esp, was the other server\'s and left with its placements (#2553).',
 }
 
 

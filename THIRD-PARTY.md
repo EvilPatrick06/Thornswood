@@ -352,7 +352,18 @@ collection and Vortex's staging folder on the shipping machine:
   crafting and gathering content: stations, salt, ore, charcoal kilns, skill
   manuals, tools, keys, fishing, repair kits, treatments, the notice board and
   drop box, house parts, and their recipes." The collection's copy keeps the
-  old one until a later revision patches it. Until 12 October this
+  old one until a later revision patches it. Since 16 October (#2553, Patrick,
+  15 October, option B on #2177) the repository's plugin is remade as
+  Thornswood's own: 132,868 bytes, sha256
+  `56efd81b767e12d2e736b841abb395b3ca6a9c8c15a587bbce00cd6502be3b89`, 205
+  records. `scripts\mods\Add-ContentRecords.py` writes every record of it from
+  its own numbers, or copies Bethesda's own, except 57 placements of the kiln,
+  the salt quarry, the hive and the alchemy lab, which stand where the other
+  server put them until Thornswood stands its own; the rest of that server's
+  placements and its changes to Skyrim's own are gone.
+  `scripts\mods\content-salvaged.json` lists every salvaged record and what
+  became of it. The collection's copy and the release plugins in the table
+  below still carry the salvaged records until they carry this one. Until 12 October this
   section gave the 1.1 file as read on 24 September, 141,234 bytes, sha256
   `3b3ecb3bda4b97e312df10a61191cdd2949286007ab03a948b323d4a749af2ae`.
 - `SKSE\Plugins\SkyrimSoulsRE.ini`: Skyrim Souls RE's own settings file (mod

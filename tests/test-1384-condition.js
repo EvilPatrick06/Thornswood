@@ -329,7 +329,8 @@ KIT_RECIPES.forEach(function (k) {
   yes('and Add-ContentRecords.py is what adds the six records',
       ['ThornswoodMiscWeaponKit', 'ThornswoodMiscArmorKit', 'ThornswoodMiscSewingKit',
        'ThornswoodRecipeWeaponKit', 'ThornswoodRecipeArmorKit', 'ThornswoodRecipeSewingKit'].every(function (e) {
-        return add.indexOf("('" + e + "', ") !== -1;
+        // Written by the tool from its own numbers (#2553).
+        return new RegExp("\\(\\s*[A-Z_]+,\\s*'" + e + "',").test(add);
       }));
 }
 
