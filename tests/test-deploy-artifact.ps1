@@ -492,7 +492,13 @@ if ($ds) {
     Yes 'Deploy-Server sends the artifact before anything is staged' ($send.Count -eq 1 -and $send[0].Extent.StartOffset -lt (At $ds 'Write-Host "Staging in'))
     $sendSrv = @(Commands $ds 'Send-ThornswoodArtifact' | Where-Object { (Arg $_ 'Artifact') -eq '$serverArtifact' })
     Yes '  and the server build''s, once, before anything is staged (#459)' ($sendSrv.Count -eq 1 -and $sendSrv[0].Extent.StartOffset -lt (At $ds 'Write-Host "Staging in') -and
-        @(Commands $ds 'Send-ThornswoodArtifact').Count -eq 2)
+        @(Commands $ds 'Send-ThornswoodArtifact').Count -eq 3)
+    # -FromStore -ServerBuild sends a build CI made to the store, before the
+    # stage too, after it is held to the record here (#459).
+    $sendCi = @(Commands $ds 'Send-ThornswoodArtifact' | Where-Object { (Arg $_ 'Artifact') -eq '$sent' })
+    Yes '  and -FromStore -ServerBuild''s, once, held to the record first and sent before anything is staged (#459)' (
+        $sendCi.Count -eq 1 -and $sendCi[0].Extent.StartOffset -lt (At $ds 'Write-Host "Staging in') -and
+        (At $ds '$sent = Test-ThornswoodServerBuildArtifact -Zip $ServerBuild -Record $recordPath') -lt $sendCi[0].Extent.StartOffset)
     Yes 'and records it only once the swap has said SWAP OK' ($set.Count -eq 1 -and $set[0].Extent.StartOffset -gt (At $ds "if (`$swapOut -notcontains 'SWAP OK')"))
     Yes 'and the live server serves the record from its data folder' ($set.Count -eq 1 -and (Arg $set[0] 'Beside') -eq '"$Root/data/thornswood-deploy.json"')
     Yes 'the build copy of gamemode.js is compared by hash, not by size' ((At $ds '(Get-FileHash -LiteralPath $src).Hash -ne (Get-FileHash -LiteralPath $built).Hash') -ge 0)
