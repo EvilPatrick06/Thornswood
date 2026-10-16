@@ -298,8 +298,7 @@ namespace Thornswood
                     string next = own + ".thornswood-share";
                     if (File.Exists(next)) File.Delete(next);
                     if (!CreateHardLink(next, theirs, IntPtr.Zero)) continue;
-                    DropName(own);
-                    File.Move(next, own);
+                    SwapIn(next, own, true);   // one rename, never a delete first (#2599)
                     var sh = new Shared();
                     sh.Rel = rel;
                     sh.Sha = sha;
@@ -422,8 +421,7 @@ namespace Thornswood
             if (File.Exists(next)) File.Delete(next);
             bool linked;
             Place(theirs, next, !SameVolume(steam, Folder), out linked);
-            if (File.Exists(own)) DropName(own);
-            File.Move(next, own);
+            SwapIn(next, own, true);   // one rename, never a delete first (#2599)
             s.At = StampOf(own);
             return true;
         }

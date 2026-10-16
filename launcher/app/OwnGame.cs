@@ -152,6 +152,35 @@ namespace Thornswood
                                       new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error()).Message);
         }
 
+        /// <summary>
+        /// Puts next in path's place in one rename (#2599), the same
+        /// MoveFileEx WriteRecord uses: until the call path is the old file,
+        /// after it the new one, and a launcher stopped anywhere never leaves
+        /// path missing. A delete and then a move left a moment with no file:
+        /// killed 150 times, that left it missing 30 times (#2591).
+        ///
+        /// Read only belongs to the file, not the name, and a rename over a
+        /// read only file is refused the same way a delete is. clearReadOnly
+        /// is DropName's rule, for a name this folder is letting go of: the
+        /// mark is cleared only when the rename was refused because of it.
+        /// Without it the refusal is thrown and path is left as it was, which
+        /// is what the delete did before on a file shared with Vortex's copy.
+        /// </summary>
+        internal static void SwapIn(string next, string path, bool clearReadOnly)
+        {
+            if (MoveFileEx(next, path, MoveReplaceExisting | MoveWriteThrough)) return;
+            int err = Marshal.GetLastWin32Error();
+            if (clearReadOnly && err == 5 && File.Exists(path) &&
+                (File.GetAttributes(path) & FileAttributes.ReadOnly) != 0)
+            {
+                File.SetAttributes(path, File.GetAttributes(path) & ~FileAttributes.ReadOnly);
+                if (MoveFileEx(next, path, MoveReplaceExisting | MoveWriteThrough)) return;
+                err = Marshal.GetLastWin32Error();
+            }
+            throw new IOException(path + " could not be replaced by " + next + ": " +
+                                  new System.ComponentModel.Win32Exception(err).Message);
+        }
+
         const int MoveReplaceExisting = 0x1;
         const int MoveWriteThrough = 0x8;
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
@@ -1893,8 +1922,9 @@ namespace Thornswood
                 if (!File.Exists(path) || Links(path) <= 1) return;
                 string own = path + ".own";
                 File.Copy(path, own, true);
-                File.Delete(path);
-                File.Move(own, path);
+                // One rename over the shared name, never a delete first (#2599).
+                try { SwapIn(own, path, false); }
+                catch { try { File.SetAttributes(own, FileAttributes.Normal); File.Delete(own); } catch { } throw; }
             }
             catch (Exception ex) { Swallow.Note("OwnGame.Separate, move", ex); }
         }
