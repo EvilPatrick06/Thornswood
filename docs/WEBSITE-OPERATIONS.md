@@ -115,9 +115,10 @@ clone, in PowerShell 7.
    files hold something of the person's, removes it, starts each one again,
    and ends `DELETED, and written down in C:\Thornswood-Deletions\requests.jsonl`.
    `NOT FINISHED` names a file it could not change; run it again.
-5. **What is not on the box**, by hand: remove their approved gallery
-   pictures in the hub by name (the gallery keeps no account with an approved
-   picture).
+5. **What the run cannot find**, by hand: a gallery picture of theirs
+   approved before 16 October 2026, removed in the hub by name. Until then the
+   site kept no account with a picture once it was approved, so nothing ties
+   those to them; the run finds every one sent since.
 6. **Tell them** in the ticket that it is done, and what stays: staff's
    records about them (bans, PKs, notes, the staff logs), reports they made or
    that were made about them, a session staff marked kept, and what the game's

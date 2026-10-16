@@ -153,11 +153,12 @@ function Build {
     Put (Join-Path $D 'for-bot\moderation.log') ('{"what":"note","pid":' + $P1 + '}' + "`n" + '{"what":"ban","pid":' + $PY + '}' + "`n")
     Put (Join-Path $D 'roster.json') ('{"who":{"' + $P1 + '":{"name":"Mine"},"' + $P2 + '":{"name":"Shared"},"' + $PY + '":{"name":"Yours"}},"servers":{"main":{"checked":[' + $P1 + ',' + $PY + '],"held":[' + $P1 + ']}}}')
     Put (Join-Path $D 'gallery-pending.json') ('[{"name":"20261001-mine.png","by":"Me","discordId":"' + $ME + '"},{"name":"20261001-yours.png","by":"You","discordId":"' + $YOU + '"}]')
-    Put (Join-Path $D 'gallery.json') '[{"name":"20260901-old.png","url":"/shot/20260901-old.png","by":"Me"}]'
-    Put (Join-Path $D 'gallery-reports.json') ('[{"name":"20260901-old.png","why":"x","discordId":"' + $ME + '"}]')
-    Put (Join-Path $Site 'uploads\20261001-mine.png') 'mine'
-    Put (Join-Path $Site 'uploads\20261001-yours.png') 'yours'
-    Put (Join-Path $Site 'uploads\uploads.json') '{"20261001-mine.png":{"by":"Me"},"20261001-yours.png":{"by":"You"}}'
+    # Approved: one of theirs, one of theirs with an open report, one from
+    # before the uploads note kept an account, and one of somebody else's.
+    Put (Join-Path $D 'gallery.json') '[{"name":"20260901-old.png","url":"/shot/20260901-old.png","by":"Me"},{"name":"20261002-approved.png","url":"/shot/20261002-approved.png","by":"Me"},{"name":"20261003-reported.png","url":"/shot/20261003-reported.png","by":"Me"},{"name":"20261004-yours.png","url":"/shot/20261004-yours.png","by":"You"}]'
+    Put (Join-Path $D 'gallery-reports.json') ('[{"name":"20260901-old.png","why":"x","discordId":"' + $ME + '"},{"name":"20261003-reported.png","why":"y","discordId":"' + $YOU + '"}]')
+    foreach ($n in '20261001-mine.png', '20261001-yours.png', '20260901-old.png', '20261002-approved.png', '20261003-reported.png', '20261004-yours.png') { Put (Join-Path $Site ('uploads\' + $n)) $n }
+    Put (Join-Path $Site 'uploads\uploads.json') ('{"20261001-mine.png":{"by":"Me","discordId":"' + $ME + '"},"20261001-yours.png":{"by":"You","discordId":"' + $YOU + '"},"20260901-old.png":{"by":"Me"},"20261002-approved.png":{"by":"Me","discordId":"' + $ME + '"},"20261003-reported.png":{"by":"Me","discordId":"' + $ME + '"},"20261004-yours.png":{"by":"You","discordId":"' + $YOU + '"}}')
     Put (Join-Path $D 'bans.json') ('{"' + $ME + '":{"why":"x"}}')
     Put (Join-Path $D 'notes.json') ('{"p:' + $P1 + '":[{"text":"a"},{"text":"b"}]}')
     Put (Join-Path $D 'pk.json') ('{"' + $P1 + '":{"why":"x"}}')
@@ -242,6 +243,8 @@ try {
         (Said 'kept\s+1\s+site: bans') -and (Said 'kept\s+2\s+site: staff notes') -and (Said 'kept\s+1\s+site: PK records') -and
         (Said 'kept\s+1\s+site: reports they made') -and (Said 'kept\s+1\s+site: reports about them') -and
         (Said 'kept\s+1\s+site: session rows staff marked kept'))
+    Yes '  and counts their approved gallery picture, and leaves the one a report is about' (
+        (Said 'remove\s+1\s+site: approved gallery pictures') -and (Said 'kept\s+1\s+site: gallery pictures held while a report about them is looked into'))
     Yes '  and counts the game registers naming their character without changing them' (Said 'left\s+1\s+live game server: places in private\\property\.json naming their character')
     if (-not (Said 'A real run stops these')) { Show }
     Yes '  and names the services a real run would stop' (Said 'A real run stops these while it changes their files, then starts them again: the site, the live game server, the dev game server, live voice, dev voice, the bot\.')
@@ -275,6 +278,14 @@ try {
     Yes 'their waiting gallery submission is gone, file and note too' (
         $gp.Count -eq 1 -and $gp[0].discordId -eq $YOU -and -not (Test-Path (Join-Path $Site 'uploads\20261001-mine.png')) -and
         $null -eq $um.'20261001-mine.png' -and (Test-Path (Join-Path $Site 'uploads\20261001-yours.png')))
+    $gl = @(J (Join-Path $D 'gallery.json'))
+    Yes 'their approved gallery picture is gone, file and note too' (
+        @($gl | Where-Object { $_.name -eq '20261002-approved.png' }).Count -eq 0 -and -not (Test-Path (Join-Path $Site 'uploads\20261002-approved.png')) -and
+        $null -eq $um.'20261002-approved.png')
+    Yes '  the one a report is about stays, and so do the old one with no account and somebody else''s' (
+        (@($gl | ForEach-Object { $_.name }) -join ',') -eq '20260901-old.png,20261003-reported.png,20261004-yours.png' -and
+        (Test-Path (Join-Path $Site 'uploads\20261003-reported.png')) -and $null -ne $um.'20261003-reported.png' -and
+        (Test-Path (Join-Path $Site 'uploads\20260901-old.png')) -and (Test-Path (Join-Path $Site 'uploads\20261004-yours.png')))
     Yes 'bans, notes, PK, gallery reports and the staff log are as they were' (
         $before['\Thornswood-Docs\data\bans.json'] -eq (Get-FileHash (Join-Path $D 'bans.json')).Hash -and
         $before['\Thornswood-Docs\data\notes.json'] -eq (Get-FileHash (Join-Path $D 'notes.json')).Hash -and

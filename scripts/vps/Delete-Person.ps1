@@ -42,7 +42,7 @@
                     (for-bot\trouble.json), their characters' rows in
                     roster.json, the tickets, applications and calls for help
                     they sent (for-bot\inbox.json), and their gallery
-                    submissions still waiting for staff, with the file
+                    pictures, waiting or approved, with the file
     game servers    each character's change form (world\changeForms, and the
                     world-before-* and _discarded-* copies), its card
                     (private\characters.json and the characters-before-*
@@ -72,8 +72,11 @@
       rest of the game server's private and data files): counted, never
       changed, because what happens to a house or a bounty held by a deleted
       character is the game's rule to decide (#2351 says which decision).
-    - approved gallery pictures: the gallery keeps no account for them, only
-      the name typed with them, so staff remove theirs in the hub.
+    - a gallery picture with an open report against it, or taken down after
+      one and still held, which is staff's while they look into it (#2352);
+      and one approved before the site kept the sending account in its
+      uploads note (16 Oct 2026, #2351), which nothing ties to them, so staff
+      remove theirs in the hub by name.
     - logs, which age by their own rule (server.log 30 days, #2349; the
       site's, the gamemode's, voice's and the bot's by size), and the
       encrypted backups, which expire on their schedule and are why the
@@ -508,7 +511,36 @@ for (const person of people) {
       if (keep.length !== pending.value.length) { pending.value = keep; pending.dirty = true; }
     }
     const greports = json(path.join(D, 'gallery-reports.json'), s.writer);
-    if (want(greports, 'array')) held(T + ': reports they made about a gallery picture', greports.value.filter((x) => isObj(x) && String(x.discordId || '') === id).length);
+    const hasReports = want(greports, 'array');
+    if (hasReports) held(T + ': reports they made about a gallery picture', greports.value.filter((x) => isObj(x) && String(x.discordId || '') === id).length);
+    /*
+      Their approved pictures. gallery.json keeps no account, because the site
+      hands it out; the uploads note the site writes at submission does
+      (site/server.js, #2351). One with an open report against it, or taken
+      down after one and still held, is staff's while they look into it, the
+      site's own rule (#2352), and is left. A picture approved before the
+      note carried the account cannot be found here: Show says so.
+    */
+    const gallery = json(path.join(D, 'gallery.json'), s.writer);
+    const umeta = s.uploads ? json(path.join(s.uploads, 'uploads.json'), s.writer) : null;
+    if (want(gallery, 'array') && umeta && want(umeta, 'object')) {
+      const reported = new Set(hasReports ? greports.value.filter(isObj).map((x) => String(x.name)) : []);
+      for (const name of Object.keys(umeta.value)) {
+        const m = umeta.value[name];
+        if (!isObj(m) || String(m.discordId || '') !== id || !/^[A-Za-z0-9._ -]+$/.test(name) || name === 'uploads.json') continue;
+        const onGallery = gallery.value.some((g) => isObj(g) && String(g.name) === name);
+        if (reported.has(name) || (m.removed && Number(m.heldUntil) > a.now)) { held(T + ': gallery pictures held while a report about them is looked into', 1); continue; }
+        if (onGallery) {
+          gallery.value = gallery.value.filter((g) => !(isObj(g) && String(g.name) === name));
+          gallery.dirty = true;
+          removed(T + ': approved gallery pictures', 1);
+        } else removed(T + ': other gallery files they sent', 1);
+        const fp = path.join(s.uploads, name);
+        if (fs.existsSync(fp)) unlinks.set(fp, s.writer);
+        delete umeta.value[name];
+        umeta.dirty = true;
+      }
+    }
     const bans = json(path.join(D, 'bans.json'), s.writer);
     const notes = json(path.join(D, 'notes.json'), s.writer);
     const pk = json(path.join(D, 'pk.json'), s.writer);
@@ -669,6 +701,7 @@ $null = New-Item -ItemType Directory -Path $work -Force
 function Run-Core([string]$mode) {
     $plan = @{
         mode    = $mode
+        now     = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
         people  = @($people | ForEach-Object { @{ discordId = $_.discordId; profiles = @($_.profiles) } })
         site    = $SiteRoot
         servers = @(@{ tag = 'live'; root = $GameRoot }, @{ tag = 'dev'; root = $DevGameRoot })
@@ -699,7 +732,7 @@ function Show([string[]]$lines, [string]$verb) {
     }
     Say ''
     Say '  Not on this box, so not done here: their Discord tickets (staff delete those in the Discord),'
-    Say '  approved gallery pictures (no account is kept with them: remove theirs in the hub by name),'
+    Say '  gallery pictures approved before the site kept the sending account (remove theirs in the hub by name),'
     Say '  and the encrypted backups (they expire on their schedule; the record reapplies this after a restore).'
 }
 function Stopped([string[]]$lines) {
