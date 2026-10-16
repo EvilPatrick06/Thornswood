@@ -7255,83 +7255,13 @@
   sp.on('loadGame', guard('no bounty', noBounty));
 
   /*
-    ------------------------------------------------- the town gates
-
-    Patrick, 21 September, from playing it: "The gate into the whiterun inner
-    city needs to be unlocked", and then "it is the front gate into the city".
-
-    MEASURED IN Skyrim.esm, through the same reader Build-DoorTable.py uses.
-    The Whiterun main gate is base WRDoorMainGate01, 50973, and it is placed
-    twice: 1b1f1 stands outside in the Tamriel persistent cell and carries a
-    lock of level 255 wanting key d8f0c, and 1b1f3 stands inside and carries
-    none. So the gate is shipped locked by Bethesda, and the outside leaf is
-    the one everybody presses.
-
-    IN A SINGLE GAME a quest script opens it. Under SkyMP no Papyrus quest
-    runs at all, so nothing ever does, and the town has no way in. The Riften
-    main gate, RTMainGate01, is the same shape twice over: 42284 wants key
-    e6705 and 42286 wants a key that does not exist, both at level 255. Riften
-    is not on Patrick's list because nobody has walked up to it yet; it is in
-    here because it is the identical defect at the identical kind of door and
-    finding it and leaving it shut would be choosing to keep a town closed.
-
-    WHY THE CLIENT AND NOT THE SERVER. The server has no lock state; it has
-    never had one. activationService.ts in the fork refuses to announce a press
-    on a locked reference at all, which is the Thornswood patch that keeps the
-    lockpicking game honest, so a locked gate never reaches the server for the
-    server to have an opinion about. The lock only exists here, so it can only
-    be lifted here.
-
-    ON A CLOCK RATHER THAN ONCE. A persistent reference keeps its lock across a
-    cell load and the world is rebuilt every session, so a single call at world
-    up would be enough today and would be silently wrong the first time
-    anything relocks it. Thirty seconds and three isLocked reads is nothing.
-
-    NOTHING ELSE IS TOUCHED. Every other locked door in the province stays
-    locked, including the two JK's Skyrim doors inside the Whiterun gate, so
-    lockpicking is the same game it was.
+    The town gates are no longer opened here (#2484). Bethesda ships the
+    Whiterun main gate (1b1f1) and Riften's two outer leaves (42284, 42286)
+    locked, and this used to unlock them every thirty seconds. Thornswood-Last.esp
+    (scripts/mods/Build-LastPlugin.py, GATES) now carries the three without
+    their lock, so they load unlocked. A claimed gate is still locked by the
+    property block's lock script (#615).
   */
-  const TOWN_GATES = [0x1b1f1, 0x42284, 0x42286];
-  const GATE_EVERY_MS = 30000;
-  let gatesAt = 0;
-  const gateSaid = {};
-
-  function openTheGates() {
-    for (let i = 0; i < TOWN_GATES.length; i++) {
-      const id = TOWN_GATES[i];
-      try {
-        // A claimed locked gate is property's to hold shut (#615). The lock
-        // script publishes __thornswoodPropertyShut; do not force those open.
-        try {
-          const shut = globalThis.__thornswoodPropertyShut;
-          if (shut && shut[id]) { continue; }
-        } catch (e) { }
-        const refr = sp.ObjectReference.from(sp.Game.getFormEx(id));
-        // Not loaded is not a problem. The next pass will find it.
-        if (!refr) { continue; }
-        if (!refr.isLocked()) { continue; }
-        refr.lock(false, false);
-        if (!gateSaid[id]) {
-          gateSaid[id] = true;
-          say('opened the town gate ' + id.toString(16) +
-              ', which vanilla ships locked and no script here opens');
-        }
-      } catch (e) {
-        if (!gateSaid[id]) {
-          gateSaid[id] = true;
-          say('could not open the town gate ' + id.toString(16) + ': ' + e);
-        }
-      }
-    }
-  }
-
-  sp.on('update', guard('gates', () => {
-    const now = Date.now();
-    if (gatesAt && now - gatesAt < GATE_EVERY_MS) { return; }
-    gatesAt = now;
-    openTheGates();
-  }));
-
   /*
     WHICH MENUS ARE UP, FROM THE GAME'S OWN EVENTS. Issue 1033.
 

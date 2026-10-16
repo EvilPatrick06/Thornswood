@@ -502,8 +502,8 @@
     },
     {
       "path": "game/content/Thornswood-Last.esp",
-      "sha256": "6354c54806a90e95ddc1c61ca622e18497e757abd7fc18bf029035a4765dae6f",
-      "what": "The light plugin that loads last (#2468): 6,757 cut placed actors overridden initially disabled, with their cells and worldspaces copied exactly from the plugin that wins each, 2,226 vanilla quests and 16 of the collection's mod quests with gate, door or arrival talk stopped. 5,984,128 bytes on 16 Oct, rebuilt against the remade content plugin (#2553).",
+      "sha256": "d8824757672eb39e0ef4067952070d6f4be782248fbb8b460e7efe60caac7d0e",
+      "what": "The light plugin that loads last (#2468): 6,757 cut placed actors overridden initially disabled, with their cells and worldspaces copied exactly from the plugin that wins each, 2,226 vanilla quests and 16 of the collection's mod quests with gate, door or arrival talk stopped, and the three town gates Bethesda ships locked (1b1f1, 42284, 42286) overridden without their lock or script (#2484). 5,984,572 bytes on 16 Oct.",
       "published": "Every pack and the installer on both channels, and handed out by both game servers, since #2486 (Patrick, 12 Oct: it ships from the repository like the content plugin)",
       "source": "Built by scripts\\mods\\Build-LastPlugin.py from the load order's own plugins (Skyrim's and the collection's), as overrides of their records",
       "creator": "Built here; the records it overrides and copies are those plugins' authors'",

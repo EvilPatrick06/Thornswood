@@ -285,7 +285,7 @@ class Plugin(object):
             if tag in want:
                 flags, fid = struct.unpack_from('<II', b, p + 8)
                 ctx = None
-                if tag in (b'ACHR', b'CELL'):
+                if tag in (b'ACHR', b'REFR', b'CELL'):
                     world = cell = child = block = sub = None
                     for (_, gt, lb) in stack:
                         if gt == 1:
@@ -497,6 +497,26 @@ def vmad_objects(tree):
             yield a['obj']
             for o in props(a['scripts']):
                 yield o
+
+
+# ------------------------------------------------------ the town gates
+
+# The town gates (#2484). Bethesda ships these three placed doors locked (XLOC
+# level 255, key only): the Whiterun main gate's outside leaf and Riften's two
+# outer leaves. In a single game a quest script opens Whiterun's
+# (defaultunlockonload on DialogueWhiterunGuardGateStop, stage 10); under SkyMP
+# no Papyrus runs and #2468 stops that quest, so nothing ever would. No later
+# plugin in the catalogue's order overrides any of them (read 16 Oct). This
+# plugin carries each winning record without its lock and without its script,
+# so the gates load unlocked. A claimed gate is still locked by the property
+# block's own lock script (#615), which never read the record's lock.
+GATES = (('skyrim.esm', 0x01B1F1), ('skyrim.esm', 0x042284), ('skyrim.esm', 0x042286))
+
+# What a gate's copy keeps, and which of those hold a form id in their first
+# four bytes. Anything else on the record stops the build.
+GATE_DROP = {b'XLOC', b'VMAD'}
+GATE_PLAIN = {b'EDID', b'DATA'}
+GATE_FID_FIRST = {b'NAME', b'XTEL', b'XNDP', b'XLRT'}
 
 
 # ------------------------------------------------- what holds a form id
@@ -767,7 +787,7 @@ def build(data_dir):
     catalogue = json.load(open(CATALOGUE, encoding='utf-8'))
     policy = json.load(open(POLICY, encoding='utf-8'))
     order, canon, plugins = load(data_dir, catalogue)
-    win = winners(plugins, {b'ACHR', b'CELL', b'WRLD', b'QUST'})
+    win = winners(plugins, {b'ACHR', b'REFR', b'CELL', b'WRLD', b'QUST'})
     tables = {}
 
     def strings(src, kind):
@@ -839,9 +859,21 @@ def build(data_dir):
         mod_stopped.append({'quest': desc_of(gid, canon), 'edid': edid})
         qentries.append(e)
 
-    # The cells and worlds the actors stand in, each from its own winner.
+    # 3. The town gates (#2484), each the winning record, unlocked.
+    gates = []
+    for g in GATES:
+        e = win.get((b'REFR', g))
+        what = '%x:%s' % (g[1], canon[g[0]])
+        if e is None:
+            raise SystemExit('STOP. no plugin places the town gate %s. Nothing was written.' % what)
+        if b'XLOC' not in [t for t, _ in subrecords(plugins[e.pi].data(e))]:
+            raise SystemExit('STOP. the town gate %s already has no lock in %s; take it off GATES. '
+                             'Nothing was written.' % (what, plugins[e.pi].name))
+        gates.append(e)
+
+    # The cells and worlds the actors and gates stand in, each from its own winner.
     cells, worlds = {}, {}
-    for e in actors:
+    for e in actors + gates:
         src = plugins[e.pi]
         world, cell, child, block, sub = e.ctx
         if cell is None or child not in (8, 9):
@@ -864,7 +896,25 @@ def build(data_dir):
     rn = Renumber()
 
     def copies():
-        out = {'achr': [], 'cell': {}, 'wrld': {}, 'qust': []}
+        out = {'achr': [], 'refr': [], 'cell': {}, 'wrld': {}, 'qust': []}
+        for e in gates:
+            src = plugins[e.pi]
+            what = '%s REFR 0x%08X' % (src.name, e.fid)
+            keep = []
+            for t, b in subrecords(src.data(e)):
+                if t in GATE_DROP:
+                    continue
+                if t in GATE_FID_FIRST:
+                    if len(b) < 4:
+                        raise SystemExit('STOP. %s %s is too short for a form id. Nothing was written.'
+                                         % (what, t.decode()))
+                    b = struct.pack('<I', rn.one(src, struct.unpack_from('<I', b, 0)[0], what)) + b[4:]
+                elif t not in GATE_PLAIN:
+                    raise SystemExit('STOP. %s carries %s, which this does not know how to copy. '
+                                     'Nothing was written.' % (what, t.decode()))
+                keep.append((t, b))
+            out['refr'].append((rn.one(src, e.fid, what), e.flags & ~COMPRESSED,
+                                pack_subrecords(keep), e))
         for e in actors:
             src = plugins[e.pi]
             what = '%s ACHR 0x%08X' % (src.name, e.fid)
@@ -923,8 +973,9 @@ def build(data_dir):
         'counts': {'actorsOff': len(refs['disabled']), 'cells': len(made['cell']),
                    'worlds': len(made['wrld']), 'questsStopped': len(quests_cut),
                    'modQuestsStopped': len(mod_stopped),
-                   'questsKept': len(quests_kept)},
+                   'questsKept': len(quests_kept), 'gatesUnlocked': len(gates)},
         'refs': {k: sorted(v, key=ref_key) for k, v in refs.items()},
+        'gatesUnlocked': [desc_of(g, canon) for g in GATES],
         'quests': {'stopped': quests_cut, 'kept': quests_kept, 'modStopped': mod_stopped},
         'arrivalTalk': arrival_talk(plugins, canon),
     }
@@ -975,9 +1026,10 @@ def write_plugin(made, masters, plugins, rn):
 
     # Placed actors under their cells, persistent (8) before temporary (9).
     children = collections.defaultdict(lambda: {8: [], 9: []})
-    for fid, flags, data, e in made['achr']:
-        src = plugins[e.pi]
-        children[src.gid(e.ctx[1])][e.ctx[2]].append((fid, flags, data))
+    for tag in ('achr', 'refr'):
+        for fid, flags, data, e in made[tag]:
+            src = plugins[e.pi]
+            children[src.gid(e.ctx[1])][e.ctx[2]].append((fid, e.tag, flags, data))
 
     def cell_and_children(cg):
         cfid, cflags, cdata, ce = made['cell'][cg]
@@ -986,7 +1038,7 @@ def write_plugin(made, masters, plugins, rn):
             items = sorted(children[cg][kind])
             if items:
                 body += g(struct.pack('<I', cfid), kind,
-                          b''.join(r(b'ACHR', f, i, d) for i, f, d in items))
+                          b''.join(r(t, f, i, d) for i, t, f, d in items))
         return r(b'CELL', cflags, cfid, cdata) + g(struct.pack('<I', cfid), 6, body)
 
     interior = collections.defaultdict(lambda: collections.defaultdict(list))
@@ -1066,8 +1118,13 @@ def verify(data_dir, plugin_bytes, manifest):
     if not last.hflags & LIGHT:
         return ['the plugin is not flagged light']
     plugins = plugins + [last]
-    win = winners(plugins, {b'ACHR', b'QUST'})
+    win = winners(plugins, {b'ACHR', b'REFR', b'QUST'})
     fails = []
+    for desc in manifest.get('gatesUnlocked', []):
+        e = win.get((b'REFR', ref_key(desc)))
+        tags = [t for t, _ in subrecords(plugins[e.pi].data(e))] if e else []
+        if e is None or e.pi != last.index or b'XLOC' in tags or b'VMAD' in tags:
+            fails.append('town gate %s is left locked' % desc)
     for desc in manifest['refs']['disabled']:
         e = win.get((b'ACHR', ref_key(desc)))
         tags = [t for t, _ in subrecords(plugins[e.pi].data(e))] if e else []

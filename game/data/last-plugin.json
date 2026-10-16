@@ -4,8 +4,8 @@
  "issue": 2468,
  "plugin": {
   "name": "Thornswood-Last.esp",
-  "size": 5984128,
-  "sha256": "6354c54806a90e95ddc1c61ca622e18497e757abd7fc18bf029035a4765dae6f"
+  "size": 5984572,
+  "sha256": "d8824757672eb39e0ef4067952070d6f4be782248fbb8b460e7efe60caac7d0e"
  },
  "loadOrder": [
   "Skyrim.esm",
@@ -663,7 +663,8 @@
   "worlds": 50,
   "questsStopped": 2226,
   "modQuestsStopped": 16,
-  "questsKept": 48
+  "questsKept": 48,
+  "gatesUnlocked": 3
  },
  "refs": {
   "disabled": [
@@ -10271,6 +10272,11 @@
    "35dcd4:WindhelmSSE.esp"
   ]
  },
+ "gatesUnlocked": [
+  "1b1f1:Skyrim.esm",
+  "42284:Skyrim.esm",
+  "42286:Skyrim.esm"
+ ],
  "quests": {
   "stopped": [
    {
