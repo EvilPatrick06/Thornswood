@@ -329,6 +329,10 @@ jobs:
           # session's alert stays) and a Discord sign-in no longer sets the
           # member cookie tw; test-chat-log.js holds the hourly chat prune.
           # A second.
+          # Issue #2183: tests\test-2183-availability.ps1 holds
+          # Read-Availability.ps1, the reader of the watchdog's down and back
+          # lines, to its counting on made-up lines, under pwsh and Windows
+          # PowerShell 5.1, and to reading only. About ten seconds.
           $six ='test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
@@ -563,7 +567,8 @@ jobs:
                  'test-launcher-icons.js',
                  'test-whose-game-gate.js',
                  'test-gate-list.ps1',
-                 'test-storage-forecast.ps1'
+                 'test-storage-forecast.ps1',
+                 'test-2183-availability.ps1'
           $failed = @()
           foreach ($n in $six) {
             $p = Join-Path 'tests' $n
