@@ -181,7 +181,7 @@ function rig(opts) {
   };
 
   const prelude =
-    'let keysSeen = 0, stuckKeys = 0, stuckMoveKeys = 0, sawAnyKey = true;\n' +
+    'let keysSeen = 0, sawAnyKey = true;\n' +
     'function rememberKey() { }\n' +
     'function wantTyping(on, fill) { typed.push([on, fill]); }\n' +
     'function lookVerb() { }\n' +

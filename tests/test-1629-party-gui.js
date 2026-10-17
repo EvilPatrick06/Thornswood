@@ -131,7 +131,7 @@ function rig(opts) {
     keyDown: function () { }
   };
   const prelude =
-    'let keysSeen = 0, stuckKeys = 0, stuckMoveKeys = 0, sawAnyKey = true;\n' +
+    'let keysSeen = 0, sawAnyKey = true;\n' +
     menus + '\n' +
     "const JOURNAL_MENU = 'Journal Menu';\n" +
     keyPrelude('') +

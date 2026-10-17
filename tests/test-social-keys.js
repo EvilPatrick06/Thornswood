@@ -100,7 +100,7 @@ function rig(opts) {
     };
   };
   const prelude =
-    'let keysSeen = 0, stuckKeys = 0, stuckMoveKeys = 0, sawAnyKey = true;\n' +
+    'let keysSeen = 0, sawAnyKey = true;\n' +
     // between() keeps its start marker, so this is the declaration itself.
     menus + '\n  ];\n' +
     "const JOURNAL_MENU = 'Journal Menu';\n" +

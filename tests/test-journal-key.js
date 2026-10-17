@@ -243,7 +243,7 @@ function rig(opts) {
   const clockDate = { now: function () { return clock.t; } };
 
   const prelude =
-    'let keysSeen = 0, stuckKeys = 0, stuckMoveKeys = 0, sawAnyKey = false;\n' +
+    'let keysSeen = 0, sawAnyKey = false;\n' +
     'function rememberKey() { }\n' +
     'function wantTyping() { }\n' +
     'function lookVerb() { }\n' +

@@ -255,7 +255,7 @@ function client(opt) {
     // The / and P watchers on the game's own menus (test-slash-key.js).
     'const OFF_MENU = { openedBy: function () { return ""; }, shutFor: function () { }, keyDown: function () { } };',
     'const statsOnSlash = OFF_MENU, magicOnP = OFF_MENU;',
-    'let keysSeen = 0, stuckKeys = 0, stuckMoveKeys = 0, sawAnyKey = true;',
+    'let keysSeen = 0, sawAnyKey = true;',
     'function busyMenuOpen() { return busyMenuOpenNow(); }',
     'function rememberKey() {}',
     'function wantTyping() {}',

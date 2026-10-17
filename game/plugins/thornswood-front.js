@@ -1767,8 +1767,8 @@
    * name that is off by a character rather than saying it has never heard of
    * it. 'Favorites Menu' was such a name. The quick favourites menu, the one
    * on Q, is 'FavoritesMenu', so for as long as somebody had it open this file
-   * believed no menu was open at all: the chat key, the emote wheel, the stuck
-   * watchdog and the controls watchdog all treated it as open world. The magic
+   * believed no menu was open at all: the chat key, the emote wheel and the
+   * old stuck and controls watchdogs (#2620) all treated it as open world. The magic
    * menu was simply missing. Both are what skymp5-client's own isBadMenuShown
    * asks for, spelled the way it spells them.
    */
@@ -2396,7 +2396,6 @@
   // Set while we are re-activating something, so our own call does not come
   // back through this handler and recurse.
   let reActivating = false;
-  let lastActivateAt = 0;
   const lastForced = {};
 
   /*
@@ -2543,16 +2542,11 @@
       Skyrim there has ever been. An activation with no actionRef at all
       (caster 0) is the game activating something while a cell loads, which is
       likewise not a press, so it is dropped with the rest.
-
-      lastActivateAt is set AFTER this, not before. It feeds the focus
-      watchdog's "activated something Xms ago", and a farmhand's day of work
-      is not a reason to believe the person is busy.
     */
     let casterId = 0;
     try { casterId = e.caster ? e.caster.getFormID() : 0; } catch (err) { }
     if (casterId !== 0x14) { return; }
 
-    lastActivateAt = now;
     if (reActivating) { return; }
 
     let target = 0, base = 0, type = -1, blocked = 'unknown', name = '';
@@ -2827,10 +2821,10 @@
     watcher below). This side only says which of the two it saw.
   */
   let restSent = false;
-  /* #843: chairs/benches leave controls off with no menu. The controls
-     watchdog, stuck rescue and ownTheCharacter all refuse to fight that
-     state when notOurs() says so. getFurnitureReference alone can flicker
-     null while still seated, so furnitureEnter/Exit keep a seated flag too. */
+  /* #843: chairs/benches leave controls off with no menu. ownTheCharacter,
+     holdSprintGate and holdNpcClear refuse to fight that state when
+     notOurs() says so. getFurnitureReference alone can flicker null while
+     still seated, so furnitureEnter/Exit keep a seated flag too. */
   let seatedInFurniture = false;
 
   try {
@@ -3589,30 +3583,21 @@
   }));
 
   /*
-   * Whether the game is letting the character be driven at all.
+   * The eight control flags, read for the log and nothing else (#2620).
    *
-   * This is the last way the game can ignore the keyboard, and the only one
-   * left standing. The pulse has now shown a lock with keys arriving here at
-   * six hundred every five seconds, no menu open, and browser focus off. So
-   * the keys are reaching the process, nothing is holding them, and the game
-   * is deciding to do nothing with them.
+   * Skyrim's EnablePlayerControls and DisablePlayerControls take these flags.
+   * Two timers used to sit here, the controls watchdog and the stuck rescue,
+   * that switched every control back on and took the character off the AI
+   * without knowing who had switched them off. The tester logs from 24
+   * September to 16 October say what they were catching: the mining furniture
+   * switching fighting and camera off on purpose, which #843 taught notOurs()
+   * to see, and nothing else. The keyboard lock they were written for was the
+   * engine's console idle branch, switched off in the fork. Nothing in this
+   * tree switches a control off or turns AI driven on, so both are gone.
    *
-   * Skyrim has exactly one switch for that. EnablePlayerControls and its
-   * opposite take eight flags, and with movement and looking off the character
-   * stands there ignoring you while everything else in the process carries on
-   * normally. Its cousin SetPlayerAIDriven hands the character to the AI, which
-   * is the same silence plus the character walking off on its own, which is the
-   * other half of what has been reported for days.
-   *
-   * Both are switched on by somebody and switched back off by the same
-   * somebody, so anything that throws, disconnects or is simply never told to
-   * finish leaves them stuck. There is no getter for AI driven and no way to
-   * ask who did it, so this does not try to find out. It waits five seconds,
-   * says which ones are off, and turns them back on.
-   *
-   * Five seconds because a real one is momentary. Menus are excluded outright:
-   * the game switches controls off for its own menus and race creation, and
-   * those turn themselves back on.
+   * What stays is the reading: the five second input line below names any
+   * control that is off, so a control that ever sticks again is in the log
+   * with its name, which is the trail to whatever switched it off.
    */
   const CONTROLS = [
     ['movement', 'isMovementControlsEnabled'],
@@ -3625,23 +3610,18 @@
     ['journal', 'isJournalControlsEnabled']
   ];
 
-  let controlsOffNow = [];
-  let controlsSince = 0;
-
   /*
     CONTROLS THE SERVER HOLDS OFF ON PURPOSE (#2573, #2620).
 
-    The watchdog below and the stuck rescue turned every control back on,
-    whoever had switched it off, because nothing told them some were off on
-    purpose. Cuffs (#2573) switch fighting off for as long as somebody is
-    bound, so five seconds later the watchdog handed the weapon back. The
-    one who switches a control off now says so: sp.storage
-    .thornswoodControlsHeld, a name per control ('fighting', and the names in
-    CONTROLS) with the reason, set by the cuffs' own property script in this
-    game and taken off when they are freed. Both rescues read it, count a
-    held control as not off, and switch on everything but the held ones.
-    sp.storage, not a variable here, because the property script runs
-    outside this file.
+    Whoever switches a control off on purpose says so in sp.storage
+    .thornswoodControlsHeld: a name per control (the names in CONTROLS) with
+    the reason. The cuffs' own property script sets 'fighting' while somebody
+    is bound and takes it off when they are freed (#2573). sp.storage, not a
+    variable here, because the property script runs outside this file.
+
+    Nothing in this file switches a held control back on, or any other: the
+    input line reads the record so the log tells a control held off on
+    purpose apart from one that is off with nobody saying why.
   */
   function heldOff() {
     let h = null;
@@ -3652,42 +3632,22 @@
     }
     return out;
   }
-  /* Every control on but the held ones. Nine, see controlsTick. */
-  function enableAllBut(held) {
-    const on = (name) => held.indexOf(name) === -1;
-    sp.Game.enablePlayerControls(on('movement'), on('fighting'), on('camera'), on('looking'),
-      on('sneaking'), on('menus'), on('activate'), on('journal'), true);
-  }
 
   /*
-    Two states where controls being off is the game doing its job.
-
-    Death, and sitting in anything. The watchdog turns every control back on
-    and takes the character off the AI after five seconds with no menu open,
-    and neither dying nor riding a carriage opens a menu, so it fought the
-    death camera and the respawn wait every time somebody was killed and it
-    stood people up out of chairs, beds and carriages.
+    Two states where controls being off is the game doing its job: death, and
+    sitting in anything (chairs, benches, beds, carts, mining, chopping).
+    Dying and sitting both switch controls off on purpose and open no menu.
+    ownTheCharacter, holdSprintGate and holdNpcClear leave both alone.
 
     Both answers are cheap and both are wrapped, because a build without one
-    of these natives must not take the watchdog down with it.
+    of these natives must not take its callers down with it. Cached at a
+    quarter second: several handlers ask every frame, and getPlayer, isDead
+    and the furniture and sit reads do not need answering thirty times a
+    frame (measured 26 September, #1033 audit).
   */
-
-  /* Same reason as the menu cache above: nine native calls a frame for an
-     answer that only matters once it has held for five seconds. Death and
-     furniture get the same rate: a five-second watchdog does not need them
-     thirty times a frame.
-
-     MEASURED 26 September after MENU_CACHE_MS and CONTROLS_CACHE_MS were
-     already 250: controls was still #1 in 11/13 heartbeats (366-736 ms per
-     ~30 s). The residual was this handler still calling getPlayer and
-     notOurs (getPlayer again, isDead, furniture/sit state) on every
-     update. The whole tick now shares that quarter-second rate. */
   const CONTROLS_CACHE_MS = 250;
-  let controlsCachedAt = 0;
-  let controlsCached = [];
   let notOursCachedAt = 0;
   let notOursCached = '';
-  let controlsTickAt = 0;
 
   function notOursNow() {
     let pc = null;
@@ -3695,10 +3655,10 @@
     if (!pc) { return ''; }
     try { if (pc.isDead()) { return 'dead'; } } catch (e) { }
     /* Chair/bench kick-out (#843). Sitting turns controls off with no menu.
-       enablePlayerControls / setPlayerAIDriven(false) stand people up. Three
+       enablePlayerControls / setPlayerAIDriven(false) stood people up. Three
        signals, any one is enough: the enter/exit flag, the furniture ref,
        and getSitState (non-zero = waiting to sit, sitting, or standing up).
-       The ref alone used to flicker null and the watchdog kicked them out. */
+       The ref alone used to flicker null and the old watchdog kicked them out. */
     try {
       if (typeof seatedInFurniture !== 'undefined' && seatedInFurniture) {
         return 'in furniture';
@@ -3737,85 +3697,16 @@
     return off;
   }
 
-  function readControls() {
-    const now = Date.now();
-    if (now - controlsCachedAt < CONTROLS_CACHE_MS) { return controlsCached; }
-    controlsCachedAt = now;
-    controlsCached = readControlsNow();
-    return controlsCached;
-  }
-
-  function controlsTick() {
-    const now = Date.now();
-    // Happy path and stuck countdown both: four times a second is enough
-    // for a five-second threshold, and keeps getPlayer / isDead /
-    // getFurnitureReference / isMenuOpen off the every-frame path.
-    if (now - controlsTickAt < CONTROLS_CACHE_MS) { return; }
-    controlsTickAt = now;
-
-    let pc = null;
-    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
-    if (!pc || busyMenuOpen()) { controlsOffNow = []; controlsSince = 0; return; }
-    // Dying and sitting both switch controls off on purpose and open no menu.
-    const theirs = notOurs();
-    if (theirs) { controlsOffNow = []; controlsSince = 0; return; }
-
-    // A control the server holds off is not off by mistake (heldOff).
+  /* The input line's controls part: on, or off with the names, and what the
+     server holds off on purpose named on its own (heldOff). Asked once every
+     five seconds, by the pulse only. */
+  function pulseControls() {
     const held = heldOff();
-    const off = readControls().filter((name) => held.indexOf(name) === -1);
-    controlsOffNow = off;
-    if (!off.length) { controlsSince = 0; return; }
-
-    if (!controlsSince) { controlsSince = now; return; }
-    if (now - controlsSince < 5000) { return; }
-    controlsSince = 0;
-
-    try {
-      // Nine, not eight. Special Edition added abFastTravel to the end of both
-      // EnablePlayerControls and DisablePlayerControls, and the binding counts
-      // them. Passing eight threw every single time this ran, so the watchdog
-      // has been reporting the problem and never once fixing it.
-      enableAllBut(held);
-      try { sp.Game.setPlayerAIDriven(false); } catch (e) { }
-      say('the game had controls switched off with no menu open (' +
-          off.join(', ') + '). turned them back on.');
-    } catch (e) {
-      say('tried to turn controls back on and it threw: ' + e);
-    }
+    const off = readControlsNow().filter((name) => held.indexOf(name) === -1);
+    return (off.length ? ', controls off [' + off.join(', ') + ']' : ', controls on') +
+      (held.length ? ', held [' + held.join(', ') + ']' : '');
   }
 
-  sp.on('update', guard('controls', controlsTick));
-
-  /*
-   * Keys arriving and the character not moving. The lock, finally stated as
-   * something that can be measured.
-   *
-   * Every check in this file has now come back clean during a lock: keys reach
-   * the plugin at four hundred every five seconds, no menu is open, the browser
-   * does not have focus, all eight control flags read enabled, and DirectInput
-   * reports a healthy device on every read. The console turning up is not the
-   * cause either; the log shows it appearing AFTER two pulses of four hundred
-   * keys, which is somebody mashing an unresponsive game and eventually hitting
-   * the console key themselves.
-   *
-   * What is left is SetPlayerAIDriven. It hands the character to the AI, and
-   * while it is on the character ignores every key with all eight control flags
-   * still reading enabled, because they are enabled: they are just not what is
-   * driving anybody. It is the one state in this whole search with NO getter,
-   * which is exactly why it has survived every check written so far. Anything
-   * that turns it on and then throws, disconnects, or is never told to finish
-   * leaves it on.
-   *
-   * So this measures the symptom instead of the state. Somebody pressing forty
-   * keys in five seconds while standing perfectly still, with no menu open and
-   * not typing in chat, is not playing: they are stuck. That is the moment to
-   * switch the controls back on and take the character off the AI, both of
-   * which are harmless when nothing was wrong.
-   *
-   * Cart rides are the one legitimate AI driven moment on this server, and they
-   * survive: forty key presses in five seconds is mashing, not the occasional
-   * press of somebody sitting still watching the scenery.
-   */
   /*
     ------------------------------------- three chopping blocks, taken away
 
@@ -6595,110 +6486,6 @@
     }
   }));
 
-
-  let stuckKeys = 0;
-  let stuckMoveKeys = 0;
-  let stuckAt = 0;
-  let stuckPos = null;
-  let lastRescue = 0;
-
-  sp.on('update', guard('stuck', () => {
-    const now = Date.now();
-    if (!stuckAt) { stuckAt = now; stuckKeys = 0; return; }
-    if (now - stuckAt < 5000) { return; }
-
-    const keys = stuckKeys;
-    const moveKeys = stuckMoveKeys;
-    stuckKeys = 0;
-    stuckMoveKeys = 0;
-    stuckAt = now;
-
-    let pc = null;
-    try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
-
-    const was = stuckPos;
-    let pos = null;
-    try {
-      pos = pc ? [pc.getPositionX(), pc.getPositionY(), pc.getPositionZ()] : null;
-    } catch (e) { pos = null; }
-    stuckPos = pos;
-
-    if (!pc || !pos || !was) { return; }
-
-    const dx0 = pos[0] - was[0];
-    const dy0 = pos[1] - was[1];
-    const dz0 = pos[2] - was[2];
-    const movedNow = Math.sqrt(dx0 * dx0 + dy0 * dy0 + dz0 * dz0);
-
-    /*
-      Say why this did not fire, every time it nearly did.
-      A run where somebody reports being stuck and this file says nothing at
-      all is a wasted run. If the conditions are wrong they can only be fixed
-      by seeing which one said no.
-    */
-    if (keys >= 40 && movedNow <= 8) {
-      const why = [];
-      if (moveKeys < 2) { why.push('only ' + moveKeys + ' movement keys'); }
-      if (now - lastActivateAt < 3000) { why.push('activated something ' + (now - lastActivateAt) + 'ms ago'); }
-      if (claims.chat) { why.push('typing in chat'); }
-      const busyName = busyMenuOpen();
-      if (busyName) { why.push(busyName + ' is open'); }
-      const why2 = notOurs();
-      if (why2) { why.push('they are ' + why2); }
-      if (lastRescue && now - lastRescue < 15000) { why.push('rescued ' + (now - lastRescue) + 'ms ago'); }
-      if (why.length) {
-        say('not calling it stuck: ' + keys + ' keys, ' + moveKeys +
-            ' movement, moved ' + movedNow.toFixed(1) + ' units, but ' +
-            why.join(' and '));
-      }
-    }
-
-    if (keys < 40) { return; }
-    // Somebody trying to walk, not somebody standing at something pressing E.
-    if (moveKeys < 2) { return; }
-    // And not somebody mid interaction: an activation in the last three
-    // seconds means the game is doing something, whatever it looks like.
-    if (now - lastActivateAt < 3000) { return; }
-    if (claims.chat) { return; }
-    if (busyMenuOpen()) { return; }
-    // Somebody dead, or sitting in something, is not stuck. They are dead or
-    // sitting in something, and standing them up is the bug.
-    const notMine = notOurs();
-    if (notMine) { return; }
-
-    const dx = pos[0] - was[0];
-    const dy = pos[1] - was[1];
-    const dz = pos[2] - was[2];
-    const moved = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    if (moved > 8) { return; }
-
-    // Not more than once every fifteen seconds, so a genuine stuck moment does
-    // not turn into something that fights the game every frame.
-    if (lastRescue && now - lastRescue < 15000) { return; }
-    lastRescue = now;
-
-    say('stuck: ' + keys + ' keys in 5s (' + moveKeys +
-        ' of them movement) and the character moved ' +
-        moved.toFixed(1) + ' units. controls ' +
-        (controlsOffNow.length ? 'off [' + controlsOffNow.join(', ') + ']' : 'on') +
-        ', browser focus ' + (function () {
-          try { return sp.browser.isFocused() ? 'yes' : 'no'; } catch (e) { return 'unknown'; }
-        })() +
-        '. Switching controls on and taking the character back off the AI.');
-
-    try {
-      // All but what the server holds off on purpose (heldOff, #2620).
-      enableAllBut(heldOff());
-    } catch (e) {
-      say('enablePlayerControls threw: ' + e);
-    }
-    try {
-      sp.Game.setPlayerAIDriven(false);
-    } catch (e) {
-      say('setPlayerAIDriven threw: ' + e);
-    }
-  }));
-
   /*
    * Jump and sprint.
    *
@@ -6742,10 +6529,7 @@
    *               for everybody who is not the person playing, and that branch
    *               has no jump or sprint transition to take.
    *
-   * Both are put back where they belong on a two second heartbeat. The
-   * watchdog above already did the first one, but only after somebody had
-   * pressed forty keys in five seconds without moving, and a person who can
-   * walk and run perfectly well never looks stuck, so it never ran for this.
+   * Both are put back where they belong on a two second heartbeat.
    *
    * THAT WAS NOT IT, and this is written here rather than tidied away because
    * the next person will otherwise have the same idea. 1.1.53 shipped the two
@@ -7455,9 +7239,10 @@
       names = open.length ? (' [' + open.join(', ') + ']') : ' [none of the usual ones]';
     }
 
-    const controls = controlsOffNow.length
-      ? ', controls off [' + controlsOffNow.join(', ') + ']'
-      : ', controls on';
+    // Read now, every flag, whatever else is going on (#2620). A menu or a
+    // chair switching some off is named here like anything else; the menu
+    // part of the line says which.
+    const controls = pulseControls();
 
     /*
       Which window Windows is sending the keys to.
@@ -7535,8 +7320,7 @@
     people save, change settings and quit. The journal flag on
     DisablePlayerControls is documented as leaving only the System page of
     the book, which takes the quest log mods still write to away from Escape
-    as well, and the controls watchdog above turns every control back on
-    after five seconds anyway.
+    as well.
 
     So the book is shut the moment it opens, when J opened it, with the same
     TESModPlatform.closeMenu that shuts the console.
@@ -8376,15 +8160,6 @@
 
   sp.on('buttonEvent', guard('keys', (e) => {
     keysSeen++;
-    // Before the isDown guard, not after it.
-    //
-    // The threshold on this was sized against the pulse's number, which counts
-    // every button event including the repeats a held key produces each frame.
-    // Counting only key downs here made those two numbers mean different
-    // things: the ring shows twenty key downs across twenty five seconds while
-    // the pulse was reporting three hundred in five, so forty was never once
-    // reached and the detector could not fire.
-    stuckKeys++;
     if (!e.isDown || e.isUp) return;
 
     rememberKey(e.code);
@@ -8395,12 +8170,6 @@
     // menu. See ourKeyMenu above.
     statsOnSlash.keyDown();
     magicOnP.keyDown();
-    // 17 30 31 32 are W A S D. Somebody standing at a handle pressing E is not
-    // stuck, they are using something, and that is what the one and only
-    // firing of this detector actually caught.
-    if (e.code === 17 || e.code === 30 || e.code === 31 || e.code === 32) {
-      stuckMoveKeys++;
-    }
 
     if (!sawAnyKey) {
       sawAnyKey = true;

@@ -13,7 +13,7 @@
 //
 // Runs the REAL cuffs block over a stand-in mp, packs, offices and places;
 // its client scripts over a stand-in Skyrim Platform; the REAL front plugin
-// watchdog helpers over a stand-in game (#2620); and reads the REAL wiring.
+// held-controls reading over a stand-in game (#2620); and reads the REAL wiring.
 // Read only.
 'use strict';
 const fs = require('fs');
@@ -469,7 +469,7 @@ if (C && typeof C.used === 'function') {
     yes('...the drawn weapon put away', log.indexOf('sheathe') !== -1);
     yes('...the cuffs equipped so they cannot be taken off', log.indexOf('equip locked') !== -1);
     yes('...and the bound hands idle played', log.indexOf('anim OffsetBoundStandingStart') !== -1);
-    yes('...and fighting is named as held off by the server, for the front plugin\'s watchdog (#2620)',
+    yes('...and fighting is named as held off by the server, for the front plugin\'s input line (#2620)',
       !!s.sp.storage.thornswoodControlsHeld && s.sp.storage.thornswoodControlsHeld.fighting === 'cuffed');
     log.length = 0;
     own({ value: bound, state: st, sp: s.sp });
@@ -525,29 +525,42 @@ yes('the cuffs answer onEquipItemAttempt and ask any handler already there, neve
 yes('mp.onDropItem refuses the pair on a prisoner\'s wrists', /cuffsDrop && !cuffsDrop\.mayLetGo\(actorId, baseId, count\)\) \{ return false; \}/.test(handler('onDropItem')));
 yes('mp.onPutItem does too', /cuffsPut && !cuffsPut\.mayLetGo\(actorId, baseId, count\)\) \{ return false; \}/.test(handler('onPutItem')));
 
-// The front plugin's two rescues and what the server holds off (#2620).
+// What the server holds off, as the front plugin reads it (#2620). The
+// controls watchdog and the stuck rescue are gone, so nothing in the plugin
+// switches fighting back on; the cuffs' own script keeps it off while bound,
+// and the input line names it as held rather than off.
 const front = fs.readFileSync(path.join(ROOT, 'game', 'plugins', 'thornswood-front.js'), 'utf8').split(String.fromCharCode(13)).join('');
 function frontSlice(a, b) { const i = front.indexOf(a); const j = i < 0 ? -1 : front.indexOf(b, i); return (i >= 0 && j >= 0) ? front.slice(i, j + b.length) : null; }
-const helpers = frontSlice('  function heldOff() {', '      on(\'sneaking\'), on(\'menus\'), on(\'activate\'), on(\'journal\'), true);\n  }');
-yes('the front plugin reads what the server holds off', !!helpers);
-if (helpers) {
+const controlsBlock = frontSlice('  const CONTROLS = [', '  function pulseControls() {');
+const pulseControlsSrc = frontSlice('  function pulseControls() {', '\n  }\n');
+yes('the front plugin reads what the server holds off', !!controlsBlock && controlsBlock.indexOf('function heldOff()') >= 0 && !!pulseControlsSrc);
+if (controlsBlock && pulseControlsSrc) {
   const calls = [];
-  const fsp = { storage: {}, Game: { enablePlayerControls: function () { calls.push([].slice.call(arguments)); } } };
-  const H = new Function('sp', helpers + '\nreturn { heldOff: heldOff, enableAllBut: enableAllBut };')(fsp);
-  yes('nothing held: nothing named', H.heldOff().length === 0);
+  const flags = { fighting: true };
+  const Game = {
+    enablePlayerControls: function () { calls.push([].slice.call(arguments)); },
+    getPlayer: function () { return null; }
+  };
+  [['movement', 'isMovementControlsEnabled'], ['fighting', 'isFightingControlsEnabled'], ['camera', 'isCamSwitchControlsEnabled'],
+   ['looking', 'isLookingControlsEnabled'], ['sneaking', 'isSneakingControlsEnabled'], ['menus', 'isMenuControlsEnabled'],
+   ['activate', 'isActivateControlsEnabled'], ['journal', 'isJournalControlsEnabled']].forEach(function (p) {
+    Game[p[1]] = function () { return flags[p[0]] !== false; };
+  });
+  const fsp = { storage: {}, Game: Game };
+  const H = new Function('sp', 'Date', 'var seatedInFurniture = false;\n' + controlsBlock.replace('  function pulseControls() {', '') + pulseControlsSrc +
+    '\nreturn { heldOff: heldOff, line: pulseControls };')(fsp, { now: function () { return 1000; } });
+  yes('nothing held: nothing named', H.heldOff().length === 0 && H.line() === ', controls on');
   fsp.storage.thornswoodControlsHeld = { fighting: 'cuffed' };
+  flags.fighting = false;
   yes('cuffed: fighting is named', H.heldOff().join() === 'fighting');
-  H.enableAllBut(H.heldOff());
-  yes('...and switching controls on leaves fighting off and turns the rest on, nine arguments',
-    calls.length === 1 && calls[0].length === 9 && calls[0][1] === false && calls[0][0] === true && calls[0][7] === true);
+  yes('...and the input line names it as held, not as off (' + H.line() + ')', H.line() === ', controls on, held [fighting]');
+  flags.camera = false;
+  yes('...while anything else off is still named as off (' + H.line() + ')', H.line() === ', controls off [camera], held [fighting]');
+  yes('...and nothing switched any control on', calls.length === 0);
 }
-const tickSrc = frontSlice('  function controlsTick() {', '\n  }\n');
-yes('the controls watchdog does not count a held control as off, and switches on all but the held ones',
-  !!tickSrc && /readControls\(\)\.filter\(\(name\) => held\.indexOf\(name\) === -1\)/.test(tickSrc) && /enableAllBut\(held\)/.test(tickSrc) &&
-  !/enablePlayerControls\(true, true/.test(tickSrc));
-yes('no rescue anywhere in the front plugin switches every control on regardless',
-  !/enablePlayerControls\(true, true, true, true, true, true, true, true, true\)/.test(front) &&
-  (front.match(/enableAllBut\(heldOff\(\)\)/g) || []).length === 1);
+yes('no rescue is left in the front plugin to hand a cuffed person their weapon back (#2620)',
+  front.indexOf('function controlsTick()') < 0 && front.indexOf("guard('stuck'") < 0 &&
+  !/\benableAllBut\b/.test(front) && !/enablePlayerControls\(/.test(front.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')));
 
 // A target still waiting on the join pass, or with no profile yet (#410): their state is not loaded,
 // so a guard facing them cuffs nobody and frees nobody, and is not refused. Both load orders.

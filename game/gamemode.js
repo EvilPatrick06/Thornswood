@@ -55746,8 +55746,8 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
   (preventRemoval), plays Skyrim's bound hands idle, the one the Helgen
   prisoners walk with (OffsetBoundStandingStart), and turns off the fighting
   controls, so no weapon or spell can be drawn; anything drawn is put away.
-  The front plugin's controls watchdog and stuck rescue leave fighting off
-  while the server holds it off (sp.storage.thornswoodControlsHeld, #2620).
+  Nothing in the front plugin turns it back on (#2620); its input line names
+  fighting as held (sp.storage.thornswoodControlsHeld).
   They still walk, talk, open doors and use menus. Everybody near sees the
   cuffs on the body and the idle, which the neighbour script plays on that
   body. It is written on the character, so it lasts through a logout, a

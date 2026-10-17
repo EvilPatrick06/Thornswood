@@ -70,9 +70,9 @@ function rig() {
   const fn = new Function(
     'sp', 'guard', 'say', 'serverBases', 'lastForced', 'lastLogged',
     'Date', 'Math', 'ran',
-    'let reActivating = false; let lastActivateAt = 0;\n' +
+    'let reActivating = false;\n' +
     body +
-    '\nreturn { seen: function () { return lastActivateAt; } };');
+    '\nreturn {};');
 
   let handler = null;
   const sp = {
@@ -122,8 +122,6 @@ if (body !== null) {
     yes('S1 an NPC working a seam is not re-activated as the person',
         seam.activatedBy === undefined);
     yes('S1 and nothing is put on the screen for it', r.said.length === 0);
-    yes('S1 and it does not count as the person doing something',
-        r.seen() === 0);
   }
 
   // S2: the game activating something while a cell loads carries no actionRef.
@@ -132,7 +130,7 @@ if (body !== null) {
     const seam = ref(VEIN, VEIN_BASE, 24, 'Iron Ore Vein');
     r.fire({ target: seam, caster: null });
     yes('S2 an activation with no actor behind it is dropped',
-        seam.activatedBy === undefined && r.seen() === 0);
+        seam.activatedBy === undefined);
   }
 
   // S3: and the person's own press still works exactly as it did.
@@ -142,7 +140,6 @@ if (body !== null) {
     r.fire({ target: lever, caster: { getFormID: function () { return 0x14; } } });
     yes('S3 the person\'s own press on a handle still runs its script',
         lever.activatedBy !== undefined);
-    yes('S3 and it counts as the person doing something', r.seen() > 0);
   }
 
   // S4: a base the server answers for is still left alone, as before.
@@ -181,12 +178,9 @@ if (body !== null) {
   const code = src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
   yes('the handler asks whose press it is',
       /casterId !== 0x14/.test(code));
-  // Order matters: the watchdog must not be told the person is busy because a
-  // farmhand is busy.
-  const i = code.indexOf('casterId !== 0x14');
-  const j = code.indexOf('lastActivateAt = now;');
-  yes('and it asks before writing down that the person did something',
-      i > 0 && j > i);
+  // lastActivateAt went with the stuck rescue, its only reader (#2620).
+  yes('and keeps no last-activation time for a rescue that is gone',
+      code.indexOf('lastActivateAt') < 0);
 }
 
 console.log('');

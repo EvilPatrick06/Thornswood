@@ -49,6 +49,13 @@ const pb = pa < 0 ? -1 : src.indexOf(SHUT, pa);
 const listAt = src.indexOf('  const PULSE_MENUS = [');
 const from = (listAt >= 0 && listAt < pa) ? listAt : pa;
 const code = (pa >= 0 && pb >= 0) ? src.slice(from, pb + SHUT.length) : null;
+// The line's controls part comes from the real CONTROLS table through
+// pulseControls (#2620): the pulse reads the eight flags itself now.
+const ca = src.indexOf('  const CONTROLS = [');
+const cp = ca < 0 ? -1 : src.indexOf('  function pulseControls() {', ca);
+const cb = cp < 0 ? -1 : src.indexOf('\n  }\n', cp);
+const controlsCode = (ca >= 0 && cb >= 0) ? src.slice(ca, cb + 4) : '';
+yes('the controls block the pulse reads is in the plugin', !!controlsCode);
 
 yes('the pulse handler is in the plugin', code !== null);
 yes('the menus it names are kept from menuOpen and menuClose',
@@ -66,7 +73,7 @@ const FakeDate = { now: function () { return clock.t; } };
 
 function rig(opts) {
   opts = opts || {};
-  const w = { up: {}, lines: [], handlers: {}, asked: { isMenuOpen: 0, isInMenuMode: 0, isFocused: 0, foreground: 0 } };
+  const w = { up: {}, lines: [], handlers: {}, asked: { isMenuOpen: 0, isInMenuMode: 0, isFocused: 0, foreground: 0, controls: 0 } };
   const spent = {};
   const sp = {
     on: function (ev, fn) { (w.handlers[ev] = w.handlers[ev] || []).push(fn); },
@@ -77,6 +84,15 @@ function rig(opts) {
         return Object.keys(w.up).length > 0;
       }
     },
+    Game: (function () {
+      const g = { getPlayer: function () { return null; } };
+      ['isMovementControlsEnabled', 'isFightingControlsEnabled', 'isCamSwitchControlsEnabled',
+       'isLookingControlsEnabled', 'isSneakingControlsEnabled', 'isMenuControlsEnabled',
+       'isActivateControlsEnabled', 'isJournalControlsEnabled'].forEach(function (n) {
+        g[n] = function () { w.asked.controls++; spin(CALL_MS); return true; };
+      });
+      return g;
+    })(),
     browser: { isFocused: function () { w.asked.isFocused++; spin(CALL_MS); return false; } },
     win32: opts.noWin32 ? undefined : {
       foregroundWindow: function () { w.asked.foreground++; spin(CALL_MS); return { isGame: true }; }
@@ -95,7 +111,7 @@ function rig(opts) {
       }
     };
   }
-  const prelude = 'let lastPulse = 0;\nlet keysSeen = 0;\nlet controlsOffNow = [];\n';
+  const prelude = 'let lastPulse = 0;\nlet keysSeen = 0;\nvar seatedInFurniture = false;\n' + controlsCode + '\n';
   new Function('sp', 'guard', 'say', 'logOwnerOutfitTransition', 'frameWent', 'Date', prelude + code)(
     sp, guard, function (t) { w.lines.push(String(t)); }, function () { }, function () { }, FakeDate);
   function fire(ev, e) { (w.handlers[ev] || []).forEach(function (f) { f(e); }); }
@@ -161,6 +177,9 @@ function rig(opts) {
   yes('it still asks isInMenuMode, browser focus and the foreground window once a line (8 each), asked ' +
       [w.asked.isInMenuMode, w.asked.isFocused, w.asked.foreground].join('/'),
       w.asked.isInMenuMode === 8 && w.asked.isFocused === 8 && w.asked.foreground === 8);
+  yes('it reads the eight control flags once a line (64 in 8 lines), read ' + w.asked.controls,
+      w.asked.controls === 64);
+  yes('and the line says controls on: ' + w.last(), /controls on/.test(w.last()));
 }
 
 {
