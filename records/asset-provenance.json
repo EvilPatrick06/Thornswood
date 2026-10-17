@@ -474,17 +474,16 @@
     },
     {
       "path": "game/content/Thornswood-Content.esp",
-      "sha256": "56efd81b767e12d2e736b841abb395b3ca6a9c8c15a587bbce00cd6502be3b89",
-      "what": "Thornswood's own plugin, 132,868 bytes on 16 Oct (#2553). Every record in it but 57 placements is written by scripts/mods/Add-ContentRecords.py from its own numbers, or is Bethesda's own record: the cells and worldspaces those placements stand in, and the house part and woodworking overrides. Until #400 its header said its crafting and gathering content was salvaged from another server's plugin; scripts/mods/content-salvaged.json lists every salvaged record and what became of it.",
+      "sha256": "78de79e801a44ebffbc4f9ea737059eedca4301b2e0a12d90e78976034780cbc",
+      "what": "Thornswood's own plugin, 105,010 bytes on 17 Oct (#2553). Every record in it is written by scripts/mods/Add-ContentRecords.py from its own numbers, or is Bethesda's own record it overrides: the cells and the worldspace its placements stand in, copied from the winning master, and the house part and woodworking recipe overrides. Its placements of the kiln, the salt quarry, the hive and the alchemy lab stand where scripts/dev/Build-StationSites.py measured Thornswood's own spots (game/data/station-sites.json). Until #400 its header said its crafting and gathering content was salvaged from another server's plugin; scripts/mods/content-salvaged.json lists every salvaged record and that none is left.",
       "published": "Every pack and the installer on both channels, and Nexus Mods mod 192001 through the collection",
-      "source": "Remade under #2553 (Patrick, 15 Oct, option B on #2177): the salvaged keywords, stations, charcoal and recipes are written from Thornswood's rulebook and pointers to Bethesda's own records, and the other server's other placements and its changes to Skyrim's own placements are gone. Left: 57 placements of Thornswood's kiln, salt quarry, hive and alchemy lab, at the spots the other server chose, until Thornswood stands its own (#2553).",
-      "creator": "Thornswood (scripts/mods/Add-ContentRecords.py), but the 57 placements, which are the other server's",
-      "licence": "Thornswood's own for every remade record; for the 57 placements, not recorded: no permission from that server's makers is recorded",
-      "attribution": "not recorded",
-      "approved": "Patrick publishes it as Thornswood Content on Nexus Mods (EvilPatrick06); Patrick, 15 Oct, #2177 B: remade as Thornswood's own",
-      "evidence": "THIRD-PARTY.md, Thornswood Content; scripts/mods/content-salvaged.json; tests/test-2553-salvaged-gone.js.",
-      "status": "unconfirmed",
-      "ask": "Patrick (#2553): where Thornswood stands its own kilns, salt quarries, hives and alchemy labs. When those 57 placements are Thornswood's own, this entry is ours."
+      "source": "Remade under #2553 (Patrick, 15 Oct, option B on #2177): the salvaged keywords, stations, charcoal and recipes are written from Thornswood's rulebook and pointers to Bethesda's own records; the other server's placements, its 57 of Thornswood's stations included (Patrick, 16 Oct, A on #2553), and its changes to Skyrim's own placements are gone.",
+      "creator": "Thornswood (scripts/mods/Add-ContentRecords.py and scripts/dev/Build-StationSites.py)",
+      "licence": "Thornswood's own; the Bethesda records it overrides are the game's, as in any plugin with Skyrim's masters",
+      "attribution": "None asked",
+      "approved": "Patrick publishes it as Thornswood Content on Nexus Mods (EvilPatrick06); Patrick, 15 Oct, #2177 B: remade as Thornswood's own; Patrick, 16 Oct, #2553 A: its stations at Thornswood's own spots",
+      "evidence": "THIRD-PARTY.md, Thornswood Content; scripts/mods/content-salvaged.json; tests/test-2553-salvaged-gone.js; tests/test-2553-station-sites.js.",
+      "status": "ours"
     },
     {
       "path": "game/content/Thornswood-WoodworkerTrail.esp",
@@ -502,8 +501,8 @@
     },
     {
       "path": "game/content/Thornswood-Last.esp",
-      "sha256": "6354c54806a90e95ddc1c61ca622e18497e757abd7fc18bf029035a4765dae6f",
-      "what": "The light plugin that loads last (#2468): 6,757 cut placed actors overridden initially disabled, with their cells and worldspaces copied exactly from the plugin that wins each, 2,226 vanilla quests and 16 of the collection's mod quests with gate, door or arrival talk stopped. 5,984,128 bytes on 16 Oct, rebuilt against the remade content plugin (#2553).",
+      "sha256": "ebcfbe2562a1a999d06cfe90fd740ce46265201687ff834c0bc9d96558b9c77f",
+      "what": "The light plugin that loads last (#2468): 6,757 cut placed actors overridden initially disabled, with their cells and worldspaces copied exactly from the plugin that wins each, 2,226 vanilla quests and 16 of the collection's mod quests with gate, door or arrival talk stopped. 5,984,128 bytes on 17 Oct, rebuilt against the content plugin with Thornswood's own station placements (#2553).",
       "published": "Every pack and the installer on both channels, and handed out by both game servers, since #2486 (Patrick, 12 Oct: it ships from the repository like the content plugin)",
       "source": "Built by scripts\\mods\\Build-LastPlugin.py from the load order's own plugins (Skyrim's and the collection's), as overrides of their records",
       "creator": "Built here; the records it overrides and copies are those plugins' authors'",
