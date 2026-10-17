@@ -52106,6 +52106,9 @@ const WORDS = ['/ooc', '/o',
                // A wound, a disease or an agreed loss written onto somebody
                // by staff (#1383). See the injury and disease block.
                '/hurt',
+               // A creature a spawn command made, taken out for good by
+               // staff, kept or not (#2623). See the staff block.
+               '/despawn',
                /*
                  NOT A COMMAND ANYBODY TYPES. The client reports each fall of
                  the axe with it, because the server sees a press and Skyrim's
@@ -52877,6 +52880,20 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
   };
 
   function findBeast(want) { return findIn(buildBeasts(), want, 'creatures'); }
+  /*
+    A creature's name from its base record, for /despawn's answer, or ''.
+    Read out of the /spawn index (buildBeasts), the one reader of
+    ADMIN_ACTORS (test-one-mint.js), so a record is turned into the name
+    /spawn knows it by and nothing else reads that table.
+  */
+  function beastName(desc) {
+    if (!desc) { return ''; }
+    var idx = buildBeasts();
+    for (var k in idx) {
+      if (Object.prototype.hasOwnProperty.call(idx, k) && idx[k].desc === desc) { return idx[k].name; }
+    }
+    return '';
+  }
 
   /*
     Any record by its form id, for the things with no name: "/spawn 23aba",
@@ -53863,7 +53880,8 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
       try {
         if (staffCmd.command(cmd, word, parts, profileId, actorId, isStaff,
                              { findThing: findThing, findBeast: findBeast,
-                               byFormId: byFormId, findPlace: findPlace })) { return; }
+                               byFormId: byFormId, findPlace: findPlace,
+                               beastName: beastName })) { return; }
       } catch (eStaff) { log('staff command failed:', eStaff); }
     }
 
@@ -64863,7 +64881,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   var WORDS_STAFF = ['/kick', '/freeze', '/unfreeze', '/bring', '/goto',
                      '/silence', '/unsilence', '/warn', '/spawnat',
                      '/ban', '/unban', '/note', '/banaccount', '/unbanaccount', '/pk', '/unpk',
-                     '/hurt'];
+                     '/hurt', '/despawn'];
+  var DESPAWN_REACH = 1500;         // units: about 21 m, the creature beside or near you
   var BAN_SWEEP_MS = 10000;        // how often online people are checked against bans
   var SITE_WAIT_MS = 8000;
   // Everybody's (or a playtester's) words that staff can also aim at a person.
@@ -65618,6 +65637,37 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     }
 
     var me = actorId ? nameOf(actorId) : ('profile ' + pid);
+    /*
+      /DESPAWN: TAKE A SPAWNED CREATURE OUT FOR GOOD (#2623). Djinn, 17 Oct:
+      a creature made with keep stays and comes back, and staff need a way
+      to end that once it is no longer wanted. Takes no person: it is the
+      spawned creature nearest you, within DESPAWN_REACH and in your own cell
+      or worldspace, alive or dead, kept or not. Only something a spawn
+      command made (the NPC population's commanded rule), never a creature
+      or a person the world put there. removeSpawned does the removal, the
+      same one a temporary spawn gets, so it does not come back at a restart.
+    */
+    if (word === '/despawn') {
+      var here = actorId ? placeOf(actorId) : null;
+      if (!here || !here.desc) { tell(pid, 'The server cannot tell where you are right now. Try again.'); return true; }
+      var pop = g.__thornswoodNpcPopulation;
+      var made = (pop && pop.spawned) ? pop.spawned() : [];
+      var best = null, bestD = DESPAWN_REACH * DESPAWN_REACH;
+      for (var di = 0; di < made.length; di++) {
+        var at = placeOf(made[di].id);
+        if (!at || at.desc !== here.desc) { continue; }
+        var dx = at.pos[0] - here.pos[0], dy = at.pos[1] - here.pos[1], dz = at.pos[2] - here.pos[2];
+        var d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 <= bestD) { best = made[di]; bestD = d2; }
+      }
+      if (!best) { tell(pid, 'No spawned creature within about 20 metres of you. Stand next to it and try again.'); return true; }
+      var what = 'creature';
+      try { what = (look && look.beastName && look.beastName(String(mp.get(best.id, 'baseDesc') || ''))) || what; } catch (eName) { }
+      if (!removeSpawned(best.id)) { tell(pid, 'The ' + what + ' could not be removed. The server log says why.'); return true; }
+      tell(pid, 'Removed the ' + (best.keep ? 'kept ' : '') + what + ' nearest you, for good. It does not come back.');
+      record('despawn', pid, me, 0, '', (best.keep ? 'kept ' : '') + what + ' ' + best.id.toString(16), 0);
+      return true;
+    }
     if (!words.length) {
       tell(pid, word + ' who? ' + word + ' <name, or the start of it, or a profile number>.');
       return true;
@@ -66264,6 +66314,12 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
     // A spawn staff did not keep (#2623): removed when it dies.
     const entry=configured.get(id);
     return !!(entry && entry.rule.commanded && !entry.rule.keep);
+  },spawned:()=>{
+    // Every creature a spawn command made that is still held here, kept or
+    // not, alive or dead: what staff's /despawn chooses from (#2623).
+    const out=[];
+    for(const [id,entry] of configured) if(entry && entry.rule && entry.rule.commanded) out.push({id,keep:entry.rule.keep===true});
+    return out;
   }};
 }
 // NPC POPULATION POLICY END

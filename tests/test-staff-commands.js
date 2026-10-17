@@ -59,7 +59,7 @@ yes('the staff block is in gamemode.js', !!STAFF);
 const PLACE_ACTORS = slice('\nfunction serverRunId(', '\n  return { made: made, why: why };\n}');
 yes('and placeActors, which /spawn and /spawnat share', !!PLACE_ACTORS);
 yes('handle() hands staff words to the staff block with isStaff and /give\'s, /spawn\'s and /tp\'s lookups',
-    !!COMMANDS && /staffCmd\.command\(cmd, word, parts, profileId, actorId, isStaff,\s*\{ findThing: findThing, findBeast: findBeast,\s*byFormId: byFormId, findPlace: findPlace \}\)/.test(COMMANDS));
+    !!COMMANDS && /staffCmd\.command\(cmd, word, parts, profileId, actorId, isStaff,\s*\{ findThing: findThing, findBeast: findBeast,\s*byFormId: byFormId, findPlace: findPlace,\s*beastName: beastName \}\)/.test(COMMANDS));
 yes('and before the /give, /spawn and /tp branches, so a line aimed at a person reaches it first',
     !!COMMANDS && COMMANDS.indexOf('staffCmd.command(') < COMMANDS.indexOf("if (word === '/give' || word === '/spawn') {") &&
     COMMANDS.indexOf('staffCmd.command(') < COMMANDS.indexOf("if (word === '/tp' || word === '/goto') {"));
@@ -113,7 +113,9 @@ function load(w) {
     // A reference made from a base record, the way the server makes one.
     place: function (baseId) { const id = 0xff100000 + w.placed.length; w.placed.push({ id: id, base: baseId }); return id; },
     makeProperty: function () { },
-    callPapyrusFunction: function () { }
+    callPapyrusFunction: function (kind, cls, fn, self) { (w.papyrus = w.papyrus || []).push(fn); },
+    getDescFromId: function (id) { return id.toString(16) + ':Skyrim.esm'; },
+    destroyActor: function (id) { (w.destroyed = w.destroyed || []).push(id); }
   };
   const http = {
     request: function (opts, cb) {
@@ -381,6 +383,38 @@ if (COMMANDS && STAFF) {
   yes('every action wrote one line for the staff channel: ' + dids,
       // Three more spawns are the keep checks (#2623).
       dids === 'warn,freeze,unfreeze,bring,goto,silence,unsilence,kick,give,spawn,spawn,spawn,spawn,spawn,tp,tp');
+
+  /*
+    /despawn (#2623): the spawned creature nearest the staff member goes for
+    good, kept or not, and nothing the world put there is ever touched.
+  */
+  {
+    const d = load(world());
+    pass10(d, STAFFER);
+    const KEPT = 0xff200001, FAR = 0xff200002, OTHER_CELL = 0xff200003;
+    d.where[KEPT] = { desc: 'Whiterun:1', pos: [400, 200, 300], rot: [0, 0, 0] };        // 3 m away
+    d.where[FAR] = { desc: 'Whiterun:1', pos: [100, 4000, 300], rot: [0, 0, 0] };        // 54 m away
+    d.where[OTHER_CELL] = { desc: 'Riften:2', pos: [100, 200, 300], rot: [0, 0, 0] };   // same spot, other cell
+    const released = [];
+    d.box.__thornswoodNpcPopulation = {
+      spawned: function () { return [{ id: FAR, keep: false }, { id: KEPT, keep: true }, { id: OTHER_CELL, keep: true }]
+        .filter(function (s) { return (d.destroyed || []).indexOf(s.id) < 0; }); },
+      release: function (id) { released.push(id); }
+    };
+    let g2 = run(d, STAFFER, '/despawn');
+    yes('/despawn removes the spawned creature nearest you, kept or not: ' + JSON.stringify(to(g2, STAFFER)),
+        JSON.stringify(d.destroyed || []) === JSON.stringify([KEPT]) &&
+        /^Removed the kept creature nearest you, for good\./.test(to(g2, STAFFER)[0] || ''));
+    yes('through removeSpawned: its record marked deleted and its habitat slot let go',
+        (d.papyrus || []).indexOf('Delete') >= 0 && released.indexOf(KEPT) >= 0);
+    yes('and it is written for the staff channel',
+        d.records.some(function (r) { const j = JSON.parse(r.text); return j.did === 'despawn' && /kept creature ff200001/.test(j.why); }));
+    g2 = run(d, STAFFER, '/despawn');
+    yes('nothing within about 20 m, and one in another cell, are left alone',
+        JSON.stringify(d.destroyed) === JSON.stringify([KEPT]) && /No spawned creature within about 20 metres/.test(to(g2, STAFFER)[0] || ''));
+    g2 = run(d, NOBODY, '/despawn');
+    yes('/despawn from somebody not staff: "' + REFUSED + '"', to(g2, NOBODY)[0] === REFUSED);
+  }
 
   console.log('\nstaff whose identity is not proven:');
   const recs = w.records.length;
