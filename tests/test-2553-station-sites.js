@@ -126,6 +126,13 @@ yes('K6 a lab for each of the nine hold capitals, indoors beside Skyrim\'s own l
     ['Whiterun', 'Solitude', 'Windhelm', 'Riften', 'Markarth', 'Falkreath', 'Dawnstar', 'Morthal', 'Winterhold']
       .every((t) => placesOf('lab').some((w) => w.indexOf(t) >= 0)));
 
+yes("K7 Patrick's B: a kiln may stand among small plants and a salt vein is set into rock, and no other kind loosens",
+    table.kinds.kiln.amongPlants === true && table.kinds.salt.setIntoRock === true &&
+    ['hive', 'lab'].every((k) => table.kinds[k].amongPlants === false && table.kinds[k].setIntoRock === false) &&
+    table.kinds.kiln.setIntoRock === false && table.kinds.salt.amongPlants === false);
+yes("K8 only Solitude's and Markarth's kilns look 20,000 units out for a chopping block",
+    kilns.every((n) => (sites[n].townReach || 0) === 0 || ['Solitude', 'Markarth'].indexOf(sites[n].where) >= 0));
+
 // ---------------------------------------------------------------- C
 const close = [];
 for (let i = 0; i < names.length; i++) {

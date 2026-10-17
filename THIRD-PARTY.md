@@ -355,8 +355,8 @@ collection and Vortex's staging folder on the shipping machine:
   old one until a later revision patches it. Since 16 October (#2553, Patrick,
   15 October, option B on #2177) the repository's plugin is remade as
   Thornswood's own. Since 17 October (#2553, Patrick, 16 October, A) it is
-  105,010 bytes, sha256
-  `78de79e801a44ebffbc4f9ea737059eedca4301b2e0a12d90e78976034780cbc`, 155
+  110,915 bytes, sha256
+  `491e5c78915a2dea1104ec44e4304728ac44ddfddf4ee594c7f81b5e8c2a7cb3`, 161
   records. `scripts\mods\Add-ContentRecords.py` writes every record of it from
   its own numbers, or copies Bethesda's own, and places the kiln, the salt
   quarry, the hive and the alchemy lab where `scripts\dev\Build-StationSites.py`
