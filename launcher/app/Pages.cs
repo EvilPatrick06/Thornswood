@@ -581,7 +581,7 @@ namespace Thornswood
             // When a server-aware LastIssues is already in hand (Scan, Fix,
             // Play, or a finished Vortex bring-up-to-date), paint from that
             // instead of Waiting on another full Run: opening Diagnostics to
-            // press Bring it up to date from Vortex was paying the server
+            // press a button there was paying the server
             // round trip every time after #709. Fresh Run only when there is
             // no shared truth yet.
             if (Verify.LastUsedServer && Verify.LastIssues != null)

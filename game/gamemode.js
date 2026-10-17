@@ -29963,9 +29963,12 @@ log('gamemode loaded:',
       // The whole order, full and light together, the order the launcher
       // puts a plugin list into when there is a light list.
       loadOrder: Array.isArray(doc.loadOrder) ? doc.loadOrder : mods.map(function (m) { return m.filename; }),
-      // Which of those the launcher's Fix may fetch from /plugins/ (#1180).
-      // The client reads mods, loadOrder and, when it is there, light.
-      served: mods.filter(function (m) { return OURS[m.filename.toLowerCase()]; })
+      // Which of those the launcher's Fix may fetch from /plugins/ (#1180):
+      // ours, full and light (#2627). The client reads mods, loadOrder and,
+      // when it is there, light, and never this list, so a light name in it
+      // changes nothing for the client; a launcher from before #2627 marks
+      // only mods entries as served and so never asks for a light one.
+      served: mods.concat(light).filter(function (m) { return OURS[m.filename.toLowerCase()]; })
                   .map(function (m) { return m.filename; })
     };
     if (hasLight) { out.light = light; }
@@ -29989,7 +29992,7 @@ log('gamemode loaded:',
                 '/manifest.json, ' + mods.length + ' plugins' +
                 (light.length ? ' and ' + light.length + ' light plugins' : '') +
                 (dropped > 0 ? ' (' + dropped + ' archive entries left out)' : ''));
-    try { publishFiles(mods); } catch (e) { console.log('[thornswood] could not publish the plugin files: ' + e.message); }
+    try { publishFiles(mods, light); } catch (e) { console.log('[thornswood] could not publish the plugin files: ' + e.message); }
     return '';
   }
 
@@ -30011,8 +30014,15 @@ log('gamemode loaded:',
   // from its author; the launcher's Fix says which mod. Bethesda's masters
   // were never served. The clearing below takes the files an older start
   // published off this box.
+  //
+  // Our light plugins too, since #2627, as light-<index>.bin at their place
+  // in the manifest's light list, so the two lists never name one file. On
+  // 16 Oct the server's light order named Thornswood-Last.esp, which is ours
+  // and light, a machine whose launcher had not taken the release carrying
+  // it had none, and Fix had nothing to fetch: only mods entries were
+  // published, and the launcher only ever asked for those.
 
-  function publishFiles(mods) {
+  function publishFiles(mods, light) {
     var order = [];
     try { order = JSON.parse(fs.readFileSync('server-settings.json', 'utf8')).loadOrder || []; } catch (e) { return; }
     var byName = {};
@@ -30037,20 +30047,24 @@ log('gamemode loaded:',
       }
     } catch (e) { console.log('[thornswood] could not read /plugins/ to clear it: ' + e.message); }
     var linked = 0, copied = 0, missing = 0, bytes = 0;
-    for (var j = 0; j < mods.length; j++) {
-      var name = mods[j].filename;
-      if (!OURS[name.toLowerCase()]) continue;
-      var src = byName[name.toLowerCase()];
-      if (!src || !fs.existsSync(src)) { missing++; continue; }
-      var dst = path.join(PLUG, j + '.bin');
-      try {
-        fs.linkSync(src, dst);
-        linked++;
-      } catch (e) {
-        try { fs.copyFileSync(src, dst); copied++; }
-        catch (e2) { missing++; console.log('[thornswood] could not publish ' + name + ': ' + e2.message); continue; }
+    var lists = [[mods, ''], [light || [], 'light-']];
+    for (var k = 0; k < lists.length; k++) {
+      var list = lists[k][0], prefix = lists[k][1];
+      for (var j = 0; j < list.length; j++) {
+        var name = list[j].filename;
+        if (!OURS[name.toLowerCase()]) continue;
+        var src = byName[name.toLowerCase()];
+        if (!src || !fs.existsSync(src)) { missing++; continue; }
+        var dst = path.join(PLUG, prefix + j + '.bin');
+        try {
+          fs.linkSync(src, dst);
+          linked++;
+        } catch (e) {
+          try { fs.copyFileSync(src, dst); copied++; }
+          catch (e2) { missing++; console.log('[thornswood] could not publish ' + name + ': ' + e2.message); continue; }
+        }
+        bytes += Number(list[j].size) || 0;
       }
-      bytes += Number(mods[j].size) || 0;
     }
     console.log('[thornswood] ' + (linked + copied) + ' of our plugin files published at /api/servers/' + KEY +
                 '/plugins/ for the launcher, ' + Math.round(bytes / 1048576) + ' MB' +

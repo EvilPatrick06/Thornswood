@@ -70,8 +70,12 @@ yes('it asks OwnGame.NeedsRefresh, the same test Diagnostics refresh uses',
     due.indexOf('OwnGame.NeedsRefresh(cfg)') >= 0);
 yes('it runs StartOwnGame(false, true, ...), the same bring-up-to-date as the Diagnostics button',
     /StartOwnGame\(\s*false\s*,\s*true\s*,/.test(due));
-yes('the Diagnostics button is still that same StartOwnGame(false, true)',
-    /btnOwnGameRefresh\.Click \+= delegate \{ StartOwnGame\(false, true\); \}/.test(wire));
+// The Diagnostics button went in #2627: Fix runs the same bring-up-to-date
+// when Scan finds the folder behind Vortex.
+const scanFix = read('ShellScanFix.cs');
+yes('Fix on Diagnostics runs that same StartOwnGame(false, true, ...) when Scan finds the folder behind',
+    /Has\(rest, IssueKind\.Behind\) &&\s*StartOwnGame\(false, true, /.test(scanFix) &&
+    !/btnOwnGameRefresh/.test(wire));
 yes('it does not start a second refresh of its own',
     due.indexOf('OwnGame.Refresh(') < 0 && due.indexOf('OwnGame.Make(') < 0);
 yes('it leaves a running game alone',
@@ -80,17 +84,25 @@ yes('it does nothing when the folder is not due',
     /if \(!due\) return false;/.test(due));
 
 // ---- After the bring-up-to-date -------------------------------------------
-const startOwn = body(own, 'static void StartOwnGame(bool make, bool loud, Action then)');
+// Since #2627 the three-argument StartOwnGame hands on to one that also
+// takes what to do when the bring-up-to-date fails (Fix carries on then),
+// and that one does the work.
+const startOwn3 = body(own, 'static void StartOwnGame(bool make, bool loud, Action then)');
+const startOwn = body(own, 'static bool StartOwnGame(bool make, bool loud, Action then, Action failed)');
 const startOwn2 = body(own, 'static void StartOwnGame(bool make, bool loud)');
-yes('StartOwnGame(make, loud) is StartOwnGame(make, loud, null), so the button and startup are unchanged',
+yes('StartOwnGame(make, loud) is StartOwnGame(make, loud, null), so startup is unchanged',
     /^\{\s*StartOwnGame\(make, loud, null\);\s*\}$/.test(startOwn2));
+yes('and StartOwnGame(make, loud, then) is the same with nothing to do on a failure',
+    /^\{\s*StartOwnGame\(make, loud, then, null\);\s*\}$/.test(startOwn3));
 // Since #2210 the work runs in FolderWork, which StartOwnGame hands its
 // `then` to under OwnGame.Alone, so the finish is FolderWork's.
-const folderWork = body(own, 'static void FolderWork(bool make, bool loud, Action then, Config c, Action<string> say)');
+const folderWork = body(own, 'static void FolderWork(bool make, bool loud, Action then, Action failed, Config c, Action<string> say)');
 yes('StartOwnGame hands what comes after to FolderWork, under the folder\'s lock',
-    /OwnGame\.Alone\(delegate \{ FolderWork\(make, loud, then, c, say\); \}/.test(startOwn));
+    /OwnGame\.Alone\(delegate \{ FolderWork\(make, loud, then, failed, c, say\); \}/.test(startOwn));
 yes('FolderWork runs what comes after only when it worked, and never after a make',
     /if \(fail == null && !make && then != null\) then\(\);/.test(folderWork));
+yes('and what comes after a failure only when it failed',
+    /else if \(fail != null && failed != null\) failed\(\);/.test(folderWork));
 yes('that line is inside the finish on the window\'s thread, after the status is drawn again',
     folderWork.indexOf('then();') > folderWork.lastIndexOf('DrawOwnGame();') &&
     folderWork.lastIndexOf('win.Dispatcher.BeginInvoke') < folderWork.indexOf('then();'));
