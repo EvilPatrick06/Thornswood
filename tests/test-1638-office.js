@@ -98,7 +98,7 @@ const NAMES = ['officeView', 'officeHolders', 'officeRedraw', 'officeCmd', 'offi
                'isStewardOf', 'stewardHoldsOf', 'isSteward', 'isGuard', 'guardHoldsOf', 'jarlClashOf', 'officeOf',
                'evict', 'rentCmd', 'boxCmd', 'moveBoard', 'board', 'command', 'holderOf', 'here', 'buildingOf',
                'boxAt', 'holdOfBox', 'rentDue', 'nameOf', 'profileOf', 'onlineActorOf', 'redrawPanel', 'personName',
-               'boardHere'];
+               'boardHere', 'holdOfBuilding', 'notStewardHere'];
 const lifted = {};
 const missing = [];
 NAMES.forEach(function (n) { lifted[n] = fn(n); if (!lifted[n]) { missing.push(n); } });
@@ -220,6 +220,8 @@ function server() {
     'function saveLaw() { reg.lawSaves = (reg.lawSaves || 0) + 1; }',
     'var BUILDING_BY_DOOR = {}; BUILDING_BY_DOOR[' + JSON.stringify(DOOR) + '] = ' + JSON.stringify(HOUSE) + ';',
     'var BUILDING_NAME = { breezehome: "Breezehome" };',
+    // The building's hold (#2551), the way scripts/dev/Build-BuildingHolds.py writes it.
+    'var BUILDING_HOLD = { breezehome: "whiterun" };',
     'function lapseDays() { return 14; }',
     'function save() { reg.saves++; }',
     'function pushAll() { reg.pushes++; }',
@@ -487,6 +489,8 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
     const d = srv.view(STEW).door;
     yes('E2 at the door the page names the building, who holds it, and that there is no rent',
         !!d && d.name === 'Breezehome' && d.by === 'Alice' && d.rent === null);
+    yes('E2 and its hold, Whiterun, which the Steward of Whiterun keeps', d.hold === 'whiterun' && d.where === 'Whiterun' &&
+        d.ours === true);
     srv.writes.length = 0;
     const set = srv.say(STEW, '/rent 50');
     const d2 = srv.view(STEW).door;
@@ -520,6 +524,22 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
     const jev = srv.say(JARL, '/evict');
     yes('E11 the Jarl, who keeps their hold, sets the rent and evicts (' + jev.told + ')',
         !srv.claims[HOUSE] && /^You end Alice's claim/.test(jev.told));
+
+    // Patrick, 16 October, answer C (#2551): a steward settles their own hold's buildings only.
+    srv.claims[HOUSE] = { by: P_ALICE, name: 'Alice', at: Date.now(), touched: Date.now(), locked: false };
+    srv.give(P_NOBODY, 'steward', 'riften');
+    srv.atDoor(NOBODY);
+    const rv = srv.view(NOBODY).door;
+    yes('E12 the Steward of Riften at a Whiterun door sees whose it is, and no Evict or rent: ours is false',
+        !!rv && rv.hold === 'whiterun' && rv.where === 'Whiterun' && rv.ours === false);
+    const rev = srv.say(NOBODY, '/evict');
+    const rrent = srv.say(NOBODY, '/rent 5');
+    const WHOSE = 'Breezehome answers to Whiterun. Only the Steward of Whiterun or its Jarl ends a claim or sets rent there.';
+    yes('E13 and a line sent anyway ends no claim and sets no rent, saying whose it is (' + rev.told + ')',
+        rev.told === WHOSE && rrent.told === WHOSE && srv.claims[HOUSE].by === P_ALICE && !srv.claims[HOUSE].rent);
+    srv.atDoor(RJARL);
+    yes('E14 nor does the Jarl of Riften', srv.say(RJARL, '/evict').told === WHOSE && srv.claims[HOUSE].by === P_ALICE);
+    yes('E15 anybody still reads the rent at the door', srv.say(NOBODY, '/rent').told === 'Breezehome has no rent on it.');
   }
 
   // ----------------------------------------------------------- F. the box
@@ -529,13 +549,16 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
     yes('F1 with no container opened, the page has none', srv.view(STEW).box === null);
     srv.atBox(STEW);
     yes('F2 the container just opened is nobody\'s box yet', JSON.stringify(srv.view(STEW).box) === '{"hold":null}');
+    const other = srv.say(STEW, '/box riften');
+    yes('F3 the Steward of Whiterun does not name Riften\'s box (#2551), and is told whose it is (' + other.told + ')',
+        !srv.boxes.riften && other.told === 'Only the Steward of Riften or its Jarl names its box.');
     srv.writes.length = 0;
-    const r = srv.say(STEW, '/box riften');
-    yes('F3 pressing Riften makes it Riften\'s box, and the page says so (' + r.told + ')',
-        srv.boxes.riften === CHEST && srv.view(STEW).box.hold === 'riften' && srv.writesFor(STEW) === 1);
+    const r = srv.say(STEW, '/box whiterun');
+    yes('F3 pressing Whiterun makes it Whiterun\'s box, and the page says so (' + r.told + ')',
+        srv.boxes.whiterun === CHEST && srv.view(STEW).box.hold === 'whiterun' && srv.writesFor(STEW) === 1);
     srv.atBox(NOBODY);
-    yes('F4 somebody who is not a steward cannot', srv.say(NOBODY, '/box whiterun').told === 'Only a steward sets a hold\'s box.' &&
-        !srv.boxes.whiterun);
+    yes('F4 somebody who is not a steward cannot', srv.say(NOBODY, '/box solitude').told === 'Only a steward sets a hold\'s box.' &&
+        !srv.boxes.solitude);
   }
 
   // -------------------------------------------------------- G. the boards
@@ -752,6 +775,14 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
     yes('H12 a town under the boards asks first', lines.length === 0 && whiterun[1].textContent === 'Press again to move Whiterun\'s board here');
     if (whiterun.length === 2) { whiterun[1].onclick({}); }
     yes('H12 and the second press sends /board move whiterun', lines.join() === '/board move whiterun');
+    // A steward settles their own hold's buildings only (#2551): Riften's Steward at a Whiterun door.
+    srv.roles[P_STEW].steward = [];
+    srv.give(P_STEW, 'steward', 'riften');
+    show(srv.view(STEW));
+    goOffice();
+    yes('H13 the Steward of Riften at a Whiterun door is told whose it is, with no Evict and no rent to set',
+        /It answers to Whiterun\. Only the Steward of Whiterun or its Jarl ends a claim or sets rent here\./.test(body.textContent) &&
+        buttons('Evict').length === 0 && buttons('Set rent').length === 0 && buttons('No rent').length === 0);
     srv.roles[P_STEW].steward = [];
     show(srv.view(STEW));
     yes('H13 a steward whose role is taken loses the page', navNames().indexOf('Office') === -1);
