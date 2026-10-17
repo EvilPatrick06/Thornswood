@@ -646,12 +646,15 @@ foreach ($l in $out) {
 Yes 'the driver ran to the end and reported' (@($out | Where-Object { $_ -match '^driver: ' }).Count -eq 1)
 
 # ---- 5: the wiring, by text ---------------------------------------------------
-$shell = [IO.File]::ReadAllText((Join-Path $App 'Shell.cs'))
-$sf = [IO.File]::ReadAllText((Join-Path $App 'ShellScanFix.cs'))
-$own = [IO.File]::ReadAllText((Join-Path $App 'ShellOwnGame.cs'))
-$upd = [IO.File]::ReadAllText((Join-Path $App 'ShellUpdate.cs'))
-$xaml = [IO.File]::ReadAllText((Join-Path $Repo 'launcher\ui.xaml'))
-$upkeep = [IO.File]::ReadAllText((Join-Path $App 'Upkeep.cs'))
+# Line ends as git checked them out: CRLF on a runner, LF in some worktrees.
+# The patterns below are written with LF.
+function Src([string]$path) { [IO.File]::ReadAllText($path) -replace "`r`n", "`n" }
+$shell = Src (Join-Path $App 'Shell.cs')
+$sf = Src (Join-Path $App 'ShellScanFix.cs')
+$own = Src (Join-Path $App 'ShellOwnGame.cs')
+$upd = Src (Join-Path $App 'ShellUpdate.cs')
+$xaml = Src (Join-Path $Repo 'launcher\ui.xaml')
+$upkeep = Src (Join-Path $App 'Upkeep.cs')
 
 Yes 'the Scan button asks everything, and the Fix button is RunFix' (
     $shell.Contains('btnScan.Click += delegate { RunScan(true); };') -and $shell.Contains('btnFix.Click += delegate { RunFix(); };'))
