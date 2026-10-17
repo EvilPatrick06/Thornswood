@@ -55,9 +55,12 @@ const READERS = ['rolesOfProfile', 'officeAccountOf', 'officeHeldBy', 'officesOf
 const readerSrc = READERS.map(fnSrc);
 const tables = (lift('  var OFFICE_KINDS = [', ';') || '') + '\n' + (lift('  var HOLD_TOWN = {', '};') || '');
 const evictBlock = lift('  function evict(actorId, profileId, toProfile) {', '\n  }\n');
+// A steward ends a claim only in their own hold (#2551): the building's hold, and the rule.
+const ownHoldSrc = [fnSrc('holdOfBuilding'), fnSrc('notStewardHere')];
 
 yes('the office readers are in the gamemode, each once', readerSrc.every(function (s) { return !!s; }));
-yes('and so is the eviction', evictBlock !== null);
+yes('and so is the eviction, with the building\'s hold and its rule', evictBlock !== null &&
+    ownHoldSrc.every(function (s) { return !!s; }));
 
 const JARL = 1, ALICE = 101, BOB = 202, COURT = 303, ADMIN = 404;
 const HOUSE = 'breezehome';
@@ -102,13 +105,19 @@ function evict(opts) {
   const claims = {};
   if (opts.held) { claims[HOUSE] = opts.held; }
   const pushed = { n: 0 };
+  // opts.stewards keep Whiterun, opts.riften keep Riften; the house is in
+  // Whiterun unless opts.hold says another hold, or null for none.
+  const ofWhiterun = opts.stewards || [], ofRiften = opts.riften || [];
+  const buildingHold = {};
+  if (opts.hold !== null) { buildingHold[HOUSE] = opts.hold || 'whiterun'; }
   const fn = new Function(
     'actorId', 'profileId', 'toProfile', 'isSteward', 'here', 'holderOf',
     'nameOf', 'claims', 'save', 'pushAll', 'plog', 'redrawPanel', 'OFFICE_AT_DOOR',
-    evictBlock + '\nreturn evict;');
+    'isStewardOf', 'BUILDING_HOLD', 'HOLD_TOWN',
+    ownHoldSrc.join('\n') + '\n' + evictBlock + '\nreturn evict;');
   const call = fn(
     null, null, null,
-    function (pid) { return (opts.stewards || []).indexOf(pid) !== -1; },
+    function (pid) { return ofWhiterun.indexOf(pid) !== -1 || ofRiften.indexOf(pid) !== -1; },
     function () { return opts.atDoor === false ? null : HOUSE; },
     function () { return claims[HOUSE] || null; },
     function () { return 'Breezehome'; },
@@ -116,7 +125,11 @@ function evict(opts) {
     function () { }, function () { pushed.n++; },
     function () { logs.push(Array.prototype.join.call(arguments, ' ')); },
     function () { pushed.redraws = (pushed.redraws || 0) + 1; },
-    'Open the door of the building, then press the button on the Office page of K within a minute.');
+    'Open the door of the building, then press the button on the Office page of K within a minute.',
+    function (pid, hold) {
+      return (hold === 'whiterun' && ofWhiterun.indexOf(pid) !== -1) || (hold === 'riften' && ofRiften.indexOf(pid) !== -1);
+    },
+    buildingHold, { whiterun: 'Whiterun', riften: 'Riften' });
   call(0xff000058, opts.by, function (pid, m) { told.push(m); });
   return { told: told, claims: claims, pushes: pushed.n, redraws: pushed.redraws || 0 };
 }
@@ -198,6 +211,20 @@ if (evictBlock !== null) {
     yes('S9 and away from a door is told to go to one',
         evict({ by: BOB, stewards: [BOB], held: alicesHouse, atDoor: false })
           .told[0].indexOf('Open the door of the building') !== -1);
+  }
+
+  // Patrick, 16 October, answer C (#2551): own hold only, by the building's hold.
+  {
+    const r = evict({ by: BOB, riften: [BOB], held: alicesHouse });
+    yes('S10 the Steward of Riften does not end a claim on a Whiterun house, and is told whose it is (' + r.told[0] + ')',
+        r.claims[HOUSE] && r.claims[HOUSE].by === ALICE && r.pushes === 0 &&
+        r.told[0] === 'Breezehome answers to Whiterun. Only the Steward of Whiterun or its Jarl ends a claim or sets rent there.');
+    const r2 = evict({ by: BOB, riften: [BOB], held: alicesHouse, hold: 'riften' });
+    yes('S10 and does end one on a house in Riften', !r2.claims[HOUSE] && r2.pushes === 1);
+    const r3 = evict({ by: BOB, stewards: [BOB], held: alicesHouse, hold: null });
+    yes('S11 a building the table gives no hold is nobody\'s to end, and the steward is told why',
+        r3.claims[HOUSE] && r3.claims[HOUSE].by === ALICE &&
+        r3.told[0] === 'Breezehome answers to no hold the server knows, so no steward ends a claim or sets rent there.');
   }
 }
 

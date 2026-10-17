@@ -452,6 +452,7 @@ jobs:
                  'test-1640-jarl-word.js',
                  'test-1638-office.js',
                  'test-2551-hold-offices.js',
+                 'test-2551-building-holds.js',
                  'test-1631-needs-gui.js',
                  'test-2267-needs-text.js',
                  'test-1764-away-no-rest.js',
