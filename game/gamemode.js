@@ -52878,16 +52878,18 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
   };
 
   function findBeast(want) { return findIn(buildBeasts(), want, 'creatures'); }
-  /* A creature's name from its base record, for /despawn's answer, or ''. */
+  /*
+    A creature's name from its base record, for /despawn's answer, or ''.
+    Read out of the /spawn index (buildBeasts), the one reader of
+    ADMIN_ACTORS (test-one-mint.js), so a record is turned into the name
+    /spawn knows it by and nothing else reads that table.
+  */
   function beastName(desc) {
     if (!desc) { return ''; }
-    try {
-      if (HUNTS_BY_BASE[desc] && HUNTS_BY_BASE[desc].name) { return HUNTS_BY_BASE[desc].name; }
-      if (GAME_BY_BASE[desc] && GAME_BY_BASE[desc].name) { return GAME_BY_BASE[desc].name; }
-      for (var aa in ADMIN_ACTORS) {
-        if (Object.prototype.hasOwnProperty.call(ADMIN_ACTORS, aa) && ADMIN_ACTORS[aa][1] === desc) { return ADMIN_ACTORS[aa][0]; }
-      }
-    } catch (e) { }
+    var idx = buildBeasts();
+    for (var k in idx) {
+      if (Object.prototype.hasOwnProperty.call(idx, k) && idx[k].desc === desc) { return idx[k].name; }
+    }
     return '';
   }
 
