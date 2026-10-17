@@ -55039,7 +55039,7 @@ mp.onUpdateEquipmentAttempt = guard('onUpdateEquipmentAttempt', function (actorI
     The person's Might points, or null when there is no loaded character to
     decide from (see NO CHARACTER, NO DECISION above).
   */
-  function passHeld(actorId) {
+  function joinPassHolds(actorId) {
     var held = g.__thornswoodPassHeld;
     if (typeof held !== 'function') { return false; }
     var pid = 0;
@@ -55049,7 +55049,7 @@ mp.onUpdateEquipmentAttempt = guard('onUpdateEquipmentAttempt', function (actorI
   function mightOf(actorId) {
     var ch = g.__thornswoodCharacter;
     if (!ch || !ch.PROPERTY) { return null; }
-    if (passHeld(actorId)) { return null; }
+    if (joinPassHolds(actorId)) { return null; }
     var s = null;
     try { s = mp.get(actorId, ch.PROPERTY); } catch (e) { s = null; }
     if (!s || typeof s !== 'object' || s.v !== 1) { return null; }
@@ -55108,7 +55108,7 @@ mp.onUpdateEquipmentAttempt = guard('onUpdateEquipmentAttempt', function (actorI
 
   g.__thornswoodStrength = {
     STRENGTH: STRENGTH, weightOf: weightOf, needFor: needFor, needOf: needOf,
-    mightOf: mightOf, passHeld: passHeld, allow: allow, lines: lines, before: before
+    mightOf: mightOf, joinPassHolds: joinPassHolds, allow: allow, lines: lines, before: before
   };
   slog('ready');
 })();

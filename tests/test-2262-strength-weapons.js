@@ -105,6 +105,7 @@ yes('it goes through guard() like every other engine event', /var gate = guard\(
 yes('the thresholds are Patrick\'s: 45 needs 5, 30 needs 3',
     JSON.stringify(S.STRENGTH.tiers) === JSON.stringify([{ weight: 45, might: 5 }, { weight: 30, might: 3 }]));
 yes('no record id is named in the rule', !/0x[0-9a-f]{5,}/i.test(block) && !/\.esp/i.test(block));
+yes("the block defines no passHeld function: test-join-pass-trust.js takes the first one in the file by name", block.indexOf('  function passHeld(') < 0);
 yes('no slash command anywhere in the block', !/['"]\/[a-z]/.test(block));
 
 // ------------------------------------------------------------- weights --
