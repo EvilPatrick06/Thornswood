@@ -4450,8 +4450,8 @@ function beginChoosing(actorId, state, why) {
     and neither is on the screen. The welcome is beginAppearance's.
   */
   tellOnce(actorId, 'choosing', opened
-    ? 'You have been given plain clothes. Choose a home town, and you will ' +
-      'wake up at its inn.'
+    ? 'You have been given plain clothes. Choose a home town, and that is ' +
+      'where you will start.'
     : 'You have been given plain clothes. The starting panel did not open by ' +
       'itself. Press K to choose where you will start. Your class and ' +
       'profession can be chosen there too, or later in the world.');

@@ -11,7 +11,7 @@
 //
 //   nothing -> appearance   beginAppearance: the hall, and the move into it
 //   appearance -> choosing  beginChoosing: the clothes, and what the pick does
-//   choosing -> done        arriveAt: the town and the inn
+//   choosing -> done        arriveAt: the town's start spot (#2622)
 //   nothing -> done         the returning stamp in chargenTick: welcome back
 //
 // AND ONCE. Patrick, 28 September, on these lines: "Yes I want it, the
@@ -216,7 +216,7 @@ function clean(line) {
     line.text.indexOf(EM) < 0 && !/\n/.test(line.text);
 }
 
-// ------------------------------------------- a whole creation, start to inn
+// ------------------------------------------- a whole creation, start to the start spot
 {
   const ME = 0xff000058;
   const S = server();
@@ -241,7 +241,7 @@ function clean(line) {
       S.to(ME, CLOTHES_LINE).length === 1 && S.to(ME).length === 2);
   const l2 = S.to(ME, CLOTHES_LINE)[0];
   yes('it says what the town pick does, and not Press K, since the panel is on the screen',
-      !!l2 && /home town/.test(l2.text) && /\binn\b/.test(l2.text) && !PANEL_LINE.test(l2.text));
+      !!l2 && /home town/.test(l2.text) && /where you will start/.test(l2.text) && !/\binn\b/.test(l2.text) && !PANEL_LINE.test(l2.text));
   yes('the shift was really handed over (the log says so)',
       S.logs.some(function (l) { return /shift: 2 handed over/.test(l); }));
   yes('and the choosing log line is still written',
