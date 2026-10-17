@@ -1,0 +1,209 @@
+'use strict';
+/*
+  test-2166-retention-fixes.js
+
+      node .\tests\test-2166-retention-fixes.js
+
+  Issue #2166 (Herald's matrix, 17 Oct): three places where the code kept less
+  than site/data/site/privacy.md already promises, fixed without changing a
+  word of the page or any window.
+
+    G3  trouble.json (the failed-session alerts for the bot) copies a session
+        record and a launcher log line, and was kept by count only. It now
+        ages by the same 365 days in the hourly retention sweep, and an alert
+        for a session staff marked kept stays.
+    G2  the voice service's chat prune ran every six hours, hourly only while
+        a day was overdue; the page says the check is hourly. It now runs
+        every hour.
+    G4  a Discord sign-in set the member cookie tw for a year, which the page
+        describes as the fallback for a site with no Discord. It is now
+        cleared there instead (tests\test-site-oauth-gaps.js checks the
+        answer itself).
+
+  G3 runs against a real copy of site\server.js in a scratch folder on a spare
+  port, with no session ending. G2 lifts chatPrune out of voice-server.js and
+  watches the delay it asks for. Nothing leaves the machine and the scratch
+  folders are removed at the end.
+*/
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+const net = require('net');
+const crypto = require('crypto');
+const { spawn } = require('child_process');
+
+const ROOT = path.join(__dirname, '..');
+const SITE_SRC = path.join(ROOT, 'site', 'server.js');
+const VOICE_SRC = path.join(ROOT, 'voice', 'voice-server.js');
+const site = fs.readFileSync(SITE_SRC, 'utf8');
+const voice = fs.readFileSync(VOICE_SRC, 'utf8');
+
+let pass = 0, fail = 0;
+function yes(what, cond, why) {
+  if (cond) { pass++; console.log('PASS  ' + what); }
+  else { fail++; console.log('FAIL  ' + what + (why ? '\n      ' + why : '')); }
+}
+function grab(src, name) {
+  const at = src.indexOf('function ' + name + '(');
+  if (at < 0) return '';
+  const b = src.indexOf('{', at);
+  let d = 0;
+  for (let i = b; i < src.length; i++) {
+    if (src[i] === '{') d++;
+    else if (src[i] === '}') { d--; if (d === 0) return src.slice(at, i + 1); }
+  }
+  return '';
+}
+function freePort() {
+  return new Promise((ok) => {
+    const s = net.createServer();
+    s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => ok(p)); });
+  });
+}
+const wait = (ms) => new Promise((ok) => setTimeout(ok, ms));
+
+const DAY = 86400000;
+const NOW = Date.now();
+
+async function trouble() {
+  console.log('G3  TROUBLE.JSON AGES WITH THE SESSION IT IS ABOUT');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-2166-'));
+  fs.copyFileSync(SITE_SRC, path.join(dir, 'server.js'));
+  fs.mkdirSync(path.join(dir, 'public'), { recursive: true });
+  fs.mkdirSync(path.join(dir, 'data', 'for-bot'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({
+    password: crypto.randomBytes(12).toString('hex'),
+    discord: { clientId: '', clientSecret: '', botToken: '', guildId: '', invite: '' },
+    botKey: crypto.randomBytes(16).toString('hex'),
+    admins: ['111111111111111111'],
+    secret: crypto.randomBytes(32).toString('hex'),
+    gameCheckPort: 1,
+    onlineFile: path.join(dir, 'online.json')
+  }, null, 2));
+  // Synthetic only: made-up ids and names.
+  fs.writeFileSync(path.join(dir, 'data', 'sessions.json'), JSON.stringify([
+    { session: 'kepttrouble00002', who: '502', start: NOW - 400 * DAY - 3600000, end: NOW - 400 * DAY,
+      channel: 'main', keep: true, keptBy: 'Staff', keptAt: NOW - 390 * DAY },
+    { session: 'newtrouble000003', who: '503', start: NOW - DAY - 3600000, end: NOW - DAY, channel: 'main' }
+  ], null, 2));
+  const row = (session, who, start, end, at) => ({ session, who, name: 'Stand-in ' + who, channel: 'main',
+    profile: 900000 + Number(who), version: '0.0.0', start, end, at, why: 'a script threw',
+    file: 'launcher.log', line: 'stand-in line' });
+  const TROUBLE = path.join(dir, 'data', 'for-bot', 'trouble.json');
+  fs.writeFileSync(TROUBLE, JSON.stringify([
+    row('oldtrouble000001', '501', NOW - 400 * DAY - 3600000, NOW - 400 * DAY, NOW - 400 * DAY),
+    row('kepttrouble00002', '502', NOW - 400 * DAY - 3600000, NOW - 400 * DAY, NOW - 400 * DAY),
+    row('newtrouble000003', '503', NOW - DAY - 3600000, NOW - DAY, NOW - DAY),
+    row('latelogs00000004', '504', NOW - 370 * DAY, NOW - 369 * DAY, NOW - 10 * DAY),
+    { session: 'notime0000000005', who: '505', why: 'a script threw' },
+    row('gonesess00000006', '506', NOW - 366 * DAY, NOW - 366 * DAY, NOW - 366 * DAY)
+  ], null, 2));
+
+  const port = await freePort();
+  const srv = spawn(process.execPath, ['server.js'], {
+    cwd: dir,
+    env: Object.assign({}, process.env, { THORNSWOOD_DOCS_PORT: String(port), THORNSWOOD_DOCS_LOCAL: '1',
+                                          THORNSWOOD_CHAT_DIR: path.join(dir, 'chat') })
+  });
+  let out = '';
+  srv.stdout.on('data', (d) => { out += d; });
+  srv.stderr.on('data', (d) => { out += d; });
+  try {
+    let up = false;
+    for (let i = 0; i < 100 && !up; i++) {
+      if (out.indexOf('listening on ') >= 0) { up = true; break; }
+      if (srv.exitCode !== null) break;
+      await wait(50);
+    }
+    if (!up) throw new Error('the scratch site never came up:\n' + out);
+    await wait(300);
+    let left = [];
+    try { left = JSON.parse(fs.readFileSync(TROUBLE, 'utf8')).map((t) => t && t.session); } catch (e) { }
+    yes('with no session ending, an alert 400 days old is gone', left.indexOf('oldtrouble000001') < 0, JSON.stringify(left));
+    yes('an alert 366 days old is gone too', left.indexOf('gonesess00000006') < 0);
+    yes('an alert for a session staff marked kept stays, however old', left.indexOf('kepttrouble00002') >= 0);
+    yes('an alert from yesterday stays', left.indexOf('newtrouble000003') >= 0);
+    yes('an alert whose logs arrived 10 days ago stays, aged like its log set', left.indexOf('latelogs00000004') >= 0);
+    yes('an alert with no time at all is kept rather than guessed at', left.indexOf('notime0000000005') >= 0);
+    yes('no retention failure was said', out.indexOf('trouble-retention') < 0, out);
+  } catch (err) {
+    fail++;
+    console.log('FAIL  the trouble harness threw: ' + (err && err.stack ? err.stack : err));
+  }
+  await new Promise((ok) => {
+    srv.on('exit', ok);
+    try { srv.kill(); } catch (e) { ok(); }
+    setTimeout(ok, 3000);
+  });
+  try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { }
+
+  const sweep = grab(site, 'retentionSweep');
+  yes('the hourly retention sweep runs sweepTrouble', /sweepTrouble\(now\)/.test(sweep));
+  yes('noteTrouble ages the file on the way in as well', /freshTrouble\(all, Date\.now\(\)\)/.test(grab(site, 'noteTrouble')));
+  yes('trouble rows use the session window, SESSIONS_DAYS', /SESSIONS_DAYS \* 86400000/.test(grab(site, 'freshTrouble')));
+
+  // The rule on its own, lifted out of the same file.
+  const fresh = grab(site, 'freshTrouble');
+  if (fresh) {
+    const SESSIONS_DAYS = 365;
+    let freshTrouble;
+    eval(fresh.replace(/^function freshTrouble/, 'freshTrouble = function'));
+    const held = new Set(['k1']);
+    const got = freshTrouble([
+      { session: 'a', start: NOW - 364 * DAY, end: NOW - 364 * DAY, at: NOW - 364 * DAY },
+      { session: 'b', start: NOW - 366 * DAY, end: NOW - 366 * DAY, at: NOW - 366 * DAY },
+      { session: 'k1', start: NOW - 900 * DAY, end: NOW - 900 * DAY, at: NOW - 900 * DAY },
+      null, 'junk'
+    ], NOW, held).map((t) => t.session);
+    yes('freshTrouble: inside 365 days stays, past it goes, a kept session stays, junk goes',
+        got.join(',') === 'a,k1', got.join(','));
+  } else yes('server.js has freshTrouble', false);
+}
+
+function chat() {
+  console.log('\nG2  THE CHAT PRUNE RUNS EVERY HOUR');
+  const body = grab(voice, 'chatPrune');
+  yes('voice-server.js has chatPrune', !!body);
+  yes('the six-hour wait is gone from it', !/6 \* 3600000/.test(body));
+  const CHAT_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-2166-chat-'));
+  const CHAT_DAYS = 365;
+  const CHAT_PRUNE_ALERT = 3;
+  const chatPruneFailures = {};
+  let chatOverdue = 0, chatPruneError = '', chatPruneTimer = null;
+  const asked = [];
+  const setTimeout = (fn, ms) => { asked.push(ms); return 0; };
+  const clearTimeout = () => {};
+  const chatPruneSay = () => {};
+  let chatPrune;
+  eval(body.replace(/^function chatPrune/, 'chatPrune = function'));
+  // A day well inside the window, and one past it: synthetic files only.
+  const d = (ms) => { const t = new Date(ms); const p = (n) => (n < 10 ? '0' : '') + n;
+    return t.getFullYear() + '-' + p(t.getMonth() + 1) + '-' + p(t.getDate()) + '.jsonl'; };
+  fs.writeFileSync(path.join(CHAT_DIR, d(NOW - 2 * DAY)), '{"text":"stand-in"}\n');
+  fs.writeFileSync(path.join(CHAT_DIR, d(NOW - 400 * DAY)), '{"text":"stand-in"}\n');
+  chatPrune();
+  yes('a day past 365 is deleted and a recent one stays',
+      !fs.existsSync(path.join(CHAT_DIR, d(NOW - 400 * DAY))) && fs.existsSync(path.join(CHAT_DIR, d(NOW - 2 * DAY))));
+  yes('with nothing overdue the next pass is in one hour, not six', asked[asked.length - 1] === 3600000, String(asked));
+  try { fs.rmSync(CHAT_DIR, { recursive: true, force: true }); } catch (e) { }
+  yes('the prune still runs once at start', /\nchatPrune\(\);/.test(voice));
+}
+
+function cookie() {
+  console.log('\nG4  A DISCORD SIGN-IN DOES NOT SET THE MEMBER COOKIE');
+  const at = site.indexOf('const cookies2 = [');
+  const block = at >= 0 ? site.slice(at, site.indexOf('];', at) + 2) : '';
+  yes('the Discord callback still sets twa', /setCookie\(req, ADMIN, value, ADMIN_DAYS\)/.test(block));
+  yes('it no longer sets tw with the member token', block && !/setCookie\(req, COOKIE/.test(block));
+  yes('it clears tw the way sign-out does', /COOKIE \+ '=; Path=\/; Max-Age=0; HttpOnly; SameSite=Lax'/.test(block));
+  const sets = site.match(/setCookie\(req, COOKIE, memberToken\(\), 365\)/g) || [];
+  yes('the password door is now the only place tw is set', sets.length === 1, 'found ' + sets.length);
+}
+
+(async () => {
+  await trouble();
+  chat();
+  cookie();
+  console.log('\n' + pass + ' passed, ' + fail + ' failed');
+  process.exit(fail ? 1 : 0);
+})();

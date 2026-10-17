@@ -396,6 +396,11 @@ jobs:
           # Delete-Person.ps1 under Windows PowerShell 5.1 on stand-ins of
           # every store in a temp folder: the dry run, the deletion, the
           # record and its reapply after a restore. About half a minute.
+          # Issue #2166: tests\test-2166-retention-fixes.js holds three
+          # retention fixes to what the privacy page already says: trouble.json
+          # ages by 365 days in the hourly sweep on a scratch site (a kept
+          # session's alert stays), the voice chat prune runs every hour, and
+          # a Discord sign-in no longer sets the member cookie tw. A second.
           $six ='test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
@@ -620,6 +625,7 @@ jobs:
                  'test-page-changed.js',
                  'test-2349-server-log.js',
                  'test-2351-delete-person.ps1',
+                 'test-2166-retention-fixes.js',
                  'test-missing-files-stop.ps1',
                  'test-ship-launcher-drift.ps1',
                  'test-client-by-hash.ps1',
