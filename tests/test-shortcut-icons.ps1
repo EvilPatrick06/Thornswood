@@ -117,6 +117,27 @@ namespace Thornswood
     Remove-Item -LiteralPath $r.Path -Force   # what Install-Launcher's sweep used to do
     $r = IconNow
     Yes 'a start after an install deleted it writes it back before any shortcut is touched' ((Test-Path -LiteralPath $r.Path) -and $r.Wrote)
+
+    # #2627: what Ensure would change, said and not done, for Scan. Before any
+    # launcher exe is in the scratch install, so no shortcut anywhere names it
+    # and none is missing for it; only the icon file and the stamp count.
+    $outOfDate = $icons.GetMethod('OutOfDate', [Reflection.BindingFlags]'Public, Static')
+    Yes 'Icons has OutOfDate, what Ensure would change, for Scan (#2627)' ([bool]$outOfDate)
+    if ($outOfDate) {
+        $iconNow = [string]$r.Path
+        Remove-Item -LiteralPath $iconNow -Force
+        $seen = { @(Get-ChildItem -LiteralPath $root -Recurse -File | ForEach-Object { $_.FullName + '|' + $_.Length + '|' + $_.LastWriteTimeUtc.Ticks }) -join "`n" }
+        $before = & $seen
+        $l = @($outOfDate.Invoke($null, @()))
+        Yes 'with the icon file gone, OutOfDate says so' (@($l | Where-Object { "$_" -like '*icon file*' }).Count -eq 1)
+        Yes 'and writes nothing: the icon file is still gone, and no stamp or shortcut appeared' (((& $seen) -eq $before) -and -not (Test-Path -LiteralPath $iconNow))
+        $r = IconNow
+        [string]$noExe = Join-Path $launcherDir 'Thornswood.exe'
+        $remember.Invoke($null, @($noExe, ([string]$r.Path + ',0'))) | Out-Null
+        $l = @($outOfDate.Invoke($null, @()))
+        Yes ('with the icon written and the shortcuts redrawn for this launcher, nothing is out of date' + $(if ($l.Count) { ' (' + ($l -join '; ') + ')' } else { '' })) ($l.Count -eq 0)
+        Remove-Item -LiteralPath (Join-Path $profileDir 'icons.stamp') -Force
+    }
     $want = [string]$r.Path + ',0'
 
     # The stamp: a rebuild-style change with no .old.
