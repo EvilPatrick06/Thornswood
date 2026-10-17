@@ -74,7 +74,7 @@ const mp = {
   get(id, key) { return (props[id] || {})[key]; }
 };
 const players = {};
-function person(id, might) { props[id] = { [CHAR]: { v: 1 } }; players[id] = { tree: { might: might } }; }
+function person(id, might) { players[id] = { v: 1, tree: { might: might } }; props[id] = { [CHAR]: players[id], profileId: id & 0xffff }; }
 person(0xff000001, 0);
 person(0xff000002, 3);
 person(0xff000003, 4);
@@ -88,7 +88,11 @@ const sandbox = {
   say: (a, t) => said.push([a, t])
 };
 sandbox.globalThis = sandbox;
-sandbox.__thornswoodCharacter = { PROPERTY: CHAR, stateOf: id => players[id] };
+let stateOfCalls = 0;
+const heldPids = new Set();
+sandbox.__thornswoodPassHeld = pid => heldPids.has(pid);
+// stateOf would migrate (write) a character; the gate must never call it.
+sandbox.__thornswoodCharacter = { PROPERTY: CHAR, stateOf: id => { stateOfCalls++; return players[id]; } };
 vm.createContext(sandbox);
 vm.runInContext(block, sandbox, { filename: 'strength-block.js' });
 const S = sandbox.__thornswoodStrength;
@@ -122,12 +126,33 @@ const cases = [
   [0xff000002, 0x00100001, true], [0xff000002, 0x00100002, true], [0xff000002, 0x00100003, false],
   [0xff000003, 0x00100004, false],
   [0xff000004, 0x00100003, true], [0xff000004, 0x00100004, true],
-  [npc, 0x00100004, true]
+  [npc, 0x00100004, undefined]
 ];
 cases.forEach(([a, b, want]) => {
   const m = a === npc ? 'an NPC' : 'Might ' + players[a].tree.might;
-  yes(m + ', weight ' + S.weightOf(b) + ': ' + (want ? 'allowed' : 'refused'), mp.onEquipItemAttempt(a, b) === want);
+  yes(m + ', weight ' + S.weightOf(b) + ': ' + (want === undefined ? 'no decision' : want ? 'allowed' : 'refused'), mp.onEquipItemAttempt(a, b) === want);
 });
+
+// ----------------------------- no loaded character, no decision (Codex) --
+// guard() does not hold this event for a session waiting on its join pass,
+// so the gate itself must not refuse before the character is in.
+const PRE = 0xff000010, OLD = 0xff000011, NOTREE = 0xff000012, HELD = 0xff000013;
+props[PRE] = { profileId: 0x10 };                                   // no character record yet
+props[OLD] = { [CHAR]: { trade: 'bard' }, profileId: 0x11 };        // not a loaded state (no v 1)
+props[NOTREE] = { [CHAR]: { v: 1 }, profileId: 0x12 };              // loaded, tree not in yet
+person(HELD, 0); heldPids.add(HELD & 0xffff);                       // a Might 0 character, pass still held
+stateOfCalls = 0;
+notes.length = 0; said.length = 0;
+yes('pre-join actor (no character record) with a weight 60 weapon: no decision, allowed', mp.onEquipItemAttempt(PRE, 0x00100004) === undefined);
+yes('an unmigrated record (no v 1) with the club: no decision, allowed', mp.onEquipItemAttempt(OLD, 0x00100003) === undefined);
+yes('a loaded state with no tree yet is not read as Might 0: no decision', mp.onEquipItemAttempt(NOTREE, 0x00100003) === undefined);
+yes('a Might 0 character whose join pass is still held: no decision, allowed', mp.onEquipItemAttempt(HELD, 0x00100003) === undefined);
+yes('none of those is told anything', notes.length === 0 && said.length === 0);
+yes('the gate never calls stateOf (which would migrate and write a character)', stateOfCalls === 0);
+heldPids.delete(HELD & 0xffff);
+yes('the same Might 0 character once the pass is through: refused', mp.onEquipItemAttempt(HELD, 0x00100003) === false);
+yes('a loaded actor with Might 0 is refused the club', mp.onEquipItemAttempt(0xff000001, 0x00100003) === false);
+yes('undefined from the gate is no refusal to the engine (only false is)', (function (r) { return r !== false; })(mp.onEquipItemAttempt(PRE, 0x00100004)));
 
 notes.length = 0; said.length = 0;
 mp.onEquipItemAttempt(0xff000002, 0x00100003);
@@ -162,9 +187,19 @@ yes('the client is told to unequip the club', r1.unequip.length === 1 && r1.uneq
 yes('the club stays in the pack', r1.pack.indexOf(0x00100003) >= 0);
 const r2 = engineEquip(0xff000004, { inventory: [] }, { inventory: [{ baseId: 0x00100003, worn: true }] });
 yes('Might 5 equips the club and it is saved', r2.saved.inventory.length === 1 && !r2.unequip.length);
-const r3 = engineEquip(0xff000001, { inventory: [] }, { inventory: [{ baseId: 0x00100004, worn: true }] });
-yes('a login with a heavy weapon already worn is refused through the same event (first report after spawn)',
-    r3.saved.inventory.length === 0);
+// Login: the saved record already has the weapon on, so the first report
+// after spawn asks about nothing that was worn when they left.
+let asked3 = 0;
+const realGate = mp.onEquipItemAttempt;
+mp.onEquipItemAttempt = function () { asked3++; return realGate.apply(null, arguments); };
+const r3 = engineEquip(0xff000001, { inventory: [{ baseId: 0x00100004, worn: true }] }, { inventory: [{ baseId: 0x00100004, worn: true }] });
+mp.onEquipItemAttempt = realGate;
+yes('a login with a weapon already worn in the saved record is not asked about and stays worn',
+    asked3 === 0 && r3.saved.inventory.length === 1 && !r3.unequip.length);
+const r4 = engineEquip(0xff000001, { inventory: [] }, { inventory: [{ baseId: 0x00100004, worn: true }] });
+yes('a heavy weapon newly put on by a loaded Might 0 character is refused', r4.saved.inventory.length === 0 && r4.unequip[0] === 0x00100004);
+const r5 = engineEquip(PRE, { inventory: [] }, { inventory: [{ baseId: 0x00100004, worn: true }] });
+yes('the same for a pre-join actor goes through (no decision)', r5.saved.inventory.length === 1 && !r5.unequip.length);
 
 // ------------------------------------------- sharing the event (#2618) --
 // The cuffs (#2573, #2618) answer onEquipItemAttempt too, and wrap whatever
@@ -194,7 +229,8 @@ const answers = {};
 for (const order of ['cuffs then strength', 'strength then cuffs']) {
   const m = world(); const c = [];
   if (order === 'cuffs then strength') { loadCuffs(m, c); loadStrength(m); } else { loadStrength(m); loadCuffs(m, c); }
-  answers[order] = pairs.map(([a, b]) => m.onEquipItemAttempt(a, b));
+  // Allowed or refused: only false is a refusal, so undefined (no decision) counts as allowed.
+  answers[order] = pairs.map(([a, b]) => m.onEquipItemAttempt(a, b) !== false);
   yes(order + ': a cuffed person is refused even an ordinary sword', answers[order][4] === false);
   yes(order + ': a cuffed person with Might 5 is refused the club too', answers[order][5] === false);
   yes(order + ': Might 0 still refused the club', answers[order][1] === false);

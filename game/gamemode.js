@@ -54946,8 +54946,27 @@ mp.onUpdateEquipmentAttempt = guard('onUpdateEquipmentAttempt', function (actorI
   the engine behaves as it always has, so this block is inert on an engine
   that does not yet raise the event.
 
-  Login with a heavy weapon already worn goes through the same event (the
-  client's first equipment report after spawn), so there is no second path.
+  LOGIN NEVER STRIPS A WEAPON. The fork asks only about an item the update
+  puts on that the server's saved record does not already have on
+  (ActionListener::OnUpdateEquipment, alreadyWornIds). At login the record is
+  the saved one, so the client's first report after spawn, which names what
+  the game put back on, matches it and asks about nothing that was worn when
+  they left. Only an item newly put on reaches this gate.
+
+  NO CHARACTER, NO DECISION. guard() does not hold this event for somebody
+  still waiting on their join pass (it is not in ACTS_AS, and must not be:
+  a false there would refuse everything they put on). So the gate answers
+  nothing (undefined, which the engine treats as allowed) while:
+    - the join pass still holds their profile (__thornswoodPassHeld), since
+      the character on that actor is not yet proven theirs;
+    - the actor has no character record, or one that is not a loaded state
+      (the character block's own test: an object with v 1), or a state with
+      no tree yet.
+  It reads the record straight off the actor and never calls stateOf, which
+  would migrate, and so write, a character the moment somebody equips. A
+  missing tree is not Might 0: that would strip a weapon from somebody whose
+  character simply is not in yet. Once the character is in, the gate
+  applies.
 
   The weight is the WEAP record's DATA: value u32 at 0, weight float at 4,
   damage u16 at 8 (libespm WEAP.h). A record that is not a WEAP, or has no
@@ -55016,31 +55035,41 @@ mp.onUpdateEquipmentAttempt = guard('onUpdateEquipmentAttempt', function (actorI
   }
   function needOf(baseId) { return needFor(weightOf(baseId)); }
 
-  /* The person's Might points, or null for an actor with no character record. */
+  /*
+    The person's Might points, or null when there is no loaded character to
+    decide from (see NO CHARACTER, NO DECISION above).
+  */
+  function passHeld(actorId) {
+    var held = g.__thornswoodPassHeld;
+    if (typeof held !== 'function') { return false; }
+    var pid = 0;
+    try { pid = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { pid = 0; }
+    return pid > 0 && !!held(pid);
+  }
   function mightOf(actorId) {
     var ch = g.__thornswoodCharacter;
-    if (!ch || !ch.stateOf || !ch.PROPERTY) { return null; }
-    var raw = null;
-    try { raw = mp.get(actorId, ch.PROPERTY); } catch (e) { raw = null; }
-    if (!raw) { return null; }
+    if (!ch || !ch.PROPERTY) { return null; }
+    if (passHeld(actorId)) { return null; }
     var s = null;
-    try { s = ch.stateOf(actorId); } catch (e) { s = null; }
-    if (!s) { return null; }
-    return Math.max(0, Number((s.tree || {}).might) || 0);
+    try { s = mp.get(actorId, ch.PROPERTY); } catch (e) { s = null; }
+    if (!s || typeof s !== 'object' || s.v !== 1) { return null; }
+    if (!s.tree || typeof s.tree !== 'object') { return null; }
+    return Math.max(0, Number(s.tree.might) || 0);
   }
 
   function lines(need) { return [STRENGTH.refused, 'Needs Might ' + need]; }
 
   /*
     The answer to onEquipItemAttempt: true lets the item be worn, false drops
-    it from the update and leaves it in the pack. Told in the world (the
+    it from the update and leaves it in the pack, undefined is no decision
+    (no loaded character yet) and lets it through. Told in the world (the
     notification and the chat line), never through a command.
   */
   function allow(actorId, baseId) {
     var need = needOf(baseId);
     if (!need) { return true; }
     var might = mightOf(actorId);
-    if (might === null) { return true; }
+    if (might === null) { return undefined; }
     if (might >= need) { return true; }
     var l = lines(need);
     slog(hex(actorId), 'refused', hex(baseId), '(weight ' + weightOf(baseId) + ', Might ' + might + ' of ' + need + ')');
@@ -55079,7 +55108,7 @@ mp.onUpdateEquipmentAttempt = guard('onUpdateEquipmentAttempt', function (actorI
 
   g.__thornswoodStrength = {
     STRENGTH: STRENGTH, weightOf: weightOf, needFor: needFor, needOf: needOf,
-    mightOf: mightOf, allow: allow, lines: lines, before: before
+    mightOf: mightOf, passHeld: passHeld, allow: allow, lines: lines, before: before
   };
   slog('ready');
 })();
