@@ -623,7 +623,7 @@ if (social && trade) {
   {
     const w=world(), A=w.person(0xff000003,'First',701), B=w.person(0xff000004,'Second',702);
     w.g.__thornswoodJoinPass={requiring(){return true;}};
-    const da=src.indexOf('  if (!globalThis.__thornswoodLastActor)'), db=src.indexOf('  /** key -> the arrival point',da);
+    const da=src.indexOf('  if (!globalThis.__thornswoodLastActor)'), db=src.indexOf('  /** key -> where /tp sends staff',da);
     const words=/^const WORDS = (\[[\s\S]*?\]);$/m.exec(src);
     const api=new Function('globalThis','g','mp','WORDS','handle','toProfile','log','Date',src.slice(da,db)+'; return {dispatch,actorOf};')(
       w.g,w.g,w.mp,new Function('return '+words[1])(),
