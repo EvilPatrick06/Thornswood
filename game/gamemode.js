@@ -4306,7 +4306,9 @@ function townsForPanel() {
   const out = [];
   for (const desc in PASSAGES) {
     const t = PASSAGES[desc];
-    if (t && t.arrival) { out.push({ key: t.key, name: t.town }); }
+    // The start spot is what a pick leads to since #2622, and the hold is
+    // what the panel shows under the town, the same name the welcome says.
+    if (t && t.start) { out.push({ key: t.key, name: t.town, hold: t.hold || '' }); }
   }
   return out;
 }
