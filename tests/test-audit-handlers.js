@@ -162,7 +162,11 @@ if (handlersSrc !== null) {
   // somebody turns into a refusal for everybody.
   const dropSrc = handlersSrc.slice(handlersSrc.indexOf('mp.onDropItem = guard('));
   const takeSrc = handlersSrc.slice(0, handlersSrc.indexOf('mp.onDropItem = guard('));
-  yes('the drop watcher has no return statement in it', !/\breturn\b/.test(dropSrc));
+  // One refusal is read and allowed: the pair of Prisoner's Cuffs locked on a
+  // prisoner's wrists (#2573, mayLetGo), which refuses that pair and nothing else.
+  const CUFFS_DROP = 'if (cuffsDrop && !cuffsDrop.mayLetGo(actorId, baseId, count)) { return false; }';
+  yes('the drop watcher has no return statement in it but the cuffs\' one refusal',
+      !/\breturn\b/.test(dropSrc.split(CUFFS_DROP).join('')) && dropSrc.split(CUFFS_DROP).length <= 2);
   yes('the take watcher has one return, a false on the take limit\'s refusal',
       (takeSrc.match(/\breturn\b/g) || []).length === 1 &&
       /if \(no\) \{[\s\S]*?return false;\s*\}/.test(takeSrc) &&
