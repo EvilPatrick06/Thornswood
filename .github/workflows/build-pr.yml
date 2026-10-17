@@ -552,6 +552,7 @@ jobs:
                  'test-package-release-dir.ps1', 'test-no-machine-files.ps1',
                  'test-main-runtime-startup.js',
                  'test-spawn-reply.js',
+                 'test-2622-start-spots.js',
                  'test-nightly-stray.ps1',
                  'test-discord-callback-hang.js',
                  'test-member-role-wording.js',
