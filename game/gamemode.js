@@ -54837,6 +54837,20 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
   function cuffsId() { return idOf(CUFFS_DESC); }
   function read(id, key) { try { return mp.get(id, key); } catch (e) { return null; } }
   function pidOf(id) { return Number(read(id, 'profileId')) || 0; }
+  /*
+    Somebody still waiting on their join pass (#410), or with no profile on
+    them yet, has no character this server may act on: the number they are
+    in the world under is one their client picked. Nothing they do counts
+    yet, so they cuff nobody, free nobody and are issued nothing, and on
+    onEquipItemAttempt (which guard() does not hold back, it is not in its
+    ACTS_AS list) the cuffs give no answer at all rather than a refusal.
+  */
+  function waiting(id) {
+    var pid = pidOf(id);
+    if (!(pid > 0)) { return true; }
+    var h = g.__thornswoodPassHeld;
+    try { return typeof h === 'function' && !!h(pid); } catch (e) { return true; }
+  }
   function hex(id) { return (Number(id) >>> 0).toString(16); }
   function carried(id) {
     var b = cuffsId();
@@ -54965,8 +54979,9 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
     not stay on the wearer; false leaves it worn, as clothing.
   */
   function used(actorId) {
+    if (waiting(actorId)) { return false; }
     var cp = pidOf(actorId);
-    if (!(cp > 0) || cuffedBy(actorId)) { return false; }
+    if (cuffedBy(actorId)) { return false; }
     var targetId = facing(actorId);
     if (!targetId) {
       if (guardHolds(cp).length) {
@@ -55010,7 +55025,9 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
   */
   var wornWas = {};
   function equipped(actorId, eq) {
-    if (!eq || typeof eq !== 'object' || cuffedBy(actorId)) { return; }
+    // Not even remembered while waiting: the first look after the pass is
+    // the baseline, so a pair put on before it does nothing afterwards.
+    if (!eq || typeof eq !== 'object' || waiting(actorId) || cuffedBy(actorId)) { return; }
     var b = cuffsId();
     var ee = (eq.inv && eq.inv.entries) || eq.entries || [];
     var on = false;
@@ -55037,8 +55054,8 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
 
   /* One pair for a guard who has none, at most once a real day. */
   function issue(actorId) {
+    if (waiting(actorId)) { return false; }
     var pid = pidOf(actorId);
-    if (!(pid > 0)) { return false; }
     var holds = guardHolds(pid);
     if (!holds.length || cuffedBy(actorId) || carried(actorId) > 0) { return false; }
     var last = Number(read(actorId, ISSUED_PROPERTY)) || 0;
@@ -55184,7 +55201,10 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
         when both let it through, the same in either load order;
       - the gate already there is asked first, and when it refuses, this one
         says nothing more, so nobody is told two refusals for one Equip;
-      - only false is a no; an answer of nothing is not a refusal.
+      - only false is a no; an answer of nothing (or 0, null, '') is not a
+        refusal, and the cuffs still decide;
+      - somebody still waiting on their join pass gets no answer from the
+        cuffs (a bare return), never a refusal, and the pair does nothing.
     A reload of the gamemode does not stack a second copy:
       - finding its own wrapper from the last load on top (HELD), it takes the
         gate that wrapper was holding;
@@ -55199,8 +55219,12 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
   if (typeof equipBefore === 'function' && Object.prototype.hasOwnProperty.call(equipBefore, HELD)) { equipBefore = equipBefore[HELD]; }
   if (typeof equipBefore !== 'function') { equipBefore = null; }
   var cuffsGate = guard('onEquipItemAttempt', function (actorId, baseId) {
-    if (equipBefore && equipBefore(actorId, baseId) === false) { return false; }
-    if (GEN !== g.__thornswoodCuffsGen) { return true; }
+    // Only a strict false is a refusal, from the gate held or from this one;
+    // anything else it answers (true, nothing, 0, null) leaves it to the cuffs.
+    var before = equipBefore ? equipBefore(actorId, baseId) : undefined;
+    if (before === false) { return false; }
+    if (GEN !== g.__thornswoodCuffsGen) { return before; }
+    if (waiting(actorId)) { return; }
     return mayEquip(actorId, baseId);
   });
   cuffsGate[HELD] = equipBefore;
