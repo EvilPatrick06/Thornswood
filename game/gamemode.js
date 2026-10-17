@@ -1715,6 +1715,75 @@ function addItemsAtomic(actorId,goods) {
 }
 
 /*
+  WHICH RUN OF THE SERVER THIS IS (#2623). Made once per server process and
+  kept on globalThis, which a gamemode reload keeps (the NPC startup below
+  finds the previous controllers there), so a reload is the same run and a
+  restart is a new one. A temporary spawn carries the run it was made in.
+*/
+function serverRunId() {
+  if (typeof globalThis.__thornswoodServerRun !== 'string' || !globalThis.__thornswoodServerRun) {
+    globalThis.__thornswoodServerRun = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+  }
+  return globalThis.__thornswoodServerRun;
+}
+
+/*
+  WHETHER AN ACTOR IS A SPAWN NOBODY KEPT (#2623), read off the actor's own
+  marker rather than the NPC population's table, because that table is empty
+  for the few seconds after a gamemode reload until discovery runs, and a
+  temporary spawn that died then would otherwise stand up again. Any run, not
+  only this one: a temporary spawn is removed whenever it dies. The plain
+  true from before #2623 counts, since nobody chose to keep it.
+*/
+function isTemporarySpawn(actorId) {
+  let marker = null;
+  try { marker = mp.get(actorId, 'thornswoodNpcCommanded'); } catch (e) { return false; }
+  if (marker === true) return true;
+  return !!marker && typeof marker === 'object' && marker.keep !== true && typeof marker.run === 'string';
+}
+
+/*
+  TAKES A TEMPORARY SPAWNED CREATURE OUT OF THE WORLD FOR GOOD (#2623).
+
+  Three steps, in this order, each for a reason read out of the engine (the
+  fork at the commit engine\skymp pins):
+  - ObjectReference.Delete marks its saved record deleted
+    (MpObjectReference::Delete sets isDeleted and takes it off the grid), and
+    a record marked deleted is skipped when the server loads the world
+    (PartOne's load, "Skipping deleted form"), so it does not come back at a
+    restart.
+  - destroyActor takes it out of the server's memory (WorldState::DestroyForm).
+    The respawn timer a death starts holds only a weak reference to the actor
+    (MpActor::RespawnWithDelay, lifetime.lock()), so once it is destroyed that
+    timer finds nothing and nothing stands up again.
+  - The habitat count and the shared NPC runtime let go of its id, so nothing
+    is left waiting on an actor that is gone.
+  Never called inside the engine's death event: DeathEvent::OnFireSuccess
+  starts the respawn timer on the actor after every listener has run, so
+  mp.onDeath asks for this on the next turn of the event loop, after the event
+  is over.
+*/
+function removeSpawned(actorId) {
+  try {
+    const population = globalThis.__thornswoodNpcPopulation;
+    if (population && population.release) population.release(actorId);
+  } catch (e) { log('removeSpawned', actorId.toString(16), 'could not release its habitat slot:', e); }
+  try {
+    const runtime = globalThis.__thornswoodNpcRuntime;
+    if (runtime && runtime.forget) runtime.forget(actorId);
+  } catch (e) { log('removeSpawned', actorId.toString(16), 'could not leave the NPC runtime:', e); }
+  try {
+    mp.callPapyrusFunction('method', 'ObjectReference', 'Delete',
+      { type: 'form', desc: mp.getDescFromId(actorId) }, []);
+  } catch (e) { log('removeSpawned', actorId.toString(16), 'could not mark its record deleted:', e); }
+  try {
+    mp.destroyActor(actorId);
+  } catch (e) { log('removeSpawned', actorId.toString(16), 'could not destroy it:', e); return false; }
+  log('removeSpawned', actorId.toString(16), 'a temporary spawn is gone');
+  return true;
+}
+
+/*
   Puts count new actors of the NPC record baseId away units out from where
   ({ desc, pos, rot }): one straight ahead of the way they face (rot[2], in
   degrees), several spread round them. Returns { made, why }. Shared by /spawn
@@ -1731,8 +1800,26 @@ function addItemsAtomic(actorId,goods) {
   A fifth argument, commanded, is true for tester and staff spawn commands.
   The private population marker exempts these actors from habitat capacity,
   while admission and native runtime enrollment still establish authority.
+
+  A SPAWNED CREATURE IS TEMPORARY UNLESS STAFF KEEP IT (#2623). Djinn, 17
+  October, after wolves and a vampire he spawned in The Winking Skeever for a
+  test were still there days later and attacked a new character: "A creature
+  spawned by a staff member should never be made permanent unless we want to
+  make it permanent." The marker used to be plain true, and the population
+  gave every commanded actor a saved home and a spawn point there, so it came
+  back to that spot after every death and every restart, for good. Now the
+  marker says which: { keep: true } for a creature staff asked to keep (the
+  word keep on the command), or { run } naming this run of the server for a
+  temporary one. A temporary one is removed when it dies (removeSpawned, from
+  mp.onDeath) and, if it is still standing, when the server next starts
+  (createNpcPopulation sees a run that is not this one). A spawn from before
+  this change carries plain true, which nobody chose to keep, so it is
+  removed the first time the gamemode loads with this code, a deploy
+  included, not only at a restart. The sixth argument, keep, is the staff's
+  choice.
 */
-function placeActors(baseId, where, count, away, commanded) {
+function placeActors(baseId, where, count, away, commanded, keep) {
+  const run = serverRunId();
   let rec = null;
   try { rec = (mp.lookupEspmRecordById(baseId) || {}).record || null; } catch (e) { rec = null; }
   if (rec && rec.type && rec.type !== 'NPC_') {
@@ -1755,7 +1842,7 @@ function placeActors(baseId, where, count, away, commanded) {
       // Persist the exemption before admission: the five-second discovery
       // pass and a later gamemode reload must recognize the same command.
       const population=globalThis.__thornswoodNpcPopulation;
-      if(commanded && population) mp.set(ref,'thornswoodNpcCommanded',true);
+      if(commanded && population) mp.set(ref,'thornswoodNpcCommanded',keep ? {keep:true} : {run:run});
       if(population && !population.admit(ref,mp.getNpcAIState(ref))) {
         throw new Error('This species has no available population slot in this habitat');
       }
@@ -6047,7 +6134,17 @@ mp.onDeath = guard('onDeath', function (actorId, killerId) {
     const dying = mp.get(actorId, 'baseDesc');
     if (npcDeath) {
       const population = globalThis.__thornswoodNpcPopulation;
-      const minutes = population && population.returnMinutes(actorId);
+      /*
+        A TEMPORARY SPAWN'S BODY LIES THE NORMAL TIME (#2623). Djinn, 17
+        October: "leave the normal body time", so a hunter can still skin
+        and loot it. The 45 minutes in a spawn's rule is how long a kept one
+        waits before it stands up again, which is not a body time, so a
+        temporary one skips it and gets what the same creature gets in the
+        wild: an animal a hunter can work lies HUNT_TUNING.bodySeconds,
+        anything else the engine's twenty five seconds. mp.onRespawn removes
+        it when that time is up, instead of letting it stand.
+      */
+      const minutes = !isTemporarySpawn(actorId) && population && population.returnMinutes(actorId);
       if (Number.isInteger(minutes) && minutes > 0 && minutes <= 1440) {
         mp.set(actorId, 'spawnDelay', minutes * 60);
       } else if (isCarcass(dying)) {
@@ -6067,7 +6164,6 @@ mp.onDeath = guard('onDeath', function (actorId, killerId) {
       if (bodyLoot && bodyLoot.onDeath) bodyLoot.onDeath(actorId);
     } catch (eBody) { /* a body roll must not block the rest of death */ }
   }
-
   if (npcDeath && killerId) {
     try {
       var questKill = globalThis.__thornswoodQuests;
@@ -6186,6 +6282,28 @@ mp.onDeath = guard('onDeath', function (actorId, killerId) {
 });
 
 mp.onRespawn = guard('onRespawn', function (actorId) {
+  /*
+    A TEMPORARY SPAWN DOES NOT STAND UP AGAIN (#2623). Its body has lain the
+    normal time (mp.onDeath above), and this is the moment the engine would
+    stand it up where it was made. Read out of the fork at the commit
+    engine\skymp pins: MpActor::Respawn fires this event, and false from a
+    listener makes GameModeEvent::Fire call OnFireBlocked, which for
+    RespawnEvent does nothing, so the actor stays dead and nothing is sent.
+    Then removeSpawned takes it out of the world, on the next turn of the
+    event loop because the engine is still inside the event here.
+  */
+  let temporary = false;
+  try { temporary = !(Number(mp.get(actorId, 'profileId')) > 0) && isTemporarySpawn(actorId); }
+  catch (eTemp) { log('onRespawn', actorId.toString(16), 'could not check for a temporary spawn:', eTemp); }
+  if (temporary) {
+    try {
+      var bodyGone = globalThis.__thornswoodDungeonLoot;
+      if (bodyGone && bodyGone.onStand) bodyGone.onStand(actorId);
+    } catch (eGone) { /* the body's loot record goes with the body either way */ }
+    setTimeout(function () { removeSpawned(actorId); }, 0);
+    log('respawn', actorId, 'refused: a temporary spawn, removed instead');
+    return false;
+  }
   const sp = mp.get(actorId, 'spawnPoint');
   log('respawn', actorId, 'at', sp && sp.cellOrWorldDesc);
   if (!(Number(mp.get(actorId, 'profileId')) > 0)) {
@@ -53899,6 +54017,23 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
         when it parses as one AND there is something left in front of it.
       */
       var words = parts.slice(1);
+      /*
+        KEEP, AS THE LAST WORD, MAKES A SPAWN PERMANENT (#2623). Djinn, 17
+        October: a spawned creature is never permanent "unless we want to make
+        it permanent". So "/spawn wolf 3" is temporary and "/spawn wolf 3
+        keep" stays and comes back after it dies. Read before the count, so
+        the count is still the last word once keep is off.
+      */
+      var keep = false;
+      if (word === '/spawn' && words.length > 1 && String(words[words.length - 1]).toLowerCase() === 'keep') {
+        keep = true;
+        words = words.slice(0, words.length - 1);
+        if (!mayKeepSpawn(profileId)) {
+          toProfile(profileId, 'Only staff can keep a spawn. Leave keep off and it is temporary.');
+          log('command: /spawn keep refused profile', profileId);
+          return;
+        }
+      }
       var count = 1;
       if (words.length > 1) {
         var tail = Number(words[words.length - 1]);
@@ -53953,15 +54088,17 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
         toProfile(profileId, 'The server cannot tell where you are standing.');
         return;
       }
-      var put = placeActors(baseId, { desc: inCell, pos: at, rot: facing || [0, 0, 0] }, count, 150, true);
+      var put = placeActors(baseId, { desc: inCell, pos: at, rot: facing || [0, 0, 0] }, count, 150, true, keep);
       var made = put.made;
       if (!made) {
         log('/spawn failed on', hit.name + ':', put.why);
         toProfile(profileId, 'Nothing was spawned: ' + (put.why || 'the server would not place it') + '.');
         return;
       }
-      toProfile(profileId, 'Spawned ' + made + ' ' + hit.name + (made < count ? ' of the ' + count + ' asked for: ' + put.why : '') + '.');
-      log('command: /spawn', actorId.toString(16), '->', made, hit.name, hit.desc);
+      toProfile(profileId, 'Spawned ' + made + ' ' + hit.name + (made < count ? ' of the ' + count + ' asked for: ' + put.why : '') + '.' +
+        (keep ? ' Kept: it stays, and comes back after it dies.'
+              : ' Temporary: when it dies its body lies the usual time, then it is gone, and a restart takes it too. Add keep to make one stay.'));
+      log('command: /spawn', actorId.toString(16), '->', made, hit.name, hit.desc, keep ? 'kept' : 'temporary');
       return;
     }
 
@@ -54368,6 +54505,18 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
   */
   function isStaff(profileId) {
     return isDev(profileId);
+  }
+
+  /*
+    WHO MAY ADD keep TO /spawn (#2623). Djinn, 17 October: "testers and
+    staff for right now. can change later. so make it able to change later
+    easily". This one word is the switch: 'playtester' lets testers and staff
+    keep a spawn, 'staff' lets only staff. Staff's own aimed spawns
+    (/spawnat, /spawn x on someone) are staff only already.
+  */
+  var SPAWN_KEEP_WHO = 'playtester';
+  function mayKeepSpawn(profileId) {
+    return SPAWN_KEEP_WHO === 'staff' ? isStaff(profileId) : isPlaytester(profileId);
   }
 
   function isPlaytester(profileId) {
@@ -64938,6 +65087,13 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     return { words: words, count: 1 };
   }
   function lower(ws) { return ws.join(' ').trim().toLowerCase(); }
+  /* keep as the last word: the spawn stays for good (#2623). */
+  function keepOff(words) {
+    if (words.length && String(words[words.length - 1]).toLowerCase() === 'keep') {
+      return { words: words.slice(0, words.length - 1), keep: true };
+    }
+    return { words: words, keep: false };
+  }
 
   /*
     What an aimed line asks for, or null when it names no person, which leaves
@@ -64948,10 +65104,15 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     if (word === '/give' || word === '/spawnat') {
       var p = takePerson(words);
       if (!p.actorId || !p.rest.length) { return word === '/spawnat' ? { kind: 'spawn', them: p, want: '' } : null; }
-      var c = countOff(p.rest);
-      return { kind: word === '/give' ? 'give' : 'spawn', them: p, want: lower(c.words), count: c.count };
+      var k = word === '/spawnat' ? keepOff(p.rest) : { words: p.rest, keep: false };
+      var c = countOff(k.words);
+      return { kind: word === '/give' ? 'give' : 'spawn', them: p, want: lower(c.words), count: c.count, keep: k.keep };
     }
     if (word === '/spawn') {
+      // keep may close the line ("/spawn wolf 3 on Bob keep") or the part
+      // before on ("/spawn wolf 3 keep on Bob").
+      var kEnd = keepOff(words);
+      words = kEnd.words;
       var at = -1;
       for (var i = words.length - 2; i >= 1; i--) {
         if (String(words[i]).toLowerCase() === 'on') { at = i; break; }
@@ -64959,11 +65120,12 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       if (at < 0) { return null; }
       var who = takePerson(words.slice(at + 1));
       if (!who.actorId) { return null; }
-      var left = countOff(words.slice(0, at));
+      var kLeft = keepOff(words.slice(0, at));
+      var left = countOff(kLeft.words);
       var n = left.count;
       if (who.rest.length === 1 && /^\d+$/.test(who.rest[0])) { n = Number(who.rest[0]); }
       else if (who.rest.length) { return null; }
-      return { kind: 'spawn', them: who, want: lower(left.words), count: n };
+      return { kind: 'spawn', them: who, want: lower(left.words), count: n, keep: kEnd.keep || kLeft.keep };
     }
     if (word === '/tp') {
       var t = takePerson(words);
@@ -64976,9 +65138,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   /* Places a creature beside where, spread round them. The new reference from
      mp.place(base) and then a locationalData move, because createActor's first
      argument is the id the NEW actor gets, not the record to make it from. */
-  function spawnBeside(baseId, where, count) {
+  function spawnBeside(baseId, where, count, keep) {
     // The one placing /spawn uses too, so a fix to it reaches both (#959).
-    return placeActors(baseId, where, count, SPAWN_AWAY, true);
+    return placeActors(baseId, where, count, SPAWN_AWAY, true, keep);
   }
 
   function doAimed(a, pid, actorId, me, look) {
@@ -65012,13 +65174,15 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       if (!baseId) { tell(pid, beast.name + '\'s plugin is not in this load order.'); return true; }
       var spot = placeOf(them.actorId);
       if (!spot || !spot.desc) { tell(pid, 'The server cannot tell where ' + them.name + ' is right now. Try again.'); return true; }
-      var r = spawnBeside(baseId, spot, Math.min(a.count, SPAWN_MOST));
+      var r = spawnBeside(baseId, spot, Math.min(a.count, SPAWN_MOST), a.keep === true);
       if (!r.made) {
         tell(pid, 'Nothing was spawned beside ' + them.name + ': ' + (r.why || 'the server would not place it') + '.');
         log('staff: spawning ' + beast.name + ' beside ' + them.name + ' failed: ' + r.why);
         return true;
       }
-      tell(pid, 'Spawned ' + r.made + ' ' + beast.name + ' beside ' + them.name + '.');
+      tell(pid, 'Spawned ' + r.made + ' ' + beast.name + ' beside ' + them.name + '.' +
+        (a.keep ? ' Kept: it stays, and comes back after it dies.'
+                : ' Temporary: when it dies its body lies the usual time, then it is gone, and a restart takes it too. Add keep to make one stay.'));
       if (them.pid !== pid) { tell(them.pid, 'Staff put ' + r.made + ' ' + beast.name + ' beside you.'); }
       record('spawn', pid, me, them.pid, them.name, r.made + ' ' + beast.name, 0);
       return true;
@@ -66008,12 +66172,25 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
       const validHome=saved && Number.isInteger(saved.cell) && Array.isArray(saved.home) &&
         saved.home.length===3 && saved.home.every(Number.isFinite);
       const anchor=validHome ? saved.home : state.pos,cell=validHome ? saved.cell : state.cellOrWorld;
-      const commanded=call('get',id,'thornswoodNpcCommanded')===true;
+      // The spawn command's marker (#2623): {keep:true} for one staff kept,
+      // {run} for a temporary one, and plain true from before that split,
+      // which nobody chose to keep.
+      const marker=call('get',id,'thornswoodNpcCommanded');
+      const commanded=marker===true || (!!marker && typeof marker==='object' &&
+        (marker.keep===true || typeof marker.run==='string'));
+      const kept=commanded && marker!==true && marker.keep===true;
+      if(commanded && !kept && !(options && typeof options.run==='string' && marker.run===options.run)) {
+        // A temporary spawn from an earlier run of the server, standing
+        // because it never died. It is not admitted, and the gamemode takes
+        // it out of the world (removeSpawned) after this returns.
+        if(options && typeof options.discard==='function') options.discard(id);
+        return null;
+      }
       if(commanded && Number.isInteger(cell) && cell>0 && Array.isArray(anchor) &&
           anchor.length===3 && anchor.every(Number.isFinite)) {
         // Only trusted spawn commands set this private marker. They keep
         // authority and a saved home without joining a natural habitat cap.
-        rule={cell,commanded:true,row:[null,base,call('getDescFromId',cell),anchor,1024,45,null,null,0]};
+        rule={cell,commanded:true,keep:kept,row:[null,base,call('getDescFromId',cell),anchor,1024,45,null,null,0]};
       } else if(!commanded) rule=(byBase.get(base)||[]).filter(r=>r.cell===cell &&
         (!saved || !saved.source || saved.source===r.row[0]) &&
         Math.hypot(...r.row[3].map((v,j)=>v-anchor[j]))<=r.row[4])
@@ -66081,6 +66258,10 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
   }),returnMinutes:id=>{
     const entry=configured.get(id),rule=entry ? entry.rule : allowed.get(id);
     return rule && rule.row[5];
+  },isTemporary:id=>{
+    // A spawn staff did not keep (#2623): removed when it dies.
+    const entry=configured.get(id);
+    return !!(entry && entry.rule.commanded && !entry.rule.keep);
   }};
 }
 // NPC POPULATION POLICY END
@@ -67175,7 +67356,26 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
   schedule(preload,0);schedule(prepareTick,10);schedule(meshTick,10);
   schedule(humanTick,0);schedule(backgroundTick,20);schedule(nearTick,100);schedule(searchTick,10);
   if(population) schedule(discover,5000);
-  return {stop,start,enroll,getHeldIds:()=>[...held.keys(),...searching.map(job=>job.id)],getActorStatus:id=>{const a=actors.get(id);return a && {
+  /*
+    LETS GO OF AN ACTOR THAT IS ABOUT TO BE DESTROYED (#2623). Nothing about
+    it may stay here: not its activity, its place in the walk order or on the
+    map tiles, its policy, or the excluded and enrolled marks, so the runtime
+    never steps or reports on an actor that is gone.
+  */
+  function forget(id) {
+    const a=actors.get(id);
+    if(a && a.tile && npcTiles.has(a.tile)) npcTiles.get(a.tile).delete(id);
+    actors.delete(id);policies.delete(id);owned.delete(id);unavailable.delete(id);
+    enrolled.delete(id);excluded.delete(id);held.delete(id);near.delete(id);
+    const without=list=>{for(let i=list.length-1;i>=0;i--) {
+      const entry=list[i],entryId=typeof entry==='number' ? entry : entry && entry.id;
+      if(entryId===id) list.splice(i,1);
+    }};
+    without(order);without(nearOrder);without(preparing);without(searching);
+    for(const bank of banks.values()) if(bank && Array.isArray(bank.waiting)) without(bank.waiting);
+    failed=unavailable.size;
+  }
+  return {stop,start,enroll,forget,getHeldIds:()=>[...held.keys(),...searching.map(job=>job.id)],getActorStatus:id=>{const a=actors.get(id);return a && {
     mode:a.mode,target:a.target,pos:a.pos.slice(),path:a.path.map(p=>p.slice()),
     triangle:a.node.index,mesh:a.node.mesh,lastUpdate:a.last,paused:!!a.paused};},
     getStatus:()=>({loaded,controlled:owned.size,active:actors.size,unavailable:failed,held:held.size+searching.length,
@@ -68916,7 +69116,11 @@ try {
       current();
     }
     ready();
-    population=createNpcPopulation(mp,NPC_POPULATION_DATA,plugins,merchants,{suspended:true});
+    population=createNpcPopulation(mp,NPC_POPULATION_DATA,plugins,merchants,{suspended:true,
+      // #2623: a temporary spawn left from an earlier run is taken out of
+      // the world on the next turn of the event loop, never inside the
+      // runtime's own preparation pass that asked about it.
+      run:serverRunId(),discard:id=>setTimeout(()=>removeSpawned(id),0)});
     current();
     runtime = startSharedNpcServerRuntime(
       mp, {setTimeout, clearTimeout}, Date.now, text=>log(text),population,{suspended:true});

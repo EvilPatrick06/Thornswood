@@ -25,7 +25,7 @@ function fixture(options = {}) {
     [OTHER_NPC,{profileId:-1,baseDesc:'bandit:Skyrim.esm',spawnPoint:plain(home),isDead:false}]
   ]);
   const writes = [], credits = [], arrivals = [], deaths = [], respawns = [], policyReads = [], pending = [];
-  const logs = [], notices = [];
+  const logs = [], notices = [], removed = [];
   const context = {Number,Math,Date,JSON,mp:{
     get(id,property) {
       assert.ok(states.has(id),'Read an existing actor');
@@ -37,6 +37,9 @@ function fixture(options = {}) {
     }
   },
   guard(name,fn) { return fn; },
+  // #2623: a spawn nobody kept, read off the actor's own marker in the real file.
+  isTemporarySpawn(id) { return !!options.temporary && id === NPC; },
+  removeSpawned(id) { removed.push(id); return true; },
   HUNT_TUNING:{bodySeconds:300},
   isCarcass(desc) { return desc === 'wolf:Skyrim.esm'; },
   creditWork(id,half) { credits.push({id,half});return 'Warrior rank increased'; },
@@ -60,7 +63,8 @@ function fixture(options = {}) {
   };
   vm.createContext(context);
   vm.runInContext(handlerSource,context,{filename:'production-npc-death-handlers.js'});
-  return {states,writes,credits,arrivals,deaths,respawns,policyReads,pending,logs,notices,
+  return {states,writes,credits,arrivals,deaths,respawns,policyReads,pending,logs,notices,removed,
+    context,
     death(id,killer) { context.mp.onDeath(id,killer); },
     respawn(id) { context.mp.onRespawn(id); },
     flush() { while(pending.length) pending.shift().fn(); }
@@ -104,6 +108,42 @@ test('Hunt delay remains available before population initialization',() => {
   f.death(NPC,0);
   assert.equal(f.states.get(NPC).spawnDelay,300);
   assert.deepEqual(f.arrivals,[]);
+});
+// #2623, Djinn 17 Oct: "leave the normal body time". A temporary spawn's
+// body lies what the same creature gets in the wild, never a kept spawn's
+// return minutes, and the stand-up at the end of it is refused and the
+// spawn removed after the event.
+test('A temporary spawn that is not an animal lies the engine\'s 25 seconds, not the return minutes',() => {
+  const f = fixture({temporary:true,minutes:45});
+  f.death(NPC,0);
+  assert.deepEqual(f.policyReads,[]);
+  assert.equal(f.states.get(NPC).spawnDelay,25);
+  assert.deepEqual(f.removed,[],'Nothing is removed while the body lies there');
+});
+test('A temporary spawned animal lies the hunt body time',() => {
+  const f = fixture({temporary:true,carcass:true,minutes:45});
+  f.death(NPC,HUMAN);
+  assert.equal(f.states.get(NPC).spawnDelay,300);
+  assert.deepEqual(f.removed,[]);
+});
+test('A temporary spawn\'s stand-up is refused and it is removed after the event',() => {
+  const f = fixture({temporary:true});
+  f.states.get(NPC).isDead = true;
+  const answer = f.context.mp.onRespawn(NPC);
+  assert.equal(answer,false,'false blocks the native RespawnEvent');
+  assert.deepEqual(f.removed,[],'Not removed inside the engine event');
+  f.flush();
+  assert.deepEqual(f.removed,[NPC]);
+  assert.deepEqual(f.respawns,[],'No stock reset for a creature that is gone');
+});
+test('A kept or ordinary NPC still stands up',() => {
+  const f = fixture();
+  f.states.get(NPC).isDead = true;
+  assert.notEqual(f.context.mp.onRespawn(NPC),false);
+  f.states.get(NPC).isDead = false;
+  f.flush();
+  assert.deepEqual(f.removed,[]);
+  assert.deepEqual(f.respawns,[NPC]);
 });
 test('Positive human death retains temple arrival and receives no NPC stock or population policy',() => {
   const f = fixture();

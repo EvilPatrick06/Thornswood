@@ -54,7 +54,9 @@ const COMMANDS = slice('const WORDS = [', '// ==== end thornswood chat commands 
 const STAFF = slice('// ==== thornswood staff ====', '// ==== end thornswood staff ====');
 yes('the chat command block is in gamemode.js', !!COMMANDS);
 yes('the staff block is in gamemode.js', !!STAFF);
-const PLACE_ACTORS = slice('\nfunction placeActors(', '\n  return { made: made, why: why };\n}');
+// From serverRunId, which placeActors asks for the run a temporary spawn
+// belongs to (#2623), through removeSpawned, to the end of placeActors.
+const PLACE_ACTORS = slice('\nfunction serverRunId(', '\n  return { made: made, why: why };\n}');
 yes('and placeActors, which /spawn and /spawnat share', !!PLACE_ACTORS);
 yes('handle() hands staff words to the staff block with isStaff and /give\'s, /spawn\'s and /tp\'s lookups',
     !!COMMANDS && /staffCmd\.command\(cmd, word, parts, profileId, actorId, isStaff,\s*\{ findThing: findThing, findBeast: findBeast,\s*byFormId: byFormId, findPlace: findPlace \}\)/.test(COMMANDS));
@@ -338,11 +340,23 @@ if (COMMANDS && STAFF) {
     const dx = m.pos[0] - spotB.pos[0], dy = m.pos[1] - spotB.pos[1];
     return Math.abs(Math.sqrt(dx * dx + dy * dy) - 150) < 1;
   }));
-  yes('and answers both', to(got, STAFFER)[0] === 'Spawned 2 Troll beside Bjorn Iron-Hand.' &&
+  yes('and answers both, saying the spawn is temporary (#2623)', to(got, STAFFER)[0] ===
+      'Spawned 2 Troll beside Bjorn Iron-Hand. Temporary: when it dies its body lies the usual time, then it is gone, and a restart takes it too. Add keep to make one stay.' &&
       to(got, BJORN)[0] === 'Staff put 2 Troll beside you.');
   got = run(w, STAFFER, '/spawnat Sera troll');
   yes('/spawnat <person> <creature> does the same', w.placed.length === 3 &&
       w.where[w.placed[2].id].desc === w.where[A_SERA].desc && to(got, SERA)[0] === 'Staff put 1 Troll beside you.');
+  // keep, at either end, makes a spawn stay (#2623).
+  got = run(w, STAFFER, '/spawnat Sera troll keep');
+  yes('/spawnat <person> <creature> keep places one and says it is kept', w.placed.length === 4 &&
+      to(got, STAFFER)[0] === 'Spawned 1 Troll beside Sera. Kept: it stays, and comes back after it dies.');
+  got = run(w, STAFFER, '/spawn troll 2 keep on Bjorn');
+  yes('/spawn <creature> <count> keep on <person> reads the count and keep', w.placed.length === 6 &&
+      /^Spawned 2 Troll beside Bjorn Iron-Hand\. Kept:/.test(to(got, STAFFER)[0] || ''));
+  got = run(w, STAFFER, '/spawn troll on Bjorn keep');
+  yes('/spawn <creature> on <person> keep, keep at the very end', w.placed.length === 7 &&
+      /\. Kept:/.test(to(got, STAFFER)[0] || ''));
+  w.placed.length = 3;  // the giant check below counts from the first three
   got = run(w, STAFFER, '/spawnat Sera giant');
   yes('a creature whose plugin is not loaded says so and places nothing',
       w.placed.length === 3 && /plugin is not in this load order/.test(to(got, STAFFER)[0] || ''));
@@ -365,7 +379,8 @@ if (COMMANDS && STAFF) {
 
   const dids = w.records.map(function (r) { return JSON.parse(r.text).did; }).join(',');
   yes('every action wrote one line for the staff channel: ' + dids,
-      dids === 'warn,freeze,unfreeze,bring,goto,silence,unsilence,kick,give,spawn,spawn,tp,tp');
+      // Three more spawns are the keep checks (#2623).
+      dids === 'warn,freeze,unfreeze,bring,goto,silence,unsilence,kick,give,spawn,spawn,spawn,spawn,spawn,tp,tp');
 
   console.log('\nstaff whose identity is not proven:');
   const recs = w.records.length;
