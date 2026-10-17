@@ -76,7 +76,8 @@ ATTACH_FILES = 1 << 15
 
 # Every mode that shuts @everyone out of one of the three. Only public does
 # not, and a public channel needs nothing for the bot.
-RESTRICTED = ('read', 'open', 'membersread', 'hold', 'staff', 'pathfind', 'gm')
+RESTRICTED = ('read', 'open', 'membersread', 'hold', 'staff', 'pathfind', 'gm',
+              'gmrules')
 # The hold a hold mode is asked about, where one is needed.
 HOLD = 'Whiterun'
 
