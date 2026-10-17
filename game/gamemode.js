@@ -4188,7 +4188,7 @@ const HALL = {
   front doors two units apart, which is the only reason Morthal's and
   Dawnstar's old points looked like one spot.
 */
-const CHARGEN = {"shift":[["1be1a:Skyrim.esm",1],["1be1b:Skyrim.esm",1]],"rieklingShift":[["bfd98:Playable Rieklings.esp",1],["bfdb1:Playable Rieklings.esp",1]],"towns":{"e80030:Thornswood-Content.esp":{"key":"whiterun","town":"Whiterun","arrival":{"cell":"WhiterunBanneredMare","desc":"1605e:Skyrim.esm","pos":[-113.6,-810,69.3],"rot":[0,0,3.7]}},"e80031:Thornswood-Content.esp":{"key":"riften","town":"Riften","arrival":{"cell":"RiftenBeeandBarb","desc":"16bdf:Skyrim.esm","pos":[-150.2,-598.2,64],"rot":[0,0,36.3]}},"e80032:Thornswood-Content.esp":{"key":"solitude","town":"Solitude","arrival":{"cell":"SolitudeWinkingSkeever","desc":"16a0e:Skyrim.esm","pos":[-293.9,-1450.6,0],"rot":[0,0,0]}},"e80033:Thornswood-Content.esp":{"key":"windhelm","town":"Windhelm","arrival":{"cell":"WindhelmCandlehearthHall","desc":"16789:Skyrim.esm","pos":[554.3,-3766.2,64],"rot":[0,0,91.9]}},"e80034:Thornswood-Content.esp":{"key":"markarth","town":"Markarth","arrival":{"cell":"MarkarthSilverBloodInn","desc":"16dfe:Skyrim.esm","pos":[-5588.5,-1925.8,-16],"rot":[0,0,180]}},"e80035:Thornswood-Content.esp":{"key":"falkreath","town":"Falkreath","arrival":{"cell":"FalkreathDeadMansDrink","desc":"3a184:Skyrim.esm","pos":[670.4,-443.1,0.5],"rot":[0,0,0]}},"e80036:Thornswood-Content.esp":{"key":"morthal","town":"Morthal","arrival":{"cell":"MorthalMoorsideInn","desc":"138ce:Skyrim.esm","pos":[1970.6,-160.2,0],"rot":[0,0,270.9]}},"e80037:Thornswood-Content.esp":{"key":"dawnstar","town":"Dawnstar","arrival":{"cell":"DawnstarWindpeakInn","desc":"13a7f:Skyrim.esm","pos":[1823.2,-534.7,0.5],"rot":[0,0,0]}},"e80038:Thornswood-Content.esp":{"key":"winterhold","town":"Winterhold","arrival":{"cell":"WinterholdTheFrozenHearth","desc":"13814:Skyrim.esm","pos":[1791.6,7.3,0],"rot":[0,0,88]}}}};
+const CHARGEN = {"shift":[["1be1a:Skyrim.esm",1],["1be1b:Skyrim.esm",1]],"rieklingShift":[["bfd98:Playable Rieklings.esp",1],["bfdb1:Playable Rieklings.esp",1]],"towns":{"e80030:Thornswood-Content.esp":{"key":"whiterun","town":"Whiterun","hold":"Whiterun Hold","arrival":{"cell":"WhiterunBanneredMare","desc":"1605e:Skyrim.esm","pos":[-113.6,-810,69.3],"rot":[0,0,3.7]},"start":{"cell":"WhiterunExterior01","desc":"3c:Skyrim.esm","pos":[19189.1,-12006.5,-4558.4],"rot":[0,0,309.9]}},"e80031:Thornswood-Content.esp":{"key":"riften","town":"Riften","hold":"The Rift","arrival":{"cell":"RiftenBeeandBarb","desc":"16bdf:Skyrim.esm","pos":[-150.2,-598.2,64],"rot":[0,0,36.3]},"start":{"cell":"RiftenPlankside03","desc":"3c:Skyrim.esm","pos":[166478.2,-95072.9,10735.1],"rot":[0,0,89.2]}},"e80032:Thornswood-Content.esp":{"key":"solitude","town":"Solitude","hold":"Haafingar","arrival":{"cell":"SolitudeWinkingSkeever","desc":"16a0e:Skyrim.esm","pos":[504.9,-1075.4,0],"rot":[0,0,270.1]},"start":{"cell":"cell 92be, below Solitude","desc":"3c:Skyrim.esm","pos":[-73387.2,94964.1,-11739],"rot":[0,0,12.1]}},"e80033:Thornswood-Content.esp":{"key":"windhelm","town":"Windhelm","hold":"Eastmarch","arrival":{"cell":"WindhelmCandlehearthHall","desc":"16789:Skyrim.esm","pos":[554.3,-3766.2,64],"rot":[0,0,91.9]},"start":{"cell":"WindhelmAttackStart05","desc":"3c:Skyrim.esm","pos":[135744.9,24540.5,-12865.3],"rot":[0,0,355.3]}},"e80034:Thornswood-Content.esp":{"key":"markarth","town":"Markarth","hold":"The Reach","arrival":{"cell":"MarkarthSilverBloodInn","desc":"16dfe:Skyrim.esm","pos":[-5588.5,-1925.8,-16],"rot":[0,0,180]},"start":{"cell":"MarkarthUnderStoneKeep","desc":"16df2:Skyrim.esm","pos":[-5558.7,-1247.7,6688],"rot":[0,0,37.3]}},"e80035:Thornswood-Content.esp":{"key":"falkreath","town":"Falkreath","hold":"Falkreath Hold","arrival":{"cell":"FalkreathDeadMansDrink","desc":"3a184:Skyrim.esm","pos":[834.6,-100.6,0],"rot":[0,0,53.1]},"start":{"cell":"FalkreathExterior05","desc":"3c:Skyrim.esm","pos":[-35529,-89918.3,-2946.1],"rot":[0,0,107.3]}},"e80036:Thornswood-Content.esp":{"key":"morthal","town":"Morthal","hold":"Hjaalmarch","arrival":{"cell":"MorthalMoorsideInn","desc":"138ce:Skyrim.esm","pos":[1970.6,-160.2,0],"rot":[0,0,270.9]},"start":{"cell":"MorthalExterior06","desc":"3c:Skyrim.esm","pos":[-41159.1,63851.4,-13778.6],"rot":[0,0,45.5]}},"e80037:Thornswood-Content.esp":{"key":"dawnstar","town":"Dawnstar","hold":"The Pale","arrival":{"cell":"DawnstarWindpeakInn","desc":"13a7f:Skyrim.esm","pos":[2010.3,-155.7,0],"rot":[0,0,273.1]},"start":{"cell":"DawnstarWesternMineExterior","desc":"3c:Skyrim.esm","pos":[25623.4,100614.3,-13216.9],"rot":[0,0,56.1]}},"e80038:Thornswood-Content.esp":{"key":"winterhold","town":"Winterhold","hold":"Winterhold","arrival":{"cell":"WinterholdTheFrozenHearth","desc":"13814:Skyrim.esm","pos":[1791.6,7.3,0],"rot":[0,0,88]},"start":{"cell":"WinterholdExterior05","desc":"3c:Skyrim.esm","pos":[111939,99023.6,-8742.5],"rot":[0,0,302.4]}}}};
 
 /* The plain outfit is supplied before a fresh character opens the face menu.
  * Choosing reuses those same owned pieces after the body has settled. */
@@ -4482,11 +4482,23 @@ function arriveAt(actorId, townKey) {
   if (!state || state.stage !== 'choosing') { return false; }
   const desc = TOWN_BY_KEY[String(townKey || '').toLowerCase()];
   const entry = desc ? PASSAGES[desc] : null;
-  if (!entry || !entry.arrival) {
+  if (!entry || !entry.start) {
     log('chargen', actorId.toString(16), 'no such town', townKey, '- staying in the hall');
     return false;
   }
-  const arrival = entry.arrival;
+  /*
+    A NEW CHARACTER ARRIVES AT THE TOWN'S START SPOT, NOT IN ITS INN (#2622).
+    Djinn, 17 October: inns are the busiest rooms in the game, so a stranger
+    landed in the middle of other people's scenes, several picks of one town
+    stacked on one spot, and anybody who wanted to harass new players knew
+    where they appeared. Each town's start (game\data\chargen.json) is one
+    spot Djinn stood on and marked with F8: the stables or carriage stop at
+    Whiterun, Solitude, Windhelm and Riften, a spot of his choosing in
+    Falkreath, Morthal, Dawnstar and Winterhold, and Understone Keep in
+    Markarth. The outdoor ones are in Tamriel (3c), checked against
+    Skyrim.esm. The inn spot (arrival) stays for staff, as /tp <town> inn.
+  */
+  const arrival = entry.start;
   mp.set(actorId, 'spawnPoint', {
     cellOrWorldDesc: arrival.desc, pos: arrival.pos, rot: arrival.rot,
   });
@@ -4500,7 +4512,7 @@ function arriveAt(actorId, townKey) {
   closeRaceMenu(actorId);
   log('chargen', actorId.toString(16), 'home =', entry.key, '(' + arrival.cell + ') -> done');
   /*
-    ONE LINE AT THE DOOR OF THE INN, beside the log line and never instead of it.
+    ONE LINE ON ARRIVAL, beside the log line and never instead of it.
 
     The To Do List's entry on narrating creation lists what a stranger meets in
     the first minutes: "a stone room with nobody in it, a race menu, silence,
@@ -4518,7 +4530,14 @@ function arriveAt(actorId, townKey) {
     say() and not notify(), whose own comment says it may well do nothing
     from here.
   */
-  say(actorId, 'Welcome to ' + entry.town + '. You start at the inn.');
+  /*
+    THE WORDS ARE DJINN'S, 17 October: "Welcome to (insert Hold name here),
+    Safe Travels." The hold, not the town, out of the hold field of the town
+    table (game\data\chargen.json), so it reads the way the land is named:
+    Haafingar for Solitude, the Pale for Dawnstar. Said on this first arrival
+    only, as before: arriveAt runs once, at the end of creation.
+  */
+  say(actorId, 'Welcome to ' + entry.hold + ', Safe Travels.');
   return true;
 }
 
@@ -39311,9 +39330,10 @@ log('gamemode loaded:',
     somebody rests or logs out should decide how much comes back: an inn or a
     temple the most, out in the wild the least. Until this, a bed in an inn
     nobody holds was "a bed nobody can lend you", the same 25 an hour as a
-    bedroll on the road, and no logout fill. Every new character arrives in
-    one of nine inns (CHARGEN), and none of those is held unless a person
-    claimed it, so that was every new character's first night.
+    bedroll on the road, and no logout fill. Every new character used to
+    arrive in one of nine inns (CHARGEN), and arrives a short walk from one
+    since #2622; none of those is held unless a person claimed it, so it is
+    most new characters' first night.
 
     So the beds now know an inn or a temple when they see one, and hand the
     needs block two kinds of their own: common, a bed there, and commonfire,
@@ -52430,14 +52450,22 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
     }
   }
 
-  /** key -> the arrival point the launcher would have used. */
+  /** key -> where /tp sends staff: each town's start spot, and "<town> inn" for its inn (#2622). */
   function places() {
     var out = {};
     for (var d in PASSAGES) {
       var t = PASSAGES[d];
-      if (!t || !t.arrival) { continue; }
-      out[t.key] = { desc: t.arrival.desc, pos: t.arrival.pos, rot: t.arrival.rot,
-                     town: t.town };
+      if (!t) { continue; }
+      // /tp <town> goes where a new character arrives, and /tp <town> inn
+      // to the inn spot it used to be (#2622).
+      if (t.start) {
+        out[t.key] = { desc: t.start.desc, pos: t.start.pos, rot: t.start.rot,
+                       town: t.town };
+      }
+      if (t.arrival) {
+        out[t.key + ' inn'] = { desc: t.arrival.desc, pos: t.arrival.pos, rot: t.arrival.rot,
+                                town: t.town + '\'s inn' };
+      }
     }
     out.hall = { desc: HALL.desc, pos: HALL.pos, rot: HALL.rot, town: 'the creation hall' };
     return out;
