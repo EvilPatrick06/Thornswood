@@ -37,7 +37,7 @@ yes('...and runs no command: no slash line anywhere in it', !!block && !/['"]\/[
 const CUFFS = 0x10e039;
 function idOf(d) { return d === '10e039:Skyrim.esm' ? CUFFS : 0; }
 
-function rig(src) {
+function rig(src, opts) {
   const clock = { now: Date.UTC(2026, 9, 16, 18, 0, 0) };
   const props = {}, said = [], made = {}, timers = [];
   const people = {};   // actorId -> { pid, place, inv: {baseId: n} }
@@ -78,12 +78,16 @@ function rig(src) {
       HOLD_TOWN: { whiterun: 'Whiterun', riften: 'Riften' }
     }
   };
-  const C = new Function('globalThis', 'mp', 'Date', 'setInterval', 'clearInterval', 'guard', 'notify', 'say', 'log',
-    'idOf', 'addItem', 'takeItemById', 'holdAt', (src || block) + '\nreturn globalThis.__thornswoodCuffs;')(
-    g, mp, { now: function () { return clock.now; } }, function (f, ms) { timers.push(ms); return 1; }, function () { },
-    function (n, f) { return f; }, function () { }, function (id, line) { said.push([id, line]); }, function () { },
-    idOf, addItem, takeItemById, holdAt);
-  return { C: C, g: g, clock: clock, said: said, made: made, timers: timers, people: people, guards: guards,
+  if (opts && opts.before !== undefined) { if (opts.before === null) { delete mp.onEquipItemAttempt; } else { mp.onEquipItemAttempt = opts.before; } }
+  function load() {
+    return new Function('globalThis', 'mp', 'Date', 'setInterval', 'clearInterval', 'guard', 'notify', 'say', 'log',
+      'idOf', 'addItem', 'takeItemById', 'holdAt', (src || block) + '\nreturn globalThis.__thornswoodCuffs;')(
+      g, mp, { now: function () { return clock.now; } }, function (f, ms) { timers.push(ms); return 1; }, function () { },
+      function (n, f) { return f; }, function () { }, function (id, line) { said.push([id, line]); }, function () { },
+      idOf, addItem, takeItemById, holdAt);
+  }
+  const C = (opts && opts.noLoad) ? null : load();
+  return { C: C, load: load, g: g, clock: clock, said: said, made: made, timers: timers, people: people, guards: guards,
            person: person, face: face, mp: mp, strengthAsked: strengthAsked, count: count, addItem: addItem, props: props,
            last: function (id) { for (let i = said.length - 1; i >= 0; i--) { if (said[i][0] === id) { return said[i][1]; } } return ''; } };
 }
@@ -245,6 +249,79 @@ if (C && typeof C.used === 'function') {
     yes('...and anybody else with nobody in front wears theirs', r5.mp.onEquipItemAttempt(x, CUFFS) === true);
   }
 
+  // Sharing onEquipItemAttempt with the strength gate (#2621), both load orders.
+  {
+    const WEAK = 0x5eed;   // a stand-in heavy weapon only strength refuses
+    // Stand-in strength gate, written to Waystone's pattern (f3e954cb): wraps
+    // what is there, asks it first, says nothing when it refused, unwraps its
+    // own wrapper on a reload.
+    function loadStrength(m, told) {
+      const SH = '__thornswoodStrengthHeld';
+      let before = m.onEquipItemAttempt;
+      if (typeof before === 'function' && Object.prototype.hasOwnProperty.call(before, SH)) { before = before[SH]; }
+      if (typeof before !== 'function') { before = null; }
+      const gate = function (a, b) {
+        if (before && before(a, b) === false) { return false; }
+        if (b === WEAK) { told.push('strength'); return false; }
+        return true;
+      };
+      gate[SH] = before;
+      m.onEquipItemAttempt = gate;
+    }
+    const answers = {};
+    for (const order of ['cuffs then strength', 'strength then cuffs']) {
+      const q = rig(null, { before: null, noLoad: true }), told = [];
+      if (order === 'cuffs then strength') { q.load(); loadStrength(q.mp, told); } else { loadStrength(q.mp, told); q.load(); }
+      const Q = q.g.__thornswoodCuffs;
+      const cg = q.person(0xff000041, 51, 'whiterunCell:T.esm'), cp = q.person(0xff000042, 52, 'whiterunCell:T.esm');
+      const fr = q.person(0xff000043, 53, 'whiterunCell:T.esm');
+      q.guards[51] = ['whiterun']; q.addItem(cg, C_, 1); q.face(cg, cp); Q.used(cg);
+      const tells = function (id) { return q.said.filter(function (x) { return x[0] === id; }).length; };
+      const a = [];
+      let n0 = tells(cp); told.length = 0;
+      a.push(q.mp.onEquipItemAttempt(cp, 0x12eb7));
+      yes(order + ': a cuffed person is refused a sword, told once', a[0] === false && tells(cp) - n0 === 1 && told.length === 0);
+      n0 = tells(cp); told.length = 0;
+      a.push(q.mp.onEquipItemAttempt(cp, WEAK));
+      yes(order + ': a cuffed person is refused a heavy weapon, with one refusal only', a[1] === false && (tells(cp) - n0) + told.length === 1);
+      told.length = 0; n0 = tells(fr);
+      a.push(q.mp.onEquipItemAttempt(fr, WEAK));
+      yes(order + ': somebody free is still refused the heavy weapon by strength, once', a[2] === false && told.length === 1 && tells(fr) === n0);
+      a.push(q.mp.onEquipItemAttempt(fr, 0x12eb7));
+      yes(order + ': somebody free wields a sword through both', a[3] === true);
+      a.push(q.mp.onEquipItemAttempt(cp, CUFFS));
+      yes(order + ': the cuffs go on the cuffed person through both', a[4] === true);
+      answers[order] = a;
+    }
+    yes('the two load orders give the same answer for every case',
+      JSON.stringify(answers['cuffs then strength']) === JSON.stringify(answers['strength then cuffs']));
+
+    // Reloads: the file order is strength then cuffs, so a reload wraps the old cuffs gate in the new strength gate.
+    const q = rig(null, { before: null, noLoad: true }), told = [];
+    loadStrength(q.mp, told); q.load();
+    loadStrength(q.mp, told); q.load();
+    loadStrength(q.mp, told); q.load();
+    q.load(); q.load();
+    const Q = q.g.__thornswoodCuffs;
+    const cg = q.person(0xff000051, 61, 'whiterunCell:T.esm'), cp = q.person(0xff000052, 62, 'whiterunCell:T.esm');
+    q.guards[61] = ['whiterun']; q.addItem(cg, C_, 1); q.addItem(cg, C_, 1);
+    q.face(cg, cp);
+    const before = q.said.length;
+    yes('after reloads in file order, a pair put on facing somebody cuffs them once', q.mp.onEquipItemAttempt(cg, CUFFS) === false && !!Q.cuffedBy(cp) && q.count(cg, CUFFS) === 1);
+    yes('...and nobody is told twice', q.said.length - before === 2);
+    const n1 = q.said.filter(function (x) { return x[0] === cp; }).length;
+    yes('...and a cuffed person\'s sword is refused with one line, not one per load',
+      q.mp.onEquipItemAttempt(cp, 0x12eb7) === false && q.said.filter(function (x) { return x[0] === cp; }).length - n1 === 1);
+    const nx = q.person(0xff000053, 63, 'whiterunCell:T.esm'); q.addItem(nx, C_, 1);
+    q.face(nx, cg);
+    const n2 = q.said.filter(function (x) { return x[0] === nx; }).length;
+    yes('...and somebody who is not a guard, putting cuffs on facing a person, is told once that only guards cuff, not once per load',
+      q.mp.onEquipItemAttempt(nx, CUFFS) === true && q.said.filter(function (x) { return x[0] === nx; }).length - n2 === 1);
+    const q2 = rig(null, { before: null, noLoad: true });
+    q2.load(); q2.load(); q2.load();
+    yes('reloaded alone, the cuffs gate holds what was there before the first load, not itself', q2.g.__thornswoodCuffs.equipBefore === null);
+  }
+
   // Issue once a day.
   const G3 = r.person(0xff000006, 16, 'whiterunCell:T.esm'); r.guards[16] = ['whiterun'];
   C.issue(G3); r.people[G3].inv = {};
@@ -339,7 +416,9 @@ yes('mp.onUpdateEquipmentAttempt hands the stored equipment to the cuffs, after 
   /cuffsEq && cuffsEq\.equipped\) \{ cuffsEq\.equipped\(actorId, equipment\); \}/.test(handler('onUpdateEquipmentAttempt')) &&
   handler('onUpdateEquipmentAttempt').indexOf('college.equipped') < handler('onUpdateEquipmentAttempt').indexOf('cuffsEq.equipped'));
 yes('the cuffs answer onEquipItemAttempt and ask any handler already there, never replacing it',
-  !!block && /var equipBefore = mp\.onEquipItemAttempt;/.test(block) && /equipBefore\(actorId, baseId\) !== false/.test(block));
+  !!block && /var equipBefore = mp\.onEquipItemAttempt;/.test(block) &&
+  /if \(equipBefore && equipBefore\(actorId, baseId\) === false\) \{ return false; \}/.test(block) &&
+  /mp\.onEquipItemAttempt = cuffsGate;/.test(block));
 yes('mp.onDropItem refuses the pair on a prisoner\'s wrists', /cuffsDrop && !cuffsDrop\.mayLetGo\(actorId, baseId, count\)\) \{ return false; \}/.test(handler('onDropItem')));
 yes('mp.onPutItem does too', /cuffsPut && !cuffsPut\.mayLetGo\(actorId, baseId, count\)\) \{ return false; \}/.test(handler('onPutItem')));
 

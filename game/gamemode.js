@@ -55174,19 +55174,41 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
   g.__thornswoodCuffsTimer = setInterval(guard('cuffsIssue', tick), ISSUE_TICK_MS);
 
   /*
-    A cuffed person's weapon, and a pair put on facing somebody, through the
-    fork's onEquipItemAttempt. Whatever handler is already there (the
-    strength gate, #2262) is asked after, so neither block replaces the other.
+    ONE ENGINE EVENT, MORE THAN ONE GATE. A cuffed person's weapon, and a
+    pair put on facing somebody, go through the fork's onEquipItemAttempt,
+    which the strength gate (#2262, #2621) answers too. mp holds one handler
+    per event, so this wraps whatever is already there, the same way the
+    strength gate does (Waystone, f3e954cb), and whichever loads second holds
+    the first:
+      - the item is refused when either gate says no (false), allowed only
+        when both let it through, the same in either load order;
+      - the gate already there is asked first, and when it refuses, this one
+        says nothing more, so nobody is told two refusals for one Equip;
+      - only false is a no; an answer of nothing is not a refusal.
+    A reload of the gamemode does not stack a second copy:
+      - finding its own wrapper from the last load on top (HELD), it takes the
+        gate that wrapper was holding;
+      - a copy of an earlier load still held inside another gate's wrapper
+        (the strength block loads before this one in the file, so on a reload
+        it wraps the old cuffs gate) knows it is old (GEN) and only passes on
+        what the gate it holds answers, so the cuffs are asked once.
   */
+  var HELD = '__thornswoodCuffsHeld';
+  var GEN = g.__thornswoodCuffsGen = (Number(g.__thornswoodCuffsGen) || 0) + 1;
   var equipBefore = mp.onEquipItemAttempt;
-  mp.onEquipItemAttempt = guard('onEquipItemAttempt', function (actorId, baseId) {
-    if (!mayEquip(actorId, baseId)) { return false; }
-    return typeof equipBefore === 'function' ? equipBefore(actorId, baseId) !== false : true;
+  if (typeof equipBefore === 'function' && Object.prototype.hasOwnProperty.call(equipBefore, HELD)) { equipBefore = equipBefore[HELD]; }
+  if (typeof equipBefore !== 'function') { equipBefore = null; }
+  var cuffsGate = guard('onEquipItemAttempt', function (actorId, baseId) {
+    if (equipBefore && equipBefore(actorId, baseId) === false) { return false; }
+    if (GEN !== g.__thornswoodCuffsGen) { return true; }
+    return mayEquip(actorId, baseId);
   });
+  cuffsGate[HELD] = equipBefore;
+  mp.onEquipItemAttempt = cuffsGate;
 
   g.__thornswoodCuffs = {
     used: used, facing: facing, mayEquip: mayEquip, equipped: equipped, mayFree: mayFree,
-    useScript: useScript, USE_PROPERTY: USE_PROPERTY, REACH: REACH,
+    useScript: useScript, USE_PROPERTY: USE_PROPERTY, equipBefore: equipBefore, REACH: REACH,
     mayLetGo: mayLetGo, issue: issue, tick: tick, cuffedBy: cuffedBy,
     bindingHold: bindingHold, ownerScript: ownerScript, neighborScript: neighborScript,
     CUFFS_DESC: CUFFS_DESC, CUFF_PROPERTY: CUFF_PROPERTY, ISSUE_EVERY_MS: ISSUE_EVERY_MS
