@@ -3,35 +3,35 @@
 
       pwsh -NoProfile -File .\tests\test-crash-snapshot.ps1
 
-  Issue #1191. A game crash left only Crash Logger's text log, on every
-  install, so the rare crashes (#407, #408) could not be traced. Patrick,
-  29 Sep: keep a full crash snapshot on the dev build and on staff PCs only,
-  about 1 GB, only the newest kept.
+  Issue #2626, which replaces #1191's rule. A full crash snapshot was turned
+  on by itself for the dev build and staff PCs and described as about 1 GB.
+  The one written on Djinn's PC on 17 October was 9.2 GB, and nobody had told
+  him. Djinn: off unless the person turns it on, in the launcher, with the
+  size said and a folder they choose; after a crash, show it and ask whether
+  to keep it.
 
   The launcher does it with Crash Logger's own switch (Crash Log Write
   Minidump in the install's CrashLogger.ini, launcher\app\CrashDump.cs),
-  written before every Play:
+  written before every Play to match Settings, Crash snapshots:
 
-    1. on for the dev build, and for a linked Discord account the site says
-       holds a staff role (the dev flag of /api/play/join, dev-allowed.txt);
-    2. off for everybody else, and off again with every snapshot deleted
-       at the first Play after an install stops being either;
-    3. Max Minidumps = 1, and the launcher deletes all but the newest;
+    1. off for everybody until ticked (Config.CrashSnapshots is false);
+    2. turning it off stops new snapshots and deletes none already saved;
+    3. on: Max Minidumps = 1, and the launcher deletes all but the newest,
+       in Crash Logger's folder and the chosen one;
     4. written into that install's file only: a CrashLogger.ini that is a
        hard link to another copy is split first, and nothing goes in the
        registry or asks for administrator;
-    5. as the game closes after a crash, the log line names the crash log
-       and the snapshot beside it, says it holds what was in memory and
-       that it stays on the PC;
+    5. as the game closes after a crash with it on, the snapshot is moved to
+       the chosen folder, the line names it and its size, and the launcher
+       asks whether to keep it;
     6. nothing sends a snapshot anywhere (session logs, the report zip).
 
-  HOW. Compiles the shipped CrashDump.cs and Enforce.cs with the same
-  .NET Framework 4 csc the launcher is built with (so it is a C# 5 check
-  too), with small stand-ins for Paths, Files, Swallow, Config and Discord,
-  and drives it against pretend installs in a temp folder under
-  C:\ThornswoodTemps&Worktrees\temp (or %TEMP% on another machine). Reads
-  Shell.cs, Diag.cs, Discord.cs and the site as text. Changes nothing outside
-  its temp folder.
+  HOW. Compiles the shipped CrashDump.cs and Enforce.cs with the build's own
+  compiler (Launcher-Csc.ps1), with small stand-ins for Paths, Files,
+  Swallow and Config, and drives it against pretend installs in a temp folder
+  under C:\ThornswoodTemps&Worktrees\temp (or %TEMP% on another machine).
+  Reads Config.cs, Shell.cs, ui.xaml, Diag.cs and Discord.cs as text. Changes
+  nothing outside its temp folder.
 #>
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
@@ -68,29 +68,23 @@ namespace Thornswood
     // The same line as Files.cs; the text check below holds the two together.
     static class Files { public static string SkseLogDir { get { return Path.Combine(Paths.LiveMyGames, "SKSE"); } } }
     static class Swallow { public static void Note(string where, Exception e) { Console.WriteLine("SWALLOW=" + where + ": " + e.Message); } }
-    class Config
-    {
-        public string Channel = "";
-        public bool IsDev { get { return string.Equals(Channel, "dev", StringComparison.OrdinalIgnoreCase); } }
-    }
-    static class Discord { public static bool Linked; public static bool DevAllowed; }
+    class Config { public bool CrashSnapshots; public string CrashSnapshotFolder = ""; }
 
     static class CrashSnapshotTest
     {
         static string Flat(string s) { return s == null ? "(none)" : s.Replace("\r", " ").Replace("\n", " "); }
 
-        // apply   <game> <mygames> <channel> <linked 0|1> <staff 0|1>
-        // after   <game> <mygames> <since, local ticks> <want 0|1>
+        // apply   <game> <mygames> <on 0|1> <folder or ->
+        // after   <game> <mygames> <on 0|1> <folder or -> <since, local ticks>
         public static int Main(string[] a)
         {
             Paths.Game = a[1];
             Paths.LiveMyGames = a[2];
+            var cfg = new Config();
+            cfg.CrashSnapshots = a[3] == "1";
+            cfg.CrashSnapshotFolder = a[4] == "-" ? "" : a[4];
             if (a[0] == "apply")
             {
-                var cfg = new Config();
-                cfg.Channel = a[3] == "-" ? "" : a[3];
-                Discord.Linked = a[4] == "1";
-                Discord.DevAllowed = a[5] == "1";
                 Console.WriteLine("WANTED=" + CrashDump.Wanted(cfg));
                 Console.WriteLine("SAID=" + Flat(CrashDump.Apply(cfg)));
                 Console.WriteLine("ENFORCE=" + Flat(string.Join(" | ", Enforce.Said.ToArray())));
@@ -98,8 +92,10 @@ namespace Thornswood
             }
             if (a[0] == "after")
             {
-                DateTime since = new DateTime(long.Parse(a[3]), DateTimeKind.Local);
-                Console.WriteLine("SAID=" + Flat(CrashDump.AfterSession(since, a[4] == "1")));
+                DateTime since = new DateTime(long.Parse(a[5]), DateTimeKind.Local);
+                string snapshot;
+                Console.WriteLine("SAID=" + Flat(CrashDump.AfterSession(since, CrashDump.Wanted(cfg), CrashDump.KeptIn(cfg), out snapshot)));
+                Console.WriteLine("SNAP=" + (snapshot ?? "(none)"));
                 return 0;
             }
             return 2;
@@ -146,140 +142,115 @@ try {
         if ($withIni) { [IO.File]::WriteAllText((Join-Path $plugins 'CrashLogger.ini'), $script:shippedIni, (New-Object Text.UTF8Encoding($true))) }
         return @{ Game = $game; My = $my; Ini = (Join-Path $plugins 'CrashLogger.ini'); Skse = (Join-Path $my 'SKSE') }
     }
-    function Apply($inst, [string]$channel, [bool]$linked, [bool]$staff) {
-        Run @('apply', $inst.Game, $inst.My, $(if ($channel) { $channel } else { '-' }), $(if ($linked) { '1' } else { '0' }), $(if ($staff) { '1' } else { '0' }))
-    }
-    function IniText($inst) { if (Test-Path -LiteralPath $inst.Ini) { Get-Content -LiteralPath $inst.Ini -Raw } else { '' } }
-    function Live([string]$text, [string]$key) {
-        $m = [regex]::Matches($text, '(?m)^\s*' + [regex]::Escape($key) + '\s*=\s*(.*?)\s*$')
-        return ,@($m | ForEach-Object { $_.Groups[1].Value })
-    }
-    function Dump($inst, [string]$name, [int]$minutesAgo) {
-        $p = Join-Path $inst.Skse $name
-        [IO.File]::WriteAllBytes($p, [byte[]](0x4D, 0x44, 0x4D, 0x50))
-        (Get-Item -LiteralPath $p).LastWriteTime = (Get-Date).AddMinutes(-$minutesAgo)
-        return $p
-    }
 
     # The lines of Crash Logger 1.24's own CrashLogger.ini that matter, as
     # C:\Thornswood\Game and C:\Thornswood-DevBuild\Game had them on 29 Sep
     # (#1191), with a BOM as it ships.
     $script:shippedIni = "; Crash Log Settings`r`n`r`n[Debug]`r`n`r`n; Crashlog output directory. If blank, defaults to `"Documents\my games\Skyrim Special Edition\SKSE\`"`r`nCrashlog Directory = `r`n`r`n;Maximum number of crash logs to keep. Default: 20`r`nMax Crash Logs = 20`r`n`r`n;Maximum number of minidump files to keep. Minidumps are very large, so a low limit is recommended. Default: 1`r`n;Set to 0 to disable minidump cleanup.`r`nMax Minidumps = 1`r`n`r`nAuto Open Crash Log = true`r`n`r`n;Also create minidump file (.dmp) for crash log WinDbg analysis. Default: false`r`nCrash Log Write Minidump = false`r`n`r`n;Also create minidump file (.dmp) for thread dump WinDbg analysis. Default: false`r`nThread Dump Write Minidump = false`r`n`r`nLog Level = 2`r`n"
 
-    # ------------------------------------------- 1. who gets one, who does not
-    $cases = @(
-        @{ Name = 'main build, no Discord linked';                Ch = '';    L = $false; S = $false; Want = $false },
-        @{ Name = 'main build, linked, no staff role';            Ch = '';    L = $true;  S = $false; Want = $false },
-        @{ Name = 'main build, a stale staff note, not linked';   Ch = '';    L = $false; S = $true;  Want = $false },
-        @{ Name = 'main build, linked, staff role';               Ch = '';    L = $true;  S = $true;  Want = $true },
-        @{ Name = 'dev build, not staff';                          Ch = 'dev'; L = $true;  S = $false; Want = $true },
-        @{ Name = 'dev build, not linked';                         Ch = 'dev'; L = $false; S = $false; Want = $true }
-    )
-    $n = 0
-    foreach ($c in $cases) {
-        $n++
-        $inst = NewInstall ('who' + $n)
-        $r = Apply $inst $c.Ch $c.L $c.S
-        $t = IniText $inst
-        $w = Live $t 'Crash Log Write Minidump'
-        $expect = $(if ($c.Want) { 'true' } else { 'false' })
-        Yes "$($c.Name): Crash Log Write Minidump = $expect" ($w.Count -eq 1 -and $w[0] -eq $expect -and $r['WANTED'] -eq [string]$c.Want)
-        if (-not $c.Want) {
-            Yes "$($c.Name): the launcher says nothing, the file is at Crash Logger's default" ($r['SAID'] -eq '(none)')
-        }
-        else {
-            $k = Live $t 'Max Minidumps'
-            Yes "$($c.Name): only the newest kept (Max Minidumps = 1)" ($k.Count -eq 1 -and $k[0] -eq '1')
-            $why = $(if ($c.Ch -eq 'dev') { 'it is the dev build' } else { 'your Discord account holds a staff role' })
-            Yes "$($c.Name): the log line says why ($why), where, and that it stays on this PC" ($r['SAID'] -match [regex]::Escape($why) -and $r['SAID'] -match [regex]::Escape($inst.Skse) -and $r['SAID'] -match "what was in the game's memory" -and $r['SAID'] -match 'stays on this PC and nothing sends it anywhere')
-            $again = Apply $inst $c.Ch $c.L $c.S
-            Yes "$($c.Name): a second Play changes nothing and says nothing" ($again['SAID'] -eq '(none)' -and (IniText $inst) -eq $t)
-            Yes "$($c.Name): the rest of Crash Logger's file is left alone" ((Live $t 'Max Crash Logs')[0] -eq '20' -and (Live $t 'Auto Open Crash Log')[0] -eq 'true' -and (Live $t 'Thread Dump Write Minidump')[0] -eq 'false' -and (Live $t 'Log Level')[0] -eq '2' -and $t -match ';Also create minidump file \(\.dmp\) for crash log WinDbg analysis')
-        }
+
+    function Apply($inst, [bool]$on, [string]$folder = '-') {
+        Run @('apply', $inst.Game, $inst.My, $(if ($on) { '1' } else { '0' }), $folder)
+    }
+    function After($inst, [bool]$on, [string]$folder, [datetime]$since) {
+        Run @('after', $inst.Game, $inst.My, $(if ($on) { '1' } else { '0' }), $folder, [string]$since.Ticks)
+    }
+    function IniText($inst) { if (Test-Path -LiteralPath $inst.Ini) { Get-Content -LiteralPath $inst.Ini -Raw } else { '' } }
+    function Live([string]$text, [string]$key) {
+        $m = [regex]::Matches($text, '(?m)^\s*' + [regex]::Escape($key) + '\s*=\s*(.*?)\s*$')
+        return ,@($m | ForEach-Object { $_.Groups[1].Value })
+    }
+    function Dump([string]$dir, [string]$name, [int]$minutesAgo) {
+        New-Item -ItemType Directory -Force -Path $dir | Out-Null
+        $p = Join-Path $dir $name
+        [IO.File]::WriteAllBytes($p, [byte[]](0x4D, 0x44, 0x4D, 0x50))
+        (Get-Item -LiteralPath $p).LastWriteTime = (Get-Date).AddMinutes(-$minutesAgo)
+        return $p
     }
 
-    # ------------------------------------------- 2. only the newest kept
-    $inst = NewInstall 'newest'
-    $old = Dump $inst 'crash-2026-09-20-10-00-00.dmp' 600
-    $mid = Dump $inst 'crash-2026-09-25-10-00-00.dmp' 300
-    $new = Dump $inst 'crash-2026-09-29-10-00-00.dmp' 10
-    [IO.File]::WriteAllText((Join-Path $inst.Skse 'crash-2026-09-20-10-00-00.log'), 'log')
-    $r = Apply $inst '' $true $true
-    Yes 'staff: the two older snapshots are deleted before Play, the newest is kept' (-not (Test-Path -LiteralPath $old) -and -not (Test-Path -LiteralPath $mid) -and (Test-Path -LiteralPath $new))
-    Yes 'staff: and the log says so' ($r['SAID'] -match 'Deleted 2 older crash snapshots\. Only the newest is kept\.')
-    Yes 'staff: crash logs are never touched' (Test-Path -LiteralPath (Join-Path $inst.Skse 'crash-2026-09-20-10-00-00.log'))
+    # ------------------------------------------- 1. off until ticked
+    $cfgText = Read 'launcher\app\Config.cs'
+    Yes 'the setting is off for everybody until ticked (Config.CrashSnapshots = false)' ($cfgText -match '\[DataMember\] public bool CrashSnapshots = false;')
+    $inst = NewInstall 'off'
+    $r = Apply $inst $false
+    Yes 'off: Crash Log Write Minidump = false, and the launcher says nothing (already Crash Logger''s default)' ((Live (IniText $inst) 'Crash Log Write Minidump')[0] -eq 'false' -and $r['WANTED'] -eq 'False' -and $r['SAID'] -eq '(none)')
+    $m = NewInstall 'noini-off' $false $true
+    $null = Apply $m $false
+    Yes 'off and no ini: none is made (Crash Logger''s default is off)' (-not (Test-Path -LiteralPath $m.Ini))
 
-    # ------------------------------------------- 3. staff role taken away
-    $thread = Dump $inst 'threaddump-2026-09-28-10-00-00.dmp' 60
-    $t0 = (IniText $inst) -replace '(?m)^Thread Dump Write Minidump = false', 'Thread Dump Write Minidump = true'
-    [IO.File]::WriteAllText($inst.Ini, $t0)
-    $r = Apply $inst '' $true $false
+    # ------------------------------------------- 2. turning it off deletes nothing
+    $inst = NewInstall 'turnedoff'
+    [IO.File]::WriteAllText($inst.Ini, ($script:shippedIni -replace 'Crash Log Write Minidump = false', 'Crash Log Write Minidump = true' -replace 'Thread Dump Write Minidump = false', 'Thread Dump Write Minidump = true'))
+    $d = Dump $inst.Skse 'crash-2026-10-17-13-13-14.dmp' 5
+    $r = Apply $inst $false
     $t = IniText $inst
-    Yes 'no longer staff: Crash Log Write Minidump back to false at the next Play' ((Live $t 'Crash Log Write Minidump')[0] -eq 'false')
-    Yes 'no longer staff: the hang snapshot switch is held off too' ((Live $t 'Thread Dump Write Minidump')[0] -eq 'false')
-    Yes 'no longer staff: every snapshot it left is deleted, the hang one included' (@(Get-ChildItem -LiteralPath $inst.Skse -Filter '*.dmp').Count -eq 0)
-    Yes 'no longer staff: the log says it is off and what was deleted' ($r['SAID'] -match 'no longer keeps a crash snapshot' -and $r['SAID'] -match 'Deleted 2 crash snapshots from')
-    Yes 'no longer staff: crash logs are never touched' (Test-Path -LiteralPath (Join-Path $inst.Skse 'crash-2026-09-20-10-00-00.log'))
-    $r = Apply $inst '' $false $true
-    Yes 'unlinked with a staff note left on disk: still off' ((Live (IniText $inst) 'Crash Log Write Minidump')[0] -eq 'false' -and $r['WANTED'] -eq 'False')
+    Yes 'turned off: Crash Log Write Minidump back to false' ((Live $t 'Crash Log Write Minidump')[0] -eq 'false')
+    Yes 'turned off: the hang snapshot switch is held off too' ((Live $t 'Thread Dump Write Minidump')[0] -eq 'false')
+    Yes 'turned off: a snapshot already saved is left where it is' (Test-Path -LiteralPath $d)
+    Yes 'turned off: the log says so, and where they are' ($r['SAID'] -match 'Crash snapshots are off\. Any already saved are left where they are' -and $r['SAID'] -match [regex]::Escape($inst.Skse))
 
-    # Somebody turned it on by hand on an ordinary install.
-    $inst = NewInstall 'byhand'
-    [IO.File]::WriteAllText($inst.Ini, ($script:shippedIni -replace 'Crash Log Write Minidump = false', 'Crash Log Write Minidump = true'))
-    $d = Dump $inst 'crash-2026-09-29-11-00-00.dmp' 5
-    $r = Apply $inst '' $true $false
-    Yes 'an ordinary install that turned it on by hand: off again, and its snapshot deleted' ((Live (IniText $inst) 'Crash Log Write Minidump')[0] -eq 'false' -and -not (Test-Path -LiteralPath $d))
+    # ------------------------------------------- 3. on: only the newest kept
+    $inst = NewInstall 'on'
+    $chosen = Join-Path $tmp 'chosen-on'
+    $r = Apply $inst $true $chosen
+    $t = IniText $inst
+    Yes 'on: Crash Log Write Minidump = true and Max Minidumps = 1' ((Live $t 'Crash Log Write Minidump')[0] -eq 'true' -and (Live $t 'Max Minidumps')[0] -eq '1' -and $r['WANTED'] -eq 'True')
+    Yes 'on: the log says where they go, how big they get, and that they stay on this PC' ($r['SAID'] -match [regex]::Escape($chosen) -and $r['SAID'] -match '9 GB or more' -and $r['SAID'] -match 'stays on this PC')
+    $again = Apply $inst $true $chosen
+    Yes 'on: a second Play changes nothing and says nothing' ($again['SAID'] -eq '(none)' -and (IniText $inst) -eq $t)
+    Yes 'on: the rest of Crash Logger''s file is left alone' ((Live $t 'Max Crash Logs')[0] -eq '20' -and (Live $t 'Auto Open Crash Log')[0] -eq 'true' -and (Live $t 'Thread Dump Write Minidump')[0] -eq 'false' -and (Live $t 'Log Level')[0] -eq '2')
+    $old = Dump $inst.Skse 'crash-2026-09-20-10-00-00.dmp' 600
+    $mid = Dump $chosen 'crash-2026-09-25-10-00-00.dmp' 300
+    $new = Dump $chosen 'crash-2026-09-29-10-00-00.dmp' 10
+    [IO.File]::WriteAllText((Join-Path $inst.Skse 'crash-2026-09-20-10-00-00.log'), 'log')
+    $r = Apply $inst $true $chosen
+    Yes 'on: the older snapshots are deleted in both folders, the newest kept' (-not (Test-Path -LiteralPath $old) -and -not (Test-Path -LiteralPath $mid) -and (Test-Path -LiteralPath $new))
+    Yes 'on: and the log says so' ($r['SAID'] -match 'Deleted 2 older crash snapshots\. Only the newest is kept\.')
+    Yes 'crash logs are never touched' (Test-Path -LiteralPath (Join-Path $inst.Skse 'crash-2026-09-20-10-00-00.log'))
 
     # ------------------------------------------- 4. only that install's file
-    $a = NewInstall 'devinstall'
-    $b = NewInstall 'maininstall'
-    $null = Apply $a 'dev' $true $false
-    $null = Apply $b '' $true $false
-    Yes 'dev install and main install on one PC: on in the dev install''s file, off in the main one' ((Live (IniText $a) 'Crash Log Write Minidump')[0] -eq 'true' -and (Live (IniText $b) 'Crash Log Write Minidump')[0] -eq 'false')
-
     $vortex = Join-Path $tmp 'VortexCopy.ini'
     [IO.File]::WriteAllText($vortex, $script:shippedIni)
     $h = NewInstall 'linked' $false $true
     New-Item -ItemType HardLink -Path $h.Ini -Target $vortex | Out-Null
-    $r = Apply $h '' $true $true
+    $r = Apply $h $true
     Yes 'a CrashLogger.ini that is a hard link to another copy: the other copy is not written' ((Get-Content -LiteralPath $vortex -Raw) -eq $script:shippedIni)
     Yes 'and this install''s own file is' ((Live (IniText $h) 'Crash Log Write Minidump')[0] -eq 'true')
     Yes 'and the log says the file was split' ($r['ENFORCE'] -match 'It has its own copy now')
-
     $m = NewInstall 'noini' $false $true
-    $null = Apply $m 'dev' $false $false
+    $null = Apply $m $true
     $t = IniText $m
-    Yes 'Crash Logger there but its ini missing: made with both lines under [Debug]' ($t -match '(?s)\[Debug\].*Crash Log Write Minidump = true' -and (Live $t 'Max Minidumps')[0] -eq '1')
+    Yes 'on, Crash Logger there but its ini missing: made with both lines under [Debug]' ($t -match '(?s)\[Debug\].*Crash Log Write Minidump = true' -and (Live $t 'Max Minidumps')[0] -eq '1')
     $m = NewInstall 'nocrashlogger' $false $false
-    $null = Apply $m 'dev' $false $false
+    $null = Apply $m $true
     Yes 'no Crash Logger at all: nothing is made' (-not (Test-Path -LiteralPath $m.Ini))
-    $m = NewInstall 'noini-main' $false $true
-    $null = Apply $m '' $true $false
-    Yes 'not kept and no ini: none is made (Crash Logger''s default is off)' (-not (Test-Path -LiteralPath $m.Ini))
 
     $src = Read 'launcher\app\CrashDump.cs'
     $code = [regex]::Replace($src, '(?m)^\s*///?.*$', '')
     Yes 'nothing in the registry and nothing that asks for administrator (no LocalDumps, no runas)' ($code -notmatch 'Registry|LocalDumps|runas|HKEY|HKLM|HKCU')
 
-    # ------------------------------------------- 5. the line as the game closes
+    # ------------------------------------------- 5. as the game closes
     $s = NewInstall 'session'
+    $chosen = Join-Path $tmp 'chosen-session'
     $since = (Get-Date).AddMinutes(-30)
-    $older = Dump $s 'crash-2026-09-28-09-00-00.dmp' 1500
     [IO.File]::WriteAllText((Join-Path $s.Skse 'crash-2026-09-28-09-00-00.log'), 'yesterday')
     (Get-Item -LiteralPath (Join-Path $s.Skse 'crash-2026-09-28-09-00-00.log')).LastWriteTime = (Get-Date).AddMinutes(-1500)
-    $r = Run @('after', $s.Game, $s.My, [string]$since.Ticks, '1')
-    Yes 'a session that did not crash: no crash line (yesterday''s log does not count)' ($r['SAID'] -eq '(none)')
-    $log = Join-Path $s.Skse 'crash-2026-09-29-12-00-00.log'
-    [IO.File]::WriteAllText($log, 'today')
-    $dmp = Dump $s 'crash-2026-09-29-12-00-00.dmp' 1
-    $r = Run @('after', $s.Game, $s.My, [string]$since.Ticks, '1')
-    Yes 'crashed: the line names the crash log and where it is' ($r['SAID'] -match 'The game crashed\. Its crash log is crash-2026-09-29-12-00-00\.log in ' -and $r['SAID'] -match [regex]::Escape($s.Skse))
-    Yes 'crashed: and points to the snapshot beside it' ($r['SAID'] -match 'The full crash snapshot is beside it: crash-2026-09-29-12-00-00\.dmp')
-    Yes 'crashed: and says it holds what was in memory and stays on this PC' ($r['SAID'] -match "It holds what was in the game's memory, so it stays on this PC and nothing sends it anywhere")
-    Yes 'crashed: the older snapshot is deleted as the game closes, the new one kept' (-not (Test-Path -LiteralPath $older) -and (Test-Path -LiteralPath $dmp))
-    Remove-Item -LiteralPath $dmp
-    $r = Run @('after', $s.Game, $s.My, [string]$since.Ticks, '0')
-    Yes 'crashed on an ordinary install: the crash log line, and no snapshot named' ($r['SAID'] -match 'The game crashed\.' -and $r['SAID'] -notmatch 'full crash snapshot' -and $r['SAID'] -notmatch '\.dmp')
+    $r = After $s $true $chosen $since
+    Yes 'a session that did not crash: no crash line (yesterday''s log does not count)' ($r['SAID'] -eq '(none)' -and $r['SNAP'] -eq '(none)')
+    $older = Dump $chosen 'crash-2026-09-28-09-00-00.dmp' 1500
+    [IO.File]::WriteAllText((Join-Path $s.Skse 'crash-2026-10-17-13-13-14.log'), 'today')
+    $dmp = Dump $s.Skse 'crash-2026-10-17-13-13-14.dmp' 1
+    $r = After $s $true $chosen $since
+    $moved = Join-Path $chosen 'crash-2026-10-17-13-13-14.dmp'
+    Yes 'crashed, on: the line names the crash log and where it is' ($r['SAID'] -match 'The game crashed\. Its crash log is crash-2026-10-17-13-13-14\.log in ' -and $r['SAID'] -match [regex]::Escape($s.Skse))
+    Yes 'crashed, on: the snapshot is moved to the chosen folder and named with its size' ((Test-Path -LiteralPath $moved) -and -not (Test-Path -LiteralPath $dmp) -and $r['SNAP'] -eq $moved -and $r['SAID'] -match [regex]::Escape($moved) -and $r['SAID'] -match ', \d+ (MB|GB)\.')
+    Yes 'crashed, on: and the line says it holds what was in memory and stays on this PC' ($r['SAID'] -match "It holds what was in the game's memory, so it stays on this PC and nothing sends it anywhere")
+    Yes 'crashed, on: the older snapshot in the chosen folder is deleted, the new one kept' (-not (Test-Path -LiteralPath $older) -and (Test-Path -LiteralPath $moved))
+    $s2 = NewInstall 'session-off'
+    [IO.File]::WriteAllText((Join-Path $s2.Skse 'crash-2026-10-17-14-00-00.log'), 'today')
+    $stray = Dump $s2.Skse 'crash-2026-10-17-14-00-00.dmp' 1
+    $r = After $s2 $false '-' $since
+    Yes 'crashed, off: the crash log line, no snapshot named, and nothing moved or deleted' ($r['SAID'] -match 'The game crashed\.' -and $r['SAID'] -notmatch 'crash snapshot' -and $r['SNAP'] -eq '(none)' -and (Test-Path -LiteralPath $stray))
 
     # ------------------------------------------- 6. the launcher around it
     $shell = (Get-ChildItem -LiteralPath $app -Filter 'Shell*.cs' | Sort-Object Name | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw }) -join "`n"
@@ -287,19 +258,19 @@ try {
     $body = $play.Groups[1].Value
     $iEnf = $body.IndexOf('Enforce.Apply()'); $iDump = $body.IndexOf('CrashDump.Apply(cfg)'); $iSaid = $body.IndexOf('foreach (string note in Enforce.Said)'); $iNote = $body.IndexOf('Keep.LeaveNote')
     Yes 'Play writes it every time, after the other held settings and before the game starts' ($play.Success -and $iEnf -ge 0 -and $iDump -gt $iEnf -and $iSaid -gt $iDump -and $iNote -gt $iDump)
-    Yes 'the game closing logs the crash line, with the snapshot for kept installs' ($shell -match 'CrashDump\.AfterSession\(playStartedAt, CrashDump\.Wanted\(cfg\)\)')
-    Yes 'Wanted(cfg) is the dev build, or a linked account the site said is staff' ($src -match 'return Wanted\(cfg != null && cfg\.IsDev, Discord\.Linked, Discord\.DevAllowed\);' -and $src -match 'return devBuild \|\| \(linked && staff\);')
+    Yes 'the game closing logs the crash line and asks about a saved snapshot' ($shell -match 'CrashDump\.AfterSession\(playStartedAt, CrashDump\.Wanted\(cfg\), CrashDump\.KeptIn\(cfg\), out snapshot\)' -and $shell -match 'if \(snapshot != null\) AskKeepSnapshot\(snapshot\);')
+    Yes 'asking: Yes keeps it, No deletes it' ($shell -match 'MessageBoxButton\.YesNo' -and $shell -match 'static void AskKeepSnapshot' -and $shell -match 'File\.Delete\(snapshot\);')
+    Yes 'Wanted(cfg) is the person''s own setting and nothing else' ($src -match 'return cfg != null && cfg\.CrashSnapshots;' -and $src -notmatch 'Discord\.' -and $src -notmatch 'IsDev')
+    $ui = Read 'launcher\ui.xaml'
+    Yes 'Settings has the box, the size said beside it, and a folder button' ($ui -match 'x:Name="ChkCrashSnapshots"' -and $ui -match 'One can be 9 GB or more' -and $ui -match 'x:Name="BtnCrashFolder"' -and $ui -match 'x:Name="TxtCrashFolder"')
+    Yes 'the box and the folder are saved to the config when changed' ($shell -match 'cfg\.CrashSnapshots = chkCrashSnapshots\.IsChecked == true;' -and $shell -match 'cfg\.CrashSnapshotFolder = chosen;')
     $files = Read 'launcher\app\Files.cs'
-    Yes 'the snapshot folder is the crash log folder (the stand-in above says what Files.cs says)' ($files -match 'public static string SkseLogDir \{ get \{ return Path\.Combine\(Paths\.LiveMyGames, "SKSE"\); \} \}' -and $src -match 'return Files\.SkseLogDir;')
+    Yes 'Crash Logger''s folder is the crash log folder (the stand-in above says what Files.cs says)' ($files -match 'public static string SkseLogDir \{ get \{ return Path\.Combine\(Paths\.LiveMyGames, "SKSE"\); \} \}' -and $src -match 'return Files\.SkseLogDir;')
     $discord = Read 'launcher\app\Discord.cs'
-    Yes 'staff is the site''s dev answer, written down at every check in' ($discord -match 'st\.Dev\s*= Field\(reply, "dev"\) == "true";' -and $discord -match 'NoteDev\(st\.Dev\)' -and $discord -match '"dev-allowed\.txt"')
-    $site = Read 'site\server.js'
-    Yes 'and the site''s dev answer is the staff roles' ($site -match "cfg\.access\.dev = \['Owner', 'Dev', 'Gamemaster', 'Moderator', 'Loremaster'\];")
     Yes 'the session logs never carry a snapshot (only crash-*.log)' ($discord -notmatch '\.dmp' -and $discord -match 'Directory\.GetFiles\(dir, "crash-\*\.log"\)')
     $diag = Read 'launcher\app\Diag.cs'
     $report = [regex]::Match($diag, '(?s)Entry crash = Files\.NewestCrash\(\);\s*if \(crash != null\) Grab\(work, crash\.FullPath\);')
     Yes 'the report zip takes the crash log, not the snapshot' ($report.Success -and $diag -notmatch '\.dmp' -and $files -match '"crash-\*\.log"')
-    Yes 'Diagnostics names the snapshot beside the newest crash and says the report leaves it out' ($diag -match 'CrashDump\.Beside\(crash\.FullPath\)' -and $diag -match 'The report leaves it out')
 }
 finally {
     Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
