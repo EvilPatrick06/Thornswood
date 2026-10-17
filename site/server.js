@@ -3244,14 +3244,15 @@ function pruneSessionLogs() {
   on 12 October: run them on a timer too. Once as the site comes up and then
   every hour; each says its own failures (retentionSay) and neither throws.
   The rows go first, so the log prune reads which rows are still kept from
-  the file as it now stands. Removed gallery files whose hold has ended go
-  in the same pass (#2352, pruneRemovedUploads).
+  the file as it now stands. The failed-session alerts in trouble.json age
+  in the same pass by the same 365 days (#2166, sweepTrouble), and removed
+  gallery files whose hold has ended go too (#2352, pruneRemovedUploads).
 */
 const RETENTION_EVERY_MS = 60 * 60 * 1000;
 function retentionSweep() {
   const now = Date.now();
   return { sessions: sweepSessions(now), sessionLogs: pruneSessionLogs(),
-           removedUploads: pruneRemovedUploads(now) };
+           trouble: sweepTrouble(now), removedUploads: pruneRemovedUploads(now) };
 }
 setInterval(retentionSweep, RETENTION_EVERY_MS).unref?.();
 
@@ -3538,8 +3539,47 @@ function noteTrouble(row, found) {
       file: found.file,
       line: found.line
     });
-    putJson(TROUBLE_FILE, all.slice(-TROUBLE_KEEP));
+    putJson(TROUBLE_FILE, freshTrouble(all, Date.now()).slice(-TROUBLE_KEEP));
   } catch (e) { }
+}
+
+/*
+  TROUBLE ROWS AGE LIKE THE SESSION THEY ARE ABOUT (#2166). Each row is a copy
+  of a session record (who, the name, the profile, the session's window) with
+  one line out of its launcher log, so the privacy page's 365 days for session
+  records and launcher logs is its rule too. It was kept by count only, the
+  last TROUBLE_KEEP, so on a quiet server a row outlived both the session row
+  and the log set it was read from.
+
+  A row's time is the latest of the session's start, its end and when its
+  logs arrived, the same stamp the log set itself is aged by. A row with no
+  usable time is kept rather than guessed at, the way the session rows keep
+  one. A row whose session staff marked kept stays, because its row and its
+  log set stay (pruneSessionLogs), and the alert is part of what was held.
+  The count stays as the bound on the file's size.
+*/
+function freshTrouble(rows, now, held) {
+  const cut = (Number(now) || Date.now()) - SESSIONS_DAYS * 86400000;
+  const keep = held || new Set(sessionRows().filter((r) => r && r.keep).map((r) => String(r.session)));
+  return (Array.isArray(rows) ? rows : []).filter((t) => {
+    if (!t || typeof t !== 'object') return false;
+    if (keep.has(String(t.session))) return true;
+    const at = Math.max(Number(t.start) || 0, Number(t.end) || 0, Number(t.at) || 0);
+    return !(at > 0 && at < cut);
+  });
+}
+/* The timer's half. Writes only when something aged out, and a write that
+   fails is said, the count and never what the rows hold (#2354). An
+   unreadable file reads as [] and an empty list never writes over it. */
+function sweepTrouble(now) {
+  const raw = jsonFile(TROUBLE_FILE, []);
+  const rows = Array.isArray(raw) ? raw : [];
+  const kept = freshTrouble(rows, now);
+  const out = { rows: rows.length, kept: kept.length, written: false };
+  if (kept.length === rows.length) return out;
+  out.written = putJson(TROUBLE_FILE, kept);
+  if (!out.written) retentionSay('trouble', { event: 'write-failed', rows: rows.length, kept: kept.length });
+  return out;
 }
 
 /*
@@ -4852,8 +4892,15 @@ async function handle(req, res) {
     });
     putJson(LINKED, linked);
 
+    /* Only twa (#2166). The member cookie tw is the password door's, and
+       the privacy page calls it the fallback for a site with no Discord
+       sign-in: isMember ignores it whenever Discord is configured, and this
+       callback only runs then. It used to be set here as well, so every
+       Discord sign-in left a year-long cookie that granted nothing and that
+       the page said was not set. Now it is cleared instead, which also ends
+       the ones earlier sign-ins left behind, the way sign-out clears it. */
     const cookies2 = [setCookie(req, ADMIN, value, ADMIN_DAYS),
-                      setCookie(req, COOKIE, memberToken(), 365), spent];
+                      COOKIE + '=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax', spent];
 
     // The launcher asked, so hand the ticket back to it on the loopback
     // address rather than leaving it in the browser.
