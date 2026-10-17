@@ -229,6 +229,11 @@ rehearsal, or a real move, that loses it is acceptable. In short:
 Worth an hour, and it is the only thing that turns this file from a guess into
 a runbook.
 
+It is also the only measure of how long a restore takes, the RTO row of
+[SERVICE-OBJECTIVES.md](SERVICE-OBJECTIVES.md). The alert proposed there, a
+rehearsal that starts the server and connects at a cadence Patrick sets, is
+Proposed, needs Patrick's agreement (#2183).
+
 `tests\test-backup-restore.ps1` does the scripted half every night on
 scratch folders: backs up a stand-in live and dev server, deletes the
 original, restores into another folder, and checks the character and the load
