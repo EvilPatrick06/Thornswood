@@ -54,7 +54,7 @@ function rig(src, opts) {
   const strengthAsked = [];
   const mp = {
     makeProperty: function (k, o) { made[k] = o; },
-    getOnlinePlayers: function () { return Object.keys(people).map(Number); },
+    getOnlinePlayers: function () { return Object.keys(people).filter(function (id) { return !people[id].npc; }).map(Number); },
     get: function (id, key) {
       const p = people[id];
       if (!p) { throw new Error('no such form'); }
@@ -110,7 +110,7 @@ if (C && typeof C.used === 'function') {
   const X = r.person(0xff000003, 13, 'whiterunCell:T.esm');   // not a guard
   const R = r.person(0xff000004, 14, 'whiterunCell:T.esm');   // guard of Riften
   const N = 0x1a2b3;                                          // an NPC, no profile
-  r.people[N] = { pid: 0, place: 'whiterunCell:T.esm', inv: {} }; r.props[N] = {};
+  r.people[N] = { pid: 0, place: 'whiterunCell:T.esm', inv: {}, npc: true }; r.props[N] = {};
   r.guards[11] = ['whiterun']; r.guards[14] = ['riften'];
 
   // Issuing.
@@ -548,6 +548,65 @@ yes('the controls watchdog does not count a held control as off, and switches on
 yes('no rescue anywhere in the front plugin switches every control on regardless',
   !/enablePlayerControls\(true, true, true, true, true, true, true, true, true\)/.test(front) &&
   (front.match(/enableAllBut\(heldOff\(\)\)/g) || []).length === 1);
+
+// A target still waiting on the join pass, or with no profile yet (#410): their state is not loaded,
+// so a guard facing them cuffs nobody and frees nobody, and is not refused. Both load orders.
+if (block) {
+  const WC = '10e039:Skyrim.esm', WEAK2 = 0x5eed;
+  for (const order of ['cuffs then strength', 'strength then cuffs']) {
+    const q = rig(null, { before: null, noLoad: true }), told = [];
+    const strength = function (m) {
+      let before = m.onEquipItemAttempt;
+      if (typeof before === 'function' && Object.prototype.hasOwnProperty.call(before, '__thornswoodStrengthHeld')) { before = before.__thornswoodStrengthHeld; }
+      if (typeof before !== 'function') { before = null; }
+      const gate = function (a, b) { if (before && before(a, b) === false) { return false; } if (b === WEAK2) { told.push(a); return false; } return true; };
+      gate.__thornswoodStrengthHeld = before; m.onEquipItemAttempt = gate;
+    };
+    if (order === 'cuffs then strength') { q.load(); strength(q.mp); } else { strength(q.mp); q.load(); }
+    const Q = q.g.__thornswoodCuffs;
+    const held = {};
+    q.g.__thornswoodPassHeld = function (pid) { return !!held[pid]; };
+    const tg = q.person(0xff000091, 101, 'whiterunCell:T.esm');   // guard of Whiterun, passed
+    const tw = q.person(0xff000092, 102, 'whiterunCell:T.esm');   // waits on the pass
+    const tc = q.person(0xff000093, 103, 'whiterunCell:T.esm');   // cuffed, then waits (a fresh session)
+    const tn = q.person(0xff000094, 0, 'whiterunCell:T.esm');     // online, no profile on them yet
+    const tb = q.person(0xff000095, 105, 'whiterunCell:T.esm');   // passed, standing behind tn
+    q.guards[101] = ['whiterun'];
+    q.addItem(tg, WC, 3); q.face(tg, tc); q.mp.onEquipItemAttempt(tg, CUFFS);
+    yes(order + ': (set-up) somebody cuffed to free', !!Q.cuffedBy(tc));
+    held[102] = held[103] = true;
+    const quiet = function (from) { return q.said.length === from; };
+    const prop = function (id) { return JSON.stringify(q.props[id][Q.CUFF_PROPERTY]); };
+    let s0 = q.said.length, p0 = prop(tw), n0 = q.count(tg, CUFFS);
+    q.face(tg, tw);
+    let a = q.mp.onEquipItemAttempt(tg, CUFFS);
+    yes(order + ': a guard facing somebody waiting on the pass: not refused, nobody cuffed, nothing written, the pair stays, nobody told',
+      a !== false && !Q.cuffedBy(tw) && prop(tw) === p0 && q.count(tg, CUFFS) === n0 && q.count(tw, CUFFS) === 0 && quiet(s0));
+    s0 = q.said.length; p0 = prop(tc); n0 = q.count(tg, CUFFS);
+    q.face(tg, tc);
+    a = q.mp.onEquipItemAttempt(tg, CUFFS);
+    yes(order + ': facing a cuffed person waiting on the pass: not refused, not freed, the record untouched, the pairs stay, nobody told',
+      a !== false && !!Q.cuffedBy(tc) && prop(tc) === p0 && q.count(tc, CUFFS) === 1 && q.count(tg, CUFFS) === n0 && quiet(s0));
+    s0 = q.said.length; p0 = prop(tn);
+    q.face(tg, tn); q.people[tb].pos = [0, 150, 0];
+    a = q.mp.onEquipItemAttempt(tg, CUFFS);
+    yes(order + ': facing somebody with no profile yet: not refused, nothing written, nobody told, and the person behind them is not cuffed instead',
+      a !== false && prop(tn) === p0 && !Q.cuffedBy(tn) && !Q.cuffedBy(tb) && quiet(s0));
+    yes(order + ': used() answers no effect for each of them', (q.face(tg, tw), Q.used(tg) === false) && (q.face(tg, tc), Q.used(tg) === false) && (q.face(tg, tn), Q.used(tg) === false));
+    // The stored-equipment path: no hand-back, so the pair simply stays worn.
+    q.face(tg, tw);
+    const worn = function (on) { return { inv: { entries: [{ baseId: CUFFS, count: 1, worn: on }] } }; };
+    Q.equipped(tg, worn(false)); Q.equipped(tg, worn(true));
+    yes(order + ': the stored-equipment path does nothing facing somebody waiting', !q.props[tg][Q.USE_PROPERTY] && !Q.cuffedBy(tw));
+    yes(order + ': the strength gate still answers for the guard as before', q.mp.onEquipItemAttempt(tg, WEAK2) === false && told.length === 1);
+    // Once their pass is in, the same guard cuffs and frees as usual.
+    delete held[102]; delete held[103];
+    q.face(tg, tw);
+    yes(order + ': after their pass, the guard cuffs them', q.mp.onEquipItemAttempt(tg, CUFFS) === false && !!Q.cuffedBy(tw));
+    q.face(tg, tc);
+    yes(order + ': after their pass, the guard frees the cuffed one', q.mp.onEquipItemAttempt(tg, CUFFS) === false && !Q.cuffedBy(tc));
+  }
+}
 
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
