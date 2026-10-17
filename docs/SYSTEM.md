@@ -194,7 +194,10 @@ it through the webhook in `alerts-webhook.txt` beside it
 (`Watch-Services.ps1:HealthProblem`, `Watch-Services.ps1:$tellOnly`,
 `Watch-Services.ps1:$diskLow = 20`, `Watch-Services.ps1:$diskCritical = 10`,
 `Watch-Services.ps1:Observe`, `Watch-Services.ps1:Deliver`,
-`bot/bot.py:watch_services`, `bot/bot.py:watch_alerts_due`).
+`bot/bot.py:watch_services`, `bot/bot.py:watch_alerts_due`). What each service
+is held to, and the reader that turns those down and back lines into down
+minutes and availability per service (`scripts/vps/Read-Availability.ps1`), are
+in [SERVICE-OBJECTIVES.md](SERVICE-OBJECTIVES.md) (#2183).
 
 What the backup takes: the live server's `world`, `private`, `data`,
 `server-settings.json` and `gamemode.js`, and the same five from
