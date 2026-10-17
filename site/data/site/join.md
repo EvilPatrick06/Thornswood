@@ -109,7 +109,7 @@ where you make your face. When you are done, a panel opens on its own for the
 three choices on the [Professions](/classes) page: your class, your
 profession and the half of it you will make your own, and the town you wake
 up in. Only the town has to be chosen before you leave the hall, and choosing
-it sends you to your inn; your class and profession can wait, and are picked
+it sends you to that town; your class and profession can wait, and are picked
 later in the world from the same panel. Until you pick a profession you cannot
 make anything at a bench, smelting and tanning included, so do not wait long if
 you mean to make things. You arrive in the clothes you stand in,

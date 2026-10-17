@@ -60,8 +60,8 @@ A bed in an inn or a temple nobody holds is a place of its own (#2246).
 Djinn asked on 26 Sep for an inn or a temple to give back more than the
 wild. Patrick set it on 12 Oct: 40 an hour, 45 with a fire in reach,
 better than a bedroll on the road and under a bed you are allowed in.
-Every new character arrives in one of nine inns, so this is their first
-bed.
+Every town's inn is a short walk from where a new character arrives
+(#2622), so it is the first bed most of them find.
 
 Someone playing in the same cell adds 25 on top of whatever place you
 are already in, while they play and for 5 minutes after. Playing is the
