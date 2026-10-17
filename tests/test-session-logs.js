@@ -606,6 +606,11 @@ const TROUBLE_KEEP = 200;
 const jsonFile = (p, fb) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { return fb; } };
 const putJson = (p, o) => { try { fs.writeFileSync(p, JSON.stringify(o, null, 2), 'utf8'); return true; } catch (e) { return false; } };
 eval(grab('noteTrouble'));
+// Since #2166 noteTrouble ages the file by the session window on the way in,
+// through freshTrouble, which reads which sessions are kept from the same
+// sessionRows stand-in as the log prune above.
+const SESSIONS_DAYS = 365;
+eval(grab('freshTrouble'));
 
 const started = new Date(2026, 8, 23, 20, 7, 0).getTime();
 const ended = new Date(2026, 8, 23, 21, 30, 0).getTime();
