@@ -23,6 +23,7 @@
   "e80030:Thornswood-Content.esp": {
    "key": "whiterun",
    "town": "Whiterun",
+   "hold": "Whiterun Hold",
    "arrival": {
     "cell": "WhiterunBanneredMare",
     "desc": "1605e:Skyrim.esm",
@@ -41,6 +42,7 @@
   "e80031:Thornswood-Content.esp": {
    "key": "riften",
    "town": "Riften",
+   "hold": "The Rift",
    "arrival": {
     "cell": "RiftenBeeandBarb",
     "desc": "16bdf:Skyrim.esm",
@@ -59,6 +61,7 @@
   "e80032:Thornswood-Content.esp": {
    "key": "solitude",
    "town": "Solitude",
+   "hold": "Haafingar",
    "arrival": {
     "cell": "SolitudeWinkingSkeever",
     "desc": "16a0e:Skyrim.esm",
@@ -77,6 +80,7 @@
   "e80033:Thornswood-Content.esp": {
    "key": "windhelm",
    "town": "Windhelm",
+   "hold": "Eastmarch",
    "arrival": {
     "cell": "WindhelmCandlehearthHall",
     "desc": "16789:Skyrim.esm",
@@ -95,6 +99,7 @@
   "e80034:Thornswood-Content.esp": {
    "key": "markarth",
    "town": "Markarth",
+   "hold": "The Reach",
    "arrival": {
     "cell": "MarkarthSilverBloodInn",
     "desc": "16dfe:Skyrim.esm",
@@ -113,6 +118,7 @@
   "e80035:Thornswood-Content.esp": {
    "key": "falkreath",
    "town": "Falkreath",
+   "hold": "Falkreath Hold",
    "arrival": {
     "cell": "FalkreathDeadMansDrink",
     "desc": "3a184:Skyrim.esm",
@@ -131,6 +137,7 @@
   "e80036:Thornswood-Content.esp": {
    "key": "morthal",
    "town": "Morthal",
+   "hold": "Hjaalmarch",
    "arrival": {
     "cell": "MorthalMoorsideInn",
     "desc": "138ce:Skyrim.esm",
@@ -149,6 +156,7 @@
   "e80037:Thornswood-Content.esp": {
    "key": "dawnstar",
    "town": "Dawnstar",
+   "hold": "The Pale",
    "arrival": {
     "cell": "DawnstarWindpeakInn",
     "desc": "13a7f:Skyrim.esm",
@@ -167,6 +175,7 @@
   "e80038:Thornswood-Content.esp": {
    "key": "winterhold",
    "town": "Winterhold",
+   "hold": "Winterhold",
    "arrival": {
     "cell": "WinterholdTheFrozenHearth",
     "desc": "13814:Skyrim.esm",
