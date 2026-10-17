@@ -198,17 +198,17 @@ if (loaded && pollTimer) {
   yes('150 units in front of them, facing east (angle 90): ' + (to && JSON.stringify(to.pos)),
       !!to && Math.abs(to.pos[0] - 1150) < 0.01 && Math.abs(to.pos[1] - 2000) < 0.01 && to.pos[2] === 300);
   yes('turned to face them', !!to && to.rot[2] === 270);
-  yes('and they are told: ' + one(r), r.said.length === 1 && /^Spawned 1 Troll\. Temporary: gone when it dies or the server restarts\. Add keep to make one stay\.$/.test(r.said[0]) && r.to[0] === PID);
+  yes('and they are told: ' + one(r), r.said.length === 1 && /^Spawned 1 Troll\. Temporary: when it dies its body lies the usual time, then it is gone, and a restart takes it too\. Add keep to make one stay\.$/.test(r.said[0]) && r.to[0] === PID);
 
   r = send('/spawn troll 3');
   yes('/spawn troll 3 places three and says so: ' + one(r),
-      r.placed.length === 3 && r.moved.length === 3 && r.said.length === 1 && /^Spawned 3 Troll\. Temporary: gone when it dies or the server restarts\. Add keep to make one stay\.$/.test(r.said[0]));
+      r.placed.length === 3 && r.moved.length === 3 && r.said.length === 1 && /^Spawned 3 Troll\. Temporary: when it dies its body lies the usual time, then it is gone, and a restart takes it too\. Add keep to make one stay\.$/.test(r.said[0]));
   const spots = r.moved.map(function (m) { return m.to.pos[0].toFixed(1) + ',' + m.to.pos[1].toFixed(1); });
   yes('spread round them, not stacked: ' + spots.join(' '),
       spots[0] !== spots[1] && spots[1] !== spots[2] && spots[0] !== spots[2]);
 
   r = send('/spawn troll 500');
-  yes('forty at most: ' + one(r), r.placed.length === 40 && /^Spawned 40 Troll\. Temporary: gone when it dies or the server restarts\. Add keep to make one stay\.$/.test(r.said[0]));
+  yes('forty at most: ' + one(r), r.placed.length === 40 && /^Spawned 40 Troll\. Temporary: when it dies its body lies the usual time, then it is gone, and a restart takes it too\. Add keep to make one stay\.$/.test(r.said[0]));
 
   r = send('/spawn nosuchthingatall');
   yes('a name it cannot find says so: ' + one(r),
@@ -251,7 +251,7 @@ if (loaded && pollTimer) {
   r = send('/spawn troll');
   yes('a habitat cap does not eat a tester spawn or swallow the reply: ' + one(r) + ' admits=' + capAsks,
       capAsks === 1 && r.placed.length === 1 && r.moved.length === 1 && r.destroyed.length === 0 &&
-      r.created.length === 0 && r.said.length === 1 && /^Spawned 1 Troll\. Temporary: gone when it dies or the server restarts\. Add keep to make one stay\.$/.test(r.said[0]));
+      r.created.length === 0 && r.said.length === 1 && /^Spawned 1 Troll\. Temporary: when it dies its body lies the usual time, then it is gone, and a restart takes it too\. Add keep to make one stay\.$/.test(r.said[0]));
   box.__thornswoodNpcPopulation = null;
 
   // Nothing went through a path that threw on the way to handle().

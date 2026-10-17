@@ -87,14 +87,20 @@ spawned by a staff member should never be made permanent unless we want to
 make it permanent"). Its private marker `thornswoodNpcCommanded` is
 `{run}` for a temporary one, naming the run of the server it was made in
 (`serverRunId`, kept across a gamemode reload), or `{keep:true}`. A temporary
-one is taken out of the world when it dies, and one still standing from an
+one's body lies the normal time when it dies (a hunted animal
+`HUNT_TUNING.bodySeconds`, anything else the engine's 25 seconds, never a kept
+spawn's 45 minutes), so it can be skinned and looted; when the engine would
+stand it up, `mp.onRespawn` refuses that and it is taken out of the world. One
+still standing from an
 earlier run is not admitted at the next start: `removeSpawned` marks its
 record deleted, destroys it, and the population and the runtime (`forget`)
 let go of its id. The plain `true` every spawn carried before is read as
 temporary, since nobody chose to keep it, so those go the first time the
 gamemode loads with this change, a deploy included. Whether a creature that
 dies is temporary is read off its own marker (`isTemporarySpawn`), so one
-that dies in the seconds after a gamemode reload is removed too.
+that dies in the seconds after a gamemode reload is removed too. Who may add
+`keep` to `/spawn` is the one switch `SPAWN_KEEP_WHO`: `'playtester'` (testers
+and staff, Djinn's choice on 17 Oct) or `'staff'`.
 
 Native inherited aggression, confidence, and current faction membership inform
 target selection. Common membership and ally or friend reactions suppress

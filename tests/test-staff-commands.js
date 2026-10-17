@@ -340,7 +340,7 @@ if (COMMANDS && STAFF) {
     return Math.abs(Math.sqrt(dx * dx + dy * dy) - 150) < 1;
   }));
   yes('and answers both, saying the spawn is temporary (#2623)', to(got, STAFFER)[0] ===
-      'Spawned 2 Troll beside Bjorn Iron-Hand. Temporary: gone when it dies or the server restarts. Add keep to make one stay.' &&
+      'Spawned 2 Troll beside Bjorn Iron-Hand. Temporary: when it dies its body lies the usual time, then it is gone, and a restart takes it too. Add keep to make one stay.' &&
       to(got, BJORN)[0] === 'Staff put 2 Troll beside you.');
   got = run(w, STAFFER, '/spawnat Sera troll');
   yes('/spawnat <person> <creature> does the same', w.placed.length === 3 &&

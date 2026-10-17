@@ -6115,7 +6115,17 @@ mp.onDeath = guard('onDeath', function (actorId, killerId) {
     const dying = mp.get(actorId, 'baseDesc');
     if (npcDeath) {
       const population = globalThis.__thornswoodNpcPopulation;
-      const minutes = population && population.returnMinutes(actorId);
+      /*
+        A TEMPORARY SPAWN'S BODY LIES THE NORMAL TIME (#2623). Djinn, 17
+        October: "leave the normal body time", so a hunter can still skin
+        and loot it. The 45 minutes in a spawn's rule is how long a kept one
+        waits before it stands up again, which is not a body time, so a
+        temporary one skips it and gets what the same creature gets in the
+        wild: an animal a hunter can work lies HUNT_TUNING.bodySeconds,
+        anything else the engine's twenty five seconds. mp.onRespawn removes
+        it when that time is up, instead of letting it stand.
+      */
+      const minutes = !isTemporarySpawn(actorId) && population && population.returnMinutes(actorId);
       if (Number.isInteger(minutes) && minutes > 0 && minutes <= 1440) {
         mp.set(actorId, 'spawnDelay', minutes * 60);
       } else if (isCarcass(dying)) {
@@ -6135,22 +6145,6 @@ mp.onDeath = guard('onDeath', function (actorId, killerId) {
       if (bodyLoot && bodyLoot.onDeath) bodyLoot.onDeath(actorId);
     } catch (eBody) { /* a body roll must not block the rest of death */ }
   }
-  /*
-    A TEMPORARY SPAWN DOES NOT COME BACK (#2623). A creature staff spawned
-    without keeping it is taken out of the world when it dies, instead of
-    lying there until its respawn timer stands it up where it was made.
-    Asked for on the next turn of the event loop, because the engine starts
-    that timer on the actor after this handler returns
-    (DeathEvent::OnFireSuccess); removeSpawned says why that order is safe.
-  */
-  if (npcDeath) {
-    try {
-      if (isTemporarySpawn(actorId)) {
-        setTimeout(function () { removeSpawned(actorId); }, 0);
-      }
-    } catch (eSpawned) { log('onDeath', actorId.toString(16), 'could not check for a temporary spawn:', eSpawned); }
-  }
-
   if (npcDeath && killerId) {
     try {
       var questKill = globalThis.__thornswoodQuests;
@@ -6269,6 +6263,28 @@ mp.onDeath = guard('onDeath', function (actorId, killerId) {
 });
 
 mp.onRespawn = guard('onRespawn', function (actorId) {
+  /*
+    A TEMPORARY SPAWN DOES NOT STAND UP AGAIN (#2623). Its body has lain the
+    normal time (mp.onDeath above), and this is the moment the engine would
+    stand it up where it was made. Read out of the fork at the commit
+    engine\skymp pins: MpActor::Respawn fires this event, and false from a
+    listener makes GameModeEvent::Fire call OnFireBlocked, which for
+    RespawnEvent does nothing, so the actor stays dead and nothing is sent.
+    Then removeSpawned takes it out of the world, on the next turn of the
+    event loop because the engine is still inside the event here.
+  */
+  let temporary = false;
+  try { temporary = !(Number(mp.get(actorId, 'profileId')) > 0) && isTemporarySpawn(actorId); }
+  catch (eTemp) { log('onRespawn', actorId.toString(16), 'could not check for a temporary spawn:', eTemp); }
+  if (temporary) {
+    try {
+      var bodyGone = globalThis.__thornswoodDungeonLoot;
+      if (bodyGone && bodyGone.onStand) bodyGone.onStand(actorId);
+    } catch (eGone) { /* the body's loot record goes with the body either way */ }
+    setTimeout(function () { removeSpawned(actorId); }, 0);
+    log('respawn', actorId, 'refused: a temporary spawn, removed instead');
+    return false;
+  }
   const sp = mp.get(actorId, 'spawnPoint');
   log('respawn', actorId, 'at', sp && sp.cellOrWorldDesc);
   if (!(Number(mp.get(actorId, 'profileId')) > 0)) {
@@ -53910,6 +53926,11 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
       if (word === '/spawn' && words.length > 1 && String(words[words.length - 1]).toLowerCase() === 'keep') {
         keep = true;
         words = words.slice(0, words.length - 1);
+        if (!mayKeepSpawn(profileId)) {
+          toProfile(profileId, 'Only staff can keep a spawn. Leave keep off and it is temporary.');
+          log('command: /spawn keep refused profile', profileId);
+          return;
+        }
       }
       var count = 1;
       if (words.length > 1) {
@@ -53974,7 +53995,7 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
       }
       toProfile(profileId, 'Spawned ' + made + ' ' + hit.name + (made < count ? ' of the ' + count + ' asked for: ' + put.why : '') + '.' +
         (keep ? ' Kept: it stays, and comes back after it dies.'
-              : ' Temporary: gone when it dies or the server restarts. Add keep to make one stay.'));
+              : ' Temporary: when it dies its body lies the usual time, then it is gone, and a restart takes it too. Add keep to make one stay.'));
       log('command: /spawn', actorId.toString(16), '->', made, hit.name, hit.desc, keep ? 'kept' : 'temporary');
       return;
     }
@@ -54382,6 +54403,18 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
   */
   function isStaff(profileId) {
     return isDev(profileId);
+  }
+
+  /*
+    WHO MAY ADD keep TO /spawn (#2623). Djinn, 17 October: "testers and
+    staff for right now. can change later. so make it able to change later
+    easily". This one word is the switch: 'playtester' lets testers and staff
+    keep a spawn, 'staff' lets only staff. Staff's own aimed spawns
+    (/spawnat, /spawn x on someone) are staff only already.
+  */
+  var SPAWN_KEEP_WHO = 'playtester';
+  function mayKeepSpawn(profileId) {
+    return SPAWN_KEEP_WHO === 'staff' ? isStaff(profileId) : isPlaytester(profileId);
   }
 
   function isPlaytester(profileId) {
@@ -65047,7 +65080,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       }
       tell(pid, 'Spawned ' + r.made + ' ' + beast.name + ' beside ' + them.name + '.' +
         (a.keep ? ' Kept: it stays, and comes back after it dies.'
-                : ' Temporary: gone when it dies or the server restarts. Add keep to make one stay.'));
+                : ' Temporary: when it dies its body lies the usual time, then it is gone, and a restart takes it too. Add keep to make one stay.'));
       if (them.pid !== pid) { tell(them.pid, 'Staff put ' + r.made + ' ' + beast.name + ' beside you.'); }
       record('spawn', pid, me, them.pid, them.name, r.made + ' ' + beast.name, 0);
       return true;

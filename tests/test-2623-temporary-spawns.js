@@ -12,8 +12,9 @@
 //
 // What this runs: the real serverRunId and removeSpawned, lifted out of
 // game/gamemode.js by text, against a stand-in mp that records the calls; and
-// the real mp.onDeath block, read as text, for the one thing a harness here
-// cannot run: that removal is asked for after the event, not inside it.
+// the real mp.onDeath and mp.onRespawn blocks, read as text, for what a
+// harness here cannot run: the body lies its normal time, and removal is asked
+// for when it would stand up, after the event, not inside it.
 //
 // Read only.
 'use strict';
@@ -104,17 +105,47 @@ if (runFn && removeFn) {
   }
 }
 
-// The death handler asks for removal after the event, never inside it.
+// Djinn, 17 October: "leave the normal body time". The body lies its usual
+// time, and the stand-up at the end of it is refused and the spawn removed.
 {
-  const a = src.indexOf('mp.onDeath = guard(\'onDeath\'');
-  const b = a < 0 ? -1 : src.indexOf('\n});\n', a);
-  const body = a >= 0 && b > a ? src.slice(a, b) : '';
-  yes('mp.onDeath checks the actor\'s own marker for a temporary spawn',
-      /if \(isTemporarySpawn\(actorId\)\)/.test(body));
+  const blockOf = function (head) {
+    const a = src.indexOf(head);
+    const b = a < 0 ? -1 : src.indexOf('\n});\n', a);
+    return a >= 0 && b > a ? src.slice(a, b) : '';
+  };
+  const death = blockOf('mp.onDeath = guard(\'onDeath\'');
+  const stand = blockOf('mp.onRespawn = guard(\'onRespawn\'');
+  yes('mp.onDeath no longer removes a temporary spawn as it dies',
+      death.length > 0 && !/removeSpawned/.test(death));
+  yes('mp.onDeath gives a temporary spawn the normal body time, not a kept one\'s 45 minutes',
+      /const minutes = !isTemporarySpawn\(actorId\) && population && population\.returnMinutes\(actorId\);/.test(death));
+  yes('mp.onRespawn checks the actor\'s own marker for a temporary spawn',
+      /isTemporarySpawn\(actorId\)/.test(stand));
+  const at = stand.indexOf('if (temporary) {');
+  const tail = at < 0 ? '' : stand.slice(at, stand.indexOf('\n  }\n', at));
+  yes('and refuses the stand-up (false blocks RespawnEvent)', /return false;/.test(tail));
   yes('and asks for removal on the next turn of the event loop',
-      /setTimeout\(function \(\) \{ removeSpawned\(actorId\); \}, 0\)/.test(body));
-  yes('and never calls removeSpawned directly inside the event',
-      !/[^(]\s*removeSpawned\(actorId\);\s*\n/.test(body.replace(/setTimeout\(function \(\) \{ removeSpawned\(actorId\); \}, 0\)/g, '')));
+      /setTimeout\(function \(\) \{ removeSpawned\(actorId\); \}, 0\)/.test(tail));
+  yes('before anything else in the handler runs', at >= 0 && at < stand.indexOf("mp.get(actorId, 'spawnPoint')"));
+}
+
+// Who may add keep is one switch (Djinn, 17 October: testers and staff for
+// now, easy to change later).
+{
+  const m = /\n  var SPAWN_KEEP_WHO = '([a-z]+)';\n  function mayKeepSpawn\(profileId\) \{\n([\s\S]*?)\n  \}\n/.exec(src);
+  yes('SPAWN_KEEP_WHO is the one switch, set to playtester', !!m && m[1] === 'playtester');
+  if (m) {
+    const may = function (who, staff, tester) {
+      return vm.runInNewContext('var SPAWN_KEEP_WHO = ' + JSON.stringify(who) + ';' +
+        'function isStaff(){return ' + staff + ';} function isPlaytester(){return ' + tester + ';}' +
+        'function mayKeepSpawn(profileId) {\n' + m[2] + '\n}; mayKeepSpawn(1)');
+    };
+    yes('playtester: a tester may keep', may('playtester', false, true) === true);
+    yes('playtester: somebody on no list may not', may('playtester', false, false) === false);
+    yes('staff: a tester may not', may('staff', false, true) === false);
+    yes('staff: staff may', may('staff', true, true) === true);
+  }
+  yes('/spawn ... keep asks the switch', /if \(!mayKeepSpawn\(profileId\)\) \{/.test(src));
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
