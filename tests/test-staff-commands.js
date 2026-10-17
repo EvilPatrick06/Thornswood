@@ -173,7 +173,8 @@ function load(w) {
     ADMIN_ITEMS: { 'iron ore': ['Iron Ore', '71cf3:Skyrim.esm'], 'gold': ['Gold', 'f:Skyrim.esm'] },
     ADMIN_ACTORS: { 'troll': ['Troll', '23aba:Skyrim.esm'], 'giant': ['Giant', 'deadbe:Missing.esp'] },
     HALL: { desc: 'Hall:0', pos: [0, 0, 0], rot: [0, 0, 0] },
-    PASSAGES: { a: { key: 'whiterun', town: 'Whiterun', arrival: { desc: 'Tamriel:w', pos: [10, 20, 30], rot: [0, 0, 45] } } },
+    PASSAGES: { a: { key: 'whiterun', town: 'Whiterun', start: { desc: 'Tamriel:w', pos: [10, 20, 30], rot: [0, 0, 45] },
+                     arrival: { desc: 'inn:w', pos: [1, 2, 3], rot: [0, 0, 0] } } },
     BUILDING_BY_DOOR: {}, BUILDING_NAME: {}, DATA: { cellToHold: {}, capitals: {} }
   };
   vm.createContext(box);

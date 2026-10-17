@@ -203,7 +203,8 @@ const SETTLE_TICKS = Math.ceil(K.SETTLE_MS / TICK) + 4;
 const HALL_LINE = /Welcome to Thornswood\. (This is|You are going to) the creation hall/;
 const CLOTHES_LINE = /plain clothes/;
 const PANEL_LINE = /Press K/;
-const INN_LINE = /You start at the inn/;
+// The arrival line, Djinn's words since 17 October (test-arrival-line.js holds every town's).
+const INN_LINE = /^Welcome to [A-Z][A-Za-z ]+, Safe Travels\.$/;
 const BACK_LINE = /Welcome back to Thornswood/;
 const AGAIN_LINE = "Your character creation menu didn't open. Opening it again.";
 const RELOG_LINE = 'The character creation menu still did not open. Relog, and if it ' +
@@ -249,8 +250,8 @@ function clean(line) {
   yes('picking Riften sends them', S.mod.arriveAt(ME, 'riften') === true && S.stage(ME) === 'done');
   S.mod.arriveAt(ME, 'riften');
   S.run(200);
-  yes('done: a second pick and 200 ticks later, the inn line was said exactly once',
-      S.to(ME, INN_LINE).length === 1 && /Riften/.test(S.to(ME, INN_LINE)[0].text));
+  yes('done: a second pick and 200 ticks later, the arrival line was said exactly once, naming Riften\'s hold',
+      S.to(ME, INN_LINE).length === 1 && S.to(ME, INN_LINE)[0].text === 'Welcome to The Rift, Safe Travels.');
   yes('three steps, three lines, all to this person, none repeated',
       S.said.length === 3 && S.to(ME).length === 3 &&
       new Set(S.said.map(function (s) { return s.text; })).size === 3);
