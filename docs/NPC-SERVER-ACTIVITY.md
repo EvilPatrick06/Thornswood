@@ -81,6 +81,18 @@ and shared density checks before their creation is reported as successful.
 Destroyed dynamic identities release their slots; bodies awaiting return retain
 theirs.
 
+A creature made by `/spawn` or `/spawnat` is outside the habitat caps and is
+temporary unless the command ends in `keep` (#2623, Djinn, 17 Oct: "A creature
+spawned by a staff member should never be made permanent unless we want to
+make it permanent"). Its private marker `thornswoodNpcCommanded` is
+`{run}` for a temporary one, naming the run of the server it was made in
+(`serverRunId`, kept across a gamemode reload), or `{keep:true}`. A temporary
+one is taken out of the world when it dies, and one still standing from an
+earlier run is not admitted at the next start: `removeSpawned` marks its
+record deleted, destroys it, and the population and the runtime (`forget`)
+let go of its id. The plain `true` every spawn carried before is read as
+temporary, since nobody chose to keep it.
+
 Native inherited aggression, confidence, and current faction membership inform
 target selection. Common membership and ally or friend reactions suppress
 spontaneous hostility. Accepted damage can provoke temporary retaliation.
