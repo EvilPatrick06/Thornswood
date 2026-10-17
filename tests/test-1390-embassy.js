@@ -284,7 +284,7 @@ if (block && RECIPES && ADMIN_ITEMS) {
     const env = load({});
     const E = env.E;
     const claimSrc = slice(gm, '  function claim(actorId, profileId, toProfile) {\n    var building = here(actorId);', '\n  }\n');
-    const evictSrc = slice(gm, '  function evict(actorId, profileId, toProfile) {', '\n  }\n');
+    const evictSrc = slice(gm, '  function evict(actorId, profileId, toProfile, cmd) {', '\n  }\n');
     // A door press is touched(): openedDoor() (the deed and the renewal), then doorLine() (#1637).
     const touchedSrc = slice(gm, '  function openedDoor(actorId, doorDesc) {', '\n  }\n');
     const lineSrc = slice(gm, '  function doorLine(actorId, profileId) {', '\n  }\n');
@@ -318,10 +318,12 @@ if (block && RECIPES && ADMIN_ITEMS) {
       // The steward here keeps the building's hold: a steward settles their own
       // hold only (#2551), which test-offices.js and test-2551-building-holds.js hold.
       const fn = new Function('globalThis', 'isSteward', 'here', 'holderOf', 'nameOf', 'claims', 'save', 'pushAll', 'plog',
-        'redrawPanel', 'OFFICE_AT_DOOR', 'notStewardHere', evictSrc + '\nreturn evict;');
+        'redrawPanel', 'OFFICE_AT_DOOR', 'notStewardHere', 'isStaffHere', 'settleAs', evictSrc + '\nreturn evict;');
+      // Staff at any door (settleAs, #2551) is test-2551-building-holds.js's: here the steward settles as steward.
       const evict = fn({ __thornswoodEmbassy: E }, function () { return true; }, function () { return building; },
         function () { return claims[building] || null; }, function (b) { return b; }, claims,
-        function () { }, function () { }, function () { }, function () { }, 'Stand at the door.', function () { return null; });
+        function () { }, function () { }, function () { }, function () { }, 'Stand at the door.', function () { return null; },
+        function () { return false; }, function () { return { as: 'steward' }; });
       evict(0x14, STEWARD, function (p, line) { told.push(line); });
       return { told: told.join(' '), claims: claims };
     }
@@ -499,7 +501,7 @@ if (block && RECIPES && ADMIN_ITEMS) {
     // character block's command hands a fixed list on and answers false for
     // the rest, so handle() goes on to the embassy branch.
     const charBlock = slice(gm, '// ==== thornswood character ====', '// ==== end thornswood character ====');
-    const charCommand = charBlock ? slice(charBlock, '  function command(word, parts, actorId, profileId, toProfile) {', '\n  }\n') : null;
+    const charCommand = charBlock ? slice(charBlock, '  function command(word, parts, actorId, profileId, toProfile, cmd) {', '\n  }\n') : null;
     let passedOn = false;
     if (charCommand) {
       const cbox = { clog: function () { }, g: { __thornswoodProperty: { command: function () { return true; } } } };

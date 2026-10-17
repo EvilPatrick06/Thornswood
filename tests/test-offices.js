@@ -54,9 +54,11 @@ const READERS = ['rolesOfProfile', 'officeAccountOf', 'officeHeldBy', 'officesOf
                  'isStewardOf', 'stewardHoldsOf', 'isSteward'];
 const readerSrc = READERS.map(fnSrc);
 const tables = (lift('  var OFFICE_KINDS = [', ';') || '') + '\n' + (lift('  var HOLD_TOWN = {', '};') || '');
-const evictBlock = lift('  function evict(actorId, profileId, toProfile) {', '\n  }\n');
-// A steward ends a claim only in their own hold (#2551): the building's hold, and the rule.
-const ownHoldSrc = [fnSrc('holdOfBuilding'), fnSrc('notStewardHere')];
+const evictBlock = lift('  function evict(actorId, profileId, toProfile, cmd) {', '\n  }\n');
+// A steward ends a claim only in their own hold (#2551): the building's hold, and the rule;
+// staff at any door (settleAs), which test-2551-building-holds.js drives.
+const ownHoldSrc = [fnSrc('holdOfBuilding'), fnSrc('notStewardHere'), fnSrc('isStaffHere'), fnSrc('settleAs'),
+                    fnSrc('settleWhere'), fnSrc('staffRecord')];
 
 yes('the office readers are in the gamemode, each once', readerSrc.every(function (s) { return !!s; }));
 yes('and so is the eviction, with the building\'s hold and its rule', evictBlock !== null &&
@@ -113,7 +115,7 @@ function evict(opts) {
   const fn = new Function(
     'actorId', 'profileId', 'toProfile', 'isSteward', 'here', 'holderOf',
     'nameOf', 'claims', 'save', 'pushAll', 'plog', 'redrawPanel', 'OFFICE_AT_DOOR',
-    'isStewardOf', 'BUILDING_HOLD', 'HOLD_TOWN',
+    'isStewardOf', 'BUILDING_HOLD', 'HOLD_TOWN', 'g', 'personName',
     ownHoldSrc.join('\n') + '\n' + evictBlock + '\nreturn evict;');
   const call = fn(
     null, null, null,
@@ -129,7 +131,9 @@ function evict(opts) {
     function (pid, hold) {
       return (hold === 'whiterun' && ofWhiterun.indexOf(pid) !== -1) || (hold === 'riften' && ofRiften.indexOf(pid) !== -1);
     },
-    buildingHold, { whiterun: 'Whiterun', riften: 'Riften' });
+    buildingHold, { whiterun: 'Whiterun', riften: 'Riften' },
+    // Nobody here is staff: staff at any door is test-2551-building-holds.js's.
+    { __thornswoodIsStaff: function () { return false; } }, function () { return 'somebody'; });
   call(0xff000058, opts.by, function (pid, m) { told.push(m); });
   return { told: told, claims: claims, pushes: pushed.n, redraws: pushed.redraws || 0 };
 }
