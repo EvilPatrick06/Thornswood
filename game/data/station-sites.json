@@ -511,6 +511,7 @@
  "issue": 2553,
  "kinds": {
   "hive": {
+   "amongPlants": false,
    "base": "dbf8b3:Thornswood-Content.esp",
    "bounds": [
     -115,
@@ -526,6 +527,7 @@
    "name": "beehive",
    "reach": 1200,
    "rule": "One at each of Skyrim's own named farms that has at least 5 crop plots of the farmer's table within 2,400 units, the farm claim's circle, of the farm's point: its map marker, or the farmhouse's outside door where that marker is inside the house. It stands beside the crop plot nearest that point. A placed hive is a farmer verb (farmer.md).",
+   "setIntoRock": false,
    "user": [
     -35.0,
     -180.0,
@@ -534,6 +536,7 @@
    ]
   },
   "kiln": {
+   "amongPlants": true,
    "base": "1547e:Thornswood-Content.esp",
    "bounds": [
     -229,
@@ -548,7 +551,8 @@
    "flat": 48.0,
    "name": "charcoal kiln",
    "reach": 1600,
-   "rule": "One for each of the nine towns with a woodworking bench, outside the town: beside the chopping block in the open world nearest that town's forge, among those 1,000 units or more from every bench (#2337). The kiln turns the firewood split at a chopping block into the charcoal every forge burns (charburner.md, smith.md).",
+   "rule": "One for each of the nine towns with a woodworking bench, outside the town: beside the chopping block in the open world nearest that town's forge, among those 1,000 units or more from every bench (#2337), within 12,000 units of the forge, or 20,000 for Solitude and Markarth, whose nearest blocks are at Katla's Farm and Salvius Farm. It may stand among small plants, the way Skyrim's smelters do (Patrick, B on #2553). The kiln turns the firewood split at a chopping block into the charcoal every forge burns (charburner.md, smith.md).",
+   "setIntoRock": false,
    "user": [
     -35.0,
     -230.0,
@@ -557,6 +561,7 @@
    ]
   },
   "lab": {
+   "amongPlants": false,
    "base": "42e69:Thornswood-Content.esp",
    "bounds": [
     -60,
@@ -572,6 +577,7 @@
    "name": "alchemy lab",
    "reach": 900,
    "rule": "One in the apothecary of each of the nine hold capitals, the shop Skyrim marks as a store that holds Skyrim's own alchemy lab, beside that lab; Winterhold has no apothecary in town, so the College's Hall of Countenance. The poultice and the remedy are made only at Thornswood's lab (physicker.md, injury.md).",
+   "setIntoRock": false,
    "user": [
     -35.0,
     -55.0,
@@ -580,6 +586,7 @@
    ]
   },
   "salt": {
+   "amongPlants": false,
    "base": "dde4ef:Thornswood-Content.esp",
    "bounds": [
     -178,
@@ -589,12 +596,13 @@
     265,
     8
    ],
-   "count": 1,
+   "count": 4,
    "edid": "ThornswoodFurnitureSaltMine",
    "flat": 32.0,
    "name": "salt quarry",
    "reach": 1600,
-   "rule": "One on the shore of each hold capital on the Sea of Ghosts (Solitude, Windhelm, Dawnstar, Winterhold), beside the boat drawn up nearest the town: its forge, or Winterhold's smithing anvil. Salt comes from the sea (miner.md, the salt quarry).",
+   "rule": "One on the shore of each hold capital on the Sea of Ghosts (Solitude, Windhelm, Dawnstar, Winterhold), beside the boat drawn up nearest the town: its forge, or Winterhold's smithing anvil. The quarry is an ore vein, so it is set into rock the way Skyrim's veins are: only the place the miner stands needs clear, dry, flat ground, and the vein lies on ground no lower than its underside or inside a rock or cliff (Patrick, B on #2553). Salt comes from the sea (miner.md, the salt quarry).",
+   "setIntoRock": true,
    "user": [
     -35.0,
     -300.0,
@@ -606,7 +614,7 @@
  "leftOut": {
   "FalkreathLodsHouseLocation": "Lod's house in Falkreath, which Skyrim marks as a farm, has 3 crop plots within 2,400 units of its door: a smith's yard, not a field."
  },
- "measure": "Each station stands at the nearest clear spot to its anchor, tried every step units out to its reach in eight turns of the anchor's angle, a turn costing 60 units. Its outline and its user's place lie on the navmesh, on ground flat to the kind's flat and within 60 units of the anchor's height, out of doors above the water, and touch no furniture, container, door, item, plant or static under 250 by 250, nor where anybody stands at other furniture, the way through a door, a woodworking bench, a notice board, or another station, from 6 to 140 units above the floor, with 30 units to the nearest solid thing. A kiln stands 1000 units or more from every woodworking bench. The cell and worldspace records the plugin carries are Bethesda's and change nothing in the game.",
+ "measure": "Each station stands at the nearest clear spot to its anchor, tried every step units out to its reach in eight turns of the anchor's angle, a turn costing 60 units. Its outline and its user's place lie on the navmesh, on ground flat to the kind's flat and within 60 units of the anchor's height, out of doors above the water, and touch no furniture, container, door, item, plant or static under 250 by 250, nor where anybody stands at other furniture, the way through a door, a woodworking bench, a notice board, or another station, from 6 to 140 units above the floor, with 30 units to the nearest solid thing. A kiln stands 1000 units or more from every woodworking bench. A kiln may stand among small plants, and a salt vein is set into rock: only its miner's place needs the ground (Patrick, B on #2553). The cell and worldspace records the plugin carries are Bethesda's and change nothing in the game.",
  "readFrom": "game/data/last-plugin.json loadOrder, the collection's bytes; from Thornswood-Content.esp only its four station records; Thornswood-Last.esp and Thornswood-WoodworkerTrail.esp place nothing",
  "sites": {
   "hive-brandymug": {
@@ -1286,56 +1294,50 @@
    "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
   },
   "kiln-dawnstar": {
-   "anchor": "876e1:Skyrim.esm",
-   "anchorAngle": 199.1,
+   "anchor": "1528:JKs Skyrim.esp",
+   "anchorAngle": 359.53,
    "anchorAt": [
-    27292.8,
-    101563.7,
-    -13248.4
+    28365.7,
+    102114.6,
+    -13287.9
    ],
    "anchorEdid": "WoodChoppingBlockSnow",
    "anchorRecordFrom": "JKs Skyrim.esp",
    "anchorTouchedBy": [
-    "Skyrim.esm",
     "JKs Skyrim.esp"
    ],
-   "angle": 199.1,
+   "angle": 269.53,
    "base": "1547e:Thornswood-Content.esp",
-   "cell": "8ed5:Skyrim.esm",
-   "cellCopy": "carried after the content plugin by CFTO-CoveredCarriages.esp, so the copy never wins",
-   "cellEdid": "DawnstarWesternMineExterior",
-   "fromAnchor": 1030,
+   "cell": "8eb5:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by CFTO-JK-Patch.esp, so the copy never wins",
+   "cellEdid": "Dawnstar03Exterior",
+   "fromAnchor": 592,
    "groundUnder": [
-    -13258.1,
-    -13236.2
+    -13328.3,
+    -13290.2
    ],
    "interior": false,
    "kind": "kiln",
    "nearest": {
-    "edid": "CartFurnitureDriver",
-    "ref": "bbf83:CFTO.esp",
-    "units": 32
+    "edid": "WalkwayStairs4Snow",
+    "ref": "d681c:Skyrim.esm",
+    "units": 44
    },
    "offset": [
-    704,
-    752
+    368,
+    464
    ],
-   "passedOver": [
-    {
-     "anchor": "1528:JKs Skyrim.esp",
-     "why": "no clear spot within 1600 units (6736 touches TreeThicket01Snow; 4183 off the navmesh; 2083 touches TreeVineMaple01Snow; 1486 touches FirewoodPileLarge01)"
-    }
-   ],
+   "passedOver": [],
    "point": "cadf6:Skyrim.esm",
    "pos": [
-    26381.5,
-    101083.5,
-    -13258.1
+    28729.9,
+    102581.6,
+    -13328.3
    ],
    "ref": "15506:Thornswood-Content.esp",
    "space": "3c:Skyrim.esm",
    "spaceEdid": "Tamriel",
-   "turn": 0,
+   "turn": 270,
    "where": "Dawnstar",
    "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
   },
@@ -1352,38 +1354,38 @@
    "anchorTouchedBy": [
     "Skyrim.esm"
    ],
-   "angle": 238.97,
+   "angle": 283.97,
    "base": "1547e:Thornswood-Content.esp",
    "cell": "937c:Skyrim.esm",
    "cellCopy": "carried after the content plugin by Water for ENB (Shades of Skyrim).esp, so the copy never wins",
    "cellEdid": "MorthalExterior05",
-   "fromAnchor": 488,
+   "fromAnchor": 387,
    "groundUnder": [
-    -13901.6,
-    -13862.5
+    -13902.7,
+    -13855.6
    ],
    "interior": false,
    "kind": "kiln",
    "nearest": {
     "edid": "WoodPile",
     "ref": "e7f41:Skyrim.esm",
-    "units": 48
+    "units": 34
    },
    "offset": [
-    416,
-    -256
+    -160,
+    -352
    ],
    "passedOver": [],
    "point": "24588:JKs Skyrim.esp",
    "pos": [
-    -39168.7,
-    70701.2,
-    -13901.6
+    -38724.7,
+    71080.4,
+    -13902.7
    ],
    "ref": "15507:Thornswood-Content.esp",
    "space": "3c:Skyrim.esm",
    "spaceEdid": "Tamriel",
-   "turn": 90,
+   "turn": 135,
    "where": "Morthal",
    "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
   },
@@ -1905,65 +1907,206 @@
    "turn": 135,
    "where": "The College's Hall of Countenance, Winterhold"
   },
-  "salt-windhelm": {
-   "anchor": "16fde:Dragonborn.esm",
-   "anchorAngle": 315.0,
+  "salt-dawnstar": {
+   "anchor": "1b3f:JKs Skyrim.esp",
+   "anchorAngle": 84.27,
    "anchorAt": [
-    141262.5,
-    33901.3,
-    -14151.2
+    30375.6,
+    105765.5,
+    -14016.0
    ],
-   "anchorEdid": "ShipLongBoat01",
-   "anchorRecordFrom": "Dragonborn.esm",
+   "anchorEdid": "XJKShipRowBoatAnim01snowDawnstar",
+   "anchorRecordFrom": "JKs Skyrim.esp",
    "anchorTouchedBy": [
-    "Dragonborn.esm"
+    "JKs Skyrim.esp"
    ],
-   "angle": 45.0,
+   "angle": 84.27,
    "base": "dde4ef:Thornswood-Content.esp",
-   "cell": "b4b9:Skyrim.esm",
-   "cellCopy": "carried after the content plugin by CFTO.esp, so the copy never wins",
-   "cellEdid": "WindhelmDocksExterior01",
-   "fromAnchor": 1402,
+   "cell": "8eb5:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by CFTO-JK-Patch.esp, so the copy never wins",
+   "cellEdid": "Dawnstar03Exterior",
+   "fromAnchor": 1255,
    "groundUnder": [
-    -13950.0,
-    -13938.9
+    -13854.2,
+    -13852.0
    ],
    "interior": false,
    "kind": "salt",
    "nearest": {
-    "edid": "BarrelFood01",
-    "ref": "9a3a5:Skyrim.esm",
-    "units": 32
+    "edid": "WalkwayStairs4Snow",
+    "ref": "d67f7:Skyrim.esm",
+    "units": 45
+   },
+   "offset": [
+    1184,
+    416
+   ],
+   "passedOver": [],
+   "point": "cadf6:Skyrim.esm",
+   "pos": [
+    30907.8,
+    104628.9,
+    -13854.2
+   ],
+   "ref": "15512:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 0,
+   "where": "Dawnstar",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "salt-solitude": {
+   "anchor": "1363:The Great City of Solitude.esp",
+   "anchorAngle": 254.46,
+   "anchorAt": [
+    -58505.5,
+    100213.3,
+    -14092.3
+   ],
+   "anchorEdid": "ShipLongBoat01",
+   "anchorRecordFrom": "The Great City of Solitude.esp",
+   "anchorTouchedBy": [
+    "The Great City of Solitude.esp"
+   ],
+   "angle": 254.46,
+   "base": "dde4ef:Thornswood-Content.esp",
+   "cell": "929a:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by Water for ENB (Shades of Skyrim).esp, so the copy never wins",
+   "cellEdid": "",
+   "fromAnchor": 1553,
+   "groundUnder": [
+    -13888.0,
+    -13888.0
+   ],
+   "interior": false,
+   "kind": "salt",
+   "nearest": {
+    "edid": "DockColStr02",
+    "ref": "514d:The Great City of Solitude.esp",
+    "units": 116
+   },
+   "offset": [
+    320,
+    1520
+   ],
+   "passedOver": [],
+   "point": "4e3e9:Skyrim.esm",
+   "pos": [
+    -60055.6,
+    100114.4,
+    -13888.0
+   ],
+   "ref": "15510:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 0,
+   "where": "Solitude",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "salt-windhelm": {
+   "anchor": "9a38d:Skyrim.esm",
+   "anchorAngle": 135.0,
+   "anchorAt": [
+    139503.1,
+    33232.9,
+    -14016.0
+   ],
+   "anchorEdid": "ShipRowBoat01",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 225.0,
+   "base": "dde4ef:Thornswood-Content.esp",
+   "cell": "b4b9:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by CFTO.esp, so the copy never wins",
+   "cellEdid": "WindhelmDocksExterior01",
+   "fromAnchor": 781,
+   "groundUnder": [
+    -13943.6,
+    -13941.8
+   ],
+   "interior": false,
+   "kind": "salt",
+   "nearest": {
+    "edid": "FishRack01",
+    "ref": "f46f1:Skyrim.esm",
+    "units": 31
    },
    "offset": [
     -448,
-    1328
+    -640
    ],
    "passedOver": [
     {
      "anchor": "8b0a6:WindhelmSSE.esp",
-     "why": "no clear spot within 1600 units (9517 in the water; 8772 the ground runs # to #; 8163 off the navmesh; 859 touches TreeFloraSnowberry01Snow)"
-    },
-    {
-     "anchor": "9a38d:Skyrim.esm",
-     "why": "no clear spot within 1600 units (23708 off the navmesh; 1760 touches TreeDeadShrubSnow; 1002 touches WHdockdoortrim; 597 in the water)"
-    },
-    {
-     "anchor": "9a38a:Skyrim.esm",
-     "why": "no clear spot within 1600 units (21584 off the navmesh; 1758 touches TreeDeadShrubSnow; 1348 touches WHdockdoortrim; 1229 touches FXfireWithEmbersLight)"
+     "why": "no clear spot within 1600 units (8687 in the water; 6755 off the navmesh; 4992 the vein hangs over a drop; 3918 the vein hangs over nothing)"
     }
    ],
    "point": "f7798:Skyrim.esm",
    "pos": [
-    140006.7,
-    34523.6,
-    -13950.0
+    139367.3,
+    34002.3,
+    -13943.6
    ],
    "ref": "15511:Thornswood-Content.esp",
    "space": "3c:Skyrim.esm",
    "spaceEdid": "Tamriel",
    "turn": 90,
    "where": "Windhelm",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "salt-winterhold": {
+   "anchor": "153efd:CFTO.esp",
+   "anchorAngle": 303.7,
+   "anchorAt": [
+    101917.3,
+    113331.6,
+    -14018.0
+   ],
+   "anchorEdid": "ShipRowBoat01",
+   "anchorRecordFrom": "CFTO.esp",
+   "anchorTouchedBy": [
+    "CFTO.esp"
+   ],
+   "angle": 258.7,
+   "base": "dde4ef:Thornswood-Content.esp",
+   "cell": "8e66:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by CFTO.esp, so the copy never wins",
+   "cellEdid": "",
+   "fromAnchor": 1270,
+   "groundUnder": [
+    -13973.8,
+    -13964.5
+   ],
+   "interior": false,
+   "kind": "salt",
+   "nearest": {
+    "edid": "FishRack01",
+    "ref": "153f03:CFTO.esp",
+    "units": 340
+   },
+   "offset": [
+    -1264,
+    128
+   ],
+   "passedOver": [
+    {
+     "anchor": "765e:JKs Skyrim.esp",
+     "why": "no clear spot within 1600 units (13582 off the navmesh; 8539 in the water; 1536 the vein hangs over a drop; 1124 the ground runs # to #)"
+    }
+   ],
+   "point": "89c2:JKs Skyrim.esp",
+   "pos": [
+    101109.4,
+    112351.1,
+    -13973.8
+   ],
+   "ref": "15513:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 315,
+   "where": "Winterhold",
    "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
   }
  },
@@ -2089,15 +2232,15 @@
    "triedAnchors": [
     {
      "anchor": "f1d9b:Skyrim.esm",
-     "why": "no clear spot within 1600 units (4784 within 1,000 units of a woodworking bench; 4331 off the navmesh; 2806 touches TreeThicket01; 2227 touches Ivy02)"
+     "why": "no clear spot within 1600 units (4784 within 1,000 units of a woodworking bench; 4687 off the navmesh; 2768 touches TreeThicket01; 2227 touches Ivy02)"
     },
     {
      "anchor": "d6c2b:Skyrim.esm",
-     "why": "no clear spot within 1600 units (4026 off the navmesh; 1968 touches TreeThicket01; 1811 touches RockM01; 1453 touches FloraMushroom02)"
+     "why": "no clear spot within 1600 units (4526 off the navmesh; 1811 touches RockM01; 1660 touches StonewallEndL01Ivy; 1374 touches TreeClover01)"
     },
     {
      "anchor": "99b49:Skyrim.esm",
-     "why": "no clear spot within 1600 units (6312 off the navmesh; 5870 touches TreePineForestCutLog01; 4964 touches FenceWoven02; 2942 its ground is more than # from the anchor's height)"
+     "why": "no clear spot within 1600 units (7200 off the navmesh; 6127 touches TreePineForestCutLog01; 4964 touches FenceWoven02; 3116 its ground is more than # from the anchor's height)"
     }
    ],
    "where": "Falkreath"
@@ -2106,27 +2249,31 @@
    "kind": "kiln",
    "triedAnchors": [],
    "where": "Markarth",
-   "why": "no chopping block stands in the open world within 12000 units of the forge"
+   "why": "no chopping block stands in the open world within 20000 units of the forge"
   },
   "kiln-riften": {
    "kind": "kiln",
    "triedAnchors": [
     {
      "anchor": "876:JK's Riften Outskirts.esp",
-     "why": "no clear spot within 1600 units (7644 off the navmesh; 4801 its ground is more than # from the anchor's height; 3475 touches TreeThicket01; 2186 touches TreeFallForestShrub02)"
+     "why": "no clear spot within 1600 units (8134 off the navmesh; 4813 its ground is more than # from the anchor's height; 1715 touches FarmTableBench01; 1366 touches FenceWoven01)"
     },
     {
      "anchor": "ae7:JK's Riften Outskirts.esp",
-     "why": "no clear spot within 1600 units (5689 touches TreeFallForestShrub02; 5344 off the navmesh; 4374 its ground is more than # from the anchor's height; 2731 touches FenceWoven01)"
+     "why": "no clear spot within 1600 units (7064 off the navmesh; 5825 its ground is more than # from the anchor's height; 2793 touches FenceWoven01; 1991 the ground runs # to #)"
     }
    ],
    "where": "Riften"
   },
   "kiln-solitude": {
    "kind": "kiln",
-   "triedAnchors": [],
-   "where": "Solitude",
-   "why": "no chopping block stands in the open world within 12000 units of the forge"
+   "triedAnchors": [
+    {
+     "anchor": "a9ee1:Skyrim.esm",
+     "why": "no clear spot within 1600 units (13436 off the navmesh; 1833 touches TreeFloraWheat01; 1666 touches WallLeanMarker; 1165 touches HandCartCanopy)"
+    }
+   ],
+   "where": "Solitude"
   },
   "lab-windhelm": {
    "kind": "lab",
@@ -2141,84 +2288,6 @@
     }
    ],
    "where": "The White Phial, Windhelm"
-  },
-  "salt-dawnstar": {
-   "kind": "salt",
-   "triedAnchors": [
-    {
-     "anchor": "1b3f:JKs Skyrim.esp",
-     "why": "no clear spot within 1600 units (16691 off the navmesh; 3715 in the water; 3518 touches TreeThicket01Snow; 1366 touches SkyrimUnboundMarker)"
-    },
-    {
-     "anchor": "1b1a:JKs Skyrim.esp",
-     "why": "no clear spot within 1600 units (16462 off the navmesh; 3199 touches TreeThicket01Snow; 2379 in the water; 1913 the ground runs # to #)"
-    },
-    {
-     "anchor": "1b0b:JKs Skyrim.esp",
-     "why": "no clear spot within 1600 units (19178 off the navmesh; 2368 touches TreePineShrub01Snow; 1986 the ground runs # to #; 1660 in the water)"
-    },
-    {
-     "anchor": "d67ec:Skyrim.esm",
-     "why": "no clear spot within 1600 units (19179 off the navmesh; 4303 in the water; 1675 touches TreeThicket01Snow; 958 the ground runs # to #)"
-    },
-    {
-     "anchor": "1afd:JKs Skyrim.esp",
-     "why": "no clear spot within 1600 units (19781 off the navmesh; 3298 touches TreePineShrub01Snow; 2269 in the water; 1298 the ground runs # to #)"
-    },
-    {
-     "anchor": "1afa:JKs Skyrim.esp",
-     "why": "no clear spot within 1600 units (19815 off the navmesh; 3276 touches TreePineShrub01Snow; 2323 in the water; 1292 the ground runs # to #)"
-    },
-    {
-     "anchor": "2d61:JKs Skyrim.esp",
-     "why": "no clear spot within 1600 units (19612 off the navmesh; 3485 in the water; 2417 touches TreePineShrub01Snow; 1171 the ground runs # to #)"
-    },
-    {
-     "anchor": "1be9:JKs Skyrim.esp",
-     "why": "no clear spot within 1600 units (14865 off the navmesh; 2720 touches XJKcounterweightSackSnow; 2616 in the water; 1801 touches RTDockRamp01)"
-    }
-   ],
-   "where": "Dawnstar"
-  },
-  "salt-solitude": {
-   "kind": "salt",
-   "triedAnchors": [
-    {
-     "anchor": "1363:The Great City of Solitude.esp",
-     "why": "no clear spot within 1600 units (19851 off the navmesh; 1262 touches CraftingBlackSmithForge; 1242 touches SMarketStallTop; 1201 touches TreePineShrub01)"
-    },
-    {
-     "anchor": "460f:The Great City of Solitude.esp",
-     "why": "no clear spot within 1600 units (25154 off the navmesh; 1665 touches SPatioWall01; 829 the ground runs # to #; 180 in the water)"
-    },
-    {
-     "anchor": "b013e:Skyrim.esm",
-     "why": "no clear spot within 1600 units (25081 off the navmesh; 1378 touches DockColStrSign01; 608 touches SitLedgeMarker, where its user stands; 447 touches ImpWoodbeam01)"
-    },
-    {
-     "anchor": "26109:Skyrim.esm",
-     "why": "no clear spot within 1600 units (27860 off the navmesh; 3 the ground runs # to #; 1 touches WallLeanMarker)"
-    },
-    {
-     "anchor": "299d:Dawnguard.esm",
-     "why": "no clear spot within 1600 units (25888 off the navmesh; 776 touches ImpWoodbeam01; 663 touches SitLedgeMarker, where its user stands; 201 touches DockColStrSign01)"
-    }
-   ],
-   "where": "Solitude"
-  },
-  "salt-winterhold": {
-   "kind": "salt",
-   "triedAnchors": [
-    {
-     "anchor": "765e:JKs Skyrim.esp",
-     "why": "no clear spot within 1600 units (14372 off the navmesh; 9235 in the water; 3218 the ground runs # to #; 989 its ground is more than # from the anchor's height)"
-    },
-    {
-     "anchor": "153efd:CFTO.esp",
-     "why": "no clear spot within 1600 units (12794 in the water; 10525 off the navmesh; 3664 the ground runs # to #; 881 its ground is more than # from the anchor's height)"
-    }
-   ],
-   "where": "Winterhold"
   }
  }
 }

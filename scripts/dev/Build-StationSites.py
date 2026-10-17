@@ -28,15 +28,19 @@ against its rule and stops on one that does not follow it.
            with a woodworking bench, outside the town: beside the chopping
            block in the open world (Tamriel, not a walled city's own
            worldspace) nearest that town's forge, among those 1,000 units or
-           more from every bench (#2337). A kiln is the size of Skyrim's
-           smelter, and no walled city has that much clear ground by a block.
+           more from every bench (#2337), within 12,000 units (20,000 for
+           Solitude and Markarth). A kiln is the size of Skyrim's smelter,
+           and no walled city has that much clear ground by a block; like a
+           smelter it may stand among small plants (Patrick, B on #2553).
   salt     docs\\systems\\classes\\miner.md: the salt quarry. Salt comes from
            the sea, so one quarry on the shore of each hold capital that
            stands on the Sea of Ghosts (Solitude, Windhelm, Dawnstar,
            Winterhold), beside the boat drawn up nearest the town: its forge
            for the first three, its smithing anvil for Winterhold, which has
-           no forge.
-  hive     docs\\systems\\classes\\farmer.md: a placed hive is a farmer verb.
+           no forge. The quarry is an ore vein, set into rock the way
+           Skyrim's veins are: only where the miner stands needs clear, dry,
+           flat ground (Patrick, B on #2553).
+  hive    docs\\systems\\classes\\farmer.md: a placed hive is a farmer verb.
            So one hive at each of Skyrim's own named farms (a location Skyrim
            marks as a farm) that has at least 5 crop plots of the farmer's
            table within 2,400 units, the farm claim's circle, of the farm:
@@ -155,6 +159,14 @@ TURN_COST = 60.0
 TURNS = (0, 45, 90, 135, 180, 225, 270, 315)
 CLEAR_BELOW, CLEAR_ABOVE = 6.0, 140.0
 DRY = 8.0
+# A small plant, which a kiln may stand among: a TREE or FLOR record no larger
+# than this on a side (thickets, shrubs, ferns, flowers), never a crop plot.
+PLANT = 250.0
+# The largest rock or cliff a salt vein is set into, on a side.
+INTO_ROCK = 4000.0
+# A salt vein's ground may fall this far under the miner's floor before the
+# vein would float: its bounds reach 16 units below its origin.
+VEIN_DEPTH = 16.0
 KILN_FROM_BENCH = 1000.0
 # A notice board the server stands, its drop box and room to read them (#2516):
 # a square this far each way from the board's point.
@@ -174,9 +186,9 @@ BENCH_OUTLINE = (-75.0, -55.0, 85.0, 88.0)
 # search goes. step: how far apart the spots it tries are.
 KINDS = {
     'kiln': {'base': 0x1547E, 'edid': 'ThornswoodCraftingCharcoalKilnMarker', 'name': 'charcoal kiln',
-             'user': (-35.0, -230.0, 35.0, 8.0), 'flat': 48.0, 'reach': 1600, 'step': 48, 'sample': 32.0},
+             'user': (-35.0, -230.0, 35.0, 8.0), 'flat': 48.0, 'reach': 1600, 'step': 48, 'sample': 32.0, 'plants': True},
     'salt': {'base': 0xDDE4EF, 'edid': 'ThornswoodFurnitureSaltMine', 'name': 'salt quarry',
-             'user': (-35.0, -300.0, 35.0, -236.0), 'flat': 32.0, 'reach': 1600, 'step': 48, 'sample': 32.0, 'shore': 120.0},
+             'user': (-35.0, -300.0, 35.0, -236.0), 'flat': 32.0, 'reach': 1600, 'step': 48, 'sample': 32.0, 'shore': 120.0, 'embedded': True},
     'hive': {'base': 0xDBF8B3, 'edid': 'ThornswoodFloraBeehive', 'name': 'beehive',
              'user': (-35.0, -180.0, 35.0, -115.0), 'flat': 40.0, 'reach': 1200, 'step': 32},
     'lab': {'base': 0x42E69, 'edid': 'ThornswoodCraftingAlchemyWorkbench', 'name': 'alchemy lab',
@@ -186,11 +198,15 @@ KINDS = {
 RULES = {
     'kiln': ('One for each of the nine towns with a woodworking bench, outside the town: beside the chopping '
              'block in the open world nearest that town\'s forge, among those 1,000 units or more from every bench '
-             '(#2337). The kiln turns the firewood split at a chopping block into the charcoal every forge burns '
-             '(charburner.md, smith.md).'),
+             '(#2337), within 12,000 units of the forge, or 20,000 for Solitude and Markarth, whose nearest blocks '
+             'are at Katla\'s Farm and Salvius Farm. It may stand among small plants, the way Skyrim\'s smelters do '
+             '(Patrick, B on #2553). The kiln turns the firewood split at a chopping block into the charcoal every '
+             'forge burns (charburner.md, smith.md).'),
     'salt': ('One on the shore of each hold capital on the Sea of Ghosts (Solitude, Windhelm, Dawnstar, '
              'Winterhold), beside the boat drawn up nearest the town: its forge, or Winterhold\'s smithing anvil. '
-             'Salt comes from the sea (miner.md, the salt quarry).'),
+             'The quarry is an ore vein, so it is set into rock the way Skyrim\'s veins are: only the place the '
+             'miner stands needs clear, dry, flat ground, and the vein lies on ground no lower than its underside '
+             'or inside a rock or cliff (Patrick, B on #2553). Salt comes from the sea (miner.md, the salt quarry).'),
     'hive': ('One at each of Skyrim\'s own named farms that has at least 5 crop plots of the farmer\'s table '
              'within 2,400 units, the farm claim\'s circle, of the farm\'s point: its map marker, or the '
              'farmhouse\'s outside door where that marker is inside the house. It stands beside the crop plot '
@@ -209,9 +225,11 @@ RULES = {
 SITES = {
     # Kilns: the chopping block nearest the town's forge, 1,000 units or more from its bench.
     'kiln-whiterun': {'kind': 'kiln', 'where': 'Whiterun', 'point': 'c430a:Skyrim.esm', 'ref': 0x15500},
-    'kiln-solitude': {'kind': 'kiln', 'where': 'Solitude', 'point': '4e3e9:Skyrim.esm', 'ref': 0x15501},
+    'kiln-solitude': {'kind': 'kiln', 'where': 'Solitude', 'point': '4e3e9:Skyrim.esm', 'ref': 0x15501,
+                      'townReach': 20000.0},
     'kiln-windhelm': {'kind': 'kiln', 'where': 'Windhelm', 'point': 'f7798:Skyrim.esm', 'ref': 0x15502},
-    'kiln-markarth': {'kind': 'kiln', 'where': 'Markarth', 'point': '514d8:Skyrim.esm', 'ref': 0x15503},
+    'kiln-markarth': {'kind': 'kiln', 'where': 'Markarth', 'point': '514d8:Skyrim.esm', 'ref': 0x15503,
+                      'townReach': 20000.0},
     'kiln-riften': {'kind': 'kiln', 'where': 'Riften', 'point': '53481:Skyrim.esm', 'ref': 0x15504},
     'kiln-falkreath': {'kind': 'kiln', 'where': 'Falkreath', 'point': '99b8a:Skyrim.esm', 'ref': 0x15505},
     'kiln-dawnstar': {'kind': 'kiln', 'where': 'Dawnstar', 'point': 'cadf6:Skyrim.esm', 'ref': 0x15506},
@@ -437,8 +455,13 @@ def box_of(outline):
     return (min(xs), min(ys), max(xs), max(ys))
 
 
-def thing(ref, edid, outline, lo, hi, solid):
-    return dict(ref=ref, edid=edid, outline=outline, box=box_of(outline), lo=lo, hi=hi, solid=solid)
+def thing(ref, edid, outline, lo, hi, solid, plant=False, rock=False, into=False):
+    """Something near a site. plant: a small plant (a TREE or FLOR under
+    PLANT units a side that is not a crop plot). rock: one of Skyrim's rocks
+    or cliffs (a static whose mesh is under Landscape). into: a rock too large
+    to be an obstacle, kept only so a salt vein can be set into it."""
+    return dict(ref=ref, edid=edid, outline=outline, box=box_of(outline), lo=lo, hi=hi, solid=solid,
+                plant=plant, rock=rock, into=into)
 
 
 def things_round(world, refs, space, cx, cy, radius, skip):
@@ -458,14 +481,23 @@ def things_round(world, refs, space, cx, cy, radius, skip):
         area = (ob[3] - ob[0]) * (ob[4] - ob[1]) * r['scale'] ** 2
         if area == 0:
             continue
-        if b[0] in wb.LARGE and area > wb.BIG_STATIC:
-            continue
-        if max(ob[3] - ob[0], ob[4] - ob[1]) * r['scale'] > wb.VOLUME:
+        side = max(ob[3] - ob[0], ob[4] - ob[1]) * r['scale']
+        rock = b[0] in ('STAT', 'SCOL', 'MSTT') and (b[5] or '').lower().startswith('landscape' + chr(92))
+        if (b[0] in wb.LARGE and area > wb.BIG_STATIC) or side > wb.VOLUME:
+            # The navmesh's to answer for, but a rock or a cliff still holds a
+            # salt vein set into it.
+            if rock and side <= INTO_ROCK:
+                cs = wb.corners(r, ob)
+                zs = [c[2] for c in cs]
+                out.append(thing(world.desc(k), b[1], wb.hull([(c[0], c[1]) for c in cs]), min(zs), max(zs),
+                                 False, rock=True, into=True))
             continue
         cs = wb.corners(r, ob)
         zs = [c[2] for c in cs]
         name = world.desc(k)
-        out.append(thing(name, b[1], wb.hull([(c[0], c[1]) for c in cs]), min(zs), max(zs), True))
+        plant = b[0] in ('TREE', 'FLOR') and r['base'] not in CROPS and side <= PLANT
+        out.append(thing(name, b[1], wb.hull([(c[0], c[1]) for c in cs]), min(zs), max(zs), True,
+                         plant=plant, rock=rock))
         if b[0] == 'FURN':
             out.append(thing(name, b[1] + ', where its user stands',
                              wb.rect(r['pos'][0], r['pos'][1], r['rot'][2], wb.FURN_USER),
@@ -514,6 +546,39 @@ class Spot(object):
     def boxes(self, ob):
         return [(ob[0], ob[1], ob[3], ob[4]), self.k['user']]
 
+    def ignores(self, t, part):
+        """Whether part (0 the station, 1 where its user stands) may overlap t.
+        A kiln stands among small plants (Patrick, B on #2553). A salt vein is
+        set into rock, as Skyrim's veins are, and may run through plants; the
+        miner's standing place takes nothing."""
+        if t['into']:
+            return True
+        if self.k.get('plants') and t['plant']:
+            return True
+        if self.k.get('embedded') and part == 0 and (t['rock'] or t['plant']):
+            return True
+        return False
+
+    def touching(self, close, mine, boxes, zlo, zhi):
+        for t in close:
+            if t['into'] or t['hi'] < zlo or t['lo'] > zhi:
+                continue
+            for part, (m, mb) in enumerate(zip(mine, boxes)):
+                if not self.ignores(t, part) and overlaps(mb, t) and wb.overlap(m, t['outline']):
+                    return 'touches %s (%s)' % (t['edid'], t['ref'])
+        return None
+
+    def inside_rock(self, close, px, py, z):
+        for t in close:
+            if not t['rock'] or t['hi'] < z or t['lo'] > z + CLEAR_ABOVE:
+                continue
+            x0, y0, x1, y1 = t['box']
+            if px < x0 or px > x1 or py < y0 or py > y1:
+                continue
+            if wb.overlap([(px - 1, py - 1), (px + 1, py - 1), (px + 1, py + 1), (px - 1, py + 1)], t['outline']):
+                return True
+        return False
+
     def check(self, x, y, a, ob):
         mine = [wb.rect(x, y, a, bx) for bx in self.boxes(ob)]
         boxes = [box_of(m) for m in mine]
@@ -521,42 +586,54 @@ class Spot(object):
         # A thing high and low enough to be in the way at any floor the spot
         # may have is looked at before the ground, which costs far more. The
         # same test runs again below at the floor the spot has.
-        for t in close:
-            if t['hi'] < self.zref + self.storey + CLEAR_BELOW or t['lo'] > self.zref - self.storey + CLEAR_ABOVE:
-                continue
-            for m, mb in zip(mine, boxes):
-                if overlaps(mb, t) and wb.overlap(m, t['outline']):
-                    return None, 'touches %s (%s)' % (t['edid'], t['ref'])
+        hit = self.touching(close, mine, boxes, self.zref + self.storey + CLEAR_BELOW,
+                            self.zref - self.storey + CLEAR_ABOVE)
+        if hit:
+            return None, hit
         lo = hi = None
         flat = self.k['flat']
-        storey = self.k.get('shore') or STOREY
+        storey = self.storey
         step = self.k.get('sample', SAMPLE)
-        for x0, y0, x1, y1 in self.boxes(ob):
-            nx, ny = max(2, int((x1 - x0) / step) + 1), max(2, int((y1 - y0) / step) + 1)
-            for i in range(nx):
-                for j in range(ny):
-                    lx, ly = x0 + (x1 - x0) * i / (nx - 1), y0 + (y1 - y0) * j / (ny - 1)
-                    dx, dy = wb.turn_xy(lx, ly, a)
-                    z = self.ground.at(x + dx, y + dy, self.zref)
-                    if z is None:
-                        return None, 'off the navmesh'
-                    if self.water is not None and z < self.water + DRY:
-                        return None, 'in the water'
-                    lo = z if lo is None else min(lo, z)
-                    hi = z if hi is None else max(hi, z)
-                    if hi - lo > flat:
-                        return None, 'the ground runs %.0f to %.0f' % (lo, hi)
-                    if lo < self.zref - storey or hi > self.zref + storey + flat:
-                        return None, 'its ground is more than %d from the anchor\'s height' % storey
+        embedded = self.k.get('embedded')
+        # A vein's ground is only the miner's standing place; the vein itself
+        # is looked at after, against that floor.
+        sampled = [self.k['user']] if embedded else self.boxes(ob)
+        for x0, y0, x1, y1 in sampled:
+            for lx, ly in grid(x0, y0, x1, y1, step):
+                dx, dy = wb.turn_xy(lx, ly, a)
+                z = self.ground.at(x + dx, y + dy, self.zref)
+                if z is None:
+                    return None, 'off the navmesh'
+                if self.water is not None and z < self.water + DRY:
+                    return None, 'in the water'
+                lo = z if lo is None else min(lo, z)
+                hi = z if hi is None else max(hi, z)
+                if hi - lo > flat:
+                    return None, 'the ground runs %.0f to %.0f' % (lo, hi)
+                if lo < self.zref - storey or hi > self.zref + storey + flat:
+                    return None, 'its ground is more than %d from the anchor\'s height' % storey
         z = lo
         if abs(z - self.zref) > storey:
             return None, 'its ground is %.0f from the anchor\'s height' % (z - self.zref)
-        for t in close:
-            if t['hi'] < z + CLEAR_BELOW or t['lo'] > z + CLEAR_ABOVE:
-                continue
-            for m, mb in zip(mine, boxes):
-                if overlaps(mb, t) and wb.overlap(m, t['outline']):
-                    return None, 'touches %s (%s)' % (t['edid'], t['ref'])
+        if embedded:
+            # Every part of the vein lies on ground no lower than its own
+            # underside and above the water, or inside a rock or cliff.
+            x0, y0, x1, y1 = ob[0], ob[1], ob[3], ob[4]
+            for lx, ly in grid(x0, y0, x1, y1, step):
+                dx, dy = wb.turn_xy(lx, ly, a)
+                px, py = x + dx, y + dy
+                g = self.ground.at(px, py, z)
+                if g is None or abs(g - z) > self.storey:
+                    if not self.inside_rock(close, px, py, z):
+                        return None, 'the vein hangs over nothing'
+                    continue
+                if g < z - VEIN_DEPTH:
+                    return None, 'the vein hangs over a drop'
+                if self.water is not None and g < self.water + DRY:
+                    return None, 'the vein lies in the water'
+        hit = self.touching(close, mine, boxes, z + CLEAR_BELOW, z + CLEAR_ABOVE)
+        if hit:
+            return None, hit
         return (z, lo, hi), 'clear'
 
     def nearest(self, x, y, a, z, ob):
@@ -564,7 +641,7 @@ class Spot(object):
         x0, y0, x1, y1 = ob[0], ob[1], ob[3], ob[4]
         c, s = math.cos(a), math.sin(a)
         for t in self.things:
-            if not t['solid'] or t['hi'] < z + CLEAR_BELOW or t['lo'] > z + CLEAR_ABOVE:
+            if not t['solid'] or self.ignores(t, 0) or t['hi'] < z + CLEAR_BELOW or t['lo'] > z + CLEAR_ABOVE:
                 continue
             for p in t['outline']:
                 dx, dy = p[0] - x, p[1] - y
@@ -575,6 +652,13 @@ class Spot(object):
                 if d < best[0]:
                     best = (d, t)
         return best
+
+
+def grid(x0, y0, x1, y1, step):
+    nx, ny = max(2, int((x1 - x0) / step) + 1), max(2, int((y1 - y0) / step) + 1)
+    for i in range(nx):
+        for j in range(ny):
+            yield x0 + (x1 - x0) * i / (nx - 1), y0 + (y1 - y0) * j / (ny - 1)
 
 
 # ------------------------------------------------------------ the cell gate --
@@ -812,7 +896,7 @@ def main():
             'fromAnchor': round(math.hypot(dx, dy)),
             'nearest': {'edid': near['edid'], 'ref': near['ref'], 'units': round(dist)} if near else None,
         }
-        for f in ('point', 'farm', 'plotsWithin2400'):
+        for f in ('point', 'farm', 'plotsWithin2400', 'townReach'):
             if s.get(f) is not None:
                 row[f] = s[f]
         if space[0] == 'world':
@@ -843,7 +927,8 @@ def main():
                      'records; %s place nothing' % (CONTENT, ' and '.join(OURS_AFTER))),
         'kinds': {kind: {'base': '%x:%s' % (k['base'], CONTENT), 'edid': k['edid'], 'name': k['name'],
                          'bounds': list(bases[kind][2]), 'user': list(k['user']), 'flat': k['flat'],
-                         'reach': k['reach'], 'rule': RULES[kind], 'count': counts.get(kind, 0)}
+                         'reach': k['reach'], 'rule': RULES[kind], 'count': counts.get(kind, 0),
+                         'amongPlants': bool(k.get('plants')), 'setIntoRock': bool(k.get('embedded'))}
                   for kind, k in KINDS.items()},
         'measure': ('Each station stands at the nearest clear spot to its anchor, tried every step units out to its '
                     'reach in eight turns of the anchor\'s angle, a turn costing %d units. Its outline and its '
@@ -852,7 +937,9 @@ def main():
                     'plant or static under %d by %d, nor where anybody stands at other furniture, the way through a '
                     'door, a woodworking bench, a notice board, or another station, from %g to %g units above the '
                     'floor, with %d units to the nearest solid thing. A kiln stands %d units or more from every '
-                    'woodworking bench. The cell and worldspace records the plugin carries are Bethesda\'s and '
+                    'woodworking bench. A kiln may stand among small plants, and a salt vein is set into rock: '
+                    'only its miner\'s place needs the ground (Patrick, B on #2553). The cell and worldspace '
+                    'records the plugin carries are Bethesda\'s and '
                     'change nothing in the game.'
                     % (TURN_COST, STOREY, int(math.sqrt(wb.BIG_STATIC)), int(math.sqrt(wb.BIG_STATIC)), CLEAR_BELOW,
                        CLEAR_ABOVE, MARGIN, KILN_FROM_BENCH)),
@@ -947,10 +1034,10 @@ def anchors_for(site, s, world, first, benches):
                    for v in benches.values()):
                 continue
             d = math.hypot(x['pos'][0] - px, x['pos'][1] - py)
-            if d <= TOWN_REACH['kiln']:
+            if d <= s.get('townReach', TOWN_REACH['kiln']):
                 rows.append((d, world.desc(k), k, x))
         rows.sort()
-        return [(k, x) for d, n, k, x in rows[:MAX_ANCHORS]] or 'no chopping block stands in the open world within %d units of the forge' % TOWN_REACH['kiln']
+        return [(k, x) for d, n, k, x in rows[:MAX_ANCHORS]] or 'no chopping block stands in the open world within %d units of the forge' % s.get('townReach', TOWN_REACH['kiln'])
     if kind == 'salt':
         for k, x in first.pool.items():
             xb = world.bases.get(x['base'])
