@@ -93,8 +93,11 @@ vm.createContext(sandbox);
 vm.runInContext(block, sandbox, { filename: 'strength-block.js' });
 const S = sandbox.__thornswoodStrength;
 
+yes('the block chains: it wraps the handler already on mp, never assigns over it bare',
+    /var before = mp\.onEquipItemAttempt;/.test(block) && /if \(before && before\(actorId, baseId\) === false\) \{ return false; \}/.test(block));
+
 yes('the block registers mp.onEquipItemAttempt', typeof mp.onEquipItemAttempt === 'function');
-yes('it goes through guard() like every other engine event', /mp\.onEquipItemAttempt = guard\('onEquipItemAttempt'/.test(block));
+yes('it goes through guard() like every other engine event', /var gate = guard\('onEquipItemAttempt'/.test(block) && /mp\.onEquipItemAttempt = gate;/.test(block));
 yes('the thresholds are Patrick\'s: 45 needs 5, 30 needs 3',
     JSON.stringify(S.STRENGTH.tiers) === JSON.stringify([{ weight: 45, might: 5 }, { weight: 30, might: 3 }]));
 yes('no record id is named in the rule', !/0x[0-9a-f]{5,}/i.test(block) && !/\.esp/i.test(block));
@@ -162,6 +165,69 @@ yes('Might 5 equips the club and it is saved', r2.saved.inventory.length === 1 &
 const r3 = engineEquip(0xff000001, { inventory: [] }, { inventory: [{ baseId: 0x00100004, worn: true }] });
 yes('a login with a heavy weapon already worn is refused through the same event (first report after spawn)',
     r3.saved.inventory.length === 0);
+
+// ------------------------------------------- sharing the event (#2618) --
+// The cuffs (#2573, #2618) answer onEquipItemAttempt too, and wrap whatever
+// handler is already on mp. Stand-in cuffs, written to that pattern: refuse
+// anything while the wearer is cuffed, ask the handler they found otherwise.
+const CUFFED = 0xff000004;   // Might 5, so only the cuffs can refuse them
+function loadCuffs(m, said2) {
+  const prev = m.onEquipItemAttempt;
+  m.onEquipItemAttempt = function (actorId, baseId) {
+    let mine = true;
+    if (actorId === CUFFED) { mine = false; said2.push('cuffs'); }
+    const theirs = typeof prev === 'function' ? prev(actorId, baseId) : true;
+    return mine && theirs !== false;
+  };
+}
+function loadStrength(m) {
+  const sb = Object.assign({}, sandbox, { mp: m });
+  sb.globalThis = sb;
+  vm.createContext(sb);
+  vm.runInContext(block, sb, { filename: 'strength-block.js' });
+  return sb;
+}
+function world() { return { lookupEspmRecordById: mp.lookupEspmRecordById, get: mp.get }; }
+const pairs = [[0xff000001, 0x00012eb7], [0xff000001, 0x00100003], [0xff000002, 0x00100001],
+               [0xff000002, 0x00100003], [CUFFED, 0x00012eb7], [CUFFED, 0x00100003], [npc, 0x00100004]];
+const answers = {};
+for (const order of ['cuffs then strength', 'strength then cuffs']) {
+  const m = world(); const c = [];
+  if (order === 'cuffs then strength') { loadCuffs(m, c); loadStrength(m); } else { loadStrength(m); loadCuffs(m, c); }
+  answers[order] = pairs.map(([a, b]) => m.onEquipItemAttempt(a, b));
+  yes(order + ': a cuffed person is refused even an ordinary sword', answers[order][4] === false);
+  yes(order + ': a cuffed person with Might 5 is refused the club too', answers[order][5] === false);
+  yes(order + ': Might 0 still refused the club', answers[order][1] === false);
+  yes(order + ': Might 3 still allowed the 30 weight maul', answers[order][2] === true);
+  yes(order + ': an ordinary sword for a free person goes through both', answers[order][0] === true);
+  yes(order + ': an NPC is let through by both', answers[order][6] === true);
+}
+yes('the two load orders give the same answer for every case',
+    JSON.stringify(answers['cuffs then strength']) === JSON.stringify(answers['strength then cuffs']));
+{
+  const m = world(); const c = [];
+  loadCuffs(m, c); loadStrength(m);
+  notes.length = 0; said.length = 0;
+  m.onEquipItemAttempt(CUFFED, 0x00100003);
+  yes('cuffs first: when the cuffs refuse, the strength line is not added on top', notes.length === 0 && said.length === 0);
+}
+{
+  const m = world();
+  m.onEquipItemAttempt = function () { return undefined; };
+  loadStrength(m);
+  yes('a handler before it that answers nothing is not a refusal', m.onEquipItemAttempt(0xff000004, 0x00100003) === true);
+  yes('and the strength gate still refuses behind it', m.onEquipItemAttempt(0xff000001, 0x00100003) === false);
+}
+{
+  const m = world(); const c = []; let asked = 0;
+  m.onEquipItemAttempt = function (a) { asked++; return a !== CUFFED; };
+  const first = m.onEquipItemAttempt;
+  loadStrength(m); loadStrength(m); loadStrength(m);
+  const sb = loadStrength(m);
+  m.onEquipItemAttempt(0xff000001, 0x00012eb7);
+  yes('a reload of the gamemode does not stack the strength gate (the gate before it is asked once)', asked === 1);
+  yes('and still holds the gate that was there before the first load', sb.__thornswoodStrength.before === first);
+}
 
 // ---------------------------------------------------------- the K panel --
 const might = /\{ key: 'might',[\s\S]*?gate: (\[[^\]]*\])/.exec(ui);

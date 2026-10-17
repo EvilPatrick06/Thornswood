@@ -55049,13 +55049,37 @@ mp.onUpdateEquipmentAttempt = guard('onUpdateEquipmentAttempt', function (actorI
     return false;
   }
 
-  mp.onEquipItemAttempt = guard('onEquipItemAttempt', function (actorId, baseId) {
+  /*
+    ONE ENGINE EVENT, MORE THAN ONE GATE. The cuffs (#2573, #2618) answer
+    onEquipItemAttempt as well, and mp holds one handler per event, so a plain
+    assignment would throw away whichever block registered first. This one
+    wraps whatever is already there instead, and the cuffs do the same with
+    whatever they find, so whichever loads second holds the first:
+      - the item is refused when either gate says no (false), and allowed
+        only when both let it through;
+      - the gate already there is asked first, and when it refuses, this one
+        says nothing more, so a person never gets two refusals for one press;
+      - only false is a no. A handler that answers nothing, or throws inside
+        guard() (which then answers undefined), is not a refusal, the same as
+        the engine reads it.
+    The answer is the same in either load order. A reload of this file finds
+    its own wrapper from the last load on mp and takes the gate it was holding
+    (HELD below), so the chain never grows a second copy of this gate.
+  */
+  var HELD = '__thornswoodStrengthHeld';
+  var before = mp.onEquipItemAttempt;
+  if (typeof before === 'function' && Object.prototype.hasOwnProperty.call(before, HELD)) { before = before[HELD]; }
+  if (typeof before !== 'function') { before = null; }
+  var gate = guard('onEquipItemAttempt', function (actorId, baseId) {
+    if (before && before(actorId, baseId) === false) { return false; }
     return allow(actorId, baseId);
   });
+  gate[HELD] = before;
+  mp.onEquipItemAttempt = gate;
 
   g.__thornswoodStrength = {
     STRENGTH: STRENGTH, weightOf: weightOf, needFor: needFor, needOf: needOf,
-    mightOf: mightOf, allow: allow, lines: lines
+    mightOf: mightOf, allow: allow, lines: lines, before: before
   };
   slog('ready');
 })();
