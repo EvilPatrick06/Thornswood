@@ -76,6 +76,7 @@ namespace Thornswood
 
         // apply   <game> <mygames> <on 0|1> <folder or ->
         // after   <game> <mygames> <on 0|1> <folder or -> <since, local ticks>
+        // tidy    <game> <mygames> <on 0|1> <folder or ->   (what Keep does)
         public static int Main(string[] a)
         {
             Paths.Game = a[1];
@@ -96,6 +97,11 @@ namespace Thornswood
                 string snapshot;
                 Console.WriteLine("SAID=" + Flat(CrashDump.AfterSession(since, CrashDump.Wanted(cfg), CrashDump.KeptIn(cfg), out snapshot)));
                 Console.WriteLine("SNAP=" + (snapshot ?? "(none)"));
+                return 0;
+            }
+            if (a[0] == "tidy")
+            {
+                Console.WriteLine("GONE=" + CrashDump.Tidy(CrashDump.KeptIn(cfg)));
                 return 0;
             }
             return 2;
@@ -245,7 +251,11 @@ try {
     Yes 'crashed, on: the line names the crash log and where it is' ($r['SAID'] -match 'The game crashed\. Its crash log is crash-2026-10-17-13-13-14\.log in ' -and $r['SAID'] -match [regex]::Escape($s.Skse))
     Yes 'crashed, on: the snapshot is moved to the chosen folder and named with its size' ((Test-Path -LiteralPath $moved) -and -not (Test-Path -LiteralPath $dmp) -and $r['SNAP'] -eq $moved -and $r['SAID'] -match [regex]::Escape($moved) -and $r['SAID'] -match ', \d+ (MB|GB)\.')
     Yes 'crashed, on: and the line says it holds what was in memory and stays on this PC' ($r['SAID'] -match "It holds what was in the game's memory, so it stays on this PC and nothing sends it anywhere")
-    Yes 'crashed, on: the older snapshot in the chosen folder is deleted, the new one kept' (-not (Test-Path -LiteralPath $older) -and (Test-Path -LiteralPath $moved))
+    Yes 'crashed, on: nothing older is deleted before the person answers' ((Test-Path -LiteralPath $older) -and (Test-Path -LiteralPath $moved))
+    $other = Dump $chosen 'crash-report-from-another-program.dmp' 3000
+    $r = Run @('tidy', $s.Game, $s.My, '1', $chosen)
+    Yes 'kept: the older snapshot is deleted, the new one kept' (-not (Test-Path -LiteralPath $older) -and (Test-Path -LiteralPath $moved) -and $r['GONE'] -eq '1')
+    Yes 'kept: a file in the chosen folder that is not one of Crash Logger''s is never deleted' (Test-Path -LiteralPath $other)
     $s2 = NewInstall 'session-off'
     [IO.File]::WriteAllText((Join-Path $s2.Skse 'crash-2026-10-17-14-00-00.log'), 'today')
     $stray = Dump $s2.Skse 'crash-2026-10-17-14-00-00.dmp' 1
@@ -258,8 +268,10 @@ try {
     $body = $play.Groups[1].Value
     $iEnf = $body.IndexOf('Enforce.Apply()'); $iDump = $body.IndexOf('CrashDump.Apply(cfg)'); $iSaid = $body.IndexOf('foreach (string note in Enforce.Said)'); $iNote = $body.IndexOf('Keep.LeaveNote')
     Yes 'Play writes it every time, after the other held settings and before the game starts' ($play.Success -and $iEnf -ge 0 -and $iDump -gt $iEnf -and $iSaid -gt $iDump -and $iNote -gt $iDump)
-    Yes 'the game closing logs the crash line and asks about a saved snapshot' ($shell -match 'CrashDump\.AfterSession\(playStartedAt, CrashDump\.Wanted\(cfg\), CrashDump\.KeptIn\(cfg\), out snapshot\)' -and $shell -match 'if \(snapshot != null\) AskKeepSnapshot\(snapshot\);')
-    Yes 'asking: Yes keeps it, No deletes it' ($shell -match 'MessageBoxButton\.YesNo' -and $shell -match 'static void AskKeepSnapshot' -and $shell -match 'File\.Delete\(snapshot\);')
+    Yes 'the game closing works from what Crash Logger was told at Play, off the window''s thread' ($shell -match 'bool keptAtPlay = CrashDump\.AppliedAtPlay;' -and $shell -match 'ThreadPool\.QueueUserWorkItem\(delegate\s*\{\s*string snapshot = null, crashed = null;' -and $shell -match 'CrashDump\.AfterSession\(crashSince, keptAtPlay, keptIn, out snapshot\)')
+    Yes 'and asks about a saved snapshot back on the window''s thread' ($shell -match 'if \(snapshot != null\) AskKeepSnapshot\(snapshot, keptIn\);' -and $shell -match 'MessageBox\.Show\(win,')
+    Yes 'Apply remembers what it wrote at Play' ($src -match 'AppliedAtPlay = Wanted\(cfg\);')
+    Yes 'asking: Yes keeps it and only then tidies older ones, No deletes it' ($shell -match 'MessageBoxButton\.YesNo' -and $shell -match 'static void AskKeepSnapshot\(string snapshot, string keptIn\)' -and $shell -match 'int gone = CrashDump\.Tidy\(keptIn\);' -and $shell -match 'File\.Delete\(snapshot\);')
     Yes 'Wanted(cfg) is the person''s own setting and nothing else' ($src -match 'return cfg != null && cfg\.CrashSnapshots;' -and $src -notmatch 'Discord\.' -and $src -notmatch 'IsDev')
     $ui = Read 'launcher\ui.xaml'
     Yes 'Settings has the box, the size said beside it, and a folder button' ($ui -match 'x:Name="ChkCrashSnapshots"' -and $ui -match 'One can be 9 GB or more' -and $ui -match 'x:Name="BtnCrashFolder"' -and $ui -match 'x:Name="TxtCrashFolder"')

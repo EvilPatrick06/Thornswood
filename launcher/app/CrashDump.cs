@@ -64,6 +64,14 @@ namespace Thornswood
         /// <summary>Where Crash Logger writes its logs and snapshots: this install's Profile\MyGames\SKSE.</summary>
         public static string Folder { get { return Files.SkseLogDir; } }
 
+        /// <summary>
+        /// What Apply wrote into Crash Logger's file at the last Play. The
+        /// game writes a snapshot by that, not by the setting as it is when
+        /// the game closes: untick the box mid-session and a crash still
+        /// writes one, which the person must still be told about.
+        /// </summary>
+        public static bool AppliedAtPlay;
+
         /// <summary>Whether the person turned snapshots on.</summary>
         public static bool Wanted(Config cfg)
         {
@@ -83,7 +91,8 @@ namespace Thornswood
         /// </summary>
         public static string Apply(Config cfg)
         {
-            return Apply(Wanted(cfg), KeptIn(cfg));
+            AppliedAtPlay = Wanted(cfg);
+            return Apply(AppliedAtPlay, KeptIn(cfg));
         }
 
         public static string Apply(bool want, string keptIn)
@@ -114,7 +123,8 @@ namespace Thornswood
                 said.Add("Crash snapshots are on, as you set in Settings. If the game crashes, a full snapshot is saved in " + keptIn +
                          ". One can be 9 GB or more, only the newest is kept, and it stays on this PC.");
             if (turned && !want)
-                said.Add("Crash snapshots are off. Any already saved are left where they are; you can delete them from " + keptIn + ".");
+                said.Add("Crash snapshots are off. Any already saved are left where they are; you can delete them from " + keptIn +
+                         (SameFolder(keptIn, Folder) ? "" : " and from " + Folder) + ".");
             if (gone > 0)
                 said.Add("Deleted " + gone + " older crash snapshot" + (gone == 1 ? "" : "s") + ". Only the newest is kept.");
             return said.Count == 0 ? null : string.Join(" ", said.ToArray());
@@ -138,7 +148,8 @@ namespace Thornswood
                 foreach (string dir in folders)
                 {
                     if (!Directory.Exists(dir)) continue;
-                    foreach (string f in Directory.GetFiles(dir, "crash-*.dmp")) dumps.Add(new FileInfo(f));
+                    foreach (string f in Directory.GetFiles(dir, "crash-*.dmp"))
+                        if (IsCrashLoggers(Path.GetFileName(f))) dumps.Add(new FileInfo(f));
                 }
                 dumps.Sort(delegate(FileInfo a, FileInfo b) { return b.LastWriteTimeUtc.CompareTo(a.LastWriteTimeUtc); });
                 for (int i = 1; i < dumps.Count; i++)
@@ -149,6 +160,17 @@ namespace Thornswood
             }
             catch (Exception ex) { Swallow.Note("CrashDump.Tidy", ex); }
             return gone;
+        }
+
+        /// <summary>
+        /// Only Crash Logger's own snapshot names, crash-YYYY-MM-DD-HH-MM-SS.dmp,
+        /// are ever tidied: the chosen folder may be one other programs use
+        /// too, and their files are not this launcher's to delete.
+        /// </summary>
+        static bool IsCrashLoggers(string name)
+        {
+            return System.Text.RegularExpressions.Regex.IsMatch(name ?? "",
+                @"^crash-\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}\.dmp$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         }
 
         static bool SameFolder(string a, string b)
@@ -171,10 +193,12 @@ namespace Thornswood
 
         /// <summary>
         /// As the game closes: when it crashed (Crash Logger wrote a crash
-        /// log since sinceLocal), the line saying so. With snapshots on and a
-        /// snapshot beside the log, it is moved to the chosen folder, older
-        /// ones there are deleted, and snapshot is its path, for the launcher
-        /// to show and ask about. Null when it did not crash.
+        /// log since sinceLocal), the line saying so. With snapshots on at
+        /// Play and a snapshot beside the log, it is moved to the chosen
+        /// folder and snapshot is its path, for the launcher to show and ask
+        /// about. Null when it did not crash. Can take minutes when the
+        /// folder is on another drive (a 9 GB copy), so the launcher calls it
+        /// off the window's thread.
         /// </summary>
         public static string AfterSession(DateTime sinceLocal, bool want, string keptIn, out string snapshot)
         {
@@ -212,7 +236,9 @@ namespace Thornswood
                         to = dmp;
                     }
                 }
-                Tidy(keptIn);
+                // Older ones are tidied only once the person has answered
+                // (Shell.AskKeepSnapshot): answering No to this one must not
+                // leave them with none at all.
                 snapshot = File.Exists(to) ? to : null;
                 if (snapshot != null)
                     line += " A full crash snapshot was saved: " + snapshot + ", " + Size(new FileInfo(snapshot).Length) +

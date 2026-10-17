@@ -2691,10 +2691,28 @@ namespace Thornswood
                     // person turned snapshots on (#2626). A snapshot is shown
                     // with its size and they are asked whether to keep it,
                     // since it can be 9 GB or more.
-                    string snapshot;
-                    string crashed = CrashDump.AfterSession(playStartedAt, CrashDump.Wanted(cfg), CrashDump.KeptIn(cfg), out snapshot);
-                    if (crashed != null) Log(crashed);
-                    if (snapshot != null) AskKeepSnapshot(snapshot);
+                    // What Crash Logger was told at Play, not the box as it is
+                    // now, and off the window's thread: moving a 9 GB
+                    // snapshot to a folder on another drive is a copy that
+                    // takes minutes.
+                    bool keptAtPlay = CrashDump.AppliedAtPlay;
+                    string keptIn = CrashDump.KeptIn(cfg);
+                    DateTime crashSince = playStartedAt;
+                    ThreadPool.QueueUserWorkItem(delegate
+                    {
+                        string snapshot = null, crashed = null;
+                        try { crashed = CrashDump.AfterSession(crashSince, keptAtPlay, keptIn, out snapshot); }
+                        catch (Exception ex) { Swallow.Note("Shell.Wire, crash snapshot", ex); }
+                        try
+                        {
+                            win.Dispatcher.BeginInvoke(new Action(delegate
+                            {
+                                if (crashed != null) Log(crashed);
+                                if (snapshot != null) AskKeepSnapshot(snapshot, keptIn);
+                            }));
+                        }
+                        catch (Exception ex) { Swallow.Note("Shell.Wire, crash snapshot", ex); }
+                    });
                 }
 
                 // The one failure that looks like everything else: a session
@@ -4431,17 +4449,22 @@ namespace Thornswood
         /// After a crash that saved a snapshot (#2626): says where it is and
         /// how big, and asks whether to keep it. No deletes it now.
         /// </summary>
-        static void AskKeepSnapshot(string snapshot)
+        static void AskKeepSnapshot(string snapshot, string keptIn)
         {
             long size = 0;
             try { size = new FileInfo(snapshot).Length; } catch (Exception ex) { Swallow.Note("Shell.AskKeepSnapshot, size", ex); }
-            var r = MessageBox.Show(
+            // Owned by the launcher's window, so it opens in front of it.
+            var r = MessageBox.Show(win,
                 "The game crashed, and a full crash snapshot was saved:\n\n" + snapshot + "\n" + CrashDump.Size(size) +
                 "\n\nIt is only needed if somebody is going to look into this crash. Keep it?\n\nYes keeps it. No deletes it now.",
                 "Thornswood", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (r == MessageBoxResult.Yes)
             {
-                Log("Kept the crash snapshot " + snapshot + ".");
+                // Only now are older ones tidied, so a No below never leaves
+                // somebody with none at all. This one is the newest.
+                int gone = CrashDump.Tidy(keptIn);
+                Log("Kept the crash snapshot " + snapshot + "." +
+                    (gone > 0 ? " Deleted " + gone + " older one" + (gone == 1 ? "" : "s") + "; only the newest is kept." : ""));
                 return;
             }
             try
