@@ -106,7 +106,6 @@ $allowed = @(
     @('scripts/deploy/ServiceAccount.ps1', "-UserId 'SYSTEM'", '-AsSystem, the way back (#2578)'),
     @('scripts/deploy/Install-ThornswoodServer.ps1', "-UserId 'SYSTEM'", 'its copy of ServiceAccount.ps1, -AsSystem (#2578)'),
     @('scripts/vps/vps-dev-instance.ps1', "-UserId 'SYSTEM'", 'its copy of ServiceAccount.ps1, -AsSystem (#2578)'),
-    @('scripts/deploy/Deploy-Docs.ps1', "SYSTEM", '-RunAs SYSTEM, open as #2613'),
     @('scripts/vps/vps-harden.ps1', "-UserId 'SYSTEM'", 'one-shot sshd restart and config rollback: rewrites ProgramData\ssh\sshd_config and restarts sshd, which need administrator, and must outlive the ssh session they cut (#2612)'),
     @('scripts/vps/vps-ssh-scope.ps1', "-UserId 'SYSTEM'", 'one-shot firewall rollback: sets rules'' remote addresses, which needs administrator, and must outlive a session the change may lock out (#2612)')
 )
@@ -117,6 +116,12 @@ foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $Repo 'scripts') -Recurse
     foreach ($m in @(Select-String -LiteralPath $f.FullName -Pattern $sysRe)) { $found += ($rel + ':' + $m.LineNumber) }
 }
 $stray = @($found | Where-Object { $names -notcontains ($_ -replace ':\d+$', '') })
+# #2613: the site's -RunAs SYSTEM is ServiceAccount.ps1's -AsSystem, so
+# Deploy-Docs is off the list and names no SYSTEM principal of its own.
+Yes 'Deploy-Docs is not on the list, and takes -RunAs SYSTEM from New-ThornswoodServicePrincipal -AsSystem (#2613)' (
+    $names -notcontains 'scripts/deploy/Deploy-Docs.ps1' -and
+    (Text 'scripts\deploy\Deploy-Docs.ps1') -notmatch $sysRe -and
+    (Text 'scripts\deploy\Deploy-Docs.ps1').Contains('New-ThornswoodServicePrincipal -AsSystem'))
 Yes 'every SYSTEM or Highest principal under scripts\ is on the list with its reason' ($stray.Count -eq 0)
 foreach ($s in $stray) { Write-Host "      not on the list: $s" }
 

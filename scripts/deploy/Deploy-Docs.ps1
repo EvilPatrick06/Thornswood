@@ -37,13 +37,15 @@
                                asks for a new member password without
                                showing it, and sets it. Never type the
                                password on the command line.
-    .\Deploy-Docs.ps1 -RunAs 'LOCAL SERVICE'
-                               runs the site as LOCAL SERVICE instead of
-                               SYSTEM, with its own folder and nothing else
-                               to write in, and one privilege, the one for
-                               walking folders. It stays that way: a deploy
-                               without -RunAs keeps the account the task
-                               already has. -RunAs SYSTEM puts it back.
+    .\Deploy-Docs.ps1 -RunAs SYSTEM
+                               the way back, and the only way the site runs
+                               as SYSTEM (#2613). Without -RunAs the site
+                               runs as LOCAL SERVICE, with its own folder and
+                               nothing else to write in, and one privilege,
+                               the one for walking folders; a task still on
+                               SYSTEM is moved onto it at the next deploy.
+                               A task put on SYSTEM with -RunAs SYSTEM goes
+                               back to LOCAL SERVICE at the next plain deploy.
 
   THE APP IS STAGED, CHECKED, THEN SWAPPED (issue #446). server.js and the
   public files that changed go into $Root\.stage-<stamp> while the site runs,
@@ -106,11 +108,16 @@ param(
   # LOCAL SERVICE is built in and needs no password kept anywhere, which a
   # named local user would.
   #
-  # No default on purpose. Left out, the task keeps the account it already
-  # runs as, and a task made for the first time is SYSTEM, as it always was.
-  # A default of SYSTEM put the site back on SYSTEM at the next plain deploy
-  # or -Site after the switch, which is what CLAUDE.md, Install-Bot and
-  # Set-Vps all tell people to run, and the read-back said nothing about it.
+  # Left out, the site runs as LOCAL SERVICE (#2613): a new task is made on
+  # it, and a task still on SYSTEM is moved onto it, the way #2578 moved the
+  # game, voice and Caddy tasks. Until #2613 a task made for the first time
+  # was SYSTEM and a plain deploy kept whatever the task had, so the switch
+  # only ever happened if someone remembered -RunAs 'LOCAL SERVICE', and the
+  # VPS site stayed SYSTEM. -RunAs SYSTEM is the way back, for one deploy;
+  # the principal comes from New-ThornswoodServicePrincipal -AsSystem in
+  # ServiceAccount.ps1, the same fallback the installers have. An account
+  # set on the task by hand is still left as it is. No default on the
+  # parameter itself, so the block can tell "left out" from "asked for".
   [ValidateSet('SYSTEM', 'LOCAL SERVICE')]
   [string]$RunAs,
   # How long the new site has to answer before the old files go back.
@@ -128,6 +135,10 @@ $ErrorActionPreference = 'Stop'
 $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+# The service account helpers (#2578), sent up as text in front of the setup
+# script (#2613), so the site's principal and fail-safe are the installers'.
+. (Join-Path $Here 'ServiceAccount.ps1')
+$siteAccountHelpers = (Get-ThornswoodServiceAccountScript) + "`n"
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Script.ps1')
 . (Join-Path $Here '..\vps\Send-Secret.ps1')
@@ -522,6 +533,7 @@ Write-Host 'Opening the port and setting up the task...'
 # The firewall, the account and the task definition. It stops and starts
 # nothing: the swap below does that, once this has said it is all in place.
 $setup = @(Remote @"
+$siteAccountHelpers
 `$ErrorActionPreference = 'Continue'
 
 # The site answers on loopback only unless THORNSWOOD_DOCS_EXPOSE=1 (#2185),
@@ -545,13 +557,22 @@ elseif (-not (Get-NetFirewallRule -DisplayName '$Task' -EA SilentlyContinue)) {
 # Who the site runs as, from -RunAs. Worked out before anything is stopped,
 # so an account that does not resolve leaves the running site alone.
 #
-# Without -RunAs it is the account the task already runs as, read off the
-# task, so the switch survives every plain deploy and -Site after it. A box
-# with no task yet gets SYSTEM, as it always did. An account this script did
+# Without -RunAs it is LOCAL SERVICE (#2613). A box with no task yet gets a
+# LOCAL SERVICE task, and a task still on SYSTEM is moved onto it. Until #2613
+# no -RunAs meant SYSTEM for a new task and "keep what it has" for an old one,
+# so nothing ever took the VPS site off SYSTEM. An account this script did
 # not make, set on the task by hand, is handed back to the task as it is and
 # granted nothing, because nothing here knows what it was set up to reach.
 #
-# SYSTEM is registered exactly as it always was, Highest and no grants.
+# -RunAs SYSTEM is the manual way back: New-ThornswoodServicePrincipal
+# -AsSystem, Highest and no grants, as the installers' -AsSystem (#2578). The
+# next deploy without -RunAs moves it to LOCAL SERVICE again.
+#
+# THE FAIL-SAFE (#2578). Before the site is moved off SYSTEM, or made for the
+# first time, Test-ThornswoodServiceCannotReach reads the places no service
+# may read, and when LOCAL SERVICE or a broad group could read one, the block
+# ends here with nothing stopped or changed and says to lock them or pass
+# -RunAs SYSTEM. A task already on LOCAL SERVICE is not asked again.
 #
 # LOCAL SERVICE is cut down to one privilege. -RunLevel Limited alone takes
 # nothing away from a built-in service account, because it has no split
@@ -585,27 +606,36 @@ elseif (-not (Get-NetFirewallRule -DisplayName '$Task' -EA SilentlyContinue)) {
 `$runAs = '$RunAs'
 `$principal = `$null
 `$sid = ''
+`$already = `$false
 if (-not `$runAs) {
-  `$runAs = 'SYSTEM'
+  `$runAs = 'LOCAL SERVICE'
   `$was = (Get-ScheduledTask -TaskName '$Task' -EA SilentlyContinue).Principal
   if (`$was) {
     try { `$sid = (New-Object Security.Principal.NTAccount([string]`$was.UserId)).Translate([Security.Principal.SecurityIdentifier]).Value } catch { }
-    if (`$sid -eq 'S-1-5-19') { `$runAs = 'LOCAL SERVICE' }
-    elseif (`$sid -ne 'S-1-5-18') { `$runAs = [string]`$was.UserId; `$principal = `$was }
-  }
-  'no -RunAs, so the task keeps the account it has: ' + `$runAs
+    if (`$sid -eq 'S-1-5-19') { `$already = `$true; 'no -RunAs, so the task keeps the account it has: LOCAL SERVICE' }
+    elseif (`$sid -eq 'S-1-5-18') { 'no -RunAs, and the task ran as SYSTEM: it moves to LOCAL SERVICE (#2613). -RunAs SYSTEM is the way back.' }
+    else { `$runAs = [string]`$was.UserId; `$principal = `$was }
+  } else { 'no -RunAs and no task yet: a new task runs as LOCAL SERVICE (#2613)' }
 }
 if (`$principal) {
   'an account this script did not set up: left as it is, nothing granted'
 } elseif (`$runAs -eq 'SYSTEM') {
   `$sid = 'S-1-5-18'
-  `$principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+  `$principal = New-ThornswoodServicePrincipal -AsSystem
 } else {
   `$sid = ''
   try { `$sid = (New-Object Security.Principal.NTAccount('NT AUTHORITY', `$runAs)).Translate([Security.Principal.SecurityIdentifier]).Value } catch { }
   if (-not `$sid) { 'NO SUCH ACCOUNT HERE: ' + `$runAs + '. Nothing was stopped or changed.'; return }
-  `$principal = New-ScheduledTaskPrincipal -UserId ('NT AUTHORITY\' + `$runAs) -LogonType ServiceAccount -RunLevel Limited ``
-    -RequiredPrivilege 'SeChangeNotifyPrivilege' -ProcessTokenSidType Unrestricted
+  if (-not `$already) {
+    `$cannot = @(Test-ThornswoodServiceCannotReach (Get-ThornswoodServiceNeverReach -Own '$rootWin'))
+    if (`$cannot.Count) {
+      'LOCAL SERVICE COULD READ WHAT NO SERVICE MAY, so the site is not moved onto it:'
+      foreach (`$c in `$cannot) { '  ' + `$c }
+      'Lock those (scripts\vps\Lock-VpsFolders.ps1), or pass -RunAs SYSTEM. Nothing was stopped or changed.'
+      return
+    }
+  }
+  `$principal = New-ThornswoodServicePrincipal
   foreach (`$g in @(
       @('$rootWin', '(OI)(CI)M'),
       @('C:\Thornswood-Server\data', '(OI)(NP)R'),
