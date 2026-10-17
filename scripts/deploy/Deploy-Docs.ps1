@@ -532,7 +532,8 @@ Write-Host ''
 Write-Host 'Opening the port and setting up the task...'
 # The firewall, the account and the task definition. It stops and starts
 # nothing: the swap below does that, once this has said it is all in place.
-$setup = @(Remote ($siteAccountHelpers + @"
+$setup = @(Remote @"
+$siteAccountHelpers
 `$ErrorActionPreference = 'Continue'
 
 # The site answers on loopback only unless THORNSWOOD_DOCS_EXPOSE=1 (#2185),
@@ -803,7 +804,7 @@ if (`$who) {
 }
 
 'SETUP DONE'
-"@) | ForEach-Object { "$_" })
+"@ | ForEach-Object { "$_" })
 foreach ($l in $setup) { Write-Host "  $l" }
 # An account that does not resolve, or no node, ends that block early. Nothing
 # has been stopped, so the stage goes and the site keeps running as it was.

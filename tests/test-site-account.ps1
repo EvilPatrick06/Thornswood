@@ -145,15 +145,16 @@ Yes 'there is one script that registers the task' ($remotes.Count -eq 1)
 if ($remotes.Count -ne 1) { Done }
 $remote = $remotes[0]
 
-# Only these four are filled in on this side. Anything else in there would be
+# Only these four are filled in on this side, plus $siteAccountHelpers, the
+# ServiceAccount.ps1 functions sent up in front of it (#2613). Anything else would be
 # built from a variable this does not set, and the test would be testing a
 # different script from the one that goes up.
-$known = @('Task', 'Port', 'rootWin', 'RunAs')
+$known = @('Task', 'Port', 'rootWin', 'RunAs', 'siteAccountHelpers')
 $used = @($remote.NestedExpressions | ForEach-Object {
     if ($_ -is [System.Management.Automation.Language.VariableExpressionAst]) { $_.VariablePath.UserPath } else { $_.Extent.Text }
 } | Sort-Object -Unique)
 $strangers = @($used | Where-Object { $known -notcontains $_ })
-Yes ('the script is filled in from $Task, $Port, $rootWin and $RunAs and nothing else' +
+Yes ('the script is filled in from $Task, $Port, $rootWin, $RunAs and $siteAccountHelpers and nothing else' +
      $(if ($strangers.Count) { ' (also ' + ($strangers -join ', ') + ')' } else { '' })) ($strangers.Count -eq 0)
 
 # The here-string, evaluated exactly as Deploy-Docs evaluates it. An empty
@@ -165,6 +166,8 @@ function Build([string]$account, [string]$docsRoot, [string]$taskName = 'Thornsw
     $rootWin = $docsRoot
     $Task = $taskName
     $Port = 3001
+    # The helpers are checked on their own below; here the setup script is what is under test.
+    $siteAccountHelpers = ''
     return (& ([ScriptBlock]::Create($script:remote.Extent.Text)))
 }
 
@@ -318,7 +321,7 @@ $ddText = Get-Content -LiteralPath $deploy -Raw
 Yes 'Deploy-Docs sends ServiceAccount.ps1''s functions up in front of the setup script' (
     $ddText.Contains(". (Join-Path `$Here 'ServiceAccount.ps1')") -and
     $ddText.Contains('$siteAccountHelpers = (Get-ThornswoodServiceAccountScript)') -and
-    $ddText.Contains('$setup = @(Remote ($siteAccountHelpers + @"'))
+    ($ddText -match '\$setup = @\(Remote @"\r?\n\$siteAccountHelpers\r?\n'))
 Yes 'and the functions it sends define both the principal and the fail-safe' (
     (Get-ThornswoodServiceAccountScript) -match 'function New-ThornswoodServicePrincipal' -and
     (Get-ThornswoodServiceAccountScript) -match 'function Test-ThornswoodServiceCannotReach')
