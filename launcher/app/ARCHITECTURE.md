@@ -541,13 +541,15 @@ log level and text window; the actor draw distance in `SkyrimPrefs.ini`), ThornI
 name and voice address in `Thornswood.ini`), Display.cs
 (`SSEDisplayTweaks.ini`, `SkyrimPrefs.ini`, SkyUI's `config.txt`), and Keys.cs
 (key binds, from the Controls page). All in Game except `SkyrimPrefs.ini`,
-which is in `Profile\MyGames`. CrashDump.cs (#1191) writes Crash Logger's
-own `Crash Log Write Minidump` in `CrashLogger.ini`: on for the dev build
-and for a linked account the site says is staff (the `dev` answer of
-`/api/play/join`, `dev-allowed.txt`), off for everybody else. The snapshot
-it turns on is the game's whole memory, about 1 GB, written beside the
-crash log in `Profile\MyGames\SKSE`; only the newest is kept, and nothing
-ever sends one anywhere.
+which is in `Profile\MyGames`. CrashDump.cs (#2626, replacing #1191's rule) writes Crash Logger's
+own `Crash Log Write Minidump` in `CrashLogger.ini` to match Settings, Crash
+snapshots (`Config.CrashSnapshots`): off for everybody until they tick it.
+The snapshot it turns on is the game's whole memory, which measured 9.2 GB
+on 17 October; after a crash it is moved to the folder the person chose
+(`Config.CrashSnapshotFolder`, blank leaves it beside the crash log in
+`Profile\MyGames\SKSE`) and the launcher asks whether to keep it. Only the
+newest is kept, turning it off deletes none, and nothing ever sends one
+anywhere.
 
 **SkyMp** (SkyMp.cs). Whether the server answers (`SkyMp.cs:74 Up()`, a TCP
 connect to the resources port), and on a machine whose address is this
@@ -655,7 +657,7 @@ configured at all, which is a developer's own build and never a tester's.
 | 12 | `ShellPlay.cs:201 Verify.Run` | Under Waiting. Reads the plugin list, the server's manifest and the plugins' bytes. Any problem that would get the person refused: the Diagnostics page (Scan and Fix) opens with a message saying what to do, and Play stops. | nothing |
 | 13 | `ShellPlay.cs:259 Verify.DeployPersonal` | `<Root>\Your Mods` copied into `Game\Data`, never a plugin. | those files in `Game\Data` |
 | 14 | `ShellPlay.cs:273 Display.MatchScreen` | Skipped when Lock resolution is ticked. The game's window size and Display Tweaks' resolution follow the screen, then `ShellPlay.cs:275 Display.ScaleMenus`. | `Game\Data\SKSE\Plugins\SSEDisplayTweaks.ini`, `Profile\MyGames\SkyrimPrefs.ini`, `Game\Data\Interface\skyui\config.txt` and `config.shipped.txt`, each only when it changes |
-| 15 | `ShellPlay.cs:278 Enforce.Apply` | Settings two mods rewrite on the way out, put back; SkyrimPlatform at its normal log level with no text window; one actor draw distance for everybody (#963). Then `ShellPlay.cs:282 CrashDump.Apply`: the full crash snapshot on for the dev build and staff, off for everybody else, and snapshots it should not keep deleted (#1191). | `Game\Data\SKSE\Plugins\SkyrimSoulsRE.ini`, `OpenAnimationReplacer.ini`, `SkyrimPlatform.ini`, `CrashLogger.ini`, `Profile\MyGames\SkyrimPrefs.ini`; old `crash-*.dmp` in `Profile\MyGames\SKSE` deleted |
+| 15 | `ShellPlay.cs:278 Enforce.Apply` | Settings two mods rewrite on the way out, put back; SkyrimPlatform at its normal log level with no text window; one actor draw distance for everybody (#963). Then `ShellPlay.cs:282 CrashDump.Apply`: the full crash snapshot on only when the person ticked it in Settings (#2626), and with it on, all but the newest deleted. | `Game\Data\SKSE\Plugins\SkyrimSoulsRE.ini`, `OpenAnimationReplacer.ini`, `SkyrimPlatform.ini`, `CrashLogger.ini`, `Profile\MyGames\SkyrimPrefs.ini`; old `crash-*.dmp` in `Profile\MyGames\SKSE` deleted |
 | 16 | `ShellPlay.cs:289 AutoJoin.Apply` | `AutoJoin.cs:124 Apply()`: the server address and port, and where the client fetches the server's load order, through Hold.Around. SkyMP has no join screen; this file is the whole of joining. | `skymp5-client-settings.txt` when it changes |
 | 17 | `ShellPlay.cs:298 ThornIni.Ensure` | The template, if the file is missing. | `Game\Data\SKSE\Plugins\Thornswood.ini` |
 | 18 | `ShellPlay.cs:301 Mics.Apply` | This machine's microphone name, the voice port and the voice address. | `Thornswood.ini` |

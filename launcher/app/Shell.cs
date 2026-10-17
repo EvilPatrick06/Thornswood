@@ -142,6 +142,7 @@ namespace Thornswood
         static List<Gallery.Pending> galleryPending;
         static TextBox boxSearch, boxAddress, boxPort, boxResolution, boxFrameLimit, boxFov;
         static CheckBox chkAutoUpdate, chkVSync, chkKeepOpen, chkLockRes;
+        static CheckBox chkCrashSnapshots; static TextBlock txtCrashFolder; static Button btnCrashFolder;
         static CheckBox chkMusic; static Slider sldMusic; static TextBlock txtMusic;
         static StackPanel chatFadeRow; static TextBlock txtChatFadeNote; static CheckBox chkNeedsBars;
         static CheckBox chkKeepSaves;
@@ -720,6 +721,8 @@ namespace Thornswood
             btnSaveDisplay = F<Button>("BtnSaveDisplay");
             btnQuitGame = F<Button>("BtnQuitGame");
             chkLockRes = F<CheckBox>("ChkLockRes");
+            chkCrashSnapshots = F<CheckBox>("ChkCrashSnapshots"); txtCrashFolder = F<TextBlock>("TxtCrashFolder");
+            btnCrashFolder = F<Button>("BtnCrashFolder");
             chkMusic = F<CheckBox>("ChkMusic"); sldMusic = F<Slider>("SldMusic"); txtMusic = F<TextBlock>("TxtMusic");
             dotServer = F<Ellipse>("DotServer"); dotVerify = F<Ellipse>("DotVerify");
             dotReady = F<Ellipse>("DotReady");
@@ -2138,6 +2141,8 @@ namespace Thornswood
             DrawBuildLine();
             txtStatusRight.Text = Paths.Root;
             chkKeepOpen.IsChecked = cfg.KeepLauncherOpen;
+            chkCrashSnapshots.IsChecked = cfg.CrashSnapshots;
+            DrawCrashFolder();
             if (chkMusic != null) chkMusic.IsChecked = cfg.MusicOn;
             if (sldMusic != null) sldMusic.Value = Math.Max(0, Math.Min(100, cfg.MusicVolume));
             MusicLabel();
@@ -2364,6 +2369,17 @@ namespace Thornswood
                 // back, records the session and turns Play on again.
                 DrawStatus();
             };
+            chkCrashSnapshots.Click += delegate
+            {
+                // #2626: off unless the person turns it on. Crash Logger's own
+                // switch follows at the next Play (CrashDump.Apply).
+                cfg.CrashSnapshots = chkCrashSnapshots.IsChecked == true;
+                try { cfg.Save(Paths.CfgFile); } catch (Exception ex) { Swallow.Note("Shell.Wire, cfg save", ex); }
+                Log(cfg.CrashSnapshots
+                    ? "Crash snapshots on. From the next Play, a crash saves one in " + CrashDump.KeptIn(cfg) + ". One can be 9 GB or more; only the newest is kept."
+                    : "Crash snapshots off. From the next Play none are written. Any already saved are left where they are.");
+            };
+            btnCrashFolder.Click += delegate { PickCrashFolder(); };
             chkLockRes.Click += delegate
             {
                 cfg.LockResolution = chkLockRes.IsChecked == true;
@@ -2577,10 +2593,32 @@ namespace Thornswood
                 gameClosedAt = DateTime.Now;
                 Log("Game closed after " + (int)(DateTime.Now - playStartedAt).TotalMinutes + " minutes. Your Windows Skyrim folders are back to normal.");
                 {
-                    // Where the crash log is, and the snapshot beside it on
-                    // the dev build and staff PCs (#1191).
-                    string crashed = CrashDump.AfterSession(playStartedAt, CrashDump.Wanted(cfg));
-                    if (crashed != null) Log(crashed);
+                    // Where the crash log is, and the snapshot when the
+                    // person turned snapshots on (#2626). A snapshot is shown
+                    // with its size and they are asked whether to keep it,
+                    // since it can be 9 GB or more.
+                    // What Crash Logger was told at Play, not the box as it is
+                    // now, and off the window's thread: moving a 9 GB
+                    // snapshot to a folder on another drive is a copy that
+                    // takes minutes.
+                    bool keptAtPlay = CrashDump.AppliedAtPlay;
+                    string keptIn = CrashDump.KeptIn(cfg);
+                    DateTime crashSince = playStartedAt;
+                    ThreadPool.QueueUserWorkItem(delegate
+                    {
+                        string snapshot = null, crashed = null;
+                        try { crashed = CrashDump.AfterSession(crashSince, keptAtPlay, keptIn, out snapshot); }
+                        catch (Exception ex) { Swallow.Note("Shell.Wire, crash snapshot", ex); }
+                        try
+                        {
+                            win.Dispatcher.BeginInvoke(new Action(delegate
+                            {
+                                if (crashed != null) Log(crashed);
+                                if (snapshot != null) AskKeepSnapshot(snapshot, keptIn);
+                            }));
+                        }
+                        catch (Exception ex) { Swallow.Note("Shell.Wire, crash snapshot", ex); }
+                    });
                 }
 
                 // The one failure that looks like everything else: a session
@@ -4053,6 +4091,72 @@ namespace Thornswood
             boxFrameLimit.Text = Display.GetInt("FramerateLimit", 0).ToString();
             chkVSync.IsChecked = Display.GetBool("EnableVSync", true);
             chkLockRes.IsChecked = cfg.LockResolution;
+        }
+
+        /// <summary>The folder crash snapshots go in, under the setting (#2626).</summary>
+        static void DrawCrashFolder()
+        {
+            if (txtCrashFolder == null) return;
+            string chosen = (cfg.CrashSnapshotFolder ?? "").Trim();
+            txtCrashFolder.Text = chosen.Length > 0
+                ? "Saved in " + chosen + "."
+                : "Saved beside the crash logs, in " + CrashDump.Folder + ", until you choose a folder.";
+        }
+
+        /// <summary>Where crash snapshots go: a folder the person chooses (#2626).</summary>
+        static void PickCrashFolder()
+        {
+            string chosen;
+            using (var dlg = new System.Windows.Forms.FolderBrowserDialog())
+            {
+                dlg.Description = "Choose the folder crash snapshots are saved in. One can be 9 GB or more, so pick a drive with room.";
+                dlg.ShowNewFolderButton = true;
+                try
+                {
+                    string start = CrashDump.KeptIn(cfg);
+                    if (start.Length > 0 && Directory.Exists(start)) dlg.SelectedPath = start;
+                }
+                catch { /* only where the picker opens; it opens at its own default instead */ }
+                if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
+                chosen = dlg.SelectedPath;
+            }
+            cfg.CrashSnapshotFolder = chosen;
+            try { cfg.Save(Paths.CfgFile); } catch (Exception ex) { Swallow.Note("Shell.PickCrashFolder, cfg save", ex); }
+            Log("Crash snapshots will be saved in " + chosen + ".");
+            DrawCrashFolder();
+        }
+
+        /// <summary>
+        /// After a crash that saved a snapshot (#2626): says where it is and
+        /// how big, and asks whether to keep it. No deletes it now.
+        /// </summary>
+        static void AskKeepSnapshot(string snapshot, string keptIn)
+        {
+            long size = 0;
+            try { size = new FileInfo(snapshot).Length; } catch (Exception ex) { Swallow.Note("Shell.AskKeepSnapshot, size", ex); }
+            // Owned by the launcher's window, so it opens in front of it.
+            var r = MessageBox.Show(win,
+                "The game crashed, and a full crash snapshot was saved:\n\n" + snapshot + "\n" + CrashDump.Size(size) +
+                "\n\nIt is only needed if somebody is going to look into this crash. Keep it?\n\nYes keeps it. No deletes it now.",
+                "Thornswood", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (r == MessageBoxResult.Yes)
+            {
+                // Only now are older ones tidied, so a No below never leaves
+                // somebody with none at all. This one is the newest.
+                int gone = CrashDump.Tidy(keptIn);
+                Log("Kept the crash snapshot " + snapshot + "." +
+                    (gone > 0 ? " Deleted " + gone + " older one" + (gone == 1 ? "" : "s") + "; only the newest is kept." : ""));
+                return;
+            }
+            try
+            {
+                File.Delete(snapshot);
+                Log("Deleted the crash snapshot " + snapshot + ", " + CrashDump.Size(size) + " freed.");
+            }
+            catch (Exception ex)
+            {
+                Log("Could not delete the crash snapshot " + snapshot + ": " + ex.Message);
+            }
         }
 
         /// <summary>
