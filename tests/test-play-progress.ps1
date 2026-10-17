@@ -393,7 +393,9 @@ Yes 'Sync: Transfer reports as it writes' ((Body $sync 'static void Transfer(') 
 Yes 'Sync: packs after a record without its files are planned as downloads' ($sync -match 'PlayProgress\.Plan\("Updating", count, "updates"\)')
 
 $su = Read-Text (Join-Path $AppDir 'ShellUpdate.cs')
-$run = Body $su 'static void RunUpdate()'
+# Since #2627 RunUpdate() hands on to RunUpdate(after), which Fix calls
+# with what to do once the update is in, and that one does the work.
+$run = Body $su 'static void RunUpdate(Action after)'
 Yes 'RunUpdate opens the button with one download per pack' ($run -match 'PlayProgress\.Begin\("Updating", downloads\)')
 $stages = Read-Text (Join-Path $AppDir 'UpdateStages.cs')
 Yes 'the update''s download: the self-update is its own phase' ((Body $stages 'public static Fetched FetchUpdate(') -match 'PlayProgress\.Plan\("Updating the launcher", 1, "updates"\)')
@@ -403,8 +405,9 @@ Yes 'RunUpdate closes it when it finishes and when it fails, before DrawStatus' 
 $sog = Read-Text (Join-Path $AppDir 'ShellOwnGame.cs')
 # The overload that does the work. Since #1584 StartOwnGame(make, loud) only
 # hands on to StartOwnGame(make, loud, then), which runs a step once the
-# bring-up-to-date Play asked for has finished.
-$start = Body $sog 'static void StartOwnGame(bool make, bool loud, Action then)'
+# bring-up-to-date Play asked for has finished, and since #2627 that hands on
+# to the one that also takes what to do when it fails, for Fix.
+$start = Body $sog 'static bool StartOwnGame(bool make, bool loud, Action then, Action failed)'
 Yes 'StartOwnGame opens the button' ($start -match 'PlayProgress\.Begin\(OwnGame\.Phase, 0\)')
 $work = Body $sog 'static void FolderWork('
 Yes 'the folder work closes it as soon as the work is over' ($work -match 'ownGameBusy = false;\s*PlayProgress\.End\(\);')

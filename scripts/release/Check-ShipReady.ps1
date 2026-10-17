@@ -337,7 +337,7 @@ if ($hasGame) {
   $recLines = 0
   if (Test-Path -LiteralPath $record) { $recLines = @(Get-Content -LiteralPath $record).Count }
   Ready 'the record of what came from Vortex exists' ($recLines -gt 0) ("$recLines lines") `
-    'In the launcher: Settings, Maintenance, Bring it up to date from Vortex'
+    (".\scripts\release\Update-ShipRoot.ps1 -Channel $Channel, which brings the folder up to date with what Vortex has deployed and writes the record")
 }
 
 # ------------------------------------------------------------- the compiler --

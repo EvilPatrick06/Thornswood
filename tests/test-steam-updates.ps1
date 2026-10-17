@@ -514,6 +514,12 @@ try {
     Yes 'No is remembered, and the log says how to do it in Steam' (($ask -match 'cfg\.SteamUpdatesDeclined = true;') -and ($ask -match 'SteamUpdates\.How'))
     Yes 'the question is SteamUpdates.Question, the one tested above' ($ask -match 'SteamUpdates\.Question\(manifest, steamUp\)')
     $again = Body $askSrc 'static void StartSteamAgain()'
+    # Since #2627 the start is Upkeep.StartSteam, which Fix also runs when
+    # Scan finds Steam not running; StartSteamAgain hands on to it.
+    $upkeepPath = Join-Path $AppPath 'Upkeep.cs'
+    if (($again -match 'Upkeep\.StartSteam\(') -and (Test-Path -LiteralPath $upkeepPath)) {
+        $again = Body (Get-Content -LiteralPath $upkeepPath -Raw) 'public static bool StartSteam(Action<string> say)'
+    }
     Yes 'Steam starts again in the tray, with its link as the fallback' (($again -match '"-silent"') -and ($again -match 'steam://open/main'))
     $cfgSrc = Get-Content -LiteralPath (Join-Path $AppPath 'Config.cs') -Raw
     Yes 'the remembered No is a config setting that starts off false' ($cfgSrc -match '\[DataMember\] public bool SteamUpdatesDeclined = false;')

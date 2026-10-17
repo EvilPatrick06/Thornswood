@@ -62,9 +62,15 @@ function disk(opts) {
   function put(p, data) { files[norm(p)] = data; dirs[path.posix.dirname(norm(p))] = true; }
   const mods = ORDER.map(function (n, i) { return { filename: n, size: 1000 + i, crc32: i }; });
   mods.splice(6, 0, { filename: "Embers XD - Textures.bsa", size: 5, crc32: 5 });
-  put("data/manifest.json", JSON.stringify({ versionMajor: 1, mods: mods, loadOrder: ORDER }));
-  const present = ORDER.filter(function (n) { return !(opts.without || []).includes(n); });
-  put("server-settings.json", JSON.stringify({ dataDir: "data", loadOrder: ORDER.map(function (n) { return "/srv/thornswood/plugins/" + n; }) }));
+  // A server that loads light plugins (#1715) publishes them apart, in
+  // light index order; #2627 serves ours among them.
+  const light = (opts.light || []).map(function (n, i) { return { filename: n, size: 2000 + i, crc32: 100 + i }; });
+  const whole = ORDER.concat(opts.light || []);
+  const doc = { versionMajor: 1, mods: mods, loadOrder: whole };
+  if (opts.light) { doc.light = light; }
+  put("data/manifest.json", JSON.stringify(doc));
+  const present = whole.filter(function (n) { return !(opts.without || []).includes(n); });
+  put("server-settings.json", JSON.stringify({ dataDir: "data", loadOrder: whole.map(function (n) { return "/srv/thornswood/plugins/" + n; }) }));
   present.forEach(function (n) { put("/srv/thornswood/plugins/" + n, "bytes of " + n); });
   // What an older start published: every plugin but Bethesda's, by index.
   (opts.stale || []).forEach(function (f) { put("data/api/servers/thornswood/plugins/" + f, "old"); });
@@ -153,6 +159,23 @@ if (block) {
   yes("and the manifest still names it, so the launcher says the server did not hand it over",
       !!c.manifest && JSON.stringify(c.manifest.served) === JSON.stringify(["Thornswood-Content.esp"]));
 
+  // #2627: our light plugin is published too. On 16 Oct the server's light
+  // order named Thornswood-Last.esp and nothing served it, so a machine
+  // without it had nothing for Fix to fetch.
+  const LIGHT = ["_ResourcePack.esl", "KhisartinBeards.esp", "Thornswood-Last.esp"];
+  const d = run({ light: LIGHT });
+  const lastAt = LIGHT.indexOf("Thornswood-Last.esp");
+  yes("a server with a light list names our light plugin as served, beside our full one",
+      !!d.manifest && JSON.stringify(d.manifest.served) === JSON.stringify(["Thornswood-Content.esp", "Thornswood-Last.esp"]));
+  yes("it is published as light-" + lastAt + ".bin, its place in the light list, and our full one stays at its place in mods: " + d.served.join(", "),
+      d.served.length === 2 && d.served.indexOf("light-" + lastAt + ".bin") >= 0 && d.served.indexOf(OUR_AT + ".bin") >= 0);
+  yes("the light file is a hard link to the server's own Thornswood-Last.esp",
+      d.links.some(function (l) { return l[0] === "/srv/thornswood/plugins/Thornswood-Last.esp" && l[1] === "data/api/servers/thornswood/plugins/light-" + lastAt + ".bin"; }));
+  yes("another author's light plugin is not served", d.served.every(function (f) { return f === OUR_AT + ".bin" || f === "light-" + lastAt + ".bin"; }));
+  yes("the log counts both of ours", d.log.some(function (l) { return /^\[thornswood\] 2 of our plugin files published at \/api\/servers\/thornswood\/plugins\//.test(l); }));
+  yes("the client's own lists are as they were: mods the full plugins, light the light ones",
+      !!d.manifest && d.manifest.mods.length === ORDER.length && Array.isArray(d.manifest.light) && d.manifest.light.length === LIGHT.length);
+
   const code = block.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
   yes("the rule names what is ours, not what to leave out (no STOREFRONT list in the block)",
       !/STOREFRONT/.test(code) && /if \(!OURS\[name\.toLowerCase\(\)\]\) continue;/.test(code));
@@ -199,12 +222,22 @@ if (block) {
   const bytes = slice(verify, "public static List<Issue> Bytes(Config cfg)", "\n        }\n");
   yes("Scan carries served on each issue and names Vortex for another author's plugin",
       !!bytes && /i\.Served = m\.Served;/.test(bytes) &&
-      /m\.Served \? "Fix fetches the server's copy\." : FromVortex\(cfg, m\.filename\)/.test(bytes));
+      /m\.Served \? "Fix fetches the server's copy\." : null,/.test(bytes) &&
+      /m\.Served \? NotHandedOver : FromVortex\(cfg, m\.filename\)/.test(bytes));
+  // #2627: a light plugin of ours is served too, at light-<index in light>.bin.
+  yes("Scan says where a light plugin of ours is served: its place in the light list",
+      !!bytes && /i\.WantLight = isLight;/.test(bytes) && /i\.WantIndex = isLight \? idx - mods\.Length : idx;/.test(bytes));
+  yes("Manifest marks served on the light list as well as mods",
+      /foreach \(ServerMod\[\] list in new ServerMod\[\]\[\] \{ doc\.mods, light \}\)/.test(verify));
+  yes("FetchPlugin asks for light-<index>.bin for a light plugin and <index>.bin for a full one",
+      !!fetch && /"\/plugins\/" \+ \(i\.WantLight \? "light-" : ""\) \+ i\.WantIndex \+ "\.bin"/.test(fetch));
 
   const fix = slice(verify, "public static int Fix(Config cfg, Action<string> say)", "\n        }\n");
   yes("Fix's fetch of a missing plugin passes over any the server does not serve",
       !!fix && /Storefront\.Contains\(m\.filename\) \|\| !m\.Served\) continue;/.test(fix) &&
       /miss\.Served = true;\s*if \(FetchPlugin\(cfg, miss, say\)\) n\+\+;/.test(fix));
+  yes("Fix fetches a missing plugin of ours from the light list as well as mods",
+      !!fix && /int all = mods\.Length \+ light\.Length;/.test(fix) && /miss\.WantLight = isLight;/.test(fix));
   yes("Fix's fetch of a plugin that differs goes through FetchPlugin with Scan's issue",
       !!fix && /foreach \(Issue i in Bytes\(cfg\)\)\s*if \(i\.Plugin != null && FetchPlugin\(cfg, i, say\)\) n\+\+;/.test(fix));
 
