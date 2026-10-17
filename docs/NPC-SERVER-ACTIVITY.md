@@ -91,7 +91,10 @@ one is taken out of the world when it dies, and one still standing from an
 earlier run is not admitted at the next start: `removeSpawned` marks its
 record deleted, destroys it, and the population and the runtime (`forget`)
 let go of its id. The plain `true` every spawn carried before is read as
-temporary, since nobody chose to keep it.
+temporary, since nobody chose to keep it, so those go the first time the
+gamemode loads with this change, a deploy included. Whether a creature that
+dies is temporary is read off its own marker (`isTemporarySpawn`), so one
+that dies in the seconds after a gamemode reload is removed too.
 
 Native inherited aggression, confidence, and current faction membership inform
 target selection. Common membership and ally or friend reactions suppress

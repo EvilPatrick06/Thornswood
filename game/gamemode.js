@@ -1728,6 +1728,21 @@ function serverRunId() {
 }
 
 /*
+  WHETHER AN ACTOR IS A SPAWN NOBODY KEPT (#2623), read off the actor's own
+  marker rather than the NPC population's table, because that table is empty
+  for the few seconds after a gamemode reload until discovery runs, and a
+  temporary spawn that died then would otherwise stand up again. Any run, not
+  only this one: a temporary spawn is removed whenever it dies. The plain
+  true from before #2623 counts, since nobody chose to keep it.
+*/
+function isTemporarySpawn(actorId) {
+  let marker = null;
+  try { marker = mp.get(actorId, 'thornswoodNpcCommanded'); } catch (e) { return false; }
+  if (marker === true) return true;
+  return !!marker && typeof marker === 'object' && marker.keep !== true && typeof marker.run === 'string';
+}
+
+/*
   TAKES A TEMPORARY SPAWNED CREATURE OUT OF THE WORLD FOR GOOD (#2623).
 
   Three steps, in this order, each for a reason read out of the engine (the
@@ -1741,8 +1756,8 @@ function serverRunId() {
     The respawn timer a death starts holds only a weak reference to the actor
     (MpActor::RespawnWithDelay, lifetime.lock()), so once it is destroyed that
     timer finds nothing and nothing stands up again.
-  - The habitat count and the shared NPC runtime let go of its id, because a
-    destroyed id is given out again to the next new actor.
+  - The habitat count and the shared NPC runtime let go of its id, so nothing
+    is left waiting on an actor that is gone.
   Never called inside the engine's death event: DeathEvent::OnFireSuccess
   starts the respawn timer on the actor after every listener has run, so
   mp.onDeath asks for this on the next turn of the event loop, after the event
@@ -1797,8 +1812,11 @@ function removeSpawned(actorId) {
   word keep on the command), or { run } naming this run of the server for a
   temporary one. A temporary one is removed when it dies (removeSpawned, from
   mp.onDeath) and, if it is still standing, when the server next starts
-  (createNpcPopulation sees a run that is not this one). The sixth argument,
-  keep, is the staff's choice.
+  (createNpcPopulation sees a run that is not this one). A spawn from before
+  this change carries plain true, which nobody chose to keep, so it is
+  removed the first time the gamemode loads with this code, a deploy
+  included, not only at a restart. The sixth argument, keep, is the staff's
+  choice.
 */
 function placeActors(baseId, where, count, away, commanded, keep) {
   const run = serverRunId();
@@ -6127,8 +6145,7 @@ mp.onDeath = guard('onDeath', function (actorId, killerId) {
   */
   if (npcDeath) {
     try {
-      var spawnedBy = globalThis.__thornswoodNpcPopulation;
-      if (spawnedBy && spawnedBy.isTemporary && spawnedBy.isTemporary(actorId)) {
+      if (isTemporarySpawn(actorId)) {
         setTimeout(function () { removeSpawned(actorId); }, 0);
       }
     } catch (eSpawned) { log('onDeath', actorId.toString(16), 'could not check for a temporary spawn:', eSpawned); }
@@ -67205,11 +67222,10 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
   schedule(humanTick,0);schedule(backgroundTick,20);schedule(nearTick,100);schedule(searchTick,10);
   if(population) schedule(discover,5000);
   /*
-    LETS GO OF AN ACTOR THAT IS ABOUT TO BE DESTROYED (#2623). A destroyed id
-    is handed to the next new actor, so nothing about the old one may stay
-    here: not its activity, its place in the walk order or on the map tiles,
-    its policy, or the excluded and enrolled marks that would make the next
-    actor with that id skipped or treated as already known.
+    LETS GO OF AN ACTOR THAT IS ABOUT TO BE DESTROYED (#2623). Nothing about
+    it may stay here: not its activity, its place in the walk order or on the
+    map tiles, its policy, or the excluded and enrolled marks, so the runtime
+    never steps or reports on an actor that is gone.
   */
   function forget(id) {
     const a=actors.get(id);

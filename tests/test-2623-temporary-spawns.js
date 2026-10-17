@@ -86,13 +86,31 @@ if (runFn && removeFn) {
       c.calls.some(function (x) { return x[0] === 'log' && /could not mark its record deleted/.test(x[1]); }));
 }
 
+// isTemporarySpawn reads the actor's own marker (#2623 review): kept, this
+// run, an earlier run and the old plain true.
+{
+  const fn = lift('isTemporarySpawn');
+  yes('isTemporarySpawn is in the gamemode', !!fn);
+  if (fn) {
+    const marks = {};
+    const ctx = { mp: { get: function (id, p) { if (p !== 'thornswoodNpcCommanded') throw new Error(p); return marks[id]; } } };
+    vm.createContext(ctx); vm.runInContext(fn, ctx);
+    marks[1] = { run: 'now' }; marks[2] = { run: 'before' }; marks[3] = true; marks[4] = { keep: true }; marks[5] = undefined;
+    yes('a spawn from this run is temporary', ctx.isTemporarySpawn(1) === true);
+    yes('one from an earlier run is temporary', ctx.isTemporarySpawn(2) === true);
+    yes('the old plain true is temporary', ctx.isTemporarySpawn(3) === true);
+    yes('a kept one is not', ctx.isTemporarySpawn(4) === false);
+    yes('an ordinary creature is not', ctx.isTemporarySpawn(5) === false);
+  }
+}
+
 // The death handler asks for removal after the event, never inside it.
 {
   const a = src.indexOf('mp.onDeath = guard(\'onDeath\'');
   const b = a < 0 ? -1 : src.indexOf('\n});\n', a);
   const body = a >= 0 && b > a ? src.slice(a, b) : '';
-  yes('mp.onDeath checks for a temporary spawn',
-      /spawnedBy\.isTemporary\(actorId\)/.test(body));
+  yes('mp.onDeath checks the actor\'s own marker for a temporary spawn',
+      /if \(isTemporarySpawn\(actorId\)\)/.test(body));
   yes('and asks for removal on the next turn of the event loop',
       /setTimeout\(function \(\) \{ removeSpawned\(actorId\); \}, 0\)/.test(body));
   yes('and never calls removeSpawned directly inside the event',
