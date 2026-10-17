@@ -65,10 +65,10 @@ namespace Thornswood
 
             // =================================================== character
             new HelpItem("Character", "The creation hall",
-                "A new character wakes in a shut room and the appearance menu opens on its own: make your face, give it its name, and close it. The character panel then opens. Choose the town you will wake up in and you are sent to its inn, in a plain shift. Your class and profession are on the same panel, and can be chosen there or later in the world."),
+                "A new character wakes in a shut room and the appearance menu opens on its own: make your face, give it its name, and close it. The character panel then opens. Choose the town you will start in and you are sent there, in a plain shift. Your class and profession are on the same panel, and can be chosen there or later in the world."),
 
-            new HelpItem("Character", "Where you wake up",
-                "Whiterun, Riften, Solitude, Windhelm, Markarth, Falkreath, Morthal, Dawnstar or Winterhold, each at its inn. The town is the choice that ends creation, and it cannot be changed afterwards."),
+            new HelpItem("Character", "Where you start",
+                "Whiterun, Riften, Solitude, Windhelm, Markarth, Falkreath, Morthal, Dawnstar or Winterhold. You arrive at a quiet spot in or near the town, not in its inn: the stables at Whiterun, Solitude, Windhelm and Riften, and Understone Keep in Markarth. The town is the choice that ends creation, and it cannot be changed afterwards."),
 
             new HelpItem("Character", "What you start with",
                 "The shift you stand in, and 40 gold, once. Weapons, armour, tools and coin come from other people, who make them or pay them to you."),
