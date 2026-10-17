@@ -54922,7 +54922,9 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
     var best = 0, bestD = REACH * REACH;
     for (var i = 0; i < on.length; i++) {
       var id = on[i];
-      if (id === actorId || !(pidOf(id) > 0)) { continue; }
+      // Everybody online counts as the person in front, profile or not: one
+      // still waiting is answered by used(), not looked past.
+      if (id === actorId) { continue; }
       var l = read(id, 'locationalData');
       if (!l || !l.pos || l.cellOrWorldDesc !== me.cellOrWorldDesc) { continue; }
       var dx = l.pos[0] - me.pos[0], dy = l.pos[1] - me.pos[1], dz = l.pos[2] - me.pos[2];
@@ -54990,6 +54992,11 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
       }
       return false;
     }
+    // The person in front still waiting on their pass, or with no profile on
+    // them yet, has no state of their own loaded: a cuffed record written now
+    // would land on a profile that is not yet theirs. Nothing happens, no
+    // cuff, no free and no refusal; the pair stays on the wearer as clothing.
+    if (waiting(targetId)) { return false; }
     var tp = pidOf(targetId);
     var on = cuffedBy(targetId);
     return on ? free(actorId, cp, targetId, tp, on) : bind(actorId, cp, targetId, tp);
