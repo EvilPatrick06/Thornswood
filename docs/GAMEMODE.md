@@ -106,7 +106,9 @@ stages kept in the actor property `thornswoodChargen` (`gamemode.js:CHARGEN_PROP
 2. `choosing`, set by `beginChoosing` (`gamemode.js:beginChoosing`): the choice is made
    on K in the character panel.
 3. `done`, set by `arriveAt` (`gamemode.js:arriveAt`), which moves the person to
-   the inn of the town they picked (`CHARGEN.towns` as `PASSAGES`).
+   the start spot of the town they picked (`CHARGEN.towns` as `PASSAGES`, the
+   `start` of each town; #2622), and welcomes them: "Welcome to (hold), Safe
+   Travels." The inn spot (`arrival`) is staff's `/tp <town> inn`.
 
 An old `arriving` state is folded into `done` (`gamemode.js:if (state.stage === 'arriving') {`).
 `"thornswoodChargen": false` in `server-settings.json` switches the hall off.

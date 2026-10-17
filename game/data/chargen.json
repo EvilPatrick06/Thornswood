@@ -37,6 +37,20 @@
      0,
      3.7
     ]
+   },
+   "start": {
+    "cell": "WhiterunExterior01",
+    "desc": "3c:Skyrim.esm",
+    "pos": [
+     19189.1,
+     -12006.5,
+     -4558.4
+    ],
+    "rot": [
+     0,
+     0,
+     309.9
+    ]
    }
   },
   "e80031:Thornswood-Content.esp": {
@@ -56,6 +70,20 @@
      0,
      36.3
     ]
+   },
+   "start": {
+    "cell": "RiftenPlankside03",
+    "desc": "3c:Skyrim.esm",
+    "pos": [
+     166478.2,
+     -95072.9,
+     10735.1
+    ],
+    "rot": [
+     0,
+     0,
+     89.2
+    ]
    }
   },
   "e80032:Thornswood-Content.esp": {
@@ -66,14 +94,28 @@
     "cell": "SolitudeWinkingSkeever",
     "desc": "16a0e:Skyrim.esm",
     "pos": [
-     -293.9,
-     -1450.6,
+     504.9,
+     -1075.4,
      0
     ],
     "rot": [
      0,
      0,
-     0
+     270.1
+    ]
+   },
+   "start": {
+    "cell": "cell 92be, below Solitude",
+    "desc": "3c:Skyrim.esm",
+    "pos": [
+     -73387.2,
+     94964.1,
+     -11739
+    ],
+    "rot": [
+     0,
+     0,
+     12.1
     ]
    }
   },
@@ -94,6 +136,20 @@
      0,
      91.9
     ]
+   },
+   "start": {
+    "cell": "WindhelmAttackStart05",
+    "desc": "3c:Skyrim.esm",
+    "pos": [
+     135744.9,
+     24540.5,
+     -12865.3
+    ],
+    "rot": [
+     0,
+     0,
+     355.3
+    ]
    }
   },
   "e80034:Thornswood-Content.esp": {
@@ -113,6 +169,20 @@
      0,
      180.0
     ]
+   },
+   "start": {
+    "cell": "MarkarthUnderStoneKeep",
+    "desc": "16df2:Skyrim.esm",
+    "pos": [
+     -5558.7,
+     -1247.7,
+     6688
+    ],
+    "rot": [
+     0,
+     0,
+     37.3
+    ]
    }
   },
   "e80035:Thornswood-Content.esp": {
@@ -123,14 +193,28 @@
     "cell": "FalkreathDeadMansDrink",
     "desc": "3a184:Skyrim.esm",
     "pos": [
-     670.4,
-     -443.1,
-     0.5
+     834.6,
+     -100.6,
+     0
     ],
     "rot": [
      0,
      0,
-     0
+     53.1
+    ]
+   },
+   "start": {
+    "cell": "FalkreathExterior05",
+    "desc": "3c:Skyrim.esm",
+    "pos": [
+     -35529,
+     -89918.3,
+     -2946.1
+    ],
+    "rot": [
+     0,
+     0,
+     107.3
     ]
    }
   },
@@ -151,6 +235,20 @@
      0,
      270.9
     ]
+   },
+   "start": {
+    "cell": "MorthalExterior06",
+    "desc": "3c:Skyrim.esm",
+    "pos": [
+     -41159.1,
+     63851.4,
+     -13778.6
+    ],
+    "rot": [
+     0,
+     0,
+     45.5
+    ]
    }
   },
   "e80037:Thornswood-Content.esp": {
@@ -161,14 +259,28 @@
     "cell": "DawnstarWindpeakInn",
     "desc": "13a7f:Skyrim.esm",
     "pos": [
-     1823.2,
-     -534.7,
-     0.5
+     2010.3,
+     -155.7,
+     0
     ],
     "rot": [
      0,
      0,
-     0
+     273.1
+    ]
+   },
+   "start": {
+    "cell": "DawnstarWesternMineExterior",
+    "desc": "3c:Skyrim.esm",
+    "pos": [
+     25623.4,
+     100614.3,
+     -13216.9
+    ],
+    "rot": [
+     0,
+     0,
+     56.1
     ]
    }
   },
@@ -188,6 +300,20 @@
      0,
      0,
      88
+    ]
+   },
+   "start": {
+    "cell": "WinterholdExterior05",
+    "desc": "3c:Skyrim.esm",
+    "pos": [
+     111939,
+     99023.6,
+     -8742.5
+    ],
+    "rot": [
+     0,
+     0,
+     302.4
     ]
    }
   }
