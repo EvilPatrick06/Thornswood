@@ -408,7 +408,7 @@
     },
     review: {
       title: 'Review',
-      lead: 'What you have chosen. Confirm sends all of it to the server and takes you to your inn. A profession without its half, or a mage short of two schools, is not sent; it can be picked in the world.',
+      lead: 'What you have chosen. Confirm sends all of it to the server and takes you to your home town. A profession without its half, or a mage short of two schools, is not sent; it can be picked in the world.',
       rows: []   // drawn from the choices, not from a table
     }
   };
@@ -2772,7 +2772,7 @@
     }
     if (section === 'review') {
       if (!(haveHome() || softHome())) return 'Pick a home first. Confirm sends everything you chose to the server.';
-      return 'Confirm sends everything you chose to the server and takes you to your inn.';
+      return 'Confirm sends everything you chose to the server and takes you to your home town.';
     }
     // The later lines are creation's: the mark is only ever set there.
     if (section === 'class') {
