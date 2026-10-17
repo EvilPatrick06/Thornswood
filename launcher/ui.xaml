@@ -1170,7 +1170,7 @@
                     <StackPanel Grid.Column="1">
                       <TextBlock x:Name="TxtVerifyTitle" Style="{StaticResource H2}" Text="Not checked yet"/>
                       <TextBlock x:Name="TxtVerifyNote" Style="{StaticResource Small}" Margin="0,2,0,0"
-                                 Text="Compares what you have against the list the server expects."/>
+                                 Text="Looks for everything wrong with this install: your plugins against the server's, an update waiting, Thornswood's own folder and files, Windows' Skyrim folders, the shortcut icon, the client, Steam and the Skyrim build. Fix puts right what it can, then says what is left and what will put it right."/>
                     </StackPanel>
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
                       <Button x:Name="BtnScan" Style="{StaticResource Ghost}" Content="Scan" Margin="0,0,8,0"/>
@@ -1194,28 +1194,15 @@
                      the update feed lists a pack. -->
                 <StackPanel x:Name="DiagAddons"/>
 
+                <!-- Bring it up to date from Vortex, Repair and Restore Windows
+                     folders were buttons here until 17 Oct (#2627): Scan finds
+                     each of those and Fix does it. The icon refresh stays,
+                     because a blank picture Windows remembers for a shortcut
+                     cannot be seen from the shortcut, so Scan cannot find it. -->
                 <Border Style="{StaticResource Slab}" Padding="20,18" Margin="0,16,0,0">
                   <StackPanel>
-                    <TextBlock Style="{StaticResource H2}" Text="Bring it up to date from Vortex"/>
-                    <TextBlock Style="{StaticResource Body}" Text="Thornswood runs from a Skyrim folder of its own, built from what Vortex has deployed. When Vortex deploys a newer collection, the launcher brings it in by itself the next time it starts. This does it now, on demand, without waiting for a restart."/>
-                    <Button x:Name="BtnOwnGameRefresh" Style="{StaticResource Ghost}" Content="Bring it up to date from Vortex" HorizontalAlignment="Left" Margin="0,13,0,0"/>
-
-                    <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,22,0,22"/>
-
-                    <TextBlock Style="{StaticResource H2}" Text="Repair"/>
-                    <TextBlock Style="{StaticResource Body}" Text="Puts this build's own files back: the settings and load order that shipped with it, the client and the overlays under Data, and the mod settings this build pins. Another server's launcher can replace any of those, and an install that has never taken an update has never had a spare copy of them. This is everything Play does on the way in, done on demand, and it is safe to press twice. Close Skyrim first."/>
-                    <Button x:Name="BtnRepair" Style="{StaticResource Ghost}" Content="Repair" HorizontalAlignment="Left" Margin="0,13,0,0"/>
-
-                    <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,22,0,22"/>
-
-                    <TextBlock Style="{StaticResource H2}" Text="Restore Windows folders"/>
-                    <TextBlock Style="{StaticResource Body}" Text="While the game runs, Windows' Skyrim settings and saves folders point at this build and are put back when you quit. If the game crashed hard and something still looks redirected, this undoes it by hand."/>
-                    <Button x:Name="BtnRestore" Style="{StaticResource Ghost}" Content="Restore" HorizontalAlignment="Left" Margin="0,13,0,0"/>
-
-                    <Rectangle Height="1" Fill="{DynamicResource Line}" Margin="0,22,0,22"/>
-
                     <TextBlock Style="{StaticResource H2}" Text="Refresh the shortcut icon"/>
-                    <TextBlock Style="{StaticResource Body}" Text="The launcher repoints your shortcut at the current artwork every time it starts, which is usually enough. This is for when the desktop or the taskbar is still showing an old icon anyway. Explorer restarts, so the taskbar blinks once. Nothing is lost."/>
+                    <TextBlock Style="{StaticResource Body}" Text="Scan and Fix point your shortcuts at the current artwork, and the launcher does it every time it starts. This is for when the desktop or the taskbar is still showing an old or blank icon anyway, which Windows keeps in a picture of its own that no shortcut shows. Explorer restarts, so the taskbar blinks once. Nothing is lost."/>
                     <Button x:Name="BtnIcons" Style="{StaticResource Ghost}" Content="Refresh icon" HorizontalAlignment="Left" Margin="0,13,0,0"/>
                   </StackPanel>
                 </Border>

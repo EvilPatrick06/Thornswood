@@ -325,6 +325,46 @@ namespace Thornswood
             var back = new List<string>();
             var aside = new List<string>();
             var taken = new List<string>();
+            PutBackInto(back, taken, true);
+            Park(aside);
+            return Said(back, aside, taken);
+        }
+
+        /// <summary>
+        /// Scan and Fix's half of Restore (#2627): every kept file that
+        /// differs from the game copy put back, and nothing parked, because
+        /// parking is for a session and the plugins it parks go home when the
+        /// game closes. Returns one line for the log, or null. Never throws.
+        /// </summary>
+        public static string PutBack()
+        {
+            var back = new List<string>();
+            var taken = new List<string>();
+            PutBackInto(back, taken, true);
+            return Said(back, new List<string>(), taken);
+        }
+
+        /// <summary>
+        /// The kept files PutBack would put back, relative to the game folder,
+        /// for Scan to name, and nothing written (#2627). A runtime file the
+        /// kept copy is out of date for is not one: that is the kept copy's
+        /// own refresh, which nobody needs telling about.
+        /// </summary>
+        public static List<string> Changed()
+        {
+            var back = new List<string>();
+            PutBackInto(back, new List<string>(), false);
+            return back;
+        }
+
+        /// <summary>
+        /// Restore's first half, and with <paramref name="write"/> false the
+        /// same walk that only says which files it would put back (into
+        /// <paramref name="back"/>, as paths relative to the game folder; as
+        /// file names when it writes, for the log line).
+        /// </summary>
+        static void PutBackInto(List<string> back, List<string> taken, bool write)
+        {
             bool developer = Developer;
 
             foreach (string rel in Kept())
@@ -343,7 +383,7 @@ namespace Thornswood
                     if (runtime == null && rel.Equals("Data\\Platform\\Plugins\\skymp5-client.js", StringComparison.OrdinalIgnoreCase)) continue;
                     if (runtime != null && !runtime.Sha.Equals(ClientRuntime.Sha256Of(kept), StringComparison.OrdinalIgnoreCase))
                     {
-                        if (runtime.Sha.Equals(ClientRuntime.Sha256Of(live), StringComparison.OrdinalIgnoreCase))
+                        if (write && runtime.Sha.Equals(ClientRuntime.Sha256Of(live), StringComparison.OrdinalIgnoreCase))
                         {
                             if (Remember(new[] { rel }) > 0) taken.Add(Path.GetFileName(rel));
                         }
@@ -358,10 +398,12 @@ namespace Thornswood
                         // server's. It becomes the kept copy instead of being
                         // put back, or the next Play would undo the work before
                         // it could be shipped.
+                        if (!write) continue;
                         File.Copy(live, kept, true);
                         taken.Add(Path.GetFileName(rel));
                         continue;
                     }
+                    if (!write) { back.Add(rel); continue; }
                     Directory.CreateDirectory(Path.GetDirectoryName(live));
                     OwnGame.Unshare(live);
                     File.Copy(kept, live, true);
@@ -369,7 +411,11 @@ namespace Thornswood
                 }
                 catch (Exception ex) { Swallow.Note("Keep.Restore, copy kept to live", ex); }
             }
+        }
 
+        /// <summary>Restore's second half: another server's plugins aside until the game closes.</summary>
+        static void Park(List<string> aside)
+        {
             try
             {
                 string dir = Path.Combine(Paths.Game, PluginDir);
@@ -395,7 +441,11 @@ namespace Thornswood
                 }
             }
             catch (Exception ex) { Swallow.Note("Keep.Restore", ex); }
+        }
 
+        /// <summary>Restore's line for the log, or null when nothing was done.</summary>
+        static string Said(List<string> back, List<string> aside, List<string> taken)
+        {
             if (back.Count == 0 && aside.Count == 0 && taken.Count == 0) return null;
             string said = "";
             if (taken.Count > 0)

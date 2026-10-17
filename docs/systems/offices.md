@@ -50,7 +50,8 @@ character on the account is ordinary.
 - **The Steward** of a hold holds its "Steward of <Hold>" role. A steward
   is the only one who evicts, sets rent and names a hold's box, and moves
   their own hold's notice board, and the Jarl of a hold keeps it as its
-  steward too.
+  steward too. All of it in their own hold only: a building's hold is the
+  hold its doors open onto ([Property](property.md), Where this is).
 - **The Guards** of a hold hold its "Guard of <Hold>" role (below).
 
 The Jarl of a hold gives and takes its Court, Steward and Guard roles, for

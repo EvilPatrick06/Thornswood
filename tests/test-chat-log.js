@@ -57,11 +57,13 @@ const console2 = { log: (m) => logged.push(m) };
 // name for a proven profile, none known here, so the page's.
 const positions = new Map();
 // What the prune reads since #2191: its failure book, its alert count, and a
-// timer that is never really set here, so the harness does not wait six hours.
+// timer that is never really set here, so the harness does not wait an hour.
+// The delay it asks for is kept: since #2166 it is one hour every time.
 const CHAT_PRUNE_ALERT = 3;
 const chatPruneFailures = {};
 let chatOverdue = 0, chatPruneError = '', chatPruneTimer = null;
-const setTimeout = () => 0;
+const pruneWaits = [];
+const setTimeout = (fn, ms) => { pruneWaits.push(ms); return 0; };
 const clearTimeout = () => {};
 eval(grab('peerName') + '\n' +
      grab('chatDay').replace(/^function/, 'function') + '\n' +
@@ -160,6 +162,10 @@ yes('a day older than the limit goes', !fs.existsSync(old));
 yes('a recent day stays', fs.existsSync(keepDay));
 yes('today stays', fs.existsSync(file));
 yes('a file that is not a day log is left alone', fs.existsSync(notALog));
+// #2166: the privacy page says the check is hourly and chat ages the same
+// way as the site's records; it used to wait six hours unless a day was overdue.
+yes('the next prune is an hour away, with nothing overdue (#2166)',
+    pruneWaits.length > 0 && pruneWaits.every((ms) => ms === 3600000), String(pruneWaits));
 
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');

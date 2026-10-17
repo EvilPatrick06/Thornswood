@@ -184,7 +184,7 @@ namespace Thornswood
         static Ellipse discordAvatar;
         static Button btnPlay, btnCopy, btnUpdate, btnMin, btnMax, btnClose,
                       btnSaveServer, btnCheckNow, btnFolder, btnOpenLog,
-                      btnRepair, btnRestore, btnIcons, tabPlugins, tabSkse, tabMine, tabAddons,
+                      btnIcons, tabPlugins, tabSkse, tabMine, tabAddons,
                       btnRefreshAddons,
                       btnScan, btnFix, btnOpenMine, btnRefreshMine, btnInstallNow,
                       btnBackupSaves, btnOpenSaveFolder, btnCopyCrash, btnOpenLogFolder, btnSaveDisplay, btnShowServer,
@@ -747,7 +747,6 @@ namespace Thornswood
             btnCheckNow = F<Button>("BtnCheckNow"); btnInstallNow = F<Button>("BtnInstallNow");
             btnFolder = F<Button>("BtnFolder");
             btnOpenLog = F<Button>("BtnOpenLog");
-            btnRepair = F<Button>("BtnRepair"); btnRestore = F<Button>("BtnRestore");
             btnIcons = F<Button>("BtnIcons");
             btnServerMain = F<Button>("BtnServerMain"); btnServerDev = F<Button>("BtnServerDev");
             btnServerPick = F<Button>("BtnServerPick"); serverPickPopup = F<Popup>("ServerPickPopup");
@@ -2412,31 +2411,10 @@ namespace Thornswood
                 Log("Checking for add-ons...");
                 ThreadPool.QueueUserWorkItem(delegate { CheckUpdatesBackground(false); });
             };
-            btnScan.Click += delegate { RunScan(); };
-            btnFix.Click += delegate
-            {
-                if (Checks.GameRunning())
-                {
-                    Log("Close Skyrim first. It writes the plugin list back when it exits, which would undo the fix.");
-                    return;
-                }
-
-                // Off the window's thread: a plugin fetched from the server is a
-                // few megabytes, and the window has to keep answering meanwhile.
-                var said = new List<string>();
-                int n = 0;
-                Waiting(delegate
-                {
-                    n = Verify.Fix(cfg, delegate(string m) { lock (said) said.Add(m); });
-                });
-                foreach (string m in said) Log(m);
-                Log("Fix put " + n + " thing" + (n == 1 ? "" : "s") + " right. Restart the game for it to take effect.");
-                RunScan(); BuildModList(); DrawStatus();
-                // Fix pointed the launcher at the folder Vortex really deploys
-                // into. Making Thornswood's own folder from it goes the way
-                // Make it in Settings does. See ShellOwnGame.cs.
-                if (Verify.OwnFolderNext) AskOwnGame(false);
-            };
+            // Scan looks at everything and Fix puts right what it found, then
+            // looks again and says what is left (#2627, ShellScanFix.cs).
+            btnScan.Click += delegate { RunScan(true); };
+            btnFix.Click += delegate { RunFix(); };
             btnOpenMine.Click += delegate
             {
                 try { System.IO.Directory.CreateDirectory(Paths.Personal); } catch (Exception ex) { Swallow.Note("Shell.Wire, mkdir", ex); }
@@ -2489,82 +2467,10 @@ namespace Thornswood
             {
                 if (File.Exists(Paths.LogFile)) Open(Paths.LogFile); else Log("Nothing has been logged yet.");
             };
-            btnRepair.Click += delegate
-            {
-                // Everything a Play does to put this build's files back, on
-                // demand, because the one time somebody needs it is the time
-                // they cannot press Play.
-                //
-                // It used to be one line: restore the settings files. That left
-                // it useless for the thing people actually reach for it over,
-                // which is Thornswood's own files in Data\Platform having been
-                // replaced, parked or never written. Another server's launcher
-                // rewrites the page the front plugin loads and drops its own
-                // plugin in beside ours; an install that came from the
-                // installer rather than from an update has no kept copy of
-                // anything until something makes one. Both are what this is
-                // for now.
-                //
-                // Every step is one Play already does on the way in, so none of
-                // it is new behaviour, and all of it is safe to run twice.
-                if (Checks.GameRunning())
-                {
-                    Log("Close Skyrim first. Repair writes into the game folder, and Skyrim writes its own files back when it exits.");
-                    return;
-                }
-
-                btnRepair.IsEnabled = false;
-                try
-                {
-                    var did = new List<string>();
-
-                    int cfgs = Swap.RepairConfigs();
-                    if (cfgs > 0) did.Add(cfgs + " settings file" + (cfgs == 1 ? "" : "s"));
-
-                    // A machine that installed rather than updated has nothing
-                    // kept, so there is nothing to put back until this runs.
-                    int seeded = 0;
-                    try { seeded = Keep.Seed(); } catch (Exception ex) { Swallow.Note("Shell.Wire", ex); }
-                    if (seeded > 0) did.Add("kept a copy of " + seeded + " of this build's file" + (seeded == 1 ? "" : "s"));
-
-                    // The one that matters: our Data\Platform files back from
-                    // the kept copies, and another server's plugins aside.
-                    try
-                    {
-                        string kept = Keep.Restore();
-                        if (!string.IsNullOrEmpty(kept)) Log(kept);
-                    }
-                    catch (Exception ex) { Log("Could not put this build's files back: " + ex.Message); }
-
-                    try
-                    {
-                        string ini = ThornIni.Ensure();
-                        if (!string.IsNullOrEmpty(ini)) Log(ini);
-                    }
-                    catch (Exception ex) { Swallow.Note("Shell.Wire", ex); }
-
-                    try
-                    {
-                        int rules = Enforce.Apply();
-                        if (rules > 0) did.Add(rules + " mod setting" + (rules == 1 ? "" : "s"));
-                    }
-                    catch (Exception ex) { Swallow.Note("Shell.Wire", ex); }
-
-                    Log(did.Count > 0
-                        ? "Repair put right: " + string.Join(", ", did.ToArray()) + "."
-                        : "Repair found nothing to put right.");
-
-                    // The Client row reads the bundle, so it has to be asked
-                    // again rather than trusting what it answered a moment ago.
-                    DrawStatus();
-                    BuildModList();
-                }
-                finally { btnRepair.IsEnabled = true; }
-            };
-            btnRestore.Click += delegate
-            {
-                Log(Swap.Restore() ? "Windows Skyrim folders put back." : "Nothing was redirected.");
-            };
+            // Repair and Restore Windows folders were buttons here until
+            // 17 Oct (#2627). Scan finds this build's own files changed or
+            // missing and Windows' Skyrim folders left pointed at Thornswood,
+            // and Fix runs the same steps (Upkeep.FixOnDisk).
             btnIcons.Click += delegate
             {
                 // Explorer goes away for a second, so this one says so first
@@ -3239,232 +3145,7 @@ namespace Thornswood
         }
 
         // ------------------------------------------------------------- mods
-        static void RunScan()
-        {
-            List<Issue> issues = null;
-            Waiting(delegate { issues = Verify.Run(cfg); });
-            ShowVerify(issues, true);
-        }
-
-        /// <summary>
-        /// Paints the Scan and Fix card from an Issue list and redraws Ready
-        /// to launch from the same list. <paramref name="logDetail"/> is true
-        /// for a fresh Scan (writes the issue lines to the log); false when
-        /// Diagnostics opens onto an already shared LastIssues and should not
-        /// re-say the scan.
-        /// </summary>
-        static void ShowVerify(List<Issue> issues, bool logDetail)
-        {
-            if (issues == null) issues = new List<Issue>();
-            int blocking = 0;
-            foreach (Issue i in issues) if (i.Blocking) blocking++;
-            // Vortex deploys somewhere else, and Fix makes the own folder from
-            // there: the missing mods are in that folder, so Fix does help.
-            bool elsewhere = false;
-            foreach (Issue i in issues) if (i.VortexFolder != null) elsewhere = true;
-
-            if (issues.Count == 0)
-            {
-                dotVerify.Fill = Res("Ok");
-                txtVerifyTitle.Text = "Everything matches";
-                txtVerifyNote.Text = "Your plugin list is identical to the one the server expects" +
-                                     (Verify.BytesChecked
-                                        ? ", and every plugin in it is byte for byte the server's."
-                                        : ". The server could not be asked about the plugin bytes just now, so only the names were compared.") +
-                                     "\n\nRead from " + Verify.LiveFile;
-                btnFix.IsEnabled = false;
-            }
-            else if (CollectionNotDeployed(issues, elsewhere))
-            {
-                // Vortex has not deployed the collection into the folder the
-                // launcher reads, so most of the plugins the server expects are
-                // simply not there. One line per missing plugin is a screenful
-                // of noise with the one fact that matters left out, so say that
-                // fact once and point at Vortex and the collection. The gate is
-                // untouched: Play still counts the blocking issues and refuses
-                // (Shell Play, Verify.Run). When this install already has its
-                // own Game folder, Fix refreshes it from Vortex and can put the
-                // missing plugins back; otherwise Fix cannot invent a collection
-                // Vortex never deployed, so the button stays grey.
-                dotVerify.Fill = Res("Bad");
-                txtVerifyTitle.Text = "The collection is not deployed";
-                string dataFolder = Path.Combine(Paths.Game, "Data");
-                bool canRefresh = false;
-                try { canRefresh = OwnGame.Active; }
-                catch (Exception ex) { Swallow.Note("Shell.RunScan, asking whether OwnGame is active for collection-not-deployed Fix", ex); }
-                if (canRefresh)
-                {
-                    txtVerifyNote.Text =
-                        "Thornswood's mods are not in " + dataFolder + ", so almost none of the " +
-                        "collection the server expects is installed where the launcher looks. Fix " +
-                        "refreshes Thornswood's own folder from what Vortex has deployed. Open " +
-                        "Vortex and press Deploy first if the collection is not on yet, then Fix.";
-                    btnFix.IsEnabled = true;
-                }
-                else
-                {
-                    txtVerifyNote.Text =
-                        "Thornswood's mods are not in " + dataFolder + ", so almost none of the " +
-                        "collection the server expects is installed where the launcher looks. Open " +
-                        "Vortex and press Deploy, and install the collection first if you have not. " +
-                        "The collection card above opens it. Then press Scan again.";
-                    btnFix.IsEnabled = false;
-                }
-            }
-            else
-            {
-                dotVerify.Fill = Res(blocking > 0 ? "Bad" : "Warn");
-                txtVerifyTitle.Text = blocking > 0
-                    ? (blocking == 1 ? "1 problem will stop you connecting" : blocking + " problems will stop you connecting")
-                    : "Worth a look";
-                var sb = new System.Text.StringBuilder();
-                int shown = 0;
-                foreach (Issue i in issues)
-                {
-                    if (shown >= 4) { sb.Append("and " + (issues.Count - shown) + " more."); break; }
-                    if (shown > 0) sb.Append("\n");
-                    sb.Append(i.Text);
-                    shown++;
-                }
-                // Absent ("is not installed") means Vortex never put the mod on
-                // this machine. FileMissing means the list still names it and
-                // Data does not have the file: Fix restores those from Vortex
-                // (and from the server when it serves them). Greying Fix for
-                // one absent plugin also greyed the light flags, another
-                // server's menu files and the plugins that are simply extra,
-                // which Fix does put right. 1 October that was a clean
-                // collection install with one plugin the collection does not
-                // ship. Fix stays off only when every blocking issue is a mod
-                // that is not installed at all.
-                int absent = 0;
-                int fileMissing = 0;
-                int fixable = 0;
-                foreach (Issue i in issues) if (i.Absent) absent++;
-                foreach (Issue i in issues) if (i.FileMissing) fileMissing++;
-                foreach (Issue i in issues) if (i.Blocking && !i.Absent) fixable++;
-                bool onlyAbsent = absent > 0 && fixable == 0;
-                if (onlyAbsent && !elsewhere)
-                {
-                    sb.Append("\n\nThese are not installed at all. Fix cannot help. In Vortex, " +
-                              "Profiles, press Enable under Thornswood.");
-                }
-                else if (absent > 0 && !elsewhere)
-                {
-                    sb.Append("\n\nFix cannot install a mod Vortex does not have. It still puts right the rest of this list.");
-                }
-                else if (fileMissing > 0 && !elsewhere)
-                {
-                    sb.Append("\n\nFix puts the missing plugin files back into Data from Vortex " +
-                              "(and from the server when it has a copy). It does not remove them from the list.");
-                }
-                // Which file it judged. An hour went into a mismatch nobody
-                // could place, because the page reported problems without ever
-                // saying where it had read the list from, and under the
-                // collection that is Vortex's file rather than one of ours.
-                sb.Append("\n\nRead from ").Append(Verify.LiveFile);
-                if (Paths.Collection)
-                    sb.Append("\nThat file is Vortex's. Fix writes the server's order into it, " +
-                              "and Vortex writes its own again the next time it deploys.");
-
-                txtVerifyNote.Text = sb.ToString();
-                btnFix.IsEnabled = blocking > 0 && (!onlyAbsent || elsewhere);
-            }
-            // The count alone read the same after every press: 182, 182, 182.
-            // When most of them are mods that are simply not in the game folder,
-            // pressing Scan again or Fix changes nothing, and that is the line
-            // worth reading.
-            if (logDetail)
-            {
-            int missing = 0;
-            foreach (Issue i in issues) if (i.Absent) missing++;
-            Log("Scan finished. " + issues.Count + " issue" + (issues.Count == 1 ? "" : "s") + " found." +
-                (missing > 0 && !elsewhere
-                    ? " " + missing + (missing == 1
-                        ? " of them is a mod that is not in the game folder at all, which Scan and Fix cannot change."
-                        : " of them are mods that are not in the game folder at all, which Scan and Fix cannot change.") +
-                      (Paths.Collection && OwnGame.NotThisCollection(missing, Verify.Expected)
-                        ? " Vortex most likely has another profile deployed." : "")
-                    : ""));
-
-            /*
-              AND WHICH ONES, because the count on its own is not a record of
-              anything.
-
-              FOUND 22 SEPTEMBER while working out why nobody could join the
-              dev server. The log said "Scan finished. 4 issues found" and
-              "Something needs attention before you can play", and that was the
-              entire record. It never said which four. Every one of those
-              issues already carries a written sentence naming the plugin and
-              what is wrong with it, because Verify.cs builds them that way for
-              the card on screen; this line threw all of it away and kept the
-              number.
-
-              Working out what those four were meant reading Verify.cs,
-              reimplementing its comparison by hand, fetching the server's
-              manifest and diffing it against the game folder. Twenty minutes
-              for somebody who knows the code and an impossibility for anybody
-              else.
-
-              IT MATTERS MOST FOR THE PEOPLE THE LOG IS COLLECTED FROM. Each
-              session's log goes up to the site, so a tester who cannot press
-              Play produced a line with a number in it, while the answer to
-              "why can't I play" was sitting in memory at that exact moment and
-              was deliberately not written down.
-
-              BLOCKING FIRST, because those are the ones that refuse Play, and
-              capped so a mod list that is 182 wrong does not bury the rest of
-              the log. The count above already says how many there were, so the
-              cap loses nothing that is not already recorded.
-            */
-            if (issues.Count > 0)
-            {
-                var named = new List<Issue>();
-                foreach (Issue i in issues) if (i.Blocking) named.Add(i);
-                foreach (Issue i in issues) if (!i.Blocking) named.Add(i);
-
-                const int LogAtMost = 25;
-                int shown = 0;
-                foreach (Issue i in named)
-                {
-                    if (shown >= LogAtMost) break;
-                    if (string.IsNullOrEmpty(i.Text)) continue;
-                    // One line each, flattened: a wrapped sentence in a log
-                    // file is a sentence somebody has to reassemble by eye.
-                    string one = i.Text.Replace("\r", " ").Replace("\n", " ").Trim();
-                    Log("  " + (i.Blocking ? "blocks Play: " : "worth knowing: ") + one);
-                    shown++;
-                }
-                if (named.Count > shown)
-                    Log("  and " + (named.Count - shown) + " more, not written out to keep the log readable.");
-            }
-            }
-
-            // Same Issue list the card just painted (Verify.LastIssues). Without
-            // this, Scan could go green while Ready to launch Mods / Mod list
-            // still showed the previous Run, or the reverse after Fix.
-            DrawStatus();
-        }
-
-        /// <summary>
-        /// True when Vortex has not deployed the collection into the folder the
-        /// launcher reads: most of the plugins the server expects are simply not
-        /// in Data, so the card should say that once rather than list every one.
-        /// Not when Vortex deploys somewhere else (that has its own line and Fix
-        /// helps), and only past a floor so a couple of missing files is still
-        /// read plugin by plugin. This decides only what the card shows; the Play
-        /// gate is unchanged and still counts the blocking issues.
-        /// </summary>
-        static bool CollectionNotDeployed(List<Issue> issues, bool elsewhere)
-        {
-            if (elsewhere) return false;
-            if (Verify.Expected <= 0) return false;
-            int missing = 0;
-            foreach (Issue i in issues) if (i.FileMissing) missing++;
-            // A handful of missing files is a mod or two, not the whole
-            // collection. Half of what the server expects, and at least ten,
-            // is the collection not being there at all.
-            return missing >= 10 && missing * 2 >= Verify.Expected;
-        }
+        // RunScan, ShowVerify and the Fix button are in ShellScanFix.cs (#2627).
 
         static void BuildModList()
         {

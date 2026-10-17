@@ -396,6 +396,12 @@ jobs:
           # Delete-Person.ps1 under Windows PowerShell 5.1 on stand-ins of
           # every store in a temp folder: the dry run, the deletion, the
           # record and its reapply after a restore. About half a minute.
+          # Issue #2166: tests\test-2166-retention-fixes.js holds three
+          # retention fixes to what the privacy page already says: trouble.json
+          # ages by 365 days in the hourly sweep on a scratch site (a kept
+          # session's alert stays) and a Discord sign-in no longer sets the
+          # member cookie tw; test-chat-log.js holds the hourly chat prune.
+          # A second.
           $six ='test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
@@ -408,7 +414,7 @@ jobs:
                  'test-downgrade-steam-window.ps1', 'test-address-library.ps1', 'test-vortex-folder.ps1',
                  'test-new-box-runbook.ps1', 'test-remote-header.ps1',
                  'test-vps-defaults.ps1', 'test-runner-lock.ps1', 'test-runner-offbox.ps1', 'test-498-buildtools.ps1', 'test-restore-staging.ps1', 'test-deploy-artifact.ps1', 'test-remote-command-map.ps1', 'test-deploy-records.js',
-                 'test-own-folder-alone.ps1', 'test-own-folder-first.ps1', 'test-own-folder-again.ps1', 'test-setup-game-files.ps1', 'test-setup-robocopy.ps1', 'test-sign-pilot.ps1', 'test-prod-parity.ps1', 'test-runner-isolation.ps1', 'test-discord-announced-shared.ps1', 'test-check-build.ps1', 'test-client-build-record.ps1', 'test-npc-runtime.js',
+                 'test-own-folder-alone.ps1', 'test-own-folder-first.ps1', 'test-own-folder-again.ps1', 'test-2627-scan-fix.ps1', 'test-shortcut-icons.ps1', 'test-runtime-keep.ps1', 'test-setup-game-files.ps1', 'test-setup-robocopy.ps1', 'test-sign-pilot.ps1', 'test-prod-parity.ps1', 'test-runner-isolation.ps1', 'test-discord-announced-shared.ps1', 'test-check-build.ps1', 'test-client-build-record.ps1', 'test-npc-runtime.js',
                  'test-mold-key.js', 'test-putback-flora.js', 'test-staff-spells.js', 'test-join-pass-trust.js',
                  'test-npc-shared-runtime.js', 'test-npc-navigation-equivalence.js', 'test-npc-population-runtime.js', 'test-npc-role-titles.js',
                  'test-shared-resource-stock.js', 'test-resource-stock-integration.js',
@@ -423,6 +429,7 @@ jobs:
                  'test-1319-pass-switch.ps1',
                  'test-2578-service-principals.ps1',
                  'test-2612-backup-principal.ps1',
+                 'test-site-account.ps1',
                  'test-1320-pass-one-session.js',
                  'test-1373-scarce-scene.js', 'test-quest-transactions.js', 'test-kill-contracts.js',
                  'test-nobody-makes.js', 'test-614-riekling-shift.js',
@@ -518,6 +525,7 @@ jobs:
                  'test-1640-jarl-word.js',
                  'test-1638-office.js',
                  'test-2551-hold-offices.js',
+                 'test-2551-building-holds.js',
                  'test-1631-needs-gui.js',
                  'test-2267-needs-text.js',
                  'test-1764-away-no-rest.js',
@@ -562,7 +570,7 @@ jobs:
                  'test-1157-session-ends.js',
                  'test-1994-load-refused.js',
                  'test-1894-door-sentence.js',
-                 'test-1180-own-plugins.js',
+                 'test-1180-own-plugins.js', 'test-1715-light-manifest.js',
                  'test-1885-manifest-order.js',
                  'test-1075-script-citations.js',
                  'test-1397-npc-docs-live.js',
@@ -619,6 +627,7 @@ jobs:
                  'test-page-changed.js',
                  'test-2349-server-log.js',
                  'test-2351-delete-person.ps1',
+                 'test-2166-retention-fixes.js',
                  'test-missing-files-stop.ps1',
                  'test-ship-launcher-drift.ps1',
                  'test-client-by-hash.ps1',

@@ -428,7 +428,7 @@ namespace Thornswood
                    "so the two would share files and each would undo the other's. In Vortex, point Skyrim Special Edition at the Steam copy" +
                    (steam.Length > 0 ? " in " + steam : "") + " again and deploy" +
                    (chosen ? ", press Forget the chosen folder in Settings, under Maintenance," : ",") +
-                   " and then Bring it up to date from Vortex on Diagnostics.";
+                   " and then press Scan and Fix on Diagnostics.";
         }
 
         /// <summary>

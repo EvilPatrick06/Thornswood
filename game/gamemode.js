@@ -29963,9 +29963,12 @@ log('gamemode loaded:',
       // The whole order, full and light together, the order the launcher
       // puts a plugin list into when there is a light list.
       loadOrder: Array.isArray(doc.loadOrder) ? doc.loadOrder : mods.map(function (m) { return m.filename; }),
-      // Which of those the launcher's Fix may fetch from /plugins/ (#1180).
-      // The client reads mods, loadOrder and, when it is there, light.
-      served: mods.filter(function (m) { return OURS[m.filename.toLowerCase()]; })
+      // Which of those the launcher's Fix may fetch from /plugins/ (#1180):
+      // ours, full and light (#2627). The client reads mods, loadOrder and,
+      // when it is there, light, and never this list, so a light name in it
+      // changes nothing for the client; a launcher from before #2627 marks
+      // only mods entries as served and so never asks for a light one.
+      served: mods.concat(light).filter(function (m) { return OURS[m.filename.toLowerCase()]; })
                   .map(function (m) { return m.filename; })
     };
     if (hasLight) { out.light = light; }
@@ -29989,7 +29992,7 @@ log('gamemode loaded:',
                 '/manifest.json, ' + mods.length + ' plugins' +
                 (light.length ? ' and ' + light.length + ' light plugins' : '') +
                 (dropped > 0 ? ' (' + dropped + ' archive entries left out)' : ''));
-    try { publishFiles(mods); } catch (e) { console.log('[thornswood] could not publish the plugin files: ' + e.message); }
+    try { publishFiles(mods, light); } catch (e) { console.log('[thornswood] could not publish the plugin files: ' + e.message); }
     return '';
   }
 
@@ -30011,8 +30014,15 @@ log('gamemode loaded:',
   // from its author; the launcher's Fix says which mod. Bethesda's masters
   // were never served. The clearing below takes the files an older start
   // published off this box.
+  //
+  // Our light plugins too, since #2627, as light-<index>.bin at their place
+  // in the manifest's light list, so the two lists never name one file. On
+  // 16 Oct the server's light order named Thornswood-Last.esp, which is ours
+  // and light, a machine whose launcher had not taken the release carrying
+  // it had none, and Fix had nothing to fetch: only mods entries were
+  // published, and the launcher only ever asked for those.
 
-  function publishFiles(mods) {
+  function publishFiles(mods, light) {
     var order = [];
     try { order = JSON.parse(fs.readFileSync('server-settings.json', 'utf8')).loadOrder || []; } catch (e) { return; }
     var byName = {};
@@ -30037,20 +30047,24 @@ log('gamemode loaded:',
       }
     } catch (e) { console.log('[thornswood] could not read /plugins/ to clear it: ' + e.message); }
     var linked = 0, copied = 0, missing = 0, bytes = 0;
-    for (var j = 0; j < mods.length; j++) {
-      var name = mods[j].filename;
-      if (!OURS[name.toLowerCase()]) continue;
-      var src = byName[name.toLowerCase()];
-      if (!src || !fs.existsSync(src)) { missing++; continue; }
-      var dst = path.join(PLUG, j + '.bin');
-      try {
-        fs.linkSync(src, dst);
-        linked++;
-      } catch (e) {
-        try { fs.copyFileSync(src, dst); copied++; }
-        catch (e2) { missing++; console.log('[thornswood] could not publish ' + name + ': ' + e2.message); continue; }
+    var lists = [[mods, ''], [light || [], 'light-']];
+    for (var k = 0; k < lists.length; k++) {
+      var list = lists[k][0], prefix = lists[k][1];
+      for (var j = 0; j < list.length; j++) {
+        var name = list[j].filename;
+        if (!OURS[name.toLowerCase()]) continue;
+        var src = byName[name.toLowerCase()];
+        if (!src || !fs.existsSync(src)) { missing++; continue; }
+        var dst = path.join(PLUG, prefix + j + '.bin');
+        try {
+          fs.linkSync(src, dst);
+          linked++;
+        } catch (e) {
+          try { fs.copyFileSync(src, dst); copied++; }
+          catch (e2) { missing++; console.log('[thornswood] could not publish ' + name + ': ' + e2.message); continue; }
+        }
+        bytes += Number(list[j].size) || 0;
       }
-      bytes += Number(mods[j].size) || 0;
     }
     console.log('[thornswood] ' + (linked + copied) + ' of our plugin files published at /api/servers/' + KEY +
                 '/plugins/ for the launcher, ' + Math.round(bytes / 1048576) + ' MB' +
@@ -36666,6 +36680,45 @@ log('gamemode loaded:',
       ? BUILDING_BY_DOOR[doorDesc] : null;
   }
 
+  /*
+    WHOSE HOLD A BUILDING IS IN (#2551). Patrick, 16 October, answer C: a
+    Steward evicts and sets rent only in their own hold, by a table giving
+    every claimable building the hold its door opens onto.
+    scripts\dev\Build-BuildingHolds.py measures it out of the plugins: the
+    places the building's doors open onto, and the hold whose location record
+    those places' locations reach. A building none of that gives a hold is
+    left out, and holdOfBuilding answers null for it: no Steward settles it.
+  */
+  // ==== BUILDING_HOLD, generated ====
+  // Generated by scripts\dev\Build-BuildingHolds.py from the load order; do not
+  // hand edit. Each claimable building, to the hold its doors open onto, in the
+  // town keys the offices use. A building the plugins give no hold is not here;
+  // game\data\building-holds.json says how each was measured and why each
+  // building left out was.
+  var BUILDING_HOLD = {"103e1d:Arena - Markarth Side.esp":"morthal","1041:Solitude Arena.esp":"solitude","10574:The Great City of Solitude.esp":"solitude","10665b:WindhelmSSE.esp":"windhelm","1096b5:Arena - Markarth Side.esp":"morthal","109d6d:Riften Expansion.esp":"riften","10a65f:aaaGraniteHill.esp":"falkreath","10ceea:Skyrim.esm":"morthal","115c21:WindhelmSSE.esp":"windhelm","115c8e:WindhelmSSE.esp":"windhelm","115cfd:WindhelmSSE.esp":"windhelm","11cb3:HearthFires.esm":"morthal","12f61e:WindhelmSSE.esp":"windhelm","12f7a9:WindhelmSSE.esp":"windhelm","12fba4:WindhelmSSE.esp":"windhelm","12fcff:WindhelmSSE.esp":"windhelm","1323c:SkyrimSewers.esp":"solitude","133c6:Skyrim.esm":"whiterun","133c7:Skyrim.esm":"whiterun","133c8:Skyrim.esm":"whiterun","133c9:Skyrim.esm":"whiterun","133ca:Skyrim.esm":"whiterun","13502e:WindhelmSSE.esp":"windhelm","1380e:Skyrim.esm":"winterhold","1380f:Skyrim.esm":"winterhold","13810:Skyrim.esm":"winterhold","13812:Skyrim.esm":"winterhold","13813:Skyrim.esm":"winterhold","13814:Skyrim.esm":"winterhold","13818:Skyrim.esm":"winterhold","1382d:Skyrim.esm":"morthal","1382e:Skyrim.esm":"riften","1383a:Skyrim.esm":"riften","13850:Skyrim.esm":"riften","13856:Skyrim.esm":"riften","13867:Skyrim.esm":"whiterun","1386c:Skyrim.esm":"whiterun","13870:Skyrim.esm":"whiterun","13871:Skyrim.esm":"whiterun","138be:Skyrim.esm":"markarth","138ca:Skyrim.esm":"morthal","138cb:Skyrim.esm":"morthal","138cc:Skyrim.esm":"morthal","138cd:Skyrim.esm":"morthal","138ce:Skyrim.esm":"morthal","138cf:Skyrim.esm":"morthal","138d0:Skyrim.esm":"morthal","138e1:Skyrim.esm":"morthal","13901:Skyrim.esm":"windhelm","13907:Skyrim.esm":"windhelm","13909:Skyrim.esm":"markarth","13978:Skyrim.esm":"markarth","13979:Skyrim.esm":"markarth","139d1:Skyrim.esm":"markarth","139d2:Skyrim.esm":"markarth","139e7:Skyrim.esm":"riften","13a48:Skyrim.esm":"riften","13a5c:Skyrim.esm":"riften","13a5d:Skyrim.esm":"dawnstar","13a67:Skyrim.esm":"falkreath","13a71:Skyrim.esm":"falkreath","13a72:Skyrim.esm":"falkreath","13a73:Skyrim.esm":"falkreath","13a76:Skyrim.esm":"falkreath","13a78:Skyrim.esm":"falkreath","13a79:Skyrim.esm":"falkreath","13a7a:Skyrim.esm":"solitude","13a7b:Skyrim.esm":"solitude","13a7c:Skyrim.esm":"solitude","13a7d:Skyrim.esm":"solitude","13a7e:Skyrim.esm":"solitude","13a7f:Skyrim.esm":"dawnstar","13a80:Skyrim.esm":"dawnstar","13a81:Skyrim.esm":"dawnstar","13a83:Skyrim.esm":"dawnstar","13a84:Skyrim.esm":"dawnstar","13a85:Skyrim.esm":"dawnstar","13a86:Skyrim.esm":"dawnstar","13a87:Skyrim.esm":"dawnstar","13a88:Skyrim.esm":"dawnstar","13a89:Skyrim.esm":"dawnstar","13a8a:Skyrim.esm":"windhelm","13a8c:Skyrim.esm":"windhelm","140a:Dawnguard.esm":"falkreath","142e2:Dragonborn.esm":"ravenrock","142ed:Dragonborn.esm":"ravenrock","142ee:Dragonborn.esm":"ravenrock","142ef:Dragonborn.esm":"ravenrock","142f0:Dragonborn.esm":"ravenrock","142f1:Dragonborn.esm":"ravenrock","142f6:Dragonborn.esm":"ravenrock","142f7:Dragonborn.esm":"ravenrock","142f8:Dragonborn.esm":"ravenrock","142f9:Dragonborn.esm":"ravenrock","142fa:Dragonborn.esm":"ravenrock","142fb:Dragonborn.esm":"ravenrock","142fc:Dragonborn.esm":"ravenrock","14987c:WindhelmSSE.esp":"windhelm","14c095:Riften Expansion.esp":"riften","15154:HearthFires.esm":"morthal","151f2:Skyrim.esm":"solitude","151f3:Skyrim.esm":"markarth","151f4:Skyrim.esm":"winterhold","151f5:Skyrim.esm":"winterhold","151f6:Skyrim.esm":"solitude","151f9:Skyrim.esm":"whiterun","151fa:Skyrim.esm":"whiterun","151fb:Skyrim.esm":"dawnstar","151fc:Skyrim.esm":"solitude","15200:Skyrim.esm":"riften","15201:Skyrim.esm":"riften","15206:Skyrim.esm":"winterhold","15207:Skyrim.esm":"whiterun","15208:Skyrim.esm":"winterhold","1520a:Skyrim.esm":"whiterun","15210:Skyrim.esm":"dawnstar","15211:Skyrim.esm":"whiterun","15215:Skyrim.esm":"dawnstar","1521b:Skyrim.esm":"morthal","1521c:Skyrim.esm":"whiterun","15220:Skyrim.esm":"winterhold","15223:Skyrim.esm":"solitude","15224:Skyrim.esm":"whiterun","15226:Skyrim.esm":"markarth","15227:Skyrim.esm":"markarth","15229:Skyrim.esm":"whiterun","1522a:Skyrim.esm":"markarth","1522c:Skyrim.esm":"markarth","1522f:Skyrim.esm":"falkreath","15230:Skyrim.esm":"riften","15231:Skyrim.esm":"solitude","15233:Skyrim.esm":"morthal","15235:Skyrim.esm":"solitude","15237:Skyrim.esm":"markarth","15238:Skyrim.esm":"windhelm","15239:Skyrim.esm":"windhelm","1523c:Skyrim.esm":"markarth","1523d:Skyrim.esm":"morthal","1523f:Skyrim.esm":"windhelm","15251:Skyrim.esm":"windhelm","15253:Skyrim.esm":"falkreath","15254:Skyrim.esm":"winterhold","15255:Skyrim.esm":"solitude","15257:Skyrim.esm":"dawnstar","15258:Skyrim.esm":"falkreath","1525c:Skyrim.esm":"riften","1525d:Skyrim.esm":"riften","1525f:Skyrim.esm":"winterhold","15261:Skyrim.esm":"dawnstar","15262:Skyrim.esm":"dawnstar","15265:Skyrim.esm":"falkreath","15267:Skyrim.esm":"markarth","15268:Skyrim.esm":"falkreath","15269:Skyrim.esm":"whiterun","1526a:Skyrim.esm":"falkreath","1526b:Skyrim.esm":"falkreath","1526c:Skyrim.esm":"whiterun","1526d:Skyrim.esm":"markarth","1526e:Skyrim.esm":"falkreath","1526f:Skyrim.esm":"morthal","15273:Skyrim.esm":"windhelm","15274:Skyrim.esm":"winterhold","15275:Skyrim.esm":"markarth","15276:Skyrim.esm":"morthal","15277:Skyrim.esm":"falkreath","15279:Skyrim.esm":"winterhold","1527b:Skyrim.esm":"riften","1527c:Skyrim.esm":"whiterun","1527d:Skyrim.esm":"windhelm","1527e:Skyrim.esm":"dawnstar","1527f:Skyrim.esm":"riften","15280:Skyrim.esm":"morthal","15281:Skyrim.esm":"winterhold","15282:Skyrim.esm":"dawnstar","15283:Skyrim.esm":"whiterun","15284:Skyrim.esm":"winterhold","15286:Skyrim.esm":"riften","15288:Skyrim.esm":"winterhold","1528a:Skyrim.esm":"markarth","1528c:Skyrim.esm":"markarth","15290:Skyrim.esm":"dawnstar","15294:Skyrim.esm":"riften","15295:Skyrim.esm":"markarth","15296:Skyrim.esm":"falkreath","1529c:Skyrim.esm":"markarth","1529d:Skyrim.esm":"morthal","1529f:Skyrim.esm":"riften","152a0:Skyrim.esm":"riften","152a1:Skyrim.esm":"dawnstar","152a2:Skyrim.esm":"riften","152a5:Skyrim.esm":"windhelm","152a7:Skyrim.esm":"windhelm","152a8:Skyrim.esm":"windhelm","152aa:Skyrim.esm":"morthal","152ad:Skyrim.esm":"markarth","152ae:Skyrim.esm":"morthal","152af:Skyrim.esm":"markarth","152b0:Skyrim.esm":"riften","152b1:Skyrim.esm":"whiterun","152b7:Skyrim.esm":"markarth","152ba:Skyrim.esm":"winterhold","152bb:Skyrim.esm":"winterhold","152be:Skyrim.esm":"riften","152c0:Skyrim.esm":"windhelm","152c1:Skyrim.esm":"riften","152c3:Skyrim.esm":"winterhold","15cc6f:WindhelmSSE.esp":"windhelm","1605e:Skyrim.esm":"whiterun","161e7:Skyrim.esm":"winterhold","161e9:Skyrim.esm":"solitude","161ea:Skyrim.esm":"riften","161eb:Skyrim.esm":"markarth","161ec:Skyrim.esm":"riften","161ed:Skyrim.esm":"markarth","161ee:Skyrim.esm":"whiterun","161ef:Skyrim.esm":"falkreath","161f0:Skyrim.esm":"windhelm","161f1:Skyrim.esm":"windhelm","161f3:Skyrim.esm":"riften","161f4:Skyrim.esm":"dawnstar","161f5:Skyrim.esm":"markarth","161f6:Skyrim.esm":"markarth","161f7:Skyrim.esm":"solitude","161fb:Skyrim.esm":"windhelm","161fc:Skyrim.esm":"windhelm","161fe:Skyrim.esm":"riften","161ff:Skyrim.esm":"riften","16200:Skyrim.esm":"windhelm","16203:Skyrim.esm":"markarth","16204:Skyrim.esm":"whiterun","16205:Skyrim.esm":"windhelm","16207:Skyrim.esm":"whiterun","16209:Skyrim.esm":"dawnstar","1620b:Skyrim.esm":"dawnstar","1644d:SkyrimSewers.esp":"solitude","165a0:Skyrim.esm":"whiterun","165a3:Skyrim.esm":"whiterun","165a6:Skyrim.esm":"whiterun","165a7:Skyrim.esm":"whiterun","165a8:Skyrim.esm":"whiterun","165aa:Skyrim.esm":"whiterun","165ab:Skyrim.esm":"whiterun","165ac:Skyrim.esm":"whiterun","165ad:Skyrim.esm":"whiterun","165ae:Skyrim.esm":"whiterun","165af:Skyrim.esm":"whiterun","165b1:Skyrim.esm":"whiterun","165b2:Skyrim.esm":"whiterun","165b3:Skyrim.esm":"whiterun","165b5:Skyrim.esm":"whiterun","165b6:Skyrim.esm":"whiterun","165b7:Skyrim.esm":"whiterun","16774:Skyrim.esm":"windhelm","16775:Skyrim.esm":"windhelm","16776:Skyrim.esm":"windhelm","16777:Skyrim.esm":"windhelm","16778:Skyrim.esm":"windhelm","16779:Skyrim.esm":"windhelm","1677a:Skyrim.esm":"windhelm","1677c:Skyrim.esm":"windhelm","1677d:Skyrim.esm":"windhelm","1677e:Skyrim.esm":"windhelm","1677f:Skyrim.esm":"windhelm","16780:Skyrim.esm":"windhelm","16781:Skyrim.esm":"windhelm","16782:Skyrim.esm":"windhelm","16784:Skyrim.esm":"windhelm","16785:Skyrim.esm":"windhelm","16786:Skyrim.esm":"windhelm","16787:Skyrim.esm":"windhelm","16788:Skyrim.esm":"windhelm","16789:Skyrim.esm":"windhelm","1678b:Skyrim.esm":"windhelm","1678c:Skyrim.esm":"windhelm","169fe:Skyrim.esm":"solitude","16a00:Skyrim.esm":"solitude","16a02:Skyrim.esm":"solitude","16a03:Skyrim.esm":"solitude","16a04:Skyrim.esm":"solitude","16a05:Skyrim.esm":"solitude","16a06:Skyrim.esm":"solitude","16a07:Skyrim.esm":"solitude","16a08:Skyrim.esm":"solitude","16a09:Skyrim.esm":"solitude","16a0b:Skyrim.esm":"solitude","16a0c:Skyrim.esm":"solitude","16a0d:Skyrim.esm":"solitude","16a0e:Skyrim.esm":"solitude","16a0f:Skyrim.esm":"solitude","16a10:Skyrim.esm":"solitude","16a11:Skyrim.esm":"solitude","16a55:HearthFires.esm":"dawnstar","16a56:HearthFires.esm":"dawnstar","16bce:Skyrim.esm":"riften","16bcf:Skyrim.esm":"riften","16bd0:Skyrim.esm":"riften","16bd1:Skyrim.esm":"riften","16bd2:Skyrim.esm":"riften","16bd3:Skyrim.esm":"riften","16bd4:Skyrim.esm":"riften","16bd5:Skyrim.esm":"riften","16bd6:Skyrim.esm":"riften","16bd7:Skyrim.esm":"riften","16bd8:Skyrim.esm":"riften","16bd9:Skyrim.esm":"riften","16bda:Skyrim.esm":"riften","16bdb:Skyrim.esm":"riften","16bdc:Skyrim.esm":"riften","16bdd:Skyrim.esm":"riften","16bde:Skyrim.esm":"riften","16bdf:Skyrim.esm":"riften","16d72:Skyrim.esm":"markarth","16d761:WindhelmSSE.esp":"windhelm","16df2:Skyrim.esm":"markarth","16df3:Skyrim.esm":"markarth","16df4:Skyrim.esm":"markarth","16df5:Skyrim.esm":"markarth","16df6:Skyrim.esm":"markarth","16df7:Skyrim.esm":"markarth","16dfa:Skyrim.esm":"markarth","16dfb:Skyrim.esm":"markarth","16dfc:Skyrim.esm":"markarth","16dfd:Skyrim.esm":"markarth","16dfe:Skyrim.esm":"markarth","16dff:Skyrim.esm":"markarth","16e00:Skyrim.esm":"markarth","16ea1:Skyrim.esm":"falkreath","16feb:Dragonborn.esm":"ravenrock","172b90:WindhelmSSE.esp":"windhelm","172bec:WindhelmSSE.esp":"windhelm","172c4c:WindhelmSSE.esp":"windhelm","173b2:Dragonborn.esm":"ravenrock","173b3:Dragonborn.esm":"ravenrock","17728:Dragonborn.esm":"ravenrock","17729:Dragonborn.esm":"ravenrock","1772a:Dragonborn.esm":"ravenrock","17787:Dragonborn.esm":"ravenrock","17a00:Dragonborn.esm":"ravenrock","17b6a:Dragonborn.esm":"ravenrock","17bbd4:WindhelmSSE.esp":"windhelm","17be56:WindhelmSSE.esp":"windhelm","17c14f:WindhelmSSE.esp":"windhelm","17ebe:Dragonborn.esm":"ravenrock","17ebf:Dragonborn.esm":"ravenrock","17ec0:Dragonborn.esm":"ravenrock","17ec1:Dragonborn.esm":"ravenrock","17ec2:Dragonborn.esm":"ravenrock","17ec3:Dragonborn.esm":"ravenrock","17ec4:Dragonborn.esm":"ravenrock","18195d:WindhelmSSE.esp":"windhelm","18276:Dragonborn.esm":"ravenrock","18277:Dragonborn.esm":"ravenrock","1844f:Dragonborn.esm":"ravenrock","18460:Skyrim.esm":"riften","184f0:Dragonborn.esm":"ravenrock","18682:Dragonborn.esm":"ravenrock","186c2:SkyrimSewers.esp":"solitude","18b3ba:WindhelmSSE.esp":"windhelm","18be0:Skyrim.esm":"riften","18be9:Skyrim.esm":"markarth","18bfda:WindhelmSSE.esp":"windhelm","18f45:Dragonborn.esm":"ravenrock","18f46:Dragonborn.esm":"ravenrock","18f47:Dragonborn.esm":"ravenrock","18f48:Dragonborn.esm":"ravenrock","18f49:Dragonborn.esm":"ravenrock","18f4a:Dragonborn.esm":"ravenrock","18f4b:Dragonborn.esm":"ravenrock","193ee:Skyrim.esm":"dawnstar","19454:Skyrim.esm":"solitude","198dd:Skyrim.esm":"markarth","198de:Skyrim.esm":"markarth","198df:Skyrim.esm":"markarth","198e0:Skyrim.esm":"markarth","198e2:Skyrim.esm":"markarth","19ad8:Dragonborn.esm":"ravenrock","19cd7:Dragonborn.esm":"ravenrock","19d5d9:Riften Expansion.esp":"riften","1a337:Skyrim.esm":"windhelm","1a7a8:Dragonborn.esm":"ravenrock","1ab5f:Skyrim.esm":"markarth","1ab60:Skyrim.esm":"markarth","1aec3:Skyrim.esm":"winterhold","1b147:Skyrim.esm":"falkreath","1b7c0:Skyrim.esm":"markarth","1ba33:SkyrimSewers.esp":"solitude","1bbfb:Dragonborn.esm":"ravenrock","1be37:Dragonborn.esm":"ravenrock","1c080:Dragonborn.esm":"ravenrock","1c197:The Great City of Solitude.esp":"solitude","1cb84:Skyrim.esm":"whiterun","1cd86:The Great City of Solitude.esp":"solitude","1ce8a:Skyrim.esm":"falkreath","1d09a:Skyrim.esm":"markarth","1d235:The Great City of Solitude.esp":"solitude","1d502:Dragonborn.esm":"ravenrock","1d98:SkyrimSewers.esp":"solitude","1da5d:Dragonborn.esm":"ravenrock","1db4e:Skyrim.esm":"whiterun","1dd03:Dragonborn.esm":"ravenrock","1dd04:Dragonborn.esm":"ravenrock","1e11e:Skyrim.esm":"windhelm","1e8cc:Dragonborn.esm":"ravenrock","1e9e2b:Riften Expansion.esp":"riften","1f288:Dragonborn.esm":"ravenrock","1f358:Skyrim.esm":"windhelm","1f359:Skyrim.esm":"falkreath","1f7b3:Skyrim.esm":"markarth","1fc66:Skyrim.esm":"whiterun","2031a:Skyrim.esm":"dawnstar","21074:Dragonborn.esm":"ravenrock","213a0:Skyrim.esm":"solitude","21594:Skyrim.esm":"windhelm","216bb:Skyrim.esm":"falkreath","21d5c:SkyrimSewers.esp":"solitude","21d8:JKs Skyrim.esp":"dawnstar","2210d9:WindhelmSSE.esp":"windhelm","227b9:Skyrim.esm":"winterhold","22d89:Populated Cities Towns Villages Legendary.esp":"dawnstar","22f52:Skyrim.esm":"riften","22f53:Skyrim.esm":"riften","23ae5:JKs Skyrim.esp":"dawnstar","23cd0:Populated Cities Towns Villages Legendary.esp":"falkreath","23df9:Populated Cities Towns Villages Legendary.esp":"whiterun","23f22:Populated Cities Towns Villages Legendary.esp":"solitude","23fd4:Skyrim.esm":"markarth","2404b:Populated Cities Towns Villages Legendary.esp":"windhelm","240b7:Skyrim.esm":"dawnstar","24174:Populated Cities Towns Villages Legendary.esp":"riften","241f2:JKs Skyrim.esp":"morthal","2429d:Populated Cities Towns Villages Legendary.esp":"markarth","242f3:JKs Skyrim.esp":"morthal","243c6:Populated Cities Towns Villages Legendary.esp":"solitude","244ef:Populated Cities Towns Villages Legendary.esp":"morthal","2471a:Skyrim.esm":"solitude","24771:Skyrim.esm":"winterhold","24887:JKs Skyrim.esp":"whiterun","24cad:Dragonborn.esm":"ravenrock","24d9d:Dragonborn.esm":"ravenrock","25195:Skyrim.esm":"winterhold","2529e:Skyrim.esm":"dawnstar","25e24:Skyrim.esm":"winterhold","261c6:Skyrim.esm":"solitude","263ef:Skyrim.esm":"solitude","26e93:Dragonborn.esm":"ravenrock","270ab:Skyrim.esm":"morthal","27552:Skyrim.esm":"dawnstar","275d8:Skyrim.esm":"riften","275d9:Skyrim.esm":"riften","27d1c:Skyrim.esm":"solitude","27ea3:Populated Cities Towns Villages Legendary.esp":"winterhold","27f1a:Skyrim.esm":"solitude","2802a:Populated Cities Towns Villages Legendary.esp":"whiterun","285d:Dawnguard.esm":"whiterun","28c444:WindhelmSSE.esp":"windhelm","28edf:Skyrim.esm":"windhelm","2954c:Skyrim.esm":"dawnstar","2954d:Skyrim.esm":"dawnstar","298bc:SkyrimSewers.esp":"windhelm","2a03a:Skyrim.esm":"markarth","2a436:SkyrimSewers.esp":"windhelm","2ba8d:SkyrimSewers.esp":"windhelm","2bcd7:Skyrim.esm":"winterhold","2c778:Skyrim.esm":"dawnstar","2c779:Skyrim.esm":"dawnstar","2cc83:SkyrimSewers.esp":"windhelm","2d38b:SkyrimSewers.esp":"windhelm","2d3e7:Skyrim.esm":"riften","2d3e8:Skyrim.esm":"riften","2d4e3:Skyrim.esm":"winterhold","2d4e4:Skyrim.esm":"winterhold","2d524:Skyrim.esm":"riften","2d525:Skyrim.esm":"riften","2d5d1:Skyrim.esm":"windhelm","2df5b:SkyrimSewers.esp":"windhelm","2e521:Skyrim.esm":"falkreath","2e760:Skyrim.esm":"morthal","2eac1:SkyrimSewers.esp":"windhelm","2f83d:Skyrim.esm":"dawnstar","2f83e:Skyrim.esm":"dawnstar","2f98:Update.esm":"riften","2f9c:Update.esm":"solitude","2fd0:Update.esm":"windhelm","2fd4:Update.esm":"falkreath","2fd85:Skyrim.esm":"dawnstar","2fec:HearthFires.esm":"falkreath","3016a:Skyrim.esm":"solitude","301c70:WindhelmSSE.esp":"windhelm","301d64:WindhelmSSE.esp":"windhelm","30313:Skyrim.esm":"markarth","30442:Skyrim.esm":"markarth","30934:aaaGraniteHill.esp":"falkreath","30e5:Update.esm":"riften","30e7:Update.esm":"ravenrock","30e8:Update.esm":"ravenrock","317e7:Skyrim.esm":"windhelm","31edd:SkyrimSewers.esp":"windhelm","32b8:JKs Skyrim.esp":"dawnstar","32fb04:WindhelmSSE.esp":"windhelm","336fb:Skyrim.esm":"markarth","33779:Skyrim.esm":"markarth","3377b:Dragonborn.esm":"ravenrock","33d68:Skyrim.esm":"markarth","34864:Skyrim.esm":"markarth","3486e:Skyrim.esm":"markarth","34955:Skyrim.esm":"windhelm","34e548:WindhelmSSE.esp":"windhelm","34ef4:ElysiumEstate.esp":"whiterun","34fd2:Dragonborn.esm":"ravenrock","3519:JKs Skyrim.esp":"riften","35299:Skyrim.esm":"winterhold","352c7:Skyrim.esm":"whiterun","3538d:Skyrim.esm":"falkreath","35a22:Dragonborn.esm":"ravenrock","35dec:ElysiumEstate.esp":"whiterun","35f67:Dragonborn.esm":"ravenrock","361f9:Skyrim.esm":"markarth","361fa:Skyrim.esm":"markarth","362d8:Skyrim.esm":"solitude","3678a:SkyrimSewers.esp":"whiterun","36798:Dragonborn.esm":"ravenrock","36a72:Skyrim.esm":"markarth","36d10e:WindhelmSSE.esp":"windhelm","36ed5:Skyrim.esm":"whiterun","36ed6:Skyrim.esm":"whiterun","371dd:Skyrim.esm":"falkreath","371de:Skyrim.esm":"falkreath","37a22:AnotherOakwood.esp":"falkreath","37a25:AnotherOakwood.esp":"falkreath","37a26:AnotherOakwood.esp":"falkreath","37a27:AnotherOakwood.esp":"falkreath","37a28:AnotherOakwood.esp":"falkreath","37a29:AnotherOakwood.esp":"falkreath","37a2a:AnotherOakwood.esp":"falkreath","37b76:Skyrim.esm":"riften","37cc6:Skyrim.esm":"riften","37ee0:Skyrim.esm":"solitude","38e652:Riften Expansion.esp":"riften","38f3a:SkyrimSewers.esp":"whiterun","3929e:Dragonborn.esm":"ravenrock","399d1:Skyrim.esm":"markarth","39eac:Dragonborn.esm":"ravenrock","3a183:Skyrim.esm":"falkreath","3a184:Skyrim.esm":"falkreath","3a985:North Keep.esp":"falkreath","3a986:North Keep.esp":"falkreath","3a987:North Keep.esp":"falkreath","3a988:North Keep.esp":"falkreath","3a989:North Keep.esp":"falkreath","3a98a:North Keep.esp":"falkreath","3a98b:North Keep.esp":"falkreath","3a98c:North Keep.esp":"falkreath","3ac5:JKs Skyrim.esp":"dawnstar","3b21f:SkyrimSewers.esp":"whiterun","3b696:Skyrim.esm":"riften","3b698:Skyrim.esm":"riften","3b87d:Skyrim.esm":"riften","3bf0:Dawnguard.esm":"riften","3bf9f:SkyrimSewers.esp":"whiterun","3c7f5:Dragonborn.esm":"ravenrock","3c90e:SkyrimSewers.esp":"whiterun","3cbcb:Skyrim.esm":"riften","3cfa:OarsRest.esp":"falkreath","3d35a:Skyrim.esm":"whiterun","3d61b:SkyrimSewers.esp":"whiterun","3dd34:Skyrim.esm":"winterhold","3e908:Skyrim.esm":"morthal","3ea9d:Skyrim.esm":"markarth","3f516:Skyrim.esm":"windhelm","3f78:JKs Skyrim.esp":"whiterun","3fc8f:Skyrim.esm":"falkreath","3ff10:Skyrim.esm":"whiterun","414dd:Skyrim.esm":"winterhold","41777:Skyrim.esm":"whiterun","41cd2:AnotherOakwood.esp":"falkreath","42ab0:Arena - Markarth Side.esp":"morthal","42bec:Skyrim.esm":"windhelm","42bed:Skyrim.esm":"windhelm","439e7:SkyrimSewers.esp":"windhelm","43fab:Skyrim.esm":"whiterun","4401b:Skyrim.esm":"markarth","446bf:Skyrim.esm":"winterhold","45a1d:Skyrim.esm":"riften","4624f:Skyrim.esm":"solitude","4637:JKs Skyrim.esp":"solitude","466cb:Skyrim.esm":"dawnstar","470e7:AnotherOakwood.esp":"falkreath","471dc:Skyrim.esm":"winterhold","4761b:Skyrim.esm":"riften","47817:Skyrim.esm":"falkreath","479d5:JK's Whiterun's Outskirts.esp":"whiterun","47aac:JK's Whiterun's Outskirts.esp":"whiterun","480ff:SkyrimSewers.esp":"whiterun","4823a:WindhelmSSE.esp":"windhelm","4849:HearthFires.esm":"falkreath","4a376:Skyrim.esm":"whiterun","4b8fb:Skyrim.esm":"windhelm","4bbac:SkyrimSewers.esp":"markarth","4c35:AnotherOakwood.esp":"falkreath","4c36:AnotherOakwood.esp":"falkreath","4c37:AnotherOakwood.esp":"falkreath","4c38:AnotherOakwood.esp":"falkreath","4c39:AnotherOakwood.esp":"falkreath","4c3a:AnotherOakwood.esp":"falkreath","4c3b:AnotherOakwood.esp":"falkreath","4c3d:AnotherOakwood.esp":"falkreath","4c6dd:Skyrim.esm":"riften","4d322:SkyrimSewers.esp":"markarth","4d3bb:WindhelmSSE.esp":"windhelm","4d45c:WindhelmSSE.esp":"windhelm","4d674:WindhelmSSE.esp":"windhelm","4d7bf:WindhelmSSE.esp":"windhelm","4d912:WindhelmSSE.esp":"windhelm","4da84:WindhelmSSE.esp":"windhelm","4dbf4:WindhelmSSE.esp":"windhelm","4dd75:WindhelmSSE.esp":"windhelm","4dfba:WindhelmSSE.esp":"windhelm","4fcdf:SkyrimSewers.esp":"markarth","5015c:Skyrim.esm":"riften","5015d:Skyrim.esm":"windhelm","50f1e:Skyrim.esm":"morthal","52390:Skyrim.esm":"dawnstar","5258c:Skyrim.esm":"dawnstar","527f2:Skyrim.esm":"dawnstar","529dd:Skyrim.esm":"riften","52cb5:Skyrim.esm":"dawnstar","52feb:Skyrim.esm":"windhelm","53081:Skyrim.esm":"riften","54226:Skyrim.esm":"dawnstar","542c:OarsRest.esp":"falkreath","544ab:SkyrimSewers.esp":"windhelm","547f0:Skyrim.esm":"markarth","54b6f:Skyrim.esm":"windhelm","54b70:Skyrim.esm":"windhelm","54d0e:Skyrim.esm":"whiterun","55215:Skyrim.esm":"markarth","5554a:Skyrim.esm":"riften","563e2:Skyrim.esm":"morthal","56c1b:Skyrim.esm":"winterhold","56e88:Skyrim.esm":"solitude","571b4:Skyrim.esm":"markarth","5734:Dawnguard.esm":"riften","580a2:Skyrim.esm":"whiterun","58663:Skyrim.esm":"morthal","58b4c:Skyrim.esm":"markarth","58b4d:Skyrim.esm":"markarth","5900:Arena - Markarth Side.esp":"windhelm","5912d:Skyrim.esm":"markarth","59398:Skyrim.esm":"markarth","597d4:Skyrim.esm":"markarth","59eb:OarsRest.esp":"falkreath","5a856:Skyrim.esm":"markarth","5a857:Skyrim.esm":"markarth","5b5dd:Skyrim.esm":"markarth","5b88b:Skyrim.esm":"riften","5b91b:Skyrim.esm":"falkreath","5c483:Skyrim.esm":"riften","5c591:Arena - Markarth Side.esp":"morthal","5c98:aaaGraniteHill.esp":"falkreath","5d010:Skyrim.esm":"morthal","5d01d:Skyrim.esm":"winterhold","5de24:Skyrim.esm":"falkreath","5e1f9:SkyrimSewers.esp":"markarth","5eaa:Dawnguard.esm":"riften","5eab:Dawnguard.esm":"riften","5f496:SkyrimSewers.esp":"riften","5f536:Skyrim.esm":"markarth","626a:aaaGraniteHill.esp":"falkreath","633a:JKs Skyrim.esp":"whiterun","64fc2:SkyrimSewers.esp":"solitude","6554:OarsRest.esp":"falkreath","656ca:SkyrimSewers.esp":"markarth","65ab5:Skyrim.esm":"markarth","65ab6:Skyrim.esm":"falkreath","67f2a:Skyrim.esm":"windhelm","681dd:Skyrim.esm":"riften","68b99:Skyrim.esm":"solitude","69858:Skyrim.esm":"winterhold","6c3b6:Skyrim.esm":"solitude","6c532:WindhelmSSE.esp":"windhelm","6c62b:SkyrimSewers.esp":"windhelm","6c658:WindhelmSSE.esp":"windhelm","6ccbb:Skyrim.esm":"riften","6daa0:Skyrim.esm":"solitude","6dcd5:SkyrimSewers.esp":"whiterun","6e2ac:Skyrim.esm":"markarth","70469:Skyrim.esm":"solitude","7066:Dawnguard.esm":"riften","7144c:Skyrim.esm":"dawnstar","71ffe:Skyrim.esm":"solitude","7284e:Skyrim.esm":"markarth","75669:Skyrim.esm":"falkreath","760a:AnotherOakwood.esp":"falkreath","7614c:Skyrim.esm":"dawnstar","778f1:Skyrim.esm":"morthal","78124:Skyrim.esm":"dawnstar","7843:The Great City of Solitude.esp":"solitude","7947a:Skyrim.esm":"whiterun","79f9f:Skyrim.esm":"falkreath","7b7ab:Skyrim.esm":"solitude","7bc27:Skyrim.esm":"windhelm","7bef7:Skyrim.esm":"winterhold","7bef8:Skyrim.esm":"winterhold","7c98b:Skyrim.esm":"solitude","7d033:Skyrim.esm":"windhelm","7dcfc:Skyrim.esm":"solitude","7f93:SkyrimSewers.esp":"solitude","7fcdd:Skyrim.esm":"winterhold","801:Arena - Markarth Side.esp":"morthal","801b3:Arena - Markarth Side.esp":"morthal","80c6a:Skyrim.esm":"whiterun","81972:Skyrim.esm":"winterhold","81dec:Skyrim.esm":"falkreath","83559:Skyrim.esm":"morthal","83c1:aaaGraniteHill.esp":"falkreath","87764:Skyrim.esm":"whiterun","89d51:Skyrim.esm":"riften","8a04c:Riften Expansion.esp":"riften","8a43:aaaGraniteHill.esp":"falkreath","8afc:The Great City of Solitude.esp":"solitude","8b84d:Skyrim.esm":"falkreath","8c81:The Great City of Solitude.esp":"solitude","8cdee:Skyrim.esm":"markarth","8e906:Skyrim.esm":"markarth","8ed5:The Great City of Solitude.esp":"solitude","90232:WindhelmSSE.esp":"windhelm","90335:WindhelmSSE.esp":"windhelm","91872:Skyrim.esm":"morthal","918d3:Skyrim.esm":"whiterun","94322:Skyrim.esm":"dawnstar","94bab:Skyrim.esm":"whiterun","961ff:Skyrim.esm":"winterhold","965b3:Skyrim.esm":"windhelm","97298:Skyrim.esm":"windhelm","97299:Skyrim.esm":"windhelm","9aa4a:Skyrim.esm":"dawnstar","9b238:Skyrim.esm":"solitude","9ccdd:Skyrim.esm":"riften","9ccde:Skyrim.esm":"riften","9ccdf:Skyrim.esm":"riften","a013b:Skyrim.esm":"riften","a0877:Skyrim.esm":"windhelm","a1793:Skyrim.esm":"solitude","a1a61:Skyrim.esm":"falkreath","a1bfd:Skyrim.esm":"riften","a37a0:Riften Expansion.esp":"riften","a5a71:Skyrim.esm":"riften","a6d8e:Skyrim.esm":"riften","a73f4:Skyrim.esm":"windhelm","a87c5:Skyrim.esm":"solitude","a8b23:Skyrim.esm":"riften","a8b24:Skyrim.esm":"riften","a9194:Skyrim.esm":"markarth","aa20c:Skyrim.esm":"markarth","aac5:Riften Expansion.esp":"riften","ab531:Skyrim.esm":"morthal","abd31:Skyrim.esm":"dawnstar","ac5d2:Skyrim.esm":"solitude","ad5a1:Skyrim.esm":"falkreath","addb:The Great City of Solitude.esp":"solitude","ae783:Skyrim.esm":"winterhold","af227:Skyrim.esm":"windhelm","afdb:The Great City of Solitude.esp":"solitude","b1783:Skyrim.esm":"solitude","b213:The Great City of Solitude.esp":"solitude","b29d4:Skyrim.esm":"winterhold","b29d5:Skyrim.esm":"winterhold","b29d6:Skyrim.esm":"winterhold","b64b4:Skyrim.esm":"solitude","b6be6:Skyrim.esm":"falkreath","ba599:Skyrim.esm":"solitude","bbb2f:Skyrim.esm":"solitude","be46a:Skyrim.esm":"morthal","c5aa0:Skyrim.esm":"whiterun","c7348:Skyrim.esm":"dawnstar","c849d:WindhelmSSE.esp":"windhelm","c8b44:WindhelmSSE.esp":"windhelm","c9dab:Skyrim.esm":"whiterun","cab91:Skyrim.esm":"winterhold","cab92:Skyrim.esm":"winterhold","cc3f6:Riften Expansion.esp":"riften","cc616:Riften Expansion.esp":"riften","cd4a:SkyrimSewers.esp":"solitude","d9ac:aaaGraniteHill.esp":"falkreath","d9dc7:Skyrim.esm":"riften","da07:aaaGraniteHill.esp":"falkreath","db070:Skyrim.esm":"whiterun","dbf12:Skyrim.esm":"windhelm","dd216:Skyrim.esm":"solitude","dd95b:WindhelmSSE.esp":"windhelm","ddf7c:Skyrim.esm":"falkreath","debcd:Skyrim.esm":"whiterun","e09c:The Great City of Solitude.esp":"solitude","e1e6:The Great City of Solitude.esp":"solitude","e348:The Great City of Solitude.esp":"solitude","e48e:The Great City of Solitude.esp":"solitude","e6114:Riften Expansion.esp":"riften","eb440:Skyrim.esm":"dawnstar","eb7:Dawnguard.esm":"dawnstar","eb8:Dawnguard.esm":"dawnstar","ed8e0:Skyrim.esm":"winterhold","eec53:Skyrim.esm":"winterhold","eec55:Skyrim.esm":"winterhold","ef324:Skyrim.esm":"falkreath","ef325:Skyrim.esm":"falkreath","f10d:The Great City of Solitude.esp":"solitude","f453:The Great City of Solitude.esp":"solitude","f9a47:Arena - Markarth Side.esp":"morthal","f9b2a:Arena - Markarth Side.esp":"morthal","fd2b:The Great City of Solitude.esp":"solitude","fee74:JK's Whiterun's Outskirts.esp":"whiterun"};
+  // ==== end BUILDING_HOLD ====
+
+  /** The hold a building is in, in the offices' town keys, or null. */
+  function holdOfBuilding(building) {
+    return Object.prototype.hasOwnProperty.call(BUILDING_HOLD, building) ? BUILDING_HOLD[building] : null;
+  }
+
+  /*
+    A steward ends a claim and sets rent only in their own hold (#2551): the
+    Steward of the building's hold, or its Jarl, who keeps the hold too. Null
+    when they may; otherwise what to tell them. Asked again at every press.
+  */
+  function notStewardHere(profileId, building) {
+    var hold = holdOfBuilding(building);
+    if (!hold) {
+      return nameOf(building) + ' answers to no hold the server knows, so no steward ends a claim or sets rent there.';
+    }
+    if (isStewardOf(profileId, hold)) { return null; }
+    var town = HOLD_TOWN[hold] || hold;
+    return nameOf(building) + ' answers to ' + town + '. Only the Steward of ' + town + ' or its Jarl ends a claim ' +
+      'or sets rent there.';
+  }
+
   // ------------------------------------------------------------ the doors --
 
   /*
@@ -38406,10 +38459,11 @@ log('gamemode loaded:',
     /box               say which hold's box you are standing at
 
     A steward's, because designating the city's treasury is city business.
-    Sent by the Office page of the K panel (#1638), which offers the ten
-    holds for the container the steward just opened, never typed. Only one of
-    the ten is taken, the same as a board: any other word would start a box
-    no hold's ledger knows about.
+    Sent by the Office page of the K panel (#1638), which offers the holds
+    the steward keeps for the container they just opened, never typed. Only
+    one of the ten is taken, the same as a board: any other word would start
+    a box no hold's ledger knows about. And only a hold the steward keeps
+    (#2551): the Steward of it, or its Jarl, the same rule as its board.
   */
   function boxCmd(parts, actorId, profileId, toProfile) {
     var at = boxAt(actorId);
@@ -38460,6 +38514,10 @@ log('gamemode loaded:',
     }
     if (LEDGER_HOLDS.indexOf(arg) < 0) {
       toProfile(profileId, 'No hold called ' + arg + '. The holds are ' + LEDGER_HOLDS.join(', ') + '.');
+      return true;
+    }
+    if (!isStewardOf(profileId, arg)) {
+      toProfile(profileId, 'Only the Steward of ' + (HOLD_TOWN[arg] || arg) + ' or its Jarl names its box.');
       return true;
     }
     boxes[arg] = at;
@@ -39059,7 +39117,8 @@ log('gamemode loaded:',
 
     Sent by Set rent and No rent on the Office page of the K panel (#1638),
     never typed; the page shows a steward what is owed at the door they just
-    opened. See officeView.
+    opened. See officeView. Only a steward of the building's hold sets or
+    waives it (#2551, notStewardHere); anybody at the door reads it.
   */
   var OFFICE_AT_DOOR = 'Open the door of the building, then press the button on the Office page of K within a minute.';
 
@@ -39086,6 +39145,11 @@ log('gamemode loaded:',
 
     if (!isSteward(profileId)) {
       toProfile(profileId, 'Only a steward sets rent.');
+      return true;
+    }
+    var notHere = notStewardHere(profileId, building);
+    if (notHere) {
+      toProfile(profileId, notHere);
       return true;
     }
     if (!held) {
@@ -42421,6 +42485,11 @@ log('gamemode loaded:',
       toProfile(profileId, OFFICE_AT_DOOR);
       return true;
     }
+    var notHere = notStewardHere(profileId, building);
+    if (notHere) {
+      toProfile(profileId, notHere);
+      return true;
+    }
     var held = holderOf(building);
     if (!held) {
       /*
@@ -42588,7 +42657,12 @@ log('gamemode loaded:',
     if (building) {
       var held = holderOf(building);
       if (held && held.rent) { rentDue(); }
+      // The building's hold (#2551): the page offers Evict and the rent only
+      // to a steward of it, and says whose it is to anybody else.
+      var bhold = holdOfBuilding(building);
       view.door = { name: nameOf(building), by: held ? held.name : null,
+                    hold: bhold, where: bhold ? (HOLD_TOWN[bhold] || bhold) : null,
+                    ours: !!bhold && keeps.indexOf(bhold) !== -1,
                     rent: (held && held.rent) ? { amount: Number(held.rent.amount) || 0,
                                                   every: Number(held.rent.everyDays) || 7,
                                                   owed: Number(held.rent.owed) || 0 } : null };

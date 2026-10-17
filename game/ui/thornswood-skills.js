@@ -2168,6 +2168,13 @@
     var r = d.rent;
     card.appendChild(el('div', 'desc', (d.by ? 'Held by ' + d.by + '. ' : 'Nobody holds it. ') +
       (r ? 'Rent ' + r.amount + ' gold every ' + r.every + ' days, ' + r.owed + ' owed.' : 'No rent on it.')));
+    // A steward settles only their own hold's buildings (#2551); the server says whose this one is.
+    if (!d.ours) {
+      card.appendChild(el('div', 'desc', d.where
+        ? 'It answers to ' + String(d.where) + '. Only the Steward of ' + String(d.where) + ' or its Jarl ends a claim or sets rent here.'
+        : 'It answers to no hold the server knows, so no steward ends a claim or sets rent here.'));
+      return card;
+    }
     if (!d.by) return card;
     officeRow(card, '', '', [officeButton('Evict', '/evict', 'Press again to end ' + d.by + '\'s claim')]);
     var input = document.createElement('input');
