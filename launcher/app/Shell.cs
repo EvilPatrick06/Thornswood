@@ -624,23 +624,27 @@ namespace Thornswood
             StartStallWatch();
             if (!askedToUninstall && termsOnFile)
             {
-                // The record is already there. A page whose text has changed
-                // is asked again, off this thread so startup does not wait
-                // on the site. Declining closes the launcher.
+                // The record is already there (the setup program's, or the
+                // first start's above). A page is asked again only when its
+                // text has changed since it was accepted, and then only that
+                // page: Patrick, 16 Oct 2026 (#2616), asked once at install,
+                // and again "if any changes and only ask about the one that
+                // does change". Off this thread so startup does not wait on
+                // the site. Declining closes the launcher.
                 ThreadPool.QueueUserWorkItem(delegate
                 {
                     try
                     {
-                        bool ok = Acceptance.Recheck(Paths.ProfileDir, delegate
+                        bool ok = Acceptance.Recheck(Paths.ProfileDir, delegate(bool[] which)
                         {
                             bool ticked = false;
-                            win.Dispatcher.Invoke((Action)delegate { ticked = Acceptance.Ask(true); });
+                            win.Dispatcher.Invoke((Action)delegate { ticked = Acceptance.Ask(which); });
                             return ticked;
                         });
                         if (!ok)
                         {
                             try { win.Dispatcher.Invoke((Action)delegate { if (Application.Current != null) Application.Current.Shutdown(); }); }
-                            catch (Exception ex) { Swallow.Note("Shell.Run, closing after the terms were declined", ex); }
+                            catch (Exception ex) { Swallow.Note("Shell.Run, closing after a changed page was declined", ex); }
                         }
                     }
                     catch (Exception ex) { Swallow.Note("Shell.Run, terms recheck", ex); }
