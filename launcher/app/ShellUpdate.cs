@@ -237,6 +237,9 @@ namespace Thornswood
             pendingPacks = Updater.Pending(v);
             bool newLauncher = Updater.IsNewer(v.launcherVersion, Updater.Version)
                                && !string.IsNullOrEmpty(v.launcherUrl);
+            // Scan and Fix's card goes by the same answer (#2627), so the Fix
+            // button knows about an update waiting without Scan being pressed.
+            FeedOnCard(v);
 
             // Before a word is said about updates. An update into a build with
             // no mods in it cannot work, and reporting that it failed when the
@@ -417,7 +420,10 @@ namespace Thornswood
             });
         }
 
-        static void RunUpdate()
+        static void RunUpdate() { RunUpdate(null); }
+
+        /// <param name="after">Run on the window's thread when the update has gone in or failed without restarting the launcher, or null. Fix takes the update last and scans again after it (#2627).</param>
+        static void RunUpdate(Action after)
         {
             if (playing) { Log("Quit the game first."); return; }
             // An update writes into the build. A game still holding files open
@@ -491,6 +497,7 @@ namespace Thornswood
                         updatePending = false;
                         DrawStatus(); BuildModList();
                         Log("Update finished.");
+                        if (after != null) after();
                     }));
                 }
                 catch (Exception ex)
@@ -511,6 +518,7 @@ namespace Thornswood
                         PlayProgress.End();
                         DrawStatus();
                         Log("Play stays off until the update goes through, because the server is expecting the newer mod list.");
+                        if (after != null) after();
                     }));
                 }
                 finally { PlayProgress.Second(false); }

@@ -199,6 +199,14 @@ Thornswood's own plugin when its bytes differ, names the mod to update or
 reinstall in Vortex when another author's plugin differs, and moves another
 server's files and stray Creation Club plugins aside, never deleting them.
 
+Scan also looks at the rest of the install: an update waiting, Thornswood's
+game folder behind what Vortex has deployed or missing files, this build's own
+files changed, Windows' Skyrim folders left pointed at Thornswood after a
+crash, the shortcut icon, the multiplayer client, Steam and the Skyrim build.
+Fix puts right everything it can, bringing the game folder up to date from
+Vortex first and taking a waiting update last. Then it looks again and says
+only what is still wrong, why, and what will put it right.
+
 If Scan says a plugin is missing rather than different, the collection is not
 fully installed or the wrong Vortex profile is active. The launcher says which.
 
