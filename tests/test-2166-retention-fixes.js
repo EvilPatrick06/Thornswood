@@ -14,15 +14,14 @@
         for a session staff marked kept stays.
     G2  the voice service's chat prune ran every six hours, hourly only while
         a day was overdue; the page says the check is hourly. It now runs
-        every hour.
+        every hour (held by tests\test-chat-log.js, which lifts chatPrune).
     G4  a Discord sign-in set the member cookie tw for a year, which the page
         describes as the fallback for a site with no Discord. It is now
         cleared there instead (tests\test-site-oauth-gaps.js checks the
         answer itself).
 
   G3 runs against a real copy of site\server.js in a scratch folder on a spare
-  port, with no session ending. G2 lifts chatPrune out of voice-server.js and
-  watches the delay it asks for. Nothing leaves the machine and the scratch
+  port, with no session ending. Nothing leaves the machine and the scratch
   folders are removed at the end.
 */
 const fs = require('fs');
@@ -34,9 +33,7 @@ const { spawn } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
 const SITE_SRC = path.join(ROOT, 'site', 'server.js');
-const VOICE_SRC = path.join(ROOT, 'voice', 'voice-server.js');
 const site = fs.readFileSync(SITE_SRC, 'utf8');
-const voice = fs.readFileSync(VOICE_SRC, 'utf8');
 
 let pass = 0, fail = 0;
 function yes(what, cond, why) {
@@ -160,35 +157,6 @@ async function trouble() {
   } else yes('server.js has freshTrouble', false);
 }
 
-function chat() {
-  console.log('\nG2  THE CHAT PRUNE RUNS EVERY HOUR');
-  const body = grab(voice, 'chatPrune');
-  yes('voice-server.js has chatPrune', !!body);
-  yes('the six-hour wait is gone from it', !/6 \* 3600000/.test(body));
-  const CHAT_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-2166-chat-'));
-  const CHAT_DAYS = 365;
-  const CHAT_PRUNE_ALERT = 3;
-  const chatPruneFailures = {};
-  let chatOverdue = 0, chatPruneError = '', chatPruneTimer = null;
-  const asked = [];
-  const setTimeout = (fn, ms) => { asked.push(ms); return 0; };
-  const clearTimeout = () => {};
-  const chatPruneSay = () => {};
-  let chatPrune;
-  eval(body.replace(/^function chatPrune/, 'chatPrune = function'));
-  // A day well inside the window, and one past it: synthetic files only.
-  const d = (ms) => { const t = new Date(ms); const p = (n) => (n < 10 ? '0' : '') + n;
-    return t.getFullYear() + '-' + p(t.getMonth() + 1) + '-' + p(t.getDate()) + '.jsonl'; };
-  fs.writeFileSync(path.join(CHAT_DIR, d(NOW - 2 * DAY)), '{"text":"stand-in"}\n');
-  fs.writeFileSync(path.join(CHAT_DIR, d(NOW - 400 * DAY)), '{"text":"stand-in"}\n');
-  chatPrune();
-  yes('a day past 365 is deleted and a recent one stays',
-      !fs.existsSync(path.join(CHAT_DIR, d(NOW - 400 * DAY))) && fs.existsSync(path.join(CHAT_DIR, d(NOW - 2 * DAY))));
-  yes('with nothing overdue the next pass is in one hour, not six', asked[asked.length - 1] === 3600000, String(asked));
-  try { fs.rmSync(CHAT_DIR, { recursive: true, force: true }); } catch (e) { }
-  yes('the prune still runs once at start', /\nchatPrune\(\);/.test(voice));
-}
-
 function cookie() {
   console.log('\nG4  A DISCORD SIGN-IN DOES NOT SET THE MEMBER COOKIE');
   const at = site.indexOf('const cookies2 = [');
@@ -202,7 +170,6 @@ function cookie() {
 
 (async () => {
   await trouble();
-  chat();
   cookie();
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);

@@ -399,8 +399,9 @@ jobs:
           # Issue #2166: tests\test-2166-retention-fixes.js holds three
           # retention fixes to what the privacy page already says: trouble.json
           # ages by 365 days in the hourly sweep on a scratch site (a kept
-          # session's alert stays), the voice chat prune runs every hour, and
-          # a Discord sign-in no longer sets the member cookie tw. A second.
+          # session's alert stays) and a Discord sign-in no longer sets the
+          # member cookie tw; test-chat-log.js holds the hourly chat prune.
+          # A second.
           $six ='test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
