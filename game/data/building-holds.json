@@ -1405,11 +1405,6 @@
     },
     {
      "hold": "windhelm",
-     "location": "0WHMuseumLocation",
-     "place": "0WHMuseumTopFloor"
-    },
-    {
-     "hold": "windhelm",
      "location": "WindhelmLocation",
      "place": "WindhelmWorld 31,11"
     }
@@ -5096,11 +5091,6 @@
    "opensOnto": [
     {
      "hold": "windhelm",
-     "location": "0WindhelmGQTemple",
-     "place": "0GrayQuarterTemple"
-    },
-    {
-     "hold": "windhelm",
      "location": "WindhelmLocation",
      "place": "WindhelmWorld 34,9"
     }
@@ -6763,11 +6753,6 @@
    "opensOnto": [
     {
      "hold": "windhelm",
-     "location": "0WindhelmThievesGuild",
-     "place": "0GrayQuarterLoft"
-    },
-    {
-     "hold": "windhelm",
      "location": "WindhelmLocation",
      "place": "WindhelmWorld 33,9"
     }
@@ -8257,11 +8242,6 @@
    "opensOnto": [
     {
      "hold": "falkreath",
-     "location": "NorthkeepInnLocation",
-     "place": "NorthkeepInn"
-    },
-    {
-     "hold": "falkreath",
      "location": "NorthkeepLocation",
      "place": "Tamriel -14,-19"
     }
@@ -9342,11 +9322,6 @@
    "how": "doors",
    "name": "The Rooftop",
    "opensOnto": [
-    {
-     "hold": "windhelm",
-     "location": "0WindhelmThievesGuild",
-     "place": "0GrayQuarterThievesGuild"
-    },
     {
      "hold": "windhelm",
      "location": "WindhelmLocation",
@@ -11463,11 +11438,6 @@
      "hold": "riften",
      "location": "RiftenLocation",
      "place": "RiftenWorld 43,-24"
-    },
-    {
-     "hold": "riften",
-     "location": "RiftenMaraSquareTowerLocation",
-     "place": "RiftenMaraSquareTower"
     }
    ],
    "ownLocation": "RiftenMaraSquareTowerLocation"

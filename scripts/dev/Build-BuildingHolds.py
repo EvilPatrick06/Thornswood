@@ -319,6 +319,10 @@ def main():
                     pl = place_of(d)
                     if pl is None:
                         continue
+                    # A door that stands in the building itself, or in a room
+                    # already walked, opens onto nowhere new.
+                    if 'room' in pl and pl['room'] in seen:
+                        continue
                     if pl['hold']:
                         found.append(pl)
                     elif 'room' in pl:
