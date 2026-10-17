@@ -82,6 +82,21 @@ Yes '  refuses an outfit that writes a body' ($bg.Contains('Test-GeneratedBodyPa
 Yes '  refuses a missing or stray outfit file' ($bg.Contains('did not build every outfit file') -and $bg.Contains('built files no set names'))
 Yes '  and still refuses any .tri morph' ($bg.Contains("Extension -ieq '.tri'"))
 
+# Each outfit group's permissions are recorded in the provenance register,
+# read off the mod pages (#2454): who made it, the licence, the credit.
+$prov = Get-Content -LiteralPath (Join-Path $Repo 'records\asset-provenance.json') -Raw | ConvertFrom-Json
+$rows = @($prov.notInRepo)
+function RowOf([string]$like) { @($rows | Where-Object { $_.path -like $like }) }
+Yes 'the register no longer counts 140 built meshes as one row' ((RowOf 'The 140 outfit meshes*').Count -eq 0)
+$tc = @(RowOf 'The 120 travel clothes meshes*')
+Yes '  the 120 travel clothes have a row naming Nexus 83980 and 21305' ($tc.Count -eq 1 -and $tc[0].source -like '*83980*' -and $tc[0].source -like '*21305*' -and $tc[0].issue -eq 2454)
+$ex = @(RowOf 'The 2 executioner meshes*')
+Yes '  the executioner has a row with MCE''s licence (Nexus 44666, CC BY-NC-SA 4.0) and its credit' ($ex.Count -eq 1 -and $ex[0].source -like '*44666*' -and $ex[0].licence -like '*Attribution-NonCommercial-ShareAlike 4.0*' -and $ex[0].attribution -like '*Parapets*')
+$bo = @(RowOf 'The 18 Bosmer armour meshes*')
+Yes '  the Bosmer build has a row naming Nexus 22382 and 3479 and an issue' ($bo.Count -eq 1 -and $bo[0].source -like '*22382*' -and $bo[0].source -like '*3479*' -and $bo[0].issue -eq 2454)
+$counted = 0; foreach ($r in @($tc) + @($ex)) { if ($r.path -match '^The (\d+) ') { $counted += [int]$Matches[1] } }
+Yes ('  the rows for built-until-1259 count its {0} lines' -f $ShipBuiltUntil1259.Count) ($counted -eq $ShipBuiltUntil1259.Count)
+
 Write-Host ("{0} passed, {1} failed" -f $pass, $fail)
 if ($fail) { exit 1 }
 exit 0

@@ -429,10 +429,14 @@ below that still have no licence this file can name.
   fix) shipped until collection revision 2 carried them
   (docs\COLLECTION-REVISION-2.md). The message board Thornswood-Content.esp
   places ships for as long as that plugin names it, since no revision carries
-  it (#2298), and 140
-  outfit meshes built in BodySlide on another machine ship as ours for now,
-  until Thornswood builds them itself from the collection's BodySlide projects
-  (#1259, `scripts\release\built-until-1259.txt`). Packs
+  it (#2298), and 122
+  outfit meshes built in BodySlide on another machine (the travel clothes and
+  More Craftable Equipment's executioner) ship as ours for now, until
+  Thornswood builds them itself from the collection's BodySlide projects
+  (#1259, #2454, `scripts\release\built-until-1259.txt`). The 18 Bosmer
+  armour morphs no longer ship; Build-Generated builds that armour from the
+  collection (#2454). What each mod's page permits for that built output is in
+  `records\asset-provenance.json`. Packs
   and records already on the site, and the installer there, still carry the
   rest until they are scrubbed.
 - Bethesda's `MarketplaceTextures.bsa` went out in every pack and in the
