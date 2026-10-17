@@ -403,7 +403,7 @@
     },
     home: {
       title: 'Home',
-      lead: 'Where you wake up. The inn keeps a room for you, and it is where you come back to.',
+      lead: 'The town you start in. You arrive at a quiet spot in or near it, not in its inn.',
       rows: []   // the server sends the towns while you are new
     },
     review: {
@@ -414,12 +414,17 @@
   };
   var REVIEW = DATA.review;   // kept beside a table the server might send without it
 
-  /* The inn in each town, by the server's town key. Display only. */
-  var INNS = {
-    whiterun: 'The Bannered Mare', riften: 'The Bee and Barb', solitude: 'The Winking Skeever',
-    windhelm: 'Candlehearth Hall', markarth: 'The Silver-Blood Inn', falkreath: 'Dead Man’s Drink',
-    morthal: 'Moorside Inn', dawnstar: 'The Windpeak Inn', winterhold: 'The Frozen Hearth'
-  };
+  /*
+    The hold each town is in, from the town list the server sends (#2622).
+    Until 17 Oct this was a table of inns, because a new character arrived
+    in the inn; since #2622 they arrive at the town's start spot, so the card
+    names the hold instead, the same name the welcome line says.
+  */
+  function holdOf(key) {
+    var towns = (mine && mine.towns) || [];
+    for (var i = 0; i < towns.length; i++) if (towns[i].key === key) return towns[i].hold || '';
+    return '';
+  }
 
   var RANK_NAMES = { novice: 'Novice', advanced: 'Advanced', expert: 'Expert', master: 'Master' };
   var CAP = 5;             // points that fill a skill; the server's LIMITS.skillCap, mirrored for the pips
@@ -1327,7 +1332,7 @@
     var p = picked.home;
     var towns = (mine && mine.towns) || [];
     for (var i = 0; i < towns.length; i++) {
-      if (p && towns[i].key === p.row) return { t: towns[i].name, inn: INNS[p.row] || '', c: 'chosen' };
+      if (p && towns[i].key === p.row) return { t: towns[i].name, hold: towns[i].hold || '', c: 'chosen' };
     }
     return null;
   }
@@ -2561,7 +2566,7 @@
       if (haveHome() && mine.home === t.key) name.appendChild(el('span', 'tag', 'yours'));
       else if (p.row === t.key) name.appendChild(el('span', 'tag gold', 'chosen'));
       card.appendChild(name);
-      if (INNS[t.key]) card.appendChild(el('div', 'inn', INNS[t.key]));
+      if (t.hold) card.appendChild(el('div', 'inn', t.hold));
       card.onclick = function () { rowAt = i; if (!haveHome()) choose('home', t.key, []); draw(); };
       wrap.appendChild(card);
     });
@@ -2589,8 +2594,8 @@
     if (haveClass()) out.push({ k: 'Class', v: nameOf('class', mine['class']), c: 'set' });
     else if ((soft = softClass())) out.push({ k: 'Class', v: soft.t, c: 'chosen' });
     else out.push({ k: 'Class', v: later['class'] ? 'later' : 'not chosen yet', c: 'dim' });
-    if (haveHome()) out.push({ k: 'Home', v: cap(mine.home) + (INNS[mine.home] ? ', ' + INNS[mine.home] : ''), c: 'set' });
-    else if ((soft = softHome())) out.push({ k: 'Home', v: soft.t + (soft.inn ? ', ' + soft.inn : ''), c: 'chosen' });
+    if (haveHome()) out.push({ k: 'Home', v: cap(mine.home) + (holdOf(mine.home) ? ', ' + holdOf(mine.home) : ''), c: 'set' });
+    else if ((soft = softHome())) out.push({ k: 'Home', v: soft.t + (soft.hold ? ', ' + soft.hold : ''), c: 'chosen' });
     else out.push({ k: 'Home', v: 'not chosen yet', c: 'need' });
     return out;
   }
@@ -2787,7 +2792,7 @@
       if (creating()) return 'Pick a profession and its half and move on, or choose later and pick it in the world. Nothing is sent until Confirm.';
       return 'Pick a profession and its half, then confirm.';
     }
-    if (section === 'home') return haveHome() ? 'Home is set.' : 'Pick the town you will wake up in and move on to Review. A home is the one thing you must choose before you leave the hall.';
+    if (section === 'home') return haveHome() ? 'Home is set.' : 'Pick the town you will start in and move on to Review. A home is the one thing you must choose before you leave the hall.';
     return '';
   }
 
@@ -2944,8 +2949,26 @@
     if (Date.now() - apprSent.at >= PENDING_MS) apprSent = null;
   }
 
+  /*
+    BEGIN WAITS FOR ITS ANSWER. Djinn, 17 Oct, on dev: one Confirm, then
+    "No: you already have a profession", "No: you already know that one"
+    twice, "No: you already have a class" and "No: your home is already
+    chosen" in the chat. His log shows the whole Begin sent twice, 462 ms
+    apart (18:24:49.104 and .566): a second press reached begin() before the
+    server's answer did, and begin() decides what is new from what the server
+    has already confirmed, so the second press sent everything again. While
+    the town pick is in flight Begin is dark; the answer or a refusal clears
+    it (pending), and so does PENDING_MS if neither ever comes, so a lost
+    answer never leaves the button dead.
+  */
+  function homeInFlight() {
+    for (var i = 0; i < pending.length; i++) {
+      if (pending[i].section === 'home' && Date.now() - pending[i].at < PENDING_MS) return true;
+    }
+    return false;
+  }
   function canConfirm() {
-    if (creating()) return section === 'review' && !!softHome();
+    if (creating()) return section === 'review' && !!softHome() && !homeInFlight();
     if (section === 'spells') return canLearn();
     if (section === 'staff') return canUnlockStaff();
     if (section === 'college') return !!collegeView() && !studyWaiting();
@@ -3025,6 +3048,8 @@
     if (softClass() && !haveClass()) send('class', 'class ' + picked['class'].row);
     send('home', 'town ' + picked.home.row);
     status = 'Sent. The server is checking.'; statusKind = '';
+    // Lit again when PENDING_MS is up, if no answer ever came.
+    setTimeout(function () { if (!homeInFlight()) draw(); }, PENDING_MS + 50);
     draw();
   }
 
