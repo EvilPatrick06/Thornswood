@@ -2996,6 +2996,19 @@ function freshSignIns(rows, now) {
   }
   return kept.slice(0, ATTEMPTS_KEEP);
 }
+/* The hourly sweep ages the file too. Rows went only when somebody signed in
+   or opened the list, so on 18 Oct 41 rows holding an address sat past the
+   30 days the privacy page gives them, two days after the last sign-in. */
+function sweepSignIns(now) {
+  const raw = jsonFile(ATTEMPTS, []);
+  const rows = Array.isArray(raw) ? raw : [];
+  const kept = freshSignIns(rows, now);
+  const out = { rows: rows.length, kept: kept.length, written: false };
+  if (kept.length === rows.length) return out;
+  out.written = putJson(ATTEMPTS, kept);
+  if (!out.written) retentionSay('signin', { event: 'write-failed', rows: rows.length, kept: kept.length });
+  return out;
+}
 // ==== end thornswood signin ageing ====
 
 function noteSignIn(req, me, st, back) {
@@ -3322,7 +3335,8 @@ function pruneSessionLogs() {
   The rows go first, so the log prune reads which rows are still kept from
   the file as it now stands. The failed-session alerts in trouble.json age
   in the same pass by the same 365 days (#2166, sweepTrouble), and removed
-  gallery files whose hold has ended go too (#2352, pruneRemovedUploads).
+  gallery files whose hold has ended go too (#2352, pruneRemovedUploads),
+  and sign-in rows past their 30 days (sweepSignIns).
 */
 const RETENTION_EVERY_MS = 60 * 60 * 1000;
 /*
@@ -3442,7 +3456,8 @@ function retentionSweep() {
      anything goes. */
   const keptChat = copyKeptChats(now);
   return { sessions, keptChat, sessionLogs: pruneSessionLogs(),
-           trouble: sweepTrouble(now), removedUploads: pruneRemovedUploads(now) };
+           trouble: sweepTrouble(now), removedUploads: pruneRemovedUploads(now),
+           signIns: sweepSignIns(now) };
 }
 setInterval(retentionSweep, RETENTION_EVERY_MS).unref?.();
 

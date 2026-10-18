@@ -96,6 +96,14 @@ async function trouble() {
     row('gonesess00000006', '506', NOW - 366 * DAY, NOW - 366 * DAY, NOW - 366 * DAY)
   ], null, 2));
 
+  // Sign-ins hold an address and keep 30 days; nobody signs in here, so only
+  // the sweep the site runs as it comes up can take the old one out.
+  const SIGNINS = path.join(dir, 'data', 'signins.json');
+  fs.writeFileSync(SIGNINS, JSON.stringify([
+    { at: NOW - DAY, id: '601', handle: 'standin601', outcome: 'allowed', ip: '192.0.2.1' },
+    { at: NOW - 31 * DAY, id: '602', handle: 'standin602', outcome: 'allowed', ip: '192.0.2.2' }
+  ], null, 2));
+
   const port = await freePort();
   const srv = spawn(process.execPath, ['server.js'], {
     cwd: dir,
@@ -123,6 +131,11 @@ async function trouble() {
     yes('an alert whose logs arrived 10 days ago stays, aged like its log set', left.indexOf('latelogs00000004') >= 0);
     yes('an alert with no time at all is kept rather than guessed at', left.indexOf('notime0000000005') >= 0);
     yes('no retention failure was said', out.indexOf('trouble-retention') < 0, out);
+    let ins = [];
+    try { ins = JSON.parse(fs.readFileSync(SIGNINS, 'utf8')).map((r) => r && r.id); } catch (e) { }
+    yes('with nobody signing in, a sign-in 31 days old is gone and yesterday\'s stays',
+        ins.join(',') === '601', JSON.stringify(ins));
+    yes('no sign-in retention failure was said', out.indexOf('signin-retention') < 0, out);
   } catch (err) {
     fail++;
     console.log('FAIL  the trouble harness threw: ' + (err && err.stack ? err.stack : err));
@@ -136,6 +149,7 @@ async function trouble() {
 
   const sweep = grab(site, 'retentionSweep');
   yes('the hourly retention sweep runs sweepTrouble', /sweepTrouble\(now\)/.test(sweep));
+  yes('and sweepSignIns, which ages by freshSignIns', /sweepSignIns\(now\)/.test(sweep) && /freshSignIns\(rows, now\)/.test(grab(site, 'sweepSignIns')));
   yes('noteTrouble ages the file on the way in as well', /freshTrouble\(all, Date\.now\(\)\)/.test(grab(site, 'noteTrouble')));
   yes('trouble rows use the session window, SESSIONS_DAYS', /SESSIONS_DAYS \* 86400000/.test(grab(site, 'freshTrouble')));
 
