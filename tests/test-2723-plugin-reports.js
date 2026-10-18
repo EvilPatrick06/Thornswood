@@ -17,7 +17,8 @@
   line is still queued for the game server.
 
   A. Every line the front plugin sends with press (each tellServer call, and
-     each thornswoodNet.say(..., true) it puts in the page) is in the table
+     each thornswoodNet.say it puts in the page, every one a press since
+     #2732) is in the table
      below as a report, as a line the log keeps, or as the wait in line
      (#1131), with the lines it builds. A send site added to the plugin and
      not here fails, and so does a row here the plugin no longer has, so the
@@ -96,12 +97,16 @@ const SITES = {
     { n: 1, kind: 'report', lines: ['/loadorder 3 0 0a1b23c4d5e6f7a', '/loadorder 130 64 ' + 'abc12'.repeat(64),
                                     '/loadorderlight 2 0 9f8e7d6c5b'] },
   "'/joinpass ' + raw": { n: 1, kind: 'report', lines: ['/joinpass jp1.eyJwIjo3MDF9.Zm9vYmFy_-x'] },
-  // thornswoodNet.say(..., true) written into the page
+  // thornswoodNet.say written into the page (a press, quiet or not, since #2732)
   "' + JSON.stringify('/line hand ' + id) + '": { n: 1, kind: 'line', lines: ['/line hand 777'] },
   "' + JSON.stringify('/joinpass ' + pass) + '": { n: 1, kind: 'report', lines: ['/joinpass jp1.eyJwIjo3MDF9.YmFyYmF6'] },
   "\"/line\"": { n: 1, kind: 'line', lines: ['/line'] },
   "\"/line leave\"": { n: 1, kind: 'line', lines: ['/line leave'] },
-  "' + JSON.stringify(toServer[0]) + '": { n: 1, kind: 'none', lines: [] }
+  "' + JSON.stringify(toServer[0]) + '": { n: 1, kind: 'none', lines: [] },
+  // the look keys (lookVerb), on the form id under the crosshair
+  "' + JSON.stringify(line) + '": { n: 1, kind: 'kept', lines: ['/party ff00a001', '/trade ff00a001', '/friend ff00a001',
+                                                       '/mute ff00a001', '/deliver ff00a001', '/sleephere ff00a001',
+                                                       '/treat ff00a001'] }
 };
 
 /* ------------------------------------------------------------- A: source --- */
@@ -128,8 +133,8 @@ for (let at = FRONT.indexOf('tellServer('); at >= 0; at = FRONT.indexOf('tellSer
   const k = fold(a);
   found[k] = (found[k] || 0) + 1;
 }
-const SAY_TRUE = /thornswoodNet\.say\(([^;]*?),true\)/g;
-for (let m; (m = SAY_TRUE.exec(FRONT));) {
+const SAY = /thornswoodNet\.say\(([^;]*?)(,\{quiet:true\})?\);/g;
+for (let m; (m = SAY.exec(FRONT));) {
   const k = fold(m[1]);
   found[k] = (found[k] || 0) + 1;
 }
@@ -140,8 +145,8 @@ yes('A1 every line the front plugin sends with press is in this table (' + Objec
 const gone = Object.keys(SITES).filter((k) => !found[k]);
 yes('A2 and every row here is still a send site in the plugin' + (gone.length ? '; gone: ' + gone.join(' | ') : ''),
     gone.length === 0);
-yes('A3 tellServer still sends with true, so its lines come with press',
-    /thornswoodNet\.say\(' \+\s*JSON\.stringify\(toServer\[0\]\) \+ ',true\);/.test(FRONT));
+yes('A3 tellServer still sends through say, so its lines come with press (#2732)',
+    /thornswoodNet\.say\(' \+\s*JSON\.stringify\(toServer\[0\]\) \+ ',\{quiet:true\}\);/.test(FRONT));
 
 /* A copy of each row's lines, by what the log does with them. */
 const of = (kind) => [].concat(...Object.keys(SITES).filter((k) => SITES[k].kind === kind).map((k) => SITES[k].lines));
@@ -269,7 +274,7 @@ async function person(profileId, name) {
     setTimeout(() => reject(new Error('no welcome for ' + name + ' in four seconds')), 4000);
   });
 }
-/* As the front plugin says it: auto, so press: true (#2251). */
+/* As the front plugin says it: through say, so press: true (#2251, #2732). */
 const said = (p, text) => p.ws.send(JSON.stringify({ t: 'chat', text: text, press: true }));
 /* As somebody typing it. */
 const typed = (p, text) => p.ws.send(JSON.stringify({ t: 'chat', text: text }));
