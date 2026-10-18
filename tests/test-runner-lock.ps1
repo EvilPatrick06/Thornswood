@@ -179,6 +179,20 @@ if (-not $icacls -or -not $lib) {
         $said = @(Close-RunnerAccount '*S-1-5-7' $own $scratch)
         Yes '  a second run finds both already shut and names nothing' ($said.Count -eq 1 -and $said[0] -eq '*S-1-5-7: already shut out of 2 folder(s)')
 
+        # #2711: an account name Windows does not know was looked up in a try
+        # with an empty catch; now the stop says what the lookup said. And the
+        # names Lock-RunnerRoot gives come from a lookup that cannot throw: a
+        # SID Windows cannot name stays a SID.
+        $why = ''; try { $null = Close-RunnerAccount ('no-such-runner-' + [Guid]::NewGuid().ToString('N').Substring(0, 8)) $own $scratch } catch { $why = $_.Exception.Message }
+        Yes 'an account Windows does not know stops it, with what the lookup said' ($why -match '^there is no account called no-such-runner-\w+ on this box: \S')
+        $gone = 'S-1-5-21-1-2-3-4999'
+        # icacls refuses a SID nobody can name, so the rule goes on through .NET.
+        $acl = Get-Acl -LiteralPath $other
+        $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier($gone)), 'ReadAndExecute', 'ContainerInherit,ObjectInherit', 'None', 'Allow')))
+        Set-Acl -LiteralPath $other -AclObject $acl
+        $said = @(Lock-RunnerRoot $other ('*' + $me))
+        Yes 'Lock-RunnerRoot names an account Windows no longer knows by its SID, and the rest by name' ($said.Count -eq 1 -and $said[0] -match 'SYSTEM' -and $said[0] -match [regex]::Escape($gone))
+
         # ---- crash dumps, for real: the real Lock-VpsFolders.ps1 on a scratch
         # Dumps, then the deny an install before #2488 left, then the lock.
         $box = Join-Path $scratch 'box'

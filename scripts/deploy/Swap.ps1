@@ -242,15 +242,22 @@ function StopOurs {
   # -Mode notice a "Pushing a server update in 1 minute" with nothing behind
   # it, and under -Mode restart a kick a minute after boot with no restart
   # behind it. Same gap Deploy-DevGamemode closed on 24 September.
+  # Settings that do not read name no data folder: the default is not guessed
+  # for them, and the line says the restart.json was not looked for.
   $d = 'data'
+  $dWhy = ''
   try {
     $s = [IO.File]::ReadAllText((Join-Path $Root 'server-settings.json')) | ConvertFrom-Json
     if ($s.dataDir) { $d = [string]$s.dataDir }
-  } catch { }
-  $rq = Join-Path ([IO.Path]::Combine($Root, $d)) 'restart.json'
-  if (Test-Path -LiteralPath $rq) {
-    try { Remove-Item -LiteralPath $rq -Force -EA Stop; 'removed a restart.json the old process never read' }
-    catch { 'COULD NOT REMOVE ' + $rq + ', so the new process will count down on its own: ' + $_.Exception.Message }
+  } catch { $dWhy = $_.Exception.Message }
+  if ($dWhy) {
+    'COULD NOT READ ' + (Join-Path $Root 'server-settings.json') + ' for its data folder (' + $dWhy + '), so a restart.json the old process never read was not looked for, and the new process may count down on its own'
+  } else {
+    $rq = Join-Path ([IO.Path]::Combine($Root, $d)) 'restart.json'
+    if (Test-Path -LiteralPath $rq) {
+      try { Remove-Item -LiteralPath $rq -Force -EA Stop; 'removed a restart.json the old process never read' }
+      catch { 'COULD NOT REMOVE ' + $rq + ', so the new process will count down on its own: ' + $_.Exception.Message }
+    }
   }
 }
 
@@ -258,17 +265,19 @@ function StopOurs {
 # is what the launcher and the client fetch from, and it only opens once the
 # native server has been built without throwing. $Wait is the shared ceiling
 # unless the caller passed -Wait (ServerReadyWait.ps1, #1938).
+$answerWhy = ''
 function Answering {
   $until = (Get-Date).AddSeconds($Wait)
   while ($true) {
     $tcp = $false
     if (Held) {
+      # A try that throws is kept for the FAIL line, which says it.
+      $c = New-Object Net.Sockets.TcpClient
       try {
-        $c = New-Object Net.Sockets.TcpClient
         $null = $c.BeginConnect('127.0.0.1', $resPort, $null, $null).AsyncWaitHandle.WaitOne(500)
         $tcp = $c.Connected
-        $c.Close()
-      } catch { }
+      } catch { $script:answerWhy = $_.Exception.Message }
+      finally { $c.Close() }
     }
     if ($tcp) { return $true }
     if ((Get-Date) -gt $until) { return $false }
@@ -340,11 +349,11 @@ foreach ($rel in @($Want.Keys)) {
 if ($moved -and $null -ne $ReleaseKeys -and $placed -contains 'server-settings.json') {
   $was = $null
   $got = $null
-  try { $was = [IO.File]::ReadAllText((Join-Path $prevDir 'server-settings.json')) | ConvertFrom-Json } catch { }
-  try { $got = [IO.File]::ReadAllText((Join-Path $Root 'server-settings.json')) | ConvertFrom-Json } catch { }
   $drift = @()
-  if ($null -eq $was -or $null -eq $got) { $drift += 'server-settings.json, which cannot be read' }
-  else {
+  try { $was = [IO.File]::ReadAllText((Join-Path $prevDir 'server-settings.json')) | ConvertFrom-Json } catch { $drift += ('the server-settings.json the server had, which cannot be read (' + $_.Exception.Message + ')') }
+  try { $got = [IO.File]::ReadAllText((Join-Path $Root 'server-settings.json')) | ConvertFrom-Json } catch { $drift += ('the server-settings.json now in place, which cannot be read (' + $_.Exception.Message + ')') }
+  if (-not $drift.Count -and ($null -eq $was -or $null -eq $got)) { $drift += 'server-settings.json, which is empty' }
+  if (-not $drift.Count) {
     $wn = @($was.PSObject.Properties | ForEach-Object { $_.Name })
     $gn = @($got.PSObject.Properties | ForEach-Object { $_.Name })
     foreach ($k in @($wn + $gn | Sort-Object -Unique)) {
@@ -381,6 +390,7 @@ if ($moved) {
     exit 0
   }
   'FAIL: nothing answered on UDP ' + $port + ' and ' + $resPort + ' within ' + $Wait + ' seconds'
+  if ($answerWhy) { 'the last try at ' + $resPort + ' said: ' + $answerWhy }
   if (Test-Path -LiteralPath $log) { '--- server.log, last 30 ---'; Get-Content -LiteralPath $log -Tail 30 }
   StopOurs
 }
@@ -390,7 +400,10 @@ PutBack
 TaskShape
 Start-ScheduledTask -TaskName $Task -EA SilentlyContinue
 if (Answering) { 'the previous files are back and the server is answering on ' + $resPort + ' again' }
-else { 'THE PREVIOUS FILES ARE BACK AND THE SERVER STILL IS NOT ANSWERING on ' + $resPort }
+else {
+  'THE PREVIOUS FILES ARE BACK AND THE SERVER STILL IS NOT ANSWERING on ' + $resPort
+  if ($answerWhy) { 'the last try at ' + $resPort + ' said: ' + $answerWhy }
+}
 if ($clean) {
   # A put-back's stage is the .prev folder it was putting back, full again.
   if (-not $KeepStage) { Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue }
@@ -831,7 +844,7 @@ New-Item -ItemType Directory -Force -Path (Split-Path -Parent `$cur) | Out-Null
 if ('$came' -eq 'True' -and (Test-Path -LiteralPath `$beside)) {
   Copy-Item -LiteralPath `$beside -Destination `$cur -Force
   `$name = ''
-  try { `$name = [string]([IO.File]::ReadAllText(`$beside) | ConvertFrom-Json).name } catch { }
+  try { `$name = [string]([IO.File]::ReadAllText(`$beside) | ConvertFrom-Json).name } catch { `$name = 'a record that does not read (' + `$_.Exception.Message + ')' }
 } else {
   `$name = 'an older copy kept before deploys were recorded'
   `$rec = [ordered]@{ part = $(& $q $part); component = $(& $q $Component); name = `$name; commit = ''; putBack = `$true; deployedUtc = `$when; from = `$env:COMPUTERNAME }

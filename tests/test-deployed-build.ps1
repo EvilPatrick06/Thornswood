@@ -92,6 +92,20 @@ try {
   Yes 'a dev deploy sets dev and keeps live' ($j.dev.commit -eq $B -and $j.live.commit -eq $A)
   Yes 'no .new file is left behind' (-not (Test-Path -LiteralPath ($out + '.new')))
 
+  # #2711: a deployed-build.json that does not read was written over with no
+  # word that the other server's entry had gone with it.
+  foreach ($bad in @('{ not json', '')) {
+    [IO.File]::WriteAllText($out, $bad)
+    $said = @(Save-ThornswoodDeployedBuild 'u@box' @() $dev $docs)
+    $j = Get-Content -LiteralPath $out -Raw | ConvertFrom-Json
+    Yes ('a file that does not read (' + $(if ($bad) { 'not JSON' } else { 'empty' }) + ') is written with this server alone, and that is said') (
+      ($said -contains ('DEPLOYED BUILD WRITTEN dev ' + $B)) -and $j.dev.commit -eq $B -and -not $j.PSObject.Properties['live'] -and
+      @($said | Where-Object { $_ -like 'DEPLOYED BUILD NOTE: *did not read*written with the dev server alone' }).Count -eq 1)
+  }
+  $said = @(Save-ThornswoodDeployedBuild 'u@box' @() $dev $docs)
+  Yes 'a file that reads gives no note' (-not @($said | Where-Object { $_ -like 'DEPLOYED BUILD NOTE*' }).Count)
+  $null = Save-ThornswoodDeployedBuild 'u@box' @() $live $docs
+
   $before = [IO.File]::ReadAllText($out)
   [IO.File]::WriteAllText((Join-Path $live 'server-build.json'), '{ "source": { "commit": "nope" } }')
   $said = @(Save-ThornswoodDeployedBuild 'u@box' @() $live $docs)
