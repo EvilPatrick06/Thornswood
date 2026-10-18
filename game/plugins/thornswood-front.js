@@ -6898,6 +6898,112 @@
     }
   }
 
+  // ==== broken limbs (#1383) ====
+  /*
+    A BROKEN ARM AND A BROKEN LEG, the half of each that is not an actor
+    value. docs/systems/injury.md: "An arm: ... a block costs twice the
+    stamina. A leg: ... sprint is refused." The server keeps the break on the
+    character and its screen script hands this file globalThis
+    .thornswoodBrokenLimbs, { arm, leg }, the same way it hands
+    thornswoodHurtCare. The -8 speed and the -0.15 melee already ride on the
+    skills panel; these two are what an actor value cannot say.
+
+    THE LEG. bSprintOK is the only condition on the sprint transition (see
+    holdSprintGate below, measured on 20 September), so with a broken leg the
+    gate is held SHUT while the sprint key is down instead of open, and a
+    sprint already running is stopped. The game's own refusals work the same
+    way: over encumbered, out of stamina.
+
+    THE ARM. Nothing in the game makes a block cost more stamina: there is no
+    actor value for it and the perk entry points are not ours to add. So the
+    stamina a blocked hit took is taken once more. The hit event says the hit
+    was blocked (isHitBlocked) but not what it cost, so the stamina before the
+    hit is kept from the last frame, the drop is watched for BLOCK_WINDOW_MS,
+    and the largest drop is taken again. Only while the arm is broken does
+    this read anything a frame.
+
+    Self contained, with sp and say handed in, so tests/test-1383-limbs-brews.js
+    can run it over a fake sp.
+  */
+  const brokenLimbs = (function (sp, say) {
+    const BLOCK_WINDOW_MS = 400;
+    const TELL_EVERY_MS = 30000;
+    let lastStamina = null;   // the stamina last frame, only while the arm is broken
+    let pending = null;       // { before, until, worst } for a blocked hit being measured
+    let toldLegAt = 0;
+    let saidArm = false;
+
+    function limbs() {
+      try { return globalThis.thornswoodBrokenLimbs || null; } catch (e) { return null; }
+    }
+    function arm() { const l = limbs(); return !!(l && l.arm); }
+    function leg() { const l = limbs(); return !!(l && l.leg); }
+
+    /* Shut the sprint gate on a broken leg. True when it did, so the caller
+       does not hold the gate open again on the same frame. */
+    function refuseSprint(pc) {
+      if (!pc || !leg()) { return false; }
+      try {
+        if (pc.getAnimationVariableBool('bSprintOK')) { pc.setAnimationVariableBool('bSprintOK', false); }
+      } catch (e) { }
+      try {
+        if (pc.isSprinting()) { sp.Debug.sendAnimationEvent(pc, 'SprintStop'); }
+      } catch (e) { }
+      const now = Date.now();
+      if (now - toldLegAt > TELL_EVERY_MS) {
+        toldLegAt = now;
+        try { sp.Debug.notification('Your broken leg will not take a sprint.'); } catch (e) { }
+      }
+      return true;
+    }
+
+    function onHit(e) {
+      if (!e || !e.isHitBlocked || !arm()) { return; }
+      let pc = null;
+      try { pc = sp.Game.getPlayer(); } catch (x) { return; }
+      if (!pc || !e.target) { return; }
+      try { if (e.target.getFormID() !== pc.getFormID()) { return; } } catch (x) { return; }
+      // No frame yet to measure from: the arm broke on this very frame.
+      if (lastStamina === null) { return; }
+      const until = Date.now() + BLOCK_WINDOW_MS;
+      // A second block inside the window is measured from the same start, so
+      // both are taken again together.
+      if (pending) { pending.until = until; return; }
+      pending = { before: lastStamina, until: until, worst: 0 };
+    }
+
+    function tick() {
+      if (!arm()) { lastStamina = null; pending = null; return; }
+      let pc = null;
+      try { pc = sp.Game.getPlayer(); } catch (e) { return; }
+      if (!pc) { return; }
+      let stamina = 0;
+      try { stamina = pc.getActorValue('Stamina'); } catch (e) { return; }
+      if (pending) {
+        const drop = pending.before - stamina;
+        if (drop > pending.worst) { pending.worst = drop; }
+        if (Date.now() >= pending.until) {
+          const again = pending.worst;
+          pending = null;
+          if (again > 0) {
+            try { pc.damageActorValue('Stamina', again); stamina -= again; } catch (e) { }
+            if (!saidArm) {
+              saidArm = true;
+              say('broken arm: a blocked hit cost ' + Math.round(again) + ' stamina and was taken again (#1383).');
+            }
+          }
+        }
+      }
+      lastStamina = stamina;
+    }
+
+    return { refuseSprint: refuseSprint, onHit: onHit, tick: tick, arm: arm, leg: leg, BLOCK_WINDOW_MS: BLOCK_WINDOW_MS };
+  })(sp, say);
+
+  sp.on('hit', guard('broken arm block', (e) => { brokenLimbs.onHit(e); }));
+  sp.on('update', guard('broken arm block', () => { brokenLimbs.tick(); }));
+  // ==== end broken limbs ====
+
   /**
    * Hold the sprint gate open while the key is down.
    *
@@ -6914,6 +7020,8 @@
     // keyboard mid press. Eight seconds is longer than anybody sprints in one
     // hold and short enough that it cannot stay stuck.
     if (Date.now() - sprintHeldSince > 8000) { sprintHeldSince = 0; return; }
+    // A broken leg refuses sprint (#1383): the gate is held shut instead.
+    if (brokenLimbs.refuseSprint(pc)) { return; }
     if (anyClaim() || busyMenuOpen() || notOurs()) { return; }
     try {
       if (pc.isOverEncumbered()) { return; }
@@ -7048,6 +7156,11 @@
     if (kind === 'sprint') {
       if (e.isUp) { sprintHeldSince = 0; }
       else if (e.isDown && !sprintHeldSince) { sprintHeldSince = Date.now(); }
+      // A broken leg (#1383): shut on the press itself, the frame the graph
+      // reads the gate, not only on the next update.
+      if (e.isDown && !e.isUp && brokenLimbs.leg()) {
+        try { const legPc = sp.Game.getPlayer(); if (legPc) { brokenLimbs.refuseSprint(legPc); } } catch (e3) { }
+      }
     }
 
     if (!e.isDown || e.isUp) return;

@@ -78,11 +78,14 @@ or an hour at spent cold starts one. Toughness takes 10% off each chance a
 point, and Purified Blood stops every one. The old disease mod is out
 on purpose.
 
-Not in yet:
+Raw meat, a full stomach and the water sources start food sickness and
+fouled water through the meal and drink work (#1382).
 
-- Raw meat, a full stomach and the water sources start nothing until
-  the meal and drink work (#1382) reports them. The chances are in the
-  server, waiting for that.
-- A potion of cure disease somebody brews is only the sip, because the
-  server cannot read what a brewed potion does.
-- A cooked meal's help against disease is not in.
+A potion of cure disease somebody brews cures the same way. The lab
+tells the server which bottle a Cure Disease brew made, from the
+ingredients, and drinking that bottle clears one disease. The server
+hears a brewed bottle being drunk from engine fork PR #81 on (#1383).
+
+A cooked meal's help against disease halves every chance for 20
+minutes, and a feast's quarters it for 10. That half is in the server.
+Which meal gives that help rather than another is waiting on #2682.

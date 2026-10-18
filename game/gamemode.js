@@ -27462,7 +27462,14 @@ var MIXTURES = {
   '3eaf3:Skyrim.esm': { name: 'Fortify Health', half: 'physicker', rank: 'advanced' },
   '3eaf9:Skyrim.esm': { name: 'Fortify Stamina', half: 'physicker', rank: 'advanced' },
   '3eaf8:Skyrim.esm': { name: 'Fortify Magicka', half: 'physicker', rank: 'advanced' },
-  'ae723:Skyrim.esm': { name: 'Cure Disease', half: 'physicker', rank: 'advanced' },
+  /*
+    The magic effect AlchCureDisease, 0xAE722 (#1383). It was keyed 'ae723'
+    until 17 October, which is CureDisease, the ALCH record of the potion
+    itself, so every Cure Disease brew the engine named (fork #60 hands over
+    MGEF ids) was refused as off the list. Measured in Skyrim.esm on One:
+    0xAE722 is MGEF AlchCureDisease and 0xAE723 is ALCH CureDisease.
+  */
+  'ae722:Skyrim.esm': { name: 'Cure Disease', half: 'physicker', rank: 'advanced' },
   '3eaea:Skyrim.esm': { name: 'Resist Fire', half: 'physicker', rank: 'expert' },
   '3eaeb:Skyrim.esm': { name: 'Resist Frost', half: 'physicker', rank: 'expert' },
   '3eaec:Skyrim.esm': { name: 'Resist Shock', half: 'physicker', rank: 'expert' },
@@ -28002,6 +28009,23 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId, effects) {
     try { brewed = mp.getDescFromId(craftedItemBaseId); } catch (e) { brewed = null; }
     if (brewed) {
       masterCraft(actorId, { out: brewed, name: 'brew', owner: 'Alchemist', makes: 1 }, 1);
+    }
+  }
+
+  /*
+    A BREWED BOTTLE OF CURE DISEASE CURES (#1383, disease.md "A potion of
+    cure disease clears one ordinary disease"). The bottle is a runtime form
+    with no record, so when it is drunk the injury block cannot read what it
+    does; the effects are known only here, from the ingredients the engine
+    found in the pack (fork #60). So the injury block is told which runtime id
+    this brew made and whether it cures. Every brew is told, not only a cure,
+    so an id the client hands out again after a relog cannot keep a stale cure.
+  */
+  if (want === 'alchemist' && (Number(craftedItemBaseId) || 0) >= RUNTIME && Array.isArray(effects)) {
+    var hurtBrew = globalThis.__thornswoodHurt;
+    if (hurtBrew && hurtBrew.brewed) {
+      try { hurtBrew.brewed(actorId, Number(craftedItemBaseId), effects); }
+      catch (e) { log('the injury block threw on a brew:', e); }
     }
   }
   return;
@@ -59819,8 +59843,10 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       The broken limb and the crooked one, as the engine actor values the
       skills panel already carries. attackDamageMult is a multiplier, which is
       why its numbers are small (see TUNING.perPoint). "A block costs twice the
-      stamina" and "sprint is refused" are not actor values and are not here:
-      the issue says what they need.
+      stamina" and "sprint is refused" are not actor values: the record carries
+      limbs (write, below), the screen script hands it to the front plugin as
+      thornswoodBrokenLimbs, and the plugin shuts the sprint gate and takes a
+      blocked hit's stamina a second time (#1383).
     */
     broken: { arm: { attackDamageMult: -0.15 }, leg: { speedMult: -8 } },
     crooked: { arm: { attackDamageMult: -0.05 }, leg: { speedMult: -4 } },
@@ -59905,10 +59931,27 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   /*
     THE POTION OF CURE DISEASE. The one ALCH record in this load order whose
     effect is Cure Disease, CureDisease in Skyrim.esm (game\data\food.json).
-    A potion somebody brews has no record (it is made above 0xff000000) and
-    the server cannot read what it does yet; the issue says what that needs.
+    A potion somebody brews has no record (it is made above 0xff000000), so
+    it cures by the brew instead: the alchemy gate tells brewed() which
+    runtime id a brew carrying CURE_DISEASE_EFFECT (the magic effect
+    AlchCureDisease) made, and swallowed() cures for that id too. The engine
+    raises onEatItem for a runtime bottle from fork #81 on (#1383).
   */
   var CURE_DISEASE = ['ae723:Skyrim.esm'];
+  var CURE_DISEASE_EFFECT = 'ae722:Skyrim.esm';
+  var RUNTIME = 0xff000000;
+  // The most brewed bottles one record remembers, newest kept.
+  var BREWS_MOST = 16;
+
+  /*
+    A COOKED MEAL'S HELP AGAINST DISEASE. food.md: one of a cooked meal's
+    helps is "the chance of catching a disease cut in half while it lasts",
+    for 20 real minutes, and a feast is "double the help and half the time,
+    so the disease chance is a quarter". chanceFor reads it. Which meal gives
+    this help rather than another is Patrick's to say (#2682, split from
+    #1383 on 17 October), so nothing in the meal work calls guarded() yet.
+  */
+  var MEAL_GUARD = { cooked: { mult: 0.5, min: 20 }, feast: { mult: 0.25, min: 10 } };
 
   /*
     BENCHES THAT TAKE BOTH HANDS, by the keyword a bench carries (BENCH_BY_BASE).
@@ -59936,7 +59979,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   // ------------------------------------------------------------ the record --
 
   function fresh() {
-    return { wounds: [], ills: [], crooked: {}, agreed: {}, cold: 0, ground: 0, show: [] };
+    return { wounds: [], ills: [], crooked: {}, agreed: {}, cold: 0, ground: 0, show: [], brews: [], guard: null };
   }
 
   /*
@@ -59982,6 +60025,31 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     out.cold = num(v.cold, 0);
     out.ground = num(v.ground, 0);
     out.show = Array.isArray(v.show) ? v.show.map(String) : [];
+    var bs = Array.isArray(v.brews) ? v.brews : [];
+    for (var b = 0; b < bs.length; b++) {
+      var bid = num(bs[b], 0);
+      if (bid >= RUNTIME && out.brews.indexOf(bid) === -1) { out.brews.push(bid); }
+    }
+    while (out.brews.length > BREWS_MOST) { out.brews.shift(); }
+    var gd = (v.guard && typeof v.guard === 'object') ? v.guard : null;
+    if (gd && num(gd.until, 0) > 0 && num(gd.mult, 1) > 0 && num(gd.mult, 1) < 1) {
+      out.guard = { until: num(gd.until, 0), mult: num(gd.mult, 1) };
+    }
+    return out;
+  }
+
+  /*
+    WHICH LIMB IS BROKEN, for the client (#1383). injury.md: a broken arm
+    makes a block cost twice the stamina and a broken leg refuses sprint.
+    Neither is an actor value, so the record carries the answer and the
+    screen script hands it to the front plugin. As long as the break lasts,
+    splinted or set, the same as the -8 speed and the -0.15 melee in forNeeds.
+  */
+  function limbsOf(rec) {
+    var out = { arm: 0, leg: 0 };
+    for (var i = 0; i < rec.wounds.length; i++) {
+      if (rec.wounds[i].k === 'break') { out[rec.wounds[i].limb === 'leg' ? 'leg' : 'arm'] = 1; }
+    }
     return out;
   }
 
@@ -59990,6 +60058,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     // Whether anybody could tend something here: the inventory's line and
     // the look prompt's row are offered only then (#1383).
     rec.care = (needsCare(rec) || hungOver(actorId)) ? 1 : 0;
+    rec.limbs = limbsOf(rec);
     try { mp.set(actorId, HURT_PROPERTY, rec); return true; }
     catch (e) { hlog('could not write', actorId.toString(16) + ':', e); return false; }
   }
@@ -60034,9 +60103,12 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     (TUNING.perPoint.toughness.diseaseResist), the one the client puts on the
     actor, so the two cannot disagree.
   */
-  function chanceFor(actorId, chance) {
+  function chanceFor(actorId, chance, rec) {
     var K = g.__thornswoodPerks;
     try { if (K && K.holds && K.holds(actorId, 'purifiedblood')) { return 0; } } catch (e) { }
+    // A cooked meal's help (MEAL_GUARD), while it lasts.
+    var r = rec || read(actorId);
+    if (r.guard && Date.now() < r.guard.until) { chance = chance * r.guard.mult; }
     var P = g.__thornswoodProgression;
     var s = stateOf(actorId);
     if (!P || !s) { return chance; }
@@ -60050,7 +60122,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   /* One roll at a disease. True when it took. A kind already held is not caught twice. */
   function catchIll(actorId, rec, k, chance, now) {
     if (!has(DISEASE, k) || hasIll(rec, k)) { return false; }
-    var c = chanceFor(actorId, chance);
+    var c = chanceFor(actorId, chance, rec);
     if (!(c > 0) || Math.random() >= c) { return false; }
     rec.ills.push({ k: k, at: now, cold: false, told: '' });
     hlog(actorId.toString(16), 'caught', DISEASE[k].name);
@@ -60739,14 +60811,58 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       try { id = idOf(CURE_DISEASE[i]); } catch (e) { id = 0; }
       if (id && id === baseId) { cure = true; }
     }
-    if (!cure) { return ''; }
     var rec = read(actorId);
+    // A bottle of cure disease somebody brewed (brewed, below).
+    var brew = !cure && baseId >= RUNTIME && rec.brews.indexOf(baseId) !== -1;
+    if (!cure && !brew) { return ''; }
     var gone = cureOne(rec, Date.now());
     if (!gone) { return ''; }
     write(actorId, rec);
     redraw(actorId);
-    hlog(actorId.toString(16), 'cured of', DISEASE[gone.ill.k].name, 'by a potion');
+    hlog(actorId.toString(16), 'cured of', DISEASE[gone.ill.k].name, brew ? 'by a brewed potion' : 'by a potion');
     return gone.shown ? ('The ' + DISEASE[gone.ill.k].name + ' is gone.') : '';
+  }
+
+  /*
+    A BREW AT A LAB, from the alchemy gate (recipelessCraft), with the magic
+    effects the engine worked out from the ingredients. Remembers baseId as
+    a bottle of cure disease when the brew carries CURE_DISEASE_EFFECT, and
+    forgets it when it does not, because a runtime id is the brewing client's
+    and the same number can be handed out again for another brew after a
+    relog. Answers whether this brew cures.
+  */
+  function brewed(actorId, baseId, effects) {
+    baseId = Number(baseId) || 0;
+    if (baseId < RUNTIME || !Array.isArray(effects)) { return false; }
+    var cureEffect = 0;
+    try { cureEffect = idOf(CURE_DISEASE_EFFECT); } catch (e) { cureEffect = 0; }
+    var cures = false;
+    for (var i = 0; i < effects.length; i++) {
+      if (cureEffect && (Number(effects[i]) || 0) === cureEffect) { cures = true; }
+    }
+    var rec = read(actorId);
+    var at = rec.brews.indexOf(baseId);
+    if (at === -1 && !cures) { return false; }
+    if (at !== -1) { rec.brews.splice(at, 1); }
+    if (cures) {
+      rec.brews.push(baseId);
+      while (rec.brews.length > BREWS_MOST) { rec.brews.shift(); }
+    }
+    write(actorId, rec);
+    return cures;
+  }
+
+  /*
+    A COOKED MEAL THAT GUARDS AGAINST DISEASE (MEAL_GUARD). feast is true for
+    a feast. The latest meal's help is the one that counts: a cooked meal's
+    help is "one of these, not all of them". Answers true.
+  */
+  function guarded(actorId, feast) {
+    var row = feast ? MEAL_GUARD.feast : MEAL_GUARD.cooked;
+    var rec = read(actorId);
+    rec.guard = { until: Date.now() + row.min * MIN, mult: row.mult };
+    write(actorId, rec);
+    return true;
   }
 
   /*
@@ -61297,13 +61413,18 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       '    var st = ctx.state;',
       '    if (!st) { return; }',
       '    var show = (v && v.show && v.show.length) ? v.show : [];',
-      '    var sig = "hurt:" + show.join("|") + ((v && v.care) ? "|care" : "");',
+      '    var limbs = (v && v.limbs) ? v.limbs : {};',
+      '    var sig = "hurt:" + show.join("|") + ((v && v.care) ? "|care" : "") +',
+      '      (limbs.arm ? "|arm" : "") + (limbs.leg ? "|leg" : "");',
       '    if (st.thornswoodHurtHud === sig) { return; }',
       '    st.thornswoodHurtHud = sig;',
       // The front plugin offers Tend your wounds in the inventory while there
       // is something to tend (#1383). The globalThis a plugin sees; see the
       // note over thornswoodCatchFire.
       '    try { globalThis.thornswoodHurtCare = (v && v.care) ? 1 : 0; } catch (e) { }',
+      // And which limb is broken (#1383): the plugin shuts the sprint gate on a
+      // broken leg and takes a blocked hit's stamina twice on a broken arm.
+      '    try { globalThis.thornswoodBrokenLimbs = { arm: limbs.arm ? 1 : 0, leg: limbs.leg ? 1 : 0 }; } catch (e) { }',
       '    var html = "";',
       '    for (var i = 0; i < show.length; i++) {',
       '      html += "<div>" + String(show[i]).replace(/[<>&]/g, "") + "</div>";',
@@ -61422,6 +61543,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   g.__thornswoodHurt = {
     HURT: HURT, DISEASE: DISEASE, EXPOSED: EXPOSED, HEALING: HEALING, TWO_HANDS: TWO_HANDS,
     CURE_DISEASE: CURE_DISEASE, CAUGHT_MIN: CAUGHT_MIN, BAD_AFTER_MIN: BAD_AFTER_MIN,
+    CURE_DISEASE_EFFECT: CURE_DISEASE_EFFECT, MEAL_GUARD: MEAL_GUARD, BREWS_MOST: BREWS_MOST,
+    brewed: brewed, guarded: guarded, limbsOf: limbsOf,
     CHILL_AFTER_MIN: CHILL_AFTER_MIN,
     read: read, write: write, step: step, tick: tick, bleedTick: bleedTick, bleedRate: bleedRate,
     stageOf: stageOf, lines: lines, chanceFor: chanceFor,

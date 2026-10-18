@@ -154,7 +154,12 @@ Not in yet:
 
 - Going down. Health reaching zero is still the engine's death, applied
   before the server hears of it. The fork has to ask the server first,
-  and #1383 says what it has to expose. Until then a bleed that empties
+  and #1383 says what it has to expose (#1626); the gamemode half is
+  #2681. Until then a bleed that empties
   your health is a death with no killer, and the wake stops the bleed.
-- A block costing twice the stamina, and sprint refused on a broken
-  leg. Neither is an actor value the server can send.
+
+A broken arm makes a block cost twice the stamina and a broken leg
+refuses sprint, for as long as the break lasts, splinted or not.
+Neither one is an actor value. The server tells the client which limb
+is broken, the client shuts the sprint gate, and the stamina a blocked
+hit cost is taken once more (#1383).
