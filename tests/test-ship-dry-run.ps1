@@ -33,6 +33,9 @@
     G  -DryRun on dev with no -Root, on a machine that recorded its dev
        release folder (Where.ps1 ShipRootDev, #1692): that folder is built,
        installed and published
+    G2 the same with a recorded folder that has no Launcher folder, as
+       Update-ShipRoot.ps1 makes one: not refused, and its launcher step
+       makes the folder (#2662)
     H  -Root naming a folder Vortex deploys into: refused before anything is
        built, installed or published (#1692)
     I  a folder whose generated files are out of date: refused before the
@@ -329,7 +332,10 @@ function Get-LoadOrderCopyDiffs([hashtable]$Copies) { return @() }
     }
 
     Stub 'Build-Launcher' '[string]$Root, [string]$OutDir, [switch]$NoPause' ''
+    # Makes the Launcher folder when there is none, as the real one does: a
+    # ship root Update-ShipRoot.ps1 made has none (G2, #2662).
     Stub 'Install-Launcher' '[string]$Root, [string]$From, [switch]$NoPause' @'
+[void](New-Item -ItemType Directory -Force -Path (Join-Path $Root 'Launcher'))
 [IO.File]::WriteAllText((Join-Path $Root 'Launcher\Thornswood.exe'), 'the launcher this run built')
 '@
     Stub 'Go' '[switch]$SkipServer, [string]$Game, [switch]$Vortex' ''
@@ -633,6 +639,24 @@ if ($target -match '^repos/[^/]+/[^/]+/releases\?per_page=100&page=(\d+)$') {
         $built.Count -eq 1 -and $built[0].Contains(' -Root ' + $relDevRoot) -and
         $inst.Count -eq 1 -and $inst[0].Contains(' -Root ' + $relDevRoot) -and
         $pub.Count -eq 1 -and $pub[0].Contains(' -Root ' + $relDevRoot))
+
+    # ---- G2: the recorded folder has no Launcher folder (#2662) -------------------------
+    # A ship root Update-ShipRoot.ps1 made: Game and Profile (config.json too,
+    # which this stand-in run does not need) and no Launcher folder. Until
+    # #2662 every dev Ship stopped on "No dev build at".
+    $bareRoot = Join-Path $T 'Release-Bare'
+    New-Item -ItemType Directory -Force -Path (Join-Path $bareRoot 'Game'), (Join-Path $bareRoot 'Profile') | Out-Null
+    [IO.File]::WriteAllText($shipRoots, (ConvertTo-Json -InputObject ([ordered]@{ dev = $bareRoot })))
+    try {
+        $g2 = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-Channel', 'dev', '-DryRun', '-DistRoot', $dist, '-NoPause')
+    } finally { Remove-Item -LiteralPath $shipRoots -Force -ErrorAction SilentlyContinue }
+    Yes ("G2 a dev dry run from a recorded folder with no Launcher folder runs to the end (exit {0})" -f $g2.Code) (
+        $g2.Code -eq 0 -and $g2.Out -match 'Dry run finished' -and $g2.Out -notmatch 'No dev build at')
+    $inst = Called $g2 'Install-Launcher'
+    $pub = Called $g2 'Publish-Update'
+    Yes '  installing into it and publishing it' (
+        $inst.Count -eq 1 -and $inst[0].Contains(' -Root ' + $bareRoot) -and $pub.Count -eq 1 -and $pub[0].Contains(' -Root ' + $bareRoot))
+    Yes '  and its launcher step made the Launcher folder' (Test-Path -LiteralPath (Join-Path $bareRoot 'Launcher\Thornswood.exe') -PathType Leaf)
 
     # ---- H: a folder Vortex deploys into (#1692) ---------------------------------------
     $vortexRoot = Join-Path $T 'Vortex-DevBuild'

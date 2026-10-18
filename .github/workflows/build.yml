@@ -611,7 +611,7 @@ jobs:
                  'test-backup-restore.ps1', 'test-backup-streaming.ps1', 'test-fetch-verify-all.ps1', 'test-2199-zip-policy.ps1', 'test-2199-fetch-whole-path.ps1',
                  'test-content-release.ps1',
                  'test-cooldown-sweep.js', 'test-voice-moved-clients.js',
-                 'test-release-parity.ps1', 'test-dev-version.ps1', 'test-ship-launcher-reuse.ps1', 'test-2347-dev-launcher-version.ps1', 'test-2347-publish-launcher-number.ps1', 'test-2661-keep-feed-launcher.ps1',
+                 'test-release-parity.ps1', 'test-dev-version.ps1', 'test-ship-launcher-reuse.ps1', 'test-2347-dev-launcher-version.ps1', 'test-2347-publish-launcher-number.ps1', 'test-2661-keep-feed-launcher.ps1', 'test-2662-dev-root-launcher.ps1',
                  'test-2401-legacy-dev-marks.ps1',
                  'test-server-stage-directories.ps1',
                  'test-dev-settings-keys.ps1',

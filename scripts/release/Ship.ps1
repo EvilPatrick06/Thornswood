@@ -983,10 +983,34 @@ if (-not $PSBoundParameters.ContainsKey('Root')) {
 # The dev build has its own feed and baseline on the VPS (feed-dev), and its
 # own working folder here. Until #907 it was a git worktree of the dev branch
 # of Thornswood-Releases, made on first use.
+#
+# WHO NAMED THE FOLDER (#2662). A Launcher folder is asked of the install
+# rule's folder only, <install>-DevBuild, which Where.ps1 answers when no
+# -Root is given and ship-roots.json records no dev folder. There, no
+# Launcher folder means the main launcher's dev build was never installed,
+# and without this Update-ShipRoot.ps1 would make a whole new root in a folder
+# nobody chose. A folder named by -Root or recorded with Setup-ShipMachine.ps1
+# is a ship root that Update-ShipRoot.ps1 makes with Game, Profile and
+# config.json and no Launcher folder (local\release-main, 16 Oct), and nothing
+# in a dev Ship needs that folder beforehand: one that builds a launcher puts
+# it there with Install-Launcher.ps1, which makes the folder, and one that
+# keeps the feed's publishes no exe. Until 18 Oct every such folder was
+# refused, with fixes that were wrong for it. Main asks for none.
+# Returns '' or the sentence Ship stops with.
+function Get-DevRootRefusal([string]$Root, [bool]$RootGiven, [string]$Recorded) {
+    if ($RootGiven -or $Recorded) { return '' }
+    if (Test-Path -LiteralPath (Join-Path $Root 'Launcher') -PathType Container) { return '' }
+    return "No dev build at $Root. Install it from the main launcher's Settings page (The dev build) first, or record the folder this machine builds dev from: .\scripts\release\Setup-ShipMachine.ps1 -Channel dev -Root <folder>."
+}
 if ($Dev) {
-    if (-not (Test-Path (Join-Path $Root 'Launcher'))) {
-        Die "No dev build at $Root. Install it from the main launcher's Settings page (The dev build) first, or record the folder this machine builds dev from: .\scripts\release\Setup-ShipMachine.ps1 -Channel dev -Root <folder>."
+    $rootGiven = $PSBoundParameters.ContainsKey('Root')
+    $rootRecorded = ''
+    if (-not $rootGiven) {
+        try { $rootRecorded = [string](& (Join-Path $Here 'Where.ps1') 'ShipRootNamedDev') }
+        catch { Die ($_.Exception.Message + ' Nothing was built.') }
     }
+    $devRootWhy = Get-DevRootRefusal $Root $rootGiven $rootRecorded
+    if ($devRootWhy) { Die $devRootWhy }
 }
 
 # A folder Vortex deploys into is the collection's source, not a release

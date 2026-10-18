@@ -60,6 +60,15 @@
   it does not name is the rule above. These three are this machine's, and
   only the PowerShell release scripts ask, so where.js does not answer them.
 
+  WHO NAMED THE FOLDER, issue #2662. ShipRootNamed and ShipRootNamedDev
+  answer only what ShipRoots names for the channel, and '' when it names
+  none, so a script can tell a recorded folder from the install rule's
+  answer, which ShipRoot and ShipRootDev give as one string. A dev Ship asks:
+  the install rule's <install>-DevBuild with no Launcher folder means the
+  main launcher never installed the dev build there, and Ship refuses it; a
+  recorded folder is made by Update-ShipRoot.ps1, which writes no Launcher
+  folder, and the Ship's own launcher step makes one, so it is not refused.
+
   THE ENGINE BUILD, issue #2019. engine\README.md "One engine": there is one
   engine, and an engine change is built in a worktree of the fork
   (Build-Engine.ps1 -Fork, Build-Server.ps1 -Fork), not in a checkout's
@@ -83,8 +92,8 @@
 .PARAMETER What
   Which place: Repo, Engine, EngineBuild, EngineBuilds, ServerDist,
   ClientDist, ServerSettings, ChangeForms, Out, Dist, Package, Payload,
-  ServerZip, Local, Backups, Releases, ReleasesDev, ShipRoot, ShipRootDev or
-  ShipRoots; or a top folder
+  ServerZip, Local, Backups, Releases, ReleasesDev, ShipRoot, ShipRootDev,
+  ShipRoots, ShipRootNamed or ShipRootNamedDev; or a top folder
   from layout.json (docs, bot, voice, site, tests, game, launcher,
   installer, records, scripts).
 #>
@@ -140,17 +149,23 @@ function Find-InstallRoot {
     return $first
 }
 
+# The folder ShipRoots names for $channel, or '' when it names none (#2662,
+# see the header): what Setup-ShipMachine.ps1 -Root recorded, and nothing
+# the install rule would answer. Get-ShipRoot asks this first.
+function Get-NamedShipRoot([string]$channel) {
+    $file = Get-Place 'ShipRoots'
+    if (-not (Test-Path -LiteralPath $file)) { return '' }
+    $rec = $null
+    try { $rec = [IO.File]::ReadAllText($file) | ConvertFrom-Json }
+    catch { throw "$file does not read as JSON, so which folder a release is built from here is not known. Fix it, or write it again with .\scripts\release\Setup-ShipMachine.ps1 -Channel $channel -Root <folder>." }
+    return [string](Get-Named $rec $channel)
+}
+
 # The folder a release on $channel is built from on this machine (#1692, see
 # the header): what ShipRoots names for it, or the install rule.
 function Get-ShipRoot([string]$channel) {
-    $file = Get-Place 'ShipRoots'
-    if (Test-Path -LiteralPath $file) {
-        $rec = $null
-        try { $rec = [IO.File]::ReadAllText($file) | ConvertFrom-Json }
-        catch { throw "$file does not read as JSON, so which folder a release is built from here is not known. Fix it, or write it again with .\scripts\release\Setup-ShipMachine.ps1 -Channel $channel -Root <folder>." }
-        $named = [string](Get-Named $rec $channel)
-        if ($named) { return $named }
-    }
+    $named = Get-NamedShipRoot $channel
+    if ($named) { return $named }
     $root = Find-InstallRoot
     if ($channel -eq 'dev') { return ($root + '-DevBuild') }
     return $root
@@ -184,6 +199,9 @@ function Get-Place([string]$name) {
         'ShipRoots'   { return Join-Path $env:LOCALAPPDATA 'Thornswood\ship-roots.json' }
         'ShipRoot'    { return Get-ShipRoot 'main' }
         'ShipRootDev' { return Get-ShipRoot 'dev' }
+        # Only what ShipRoots names, '' for the install rule (#2662).
+        'ShipRootNamed'    { return Get-NamedShipRoot 'main' }
+        'ShipRootNamedDev' { return Get-NamedShipRoot 'dev' }
         # This machine's engine build, and the file that names it (#2019).
         'EngineBuilds' { return Join-Path $env:LOCALAPPDATA 'Thornswood\engine-build.json' }
         'EngineBuild'  { return Get-EngineBuild }
@@ -200,7 +218,7 @@ function Get-Place([string]$name) {
 
 $placeNames = @('Repo', 'Engine', 'EngineBuild', 'EngineBuilds', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms',
                 'Out', 'Dist', 'Package', 'Payload', 'ServerZip', 'Local', 'Backups', 'Releases', 'ReleasesDev',
-                'ShipRoot', 'ShipRootDev', 'ShipRoots')
+                'ShipRoot', 'ShipRootDev', 'ShipRoots', 'ShipRootNamed', 'ShipRootNamedDev')
 $folderNames = @($layout.folders.PSObject.Properties.Name)
 
 if ($placeNames -contains $What) {

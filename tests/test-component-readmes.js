@@ -465,6 +465,15 @@ SIX.forEach(function (d) {
   const ship = read('scripts/release/Ship.ps1') || '';
   yes('Ship.ps1 refuses the dev channel without the dev build, as the paragraph says',
       /No dev build at \$Root\./.test(ship) && /refuses `-Channel dev`/.test(para));
+  // #2662: only the folder Ship finds for itself is refused. A folder named
+  // with -Root or recorded with Setup-ShipMachine is not, and the paragraph
+  // says so.
+  yes('and only the folder it finds for itself: one named with -Root or recorded with Setup-ShipMachine is not refused, ' +
+      'as the paragraph says (#2662)',
+      /function Get-DevRootRefusal\(\[string\]\$Root, \[bool\]\$RootGiven, \[string\]\$Recorded\)\s*\{\s*if \(\$RootGiven -or \$Recorded\) \{ return '' \}/.test(ship) &&
+      /'ShipRootNamedDev'/.test(ship) &&
+      /refusal is for `<drive>:\\Thornswood-DevBuild` only/.test(para) && /`-Root`/.test(para) &&
+      /Setup-ShipMachine\.ps1 -Channel dev -Root <folder>/.test(para) && /#2662/.test(para));
   // If Ship stops falling back to the Steam copy, this fails, and the
   // sentence in Developer-Guide.md that warns about it is what to change.
   yes('Ship.ps1 still builds the dev release out of the Steam copy when the dev build has no game folder, ' +
