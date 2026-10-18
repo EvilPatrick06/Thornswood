@@ -606,11 +606,30 @@ function hearers(myId, me, reach) {
  * Three at once, then one a second, per connection: a sentence is one
  * caption, and the bucket only stops a machine that sends them as fast as
  * it can.
+ *
+ * EVERY NUMBER IS A SETTING, with these as the defaults, so the server's
+ * staff tune it without a release:
+ *   THORNSWOOD_CAPTION_TAIL_MS    how long after the key comes up words still go (2000)
+ *   THORNSWOOD_CAPTION_BURST      how many at once (3)
+ *   THORNSWOOD_CAPTION_REFILL_MS  how often one more is earned (1000)
+ *   THORNSWOOD_CAPTION_REACH      the furthest a caption goes, in units, never
+ *                                 past the speaker's own voice reach; unset is
+ *                                 the voice reach itself
+ *   THORNSWOOD_CAPTION_TEXT_MUTE  off lets a personal text mute leave captions
+ *                                 alone, so only the voice switch hides them
+ *                                 on the client (on when unset)
+ * /health says what each is.
  */
+function captionNumber(v, fallback) {
+  const n = Number(String(v == null ? '' : v).trim());
+  return String(v == null ? '' : v).trim() !== '' && isFinite(n) && n >= 0 ? n : fallback;
+}
 const CAPTIONS = String(process.env.THORNSWOOD_CAPTIONS || '').trim().toLowerCase() === 'on';
-const CAPTION_BURST = 3;
-const CAPTION_REFILL_MS = 1000;
-const CAPTION_TAIL_MS = 2000;
+const CAPTION_BURST = Math.max(1, captionNumber(process.env.THORNSWOOD_CAPTION_BURST, 3));
+const CAPTION_REFILL_MS = Math.max(1, captionNumber(process.env.THORNSWOOD_CAPTION_REFILL_MS, 1000));
+const CAPTION_TAIL_MS = captionNumber(process.env.THORNSWOOD_CAPTION_TAIL_MS, 2000);
+const CAPTION_REACH = captionNumber(process.env.THORNSWOOD_CAPTION_REACH, 0);   // 0: the voice reach
+const CAPTION_TEXT_MUTE = String(process.env.THORNSWOOD_CAPTION_TEXT_MUTE || '').trim().toLowerCase() !== 'off';
 const captionPrefs = new Map();   // profileId -> { share, see }
 const talkEnded = new Map();      // profileId -> when the talk key last came up
 const captionCounts = { sent: 0, dropped: 0 };
@@ -668,7 +687,7 @@ function captionTargets(me, reach, now) {
     if (them === pid) { to.push(p); continue; }
     if (!mine) continue;
     if (captionPrefsOf(them).see === false) continue;
-    if (textBlocked(them, pid)) continue;
+    if (CAPTION_TEXT_MUTE && textBlocked(them, pid)) continue;
     const v = fresh(them);
     if (!v || !headlines.sameCellWithin(mine, v, reach)) continue;
     to.push(p);
@@ -689,7 +708,9 @@ function relayCaption(me, raw, now) {
   if (!captionAllow(me, now)) return 'too fast';
   const voice = voiceOf(pid);
   const out = { t: 'caption', profileId: pid, actor: actorOf(pid), mode: voice.mode, text: text, at: now };
-  for (const p of captionTargets(me, headlines.captionReach(voice.mode), now)) {
+  const voiceReach = headlines.captionReach(voice.mode);
+  const reach = CAPTION_REACH > 0 ? Math.min(CAPTION_REACH, voiceReach) : voiceReach;
+  for (const p of captionTargets(me, reach, now)) {
     if (p && p.ws) p.ws.send(out);
   }
   return '';
@@ -2308,7 +2329,9 @@ const server = http.createServer((req, res) => {
                             bind: BIND,
                             turn: TURN_URL ? (TURN_SECRET ? 'ephemeral' : (TURN_USER ? 'static' : 'MISCONFIGURED')) : 'none',
                             chatRange: CHAT_RANGE,
-                            captions: { on: CAPTIONS, sent: captionCounts.sent, dropped: captionCounts.dropped },
+                            captions: { on: CAPTIONS, sent: captionCounts.sent, dropped: captionCounts.dropped,
+                                        tailMs: CAPTION_TAIL_MS, burst: CAPTION_BURST, refillMs: CAPTION_REFILL_MS,
+                                        reach: CAPTION_REACH || 'voice', textMute: CAPTION_TEXT_MUTE },
                             peers: peers.size, tracked: positions.size,
                             most: MOST, people: heldBy.size, refusedFull: refusedFull,
                             queuedCommands: commands.length,

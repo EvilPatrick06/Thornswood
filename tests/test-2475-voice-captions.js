@@ -25,6 +25,9 @@
     7. The choices go when the person's last connection closes.
     8. The words are one line of at most 80 characters, with nothing that
        breaks a line or turns the text round.
+    9. Every number is a setting staff can change without a release: the
+       tail, the burst, the refill, a reach that is never past the voice
+       reach, and whether a text mute hides captions.
 
   VOICE_SERVER points it at another copy of voice-server.js, which is how it
   was shown to fail on the code before #2475. Writes only to a temp folder,
@@ -135,7 +138,7 @@ function joinToken(port, pid) {
 }
 
 
-async function service(captions) {
+async function service(captions, extra) {
   const port = await freePort();
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-2475-'));
   fs.copyFileSync(SERVER, path.join(dir, 'voice-server.js'));
@@ -148,7 +151,9 @@ async function service(captions) {
     THORNSWOOD_CHAT_RANGE: 'on'
   });
   delete env.THORNSWOOD_CAPTIONS;
+  for (const k of Object.keys(env)) { if (k.indexOf('THORNSWOOD_CAPTION_') === 0) delete env[k]; }
   if (captions != null) { env.THORNSWOOD_CAPTIONS = captions; }
+  Object.assign(env, extra || {});
   const srv = spawn(process.execPath, ['voice-server.js'], { cwd: dir, env: env });
   let log = '';
   srv.stdout.on('data', (d) => { log += d; });
@@ -388,11 +393,60 @@ async function on() {
   } finally { await svc.stop(); }
 }
 
+// ------------------------------------------------------------ settings ----
+async function settings() {
+  console.log('');
+  console.log('THORNSWOOD_CAPTIONS=on with every caption setting changed:');
+  const svc = await service('on', {
+    THORNSWOOD_CAPTION_REACH: '1000', THORNSWOOD_CAPTION_TAIL_MS: '0',
+    THORNSWOOD_CAPTION_BURST: '1', THORNSWOOD_CAPTION_REFILL_MS: '60000',
+    THORNSWOOD_CAPTION_TEXT_MUTE: 'off'
+  });
+  try {
+    const h = (await svc.health()).captions || {};
+    yes('SET /health says what each setting is',
+        h.reach === 1000 && h.tailMs === 0 && h.burst === 1 && h.refillMs === 60000 && h.textMute === false);
+    const a = await join(svc, 101, 'Aela');
+    await join(svc, 102, 'Brand');
+    const d = await join(svc, 104, 'Dagny');
+    const all = ['Aela', 'Brand', 'Dagny'];
+    await place(svc, all);
+    send(a, { t: 'captions', share: true });
+    send(a, { t: 'vmode', mode: 'yell' });
+    send(a, { t: 'talk', on: true });
+    await post(svc, '/textmute', { by: { 104: [101] } });
+    await sleep(100);
+    yes('SET a reach of 1000 units holds even a yell to 14 m, and a text mute is left to the voice switch: Aela and Dagny, not Brand',
+        seenBy(await caption(svc, a, 'Close by', ['Aela', 'Dagny']), ['Aela', 'Dagny']));
+    for (const s of svc.socks) { s.caps.length = 0; }
+    send(a, { t: 'caption', text: 'Second' });
+    await sleep(400);
+    yes('SET a burst of one with a minute to refill: the next goes nowhere', d.caps.length === 0);
+  } finally { await svc.stop(); }
+  const svc2 = await service('on', { THORNSWOOD_CAPTION_TAIL_MS: '0', THORNSWOOD_CAPTION_REACH: '99999' });
+  try {
+    const a = await join(svc2, 101, 'Aela');
+    await join(svc2, 102, 'Brand');
+    await join(svc2, 103, 'Cass');
+    await place(svc2, ['Aela', 'Brand', 'Cass']);
+    send(a, { t: 'captions', share: true });
+    send(a, { t: 'talk', on: true });
+    await sleep(100);
+    yes('SET a reach set past the voice reach is still the voice reach: not Cass at 71 m speaking ordinarily',
+        seenBy(await caption(svc2, a, 'Ordinary', ['Aela', 'Brand']), ['Aela', 'Brand']));
+    send(a, { t: 'talk', on: false });
+    await sleep(50);
+    yes('SET no tail: once the key is up, nothing',
+        seenBy(await caption(svc2, a, 'After', []), []));
+  } finally { await svc2.stop(); }
+}
+
 (async () => {
   SITE = await siteThatSaysYes();
   words();
   await off();
   await on();
+  await settings();
   console.log('');
   console.log(pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);

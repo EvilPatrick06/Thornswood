@@ -92,8 +92,13 @@ speaker said `{ t: 'captions', share: true }` and while their talk key is
 down or was up less than two seconds ago. `{ see: false }` stops a person
 getting anybody's, a text mute stops that speaker's, staff silence stops all
 of the speaker's, and none is written to the chat log or the service log.
-`/health` gives `captions`: whether it is on, and how many went out and how
-many did not. Nothing sends one yet, so every service is left without it
+`/health` gives `captions`: whether it is on, how many went out and how
+many did not, and the settings below.
+`THORNSWOOD_CAPTION_TAIL_MS` (2000), `THORNSWOOD_CAPTION_BURST` (3),
+`THORNSWOOD_CAPTION_REFILL_MS` (1000), `THORNSWOOD_CAPTION_REACH` (unset: the
+voice reach; a number of units caps it, never past the voice reach) and
+`THORNSWOOD_CAPTION_TEXT_MUTE` (`off` leaves captions to the voice switch
+alone) tune it without a release. Nothing sends one yet, so every service is left without it
 until the questions on #2475 are decided.
 `tests\test-2475-voice-captions.js` covers it.
 `THORNSWOOD_VOICE_AUTH`, which once let unproven joins in, is not read any
