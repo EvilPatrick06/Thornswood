@@ -104,12 +104,15 @@ SAME_BY_DESIGN = {
     0x5015488: 'docs/systems/professions/woodworker/charburner.md: Coke, 12 firewood, makes 1, at the kiln',
 }
 
-# The placed stations of Thornswood's own that wait on where Thornswood
-# stands its own (#2553, the decision written there): taking them out would
-# take the only kilns, salt quarries, placed hives and Thornswood labs out of
-# the world.
+# The other server's placements of Thornswood's four stations. Until
+# Patrick's A of 16 October (#2553) they stayed, because they were the only
+# kilns, salt quarries, placed hives and Thornswood labs in the world. Since
+# then Thornswood stands its own where game/data/station-sites.json measures
+# (scripts/dev/Build-StationSites.py), and these go.
 STATIONS = {0x5042E69: 'alchemy lab', 0x501547E: 'charcoal kiln', 0x5DBF8B3: 'beehive',
             0x5DDE4EF: 'salt quarry'}
+STATION_COUNTS = {'alchemy lab': 25, 'charcoal kiln': 8, 'beehive': 13, 'salt quarry': 11}
+STATION_SITES = os.path.join(ROOT, 'game', 'data', 'station-sites.json')
 
 COMPRESSED = 0x00040000
 
@@ -272,17 +275,22 @@ def build(masters_dir):
     final = {f for (t, fl, f, d, w, c) in records(vers[-1][2])}
     last = records(vers[-1][2])
 
-    # The placements and what holds them.
-    awaiting, holders = set(), set()
+    # The other server's placements of the stations, and the cells and
+    # worldspaces Thornswood's own placements stand in, which the plugin
+    # carries as Bethesda's records.
+    stations = set()
     for (t, fl, f, d, w, c) in last:
         if t != 'REFR' or f not in salvaged_ids:
             continue
         base = next(struct.unpack('<I', b)[0] for tt, b in subrecords(d) if tt == b'NAME')
         if base in STATIONS and not fl & 0x800:
-            awaiting.add(f)
-            holders.add(c)
-            if w is not None:
-                holders.add(w)
+            stations.add(f)
+    low = [n.lower() for n in names]
+    holders = set()
+    for row in json.load(open(STATION_SITES, encoding='utf-8'))['sites'].values():
+        for field in ('cell',) + (() if row['interior'] else ('space',)):
+            obj, owner = row[field].split(':', 1)
+            holders.add((low.index(owner.lower()) << 24) | int(obj, 16))
     overrides = [f for (t, fl, f, d, w, c) in last
                  if t == 'REFR' and f in salvaged_ids and f >> 24 != 5]
     bethesda = bethesda_placements(masters_dir, names, overrides)
@@ -308,14 +316,12 @@ def build(masters_dir):
             base = next(struct.unpack('<I', b)[0] for x, b in subrecords(d) if x == b'NAME')
             row['base'] = desc(base, names)
             row['cell'] = desc(c, names)
-            if f in awaiting:
-                row['disposition'] = 'awaiting sites'
-                row['why'] = ('one of the %s placements of Thornswood\'s %s: it stays until Thornswood '
-                              'stands its own (#2553)' % (
-                                  {'alchemy lab': 25, 'charcoal kiln': 8, 'beehive': 13, 'salt quarry': 11}[STATIONS[base]],
-                                  STATIONS[base]))
+            row['disposition'] = 'dropped'
+            if f in stations:
+                row['why'] = ('one of the other server\'s %d placements of Thornswood\'s %s, at the spot it '
+                              'chose; Thornswood stands its own where game/data/station-sites.json measures '
+                              '(Patrick, A on #2553)' % (STATION_COUNTS[STATIONS[base]], STATIONS[base]))
             else:
-                row['disposition'] = 'dropped'
                 if f >> 24 != 5:
                     did = what_it_did(fl, dict(subrecords(d)), bethesda[f])
                     row['did'] = did or ['nothing but the location ref type the editor writes']
@@ -328,8 +334,8 @@ def build(masters_dir):
         elif t in ('CELL', 'WRLD'):
             if f in holders:
                 row['disposition'] = "Bethesda's"
-                row['why'] = ('it holds placements awaiting sites, so it stays, written by the tool from '
-                              'the winning master\'s own record')
+                row['why'] = ('a station Thornswood places stands in it (game/data/station-sites.json), so '
+                              'it stays, written by the tool from the winning master\'s own record')
             else:
                 row['disposition'] = 'dropped'
                 row['why'] = 'nothing of Thornswood\'s is placed in it once the placements above go'
