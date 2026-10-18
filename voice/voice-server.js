@@ -60,7 +60,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1-tls-only-1-ice-socket-1-no-page-1-most-1-roster-once-1-long-command-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1-tls-only-1-ice-socket-1-no-page-1-most-1-roster-once-1-long-command-1-captions-1';
 
 // ==== thornswood deploy record ====
 // Which commit this copy came from (#459): Install-Voice.ps1 leaves the deploy
@@ -562,6 +562,137 @@ function hearers(myId, me, reach) {
     to.push(p);
   }
   return { to: to, placed: !!mine };
+}
+
+/* ------------------------------------------------------------- captions ---
+ *
+ * WHAT SOMEBODY SAYS ON VOICE, AS WORDS ABOVE THEIR HEAD (#2475). Patrick,
+ * 12 Oct: "so it's not only just chat but also what players say".
+ *
+ * The audio never comes here (it goes between people's machines), so the
+ * words are made on the speaker's own machine and only the text comes
+ * here, as { t: 'caption', text }. This decides who sees it and nothing
+ * else: it does not make words out of anything, and it does not keep them.
+ *
+ * OFF UNLESS THORNSWOOD_CAPTIONS IS on. Nothing sends a caption yet, and the
+ * decisions on #2475 (where the words are made, whether they are kept,
+ * whether they also go in the chat box) are still open there, so a service started
+ * without the setting drops every caption, and /health says which it is.
+ *
+ * NOBODY'S VOICE IS SHOWN UNLESS THEY SAID SO. A person's captions go out
+ * only after one of their connections has sent { t: 'captions', share: true }.
+ * { see: false } stops them being sent anybody else's. Both are kept for
+ * the profile, not the connection, because the launcher's voice page and the
+ * game's chat each hold one, and both are forgotten when the last of them
+ * closes, so every session starts from what the client says, never from
+ * what this process remembers.
+ *
+ * WHO SEES IT is who could hear it: the same cell, and the reach of the
+ * voice mode the speaker is in (headlines.captionReach: 7, 30 or 85 metres,
+ * as the speaking mark). No fresh position for the speaker is nobody but
+ * themselves, never everybody, unlike a typed line when the feed is down:
+ * a caption is somebody's voice, and voice is never worldwide. The speaker's
+ * own connections always get it, so they can see what was made of them.
+ * A listener who turned the speaker's text off gets none of theirs.
+ *
+ * ONLY WHILE THEY ARE TALKING: the talk key down, or up for less than
+ * CAPTION_TAIL_MS, which is how long the words for the last thing said can
+ * take to come. Staff silence drops them, as it closes the microphone. A
+ * caption at any other time did not come from a voice, so it goes nowhere.
+ *
+ * NOT IN THE CHAT LOG, and not in the service log. Whether voice words are
+ * kept is one of the open decisions; until it is made, they are not.
+ *
+ * Three at once, then one a second, per connection: a sentence is one
+ * caption, and the bucket only stops a machine that sends them as fast as
+ * it can.
+ */
+const CAPTIONS = String(process.env.THORNSWOOD_CAPTIONS || '').trim().toLowerCase() === 'on';
+const CAPTION_BURST = 3;
+const CAPTION_REFILL_MS = 1000;
+const CAPTION_TAIL_MS = 2000;
+const captionPrefs = new Map();   // profileId -> { share, see }
+const talkEnded = new Map();      // profileId -> when the talk key last came up
+const captionCounts = { sent: 0, dropped: 0 };
+
+function captionPrefsOf(profileId) {
+  return captionPrefs.get(Number(profileId) || 0) || { share: false, see: true };
+}
+
+function setCaptionPrefs(profileId, msg) {
+  const pid = Number(profileId) || 0;
+  if (!pid || !msg) return;
+  const was = captionPrefsOf(pid);
+  captionPrefs.set(pid, {
+    share: typeof msg.share === 'boolean' ? msg.share : was.share,
+    see: typeof msg.see === 'boolean' ? msg.see : was.see
+  });
+}
+
+function forgetCaptions(profileId) {
+  const pid = Number(profileId) || 0;
+  captionPrefs.delete(pid);
+  talkEnded.delete(pid);
+}
+
+function speakingNow(profileId, now) {
+  const pid = Number(profileId) || 0;
+  for (const [, p] of peers) {
+    if (Number(p.profileId) === pid && p.talking) return true;
+  }
+  const ended = talkEnded.get(pid);
+  return !!ended && now - ended >= 0 && now - ended <= CAPTION_TAIL_MS;
+}
+
+function captionAllow(me, now) {
+  if (typeof me.captionTokens !== 'number') { me.captionTokens = CAPTION_BURST; me.captionAt = now; }
+  const since = Math.max(0, now - me.captionAt);
+  me.captionTokens = Math.min(CAPTION_BURST, me.captionTokens + since / CAPTION_REFILL_MS);
+  me.captionAt = now;
+  if (me.captionTokens < 1) return false;
+  me.captionTokens -= 1;
+  return true;
+}
+
+/* The connections a caption from me goes to. */
+function captionTargets(me, reach, now) {
+  const pid = Number(me.profileId) || 0;
+  const fresh = (p) => {
+    const v = positions.get(Number(p) || 0);
+    return (v && now - v.at <= STALE_MS && Array.isArray(v.pos)) ? v : null;
+  };
+  const mine = fresh(pid);
+  const to = [];
+  for (const [, p] of peers) {
+    const them = Number(p.profileId) || 0;
+    if (them === pid) { to.push(p); continue; }
+    if (!mine) continue;
+    if (captionPrefsOf(them).see === false) continue;
+    if (textBlocked(them, pid)) continue;
+    const v = fresh(them);
+    if (!v || !headlines.sameCellWithin(mine, v, reach)) continue;
+    to.push(p);
+  }
+  return to;
+}
+
+/* Why a caption went nowhere, or '' when it went out. */
+function relayCaption(me, raw, now) {
+  if (!CAPTIONS) return 'off';
+  if (!me) return 'nobody';
+  const pid = Number(me.profileId) || 0;
+  if (!captionPrefsOf(pid).share) return 'not shared';
+  if (silencedLeft(pid, now)) return 'silenced';
+  if (!speakingNow(pid, now)) return 'not talking';
+  const text = headlines.captionHead(raw);
+  if (!text) return 'empty';
+  if (!captionAllow(me, now)) return 'too fast';
+  const voice = voiceOf(pid);
+  const out = { t: 'caption', profileId: pid, actor: actorOf(pid), mode: voice.mode, text: text, at: now };
+  for (const p of captionTargets(me, headlines.captionReach(voice.mode), now)) {
+    if (p && p.ws) p.ws.send(out);
+  }
+  return '';
 }
 
 /* ----------------------------------------------------------- chat limit ---
@@ -2177,6 +2308,7 @@ const server = http.createServer((req, res) => {
                             bind: BIND,
                             turn: TURN_URL ? (TURN_SECRET ? 'ephemeral' : (TURN_USER ? 'static' : 'MISCONFIGURED')) : 'none',
                             chatRange: CHAT_RANGE,
+                            captions: { on: CAPTIONS, sent: captionCounts.sent, dropped: captionCounts.dropped },
                             peers: peers.size, tracked: positions.size,
                             most: MOST, people: heldBy.size, refusedFull: refusedFull,
                             queuedCommands: commands.length,
@@ -2450,6 +2582,24 @@ server.on('upgrade', (req, socket, head) => {
       for (const [, p] of peers) {
         if (Number(p.profileId) === Number(me.profileId)) p.talking = on;
       }
+      // When the key came up, for the words that are still coming (#2475).
+      if (!on) talkEnded.set(Number(me.profileId) || 0, Date.now());
+      return;
+    }
+
+    // Whether this person's voice may be shown as words, and whether they
+    // see other people's (#2475). See captions, above.
+    if (msg.t === 'captions') {
+      const me = peers.get(myId);
+      if (me) setCaptionPrefs(me.profileId, msg);
+      return;
+    }
+
+    // Words made of what somebody said on voice, on their own machine
+    // (#2475). Never written down; see captions, above.
+    if (msg.t === 'caption') {
+      const why = relayCaption(peers.get(myId), msg.text, Date.now());
+      if (why) captionCounts.dropped++; else captionCounts.sent++;
       return;
     }
 
@@ -2664,6 +2814,8 @@ server.on('upgrade', (req, socket, head) => {
 
   ws.onclose = () => {
     letGoFor(proven);
+    // The last connection for this person: their caption choices go with it.
+    if (!heldBy.has(proven)) forgetCaptions(proven);
     if (!myId) return;
     const me = peers.get(myId);
     peers.delete(myId);

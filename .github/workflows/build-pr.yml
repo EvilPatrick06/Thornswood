@@ -483,6 +483,7 @@ jobs:
                  'test-1925-voice-relay-peers.js',
                  'test-1869-voice-negotiation.js',
                  'test-1924-voice-whole-view.js',
+                 'test-2475-voice-captions.js',
                  'test-1959-relay-keeps-reading.js',
                  'test-1336-missing-stops.ps1',
                  'test-1223-live-pass-asked.ps1',
