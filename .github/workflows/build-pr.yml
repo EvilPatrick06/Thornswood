@@ -530,7 +530,7 @@ jobs:
                  'test-release-baseline.ps1', 'test-publish-refusals.ps1', 'test-2513-every-harness-listed.ps1', 'test-release-workflow.ps1',
                  'test-2460-winps-module-path.ps1',
                  'test-feed-watch.js',
-                 'test-session-cards.js', 'test-staff-bans.js', 'test-hub-staff-gallery.js', 'test-known-issues.js', 'test-2414-known-one-copy.js', 'test-2560-roadmap-done.js',
+                 'test-session-cards.js', 'test-staff-bans.js', 'test-hub-staff-gallery.js', 'test-known-issues.js', 'test-known-page.js', 'test-sunhelm-gone.js', 'test-known-npcs.js', 'test-2414-known-one-copy.js', 'test-2560-roadmap-done.js',
                  'test-join-outage.js', 'test-join-pass-site.js', 'test-open-switch.js', 'test-component-readmes.js',
                  'test-site-front-resilience.js', 'test-site-upload-guard.js',
                  'test-report-limits.js', 'test-site-hangs.js',
