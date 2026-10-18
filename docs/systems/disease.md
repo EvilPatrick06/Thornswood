@@ -84,7 +84,7 @@ fouled water through the meal and drink work (#1382).
 A potion of cure disease somebody brews cures the same way. The lab
 tells the server which bottle a Cure Disease brew made, from the
 ingredients, and drinking that bottle clears one disease. The server
-hears a brewed bottle being drunk from engine fork PR #81 on (#1383).
+hears a brewed bottle being drunk from engine fork PR #78 on (#1383).
 
 A cooked meal's help against disease halves every chance for 20
 minutes, and a feast's quarters it for 10. That half is in the server.

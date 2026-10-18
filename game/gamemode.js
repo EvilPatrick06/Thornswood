@@ -59935,7 +59935,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     it cures by the brew instead: the alchemy gate tells brewed() which
     runtime id a brew carrying CURE_DISEASE_EFFECT (the magic effect
     AlchCureDisease) made, and swallowed() cures for that id too. The engine
-    raises onEatItem for a runtime bottle from fork #81 on (#1383).
+    raises onEatItem for a brewed bottle from fork #78 on (#1383).
   */
   var CURE_DISEASE = ['ae723:Skyrim.esm'];
   var CURE_DISEASE_EFFECT = 'ae722:Skyrim.esm';
