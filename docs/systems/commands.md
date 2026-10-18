@@ -136,6 +136,17 @@ These stay commands. How to run each one, with examples:
 Nobody types these, and nothing tells anybody to. They are how the
 client reports what only it can see. They stay.
 
+The voice service's chat log, which staff read for a report, leaves out
+the ones the front plugin sends by itself (#2723,
+`voice/voice-server.js:PLUGIN_REPORTS`): `/joinpass`, `/place`, `/burn`,
+`/loadorder` and `/loadorderlight`, `/afk active`, `/face done`,
+`/racemenu` and `/racedown`, `/modset`, `/ate`, `/chopped`, `/tspicks`,
+`/rest`, and the panels' `refresh`. It writes the ones a key, E, a pick
+or a button sends, marked as a key press (#2251), and the wait in line
+once when it starts and once when it ends (#1131). Every one of them
+still reaches the game server, and the same line typed in the chat box
+is written as typed.
+
 | Line | Sent by | What it reports | Read at |
 | --- | --- | --- | --- |
 | `/joinpass <pass>` | The front plugin | The launcher's join pass | `gamemode.js:word === '/joinpass'` |

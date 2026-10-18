@@ -60,7 +60,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1-tls-only-1-ice-socket-1-no-page-1-most-1-roster-once-1-long-command-1-captions-2-line-log-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1-tls-only-1-ice-socket-1-no-page-1-most-1-roster-once-1-long-command-1-captions-2-line-log-1-own-reports-1';
 
 // ==== thornswood deploy record ====
 // Which commit this copy came from (#459): Install-Voice.ps1 leaves the deploy
@@ -353,6 +353,10 @@ function sweepSilenced(now) {
  * SLASH COMMANDS ARE KEPT TOO. They are queued for the game server rather
  * than broadcast, so nobody else sees them, but somebody typed them and
  * "what did they run" is the same kind of question as "what did they say".
+ * So is a line a key or a panel sent for somebody, kept as a key press
+ * (#2251). The front plugin's own reports are not kept: nobody typed or
+ * pressed them, and they were most of every day's file (#2723, see
+ * pluginReport below).
  */
 const CHAT_DIR = process.env.THORNSWOOD_CHAT_DIR || path.join(HERE, 'chat');
 const CHAT_DAYS = Number(process.env.THORNSWOOD_CHAT_DAYS || 365);
@@ -392,7 +396,65 @@ function chatWrite(kind, peerId, me, text, via) {
   }
 }
 
-/* WHAT A SLASH LINE WRITES TO THE CHAT LOG, or '' for nothing (#1131).
+/* THE FRONT PLUGIN'S OWN REPORTS ARE NOT WRITTEN (#2723).
+
+   Measured 18 Oct on the box: the dev chat log for 17 Oct had 444 lines and
+   every one was a command line, most of them the front plugin telling the
+   game server what only the client can see (docs\systems\commands.md, "Lines
+   the game sends itself"): /place 130, /joinpass 102, /loadorderlight and
+   /loadorder 42 each, /afk 33, /pick 33, /party 24. Nobody typed or pressed
+   any of them. They go on a change or a timer (the pass every minute, the
+   load order every two minutes, /place whenever the weather or the roof
+   changes, /afk active while somebody is at the keys, /racemenu every minute
+   while the race menu is up) or as a panel opens and asks for its view
+   (/pick refresh, /party refresh, /trade refresh). The game server reads
+   them as reports and answers most with nothing. The chat log is for what
+   somebody said, typed or pressed, so staff reading it for a report read
+   that and not the client.
+
+   WHAT DECIDES IT. The line's whole text has to be one of the shapes below,
+   each exactly what thornswood-front.js builds, and the line has to come
+   with press, which the chat page sets only on the plugin's own lines and a
+   key's (thornswood-chat.js, say with auto). Neither alone is enough. press
+   is the client's word and anybody with a console can put it on any line, so
+   on its own it would let somebody keep a typed /tp out of the log; here it
+   only ever leaves out a line that is a report by its shape, which the game
+   server takes the same way whoever sent it. A report shape typed into the
+   chat box comes with no press, so it is written: somebody typed it.
+   tests\test-2723-plugin-reports.js holds this list to the plugin's own
+   send sites, so a report added there without a shape here fails the build.
+
+   A report is still queued for the game server like every other line: this
+   decides the chat log and nothing else. What stays written of the plugin's
+   lines: the keys' and E's (/lock, /key, /moldhere, /plot, /ride e,
+   /merchant e, /repair, /treat), the K panel's picks (/pick <what>), the
+   "I am still here" button (/afk here), and the wait in line (#1131):
+   the /line that starts it, /afk out, /line leave and /line hand. */
+const PLUGIN_REPORTS = [
+  /^\/joinpass jp1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/,
+  /^\/place (?:outdoors|water|shallow|indoors|snow|rain) (?:[0-9a-f]+|-) [01] [01] -?\d+ (?:\d+|-)$/,
+  /^\/loadorder(?:light)? \d+ \d+ (?:[0-9a-f]{5})*$/,
+  /^\/afk active$/,
+  /^\/(?:pick|party|trade) refresh$/,
+  /^\/racemenu$/,
+  /^\/racedown$/,
+  /^\/face done$/,
+  /^\/burn [01]$/,
+  /^\/chopped$/,
+  /^\/ate [0-9a-f]+$/,
+  /^\/rest (?:bed|sit|up)$/,
+  /^\/tspicks \d+$/,
+  /^\/modset(?: [A-Za-z0-9_]+=-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)+$/
+];
+function pluginReport(text) {
+  for (const shape of PLUGIN_REPORTS) { if (shape.test(text)) return true; }
+  return false;
+}
+
+/* WHAT A SLASH LINE WRITES TO THE CHAT LOG, or '' for nothing (#1131, #2723).
+
+   press is true for a line the chat page sent with press. A report the
+   front plugin makes by itself writes nothing; see PLUGIN_REPORTS above.
 
    A join pass is good for ten minutes to whoever holds it, so the log keeps
    that one was sent and never the pass itself (#937).
@@ -411,7 +473,8 @@ function chatWrite(kind, peerId, me, text, via) {
    the place away; each is said once and written once, like every other
    command. Every "/line" still goes to the game server: this decides the log
    and nothing else. */
-function commandLogText(me, text) {
+function commandLogText(me, text, press) {
+  if (press === true && pluginReport(text)) return '';
   if (/^\/joinpass\b/i.test(text)) return '/joinpass [pass]';
   if (/^\/line\s*$/i.test(text) && me && me.inLine) return '';
   return text;
@@ -2763,10 +2826,12 @@ server.on('upgrade', (req, socket, head) => {
       // in your own game and the server puts you straight back.
       if (text.charAt(0) === '/') {
         // What the chat log keeps of it: the pass masked, and a waiting
-        // menu's repeated "/line" not at all (commandLogText). Asked before
-        // lineMark below, which is what moves the waiting mark it reads.
-        const logged = commandLogText(me, text);
-        if (logged) chatWrite('command', myId, me, logged, msg.press === true ? 'press' : '');
+        // menu's repeated "/line" and the front plugin's own reports not at
+        // all (commandLogText). Asked before lineMark below, which is what
+        // moves the waiting mark it reads.
+        const press = msg.press === true;
+        const logged = commandLogText(me, text, press);
+        if (logged) chatWrite('command', myId, me, logged, press ? 'press' : '');
         // Full: the newest is refused and its sender told, and everything
         // already taken stays. See the note over COMMAND_CAP.
         if (commands.length >= COMMAND_CAP) {
