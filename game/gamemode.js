@@ -34322,6 +34322,337 @@ log('gamemode loaded:',
 })();
 // ==== end thornswood season ====
 
+// ==== thornswood world stage ====
+/*
+  THE WORLD STAGE AND THE OFFICE PROCLAMATION (#513).
+
+  #513 is the Thalmor war. Patrick, 17 Oct: Thornswood is player driven, so
+  the war is tools for staff and never a script. Nothing here decides what
+  happens next, and no timer moves anything. The stages are data, written by
+  staff in game/data/war-stages.json, and this block knows no stage by name.
+
+  THE STAGE LIST is WAR_STAGES below, the same table as
+  game/data/war-stages.json. The server is sent this file and not game/data,
+  so the table is copied in, and tests/test-513-world-stage.js fails if the
+  two differ. Each stage has an id, a name and its words, and may carry
+  force: free text saying who is behind it (dominion, remnant, proxy, mixed,
+  or whatever staff write). force is handed back as it is written. No code
+  here reads it to choose anything. The first stage in the list is where the
+  world starts, and where it falls back to.
+
+  ONE STAGE FOR THE WHOLE PROVINCE, kept in private/war.json beside
+  season.json, so a restart or a deploy does not reset it. worldStage() is
+  the one place it is read: the stage, its force, when the world reached it
+  and who moved it there. Any block that needs it asks here rather than
+  keeping a copy of its own.
+
+    - No file is the start of the world, the first stage. Nothing is written
+      and nothing is said.
+    - A file that cannot be read, or one whose stage the list does not have,
+      is the first stage too, and the log says so once, when this block
+      loads. The file is left as it is. If a move is made after that, the
+      unreadable file is kept beside it as war.json.unreadable-<time> before
+      the new one is written, so nothing on record is lost.
+
+  THE HISTORY. war.json keeps every move the world has made, oldest first:
+  the stage, when, and who moved it there (and who proposed it, for a move
+  that was proposed). The last entry is where the world is now. A move is
+  never taken off it, so a change that is meant to be permanent stays on
+  record even when a later stage undoes it in the world.
+
+  setWorldStage(id, by) moves it, and is a function only: nothing in play
+  calls it. An id the list does not have is refused. So is the stage the
+  world is already at, so the time it was reached is never reset by
+  accident, and so is a move that does not say who made it. Nothing is
+  written when it refuses. The file is written whole and then renamed into
+  place, so a crash halfway leaves the old stage, not half a file.
+
+  THE SEAM FOR LATER, SERVER PROPOSES AND STAFF CONFIRM. proposeWorldStage
+  (id, by) keeps one proposal in war.json, checked the same way as a move,
+  and moves nothing. A later proposal replaces it. confirmWorldStage(by)
+  makes the move it proposed, as a move by whoever confirmed it, and clears
+  it. dropWorldStageProposal(by) clears it without a move. A direct
+  setWorldStage clears it too, because it no longer says where the world
+  goes from here. pendingWorldStage() reads it. Who proposes and who may
+  confirm, and from where in the world, is the next step on #513 and is not
+  built here.
+
+  proclaim(holds, office, title, body) puts one notice on the board of each
+  hold named, in the name of an office (the Crown, the Jarl of Haafingar),
+  never a person. It is a notice like any other on the wall and under Boards
+  on J, kept in the property register with the rest, so it survives a
+  restart. There is no fee, no gold moves, and nothing is held on any
+  ledger: it is the office's word, not somebody's purchase. The property
+  block's officePost does the writing, with the same 60 and 600 limits as a
+  person's post. Everybody standing at one of those boards, within the
+  board's own reach of 400, is told once in their chat. A hold with no board
+  refuses the whole call, and so does anything else wrong with it, and then
+  nothing is written and nobody is told. 'all' names every hold that has a
+  board.
+
+  NOTHING CALLS ANY OF THIS IN PLAY YET. The patrol cap is #1390's, and
+  nothing here touches it.
+*/
+(function () {
+  'use strict';
+  var g = (typeof globalThis !== 'undefined') ? globalThis : this;
+
+  // ==== WAR_STAGES ====
+  /* The same table as game/data/war-stages.json. tests/test-513-world-stage.js checks that they agree. */
+  var WAR_STAGES = {"version":1,"stages":[{"id":"peace","name":"Peace","text":"The Kingdom is at peace. Nothing in the world changes."}]};
+  // ==== end WAR_STAGES ====
+
+  var BY_CHARS = 80;
+
+  function wlog() {
+    var a = ['[thornswood world stage]'];
+    for (var i = 0; i < arguments.length; i++) { a.push(arguments[i]); }
+    try { console.log(a.join(' ')); } catch (e) { }
+  }
+
+  function stagePath() {
+    var fs = require('fs');
+    var path = require('path');
+    var priv = 'private';
+    try {
+      var cfg = JSON.parse(fs.readFileSync('server-settings.json', 'utf8'));
+      if (cfg && cfg.privDir) { priv = String(cfg.privDir); }
+    } catch (e) { }
+    try { if (!fs.existsSync(priv)) { fs.mkdirSync(priv, { recursive: true }); } } catch (e2) { }
+    return path.join(priv, 'war.json');
+  }
+
+  function stageList() { return (WAR_STAGES && Array.isArray(WAR_STAGES.stages)) ? WAR_STAGES.stages : []; }
+
+  /** The stage row for an id, or null when the list has no such stage. */
+  function stageOf(id) {
+    var list = stageList();
+    for (var i = 0; i < list.length; i++) {
+      if (list[i] && typeof list[i].id === 'string' && list[i].id === id) { return list[i]; }
+    }
+    return null;
+  }
+
+  /** Where the world starts: the first stage in the list. */
+  function startId() {
+    var first = stageList()[0];
+    return (first && typeof first.id === 'string') ? first.id : '';
+  }
+
+  function cleanWho(by) { return typeof by === 'string' ? by.replace(/\s+/g, ' ').trim() : ''; }
+
+  /* One history entry as it is kept: a stage, when, who, and who proposed it. */
+  function entryOf(row) {
+    if (!row || typeof row !== 'object' || typeof row.id !== 'string' || !row.id) { return null; }
+    var out = { id: row.id, at: Number(row.at) || 0, by: typeof row.by === 'string' ? row.by : '' };
+    if (typeof row.proposedBy === 'string' && row.proposedBy) { out.proposedBy = row.proposedBy; }
+    return out;
+  }
+
+  function readState() {
+    var fs = require('fs');
+    var file = stagePath();
+    var fresh = { history: [], pending: null, unreadable: false };
+    var text = null;
+    try {
+      text = fs.readFileSync(file, 'utf8');
+    } catch (e) {
+      if (e && e.code === 'ENOENT') { return fresh; }
+      wlog('could not read', file + ':', (e && e.message) || e, '; the world is at', startId());
+      fresh.unreadable = true;
+      return fresh;
+    }
+    var raw = null;
+    try { raw = JSON.parse(String(text).replace(/^\uFEFF/, '')); } catch (e2) { raw = null; }
+    if (!raw || typeof raw !== 'object' || !Array.isArray(raw.history)) {
+      wlog(file, 'is not readable; the world is at', startId(), 'and the file is left as it is');
+      fresh.unreadable = true;
+      return fresh;
+    }
+    var history = [];
+    for (var i = 0; i < raw.history.length; i++) {
+      var en = entryOf(raw.history[i]);
+      if (en) { history.push(en); }
+    }
+    var last = history.length ? history[history.length - 1] : null;
+    var lost = false;
+    if (last && !stageOf(last.id)) {
+      wlog(file, 'puts the world at a stage the list does not have (' + JSON.stringify(last.id) +
+           '); the world is at', startId(), 'and the file is left as it is');
+      lost = true;
+    }
+    var pending = null;
+    if (raw.pending && typeof raw.pending === 'object') {
+      var p = entryOf(raw.pending);
+      if (p && stageOf(p.id)) { pending = p; }
+      else { wlog('the proposal in', file, 'names a stage the list does not have; it is not kept'); }
+    }
+    return { history: history, pending: pending, unreadable: false, lost: lost };
+  }
+
+  var state = readState();
+
+  /* The history entry the world is at now, or null at the start. */
+  function current() {
+    if (state.lost) { return null; }
+    return state.history.length ? state.history[state.history.length - 1] : null;
+  }
+
+  function currentId() { var c = current(); return c ? c.id : startId(); }
+
+  /** Where the world is: the stage, its force, when it was reached and who moved it there. */
+  function worldStage() {
+    var c = current();
+    var row = stageOf(currentId()) || { id: currentId(), name: '', text: '' };
+    return { id: row.id, name: String(row.name || ''), text: String(row.text || ''),
+             force: typeof row.force === 'string' ? row.force : '',
+             since: c ? c.at : 0, by: c ? c.by : '' };
+  }
+
+  /** Every move the world has made, oldest first. A copy. */
+  function worldHistory() { return JSON.parse(JSON.stringify(state.history)); }
+
+  /** The proposal waiting for a yes, or null. A copy. */
+  function pendingWorldStage() { return state.pending ? JSON.parse(JSON.stringify(state.pending)) : null; }
+
+  /* Writes the next state whole, or nothing. Answers true when it is on disk. */
+  function write(next) {
+    var fs = require('fs');
+    var file = stagePath();
+    try {
+      if (state.unreadable && fs.existsSync(file)) {
+        fs.renameSync(file, file + '.unreadable-' + Date.now());
+      }
+      var c = next.history.length ? next.history[next.history.length - 1] : null;
+      fs.writeFileSync(file + '.tmp', JSON.stringify({
+        id: c ? c.id : startId(), since: c ? c.at : 0, by: c ? c.by : '',
+        history: next.history, pending: next.pending
+      }));
+      fs.renameSync(file + '.tmp', file);
+    } catch (e) {
+      wlog('could not write', file + ':', (e && e.message) || e, '; the world stays at', currentId());
+      return false;
+    }
+    state = { history: next.history, pending: next.pending, unreadable: false, lost: false };
+    return true;
+  }
+
+  /* Why a move to id by who cannot be made, or '' when it can. */
+  function refusal(id, who, doing) {
+    if (typeof id !== 'string' || !stageOf(id)) { return 'There is no stage called ' + JSON.stringify(String(id)) + '.'; }
+    if (!who) { return 'Say who ' + doing + '.'; }
+    if (who.length > BY_CHARS) { return 'Who ' + doing + ' is up to ' + BY_CHARS + ' characters.'; }
+    // A file whose stage the list lost may still be moved to the start.
+    if (!state.lost && id === currentId()) { return 'The world is already at ' + (stageOf(id).name || id) + '.'; }
+    return '';
+  }
+
+  function move(id, who, proposedBy) {
+    var entry = { id: id, at: Date.now(), by: who };
+    if (proposedBy) { entry.proposedBy = proposedBy; }
+    var was = currentId();
+    var history = state.history.concat([entry]);
+    if (!write({ history: history, pending: null })) {
+      return { ok: false, why: 'The stage could not be written, so the world stays where it was.' };
+    }
+    wlog(who, 'moved the world from', was, 'to', id + (proposedBy ? ', proposed by ' + proposedBy : ''));
+    return { ok: true, stage: worldStage() };
+  }
+
+  /** Moves the world to stage id. Answers { ok: true, stage } or { ok: false, why }, and writes nothing on a no. */
+  function setWorldStage(id, by) {
+    var key = typeof id === 'string' ? id.trim() : id;
+    var who = cleanWho(by);
+    var why = refusal(key, who, 'moved the world');
+    if (why) { return { ok: false, why: why }; }
+    return move(key, who, '');
+  }
+
+  /** Keeps one proposal to move to stage id, and moves nothing. A later one replaces it. */
+  function proposeWorldStage(id, by) {
+    var key = typeof id === 'string' ? id.trim() : id;
+    var who = cleanWho(by);
+    var why = refusal(key, who, 'proposes it');
+    if (why) { return { ok: false, why: why }; }
+    var pending = { id: key, at: Date.now(), by: who };
+    if (!write({ history: state.history, pending: pending })) {
+      return { ok: false, why: 'The proposal could not be written, so nothing changed.' };
+    }
+    wlog(who, 'proposed moving the world from', currentId(), 'to', key);
+    return { ok: true, pending: pendingWorldStage() };
+  }
+
+  /** Makes the move the proposal names, as a move by whoever confirms it. */
+  function confirmWorldStage(by) {
+    var p = state.pending;
+    if (!p) { return { ok: false, why: 'Nothing is proposed.' }; }
+    var who = cleanWho(by);
+    var why = refusal(p.id, who, 'confirms it');
+    if (why) { return { ok: false, why: why }; }
+    return move(p.id, who, p.by);
+  }
+
+  /** Clears the proposal without a move. */
+  function dropWorldStageProposal(by) {
+    var p = state.pending;
+    if (!p) { return { ok: false, why: 'Nothing is proposed.' }; }
+    var who = cleanWho(by);
+    if (!who) { return { ok: false, why: 'Say who is dropping it.' }; }
+    if (!write({ history: state.history, pending: null })) {
+      return { ok: false, why: 'The proposal could not be cleared, so it stands.' };
+    }
+    wlog(who, 'dropped the proposal to move the world to', p.id);
+    return { ok: true };
+  }
+
+  /*
+    A notice in an office's name on the boards named, and a line to everybody
+    standing at one of them. Answers { ok: true, holds, told } or
+    { ok: false, why }. See the top of this block.
+  */
+  function proclaim(holds, office, title, body) {
+    var W = g.__thornswoodProperty;
+    if (!W || typeof W.officePost !== 'function' || typeof W.boardHere !== 'function') {
+      return { ok: false, why: 'The boards are not loaded, so nothing was put up.' };
+    }
+    var r = W.officePost(holds, office, title, body);
+    if (!r || !r.ok) { return r || { ok: false, why: 'Nothing was put up.' }; }
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { online = []; }
+    var line = 'A notice from ' + r.office + ' is up on the board: ' + r.title +
+               (/[.!?]$/.test(r.title) ? '' : '.');
+    var told = 0;
+    for (var i = 0; i < online.length; i++) {
+      var hold = null;
+      try { hold = W.boardHere(online[i]); } catch (e2) { hold = null; }
+      if (!hold || r.holds.indexOf(hold) < 0) { continue; }
+      try { say(online[i], line); told++; } catch (e3) { }
+      // A board panel that is open shows the new notice now, not at the next push.
+      try {
+        var soc = g.__thornswoodSocial;
+        if (soc && soc.push) { soc.push(online[i], true); }
+      } catch (e4) { }
+    }
+    wlog(r.office, 'proclaimed on', r.holds.join(', ') + ':', r.title, '; told', told);
+    return { ok: true, holds: r.holds.slice(), told: told };
+  }
+
+  g.__thornswoodWorldStage = {
+    worldStage: worldStage,
+    worldHistory: worldHistory,
+    setWorldStage: setWorldStage,
+    proposeWorldStage: proposeWorldStage,
+    confirmWorldStage: confirmWorldStage,
+    dropWorldStageProposal: dropWorldStageProposal,
+    pendingWorldStage: pendingWorldStage,
+    proclaim: proclaim,
+    stages: function () { return JSON.parse(JSON.stringify(stageList())); }
+  };
+  if (!startId()) { wlog('the stage list is empty; nothing here can move'); }
+  wlog('the world is at', currentId());
+})();
+// ==== end thornswood world stage ====
+
 // ==== thornswood farming ====
 /*
   FARMING: claiming ground, sowing it, waiting, and bringing it in.
@@ -41337,6 +41668,64 @@ log('gamemode loaded:',
     return true;
   }
 
+  /*
+    A NOTICE IN AN OFFICE'S NAME (#513). The world stage block's proclaim is
+    the only caller, and nothing calls that in play yet.
+
+    An office's notice is the office's word, not somebody's purchase: no fee
+    is taken, nothing goes onto any hold's ledger and nothing is held there,
+    so funds and heldOn are as they were. It is otherwise a notice like a
+    person's, on the wall and under Boards on J, with the same 60 and 600
+    limits. It is put up by nobody: by is 0, which is no profile, so no
+    person sees it as their own and only that hold's Guard or Jarl takes it
+    down, the same as any post on their board (#502, #2551). name is the
+    office, which is what the wall shows, and office marks it as one.
+
+    Every hold named has to have a board, and the words have to fit, or the
+    whole call is refused and nothing is written. 'all' is every hold that
+    has a board. A hold named twice gets one notice.
+  */
+  function officePost(holdList, office, title, body) {
+    var named = holdList === 'all'
+      ? LEDGER_HOLDS.filter(function (h) { return Object.prototype.hasOwnProperty.call(boards, h); })
+      : (typeof holdList === 'string' ? [holdList] : holdList);
+    if (!Array.isArray(named) || !named.length) { return { ok: false, why: 'Name a hold. Nothing was put up.' }; }
+    var keys = [];
+    for (var i = 0; i < named.length; i++) {
+      var k = String(named[i] || '').trim().toLowerCase();
+      if (LEDGER_HOLDS.indexOf(k) < 0 || !Object.prototype.hasOwnProperty.call(boards, k)) {
+        return { ok: false, why: 'No board in ' + String(named[i]) + '. Nothing was put up.' };
+      }
+      if (keys.indexOf(k) < 0) { keys.push(k); }
+    }
+    var who = String(office || '').replace(/\s+/g, ' ').trim();
+    if (!who) { return { ok: false, why: 'Name the office it is from. Nothing was put up.' }; }
+    if (who.length > POST_TITLE_CHARS) {
+      return { ok: false, why: 'An office is up to ' + POST_TITLE_CHARS + ' characters. Nothing was put up.' };
+    }
+    var head = String(title || '').replace(/\s+/g, ' ').trim();
+    if (!head) { return { ok: false, why: 'Give the notice a title. Nothing was put up.' }; }
+    if (head.length > POST_TITLE_CHARS) {
+      return { ok: false, why: 'A title is up to ' + POST_TITLE_CHARS + ' characters. That one is ' +
+               head.length + '. Nothing was put up.' };
+    }
+    var text = String(body || '').trim();
+    if (!text) { return { ok: false, why: 'Say what the notice says. Nothing was put up.' }; }
+    if (text.length > POST_BODY_CHARS) {
+      return { ok: false, why: 'What the notice says is up to ' + POST_BODY_CHARS + ' characters. That is ' +
+               text.length + '. Nothing was put up.' };
+    }
+    var at = Date.now();
+    for (var j = 0; j < keys.length; j++) {
+      if (!notices[keys[j]]) { notices[keys[j]] = []; }
+      notices[keys[j]].push({ by: 0, office: true, name: who, title: head, text: text, at: at,
+                              job: false, taken: 0 });
+    }
+    save();
+    plog(who, 'put a notice up in', keys.join(', '), 'with no fee:', head);
+    return { ok: true, holds: keys, office: who, title: head };
+  }
+
   function board(parts, actorId, profileId, toProfile) {
     var arg = (parts && parts.length > 1) ? String(parts[1]).trim().toLowerCase() : '';
     var standing = boardHere(actorId);
@@ -42995,6 +43384,8 @@ log('gamemode loaded:',
     rentDue: rentDue, funds: function () { return funds; },
     boxes: function () { return boxes; },
     notices: function () { return notices; }, takedown: takedown,
+    // A notice in an office's name, with no fee (#513). See the world stage block.
+    officePost: officePost,
     boards: function () { return boards; }, boardHere: boardHere, boardPanel: boardPanel,
     standBoard: standBoard, standBoards: standBoards, boardActivated: boardActivated,
     boxOffset: boxOffset, boardAngle: boardAngle,
