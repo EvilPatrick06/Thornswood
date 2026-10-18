@@ -396,7 +396,9 @@ if (-not $GamemodeDeploy) {
   if ($Record) {
     if ($DryRun) { Write-Host ('  -DryRun: would record ' + (Prop $v 'launcherVersion') + ' as announced, nothing posted') -ForegroundColor Yellow; return }
     $why = Save-ThornswoodAnnounced
-    if ($why) { Write-Host "  could not record it: $why" -ForegroundColor Red; $global:ThornswoodDiscordResult = 'failed' }
+    # Exit 1 when it could not (#2645): -Record is typed by a person or run by
+    # a script that reads the exit code, and it used to exit 0 either way.
+    if ($why) { Write-Host "  could not record it: $why" -ForegroundColor Red; $global:ThornswoodDiscordResult = 'failed'; exit 1 }
     else { Write-Host ('  recorded ' + (Prop $v 'launcherVersion') + ' as announced in the shared record, nothing posted'); $global:ThornswoodDiscordResult = 'recorded' }
     return
   }
