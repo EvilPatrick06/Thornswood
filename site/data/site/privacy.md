@@ -2,7 +2,7 @@
 
 What Thornswood keeps about you, why, and how to have it deleted.
 
-Last changed: 17 October 2026.
+Last changed: 18 October 2026.
 
 Thornswood is a free fan project run by two people. It is not a company. This
 page is written plainly rather than legally, and it is meant to be the whole
@@ -194,5 +194,7 @@ There is no advertising cookie and no analytics cookie on this site. A longer li
 
 ## Asking about any of this
 
-The Discord, which is linked on every page. For a security problem rather than
-a privacy one, see `SECURITY.md` in the repository.
+The Discord, which is linked on every page. A security problem, a way to get
+at what this page says is kept, goes to the owner as a Discord direct message,
+never in a channel, where everybody would read it. You will hear back within
+72 hours.
