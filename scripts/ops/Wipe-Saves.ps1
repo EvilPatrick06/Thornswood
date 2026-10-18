@@ -47,6 +47,14 @@
                              and comes back with them if the wipe is undone.
                              The new list this writes (below) carries its ids
                              over, so a deletion still waiting is not lost.
+    private\trade-cargo.json the trade ships' register (#511): what each
+                             hold carries and for which character, and the
+                             staff list of ports and routes in force beside
+                             it. The goods aboard came out of packs in the
+                             world set aside, so they go aside with it, every
+                             piece kept, and come back with it if the wipe is
+                             undone. The staff list is in that copy too, for
+                             staff to confirm again on the fresh world.
     data\property.json and data\farm-claims.json, where both were until
                              25 September (issue #541: data is served to
                              anybody), so a wipe on a server still running
@@ -73,7 +81,7 @@
   writes) naming every character in the world it set aside, by form id only,
   since a profile keeps its id through a wipe and is never named. The parts
   whose registers were just set aside (farms, property, embassy, dungeon,
-  books) are marked done in it, so only the merchant ledger waits on it, and
+  cargo, books) are marked done in it, so only the merchant ledger waits on it, and
   the first start lets go and deletes it. The fresh world hands those form
   ids to new characters, which is why it is written before that start and
   not left to chance. A server whose move did not finish gets no list.
@@ -148,14 +156,14 @@ $stamp = (Get-Date).ToString('yyyyMMdd-HHmm')
 # What a wipe moves aside, in each server folder: the header says why each one.
 $Moves = @('world', 'private\characters.json', 'private\property.json', 'private\farm-claims.json',
            'private\law.json', 'private\beds.json', 'private\embassy.json', 'private\books.json',
-           'private\last-left.json', 'private\take-limit.json',
+           'private\last-left.json', 'private\take-limit.json', 'private\trade-cargo.json',
            'private\dungeon-rewards-ledger.json', 'private\dungeon-rewards-ledger.initialized',
            'private\deleted-characters.json',
            'data\property.json', 'data\farm-claims.json')
 # The release parts (game\gamemode.js PARTS) whose registers are all in
 # $Moves, so a fresh start has nothing of anybody's in them: the new release
 # list marks them done and only 'merchants', the ledger a wipe keeps, waits.
-$WipeDone = @('farms', 'property', 'embassy', 'dungeon', 'books')
+$WipeDone = @('farms', 'property', 'embassy', 'dungeon', 'cargo', 'books')
 # Both lists go across as literals. A single quote inside either would end the
 # string early on the far side, so it is doubled first.
 function Lit($a) { return (($a | ForEach-Object { "'" + ($_ -replace "'", "''") + "'" }) -join ',') }

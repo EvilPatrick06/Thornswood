@@ -21,8 +21,8 @@
   characters by form id only and never a profile. Each register's release
   in gamemode.js lets go by profile what a profile holds and by form id
   only what the character held (a dungeon chest's reservation, an embassy
-  row with no profile, a trader's supply waits and a trade waiting on that
-  character), so a list with no profiles in it never takes anything a
+  row with no profile, a trader's supply waits, a trade waiting on that
+  character and the trade ships' manifest, #511), so a list with no profiles in it never takes anything a
   profile holds (#2668 has the table, part by part).
 
   A character's form id is read off its change form the way Delete-Person

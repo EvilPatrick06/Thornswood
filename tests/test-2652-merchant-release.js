@@ -208,7 +208,7 @@ try {
   seed(path.join(dir2, 'private'));
   fs.writeFileSync(path.join(dir2, 'server-settings.json'), JSON.stringify({ privDir: 'private', dataDir: 'data' }));
   fs.writeFileSync(path.join(dir2, 'private', 'deleted-characters.json'),
-    JSON.stringify({ profiles: [P1], actors: [A1, A2], done: { farms: 1, property: 1, embassy: 1, dungeon: 1, books: 1 } }));
+    JSON.stringify({ profiles: [P1], actors: [A1, A2], done: { farms: 1, property: 1, embassy: 1, dungeon: 1, cargo: 1, books: 1 } }));
   const was = process.cwd();
   process.chdir(dir2);
   let f1, f2;

@@ -62,7 +62,7 @@ $Moves = @()
 if ($assign.Count -eq 1) { $Moves = @(& ([scriptblock]::Create($assign[0].Right.Extent.Text))) }
 foreach ($n in 'world', 'private\characters.json', 'private\property.json', 'private\farm-claims.json',
                'private\law.json', 'private\beds.json', 'private\embassy.json', 'private\books.json',
-               'private\last-left.json', 'private\take-limit.json', 'private\dungeon-rewards-ledger.json',
+               'private\last-left.json', 'private\take-limit.json', 'private\trade-cargo.json', 'private\dungeon-rewards-ledger.json',
                'private\dungeon-rewards-ledger.initialized', 'private\deleted-characters.json',
                'data\property.json', 'data\farm-claims.json') {
     Yes "  it moves $n" ($Moves -contains $n)
@@ -130,7 +130,7 @@ try {
     Put (Join-Path $Root 'world\changeForms\0.json') '{"formDesc":"ff000a01","profileId":5001}'
     Put (Join-Path $Root 'private\characters.json') '{"who":{"5001":{"name":"A"},"6001":{"name":"B"},"7001":{"name":"C"}}}'
     foreach ($f in 'property.json', 'farm-claims.json', 'law.json', 'beds.json', 'embassy.json', 'books.json', 'last-left.json',
-                   'take-limit.json', 'dungeon-rewards-ledger.json', 'deleted-characters.json', 'mod-settings.json', 'merchant-ledger.json',
+                   'take-limit.json', 'trade-cargo.json', 'dungeon-rewards-ledger.json', 'deleted-characters.json', 'mod-settings.json', 'merchant-ledger.json',
                    'season.json', 'benches.json', 'door.json') {
         Put (Join-Path $Root "private\$f") ('{"file":"' + $f + '"}')
     }
@@ -144,7 +144,7 @@ try {
     $chars = @($out | Where-Object { $_ -like 'CHARS|*' })
     Yes ('the survey counts the 3 characters in characters.json, and only there (' + ($chars -join ' ') + ')') ($chars.Count -eq 1 -and $chars[0] -eq 'CHARS|3')
     $items = @($out | Where-Object { $_ -like 'ITEM|*' })
-    Yes ('the survey lists the 13 things there that would go (' + $items.Count + ')') ($items.Count -eq 13 -and @($out | Where-Object { $_ -like 'NONE|data\*' }).Count -eq 2)
+    Yes ('the survey lists the 14 things there that would go (' + $items.Count + ')') ($items.Count -eq 14 -and @($out | Where-Object { $_ -like 'NONE|data\*' }).Count -eq 2)
 
     # ---- the stop, with a process running from the folder
     $node = (Get-Command node -ErrorAction SilentlyContinue)
@@ -171,11 +171,11 @@ try {
     # ---- the move
     $stamp = '20261017-0100'
     $out = RunBox (Fill $move $stamp)
-    Yes 'the move says nothing failed' (@($out | Where-Object { $_ -like 'FAILED*' }).Count -eq 0 -and @($out | Where-Object { $_ -like 'moved*' }).Count -eq 13)
+    Yes 'the move says nothing failed' (@($out | Where-Object { $_ -like 'FAILED*' }).Count -eq 0 -and @($out | Where-Object { $_ -like 'moved*' }).Count -eq 14)
     $P = Join-Path $Root 'private'
     Yes 'the world goes aside as world-before-<date>' ((Test-Path (Join-Path $Root "world-before-$stamp\changeForms\ff000a01.json")) -and -not (Test-Path (Join-Path $Root 'world')))
     $ok = $true
-    foreach ($f in 'characters', 'property', 'farm-claims', 'law', 'beds', 'embassy', 'books', 'last-left', 'take-limit', 'dungeon-rewards-ledger') {
+    foreach ($f in 'characters', 'property', 'farm-claims', 'law', 'beds', 'embassy', 'books', 'last-left', 'take-limit', 'trade-cargo', 'dungeon-rewards-ledger') {
         if (-not (Test-Path (Join-Path $P "$f-before-$stamp.json")) -or (Test-Path (Join-Path $P "$f.json"))) { $ok = $false; Write-Host "      not moved: $f.json" }
     }
     Yes 'every register naming a character goes aside under its own name with the date' $ok
