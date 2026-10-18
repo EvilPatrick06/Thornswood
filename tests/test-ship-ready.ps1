@@ -37,6 +37,18 @@
     7. Uncommitted changes (issue #1254): on main the line says a main Ship
        refuses while anything is uncommitted, and that row is a gap. On dev
        the line says a dev Ship builds from those changes as they are.
+    8. The release folder is a ship root, not an install (issue #2603).
+       Get-LauncherRows: on main a folder with no launcher passes, saying
+       the Ship puts the one CI built there itself, and no fix says to
+       install Thornswood; on dev the Launcher folder, not the exe, is the
+       need, as Ship asks it, with the main launcher's dev build as the fix
+       only for <install>-DevBuild, where it installs, and #2662 for any
+       other folder. Get-PackageLauncherRows: a
+       warning only, passing when the Ship builds a launcher (another number
+       on main's feed) or the folder holds the feed's, and naming #2661
+       otherwise. And the script's text: no "Install Thornswood from
+       thornswood.net", no "press Play", and the game folder's fix is
+       Update-ShipRoot then Build-Generated.
 
   Writes only to a temp folder of its own, and removes it.
 #>
@@ -60,7 +72,7 @@ $errs = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($Ready, [ref]$null, [ref]$errs)
 Yes 'Check-ShipReady.ps1 parses' (@($errs).Count -eq 0)
 $fns = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true))
-foreach ($name in 'New-Row', 'Get-ShipVerdict', 'Get-ClientRows', 'Get-MainOnlyRows') {
+foreach ($name in 'New-Row', 'Get-ShipVerdict', 'Get-ClientRows', 'Get-MainOnlyRows', 'Get-LauncherRows', 'Get-PackageLauncherRows') {
     $f = @($fns | Where-Object { $_.Name -eq $name })
     Yes "Check-ShipReady.ps1 has $name" ($f.Count -eq 1)
     if ($f.Count -eq 1) { Invoke-Expression $f[0].Extent.Text }
@@ -242,6 +254,86 @@ try {
         $text -match 'A dev Ship builds from those changes as they are')
     Yes '7. it no longer says a main Ship commits uncommitted changes' (
         $text -notmatch 'commits them when it is out')
+
+    # ------------------------------- 8. a ship root, not an install (#2603) --
+    # Main: local\release-main on 16 Oct, Game, Profile and config.json and no
+    # Launcher folder, was NOT READY on "a launcher is installed".
+    $mainRoot = Join-Path $tmp 'release-main'
+    Fresh $mainRoot
+    New-Item -ItemType Directory -Force -Path (Join-Path $mainRoot 'Game') | Out-Null
+    $r = @(Get-LauncherRows 'main' $mainRoot)
+    Yes '8. main, no Launcher folder: one row, and it passes' ($r.Count -eq 1 -and $r[0].Ok)
+    Yes '8.   it is a need row, so it counts as passed, not as a warning' ($r[0].Level -eq 'need')
+    Yes '8.   it says a main Ship puts the launcher CI built there itself' ($r[0].Detail -match 'none yet' -and $r[0].Detail -match 'CI built' -and $r[0].Detail -match 'Install-Launcher')
+    Yes '8.   and no fix line, least of all installing Thornswood' (-not $r[0].Fix)
+    Yes '8.   the verdict with it alone is READY' ((Get-ShipVerdict $r).Ready)
+    Put $mainRoot 'Launcher\Thornswood.exe' 'a launcher'
+    $r = @(Get-LauncherRows 'main' $mainRoot)
+    Yes '8. main, a launcher there: passes, naming it and saying a Ship that builds one replaces it' (
+        $r[0].Ok -and $r[0].Detail.Contains((Join-Path $mainRoot 'Launcher\Thornswood.exe')) -and $r[0].Detail -match 'replaces')
+
+    # Dev: Ship asks for the Launcher folder, not the exe.
+    $mainInstall = Join-Path $tmp 'Thornswood'
+    $devRoot = $mainInstall + '-DevBuild'
+    Fresh $devRoot
+    $r = @(Get-LauncherRows 'dev' $devRoot)
+    Yes '8. dev, no Launcher folder: a need that fails, as a dev Ship stops' ($r.Count -eq 1 -and -not $r[0].Ok -and $r[0].Level -eq 'need')
+    Yes '8.   saying a dev Ship stops on it' ($r[0].Detail -match 'No dev build at')
+    Yes '8.   <install>-DevBuild with no main launcher beside it: the fix says so, and points at #2662' (
+        $r[0].Fix -notmatch 'Settings, The dev build' -and $r[0].Fix.Contains('no main launcher is installed at ' + $mainInstall) -and $r[0].Fix -match '#2662')
+    Put $mainInstall 'Launcher\Thornswood.exe' 'the main launcher'
+    $r = @(Get-LauncherRows 'dev' $devRoot)
+    Yes '8.   with the main install beside it: that launcher''s dev build, naming both folders' (
+        $r[0].Fix -match ('^In the main launcher installed at ' + [regex]::Escape($mainInstall) + ':') -and $r[0].Fix.Contains('into ' + $devRoot))
+    # One's dev root ends in -devbuild too, and no main launcher is beside it.
+    $relDev = Join-Path $tmp 'local\release-devbuild'
+    Fresh $relDev
+    $r = @(Get-LauncherRows 'dev' $relDev)
+    Yes '8. dev, a ship root like local\release-devbuild with no Launcher folder fails the same' (-not $r[0].Ok)
+    Yes '8.   and its fix is neither the main launcher''s dev build, which installs elsewhere, nor recording it again, but #2662' (
+        $r[0].Fix -notmatch 'Settings, The dev build' -and $r[0].Fix -notmatch 'Setup-ShipMachine' -and $r[0].Fix -match 'nothing else makes one' -and $r[0].Fix -match '#2662')
+    $r = @(Get-LauncherRows 'dev' (Join-Path $tmp 'release-dev'))
+    Yes '8.   a folder not ending in -DevBuild names no main install' ($r[0].Fix -notmatch 'installed at' -and $r[0].Fix -match '#2662')
+    New-Item -ItemType Directory -Force -Path (Join-Path $relDev 'Launcher') | Out-Null
+    $r = @(Get-LauncherRows 'dev' $relDev)
+    Yes '8. dev, an empty Launcher folder passes: Ship asks for the folder, and builds and puts the exe there' ($r[0].Ok -and $r[0].Detail -eq (Join-Path $relDev 'Launcher'))
+    Put $devRoot 'Launcher' 'a file, not a folder'
+    Yes '8. dev, a file named Launcher is not the folder' (-not (@(Get-LauncherRows 'dev' $devRoot))[0].Ok)
+    Yes '8. no folder known: the dev row fails, the main row still passes' (
+        -not (@(Get-LauncherRows 'dev' ''))[0].Ok -and (@(Get-LauncherRows 'main' ''))[0].Ok)
+
+    # What -Package packs as the launcher, a warning on main.
+    $exe = Join-Path $mainRoot 'Launcher\Thornswood.exe'
+    $feedSha = Sha $exe
+    function Feed([string]$v, [string]$s) { return [pscustomobject]@{ launcherVersion = $v; launcherSha256 = $s } }
+    $r = @(Get-PackageLauncherRows '1.2.5' (Feed '1.2.4' 'e079f4e484129540c24b076185886d6a2e945f52ff2d02b94b3880f4fa7efe20') $exe)
+    Yes '8. -Package: another number on main''s feed passes, as a warning row' ($r.Count -eq 1 -and $r[0].Ok -and $r[0].Level -eq 'warn')
+    Yes '8.   saying the Ship builds this checkout''s number and puts it there first' ($r[0].Detail -match 'builds 1\.2\.5' -and $r[0].Detail -match 'before -Package')
+    $r = @(Get-PackageLauncherRows '1.2.5' (Feed '1.2.4' 'aa') (Join-Path $tmp 'nowhere\Thornswood.exe'))
+    Yes '8.   even with no launcher in the folder' ($r[0].Ok)
+    $r = @(Get-PackageLauncherRows '1.2.4' (Feed '1.2.4' $feedSha.ToUpperInvariant()) $exe)
+    Yes '8. -Package: the same number and the folder holds the feed''s launcher passes' ($r[0].Ok -and $r[0].Detail -match 'is the 1\.2\.4')
+    $r = @(Get-PackageLauncherRows '1.2.4' (Feed '1.2.4' ('0' * 64)) $exe)
+    Yes '8. -Package: the same number and another launcher in the folder warns' (-not $r[0].Ok -and $r[0].Level -eq 'warn')
+    Yes '8.   saying -Package would pack it when the Ship keeps the feed''s, and naming #2661' (
+        $r[0].Detail -match 'would pack it' -and $r[0].Detail -match 'keeps the feed' -and $r[0].Fix -match '#2661')
+    $r = @(Get-PackageLauncherRows '1.2.4' (Feed '1.2.4' $feedSha) (Join-Path $tmp 'nowhere\Thornswood.exe'))
+    Yes '8. -Package: the same number and no launcher warns that the installer would stop at MISSING the launcher' (
+        -not $r[0].Ok -and $r[0].Detail -match 'MISSING the launcher')
+    $r = @(Get-PackageLauncherRows '1.2.4' $null $exe)
+    Yes '8. -Package: main''s feed unread warns, saying so' (-not $r[0].Ok -and $r[0].Level -eq 'warn' -and $r[0].Detail -match 'could not be read')
+    $v = Get-ShipVerdict (@(Get-LauncherRows 'main' (Join-Path $tmp 'nowhere')) + @(Get-PackageLauncherRows '1.2.4' (Feed '1.2.4' $feedSha) ''))
+    Yes '8. a main root with no launcher and the -Package warning is still READY' ($v.Ready -and $v.Warns.Count -eq 1)
+
+    # The script's text.
+    Yes '8. no fix says to install Thornswood from thornswood.net' ($text -notmatch 'Install Thornswood from thornswood\.net')
+    Yes '8. no fix says to open the launcher and press Play' ($text -notmatch 'press Play')
+    Yes '8. the old row is gone' ($text -notmatch "Ready 'a launcher is installed'")
+    Yes '8. the game folder''s fix is Update-ShipRoot, with -SkyrimFrom named, then Build-Generated' (
+        $text -match "(?s)Ready 'it has its own game folder'.{0,400}Update-ShipRoot\.ps1 -Channel.{0,300}-SkyrimFrom.{0,200}Build-Generated\.ps1 -Channel")
+    Yes '8. the launcher row is asked of the folder Ship would build from' ($text -match 'foreach \(\$r in @\(Get-LauncherRows \$Channel \$Root\)\) \{ Show-Row \$r \}')
+    Yes '8. the -Package launcher row is asked on main only, beside the other -Package row' (
+        $text -match '(?s)if \(-not \$Dev\) \{\s*Head [^\n]*\n\s*foreach \(\$r in @\(Get-MainOnlyRows.{0,1200}Get-PackageLauncherRows')
 }
 finally {
     Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue

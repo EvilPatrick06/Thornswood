@@ -15,6 +15,14 @@
   install, and for dev that with -DevBuild on the end). A folder Vortex
   deploys into is a gap, because Ship refuses it before anything is built.
 
+  A SHIP ROOT IS NOT AN INSTALL (#2603). Since #2019 that folder is a ship
+  root: Update-ShipRoot.ps1, the step every Ship runs first, makes or
+  refreshes its game folder, and its launcher is never started. So no fix
+  here says to install Thornswood or to open a launcher in it. A main Ship
+  puts the launcher it builds into the folder itself, so a main root with
+  none yet is not a gap; only a dev Ship refuses a folder with no Launcher
+  folder, and only the install rule's dev folder has a step that makes one.
+
   WHY IT EXISTS. Ship.ps1 has fourteen ways to refuse, and every one of them is
   found by running Ship and being stopped, usually after the launcher has
   already been compiled and the version already bumped. That is fine on the one
@@ -153,9 +161,11 @@ function Get-ClientRows([string]$SyncClient, [string]$Record, [string]$Game, [st
 # behavior and BodySlide files it made in the game folder is missing, or no
 # longer matches the mod list, the files the tools read, records\generated.json
 # or the files themselves (Get-GeneratedState, scripts\mods\Generated.ps1).
-function Get-GeneratedRows([string]$Root, [string]$ListPath, [string]$Channel) {
+# $RootArg is ' -Root "<folder>"' when Check-ShipReady was given -Root, so the
+# command builds in the folder this checked and not the recorded one.
+function Get-GeneratedRows([string]$Root, [string]$ListPath, [string]$Channel, [string]$RootArg = '') {
   $what = 'Thornswood''s animation and body files are built for this mod list'
-  $fix = '.\scripts\mods\Build-Generated.ps1 -Channel ' + $Channel + '     with the game and the launcher closed; it builds them in Thornswood''s own folder'
+  $fix = '.\scripts\mods\Build-Generated.ps1 -Channel ' + $Channel + $RootArg + '     with the game and the launcher closed; it builds them in Thornswood''s own folder'
   $st = $null
   try { $st = Get-GeneratedState $Root $ListPath } catch { return @(New-Row $what $false $_.Exception.Message $fix) }
   if ($st.Current) { return @(New-Row $what $true ('{0} files, as built' -f $st.Record.Files.Count) $null) }
@@ -201,6 +211,88 @@ function Get-MainOnlyRows([string]$Channel, [string]$ServerRecord, [string[]]$Se
       'Build the fork with .\scripts\release\Build-Engine.ps1, or pass Deploy-Gamemode.ps1 and Deploy-Server.ps1 -Dist with a server build whose files all match' 'either' 'warn'
   }
   return $rows
+}
+
+# THE LAUNCHER IN THE RELEASE FOLDER (#2603). What Ship.ps1 does with
+# <root>\Launcher, read from the code:
+#   - main: nothing is asked of it before the build. A Ship that builds a
+#     launcher takes the exe CI built for main's tag, signs it, and puts it
+#     there with Install-Launcher.ps1, which makes the folder. A Ship that
+#     keeps the feed's launcher publishes none, so it never reads the folder
+#     either. Until 17 Oct this asked for Launcher\Thornswood.exe on main too,
+#     and its fix was a person's install from the site, which is wrong for a
+#     ship root (its launcher is never started) and asked for something no main
+#     Ship needs: main's own root, local\release-main, made on 16 Oct by
+#     Update-ShipRoot.ps1, has no Launcher folder and was NOT READY on it.
+#   - dev: "No dev build at <root>" unless <root>\Launcher is there, the folder,
+#     not the exe, before anything else; Publish-Update.ps1 asks the same.
+#     The main launcher's Settings page (The dev build) makes it, and only in
+#     <its own folder>-DevBuild (DevBuild.Root), the install rule's dev
+#     folder. Any other folder, such as one recorded with
+#     Setup-ShipMachine.ps1 -Root, is made by Update-ShipRoot.ps1, which makes
+#     no Launcher folder, so nothing a person runs makes one there (#2662).
+# One row, a need, as Ship asks it.
+function Get-LauncherRows([string]$Channel, [string]$Root) {
+  $launchDir = $(if ($Root) { Join-Path $Root 'Launcher' } else { '' })
+  if ($Channel -ne 'dev') {
+    $exe = $(if ($launchDir) { Join-Path $launchDir 'Thornswood.exe' } else { '' })
+    $has = [bool]($exe -and (Test-Path -LiteralPath $exe -PathType Leaf))
+    $detail = $(if ($has) { $exe + ', which a main Ship that builds a launcher replaces' }
+                else { 'none yet: a main Ship that builds a launcher puts the one CI built for main''s tag there itself (Install-Launcher.ps1), and asks for none before that' })
+    return @(New-Row 'the launcher in it, which a main Ship puts there itself' $true $detail $null)
+  }
+  $has = [bool]($launchDir -and (Test-Path -LiteralPath $launchDir -PathType Container))
+  $detail = $(if ($has) { $launchDir } else { 'no Launcher folder in ' + $Root + ', and a dev Ship stops on that ("No dev build at")' })
+  # The main install whose dev build would go here: <root> less -DevBuild,
+  # when a main launcher is installed there. One's dev root,
+  # local\release-devbuild, ends the same way and has none beside it.
+  $main = $(if ($Root -match '-DevBuild$') { $Root.Substring(0, $Root.Length - '-DevBuild'.Length) } else { '' })
+  if ($main -and (Test-Path -LiteralPath (Join-Path $main 'Launcher\Thornswood.exe') -PathType Leaf)) {
+    $fix = 'In the main launcher installed at ' + $main + ': Settings, The dev build, Install it; it installs into ' + $Root
+  } else {
+    $fix = 'A dev Ship refuses a folder with no Launcher folder (#2662). The main launcher''s dev build makes one only in <its own folder>-DevBuild' +
+           $(if ($main) { ', and no main launcher is installed at ' + $main } else { '' }) +
+           '; a release folder Update-ShipRoot.ps1 made has none, and nothing else makes one'
+  }
+  return @(New-Row 'it has the Launcher folder a dev Ship asks for' $has $detail $fix)
+}
+
+# WHAT -PACKAGE PUTS IN THE INSTALLER AS THE LAUNCHER (#2603), a warning on
+# main like the other -Package row. Package-Thornswood.ps1 packs
+# <root>\Launcher\Thornswood.exe and stops with "MISSING the launcher" when
+# there is none, after the feed is out (Ship carries on, #2243). A main Ship
+# that builds a launcher puts it there first. One that keeps the feed's
+# launcher (Test-KeepFeedLauncher: nothing it is built from changed since)
+# puts none there, so -Package packs whatever the folder holds, and a ship
+# root's launcher is never started to update itself (#2661). Which of the two
+# a Ship does: a launcher on main's feed under another number than
+# launcher\app\Updater.cs is never kept, because Updater.cs is one of the
+# files the launcher is built from, and one under the same number may be.
+# $Current is Updater.cs's number, $Feed main's feed as the site serves it
+# ($null when it could not be read) and $Exe <root>\Launcher\Thornswood.exe.
+function Get-PackageLauncherRows([string]$Current, $Feed, [string]$Exe) {
+  $what = 'a launcher for -Package to put in the installer'
+  if ($null -eq $Feed) {
+    return @(New-Row $what $false 'main''s feed could not be read, so whether the Ship builds a launcher is not known' `
+      'Run this again once https://thornswood.net/feed/version.json answers' 'either' 'warn')
+  }
+  $fv = ''; $fsha = ''
+  if ($Feed.PSObject.Properties['launcherVersion']) { $fv = [string]$Feed.launcherVersion }
+  if ($Feed.PSObject.Properties['launcherSha256']) { $fsha = ([string]$Feed.launcherSha256).ToLowerInvariant() }
+  if ($Current -and $fv -ne $Current) {
+    return @(New-Row $what $true ('main''s feed has ' + $(if ($fv) { $fv } else { 'no launcher' }) + ' and this checkout ' + $Current +
+      ', so the Ship builds ' + $Current + ' and puts it in the folder before -Package (not with -ModsOnly)') $null 'either' 'warn')
+  }
+  $has = [bool]($Exe -and (Test-Path -LiteralPath $Exe -PathType Leaf))
+  $sha = ''
+  if ($has) { $sha = (Get-FileHash -LiteralPath $Exe -Algorithm SHA256).Hash.ToLowerInvariant() }
+  if ($has -and $fsha -and $sha -eq $fsha) {
+    return @(New-Row $what $true ($Exe + ' is the ' + $fv + ' main''s feed offers') $null 'either' 'warn')
+  }
+  $now = $(if ($has) { $Exe + ' is not the ' + $fv + ' main''s feed offers, and -Package would pack it' }
+           else { 'there is no ' + $Exe + ', and the installer rebuild would stop at MISSING the launcher' })
+  return @(New-Row $what $false ($now + ' when the Ship keeps the feed''s ' + $fv + ' (nothing it is built from changed since)') `
+    'Nothing a person runs puts the feed''s launcher in a ship root: a Ship that keeps it does not (#2661)' 'either' 'warn')
 }
 
 # WHETHER THIS MACHINE SIGNS (issue #458). Ship refuses every release, dev and
@@ -284,18 +376,21 @@ try {
 } catch { $ghOk = $false }
 Ready 'signed in to GitHub' $ghOk $ghWho 'gh auth login'
 
-# --------------------------------------------------------- the install root --
-Head 'The launcher install'
+# ------------------------------------------------------ the release folder --
+Head 'The release folder'
 # The folder Ship would build from (#1692): -Root, or what Where.ps1 answers.
 $rootSaid = ''
+$rootGiven = [bool]$Root
 if (-not $Root) {
   try { $Root = [string](& (Join-Path $Here 'Where.ps1') $(if ($Dev) { 'ShipRootDev' } else { 'ShipRoot' })) }
   catch { $rootSaid = $_.Exception.Message; $Root = '' }
 }
+# What the fix lines below add, so a command names the folder this checked
+# when it is not the one the scripts find for themselves.
+$rootArg = $(if ($rootGiven) { ' -Root "' + $Root + '"' } else { '' })
 Ready 'which folder the release is built from is known' (-not $rootSaid) $(if ($rootSaid) { $rootSaid } else { $Root }) `
   ('.\scripts\release\Setup-ShipMachine.ps1 -Channel ' + $Channel + ' -Root <the release folder>   (writes the file Where.ps1 ShipRoots names)')
-Ready 'a launcher is installed' ($Root -and (Test-Path (Join-Path $Root 'Launcher\Thornswood.exe'))) $Root `
-  $(if ($Dev) { 'In the main launcher: Settings, The dev build, Install it; or, for a release folder that is not the dev build, .\scripts\release\Setup-ShipMachine.ps1 -Channel dev -Root <it>' } else { 'Install Thornswood from thornswood.net' })
+foreach ($r in @(Get-LauncherRows $Channel $Root)) { Show-Row $r }
 # Ship refuses a folder Vortex deploys into before anything is built (#1692).
 $vortexHere = [bool]($Root -and (Test-Path -LiteralPath (Join-Path $Root 'Game\Data\vortex.deployment.json')))
 Ready 'it is not a folder Vortex deploys into' (-not $vortexHere) $(if ($vortexHere) { 'Game\Data\vortex.deployment.json is there' } else { '' }) `
@@ -329,15 +424,19 @@ $vpDir = $null
 try { $vpDir = Get-VortexProfileDir 'Thornswood' } catch { $vpDir = $null }
 Ready 'Vortex has a profile named Thornswood' ([bool]$vpDir) $(if ($vpDir) { $vpDir } else { '' }) `
   'In Vortex: Profiles, add one named Thornswood, switch to it, install the Thornswood collection and let it deploy'
-Ready 'it has its own game folder' $hasGame $GameDir `
-  'Open the launcher and press Play once; it builds the folder from what Vortex has deployed'
+# A ship root's launcher is never started (#2603), so the folder is made the
+# way a Ship makes it first, by Update-ShipRoot.ps1. A Ship that makes it then
+# stops at the animation and body files, which are built in it afterwards.
+Ready 'it has its own game folder' $hasGame $(if ($hasGame) { $GameDir } else { $GameDir + ' is not there yet; a Ship makes it and then stops at the animation and body files' }) `
+  ('.\scripts\release\Update-ShipRoot.ps1 -Channel ' + $Channel + $rootArg + '   makes it from what Vortex has deployed, as a Ship does first' +
+   ' (add -SkyrimFrom <a folder holding Skyrim 1.6.1170''s own files> where the Steam copy is not on 1.6.1170); then .\scripts\mods\Build-Generated.ps1 -Channel ' + $Channel + $rootArg)
 
 if ($hasGame) {
   $record = Join-Path $Root 'Profile\OwnGame\files.txt'
   $recLines = 0
   if (Test-Path -LiteralPath $record) { $recLines = @(Get-Content -LiteralPath $record).Count }
   Ready 'the record of what came from Vortex exists' ($recLines -gt 0) ("$recLines lines") `
-    (".\scripts\release\Update-ShipRoot.ps1 -Channel $Channel, which brings the folder up to date with what Vortex has deployed and writes the record")
+    (".\scripts\release\Update-ShipRoot.ps1 -Channel $Channel$rootArg, which brings the folder up to date with what Vortex has deployed and writes the record")
 }
 
 # ------------------------------------------------------------- the compiler --
@@ -448,7 +547,7 @@ if (Test-Path -LiteralPath (Join-Path $fork '.git')) {
 # ------------------------------------------------ the generated files --
 Head 'The animation and body files'
 if ($hasGame) {
-  foreach ($r in @(Get-GeneratedRows $Root (Join-Path $RepoDir 'records\generated.json') $Channel)) { Show-Row $r }
+  foreach ($r in @(Get-GeneratedRows $Root (Join-Path $RepoDir 'records\generated.json') $Channel $rootArg)) { Show-Row $r }
 } else {
   Say '  skip  no own game folder, so there are none to check' 'DarkGray'
 }
@@ -459,6 +558,18 @@ if (-not $Dev) {
   foreach ($r in @(Get-MainOnlyRows $Channel `
                      (Join-Path $RepoDir 'records\server-build.json') `
                      @((& $where ServerDist), (& $where Payload)))) { Show-Row $r }
+  # Main's feed as the site serves it, as Ship reads it (Get-PublishedLauncher),
+  # and the number this checkout's launcher carries, as Publish-Update reads it.
+  . (Join-Path $Here 'Feed-Store.ps1')
+  $mainFeed = $null
+  try { $mainFeed = Read-SiteFeed 'main' } catch { $mainFeed = $null }
+  $current = ''
+  $updaterCs = Join-Path $RepoDir 'launcher\app\Updater.cs'
+  if (Test-Path -LiteralPath $updaterCs) {
+    $vm = [regex]::Match([IO.File]::ReadAllText($updaterCs), 'Version\s*=\s*"([^"]+)"')
+    if ($vm.Success) { $current = $vm.Groups[1].Value }
+  }
+  foreach ($r in @(Get-PackageLauncherRows $current $mainFeed $(if ($Root) { Join-Path $Root 'Launcher\Thornswood.exe' } else { '' }))) { Show-Row $r }
 }
 
 # ---------------------------------------------------------------- the VPS ---
