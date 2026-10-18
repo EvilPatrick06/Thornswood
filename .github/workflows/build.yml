@@ -874,12 +874,15 @@ jobs:
           Write-Host ("PSScriptAnalyzer: {0} finding(s)" -f $found.Count)
           exit 0
 
-      - name: Count the silent catches in the launcher
+      - name: Count the silent catches in the launcher and the scripts
         shell: pwsh
         run: |
           # Entry 239. A catch with nothing in it leaves no line in
           # launcher.log when it fires, and there were 386 of them on 24 Sep.
-          # Red when any file in launcher\app has more than
+          # Since #2711 the PowerShell under scripts\ and installer\ is
+          # counted too: two empty catches let New-ClientBuildRecord.ps1 write
+          # a record over checks that never ran. Red when any of those files
+          # has more than
           # scripts\dev\swallow-baseline.txt allows, and since #756 red when a
           # file has fewer and its line has not been lowered with it, so the
           # lowering lands in the branch that made the count fall rather than

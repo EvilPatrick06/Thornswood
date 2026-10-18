@@ -70,7 +70,14 @@ try {
     } else {
         Write-Host ('  OK       {0,-20} one build, {1}' -f 'skyrim pin and files', $pinDoc.build)
     }
-} catch { }   # either file unreadable is already REFUSED above
+} catch {
+    # The comparison could not be made, so the pair is not known to be one
+    # build (#2711). This catch used to be empty, on the grounds that a file
+    # that does not read is refused above, but anything else that stopped it
+    # (a pin with no build field, under strict mode) passed in silence.
+    $bad++
+    Write-Host ('  REFUSED  {0,-20} could not compare skyrim-pin.json with skyrim-files.json: {1}' -f 'skyrim pin and files', $_.Exception.Message) -ForegroundColor Red
+}
 if ($bad) { Write-Host "$bad record(s) cannot be trusted." -ForegroundColor Red; exit 1 }
 Write-Host 'Every high-risk record reads at a known version with the fields its readers need.'
 # Said out loud: a caller that dot-runs this reads $LASTEXITCODE, which is

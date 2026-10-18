@@ -74,6 +74,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 if (-not $Out) { $Out = Join-Path $Here '..\..\records\server-build.json' }
 . (Join-Path $Here '..\deploy\ServerBuild.ps1')
+. (Join-Path $Here 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
 $bin = Join-Path $Dist 'scam_native.node'
 if (-not (Test-Path -LiteralPath $bin)) { throw "not built: $bin" }
@@ -97,6 +98,19 @@ function Read-Git([string[]]$a) {
   try { $o = & git.exe -C $Clone @a 2>$null } finally { $ErrorActionPreference = $eap }
   if ($LASTEXITCODE -ne 0) { return '' }
   return ($o | Out-String).Trim()
+}
+# For a question the clone must answer, where '' would read as an answer: an
+# empty `git status --porcelain` is a clean clone, so a git that could not say
+# must not hand back the same '' (#2711). It stops the record instead.
+function Read-GitOrStop([string[]]$a, [string]$what) {
+  $eap = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try { $o = @(& git.exe -C $Clone @a 2>&1); $code = $LASTEXITCODE } finally { $ErrorActionPreference = $eap }
+  if ($code -ne 0) {
+    $err = (@($o | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] } | ForEach-Object { "$_" }) -join ' ').Trim()
+    throw ("cannot read {0} from {1}: git {2} exited {3} ({4}). Nothing was recorded." -f $what, $Clone, ($a -join ' '), $code, $err)
+  }
+  return (@($o | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] } | ForEach-Object { "$_" }) -join "`n").Trim()
 }
 
 # The fork is a submodule now, which checks out a commit and not a branch, and
@@ -138,12 +152,18 @@ $commit = Read-Git @('rev-parse', 'HEAD')
 $branch = Get-ForkBranch $Clone (Read-Git @('rev-parse', '--abbrev-ref', 'HEAD'))
 $origin = Read-Git @('remote', 'get-url', 'origin')
 $upstream = Read-Git @('remote', 'get-url', 'upstream')
-$recordedBase = ''
-try { $recordedBase = [string]((Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\records\server-build.json') -Raw | ConvertFrom-Json).source.upstreamBase) } catch { }
-$base = Get-UpstreamBase $Clone (Read-Git @('merge-base', 'HEAD', 'upstream/main')) $recordedBase
-$dirty = Read-Git @('status', '--porcelain')
-
 if (-not $commit) { throw "cannot read a commit from $Clone. Is it a git clone?" }
+# No record yet is a first record, with no base to carry over. A record that
+# is there and does not read stops it (#2711): it used to sit in an empty
+# catch, so the base it held was dropped without a word.
+$recordedBase = ''
+$recordPath = Join-Path $PSScriptRoot '..\..\records\server-build.json'
+if (Test-Path -LiteralPath $recordPath) {
+  $was = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $recordPath -Raw) $recordPath
+  if ($was.PSObject.Properties['source'] -and $was.source -and $was.source.PSObject.Properties['upstreamBase']) { $recordedBase = [string]$was.source.upstreamBase }
+}
+$base = Get-UpstreamBase $Clone (Read-Git @('merge-base', 'HEAD', 'upstream/main')) $recordedBase
+$dirty = Read-GitOrStop @('status', '--porcelain') 'whether the clone is committed'
 
 # A build made on another machine (-BuiltBy): the time every date below is
 # held to is the commit's, since this clone's files were written when it was
@@ -175,11 +195,18 @@ if ($dirty) {
 # and this said "rebuild" about a build that was whole (the #1972 change to
 # index.ts, 5 Oct). The JavaScript half is held to the fork's sources by its
 # map, below, which is stronger than any timestamp.
+#
+# A folder that is not there, or that cannot be walked, stops the record
+# (#2711): the walk used to skip a missing cpp\ and pass over what it could
+# not read, so a check that never ran said nothing was newer than the binary.
 $newest = $null
 $d = Join-Path $Clone 'skymp5-server\cpp'
 # A build made elsewhere is held to the commit's time instead, below.
-if (-not $BuiltBy -and (Test-Path -LiteralPath $d)) {
-  $newest = Get-ChildItem -LiteralPath $d -Recurse -File -EA SilentlyContinue |
+if (-not $BuiltBy) {
+  if (-not (Test-Path -LiteralPath $d -PathType Container)) {
+    throw "there is no skymp5-server\cpp in $Clone, so whether the binary is older than its sources cannot be checked. Nothing was recorded."
+  }
+  $newest = Get-ChildItem -LiteralPath $d -Recurse -File |
        Where-Object { $_.Extension -in '.cpp', '.h' -and $_.FullName -notlike '*\node_modules\*' } |
        Sort-Object LastWriteTime -Descending | Select-Object -First 1
 }
@@ -245,15 +272,20 @@ if (-not (Test-SameBytes (Join-Path $Dist 'launch_server.bat') $bat)) { $why += 
 # The JavaScript half: the bundle names its map, the map's sources are the
 # fork's, and the fork's packages are its lockfile's.
 $js = Join-Path $Dist 'dist_back\skymp5-server.js'
+# A bundle that cannot be read is named as that (#2711). Its catch used to be
+# empty, and the reason given was that the bundle names no map, which is not
+# what was wrong.
 $tail = ''
+$tailWhy = ''
 try {
   $fs = [IO.File]::OpenRead($js)
   try {
     $n = [Math]::Min(200, [int]$fs.Length); [void]$fs.Seek(-$n, 'End'); $buf = New-Object byte[] $n; [void]$fs.Read($buf, 0, $n)
     $tail = [Text.Encoding]::ASCII.GetString($buf)
   } finally { $fs.Dispose() }
-} catch { }
-if ($tail -notmatch 'sourceMappingURL=skymp5-server\.js\.map\s*$') { $why += 'dist_back\skymp5-server.js does not name skymp5-server.js.map as its map, so the map says nothing about it' }
+} catch { $tailWhy = $_.Exception.Message }
+if ($tailWhy) { $why += "dist_back\skymp5-server.js could not be read, so whether it names its map is not known: $tailWhy" }
+elseif ($tail -notmatch 'sourceMappingURL=skymp5-server\.js\.map\s*$') { $why += 'dist_back\skymp5-server.js does not name skymp5-server.js.map as its map, so the map says nothing about it' }
 $node = Get-Command node -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
 if (-not $node) { $why += 'node is not on this machine, so the JavaScript half cannot be tied to the fork' }
 else {
