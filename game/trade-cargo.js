@@ -23,6 +23,17 @@
   - Coin is not cargo. Gold (base 0xF) is refused; freight is #512's rule.
   - Saved state that does not verify is refused. It never starts empty.
 
+  WHO IS NAMED. A person on the manifest is a character, { actor, profile }:
+  the character's form id and the profile it is on, the two numbers the
+  release list of deleted characters (#2351, #2668) names people by. Never a
+  name: what a panel shows is read off the character when it is shown. When
+  a character is deleted, reset, wiped or replaced by New-Character,
+  release() takes them off: every place they are named becomes null, and
+  every piece stays exactly where it was. A line whose recipient is gone
+  cannot be delivered or left for them, and one whose loader is gone cannot
+  be returned to them; it stays aboard for the world to settle (a piece can
+  still be taken, and staff can narrate what became of it).
+
   WHAT IT NEVER DECIDES. Thornswood is a player-driven RP server (Patrick,
   17 Oct 2026, 10:13 PM MT): a trade ship is a tool, and the players decide
   what happens with it in the world. So nothing here says who sails, where,
@@ -46,9 +57,22 @@ var HOWS = { delivered: 1, left: 1, returned: 1, taken: 1 };
 
 function copy(v) { return JSON.parse(JSON.stringify(v)); }
 function isObj(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
+function has(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
 function count(n) { return Number.isInteger(n) && n > 0 && n <= MAX_COUNT; }
 function text(s, max) { return typeof s === 'string' && s.length > 0 && s.length <= (max || 128) && s.trim() === s; }
 function time(t) { return Number.isInteger(t) && t >= 0; }
+
+/* A character: its form id and its profile (0 when it has none). */
+function party(p) {
+  return isObj(p) && Object.keys(p).length === 2 &&
+    Number.isInteger(p.actor) && p.actor > 0 && p.actor <= 0xffffffff &&
+    Number.isSafeInteger(p.profile) && p.profile >= 0;
+}
+function partyOf(p, what) {
+  if (!party(p)) { throw new Error(what + ' has to be a character.'); }
+  return { actor: p.actor, profile: p.profile };
+}
+function same(a, b) { return !!a && !!b && a.actor === b.actor && a.profile === b.profile; }
 
 /* A piece as the inventory holds it: base, count and every other field kept. */
 function entryOf(e) {
@@ -67,9 +91,13 @@ function canonical(v) {
   return out;
 }
 
+/*
+  opts.ports is the port keys a hold may stand at, and may be empty (a world
+  with no ships). opts.routes, when given, is the one-way legs a hold may sail.
+*/
 function createTradeCargo(opts) {
   opts = opts || {};
-  if (!Array.isArray(opts.ports) || opts.ports.length < 2) { throw new Error('A ship needs at least two ports.'); }
+  if (!Array.isArray(opts.ports)) { throw new Error('The ports cannot be verified.'); }
   var ports = {};
   opts.ports.forEach(function (p) {
     if (typeof p !== 'string' || !ID_RE.test(p) || ports[p]) { throw new Error('A port cannot be verified: ' + p); }
@@ -90,41 +118,45 @@ function createTradeCargo(opts) {
   function empty() { return { v: 1, seq: 0, holds: {}, receipts: {} }; }
 
   function holdOf(state, id) {
-    var h = Object.prototype.hasOwnProperty.call(state.holds, id) ? state.holds[id] : null;
+    var h = has(state.holds, id) ? state.holds[id] : null;
     if (!h) { throw new Error('No hold ' + id + '.'); }
     return h;
   }
 
   function useReceipt(state, receipt) {
     if (!text(receipt, 200)) { throw new Error('A receipt cannot be verified.'); }
-    if (Object.prototype.hasOwnProperty.call(state.receipts, receipt)) { throw new Error('That receipt was already used.'); }
+    if (has(state.receipts, receipt)) { throw new Error('That receipt was already used.'); }
     state.receipts[receipt] = true;
   }
 
   /*
     The audit. Throws on the first thing that does not add up, so a caller that
-    catches it can refuse the change and keep the state it had.
+    catches it can refuse the change and keep the state it had. Answers the
+    counts a load banner says.
   */
   function audit(state) {
     if (!isObj(state) || state.v !== 1 || !Number.isInteger(state.seq) || state.seq < 0 ||
         !isObj(state.holds) || !isObj(state.receipts)) {
       throw new Error('The manifest cannot be verified.');
     }
-    var seen = {}, used = {}, aboard = 0, pending = 0, out = 0;
+    var seen = {}, used = {}, holds = 0, sailing = 0, aboard = 0, pending = 0, out = 0;
     function receipt(r) {
       if (!text(r, 200) || used[r] || state.receipts[r] !== true) { throw new Error('A receipt does not match the manifest.'); }
       used[r] = true;
     }
+    function named(p) { return p === null || party(p); }
     Object.keys(state.holds).forEach(function (id) {
       var h = state.holds[id];
       if (!ID_RE.test(id) || !isObj(h) || !ports[h.port] || !isObj(h.lines) || !Array.isArray(h.outs)) {
         throw new Error('Hold ' + id + ' cannot be verified.');
       }
+      holds++;
       if (h.sailing !== null) {
         var s = h.sailing;
         if (!isObj(s) || s.from !== h.port || !ports[s.to] || s.to === s.from || !time(s.at) || !time(s.arriveAt) || s.arriveAt <= s.at) {
           throw new Error('Hold ' + id + '\'s voyage cannot be verified.');
         }
+        sailing++;
       }
       var left = {};
       var lines = Object.keys(h.lines);
@@ -132,7 +164,7 @@ function createTradeCargo(opts) {
       lines.forEach(function (k) {
         var l = h.lines[k];
         if (!isObj(l) || String(l.seq) !== k || !Number.isInteger(l.seq) || l.seq < 1 || l.seq > state.seq || seen[l.seq] ||
-            !text(l.by) || !text(l.for) || !ports[l.from] || !Number.isInteger(l.aboard) || l.aboard < 0) {
+            !named(l.by) || !named(l.for) || !ports[l.from] || !Number.isInteger(l.aboard) || l.aboard < 0) {
           throw new Error('A line in hold ' + id + ' cannot be verified.');
         }
         seen[l.seq] = true;
@@ -144,7 +176,7 @@ function createTradeCargo(opts) {
       });
       h.outs.forEach(function (o) {
         if (!isObj(o) || !Number.isInteger(o.seq) || o.seq < 1 || o.seq > state.seq || seen[o.seq] || !HOWS[o.how] ||
-            !text(o.who) || !count(o.count) || !time(o.at) || !Object.prototype.hasOwnProperty.call(h.lines, String(o.line))) {
+            !named(o.who) || !count(o.count) || !time(o.at) || !has(h.lines, String(o.line))) {
           throw new Error('Something that left hold ' + id + ' cannot be verified.');
         }
         seen[o.seq] = true;
@@ -159,7 +191,7 @@ function createTradeCargo(opts) {
     Object.keys(state.receipts).forEach(function (r) {
       if (!used[r]) { throw new Error('A receipt is not on the manifest.'); }
     });
-    return { aboard: aboard, pending: pending, out: out };
+    return { holds: holds, sailing: sailing, aboard: aboard, pending: pending, out: out };
   }
 
   /* Every change works on a copy and replaces the state only once it audits. */
@@ -175,7 +207,7 @@ function createTradeCargo(opts) {
   function open(state, id, port) {
     return change(state, function (s) {
       if (typeof id !== 'string' || !ID_RE.test(id)) { throw new Error('A hold needs a plain name.'); }
-      if (Object.prototype.hasOwnProperty.call(s.holds, id)) { throw new Error('There is already a hold ' + id + '.'); }
+      if (has(s.holds, id)) { throw new Error('There is already a hold ' + id + '.'); }
       if (!ports[port]) { throw new Error('No port ' + port + '.'); }
       s.holds[id] = { port: port, sailing: null, lines: {}, outs: [] };
       return id;
@@ -184,18 +216,21 @@ function createTradeCargo(opts) {
 
   /*
     Loads one piece. The caller has already taken it out of a pack, and
-    receipt names that debit. who is the loader, recipient who it is for.
+    receipt names that debit. by is the character who loaded it, for the
+    character it is for.
   */
   function load(state, id, piece) {
     return change(state, function (s) {
       var h = holdOf(s, id);
       if (h.sailing) { throw new Error('The hold is at sea.'); }
-      if (!isObj(piece) || !text(piece.by) || !text(piece.for)) { throw new Error('A load needs who loaded it and who it is for.'); }
+      if (!isObj(piece)) { throw new Error('A load needs who loaded it and who it is for.'); }
+      var by = partyOf(piece.by, 'Who loaded it');
+      var to = partyOf(piece.for, 'Who it is for');
       var e = entryOf(piece.entry);
       if (Object.keys(h.lines).length >= maxLines) { throw new Error('The hold is full.'); }
       useReceipt(s, piece.receipt);
       var seq = ++s.seq;
-      h.lines[seq] = { seq: seq, by: piece.by, for: piece.for, from: h.port, receipt: piece.receipt, entry: e, aboard: e.count };
+      h.lines[seq] = { seq: seq, by: by, for: to, from: h.port, receipt: piece.receipt, entry: e, aboard: e.count };
       return seq;
     });
   }
@@ -260,27 +295,27 @@ function createTradeCargo(opts) {
     delivered (to the recipient), left (in the drop box under the
     recipient's name), returned (to the loader, at the port it was loaded
     in) or taken (by whoever opened it; when that is allowed is the
-    caller's rule, not this file's).
+    caller's rule, not this file's). who is the character receiving it.
   */
   function begin(state, id, line, n, how, who, at) {
     return change(state, function (s) {
       var h = holdOf(s, id);
-      var l = Object.prototype.hasOwnProperty.call(h.lines, String(line)) ? h.lines[String(line)] : null;
+      var l = has(h.lines, String(line)) ? h.lines[String(line)] : null;
       if (!l) { throw new Error('No such line in the hold.'); }
       if (!HOWS[how]) { throw new Error('Not a way for cargo to leave.'); }
-      if (!text(who)) { throw new Error('Somebody has to receive it.'); }
+      var to = partyOf(who, 'Who receives it');
       if (!count(n) || n > l.aboard) { throw new Error('There is not that much aboard.'); }
       if (!time(at)) { throw new Error('The time cannot be verified.'); }
       if (how !== 'taken' && h.sailing) { throw new Error('The hold is at sea.'); }
-      if ((how === 'delivered' || how === 'left') && (who !== l.for || h.port === l.from)) {
+      if ((how === 'delivered' || how === 'left') && (!same(to, l.for) || h.port === l.from)) {
         throw new Error('Only the person it is for receives it, at the far end.');
       }
-      if (how === 'returned' && (who !== l.by || h.port !== l.from)) {
+      if (how === 'returned' && (!same(to, l.by) || h.port !== l.from)) {
         throw new Error('Only the person who loaded it takes it back, where it was loaded.');
       }
       l.aboard -= n;
       var seq = ++s.seq;
-      h.outs.push({ seq: seq, line: l.seq, count: n, how: how, who: who, at: at, receipt: null });
+      h.outs.push({ seq: seq, line: l.seq, count: n, how: how, who: to, at: at, receipt: null });
       var e = copy(l.entry);
       e.count = n;
       return { out: seq, entry: e };
@@ -312,13 +347,47 @@ function createTradeCargo(opts) {
     });
   }
 
+  /*
+    THE RELEASE OF DELETED CHARACTERS (#2351, #2668). who is what the
+    release list answers: who.actor(formId) and who.profile(profileId), each
+    true for one the list names. A character the list names by form id, or
+    whose profile it names (Delete-Person.ps1, which deletes the profile and
+    every character on it), comes off every line and every hand out: the
+    place becomes null. A list of characters only (Reset-Character.ps1,
+    Wipe-Saves.ps1, New-Character.ps1) never names a profile, so a profile's
+    other characters stay. Nothing aboard, pending or gone out changes by one
+    piece, which the audit holds it to. Answers the counts, for the log.
+  */
+  function release(state, who) {
+    if (!isObj(who) || typeof who.actor !== 'function' || typeof who.profile !== 'function') {
+      throw new Error('The release list cannot be verified.');
+    }
+    function gone(p) { return !!p && (who.actor(p.actor) === true || (p.profile > 0 && who.profile(p.profile) === true)); }
+    return change(state, function (s) {
+      var c = { loaders: 0, recipients: 0, receivers: 0 };
+      Object.keys(s.holds).forEach(function (id) {
+        var h = s.holds[id];
+        Object.keys(h.lines).forEach(function (k) {
+          var l = h.lines[k];
+          if (gone(l.by)) { l.by = null; c.loaders++; }
+          if (gone(l.for)) { l.for = null; c.recipients++; }
+        });
+        h.outs.forEach(function (o) { if (gone(o.who)) { o.who = null; c.receivers++; } });
+      });
+      return c;
+    });
+  }
+
   /* What is aboard a hold now, line by line, for a panel. */
   function aboard(state, id) {
     var h = holdOf(state, id);
     return Object.keys(h.lines).map(Number).sort(function (a, b) { return a - b; })
       .map(function (k) { return h.lines[k]; })
       .filter(function (l) { return l.aboard > 0; })
-      .map(function (l) { var e = copy(l.entry); e.count = l.aboard; return { line: l.seq, for: l.for, by: l.by, entry: e }; });
+      .map(function (l) {
+        var e = copy(l.entry); e.count = l.aboard;
+        return { line: l.seq, for: l.for && copy(l.for), by: l.by && copy(l.by), entry: e };
+      });
   }
 
   function save(state) {
@@ -340,7 +409,7 @@ function createTradeCargo(opts) {
 
   return {
     empty: empty, audit: audit, open: open, load: load, depart: depart, amend: amend, arrive: arrive,
-    begin: begin, finish: finish, undo: undo, aboard: aboard, save: save, parse: load_,
+    begin: begin, finish: finish, undo: undo, release: release, aboard: aboard, save: save, parse: load_,
     PORTS: Object.keys(ports), MAX_LINES: maxLines
   };
 }
@@ -370,6 +439,7 @@ var HOLD_KEYS = { whiterun: 1, solitude: 1, riften: 1, markarth: 1, windhelm: 1,
   morthal: 1, dawnstar: 1, winterhold: 1, ravenrock: 1 };
 var REF_RE = /^[0-9a-f]{1,8}:[^:\s][^:]{0,95}$/i;
 var MAX_ROUTE_MINUTES = 7 * 24 * 60;
+var NO_ROUTES = { v: 1, ports: [], routes: [] };
 
 function checkRoutes(cfg) {
   if (!isObj(cfg) || cfg.v !== 1 || !Array.isArray(cfg.ports) || !Array.isArray(cfg.routes) ||
@@ -436,4 +506,70 @@ function proposeRoutes(current, next, state) {
   return { changes: lines, strands: strands, next: b };
 }
 
-module.exports = { createTradeCargo: createTradeCargo, checkRoutes: checkRoutes, proposeRoutes: proposeRoutes, GOLD_BASE: GOLD_BASE, MAX_LINES_DEFAULT: MAX_LINES_DEFAULT };
+/*
+  THE REGISTER: what the server keeps on disk, one file in the private
+  folder (it names characters, and the data folder is served to anybody,
+  #541):
+
+    { v: 1, routes: <the staff list in force>, cargo: <the manifest> }
+
+  The list in force is kept beside the manifest, in the same file, because
+  the manifest names ports and routes off that list: written apart, a crash
+  between the two writes could leave a manifest naming a port the list does
+  not have, and that manifest would no longer verify. Where staff write an
+  edit before it is confirmed (#511 question 1) is a separate thing; a
+  confirmed edit becomes the list in force here, through adoptRoutes().
+
+  openRegister(null) is the register of a server that never had one: no
+  ports, no routes, no holds. A text that is there and does not verify is
+  refused whole, never read as empty.
+*/
+function registerOf(routes, state) {
+  var ships = createTradeCargo({ ports: routes.ports.map(function (p) { return p.key; }), routes: routes.routes });
+  ships.audit(state);
+  return { routes: routes, ships: ships, state: state };
+}
+
+function openRegister(textIn) {
+  if (textIn === null || textIn === undefined) {
+    var none = checkRoutes(NO_ROUTES);
+    return registerOf(none, createTradeCargo({ ports: [] }).empty());
+  }
+  if (typeof textIn !== 'string' || Buffer.byteLength(textIn, 'utf8') > MAX_STATE_BYTES * 2) {
+    throw new Error('The ship register cannot be verified.');
+  }
+  var raw;
+  try { raw = JSON.parse(textIn.replace(/^\uFEFF/, '')); } catch (e) { throw new Error('The ship register cannot be verified.'); }
+  if (!isObj(raw) || raw.v !== 1 || Object.keys(raw).length !== 3 || !has(raw, 'routes') || !has(raw, 'cargo')) {
+    throw new Error('The ship register cannot be verified.');
+  }
+  return registerOf(checkRoutes(raw.routes), raw.cargo);
+}
+
+function saveRegister(reg) {
+  if (!isObj(reg) || !reg.ships || !isObj(reg.routes)) { throw new Error('The ship register cannot be verified.'); }
+  var routes = checkRoutes(reg.routes);
+  var cargo = JSON.parse(reg.ships.save(reg.state));
+  return JSON.stringify(canonical({ v: 1, routes: routes, cargo: cargo }));
+}
+
+/* The register with a staff-confirmed list in force. It strands no hold. */
+function adoptRoutes(reg, next) {
+  var p = proposeRoutes(reg.routes, next, reg.state);
+  if (p.strands.length) { throw new Error('The edit strands a hold: ' + p.strands.join(' ')); }
+  return registerOf(p.next, copy(reg.state));
+}
+
+/* The counts a load banner says. */
+function countsOf(reg) {
+  var c = reg.ships.audit(reg.state);
+  c.ports = reg.routes.ports.length;
+  c.routes = reg.routes.routes.length;
+  return c;
+}
+
+module.exports = {
+  createTradeCargo: createTradeCargo, checkRoutes: checkRoutes, proposeRoutes: proposeRoutes,
+  openRegister: openRegister, saveRegister: saveRegister, adoptRoutes: adoptRoutes, countsOf: countsOf,
+  GOLD_BASE: GOLD_BASE, MAX_LINES_DEFAULT: MAX_LINES_DEFAULT
+};

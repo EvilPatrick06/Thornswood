@@ -4,237 +4,261 @@
 
       node tests/test-511-trade-cargo.js
 
-  #511, trade ships. The manifest in game/trade-cargo.js is the part of the
-  design that does not wait on Patrick (issuecomment-6245473792): what is in a
-  hold, whose pack each piece came out of, who it is for, and where it went.
-  The rule the issue names is that a cargo worth robbing must never be a
-  cargo made out of nothing, so most of this file tries to make one grow:
+  #511, trade ships. Holds game\trade-cargo.js to its rule that a cargo never
+  grows, and the trade ships block of game\gamemode.js to its register:
 
-  - nothing is written aboard without the receipt of a debit, and one receipt
-    loads once;
-  - coin is not cargo;
-  - a piece leaves in two steps (begin, then finish with the credit's
-    receipt), and a crash between them keeps it counted;
-  - only the person it is for receives it at the far end, only the loader
-    takes it back where it was loaded, and nothing but taking happens at sea;
-  - a refused change leaves the state as it was;
-  - saved state that has been tampered with is refused, never started empty.
+    N  nothing aboard without a debit receipt, coin refused, the two-step
+       hand out, a tampered save refused
+    S  staff data: ports, routes and crews checked whole, an edit proposed
+       with the holds it would strand, a voyage amended for narration
+    D  the release of deleted characters: by form id, by profile, never a
+       profile's other characters, every piece where it was
+    G  the register: none is a world with no ships, a bad one is refused
+       whole, an edit that strands a hold is refused
+    B  the block, started as the server starts it: off by default with the
+       counts in the log, the release answered with the switch off, a register
+       that does not verify never written over, on puts the handle up and
+       writes before it changes
+    U  the bundle in gamemode.js is game\trade-cargo.js as it is
 
-  - the ports, routes, leg times and crews are staff data, never code: a bad
-    list is refused whole, and an edit is first a proposal that says what it
-    would change and which holds it would strand (Patrick, 17 Oct, 10:13 PM
-    MT: the server proposes, staff confirm, players decide).
-
-  The ports here are stand-ins written as staff would write them.
-  Read only: no world, no files.
+  Nothing leaves this machine. The scratch folder goes at the end.
 */
+const fs = require('fs');
+const os = require('os');
 const path = require('path');
-const { createTradeCargo, checkRoutes, proposeRoutes, GOLD_BASE } = require(path.join(__dirname, '..', 'game', 'trade-cargo.js'));
+const vm = require('vm');
+const { spawnSync } = require('child_process');
+const T = require('../game/trade-cargo.js');
 
+const REPO = path.join(__dirname, '..');
 let pass = 0, fail = 0;
 function yes(what, cond) {
   if (cond) { pass++; console.log('PASS  ' + what); }
   else { fail++; console.log('FAIL  ' + what); }
 }
-function refused(what, fn, re) {
-  let err = null;
-  try { fn(); } catch (e) { err = e; }
-  yes(what, !!err && (!re || re.test(String(err.message))));
-}
-const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-
-const ships = createTradeCargo({ ports: ['solitude', 'windhelm', 'dawnstar'] });
-const s = ships.empty();
-
-// ------------------------------------------------------------- setting up
-refused('a ship needs two ports', () => createTradeCargo({ ports: ['solitude'] }));
-refused('a port is named once', () => createTradeCargo({ ports: ['solitude', 'solitude'] }));
-yes('the line limit is a trade side, 24, unless told otherwise', ships.MAX_LINES === 24);
-ships.open(s, 'red-wave', 'solitude');
-refused('a hold is opened once', () => ships.open(s, 'red-wave', 'solitude'), /already/);
-refused('a hold opens only at a port on the list', () => ships.open(s, 'ghost', 'riften'), /No port/);
-
-// ------------------------------------------------------------- loading
-const sword = { baseId: 0x13989, count: 1, health: 0.85, name: 'Steel Sword' };
-const ore = { baseId: 0x5acdb, count: 20 };
-const l1 = ships.load(s, 'red-wave', { by: 'Brynja', for: 'Ulfric Trader', receipt: 'debit:1', entry: sword });
-const l2 = ships.load(s, 'red-wave', { by: 'Brynja', for: 'Ulfric Trader', receipt: 'debit:2', entry: ore });
-yes('two lines go aboard', ships.aboard(s, 'red-wave').length === 2);
-yes('a piece keeps every field it had, condition and name included',
-    same(ships.aboard(s, 'red-wave')[0].entry, sword));
-refused('one debit loads once', () =>
-  ships.load(s, 'red-wave', { by: 'Brynja', for: 'Ulfric Trader', receipt: 'debit:1', entry: ore }), /already used/);
-refused('nothing goes aboard without a receipt', () =>
-  ships.load(s, 'red-wave', { by: 'Brynja', for: 'Ulfric Trader', entry: ore }), /receipt/);
-refused('coin is not cargo', () =>
-  ships.load(s, 'red-wave', { by: 'Brynja', for: 'Ulfric Trader', receipt: 'debit:g', entry: { baseId: GOLD_BASE, count: 100 } }), /Coin/);
-refused('a count of nothing is not a piece', () =>
-  ships.load(s, 'red-wave', { by: 'Brynja', for: 'X', receipt: 'debit:0', entry: { baseId: 0x5acdb, count: 0 } }));
-refused('a load names who it is for', () =>
-  ships.load(s, 'red-wave', { by: 'Brynja', receipt: 'debit:9', entry: ore }));
-yes('the refused loads used no receipt', !('debit:g' in s.receipts) && !('debit:0' in s.receipts) && !('debit:9' in s.receipts));
-
-{
-  const small = createTradeCargo({ ports: ['a', 'b'], maxLines: 2 });
-  const t = small.empty();
-  small.open(t, 'h', 'a');
-  small.load(t, 'h', { by: 'P', for: 'Q', receipt: 'r1', entry: ore });
-  small.load(t, 'h', { by: 'P', for: 'Q', receipt: 'r2', entry: ore });
-  refused('a full hold takes no more', () => small.load(t, 'h', { by: 'P', for: 'Q', receipt: 'r3', entry: ore }), /full/);
+function throws(what, fn, re) {
+  let msg = null;
+  try { fn(); } catch (e) { msg = String(e && e.message); }
+  yes(what + (msg ? ' (' + msg + ')' : ''), msg !== null && (!re || re.test(msg)));
 }
 
-// ------------------------------------------------------------- leaving early
-refused('nobody else takes it back at the dock it was loaded at', () =>
-  ships.begin(s, 'red-wave', l2, 1, 'returned', 'Ulfric Trader', 10), /loaded it/);
-refused('it is not delivered at the port it was loaded in', () =>
-  ships.begin(s, 'red-wave', l2, 1, 'delivered', 'Ulfric Trader', 10), /far end/);
-{
-  const r = ships.begin(s, 'red-wave', l2, 5, 'returned', 'Brynja', 10);
-  yes('the loader takes five ore back where they loaded it', r.entry.count === 5 && r.entry.baseId === ore.baseId);
-  ships.finish(s, 'red-wave', r.out, 'credit:1');
-  yes('and fifteen are left aboard', ships.aboard(s, 'red-wave')[1].entry.count === 15);
+const BRYNJA = { actor: 0xff000a01, profile: 5001 };
+const BRYNJA2 = { actor: 0xff000a03, profile: 5001 };   // another character on Brynja's profile
+const ONUND = { actor: 0xff000a02, profile: 5002 };
+const KARI = { actor: 0xff000a09, profile: 0 };
+const IRON = 0x5ace4, SALT = 0x34cdf;
+
+const ROUTES = {
+  v: 1,
+  ports: [
+    { key: 'solitude', name: 'Solitude docks', hold: 'solitude', world: '3c:Skyrim.esm', pos: [1, 2, 3] },
+    { key: 'windhelm', name: 'Windhelm docks', hold: 'windhelm', world: '3c:Skyrim.esm', pos: [4, 5, 6] },
+    { key: 'dawnstar', name: 'Dawnstar', hold: 'dawnstar', world: '3c:Skyrim.esm', pos: [7, 8, 9] }
+  ],
+  routes: [
+    { from: 'solitude', to: 'windhelm', minutes: 90, crew: [] },
+    { from: 'windhelm', to: 'solitude', minutes: 120 },
+    { from: 'solitude', to: 'dawnstar', minutes: 40, crew: ['1a2b3:Skyrim.esm'] }
+  ]
+};
+
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-511-'));
+function done() {
+  try { fs.rmSync(scratch, { recursive: true, force: true }); } catch (e) { }
+  console.log('');
+  console.log(pass + ' passed, ' + fail + ' failed');
+  process.exit(fail ? 1 : 0);
 }
 
-// ------------------------------------------------------------- the voyage
-refused('a voyage goes somewhere else', () => ships.depart(s, 'red-wave', 'solitude', 100, 200), /No voyage/);
-refused('a voyage arrives after it leaves', () => ships.depart(s, 'red-wave', 'windhelm', 200, 200), /later/);
-{
-  const pend = ships.begin(s, 'red-wave', l2, 1, 'returned', 'Brynja', 20);
-  refused('a hold does not sail with something half handed out', () => ships.depart(s, 'red-wave', 'windhelm', 100, 200), /handed out/);
-  ships.undo(s, 'red-wave', pend.out);
-  yes('a refused credit puts the piece back aboard', ships.aboard(s, 'red-wave')[1].entry.count === 15);
-}
-ships.depart(s, 'red-wave', 'windhelm', 100, 1900);
-refused('a hold at sea takes no cargo', () =>
-  ships.load(s, 'red-wave', { by: 'Brynja', for: 'X', receipt: 'debit:3', entry: ore }), /at sea/);
-refused('nothing is delivered at sea', () => ships.begin(s, 'red-wave', l1, 1, 'delivered', 'Ulfric Trader', 500), /at sea/);
-yes('before its time it is still at sea', same(ships.arrive(s, 1899), []) && s.holds['red-wave'].sailing !== null);
-yes('at its time it docks at Windhelm', same(ships.arrive(s, 1900), ['red-wave']) &&
-    s.holds['red-wave'].port === 'windhelm' && s.holds['red-wave'].sailing === null);
+try {
+  // ================================================================== N
+  const ships = T.createTradeCargo({ ports: ['solitude', 'windhelm', 'dawnstar'], routes: ROUTES.routes });
+  const s = ships.empty();
+  ships.open(s, 'ship-1', 'solitude');
+  const l1 = ships.load(s, 'ship-1', { by: BRYNJA, for: ONUND, receipt: 'debit:1', entry: { baseId: IRON, count: 10 } });
+  const l2 = ships.load(s, 'ship-1', { by: BRYNJA, for: KARI, receipt: 'debit:2', entry: { baseId: SALT, count: 4, health: 1 } });
+  yes('N1 two lines aboard, every field of a piece kept', ships.aboard(s, 'ship-1').length === 2 && ships.aboard(s, 'ship-1')[1].entry.health === 1);
+  throws('N2 one receipt loads once', function () { ships.load(s, 'ship-1', { by: BRYNJA, for: ONUND, receipt: 'debit:1', entry: { baseId: IRON, count: 1 } }); }, /already used/);
+  throws('N3 coin is not cargo', function () { ships.load(s, 'ship-1', { by: BRYNJA, for: ONUND, receipt: 'debit:3', entry: { baseId: 15, count: 100 } }); }, /Coin/);
+  throws('N4 a person on the manifest is a character, never a name', function () { ships.load(s, 'ship-1', { by: 'Brynja', for: ONUND, receipt: 'debit:4', entry: { baseId: IRON, count: 1 } }); }, /character/);
+  throws('N5 a load with no receipt is refused', function () { ships.load(s, 'ship-1', { by: BRYNJA, for: ONUND, entry: { baseId: IRON, count: 1 } }); }, /receipt/);
+  throws('N6 delivery at the port it was loaded in is refused', function () { ships.begin(s, 'ship-1', l1, 1, 'delivered', ONUND, 1); }, /far end/);
+  throws('N7 a route staff did not write is refused', function () { ships.depart(s, 'ship-1', 'windhelm', 10, 5); }, /later time/);
+  ships.depart(s, 'ship-1', 'windhelm', 100, 200);
+  throws('N8 nothing loads at sea', function () { ships.load(s, 'ship-1', { by: ONUND, for: BRYNJA, receipt: 'debit:5', entry: { baseId: IRON, count: 1 } }); }, /at sea/);
+  yes('N9 nothing lands before its time', ships.arrive(s, 150).length === 0);
+  yes('N10 and it lands at its time', ships.arrive(s, 200)[0] === 'ship-1' && s.holds['ship-1'].port === 'windhelm');
+  throws('N11 only the person it is for receives it', function () { ships.begin(s, 'ship-1', l1, 1, 'delivered', KARI, 300); }, /Only the person/);
+  const b1 = ships.begin(s, 'ship-1', l1, 6, 'delivered', ONUND, 300);
+  yes('N12 a hand out is pending and still counted', b1.entry.count === 6 && ships.audit(s).pending === 6 && ships.audit(s).aboard === 8);
+  throws('N13 a hold with a hand out pending cannot sail', function () { ships.depart(s, 'ship-1', 'solitude', 400, 500); }, /handed out/);
+  ships.finish(s, 'ship-1', b1.out, 'credit:1');
+  throws('N14 a credit receipt is used once', function () { ships.finish(s, 'ship-1', b1.out, 'credit:2'); }, /Nothing is waiting/);
+  const b2 = ships.begin(s, 'ship-1', l1, 4, 'left', ONUND, 301);
+  ships.undo(s, 'ship-1', b2.out);
+  yes('N15 a refused credit puts the piece back aboard', ships.audit(s).aboard === 8 && ships.audit(s).out === 6 && ships.audit(s).pending === 0);
+  const saved = ships.save(s);
+  yes('N16 a save reads back the same', ships.save(ships.parse(saved)) === saved);
+  const t1 = JSON.parse(saved); t1.holds['ship-1'].lines[String(l1)].aboard = 9;
+  throws('N17 a save where a line grew is refused', function () { ships.parse(JSON.stringify(t1)); });
+  const t3 = JSON.parse(saved); delete t3.receipts['credit:1'];
+  throws('N19 a save that lost a receipt is refused', function () { ships.parse(JSON.stringify(t3)); }, /receipt/);
+  throws('N20 a save that is not one is refused, not read as empty', function () { ships.parse('{}'); });
+  const before = ships.save(s);
+  throws('N21 a refused change changes nothing', function () { ships.begin(s, 'ship-1', l2, 99, 'delivered', KARI, 400); });
+  yes('N22 the manifest is as it was', ships.save(s) === before);
+  const b3 = ships.begin(s, 'ship-1', l2, 1, 'taken', ONUND, 401);
+  yes('N23 this file lets a piece be taken; when that is allowed is the world\'s rule', b3.entry.count === 1);
+  ships.finish(s, 'ship-1', b3.out, 'credit:3');
 
-// ------------------------------------------------------------- the far end
-refused('only the person it is for receives it', () => ships.begin(s, 'red-wave', l1, 1, 'delivered', 'Brynja', 2000), /person it is for/);
-refused('the loader cannot take it back at the far end', () => ships.begin(s, 'red-wave', l1, 1, 'returned', 'Brynja', 2000), /where it was loaded/);
-refused('no more leaves than is aboard', () => ships.begin(s, 'red-wave', l2, 16, 'delivered', 'Ulfric Trader', 2000), /not that much/);
-{
-  const d = ships.begin(s, 'red-wave', l1, 1, 'delivered', 'Ulfric Trader', 2000);
-  yes('the sword arrives as it was loaded', same(d.entry, sword));
-  yes('while it is being handed out it is still counted', ships.audit(s).pending === 1);
-  refused('one credit receipt finishes once', () => { ships.finish(s, 'red-wave', d.out, 'credit:1'); }, /already used/);
-  ships.finish(s, 'red-wave', d.out, 'credit:2');
-  refused('a finished hand out cannot finish again', () => ships.finish(s, 'red-wave', d.out, 'credit:3'), /Nothing is waiting/);
-  const t = ships.begin(s, 'red-wave', l2, 10, 'taken', 'A Stranger', 2100);
-  ships.finish(s, 'red-wave', t.out, 'credit:4');
-  const left = ships.begin(s, 'red-wave', l2, 5, 'left', 'Ulfric Trader', 2200);
-  ships.finish(s, 'red-wave', left.out, 'drop:windhelm:1');
-}
-{
-  const a = ships.audit(s);
-  yes('the books balance: 21 loaded, 5 returned, 1 delivered, 10 taken, 5 left, none aboard',
-      a.aboard === 0 && a.pending === 0 && a.out === 21);
-}
-refused('an empty hold does not sail', () => ships.depart(s, 'red-wave', 'solitude', 3000, 4000), /empty/);
+  // ================================================================== S
+  const ok = T.checkRoutes(ROUTES);
+  yes('S1 the staff list reads, a missing crew is no crew', ok.routes[1].crew.length === 0 && ok.ports.length === 3);
+  throws('S2 a route to a port not on the list is refused whole', function () {
+    T.checkRoutes({ v: 1, ports: ROUTES.ports, routes: ROUTES.routes.concat([{ from: 'solitude', to: 'riften', minutes: 5 }]) });
+  }, /Route 4/);
+  throws('S3 a port in no hold is refused', function () {
+    T.checkRoutes({ v: 1, ports: [{ key: 'x', name: 'X', hold: 'nowhere', world: '3c:Skyrim.esm', pos: [0, 0, 0] }], routes: [] });
+  }, /Port 1/);
+  yes('S4 an empty list is a world with no ships', T.checkRoutes({ v: 1, ports: [], routes: [] }).ports.length === 0);
+  const edit = JSON.parse(JSON.stringify(ROUTES));
+  edit.ports = edit.ports.filter(function (p) { return p.key !== 'windhelm'; });
+  edit.routes = edit.routes.filter(function (r) { return r.from !== 'windhelm' && r.to !== 'windhelm'; });
+  const p = T.proposeRoutes(ROUTES, edit, s);
+  yes('S5 an edit says what it changes and the hold it strands', p.changes.some(function (c) { return /Remove the port Windhelm/.test(c); }) &&
+      p.strands.length === 1 && /ship-1 is at windhelm/.test(p.strands[0]));
+  const s2 = ships.empty();
+  ships.open(s2, 'ship-2', 'solitude');
+  ships.load(s2, 'ship-2', { by: ONUND, for: BRYNJA, receipt: 'debit:x', entry: { baseId: IRON, count: 2 } });
+  ships.depart(s2, 'ship-2', 'dawnstar', 10, 20);
+  ships.amend(s2, 'ship-2', { to: 'windhelm', arriveAt: 99 });
+  yes('S6 staff can turn a voyage under way, nothing aboard changes', s2.holds['ship-2'].sailing.to === 'windhelm' && ships.audit(s2).aboard === 2);
+  throws('S7 not back to where it left', function () { ships.amend(s2, 'ship-2', { to: 'solitude' }); });
 
-// ------------------------------------------------------------- taking at sea is the caller's rule
-{
-  const t = ships.empty();
-  ships.open(t, 'maiden', 'windhelm');
-  const l = ships.load(t, 'maiden', { by: 'Gjalund', for: 'Raven', receipt: 'd1', entry: ore });
-  ships.depart(t, 'maiden', 'dawnstar', 0, 10);
-  const r = ships.begin(t, 'maiden', l, 3, 'taken', 'Raider', 5);
-  yes('this file lets a hold at sea be taken from; when is for the world to decide, not this file', r.entry.count === 3);
-}
-
-// ------------------------------------------------------------- a refused change changes nothing
-{
-  const before = JSON.stringify(s);
-  try { ships.begin(s, 'red-wave', l2, 1, 'delivered', 'Ulfric Trader', 1); } catch (e) { /* refused */ }
-  try { ships.load(s, 'red-wave', { by: 'B', for: 'C', receipt: 'credit:2', entry: ore }); } catch (e) { /* refused */ }
-  yes('refused changes leave the state byte for byte', JSON.stringify(s) === before);
-}
-
-// ------------------------------------------------------------- saving
-{
-  const t = ships.empty();
-  ships.open(t, 'h', 'solitude');
-  const l = ships.load(t, 'h', { by: 'P', for: 'Q', receipt: 'd1', entry: ore });
-  ships.begin(t, 'h', l, 2, 'returned', 'P', 1);
-  const kept = ships.save(t);
-  const back = ships.parse(kept);
-  yes('a save reads back the same, a pending hand out included', ships.save(back) === kept && ships.audit(back).pending === 2);
-
-  function tamper(what, edit) {
-    const x = JSON.parse(kept); edit(x);
-    refused('a save is refused when ' + what, () => ships.parse(JSON.stringify(x)));
+  // ================================================================== D
+  function who(actors, profiles) {
+    return { actor: function (n) { return actors.indexOf(n) >= 0; }, profile: function (n) { return profiles.indexOf(n) >= 0; } };
   }
-  tamper('a line grew', x => { x.holds.h.lines[l].aboard = 30; });
-  tamper('a line\'s piece grew', x => { x.holds.h.lines[l].entry.count = 25; });
-  tamper('a pending hand out vanished', x => { x.holds.h.outs = []; });
-  tamper('a receipt is missing from the list', x => { x.receipts = {}; });
-  tamper('a receipt nothing uses is on the list', x => { x.receipts.spare = true; });
-  tamper('the cargo turned to gold', x => { x.holds.h.lines[l].entry.baseId = GOLD_BASE; });
-  tamper('the hold is at an unknown port', x => { x.holds.h.port = 'riften'; });
-  tamper('it is not a manifest at all', x => { delete x.v; });
-  refused('a save that is not JSON is refused', () => ships.parse('{'), /cannot be verified/);
-  refused('nothing saved is refused, not started empty', () => ships.parse(''), /cannot be verified/);
-}
+  const d = ships.empty();
+  ships.open(d, 'ship-3', 'solitude');
+  const d1 = ships.load(d, 'ship-3', { by: BRYNJA, for: ONUND, receipt: 'r1', entry: { baseId: IRON, count: 5 } });
+  const d2 = ships.load(d, 'ship-3', { by: ONUND, for: BRYNJA2, receipt: 'r2', entry: { baseId: SALT, count: 3 } });
+  const d3 = ships.load(d, 'ship-3', { by: KARI, for: ONUND, receipt: 'r3', entry: { baseId: IRON, count: 7 } });
+  ships.depart(d, 'ship-3', 'windhelm', 1, 2);
+  ships.arrive(d, 2);
+  const h1 = ships.begin(d, 'ship-3', d1, 2, 'delivered', ONUND, 3);
+  ships.finish(d, 'ship-3', h1.out, 'c1');
+  const was = ships.audit(d);
+  const c1 = ships.release(d, who([BRYNJA.actor], []));
+  const line = function (k) { return d.holds['ship-3'].lines[String(k)]; };
+  yes('D1 a character listed by form id comes off the lines they loaded', line(d1).by === null && c1.loaders === 1);
+  yes('D2 another character on the same profile stays, because a list of characters never names a profile', !!line(d2).for && line(d2).for.actor === BRYNJA2.actor && c1.recipients === 0);
+  const now = ships.audit(d);
+  yes('D3 not one piece is made or lost', now.aboard === was.aboard && now.out === was.out && now.pending === was.pending);
+  const c2 = ships.release(d, who([], [5001]));
+  yes('D4 a profile Delete-Person names takes every character on it off', line(d2).for === null && c2.recipients === 1);
+  const c3 = ships.release(d, who([ONUND.actor], []));
+  yes('D5 a receiver of a hand out comes off it too', c3.receivers === 1 && d.holds['ship-3'].outs[0].who === null && c3.loaders === 1 && c3.recipients === 2);
+  yes('D6 the hand out that went out keeps its count and receipt', d.holds['ship-3'].outs[0].count === 2 && d.holds['ship-3'].outs[0].receipt === 'c1');
+  throws('D7 a line whose recipient is gone cannot be delivered to anybody', function () { ships.begin(d, 'ship-3', d3, 1, 'delivered', ONUND, 4); }, /Only the person/);
+  const tk = ships.begin(d, 'ship-3', d3, 7, 'taken', KARI, 5);
+  ships.finish(d, 'ship-3', tk.out, 'c2');
+  yes('D8 it can still be taken, for the world to settle', ships.audit(d).aboard === was.aboard - 7);
+  const c4 = ships.release(d, who([BRYNJA.actor, ONUND.actor], [5001, 5002]));
+  yes('D9 running again finds nothing', c4.loaders === 0 && c4.recipients === 0 && c4.receivers === 0);
+  const dsave = ships.save(d);
+  yes('D10 a released manifest saves, reads back, and names nobody released',
+      ships.save(ships.parse(dsave)) === dsave && dsave.indexOf(String(BRYNJA.actor)) < 0 && dsave.indexOf(String(ONUND.actor)) < 0 && dsave.indexOf('5001') < 0);
+  throws('D11 a release list that is not one is refused', function () { ships.release(d, {}); }, /release list/);
 
-// ------------------------------------------------------------- staff data
-{
-  const port = (key, name, hold, x) => ({ key, name, hold, world: '3c:Skyrim.esm', pos: [x, 0, 0] });
-  const cfg = { v: 1,
-    ports: [port('solitude', 'Solitude docks', 'solitude', 1), port('windhelm', 'Windhelm docks', 'windhelm', 2)],
-    routes: [{ from: 'solitude', to: 'windhelm', minutes: 30, crew: ['fb18:CFTO.esp'] }] };
-  const ok = checkRoutes(cfg);
-  yes('staff routes read back as written', ok.ports.length === 2 && ok.routes[0].minutes === 30 && ok.routes[0].crew[0] === 'fb18:CFTO.esp');
-  yes('an empty list is a world with no ships, not an error', checkRoutes({ v: 1, ports: [], routes: [] }).routes.length === 0);
-  yes('a route with no crew is allowed', checkRoutes({ v: 1, ports: cfg.ports, routes: [{ from: 'windhelm', to: 'solitude', minutes: 45 }] }).routes[0].crew.length === 0);
-  const bad = (what, edit) => { const x = JSON.parse(JSON.stringify(cfg)); edit(x); refused('staff routes are refused whole when ' + what, () => checkRoutes(x)); };
-  bad('a route names a port that is not on the list', x => { x.routes[0].to = 'dawnstar'; });
-  bad('a port is listed twice', x => { x.ports.push(x.ports[0]); });
-  bad('a route is listed twice', x => { x.routes.push(x.routes[0]); });
-  bad('a leg takes no time', x => { x.routes[0].minutes = 0; });
-  bad('a leg is longer than a week', x => { x.routes[0].minutes = 7 * 24 * 60 + 1; });
-  bad('a port is in no hold', x => { x.ports[0].hold = 'cyrodiil'; });
-  bad('a crew member is not a reference', x => { x.routes[0].crew = ['Captain']; });
-  bad('a field nobody reads is added', x => { x.schedule = 'noon'; });
+  // ================================================================== G
+  const none = T.openRegister(null);
+  yes('G1 no register is no ports, no routes, no holds', JSON.stringify(T.countsOf(none)) === JSON.stringify({ holds: 0, sailing: 0, aboard: 0, pending: 0, out: 0, ports: 0, routes: 0 }));
+  throws('G2 a register that is not one is refused, not read as empty', function () { T.openRegister('{"v":1}'); }, /register/);
+  let reg = T.adoptRoutes(none, ROUTES);
+  yes('G3 a confirmed staff list becomes the list in force', T.countsOf(reg).ports === 3 && T.countsOf(reg).routes === 3);
+  reg.ships.open(reg.state, 'ship-4', 'windhelm');
+  reg.ships.load(reg.state, 'ship-4', { by: BRYNJA, for: ONUND, receipt: 'g1', entry: { baseId: IRON, count: 1 } });
+  const text = T.saveRegister(reg);
+  yes('G4 the register saves and reads back the same', T.saveRegister(T.openRegister(text)) === text);
+  throws('G5 an edit that strands a hold is refused', function () { T.adoptRoutes(reg, edit); }, /strands/);
+  const bad = JSON.parse(text); bad.routes.ports = bad.routes.ports.filter(function (x) { return x.key !== 'windhelm'; });
+  bad.routes.routes = bad.routes.routes.filter(function (r) { return r.from !== 'windhelm' && r.to !== 'windhelm'; });
+  throws('G6 a register whose manifest names a port its list does not have is refused', function () { T.openRegister(JSON.stringify(bad)); }, /Hold ship-4/);
 
-  const ships2 = createTradeCargo({ ports: ok.ports.map(p => p.key), routes: ok.routes });
-  const t = ships2.empty();
-  ships2.open(t, 'h', 'windhelm');
-  ships2.load(t, 'h', { by: 'P', for: 'Q', receipt: 'r', entry: ore });
-  refused('with staff routes in force, a hold sails only a route staff listed', () => ships2.depart(t, 'h', 'solitude', 0, 10), /No voyage/);
-  {
-    const u = ships.empty();
-    ships.open(u, 'm', 'solitude');
-    ships.load(u, 'm', { by: 'P', for: 'Q', receipt: 'r', entry: ore });
-    refused('staff cannot amend a voyage that has not started', () => ships.amend(u, 'm', { arriveAt: 50 }), /not at sea/);
-    ships.depart(u, 'm', 'windhelm', 0, 100);
-    ships.amend(u, 'm', { to: 'dawnstar', arriveAt: 500 });
-    yes('staff can turn a ship to another port and another time, for the story', u.holds.m.sailing.to === 'dawnstar' && u.holds.m.sailing.arriveAt === 500);
-    refused('but not back to where it left', () => ships.amend(u, 'm', { to: 'solitude' }), /No voyage/);
-    refused('and not to arrive before it left', () => ships.amend(u, 'm', { arriveAt: 0 }), /after it left/);
-    yes('and what is aboard is untouched', ships.aboard(u, 'm')[0].entry.count === 20 && same(ships.arrive(u, 499), []) && same(ships.arrive(u, 500), ['m']));
+  // ================================================================== B
+  const gm = fs.readFileSync(path.join(REPO, 'game', 'gamemode.js'), 'utf8').split(String.fromCharCode(13)).join('');
+  const a = gm.indexOf('// ==== thornswood trade ships ====');
+  const z = gm.indexOf('// ==== end thornswood trade ships ====');
+  yes('B0 the trade ships block is in gamemode.js, after the dungeon loot', a > 0 && z > a && a > gm.indexOf('// ==== end thornswood dungeon loot ===='));
+  const blockSrc = gm.slice(a, z);
+  function start(dir, opt) {
+    opt = opt || {};
+    const logged = [];
+    const box = {
+      console: { log: function () { logged.push(Array.prototype.join.call(arguments, ' ')); } },
+      require: require, Buffer: Buffer,
+      log: function () { logged.push(Array.prototype.join.call(arguments, ' ')); },
+      mp: { getServerSettings: function () { return Object.assign({ privDir: 'private' }, opt.settings || {}); } }
+    };
+    if (opt.release) { box.__thornswoodRelease = opt.release; }
+    box.globalThis = box;
+    vm.createContext(box);
+    const back = process.cwd();
+    process.chdir(dir);
+    try { vm.runInContext(blockSrc, box, { filename: 'gamemode.js (trade ships)' }); } finally { process.chdir(back); }
+    return { box: box, logged: logged.filter(function (l) { return /^\[ships\]/.test(l); }) };
   }
+  function server(name, register) {
+    const dir = path.join(scratch, name);
+    fs.mkdirSync(path.join(dir, 'private'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'server-settings.json'), JSON.stringify({ privDir: 'private' }));
+    if (register !== undefined) { fs.writeFileSync(path.join(dir, 'private', 'trade-cargo.json'), register); }
+    return dir;
+  }
+  const FILE = function (dir) { return path.join(dir, 'private', 'trade-cargo.json'); };
 
-  const edit = { v: 1, ports: [cfg.ports[0], port('dawnstar', 'Dawnstar docks', 'dawnstar', 3)],
-    routes: [{ from: 'solitude', to: 'dawnstar', minutes: 40 }] };
-  const p = proposeRoutes(cfg, edit, t);
-  yes('a proposal names every change for staff to confirm',
-      p.changes.some(l => /Add the port Dawnstar/.test(l)) && p.changes.some(l => /Remove the port Windhelm/.test(l)) &&
-      p.changes.some(l => /Add the route solitude to dawnstar, 40/.test(l)) && p.changes.some(l => /Remove the route solitude to windhelm/.test(l)));
-  yes('and names the hold it would strand', p.strands.length === 1 && /h is at windhelm/.test(p.strands[0]));
-  yes('a proposal changes nothing by itself', checkRoutes(cfg).ports.length === 2 && t.holds.h.port === 'windhelm');
-  refused('a proposal of a bad list is refused', () => proposeRoutes(cfg, { v: 1, ports: [], routes: [{ from: 'a', to: 'b', minutes: 1 }] }, null));
+  const e1 = server('empty');
+  let asked = null;
+  const r1 = start(e1, { release: function (part, fn) { asked = { part: part, r: fn(who([BRYNJA.actor], [])) }; } });
+  yes('B1 off by default: no handle, and the load says off with the counts (' + (r1.logged[0] || '') + ')',
+      !r1.box.__thornswoodTradeShips && /^\[ships\] ready, off \("thornswoodTradeShips": true in server-settings\.json switches it on\): 0 port\(s\), 0 route\(s\), 0 hold\(s\)/.test(r1.logged[0] || ''));
+  yes('B2 the release is asked for as part cargo and, with no register, answers done without writing one',
+      !!asked && asked.part === 'cargo' && asked.r.saved === true && !fs.existsSync(FILE(e1)));
+
+  const e2 = server('switched-off', text);
+  const r2 = start(e2, { release: function (part, fn) { asked = { part: part, r: fn(who([ONUND.actor], [])) }; } });
+  const kept = JSON.parse(fs.readFileSync(FILE(e2), 'utf8'));
+  const kl = kept.cargo.holds['ship-4'].lines['1'];
+  yes('B3 with the switch off the release still takes a character off, written through', asked.r.saved === true && asked.r.counts.recipients === 1 && kl.for === null && kl.by.actor === BRYNJA.actor);
+  yes('B4 and the piece is still aboard', kl.aboard === 1 && /1 piece\(s\) aboard/.test(r2.logged[0] || ''));
+
+  const e3 = server('unreadable', '{"v":1,"routes":{},"cargo":{}}');
+  const r3 = start(e3, { release: function (part, fn) { asked = { part: part, r: fn(who([ONUND.actor], [])) }; } });
+  yes('B5 a register that does not verify is said, the release waits, and nothing writes over it',
+      r3.logged.some(function (l) { return /could not be read/.test(l); }) && asked.r.saved === false &&
+      fs.readFileSync(FILE(e3), 'utf8') === '{"v":1,"routes":{},"cargo":{}}');
+  const r3on = start(e3, { settings: { thornswoodTradeShips: true } });
+  yes('B6 and with the switch on there is still no handle on a register that does not verify', !r3on.box.__thornswoodTradeShips);
+
+  const e4 = server('on', text);
+  const r4 = start(e4, { settings: { thornswoodTradeShips: true } });
+  const ts = r4.box.__thornswoodTradeShips;
+  yes('B7 on: the load says on and the handle is up', /^\[ships\] ready, on: 3 port\(s\)/.test(r4.logged[0] || '') && !!ts);
+  ts.depart('ship-4', 'solitude', 10, 20);
+  yes('B8 a change is on disk when it returns', JSON.parse(fs.readFileSync(FILE(e4), 'utf8')).cargo.holds['ship-4'].sailing.to === 'solitude');
+  const disk = fs.readFileSync(FILE(e4), 'utf8');
+  let refused = false;
+  try { ts.load('ship-4', { by: BRYNJA, for: ONUND, receipt: 'g2', entry: { baseId: IRON, count: 1 } }); } catch (e) { refused = true; }
+  yes('B9 a refused change writes nothing', refused && fs.readFileSync(FILE(e4), 'utf8') === disk);
+  yes('B10 the counts read through the handle', ts.counts().sailing === 1 && ts.aboard('ship-4').length === 1);
+  const all = r1.logged.concat(r2.logged, r3.logged, r4.logged).join('\n');
+  yes('B11 the log never says a form id or a profile id', [BRYNJA.actor, ONUND.actor].every(function (n) { return all.indexOf(String(n)) < 0 && all.toLowerCase().indexOf(n.toString(16)) < 0; }) && all.indexOf('5001') < 0);
+
+  // ================================================================== U
+  const u = spawnSync(process.execPath, [path.join(REPO, 'scripts', 'dev', 'Build-TradeCargoGamemode.js'), '--check'], { encoding: 'utf8' });
+  yes('U1 the bundle in gamemode.js is game\\trade-cargo.js as it is' + (u.status ? ': ' + (u.stderr || '').split('\n')[0] : ''), u.status === 0);
+} catch (e) {
+  yes('the harness ran to the end: ' + (e && e.stack || e), false);
 }
-
-// ------------------------------------------------------------- boundaries
-{
-  const src = require('fs').readFileSync(path.join(__dirname, '..', 'game', 'trade-cargo.js'), 'utf8');
-  yes('the manifest never asks the merchant trading code (#1373)', !/merchant-|MERCHANT_/.test(src.replace(/\/\*[\s\S]*?\*\//g, '')));
-  yes('and never touches the world or a pack itself', !/\bmp\.|addItem|takeItem|require\(/.test(src.replace(/\/\*[\s\S]*?\*\//g, '')));
-}
-
-console.log('');
-console.log(pass + ' passed, ' + fail + ' failed');
-process.exit(fail ? 1 : 0);
+done();

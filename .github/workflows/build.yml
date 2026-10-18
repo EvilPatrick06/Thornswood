@@ -413,8 +413,10 @@ jobs:
           # them. A second or two.
           # Issue #511: tests\test-511-trade-cargo.js holds the trade ship manifest
           # (game\trade-cargo.js) to its rule that a cargo never grows: no piece
-          # aboard without a debit receipt, coin refused, two-step hand out, and a
-          # tampered save refused. Under a second.
+          # aboard without a debit receipt, coin refused, two-step hand out, a
+          # tampered save refused, a deleted character taken off with every piece
+          # kept, and the trade ships block of gamemode.js (off by default, its
+          # register never written over) with its bundle current. Under a second.
           $six ='test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
