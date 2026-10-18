@@ -115,15 +115,83 @@ yes('along with the plugin that hands its armour out without a script',
     ia !== null && ia.files.indexOf('AZ_IADistribution.esp') >= 0);
 
 // Nothing else on the page talks about the removed mods as if they ship.
+// The names come from the table's own Out rows (#2703): each mod's name and
+// each of its plugin files, with and without the extension, so a mod newly
+// marked Out is covered without touching this file. OLD keeps the words the
+// five from revision 5 were also called by ("SunHelm's diseases" was the
+// line a74e39cf added above the table, #2703).
 const OLD = /SunHelm|Tavern ?Games|Respawn - Death/;
-const loose = [];
-lines.forEach(function (l, i) {
-  if (!OLD.test(l)) { return; }
-  const r = rows.filter(function (x) { return x.line === i + 1; })[0];
-  if (!r || !isOut(r)) { loose.push(i + 1); }
-});
+function escapeRe(t) { return t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+function outWords(table) {
+  const words = [];
+  table.filter(isOut).forEach(function (r) {
+    words.push(r.mod);
+    r.files.forEach(function (fl) { words.push(fl, fl.replace(/\.(esp|esm|esl)$/i, '')); });
+  });
+  return words.filter(function (w) { return w.length >= 4; });
+}
+function looseLines(pageLines, table) {
+  const words = outWords(table);
+  const named = words.length ? new RegExp(words.map(escapeRe).join('|'), 'i') : null;
+  const out = [];
+  pageLines.forEach(function (l, i) {
+    if (!OLD.test(l) && !(named && named.test(l))) { return; }
+    const r = table.filter(function (x) { return x.line === i + 1; })[0];
+    if (!r || !isOut(r)) { out.push(i + 1); }
+  });
+  return out;
+}
+const loose = looseLines(lines, rows);
 yes('the mods that came out are named nowhere else on the page', loose.length === 0);
 if (loose.length) { console.log('      Known Issues page lines ' + loose.join(', ')); }
+{
+  // Planted: the a74e39cf sentence, and a newly Out mod named in prose.
+  const planted = lines.slice(0, head).concat(['SunHelm\'s diseases went with it.'], lines.slice(head));
+  const plantedRows = rows.map(function (r) { return Object.assign({}, r, { line: r.line + 1 }); });
+  yes('planted: the sentence a74e39cf added above the table is caught', looseLines(planted, plantedRows).indexOf(head + 1) >= 0);
+  const outIa = plantedRows.map(function (r) {
+    return r.mod === 'Immersive Armors' ? Object.assign({}, r, { stands: 'Out. Planted.' }) : r;
+  });
+  const prose = planted.slice(0, head).concat(['Hothtrooper44_Armor_Ecksstra is great.'], planted.slice(head));
+  const proseRows = outIa.map(function (r) { return Object.assign({}, r, { line: r.line + 1 }); });
+  yes('planted: a mod newly marked Out and still named in prose is caught without editing this harness',
+      looseLines(prose, proseRows).indexOf(head + 1) >= 0);
+}
+
+// ------------------------------------------- the collection's own record
+// records/collection-plugins.json is the repository's record of the plugins
+// the collection carries (scripts/mods/New-CollectionPluginRecord.ps1). It is
+// in every checkout, so this half runs on the pull request gate too (#2703):
+// a change that takes a mod out of the record fails here until the page's row
+// for it says Out, and one that brings a mod back fails until it says In.
+function recordProblems(table, record) {
+  const have = new Set(record.map(function (n) { return n.toLowerCase(); }));
+  const problems = [];
+  table.forEach(function (r) {
+    r.files.forEach(function (fl) {
+      const there = have.has(fl.toLowerCase());
+      if (isIn(r) && !there) { problems.push(fl + ' is In on the page and not in the collection record'); }
+      if (isOut(r) && there) { problems.push(fl + ' is Out on the page and still in the collection record'); }
+    });
+  });
+  return problems;
+}
+let RECORD = null;
+try {
+  RECORD = JSON.parse(fs.readFileSync(path.join(REPO_DIR, 'records', 'collection-plugins.json'), 'utf8').replace(/^\uFEFF/, ''))
+    .plugins.map(function (p) { return String(p.name); });
+} catch (e) { RECORD = null; }
+yes('the collection record (records/collection-plugins.json) reads and lists plugins', !!RECORD && RECORD.length > 0);
+const recordWrong = RECORD ? recordProblems(rows, RECORD) : ['no record'];
+yes('every file the page calls In is in the collection record, and every file it calls Out is not', recordWrong.length === 0);
+if (recordWrong.length) { recordWrong.forEach(function (p) { console.log('      ' + p); }); }
+if (RECORD) {
+  const without = RECORD.filter(function (n) { return n.toLowerCase() !== 'az_iadistribution.esp'; });
+  yes('planted: a record that took out a mod the page calls In fails',
+      recordProblems(rows, without).some(function (p) { return /AZ_IADistribution\.esp is In/.test(p); }));
+  yes('planted: a record that brought back a mod the page calls Out fails',
+      recordProblems(rows, RECORD.concat(['TavernGames.esp'])).some(function (p) { return /TavernGames\.esp is Out/.test(p); }));
+}
 yes('there is no section of mods that do not work as installed',
     !/do not work as installed/i.test(text));
 yes('and nothing says what to do about them is not settled yet',
