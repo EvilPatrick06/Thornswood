@@ -674,24 +674,27 @@ if (social && trade) {
   yes('D3: a differently mapped client actor arms the prompt with its server ID', target === 'ff000004' && !!prompt && prompt.n === 'Second');
   const va=FRONT.indexOf('  function lookVerb(cmd) {'), vb=FRONT.indexOf('\n  }',va);
   const scripts=[], lines=[], notices=[];
-  const page={ thornswoodNet: { say(line, auto) { lines.push({line,auto}); return true; } },
+  const page={ thornswoodNet: { say(line, how) { lines.push({line,quiet:!!(how&&how.quiet)}); return true; } },
     skyrimPlatform: { sendMessage(target, text) { notices.push(text); } } };
   const T={ready:true,js(code){ scripts.push(code); new Function('window',code)(page); return true; }};
   const verb = new Function('T','lookingAt','tellServer','say','note',FRONT.slice(va,vb+4)+'; return lookVerb;')(
-    T,'ff000004',line=>lines.push({line,auto:true}),()=>{},text=>notices.push(text));
+    T,'ff000004',line=>lines.push({line,quiet:true}),()=>{},text=>notices.push(text));
   verb('friend'); verb('trade');
   yes('D3: friend and trade key actions send the server target through chat', lines.length===2 && lines[0].line==='/friend ff000004' && lines[1].line==='/trade ff000004');
-  yes('D3: deliberate actions use the chat connection feedback rather than silent telemetry', lines.every(x=>x.auto!==true));
+  yes('D3: deliberate actions use the chat connection feedback rather than silent telemetry', lines.every(x=>x.quiet!==true));
   // Run chat's real offline queue path, not a stand-in acknowledgement.
   const chat = fs.readFileSync(path.join(REPO_DIR, 'game', 'ui', 'thornswood-chat.js'), 'utf8');
-  const sa = chat.indexOf('    say: function (text, auto)'), sb = chat.indexOf('    state: function', sa);
+  // send is what say and typed share since #2732; the methods are lifted with it.
+  const fa = chat.indexOf('  function send(text, press, notice) {'), fb = chat.indexOf('  window.thornswoodNet = {', fa);
+  const sa = chat.indexOf('    say: function (text, how)'), sb = chat.indexOf('    state: function', sa);
   const offline = new Function('note',
-    'var ws=null, joined=false, queue=[]; const ROLL=/^\\/roll /, C_WARN="warn"; ' +
+    'var ws=null, joined=false, queue=[]; const ROLL=/^\\/roll /, C_WARN="warn"; ' + chat.slice(fa,fb) +
     'return {net:{' + chat.slice(sa,sb) + '},queue};')(text=>notices.push(text));
   page.thornswoodNet = offline.net;
   verb('friend');
-  yes('D3: an offline deliberate action is queued once and visibly acknowledged',
-    offline.queue.length===1 && offline.queue[0]==='/friend ff000004' && notices.length===1 && /queued/.test(notices[0]));
+  yes('D3: an offline deliberate action is queued once, marked as a press, and visibly acknowledged',
+    offline.queue.length===1 && offline.queue[0].text==='/friend ff000004' && offline.queue[0].press===true &&
+    notices.length===1 && /queued/.test(notices[0]));
   notices.length=0;
   delete page.thornswoodNet; verb('friend');
   yes('D3: an unavailable command transport reports that the action could not be sent', notices.length===1);

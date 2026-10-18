@@ -385,7 +385,7 @@ if (TELL) {
   yes('3 three lines the plugin sent by itself while the socket was down say nothing',
       c.count(QUEUED) === 0);
 
-  c.net.say('hello, is anybody here');
+  c.net.typed('hello, is anybody here');
   yes('3 a line the person typed is told it is queued, once', c.count(QUEUED) === 1);
 
   c.up();
@@ -409,7 +409,7 @@ if (TELL) {
   c.retry(); c.drop();
   yes('3 a real outage is said once, not once per failed retry', c.count(LOST) === 1);
   tellServer('/place outdoors - 1 0 0 -');
-  c.net.say('/me waits');
+  c.net.typed('/me waits');
   yes('3 during it, the plugin\'s line is quiet and the typed one is told',
       c.count(QUEUED) === 2);
   c.retry();
@@ -422,11 +422,11 @@ if (TELL) {
 // ------------------------------------------------ who else calls say, by text
 {
   // The bridge sends what was typed into the chat box. It must stay a typed
-  // line, so it passes the text and nothing else.
+  // line, so it goes through typed, the one door for that (#2732).
   const bridge = read(path.join(REPO_DIR, 'game', 'ui', 'thornswood-bridge.js'));
   yes('3 the chat box still sends a typed line as a typed line',
-      /window\.thornswoodNet\.say\(text\);/.test(bridge) &&
-      /window\.thornswoodNet\.say\(held\.shift\(\)\);/.test(bridge));
+      /window\.thornswoodNet\.typed\(text\);/.test(bridge) &&
+      /window\.thornswoodNet\.typed\(held\.shift\(\)\);/.test(bridge));
   // The panels are somebody pressing a button, which is theirs, so they keep the notice.
   const panels = ['thornswood-journal.js', 'thornswood-party.js', 'thornswood-trade.js'];
   // Read as every say call the panel makes passing the line and nothing
