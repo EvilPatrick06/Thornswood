@@ -1284,7 +1284,18 @@ namespace Thornswood
                 && !KindsDue()
                 && DeploymentStamp(src) == Recorded("deployment")
                 && Recorded("deployment") != 0)
+            {
+                // The files are Vortex's, but its plugin list can change with
+                // nothing deployed: enabling a plugin, or a reinstall that
+                // Vortex re-enables. On 17 Oct a release folder kept a list
+                // from a minute when Thornswood-Content.esp was missing, the
+                // Ship built from it refused, and every later refresh came
+                // through here and never copied the list again. So the list
+                // is copied on this path too. It is two small files, and
+                // copying them writes nothing but Profile\OwnGame.
+                BakeVortexList();
                 return "Thornswood's own Skyrim folder already matches what Vortex has deployed.";
+            }
 
             string why = WhyNot(cfg, src);
             if (why != null) throw new Exception(why);
@@ -1886,10 +1897,22 @@ namespace Thornswood
             }
             catch (Exception ex) { Swallow.Note("OwnGame.SettleSettings, copy shipped ini", ex); }
 
-            // Vortex's Thornswood profile list, for Publish-Update on a machine
-            // that ships (#557). Windows' live plugins.txt follows whichever
-            // Vortex profile is active; the named Thornswood profile is the
-            // collection's order. Nothing here writes to Vortex.
+            BakeVortexList();
+
+            if (!first) return;
+            SettleFirstSettings();
+        }
+
+        /// <summary>
+        /// Vortex's Thornswood profile list, for Publish-Update on a machine
+        /// that ships (#557), copied into Profile\OwnGame. Windows' live
+        /// plugins.txt follows whichever Vortex profile is active; the named
+        /// Thornswood profile is the collection's order. Nothing here writes
+        /// to Vortex. Run on every refresh, the one that finds nothing to
+        /// bring in included, since the list changes without a deployment.
+        /// </summary>
+        static void BakeVortexList()
+        {
             try
             {
                 string tw = Checks.VortexProfileDir("Thornswood");
@@ -1917,9 +1940,11 @@ namespace Thornswood
                 }
             }
             catch (Exception ex) { try { File.AppendAllText(Paths.LogFile, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  OwnGame: baking Thornswood profile list failed: " + ex.Message + Environment.NewLine); } catch { /* the log itself failed; nowhere left to say so */ } }
+        }
 
-            if (!first) return;
-
+        /// <summary>The settings a folder gets only when it is made (SettleSettings(true)).</summary>
+        static void SettleFirstSettings()
+        {
             // Skyrim's own ini files, so the first session is not on defaults.
             try
             {
