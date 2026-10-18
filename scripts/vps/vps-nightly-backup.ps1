@@ -1,4 +1,4 @@
-﻿<#
+<#
   vps-nightly-backup.ps1
 
   Runs on the VPS, once a night, as the scheduled task that Install-Backup.ps1
@@ -21,6 +21,9 @@
     the site's data       linked Discord accounts, the boards, the documents
     the bot's config      bot.env.json
     the bot's join record joins.json, which arrival each person was
+    the deletion record   requests.jsonl, every deletion request carried out
+                          (Delete-Person.ps1, #2351), so a restore reapplies
+                          them before anything starts
     the Caddyfile         whatever is answering on 443 for thornswood.net
 
     the dev server        its world, private, data, server-settings.json and
@@ -61,6 +64,8 @@ param(
   [string]$BotRoot    = 'C:\Thornswood-Bot',
   [string]$CaddyRoot  = 'C:\Thornswood-Caddy',
   [string]$VoiceRoot  = 'C:\Thornswood-Voice',
+  # The record of completed deletion requests (Delete-Person.ps1, #2351).
+  [string]$DeletionRoot = 'C:\Thornswood-Deletions',
   [string]$Out        = 'C:\Thornswood-Backup',
   # The passphrase. Created by Install-Backup.ps1 if it is not already there,
   # and the one thing in all of this that has to be kept somewhere else as
@@ -112,6 +117,10 @@ $stageOwned = $false
 $cap = $MaxFileMB * 1MB
 $took = 0
 $skipped = 0
+# Places the task could not read (#2612). It runs as LOCAL SERVICE with a SID
+# of its own, so a folder that never got its read rule is said, by name, and
+# the run ends non-zero, rather than a smaller backup that looks whole.
+$denied = 0
 
 try {
   [void](New-Item -ItemType Directory -Path $ownedStage)
@@ -120,7 +129,16 @@ try {
   # any data; descendants inherit this ACL even when TEMP is shared.
   $acl = [Security.AccessControl.DirectorySecurity]::new()
   $acl.SetAccessRuleProtection($true, $false)
-  $currentSid = [Security.Principal.WindowsIdentity]::GetCurrent().User
+  $me = [Security.Principal.WindowsIdentity]::GetCurrent()
+  $currentSid = $me.User
+  # As LOCAL SERVICE (#2612) TEMP is shared with every other LOCAL SERVICE
+  # task, the game servers, voice and Caddy among them, so the stage goes to
+  # the task's own SID instead, never to LOCAL SERVICE as a whole.
+  if ($currentSid.Value -eq 'S-1-5-19') {
+    $taskSid = @($me.Groups | Where-Object { $_.Value -like 'S-1-5-87-*' }) | Select-Object -First 1
+    if (-not $taskSid) { throw 'Running as LOCAL SERVICE without a SID of its own, so the stage would be open to every LOCAL SERVICE task. Run Install-Backup.ps1 again.' }
+    $currentSid = [Security.Principal.SecurityIdentifier]::new($taskSid.Value)
+  }
   foreach ($sid in @($currentSid, [Security.Principal.SecurityIdentifier]::new('S-1-5-18'), [Security.Principal.SecurityIdentifier]::new('S-1-5-32-544'))) {
     $rule = [Security.AccessControl.FileSystemAccessRule]::new($sid, 'FullControl', 'ContainerInherit, ObjectInherit', 'None', 'Allow')
     [void]$acl.AddAccessRule($rule)
@@ -135,7 +153,11 @@ function Grab($from, $to, [switch]$Complete) {
     if (-not $Complete -and $item.Length -gt $cap) { Note ("  too big   $from"); $script:skipped++; return }
     $parent = Split-Path -Parent $dest
     if (-not (Test-Path $parent)) { [void](New-Item -ItemType Directory -Path $parent -Force) }
-    Copy-Item -LiteralPath $from -Destination $dest -Force
+    try { Copy-Item -LiteralPath $from -Destination $dest -Force -ErrorAction Stop }
+    catch {
+      if ($_.Exception -is [UnauthorizedAccessException]) { Note "  NO ACCESS $from"; $script:denied++; return }
+      throw
+    }
     $script:took++
     return
   }
@@ -144,7 +166,12 @@ function Grab($from, $to, [switch]$Complete) {
   # FullName is not: cutting by the short length takes the wrong relative
   # path (issue #1156).
   $listedFrom = $item.FullName
-  foreach ($f in (Get-ChildItem -LiteralPath $listedFrom -Recurse -File -EA $(if ($Complete) { "Stop" } else { "SilentlyContinue" }))) {
+  $listErr = $null
+  $files = @(Get-ChildItem -LiteralPath $listedFrom -Recurse -File -EA $(if ($Complete) { "Stop" } else { "SilentlyContinue" }) -ErrorVariable listErr)
+  foreach ($e in @($listErr)) {
+    if ($e.Exception -is [UnauthorizedAccessException]) { Note "  NO ACCESS $($e.TargetObject)"; $script:denied++ }
+  }
+  foreach ($f in $files) {
     if ($f.FullName -match '\\node_modules\\') { continue }
     if (-not $Complete -and $f.Length -gt $cap) { $script:skipped++; continue }
     $rel = $f.FullName.Substring($listedFrom.Length).TrimStart('\')
@@ -171,7 +198,10 @@ function Grab($from, $to, [switch]$Complete) {
       } else { Copy-Item -LiteralPath $f.FullName -Destination $d -Force }
       $n++
     }
-    catch { if ($Complete) { throw }; $script:skipped++ }
+    catch {
+      if ($Complete) { throw }
+      if ($_.Exception -is [UnauthorizedAccessException]) { Note "  NO ACCESS $($f.FullName)"; $script:denied++ } else { $script:skipped++ }
+    }
   }
   $script:took += $n
   Note ("  {0,-42} {1} files" -f $to, $n)
@@ -274,6 +304,11 @@ Grab (Join-Path $BotRoot  'bot.env.json')         'bot\bot.env.json'
 $joins = Join-Path $BotRoot 'data\joins.json'
 if (-not (Test-Path -LiteralPath $joins) -and (Test-Path -LiteralPath (Join-Path $BotRoot 'joins.json'))) { $joins = Join-Path $BotRoot 'joins.json' }
 Grab $joins                                       'bot\joins.json'
+# Every deletion request carried out (#2351). A backup put back holds the
+# people who asked before it was taken; this line is how a restore knows to
+# remove them again, and the copy here is the one that survives the box.
+# A box where nobody has asked yet has none, and that is a "missing" line.
+Grab (Join-Path $DeletionRoot 'requests.jsonl')  'deletions\requests.jsonl'
 # THE CHARACTER REGISTER IS GONE, 23 September, and so are the two files this
 # used to fetch for it: secret.txt, the shared secret it checked against, and
 # owners.json, the register itself. Nothing reads either any more, so backing
@@ -427,6 +462,9 @@ if ($stuck.Count) {
 Note ("  kept      {0} daily, {1} weekly" -f [Math]::Min($daily.Count, $KeepDaily), [Math]::Min($weekly.Count, $KeepWeekly))
 if ($stuck.Count) {
   throw ("Retention failed: {0} backup(s) past the seven daily and four weekly would not delete (listed in {1}). Tonight's backup itself was made." -f $stuck.Count, $failedList)
+}
+if ($denied) {
+  throw ("{0} place(s) could not be read by the backup task (NO ACCESS above). Tonight's backup was made without them. Run Install-Backup.ps1 again, which gives the task read there (#2612)." -f $denied)
 }
 Note '  done. Fetch-Backups.ps1 on the other machine is what gets these off this box.'
 

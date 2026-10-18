@@ -197,7 +197,7 @@ typed on a command line or written on this page.
    .\scripts\deploy\Deploy-Gamemode.ps1
    .\scripts\release\Export-ServerPayload.ps1
    scp (.\scripts\release\Where.ps1 ServerZip) Administrator@<new address>:C:/thornswood-server.zip
-   scp .\scripts\deploy\Install-ThornswoodServer.ps1 .\scripts\deploy\ServerSettings.ps1 .\scripts\deploy\ServerBuild.ps1 .\scripts\deploy\ServerReadyWait.ps1 .\scripts\release\Read-JsonFile.ps1 .\scripts\release\RecordShape.ps1 .\scripts\vps\Roll-Log.ps1 Administrator@<new address>:C:/
+   scp .\scripts\deploy\Install-ThornswoodServer.ps1 .\scripts\deploy\ServerSettings.ps1 .\scripts\deploy\ServerBuild.ps1 .\scripts\deploy\ServerReadyWait.ps1 .\scripts\release\Read-JsonFile.ps1 .\scripts\release\RecordShape.ps1 .\scripts\vps\Server-Log.js Administrator@<new address>:C:/
    ssh Administrator@<new address> "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Install-ThornswoodServer.ps1 -RequirePass on"
    ```
    The last one prints `load order: all <n> plugins present` and registers the
@@ -264,7 +264,9 @@ repository folder, as docs\RESTORING.md "The box is gone" says.
     carries the backup, the passphrase file and the restore scripts to the new
     box; puts back both worlds (Restore-Server.ps1) and the site's data,
     config, uploads and feed store, the bot's settings and join record and the
-    Caddyfile (vps-restore-services.ps1); and deletes its copy from the box
+    Caddyfile (vps-restore-services.ps1); removes again everybody in the
+    record of deletion requests, the backup's merged into the box's
+    (Delete-Person.ps1 -Reapply, #2351); and deletes its copy from the box
     again. It should end `RESTORE BOX OK`. A `GAMEMODE DIFFERS` line means
     step 6 installed a gamemode the old box was not running: ask Patrick
     before step 16.
@@ -442,12 +444,21 @@ are kept. The oldest past five is the only thing that is ever removed. The
 watchdog's files and the door's log are kept a different way, or not at all,
 and are listed below.
 
-- `server.log` (game server, live and dev) and `voice.log` (live and dev)
-  are written by cmd's `>>` from the scheduled task, and Windows will not
-  move a file held that way while the service runs. So `roll-log.ps1`,
-  beside each service, rolls it just before the service starts. A service
-  that runs for days grows one file until its next restart. An install of
-  the game server or of voice rolls its log whatever the size, so the run it
+- `server.log` (game server, live and dev) is written by `server-log.js`
+  beside the server, which the scheduled task runs the server under (#2349).
+  It rolls the file at midnight, at 4 MB and at a start from another day,
+  into `server.log.<when it was rolled>`, and keeps no line in any of them
+  past 30 days: once an hour, and at every roll, each rolled file loses its
+  lines older than that and a file with nothing left is deleted. The engine
+  writes every connecting address into this log, and the privacy page says
+  it is kept for 30 days. What it deleted or cut, and any file it could not
+  change, is a `[server-log]` line in `server.log` itself. An install rolls it
+  whatever the size, so the run it starts has a file of its own.
+- `voice.log` (live and dev) is written by cmd's `>>` from the scheduled
+  task, and Windows will not move a file held that way while the service
+  runs. So `roll-log.ps1`, beside the service, rolls it just before the
+  service starts. A service that runs for days grows one file until its next
+  restart. An install of voice rolls its log whatever the size, so the run it
   starts has a file of its own and the one before is `.1`.
 - `thornswood.log` (the gamemode), `site.log` (the website) and `bot.log`
   roll themselves. The bot's is written by its Windows service,
@@ -464,14 +475,16 @@ and are listed below.
   the file grows until somebody moves it.
 - `.\scripts\vps\Get-Logs.ps1` brings down the current file of each log and,
   for every log that rolls (server, thornswood, voice, site and bot), the
-  rolled `.1` to `.5` the box has, under the same names, so last night's
-  crash in `.1` comes down with the rest. `door.log` does not roll, so only
+  rolled ones the box has, under the same names (`.1` to `.5`, and for the
+  game server `server.log.<when>`, newest first), so last night's crash
+  comes down with the rest. `door.log` does not roll, so only
   its current file comes. Each file is the last 4000 lines unless `-Lines` or
   `-All` asks for more.
 - The site's /sessions page reads a session's game server lines out of
-  `server.log` and, when that is shorter than 4 MB, out of the end of
-  `server.log.1` and the older ones behind it, so a session from before a
-  restart, the crash session included, is still on the page.
+  `server.log` and, when that is shorter than 4 MB, out of the end of the
+  rolled ones behind it, newest first, so a session from before a restart,
+  the crash session included, is still on the page. A session older than 30
+  days has no server lines left.
 - Whether the gamemode can write its log at all is at
   `http://192.135.112.23:3000/thornswood-log.json`, and on 7788 for dev.
   `"ok": false` means thornswood.log has stopped, and `why` says what the

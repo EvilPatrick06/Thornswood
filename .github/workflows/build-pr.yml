@@ -157,15 +157,16 @@ jobs:
         run: |
           # Issue #400. Patrick, 12 October: the name of the SkyMP server
           # Thornswood-Content.esp was salvaged from goes from every file,
-          # records, tests, docs\archive and the plugin included. One read of
-          # every tracked file, text and binary, so it runs here.
+          # records, tests, docs\archive and the plugin included, and on
+          # 15 October (decision C) its two short forms with it. One read of
+          # every tracked file, text, plugins and binary, so it runs here.
           if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
             Write-Host '::error file=tests/test-other-server-name-gone.js::no node on this runner, so the other server''s name was not checked'
             exit 1
           }
           node tests\test-other-server-name-gone.js
           if ($LASTEXITCODE -ne 0) {
-            Write-Host '::error file=tests/test-other-server-name-gone.js::the other server is named again; the lines above say where'
+            Write-Host '::error file=tests/test-other-server-name-gone.js::the other server or one of its short forms is named again; the lines above say where'
             exit 1
           }
 
@@ -302,11 +303,36 @@ jobs:
           # register, recordsasset-provenance.json, by its sha256, so a
           # new or changed one is red until its source, maker, licence and
           # approval are written down, or what is missing is. Under a second.
+          # Issue #2177 again: the two pictures in Data\Platform\Images and
+          # the ChainLink, NoticeIcon and VoiceIcon sprite fonts nothing
+          # uses never ship and every pack deletes them, and OwnGame.Foreign
+          # keeps a refresh from bringing them back.
+          # tests\test-2177-platform-unused.ps1 holds both lists to the same
+          # five. About twenty seconds.
           # Issue #485: the whose-game gate is one copy, in
           # thornswood-front.js, and every other plugin reads it on the first
           # tick and stays idle without it. tests\test-whose-game-gate.js
           # runs each plugin in a sandbox and fails on a second copy or a
           # reader that wakes without the check. Under a second.
+          # Issue #2349: the game server's log keeps nothing past 30 days.
+          # tests\test-2349-server-log.js runs the real server-log.js on a
+          # stand-in server in a temp folder: the roll, the cut, the exit code
+          # handed back, the server ending with the writer, and the privacy
+          # page saying it. A few seconds.
+          # Issue #2351: tests\test-2351-delete-person.ps1 runs the real
+          # Delete-Person.ps1 under Windows PowerShell 5.1 on stand-ins of
+          # every store in a temp folder: the dry run, the deletion, the
+          # record and its reapply after a restore. About half a minute.
+          # Issue #2166: tests\test-2166-retention-fixes.js holds three
+          # retention fixes to what the privacy page already says: trouble.json
+          # ages by 365 days in the hourly sweep on a scratch site (a kept
+          # session's alert stays) and a Discord sign-in no longer sets the
+          # member cookie tw; test-chat-log.js holds the hourly chat prune.
+          # A second.
+          # Issue #2183: tests\test-2183-availability.ps1 holds
+          # Read-Availability.ps1, the reader of the watchdog's down and back
+          # lines, to its counting on made-up lines, under pwsh and Windows
+          # PowerShell 5.1, and to reading only. About ten seconds.
           $six ='test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
@@ -314,17 +340,19 @@ jobs:
                  'test-asset-provenance.js',
                  'test-ship-rules.ps1',
                  'test-2454-fitted-outfits.ps1',
+                 'test-ship-permission-held.ps1',
                  'test-chargen-gone.ps1',
+                 'test-2177-platform-unused.ps1',
                  'test-hand-install-retired.ps1',
                  'test-downgrade-steam-window.ps1', 'test-address-library.ps1', 'test-vortex-folder.ps1',
                  'test-new-box-runbook.ps1', 'test-remote-header.ps1',
                  'test-vps-defaults.ps1', 'test-runner-lock.ps1', 'test-runner-offbox.ps1', 'test-498-buildtools.ps1', 'test-restore-staging.ps1', 'test-deploy-artifact.ps1', 'test-remote-command-map.ps1', 'test-deploy-records.js',
-                 'test-own-folder-alone.ps1', 'test-own-folder-first.ps1', 'test-own-folder-again.ps1', 'test-setup-game-files.ps1', 'test-setup-robocopy.ps1', 'test-sign-pilot.ps1', 'test-prod-parity.ps1', 'test-runner-isolation.ps1', 'test-discord-announced-shared.ps1', 'test-check-build.ps1', 'test-client-build-record.ps1', 'test-npc-runtime.js',
+                 'test-own-folder-alone.ps1', 'test-own-folder-first.ps1', 'test-own-folder-again.ps1', 'test-2627-scan-fix.ps1', 'test-shortcut-icons.ps1', 'test-runtime-keep.ps1', 'test-setup-game-files.ps1', 'test-setup-robocopy.ps1', 'test-sign-pilot.ps1', 'test-prod-parity.ps1', 'test-runner-isolation.ps1', 'test-discord-announced-shared.ps1', 'test-check-build.ps1', 'test-client-build-record.ps1', 'test-npc-runtime.js',
                  'test-mold-key.js', 'test-putback-flora.js', 'test-staff-spells.js', 'test-join-pass-trust.js',
                  'test-npc-shared-runtime.js', 'test-npc-navigation-equivalence.js', 'test-npc-population-runtime.js', 'test-npc-role-titles.js',
                  'test-shared-resource-stock.js', 'test-resource-stock-integration.js',
                  'test-npc-death-policy.js', 'test-vortex-profile-state.ps1',
-                 'test-books.js', 'test-guild-ledger-safety.js', 'test-book-review-regressions.js',
+                 'test-books.js', 'test-guild-ledger-safety.js', 'test-book-review-regressions.js', 'test-2582-nothing-personal-served.js',
                  'test-recipeless-craft.js',
                  'test-npc-merchant-purses.js', 'test-merchant-ledger-storage.js', 'test-npc-merchant-startup.js',
                  'test-npc-activation-staging.js', 'test-merchant-roster-runtime.js', 'test-merchant-retirement-inspection.js', 'test-merchant-ledger-inspection.js', 'test-merchant-ledger-native.js',
@@ -332,6 +360,9 @@ jobs:
                  'test-dungeon-loot.js', 'test-dungeon-reward-safety.js', 'test-dungeon-reward-storage.js', 'test-one-mint.js',
                  'test-1319-pass-switch.js',
                  'test-1319-pass-switch.ps1',
+                 'test-2578-service-principals.ps1',
+                 'test-2612-backup-principal.ps1',
+                 'test-site-account.ps1',
                  'test-1320-pass-one-session.js',
                  'test-1373-scarce-scene.js', 'test-quest-transactions.js', 'test-kill-contracts.js',
                  'test-nobody-makes.js', 'test-614-riekling-shift.js',
@@ -386,7 +417,7 @@ jobs:
                  'test-1588-tools-50.js',
                  'test-1741-encoding.js',
                  'test-1634-apprentice-gui.js',
-                 'test-1637-door-gui.js', 'test-2250-claim-door.js', 'test-2256-locked-for-everyone.js', 'test-2245-drawn-pick.js', 'test-2244-after-mining-measure.js', 'test-item-names.js', 'test-2255-key-mold-models.js', 'test-2254-master-key.js', 'test-2258-house-parts-hidden.js', 'test-2468-last-plugin.js', 'test-2486-last-ships.ps1', 'test-2298-held-board.ps1',
+                 'test-1637-door-gui.js', 'test-2250-claim-door.js', 'test-2256-locked-for-everyone.js', 'test-2245-drawn-pick.js', 'test-2244-after-mining-measure.js', 'test-item-names.js', 'test-2255-key-mold-models.js', 'test-2254-master-key.js', 'test-2258-house-parts-hidden.js', 'test-2553-salvaged-gone.js', 'test-2553-station-sites.js', 'test-content-names.js', 'test-2468-last-plugin.js', 'test-2486-last-ships.ps1', 'test-2298-held-board.ps1',
                  'test-502-no-bounty.js',
                  'test-502-jail-cells.js',
                  'test-502-guard-board.js',
@@ -421,10 +452,13 @@ jobs:
                  'test-1874-hunting-spots.js',
                  'test-1628-social-gui.js',
                  'test-1630-journal-gui.js',
+                 'test-fire-walk.js',
                  'test-1629-party-gui.js',
                  'test-1695-party-ask-id.js',
                  'test-1640-jarl-word.js',
                  'test-1638-office.js',
+                 'test-2551-hold-offices.js',
+                 'test-2551-building-holds.js',
                  'test-1631-needs-gui.js',
                  'test-2267-needs-text.js',
                  'test-1764-away-no-rest.js',
@@ -469,7 +503,7 @@ jobs:
                  'test-1157-session-ends.js',
                  'test-1994-load-refused.js',
                  'test-1894-door-sentence.js',
-                 'test-1180-own-plugins.js',
+                 'test-1180-own-plugins.js', 'test-1715-light-manifest.js',
                  'test-1885-manifest-order.js',
                  'test-1075-script-citations.js',
                  'test-1397-npc-docs-live.js',
@@ -479,19 +513,19 @@ jobs:
                  'test-table-install.js',
                  'test-secrets-fail-closed.js',
                  'test-our-key-menus.js', 'test-slash-key.js', 'test-social-keys.js', 'test-server-pick-order.ps1',
-                 'test-2037-journal-new.js', 'test-2135-journal-press.js', 'test-social.js', 'test-2157-reconfigure.ps1', 'test-2210-links-attributes.ps1', 'test-2210-refresh-scope.ps1',
+                 'test-2037-journal-new.js', 'test-2135-journal-press.js', 'test-social.js', 'test-2157-reconfigure.ps1', 'test-2210-links-attributes.ps1', 'test-2210-refresh-scope.ps1', 'test-2019-ship-roots.ps1', 'test-2586-atomic-records.ps1', 'test-2591-whole-records.ps1',
                  'test-site-auth.js',
                  'test-site-route-gaps.js', 'test-2215-play-pressed-by.ps1',
                  'test-docs-pwfile.ps1', 'test-docs-password.ps1', 'test-2317-rotate-config.ps1',
                  'test-site-credits-fill.js', 'test-deployed-build.ps1', 'test-459-publish-record.ps1',
                  'test-site-headers.js', 'test-generated-source-chain.ps1',
-                 'test-site-render.js', 'test-site-discovery.js', 'test-515-site-looks.js',
+                 'test-site-render.js', 'test-site-discovery.js', 'test-998-patreon-copy.js',
                  'test-home-status.js', 'test-seats.js', 'test-age-gate.js', 'test-download-hash.js', 'test-2233-inuse-image.ps1',
                  'test-download-button.js', 'test-gallery-ux.js', 'test-gallery.js', 'test-site-local.js',
                  'test-release-baseline.ps1', 'test-publish-refusals.ps1', 'test-2513-every-harness-listed.ps1', 'test-release-workflow.ps1',
                  'test-2460-winps-module-path.ps1',
                  'test-feed-watch.js',
-                 'test-session-cards.js', 'test-staff-bans.js', 'test-hub-staff-gallery.js', 'test-known-issues.js', 'test-2414-known-one-copy.js',
+                 'test-session-cards.js', 'test-staff-bans.js', 'test-hub-staff-gallery.js', 'test-known-issues.js', 'test-2414-known-one-copy.js', 'test-2560-roadmap-done.js',
                  'test-join-outage.js', 'test-join-pass-site.js', 'test-open-switch.js', 'test-component-readmes.js',
                  'test-site-front-resilience.js', 'test-site-upload-guard.js',
                  'test-report-limits.js', 'test-site-hangs.js',
@@ -511,6 +545,8 @@ jobs:
                  'test-2309-loadorder-fresh.ps1',
                  'test-459-publish-dist.ps1',
                  'test-459-server-artifact.ps1',
+                 'test-459-store-deploy.ps1',
+                 'test-459-engine-workflow.ps1',
                  'test-2320-short-load-order.ps1',
                  'test-1929-dev-gamemode-note.ps1',
                  'test-1938-server-ready-wait.ps1',
@@ -518,10 +554,15 @@ jobs:
                  'test-package-release-dir.ps1', 'test-no-machine-files.ps1',
                  'test-main-runtime-startup.js',
                  'test-spawn-reply.js',
+                 'test-2623-temporary-spawns.js',
+                 'test-2622-start-spots.js',
                  'test-nightly-stray.ps1',
                  'test-discord-callback-hang.js',
                  'test-member-role-wording.js',
                  'test-page-changed.js',
+                 'test-2349-server-log.js',
+                 'test-2351-delete-person.ps1',
+                 'test-2166-retention-fixes.js',
                  'test-missing-files-stop.ps1',
                  'test-ship-launcher-drift.ps1',
                  'test-client-by-hash.ps1',
@@ -530,7 +571,8 @@ jobs:
                  'test-launcher-icons.js',
                  'test-whose-game-gate.js',
                  'test-gate-list.ps1',
-                 'test-storage-forecast.ps1'
+                 'test-storage-forecast.ps1',
+                 'test-2183-availability.ps1'
           $failed = @()
           foreach ($n in $six) {
             $p = Join-Path 'tests' $n
@@ -735,6 +777,22 @@ jobs:
           New-Item -ItemType Directory -Force -Path (Join-Path $root 'Launcher') | Out-Null
           .\scripts\release\Build-Launcher.ps1 -Root $root -NoPause
           if (-not (Test-Path (Join-Path $root 'Launcher\Thornswood.exe'))) { Write-Host '::error::no Thornswood.exe came out of the build'; exit 1 }
+
+      - name: Build the ship root tool
+        shell: pwsh
+        run: |
+          # Issue #2019. Every Ship builds Thornswood-ShipRoot.exe from
+          # scripts\release\ShipRoot\ShipRoot.csproj, which compiles all of
+          # launcher\app with its own entry point, and runs it on the folder
+          # the release is built from before anything is packed. A launcher
+          # change that stops it compiling would stop every Ship, so it is
+          # built here with the same MSBuild; tests\test-2019-ship-roots.ps1
+          # in the list above runs it on a pretend root.
+          $msb = & .\scripts\release\Find-MSBuild.ps1
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::MSBuild is not on this runner, so the ship root tool cannot be built'; exit 1 }
+          $out = Join-Path $env:RUNNER_TEMP 'shiproot'
+          & $msb scripts\release\ShipRoot\ShipRoot.csproj -nologo -v:minimal -nr:false -p:Configuration=Release ('-p:OutDir=' + $out + '\')
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path (Join-Path $out 'Thornswood-ShipRoot.exe'))) { Write-Host '::error file=scripts/release/ShipRoot/ShipRoot.csproj::the ship root tool did not build, see the lines above'; exit 1 }
 
       - name: Check the manifests in the built exes
         shell: pwsh

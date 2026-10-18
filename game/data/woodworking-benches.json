@@ -160,43 +160,42 @@
    "worldEdid": "Tamriel"
   },
   "riften": {
-   "angle": 270.0,
+   "angle": 272.34,
    "cell": "16bb4:Skyrim.esm",
    "forge": "53481:Skyrim.esm",
-   "forgeAngle": 270.0,
+   "forgeAngle": 2.34,
    "forgeAt": [
-    172349.5,
-    -97063.8,
+    172414.7,
+    -97164.6,
     11128.0
    ],
    "forgeEdid": "CraftingBlackSmithForge",
-   "forgeRecordFrom": "Thornswood-Content.esp",
+   "forgeRecordFrom": "Skyrim.esm",
    "forgeTouchedBy": [
-    "Skyrim.esm",
-    "Thornswood-Content.esp"
+    "Skyrim.esm"
    ],
-   "fromForge": 283,
+   "fromForge": 260,
    "groundUnder": [
     11128.0,
-    11141.0
+    11132.9
    ],
    "nearest": {
-    "edid": "CraftingSmelterMarker1",
-    "ref": "1d86:JKs Skyrim.esp",
-    "units": 43
+    "edid": "Slightpost01",
+    "ref": "23926:JKs Skyrim.esp",
+    "units": 70
    },
    "offset": [
-    280,
-    -40
+    240,
+    100
    ],
    "pos": [
-    172389.5,
-    -96783.8,
+    172658.6,
+    -97074.5,
     11128.0
    ],
-   "turn": 0,
+   "turn": 270,
    "where": "Riften",
-   "why": "The Scorched Hammer's forge. To the smith's right on the same boards, past the smelter, facing the way the forge does.",
+   "why": "The Scorched Hammer's forge, where Skyrim stands it since #2553 (the other server's plugin had moved it 101 units and turned it a quarter turn, onto the spot the bench had). To the smith's right on the same boards, a signpost nearest at 70 units.",
    "worldEdid": "RiftenWorld"
   },
   "riverwood": {
@@ -260,9 +259,9 @@
     -7936.0
    ],
    "nearest": {
-    "edid": "CraftingSmelterMarker1",
-    "ref": "2e99e:Thornswood-Content.esp",
-    "units": 34
+    "edid": "CraftingBlackSmithForge",
+    "ref": "4e3e9:Skyrim.esm",
+    "units": 38
    },
    "offset": [
     20,
@@ -282,19 +281,18 @@
    "angle": 90.0,
    "cell": "1a26f:Skyrim.esm",
    "forge": "c430a:Skyrim.esm",
-   "forgeAngle": 90.0,
+   "forgeAngle": 135.0,
    "forgeAt": [
-    20256.5,
-    -8349.2,
+    20300.7,
+    -8237.8,
     -3622.3
    ],
    "forgeEdid": "CraftingBlackSmithForgeWR",
-   "forgeRecordFrom": "Thornswood-Content.esp",
+   "forgeRecordFrom": "Skyrim.esm",
    "forgeTouchedBy": [
-    "Skyrim.esm",
-    "Thornswood-Content.esp"
+    "Skyrim.esm"
    ],
-   "fromForge": 781,
+   "fromForge": 668,
    "groundUnder": [
     -3626.9,
     -3616.0
@@ -302,24 +300,24 @@
    "nearest": {
     "edid": "WRIntShield05",
     "ref": "1eac:JKs Skyrim.esp",
-    "units": 31
+    "units": 30
    },
    "offset": [
-    -600,
-    500
+    -668,
+    -23
    ],
    "pos": [
-    20756.5,
+    20756.8,
     -7749.2,
     -3626.9
    ],
-   "turn": 0,
+   "turn": 315,
    "where": "Whiterun",
-   "why": "Warmaiden's forge, not the Skyforge. The smithing yard round it is cut up by the tanning rack, the armour bench, the grindstone, the smelter and JK's Skyrim's railings, and searched every 20 units in eight turns no clear spot on the forge's own floor is nearer. This one is north of Warmaiden's shop, by its wall, on the forge's floor, facing the way the forge does.",
+   "why": "Warmaiden's forge, not the Skyforge. The smithing yard round it is cut up by the tanning rack, the armour bench, the grindstone, the smelter and JK's Skyrim's railings, and searched every 20 units in four turns no clear spot within 640 units is on the forge's own floor. This one is north of Warmaiden's shop, by its wall, on the forge's floor, facing north. It is the same spot as before #2553, measured now from where Skyrim stands the forge: until then the forge stood where the other server's plugin had moved and turned it.",
    "worldEdid": "WhiterunWorld"
   },
   "windhelm": {
-   "angle": 180.0,
+   "angle": 0.0,
    "cell": "1691d:Skyrim.esm",
    "forge": "f7798:Skyrim.esm",
    "forgeAngle": 180.0,
@@ -333,28 +331,28 @@
    "forgeTouchedBy": [
     "Skyrim.esm"
    ],
-   "fromForge": 286,
+   "fromForge": 260,
    "groundUnder": [
-    -12271.7,
-    -12257.7
+    -12268.4,
+    -12256.0
    ],
    "nearest": {
-    "edid": "SignWHBlacksmith01",
-    "ref": "ea69a:Skyrim.esm",
-    "units": 97
+    "edid": "CraftingBlacksmithSharpeningWheel",
+    "ref": "f7799:Skyrim.esm",
+    "units": 53
    },
    "offset": [
-    -260,
-    120
+    -100,
+    -240
    ],
    "pos": [
-    131919.1,
-    36095.7,
-    -12271.7
+    131759.1,
+    36455.7,
+    -12268.4
    ],
-   "turn": 0,
+   "turn": 180,
    "where": "Windhelm",
-   "why": "The blacksmith yard's forge, Skyrim's own and untouched by any plugin. To the smith's left, clear of the smelter and the armour bench, the smithy sign nearest at 97 units.",
+   "why": "The blacksmith yard's forge, Skyrim's own and untouched by any plugin. Behind the smith, facing away from the forge, the grindstone nearest at 53 units. Until #2553 it stood to the smith's left; Skyrim's tanning rack there is back at its own size and place, 15 units from that table, since the other server's plugin no longer shrinks and moves it.",
    "worldEdid": "WindhelmWorld"
   }
  },
@@ -616,8 +614,8 @@
   },
   {
    "name": "Thornswood-Content.esp",
-   "sha256": "37aa6a4531ae796d8e371afa4486305193c6e96a2e650abc55c93ed4542d80a8",
-   "size": 151225
+   "sha256": "491e5c78915a2dea1104ec44e4304728ac44ddfddf4ee594c7f81b5e8c2a7cb3",
+   "size": 110915
   },
   {
    "name": "Populated Cities Towns Villages Legendary.esp",
@@ -871,7 +869,7 @@
   },
   {
    "name": "Thornswood-Last.esp",
-   "sha256": "0c57943b5db6bda31e5186159501d3879b219fc5f0521b94225475c73035dcf4",
+   "sha256": "ebcfbe2562a1a999d06cfe90fd740ce46265201687ff834c0bc9d96558b9c77f",
    "size": 5984128
   },
   {
@@ -886,7 +884,7 @@
  "readFrom": "game/data/last-plugin.json loadOrder, then Thornswood-Last.esp, Thornswood-WoodworkerTrail.esp; Thornswood-Content.esp, Thornswood-Last.esp, Thornswood-WoodworkerTrail.esp from game/content",
  "rule": "Each bench stands beside a forge, at offset (x to the smith's right, y the way the smith faces) and turn from the forge's winning record. Its outline (x -75 to 85, y 8 to 88) and its user's place (x -35 to 35, y -55 to 8) lie on the navmesh, on ground flat to 16 units and within 60 of the forge's height, and touch no furniture, container, door, item or static under 250 by 250 (larger statics, and anything over 600 units on a side, are the navmesh's), nor where anybody stands at another bench or the way through a door, from 6 to 140 units above the floor, with 30 units round the table. It stands on the lowest of those samples.",
  "skipped": {
-  "dragonbridge": "both forges (aa57:Thornswood-Content.esp and 531b:JKs Skyrim.esp) stand on sloping ground; the nearest clear flat spot is 725 units away out in the field, which is not beside a forge.",
+  "dragonbridge": "its forge (531b:JKs Skyrim.esp) stands on sloping ground; the nearest clear flat spot is 725 units away out in the field, which is not beside a forge. The second forge, aa57 in Thornswood-Content.esp, was the other server's and left with its placements (#2553).",
   "ivarstead": "no forge and no anvil: no placed reference carrying CraftingSmithingForge stands in Ivarstead.",
   "rorikstead": "no forge of Skyrim's own. JK's Skyrim's anvil yard (62b1:JKs Skyrim.esp) sits on a raised ledge, and no clear flat ground of the bench's size lies within 640 units of it on that ledge.",
   "winterhold": "no forge: JK's Skyrim's smithing anvil (89c2:JKs Skyrim.esp) stands inside a shack of its own, and no clear flat ground of the bench's size lies within 640 units of it on its floor."

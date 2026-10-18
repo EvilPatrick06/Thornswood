@@ -27,7 +27,7 @@ for(const failure of ['trading','native','retirement','population','runtime',nul
       if(failure==='runtime')throw new Error('runtime failure');
       assert.equal(options.suspended,true);return {stop(){stopped=true;},start(){return true;}};
     },
-    require,setTimeout,clearTimeout,log() {}};
+    require,setTimeout,clearTimeout,serverRunId:()=>"test-run",removeSpawned(){},log() {}};
   vm.createContext(ctx);vm.runInContext(manifest,ctx);vm.runInContext(startup,ctx);
   if(failure) {
     assert.equal(ctx.__thornswoodNpcMerchants,null,'Failed startup must not expose a merchant service');
@@ -53,14 +53,14 @@ for(const failure of ['trading','native','retirement','population','runtime',nul
     createNpcMerchantPurses:()=>({shutdown(){}}),createNpcPopulation:()=>({commit(){},stop(){}}),
     MERCHANT_TRADING:{installMerchantTrading:()=>({shutdown(){},nativeReady:()=>true,start(){}})},
     startSharedNpcServerRuntime:()=>({stop(){},start:()=>true}),
-    require,setTimeout,clearTimeout,log(){}};
+    require,setTimeout,clearTimeout,serverRunId:()=>"test-run",removeSpawned(){},log(){}};
   vm.createContext(ctx);vm.runInContext(manifest,ctx);vm.runInContext(startup,ctx);
   assert.deepEqual(Array.from(references),['1:Skyrim.esm','2:Skyrim.esm'],'startup retains the complete historical initialization manifest');
 }
 {
   let revoked=false;
   const ctx={mp:{getServerSettings:()=>({thornswoodServer:'unsupported'})},
-    __thornswoodMerchantTrade:{shutdown(){revoked=true;}}, require,setTimeout,clearTimeout,log(){}};
+    __thornswoodMerchantTrade:{shutdown(){revoked=true;}}, require,setTimeout,clearTimeout,serverRunId:()=>"test-run",removeSpawned(){},log(){}};
   vm.createContext(ctx); vm.runInContext(startup,ctx);
   assert.equal(revoked,true,'changing channel must revoke the old native writer before the new channel gate');
   assert.equal(ctx.__thornswoodMerchantTrade,null);
@@ -84,7 +84,7 @@ for(const failure of ['trading','native','retirement','population','runtime',nul
       populations.push(service);return service;},
     startSharedNpcServerRuntime(){const service={alive:true,started:false,stop(){this.alive=false;},
       start(){this.started=true;return true;}};runtimes.push(service);return service;},
-    require,setTimeout,clearTimeout,log:line=>logs.push(line)};
+    require,setTimeout,clearTimeout,serverRunId:()=>"test-run",removeSpawned(){},log:line=>logs.push(line)};
   vm.createContext(ctx);vm.runInContext(manifest,ctx);vm.runInContext(startup,ctx);
   assert.equal(replaced,true,'native preflight callback reproduces a new startup');
   for(const [key,instances] of [['__thornswoodNpcMerchants',merchants],['__thornswoodMerchantTrade',trades],

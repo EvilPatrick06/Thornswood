@@ -615,7 +615,13 @@ if (Test-Path $orderSrc) {
         if (Test-ShipLastPluginHeld $RepoDir) {
             $lastEnabled = @(Get-Content -LiteralPath $shippedList | ForEach-Object { $_.Trim() } |
                              Where-Object { $_.StartsWith('*') } | ForEach-Object { $_.Substring(1).Trim() })
-            $lastProblem = Get-ShipLastPluginProblem $RepoDir $lastEnabled
+            $lastCcc = @()
+            $lastCccPath = Join-Path $GameDir 'Skyrim.ccc'
+            if (Test-Path -LiteralPath $lastCccPath) {
+                $lastCcc = @(Get-Content -LiteralPath $lastCccPath | ForEach-Object { "$_".Trim() } |
+                             Where-Object { $_ -and (Test-Path -LiteralPath (Join-Path $GameDir ('Data\' + $_))) })
+            }
+            $lastProblem = Get-ShipLastPluginProblem $RepoDir $lastEnabled $lastCcc
             if ($lastProblem) { throw ('LASTPLUGIN ' + $lastProblem) }
             Say ("  {0} was built against this release's load order and the collection's bytes" -f $ShipLastPlugin) 'DarkGray'
         }
@@ -2400,8 +2406,8 @@ if ($profileChanged.Count) {
             # line above had its + outside brackets, so PowerShell read '+' as a
             # colour and threw, and that throw was the only thing between two dev
             # releases and every tester being refused at connect: the list had 7
-            # plugins of another server switched on (its own start plugin, KzlHorses,
-            # SunHelm...), taken from Vortex's deployment because that server's
+            # plugins of another server switched on (its own start plugin, its
+            # horses plugin, SunHelm...), taken from Vortex's deployment because that server's
             # collection is
             # deployed to the same Steam copy. version.json is written and not
             # pushed, so nobody has it; the assets are up and nothing points at

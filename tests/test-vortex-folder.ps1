@@ -591,13 +591,10 @@ namespace Thornswood
             Yes("it carries the folder for Fix, and blocks as the missing plugins already do",
                 first != null && string.Equals(VortexFolderOf(first), k, StringComparison.OrdinalIgnoreCase) && first.Blocking);
             Yes("the words are the house words: no em dash, never player", first != null && Clean(first.Text));
-            bool one = false, two = false;
-            for (int i = 1; i < issues.Count; i++)
-            {
-                if (issues[i].Text.StartsWith("TsOne.esp", StringComparison.Ordinal)) one = true;
-                if (issues[i].Text.StartsWith("TsTwo.esm", StringComparison.Ordinal)) two = true;
-            }
-            Yes("the plugins missing from the Steam copy are still listed after it", one && two);
+            // Since #2627 (#2403) nothing of the Steam copy's is judged while
+            // there is no folder of its own: the folder is what Fix makes,
+            // and the plugins are judged in it.
+            Yes("and nothing after it: the plugins missing from the Steam copy are not judged there", issues.Count == 1);
             Yes("DeploysElsewhere answers the same folder", string.Equals(DeploysElsewhere(s.Cfg), k, StringComparison.OrdinalIgnoreCase));
 
             string log = File.Exists(Paths.LogFile) ? File.ReadAllText(Paths.LogFile) : "";
@@ -852,7 +849,7 @@ namespace Thornswood
             Put(Path.Combine(steam, anim), "ANIMATION");
             Put(Path.Combine(steam, "_Parked\\Multiplayer\\Platform\\voice-token.txt"), "PARKED-TOKEN");
             Put(Path.Combine(steam, "_Profile Switch\\Switch.ps1"), "SWITCH");
-            Put(Path.Combine(steam, "Data\\_disabledByKzl\\ccParked.esm"), "PARKED-CC");
+            Put(Path.Combine(steam, "Data\\_disabledByOtherServer\\ccParked.esm"), "PARKED-CC");
             Put(Path.Combine(steam, "Data\\_ResourcePack.esl"), "GAME-RESOURCEPACK");
             // The behavior output is Thornswood's, from a pack, as the shipping
             // machine's Nemesis output is: since #1232 a file in the Steam copy
@@ -1047,17 +1044,26 @@ try {
 
     # ---- the launcher's side, read from the source ----------------------------
     $shell = [IO.File]::ReadAllText((Join-Path $AppPath 'Shell.cs'))
+    # Scan and Fix moved to ShellScanFix.cs with #2627; a tree from before it
+    # has them in Shell.cs.
+    $scanFixCs = Join-Path $AppPath 'ShellScanFix.cs'
+    if (Test-Path -LiteralPath $scanFixCs) { $shell += [IO.File]::ReadAllText($scanFixCs) }
+    $verifyCs = [IO.File]::ReadAllText((Join-Path $AppPath 'Verify.cs'))
     $own = [IO.File]::ReadAllText((Join-Path $AppPath 'ShellOwnGame.cs'))
     $xamlPath = Join-Path (Split-Path -Parent $AppPath) 'ui.xaml'
     $xaml = if (Test-Path -LiteralPath $xamlPath) { [IO.File]::ReadAllText($xamlPath) } else { '' }
     $down = [IO.File]::ReadAllText((Join-Path $AppPath 'Downgrade.cs'))
 
     Yes 'after Fix points it at the folder, the launcher makes the own folder the way Make it does (AskOwnGame)' `
-        ($shell -match 'if\s*\(\s*Verify\.OwnFolderNext\s*\)\s*AskOwnGame\(\s*false\s*\)')
+        ($shell -match 'if\s*\(\s*Verify\.OwnFolderNext\s*\)\s*\{?\s*AskOwnGame\(\s*false\s*\)')
+    # Since #2627 the Fix button is on whenever an issue on the card is one
+    # Fix can do something about, and the folder Vortex deploys into is one.
     Yes 'Scan keeps Fix pressable when the missing mods are in the folder Vortex deploys into' `
-        (($shell -match 'VortexFolder\s*!=\s*null') -and ($shell -match 'btnFix\.IsEnabled\s*=\s*blocking\s*>\s*0\s*&&\s*\(!onlyAbsent\s*\|\|\s*elsewhere\)'))
-    Yes 'Fix stays off only when every blocking problem is a mod that is not installed' `
-        ($shell -match 'bool onlyAbsent = absent > 0 && fixable == 0')
+        (($shell -match 'btnFix\.IsEnabled\s*=\s*canFix\s*>\s*0') -and
+         ($verifyCs -match '(?s)i\.VortexFolder = into;') -and
+         ($verifyCs -match '(?s)Issue\.Of\(IssueKind\.OwnFolder, "Vortex deploys into " \+ into[^;]*"Fix will make Thornswood''s own Skyrim folder'))
+    Yes 'Fix stays off only when nothing on the card is something Fix can do' `
+        ($shell -match 'if \(i\.Fixable && !triedByFix\.Contains\(FixKey\(i\)\)\) canFix\+\+;')
     Yes 'Settings has Choose Vortex''s folder and Forget the chosen folder' `
         (($xaml -match 'x:Name="BtnOwnGamePick"') -and ($xaml -match 'x:Name="BtnOwnGameForget"') -and
          ($own -match 'F<Button>\("BtnOwnGamePick"\)') -and ($own -match 'F<Button>\("BtnOwnGameForget"\)'))

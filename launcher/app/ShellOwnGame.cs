@@ -24,19 +24,20 @@ namespace Thornswood
         // background answer compares it on the way back through the Dispatcher.
         static int ownGameDrawGen;
         static TextBlock txtOwnGameState;
-        static Button btnOwnGameMake, btnOwnGameRefresh, btnOwnGamePick, btnOwnGameForget;
+        static Button btnOwnGameMake, btnOwnGamePick, btnOwnGameForget;
 
         static void WireOwnGame()
         {
             txtOwnGameState = F<TextBlock>("TxtOwnGameState");
             btnOwnGameMake = F<Button>("BtnOwnGameMake");
-            btnOwnGameRefresh = F<Button>("BtnOwnGameRefresh");
             btnOwnGamePick = F<Button>("BtnOwnGamePick");
             btnOwnGameForget = F<Button>("BtnOwnGameForget");
             var panel = F<StackPanel>("PnlOwnGame");
 
             if (btnOwnGameMake != null) btnOwnGameMake.Click += delegate { AskOwnGame(false); };
-            if (btnOwnGameRefresh != null) btnOwnGameRefresh.Click += delegate { StartOwnGame(false, true); };
+            // Bring it up to date from Vortex had a button of its own on
+            // Diagnostics until 17 Oct (#2627). Scan finds a folder behind
+            // Vortex and Fix brings it up to date, so the button went.
             if (btnOwnGamePick != null) btnOwnGamePick.Click += delegate { PickVortexFolder(); };
             if (btnOwnGameForget != null) btnOwnGameForget.Click += delegate { ForgetVortexFolder(); };
             if (panel != null) panel.IsVisibleChanged += delegate { if (panel.IsVisible) DrawOwnGame(); };
@@ -104,9 +105,20 @@ namespace Thornswood
             ThreadPool.QueueUserWorkItem(delegate
             {
                 bool refresh = false, offer = false;
+                string refused = null;
                 try
                 {
-                    if (active) refresh = OwnGame.NeedsRefresh(c);
+                    // Vortex deploying into a Thornswood folder is refused
+                    // (#2210), and said at every start, because the folder then
+                    // never follows Vortex until it is pointed back.
+                    if (active) refused = OwnGame.RefusedSource(c);
+                    if (refused != null)
+                    {
+                        string say = refused;
+                        try { win.Dispatcher.BeginInvoke((Action)delegate { Log(say); }); }
+                        catch (Exception ex) { Swallow.Note("ShellOwnGame.OwnGameAtStart, refused BeginInvoke", ex); }
+                    }
+                    else if (active) refresh = OwnGame.NeedsRefresh(c);
                     // A yes given in the setup window (MakeOwnGame) is newer
                     // than a no left in the profile by an earlier install.
                     else if (collection && (!OwnGame.Declined || c.MakeOwnGame))
@@ -136,8 +148,9 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// The same bring-up-to-date Diagnostics runs (BtnOwnGameRefresh,
-        /// StartOwnGame(false, true)). True when Play must stop for that work.
+        /// The same bring-up-to-date Fix runs on Diagnostics when Scan finds
+        /// the folder behind Vortex (#2627). True when Play must stop for that
+        /// work.
         ///
         /// OwnGameAtStart does this once when the window is first shown.
         /// Play never asked, so a collection Vortex had already deployed
@@ -192,7 +205,7 @@ namespace Thornswood
                 // Just brought up to date for this same press, and it still
                 // does not match. Starting it again would go round for ever.
                 Log("Thornswood's own Skyrim folder still does not match what Vortex has deployed after bringing it up to date. " +
-                    "Press Bring it up to date from Vortex on Diagnostics, and send the launcher log if it keeps saying this.");
+                    "Press Scan, then Fix, on Diagnostics, and send the launcher log if it keeps saying this.");
                 return true;
             }
             StartOwnGame(false, true, delegate
@@ -344,22 +357,29 @@ namespace Thornswood
         /// <param name="then">Run on the window's thread once a bring-up-to-date has succeeded, or null. Not run when it fails, and never after a make, which restarts the launcher.</param>
         static void StartOwnGame(bool make, bool loud, Action then)
         {
-            if (ownGameBusy) return;
+            StartOwnGame(make, loud, then, null);
+        }
+
+        /// <param name="failed">Run on the window's thread when a bring-up-to-date that started did not succeed, or null; Fix carries on from there (#2627).</param>
+        /// <returns>True when the work started; false when something in the way was said instead, and neither <paramref name="then"/> nor <paramref name="failed"/> will run.</returns>
+        static bool StartOwnGame(bool make, bool loud, Action then, Action failed)
+        {
+            if (ownGameBusy) return false;
             // The downgrade puts 1.6.1170's files into this folder, or, before
             // there is one, makes it from them itself when it is done (#1218).
             if (Downgrade.Busy)
             {
-                Log("Skyrim 1.6.1170 is being fetched for Thornswood's own folder. Bring it up to date from Vortex in Settings once that is done; the launcher also does it by itself the next time it starts.");
-                return;
+                Log("Skyrim 1.6.1170 is being fetched for Thornswood's own folder. Press Scan, then Fix, on Diagnostics once that is done; the launcher also brings the folder up to date by itself the next time it starts.");
+                return false;
             }
             if (playing || Checks.GameRunning())
             {
                 string msg = "Close Skyrim first, then " + (make ? "make" : "update") + " Thornswood's own folder. " + Checks.StuckReport();
                 Log(msg);
                 if (loud) MessageBox.Show(msg, "Thornswood", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
+                return false;
             }
-            if (!make && !OwnGame.Active) { Log("Thornswood does not have its own Skyrim folder yet."); return; }
+            if (!make && !OwnGame.Active) { Log("Thornswood does not have its own Skyrim folder yet."); return false; }
 
             ownGameBusy = true;
             // The Play button shows how far it has got (#1145): OwnGame counts
@@ -374,117 +394,142 @@ namespace Thornswood
             Config c = cfg;
             ThreadPool.QueueUserWorkItem(delegate
             {
-                string said = null, fail = null;
                 Action<string> say = delegate(string m)
                 {
                     try { win.Dispatcher.BeginInvoke((Action)delegate { Log(m); }); } catch (Exception ex) { Swallow.Note("ShellOwnGame.StartOwnGame, say BeginInvoke", ex); }
                 };
-                try { said = make ? OwnGame.Make(c, say) : OwnGame.Refresh(c, say); }
-                catch (Exception ex) { fail = ex.Message; }
+                // One folder writer at a time (#2210): an update writing what it
+                // downloaded finishes first, and none starts writing until this
+                // is done, the light flags, the load order and the check after
+                // the refresh included. The update's download is not held.
+                OwnGame.Alone(delegate { FolderWork(make, loud, then, failed, c, say); },
+                    delegate { say("An update is putting its files into the game folder. Thornswood's own Skyrim folder is prepared as soon as that is done."); });
+            });
+            return true;
+        }
 
-                // Made: from here Paths name the new folder, as they will after
-                // the restart below, so the light flags and the load order are
-                // put right in Thornswood's own folder and its Profile. On the
-                // old Paths they went into the Steam copy's plugins, through
-                // Vortex's links, and Windows' own plugin list, or, with the
-                // folder chosen at install, into a Profile\Payload that is gone
-                // (#1226).
-                if (make && fail == null)
-                {
-                    try { Paths.Init(Paths.Root); }
-                    catch (Exception ex) { Swallow.Note("ShellOwnGame.StartOwnGame, pointing Paths at the new folder", ex); }
-                }
+        /// <summary>
+        /// StartOwnGame's work, on its pool thread, with the folder to itself
+        /// (OwnGame.Alone). Its last step queues the finish on the window's
+        /// thread before the folder is let go, so an update waiting to write
+        /// is always after it there.
+        /// </summary>
+        static void FolderWork(bool make, bool loud, Action then, Action failed, Config c, Action<string> say)
+        {
+            // While the folder is prepared the Play button shows that, and an
+            // update downloading beside it says nothing to the button.
+            PlayProgress.FolderFirst(true);
+            string said = null, fail = null;
+            try { said = make ? OwnGame.Make(c, say) : OwnGame.Refresh(c, say); }
+            catch (Exception ex) { fail = ex.Message; }
 
-                // Same light-flag and load-order steps Fix runs. Refresh can
-                // bring Vortex's unflagged staging copy of a MustBeLight
-                // plugin (CBBE.esp and the rest) over a Separated flagged
-                // copy, or place a fresh one that never had the ESL bit.
-                // SettleSettings on a full Refresh used to lay Golden's
-                // plugins.txt over Live, which put Thornswood-Content.esp out
-                // of the server's order (Gavin: Mod list red at position 21
-                // after "already matches"). FlagLight then PutInServerOrder
-                // (the same write Scan and Fix uses) so Mod list stays green.
-                // Verify.Run follows; when Refresh already matched, skip the
-                // Bytes CRC pass so finishing is not held on hashing every
-                // plugin, and skip Run entirely when nothing changed and a
-                // server-aware LastIssues is already shared.
-                if (fail == null)
-                {
-                    bool already = said != null
-                        && said.IndexOf("already matches what Vortex has deployed", StringComparison.Ordinal) >= 0;
-                    int flagged = 0, ordered = 0;
-                    try
-                    {
-                        flagged = Checks.FlagLight(Verify.MustBeLight(c), say);
-                        if (flagged > 0)
-                            say("Flagged " + flagged + " plugin" + (flagged == 1 ? "" : "s") +
-                                " light so the load order matches the server after the Vortex update.");
-                    }
-                    catch (Exception ex)
-                    {
-                        Swallow.Note("ShellOwnGame.StartOwnGame, FlagLight after Vortex bring-up-to-date", ex);
-                        say("Could not flag light plugins after the Vortex update (" + ex.Message.TrimEnd('.') + "). Press Fix on Diagnostics if Mod list goes red.");
-                    }
-                    try
-                    {
-                        ordered = Verify.PutInServerOrder(c, say);
-                    }
-                    catch (Exception ex)
-                    {
-                        Swallow.Note("ShellOwnGame.StartOwnGame, PutInServerOrder after Vortex bring-up-to-date", ex);
-                        say("Could not put the plugin list into the server's order after the Vortex update (" + ex.Message.TrimEnd('.') + "). Press Fix on Diagnostics if Mod list goes red.");
-                    }
-                    bool needVerify = !already || flagged > 0 || ordered > 0
-                        || !Verify.LastUsedServer || Verify.LastIssues == null;
-                    if (needVerify)
-                    {
-                        try { Verify.Run(c, !already); }
-                        catch (Exception ex) { Swallow.Note("ShellOwnGame.StartOwnGame, Verify after Vortex bring-up-to-date", ex); }
-                    }
-                }
+            // Made: from here Paths name the new folder, as they will after
+            // the restart below, so the light flags and the load order are
+            // put right in Thornswood's own folder and its Profile. On the
+            // old Paths they went into the Steam copy's plugins, through
+            // Vortex's links, and Windows' own plugin list, or, with the
+            // folder chosen at install, into a Profile\Payload that is gone
+            // (#1226).
+            if (make && fail == null)
+            {
+                try { Paths.Init(Paths.Root); }
+                catch (Exception ex) { Swallow.Note("ShellOwnGame.StartOwnGame, pointing Paths at the new folder", ex); }
+            }
 
-                // No firewall rule is written here any more, and nothing asks
-                // for administrator (#911). Windows only asked about the game's
-                // browser because the in-game voice page kept making WebRTC
-                // connections after the launcher had taken the audio, and a
-                // WebRTC connection opens UDP sockets on every network the
-                // machine has. thornswood-voice.js makes none in relay mode now,
-                // so the browser has nothing for Windows to ask about.
-
+            // Same light-flag and load-order steps Fix runs. Refresh can
+            // bring Vortex's unflagged staging copy of a MustBeLight
+            // plugin (CBBE.esp and the rest) over a Separated flagged
+            // copy, or place a fresh one that never had the ESL bit.
+            // SettleSettings on a full Refresh used to lay Golden's
+            // plugins.txt over Live, which put Thornswood-Content.esp out
+            // of the server's order (Gavin: Mod list red at position 21
+            // after "already matches"). FlagLight then PutInServerOrder
+            // (the same write Scan and Fix uses) so Mod list stays green.
+            // Verify.Run follows; when Refresh already matched, skip the
+            // Bytes CRC pass so finishing is not held on hashing every
+            // plugin, and skip Run entirely when nothing changed and a
+            // server-aware LastIssues is already shared.
+            if (fail == null)
+            {
+                bool already = said != null
+                    && said.IndexOf("already matches what Vortex has deployed", StringComparison.Ordinal) >= 0;
+                int flagged = 0, ordered = 0;
                 try
                 {
-                    win.Dispatcher.BeginInvoke((Action)delegate
-                    {
-                        ownGameBusy = false;
-                        PlayProgress.End();
-                        if (fail != null)
-                        {
-                            Log((make ? "Thornswood's own Skyrim folder was not made. " : "Thornswood's own Skyrim folder was not brought up to date. ") + fail);
-                            if (loud) MessageBox.Show(fail, "Thornswood", MessageBoxButton.OK, MessageBoxImage.Warning);
-                        }
-                        else
-                        {
-                            Log(said);
-                            if (make)
-                            {
-                                Log("Restarting the launcher so it runs from the new folder.");
-                                RestartLauncher();
-                                return;
-                            }
-                            // LastIssues was refreshed on the pool thread after
-                            // FlagLight and PutInServerOrder; paint Scan and Fix
-                            // and Ready from it so the card does not stay on the
-                            // pre-Vortex state.
-                            if (Verify.LastUsedServer && Verify.LastIssues != null)
-                                ShowVerify(Verify.LastIssues, false);
-                        }
-                        DrawStatus();
-                        DrawOwnGame();
-                        if (fail == null && !make && then != null) then();
-                    });
+                    flagged = Checks.FlagLight(Verify.MustBeLight(c), say);
+                    if (flagged > 0)
+                        say("Flagged " + flagged + " plugin" + (flagged == 1 ? "" : "s") +
+                            " light so the load order matches the server after the Vortex update.");
                 }
-                catch (Exception ex) { Swallow.Note("ShellOwnGame.StartOwnGame, finish BeginInvoke", ex); }
-            });
+                catch (Exception ex)
+                {
+                    Swallow.Note("ShellOwnGame.StartOwnGame, FlagLight after Vortex bring-up-to-date", ex);
+                    say("Could not flag light plugins after the Vortex update (" + ex.Message.TrimEnd('.') + "). Press Fix on Diagnostics if Mod list goes red.");
+                }
+                try
+                {
+                    ordered = Verify.PutInServerOrder(c, say);
+                }
+                catch (Exception ex)
+                {
+                    Swallow.Note("ShellOwnGame.StartOwnGame, PutInServerOrder after Vortex bring-up-to-date", ex);
+                    say("Could not put the plugin list into the server's order after the Vortex update (" + ex.Message.TrimEnd('.') + "). Press Fix on Diagnostics if Mod list goes red.");
+                }
+                bool needVerify = !already || flagged > 0 || ordered > 0
+                    || !Verify.LastUsedServer || Verify.LastIssues == null;
+                if (needVerify)
+                {
+                    try { Verify.Run(c, !already); }
+                    catch (Exception ex) { Swallow.Note("ShellOwnGame.StartOwnGame, Verify after Vortex bring-up-to-date", ex); }
+                }
+            }
+
+            // No firewall rule is written here any more, and nothing asks
+            // for administrator (#911). Windows only asked about the game's
+            // browser because the in-game voice page kept making WebRTC
+            // connections after the launcher had taken the audio, and a
+            // WebRTC connection opens UDP sockets on every network the
+            // machine has. thornswood-voice.js makes none in relay mode now,
+            // so the browser has nothing for Windows to ask about.
+
+            // The folder work is over: an update writing next may show itself.
+            PlayProgress.FolderFirst(false);
+            try
+            {
+                win.Dispatcher.BeginInvoke((Action)delegate
+                {
+                    ownGameBusy = false;
+                    PlayProgress.End();
+                    if (fail != null)
+                    {
+                        Log((make ? "Thornswood's own Skyrim folder was not made. " : "Thornswood's own Skyrim folder was not brought up to date. ") + fail);
+                        if (loud) MessageBox.Show(fail, "Thornswood", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
+                    else
+                    {
+                        Log(said);
+                        if (make)
+                        {
+                            Log("Restarting the launcher so it runs from the new folder.");
+                            RestartLauncher();
+                            return;
+                        }
+                        // LastIssues was refreshed on the pool thread after
+                        // FlagLight and PutInServerOrder; paint Scan and Fix
+                        // and Ready from it so the card does not stay on the
+                        // pre-Vortex state. The folder is up to date now, so
+                        // the card stops saying it is behind.
+                        Upkeep.Forget(IssueKind.Behind);
+                        if (Verify.LastUsedServer && Verify.LastIssues != null)
+                            ShowVerify(Verify.LastIssues, false);
+                    }
+                    DrawStatus();
+                    DrawOwnGame();
+                    if (fail == null && !make && then != null) then();
+                    else if (fail != null && failed != null) failed();
+                });
+            }
+            catch (Exception ex) { Swallow.Note("ShellOwnGame.StartOwnGame, finish BeginInvoke", ex); }
         }
 
         static void DrawOwnGame()
@@ -552,11 +597,6 @@ namespace Thornswood
                 btnOwnGameMake.Visibility = active ? Visibility.Collapsed : Visibility.Visible;
                 btnOwnGameMake.IsEnabled = !ownGameBusy && Paths.Collection;
             }
-            if (btnOwnGameRefresh != null)
-            {
-                btnOwnGameRefresh.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
-                btnOwnGameRefresh.IsEnabled = !ownGameBusy;
-            }
         }
 
         /// <summary>
@@ -586,7 +626,7 @@ namespace Thornswood
             string said = OwnGame.PointAt(cfg, chosen, out ok);
             Log(said);
             if (!ok) MessageBox.Show(said, "Thornswood", MessageBoxButton.OK, MessageBoxImage.Information);
-            else if (OwnGame.Active) Log("Bring it up to date from Vortex takes it in now; otherwise the launcher does it the next time it starts.");
+            else if (OwnGame.Active) Log("Scan and then Fix on Diagnostics take it in now; otherwise the launcher does it the next time it starts.");
             DrawOwnGame();
             DrawStatus();
         }

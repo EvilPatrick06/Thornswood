@@ -106,9 +106,32 @@ next number, never used twice.
 
 ## Stewards and rent
 
-A jarl names stewards. Only a steward can evict, and only at the
+A steward is whoever holds a hold's "Steward of <Hold>" Discord role,
+which that hold's Jarl gives, and the Jarl of a hold keeps it as its
+steward too (#2551, [Offices](offices.md)). Only a steward can evict, and only at the
 door: open it, then press Evict on the Office page of the K panel
-within a minute. Eviction ends the claim. It does not empty the house. It does not
+within a minute. A steward evicts and sets rent only in their own
+hold (Patrick, 16 Oct, #2551): Riften's steward settles Riften's
+buildings and no other's. A building's hold is the hold its doors
+open onto, measured from the game's own records (see Where this
+is). At another hold's door the page says whose it is and offers
+nothing to press. A few buildings answer to no hold at all, and no
+steward settles those.
+
+Staff end claims and set rent at any building, those with no hold
+included (Patrick, 17 Oct, #2551). Staff hold no office by being staff,
+so this is not a steward's office: it is the same Evict, Set rent and
+No rent on the Office page of K, which staff get at every door, saying
+they act as staff there. Staff are who the staff commands take (the
+Owner, Dev, Gamemaster, Moderator and Loremaster roles, and the admins),
+and a press needs what a staff command needs: the chat proved who they
+are and the launcher's pass is on hand. Every press is one line in the
+staff log, the one the staff commands write, which the bot says in the
+staff channel: who pressed, whose claim, the building and its hold, the
+rent set, and when. Staff who are the Steward or Jarl of a building's
+hold settle it as its steward, like anybody who keeps it.
+
+Eviction ends the claim. It does not empty the house. It does not
 take a key back, so a tenant who kept one can still walk in. That is a
 person's problem, handled like a person.
 
@@ -126,8 +149,8 @@ box pays rent owed by that person first. What is left is the hold's.
 Each hold has one box, and it is that hold's notice board. The nine
 mainland towns already have a spot each, the coordinates given for
 the boards, and Raven Rock's is at its inn. You are at the box when
-you are within 400 of that spot. A steward who moves the board moves
-the box with it. See [Notice boards](noticeboards.md).
+you are within 400 of that spot. A steward of that hold who moves the
+board moves the box with it. See [Notice boards](noticeboards.md).
 
 A price list is not dropped in as an item. Someone with the Prices
 permission on a faction or business book stands at the board and
@@ -135,8 +158,8 @@ submits the list. The guild of that hold keeps the copy. The rules
 are on [Factions and businesses](factions.md) and
 [Merchant's Guild](merchants-guild.md).
 
-A steward can still make a container a hold's box: open it, then
-press the hold on the Office page of the K panel within a minute. Only
+A steward can still make a container their own hold's box: open it,
+then press the hold on the Office page of the K panel within a minute. Only
 gold goes in that chest. Anything else is handed back, still in the hand.
 The board itself is enough to submit a list.
 
@@ -222,10 +245,41 @@ not company wares.
 Claims, deeds, the 14 day lapse, locks, molds, keys, master keys,
 stewards, eviction, rent, and the gold-only box are in the server. The register
 is `private/property.json`. Eviction, the rent and marking a box are
-the Office page of the K panel, for a steward or a Jarl; see
+the Office page of the K panel, for a steward (the Steward or the Jarl
+of a hold, by the Discord role); see
 [Offices](offices.md). A container is made one of the ten holds' boxes
-and no other. The rent owed is on that page for the steward at the
+and no other, and only by a steward of that hold. The rent owed is on that page for the steward at the
 door, and on the property page of K for the holder.
+
+Which hold a building is in is `BUILDING_HOLD` in the property block,
+written with `game\data\building-holds.json` by
+`scripts\dev\Build-BuildingHolds.py` out of the plugins (#2551). A hold
+is a location record (WhiterunHoldLocation and the other eight, and
+DLC2SolstheimLocation for Raven Rock), and a place is in a hold when
+its location's parents reach that record. A building takes the hold
+of the places its doors open onto: an exterior cell's location, or its
+worldspace's, or a room's own, walking through a room with none, such
+as a cellar, to where its doors open. Two holds there, the building's
+own location picks between them; none, the building's own location
+answers. Measured 17 Oct: 811 of the 850 buildings have a hold, and all
+601 that `DATA.cellToHold` names agree with it. The 39 left out (the
+Soul Cairn, Apocrypha, the Forgotten Vale, Sovngarde, Castle Volkihar,
+Fort Dawnguard, Nightingale Hall, Ironbind Barrow, test and Creation
+Club cells, Misty Grove, whose only door starts disabled, and four
+from mods) open onto places no hold's location covers, and the table
+says why for each. No steward evicts or sets
+rent at those; staff do.
+
+Staff at a door (#2551) are `settleAs` in the property block: a
+steward of the building's hold acts as its steward, and anybody else
+must be staff by the chat block's `isStaff` (`__thornswoodIsStaff`) and
+pass the staff block's `unproven` on the line the press arrived on.
+`staffRecord` writes the press through the staff block's `record`:
+thornswood.log, and `for-bot\moderation.log` with `did` evict, rent or
+norent, `by`, `byName`, `who`, `whoName`, `why` (the building and its
+hold, and the rent set), `building`, `buildingName`, `hold` and `at`.
+A press is refused when that log cannot be reached.
+`tests\test-2551-building-holds.js` drives it at all 850 buildings.
 
 Claiming, locking, unlocking and cutting a key are the lock key, with
 nothing typed (#1637). The server writes the door's word, Claim, Lock or

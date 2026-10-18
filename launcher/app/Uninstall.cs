@@ -408,7 +408,7 @@ namespace Thornswood
                     {
                         throw new Exception(
                             "Windows' Skyrim folder is still redirected at this build:\n\n    " + win +
-                            "\n\nNothing has been removed. Close Skyrim, press Restore on this page, and try again.");
+                            "\n\nNothing has been removed. Close Skyrim, press Scan and then Fix on Diagnostics, which puts it back, and try again.");
                     }
                 }
                 catch (Exception ex) { if (ex.Message.StartsWith("Windows'")) throw; }
@@ -426,7 +426,7 @@ namespace Thornswood
                 {
                     throw new Exception(
                         "Your own Skyrim folder is still set aside at:\n\n    " + bak +
-                        "\n\nNothing has been removed. Close Skyrim, press Restore on this page, and try again. " +
+                        "\n\nNothing has been removed. Close Skyrim, press Scan and then Fix on Diagnostics, which puts it back, and try again. " +
                         "If it still will not go back, move what is in that folder into\n\n    " + win +
                         "\n\nyourself, delete the empty one it came from, and run this again.");
                 }

@@ -398,8 +398,11 @@ function chatWrite(kind, peerId, me, text, via) {
    silently, so a locked or protected day could outlive CHAT_DAYS with nobody
    told. Now each failure is a structured line (the file's name and the error
    code, never what it holds), a day that has failed CHAT_PRUNE_ALERT passes
-   in a row says ALERT, /health counts the days past their time, and while
-   any is overdue the prune is tried again every hour, not every six. */
+   in a row says ALERT, and /health counts the days past their time.
+   EVERY HOUR (#2166). The privacy page says the site checks every hour and
+   that chat ages the same way; this ran every six hours and hourly only while
+   a day was overdue, so a day could sit up to six hours past its window. It
+   now runs at start and then every hour, overdue or not. */
 const CHAT_PRUNE_ALERT = 3;
 const chatPruneFailures = {};   // file name -> passes in a row it would not go
 let chatOverdue = 0;
@@ -439,7 +442,7 @@ function chatPrune() {
   }
   chatOverdue = overdue;
   clearTimeout(chatPruneTimer);
-  chatPruneTimer = setTimeout(chatPrune, (overdue || chatPruneError) ? 3600000 : 6 * 3600000);
+  chatPruneTimer = setTimeout(chatPrune, 3600000);
 }
 chatPrune();
 

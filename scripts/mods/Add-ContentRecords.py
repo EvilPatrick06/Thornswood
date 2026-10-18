@@ -1,8 +1,65 @@
 """
 Add-ContentRecords.py
 
-Adds records to Thornswood-Content.esp, and edits the subrecords of ones already
-in it.
+Writes Thornswood-Content.esp's records: every record of Thornswood's own from
+the numbers in this script, the overrides of Bethesda's records it carries, and
+the cells and worldspaces its placements stand in from Bethesda's own records,
+and the placements of Thornswood's kilns, salt quarries, hives and labs from
+game\\data\\station-sites.json. Since #2553 nothing in it is the salvaged
+plugin's (see THE SALVAGED RECORDS, REMADE, and WHERE THE STATIONS STAND,
+below).
+
+THE SALVAGED RECORDS, REMADE (#2553)
+
+Until #400 the plugin's header said its crafting and gathering records were
+salvaged from another server's plugin, and no permission from that server's
+makers is recorded. Patrick, 15 October 2026, option B on #2177: the salvaged
+records are remade as Thornswood's own and the salvaged ones removed.
+scripts\\mods\\List-SalvagedRecords.py lists them in
+scripts\\mods\\content-salvaged.json, with what became of each:
+
+  remade    the two keywords, the kiln, the alchemy lab, the salt quarry, the
+            beehive, the notice board, the four grades of charcoal, their four
+            recipes, the pickaxe and the axe. Each is written below from
+            Thornswood's rulebook and pointers to Bethesda's own records, its
+            form id and editor id kept because the gamemode, the tables and
+            the saves name them. Six recipes come out the bytes the plugin
+            held, because every field of them is a fact the rulebook states
+            (the Charburner and Edgewright pages); the register says which.
+  dropped   the other server's placements: its 57 of Thornswood's kiln (8),
+            salt quarry (11), hive (13) and alchemy lab (25) at the spots it
+            chose, which went on Patrick's A of 16 October when Thornswood
+            stood its own; Skyrim's own objects put where it chose and notice
+            boards placed switched off; its changes to Skyrim's own
+            placements (80 switched off, 32 moved, turned or resized, 3
+            relinked, 4 that change nothing); the cells and worldspaces left
+            holding nothing of Thornswood's; and a chest of ore nothing names.
+  Bethesda's  the salvaged cells and worldspaces a station Thornswood places
+            stands in, each written from the winning master's own record by
+            Build-LastPlugin.py's copier, never the salvaged copy.
+
+WHERE THE STATIONS STAND (#2553)
+
+Patrick, 16 October 2026, A on #2553: Thornswood measures its own spots for
+its kilns, salt quarries, hives and labs, the way the woodworking benches were
+placed, and this plugin places them. scripts\\dev\\Build-StationSites.py
+measures each spot over the whole load order into game\\data\\station-sites.json
+(docs\\systems\\station-placement.md says the rule for each kind); this writes
+one placement for each row, its base, its point and its turn and nothing
+else, in the cell the row names, under the form id the row gives. A cell or
+worldspace a placement needs and the plugin does not carry yet is copied from
+the winning master's own record, which needs --masters the first time; the
+builder has already refused any spot whose cell a mod changes, so the copy
+changes nothing in the game. The placements' form ids start at 0x05015500,
+which no version of this plugin ever used, so no change form a save holds for
+an old placement can land on a new one.
+
+Before #2553 most of Thornswood's own items here were clones of the salvaged
+charcoal and its recipe; they are written from their own numbers now as well.
+The tool refuses to write a plugin that holds any salvaged record the
+register does not keep, by its bytes under any editor id, or by its form id
+for one that left before #2553 (the skill manuals, the Execution Block).
+tests\\test-2553-salvaged-gone.js holds the committed plugin to the register.
 
 WHY
 
@@ -36,8 +93,8 @@ So this adds:
                                   to specifically that house and it can be
                                   reused".
 
-    ThornswoodMiscToolHandle      the handle itself. A MISC, cloned from the
-                                  charcoal, which already uses
+    ThornswoodMiscToolHandle      the handle itself. A MISC on Skyrim's own
+                                  charcoal stick,
                                   Clutter\\Quest\\TG06CharcoalStick.nif: a stick,
                                   which is what a handle looks like. No new mesh
                                   has to ship.
@@ -66,11 +123,16 @@ chopWood instead: the Woodwright's verb, axe required, firewood out.
 
 THE EXECUTION BLOCK, TAKEN OUT OF SOLITUDE (issue #400)
 
+Since #2553 the step that took it out is gone from this tool: the block and
+its placement are salvaged records the register says left before #2553, so the
+tool refuses a plugin that carries either again. What follows is why it went.
+
 The plugin came from another server, and the last trace of that server's name
 in it was a script: FURN 0x05DF7B34, ThornswoodExecutionerChoppingBlock, the
 headsman's block placed once in Solitude (REFR 0x05DFCC75), carried a VMAD
-attaching KzlChop, with one property pointing at Skyrim.esm's executioner
-swing, IDLE 0x0F95BE. KzlChop.pex was never in C:\\Thornswood\\Game, the
+attaching the other server's chopping script, named with its prefix, with one
+property pointing at Skyrim.esm's executioner swing, IDLE 0x0F95BE. That
+script was never in C:\\Thornswood\\Game, the
 Steam copy or any pack, measured 20 and 24 September, so it has never run for
 anybody here. It is the headsman's block, not a woodcutting one: firewood comes
 from the three vanilla chopping blocks, answered server side by chopWood.
@@ -116,16 +178,17 @@ stops and writes nothing.
 
 WHAT IT PROVES BEFORE IT WRITES
 
-The same discipline as Rename-ContentRecords.ps1, Remove-DeadRecords.ps1 and
-Remove-DeadConditions.py, whose parser this shares. It serialises the file back
+The same discipline as Remove-DeadRecords.ps1 and Remove-DeadConditions.py,
+whose parser this shares. It serialises the file back
 byte for byte before it edits anything. Afterwards it checks that every record
 that was there is still there, apart from the ones it was asked to take out, in
 the same order, with the same form id, type and flags; that the ones taken out
 are gone; that every record it was not asked to touch has the bytes it started with;
 that the new records parse back to exactly what was built; that no form id it
 allocates is already taken; that the header's record count matches what is
-actually in the file; that the other server's naming (Kzl, kzolivar) is on no
-editor id and no script, and its full name in no record and not in the header,
+actually in the file; that neither the other server's full name nor either of
+its short forms is in the header or in any record's editor id, attached script
+or text, and its full name and longer short form in no record's bytes at all,
 compressed records included; and that the header changed in its description
 and its record count and nowhere else.
 
@@ -163,7 +226,7 @@ Tundra cotton is a gatherer's at novice and is already on the crude pole.
 The tanning rack, not the loom, because the loom's keyword is a mod's record
 (MCE_CraftingLoom, 6ce000:Update.esm) and these recipes name only Skyrim.esm.
 
-All three MISC records are cloned from the charcoal, like the handle, so no
+All three MISC records wear Skyrim's charcoal stick, like the handle, so no
 new mesh has to ship.
 
 THE FOUR TREATMENTS (issue #1383)
@@ -203,14 +266,14 @@ keyword, with no new master. The repair kits stayed off the loom because
 they named only Skyrim.esm; Patrick asked for the bandage at the loom.
 
 THE ALCHEMY LAB IS THIS PLUGIN'S OWN. ThornswoodCraftingAlchemyWorkbench
-(FURN 0x5042E69) is a create-object bench, WBDT 01 10, placed 25 times, and
-carries ThornswoodCraftingAlchemy (KYWD 0x5042E6B), which no recipe named
+(FURN 0x5042E69) is a create-object bench, WBDT 01 10, placed in the apothecary
+of each hold capital (WHERE THE STATIONS STAND, above), and carries ThornswoodCraftingAlchemy (KYWD 0x5042E6B), which no recipe named
 until now. Skyrim's own alchemy lab cannot show a recipe at all: it brews from
 the effects ingredients share. So the physicker's two are made at this one.
 
 The owner and the half are named in $RECIPE_OWNER in
 scripts/dev/Build-RecipeTable.ps1, because none of the four can be read off a
-MISC at these benches. All four MISC records are cloned from the charcoal,
+MISC at these benches. All four MISC records wear Skyrim's charcoal stick,
 like the kits, so no new mesh has to ship.
 
 THE HEARTHFIRE HOUSE PARTS, TAKEN OFF THE FORGE (issue #2258)
@@ -287,6 +350,8 @@ if anything it was asked to add is already there.
 """
 
 import argparse
+import json
+import math
 import os
 import struct
 import sys
@@ -294,20 +359,21 @@ import zlib
 
 COMPRESSED = 0x00040000
 
-# The headsman's block in Solitude, whose VMAD named KzlChop, and its one placed
-# reference. Both come out (see the top).
-EXECUTION_BLOCK = 0x5DF7B34
-EXECUTION_BLOCK_REF = 0x5DFCC75
-
-# The other server's naming, in either spelling the plugin used. Lower case,
-# because the comparison is.
-OTHER_SERVER = (b'kzl', b'kzolivar')
-
 # The other server's full name, lower case. Written as its code points so that
 # this file does not carry the name either: it goes from everywhere in the
-# repository (Patrick, 12 October, #400), and scripts\dev\Check-Words.ps1
+# repository (Patrick, 12 October, #400), and tests\test-other-server-name-gone.js
 # refuses it in any file git tracks.
 OTHER_SERVER_NAME = bytes([107, 101, 105, 122, 97, 97, 108])
+
+# Its two short forms, lower case and written the same way (Patrick, 15
+# October, decision C on #400): the three letter prefix that was on 33 of this
+# plugin's editor ids, its script and its folders, and the six letter one that
+# was on its board and, with two letters in front, on its records. The longer
+# one is looked for in every byte of a record. The three letter one only in
+# text (an editor id, an attached script, a string), where it would be a name;
+# among a record's numbers any three letters can turn up by chance.
+OTHER_SERVER_SHORT = bytes([107, 122, 108])
+OTHER_SERVER_LONGER = bytes([111, 108, 105, 118, 97, 114])
 
 # What the header says the plugin is (SNAM), written by this tool (#400).
 DESCRIPTION = (b"Thornswood's crafting and gathering content: stations, salt, ore, "
@@ -420,7 +486,8 @@ RECIPE_REMEDY = 0x50154C7
 #
 # ThornswoodMessageBoard, the activator every board in the world is, named a
 # reworked copy of the board in Missives (Nexus 111375) that came with the other
-# server's records: olivar-messageboard/MissiveBoardCOTND.nif. Patrick, 12 Oct,
+# server's records, MissiveBoardCOTND.nif in a folder named with that server's
+# prefix. Patrick, 12 Oct,
 # chose Thornswood's own board built from vanilla pieces, with the hold's drop
 # box on a shelf on its right post, as two objects placed together: "when they
 # click on the Notice Board it does the Notice Board and when they click on the
@@ -429,7 +496,7 @@ RECIPE_REMEDY = 0x50154C7
 #
 # So the board's MODL moves to the new mesh, its OBND to the new mesh's bounds
 # (the old one's were Missives' board), and the box is an activator of its own,
-# ThornswoodDropBox, cloned from the board.
+# ThornswoodDropBox, written the same way as the board.
 #
 # WHY AN ACTIVATOR AND NOT A CONTAINER. Patrick, 12 Oct: a person sees only what
 # they put in, gold included, and only the hold's officers see everything. A
@@ -483,14 +550,6 @@ WOODWORKER_MASTER_RECIPES = (
     (0x0402B07F, 'DLC2RecipeWeaponNordicBow', 'Dragonborn.esm'),
     (0x0403CF53, 'DLC2RecipeArrowNordic', 'Dragonborn.esm'),
     (0x0403CF54, 'DLC2RecipeArrowStalhrim', 'Dragonborn.esm'),
-)
-
-# Our own poles and trap: already in this plugin, BNAM flipped from the forge.
-WOODWORKER_OWN_RECIPES = (
-    RECIPE_POLE_CRUDE,
-    RECIPE_POLE_FINE,
-    RECIPE_POLE_MASTER,
-    RECIPE_TRAP,
 )
 
 LEATHER_STRIPS = 0x000800E4
@@ -583,6 +642,537 @@ SPLINT_VALUE, SPLINT_WEIGHT = 5, 1.0
 POULTICE_VALUE, POULTICE_WEIGHT = 5, 0.2
 REMEDY_VALUE, REMEDY_WEIGHT = 15, 0.2
 
+# ---------------------------------------------------------------------------
+# THE SALVAGED RECORDS, REMADE AS THORNSWOOD'S OWN (#2553)
+#
+# Every record below is written by this tool, field by field, from the numbers
+# and names in this section. Nothing is read out of the plugin it rewrites,
+# and nothing is cloned from a salvaged record: before #2553 most of
+# Thornswood's own items here were clones of the salvaged charcoal and its
+# recipe, and the station records were the salvaged ones. The deed is still
+# made from Thornswood's own passage book, and the catches from Skyrim's clam. See the top of
+# scripts\mods\List-SalvagedRecords.py for which records were salvaged, and
+# scripts\mods\content-salvaged.json for what became of each.
+#
+# WHERE THE LINE IS DRAWN. A field that only points at Bethesda's game, a mesh
+# path, a keyword, a sound, an ingredient, the bounds and furniture markers of
+# the vanilla object whose mesh it wears, is taken from that vanilla record and
+# named beside it here. That is Bethesda's, not the other server's. A field
+# that is a choice, the name, what a recipe takes and makes and where, what an
+# item is worth, whether a bench makes things, is Thornswood's and comes from
+# its rulebook (docs/systems), named beside it too. What the salvaged records
+# carried and Thornswood's design does not ask for is not written: the
+# editor-only colours of the keywords and markers, the empty texture lists,
+# the activate text of the hive.
+#
+# The form ids stay, because the gamemode, the recipe table, the economy
+# tables and the saves name them. The editor ids stay, because the fire table
+# and the harnesses do.
+
+# The SSE record header's last eight bytes: no version control, form version 44.
+FORM_TAIL = struct.pack('<IHH', 0, 44, 0)
+
+# Keywords and records of Bethesda's that the remade records point at.
+VENDOR_ITEM_TOOL = 0x000914EE         # the keyword Skyrim's own Charcoal carries
+FURNITURE_FORCE_3RD = 0x000A56D8      # FurnitureForce3rdPerson
+FURNITURE_SPECIAL = 0x0006E9C7        # FurnitureSpecial
+RACE_TO_SCALE = 0x000FD0E1            # RaceToScale
+IS_SMELTER = 0x0009C6C3               # isSmelter, the smelter's working animation
+IS_ALCHEMY = 0x0002A40B               # isAlchemy, the alchemy lab's
+IS_BLACKSMITH_WORKBENCH = 0x000D932E  # isBlacksmithWorkbench, the carpenter bench's
+ACTOR_TYPE_NPC = 0x00013794           # ActorTypeNPC, who may use a bench
+HONEYCOMB = 0x000B08C5                # BeeHoneyComb
+HONEYCOMB_SOUND = 0x0010FD51          # ITMIngredientBeehiveHuskUp, the comb's own sound
+
+# A bench's furniture marker numbers, as Skyrim's own benches carry them: one
+# marker, entered from the front (MNAM, FNPR), and its WBDT, the kind of bench
+# and the skill it uses (01 is a bench that makes things from a recipe list).
+BENCH_MARKERS = struct.pack('<I', 0x40000001)
+BENCH_ENTRY = bytes([1, 0, 2, 0])
+
+# Skyrim.esm's Charcoal (MISC 0x33760): the stick every grade and every small
+# Thornswood item wears, its bounds, worth and weight.
+CHARCOAL_MODEL = 'Clutter\\Quest\\TG06CharcoalStick.nif'
+CHARCOAL_BOUNDS = (-1, -1, -7, 1, 1, 7)
+CHARCOAL_VALUE, CHARCOAL_WEIGHT = 2, 0.5
+# The bounds of the vanilla records that wear the key's and the mold's meshes:
+# RiftenConfiscatedGoodsChestKey (KEYM 0x10E7E6) and TGTQ01SilverMold
+# (MISC 0x44E12).
+KEY_BOUNDS = (0, -12, -2, 0, 12, 2)
+MOLD_BOUNDS = (-12, -12, 0, 12, 12, 24)
+
+# The four grades of charcoal. docs/systems/professions/woodworker/charburner.md:
+# the kiln's ladder, what each grade takes and makes, and that the grades are
+# how hot a forge burns (smith.md). An item has no gold price here, so each
+# grade is worth and weighs what Skyrim's own charcoal does.
+CHARCOAL_GRADES = (
+    # item, recipe, item editor id, recipe editor id, name, firewood in
+    (0x5015481, 0x5015480, 'ThornswoodCharcoalTier1', 'ThornswoodRecipeCharcoalTier1', 'Poor Charcoal', 2),
+    (0x5015482, 0x5015486, 'ThornswoodCharcoalTier2', 'ThornswoodRecipeCharcoalTier2', 'Charcoal', 4),
+    (0x5015484, 0x5015487, 'ThornswoodCharcoalTier3', 'ThornswoodRecipeCharcoalTier3', 'Charcoal Briquette', 7),
+    (0x5015485, 0x5015488, 'ThornswoodCharcoalTier4', 'ThornswoodRecipeCharcoalTier4', 'Coke', 12),
+)
+
+# The two tools a smith makes (smith/edgewright.md): an iron ingot and a
+# handle each, at a forge.
+RECIPE_PICKAXE = 0x501548D
+RECIPE_AXE = 0x501548E
+PICKAXE = 0x000E3C16      # Skyrim's Pickaxe
+WOODCUTTERS_AXE = 0x0002F2F4  # Skyrim's Woodcutter's Axe
+
+# THE STATIONS.
+#
+# The charcoal kiln (charburner.md) is Skyrim's smelter marker furniture
+# (CraftingSmelterMarker1, FURN 0x9C6CE): its mesh, bounds, markers and
+# working animation, made a bench that makes things from a recipe list, under
+# Thornswood's kiln keyword in place of the smelter's.
+KILN = 0x501547E
+KILN_MODEL = 'Furniture\\SmelterMarker.nif'
+KILN_BOUNDS = (-229, -149, -34, 212, 305, 254)
+# The Physicker's alchemy lab (physicker.md, injury.md) is Skyrim's alchemy lab
+# (CraftingAlchemyWorkbench, FURN 0xBAD0C), made a bench that makes things
+# from a recipe list, which Skyrim's own cannot be, under Thornswood's keyword.
+ALCHEMY_LAB = 0x5042E69
+ALCHEMY_MODEL = 'Furniture\\AlchemyWorkbench.nif'
+ALCHEMY_BOUNDS = (-60, -10, -34, 60, 123, 112)
+# The salt quarry (miner.md) wears Skyrim's moonstone vein (MineOreMoonstone02,
+# ACTI 0xA2C4F), pale like salt, and its bounds. It is furniture nobody sits
+# at: no markers. The server answers the swing.
+SALT_QUARRY = 0x5DDE4EF
+QUARRY_MODEL = 'Dungeons\\Mines\\Ore\\MineOreMoonstone02.nif'
+QUARRY_BOUNDS = (-178, -236, -16, 151, 265, 8)
+# The placed beehive (farmer.md: a farmer verb, 1 Honeycomb) wears Skyrim's hive
+# (TG02BeeHive, ACTI 0x25D94) and its bounds, and gives what Skyrim's hives
+# give, with the comb's own sound.
+BEEHIVE = 0x5DBF8B3
+BEEHIVE_MODEL = 'Clutter\\BeeHive\\BeeHive01.nif'
+BEEHIVE_BOUNDS = (-115, -115, -19, 115, 115, 275)
+# The woodworking bench (#516) is Hearthfire's carpenter workbench
+# (BYOHHouseCarpentersWorkbench, FURN 0x3003065): its mesh, bounds, markers,
+# working animation and flags, under Thornswood's keyword and without
+# Hearthfire's two building keywords, which would list the house parts.
+WOODWORKING_FLAGS = 0x0002
+
+
+def own_record(tag, fid, pairs):
+    return Rec(tag, 0, fid, FORM_TAIL, pack_subrecords(pairs))
+
+
+def bounds(b):
+    return struct.pack('<6h', *b)
+
+
+def keywords(kws):
+    return [(b'KSIZ', struct.pack('<I', len(kws))),
+            (b'KWDA', b''.join(struct.pack('<I', k) for k in kws))]
+
+
+def kywd(fid, edid):
+    """A keyword: its editor id and nothing else."""
+    return own_record(b'KYWD', fid, [(b'EDID', zstr(edid))])
+
+
+def misc(fid, edid, name, model, box, value, weight, kws=(VENDOR_ITEM_TOOL,)):
+    return own_record(b'MISC', fid, [
+        (b'EDID', zstr(edid)), (b'OBND', bounds(box)), (b'FULL', zstr(name)),
+        (b'MODL', zstr(model))] + keywords(kws) + [
+        (b'DATA', struct.pack('<If', value, weight))])
+
+
+def cobj(fid, edid, inputs, out, bench, makes=1):
+    """A recipe: what goes in, what comes out and how many, at which bench."""
+    return own_record(b'COBJ', fid, [(b'EDID', zstr(edid)), (b'COCT', struct.pack('<I', len(inputs)))] +
+                      [(b'CNTO', cnto(base, count)) for base, count in inputs] +
+                      [(b'CNAM', struct.pack('<I', out)), (b'BNAM', struct.pack('<I', bench)),
+                       (b'NAM1', struct.pack('<H', makes))])
+
+
+def acti(fid, edid, box, name, model):
+    return own_record(b'ACTI', fid, [(b'EDID', zstr(edid)), (b'OBND', bounds(box)),
+                                     (b'FULL', zstr(name)), (b'MODL', zstr(model))])
+
+
+def bench(fid, edid, box, name, model, kws, flags=0, skill=0xFF):
+    """A bench that makes things from a recipe list, used by people."""
+    return own_record(b'FURN', fid, [
+        (b'EDID', zstr(edid)), (b'OBND', bounds(box)), (b'FULL', zstr(name)),
+        (b'MODL', zstr(model))] + keywords(kws) + [
+        (b'FNAM', struct.pack('<H', flags)), (b'KNAM', struct.pack('<I', ACTOR_TYPE_NPC)),
+        (b'MNAM', BENCH_MARKERS), (b'WBDT', bytes([1, skill])), (b'FNPR', BENCH_ENTRY)])
+
+
+def thornswood_records(passage, clam):
+    """Every record this tool writes from its own numbers, in the order it
+    writes new ones. passage is the Whiterun passage book, Thornswood's own
+    since 13 September, which the deed is made from; clam is Skyrim's Clam01,
+    which the catches are made from."""
+    out = [
+        kywd(KILN_KEYWORD, 'ThornswoodCraftingCharcoalKiln'),
+        kywd(ALCHEMY_KEYWORD, 'ThornswoodCraftingAlchemy'),
+        kywd(WOODWORKING_KEYWORD, 'ThornswoodCraftingWoodworking'),
+        acti(BOARD, 'ThornswoodMessageBoard', BOARD_BOUNDS, 'Message Board', BOARD_MODEL),
+        acti(DROP_BOX, 'ThornswoodDropBox', DROP_BOX_BOUNDS, 'Drop Box', DROP_BOX_MODEL),
+        own_record(b'FLOR', BEEHIVE, [
+            (b'EDID', zstr('ThornswoodFloraBeehive')), (b'OBND', bounds(BEEHIVE_BOUNDS)),
+            (b'FULL', zstr('Beehive')), (b'MODL', zstr(BEEHIVE_MODEL)),
+            (b'FNAM', struct.pack('<H', 0)), (b'PFIG', struct.pack('<I', HONEYCOMB)),
+            (b'SNAM', struct.pack('<I', HONEYCOMB_SOUND)),
+            # Every season: the server keeps the hive's clock (farmer.md).
+            (b'PFPC', bytes([100, 100, 100, 100]))]),
+        bench(KILN, 'ThornswoodCraftingCharcoalKilnMarker', KILN_BOUNDS, 'Charcoal Kiln', KILN_MODEL,
+              (FURNITURE_FORCE_3RD, FURNITURE_SPECIAL, IS_SMELTER, KILN_KEYWORD, RACE_TO_SCALE)),
+        bench(ALCHEMY_LAB, 'ThornswoodCraftingAlchemyWorkbench', ALCHEMY_BOUNDS, 'Alchemy Lab',
+              ALCHEMY_MODEL,
+              (FURNITURE_FORCE_3RD, FURNITURE_SPECIAL, IS_ALCHEMY, ALCHEMY_KEYWORD, RACE_TO_SCALE),
+              skill=0x10),
+        own_record(b'FURN', SALT_QUARRY, [
+            (b'EDID', zstr('ThornswoodFurnitureSaltMine')), (b'OBND', bounds(QUARRY_BOUNDS)),
+            (b'FULL', zstr('Salt Quarry')), (b'MODL', zstr(QUARRY_MODEL)),
+            (b'FNAM', struct.pack('<H', 0)), (b'MNAM', struct.pack('<I', 0)),
+            (b'WBDT', bytes([0, 0xFF]))]),
+        bench(WOODWORKING_BENCH, 'ThornswoodCraftingWoodworkingWorkbench', WOODWORKING_BOUNDS,
+              WOODWORKING_FULL, WOODWORKING_MODEL,
+              (FURNITURE_FORCE_3RD, FURNITURE_SPECIAL, RACE_TO_SCALE, IS_BLACKSMITH_WORKBENCH,
+               WOODWORKING_KEYWORD), flags=WOODWORKING_FLAGS),
+    ]
+    for item, recipe, item_id, recipe_id, name, logs in CHARCOAL_GRADES:
+        out.append(misc(item, item_id, name, CHARCOAL_MODEL, CHARCOAL_BOUNDS,
+                        CHARCOAL_VALUE, CHARCOAL_WEIGHT))
+    for item, recipe, item_id, recipe_id, name, logs in CHARCOAL_GRADES:
+        out.append(cobj(recipe, recipe_id, [(FIREWOOD, logs)], item, KILN_KEYWORD))
+
+    def stick(fid, edid, name, value, weight):
+        return misc(fid, edid, name, CHARCOAL_MODEL, CHARCOAL_BOUNDS, value, weight)
+
+    out += [
+        cobj(RECIPE_PICKAXE, 'ThornswoodRecipeWeaponPickaxe', [(IRON_INGOT, 1), (HANDLE, 1)],
+             PICKAXE, FORGE_KEYWORD),
+        cobj(RECIPE_AXE, 'ThornswoodRecipeWeaponAxe', [(IRON_INGOT, 1), (HANDLE, 1)],
+             WOODCUTTERS_AXE, FORGE_KEYWORD),
+        stick(HANDLE, 'ThornswoodMiscToolHandle', 'Tool Handle', HANDLE_VALUE, HANDLE_WEIGHT),
+        cobj(RECIPE_HANDLE, 'ThornswoodRecipeToolHandle', [(FIREWOOD, 1)], HANDLE, KILN_KEYWORD),
+        cobj(RECIPE_SHOVEL, 'ThornswoodRecipeToolShovel', [(IRON_INGOT, 1), (HANDLE, 1)],
+             SHOVEL, FORGE_KEYWORD),
+        clone(passage, DEED, 'ThornswoodBookDeed', sets={
+            b'FULL': zstr('Deed'), b'DESC': zstr(DEED_WORDS)}),
+        misc(KEY, 'ThornswoodMiscKey', 'Key', KEY_MODEL, KEY_BOUNDS, 0, 0.0),
+        misc(MOLD, 'ThornswoodMiscKeyMold', 'Key Mold', MOLD_MODEL, MOLD_BOUNDS, 25, 1.0),
+        cobj(RECIPE_MOLD, 'ThornswoodRecipeKeyMold', [(IRON_INGOT, 1)], MOLD, FORGE_KEYWORD),
+        cobj(RECIPE_KEY, 'ThornswoodRecipeKey', [(IRON_INGOT, 1)], KEY, FORGE_KEYWORD),
+        stick(POLE_CRUDE, 'ThornswoodMiscPoleCrude', 'Crude Fishing Pole', 25, 1.0),
+        stick(POLE_FINE, 'ThornswoodMiscPoleFine', 'Fine Fishing Pole', 80, 1.0),
+        stick(POLE_MASTER, 'ThornswoodMiscPoleMaster', 'Master Fishing Pole', 200, 1.0),
+        stick(FISH_TRAP, 'ThornswoodMiscFishTrap', 'Fish Trap', 10, 0.5),
+        cobj(RECIPE_POLE_CRUDE, 'ThornswoodRecipePoleCrude',
+             [(FIREWOOD, 2), (LEATHER_STRIPS, 1), (TUNDRA_COTTON, 2)], POLE_CRUDE, WOODWORKING_KEYWORD),
+        cobj(RECIPE_POLE_FINE, 'ThornswoodRecipePoleFine',
+             [(FIREWOOD, 2), (LEATHER_STRIPS, 1), (STEEL_INGOT, 1), (TUNDRA_COTTON, 3)],
+             POLE_FINE, WOODWORKING_KEYWORD),
+        cobj(RECIPE_POLE_MASTER, 'ThornswoodRecipePoleMaster',
+             [(FIREWOOD, 3), (LEATHER_STRIPS, 2), (STEEL_INGOT, 1), (REFINED_MOONSTONE, 1)],
+             POLE_MASTER, WOODWORKING_KEYWORD),
+        cobj(RECIPE_TRAP, 'ThornswoodRecipeFishTrap',
+             [(FIREWOOD, 3), (LEATHER_STRIPS, 2), (IRON_INGOT, 1)], FISH_TRAP, WOODWORKING_KEYWORD),
+    ]
+
+    def catch(fid, edid, name, produce):
+        return clone(clam, fid, edid, sets={b'FULL': zstr(name), b'PFIG': struct.pack('<I', produce)})
+
+    out += [
+        catch(CATCH_HISTCARP, 'ThornswoodFishHistcarp', 'Histcarp', HISTCARP),
+        catch(CATCH_RIVER_BETTY, 'ThornswoodFishRiverBetty', 'River Betty', RIVER_BETTY),
+        catch(CATCH_SCALES, 'ThornswoodFishSlaughterfishScales', 'Slaughterfish Scales',
+              SLAUGHTERFISH_SCALES),
+        catch(CATCH_PERCH, 'ThornswoodFishSilversidePerch', 'Silverside Perch', SILVERSIDE_PERCH),
+        catch(CATCH_SPADETAIL, 'ThornswoodFishCyrodilicSpadetail', 'Cyrodilic Spadetail',
+              CYRODILIC_SPADETAIL),
+        catch(CATCH_LONGFIN, 'ThornswoodFishAbeceanLongfin', 'Abecean Longfin', ABECEAN_LONGFIN),
+        stick(WEAPON_KIT, 'ThornswoodMiscWeaponKit', 'Weapon Kit', METAL_KIT_VALUE, METAL_KIT_WEIGHT),
+        stick(ARMOR_KIT, 'ThornswoodMiscArmorKit', 'Armor Kit', METAL_KIT_VALUE, METAL_KIT_WEIGHT),
+        stick(SEWING_KIT, 'ThornswoodMiscSewingKit', 'Sewing Kit', SEWING_KIT_VALUE, SEWING_KIT_WEIGHT),
+        cobj(RECIPE_WEAPON_KIT, 'ThornswoodRecipeWeaponKit', [(IRON_INGOT, 1), (LEATHER_STRIPS, 1)],
+             WEAPON_KIT, FORGE_KEYWORD),
+        cobj(RECIPE_ARMOR_KIT, 'ThornswoodRecipeArmorKit', [(IRON_INGOT, 1), (LEATHER, 1)],
+             ARMOR_KIT, FORGE_KEYWORD),
+        cobj(RECIPE_SEWING_KIT, 'ThornswoodRecipeSewingKit', [(TUNDRA_COTTON, 1), (LEATHER_STRIPS, 1)],
+             SEWING_KIT, TANNING_KEYWORD),
+        stick(BANDAGE, 'ThornswoodMiscBandage', 'Bandage', BANDAGE_VALUE, BANDAGE_WEIGHT),
+        stick(SPLINT, 'ThornswoodMiscSplint', 'Splint', SPLINT_VALUE, SPLINT_WEIGHT),
+        stick(POULTICE, 'ThornswoodMiscPoultice', 'Poultice', POULTICE_VALUE, POULTICE_WEIGHT),
+        stick(REMEDY, 'ThornswoodMiscRemedy', "Physicker's Remedy", REMEDY_VALUE, REMEDY_WEIGHT),
+        cobj(RECIPE_BANDAGE, 'ThornswoodRecipeBandage', [(TUNDRA_COTTON, 1)], BANDAGE, LOOM_KEYWORD),
+        cobj(RECIPE_SPLINT, 'ThornswoodRecipeSplint', [(FIREWOOD, 1), (LEATHER_STRIPS, 1)],
+             SPLINT, KILN_KEYWORD),
+        cobj(RECIPE_POULTICE, 'ThornswoodRecipePoultice', [(TUNDRA_COTTON, 1), (GARLIC, 1)],
+             POULTICE, ALCHEMY_KEYWORD),
+        cobj(RECIPE_REMEDY, 'ThornswoodRecipeRemedy', [(MUDCRAB_CHITIN, 1), (BLUE_MOUNTAIN_FLOWER, 1)],
+             REMEDY, ALCHEMY_KEYWORD),
+        misc(MASTER_KEY, 'ThornswoodMiscMasterKey', 'Master Key', KEY_MODEL, KEY_BOUNDS, 0, 0.0),
+    ]
+    return out
+
+
+# The register of the salvaged records (#2553), written by
+# scripts\mods\List-SalvagedRecords.py.
+SALVAGED_REGISTER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'content-salvaged.json')
+
+
+def body_hash(data):
+    """A record's subrecords without its editor id, hashed the way
+    List-SalvagedRecords.py hashes every salvaged version."""
+    import hashlib
+    rest = b''.join(t + struct.pack('<I', len(b)) + b for t, b in subrecords(data) if t != b'EDID')
+    return hashlib.sha256(rest).hexdigest()
+
+
+def local_fid(desc, plugin_masters, plugin_name):
+    """A descriptor (object id:plugin) as this plugin writes the form id."""
+    obj, owner = desc.split(':', 1)
+    names = [m.lower() for m in plugin_masters]
+    if owner.lower() == plugin_name.lower():
+        return (len(names) << 24) | int(obj, 16)
+    return (names.index(owner.lower()) << 24) | int(obj, 16)
+
+
+def drop_bare_parents(kids):
+    """kids without a CELL or WRLD record whose children group is gone, and
+    without a group left empty by that. A cell record with no placements of
+    this plugin's under it is an override of Bethesda's cell that changes
+    nothing Thornswood needs."""
+    out = []
+    for i, k in enumerate(kids):
+        if isinstance(k, Grup):
+            had = len(k.kids)
+            k.kids = drop_bare_parents(k.kids)
+            if had and not k.kids:
+                continue
+            out.append(k)
+            continue
+        if k.tag in (b'CELL', b'WRLD'):
+            nxt = kids[i + 1] if i + 1 < len(kids) else None
+            want = 6 if k.tag == b'CELL' else 1
+            if not (isinstance(nxt, Grup) and struct.unpack_from('<I', nxt.label, 0)[0] == k.fid
+                    and struct.unpack_from('<i', nxt.label, 4)[0] == want and nxt.kids):
+                continue
+        out.append(k)
+    return out
+
+
+def orphan_groups(kids, prev=None):
+    """Children groups (a cell's, a world's) whose own record is not just
+    before them. There should be none."""
+    bad = []
+    for k in kids:
+        if isinstance(k, Grup):
+            gt = struct.unpack_from('<i', k.label, 4)[0]
+            label = struct.unpack_from('<I', k.label, 0)[0]
+            if gt in (1, 6):
+                want = b'WRLD' if gt == 1 else b'CELL'
+                if not (isinstance(prev, Rec) and prev.tag == want and prev.fid == label):
+                    bad.append(label)
+            bad += orphan_groups(k.kids)
+        prev = k
+    return bad
+
+
+def bethesdas_world_records(masters_dir, plugin_masters, wanted):
+    """{(tag, fid): data} for the CELL and WRLD records in wanted, each the
+    winning master's own record, every form id in this plugin's numbering and
+    every localised name written in plain. Read with Build-LastPlugin.py's
+    reader and copier, the ones Thornswood-Last.esp is made with. None when
+    the masters are not in masters_dir."""
+    import importlib.util
+    paths = [os.path.join(masters_dir, m) for m in plugin_masters]
+    if not all(os.path.isfile(p) for p in paths):
+        return None
+    spec = importlib.util.spec_from_file_location(
+        'build_last_plugin', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Build-LastPlugin.py'))
+    last = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(last)
+    names = [m.lower() for m in plugin_masters]
+    want = {(t, (names[f >> 24], f & 0xFFFFFF)) for t, f in wanted}
+    win = {}
+    plugins = []
+    for i, (m, p) in enumerate(zip(plugin_masters, paths)):
+        src = last.Plugin(p, m, i)
+        plugins.append(src)
+        for e in src.walk({b'CELL', b'WRLD'}):
+            key = (e.tag, src.gid(e.fid))
+            if key in want:
+                win[key] = (src, e)
+    tables = {}
+
+    def strings(src, kind):
+        if (src.name, kind) not in tables:
+            tables[(src.name, kind)] = last.string_table(masters_dir, src.name, kind)
+        return tables[(src.name, kind)]
+
+    rn = last.Renumber()
+    rn.masters = names
+    out = {}
+    for t, f in wanted:
+        key = (t, (names[f >> 24], f & 0xFFFFFF))
+        if key not in win:
+            raise SystemExit('STOP. no master of this plugin has %s 0x%08X. Nothing was written.'
+                             % (t.decode(), f))
+        src, e = win[key]
+        what = '%s %s 0x%08X' % (src.name, t.decode(), e.fid)
+        # Where an interior or exterior cell sits among the groups: its block
+        # and sub-block labels, the master's own, which are the same in every
+        # file because they come from the cell's grid or its object id.
+        ctx = None
+        if t == b'CELL':
+            world, block, sub, persistent = e.ctx
+            if persistent or block is None or sub is None:
+                raise SystemExit('STOP. %s is a worldspace\'s persistent cell, which this does not place in. '
+                                 'Nothing was written.' % what)
+            ctx = (block, sub, world is not None)
+        out[(t, f)] = (e.flags & ~COMPRESSED,
+                       last.pack_subrecords(last.copy_record(src, e, rn, strings, what)), src.name, ctx)
+    return out
+
+
+# THE STATIONS' PLACEMENTS (#2553). Patrick, 16 October 2026, A on #2553:
+# Thornswood measures its own spots for its kilns, salt quarries, beehives and
+# alchemy labs, the way the woodworking benches were placed, and this plugin
+# places them. scripts\dev\Build-StationSites.py measures them over the load
+# order into game\data\station-sites.json; each placement is written from that
+# table and nothing else: its base, its point and its turn about the upright.
+STATION_SITES = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..',
+                                              'game', 'data', 'station-sites.json'))
+STATION_NAMES = {KILN: 'charcoal kilns', SALT_QUARRY: 'salt quarries', BEEHIVE: 'beehives',
+                 ALCHEMY_LAB: 'alchemy labs'}
+STATION_BASES = set(STATION_NAMES)
+
+
+def placement(fid, base, pos, angle):
+    """A placed station: its base and where it stands, turned angle degrees."""
+    x, y, z = pos
+    return own_record(b'REFR', fid, [(b'NAME', struct.pack('<I', base)),
+                                     (b'DATA', struct.pack('<6f', x, y, z, 0.0, 0.0, math.radians(angle)))])
+
+
+def group_type(g):
+    return struct.unpack_from('<i', g.label, 4)[0]
+
+
+def group_id(g):
+    return struct.unpack_from('<I', g.label, 0)[0]
+
+
+def placements_in(kids, cell=None):
+    """(REFR, the list it sits in, its cell's form id) for every placement."""
+    out = []
+    for k in kids:
+        if isinstance(k, Grup):
+            out += placements_in(k.kids, group_id(k) if group_type(k) in (6, 8, 9, 10) else cell)
+        elif k.tag == b'REFR':
+            out.append((k, kids, cell))
+    return out
+
+
+def placed_ids(tree):
+    return set(r.fid for r, _, _ in placements_in(tree))
+
+
+def find_cell(kids, fid):
+    """(the list a cell's record sits in, its index), or None."""
+    for i, k in enumerate(kids):
+        if isinstance(k, Grup):
+            got = find_cell(k.kids, fid)
+            if got:
+                return got
+        elif k.tag == b'CELL' and k.fid == fid:
+            return kids, i
+    return None
+
+
+def find_world(tree, fid):
+    top = next((k for k in tree if isinstance(k, Grup) and k.label[:4] == b'WRLD'), None)
+    if top is None:
+        return None
+    for i, k in enumerate(top.kids):
+        if isinstance(k, Rec) and k.tag == b'WRLD' and k.fid == fid:
+            return top.kids, i
+    return None
+
+
+def new_group(label, gtype, stamp, kids=None):
+    return Grup(label + struct.pack('<i', gtype) + b'\x00' * 4 + stamp, kids or [])
+
+
+def children_of(kids, i, gtype, stamp):
+    """The children group straight after the record at kids[i], made if missing."""
+    rec = kids[i]
+    nxt = kids[i + 1] if i + 1 < len(kids) else None
+    if isinstance(nxt, Grup) and group_type(nxt) == gtype and group_id(nxt) == rec.fid:
+        return nxt
+    g = new_group(struct.pack('<I', rec.fid), gtype, stamp)
+    kids.insert(i + 1, g)
+    return g
+
+
+def sub_group(kids, label, gtype, stamp):
+    """The block or sub-block group with that label, made in its sorted place."""
+    def key(lb):
+        if gtype in (4, 5):
+            return struct.unpack('<hh', lb)[::-1]
+        return (struct.unpack('<i', lb)[0],)
+    for k in kids:
+        if isinstance(k, Grup) and group_type(k) == gtype and k.label[:4] == label:
+            return k
+    g = new_group(label, gtype, stamp)
+    at = next((i for i, k in enumerate(kids) if isinstance(k, Grup) and group_type(k) == gtype
+               and key(k.label[:4]) > key(label)), None)
+    if at is None:
+        at = max([i + 1 for i, k in enumerate(kids) if isinstance(k, Grup) and group_type(k) == gtype] or
+                 [len(kids)])
+    kids.insert(at, g)
+    return g
+
+
+def insert_pair(kids, rec, tag):
+    """A CELL or WRLD record in its sorted place among its kind, before the
+    next record of that kind (whose children group follows it)."""
+    at = next((i for i, k in enumerate(kids) if isinstance(k, Rec) and k.tag == tag and k.fid > rec.fid),
+              len(kids))
+    kids.insert(at, rec)
+    return at
+
+
+def put_world(tree, rec, stamp):
+    top = next((k for k in tree if isinstance(k, Grup) and k.label[:4] == b'WRLD'), None)
+    if top is None:
+        top = ensure_top_group(tree, b'WRLD')
+    insert_pair(top.kids, rec, b'WRLD')
+
+
+def put_cell(tree, rec, ctx, world, stamp):
+    (bgt, blabel), (sgt, slabel), exterior = ctx
+    if exterior:
+        kids, i = find_world(tree, world)
+        parent = children_of(kids, i, 1, stamp).kids
+    else:
+        top = next((k for k in tree if isinstance(k, Grup) and k.label[:4] == b'CELL'), None)
+        if top is None:
+            top = ensure_top_group(tree, b'CELL')
+        parent = top.kids
+    block = sub_group(parent, blabel, bgt, stamp)
+    sub = sub_group(block.kids, slabel, sgt, stamp)
+    at = insert_pair(sub.kids, rec, b'CELL')
+    children_of(sub.kids, at, 6, stamp)
+
+
+def put_placement(tree, rec, cell, stamp):
+    kids, i = find_cell(tree, cell)
+    children = children_of(kids, i, 6, stamp)
+    temp = next((k for k in children.kids if isinstance(k, Grup) and group_type(k) == 9), None)
+    if temp is None:
+        temp = new_group(struct.pack('<I', cell), 9, stamp)
+        children.kids.append(temp)
+    at = next((j for j, k in enumerate(temp.kids) if isinstance(k, Rec) and k.fid > rec.fid), len(temp.kids))
+    temp.kids.insert(at, rec)
+
 
 def cnto(base, count):
     return struct.pack('<II', base, count)
@@ -620,10 +1210,19 @@ class Grup(object):
 
 
 def subrecords(data):
-    out, i = [], 0
+    """(tag, bytes) pairs. A subrecord longer than 65,535 bytes is preceded by
+    an XXXX carrying its real size (a worldspace's large reference list can
+    be); the pair comes back whole."""
+    out, i, big = [], 0, None
     while i + 6 <= len(data):
         tag = data[i:i + 4]
         size = struct.unpack_from('<H', data, i + 4)[0]
+        if tag == b'XXXX' and size == 4:
+            big = struct.unpack_from('<I', data, i + 6)[0]
+            i += 10
+            continue
+        if big is not None:
+            size, big = big, None
         if i + 6 + size > len(data):
             break
         out.append((tag, data[i + 6:i + 6 + size]))
@@ -632,7 +1231,13 @@ def subrecords(data):
 
 
 def pack_subrecords(pairs):
-    return b''.join(t + struct.pack('<H', len(b)) + b for t, b in pairs)
+    out = []
+    for t, b in pairs:
+        if len(b) > 0xFFFF:
+            out.append(b'XXXX' + struct.pack('<HI', 4, len(b)) + t + struct.pack('<H', 0) + b)
+        else:
+            out.append(t + struct.pack('<H', len(b)) + b)
+    return b''.join(out)
 
 
 def zstr(s):
@@ -662,13 +1267,6 @@ def every_record(kids):
                 yield r
         else:
             yield k
-
-
-def top_group(tree, tag):
-    for k in tree:
-        if isinstance(k, Grup) and k.label[:4] == tag:
-            return k
-    raise SystemExit('no top level %s group in this plugin' % tag.decode())
 
 
 def clone(src, fid, editor_id, sets=None, after=None, drop=None):
@@ -711,41 +1309,6 @@ def set_model(rec, model):
     return True
 
 
-def set_bounds(rec, bounds):
-    """The record's OBND set to bounds (six whole numbers). True when that changed
-    anything, so a second run is not an edit."""
-    pairs = subrecords(rec.data)
-    want = struct.pack('<6h', *bounds)
-    if not any(t == b'OBND' for t, _ in pairs):
-        raise SystemExit('0x%07X has no OBND to set' % rec.fid)
-    out = [(t, want) if t == b'OBND' else (t, b) for t, b in pairs]
-    if out == pairs:
-        return False
-    rec.data = pack_subrecords(out)
-    return True
-
-
-def set_inputs(rec, items):
-    """Replace every CNTO and set COCT to match. items is (formid, count)."""
-    pairs = subrecords(rec.data)
-    out = []
-    placed = False
-    for t, b in pairs:
-        if t == b'COCT':
-            out.append((t, struct.pack('<I', len(items))))
-            continue
-        if t == b'CNTO':
-            if not placed:
-                for base, count in items:
-                    out.append((b'CNTO', cnto(base, count)))
-                placed = True
-            continue
-        out.append((t, b))
-    if not placed:
-        raise SystemExit('recipe had no CNTO to replace')
-    rec.data = pack_subrecords(out)
-
-
 def set_bnam(rec, keyword):
     """The recipe's BNAM set to keyword. True when that changed anything."""
     pairs = subrecords(rec.data)
@@ -757,21 +1320,6 @@ def set_bnam(rec, keyword):
         return False
     rec.data = pack_subrecords(out)
     return True
-
-
-def kwda_swap(kwda, old_fid, new_fid):
-    """KWDA bytes with one form id replaced. Raises if old_fid is not there."""
-    if len(kwda) % 4:
-        raise SystemExit('KWDA length %d is not a multiple of 4' % len(kwda))
-    out = bytearray(kwda)
-    found = False
-    for o in range(0, len(out), 4):
-        if struct.unpack_from('<I', out, o)[0] == old_fid:
-            struct.pack_into('<I', out, o, new_fid)
-            found = True
-    if not found:
-        raise SystemExit('KWDA does not carry 0x%08X to swap' % old_fid)
-    return bytes(out)
 
 
 def ensure_top_group(tree, tag):
@@ -786,49 +1334,9 @@ def ensure_top_group(tree, tag):
     return g
 
 
-def wants_handle(rec):
-    """One more input on a recipe that already has one, and the count bumped."""
-    pairs = subrecords(rec.data)
-    have = sum(1 for t, _ in pairs if t == b'CNTO')
-    out = []
-    for i, (t, b) in enumerate(pairs):
-        if t == b'COCT':
-            out.append((t, struct.pack('<I', have + 1)))
-            continue
-        out.append((t, b))
-        if t == b'CNTO' and i == max(j for j, (tt, _) in enumerate(pairs) if tt == b'CNTO'):
-            out.append((b'CNTO', cnto(HANDLE, 1)))
-    rec.data = pack_subrecords(out)
-
-
-def drop_script(rec):
-    """Takes the VMAD off a record and leaves every other subrecord as it was.
-
-    True when there was one to take. Refuses (SystemExit) when the record's
-    subrecords do not pack back to its own bytes, because then dropping one of
-    them would be a guess about the rest."""
-    pairs = subrecords(rec.data)
-    if pack_subrecords(pairs) != rec.data:
-        raise SystemExit('STOP. 0x%07X does not read back as its own subrecords. '
-                         'Nothing was written.' % rec.fid)
-    kept = [(t, b) for t, b in pairs if t != b'VMAD']
-    if len(kept) == len(pairs):
-        return False
-    rec.data = pack_subrecords(kept)
-    return True
-
-
 def plain(rec):
     """A record's subrecord bytes, inflated when it is compressed."""
     return zlib.decompress(rec.data[4:]) if rec.compressed else rec.data
-
-
-def pointing_at(records, fid, besides):
-    """Every record, other than those whose ids are in besides, whose bytes hold
-    fid as a form id. A byte search rather than a field by field read, so it can
-    only find too much, never too little: a false hit keeps a record in."""
-    needle = struct.pack('<I', fid)
-    return [r for r in records if r.fid not in besides and needle in plain(r)]
 
 
 def take_out(kids, fids):
@@ -848,23 +1356,43 @@ def take_out(kids, fids):
     return out
 
 
+def is_text(body):
+    """A subrecord that is one string: printable ASCII ending in a zero, the
+    way an editor id, a model path or a description is written."""
+    return (len(body) > 1 and body.endswith(b'\x00') and
+            all(32 <= b < 127 for b in body[:-1]))
+
+
 def other_server_names(rec):
-    """Where the other server's name is in one record: its editor id, or a
-    script its VMAD attaches. A compressed record is inflated to be read, and
-    never written back from here."""
+    """Where the other server's name or one of its short forms is in one
+    record: its editor id, a script its VMAD attaches, any other string, or,
+    for the full name and the longer short form, any byte. A compressed record
+    is inflated to be read, and never written back from here."""
     data = rec.data
     if rec.compressed:
         data = zlib.decompress(data[4:])
     found = []
     for tag, body in subrecords(data):
         low = body.lower()
-        if tag == b'EDID' and low.startswith(OTHER_SERVER):
-            found.append('editor id ' + body.rstrip(b'\x00').decode('ascii', 'replace'))
-        elif tag == b'VMAD' and any(n in low for n in OTHER_SERVER):
-            found.append('a script it attaches')
-        elif OTHER_SERVER_NAME in low:
+        short = OTHER_SERVER_SHORT in low or OTHER_SERVER_LONGER in low
+        if OTHER_SERVER_NAME in low:
             found.append('its full name, in ' + tag.decode('ascii', 'replace'))
+        elif tag == b'EDID' and short:
+            found.append('editor id ' + body.rstrip(b'\x00').decode('ascii', 'replace'))
+        elif tag == b'VMAD' and short:
+            found.append('a script it attaches')
+        elif short and (is_text(body) or OTHER_SERVER_LONGER in low):
+            found.append('a short form, in ' + tag.decode('ascii', 'replace'))
     return found
+
+
+def other_server_in_header(head):
+    """Whether the header carries the other server's full name or either short
+    form, anywhere. It is a description, the masters' names and a handful of
+    numbers, and every run reads it, so a chance hit among the numbers would
+    be seen at once and not months later."""
+    low = bytes(head).lower()
+    return any(n in low for n in (OTHER_SERVER_NAME, OTHER_SERVER_SHORT, OTHER_SERVER_LONGER))
 
 
 def described(head):
@@ -1028,190 +1556,54 @@ def main():
     taken = set(r.fid for r in records)
     before = {r.fid: r.data for r in records}
 
-    # ALREADY THERE IS NOT AN ERROR, BUT A DIFFERENT RECORD UNDER THE SAME NAME
-    # IS. This script is run again every time the plugin grows another record, so
-    # it says what is already in place and adds what is not. What it will not do
-    # is write a second record with an editor id the file already uses: two
-    # records under one name is the kind of thing that is found months later.
-    already = set()
-    for name, fid in (('ThornswoodMiscToolHandle', HANDLE),
-                      ('ThornswoodRecipeToolHandle', RECIPE_HANDLE),
-                      ('ThornswoodRecipeToolShovel', RECIPE_SHOVEL),
-                      ('ThornswoodBookDeed', DEED),
-                      ('ThornswoodMiscKey', KEY),
-                      ('ThornswoodMiscKeyMold', MOLD),
-                      ('ThornswoodRecipeKeyMold', RECIPE_MOLD),
-                      ('ThornswoodRecipeKey', RECIPE_KEY),
-                      ('ThornswoodMiscPoleCrude', POLE_CRUDE),
-                      ('ThornswoodMiscPoleFine', POLE_FINE),
-                      ('ThornswoodMiscPoleMaster', POLE_MASTER),
-                      ('ThornswoodMiscFishTrap', FISH_TRAP),
-                      ('ThornswoodRecipePoleCrude', RECIPE_POLE_CRUDE),
-                      ('ThornswoodRecipePoleFine', RECIPE_POLE_FINE),
-                      ('ThornswoodRecipePoleMaster', RECIPE_POLE_MASTER),
-                      ('ThornswoodRecipeFishTrap', RECIPE_TRAP),
-                      ('ThornswoodFishHistcarp', CATCH_HISTCARP),
-                      ('ThornswoodFishRiverBetty', CATCH_RIVER_BETTY),
-                      ('ThornswoodFishSlaughterfishScales', CATCH_SCALES),
-                      ('ThornswoodFishSilversidePerch', CATCH_PERCH),
-                      ('ThornswoodFishCyrodilicSpadetail', CATCH_SPADETAIL),
-                      ('ThornswoodFishAbeceanLongfin', CATCH_LONGFIN),
-                      ('ThornswoodMiscWeaponKit', WEAPON_KIT),
-                      ('ThornswoodMiscArmorKit', ARMOR_KIT),
-                      ('ThornswoodMiscSewingKit', SEWING_KIT),
-                      ('ThornswoodRecipeWeaponKit', RECIPE_WEAPON_KIT),
-                      ('ThornswoodRecipeArmorKit', RECIPE_ARMOR_KIT),
-                      ('ThornswoodRecipeSewingKit', RECIPE_SEWING_KIT),
-                      ('ThornswoodMiscBandage', BANDAGE),
-                      ('ThornswoodMiscSplint', SPLINT),
-                      ('ThornswoodMiscPoultice', POULTICE),
-                      ('ThornswoodMiscRemedy', REMEDY),
-                      ('ThornswoodRecipeBandage', RECIPE_BANDAGE),
-                      ('ThornswoodRecipeSplint', RECIPE_SPLINT),
-                      ('ThornswoodRecipePoultice', RECIPE_POULTICE),
-                      ('ThornswoodRecipeRemedy', RECIPE_REMEDY),
-                      ('ThornswoodDropBox', DROP_BOX),
-                      ('ThornswoodMiscMasterKey', MASTER_KEY),
-                      ('ThornswoodCraftingWoodworking', WOODWORKING_KEYWORD),
-                      ('ThornswoodCraftingWoodworkingWorkbench', WOODWORKING_BENCH)):
-        here_already = name in by_edid
-        if here_already and by_edid[name].fid != fid:
+    # THE SALVAGED REGISTER (#2553): every record that came with the salvaged
+    # plugin, what became of it, and the hash of every version of it the
+    # repository has held. What goes, goes; what is left is checked against it.
+    register = json.load(open(SALVAGED_REGISTER, encoding='utf-8'))
+    plugin_masters = masters_of(raw)
+    salvaged_hashes = {}
+    dropping, bethesdas, remade, same_by_design = set(), set(), set(), set()
+    gone_before = set()
+    for row in register['records']:
+        fid = local_fid(row['formId'], plugin_masters, args.plugin)
+        for h in row['dataSha256']:
+            salvaged_hashes.setdefault(h, set()).add(fid)
+        d = row['disposition']
+        if d == 'gone before #2553':
+            gone_before.add(fid)
+        elif d not in ('dropped', "Bethesda's", 'remade'):
+            # Since Patrick's A of 16 October nothing salvaged waits on
+            # anything: the 57 placements are the other server's spots and go.
             print('')
-            print('STOP. %s is already in this plugin as 0x%07X and this would add it as '
-                  '0x%07X. Nothing was written.' % (name, by_edid[name].fid, fid))
+            print('STOP. the register keeps %s 0x%07X as "%s". Run scripts\\mods\\List-SalvagedRecords.py. '
+                  'Nothing was written.' % (row['type'], fid, d))
             return 1
-        if here_already:
-            already.add(name)
-        elif fid in taken:
-            print('')
-            print('STOP. 0x%07X is already taken. Nothing was written.' % fid)
-            return 1
-    if already:
-        print('')
-        print('Already in the plugin, so not added again')
-        for name in sorted(already):
-            print('  %s' % name)
-    misc_src = by_edid['ThornswoodCharcoalTier1']
-    cobj_charcoal = by_edid['ThornswoodRecipeCharcoalTier1']
-    cobj_pickaxe = by_edid['ThornswoodRecipeWeaponPickaxe']
-    cobj_axe = by_edid['ThornswoodRecipeWeaponAxe']
-    # Looked up by form id, which is what the gamemode and the load order use.
-    # Absent is not an error: once they are out, a second run finds neither.
-    block = next((r for r in records if r.fid == EXECUTION_BLOCK and r.tag == b'FURN'), None)
-    block_ref = next((r for r in records
-                      if r.fid == EXECUTION_BLOCK_REF and r.tag == b'REFR'), None)
+        elif d == 'dropped':
+            dropping.add(fid)
+        elif d == "Bethesda's":
+            bethesdas.add(fid)
+        elif d == 'remade':
+            remade.add(fid)
+            if row.get('sameByDesign'):
+                same_by_design.add(fid)
+    by_fid = {}
+    for r in records:
+        by_fid[r.fid] = r
+
     removing = set()
-    if block_ref is not None:
-        if (block_ref.compressed or
-                not any(t == b'NAME' and b == struct.pack('<I', EXECUTION_BLOCK)
-                        for t, b in subrecords(block_ref.data))):
-            print('')
-            print('STOP. REFR 0x%07X is not the placed Execution Block any more. '
-                  'Nothing was written.' % EXECUTION_BLOCK_REF)
-            return 1
-        on_ref = pointing_at(records, EXECUTION_BLOCK_REF, {EXECUTION_BLOCK_REF})
-        if on_ref:
-            print('')
-            for r in on_ref:
-                print('STOP. %s 0x%07X %s points at the placed block 0x%07X.'
-                      % (r.tag.decode(), r.fid, r.editor_id(), EXECUTION_BLOCK_REF))
-            print('  Nothing was written.')
-            return 1
-        removing.add(EXECUTION_BLOCK_REF)
-    # The base goes too, unless something other than its one placed reference
-    # names it. Then it stays, and only its script comes off.
-    on_block = []
-    if block is not None:
-        on_block = pointing_at(records, EXECUTION_BLOCK,
-                               {EXECUTION_BLOCK, EXECUTION_BLOCK_REF})
-        if not on_block:
-            removing.add(EXECUTION_BLOCK)
-    block_scripted = (block is not None and EXECUTION_BLOCK not in removing and
-                      any(t == b'VMAD' for t, _ in subrecords(block.data)))
 
-    handle = clone(misc_src, HANDLE, 'ThornswoodMiscToolHandle', sets={
-        b'FULL': zstr('Tool Handle'),
-        b'DATA': struct.pack('<If', HANDLE_VALUE, HANDLE_WEIGHT),
-    })
-    make_handle = clone(cobj_charcoal, RECIPE_HANDLE, 'ThornswoodRecipeToolHandle', sets={
-        b'CNTO': cnto(FIREWOOD, 1),
-        b'CNAM': struct.pack('<I', HANDLE),
-        b'BNAM': struct.pack('<I', KILN_KEYWORD),
-    })
-    # The body is the same on every deed, because there is only one record. What
-    # property it is, is the per-instance name in the pack, and the words below
-    # are why a stolen one is worth stealing: whoever carries it holds the place.
-    deed = clone(by_edid['ThornswoodPassageWhiterun'], DEED, 'ThornswoodBookDeed', sets={
-        b'FULL': zstr('Deed'),
-        b'DESC': zstr(DEED_WORDS),
-    })
-    # A key and its mold, both cloned from the charcoal MISC for the same reason
-    # the handle was: it already uses a small clutter mesh, so no new art ships.
-    key = clone(misc_src, KEY, 'ThornswoodMiscKey', sets={
-        b'FULL': zstr('Key'),
-        b'DATA': struct.pack('<If', 0, 0.0),
-    })
-    set_model(key, KEY_MODEL)
-    mold = clone(misc_src, MOLD, 'ThornswoodMiscKeyMold', sets={
-        b'FULL': zstr('Key Mold'),
-        b'DATA': struct.pack('<If', 25, 1.0),
-    })
-    set_model(mold, MOLD_MODEL)
-    # The master key (#2254), the key's twin: weightless and worth nothing to a
-    # merchant, on the key's mesh. See MASTER_KEY at the top.
-    master_key = clone(misc_src, MASTER_KEY, 'ThornswoodMiscMasterKey', sets={
-        b'FULL': zstr('Master Key'),
-        b'DATA': struct.pack('<If', 0, 0.0),
-    })
-    set_model(master_key, KEY_MODEL)
-    # THE MOLD AND THE KEY ARE BOTH MADE BY A SMITH, WHICH IS WHAT MAKES THE
-    # CHAIN START AT ALL.
-    #
-    # Patrick, 23 September: "Wait how tf does someone use a mold if you can't
-    # make a key to own the building make this shit make sense make a fucking
-    # mold item craftable dude this would solve alot", and then the whole
-    # shape: "The key should be too what should happen is you make a mold,
-    # mold gets used on door to assign mold to the door, than key uses that
-    # mold during crafting to make a key to specifically that house and it can
-    # be reused".
-    #
-    # He is right and it was circular. Both records have been in this plugin
-    # since the property system was built and nothing in the game made either
-    # one: the only mold in the world was conjured out of nothing by /mold at
-    # a door, so the ceremony had to happen before the object existed, and a
-    # smith on their own could never reach a key at all.
-    #
-    # ONE IRON INGOT EACH, at a forge, the same shape as the pickaxe and the
-    # axe beside them. The mold is the blank; the door stamps it; the key
-    # recipe is answered server side by which stamped mold is in the pack, so
-    # the key comes out named for that house and THE MOLD IS NOT CONSUMED.
-    # That is why the mold is not an input here: a CNTO is taken away by the
-    # engine before the server is asked, and he asked for it to be reusable.
-    #
-    # Both cloned from the charcoal recipe rather than the pickaxe, because
-    # the pickaxe wants a handle as well and carries COCT 2. These take one
-    # input each.
-    make_mold = clone(cobj_charcoal, RECIPE_MOLD, 'ThornswoodRecipeKeyMold', sets={
-        b'CNTO': cnto(IRON_INGOT, 1),
-        b'CNAM': struct.pack('<I', MOLD),
-        b'BNAM': struct.pack('<I', FORGE_KEYWORD),
-    })
-    make_key = clone(cobj_charcoal, RECIPE_KEY, 'ThornswoodRecipeKey', sets={
-        b'CNTO': cnto(IRON_INGOT, 1),
-        b'CNAM': struct.pack('<I', KEY),
-        b'BNAM': struct.pack('<I', FORGE_KEYWORD),
-    })
-    make_shovel = clone(cobj_pickaxe, RECIPE_SHOVEL, 'ThornswoodRecipeToolShovel', sets={
-        b'CNAM': struct.pack('<I', SHOVEL),
-    }, after={b'CNTO': [(b'CNTO', cnto(HANDLE, 1))]})
-    # The clone copied COCT 1 from the pickaxe and the shovel now has two inputs.
-    make_shovel.data = pack_subrecords(
-        [(t, struct.pack('<I', 2)) if t == b'COCT' else (t, b)
-         for t, b in subrecords(make_shovel.data)])
-
-
-    # Clam01 from Skyrim.esm, uncompressed, PFIG present. Kept here so this
-    # script does not need the master open. FULL is replaced with a plain name.
+    # THE RECORDS THIS TOOL WRITES FROM ITS OWN NUMBERS (#2553). Each one that
+    # is already in the plugin is written over where it stands; one that is
+    # not is added. A name the plugin already gives another record stops it:
+    # two records under one name is the kind of thing found months later.
+    passage = by_edid.get('ThornswoodPassageWhiterun')
+    if passage is None or passage.compressed or passage.tag != b'BOOK':
+        print('')
+        print('STOP. BOOK ThornswoodPassageWhiterun, which the deed is made from, is not here. '
+              'Nothing was written.')
+        return 1
+    # Clam01 from Skyrim.esm, uncompressed, PFIG present, which the catches are
+    # made from (#1379). Kept here so this script does not need the master open.
     clam_raw = bytes.fromhex(
         '464c4f52bd00000000000000805f08002f301e002c000b00454449440700436c616d303100'
         '4f424e440c00eeffe8fffeff12001800210046554c4c04001fdc00004d4f444c1200506c61'
@@ -1220,133 +1612,37 @@ def main():
         '647300f64c4bb9504e414d040000000000524e414d0400dc070100464e414d020000005046'
         '4947040003ba0e00534e414d04002605100050465043040064646464')
     clam = Rec(b'FLOR', 0, 0x85F80, clam_raw[16:24], clam_raw[24:])
-
-    pole_crude = clone(misc_src, POLE_CRUDE, 'ThornswoodMiscPoleCrude', sets={
-        b'FULL': zstr('Crude Fishing Pole'),
-        b'DATA': struct.pack('<If', 25, 1.0),
-    })
-    pole_fine = clone(misc_src, POLE_FINE, 'ThornswoodMiscPoleFine', sets={
-        b'FULL': zstr('Fine Fishing Pole'),
-        b'DATA': struct.pack('<If', 80, 1.0),
-    })
-    pole_master = clone(misc_src, POLE_MASTER, 'ThornswoodMiscPoleMaster', sets={
-        b'FULL': zstr('Master Fishing Pole'),
-        b'DATA': struct.pack('<If', 200, 1.0),
-    })
-    fish_trap = clone(misc_src, FISH_TRAP, 'ThornswoodMiscFishTrap', sets={
-        b'FULL': zstr('Fish Trap'),
-        b'DATA': struct.pack('<If', 10, 0.5),
-    })
-    make_pole_crude = clone(cobj_charcoal, RECIPE_POLE_CRUDE, 'ThornswoodRecipePoleCrude', sets={
-        b'CNAM': struct.pack('<I', POLE_CRUDE),
-        b'BNAM': struct.pack('<I', WOODWORKING_KEYWORD),
-    })
-    set_inputs(make_pole_crude, [(FIREWOOD, 2), (LEATHER_STRIPS, 1), (TUNDRA_COTTON, 2)])
-    make_pole_fine = clone(cobj_charcoal, RECIPE_POLE_FINE, 'ThornswoodRecipePoleFine', sets={
-        b'CNAM': struct.pack('<I', POLE_FINE),
-        b'BNAM': struct.pack('<I', WOODWORKING_KEYWORD),
-    })
-    set_inputs(make_pole_fine, [(FIREWOOD, 2), (LEATHER_STRIPS, 1), (STEEL_INGOT, 1), (TUNDRA_COTTON, 3)])
-    make_pole_master = clone(cobj_charcoal, RECIPE_POLE_MASTER, 'ThornswoodRecipePoleMaster', sets={
-        b'CNAM': struct.pack('<I', POLE_MASTER),
-        b'BNAM': struct.pack('<I', WOODWORKING_KEYWORD),
-    })
-    set_inputs(make_pole_master, [
-        (FIREWOOD, 3), (LEATHER_STRIPS, 2), (STEEL_INGOT, 1), (REFINED_MOONSTONE, 1)])
-    make_trap = clone(cobj_charcoal, RECIPE_TRAP, 'ThornswoodRecipeFishTrap', sets={
-        b'CNAM': struct.pack('<I', FISH_TRAP),
-        b'BNAM': struct.pack('<I', WOODWORKING_KEYWORD),
-    })
-    set_inputs(make_trap, [(FIREWOOD, 3), (LEATHER_STRIPS, 2), (IRON_INGOT, 1)])
-
-    def catch(fid, edid, name, produce):
-        return clone(clam, fid, edid, sets={
-            b'FULL': zstr(name),
-            b'PFIG': struct.pack('<I', produce),
-        })
-
-    catch_histcarp = catch(CATCH_HISTCARP, 'ThornswoodFishHistcarp', 'Histcarp', HISTCARP)
-    catch_betty = catch(CATCH_RIVER_BETTY, 'ThornswoodFishRiverBetty', 'River Betty', RIVER_BETTY)
-    catch_scales = catch(CATCH_SCALES, 'ThornswoodFishSlaughterfishScales', 'Slaughterfish Scales', SLAUGHTERFISH_SCALES)
-    catch_perch = catch(CATCH_PERCH, 'ThornswoodFishSilversidePerch', 'Silverside Perch', SILVERSIDE_PERCH)
-    catch_spadetail = catch(CATCH_SPADETAIL, 'ThornswoodFishCyrodilicSpadetail', 'Cyrodilic Spadetail', CYRODILIC_SPADETAIL)
-    catch_longfin = catch(CATCH_LONGFIN, 'ThornswoodFishAbeceanLongfin', 'Abecean Longfin', ABECEAN_LONGFIN)
-
-    # The three repair kits (#1384), and what makes each. See the top.
-    weapon_kit = clone(misc_src, WEAPON_KIT, 'ThornswoodMiscWeaponKit', sets={
-        b'FULL': zstr('Weapon Kit'),
-        b'DATA': struct.pack('<If', METAL_KIT_VALUE, METAL_KIT_WEIGHT),
-    })
-    armor_kit = clone(misc_src, ARMOR_KIT, 'ThornswoodMiscArmorKit', sets={
-        b'FULL': zstr('Armor Kit'),
-        b'DATA': struct.pack('<If', METAL_KIT_VALUE, METAL_KIT_WEIGHT),
-    })
-    sewing_kit = clone(misc_src, SEWING_KIT, 'ThornswoodMiscSewingKit', sets={
-        b'FULL': zstr('Sewing Kit'),
-        b'DATA': struct.pack('<If', SEWING_KIT_VALUE, SEWING_KIT_WEIGHT),
-    })
-    make_weapon_kit = clone(cobj_charcoal, RECIPE_WEAPON_KIT, 'ThornswoodRecipeWeaponKit', sets={
-        b'CNAM': struct.pack('<I', WEAPON_KIT),
-        b'BNAM': struct.pack('<I', FORGE_KEYWORD),
-    })
-    set_inputs(make_weapon_kit, [(IRON_INGOT, 1), (LEATHER_STRIPS, 1)])
-    make_armor_kit = clone(cobj_charcoal, RECIPE_ARMOR_KIT, 'ThornswoodRecipeArmorKit', sets={
-        b'CNAM': struct.pack('<I', ARMOR_KIT),
-        b'BNAM': struct.pack('<I', FORGE_KEYWORD),
-    })
-    set_inputs(make_armor_kit, [(IRON_INGOT, 1), (LEATHER, 1)])
-    make_sewing_kit = clone(cobj_charcoal, RECIPE_SEWING_KIT, 'ThornswoodRecipeSewingKit', sets={
-        b'CNAM': struct.pack('<I', SEWING_KIT),
-        b'BNAM': struct.pack('<I', TANNING_KEYWORD),
-    })
-    set_inputs(make_sewing_kit, [(TUNDRA_COTTON, 1), (LEATHER_STRIPS, 1)])
-
-    # The four treatments (#1383), and what makes each. See the top.
-    def treatment(fid, edid, name, value, weight):
-        return clone(misc_src, fid, edid, sets={
-            b'FULL': zstr(name),
-            b'DATA': struct.pack('<If', value, weight),
-        })
-
-    def recipe(fid, edid, out, bench, inputs):
-        r = clone(cobj_charcoal, fid, edid, sets={
-            b'CNAM': struct.pack('<I', out),
-            b'BNAM': struct.pack('<I', bench),
-        })
-        set_inputs(r, inputs)
-        return r
-
-    bandage = treatment(BANDAGE, 'ThornswoodMiscBandage', 'Bandage', BANDAGE_VALUE, BANDAGE_WEIGHT)
-    splint = treatment(SPLINT, 'ThornswoodMiscSplint', 'Splint', SPLINT_VALUE, SPLINT_WEIGHT)
-    poultice = treatment(POULTICE, 'ThornswoodMiscPoultice', 'Poultice', POULTICE_VALUE, POULTICE_WEIGHT)
-    remedy = treatment(REMEDY, 'ThornswoodMiscRemedy', "Physicker's Remedy", REMEDY_VALUE, REMEDY_WEIGHT)
-    make_bandage = recipe(RECIPE_BANDAGE, 'ThornswoodRecipeBandage', BANDAGE, LOOM_KEYWORD,
-                          [(TUNDRA_COTTON, 1)])
-    make_splint = recipe(RECIPE_SPLINT, 'ThornswoodRecipeSplint', SPLINT, KILN_KEYWORD,
-                         [(FIREWOOD, 1), (LEATHER_STRIPS, 1)])
-    make_poultice = recipe(RECIPE_POULTICE, 'ThornswoodRecipePoultice', POULTICE, ALCHEMY_KEYWORD,
-                           [(TUNDRA_COTTON, 1), (GARLIC, 1)])
-    make_remedy = recipe(RECIPE_REMEDY, 'ThornswoodRecipeRemedy', REMEDY, ALCHEMY_KEYWORD,
-                         [(MUDCRAB_CHITIN, 1), (BLUE_MOUNTAIN_FLOWER, 1)])
-
-    board = next((r for r in records if r.fid == BOARD and r.tag == b'ACTI'), None)
-    if board is None or board.compressed or board.editor_id() != 'ThornswoodMessageBoard':
+    own = thornswood_records(passage, clam)
+    unmade = sorted(remade - set(r.fid for r in own))
+    if unmade:
         print('')
-        print('STOP. ACTI 0x%07X is not ThornswoodMessageBoard as it should be. '
-              'Nothing was written.' % BOARD)
+        print('STOP. the register says 0x%07X is remade and this tool does not write it. '
+              'Nothing was written.' % unmade[0])
         return 1
-    # The hold's drop box (#2298): an activator of its own on its own mesh,
-    # cloned from the board, so E on it is the box's and never the board's.
-    drop_box = clone(board, DROP_BOX, 'ThornswoodDropBox', sets={
-        b'OBND': struct.pack('<6h', *DROP_BOX_BOUNDS),
-        b'FULL': zstr('Drop Box'),
-        b'MODL': zstr(DROP_BOX_MODEL),
-    }, drop=(b'MODT',))
+    built, rewritten = [], []
+    for r in own:
+        name = r.editor_id()
+        other = by_edid.get(name)
+        if other is not None and other.fid != r.fid:
+            print('')
+            print('STOP. %s is already in this plugin as 0x%07X and this writes it as 0x%07X. '
+                  'Nothing was written.' % (name, other.fid, r.fid))
+            return 1
+        have = by_fid.get(r.fid)
+        if have is None:
+            built.append(r)
+            continue
+        if have.tag != r.tag or have.compressed:
+            print('')
+            print('STOP. 0x%07X is a %s here and this writes a %s. Nothing was written.'
+                  % (r.fid, have.tag.decode(), r.tag.decode()))
+            return 1
+        if (have.data, have.flags, have.extra) != (r.data, r.flags, r.extra):
+            rewritten.append((have, r))
 
     # The Hearthfire house parts (#2258), overrides of a master's records. One
     # already in this plugin is edited where it is; one that is not is copied
     # in from HearthFires.esm. See the top.
-    plugin_masters = masters_of(raw)
     house_new, house_have = [], []
     for fid, edid in HOUSE_PARTS:
         have = next((r for r in records if r.fid == fid and r.tag == b'COBJ'), None)
@@ -1373,37 +1669,6 @@ def main():
         house_new.append(made_here)
     house_bare = [r for r in house_have
                   if not any(t == b'CTDA' and b == NEVER_TRUE for t, b in subrecords(r.data))]
-
-    # Woodworking bench (#516): keyword + furniture cloned from the alchemy lab,
-    # mesh and bounds from Hearthfire's carpenter workbench.
-    alchemy_kw = next((r for r in records if r.fid == ALCHEMY_KEYWORD and r.tag == b'KYWD'), None)
-    alchemy_furn = next((r for r in records
-                         if r.fid == 0x5042E69 and r.tag == b'FURN'), None)
-    if alchemy_kw is None or alchemy_kw.compressed or alchemy_kw.editor_id() != 'ThornswoodCraftingAlchemy':
-        print('')
-        print('STOP. KYWD 0x%07X is not ThornswoodCraftingAlchemy as it should be. '
-              'Nothing was written.' % ALCHEMY_KEYWORD)
-        return 1
-    if (alchemy_furn is None or alchemy_furn.compressed or
-            alchemy_furn.editor_id() != 'ThornswoodCraftingAlchemyWorkbench'):
-        print('')
-        print('STOP. FURN 0x%07X is not ThornswoodCraftingAlchemyWorkbench as it should be. '
-              'Nothing was written.' % 0x5042E69)
-        return 1
-    old_kwda = next((b for t, b in subrecords(alchemy_furn.data) if t == b'KWDA'), None)
-    if old_kwda is None:
-        print('')
-        print('STOP. alchemy workbench has no KWDA. Nothing was written.')
-        return 1
-    wood_kw = clone(alchemy_kw, WOODWORKING_KEYWORD, 'ThornswoodCraftingWoodworking')
-    wood_furn = clone(alchemy_furn, WOODWORKING_BENCH, 'ThornswoodCraftingWoodworkingWorkbench',
-                      sets={
-                          b'FULL': zstr(WOODWORKING_FULL),
-                          b'MODL': zstr(WOODWORKING_MODEL),
-                          b'OBND': struct.pack('<6h', *WOODWORKING_BOUNDS),
-                          b'KWDA': kwda_swap(old_kwda, ALCHEMY_KEYWORD, WOODWORKING_KEYWORD),
-                          b'WBDT': b'\x01\xff',
-                      }, drop=(b'MODT', b'MODS'))
 
     # Master recipe overrides onto the woodworking bench (#516).
     wood_new, wood_have = [], []
@@ -1433,108 +1698,161 @@ def main():
     wood_bare = [r for r in wood_have
                  if not any(t == b'BNAM' and struct.unpack_from('<I', b, 0)[0] == WOODWORKING_KEYWORD
                             for t, b in subrecords(r.data))]
+    built += house_new + wood_new
+
+    # WHAT THE REGISTER SAYS GOES (#2553): the placements and switched-off
+    # Skyrim objects nothing of Thornswood's asks for, the cells and worlds left
+    # holding nothing, and the one base record nothing names.
+    going = set(f for f in dropping if f in by_fid)
+    removing |= going
+
+    # The cell and world records that stay hold the stations' placements.
+    # Each is written from the winning master's own record, Bethesda's, never
+    # the salvaged copy. That needs the masters; without them a record that is
+    # already Bethesda's is left as it is, and one that is still the salvaged
+    # copy stops the tool below.
+    world_keep = [r for r in records if r.tag in (b'CELL', b'WRLD') and r.fid not in removing
+                  and (r.fid >> 24) < len(plugin_masters)]
+    world_new = bethesdas_world_records(args.masters, plugin_masters,
+                                        [(r.tag, r.fid) for r in world_keep]) if world_keep else {}
+    world_from = {}
+    if world_new is not None:
+        for r in world_keep:
+            flags, data, src, ctx = world_new[(r.tag, r.fid)]
+            world_from[r.fid] = src
+            if (r.data, r.flags, r.extra) != (data, flags, FORM_TAIL):
+                rewritten.append((r, Rec(r.tag, flags, r.fid, FORM_TAIL, data)))
+
+    # WHERE THE STATIONS STAND (#2553, Patrick's A of 16 October): every
+    # placement game\data\station-sites.json measures, and nothing else. A
+    # placement already where the table puts it stays; one the table moved is
+    # written over, or taken out of its old cell and put in its new one; a
+    # cell or worldspace a placement needs that the plugin does not carry is
+    # copied from the winning master's own record.
+    sites = json.load(open(STATION_SITES, encoding='utf-8'))
+    want, want_cell, want_world = {}, {}, {}
+    own_index = len(plugin_masters)
+    for name, row in sorted(sites['sites'].items()):
+        fid = local_fid(row['ref'], plugin_masters, args.plugin)
+        base = local_fid(row['base'], plugin_masters, args.plugin)
+        cell = local_fid(row['cell'], plugin_masters, args.plugin)
+        if base not in STATION_BASES or (fid >> 24) != own_index or (cell >> 24) >= own_index or fid in want:
+            print('')
+            print('STOP. the station table\'s %s is not a placement of a station in this plugin, in a cell of '
+                  'its masters, under a form id of its own. Nothing was written.' % name)
+            return 1
+        if fid in taken and fid not in placed_ids(tree):
+            print('')
+            print('STOP. the station table gives %s 0x%07X, which this plugin uses for something else. '
+                  'Nothing was written.' % (name, fid))
+            return 1
+        want[fid] = placement(fid, base, row['pos'], row['angle'])
+        want_cell[fid] = cell
+        want_world[fid] = None if row['interior'] else local_fid(row['space'], plugin_masters, args.plugin)
+    stays, moved, to_place = set(), set(), []
+    for r, parent, cell in placements_in(tree):
+        if r.fid in removing:
+            continue
+        if r.fid not in want:
+            print('')
+            print('STOP. REFR 0x%07X is a placement neither the station table nor the register knows. '
+                  'Nothing was written.' % r.fid)
+            return 1
+        if cell != want_cell[r.fid]:
+            moved.add(r.fid)
+            continue
+        stays.add(r.fid)
+        if (r.data, r.flags, r.extra) != (want[r.fid].data, want[r.fid].flags, want[r.fid].extra):
+            rewritten.append((r, want[r.fid]))
+    to_place = [want[f] for f in sorted(want) if f not in stays]
+    need = set()
+    for r in to_place:
+        cell = want_cell[r.fid]
+        if cell in removing or find_cell(tree, cell) is None:
+            if cell in removing:
+                print('')
+                print('STOP. the register says cell 0x%08X goes, and the station table places 0x%07X in it. '
+                      'Run scripts\\mods\\List-SalvagedRecords.py. Nothing was written.' % (cell, r.fid))
+                return 1
+            need.add((b'CELL', cell))
+        w = want_world[r.fid]
+        if w is not None and find_world(tree, w) is None:
+            need.add((b'WRLD', w))
+    copies = {}
+    if need:
+        copies = bethesdas_world_records(args.masters, plugin_masters, sorted(need))
+        if copies is None:
+            print('')
+            print('STOP. %d cell or worldspace record(s) the stations need are not in this plugin, and the '
+                  'masters are not in %s. Give --masters the game\'s Data folder. Nothing was written.'
+                  % (len(need), args.masters))
+            return 1
+
+    # A salvaged record that is not going and not written over is refused
+    # here, before anything else: put back by hand, or by an old copy, it
+    # would otherwise ride along with a run that has nothing else to do.
+    replacing = set(o.fid for o, n in rewritten)
+    for r in records:
+        if r.fid in removing or r.fid in replacing:
+            continue
+        # One the register says left before #2553 (the skill manuals, the
+        # Execution Block and its placement) is refused by its form id too,
+        # however it was edited since.
+        salvaged_bytes = body_hash(plain(r)) in salvaged_hashes and r.fid not in same_by_design
+        if r.fid in gone_before or salvaged_bytes:
+            print('')
+            print('STOP. %s 0x%07X %s is a salvaged record (#2553), by its %s, and the register '
+                  'keeps no such record. Nothing was written.'
+                  % (r.tag.decode(), r.fid, r.editor_id(), 'bytes' if salvaged_bytes else 'form id'))
+            return 1
 
     print('')
-    print('What goes in')
-    print('  MISC 0x%07X ThornswoodMiscToolHandle      Tool Handle, %d gold, %s weight'
-          % (HANDLE, HANDLE_VALUE, HANDLE_WEIGHT))
-    print('  COBJ 0x%07X ThornswoodRecipeToolHandle    1 firewood -> 1 handle, at the kiln'
-          % RECIPE_HANDLE)
-    print('  COBJ 0x%07X ThornswoodRecipeToolShovel    1 iron ingot + 1 handle -> 1 shovel, at a forge'
-          % RECIPE_SHOVEL)
-    print('  BOOK 0x%07X ThornswoodBookDeed            one record, named per instance in the pack'
-          % DEED)
-    print('  MISC 0x%07X ThornswoodMiscKey             a key somebody can lose, so MISC and not KEYM'
-          % KEY)
-    print('  MISC 0x%07X ThornswoodMiscKeyMold         the mold a smith cuts keys from'
-          % MOLD)
-    print('  MISC 0x%07X ThornswoodMiscMasterKey       one building\'s master key, named per instance, '
-          'no recipe' % MASTER_KEY)
-    print('  COBJ 0x%07X ThornswoodRecipeKeyMold       1 iron ingot -> 1 blank mold, at a forge'
-          % RECIPE_MOLD)
-    print('  COBJ 0x%07X ThornswoodRecipeKey           1 iron ingot -> 1 key, at a forge, named '
-          'by the stamped mold in the pack'
-          % RECIPE_KEY)
-    print('  MISC/COBJ poles and fish trap, fisher.md ingredients, no dragon bone')
-    print('  FLOR ThornswoodFishHistcarp')
-    print('  FLOR ThornswoodFishRiverBetty')
-    print('  FLOR ThornswoodFishSlaughterfishScales')
-    print('  FLOR ThornswoodFishSilversidePerch')
-    print('  FLOR ThornswoodFishCyrodilicSpadetail')
-    print('  FLOR ThornswoodFishAbeceanLongfin')
-    print('  MISC 0x%07X ThornswoodMiscWeaponKit       Weapon Kit, %d gold, %s weight'
-          % (WEAPON_KIT, METAL_KIT_VALUE, METAL_KIT_WEIGHT))
-    print('  MISC 0x%07X ThornswoodMiscArmorKit        Armor Kit, %d gold, %s weight'
-          % (ARMOR_KIT, METAL_KIT_VALUE, METAL_KIT_WEIGHT))
-    print('  MISC 0x%07X ThornswoodMiscSewingKit       Sewing Kit, %d gold, %s weight'
-          % (SEWING_KIT, SEWING_KIT_VALUE, SEWING_KIT_WEIGHT))
-    print('  COBJ 0x%07X ThornswoodRecipeWeaponKit     1 iron ingot + 1 leather strips -> 1 Weapon Kit, at a forge'
-          % RECIPE_WEAPON_KIT)
-    print('  COBJ 0x%07X ThornswoodRecipeArmorKit      1 iron ingot + 1 leather -> 1 Armor Kit, at a forge'
-          % RECIPE_ARMOR_KIT)
-    print('  COBJ 0x%07X ThornswoodRecipeSewingKit     1 tundra cotton + 1 leather strips -> 1 Sewing Kit, '
-          'at a tanning rack' % RECIPE_SEWING_KIT)
-    print('  MISC 0x%07X ThornswoodMiscBandage         Bandage, %d gold, %s weight'
-          % (BANDAGE, BANDAGE_VALUE, BANDAGE_WEIGHT))
-    print('  MISC 0x%07X ThornswoodMiscSplint          Splint, %d gold, %s weight'
-          % (SPLINT, SPLINT_VALUE, SPLINT_WEIGHT))
-    print('  MISC 0x%07X ThornswoodMiscPoultice        Poultice, %d gold, %s weight'
-          % (POULTICE, POULTICE_VALUE, POULTICE_WEIGHT))
-    print("  MISC 0x%07X ThornswoodMiscRemedy          Physicker's Remedy, %d gold, %s weight"
-          % (REMEDY, REMEDY_VALUE, REMEDY_WEIGHT))
-    print('  COBJ 0x%07X ThornswoodRecipeBandage       1 tundra cotton -> 1 Bandage, at the loom'
-          % RECIPE_BANDAGE)
-    print('  COBJ 0x%07X ThornswoodRecipeSplint        1 firewood + 1 leather strips -> 1 Splint, at the kiln'
-          % RECIPE_SPLINT)
-    print('  COBJ 0x%07X ThornswoodRecipePoultice      1 tundra cotton + 1 garlic -> 1 Poultice, at the alchemy lab'
-          % RECIPE_POULTICE)
-    print("  COBJ 0x%07X ThornswoodRecipeRemedy        1 mudcrab chitin + 1 blue mountain flower -> 1 Physicker's "
-          'Remedy, at the alchemy lab' % RECIPE_REMEDY)
+    print('What this tool writes from its own numbers (#2553)')
+    for r in own:
+        state = ('added' if r in built else
+                 'rewritten' if any(n is r for _, n in rewritten) else 'as it is')
+        print('  %s 0x%07X %-40s %s' % (r.tag.decode(), r.fid, r.editor_id(), state))
     for r in house_new:
         print("  COBJ 0x%08X %-30s HearthFires.esm's, never listed: GetItemCount(gold) < 0"
               % (r.fid, r.editor_id()))
-    print('  ACTI 0x%07X ThornswoodDropBox             the hold\'s drop box, %s'
-          % (DROP_BOX, DROP_BOX_MODEL))
-    print('  KYWD 0x%07X ThornswoodCraftingWoodworking  the woodworker\'s bench keyword (#516)'
-          % WOODWORKING_KEYWORD)
-    print('  FURN 0x%07X ThornswoodCraftingWoodworkingWorkbench  %s, mesh %s'
-          % (WOODWORKING_BENCH, WOODWORKING_FULL, WOODWORKING_MODEL))
     for r in wood_new:
         print('  COBJ 0x%08X %-30s %s override, BNAM -> woodworking bench'
               % (r.fid, r.editor_id(), next(m for f, e, m in WOODWORKER_MASTER_RECIPES if f == r.fid)))
-    print('')
-    print('What changes')
+    if house_bare or wood_bare:
+        print('')
+        print('What changes')
     for r in house_bare:
         print('  COBJ 0x%08X %-30s gains the condition that is never true' % (r.fid, r.editor_id()))
     for r in wood_bare:
         print('  COBJ 0x%08X %-30s BNAM -> woodworking bench' % (r.fid, r.editor_id()))
-    for fid in WOODWORKER_OWN_RECIPES:
-        have = next((r for r in records if r.fid == fid and r.tag == b'COBJ'), None)
-        if have is None:
-            continue
-        if any(t == b'BNAM' and struct.unpack_from('<I', b, 0)[0] == WOODWORKING_KEYWORD
-               for t, b in subrecords(have.data)):
-            continue
-        print('  COBJ 0x%07X %-30s BNAM forge -> woodworking bench' % (have.fid, have.editor_id()))
-    print('  ACTI 0x%07X ThornswoodMessageBoard        its mesh is %s' % (BOARD, BOARD_MODEL))
-    print('  COBJ 0x%07X ThornswoodRecipeWeaponPickaxe now wants a handle as well as the ingot'
-          % cobj_pickaxe.fid)
-    print('  COBJ 0x%07X ThornswoodRecipeWeaponAxe     now wants a handle as well as the ingot'
-          % cobj_axe.fid)
-    if block_scripted:
-        print('  FURN 0x%07X %s loses the script it named, which never shipped'
-              % (block.fid, block.editor_id()))
+    print('')
+    print('Cells and worlds')
+    if world_new is None:
+        print('  the masters are not in %s, so the %d that stay are left as they are'
+              % (args.masters, len(world_keep)))
+    else:
+        changed = sum(1 for o, n in rewritten if o.tag in (b'CELL', b'WRLD'))
+        print('  %d stay, each written from its winning master, %d of them changed now'
+              % (len(world_keep), changed))
     if removing:
         print('')
         print('What comes out')
-    if EXECUTION_BLOCK_REF in removing:
-        print('  REFR 0x%07X the Execution Block placed in Solitude' % EXECUTION_BLOCK_REF)
-    if EXECUTION_BLOCK in removing:
-        print('  FURN 0x%07X %s, its base, named by nothing else'
-              % (EXECUTION_BLOCK, block.editor_id()))
-    for r in on_block:
-        print('  kept: FURN 0x%07X stays, because %s 0x%07X %s names it'
-              % (EXECUTION_BLOCK, r.tag.decode(), r.fid, r.editor_id()))
+    if going:
+        kinds = {}
+        for f in going:
+            kinds[by_fid[f].tag.decode()] = kinds.get(by_fid[f].tag.decode(), 0) + 1
+        print('  salvaged, nothing of Thornswood\'s asks for them (#2553): %s'
+              % ', '.join('%d %s' % (n, t) for t, n in sorted(kinds.items())))
+    print('')
+    print('Where the stations stand (#2553, game\\data\\station-sites.json)')
+    kinds = {}
+    for r in want.values():
+        b = struct.unpack_from('<I', dict(subrecords(r.data))[b'NAME'])[0]
+        kinds[b] = kinds.get(b, 0) + 1
+    print('  %s' % ', '.join('%d %s' % (kinds.get(b, 0), n) for b, n in sorted(STATION_NAMES.items())))
+    print('  %d already where the table puts them, %d moved to another cell, %d placed now, %d cell and '
+          'worldspace record(s) copied from the masters for them'
+          % (len(stays), len(moved), len(to_place) - len(moved), len(copies)))
 
     new_head, head_changed = described(head)
     print('')
@@ -1549,60 +1867,71 @@ def main():
         print('  --check, so nothing was written.')
         return 0
 
-    built = [r for r in (handle, make_handle, make_shovel, deed, key, mold,
-                         make_mold, make_key,
-                         pole_crude, pole_fine, pole_master, fish_trap,
-                         make_pole_crude, make_pole_fine, make_pole_master, make_trap,
-                         catch_histcarp, catch_betty, catch_scales, catch_perch,
-                         catch_spadetail, catch_longfin,
-                         weapon_kit, armor_kit, sewing_kit,
-                         make_weapon_kit, make_armor_kit, make_sewing_kit,
-                         bandage, splint, poultice, remedy,
-                         make_bandage, make_splint, make_poultice, make_remedy,
-                         drop_box, master_key, wood_kw, wood_furn)
-             if r.editor_id() not in already] + house_new + wood_new
-    # An edit that has already been made is not made twice. A recipe that already
-    # asks for a handle would otherwise gain a second one on every run.
     edited = set()
-    for rec in (cobj_pickaxe, cobj_axe):
-        if any(t == b'CNTO' and len(b) >= 4 and
-               struct.unpack_from('<I', b, 0)[0] == HANDLE
-               for t, b in subrecords(rec.data)):
-            continue
-        wants_handle(rec)
-        edited.add(rec.fid)
-    if block is not None and EXECUTION_BLOCK not in removing and drop_script(block):
-        edited.add(block.fid)
+    for old, new in rewritten:
+        old.data, old.flags, old.extra = new.data, new.flags, new.extra
+        edited.add(old.fid)
+    world_rewritten = set(o.fid for o, n in rewritten if o.tag in (b'CELL', b'WRLD'))
     # A house part already overridden here keeps or gains the condition (#2258).
     for r in house_have:
         if never_listed(r):
             edited.add(r.fid)
-    # Woodworking bench overrides and our poles/trap (#516).
+    # Woodworking bench overrides (#516).
     for r in wood_have:
         if set_bnam(r, WOODWORKING_KEYWORD):
             edited.add(r.fid)
-    for fid in WOODWORKER_OWN_RECIPES:
-        have = next((r for r in records if r.fid == fid and r.tag == b'COBJ'), None)
-        if have is not None and set_bnam(have, WOODWORKING_KEYWORD):
-            edited.add(have.fid)
-    # A key and a mold already in the plugin get their own meshes (#2255).
-    for name, model in (('ThornswoodMiscKey', KEY_MODEL), ('ThornswoodMiscKeyMold', MOLD_MODEL)):
-        if name in already and set_model(by_edid[name], model):
-            edited.add(by_edid[name].fid)
-    # The notice board's own mesh and its bounds (#2298).
-    board_moved = set_model(board, BOARD_MODEL)
-    if set_bounds(board, BOARD_BOUNDS) or board_moved:
-        edited.add(board.fid)
-    if not built and not edited and not removing and not head_changed:
+    if not built and not edited and not removing and not head_changed and not to_place:
         print('')
-        print('  Everything this adds is already in the plugin. Nothing was written.')
+        print('  Everything this writes is already in the plugin as it writes it. Nothing was written.')
         return 0
     old_head = bytes(head)
     head = new_head
+    # The stations go in before anything comes out, so a cell that loses the
+    # other server's placement and gains Thornswood's keeps its record.
+    for f in moved:
+        for r, parent, cell in placements_in(tree):
+            if r.fid == f:
+                parent.remove(r)
+                break
+    stamp = next(k for k in tree if isinstance(k, Grup)).label[12:16]
+    built_world = []
+    for (tag, fid), (flags, data, src, ctx) in sorted(copies.items(), key=lambda x: (x[0][0] != b'WRLD', x[0][1])):
+        rec = Rec(tag, flags, fid, FORM_TAIL, data)
+        built_world.append(rec)
+        if tag == b'WRLD':
+            put_world(tree, rec, stamp)
+        else:
+            w = next(want_world[f] for f in want if want_cell[f] == fid)
+            put_cell(tree, rec, ctx, w, stamp)
+    for r in to_place:
+        put_placement(tree, r, want_cell[r.fid], stamp)
+    built_world += to_place
     tree = take_out(tree, removing)
+    tree = drop_bare_parents(tree)
+    # A record this adds goes where it belongs in the order this tool writes
+    # its records in, not at the end of its group: a house part copied back in
+    # from HearthFires.esm lands before the woodworking overrides, where it
+    # was, so the same records always make the same file.
+    order = ([r.fid for r in own] + [f for f, _ in HOUSE_PARTS] +
+             [f for f, _, _ in WOODWORKER_MASTER_RECIPES])
+    rank = dict((f, i) for i, f in enumerate(order))
     for r in built:
-        ensure_top_group(tree, r.tag).kids.append(r)
-    kept = [r for r in records if r.fid not in removing]
+        group = ensure_top_group(tree, r.tag)
+        at = next((i for i, k in enumerate(group.kids)
+                   if isinstance(k, Rec) and rank.get(k.fid, -1) > rank.get(r.fid, len(order))),
+                  len(group.kids))
+        group.kids.insert(at, r)
+    built += built_world
+    added = set(r.fid for r in built)
+    kept_ids = set(r.fid for r in every_record(tree)) - added
+    # A placement the table moved to another cell is in the file again, added.
+    gone_unasked = sorted(f for f in before if f not in kept_ids and f not in removing and f not in moved)
+    if gone_unasked:
+        print('')
+        print('STOP. 0x%07X went with nothing left under it, and the register does not say it goes. '
+              'Nothing was written.' % gone_unasked[0])
+        return 1
+    kept = [r for r in records if r.fid in kept_ids]
 
     # The header's record count, which sits in HEDR after the version float.
     #
@@ -1610,8 +1939,8 @@ def main():
     # the file is wrong and has been for as long as this repo has had the file.
     # Measured 21 September across three copies: before the conditions edit,
     # before the manual trim, and after, the header said 408 every time, while
-    # the file actually held 392, 392 and 376. So neither
-    # Rename-ContentRecords.ps1 nor Remove-DeadRecords.ps1 has ever touched it,
+    # the file actually held 392, 392 and 376. So neither the editor id rename
+    # of 21 September nor Remove-DeadRecords.ps1 has ever touched it,
     # and the plugin has been shipping and working at 408 against 392, which is
     # the evidence that the engine does not read it. Adding three to a wrong
     # number would keep it wrong; this writes what is actually there.
@@ -1632,11 +1961,12 @@ def main():
     print('')
     print('Does the result verify')
     after_records = list(every_record(parse(out, len(head), len(out))))
-    # The header: the other server's name nowhere in it, and nothing changed
-    # but the description and the record count.
+    # The header: the other server's name and short forms nowhere in it, and
+    # nothing changed but the description and the record count.
     out_head = out[:len(head)]
-    if OTHER_SERVER_NAME in out_head.lower():
-        print('  STOP. the header still carries the other server\'s name. Nothing was written.')
+    if other_server_in_header(out_head):
+        print('  STOP. the header still carries the other server\'s name or a short form of it. '
+              'Nothing was written.')
         return 1
     def header_rest(h):
         return [(t, b) for t, b in subrecords(h[24:]) if t not in (b'SNAM', b'HEDR')]
@@ -1656,14 +1986,10 @@ def main():
         print('  STOP. 0x%07X was to come out and is still there. Nothing was written.'
               % back[0].fid)
         return 1
-    added = set(r.fid for r in built)
-    seen = []
-    for r in after_records:
-        if r.fid in added:
-            continue
-        seen.append(r)
+    seen = [r for r in after_records if r.fid not in added]
     for was_r, now in zip(kept, seen):
-        if was_r.fid != now.fid or was_r.tag != now.tag or was_r.flags != now.flags:
+        if (was_r.fid != now.fid or was_r.tag != now.tag or
+                (was_r.flags != now.flags and now.fid not in world_rewritten)):
             print('  STOP. 0x%07X changed identity. Nothing was written.' % was_r.fid)
             return 1
         if now.fid not in edited and now.data != before[was_r.fid]:
@@ -1676,12 +2002,34 @@ def main():
             print('  STOP. 0x%07X did not come back as it was built. Nothing was written.'
                   % b.fid)
             return 1
-    if block is not None and block.fid in edited:
-        now = next(r for r in after_records if r.fid == block.fid)
-        want = [(t, b) for t, b in subrecords(before[block.fid]) if t != b'VMAD']
-        if subrecords(now.data) != want:
-            print('  STOP. 0x%07X lost more than its script. Nothing was written.' % block.fid)
+    now_by_fid = dict((r.fid, r) for r in after_records)
+    for r in own:
+        if now_by_fid[r.fid].data != r.data:
+            print('  STOP. 0x%07X is not what this tool writes for it. Nothing was written.' % r.fid)
             return 1
+    if orphan_groups(tree):
+        print('  STOP. a cell or world group is left without its record. Nothing was written.')
+        return 1
+    # THE PLACEMENTS ARE THE STATION TABLE'S, each in its cell, and no other.
+    there = dict((r.fid, (r, cell)) for r, parent, cell in placements_in(tree))
+    if sorted(there) != sorted(want) or any(there[f][0].data != want[f].data or there[f][1] != want_cell[f]
+                                            for f in want):
+        print("  STOP. the placements are not the station table's, each in its cell. Nothing was written.")
+        return 1
+    # NOTHING SALVAGED IS LEFT (#2553), but the four kiln recipes and the
+    # pickaxe and the axe, every field of which the rulebook states (the
+    # register's sameByDesign says which line).
+    left_salvaged = []
+    for r in after_records:
+        h = body_hash(plain(r))
+        if h in salvaged_hashes and r.fid not in same_by_design:
+            left_salvaged.append(r)
+    if left_salvaged:
+        for r in left_salvaged:
+            print('  STOP. %s 0x%07X %s is still a salvaged record, byte for byte.'
+                  % (r.tag.decode(), r.fid, r.editor_id()))
+        print('  Nothing was written.')
+        return 1
     left = [(r, w) for r in after_records for w in other_server_names(r)]
     if left:
         for r, w in left:
@@ -1694,12 +2042,16 @@ def main():
         print('  STOP. the header says %d records and there are %d. Nothing was written.'
               % (count, len(after_records)))
         return 1
-    print('  ok    %d records in, %d out, same order, same ids, same flags'
+    print('  ok    %d records in, %d out, same order, same ids'
           % (len(records), len(after_records)))
     print('  ok    %d added, %d edited, %d taken out, every other byte untouched'
           % (len(built), len(edited), len(removing)))
+    print('  ok    every record this tool writes is what it writes')
+    print("  ok    the %d placements are the station table's, each in its cell" % len(want))
+    print('  ok    no salvaged record is left')
     print('  ok    the header record count reads %d, which is what is in the file' % count)
-    print('  ok    no record carries the other server\'s name, compressed ones included')
+    print('  ok    no record carries the other server\'s name or its short forms, '
+          'compressed ones included')
     print('  ok    the header carries Thornswood\'s description and not that name, '
           'and nothing else in it moved')
 

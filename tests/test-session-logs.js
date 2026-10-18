@@ -70,7 +70,7 @@ function sessionRows() { return ROWS; }
 
 eval([
   grab('slogFile'), grab('slogTrim'), grab('putSessionLogs'),
-  grab('retentionSay'), grab('pruneSessionLogs'), grab('serverLogSlice')
+  grab('retentionSay'), grab('pruneSessionLogs'), grab('serverLogGenerations'), grab('serverLogSlice')
 ].join('\n'));
 
 let pass = 0, fail = 0;
@@ -191,38 +191,30 @@ const missing = serverLogSlice('dev', from, to);
 yes('a server log that is not on this box says so rather than throwing',
     missing.ok === false && missing.lines.length === 0 && String(missing.why).length > 0);
 
-// ---- the server log slice after a roll (entry 220) -------------------------
+// ---- the server log slice after a roll (entry 220, #2349) ------------------
 /*
-  roll-log.ps1 runs in front of the game server on every start, and moves a
-  server.log of 4 MB or more to server.log.1. Found in review, measured: a
-  crash with the log past 4 MB, the watcher's restart rolled it, and the page
-  then showed nothing for the crash session, because the slice read
-  server.log and nothing else. So this builds that log, rolls it with the
-  real Roll-Log.ps1 the way the task line runs it, and asks again.
+  The game server runs under server-log.js, which moves server.log aside into
+  server.log.<when> at a start when it is full or from another day, at
+  midnight, at 4 MB, and at every install whatever the size. Found in review
+  (entry 220), measured: a crash with the log past 4 MB, the watcher's restart
+  rolled it, and the page then showed nothing for the crash session, because
+  the slice read server.log and nothing else. So this builds that log, rolls
+  it with the real writer's own roll, and asks again.
 */
-const { spawnSync } = require('child_process');
-const ROLLER = path.join(REPO_DIR, 'scripts', 'vps', 'Roll-Log.ps1');
-const WINPS = path.join(process.env.SystemRoot || 'C:\\Windows',
-                        'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
-let rolledBy = 'Roll-Log.ps1';
+const WRITER = require(path.join(REPO_DIR, 'scripts', 'vps', 'Server-Log.js'));
+const rolledBy = 'Server-Log.js';
+/* A start's roll (only when full or from another day) or, forced, an
+   install's. The 30 days are left out on purpose: these lines are dated
+   22 September and the sweep is tests\test-2349-server-log.js's. Each roll
+   is a millisecond apart from the last, as a real one is, so no two rolled
+   files share a last-write time. */
+let rollClock = new Date(2026, 8, 22, 23, 0, 0).getTime();
 function rollLog(file, force) {
-  if (fs.existsSync(WINPS)) {
-    const args = ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
-                  '-File', ROLLER, '-Path', file];
-    if (force) args.push('-Force');
-    const r = spawnSync(WINPS, args, { encoding: 'utf8' });
-    return String(r.stdout || '') + String(r.stderr || '');
-  }
-  /* No Windows PowerShell here, so the roll is done the way the roller does
-     it, and the run says so rather than passing as if the real one ran. */
-  rolledBy = 'a stand-in for Roll-Log.ps1';
-  if (!force && fs.statSync(file).size < 4 * 1024 * 1024) return '';
-  if (fs.existsSync(file + '.5')) fs.unlinkSync(file + '.5');
-  for (let i = 4; i >= 1; i--) {
-    if (fs.existsSync(file + '.' + i)) fs.renameSync(file + '.' + i, file + '.' + (i + 1));
-  }
-  fs.renameSync(file, file + '.1');
-  return 'rolled';
+  rollClock += 1000;
+  if (!force && !WRITER.rollAtStart(file, rollClock)) return '';
+  const to = WRITER.rollFile(file, rollClock);
+  if (to) fs.utimesSync(to, new Date(rollClock), new Date(rollClock));
+  return to ? 'rolled ' + path.basename(to) : '';
 }
 const has = (s, what) => s.lines.some(l => l.indexOf(what) >= 0);
 const at = (h, m) => new Date(2026, 8, 22, h, m, 0).getTime();
@@ -246,15 +238,15 @@ yes('before the restart, the crash session is on the page',
     has(serverLogSlice('main', crashFrom, crashTo), 'FATAL the server went down'));
 
 const said = rollLog(SERVER_LOGS.main, false);
-yes('the roller moved the 4 MB log aside, as it does in front of every start',
+yes('the writer moved the 4 MB log aside, as it does at a start',
     said.indexOf('rolled') >= 0 && !fs.existsSync(SERVER_LOGS.main) &&
-    fs.existsSync(SERVER_LOGS.main + '.1'));
+    WRITER.rolledFiles(SERVER_LOGS.main).length === 1);
 
 const between = serverLogSlice('main', crashFrom, crashTo);
 yes('in the moment before the server opens a new server.log, the crash session is still found',
     between.ok && has(between, 'FATAL the server went down'));
 
-/* The restart, writing a fresh server.log the way cmd's >> does. */
+/* The restart, the writer opening a fresh server.log. */
 fs.writeFileSync(SERVER_LOGS.main,
   '[2026-09-22 22:07:00.000] [console] [info] the server is up again\n' +
   '[2026-09-22 22:30:00.000] [console] [info] a session after the restart\n');
@@ -273,11 +265,12 @@ const fi = across.lines.findIndex(l => l.indexOf('FATAL') >= 0);
 const ui = across.lines.findIndex(l => l.indexOf('the server is up again') >= 0);
 yes('a session across the restart has both halves, oldest first', fi >= 0 && ui > fi);
 
-/* An install rolls whatever the size, so the run before it can be a small .1
-   with the crash a generation further back in .2. */
+/* An install rolls whatever the size, so the run before it can be a small
+   rolled file with the crash a generation further back. */
 rollLog(SERVER_LOGS.main, true);
 fs.writeFileSync(SERVER_LOGS.main, '[2026-09-22 23:00:00.000] [console] [info] installed\n');
-yes('an install roll put the crash in server.log.2', fs.existsSync(SERVER_LOGS.main + '.2'));
+yes('an install roll put the crash a generation further back',
+    WRITER.rolledFiles(SERVER_LOGS.main).length === 2);
 yes('and the crash session is still found there',
     has(serverLogSlice('main', crashFrom, crashTo), 'FATAL the server went down'));
 
@@ -613,6 +606,11 @@ const TROUBLE_KEEP = 200;
 const jsonFile = (p, fb) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { return fb; } };
 const putJson = (p, o) => { try { fs.writeFileSync(p, JSON.stringify(o, null, 2), 'utf8'); return true; } catch (e) { return false; } };
 eval(grab('noteTrouble'));
+// Since #2166 noteTrouble ages the file by the session window on the way in,
+// through freshTrouble, which reads which sessions are kept from the same
+// sessionRows stand-in as the log prune above.
+const SESSIONS_DAYS = 365;
+eval(grab('freshTrouble'));
 
 const started = new Date(2026, 8, 23, 20, 7, 0).getTime();
 const ended = new Date(2026, 8, 23, 21, 30, 0).getTime();

@@ -112,7 +112,7 @@ Write-Host ''; Write-Host 'what Thornswood ships'
 $ours = @(
     'Data\Platform\UI\index.html', 'Data\Platform\UI\thornswood-select.js', 'Data\Platform\Plugins\thornswood-front.js',
     'Data\Platform\Distribution\RuntimeDependencies\SkyrimPlatformImpl.dll', 'Data\Platform\Distribution\RuntimeDependencies\SkyrimPlatformCEF.exe.hidden',
-    'Data\Platform\Modules\skyrimPlatform.ts', 'Data\Platform\Images\lock.png', 'Data\Platform\Fonts\x.ttf',
+    'Data\Platform\Modules\skyrimPlatform.ts', 'Data\Platform\Images\x.png', 'Data\Platform\Fonts\x.ttf',
     'Data\Interface\skyui\config.shipped.txt', 'Data\Interface\skyhud\skyhud.txt',
     'Data\SKSE\Plugins\CommunityShaders\SettingsDefault.json', 'Data\MCM\Config\TrueHUD\settings.ini', 'Data\SKSE\Plugins\ImGuiVRHelper.toml',
     'Data\Thornswood-Content.esp', 'Data\ElysiumEstateSSE.esp', 'Data\Scripts\MCM.pex', 'Data\SKSE\Plugins\ThornswoodExtra.ini',

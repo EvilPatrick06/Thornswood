@@ -573,9 +573,10 @@ Any developer may run a main Ship from a machine that can sign (How work moves).
 
 Ship builds a channel's release from one folder on each machine: the main
 install for main and `<Root>-DevBuild` for dev, unless the machine has
-recorded another (issue #1692). On a machine whose Vortex deploys into the
-dev build's game folder (docs/COLLECTION-REVISION-2.md step 8), record the
-release folder once. On One it is `local\release-devbuild` in the
+recorded another (issue #1692). Vortex deploys into the Steam copy; the
+launcher refuses a Thornswood game folder as Vortex's folder since #2210
+(docs/COLLECTION-REVISION-2.md step 8). A machine that keeps its release
+folder apart from its installs records it once. On One it is `local\release-devbuild` in the
 repository folder since 5 Oct, because Thornswood work on One lives only in
 the repository, the vault and `C:\ThornswoodTemps&Worktrees` (Patrick); give
 the whole path, since every clone and worktree reads what is recorded:
@@ -854,8 +855,15 @@ Two names are in no tracked file at all, code, tests, records, data,
 comes back: the multiplayer mod this build replaced (#497,
 `tests\test-old-name-gone.js`), and the SkyMP server `Thornswood-Content.esp`
 was salvaged from (#400, Patrick, 12 Oct: "no records may keep it";
-`tests\test-other-server-name-gone.js`). Say "the other server" in prose and
-OtherServer in a file, folder or code name.
+`tests\test-other-server-name-gone.js`), along with that server's two short
+forms, the prefix its editor ids, scripts and folders carried (Patrick,
+15 Oct, decision C). Say "the other server" in prose and OtherServer in a
+file, folder or code name. A check that has to find that server's leftovers
+on a machine matches them by their shape, never by its name: its parking
+folder in Data is `_disabledBy` and a name, its backup and plugin list
+beside the game are `<name>-backup-<version>` and `_<name>-plugins-off`
+(`scripts\release\Ship-Rules.ps1`, Test-ShipOtherServer), and any other file
+of its is simply not on the list of ours.
 
 No machine checks these, so the person writing keeps them: plain, direct
 sentences with no filler; the text inside code (the launcher's messages, the
@@ -1058,7 +1066,9 @@ from the board, none of these three puts an issue aside:
   until the folder exists (tests\test-own-folder-first.ps1).
   Decided by Patrick on 29 Sep (#1232): `Thornswood\Game` takes only
   Skyrim's own files (from the Steam copy when it is on the pinned build, or
-  the Downgrade's download), Vortex's deployed files by Vortex's own record,
+  the Downgrade's download; for a ship root, also from a folder that holds
+  that build's files byte for byte, checked file by file first, #2603),
+  Vortex's deployed files by Vortex's own record,
   and Thornswood's own files. Skyrim's own is the pinned build's file list,
   `records\skyrim-files.json`, read out of the depot manifests the Downgrade
   uses, never a guess by folder. A mod put into the Steam copy by hand stays
@@ -1485,8 +1495,11 @@ The machine that runs `Ship.ps1` still has to sign the build. `records\signing\s
 | Dev gamemode | `.\scripts\deploy\Deploy-DevGamemode.ps1` | Dev server only |
 | Live gamemode | `.\scripts\deploy\Deploy-Server.ps1 -GamemodeOnly`, from any machine, needs no server build | Live server |
 | Live server build, or the live settings Deploy-Gamemode writes | `.\scripts\deploy\Deploy-Gamemode.ps1`, then `.\scripts\deploy\Deploy-Server.ps1`, from a machine with the fork built | Live server |
+| The server build your commit records, already in the store on the box, with the gamemode | `.\scripts\deploy\Deploy-Server.ps1 -FromStore` for live, `.\scripts\release\Publish-Server.ps1 -Channel dev -FromStore` for dev, from any machine | Live or dev server |
 
 `Deploy-Server.ps1 -GamemodeOnly` sends the committed `game\gamemode.js`, its build stamp, and `game\content\Thornswood-Content.esp` when the live server's copy is not the same size and sha256. The live server keeps its own settings, and no setting may change. Before anything is sent it asks the live server which server build it runs, and refuses unless that is the build `records\server-build.json` names at your commit. A gamemode that needs a new server build, or a change to the live settings (the load order, the NPC, gear, reloot and damage settings, the join pass and the role lists), goes the full way, from a machine with the build. `-PutBack` puts back what either one replaced. Decided by Patrick on 5 Oct, #1089: any machine may put a gamemode live this way.
+
+`-FromStore` (#459) puts the server build `records\server-build.json` names onto the server from the box's own store, where every publish and full deploy has kept the build it sent since #2467, so any machine can deploy a recorded engine. Before anything is sent the box says which build its store keeps for that record, and with none the run stops there; `-ServerBuild <zip>` sends one first, such as the one the engine build in CI made, held to the record on both sides. The server keeps its own settings, load order and start point, so it is the engine and the gamemode that move. An engine that reads light plugins another way than the running one is refused, because the order it keeps would then mean something else; that one goes the full way.
 
 A dev release can run from any branch on any developer's machine. A main release runs from `main` after `git pull`, with a clean tree that matches GitHub. The note shape is in [Say so, then write the note](#say-so-then-write-the-note). The command for each file is in [After a pull request is merged](#after-a-pull-request-is-merged). The restart warning is in [How a release goes out](#how-a-release-goes-out).
 
@@ -1933,6 +1946,44 @@ Vortex deploys files of the same names. Ship and `Check-ShipReady.ps1` stop
 when that record is missing or stale: the mod list, a file either tool reads,
 `records\generated.json`, or a built file changed since. The fix is to run it
 again.
+
+**The folder a release is built from (issue #2019).** Each channel's ship root
+(`Where.ps1 ShipRoot` and `ShipRootDev`, recorded by `Setup-ShipMachine.ps1
+-Root`) is a launcher install whose launcher is never started: Patrick's own
+installs stay apart from the build folders, so he has the same files as
+everybody else. So every Ship first runs `scripts\release\Update-ShipRoot.ps1`,
+which builds `Thornswood-ShipRoot.exe` from `scripts\release\ShipRoot`
+(all of `launcher\app` with its own entry point, so OwnGame has one
+implementation) and runs OwnGame's own Make or Refresh on the root: a new root
+takes Thornswood's own files of the channel's release from its feed, as an
+install does, and a root made at older rules or from another folder is brought
+up to date with Vortex's deployment. Then the recorded client goes in from the
+engine build (`engine\README.md` "One engine"), and the Ship stops with a
+sentence, before anything is built or published, when either step cannot be
+done. Main has its own root (`local\release-main` on One), so no Ship packs
+`C:\Thornswood`. After a refresh that changed the bodies' or the animations'
+sources, `Build-Generated.ps1 -Channel <channel>` runs again, and Ship says so.
+`tests\test-2019-ship-roots.ps1` holds it.
+
+A new root takes the game's own files from the Steam copy only when that copy
+is on 1.6.1170, and an install's other way, the Downgrade, is a Steam
+download under the person's own account that a script cannot run. One's
+Steam copy is not on it since 16 Oct (another `bink2w64.dll` and
+`Dawnguard.esm`, and the Anniversary Edition's Creation Club files), so
+`-SkyrimFrom` on `Setup-ShipMachine.ps1` or `Update-ShipRoot.ps1` names a
+folder that holds them, such as the other root's `Game` (#2603):
+
+```
+.\scripts\release\Setup-ShipMachine.ps1 -Channel main -Root C:\Users\evilp\Downloads\Thornswood-Repo\local\release-main -SkyrimFrom C:\Users\evilp\Downloads\Thornswood-Repo\local\release-devbuild\Game
+```
+
+Every one of the game's own files the new folder takes is checked against
+`records\skyrim-files.json` by size and SHA-1, the archives too, before
+anything is placed, and the root is not made when one is missing or
+different; the sentence names it. They are copied, never linked, so the two
+roots share no file, and Make stops if one of them changed while it worked.
+`made.txt` names the folder on its `skyrim=` line. Only the ship root tool
+does this: an install's way to 1.6.1170's own files stays the Downgrade.
 
 **The Skyrim build.** Steam updates the Steam copy by itself. With Thornswood's
 own folder, the Downgrade button works on the Steam copy the folder is made

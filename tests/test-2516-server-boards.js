@@ -77,9 +77,13 @@ const WR_SPOT = [23139.4, -7891.7, -3494.4];
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-2516-'));
 fs.writeFileSync(path.join(dir, 'server-settings.json'), JSON.stringify({ dataDir: 'data', privDir: 'private' }));
 fs.mkdirSync(path.join(dir, 'private'));
+// An office is one character's (#2551, Patrick, 16 Oct): the law register
+// names the character that holds each office for its account. A profile the
+// door ties to no account is an account of its own, 'p:<profile>'.
+fs.writeFileSync(path.join(dir, 'private', 'law.json'), JSON.stringify({ cells: {}, held: { 'steward:whiterun': { 'p:606': { pid: 606, name: 'Proventus' } } } }));
 function writeRegister(boards) {
   fs.writeFileSync(path.join(dir, 'private', 'property.json'), JSON.stringify({
-    claims: {}, stewards: [STEWARD.pid], boxes: {}, funds: {}, notices: {}, boards: boards
+    claims: {}, boxes: {}, funds: {}, notices: {}, boards: boards
   }));
 }
 writeRegister({
@@ -172,7 +176,11 @@ function makeBlock() {
     guard: function (n, f) { return f; },
     setInterval: function () { return 1; }, clearInterval: function () { },
     log: function () { },
-    __thornswoodCharacter: { stateOf: function () { return {}; }, writeState: function () { } }
+    __thornswoodCharacter: { stateOf: function () { return {}; }, writeState: function () { } },
+    // Proventus holds the Steward of Whiterun role (#2551), and nobody else holds an office.
+    __thornswoodOffices: function (pid) {
+      return { jarl: [], court: [], guard: [], steward: pid === STEWARD.pid ? ['whiterun'] : [] };
+    }
   };
   box.globalThis = box;
   inDir(function () { vm.runInNewContext(propBlock, box, { filename: 'gamemode.js property' }); });

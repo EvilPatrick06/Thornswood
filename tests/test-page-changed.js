@@ -13,7 +13,7 @@ const ROOT = path.join(__dirname, '..');
 const PAGES = ['terms', 'privacy', 'rules'];
 const EXPECT = {
   terms: '2026-09-29',
-  privacy: '2026-10-15',
+  privacy: '2026-10-16',
   rules: '2026-09-29'
 };
 const MONTHS = [null, 'January', 'February', 'March', 'April', 'May', 'June',
@@ -64,6 +64,8 @@ for (const name of PAGES) {
       const digest = sha(forMode(text, open));
       const which = open ? 'open' : 'alpha';
       yes(name + ' as served (' + which + ') is listed as ' + day, bySha[digest] === day);
+      // The row a new wording needs, so whoever changed the page can add it.
+      if (bySha[digest] !== day) console.log('      add to page-versions.json under ' + name + ': { "sha256": "' + digest + '", "changed": "' + day + '" }');
     });
   });
   const days = {};

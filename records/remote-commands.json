@@ -12,8 +12,8 @@
                     "admin":  "needs Administrator: install, service, task registration, ACL, firewall, keys, secrets, or work outside the gate verbs",
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
-    "scriptCount":  55,
-    "callCount":  238,
+    "scriptCount":  56,
+    "callCount":  241,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -464,6 +464,15 @@
                       "does":  "writes or checks a stage folder",
                       "class":  "stage",
                       "reason":  "writes or checks a stage folder or file"
+                  },
+                  {
+                      "script":  "scripts/deploy/Deploy-Server.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "$storeOut = @(Remote $storeScript | ForEach-Object { Write-Host (\u0027  \u0027 + $_); \"$_\".Trim() })",
+                      "does":  "takes the recorded server build out of the deploy store into the stage (-FromStore, #459)",
+                      "class":  "stage",
+                      "reason":  "writes the stage from the deploy store; nothing running is touched"
                   },
                   {
                       "script":  "scripts/deploy/Deploy-Server.ps1",
@@ -1006,6 +1015,15 @@
                       "reason":  "sends ThornswoodSecret"
                   },
                   {
+                      "script":  "scripts/deploy/ServerArtifact.ps1",
+                      "scope":  "Get-ThornswoodStoredServerBuild",
+                      "via":  "Invoke-ThornswoodArtifactRemote",
+                      "anchor":  "$lines = @(Invoke-ThornswoodArtifactRemote $Target $SshArgs $text)",
+                      "does":  "reads which server builds the deploy store keeps for a commit (-FromStore, #459)",
+                      "class":  "read-status",
+                      "reason":  "read only"
+                  },
+                  {
                       "script":  "scripts/deploy/ServerContent.ps1",
                       "scope":  "Read-ThornswoodServerContent",
                       "via":  "Invoke-ThornswoodRemote",
@@ -1441,7 +1459,7 @@
                       "script":  "scripts/release/Publish-Server.ps1",
                       "scope":  "Send-InstallerOnly",
                       "via":  "scp",
-                      "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh $rollLog \"${target}:C:/Roll-Log.ps1\" }",
+                      "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh $serverLog \"${target}:C:/Server-Log.js\" }",
                       "does":  "uploads the server zip or installer libraries to C:\\",
                       "class":  "admin",
                       "reason":  "consumed by Install-ThornswoodServer, which registers the SYSTEM task"
@@ -1495,7 +1513,7 @@
                       "script":  "scripts/release/Publish-Server.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "scp",
-                      "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh $rollLog \"${target}:C:/Roll-Log.ps1\" }",
+                      "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh $serverLog \"${target}:C:/Server-Log.js\" }",
                       "does":  "uploads the server zip or installer libraries to C:\\",
                       "class":  "admin",
                       "reason":  "consumed by Install-ThornswoodServer, which registers the SYSTEM task"
@@ -1913,6 +1931,15 @@
                       "does":  "install-time or outside-the-gate work",
                       "class":  "admin",
                       "reason":  "destructive or install-time work outside the gate verbs"
+                  },
+                  {
+                      "script":  "scripts/vps/Restore-Box.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "$has = Remote \"if (Test-Path -LiteralPath \u0027$far\\unpacked\\deletions\\requests.jsonl\u0027) { \u0027RECORD\u0027 } else { \u0027NONE\u0027 }\"",
+                      "does":  "reads files, settings, logs or status",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
                   },
                   {
                       "script":  "scripts/vps/Restore-Box.ps1",

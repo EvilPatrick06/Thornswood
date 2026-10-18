@@ -484,6 +484,32 @@ function Save-ShipUiHashedAssets([string]$GameFolder) {
     }
 }
 
+# FIVE FILES UNDER Data\Platform THAT NOTHING USES, issue #2177. Patrick,
+# 15 Oct: they stop shipping and every install loses them on the next
+# release. Two pictures in Images (lock.png, a red broken padlock, and
+# speaking.png, a white speaker), dated 12 Sep, and three DirectXTK icon fonts
+# in Fonts (four, one and one glyphs in the private use range), dated 14 Sep.
+# None is in the SkyMP fork or its history. Searched 16 Oct: no file in this
+# repository, the game folder's skymp5-client.js, build.js or Modules, or the
+# fork names any of them. Skyrim Platform loads every sprite font in Fonts by
+# its name (DX11RenderHandler.cpp), and a font is drawn only when a script
+# names it: ours names DIN-Pro-bold, and Tavern is the default. Nothing
+# reads Images. Nobody recorded who made them or on what terms.
+#
+# Test-ShipOtherServer calls them not ours, so no pack or installer carries
+# them, and they are on $ShipDeleteAlways below, so every pack deletes them
+# from the installs that have them. The other sprite fonts (Tavern,
+# DIN-Pro-bold, Futura) still ship. OwnGame.Foreign carries the same five so
+# a refresh cannot copy them back from a Steam copy; change the two together.
+# tests\test-2177-platform-unused.ps1 holds both.
+$ShipPlatformUnused = @(
+    'Data\Platform\Images\lock.png',
+    'Data\Platform\Images\speaking.png',
+    'Data\Platform\Fonts\ChainLink.spritefont',
+    'Data\Platform\Fonts\NoticeIcon.spritefont',
+    'Data\Platform\Fonts\VoiceIcon.spritefont'
+)
+
 function Test-ShipOtherServer([string]$rel) {
     # The client runtime, before anything else is asked: ours when it is the
     # recorded build, and not ours when it is anything else or is not there.
@@ -496,15 +522,18 @@ function Test-ShipOtherServer([string]$rel) {
     if ((Split-Path $rel -Leaf) -ieq 'NirnLabUIPlugin.dll') { return $true }
     # Other launchers' parking folders inside our own game folder, Djinn, 25
     # September. Another SkyMP server's launcher moves the Creation Club archives it turns
-    # off into Data\_disabledByKzl and keeps its own backup and plugin list
-    # beside the game; the Daedric server's launcher keeps DaedricData. They
-    # came back after a Play and put 2.4 GB of somebody else's files into a dev
-    # release. Never shipped, never removed. Anchored, with a boundary.
-    # The backup and the plugin list are matched by their shape, a folder at
-    # the root named <name>-backup-<version> or _<name>-plugins-off, not by
-    # the server's name, which no file here carries (Patrick, 12 October,
-    # #400). Nothing of ours sits at the game's root under either shape.
-    if ($rel -match '^Data\\_disabledByKzl($|\\)') { return $true }
+    # off into a folder in Data named _disabledBy and its own short name, and
+    # keeps its own backup and plugin list beside the game; the Daedric
+    # server's launcher keeps DaedricData. They came back after a Play and put
+    # 2.4 GB of somebody else's files into a dev release. Never shipped, never
+    # removed. Anchored, with a boundary.
+    # All three are matched by their shape, not by the server's name or its
+    # short forms, which no file here carries (Patrick, 12 October, and
+    # decision C of 15 October, #400): a folder directly in Data named
+    # _disabledBy<name>, and a folder at the root named <name>-backup-<version>
+    # or _<name>-plugins-off. Nothing of ours sits in either place under any
+    # of those shapes.
+    if ($rel -match '^Data\\_disabledBy[^\\]+($|\\)') { return $true }
     if ($rel -match '^(DaedricData|_[^\\]+-plugins-off|[^\\]+-backup-[^\\]+)($|\\)') { return $true }
     # See $ShipDeleteAlways below for why this one also has to be DELETED from
     # machines that already have it, and not merely left out of new packs.
@@ -533,6 +562,8 @@ function Test-ShipOtherServer([string]$rel) {
     # pack takes it off the machines that have it. OwnGame.Foreign carries the
     # same rule; change the two together.
     if ($rel -ieq 'Data\Platform\Plugins\thornswood-chargen.js') { return $true }
+    # The five files nothing uses (#2177, $ShipPlatformUnused above).
+    foreach ($u in $ShipPlatformUnused) { if ($rel -ieq $u) { return $true } }
     # In Plugins only our overlays belong. The bundle was decided by its hash above.
     if ($rel -like 'Data\Platform\Plugins\*.js') {
         if ($leaf -like 'thornswood-*.js') { return $false }
@@ -932,7 +963,8 @@ function Test-ShipBethesda([string]$rel) {
 #     join pass, the voice port, status and token, the character list and the
 #     pick, the load order the game saw, the spots file, the plugins' logs.
 #     Every file the build ships under Data\Platform is in a folder (Plugins,
-#     UI, Modules, Distribution, Fonts, Images); nothing ships straight in it.
+#     UI, Modules, Distribution, Fonts; Images held two pictures until
+#     #2177); nothing ships straight in it.
 #   - The SkyMP client's saved sign in, Data\Platform\PluginsNoLoad.
 #   - Logs and crash dumps (*.log, *.dmp), anywhere.
 #   - Backups (Test-ShipBackup, *.bak) and Vortex's own records: its
@@ -1176,7 +1208,8 @@ function Get-ShipLooseArt($files) {
 #     Unofficial Patch and interior mods' scripts without their plugins, old
 #     MCM Helper scripts that override the collection's newer ones, and
 #     retextures with no mod found.
-#   - Another server's files: kzl_haybale.nif, Daedric Online's
+#   - Another server's files: the other server's haybale mesh (a weapon mesh
+#     in a folder named with its prefix), Daedric Online's
 #     TrueHUD boss list (RP_Bosses.ini, "Daedric Online boss health bars" by
 #     its first line; Patrick, 29 September, #1253: it goes).
 #   - Settings a mod or the launcher writes on each machine: ImGui window state,
@@ -1306,7 +1339,11 @@ $ShipGeneratedPatterns = $ShipGeneratedBodyFiles + $ShipGeneratedOutfitFiles + @
 # (records\collection-plugins.json), so dev 1.2.3 listed the board mesh as gone
 # and every board the plugin places lost its model while the plugin still named
 # it. A line now refuses to be made without a way out, and the board's way out
-# is the plugin itself.
+# was the plugin itself. Since #2298 the plugin's board is Thornswood's own
+# mesh, so the board's line held nothing, and it came out on 16 October (#400):
+# the old mesh is somebody else's file like any other, which never ships. No
+# line holds this way today; it stays for the next mesh the plugin names that
+# no revision carries (tests\test-2298-held-board.ps1).
 function New-ShipHeld {
     param(
         [Parameter(Mandatory = $true, Position = 0)][string]$Path,
@@ -1401,20 +1438,16 @@ $ShipHeldForCollection = @(
     (New-ShipHeld 'Data\meshes\clothes\childrenclothes\' 'Styles of Skyrim Mashups - Children Clothes Variations and Mesh Fixes (154063)' -Revision 2),
     (New-ShipHeld 'Data\meshes\_byoh\clothes\childrenclothesvariants\' 'Styles of Skyrim Mashups - Children Clothes Variations and Mesh Fixes (154063)' -Revision 2),
     # A noble end table's mesh fix: Assorted Mesh Fixes (Nexus 32117).
-    (New-ShipHeld 'Data\meshes\furniture\noble\nobleendtable04.nif' 'Assorted Mesh Fixes (32117)' -Revision 2),
-    # The message board Thornswood-Content.esp itself places, from the other
-    # server's kzolivar records Patrick kept. Dev packs carry it (main never
-    # has) and no mod in the collection has it at this path; a board of the
-    # same name is in Missives - Unique Missive Boards (Nexus 111375, a quest
-    # mod with a plugin of its own) at meshes\clutter\missives, and its bytes
-    # are not this one's (#1258). No collection revision carries this path, so
-    # it ships while the plugin names it, and leaves the release the plugin's
-    # board points at a mesh the collection installs or one Thornswood ships
-    # as its own (#2298). Since #2298 the board names Thornswood's own
-    # meshes\thornswood\noticeboard01.nif, so this line holds nothing any
-    # more: the next release lists the old mesh as gone and every launcher
-    # takes it off. It stays so the record of why reads in one place.
-    (New-ShipHeld 'Data\meshes\olivar-messageboard\missiveboardcotnd.nif' 'none yet: Thornswood Content must point its board at a mesh the collection installs' -WhileContentNamesIt)
+    (New-ShipHeld 'Data\meshes\furniture\noble\nobleendtable04.nif' 'Assorted Mesh Fixes (32117)' -Revision 2)
+    # The message board Thornswood-Content.esp used to place, a reworked copy
+    # of the board in Missives - Unique Missive Boards (Nexus 111375) that came
+    # with the other server's records, in a folder named with that server's
+    # prefix (#1258), was held here while the plugin named it. Since #2298 the
+    # board names Thornswood's own meshes\thornswood\noticeboard01.nif, so its
+    # line held nothing, and it came out on 16 October (#400, decision C: the
+    # other server's short forms are named nowhere). The old mesh is now
+    # somebody else's file like any other, kept out of every pack because it
+    # is not on the list of ours.
 )
 
 # The collection revision this release is built against: what the feed's
@@ -1467,6 +1500,45 @@ foreach ($ShipBuiltLine in @(& {
         }
     } catch { }
 })) { [void]$ShipBuiltUntil1259.Add($ShipBuiltLine) }
+
+# NEVER HANDED ON (#2454). A file used only as the collection installs it
+# never ships, whichever list above calls it ours: permission-held.txt beside
+# this file. Patrick, 17 Oct: Immersive Armors is used as-is through the
+# collection and nothing built from it is redistributed, so its Bosmer armour
+# folder is held. One hold a line: a path under the game folder (a folder ends
+# in \), two or more spaces or a tab, then a reason naming its issue. A line
+# with no reason, or no issue, stops the script. The repo's own list is kept by
+# tests\test-ship-permission-held.ps1 in the gate, which fails without it; a
+# copy of this file alone (as test fixtures make) has no list and no holds,
+# like the lists above. Read-ShipPermissionHeld refuses a missing list. A release
+# that drops a held file an earlier one shipped lists it as gone with its
+# sha256 (Publish-Update, #1261), so installs lose our copy and keep any other.
+function Read-ShipPermissionHeld([string]$List) {
+    if (-not (Test-Path -LiteralPath $List -PathType Leaf)) { throw "The permission hold list is missing: $List. A hold is released by taking its line out; keep the file." }
+    $out = @()
+    foreach ($line in [IO.File]::ReadAllLines($List)) {
+        $one = $line.Trim()
+        if (-not $one -or $one.StartsWith('#')) { continue }
+        $parts = ([regex]'\t+| {2,}').Split($one, 2)
+        if ($parts.Count -lt 2 -or -not $parts[1].Trim()) { throw "A permission hold gives no reason: $one" }
+        if ($parts[1] -notmatch '#\d+') { throw "A permission hold names no issue: $one" }
+        $out += [pscustomobject]@{ Path = $parts[0].Trim().Replace('/', '\'); Reason = $parts[1].Trim() }
+    }
+    return $out
+}
+$ShipPermissionHeldList = Join-Path $PSScriptRoot 'permission-held.txt'
+$ShipPermissionHeld = @(if (Test-Path -LiteralPath $ShipPermissionHeldList -PathType Leaf) { Read-ShipPermissionHeld $ShipPermissionHeldList })
+
+# Whether a path is held until its maker's permission is recorded. Either slash.
+function Test-ShipPermissionHeld([string]$rel) {
+    $rel = $rel.Replace('/', '\')
+    foreach ($h in $ShipPermissionHeld) {
+        $p = [string]$h.Path
+        if ($p.EndsWith('\')) { if ($rel.StartsWith($p, 'OrdinalIgnoreCase')) { return $true } }
+        elseif ($rel -ieq $p) { return $true }
+    }
+    return $false
+}
 
 function Test-ShipGenerated([string]$rel) {
     foreach ($p in $ShipGeneratedPatterns) { if ($rel -like $p) { return $true } }
@@ -1538,6 +1610,8 @@ function Test-ShipHeld([string]$rel, [int]$Revision = $ShipCollectionRevision) {
 # the generator's output. Inside Data\Platform this answers yes; that folder is
 # Test-ShipOtherServer's to decide.
 function Test-ShipOurs([string]$rel) {
+    # Never handed on (permission-held.txt, #2454): not ours to ship.
+    if (Test-ShipPermissionHeld $rel) { return $false }
     if ($rel.StartsWith('Data\Platform\', 'OrdinalIgnoreCase')) { return $true }
     if ($ShipClientFiles.Contains($rel)) { return $true }
     foreach ($o in $ShipOursFiles) { if ($rel -ieq $o) { return $true } }
@@ -1550,6 +1624,8 @@ function Test-ShipOurs([string]$rel) {
 # Somebody else's loose file, which never ships: not ours, and not held for the
 # collection at this revision.
 function Test-ShipNotOurs([string]$rel, [int]$Revision = $ShipCollectionRevision) {
+    # Never handed on (permission-held.txt, #2454), at every revision.
+    if (Test-ShipPermissionHeld $rel) { return $true }
     if (Test-ShipOurs $rel) { return $false }
     return (-not (Test-ShipHeld $rel $Revision))
 }
@@ -1680,6 +1756,9 @@ $ShipDeleteAlways += $ShipOldSkyUIScripts
 $ShipUiGonePaths = @($ShipDaedricMenu.Keys | ForEach-Object { 'Data\Platform\UI\' + $_ })
 $ShipUiGonePaths += @($ShipUnusedFrontAssets | ForEach-Object { 'Data\Platform\UI\' + $_ })
 $ShipDeleteAlways += $ShipUiGonePaths
+# The five files under Data\Platform nothing uses, issue #2177: every pack
+# deletes them, so the next release takes them off every install.
+$ShipDeleteAlways += $ShipPlatformUnused
 
 function Get-ShipDeleteAlways {
     $list = New-Object 'System.Collections.Generic.List[string]'
@@ -1895,9 +1974,11 @@ function Add-ShipLastPluginLine([string]$Src, [string]$Out, [switch]$Plain) {
 # Why this release may not carry Thornswood-Last.esp, or '' when it may.
 #   $RepoDir  the checkout
 #   $Enabled  the enabled plugin names of the list the pack carries, in order
+#   $Ccc      Skyrim.ccc's names that are in the release's Data folder
 # Refused: no manifest, a plugin that is not the manifest's bytes, a load
-# order (the five masters, then the enabled names, without this plugin) that
-# is not the one it was built against, the plugin not enabled last, and any
+# order (the five masters, the Skyrim.ccc plugins, then the enabled names,
+# without this plugin) that is not the one it was built against, the plugin
+# not enabled last, and any
 # plugin it was built against whose size or sha256 is not the one the release
 # gives people: records\collection-plugins.json for the collection's plugins
 # (what Vortex installs and the deploys hold the servers to, #2019) and the
@@ -1905,7 +1986,13 @@ function Add-ShipLastPluginLine([string]$Src, [string]$Out, [switch]$Plain) {
 # measure: a plugin Vortex deploys is never in a pack, and on One on 15 Oct
 # the dev release folder held a 3BBB.esp of 3,288 bytes from another
 # installer choice while the collection's is 20,257.
-function Get-ShipLastPluginProblem([string]$RepoDir, [string[]]$Enabled) {
+# The Skyrim.ccc plugins are the game's to load straight after the five
+# masters, and a plugin list never names them, so they come from $Ccc: the
+# order the plugin is built against is the server's, which has them there
+# (ServerOrder.ps1, Get-ThornswoodGameSequence). Until 15 Oct this left them
+# out, and the first dev Ship carrying the plugin was refused on One for
+# loading Water for ENB.esm where the server loads _ResourcePack.esl.
+function Get-ShipLastPluginProblem([string]$RepoDir, [string[]]$Enabled, [string[]]$Ccc = @()) {
     $rebuild = 'Build it again for this load order: python scripts\mods\Build-LastPlugin.py --data <a Data folder holding the collection''s bytes>, then commit the plugin and game\data\last-plugin.json.'
     $plugin = Join-Path $RepoDir ('game\content\' + $ShipLastPlugin)
     $mpath = Join-Path $RepoDir $ShipLastManifest
@@ -1927,7 +2014,9 @@ function Get-ShipLastPluginProblem([string]$RepoDir, [string[]]$Enabled) {
         if (-not $names.Count -or $names[-1] -ine $ShipLastPlugin) {
             return "the plugin list this release carries does not enable $ShipLastPlugin last."
         }
-        $order = @($ShipBaseMasters) + @($names | Select-Object -First ($names.Count - 1) | Where-Object { $ShipBaseMasters -notcontains $_ })
+        $first = @($ShipBaseMasters)
+        foreach ($c in @($Ccc | ForEach-Object { "$_".Trim() } | Where-Object { $_ })) { if ($first -notcontains $c) { $first += $c } }
+        $order = $first + @($names | Select-Object -First ($names.Count - 1) | Where-Object { $first -notcontains $_ })
         $built = @($m.loadOrder | ForEach-Object { [string]$_ })
         for ($i = 0; $i -lt [Math]::Max($order.Count, $built.Count); $i++) {
             $a = if ($i -lt $order.Count) { $order[$i] } else { '(nothing)' }

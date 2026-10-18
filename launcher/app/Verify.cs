@@ -41,8 +41,71 @@ namespace Thornswood
         // folder is made from it, so the plugins Run finds missing are not a
         // reason to grey Fix out while this is on the list.
         public string VortexFolder;
-        public Issue(string t, bool b) { Text = t; Blocking = b; }
-        public Issue(string t, bool b, bool absent) { Text = t; Blocking = b; Absent = absent; }
+        // Served at /plugins/light-<index>.bin, where the index is the
+        // plugin's place in the manifest's light list, rather than at
+        // /plugins/<index>.bin: one of our own light plugins (#2627).
+        public bool WantLight;
+
+        // ---- for Scan and Fix (#2627) ----------------------------------
+        // Which check found it, so Fix knows what to do and the report after
+        // Fix can say which ones are still there (IssueKind).
+        public string Kind = "";
+        // The problem alone, without the sentence about what Fix does, for
+        // the report after Fix: "Fix fetches the server's copy" read after a
+        // Fix that could not is the sentence that made Fix look broken.
+        public string Problem;
+        // Fix has something to do for it. The Fix button is on while any
+        // issue on the card is, and only then.
+        public bool Fixable;
+        // What puts it right when Fix cannot, or tried and could not: one
+        // line, said after Fix in place of what Fix does.
+        public string WhatWill;
+
+        public Issue(string t, bool b) { Text = t; Problem = t; Blocking = b; }
+
+        /// <summary>
+        /// One issue in the shape Scan and Fix read (#2627): the problem, what
+        /// Fix does about it (null when Fix cannot, which leaves it not
+        /// Fixable), and what puts it right otherwise.
+        /// </summary>
+        public static Issue Of(string kind, string problem, string fixDoes, string whatWill, bool blocking)
+        {
+            // The card says what Fix does, or, when Fix cannot, what will.
+            string then = fixDoes ?? whatWill;
+            var i = new Issue(string.IsNullOrEmpty(then) ? problem : problem + " " + then, blocking);
+            i.Kind = kind;
+            i.Problem = problem;
+            i.Fixable = fixDoes != null;
+            i.WhatWill = whatWill;
+            return i;
+        }
+    }
+
+    /// <summary>
+    /// Which check found an issue (Issue.Kind, #2627), so Fix knows what to
+    /// do for it and the report after Fix can say which are still there.
+    /// Verify's own are Plugins and Personal; the rest are Upkeep's checks of
+    /// the install beyond the plugin list. Here, beside Issue, so a harness
+    /// that compiles Verify alone needs nothing of Upkeep's.
+    /// </summary>
+    static class IssueKind
+    {
+        public const string Plugins = "plugins";
+        public const string Personal = "your-mods";
+        public const string OwnFolder = "own-folder";
+        public const string Update = "update";
+        public const string Feed = "feed";
+        public const string Behind = "behind-vortex";
+        public const string VortexInto = "vortex-into-thornswood";
+        public const string Lost = "lost-vortex";
+        public const string OursLost = "lost-ours";
+        public const string Skyrim = "skyrim-build";
+        public const string ScriptExtender = "script-extender";
+        public const string BuildFiles = "build-files";
+        public const string WindowsFolders = "windows-folders";
+        public const string Icon = "shortcut-icon";
+        public const string Client = "client";
+        public const string Steam = "steam";
     }
 
     static class Verify
@@ -99,22 +162,22 @@ namespace Thornswood
             var issues = new List<Issue>();
             Expected = 0;
 
-            // The own folder was chosen at install and is not made yet
-            // (#1226): Paths.Game is Profile\Payload, Thornswood's own files
-            // and nothing else, so there is no game to hold against the
-            // server. Checking Payload would call every plugin of the
-            // collection missing while Vortex has it deployed. One line says
-            // what is next, and Fix makes the folder (OwnFolderNext).
-            if (Paths.OwnFirst)
+            // No folder of its own yet, whether it was chosen at install and
+            // is not made (Paths.OwnFirst, #1226: Paths.Game is Profile\Payload,
+            // Thornswood's own files and nothing else) or Thornswood still
+            // shares the Steam copy (Paths.Collection). Either way there is no
+            // game of Thornswood's to hold against the server, and the Steam
+            // copy is the person's own and not Thornswood's to change (#1218,
+            // #1226). Until 17 Oct a shared install was scanned plugin by
+            // plugin against the Steam copy, and Fix then put right what the
+            // scan found, in the Steam copy: on 11 Oct a new dev build's first
+            // Fix moved 21 Creation Club plugins out of it and wrote the
+            // server's content plugin over Vortex's copy there, while its own
+            // folder was being made (#2403). So the scan says one thing, the
+            // folder, and Fix makes it (OwnFolderNext) and writes nothing else.
+            if (Paths.Collection)
             {
-                string why = null;
-                if (cfg != null)
-                {
-                    try { why = OwnGame.WhyNot(cfg, OwnGame.DeploysInto(cfg)); }
-                    catch (Exception ex) { why = ex.Message; }
-                }
-                issues.Add(new Issue("Thornswood's own Skyrim folder was chosen when Thornswood was installed and is not made yet, so there is no game to check. " +
-                                     (why == null ? "Fix makes it from what Vortex has deployed." : "It cannot be made yet: " + why), false));
+                issues.AddRange(NoFolderYet(cfg));
                 if (cfg != null || LastIssues == null)
                 {
                     LastIssues = issues;
@@ -142,46 +205,14 @@ namespace Thornswood
 
             if (!File.Exists(golden))
             {
-                issues.Add(new Issue("This build shipped without a reference plugin list, so there is nothing to compare against.", false));
+                issues.Add(Issue.Of(IssueKind.Plugins, "This build shipped without a reference plugin list, so there is nothing to compare against.",
+                                    null, "The next update carries one. Fix cannot make it up.", false));
                 return issues;
             }
             if (!File.Exists(live))
             {
-                issues.Add(new Issue("Your plugins.txt is missing. Fix will put the shipped one back.", true));
+                issues.Add(Issue.Of(IssueKind.Plugins, "Your plugins.txt is missing.", "Fix puts the shipped one back.", Retry, true));
                 return issues;
-            }
-
-            // Vortex deploys the collection somewhere other than the Skyrim this
-            // install reads. 24 September, a tester whose Vortex manages another
-            // SkyMP server's copy of Skyrim, and deploys
-            // Thornswood's collection into it: every plugin below then reads as
-            // not installed, and nothing said where the mods actually were.
-            // Patrick: "can we fix it so the launcher can detect and fix this in
-            // scan and fix aswell". First, because the card shows four lines
-            // and this one explains the ninety four after it. Blocking, which
-            // adds no refusal: it only appears on a shared Skyrim, and Play
-            // already refuses to start out of one (Shell.OwnGameRequired).
-            if (Paths.Collection && !OwnGame.Active)
-            {
-                string into = "";
-                try { into = OwnGame.DeploysElsewhere(cfg); }
-                catch (Exception ex) { Swallow.Note("Verify.Run, asking which folder Vortex deploys into", ex); }
-                if (into.Length > 0)
-                {
-                    string game = "";
-                    try { game = OwnGame.Source(cfg); } catch { /* "" reads as apart, which only changes the sentence */ }
-                    bool apart = !string.Equals(game, into, StringComparison.OrdinalIgnoreCase);
-                    // "Vortex deploys into", not "Thornswood's mods": the record
-                    // here says Vortex deployed something, not that it is the
-                    // Thornswood collection. Fix checks that before it builds
-                    // (OwnGame.WhyNot counts Thornswood's plugins) and says to
-                    // enable the Thornswood profile when it is not.
-                    var i = new Issue("Vortex deploys into " + into + ", not into " + Paths.Game +
-                                      ", so Fix will make Thornswood's own Skyrim folder from what Vortex deployed there, once it has checked that is Thornswood's collection" +
-                                      (apart ? ", taking the game itself from the Steam copy and nothing else from that folder." : "."), true);
-                    i.VortexFolder = into;
-                    issues.Add(i);
-                }
             }
 
             List<string> want = Enabled(golden), have = Enabled(live);
@@ -198,24 +229,38 @@ namespace Thornswood
                 if (haveSet.Contains(p)) continue;
                 bool onDisk = true;
                 try { onDisk = File.Exists(Path.Combine(dataDir, p)); } catch (Exception ex) { Swallow.Note("Verify.Run, asking whether " + p + " is on disk", ex); }
-                issues.Add(new Issue(
-                    onDisk ? p + " is turned off." : p + " is not installed.",
-                    true, !onDisk));
+                Issue off = onDisk
+                    ? Issue.Of(IssueKind.Plugins, p + " is turned off.", "Fix switches it on from this build's plugin list.", Retry, true)
+                    // Not in the list and not on disk: Vortex never put it on
+                    // this machine, or the Thornswood profile is not the one
+                    // Vortex has on. Fix brings it from Vortex's own copy when
+                    // Vortex has one (OwnGame.RestoreMissingPlugins).
+                    : Issue.Of(IssueKind.Plugins, p + " is not installed.", "Fix brings it from Vortex's copy when Vortex has one.", VortexDeploys, true);
+                off.Absent = !onDisk;
+                off.Plugin = p;
+                issues.Add(off);
             }
 
             // An Anniversary owner's Creation Club plugins that take no place in
-            // the order are not counted here (#479, LoadOrder.NotInBuild).
+            // the order are not counted here (#479, LoadOrder.NotInBuild). Nor
+            // is a plugin the server hands out, which is ours: a server ahead
+            // of this build's list names it, Fix put it in the server's place
+            // (PutInServerOrder), and the next release's list carries it.
             foreach (string p in LoadOrder.NotInBuild(have, want, LightOrMissing))
-                issues.Add(new Issue(p + " is enabled but is not part of this build.", true));
+            {
+                if (ServedByServer(cfg, p)) continue;
+                issues.Add(Issue.Of(IssueKind.Plugins, p + " is enabled but is not part of this build.", "Fix switches it off from this build's plugin list.", Retry, true));
+            }
 
             // Another server's client. Not a plugin, so nothing above would ever
             // have found it, and it is the difference between Thornswood loading
             // and another server's main menu loading instead.
             foreach (string f in Checks.ForeignClients())
-                issues.Add(new Issue(
+                issues.Add(Issue.Of(IssueKind.Plugins,
                     Path.GetFileName(f) + " belongs to another server. It replaces the main menu " +
-                    "and asks you to sign in to them. Fix moves it aside into Thornswood's " +
-                    "Isolated folder and nothing is deleted, so that server still works.", true));
+                    "and asks you to sign in to them.",
+                    "Fix moves it aside into Thornswood's Isolated folder and nothing is deleted, so that server still works.",
+                    "Close that server's launcher and Skyrim, then press Fix again: a file another program has open cannot be moved.", true));
 
             // A plugin the server counts as light but this machine's copy does
             // not, which gives it a load order index the server does not have and
@@ -223,9 +268,9 @@ namespace Thornswood
             // server's manifest against the collection reference, so a new one is
             // caught without editing Checks. See Verify.MustBeLight.
             foreach (string p in Checks.NotLight(MustBeLight(cfg)))
-                issues.Add(new Issue(
+                issues.Add(Issue.Of(IssueKind.Plugins,
                     p + " is not flagged light, so from there on your load order counts " +
-                    "one place differently from the server's. Fix flags it; nothing else changes.", true));
+                    "one place differently from the server's.", "Fix flags it; nothing else changes.", Retry, true));
             // The order, position by position. Only when nothing above was
             // found, as before: a plugin turned off or not flagged light
             // already explains the shift from there on, and one problem
@@ -255,10 +300,11 @@ namespace Thornswood
                     {
                         string yours = at < game.Count ? game[at] : "nothing";
                         string theirs = at < manifest.Count ? manifest[at] : "nothing";
-                        issues.Add(new Issue(
+                        issues.Add(Issue.Of(IssueKind.Plugins,
                             "Your load order is not the server's from position " + at + ": you have " + yours +
-                            " there, the server has " + theirs + ". The game shows that as LOAD ORDER ERROR. " +
-                            "Fix puts the server's order into this build's plugin list; nothing is downloaded.", true));
+                            " there, the server has " + theirs + ". The game shows that as LOAD ORDER ERROR.",
+                            "Fix puts the server's order into this build's plugin list, and adds a plugin of ours the list lacks.",
+                            OrderWhatWill(cfg, theirs), true));
                     }
                     else
                     {
@@ -279,10 +325,11 @@ namespace Thornswood
                             {
                                 string yours = li < mine.Count ? mine[li] : "nothing";
                                 string theirs = li < serverLight.Count ? serverLight[li] : "nothing";
-                                issues.Add(new Issue(
+                                issues.Add(Issue.Of(IssueKind.Plugins,
                                     "Your light plugins are not in the server's order from light position " + li + ": you have " + yours +
-                                    " there, the server has " + theirs + ". Hair, beards and other parts from light plugins would show as the wrong ones. " +
-                                    "Fix puts the server's order into this build's plugin list; nothing is downloaded.", true));
+                                    " there, the server has " + theirs + ". Hair, beards and other parts from light plugins would show as the wrong ones.",
+                                    "Fix puts the server's order into this build's plugin list, and fetches and adds a plugin of ours the list lacks.",
+                                    OrderWhatWill(cfg, theirs), true));
                             }
                         }
                     }
@@ -293,7 +340,8 @@ namespace Thornswood
                     {
                         if (!string.Equals(want[i], have[i], StringComparison.OrdinalIgnoreCase))
                         {
-                            issues.Add(new Issue("The load order does not match the server's from " + want[i] + " onwards.", true));
+                            issues.Add(Issue.Of(IssueKind.Plugins, "The load order does not match this build's from " + want[i] + " onwards.",
+                                                "Fix puts this build's plugin list back.", Retry, true));
                             break;
                         }
                     }
@@ -312,13 +360,13 @@ namespace Thornswood
                 // its light order (Checks.StrayCreations), and it moves the
                 // light plugins rather than the full ones.
                 bool lightStray = Checks.TakesNoPlace(p);
-                issues.Add(new Issue(
+                issues.Add(Issue.Of(IssueKind.Plugins,
                     p + " is loaded by the game on its own, because Skyrim.ccc names it, and the server does not have it, " +
                     (lightStray
-                        ? "so every light plugin after it is one place off the server's, and hair, beards and other parts from light plugins show as the wrong ones. "
-                        : "so every plugin after it is out of place and the game shows LOAD ORDER ERROR. ") +
+                        ? "so every light plugin after it is one place off the server's, and hair, beards and other parts from light plugins show as the wrong ones."
+                        : "so every plugin after it is out of place and the game shows LOAD ORDER ERROR."),
                     "Fix moves it aside into Thornswood's Isolated folder and nothing is deleted.",
-                    true));
+                    "Close Skyrim, then press Fix again: a file the game has open cannot be moved.", true));
             }
 
             // A plugin the list references but that is not actually on disk.
@@ -332,7 +380,8 @@ namespace Thornswood
                 {
                     if (!File.Exists(Path.Combine(data, p)))
                     {
-                        var gone = new Issue(p + " is in the list but the file is not in Data.", true);
+                        var gone = Issue.Of(IssueKind.Plugins, p + " is in the list but the file is not in Data.",
+                                            "Fix puts it back from Vortex's copy, or fetches the server's when it is ours.", VortexDeploys, true);
                         gone.FileMissing = true;
                         gone.Plugin = p;
                         issues.Add(gone);
@@ -348,7 +397,13 @@ namespace Thornswood
                 {
                     string e = Path.GetExtension(f).ToLowerInvariant();
                     if (e == ".esp" || e == ".esm" || e == ".esl")
-                        issues.Add(new Issue("Your own mods folder contains " + Path.GetFileName(f) + ". Plugins there will get you refused.", true));
+                    {
+                        var mine = Issue.Of(IssueKind.Personal, "Your own mods folder contains " + Path.GetFileName(f) + ". Plugins there will get you refused.",
+                                            "Fix moves it aside into Thornswood's Isolated folder and nothing is deleted.",
+                                            "Take it out of " + Paths.Personal + " yourself: Fix could not move it.", true);
+                        mine.Plugin = Path.GetFileName(f);
+                        issues.Add(mine);
+                    }
                 }
             }
 
@@ -417,8 +472,10 @@ namespace Thornswood
         class ServerManifest
         {
             [DataMember] public ServerMod[] mods;
-            // The plugins the server hands out at /plugins/<index>.bin:
-            // Thornswood's own, by the gamemode's server manifest block (#1180).
+            // The plugins the server hands out: Thornswood's own, by the
+            // gamemode's server manifest block (#1180), a full one at
+            // /plugins/<index in mods>.bin and, since #2627, a light one at
+            // /plugins/light-<index in light>.bin.
             [DataMember] public string[] served;
             // A server that loads light plugins publishes them apart from
             // mods, in light index order (#1715): mods stays the full plugins
@@ -479,9 +536,13 @@ namespace Thornswood
                 using (var ms = new MemoryStream(raw)) doc = (ServerManifest)ser.ReadObject(ms);
                 if (doc == null || doc.mods == null || doc.mods.Length == 0) return null;
                 var served = new HashSet<string>(doc.served ?? new string[0], StringComparer.OrdinalIgnoreCase);
-                foreach (ServerMod m in doc.mods)
-                    if (m != null && m.filename != null) m.Served = served.Contains(m.filename);
-                manifestLight = doc.light ?? new ServerMod[0];
+                ServerMod[] light = doc.light ?? new ServerMod[0];
+                // Full and light alike (#2627): Thornswood-Last.esp is ours and
+                // light, and a server that publishes it names it here.
+                foreach (ServerMod[] list in new ServerMod[][] { doc.mods, light })
+                    foreach (ServerMod m in list)
+                        if (m != null && m.filename != null) m.Served = served.Contains(m.filename);
+                manifestLight = light;
                 manifestAll = doc.loadOrder ?? new string[0];
                 manifestCache = doc.mods;
                 manifestAt = DateTime.UtcNow;
@@ -505,7 +566,8 @@ namespace Thornswood
             // The light plugins a server publishes (#1715) after its full
             // ones: a light plugin with other bytes holds other forms under
             // the same light index, which is the same fault as a full one.
-            // None of them is served, so Fix sends the person to Vortex.
+            // One of ours is served like a full one of ours (#2627); another
+            // author's is Vortex's to put right.
             ServerMod[] light = manifestLight ?? new ServerMod[0];
             int all = mods.Length + light.Length;
             string data = Path.Combine(Paths.Game, "Data");
@@ -535,20 +597,23 @@ namespace Thornswood
                 }
                 if (same) continue;
 
-                var i = new Issue(
+                var i = Issue.Of(IssueKind.Plugins,
                     m.filename + " is not the same file the server has" +
                     (size == m.size ? " (same size, other contents)" : " (yours is " + Fmt(size) + ", the server's is " + Fmt(m.size) + ")") +
-                    ". The game shows that as LOAD ORDER ERROR and anything in it can mean something else here than on the server. " +
-                    (m.Served ? "Fix fetches the server's copy." : FromVortex(cfg, m.filename)),
+                    ". The game shows that as LOAD ORDER ERROR and anything in it can mean something else here than on the server.",
+                    m.Served ? "Fix fetches the server's copy." : null,
+                    m.Served ? NotHandedOver : FromVortex(cfg, m.filename),
                     true);
                 i.Plugin = m.filename;
                 i.WantSize = m.size;
                 i.WantCrc = (int)m.crc32;
-                // Where the file is served, /plugins/<index>.bin, which only a
-                // full plugin of ours ever is. Manifest marks served on mods
-                // alone, so a light entry is never served and Fix sends the
-                // person to Vortex for it.
-                i.WantIndex = isLight ? -1 : idx;
+                // Where the file is served: a full plugin of ours at
+                // /plugins/<index in mods>.bin, a light one of ours at
+                // /plugins/light-<index in light>.bin (#2627). Another
+                // author's is never served, and Fix sends the person to
+                // Vortex for it.
+                i.WantLight = isLight;
+                i.WantIndex = isLight ? idx - mods.Length : idx;
                 i.Served = m.Served;
                 issues.Add(i);
             }
@@ -571,6 +636,113 @@ namespace Thornswood
                    "In Vortex, update the Thornswood collection, or reinstall " +
                    (string.IsNullOrEmpty(mod) ? "the mod that has " + plugin : mod) +
                    " (right click it on the Mods page, Reinstall), then press Scan.";
+        }
+
+        // ---- what puts each one right when Fix cannot (#2627) ------------
+
+        /// <summary>Said after Fix for a step that fails only while something else has the file open.</summary>
+        const string Retry = "Close Skyrim and Vortex, then press Fix again; if it is still here after that, send the launcher log to the Discord.";
+
+        /// <summary>A plugin of the collection that is not in the game folder and Vortex has no copy of.</summary>
+        const string VortexDeploys = "Vortex has to deploy it: in Vortex, enable the Thornswood profile and press Deploy, or install the collection if you have not, then press Scan.";
+
+        /// <summary>A plugin of ours the server did not hand over.</summary>
+        const string NotHandedOver = "The server did not hand over its copy. It publishes its plugin files when it starts, so a server started before this launcher's release has none to give: staff restart it, then press Fix again.";
+
+        /// <summary>The order cannot be put right while the server names a plugin this build has no line for and that is not ours.</summary>
+        const string OrderNeeds = "The server's order names a plugin this build's list does not have and the server does not hand out, so only an update or Vortex can bring it: take the update when one is waiting, or deploy the Thornswood collection in Vortex, then press Scan.";
+
+        /// <summary>
+        /// What puts an order right that Fix could not: the server's copy when
+        /// the plugin the server has there is ours (Fix fetches it and puts it
+        /// in its place, so what is left is a server with none to give), an
+        /// update or Vortex when it is another author's, and pressing Fix again
+        /// when the server has nothing there and the list has one too many.
+        /// </summary>
+        static string OrderWhatWill(Config cfg, string theirs)
+        {
+            if (theirs == "nothing") return Retry;
+            return ServedByServer(cfg, theirs) ? NotHandedOver : OrderNeeds;
+        }
+
+        /// <summary>
+        /// True when the server's manifest names this plugin as one it hands
+        /// out, which makes it ours (#1180): full or light (#2627). False when
+        /// the server cannot be asked.
+        /// </summary>
+        static bool ServedByServer(Config cfg, string plugin)
+        {
+            if (cfg == null || string.IsNullOrEmpty(plugin)) return false;
+            ServerMod[] mods = null;
+            try { mods = Manifest(cfg); } catch (Exception ex) { Swallow.Note("Verify.ServedByServer, asking the server for its manifest", ex); }
+            if (mods == null) return false;
+            foreach (ServerMod[] list in new ServerMod[][] { mods, manifestLight ?? new ServerMod[0] })
+                foreach (ServerMod m in list)
+                    if (m != null && m.Served && string.Equals(m.filename, plugin, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// What Scan says while Thornswood has no folder of its own: the
+        /// folder, and nothing about the Steam copy, which is the person's
+        /// (#1218, #2403). When Vortex deploys somewhere else, that folder is
+        /// named first, because it is where the folder will be made from.
+        /// </summary>
+        static List<Issue> NoFolderYet(Config cfg)
+        {
+            var l = new List<Issue>();
+            string into = "";
+            if (cfg != null && !Paths.OwnFirst)
+            {
+                try { into = OwnGame.DeploysElsewhere(cfg); }
+                catch (Exception ex) { Swallow.Note("Verify.Run, asking which folder Vortex deploys into", ex); }
+            }
+            // Vortex deploys the collection somewhere other than the Skyrim
+            // this install reads. 24 September, a tester whose Vortex manages
+            // another SkyMP server's copy of Skyrim, and deploys Thornswood's
+            // collection into it. Patrick: "can we fix it so the launcher can
+            // detect and fix this in scan and fix aswell". Blocking, which
+            // adds no refusal: it only appears on a shared Skyrim, and Play
+            // already refuses to start out of one (Shell.OwnGameRequired).
+            if (into.Length > 0)
+            {
+                string game = "";
+                try { game = OwnGame.Source(cfg); } catch { /* "" reads as apart, which only changes the sentence */ }
+                bool apart = !string.Equals(game, into, StringComparison.OrdinalIgnoreCase);
+                // "Vortex deploys into", not "Thornswood's mods": the record
+                // here says Vortex deployed something, not that it is the
+                // Thornswood collection. Fix checks that before it builds
+                // (OwnGame.WhyNot counts Thornswood's plugins) and says to
+                // enable the Thornswood profile when it is not.
+                var i = Issue.Of(IssueKind.OwnFolder, "Vortex deploys into " + into + ", not into " + Paths.Game + ".",
+                                 "Fix will make Thornswood's own Skyrim folder from what Vortex deployed there, once it has checked that is Thornswood's collection" +
+                                 (apart ? ", taking the game itself from the Steam copy and nothing else from that folder." : "."),
+                                 "Settings, Maintenance, Choose Vortex's folder, then Make it, does the same by hand.", true);
+                i.VortexFolder = into;
+                l.Add(i);
+                return l;
+            }
+
+            string why = null;
+            if (cfg != null)
+            {
+                try { why = OwnGame.WhyNot(cfg, OwnGame.DeploysInto(cfg)); }
+                catch (Exception ex) { why = ex.Message; }
+            }
+            string what = Paths.OwnFirst
+                ? "Thornswood's own Skyrim folder was chosen when Thornswood was installed and is not made yet, so there is no game to check."
+                : "Thornswood has no Skyrim folder of its own yet, so there is no game of its own to check. The Steam copy in " + Paths.SteamCopy +
+                  " is yours, and Scan and Fix leave it as it is.";
+            // Not blocking when it was chosen at install, as it never was; a
+            // shared Skyrim blocks, because the plugins it used to be judged
+            // by are not judged any more and Ready to launch must not read
+            // green for an install Play will not start from.
+            bool blocks = !Paths.OwnFirst;
+            l.Add(why == null
+                ? Issue.Of(IssueKind.OwnFolder, what, "Fix makes it from what Vortex has deployed, after asking, and the launcher restarts into it.",
+                           "Settings, Maintenance, Make it, makes it too.", blocks)
+                : Issue.Of(IssueKind.OwnFolder, what, null, "It cannot be made yet: " + why, blocks));
+            return l;
         }
 
         /// <summary>
@@ -754,17 +926,51 @@ namespace Thornswood
             // server has them. The Skyrim.ccc names are the game's to load
             // first and are skipped, as the masters are.
             List<string> ordered = whole != null ? LoadOrder.ReorderWhole(lines, whole, ccc) : LoadOrder.Reorder(lines, manifest, Light);
+            var added = new List<string>();
             if (ordered == null)
             {
                 List<string> off = whole != null ? LoadOrder.NotEnabledWhole(lines, whole, ccc) : LoadOrder.NotEnabled(lines, manifest);
-                say(off.Count > 0
-                    ? "The server's order names " + string.Join(", ", off.ToArray()) + ", which this build's plugin list does not enable, so the order was left alone."
-                    : "This build's plugin list enables the same plugin twice, so the order was left alone.");
-                return 0;
+                // A plugin of ours the server names and this build's list
+                // does not enable goes into the server's place (#2627). On
+                // 16 Oct the server's order named Thornswood-Last.esp, which
+                // the release Patrick's launcher had not taken yet ships, and
+                // this said the order "was left alone" at every Fix while the
+                // light order stayed wrong. Ours is what the server hands
+                // out, and only once it is in Data: switching on a plugin the
+                // game cannot find would move every one after it.
+                var ours = new List<string>();
+                var notOurs = new List<string>();
+                var notHere = new List<string>();
+                foreach (string p in off)
+                {
+                    if (!ServedByServer(cfg, p)) notOurs.Add(p);
+                    else if (!InData(p)) notHere.Add(p);
+                    else ours.Add(p);
+                }
+                if (off.Count > 0 && notOurs.Count == 0 && notHere.Count == 0)
+                {
+                    List<string> with = SwitchOn(lines, ours);
+                    ordered = whole != null ? LoadOrder.ReorderWhole(with, whole, ccc) : LoadOrder.Reorder(with, manifest, Light);
+                    if (ordered != null)
+                    {
+                        added = ours;
+                        lines = with;
+                    }
+                }
+                if (ordered == null)
+                {
+                    if (notOurs.Count > 0)
+                        say("The server's order names " + string.Join(", ", notOurs.ToArray()) + ", which this build's plugin list does not enable and the server does not hand out, so the order was left alone. " + OrderNeeds);
+                    else if (notHere.Count > 0)
+                        say("The server's order names " + string.Join(", ", notHere.ToArray()) + ", which is ours and is not in Data, because the server did not hand it over, so the order was left alone. " + NotHandedOver);
+                    else
+                        say("This build's plugin list enables the same plugin twice, so the order was left alone.");
+                    return 0;
+                }
             }
             string first;
             int moved = LoadOrder.Moved(lines, ordered, out first);
-            if (moved == 0) return 0;
+            if (moved == 0 && added.Count == 0) return 0;
 
             var body = new List<byte>();
             if (bom) body.AddRange(new byte[] { 0xEF, 0xBB, 0xBF });
@@ -778,8 +984,38 @@ namespace Thornswood
                 say("The plugin list could not be written (" + ex.Message.TrimEnd('.') + "). Close Skyrim and press Fix again.");
                 return 0;
             }
-            say(moved + (moved == 1 ? " plugin" : " plugins") + " moved into the server's order, the first " + first + ".");
+            if (added.Count > 0)
+                say(string.Join(", ", added.ToArray()) + (added.Count == 1 ? " is" : " are") +
+                    " ours, and the server's order names " + (added.Count == 1 ? "it" : "them") +
+                    ", so " + (added.Count == 1 ? "it is" : "they are") + " switched on in the server's place. The next release's plugin list carries " +
+                    (added.Count == 1 ? "it." : "them."));
+            if (moved > 0)
+                say(moved + (moved == 1 ? " plugin" : " plugins") + " moved into the server's order, the first " + first + ".");
             return 1;
+        }
+
+        /// <summary>
+        /// The same plugins.txt lines with each of <paramref name="names"/>
+        /// switched on: a line that lists it switched off gains its star,
+        /// and a name with no line at all gets one at the end, where the
+        /// reorder after it takes it to the server's place. Every other line
+        /// stays as it was.
+        /// </summary>
+        static List<string> SwitchOn(IList<string> lines, IList<string> names)
+        {
+            var result = new List<string>(lines);
+            foreach (string name in names)
+            {
+                bool done = false;
+                for (int i = 0; i < result.Count && !done; i++)
+                {
+                    string t = result[i].Trim();
+                    if (t.StartsWith("*")) continue;
+                    if (string.Equals(t, name, StringComparison.OrdinalIgnoreCase)) { result[i] = "*" + t; done = true; }
+                }
+                if (!done) result.Add("*" + name);
+            }
+            return result;
         }
 
         static string Fmt(long bytes)
@@ -879,8 +1115,10 @@ namespace Thornswood
             string dest = Path.Combine(Paths.Game, "Data", i.Plugin);
             // Served by manifest position, not name: the resources server refuses
             // any URL whose name contains .esp/.esm/.esl. gamemode publishFiles
-            // writes each plugin as <index>.bin at the same position.
-            byte[] bytes = Get(ServerBase(cfg) + "/plugins/" + i.WantIndex + ".bin", 90000);
+            // writes each full plugin as <index>.bin at its position in mods,
+            // and each light one as light-<index>.bin at its position in light
+            // (#2627), so the two lists cannot name the same file.
+            byte[] bytes = Get(ServerBase(cfg) + "/plugins/" + (i.WantLight ? "light-" : "") + i.WantIndex + ".bin", 90000);
             if (bytes == null)
             {
                 say(i.Plugin + ": the server did not hand over its copy. It publishes the files at start, so a server older than this launcher, or one that is down, has none to give.");
@@ -1000,46 +1238,49 @@ namespace Thornswood
         public static int Fix(Config cfg, Action<string> say)
         {
             if (say == null) say = delegate(string m) { };
+            OwnFolderNext = false;
 
-            // Chosen at install and not made yet (#1226): what Fix puts right
-            // is the folder Thornswood plays from, and that folder is what is
+            // No folder of its own yet (#1226, #2403): what Fix puts right is
+            // the folder Thornswood plays from, and that folder is what is
             // missing. Making it is the fix, the way Make it in Settings does
-            // it; nothing else is touched first, least of all the Steam copy.
-            if (Paths.OwnFirst)
+            // it, and nothing else is touched first, least of all the Steam
+            // copy. Until 17 Oct a shared install got the whole of Fix in the
+            // Steam copy: on 11 Oct a new dev build's first Fix moved 21
+            // Creation Club plugins out of it and put the server's content
+            // plugin over Vortex's copy there, while its own folder was being
+            // made. The plugin list a release carries waits in Profile
+            // (SettleLoadOrder, OrderFolder, #1234), which is not the Steam
+            // copy, and goes into the folder when it is made.
+            if (Paths.Collection)
             {
+                int made = Paths.OwnFirst ? 0 : SettleLoadOrder();
+                if (cfg != null && !Paths.OwnFirst)
+                {
+                    // Run's first issue, when Vortex deploys somewhere else:
+                    // saved as VortexGame, so the own folder is made from there.
+                    string into = "";
+                    try { into = OwnGame.DeploysElsewhere(cfg); }
+                    catch (Exception ex) { Swallow.Note("Verify.Fix, asking which folder Vortex deploys into", ex); }
+                    if (into.Length > 0)
+                    {
+                        bool ok;
+                        say(OwnGame.PointAt(cfg, into, out ok));
+                        if (!ok) return made;
+                    }
+                }
                 OwnFolderNext = true;
-                say("Thornswood's own Skyrim folder is made next, from what Vortex has deployed. Nothing else needs putting right before it exists.");
-                return 1;
+                say("Thornswood's own Skyrim folder is made next, from what Vortex has deployed. Nothing else is put right before it exists, and nothing is written into the Steam copy.");
+                return made + 1;
             }
 
             int n = SettleLoadOrder();
-
-            // Run's first issue, when Vortex deploys somewhere else: saved as
-            // VortexGame, so the own folder is made from there (OwnFolderNext).
-            OwnFolderNext = false;
-            if (cfg != null && Paths.Collection && !OwnGame.Active)
-            {
-                string into = "";
-                try { into = OwnGame.DeploysElsewhere(cfg); }
-                catch (Exception ex) { Swallow.Note("Verify.Fix, asking which folder Vortex deploys into", ex); }
-                if (into.Length > 0)
-                {
-                    bool ok;
-                    say(OwnGame.PointAt(cfg, into, out ok));
-                    if (ok)
-                    {
-                        OwnFolderNext = true;
-                        n++;
-                    }
-                }
-            }
 
             // Fix means make this install match what the server expects, and
             // another server's client running the main menu is the furthest
             // from that anything gets. It is moved aside, never deleted,
             // because somebody who plays here may also play there.
-            n += Checks.IsolateForeign(null);
-            n += Checks.FlagLight(MustBeLight(cfg), null);
+            n += Checks.IsolateForeign(say);
+            n += Checks.FlagLight(MustBeLight(cfg), say);
 
             // Creation Club plugins the game would load because Skyrim.ccc
             // names them. Moved aside the same way, and said, because these are
@@ -1048,24 +1289,15 @@ namespace Thornswood
             List<string> theirLight = cfg != null ? LightNames(cfg) : new List<string>();
             n += Checks.IsolateCreations(wanted, theirLight, say);
 
-            // The server's order, into this build's own list. After the
-            // reference copy, which settles what is on and off, and after the
-            // creations are moved aside, so the order is judged on what the
-            // game will count. Nothing is fetched for it, and the reference
-            // under Profile\Default is not touched: the next release carries
-            // the server's order in it (Publish-Update) and until then this
-            // is what puts it right on a machine.
-            if (cfg != null)
-            {
-                try { n += PutInServerOrder(cfg, say); } catch (Exception ex) { Swallow.Note("Verify.Fix, PutInServerOrder", ex); }
-            }
+            // A plugin in the person's own mods folder, which Play never
+            // copies in and the server would refuse: aside, never deleted.
+            n += IsolatePersonal(say);
 
             // Missing plugins the golden list expects. SettleLoadOrder only
             // rewrites plugins.txt; it never puts a file back into Data, which
             // is why Diagnostics Fix left CFTO-Lanterns / BeardMaskFix and the
-            // like uncleared on Djinn's machine. Restore from Vortex first
-            // (light plugins are not on the server at all). Then fetch any
-            // still-missing non-light plugin the manifest names.
+            // like uncleared on Djinn's machine. Restore from Vortex first.
+            // Then fetch any of ours still missing.
             try { n += OwnGame.RestoreMissingPlugins(cfg, say); }
             catch (Exception ex) { Swallow.Note("Verify.Fix, restoring missing plugins from Vortex", ex); say("Could not restore missing plugins from Vortex (" + ex.Message.TrimEnd('.') + ")."); }
 
@@ -1078,11 +1310,15 @@ namespace Thornswood
             }
 
             // Still missing from Data and served by the server, which is our
-            // own plugin only (#1180): fetch that copy. Bytes skips absent
-            // files on purpose (Run already named them); Fix still has to put
-            // ours back when the game folder lost it. Another author's missing
-            // plugin is Vortex's to put back, and RestoreMissingPlugins above
-            // has already said so.
+            // own plugin only (#1180), full or light (#2627): fetch that copy.
+            // Bytes skips absent files on purpose (Run already named them);
+            // Fix still has to put ours back when the game folder lost it, or
+            // never had it: on 16 Oct Thornswood-Last.esp, light and ours,
+            // shipped only in a release Patrick's open launcher had not taken,
+            // the server's light order named it, and Fix fetched nothing
+            // because it looked at the full plugins alone. Another author's
+            // missing plugin is Vortex's to put back, and RestoreMissingPlugins
+            // above has already said so.
             if (cfg != null)
             {
                 try
@@ -1090,10 +1326,13 @@ namespace Thornswood
                     ServerMod[] mods = Manifest(cfg);
                     if (mods != null)
                     {
+                        ServerMod[] light = manifestLight ?? new ServerMod[0];
                         string dataDir = Path.Combine(Paths.Game, "Data");
-                        for (int idx = 0; idx < mods.Length; idx++)
+                        int all = mods.Length + light.Length;
+                        for (int idx = 0; idx < all; idx++)
                         {
-                            ServerMod m = mods[idx];
+                            bool isLight = idx >= mods.Length;
+                            ServerMod m = isLight ? light[idx - mods.Length] : mods[idx];
                             if (m == null || string.IsNullOrEmpty(m.filename) || Storefront.Contains(m.filename) || !m.Served) continue;
                             string dest = Path.Combine(dataDir, m.filename);
                             bool goneFile = false;
@@ -1105,13 +1344,63 @@ namespace Thornswood
                             miss.Plugin = m.filename;
                             miss.WantSize = m.size;
                             miss.WantCrc = (int)m.crc32;
-                            miss.WantIndex = idx;
+                            miss.WantLight = isLight;
+                            miss.WantIndex = isLight ? idx - mods.Length : idx;
                             miss.Served = true;
                             if (FetchPlugin(cfg, miss, say)) n++;
                         }
                     }
                 }
                 catch (Exception ex) { Swallow.Note("Verify.Fix, fetching still-missing plugins from the server", ex); }
+            }
+
+            // The server's order, into this build's own list, last: after the
+            // reference copy, which settles what is on and off, after the
+            // creations are moved aside, so the order is judged on what the
+            // game will count, and after our own plugins are fetched, so one
+            // the server names and this build's list lacks is in Data when it
+            // is put in its place (#2627). The reference under Profile\Default
+            // is not touched: the next release carries the server's order in
+            // it (Publish-Update) and until then this is what puts it right on
+            // a machine.
+            if (cfg != null)
+            {
+                try { n += PutInServerOrder(cfg, say); } catch (Exception ex) { Swallow.Note("Verify.Fix, PutInServerOrder", ex); }
+            }
+            return n;
+        }
+
+        /// <summary>
+        /// Plugins in the person's own mods folder, moved aside into
+        /// Profile\Isolated, never deleted. Play copies that folder into the
+        /// game without its plugins (DeployPersonal), so a plugin there does
+        /// nothing but stop Play, and Scan says so. Returns how many moved.
+        /// </summary>
+        static int IsolatePersonal(Action<string> say)
+        {
+            int n = 0;
+            string[] files;
+            try
+            {
+                if (!Directory.Exists(Paths.Personal)) return 0;
+                files = Directory.GetFiles(Paths.Personal, "*.*", SearchOption.AllDirectories);
+            }
+            catch (Exception ex) { Swallow.Note("Verify.IsolatePersonal, listing " + Paths.Personal, ex); return 0; }
+            string bin = Path.Combine(Paths.Isolated, DateTime.Now.ToString("yyyyMMdd-HHmm") + "-your-mods");
+            foreach (string f in files)
+            {
+                string e = Path.GetExtension(f).ToLowerInvariant();
+                if (e != ".esp" && e != ".esm" && e != ".esl") continue;
+                try
+                {
+                    Directory.CreateDirectory(bin);
+                    string to = Path.Combine(bin, Path.GetFileName(f));
+                    if (File.Exists(to)) to = Path.Combine(bin, DateTime.Now.ToString("HHmmss") + "-" + Path.GetFileName(f));
+                    File.Move(f, to);
+                    say(Path.GetFileName(f) + " was in your own mods folder, where a plugin only stops Play. It is in " + bin + " now; nothing was deleted.");
+                    n++;
+                }
+                catch (Exception ex) { say(Path.GetFileName(f) + " could not be moved out of your own mods folder (" + ex.Message.TrimEnd('.') + ")."); }
             }
             return n;
         }

@@ -6,7 +6,7 @@ made once, in the game, that decide what you are for. A new character wakes
 in the creation hall, makes a face, and then the panel behind K opens on its
 own: your class, your profession and the half of it you will make your own,
 and the town you wake up in tomorrow. Only the town has to be chosen before
-you leave the hall, and choosing it sends you to your inn. Your class and your
+you leave the hall, and choosing it sends you to that town. Your class and your
 profession can wait: leave them for later and pick them in the world, from the
 same panel. What waiting means is further down. The same panel, on K, is where
 you spend skill points

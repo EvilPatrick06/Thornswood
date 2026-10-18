@@ -56,8 +56,8 @@
   sends the installer and nothing to install, and the installer registers the
   server's scheduled task again with its own action and settings, stops the
   server and starts it through the new task (Install-ThornswoodServer.ps1
-  -TaskOnly). No zip, no file in the server's folder, no setting, no record
-  and no news: it is how the box takes a change to the task itself, the
+  -TaskOnly). No zip, no file in the server's folder but the log writer the
+  task runs (server-log.js, #2349), no setting, no record and no news: it is how the box takes a change to the task itself, the
   priority it starts node at (#2491), without a release. If the server does
   not answer under the new task, the task it had goes back and is started.
   -Channel dev for the dev server. It drops whoever is on that server, so
@@ -86,6 +86,26 @@
   publish copies the commit's gamemode.js into that build and sets how many
   it holds in its server-settings.json, as it always has; the build is
   otherwise read, not changed.
+
+  FROM THE STORE, WITH NO ENGINE BUILD HERE (-FromStore, #459). Since #2467
+  every publish and every full Deploy-Server keeps the server build it sends
+  in the box's store, C:\Thornswood-Deploys\server, by name. -FromStore puts
+  the one records\server-build.json names onto the server from there, so a
+  machine with no engine build can publish one:
+      .\scripts\release\Publish-Server.ps1 -Channel dev -FromStore
+  The payload carries no server build and no plugins: the commit's gamemode
+  and its stamp for the channel, the record, how many the server holds
+  (records\most-online.json) and any plugin of ours the running load order
+  names, from game\content. Before anything is sent the box is asked which
+  zip its store keeps for this record, and a publish with none stops there.
+  The installer takes that zip's files into its stage, held to the record
+  the way a payload's are, and the running server's plugins by its own
+  order, and keeps its load order and start point (Install-ThornswoodServer.ps1
+  says what it refuses). So it is the engine and the gamemode that move, never
+  the order; a new order is Deploy-Gamemode.ps1 and a publish with -Dist.
+  A build CI made and the store does not hold yet goes there first, held to
+  the record here and again on the box:
+      .\scripts\release\Publish-Server.ps1 -Channel dev -FromStore -ServerBuild <engine.yml's server-<...>.zip>
 
   A LOAD ORDER THAT DROPS PLUGINS (#2320). The installer refuses, before
   anything is stopped, a payload whose load order leaves out a plugin the
@@ -187,6 +207,13 @@ param(
     # is what a payload built before Deploy-Gamemode.ps1 -Vortex wrote the
     # collection's order carries: on 5 Oct, the engine's five base masters.
     [string[]]$DropPlugins = @(),
+    # Take the server build records\server-build.json names out of the box's
+    # store, with no engine build on this machine (#459, FROM THE STORE in the
+    # header).
+    [switch]$FromStore,
+    # A server build zip (engine.yml's server-<...>.zip, with its .json beside
+    # it) to send to the store first, for -FromStore.
+    [string]$ServerBuild = '',
     # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
     [switch]$AllowStaleCheckout
 )
@@ -219,7 +246,8 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 # empty in an advanced script's defaults (#2229). $DistGiven says whether the
 # person named the build, for the refusal below.
 $DistGiven = [bool]$Dist
-if (-not $Dist) { $Dist = & (Join-Path $Here 'Where.ps1') ServerDist }
+# -FromStore packs no build, so it never asks this machine for one (#459).
+if (-not $Dist -and -not $FromStore) { $Dist = & (Join-Path $Here 'Where.ps1') ServerDist }
 if (-not $Zip)  { $Zip  = & (Join-Path $Here 'Where.ps1') ServerZip }
 . (Join-Path $Here '..\vps\Vps.ps1')
 if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
@@ -237,6 +265,20 @@ if ($PutBack -and $RequirePass) {
 }
 if ($PutBack -and @($DropPlugins).Count) {
     Die '-PutBack brings back an order the server ran, so it does not take -DropPlugins. Nothing was sent.'
+}
+# -FromStore deploys a build out of the store onto a running server, keeping
+# its load order (#459); none of these goes with it.
+if ($ServerBuild -and -not $FromStore) {
+    Die '-ServerBuild sends a server build to the store for -FromStore to publish. Give -FromStore with it. Nothing was sent.'
+}
+if ($FromStore -and ($PutBack -or $TaskOnly)) {
+    Die '-FromStore publishes a server build out of the store; -PutBack and -TaskOnly publish none. Nothing was sent.'
+}
+if ($FromStore -and ($DistGiven -or $SkipBuild)) {
+    Die '-FromStore packs no build: the server build comes out of the store on the box. Run it without -Dist and -SkipBuild. Nothing was sent.'
+}
+if ($FromStore -and @($DropPlugins).Count) {
+    Die '-FromStore keeps the running server''s load order, so it drops no plugin. A new order is Deploy-Gamemode.ps1 and a publish with -Dist. Nothing was sent.'
 }
 # The task alone changes no file, setting or world (#2491).
 if ($TaskOnly -and ($PutBack -or $RequirePass -or @($DropPlugins).Count -or $FreshWorld)) {
@@ -257,7 +299,7 @@ foreach ($t in 'ssh', 'scp') {
 
 # -------------------------------------------------------- committed only ----
 # A publish sends a commit or nothing (Patrick, 29 Sep, #1121). The files it
-# takes out of this repository are the installer and the log roller, sent
+# takes out of this repository are the installer and the log writer, sent
 # every time, and for a publish the gamemode it copies into the build and the
 # number of people records\most-online.json puts in the settings. Any of them
 # with uncommitted changes, or untracked, refuses it here, naming each, before
@@ -267,8 +309,11 @@ foreach ($t in 'ssh', 'scp') {
 . (Join-Path $Here '..\deploy\ServerArtifact.ps1')
 # What engine each server runs, for the site's credits page (#2303).
 . (Join-Path $Here '..\deploy\DeployedBuild.ps1')
-$committedOnly = @('scripts/deploy/Install-ThornswoodServer.ps1', 'scripts/deploy/ServerSettings.ps1', 'scripts/deploy/ServerBuild.ps1', 'scripts/deploy/ServerReadyWait.ps1', 'scripts/vps/Roll-Log.ps1', 'scripts/release/Read-JsonFile.ps1', 'scripts/release/RecordShape.ps1')
+$committedOnly = @('scripts/deploy/Install-ThornswoodServer.ps1', 'scripts/deploy/ServerSettings.ps1', 'scripts/deploy/ServerBuild.ps1', 'scripts/deploy/ServerReadyWait.ps1', 'scripts/vps/Server-Log.js', 'scripts/release/Read-JsonFile.ps1', 'scripts/release/RecordShape.ps1')
 if (-not $PutBack -and -not $TaskOnly) { $committedOnly += 'game/gamemode.js', 'records/most-online.json', 'records/server-build.json' }
+# -FromStore sends our plugins from game\content (#459).
+. (Join-Path $Here 'RepoPlugins.ps1')
+if ($FromStore) { $committedOnly += @($ThornswoodRepoPlugins | ForEach-Object { 'game/content/' + $_ }) }
 try { Assert-ThornswoodCommitted -RepoDir (Join-Path $Here '..\..') -Paths $committedOnly -What 'this publish' }
 catch { Die $_.Exception.Message }
 
@@ -278,10 +323,10 @@ catch { Die $_.Exception.Message }
 $installer = Join-Path $Here '..\deploy\Install-ThornswoodServer.ps1'
 if (-not (Test-Path -LiteralPath $installer)) { Die "not found: $installer" }
 # Beside the installer, which puts it in the server's folder for the task to
-# run in front of the server. See Roll-Log.ps1 for why a log can only be
-# rolled at start.
-$rollLog = Join-Path $Here '..\vps\Roll-Log.ps1'
-if (-not (Test-Path -LiteralPath $rollLog)) { Die "not found: $rollLog" }
+# run the server under: it writes server.log, rolls it at midnight and keeps
+# no line past 30 days (#2349). See Server-Log.js.
+$serverLog = Join-Path $Here '..\vps\Server-Log.js'
+if (-not (Test-Path -LiteralPath $serverLog)) { Die "not found: $serverLog" }
 # And ServerSettings.ps1 beside it, which says which settings come from the
 # payload and which stay the running server's (#1222). The installer refuses
 # without it rather than put the build's settings over the server's.
@@ -343,7 +388,8 @@ function Save-ServerRecords([switch]$PutBack) {
         if ($PutBack) {
             $lines = @(Restore-ThornswoodServerRecord -Target $target -SshArgs $ssh -Root $VpsRoot)
         } else {
-            Send-ThornswoodArtifact -Artifact $serverArtifact -Target $target -SshArgs $ssh
+            # -FromStore's build is the store's already (#459).
+            if (-not $FromStore) { Send-ThornswoodArtifact -Artifact $serverArtifact -Target $target -SshArgs $ssh }
             Send-ThornswoodArtifact -Artifact $artifact -Target $target -SshArgs $ssh
             $lines = @(Set-ThornswoodServerRecord -Artifact $artifact -Target $target -SshArgs $ssh -Root $VpsRoot)
         }
@@ -361,7 +407,7 @@ function Save-ServerRecords([switch]$PutBack) {
 function Send-InstallerOnly {
     Invoke-ThornswoodNative { & scp @ssh $installer "${target}:C:/Install-ThornswoodServer.ps1" }
     if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
-    Invoke-ThornswoodNative { & scp @ssh $rollLog "${target}:C:/Roll-Log.ps1" }
+    Invoke-ThornswoodNative { & scp @ssh $serverLog "${target}:C:/Server-Log.js" }
     if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
     Invoke-ThornswoodNative { & scp @ssh $settingsLib "${target}:C:/ServerSettings.ps1" }
     if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. Nothing up there was changed." }
@@ -410,7 +456,8 @@ $recCommit = ''
 try { $recCommit = [string](([IO.File]::ReadAllText($Record) | ConvertFrom-Json).source.commit) } catch { }
 $recShort = if ($recCommit.Length -ge 8) { $recCommit.Substring(0, 8) } else { 'the one it names' }
 $distWhy = ''
-if (-not (Test-Path -LiteralPath $Dist -PathType Container)) { $distWhy = "there is no built server at $Dist" }
+if ($FromStore) { }
+elseif (-not (Test-Path -LiteralPath $Dist -PathType Container)) { $distWhy = "there is no built server at $Dist" }
 elseif (-not (Test-Path -LiteralPath (Join-Path $Dist 'server-settings.json'))) { $distWhy = "$Dist holds no server-settings.json, so it is not a built server" }
 if ($distWhy) {
     $nl = [Environment]::NewLine
@@ -422,9 +469,12 @@ if ($distWhy) {
          'Name that build:' + $nl +
          '    .\scripts\release\Publish-Server.ps1 -Channel ' + $Channel + ' -Dist <the engine build''s dist\server>' + $nl +
          'Its server files must be the build records\server-build.json names (engine ' + $recShort + '); that is checked before anything is sent.' + $nl +
+         'Or, with no engine build here, put the recorded one on from the store on the box:' + $nl +
+         '    .\scripts\release\Publish-Server.ps1 -Channel ' + $Channel + ' -FromStore' + $nl +
          'Nothing was built or sent.')
 }
-Say ('{0,-22} {1}' -f 'built server', $Dist) 'DarkGray'
+if ($FromStore) { Say ('{0,-22} {1}' -f 'server build', ('from the store on the box, the build records\server-build.json names (engine ' + $recShort + ')')) 'DarkGray' }
+else { Say ('{0,-22} {1}' -f 'built server', $Dist) 'DarkGray' }
 
 # ------------------------------------------------------------- gamemode ------
 # The gamemode is edited in game\ and packaged from dist\server. Those are two
@@ -444,8 +494,9 @@ $artifact = New-ThornswoodArtifact -Component gamemode -RepoDir (Join-Path $Here
 Say ('{0,-22} {1}' -f 'gamemode artifact', (Format-ThornswoodArtifact $artifact)) 'DarkGray'
 $gmSrc = Join-Path $artifact.Folder 'game\gamemode.js'
 $gmSha = (Get-FileHash -LiteralPath $gmSrc -Algorithm SHA256).Hash.ToLowerInvariant()
-$gmDst = Join-Path $Dist 'gamemode.js'
-if (Test-Path -LiteralPath $Dist) {
+# -FromStore has no build to copy it into: the payload takes the artifact's own.
+if (-not $FromStore -and (Test-Path -LiteralPath $Dist)) {
+    $gmDst = Join-Path $Dist 'gamemode.js'
     $dstHash = if (Test-Path -LiteralPath $gmDst) {
         (Get-FileHash -LiteralPath $gmDst -Algorithm SHA256).Hash.ToLowerInvariant()
     } else { '' }
@@ -489,7 +540,10 @@ if (-not $SkipBuild) {
 # Checked rather than recomputed, on purpose. The file being read is the one
 # about to be zipped, and a publish that quietly rewrites its own input is
 # worse than one that stops and names the command that fixes it.
-$settingsPath = Join-Path $Dist 'server-settings.json'
+# -FromStore has no build settings: the server keeps its own load order and
+# start point, which the publish that wrote them checked (#459).
+$settingsPath = ''
+if (-not $FromStore) { $settingsPath = Join-Path $Dist 'server-settings.json' }
 
 <#
   A DEV PUBLISH PACKS THE DEV PORTS, AND ONLY INTO THE PAYLOAD.
@@ -520,7 +574,7 @@ $settingsPath = Join-Path $Dist 'server-settings.json'
   12 Oct). Into the DIST copy like the ports above, so what is packed
   carries the one number, and only written when it moved.
 #>
-if (Test-Path -LiteralPath $settingsPath) {
+if ($settingsPath -and (Test-Path -LiteralPath $settingsPath)) {
     . (Join-Path $PSScriptRoot '..\deploy\MaxOnline.ps1')
     $mostOnline = Get-MostOnline -Channel $Channel
     # The two keys a publish puts over the running server's (ServerSettings.ps1,
@@ -537,7 +591,7 @@ if (Test-Path -LiteralPath $settingsPath) {
         throw "Could not set how many the server holds in $settingsPath : $_"
     }
 }
-if (Test-Path -LiteralPath $settingsPath) {
+if ($settingsPath -and (Test-Path -LiteralPath $settingsPath)) {
     Head 'Where new characters start'
     $hallPlugin = 'Skyrim Unbound.esp'
     $hallLocal = 0x19BAD4                     # SkyrimUnboundRoom01
@@ -584,8 +638,51 @@ if (Test-Path -LiteralPath $settingsPath) {
     }
 }
 
+# The port the zip must start on: the channel's, or the harness's (#1728).
+$wantPort = if ($GamePort -gt 0) { $GamePort } elseif ($IsDev) { 7787 } else { 7777 }
+
+# ---------------------------------------------------- a payload with no build ---
+# -FromStore (#459, the header): the gamemode and its stamp, the record, how
+# many the server holds, and our plugins the running order names, so the box
+# is asked for that order first. Nothing of a server build goes in.
+function New-StorePayload {
+    Head 'Packing the payload, with no server build in it'
+    . (Join-Path $PSScriptRoot '..\deploy\MaxOnline.ps1')
+    . (Join-Path $PSScriptRoot '..\deploy\ServerContent.ps1')
+    $mostOnline = Get-MostOnline -Channel $Channel
+    if ($mostOnline.Value -le 0) { Die ("$($mostOnline.From) gave no number ($($mostOnline.Why)), and a publish sets how many the server holds from it. Nothing was sent.") }
+    $box = Read-ThornswoodServerContent -Channel $Channel -Root $VpsRoot -Target $target -SshArgs $ssh
+    if (-not $box.OrderRead) {
+        Die ("the $Channel server did not say which load order it runs (it answered: " + ((@($box.Said | Where-Object { $_ }) | Select-Object -Last 3) -join ' | ') +
+             "), and -FromStore keeps that order. Nothing was sent.")
+    }
+    $dir = Join-Path (Split-Path -Parent $Zip) '_payload'
+    if (Test-Path -LiteralPath $dir) { Remove-Item -LiteralPath $dir -Recurse -Force }
+    $null = [IO.Directory]::CreateDirectory((Join-Path $dir 'plugins'))
+    Copy-Item -LiteralPath $gmSrc -Destination (Join-Path $dir 'gamemode.js')
+    Copy-Item -LiteralPath $stampPath -Destination (Join-Path $dir 'thornswood-build.json')
+    Copy-Item -LiteralPath $Record -Destination (Join-Path $dir 'server-build.json')
+    # The port is read, not set: the installer keeps the running server's.
+    $st = [pscustomobject]@{ port = $wantPort }
+    Set-MaxPlayers $st $mostOnline
+    [IO.File]::WriteAllText((Join-Path $dir 'server-settings.json'), ($st | ConvertTo-Json -Depth 5), (New-Object Text.UTF8Encoding($false)))
+    $ours = @()
+    foreach ($n in $ThornswoodRepoPlugins) {
+        $src = Get-ThornswoodRepoPluginPath (Join-Path $Here '..\..') $n
+        if (-not (Test-Path -LiteralPath $src)) { continue }
+        if (-not (@($box.Order) -icontains $n)) { Say "  $n is ours and the $Channel server's load order does not name it, so it stays out" 'DarkGray'; continue }
+        Copy-Item -LiteralPath $src -Destination (Join-Path $dir ('plugins\' + $n))
+        $ours += $n
+    }
+    Say ('  the gamemode artifact and its stamp, the record, how many it holds, and ' + $(if ($ours.Count) { 'our ' + ($ours -join ', ') } else { 'none of our plugins' }) +
+         '; the running server keeps its ' + @($box.Order).Count + ' plugins and their order') 'Green'
+    if (Test-Path -LiteralPath $Zip) { Remove-Item -LiteralPath $Zip -Force }
+    Compress-Archive -Path (Join-Path $dir '*') -DestinationPath $Zip -CompressionLevel Optimal
+}
+
 # ---------------------------------------------------------------- build ------
-if (-not $SkipBuild) {
+if ($FromStore) { New-StorePayload }
+elseif (-not $SkipBuild) {
     Head 'Packing the payload'
     $export = Join-Path $Here 'Export-ServerPayload.ps1'
     if (-not (Test-Path -LiteralPath $export)) { Die "not found: $export" }
@@ -606,7 +703,6 @@ Say ("payload {0:N1} MB" -f ((Get-Item -LiteralPath $Zip).Length / 1MB)) 'Green'
 
 # The port the zip will really start on, read out of the zip (#1114), so a
 # -SkipBuild zip packed for the other channel cannot go to this one either.
-$wantPort = if ($GamePort -gt 0) { $GamePort } elseif ($IsDev) { 7787 } else { 7777 }
 $zipPort = ''
 # And every server file in it is the recorded build, with the record beside
 # them for the installer (#1214), read out of the zip too, so a -SkipBuild zip
@@ -659,6 +755,12 @@ $recObj = $null
 try { $recObj = [IO.File]::ReadAllText($Record) | ConvertFrom-Json } catch { }
 if (-not $recObj -or -not $recObj.sha256) { Die "$Record cannot be read or names no sha256, so nothing says which build is to go. Nothing was sent." }
 $zipBuild = @(Get-ThornswoodServerBuildProblems $recObj $zipSums 'the payload' $Record)
+# -FromStore's payload carries none: the build comes out of the store (#459).
+if ($FromStore) {
+    . (Join-Path $Here 'RecordShape.ps1')   # #2180: a version this checkout knows, every field
+    $zipBuild = @(Get-ThornswoodRecordProblems -Doc $recObj -Kind server-build)
+    if ($zipSums.Count) { $zipBuild += ('the payload carries server files (' + (@($zipSums.Keys) -join ', ') + '), and -FromStore takes them from the store') }
+}
 if ($zipBuild.Count) {
     Say 'the payload''s server files are not the recorded build:' 'Red'
     foreach ($w in $zipBuild) { Say "  $w" 'Red' }
@@ -669,7 +771,8 @@ if ($zipRecSum -ne (Get-FileHash -LiteralPath $Record -Algorithm SHA256).Hash.To
     Die ("the payload carries " + $(if ($zipRecSum) { "a server-build.json that is not $Record" } else { 'no server-build.json' }) +
          ", so the installer could not hold the server files to the record. Nothing was sent. Run it again without -SkipBuild.")
 }
-Say ("payload server files are the recorded build of " + ([string]$recObj.source.commit).Substring(0, 8) + ", " + $zipSums.Count + " files, and it carries the record") 'Green'
+if ($FromStore) { Say ("payload carries the record of " + ([string]$recObj.source.commit).Substring(0, 8) + " and no server file; the build comes out of the store") 'Green' }
+else { Say ("payload server files are the recorded build of " + ([string]$recObj.source.commit).Substring(0, 8) + ", " + $zipSums.Count + " files, and it carries the record") 'Green' }
 # The gamemode is the artifact's and its stamp says so, for this channel, or
 # the record the box writes after the install would name a gamemode it does
 # not run (#459). A -SkipBuild zip packed at an older commit stops here.
@@ -687,9 +790,33 @@ Say ("payload gamemode is the artifact's, " + $artifact.Short + ", with its stam
 # ServerArtifact.ps1): the recorded files read out of this zip, so what the
 # store keeps is what the server runs. Built here, before anything is sent;
 # it goes to the store with the gamemode artifact once the install answers.
-try { $serverArtifact = New-ThornswoodServerBuildArtifact -From $Zip -Record $Record }
-catch { Die ($_.Exception.Message + ' Nothing was sent.') }
-Say ('{0,-22} {1}' -f 'server build artifact', (Format-ThornswoodArtifact $serverArtifact)) 'DarkGray'
+if (-not $FromStore) {
+    try { $serverArtifact = New-ThornswoodServerBuildArtifact -From $Zip -Record $Record }
+    catch { Die ($_.Exception.Message + ' Nothing was sent.') }
+    Say ('{0,-22} {1}' -f 'server build artifact', (Format-ThornswoodArtifact $serverArtifact)) 'DarkGray'
+} else {
+    # -FromStore (#459): a build CI made goes to the store first, held to the
+    # record here and by its bytes there; then the box is asked which zip it
+    # keeps for this record, and a publish it has none for stops here.
+    if ($ServerBuild) {
+        Head 'The server build, to the store on the box'
+        try {
+            $sent = Test-ThornswoodServerBuildArtifact -Zip $ServerBuild -Record $Record
+            Say ('{0,-22} {1}' -f 'server build artifact', (Format-ThornswoodArtifact $sent)) 'DarkGray'
+            Send-ThornswoodArtifact -Artifact $sent -Target $target -SshArgs $ssh
+        } catch { Die ($_.Exception.Message) }
+    }
+    $stored = $null
+    try { $stored = Get-ThornswoodStoredServerBuild -Record $Record -Target $target -SshArgs $ssh } catch { Die ($_.Exception.Message + ' Nothing was sent.') }
+    if (-not $stored.Answered) { Die ('the box did not say what its store keeps: ' + ((@($stored.Said | Where-Object { $_ }) | Select-Object -Last 3) -join ' | ') + '. Nothing was sent.') }
+    if ($stored.Many) { Die ('the store on the box keeps more than one server build for this record, and one record makes one zip, so the store is not what its records say. Look at C:\Thornswood-Deploys\server. Nothing was sent.') }
+    if (-not $stored.Name) {
+        Die ('the store on the box keeps no server build of ' + $stored.Commit.Substring(0, 8) + ' with the record this commit holds' +
+             $(if (@($stored.Others).Count) { ' (it has ' + (@($stored.Others) -join ', ') + ', from that commit with another record)' } else { '' }) +
+             '. Put it there with a publish from a machine that has that build (-Dist), or with -ServerBuild and the zip engine.yml made. Nothing was sent.')
+    }
+    Say ('{0,-22} {1}, in the store on the box' -f 'server build', $stored.Name) 'Green'
+}
 
 # ------------------------------------------------------------ no stop here ---
 # This used to stop the server here, before anything was copied, so a copy
@@ -703,7 +830,7 @@ Invoke-ThornswoodNative { & scp @ssh $Zip "${target}:C:/thornswood-server.zip" }
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. The server up there was not touched." }
 Invoke-ThornswoodNative { & scp @ssh $installer "${target}:C:/Install-ThornswoodServer.ps1" }
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. The server up there was not touched." }
-Invoke-ThornswoodNative { & scp @ssh $rollLog "${target}:C:/Roll-Log.ps1" }
+Invoke-ThornswoodNative { & scp @ssh $serverLog "${target}:C:/Server-Log.js" }
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. The server up there was not touched." }
 Invoke-ThornswoodNative { & scp @ssh $settingsLib "${target}:C:/ServerSettings.ps1" }
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE. The server up there was not touched." }
@@ -718,6 +845,8 @@ Head 'Installing'
 # The zip's hash as it left here, for the installer to hold the copy up there to.
 $zipSum = (Get-FileHash -LiteralPath $Zip -Algorithm SHA256).Hash
 $instArgs = "-Zip C:\thornswood-server.zip -Root '$VpsRoot' -TaskName '$TaskName' -StartNow -ZipSha256 $zipSum -Wait $Wait"
+# The build out of the store, and the running server's plugins (#459).
+if ($FromStore) { $instArgs += (" -FromStore -Store '" + ($script:ThornswoodDeployStore + '/server').Replace('/', '\') + "'") }
 if ($RequirePass) {
     Say "the installer sets the join pass hold $RequirePass, as asked" 'Yellow'
     $instArgs += " -RequirePass $RequirePass"
@@ -956,10 +1085,12 @@ if (-not $NoNews -and $up) {
             # 60 plugins server side". Entry 187 on the To Do List: patch notes
             # people read are about what they will notice. The gamemode copy is
             # said above where it happens; the count is said here, on screen.
-            try {
-                $ss = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath (Join-Path $Dist 'server-settings.json') -Raw) (Join-Path $Dist 'server-settings.json')
-                if ($ss.loadOrder) { Say ('  load order: {0} plugins server side' -f @($ss.loadOrder).Count) 'DarkGray' }
-            } catch { }
+            if (-not $FromStore) {
+                try {
+                    $ss = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath (Join-Path $Dist 'server-settings.json') -Raw) (Join-Path $Dist 'server-settings.json')
+                    if ($ss.loadOrder) { Say ('  load order: {0} plugins server side' -f @($ss.loadOrder).Count) 'DarkGray' }
+                } catch { }
+            }
 
             if ($FreshWorld) { $details += 'The world was thrown away, so every character on the server is gone' }
             $details += 'Nothing to download for this one. It is on the server, so it is already live.'

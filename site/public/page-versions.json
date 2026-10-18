@@ -77,6 +77,14 @@
     ],
     "privacy": [
       {
+        "sha256": "e69d2c897a50e9ac02fcd7d315d49a6d972e31698a8db14924faa14dc02d44f9",
+        "changed": "2026-10-16"
+      },
+      {
+        "sha256": "546598f68afa9b86ed20c4b48ae4de64281579e232f864f512238982c7849119",
+        "changed": "2026-10-16"
+      },
+      {
         "sha256": "f71dce88301f7bb564baa07d406a9785dd0762b4f3e984684009644c023aaee2",
         "changed": "2026-10-11"
       },
@@ -195,6 +203,14 @@
       {
         "sha256": "b01ef02dc2526ada824bce36999b5f107e7e49c34c3a42af8d68ae7ffc39ab8e",
         "changed": "2026-10-15"
+      },
+      {
+        "sha256": "efb4e87cc6713822301d509547cc8431fbe1f012e737329a4200539f1523c3b3",
+        "changed": "2026-10-16"
+      },
+      {
+        "sha256": "fe77286212bbea88e6a604cafac8c657d729a1f7a798c134300493ad41321401",
+        "changed": "2026-10-16"
       }
     ],
     "rules": [

@@ -119,6 +119,49 @@ function Get-FeedStoreVps([hashtable]$To) {
     return $o
 }
 
+# ------------------------------------------------------------ the one rename
+# A file into the place of another in one call, MoveFileEx with
+# MOVEFILE_REPLACE_EXISTING, the call OwnGame.WriteRecord makes in the
+# launcher and Write-GeneratedRecord in scripts\mods\Generated.ps1 (#2586).
+# Until it the file is the old one, after it the new one. Not File.Replace
+# (#2591): ReplaceFile moves the old file aside first and then the new one
+# in, so a send stopped between the two left the feed file missing, and the
+# site answered 404 for it until the next send. Measured 16 Oct on One: a
+# Windows PowerShell 5.1 swapping a feed sized file that way in a loop,
+# killed over and over, left it missing; through this call, never
+# (tests\test-2591-whole-records.ps1). Windows PowerShell 5.1, which runs
+# this on the VPS, has no File.Move that replaces, so the call is declared.
+# The type is the one Generated.ps1 declares, word for word, so either can
+# load it first in one session.
+$script:FeedStoreSwap = @'
+function Move-FeedStoreInto([string]$from, [string]$to) {
+  if (-not ('Thornswood.RecordSwap' -as [type])) {
+    Add-Type -TypeDefinition @"
+using System;
+using System.IO;
+using System.Runtime.InteropServices;
+namespace Thornswood
+{
+    public static class RecordSwap
+    {
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        static extern bool MoveFileEx(string existing, string replacement, int flags);
+        // MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
+        public static void Into(string from, string to)
+        {
+            if (!MoveFileEx(from, to, 0x1 | 0x8))
+                throw new IOException(to + " could not be replaced by " + from + ": " +
+                                      new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error()).Message);
+        }
+    }
+}
+"@
+  }
+  [Thornswood.RecordSwap]::Into($from, $to)
+}
+'@
+. ([scriptblock]::Create($script:FeedStoreSwap))
+
 # ------------------------------------------------------------ the one script
 # Everything that happens up there is this one script, run by ssh on the VPS
 # or in place on -SiteDir, so the tests run exactly what the VPS runs. It takes
@@ -237,12 +280,11 @@ if ($op -eq 'swap') {
       $k = 2
       while (Test-Path -LiteralPath $keep) { $keep = Join-Path $hist ($stamp + '-' + $k + '-' + $n); $k++ }
       Copy-Item -LiteralPath $p -Destination $keep -Force
-      # One rename over the old file, so the site never answers 404 between
-      # the old feed and the new one.
-      [IO.File]::Replace($part, $p, [NullString]::Value)
-    } else {
-      Move-Item -LiteralPath $part -Destination $p -Force
     }
+    # One rename over the old file, so the site never answers 404 between
+    # the old feed and the new one, and a send stopped here leaves the old
+    # file or the new one whole (FeedStoreSwap, above).
+    Move-FeedStoreInto $part $p
     if ($n -eq 'version.json') {
       $m = [regex]::Match([IO.File]::ReadAllText($p), '"launcherVersion"\s*:\s*"([^"]+)"')
       if ($m.Success) {
@@ -287,7 +329,7 @@ function New-FeedStoreScript([string]$root, [string]$prefix, [string]$op, [strin
     $lines += ('$expect = @{ ' + ($e -join '; ') + ' }')
     $s = @(); if ($sizes) { foreach ($k in $sizes.Keys) { $s += ((Q $k) + ' = ' + [int64]$sizes[$k]) } }
     $lines += ('$sizes = @{ ' + ($s -join '; ') + ' }')
-    return (($lines -join "`r`n") + "`r`n" + $script:FeedStoreBody)
+    return (($lines -join "`r`n") + "`r`n" + $script:FeedStoreSwap + "`r`n" + $script:FeedStoreBody)
 }
 
 # Runs the one script, up there or on -SiteDir, and hands back its lines.
@@ -367,7 +409,11 @@ function Write-FeedStoreRead([string]$Dir, [string]$Channel, [hashtable]$there) 
     $t = [ordered]@{}
     foreach ($k in @($there.Keys | Sort-Object)) { $t[$k] = [string]$there[$k] }
     $o = [ordered]@{ channel = $Channel; at = (Get-Date).ToUniversalTime().ToString('s') + 'Z'; there = $t }
-    [IO.File]::WriteAllText((Join-Path $Dir 'read.json'), ($o | ConvertTo-Json -Depth 4), (New-Object Text.UTF8Encoding($false)))
+    # Beside it, then the one rename (#2591): written in place, a stop left
+    # read.json cut, and the next send refused with "never received".
+    $f = Join-Path $Dir 'read.json'
+    [IO.File]::WriteAllText(($f + '.new'), ($o | ConvertTo-Json -Depth 4), (New-Object Text.UTF8Encoding($false)))
+    Move-FeedStoreInto ($f + '.new') $f
 }
 
 # Fetches the files into the working folder and writes down what they were.
@@ -402,7 +448,7 @@ function Receive-FeedStore([string]$Channel, [string]$Dir, [string[]]$Files = @(
             Remove-Item -LiteralPath $down -Force -ErrorAction SilentlyContinue
             throw ("$n changed on the VPS while it was being read. Nothing was changed here; run it again.")
         }
-        Move-Item -LiteralPath $down -Destination $local -Force
+        Move-FeedStoreInto $down $local
         New-Item -ItemType Directory -Force -Path $backup | Out-Null
         Copy-Item -LiteralPath $local -Destination (Join-Path $backup ($stamp + '-' + $n)) -Force
         $read[$n] = $got

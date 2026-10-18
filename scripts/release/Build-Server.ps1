@@ -111,6 +111,12 @@ function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if
 
 if (-not $BuildDir) { $BuildDir = Join-Path $Fork 'build' }
 
+# The fork's own vcpkg on a build runner too (#459): this generates the build
+# again over its cache, and with CI=true in the environment the fork's
+# CMakeLists would switch that cache to C:/vcpkg (EngineJobs.ps1 says why).
+$ciSaid = Clear-EngineCiSwitch
+if ($ciSaid) { Say ('  ' + $ciSaid) 'DarkGray' }
+
 Head 'Where the source is'
 
 if (-not (Test-Path -LiteralPath $Fork)) {

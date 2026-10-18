@@ -206,6 +206,14 @@ namespace Thornswood
 
         [DataMember] public bool KeepLauncherOpen = false;
 
+        // A full crash snapshot (#2626). Off unless the person turns it on in
+        // Settings: one can be 9 GB or more, and Djinn, 17 October, found one
+        // on his PC that nobody had told him was being written. Absent means
+        // off, which is what false means. The folder is where they go; blank
+        // leaves them beside the crash log, where Crash Logger writes them.
+        [DataMember] public bool CrashSnapshots = false;
+        [DataMember] public string CrashSnapshotFolder = "";
+
         // Said No to setting Steam's Updates setting for Skyrim (ShellSteamUpdates.cs,
         // #493), so the start does not ask again. The question after a downgrade still does.
         [DataMember] public bool SteamUpdatesDeclined = false;

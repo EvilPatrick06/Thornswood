@@ -99,7 +99,9 @@ yes('the door writes it into allowed.json, and keeps it for a profile Discord co
     /staffRoleProfiles: Array\.isArray\(doc\.staffRoleProfiles\) \? doc\.staffRoleProfiles : \[\]/.test(src) &&
     /staffRoleProfiles: merged\(doc\.staffRoleProfiles, had\.staffRoleProfiles\)/.test(src) &&
     /doc\.staffRoleProfiles = kept\.staffRoleProfiles;/.test(src));
-yes('the seats block no longer borrows the chat commands staff check', !/g\.__thornswoodIsStaff = isStaff;/.test(src));
+// The chat block publishes isStaff again since #2551, for the property block's staff at any door; the seats keep to the role.
+yes('the seats block no longer borrows the chat commands staff check',
+    !/__thornswoodIsStaff/.test(block.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')));
 yes('the online count file carries max, how many wait, and whether it is full',
     /restarting: restarting, max: max, line: line, full: full/.test(src));
 yes('and max is every seat, the number and the staff seats over it, from the seats block',
@@ -549,7 +551,8 @@ yes('standing() sets staffRole from the roles in both of its paths, the hand wri
     (site.match(/out\.staffRole = holdsStaffRole\(out\.roles\);/g) || []).length === 2);
 yes('/api/allowed sends staffRoleProfiles from staffRole, and a ban takes a profile off it',
     /if \(st\.staffRole\) \{\s*for \(const n of profiles\) if \(!seenStaffRole\.has\(n\)\) \{ seenStaffRole\.add\(n\); out\.staffRoleProfiles\.push\(n\); \}/.test(site) &&
-    /\['profiles', 'devProfiles', 'adminProfiles', 'jarlProfiles', 'staffRoleProfiles', 'failedProfiles'\]/.test(site));
+    // jarlProfiles went in #2551: the hold offices are a map by profile now.
+    /\['profiles', 'devProfiles', 'adminProfiles', 'staffRoleProfiles', 'failedProfiles'\]/.test(site));
 yes('the count poll reads max, line and full out of online.json',
     /o\.max > 0\) max = o\.max/.test(site) && /o\.line > 0\) line = o\.line/.test(site) && /o\.full === true\) full = true/.test(site));
 yes('/api/public carries max from the server, or else from the record, and the line',

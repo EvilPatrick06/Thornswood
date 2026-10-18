@@ -334,6 +334,9 @@ function Get-LoadOrderCopyDiffs([hashtable]$Copies) { return @() }
 '@
     Stub 'Go' '[switch]$SkipServer, [string]$Game, [switch]$Vortex' ''
     Stub 'Sync-Client' '[switch]$Check, [switch]$NoPause, [string]$Game' ''
+    # The ship root (#2019): passes unless TS_SHIPROOT_EXIT says otherwise, for N.
+    # tests\test-2019-ship-roots.ps1 runs the real one on a stand-in root.
+    Stub 'Update-ShipRoot' '[string]$Channel, [string]$Root, [switch]$NoPause' 'if ($env:TS_SHIPROOT_EXIT) { exit ([int]$env:TS_SHIPROOT_EXIT) }'
     # What the real publisher does: receives the feed and baseline (from the
     # stand-in store), writes version.json and its baseline, and with no
     # -NoPush sends both back.
@@ -641,6 +644,25 @@ if ($target -match '^repos/[^/]+/[^/]+/releases\?per_page=100&page=(\d+)$') {
         $h.Code -eq 1 -and $h.Out -match 'is a folder Vortex deploys into' -and $h.Out -match 'Nothing was built')
     Yes '  before anything is built, installed or published' (
         (Called $h 'Build-Launcher').Count -eq 0 -and (Called $h 'Install-Launcher').Count -eq 0 -and (Called $h 'Publish-Update').Count -eq 0)
+    Yes '  and Updater.cs is on the version it had' ((Read-Version $updaterCs) -eq '1.1.93')
+
+    # ---- N: the ship root could not be brought up to date (#2019) ------------------------
+    # Update-ShipRoot.ps1 stood in for, exiting 1 as it does when the tool or
+    # the client install refuses. On a real Ship, before anything is built,
+    # installed, packed or told; and every Ship asks it, dry runs included.
+    $rooted = Called $g 'Update-ShipRoot'
+    Yes 'G and the root it built from was brought up to date first (Update-ShipRoot.ps1, #2019)' (
+        $rooted.Count -eq 1 -and $rooted[0].EndsWith(' -Root ' + $relDevRoot) -and $rooted[0] -match ' -Channel dev\b')
+    $env:TS_SHIPROOT_EXIT = '1'
+    try {
+        $nr = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-Channel', 'dev', '-Root', $rootDev, '-DistRoot', $dist, '-NoPause')
+    } finally { $env:TS_SHIPROOT_EXIT = '' }
+    Yes ("N a Ship whose ship root is not current stops (exit {0})" -f $nr.Code) (
+        $nr.Code -eq 1 -and $nr.Out -match 'is not current: Update-ShipRoot\.ps1 says why above\. Nothing was built or published\.')
+    Yes '  before the launcher is built or installed, and before anything is published or told' (
+        (Called $nr 'Build-Launcher').Count -eq 0 -and (Called $nr 'Install-Launcher').Count -eq 0 -and (Called $nr 'Publish-Update').Count -eq 0 -and
+        (Called $nr 'Publish-News').Count -eq 0 -and (Called $nr 'Publish-Discord').Count -eq 0 -and (Called $nr 'Request-Restart').Count -eq 0)
+    Yes '  and nothing left the machine' (@(Away $nr | Where-Object { $_ -notmatch '^git ' }).Count -eq 0 -and @(Away $nr | Where-Object { $_ -match '\b(push|tag)\b' }).Count -eq 0)
     Yes '  and Updater.cs is on the version it had' ((Read-Version $updaterCs) -eq '1.1.93')
 
     # ---- I: generated files out of date (#1692) ------------------------------------------

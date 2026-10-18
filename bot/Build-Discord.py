@@ -235,10 +235,46 @@ ROLES = [
 # hoisted group in the member list when somebody in it is online, so the empty
 # ones are invisible until they are not. A Jarl outranks their own citizens in
 # the list because Jarl sits higher here.
-for _h in HOLDS:
+# RAVEN ROCK HAS ITS OFFICES TOO (#2551, Patrick, 16 Oct, B): its Jarl, Court,
+# Steward and Guards, like the nine, because the game has its board, its drop
+# box and its jail. Its Jarl is "Jarl of Raven Rock", the name the site and the
+# game read for every hold. It is not one of HOLDS: it has no Citizen role and
+# no hold channel, which nobody has asked for.
+OFFICE_HOLDS = HOLDS + ['Raven Rock']
+
+for _h in OFFICE_HOLDS:
     ROLES.append(('Jarl of ' + _h, 0xE0C56A, True, PLAIN))
 for _h in HOLDS:
     ROLES.append(('Citizen of ' + _h, 0x8FA9B8, True, PLAIN))
+
+# THE OFFICES A JARL GIVES (#2551). Patrick, 15 Oct: each hold has a Court, a
+# Steward and its Guards, and they are Discord roles, so the role is the one
+# truth for who holds one, in the game and here. That hold's Jarl gives and
+# takes them, from the bot's office panel or from the Office page in the game,
+# and the bot sets the role either way. "Steward of <Hold>" replaces the one
+# shared steward office the game kept by itself. The role is on the account,
+# and the game keeps which one character of the account holds the office
+# (Patrick, 16 Oct: character based, not account based).
+#
+# The running bot also makes any of these, and the Jarl roles, that are
+# missing when it starts (bot.py, ensure_office_roles), so they exist without
+# a build; a build then puts them in this order.
+#
+# NOT HOISTED (Patrick, 15 Oct: "they must not be shown separately in the
+# member list"). The only in-world roles shown in their own group are the
+# Jarl and Citizen roles above. They sit under the Citizen roles, so a
+# citizen who also holds one keeps their Citizen colour.
+#
+# The site reads them by these exact names (site\server.js, OFFICE_ROLE), and
+# so does the bot's panel (bot.py, office_role). A name changed here and not
+# there leaves the office with nobody in it.
+OFFICE_ROLES = []
+for _h in OFFICE_HOLDS:
+    OFFICE_ROLES.append(_h + ' Court')
+    OFFICE_ROLES.append('Steward of ' + _h)
+    OFFICE_ROLES.append('Guard of ' + _h)
+for _name in OFFICE_ROLES:
+    ROLES.append((_name, 0xA8977A, False, PLAIN))
 
 # The Free Skyrim Trading Company (#1393, docs/systems/trading-company.md).
 # Applied for in Discord, the same shape as a Jarl, and given by a person.
@@ -292,14 +328,24 @@ NOT_MADE = ('Server Booster', 'Patreon', 'News Pings', 'Updates Pings')
 # opens #reports and every other staff channel.
 STAFF = ('Owner', 'Dev', 'Moderator', 'Gamemaster')
 
-# Who sees the Gamemasters category: the gamemaster ranks and nobody else.
-# Djinn, 14 Oct 2026: "there should be NO public channel inside the GM channel
-# area. GM only." So no Member, no Moderator, no Loremaster, no Playtester.
+# Who sees the Gamemasters category (#2519). Djinn's layout of 15 Oct 2026,
+# confirmed by him on 17 Oct: the gamemaster ranks and Moderator, nobody
+# else, and nothing public in it ("there should be NO public channel inside
+# the GM channel area", 14 Oct). So no Member, no Loremaster, no Playtester.
+# Moderator is in since 15 Oct; the 14 Oct list #2547 built left them out.
 # Owner and Dev hold Administrator, which Discord lets through every overwrite,
 # so they see it anyway; nothing here grants it to them. Both spellings of the
 # lead role are named, the same as the Test-Tasks line, because the role has
 # been written both ways; _named passes over the one that is not there.
-GM_ONLY = ('Lead Gamemaster', 'Lead GM', 'Gamemaster', 'Trial Gamemaster')
+GM_AREA = ('Lead Gamemaster', 'Lead GM', 'Gamemaster', 'Trial Gamemaster',
+           'Moderator')
+
+# Who may post in #gm-rules, which everybody in GM_AREA reads (Djinn, 15 Oct:
+# "only Lead Gamemaster, Owner and Dev post"). Owner and Dev are named even
+# though Administrator lets them through, so the rule is in the code and not
+# in who happens to hold Administrator. Read only in code, not by a hand
+# change on the live guild.
+GM_RULES_POST = ('Lead Gamemaster', 'Lead GM', 'Owner', 'Dev')
 
 # --------------------------------------------------------------- channels --
 # mode:  public       anybody talks, including somebody not yet approved
@@ -309,8 +355,10 @@ GM_ONLY = ('Lead Gamemaster', 'Lead GM', 'Gamemaster', 'Trial Gamemaster')
 #        hold         one hold's Citizen and Jarl, and hold staff
 #        staff        staff only, invisible to everybody else
 #        pathfind     testers and staff only
-#        gm           the gamemaster ranks only (GM_ONLY), invisible to
-#                     everybody else, staff included
+#        gm           the gamemaster ranks and Moderator (GM_AREA),
+#                     invisible to everybody else
+#        gmrules      GM_AREA reads, only GM_RULES_POST posts, invisible to
+#                     everybody else
 #
 # THE GATE, set up by hand on 23 and 24 September. Somebody who joins sees the
 # Start Here category (#rules, #welcome, #start-here, #say-hello) and the
@@ -460,15 +508,26 @@ PLAN = [
    dict(kind='text',  name='test-tasks-archive', mode='pathfind', make=False),
    dict(kind='voice', name='play-testing', mode='pathfind'),
  ]),
- # The gamemasters' own room. Djinn, 14 Oct (off hold): a GM room, a GM Voice
- # room, and one channel for reprimands, punishments and bans only. Every
- # channel in it is gm, and nothing public goes in here.
+ # The gamemasters' own room (#2519). Djinn's layout of 15 Oct, confirmed on
+ # 17 Oct, with #gm-discipline kept from the 14 Oct list as a sixth channel.
+ # Every channel in it is gm or gmrules, and nothing public goes in here: a
+ # public scene listing goes in the Discord's Events channel later, not here.
+ # GM Rules v1.0 is pinned in #gm-rules by hand; its text is not in this
+ # repository. #gm from the 14 Oct list is named with make=False, so prune
+ # leaves it alone if a run of #2547 ever made it, and nothing makes it again.
  ('Gamemasters', [
-   dict(kind='text',  name='gm',             mode='gm',
+   dict(kind='text',  name='gm-rules',           mode='gmrules',
+        topic='The GM Rules. Lead Gamemaster, Owner and Dev post here.'),
+   dict(kind='text',  name='gm-scene-summaries', mode='gm',
+        topic='What happened in a scene you ran, after it ends.'),
+   dict(kind='text',  name='gm-chat',            mode='gm',
         topic='Planning, handoffs and questions between gamemasters.'),
-   dict(kind='text',  name='gm-discipline',  mode='gm',
+   dict(kind='text',  name='gm-suggestions',     mode='gm',
+        topic='Ideas for scenes, events and how we run them.'),
+   dict(kind='text',  name='gm-discipline',      mode='gm',
         topic='Reprimands, punishments and bans only. Nothing else.'),
-   dict(kind='voice', name='GM Voice',       mode='gm'),
+   dict(kind='voice', name='GM Voice',           mode='gm'),
+   dict(kind='text',  name='gm',                 mode='gm', make=False),
  ]),
  ('Staff', [
    # The staff #news. Not the public #news in Information: that one carries
@@ -544,7 +603,15 @@ KEEP = (
     # no longer in the plan and -Prune would delete it (#2501).
     'staff-updates',
     # Gamemasters category (#2519). Named so -Prune cannot take them.
-    'gm', 'gm-discipline', 'gm voice',
+    'gm-rules', 'gm-scene-summaries', 'gm-chat', 'gm-suggestions',
+    'gm-discipline', 'gm voice', 'gm',
+) + tuple(
+    # The in-world roles (#2551, Patrick, 15 Oct: the office roles go in the
+    # never-delete list). Nothing in this script deletes a role today; these
+    # are named so that nothing added later ever may. A role holds who is in
+    # an office, and deleting one empties that office in the game as well.
+    ['Jarl of ' + _h for _h in OFFICE_HOLDS] + ['Citizen of ' + _h for _h in HOLDS] +
+    OFFICE_ROLES
 )
 
 
@@ -802,7 +869,23 @@ def overwrites(guild, mode, roles, hold=None, needs=BOT_NEEDS, extra=None):
         return with_bot(guild, _also(guild, roles, out, extra, talk), needs)
     if mode == 'gm':
         out = {ev: deny_all}
-        for n in GM_ONLY:
+        for n in GM_AREA:
+            r = _named(guild, roles, n)
+            if r is not None:
+                out[r] = talk
+        return with_bot(guild, _also(guild, roles, out, extra, talk), needs)
+    if mode == 'gmrules':
+        out = {ev: deny_all}
+        reader = discord.PermissionOverwrite(view_channel=True,
+                                             read_message_history=True,
+                                             send_messages=False,
+                                             create_public_threads=False,
+                                             send_messages_in_threads=False)
+        for n in GM_AREA:
+            r = _named(guild, roles, n)
+            if r is not None:
+                out[r] = reader
+        for n in GM_RULES_POST:
             r = _named(guild, roles, n)
             if r is not None:
                 out[r] = talk

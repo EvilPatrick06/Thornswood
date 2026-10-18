@@ -21,6 +21,7 @@ start the restored server and connect to it; see the end of that section.
 | `scripts\vps\Restore-Backup.ps1` | checks and unpacks one; `-CheckOnly` fails a backup with no characters in it |
 | `scripts\vps\Restore-Server.ps1` | puts one back into a server folder and checks the load order resolves and the characters are there |
 | `scripts\vps\Restore-Box.ps1` | run on Patrick's machine: carries one to a new box and puts all of it back there, both worlds with Restore-Server.ps1 and the rest with `vps-restore-services.ps1`, then deletes its copy (issue #454) |
+| `scripts\vps\Delete-Person.ps1` | carries out a deletion request and writes it in `C:\Thornswood-Deletions\requests.jsonl`; `-Reapply` removes everybody in that record again after a restore (issue #2351, `docs\WEBSITE-OPERATIONS.md` "Deletion requests") |
 | `scripts\vps\vps-freeze.ps1` | run on the old box through Remote.ps1 on the day of a move: stops everything and takes the last backup |
 | `tests\test-backup-restore.ps1` | backs up a scratch server, restores it into another, and checks it, every night in the build checks |
 | `tests\test-backup-streaming.ps1` | verifies large uploads, old archive compatibility, tampering, stream failures and publication collisions with disposable data |
@@ -39,7 +40,9 @@ folder: the character cards in `characters.json`, the door's `door.json`,
 site's `uploads` (the gallery's pictures) and each feed's store
 (`version.json`, `published.json`, `launchers.txt`, `releases.txt` and
 `history`, for `feed` and `feed-dev`), the bot's config and its join record
-(`joins.json`, which arrival each person was), and the Caddyfile. `NOTES.txt`
+(`joins.json`, which arrival each person was), the record of completed
+deletion requests (`deletions\requests.jsonl`, since issue #2351), and the
+Caddyfile. `NOTES.txt`
 in it counts the characters in each world and names any private file that was
 missing. The voice service's `owners.json` and `secret.txt` stopped being
 taken on 23 September, when the character register they belonged to was
@@ -66,11 +69,23 @@ another stream's cleanup fails. Publication refuses to overwrite a backup
 with the same timestamp. Neither a failed run nor retention considers an
 unrelated file for deletion.
 
-Before restoring a website backup into service, reapply any completed
-account or gallery deletion requests made after that backup. Restrict the
-rehearsal destination to the operators: an unpacked archive contains
-credentials and private records. A restore rehearsal must use a disposable
-destination, never the live service folder.
+Before anything restored goes back into service, the people who asked to be
+deleted are removed again (issue #2351): a backup still holds everybody who
+asked after it was taken. `Restore-Box.ps1` does it as its last step. After
+any other restore (Restore-Server.ps1 on its own, a folder copied back by
+hand), with the services it wrote under still stopped, on the box:
+```powershell
+.\scripts\vps\Remote.ps1 -File .\scripts\vps\Delete-Person.ps1 -Arguments '-Reapply'
+.\scripts\vps\Remote.ps1 -File .\scripts\vps\Delete-Person.ps1 -Arguments '-Reapply -Delete'
+```
+The first is a dry run that counts what goes; the second removes it, and
+refuses while a service it would write under is running. When the backup
+being put back carries a record the box's own does not, add
+`-Merge <its deletions\requests.jsonl>` to both. "Deletion requests" in
+`docs\WEBSITE-OPERATIONS.md` is the whole procedure. Restrict the rehearsal
+destination to the operators: an unpacked archive contains credentials and
+private records. A restore rehearsal must use a disposable destination, never
+the live service folder.
 
 Before 18 September it held none of it. The world was never in the backup at
 all.
@@ -101,6 +116,9 @@ The common case, and it does not need the server stopped for long.
    ```powershell
    Get-ChildItem C:\restore-check\game\world\changeForms -Filter *.json | Where-Object { $_.BaseName -match '^\d+$' } | Where-Object { (Get-Content $_.FullName -Raw | ConvertFrom-Json).profileId -eq 1234567 } | Select-Object Name
    ```
+   Never put back a character whose profile id is in the record of deletion
+   requests, `C:\Thornswood-Deletions\requests.jsonl`: that person asked for
+   it to be gone (issue #2351).
    Confirm the live server's file with the same slot number holds the same
    profile id before copying anything: a slot belongs to one character for as
    long as it lives, but a character deleted and made again gets a new one.
@@ -159,8 +177,10 @@ rehearsal, or a real move, that loses it is acceptable. In short:
    lines it prints. The join pass switch and the written role lists
    (`thornswoodRequirePass`, `thornswoodDevs`, `thornswoodPlaytesters`) come
    from the backup too, since no build carries them (issue #1845); those
-   lines name each one and never its value. Then `vps-restore-services.ps1` puts the rest back, and
-   the copy on the box is deleted. By hand, from an unpacked backup, it is:
+   lines name each one and never its value. Then `vps-restore-services.ps1` puts the rest back,
+   `Delete-Person.ps1 -Reapply -Delete` removes again everybody in the record
+   of deletion requests, the backup's merged into the box's, and the copy on
+   the box is deleted. By hand, from an unpacked backup, it is:
    - `game\world` -> `C:\Thornswood-Server\world`
    - `game\private` -> `C:\Thornswood-Server\private`
    - `game\data` -> `C:\Thornswood-Server\data`
@@ -174,6 +194,10 @@ rehearsal, or a real move, that loses it is acceptable. In short:
    - `bot\joins.json` -> `C:\Thornswood-Bot\data\joins.json`, before the bot
      starts, or the join cards start counting again
    - `web\Caddyfile` -> `C:\Thornswood-Caddy\Caddyfile`
+   - `deletions\requests.jsonl` is not copied: with everything above in place
+     and nothing started, `Delete-Person.ps1 -Reapply -Delete -Merge
+     <unpacked>\deletions\requests.jsonl` adds its lines to the box's record
+     and removes those people again
 4. **The rest comes from the repository and Patrick's machine, not from the
    backup**, steps 14 to 25 there: `.\scripts\deploy\Deploy-Docs.ps1` (never
    `-SeedDocs`, which would flatten the restored documents),
@@ -204,6 +228,11 @@ rehearsal, or a real move, that loses it is acceptable. In short:
 
 Worth an hour, and it is the only thing that turns this file from a guess into
 a runbook.
+
+It is also the only measure of how long a restore takes, the RTO row of
+[SERVICE-OBJECTIVES.md](SERVICE-OBJECTIVES.md). The alert proposed there, a
+rehearsal that starts the server and connects at a cadence Patrick sets, is
+Proposed, needs Patrick's agreement (#2183).
 
 `tests\test-backup-restore.ps1` does the scripted half every night on
 scratch folders: backs up a stand-in live and dev server, deletes the
@@ -260,7 +289,7 @@ the box has no repo:
 
 ```powershell
 scp .\scripts\deploy\Install-ThornswoodServer.ps1 .\scripts\deploy\ServerSettings.ps1 Administrator@192.135.112.23:C:/Thornswood-RestoreTest/scripts/deploy/
-scp .\scripts\vps\Restore-Server.ps1 .\scripts\vps\Restore-Backup.ps1 .\scripts\vps\Roll-Log.ps1 Administrator@192.135.112.23:C:/Thornswood-RestoreTest/scripts/vps/
+scp .\scripts\vps\Restore-Server.ps1 .\scripts\vps\Restore-Backup.ps1 .\scripts\vps\Server-Log.js Administrator@192.135.112.23:C:/Thornswood-RestoreTest/scripts/vps/
 ```
 
 and then, on the box:

@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The ship root tool (issue #2019): Thornswood-ShipRoot.exe, a console program
+  built from the launcher's own sources, which makes or brings up to date the
+  Game folder of a folder a release is built from (a "ship root", Where.ps1
+  ShipRoot and ShipRootDev) exactly as OwnGame does it for an install.
+
+  WHY IT IS THE LAUNCHER'S SOURCES AND NOT A SCRIPT. A ship root is a whole
+  launcher install, and its Game folder was made and refreshed only by that
+  install's own launcher (OwnGame.Make, OwnGame.Refresh). Patrick, 15 Oct: the
+  launchers he plays from stay apart from the build folders, and a ship
+  root's launcher is never started, so nothing refreshed it: on 15 Oct One's
+  dev root was still the folder made on 3 Oct, at rules 14, from another
+  install's game folder, with the old 3BBB.esp and the 12 Oct client in it.
+  Copying OwnGame's rules into PowerShell would make two implementations that
+  drift. So this compiles every file of launcher\app, OwnGame and everything
+  it calls, with ShipRoot.cs as the entry point instead of the window.
+
+  WHY IT IS NOT UNDER launcher\. Ship fingerprints everything under launcher\
+  to decide whether a new launcher must be built, signed and published
+  (Get-LauncherInputHash, #921), and a main Ship refuses launcher files that
+  changed since its tag (Get-LauncherDrift). This program never ships, so a
+  change to it must not cost either. A change to OwnGame itself still does,
+  through launcher\app, as it should.
+
+  Built by scripts\release\Update-ShipRoot.ps1 at the start of every Ship, so
+  it is always the checkout's own OwnGame, and by the Launcher builds check.
+  Never signed and never packed: it runs on the machine that ships and
+  nowhere else.
+
+  Build it (from the repository folder, in PowerShell 7):
+    $msb = .\scripts\release\Find-MSBuild.ps1
+    & $msb scripts\release\ShipRoot\ShipRoot.csproj -nologo -p:OutDir=<folder>\
+-->
+<Project ToolsVersion="Current" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ThornswoodRepo>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..\'))</ThornswoodRepo>
+    <ThornswoodApp>$(ThornswoodRepo)launcher\app\</ThornswoodApp>
+    <BaseIntermediateOutputPath>$(ThornswoodRepo)out\obj\shiproot\</BaseIntermediateOutputPath>
+  </PropertyGroup>
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
+    <Platform Condition="'$(Platform)' == ''">AnyCPU</Platform>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>Thornswood-ShipRoot</AssemblyName>
+    <RootNamespace>Thornswood</RootNamespace>
+    <StartupObject>Thornswood.ShipRootTool</StartupObject>
+    <!-- The launcher's own framework and C# version, so its sources compile
+         here exactly as they do there (launcher\app\Thornswood.csproj). -->
+    <TargetFrameworkVersion>v4.8.1</TargetFrameworkVersion>
+    <LangVersion>13.0</LangVersion>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <Optimize>true</Optimize>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>pdbonly</DebugType>
+    <NoConfig>true</NoConfig>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+    <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <OutDir Condition="'$(OutDir)' == ''">$(ThornswoodRepo)out\shiproot\</OutDir>
+    <OutputPath>$(OutDir)</OutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Security" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+    <Reference Include="PresentationFramework" />
+    <Reference Include="PresentationCore" />
+    <Reference Include="WindowsBase" />
+    <Reference Include="System.Xaml" />
+    <Reference Include="System.Windows.Forms" />
+    <!-- Compiled against, never loaded: nothing this program runs reaches the
+         window or its browser. -->
+    <Reference Include="Microsoft.Web.WebView2.Core">
+      <HintPath>$(ThornswoodRepo)launcher\lib\webview2\Microsoft.Web.WebView2.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Microsoft.Web.WebView2.Wpf">
+      <HintPath>$(ThornswoodRepo)launcher\lib\webview2\Microsoft.Web.WebView2.Wpf.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="$(ThornswoodApp)*.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)*.cs" />
+  </ItemGroup>
+
+  <!-- The records OwnGame and the client runtime read out of the exe, under
+       the names the launcher embeds them as. -->
+  <ItemGroup>
+    <EmbeddedResource Include="$(ThornswoodRepo)records\client-build.json"><LogicalName>client-build.json</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="$(ThornswoodRepo)records\skyrim-files.json"><LogicalName>skyrim-files.json</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="$(ThornswoodRepo)records\ui-gone.json"><LogicalName>ui-gone.json</LogicalName></EmbeddedResource>
+  </ItemGroup>
+
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+
+  <Target Name="ThornswoodShipRootInputs" BeforeTargets="BeforeBuild">
+    <Error Condition="!Exists('%(EmbeddedResource.FullPath)')" Text="%(EmbeddedResource.Identity) is not in the repository folder where it should be; nothing was built." />
+    <Error Condition="!Exists('$(ThornswoodApp)OwnGame.cs')" Text="launcher\app\OwnGame.cs is not where it should be; nothing was built." />
+  </Target>
+</Project>

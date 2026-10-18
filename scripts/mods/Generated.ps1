@@ -128,7 +128,14 @@ function Read-GeneratedRecord([string]$Path) {
     return $rec
 }
 
-# Writes the record in one step, so nothing ever reads half of one.
+# Writes the record in one step, so nothing ever reads half of one: the lines
+# go to a file beside it, which is renamed over the record by one MoveFileEx
+# with MOVEFILE_REPLACE_EXISTING (#2586), the call OwnGame.WriteRecord makes in
+# the launcher. Deleting the old record and moving the new one in left a
+# moment with no record at all, and a run stopped there lost what was built;
+# File.Replace has the same moment inside it (it moves the old record aside
+# first), measured in tests\test-2586-atomic-records.ps1. Windows PowerShell
+# 5.1 has no File.Move that replaces, so the call is declared on the first write.
 function Write-GeneratedRecord([string]$Path, [string]$Game, $Inputs, $Files) {
     $lines = New-Object 'System.Collections.Generic.List[string]'
     $lines.Add('generated 1')
@@ -141,8 +148,29 @@ function Write-GeneratedRecord([string]$Path, [string]$Game, $Inputs, $Files) {
     if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
     $tmp = $Path + '.new'
     [IO.File]::WriteAllLines($tmp, $lines.ToArray(), (New-Object Text.UTF8Encoding($false)))
-    if (Test-Path -LiteralPath $Path) { [IO.File]::Delete($Path) }
-    [IO.File]::Move($tmp, $Path)
+    if (-not ('Thornswood.RecordSwap' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.IO;
+using System.Runtime.InteropServices;
+namespace Thornswood
+{
+    public static class RecordSwap
+    {
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        static extern bool MoveFileEx(string existing, string replacement, int flags);
+        // MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
+        public static void Into(string from, string to)
+        {
+            if (!MoveFileEx(from, to, 0x1 | 0x8))
+                throw new IOException(to + " could not be replaced by " + from + ": " +
+                                      new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error()).Message);
+        }
+    }
+}
+'@
+    }
+    [Thornswood.RecordSwap]::Into($tmp, $Path)
 }
 
 # records\generated.json, checked. Throws with the sentence to show.

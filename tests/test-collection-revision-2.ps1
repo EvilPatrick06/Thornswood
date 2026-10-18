@@ -17,7 +17,8 @@
       address from scripts\vps\vps.json). THIS PART TALKS TO THE VPS: it only
       reads the manifest a launcher reads. -Offline leaves it out.
     - the built server settings on the shipping machine
-      (Where.ps1 ServerSettings), which Deploy-DevGamemode.ps1 sends.
+      (Where.ps1 ServerSettings), which Deploy-DevGamemode.ps1 sends, by
+      their full plugins: the table counts no light plugin (#2577).
   A source that is not there says SKIP. One that is there and disagrees with
   the table is a FAIL naming the first position where they part.
 
@@ -177,8 +178,10 @@ Yes 'the published additions include the two generator packages and the three me
 Yes 'Styles is explicitly excluded, so its legacy held files expire rather than becoming an addition' ($addIds -notcontains '154063' -and $doc -match 'Styles of Skyrim Mashups \(154063\) is excluded')
 Yes 'everything held for a revision waits for revision 2, this page''s' (@($ShipHeldForCollection | Where-Object { -not [string]$_.ContentModel -and [int]$_.Revision -ne 2 }).Count -eq 0)
 $byPlugin = @($ShipHeldForCollection | Where-Object { [string]$_.ContentModel })
-Yes '  and the one no revision carries, the board, waits for the content plugin instead (#2298)' (
-    $byPlugin.Count -eq 1 -and [string]$byPlugin[0].Path -eq 'Data\meshes\olivar-messageboard\missiveboardcotnd.nif')
+# The board was the one no revision carries, held while the content plugin
+# named it (#2298). The plugin names Thornswood's own board since, so that line
+# held nothing and came out on 16 October (#400): nothing waits on the plugin.
+Yes '  and nothing waits on the content plugin, now that its board is Thornswood''s own mesh (#2298, #400)' ($byPlugin.Count -eq 0)
 $heldRows = @($loose | Where-Object { $_ -match '\*\*Held\*\*' })
 Yes 'every held folder or file is named on a Held row of the loose files table' (@($ShipHeldForCollection | Where-Object {
     $leaf = ([string]$_.Path).TrimEnd('\') -replace '^Data\\meshes\\', ''
@@ -276,14 +279,76 @@ if ($Offline) {
         Compare-Order "the $w server" ([string[]]$names)
     }
 }
+# The page's table is the full plugins (step 6: light plugins are not counted,
+# step 10: 48 full plugins), the same list as a manifest's mods; the manifest
+# keeps the light ones apart, under light. A server settings loadOrder lists
+# every plugin the game loads, full and light, in the game's order, once the
+# engine its record names loads light plugins (#1715, ServerOrder.ps1). So the
+# settings are compared by their full plugins, which plugin is light read from
+# each listed file's header the way Publish-Server reads it (#2577: until this
+# the whole loadOrder was compared, and it parted at _ResourcePack.esl, the
+# Skyrim.ccc plugin the game loads straight after the masters).
+. (Join-Path $Repo 'scripts\deploy\ServerOrder.ps1')
+$serverRecord = Join-Path $Repo 'records\server-build.json'
+function Get-FullPlugins([string[]]$loadOrder, [string]$record) {
+    $isLight = Get-ThornswoodLightTest $loadOrder $record
+    return ,[string[]]@($loadOrder | ForEach-Object { [IO.Path]::GetFileName(([string]$_).Replace('/', '\')) } |
+                        Where-Object { $_ -and -not (($null -ne $isLight) -and (& $isLight $_)) })
+}
+
 $settings = ''
 try { $settings = & (Join-Path $Repo 'scripts\release\Where.ps1') ServerSettings } catch { $settings = '' }
 if ($settings -and (Test-Path -LiteralPath $settings)) {
-    $lo = @(((Get-Content -LiteralPath $settings -Raw | ConvertFrom-Json).loadOrder) | ForEach-Object { [IO.Path]::GetFileName(([string]$_).Replace('/', '\')) } | Where-Object { $_ })
-    if ($lo.Count) { $sources++; Compare-Order 'the built server settings' ([string[]]$lo) }
+    $lo = [string[]]@(((Get-Content -LiteralPath $settings -Raw | ConvertFrom-Json).loadOrder) | Where-Object { $_ })
+    if ($lo.Count) {
+        # A listed plugin whose header cannot be read here (the game folder the
+        # settings were built from is gone) leaves nothing to compare, and the
+        # reason is printed.
+        $full = $null
+        try { $full = Get-FullPlugins $lo $serverRecord } catch { Skip "the built server settings at ${settings}: $($_.Exception.Message)" }
+        if ($null -ne $full) {
+            Write-Host ("NOTE  the built server settings list {0} plugins, {1} of them full; the page is the full ones" -f $lo.Count, $full.Count)
+            $sources++; Compare-Order 'the built server settings' $full
+        }
+    }
     else { Skip "the built server settings at $settings name no load order" }
 } else {
     Skip 'the built server settings: not on this machine'
+}
+
+# The full plugins of a settings loadOrder, on made up plugin files, so the
+# comparison above can never pass a full plugin out of place.
+$fx = Join-Path $Scratch ('thornswood-rev2-order-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+try {
+    $null = New-Item -ItemType Directory -Force -Path $fx
+    function FxPlugin([string]$name, [uint32]$flags) {
+        $b = New-Object byte[] 24
+        [Text.Encoding]::ASCII.GetBytes('TES4').CopyTo($b, 0)
+        [BitConverter]::GetBytes($flags).CopyTo($b, 8)
+        [IO.File]::WriteAllBytes((Join-Path $fx $name), $b)
+        return ((Join-Path $fx $name).Replace('\', '/'))
+    }
+    $yes = Join-Path $fx 'loads-light.json'; [IO.File]::WriteAllText($yes, '{"lightPlugins": true}')
+    $no = Join-Path $fx 'loads-none.json'; [IO.File]::WriteAllText($no, '{"binary": "scam_native.node"}')
+    $fxOrder = [string[]]@(
+        (FxPlugin 'Skyrim.esm' 0x1), (FxPlugin 'Update.esm' 0x1), (FxPlugin 'Dawnguard.esm' 0x1),
+        (FxPlugin 'HearthFires.esm' 0x1), (FxPlugin 'Dragonborn.esm' 0x1),
+        (FxPlugin '_ResourcePack.esl' 0), (FxPlugin 'Water for ENB.esm' 0x1), (FxPlugin 'TrueHUD.esl' 0x200),
+        (FxPlugin 'SkyUI_SE.esp' 0x200), (FxPlugin 'Embers XD.esm' 0x1))
+    $f = Get-FullPlugins $fxOrder $yes
+    Yes 'a settings loadOrder with light plugins: its full plugins are the masters, then Water for ENB.esm and Embers XD.esm' (
+        ($f -join '|') -eq 'Skyrim.esm|Update.esm|Dawnguard.esm|HearthFires.esm|Dragonborn.esm|Water for ENB.esm|Embers XD.esm')
+    Yes '...an .esl is light by its name and an .esp by its 0x200 flag' ($f -notcontains '_ResourcePack.esl' -and $f -notcontains 'SkyUI_SE.esp')
+    Yes '...which agree with the page until the made up list ends, at position 8' ((Get-Parting $f).At -eq 7)
+    $swap = [string[]]$f.Clone(); $swap[5] = 'Embers XD.esm'; $swap[6] = 'Water for ENB.esm'
+    Yes '...and two full plugins out of place part at position 6' ((Get-Parting $swap).At -eq 5)
+    Yes 'for an engine that loads no light plugin every listed entry is full' ((Get-FullPlugins $fxOrder $no).Count -eq $fxOrder.Count)
+    $threw = $false
+    try { [void](Get-FullPlugins ([string[]]@($fxOrder + ($fx.Replace('\', '/') + '/Gone.esp'))) $yes) } catch { $threw = $true }
+    Yes 'a listed plugin that is not on this machine cannot be told, so nothing is compared' $threw
+}
+finally {
+    Remove-Item -LiteralPath $fx -Recurse -Force -EA SilentlyContinue
 }
 if ($sources -eq 0) { Skip 'nothing to compare the page''s order with here; the nightly run on the VPS reads the servers' }
 

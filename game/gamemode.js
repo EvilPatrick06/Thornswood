@@ -66,8 +66,9 @@ const WORLDSPACES = new Set(DATA.worldspaces);
   Nothing rolled this file, so it grew until reading last night's crash meant
   opening a file nothing could open. appendFileSync opens, writes and closes
   on every line, so between lines this process holds nothing and a rename
-  works. server.log is different: cmd holds it open for as long as the server
-  runs, so roll-log.ps1 rolls that one before the server starts. The size is
+  works. server.log is different: server-log.js beside the server writes it
+  and rolls it at midnight and at 4 MB, keeping nothing past 30 days (#2349).
+  The size is
   read once per load and counted after that, so a busy tick does not ask the
   disk about the file for every line.
 */
@@ -1714,6 +1715,75 @@ function addItemsAtomic(actorId,goods) {
 }
 
 /*
+  WHICH RUN OF THE SERVER THIS IS (#2623). Made once per server process and
+  kept on globalThis, which a gamemode reload keeps (the NPC startup below
+  finds the previous controllers there), so a reload is the same run and a
+  restart is a new one. A temporary spawn carries the run it was made in.
+*/
+function serverRunId() {
+  if (typeof globalThis.__thornswoodServerRun !== 'string' || !globalThis.__thornswoodServerRun) {
+    globalThis.__thornswoodServerRun = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+  }
+  return globalThis.__thornswoodServerRun;
+}
+
+/*
+  WHETHER AN ACTOR IS A SPAWN NOBODY KEPT (#2623), read off the actor's own
+  marker rather than the NPC population's table, because that table is empty
+  for the few seconds after a gamemode reload until discovery runs, and a
+  temporary spawn that died then would otherwise stand up again. Any run, not
+  only this one: a temporary spawn is removed whenever it dies. The plain
+  true from before #2623 counts, since nobody chose to keep it.
+*/
+function isTemporarySpawn(actorId) {
+  let marker = null;
+  try { marker = mp.get(actorId, 'thornswoodNpcCommanded'); } catch (e) { return false; }
+  if (marker === true) return true;
+  return !!marker && typeof marker === 'object' && marker.keep !== true && typeof marker.run === 'string';
+}
+
+/*
+  TAKES A TEMPORARY SPAWNED CREATURE OUT OF THE WORLD FOR GOOD (#2623).
+
+  Three steps, in this order, each for a reason read out of the engine (the
+  fork at the commit engine\skymp pins):
+  - ObjectReference.Delete marks its saved record deleted
+    (MpObjectReference::Delete sets isDeleted and takes it off the grid), and
+    a record marked deleted is skipped when the server loads the world
+    (PartOne's load, "Skipping deleted form"), so it does not come back at a
+    restart.
+  - destroyActor takes it out of the server's memory (WorldState::DestroyForm).
+    The respawn timer a death starts holds only a weak reference to the actor
+    (MpActor::RespawnWithDelay, lifetime.lock()), so once it is destroyed that
+    timer finds nothing and nothing stands up again.
+  - The habitat count and the shared NPC runtime let go of its id, so nothing
+    is left waiting on an actor that is gone.
+  Never called inside the engine's death event: DeathEvent::OnFireSuccess
+  starts the respawn timer on the actor after every listener has run, so
+  mp.onDeath asks for this on the next turn of the event loop, after the event
+  is over.
+*/
+function removeSpawned(actorId) {
+  try {
+    const population = globalThis.__thornswoodNpcPopulation;
+    if (population && population.release) population.release(actorId);
+  } catch (e) { log('removeSpawned', actorId.toString(16), 'could not release its habitat slot:', e); }
+  try {
+    const runtime = globalThis.__thornswoodNpcRuntime;
+    if (runtime && runtime.forget) runtime.forget(actorId);
+  } catch (e) { log('removeSpawned', actorId.toString(16), 'could not leave the NPC runtime:', e); }
+  try {
+    mp.callPapyrusFunction('method', 'ObjectReference', 'Delete',
+      { type: 'form', desc: mp.getDescFromId(actorId) }, []);
+  } catch (e) { log('removeSpawned', actorId.toString(16), 'could not mark its record deleted:', e); }
+  try {
+    mp.destroyActor(actorId);
+  } catch (e) { log('removeSpawned', actorId.toString(16), 'could not destroy it:', e); return false; }
+  log('removeSpawned', actorId.toString(16), 'a temporary spawn is gone');
+  return true;
+}
+
+/*
   Puts count new actors of the NPC record baseId away units out from where
   ({ desc, pos, rot }): one straight ahead of the way they face (rot[2], in
   degrees), several spread round them. Returns { made, why }. Shared by /spawn
@@ -1730,8 +1800,26 @@ function addItemsAtomic(actorId,goods) {
   A fifth argument, commanded, is true for tester and staff spawn commands.
   The private population marker exempts these actors from habitat capacity,
   while admission and native runtime enrollment still establish authority.
+
+  A SPAWNED CREATURE IS TEMPORARY UNLESS STAFF KEEP IT (#2623). Djinn, 17
+  October, after wolves and a vampire he spawned in The Winking Skeever for a
+  test were still there days later and attacked a new character: "A creature
+  spawned by a staff member should never be made permanent unless we want to
+  make it permanent." The marker used to be plain true, and the population
+  gave every commanded actor a saved home and a spawn point there, so it came
+  back to that spot after every death and every restart, for good. Now the
+  marker says which: { keep: true } for a creature staff asked to keep (the
+  word keep on the command), or { run } naming this run of the server for a
+  temporary one. A temporary one is removed when it dies (removeSpawned, from
+  mp.onDeath) and, if it is still standing, when the server next starts
+  (createNpcPopulation sees a run that is not this one). A spawn from before
+  this change carries plain true, which nobody chose to keep, so it is
+  removed the first time the gamemode loads with this code, a deploy
+  included, not only at a restart. The sixth argument, keep, is the staff's
+  choice.
 */
-function placeActors(baseId, where, count, away, commanded) {
+function placeActors(baseId, where, count, away, commanded, keep) {
+  const run = serverRunId();
   let rec = null;
   try { rec = (mp.lookupEspmRecordById(baseId) || {}).record || null; } catch (e) { rec = null; }
   if (rec && rec.type && rec.type !== 'NPC_') {
@@ -1754,7 +1842,7 @@ function placeActors(baseId, where, count, away, commanded) {
       // Persist the exemption before admission: the five-second discovery
       // pass and a later gamemode reload must recognize the same command.
       const population=globalThis.__thornswoodNpcPopulation;
-      if(commanded && population) mp.set(ref,'thornswoodNpcCommanded',true);
+      if(commanded && population) mp.set(ref,'thornswoodNpcCommanded',keep ? {keep:true} : {run:run});
       if(population && !population.admit(ref,mp.getNpcAIState(ref))) {
         throw new Error('This species has no available population slot in this habitat');
       }
@@ -4187,7 +4275,7 @@ const HALL = {
   front doors two units apart, which is the only reason Morthal's and
   Dawnstar's old points looked like one spot.
 */
-const CHARGEN = {"shift":[["1be1a:Skyrim.esm",1],["1be1b:Skyrim.esm",1]],"rieklingShift":[["bfd98:Playable Rieklings.esp",1],["bfdb1:Playable Rieklings.esp",1]],"towns":{"e80030:Thornswood-Content.esp":{"key":"whiterun","town":"Whiterun","arrival":{"cell":"WhiterunBanneredMare","desc":"1605e:Skyrim.esm","pos":[-113.6,-810,69.3],"rot":[0,0,3.7]}},"e80031:Thornswood-Content.esp":{"key":"riften","town":"Riften","arrival":{"cell":"RiftenBeeandBarb","desc":"16bdf:Skyrim.esm","pos":[-150.2,-598.2,64],"rot":[0,0,36.3]}},"e80032:Thornswood-Content.esp":{"key":"solitude","town":"Solitude","arrival":{"cell":"SolitudeWinkingSkeever","desc":"16a0e:Skyrim.esm","pos":[-293.9,-1450.6,0],"rot":[0,0,0]}},"e80033:Thornswood-Content.esp":{"key":"windhelm","town":"Windhelm","arrival":{"cell":"WindhelmCandlehearthHall","desc":"16789:Skyrim.esm","pos":[554.3,-3766.2,64],"rot":[0,0,91.9]}},"e80034:Thornswood-Content.esp":{"key":"markarth","town":"Markarth","arrival":{"cell":"MarkarthSilverBloodInn","desc":"16dfe:Skyrim.esm","pos":[-5588.5,-1925.8,-16],"rot":[0,0,180]}},"e80035:Thornswood-Content.esp":{"key":"falkreath","town":"Falkreath","arrival":{"cell":"FalkreathDeadMansDrink","desc":"3a184:Skyrim.esm","pos":[670.4,-443.1,0.5],"rot":[0,0,0]}},"e80036:Thornswood-Content.esp":{"key":"morthal","town":"Morthal","arrival":{"cell":"MorthalMoorsideInn","desc":"138ce:Skyrim.esm","pos":[1970.6,-160.2,0],"rot":[0,0,270.9]}},"e80037:Thornswood-Content.esp":{"key":"dawnstar","town":"Dawnstar","arrival":{"cell":"DawnstarWindpeakInn","desc":"13a7f:Skyrim.esm","pos":[1823.2,-534.7,0.5],"rot":[0,0,0]}},"e80038:Thornswood-Content.esp":{"key":"winterhold","town":"Winterhold","arrival":{"cell":"WinterholdTheFrozenHearth","desc":"13814:Skyrim.esm","pos":[1791.6,7.3,0],"rot":[0,0,88]}}}};
+const CHARGEN = {"shift":[["1be1a:Skyrim.esm",1],["1be1b:Skyrim.esm",1]],"rieklingShift":[["bfd98:Playable Rieklings.esp",1],["bfdb1:Playable Rieklings.esp",1]],"towns":{"e80030:Thornswood-Content.esp":{"key":"whiterun","town":"Whiterun","hold":"Whiterun Hold","arrival":{"cell":"WhiterunBanneredMare","desc":"1605e:Skyrim.esm","pos":[-113.6,-810,69.3],"rot":[0,0,3.7]},"start":{"cell":"WhiterunExterior01","desc":"3c:Skyrim.esm","pos":[19189.1,-12006.5,-4558.4],"rot":[0,0,309.9]}},"e80031:Thornswood-Content.esp":{"key":"riften","town":"Riften","hold":"The Rift","arrival":{"cell":"RiftenBeeandBarb","desc":"16bdf:Skyrim.esm","pos":[-150.2,-598.2,64],"rot":[0,0,36.3]},"start":{"cell":"RiftenPlankside03","desc":"3c:Skyrim.esm","pos":[166478.2,-95072.9,10735.1],"rot":[0,0,89.2]}},"e80032:Thornswood-Content.esp":{"key":"solitude","town":"Solitude","hold":"Haafingar","arrival":{"cell":"SolitudeWinkingSkeever","desc":"16a0e:Skyrim.esm","pos":[504.9,-1075.4,0],"rot":[0,0,270.1]},"start":{"cell":"cell 92be, below Solitude","desc":"3c:Skyrim.esm","pos":[-73387.2,94964.1,-11739],"rot":[0,0,12.1]}},"e80033:Thornswood-Content.esp":{"key":"windhelm","town":"Windhelm","hold":"Eastmarch","arrival":{"cell":"WindhelmCandlehearthHall","desc":"16789:Skyrim.esm","pos":[554.3,-3766.2,64],"rot":[0,0,91.9]},"start":{"cell":"WindhelmAttackStart05","desc":"3c:Skyrim.esm","pos":[135744.9,24540.5,-12865.3],"rot":[0,0,355.3]}},"e80034:Thornswood-Content.esp":{"key":"markarth","town":"Markarth","hold":"The Reach","arrival":{"cell":"MarkarthSilverBloodInn","desc":"16dfe:Skyrim.esm","pos":[-5588.5,-1925.8,-16],"rot":[0,0,180]},"start":{"cell":"MarkarthUnderStoneKeep","desc":"16df2:Skyrim.esm","pos":[-5558.7,-1247.7,6688],"rot":[0,0,37.3]}},"e80035:Thornswood-Content.esp":{"key":"falkreath","town":"Falkreath","hold":"Falkreath Hold","arrival":{"cell":"FalkreathDeadMansDrink","desc":"3a184:Skyrim.esm","pos":[834.6,-100.6,0],"rot":[0,0,53.1]},"start":{"cell":"FalkreathExterior05","desc":"3c:Skyrim.esm","pos":[-35529,-89918.3,-2946.1],"rot":[0,0,107.3]}},"e80036:Thornswood-Content.esp":{"key":"morthal","town":"Morthal","hold":"Hjaalmarch","arrival":{"cell":"MorthalMoorsideInn","desc":"138ce:Skyrim.esm","pos":[1970.6,-160.2,0],"rot":[0,0,270.9]},"start":{"cell":"MorthalExterior06","desc":"3c:Skyrim.esm","pos":[-41159.1,63851.4,-13778.6],"rot":[0,0,45.5]}},"e80037:Thornswood-Content.esp":{"key":"dawnstar","town":"Dawnstar","hold":"The Pale","arrival":{"cell":"DawnstarWindpeakInn","desc":"13a7f:Skyrim.esm","pos":[2010.3,-155.7,0],"rot":[0,0,273.1]},"start":{"cell":"DawnstarWesternMineExterior","desc":"3c:Skyrim.esm","pos":[25623.4,100614.3,-13216.9],"rot":[0,0,56.1]}},"e80038:Thornswood-Content.esp":{"key":"winterhold","town":"Winterhold","hold":"Winterhold","arrival":{"cell":"WinterholdTheFrozenHearth","desc":"13814:Skyrim.esm","pos":[1791.6,7.3,0],"rot":[0,0,88]},"start":{"cell":"WinterholdExterior05","desc":"3c:Skyrim.esm","pos":[111939,99023.6,-8742.5],"rot":[0,0,302.4]}}}};
 
 /* The plain outfit is supplied before a fresh character opens the face menu.
  * Choosing reuses those same owned pieces after the body has settled. */
@@ -4218,7 +4306,9 @@ function townsForPanel() {
   const out = [];
   for (const desc in PASSAGES) {
     const t = PASSAGES[desc];
-    if (t && t.arrival) { out.push({ key: t.key, name: t.town }); }
+    // The start spot is what a pick leads to since #2622, and the hold is
+    // what the panel shows under the town, the same name the welcome says.
+    if (t && t.start) { out.push({ key: t.key, name: t.town, hold: t.hold || '' }); }
   }
   return out;
 }
@@ -4449,8 +4539,8 @@ function beginChoosing(actorId, state, why) {
     and neither is on the screen. The welcome is beginAppearance's.
   */
   tellOnce(actorId, 'choosing', opened
-    ? 'You have been given plain clothes. Choose a home town, and you will ' +
-      'wake up at its inn.'
+    ? 'You have been given plain clothes. Choose a home town, and that is ' +
+      'where you will start.'
     : 'You have been given plain clothes. The starting panel did not open by ' +
       'itself. Press K to choose where you will start. Your class and ' +
       'profession can be chosen there too, or later in the world.');
@@ -4481,11 +4571,23 @@ function arriveAt(actorId, townKey) {
   if (!state || state.stage !== 'choosing') { return false; }
   const desc = TOWN_BY_KEY[String(townKey || '').toLowerCase()];
   const entry = desc ? PASSAGES[desc] : null;
-  if (!entry || !entry.arrival) {
+  if (!entry || !entry.start) {
     log('chargen', actorId.toString(16), 'no such town', townKey, '- staying in the hall');
     return false;
   }
-  const arrival = entry.arrival;
+  /*
+    A NEW CHARACTER ARRIVES AT THE TOWN'S START SPOT, NOT IN ITS INN (#2622).
+    Djinn, 17 October: inns are the busiest rooms in the game, so a stranger
+    landed in the middle of other people's scenes, several picks of one town
+    stacked on one spot, and anybody who wanted to harass new players knew
+    where they appeared. Each town's start (game\data\chargen.json) is one
+    spot Djinn stood on and marked with F8: the stables or carriage stop at
+    Whiterun, Solitude, Windhelm and Riften, a spot of his choosing in
+    Falkreath, Morthal, Dawnstar and Winterhold, and Understone Keep in
+    Markarth. The outdoor ones are in Tamriel (3c), checked against
+    Skyrim.esm. The inn spot (arrival) stays for staff, as /tp <town> inn.
+  */
+  const arrival = entry.start;
   mp.set(actorId, 'spawnPoint', {
     cellOrWorldDesc: arrival.desc, pos: arrival.pos, rot: arrival.rot,
   });
@@ -4499,7 +4601,7 @@ function arriveAt(actorId, townKey) {
   closeRaceMenu(actorId);
   log('chargen', actorId.toString(16), 'home =', entry.key, '(' + arrival.cell + ') -> done');
   /*
-    ONE LINE AT THE DOOR OF THE INN, beside the log line and never instead of it.
+    ONE LINE ON ARRIVAL, beside the log line and never instead of it.
 
     The To Do List's entry on narrating creation lists what a stranger meets in
     the first minutes: "a stone room with nobody in it, a race menu, silence,
@@ -4517,7 +4619,14 @@ function arriveAt(actorId, townKey) {
     say() and not notify(), whose own comment says it may well do nothing
     from here.
   */
-  say(actorId, 'Welcome to ' + entry.town + '. You start at the inn.');
+  /*
+    THE WORDS ARE DJINN'S, 17 October: "Welcome to (insert Hold name here),
+    Safe Travels." The hold, not the town, out of the hold field of the town
+    table (game\data\chargen.json), so it reads the way the land is named:
+    Haafingar for Solitude, the Pale for Dawnstar. Said on this first arrival
+    only, as before: arriveAt runs once, at the end of creation.
+  */
+  say(actorId, 'Welcome to ' + entry.hold + ', Safe Travels.');
   return true;
 }
 
@@ -6027,7 +6136,17 @@ mp.onDeath = guard('onDeath', function (actorId, killerId) {
     const dying = mp.get(actorId, 'baseDesc');
     if (npcDeath) {
       const population = globalThis.__thornswoodNpcPopulation;
-      const minutes = population && population.returnMinutes(actorId);
+      /*
+        A TEMPORARY SPAWN'S BODY LIES THE NORMAL TIME (#2623). Djinn, 17
+        October: "leave the normal body time", so a hunter can still skin
+        and loot it. The 45 minutes in a spawn's rule is how long a kept one
+        waits before it stands up again, which is not a body time, so a
+        temporary one skips it and gets what the same creature gets in the
+        wild: an animal a hunter can work lies HUNT_TUNING.bodySeconds,
+        anything else the engine's twenty five seconds. mp.onRespawn removes
+        it when that time is up, instead of letting it stand.
+      */
+      const minutes = !isTemporarySpawn(actorId) && population && population.returnMinutes(actorId);
       if (Number.isInteger(minutes) && minutes > 0 && minutes <= 1440) {
         mp.set(actorId, 'spawnDelay', minutes * 60);
       } else if (isCarcass(dying)) {
@@ -6047,7 +6166,6 @@ mp.onDeath = guard('onDeath', function (actorId, killerId) {
       if (bodyLoot && bodyLoot.onDeath) bodyLoot.onDeath(actorId);
     } catch (eBody) { /* a body roll must not block the rest of death */ }
   }
-
   if (npcDeath && killerId) {
     try {
       var questKill = globalThis.__thornswoodQuests;
@@ -6166,6 +6284,28 @@ mp.onDeath = guard('onDeath', function (actorId, killerId) {
 });
 
 mp.onRespawn = guard('onRespawn', function (actorId) {
+  /*
+    A TEMPORARY SPAWN DOES NOT STAND UP AGAIN (#2623). Its body has lain the
+    normal time (mp.onDeath above), and this is the moment the engine would
+    stand it up where it was made. Read out of the fork at the commit
+    engine\skymp pins: MpActor::Respawn fires this event, and false from a
+    listener makes GameModeEvent::Fire call OnFireBlocked, which for
+    RespawnEvent does nothing, so the actor stays dead and nothing is sent.
+    Then removeSpawned takes it out of the world, on the next turn of the
+    event loop because the engine is still inside the event here.
+  */
+  let temporary = false;
+  try { temporary = !(Number(mp.get(actorId, 'profileId')) > 0) && isTemporarySpawn(actorId); }
+  catch (eTemp) { log('onRespawn', actorId.toString(16), 'could not check for a temporary spawn:', eTemp); }
+  if (temporary) {
+    try {
+      var bodyGone = globalThis.__thornswoodDungeonLoot;
+      if (bodyGone && bodyGone.onStand) bodyGone.onStand(actorId);
+    } catch (eGone) { /* the body's loot record goes with the body either way */ }
+    setTimeout(function () { removeSpawned(actorId); }, 0);
+    log('respawn', actorId, 'refused: a temporary spawn, removed instead');
+    return false;
+  }
   const sp = mp.get(actorId, 'spawnPoint');
   log('respawn', actorId, 'at', sp && sp.cellOrWorldDesc);
   if (!(Number(mp.get(actorId, 'profileId')) > 0)) {
@@ -28980,6 +29120,11 @@ log('gamemode loaded:',
 
   var list = null;       // null means no file, door off
   var readAt = 0;
+  // The hold offices the site reads from Discord roles (#2551): the ten holds
+  // as the ledgers name them, and the four offices.
+  var OFFICE_HOLDS = ['whiterun', 'solitude', 'riften', 'markarth', 'windhelm',
+                      'falkreath', 'morthal', 'dawnstar', 'winterhold', 'ravenrock'];
+  var OFFICE_KINDS = ['jarl', 'court', 'steward', 'guard'];
 
   function load() {
     var now = Date.now();
@@ -29014,15 +29159,43 @@ log('gamemode loaded:',
           if (an) adminIds[an] = true;
         }
       }
-      // Discord Jarl role holders, from the same allowed.json answer as
-      // adminProfiles. Eligibility only; the office sits on one character.
-      var jarlIds = {};
-      if (Array.isArray(doc.jarlProfiles)) {
-        for (var jn = 0; jn < doc.jarlProfiles.length; jn++) {
-          var jid = Number(doc.jarlProfiles[jn]);
-          if (jid) jarlIds[jid] = true;
+      // The hold offices (#2551), each profile's, from its account's Discord
+      // roles ("Jarl of Whiterun", "Whiterun Court", "Steward of Whiterun",
+      // "Guard of Whiterun"), which the site reads. The roles are the one
+      // truth: nothing in the game keeps a list of who holds what. Read field
+      // by field: an office is one of the four, a hold one of the ten.
+      var offices = {};
+      var od = (doc.offices && typeof doc.offices === 'object') ? doc.offices : {};
+      for (var ok in od) {
+        if (!Object.prototype.hasOwnProperty.call(od, ok)) continue;
+        var opid = Number(ok);
+        if (!(opid > 0) || !od[ok] || typeof od[ok] !== 'object') continue;
+        var orow = { jarl: [], court: [], steward: [], guard: [] };
+        for (var oi = 0; oi < OFFICE_KINDS.length; oi++) {
+          var ol = Array.isArray(od[ok][OFFICE_KINDS[oi]]) ? od[ok][OFFICE_KINDS[oi]] : [];
+          for (var oj = 0; oj < ol.length; oj++) {
+            var oh = String(ol[oj]);
+            if (OFFICE_HOLDS.indexOf(oh) !== -1 && orow[OFFICE_KINDS[oi]].indexOf(oh) === -1) orow[OFFICE_KINDS[oi]].push(oh);
+          }
+        }
+        offices[opid] = orow;
+      }
+      // A hold whose Jarl role two accounts hold (#2551): the site has
+      // already taken it off both, and names the profiles so the game can
+      // tell each of them why.
+      var clash = [];
+      if (Array.isArray(doc.jarlClash)) {
+        for (var ci = 0; ci < doc.jarlClash.length; ci++) {
+          var cr = doc.jarlClash[ci] || {};
+          var ch = String(cr.hold || '');
+          if (OFFICE_HOLDS.indexOf(ch) === -1) continue;
+          var cps = [];
+          var crp = Array.isArray(cr.profiles) ? cr.profiles : [];
+          for (var cj = 0; cj < crp.length; cj++) { var cn = Number(crp[cj]); if (cn > 0) cps.push(cn); }
+          clash.push({ hold: ch, profiles: cps });
         }
       }
+      sayClash(clash);
       // Who holds one of the Discord staff roles itself (#481), for the staff
       // seats. Not devProfiles: that also counts the site's hand written
       // admins list, which is not a role.
@@ -29100,7 +29273,7 @@ log('gamemode loaded:',
           }
         }
       }
-      list = { enforce: doc.enforce === true, ids: ids, devIds: devIds, adminIds: adminIds, jarlIds: jarlIds, staffRoleIds: staffRoleIds, devRoleIds: devRoleIds, businessIds: businessIds, factionIds: factionIds, companyIds: companyIds, accounts: accounts, barred: barred, count: Object.keys(ids).length };
+      list = { enforce: doc.enforce === true, ids: ids, devIds: devIds, adminIds: adminIds, offices: offices, clash: clash, staffRoleIds: staffRoleIds, devRoleIds: devRoleIds, businessIds: businessIds, factionIds: factionIds, companyIds: companyIds, accounts: accounts, barred: barred, count: Object.keys(ids).length };
     } catch (e) {
       list = null;
     }
@@ -29156,13 +29329,91 @@ log('gamemode loaded:',
   };
 
   /*
-    Discord Jarl role on the account. Eligibility for the office, not the
-    office itself: isJarl in the property block also asks which character
-    holds it (#397).
+    THE HOLD OFFICES OF A PROFILE (#2551). Patrick, 15 Oct: a Jarl's hold
+    comes from their "Jarl of <Hold>" Discord role, and each hold's Court,
+    Steward and Guards are Discord roles that hold's Jarl gives. So every
+    office is read from the account's roles, through the site, and nothing in
+    the game keeps a copy: { jarl: [holds], court: [...], steward: [...],
+    guard: [...] }, empty for a profile the pass has not proved. A Jarl role
+    two accounts hold is already off both (the site's jarlClashes).
+
+    The office is the account's, so every character on it holds it: the role
+    is the one truth, and the seat that tied the Jarl office to one character
+    is gone with the hold choice (#2508, replaced by #2551).
+
+    The property block reads these through officeOf, the one place.
   */
-(typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodIsJarl = function (profileId) {
+  function officesIn(l, n) {
+    var row = (l && l.offices && Object.prototype.hasOwnProperty.call(l.offices, n)) ? l.offices[n] : null;
+    return { jarl: row ? row.jarl.slice() : [], court: row ? row.court.slice() : [],
+             steward: row ? row.steward.slice() : [], guard: row ? row.guard.slice() : [] };
+  }
+  (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodOffices = function (profileId) {
+    var n = Number(profileId) || 0;
+    return officesIn(passProved(n) ? load() : null, n);
+  };
+  /*
+    The same, for a record the server already holds about a profile and not
+    for a press arriving now: who held a jail claim made before the jail rule
+    (endPreRuleJailClaims, at server start, when nobody has sent a pass). Never
+    for a live action: a live action is keyed on a profile the pass proves.
+  */
+  (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodOfficesOnRecord = function (profileId) {
+    var n = Number(profileId) || 0;
+    return officesIn(load(), n);
+  };
+  /*
+    Everybody who holds one office of one hold, for the Jarl's Office page:
+    one row per Discord account, with every profile of it the list knows, so
+    the page can name whichever of its characters is in the world.
+  */
+  /*
+    The Discord account a profile is on, as the site named it, or '' when the
+    list names no account for it. A hold office is one character's (#2551,
+    Patrick, 16 Oct): the role is the account's, and the property block keeps
+    which of the account's characters holds it.
+  */
+  /* Whether there is a list of the roles at all, read from the site (#2551). */
+  (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodRolesKnown = function () {
+    return !!load();
+  };
+  (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodAccountOf = function (profileId) {
     var l = load();
-    return passProved(profileId) && !!(l && l.jarlIds && l.jarlIds[Number(profileId)]);
+    var n = Number(profileId) || 0;
+    return (l && l.accounts && l.accounts[n]) ? String(l.accounts[n]) : '';
+  };
+  (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodOfficeHolders = function (office, hold) {
+    var l = load();
+    var out = [];
+    var byAccount = {};
+    if (!l || !l.offices || OFFICE_KINDS.indexOf(String(office)) === -1) return out;
+    for (var k in l.offices) {
+      if (!Object.prototype.hasOwnProperty.call(l.offices, k)) continue;
+      if (l.offices[k][office].indexOf(String(hold)) === -1) continue;
+      var n = Number(k);
+      var acct = (l.accounts && l.accounts[n]) ? String(l.accounts[n]) : ('p:' + n);
+      if (!Object.prototype.hasOwnProperty.call(byAccount, acct)) {
+        byAccount[acct] = { account: acct, profiles: [] };
+        out.push(byAccount[acct]);
+      }
+      byAccount[acct].profiles.push(n);
+    }
+    return out;
+  };
+  /*
+    The holds whose Jarl role this profile's account holds with another
+    account, so neither acts. onRecord: for a record the server holds, the
+    way __thornswoodOfficesOnRecord is, without the pass.
+  */
+  (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodJarlClash = function (profileId, onRecord) {
+    var l = load();
+    var n = Number(profileId) || 0;
+    var out = [];
+    if (!l || !Array.isArray(l.clash) || (!onRecord && !passProved(n))) return out;
+    for (var i = 0; i < l.clash.length; i++) {
+      if (l.clash[i].profiles.indexOf(n) !== -1 && out.indexOf(l.clash[i].hold) === -1) out.push(l.clash[i].hold);
+    }
+    return out;
   };
 
   /*
@@ -29449,11 +29700,18 @@ log('gamemode loaded:',
         if (failed[Number(row.profiles[r])]) { named[String(row.id)] = true; people.push(row); break; }
       }
     }
+    // The hold offices (#2551) are a map by profile: a profile that could
+    // not be checked keeps the offices it had in the file, and no other.
+    var offices = {};
+    var fresh = (doc.offices && typeof doc.offices === 'object') ? doc.offices : {};
+    var stale = (had.offices && typeof had.offices === 'object') ? had.offices : {};
+    for (var fo in fresh) if (Object.prototype.hasOwnProperty.call(fresh, fo) && !failed[Number(fo)]) offices[fo] = fresh[fo];
+    for (var so in stale) if (Object.prototype.hasOwnProperty.call(stale, so) && failed[Number(so)]) offices[so] = stale[so];
     return {
       profiles: merged(doc.profiles, had.profiles),
       devProfiles: merged(doc.devProfiles, had.devProfiles),
       adminProfiles: merged(doc.adminProfiles, had.adminProfiles),
-      jarlProfiles: merged(doc.jarlProfiles, had.jarlProfiles),
+      offices: offices,
       staffRoleProfiles: merged(doc.staffRoleProfiles, had.staffRoleProfiles),
       businessOwnerProfiles: merged(doc.businessOwnerProfiles, had.businessOwnerProfiles),
       factionOwnerProfiles: merged(doc.factionOwnerProfiles, had.factionOwnerProfiles),
@@ -29463,7 +29721,40 @@ log('gamemode loaded:',
     };
   }
 
-  function refresh() {
+  /*
+    A HOLD'S JARL ROLE HELD BY TWO ACCOUNTS (#2551). Patrick, 15 Oct: neither
+    acts as Jarl until staff fix it, and staff are told which accounts. The
+    site tells staff, in the staff channel; this says it once in the door's
+    log when the list changes, so the server's own log shows why a Jarl
+    could not act.
+  */
+  var clashSaid = '';
+  function sayClash(clashes) {
+    var holds = [];
+    for (var i = 0; Array.isArray(clashes) && i < clashes.length; i++) {
+      if (clashes[i] && clashes[i].hold) holds.push(String(clashes[i].hold));
+    }
+    var now = holds.sort().join(', ');
+    if (now === clashSaid) return;
+    clashSaid = now;
+    note(now ? 'two or more Discord accounts hold the Jarl role of ' + now +
+               ', so neither acts as Jarl there until staff take the role from all but one'
+             : 'no Jarl role of a hold is held by more than one account now');
+  }
+
+  /*
+    done, when given, hears whether the list was written: true once
+    allowed.json holds the site's answer, false for every way it was not. An
+    office change made in the game (#2551) asks for the list once, right after
+    the site set the role, and redraws the pages when it is in.
+  */
+  function refresh(done) {
+    var told = false;
+    var tell = function (ok) {
+      if (told || typeof done !== 'function') { return; }
+      told = true;
+      try { done(ok); } catch (e) { note('refresh: what waited on it threw: ' + e); }
+    };
     var conf;
     try {
       conf = JSON.parse(fs.readFileSync(path.join(privDir, 'door.json'), 'utf8')
@@ -29476,6 +29767,7 @@ log('gamemode loaded:',
                     'and every role check refuses everybody including the owner. ' +
                     'Set-Door.ps1 -Connect writes it.');
       }
+      tell(false);
       return;
     }
     if (!conf || !conf.site || !conf.key) {
@@ -29485,12 +29777,13 @@ log('gamemode loaded:',
                     ' is there but has no site or no key, so the door cannot ' +
                     'fetch. Set-Door.ps1 -Connect rewrites it.');
       }
+      tell(false);
       return;
     }
     doorSaid = false;
 
     var https;
-    try { https = require('https'); } catch (e) { return; }
+    try { https = require('https'); } catch (e) { tell(false); return; }
 
     // The key goes in a header, never the address. An address is what a web
     // server writes down, and this key is the door's whole secret. Entry 248.
@@ -29504,11 +29797,13 @@ log('gamemode loaded:',
           var doc;
           try { doc = JSON.parse(buf); } catch (e) {
             note('the site sent something that is not a list: ' + buf.slice(0, 120));
+            tell(false);
             return;
           }
           if (resp.statusCode !== 200) {
             note('the site refused the list, ' + resp.statusCode +
                  (doc && doc.error ? ' (' + doc.error + ')' : ''));
+            tell(false);
             return;
           }
           // Keeping the old list is the safe failure. Writing a short one built
@@ -29533,6 +29828,7 @@ log('gamemode loaded:',
                  (doc.lookupFailedWhy ? ': ' + doc.lookupFailedWhy
                                       : '. The site did not say why, so it is ' +
                                         'running a build older than 22 September.'));
+            tell(false);
             return;
           }
           /*
@@ -29551,6 +29847,7 @@ log('gamemode loaded:',
           if (!Array.isArray(doc.profiles)) {
             note('the site answered 200 but sent no profiles list. Keys it sent: ' +
                  Object.keys(doc || {}).join(', '));
+            tell(false);
             return;
           }
 
@@ -29566,7 +29863,7 @@ log('gamemode loaded:',
             doc.profiles = kept.profiles;
             doc.devProfiles = kept.devProfiles;
             doc.adminProfiles = kept.adminProfiles;
-            doc.jarlProfiles = kept.jarlProfiles;
+            doc.offices = kept.offices;
             doc.staffRoleProfiles = kept.staffRoleProfiles;
             doc.businessOwnerProfiles = kept.businessOwnerProfiles;
             doc.factionOwnerProfiles = kept.factionOwnerProfiles;
@@ -29584,7 +29881,10 @@ log('gamemode loaded:',
               profiles: doc.profiles,
               devProfiles: Array.isArray(doc.devProfiles) ? doc.devProfiles : [],
               adminProfiles: Array.isArray(doc.adminProfiles) ? doc.adminProfiles : [],
-              jarlProfiles: Array.isArray(doc.jarlProfiles) ? doc.jarlProfiles : [],
+              // The hold offices by profile, and the Jarl roles two accounts
+              // hold (#2551), from the Discord roles the site reads.
+              offices: (doc.offices && typeof doc.offices === 'object') ? doc.offices : {},
+              jarlClash: Array.isArray(doc.jarlClash) ? doc.jarlClash : [],
               // The Discord staff roles themselves, for the staff seats (#481).
               staffRoleProfiles: Array.isArray(doc.staffRoleProfiles) ? doc.staffRoleProfiles : [],
               businessOwnerProfiles: Array.isArray(doc.businessOwnerProfiles) ? doc.businessOwnerProfiles : [],
@@ -29610,17 +29910,79 @@ log('gamemode loaded:',
             note('list refreshed from the site, ' + doc.profiles.length + ' profiles, ' +
                  (Array.isArray(doc.devProfiles) ? doc.devProfiles.length : 0) + ' dev, ' +
                  (Array.isArray(doc.adminProfiles) ? doc.adminProfiles.length : 0) + ' admin');
+            /*
+              The roles may have changed, so whoever keeps which character
+              holds an office (the property block, #2551) reads them now: a
+              role taken in Discord ends that character's office at once.
+            */
+            var heard = (typeof globalThis !== 'undefined') ? globalThis.__thornswoodRolesRead : null;
+            if (typeof heard === 'function') {
+              try { heard(); } catch (e) { note('the offices could not read the new roles: ' + e); }
+            }
+            tell(true);
           } catch (e) {
             note('could not write ' + FILE + ': ' + e);
+            tell(false);
           }
         });
       });
       req.setTimeout(10000, function () { try { req.destroy(); } catch (e) { } });
-      req.on('error', function (e) { note('could not reach the site: ' + e.message); });
-    } catch (e) { note('refresh failed: ' + e); }
+      req.on('error', function (e) { note('could not reach the site: ' + e.message); tell(false); });
+    } catch (e) { note('refresh failed: ' + e); tell(false); }
   }
 
   var g = (typeof globalThis !== 'undefined') ? globalThis : this;
+
+  /*
+    The list again, now, once (#2551): after a Jarl's office change in the
+    game the site has set the role, and this reads it back so the office
+    holds in the world at once rather than at the next five minute refresh.
+    done hears whether the new list was written.
+  */
+  g.__thornswoodDoorReadNow = function (done) {
+    try { refresh(done); } catch (e) { note('refresh threw: ' + e); if (typeof done === 'function') { done(false); } }
+  };
+
+  /*
+    ASK THE SITE TO DO SOMETHING (#2551): a POST of JSON to the site the door
+    names, with the door's key in the X-Thornswood-Key header, the way the
+    list is fetched. The one thing asked today is a Jarl's office change
+    (/api/office). done(why, doc): why is '' when the site answered with JSON,
+    and otherwise says what went wrong in words; doc is the site's answer.
+    Never retried: a change that did not go through is the Jarl's to press
+    again, told why.
+  */
+  g.__thornswoodAskSite = function (route, body, done) {
+    var finish = function (why, doc) { if (typeof done === 'function') { try { done(why, doc || null); } catch (e) { note('the site\'s answer to ' + route + ' threw: ' + e); } } };
+    var conf = null;
+    try { conf = JSON.parse(fs.readFileSync(path.join(privDir, 'door.json'), 'utf8').replace(/^\uFEFF/, '')); } catch (e) { conf = null; }
+    if (!conf || !conf.site || !conf.key) { finish('this server has no door.json naming the site, so the site cannot be asked'); return; }
+    var https;
+    try { https = require('https'); } catch (e) { finish('this server cannot make a request'); return; }
+    var data = JSON.stringify(body || {});
+    var settled = false;
+    var once = function (why, doc) { if (settled) { return; } settled = true; finish(why, doc); };
+    try {
+      var u = new URL(String(conf.site).replace(/\/+$/, '') + route);
+      var req = https.request({ hostname: u.hostname, port: u.port || 443, path: u.pathname, method: 'POST',
+                                headers: { 'X-Thornswood-Key': String(conf.key), 'Content-Type': 'application/json',
+                                           'Content-Length': Buffer.byteLength(data) } }, function (resp) {
+        var buf = '';
+        resp.on('data', function (d) { buf += d; });
+        resp.on('end', function () {
+          var doc = null;
+          try { doc = JSON.parse(buf); } catch (e) { doc = null; }
+          if (!doc) { note('the site answered ' + route + ' with something that is not JSON, ' + resp.statusCode); once('the site did not answer properly (' + resp.statusCode + ')'); return; }
+          if (resp.statusCode !== 200) { note('the site refused ' + route + ', ' + resp.statusCode); once('the site refused the request (' + resp.statusCode + ')', doc); return; }
+          once('', doc);
+        });
+      });
+      req.setTimeout(15000, function () { try { req.destroy(); } catch (e) { } });
+      req.on('error', function (e) { note('could not reach the site for ' + route + ': ' + e.message); once('the site could not be reached'); });
+      req.end(data);
+    } catch (e) { note('asking the site ' + route + ' failed: ' + e); once('the request could not be made'); }
+  };
+
   if (g.__thornswoodDoorRefresh) { try { clearInterval(g.__thornswoodDoorRefresh); } catch (e) { } }
   g.__thornswoodDoorRefresh = setInterval(function () {
     try { refresh(); } catch (e) { note('refresh threw: ' + e); }
@@ -29740,9 +30102,12 @@ log('gamemode loaded:',
       // The whole order, full and light together, the order the launcher
       // puts a plugin list into when there is a light list.
       loadOrder: Array.isArray(doc.loadOrder) ? doc.loadOrder : mods.map(function (m) { return m.filename; }),
-      // Which of those the launcher's Fix may fetch from /plugins/ (#1180).
-      // The client reads mods, loadOrder and, when it is there, light.
-      served: mods.filter(function (m) { return OURS[m.filename.toLowerCase()]; })
+      // Which of those the launcher's Fix may fetch from /plugins/ (#1180):
+      // ours, full and light (#2627). The client reads mods, loadOrder and,
+      // when it is there, light, and never this list, so a light name in it
+      // changes nothing for the client; a launcher from before #2627 marks
+      // only mods entries as served and so never asks for a light one.
+      served: mods.concat(light).filter(function (m) { return OURS[m.filename.toLowerCase()]; })
                   .map(function (m) { return m.filename; })
     };
     if (hasLight) { out.light = light; }
@@ -29766,7 +30131,7 @@ log('gamemode loaded:',
                 '/manifest.json, ' + mods.length + ' plugins' +
                 (light.length ? ' and ' + light.length + ' light plugins' : '') +
                 (dropped > 0 ? ' (' + dropped + ' archive entries left out)' : ''));
-    try { publishFiles(mods); } catch (e) { console.log('[thornswood] could not publish the plugin files: ' + e.message); }
+    try { publishFiles(mods, light); } catch (e) { console.log('[thornswood] could not publish the plugin files: ' + e.message); }
     return '';
   }
 
@@ -29788,8 +30153,15 @@ log('gamemode loaded:',
   // from its author; the launcher's Fix says which mod. Bethesda's masters
   // were never served. The clearing below takes the files an older start
   // published off this box.
+  //
+  // Our light plugins too, since #2627, as light-<index>.bin at their place
+  // in the manifest's light list, so the two lists never name one file. On
+  // 16 Oct the server's light order named Thornswood-Last.esp, which is ours
+  // and light, a machine whose launcher had not taken the release carrying
+  // it had none, and Fix had nothing to fetch: only mods entries were
+  // published, and the launcher only ever asked for those.
 
-  function publishFiles(mods) {
+  function publishFiles(mods, light) {
     var order = [];
     try { order = JSON.parse(fs.readFileSync('server-settings.json', 'utf8')).loadOrder || []; } catch (e) { return; }
     var byName = {};
@@ -29814,20 +30186,24 @@ log('gamemode loaded:',
       }
     } catch (e) { console.log('[thornswood] could not read /plugins/ to clear it: ' + e.message); }
     var linked = 0, copied = 0, missing = 0, bytes = 0;
-    for (var j = 0; j < mods.length; j++) {
-      var name = mods[j].filename;
-      if (!OURS[name.toLowerCase()]) continue;
-      var src = byName[name.toLowerCase()];
-      if (!src || !fs.existsSync(src)) { missing++; continue; }
-      var dst = path.join(PLUG, j + '.bin');
-      try {
-        fs.linkSync(src, dst);
-        linked++;
-      } catch (e) {
-        try { fs.copyFileSync(src, dst); copied++; }
-        catch (e2) { missing++; console.log('[thornswood] could not publish ' + name + ': ' + e2.message); continue; }
+    var lists = [[mods, ''], [light || [], 'light-']];
+    for (var k = 0; k < lists.length; k++) {
+      var list = lists[k][0], prefix = lists[k][1];
+      for (var j = 0; j < list.length; j++) {
+        var name = list[j].filename;
+        if (!OURS[name.toLowerCase()]) continue;
+        var src = byName[name.toLowerCase()];
+        if (!src || !fs.existsSync(src)) { missing++; continue; }
+        var dst = path.join(PLUG, prefix + j + '.bin');
+        try {
+          fs.linkSync(src, dst);
+          linked++;
+        } catch (e) {
+          try { fs.copyFileSync(src, dst); copied++; }
+          catch (e2) { missing++; console.log('[thornswood] could not publish ' + name + ': ' + e2.message); continue; }
+        }
+        bytes += Number(list[j].size) || 0;
       }
-      bytes += Number(mods[j].size) || 0;
     }
     console.log('[thornswood] ' + (linked + copied) + ' of our plugin files published at /api/servers/' + KEY +
                 '/plugins/ for the launcher, ' + Math.round(bytes / 1048576) + ' MB' +
@@ -32312,7 +32688,7 @@ log('gamemode loaded:',
   function fresh() {
     return { cls: null, prof: null, half: null, schools: [],
              ranks: {}, taught: [], spells: null, tree: {}, points: 0,
-             work: {}, placed: {}, office: null };
+             work: {}, placed: {} };
   }
 
   function clone(s) { return JSON.parse(JSON.stringify(s || fresh())); }
@@ -35763,7 +36139,7 @@ log('gamemode loaded:',
       var dir = require('path').dirname(registerPath());
       try { require('fs').mkdirSync(dir, { recursive: true }); } catch (e) { }
       require('fs').writeFileSync(registerPath(),
-        JSON.stringify({ claims: claims, stewards: stewards, boxes: boxes,
+        JSON.stringify({ claims: claims, boxes: boxes,
                         funds: funds, notices: notices, boards: boards, steps: steps,
                         masters: masterCut, dropbox: dropbox }, null, 1));
     } catch (e) {
@@ -35816,77 +36192,174 @@ log('gamemode loaded:',
   /*
     ------------------------------------------------------------ the offices
 
-    A JARL is an office held by a character. An admin gives an account the Jarl
-    role, out of character, as world setup, and that is the ONLY out of
-    character grant in the whole chain: nothing in the world can create the
-    first office, so somebody has to place it. After that admins never grant
-    anything again, which is Patrick's rule on 21 September that "admins only
-    overlook the RP and not get involved on their admin characters".
+    THE HOLD OFFICES ARE DISCORD ROLES (#2551). Patrick, 15 October:
+      - a Jarl's hold comes from their "Jarl of <Hold>" Discord role, and
+        nobody picks a hold in the game;
+      - if two accounts hold the same hold's Jarl role, neither acts as Jarl
+        until staff fix it, and staff are told which accounts clash;
+      - each hold has a Court ("<Hold> Court"), a Steward ("Steward of
+        <Hold>", in place of the one shared steward office this block kept
+        in property.json) and Guards ("Guard of <Hold>"), all Discord roles;
+      - that hold's Jarl gives and takes those three, for their own hold
+        only: from the bot's office panel in Discord, and here, on the Office
+        page of K, where the game asks the site and the bot's account sets
+        the role, so the role stays the one truth.
 
-    A JARL NAMES STEWARDS and that list lives here, beside the claims, rather
-    than in Discord. A jarl saying a name in the world is the act; making them
-    wait for somebody to click in a Discord role menu is not an act in the
-    world at all. The Jarl role itself stays in Discord because it has to: it
-    is the one thing that cannot come from inside.
+    So the role is the one truth for who may hold an office. The door reads
+    every account's roles from the site with the other roles
+    (__thornswoodOffices), this block keeps only which character of the
+    account holds it (below), and officeOf is the one place anything asks.
+    The seat each hold's Jarl had in law.json (#2508), the hold chosen on the
+    Office page (#2476), the stewards in property.json and the guards in
+    law.json are gone; a law.json or property.json written before still
+    carries them, nothing reads them, and the next write leaves them out.
+
+    THE OFFICE IS ONE CHARACTER'S (Patrick, 16 October: "it's character
+    based not account based"). A Discord role is on the account, and
+    Discord has no characters, so the role says which account may hold the
+    office and the law register says which one of its characters does
+    (law.held: office and hold, then account, to { pid, name, at }). Only
+    that character acts in the office; every other character on the
+    account is ordinary. The character is set in the game, never typed:
+      - the Jarl names a character on the Office page (officeCmd), and the
+        site sets the role on that character's account;
+      - a role given anywhere else (the bot's office panel, staff) names
+        only an account, and its holder presses Hold it on the character
+        that is to hold it (/office hold); pressing it on another of the
+        account's characters moves the office there.
+    The role and the character cannot disagree in silence: the office needs
+    both, so a role taken away ends it at once, and when the roles are read
+    again (rolesRead) a record whose account no longer holds the role is
+    deleted and said in the log, so a role given back later is chosen again.
+    A Jarl role two accounts hold is left alone while they clash.
+
+    NOBODY IS AN OFFICER BY BEING STAFF. An admin without the role holds no
+    office: the role decides who is Jarl. Patrick's rule of 21 September,
+    "admins only overlook the RP and not get involved on their admin
+    characters", now holds for every office.
 
     A STEWARD IS NOT AN ADMIN and carries no admin power. The only thing a
     steward can do that nobody else can is end a claim, which is the city
     taking a house back. They cannot make one, cannot lock one, and cannot see
     anybody's pack.
 
-    SETTLED 21 September, built #397: the Discord Jarl role is eligibility
-    only (__thornswoodIsJarl on the account). One named character holds the
-    office, stored as thornswoodCharacter.office beside class and profession.
-    /jarl seats it on the character who says it. A second character on the
-    same account is ordinary. Admins still count as jarl so the first office
-    can be placed and the chain tested.
+    The ten holds are the ledgers' (HOLD_TOWN below), Raven Rock's with them
+    (Patrick, 16 October: Raven Rock gets its Jarl, Court, Steward and Guard
+    roles like the nine).
   */
-  var stewards = loadStewards();
+  var OFFICE_KINDS = ['jarl', 'court', 'steward', 'guard'];
+  // The three a Jarl gives and takes, and what each is called on the page.
+  var OFFICE_GIVEN = { court: 'Court', steward: 'Steward', guard: 'Guard' };
 
-  function loadStewards() {
-    try {
-      var raw = require('fs').readFileSync(registerPath(), 'utf8');
-      var o = JSON.parse(raw);
-      var list = (o && o.stewards) || [];
-      var out = [];
-      for (var i = 0; i < list.length; i++) {
-        var n = Number(list[i]) || 0;
-        if (n > 0 && out.indexOf(n) === -1) { out.push(n); }
+  /*
+    The office roles this profile's account holds, as the door read them:
+    { jarl, court, steward, guard }, each a list of holds. Only for a profile
+    the pass has proved, unless onRecord: a record the server already holds
+    (who held a jail claim, whose record is still good), never a press.
+  */
+  function rolesOfProfile(profileId, onRecord) {
+    var out = { jarl: [], court: [], steward: [], guard: [] };
+    var fn = g[onRecord ? '__thornswoodOfficesOnRecord' : '__thornswoodOffices'];
+    var got = null;
+    try { got = (typeof fn === 'function') ? fn(Number(profileId) || 0) : null; } catch (e) { got = null; }
+    for (var i = 0; got && i < OFFICE_KINDS.length; i++) {
+      var list = Array.isArray(got[OFFICE_KINDS[i]]) ? got[OFFICE_KINDS[i]] : [];
+      for (var j = 0; j < list.length; j++) {
+        var h = String(list[j]);
+        if (Object.prototype.hasOwnProperty.call(HOLD_TOWN, h) && out[OFFICE_KINDS[i]].indexOf(h) === -1) {
+          out[OFFICE_KINDS[i]].push(h);
+        }
       }
-      return out;
-    } catch (e) {
-      return [];
     }
+    return out;
   }
 
-  /**
-   * Jarl on THIS character, or an admin placing / testing the chain.
-   * Discord Jarl (__thornswoodIsJarl) is eligibility only; the office is
-   * thornswoodCharacter.office === "jarl" on the pressing actor (#397).
-   */
-  function isJarl(profileId, actorId) {
-    var adm = g['__thornswoodIsAdmin'];
-    try { if (typeof adm === 'function' && adm(profileId)) { return true; } } catch (e2) { }
-    var fn = g['__thornswoodIsJarl'];
-    var eligible = false;
-    try { if (typeof fn === 'function' && fn(profileId)) { eligible = true; } } catch (e) { }
-    if (!eligible) { return false; }
-    if (!actorId) { return false; }
-    var c = g['__thornswoodCharacter'];
-    if (!c || typeof c.stateOf !== 'function') { return false; }
-    try {
-      var s = c.stateOf(actorId);
-      return !!(s && s.office === 'jarl');
-    } catch (e3) { return false; }
+  /* The Discord account a profile is on; a profile the list ties to no account is an account of its own. */
+  function officeAccountOf(profileId) {
+    var fn = g['__thornswoodAccountOf'];
+    var a = '';
+    try { a = (typeof fn === 'function') ? String(fn(Number(profileId) || 0) || '') : ''; } catch (e) { a = ''; }
+    return a || ('p:' + (Number(profileId) || 0));
   }
 
-  /** Named by a jarl, or a jarl themselves. */
-  function isSteward(profileId, actorId) {
+  /* Which character of this account holds this office of this hold: { pid, name, at }, or null. */
+  function officeHeldBy(office, hold, account) {
+    var row = law.held[office + ':' + hold];
+    return (row && Object.prototype.hasOwnProperty.call(row, account)) ? row[account] : null;
+  }
+
+  /*
+    Every office this character holds: the roles of its account, and of
+    those only the ones the register says this character holds.
+  */
+  function officesOfProfile(profileId, onRecord) {
     var pid = Number(profileId) || 0;
-    if (!pid) { return false; }
-    if (stewards.indexOf(pid) !== -1) { return true; }
-    return isJarl(pid, actorId);
+    var out = { jarl: [], court: [], steward: [], guard: [] };
+    if (!pid) { return out; }
+    var roles = rolesOfProfile(pid, onRecord);
+    var acct = officeAccountOf(pid);
+    for (var i = 0; i < OFFICE_KINDS.length; i++) {
+      var k = OFFICE_KINDS[i];
+      for (var j = 0; j < roles[k].length; j++) {
+        var rec = officeHeldBy(k, roles[k][j], acct);
+        if (rec && rec.pid === pid) { out[k].push(roles[k][j]); }
+      }
+    }
+    return out;
   }
+
+  /* The offices this character's account holds that this character does not: the ones it may hold here. */
+  function officesToHold(profileId) {
+    var pid = Number(profileId) || 0;
+    var out = [];
+    if (!pid) { return out; }
+    var roles = rolesOfProfile(pid);
+    var acct = officeAccountOf(pid);
+    for (var i = 0; i < OFFICE_KINDS.length; i++) {
+      var k = OFFICE_KINDS[i];
+      for (var j = 0; j < roles[k].length; j++) {
+        var rec = officeHeldBy(k, roles[k][j], acct);
+        if (!rec || rec.pid !== pid) { out.push({ office: k, hold: roles[k][j], by: rec }); }
+      }
+    }
+    return out;
+  }
+
+  /* Whether this character holds this office of this hold. */
+  function holdsOffice(profileId, office, hold) {
+    var pid = Number(profileId) || 0;
+    if (!pid || !hold) { return false; }
+    var o = officesOfProfile(pid);
+    return Array.isArray(o[office]) && o[office].indexOf(String(hold)) !== -1;
+  }
+
+  /** The Jarl of exactly this hold, by the "Jarl of <Hold>" role. */
+  function isJarlOf(profileId, hold) { return holdsOffice(profileId, 'jarl', hold); }
+
+  /** The holds this profile is Jarl of. */
+  function jarlHoldsOf(profileId) { return officesOfProfile(profileId).jarl; }
+
+  /** Jarl of any hold. */
+  function isJarl(profileId) { return jarlHoldsOf(profileId).length > 0; }
+
+  /** On the Court of exactly this hold. */
+  function isCourtOf(profileId, hold) { return holdsOffice(profileId, 'court', hold); }
+
+  /** The Steward of exactly this hold, or its Jarl, who keeps the hold too. */
+  function isStewardOf(profileId, hold) {
+    return holdsOffice(profileId, 'steward', hold) || isJarlOf(profileId, hold);
+  }
+
+  /** The holds this profile keeps as a steward: those it is Steward of, and those it is Jarl of. */
+  function stewardHoldsOf(profileId) {
+    var o = officesOfProfile(profileId);
+    var out = o.steward.slice();
+    for (var i = 0; i < o.jarl.length; i++) { if (out.indexOf(o.jarl[i]) === -1) { out.push(o.jarl[i]); } }
+    return out;
+  }
+
+  /** A steward of any hold, or a Jarl. */
+  function isSteward(profileId) { return stewardHoldsOf(profileId).length > 0; }
 
   /*
     ------------------------------------------------------- guards and cells
@@ -35906,16 +36379,15 @@ log('gamemode loaded:',
     writes JAIL_CELLS below and game\data\jails.json).
 
     THE REGISTER is law.json beside property.json, in the private folder:
-    each guard by profile with their hold, and every cell door a guard has
-    turned, locked or not. Kept apart from property.json because none of it
-    is property: a cell is the hold's, whoever claims the building it is in.
+    every cell door a guard has turned, locked or not. Kept apart from
+    property.json because none of it is property: a cell is the hold's,
+    whoever claims the building it is in.
 
-    WHO NAMES A GUARD. Patrick, 12 October, on #502: guards are named by the
-    Jarl of that hold, and taking the Jarl office asks for a hold. So the
-    Jarl office carries its hold on the character (s.officeHold, beside
-    s.office), and a Jarl names and removes guards of that hold alone, with
-    Name guard and Remove on the Office page of K (guardCmd). Nothing else
-    writes a guard into the register.
+    WHO IS A GUARD. Patrick, 15 October (#2551): a guard holds that hold's
+    "Guard of <Hold>" Discord role, which the hold's Jarl gives and takes,
+    from the bot's office panel or the Office page of K (officeCmd). The role
+    is the one truth, so the register keeps no guards (it did from #502 to
+    #2551); isGuard reads the role through officesOfProfile.
 
     A CELL IS THE ONE LOCK THAT SHUTS PEOPLE IN. Every other lock here keeps
     people out and never shuts them in (shutFor, WAY_OUT); a cell door is a
@@ -35950,47 +36422,51 @@ log('gamemode loaded:',
 
   /*
     The register off disk, rebuilt field by field the way load() rebuilds a
-    claim: a guard is a profile above 0 with one of the ten holds, and a cell
-    is a door in JAIL_DOOR with a yes or a no. Anything else is dropped and
-    counted, never trusted.
+    claim: a cell is a door in JAIL_DOOR with a yes or a no, and a held
+    office (#2551) is one of the four offices of one of the ten holds, by
+    account, naming a profile above 0. Anything else is dropped and counted,
+    never trusted. A register written before #2551 also carries the guards
+    and each hold's Jarl seat; nothing reads them, the roles and the held
+    offices say who holds an office, and they are not written back.
   */
   function loadLaw() {
-    var out = { guards: {}, cells: {} };
+    var out = { cells: {}, held: {} };
     var raw = null;
     try { raw = JSON.parse(require('fs').readFileSync(lawPath(), 'utf8')); }
     catch (e) { return out; }
     var dropped = 0;
-    var gs = (raw && raw.guards && typeof raw.guards === 'object') ? raw.guards : {};
-    for (var k in gs) {
-      if (!Object.prototype.hasOwnProperty.call(gs, k)) { continue; }
-      var pid = Number(k) || 0;
-      var hold = String(gs[k] || '');
-      if (pid > 0 && Object.prototype.hasOwnProperty.call(JAIL_NAME, hold)) { out.guards[pid] = hold; }
-      else { dropped++; }
-    }
     var cs = (raw && raw.cells && typeof raw.cells === 'object') ? raw.cells : {};
     for (var d in cs) {
       if (!Object.prototype.hasOwnProperty.call(cs, d)) { continue; }
       if (Object.prototype.hasOwnProperty.call(JAIL_DOOR, d)) { out.cells[d] = cs[d] === true; }
       else { dropped++; }
     }
-    // The Jarl's seat of each hold (#502): the profile and the character that
-    // holds it, and the character's name for whoever asks who holds it.
-    out.jarls = {};
-    var js = (raw && raw.jarls && typeof raw.jarls === 'object') ? raw.jarls : {};
-    for (var h in js) {
-      if (!Object.prototype.hasOwnProperty.call(js, h)) { continue; }
-      var seat = js[h];
-      var spid = seat ? Number(seat.pid) || 0 : 0;
-      var sact = seat ? Number(seat.actor) || 0 : 0;
-      if (Object.prototype.hasOwnProperty.call(JAIL_NAME, h) && spid > 0 && sact > 0) {
-        out.jarls[h] = { pid: spid, actor: sact, name: String(seat.name || 'somebody').slice(0, 60),
-                         at: Number(seat.at) || 0 };
-      } else { dropped++; }
+    // Which character of an account holds each office (#2551). The ten
+    // holds are JAIL_NAME's here: HOLD_TOWN is set further down the block.
+    var hs = (raw && raw.held && typeof raw.held === 'object') ? raw.held : {};
+    var heldRows = 0;
+    for (var key in hs) {
+      if (!Object.prototype.hasOwnProperty.call(hs, key)) { continue; }
+      var bits = String(key).split(':');
+      var accounts = hs[key];
+      if (bits.length !== 2 || ['jarl', 'court', 'steward', 'guard'].indexOf(bits[0]) === -1 ||
+          !Object.prototype.hasOwnProperty.call(JAIL_NAME, bits[1]) || !accounts || typeof accounts !== 'object') {
+        dropped++;
+        continue;
+      }
+      for (var acct in accounts) {
+        if (!Object.prototype.hasOwnProperty.call(accounts, acct) || acct === '__proto__') { continue; }
+        var r = accounts[acct];
+        var rpid = r ? Number(r.pid) || 0 : 0;
+        if (!(rpid > 0)) { dropped++; continue; }
+        if (!out.held[key]) { out.held[key] = {}; }
+        out.held[key][acct] = { pid: rpid, name: String(r.name || 'somebody').slice(0, 60), at: Number(r.at) || 0 };
+        heldRows++;
+      }
     }
-    if (dropped) { plog('law: dropped', dropped, 'row(s) that were not a guard, a cell or a Jarl\'s seat'); }
-    plog('law: read', Object.keys(out.guards).length, 'guard(s),', Object.keys(out.cells).length,
-         'cell door(s) a guard has turned, and', Object.keys(out.jarls).length, 'seated Jarl(s)');
+    if (dropped) { plog('law: dropped', dropped, 'row(s) that were not a cell door or a held office'); }
+    plog('law: read', Object.keys(out.cells).length, 'cell door(s) a guard has turned, and', heldRows,
+         'office(s) held by a character');
     return out;
   }
 
@@ -35998,7 +36474,7 @@ log('gamemode loaded:',
     try {
       var fs = require('fs');
       try { fs.mkdirSync(require('path').dirname(lawPath()), { recursive: true }); } catch (e) { }
-      fs.writeFileSync(lawPath(), JSON.stringify({ guards: law.guards, cells: law.cells, jarls: law.jarls }, null, 1));
+      fs.writeFileSync(lawPath(), JSON.stringify({ cells: law.cells, held: law.held }, null, 1));
     } catch (e) {
       plog('law: could not write the register:', e);
     }
@@ -36006,31 +36482,15 @@ log('gamemode loaded:',
 
   var law = loadLaw();
 
-  /** A guard of exactly this hold. */
-  function isGuard(profileId, hold) {
-    var pid = Number(profileId) || 0;
-    if (!pid || !hold) { return false; }
-    return Object.prototype.hasOwnProperty.call(law.guards, pid) && law.guards[pid] === String(hold);
-  }
+  /** A guard of exactly this hold, by the "Guard of <Hold>" role (#2551). */
+  function isGuard(profileId, hold) { return holdsOffice(profileId, 'guard', hold); }
 
-  /** The hold this profile guards, or ''. */
-  function guardHoldOf(profileId) {
-    var pid = Number(profileId) || 0;
-    return (pid && Object.prototype.hasOwnProperty.call(law.guards, pid)) ? law.guards[pid] : '';
-  }
+  /** The holds this profile guards. */
+  function guardHoldsOf(profileId) { return officesOfProfile(profileId).guard; }
 
   /*
-    THE HOLD OF A JARL (#502). Patrick, 12 October: guards are named by the
-    Jarl of that hold, and taking the Jarl office asks for a hold. The hold is
-    on the character beside the office, s.officeHold, one of the ten holds
-    the ledgers and the jails use, and it is chosen once, when the office is
-    taken (jarlCmd). A Jarl seated before there was a hold has none until
-    they choose it on the Office page.
-
-    An admin counts as a Jarl for the stewards and the steward's powers, so
-    the first office can be placed (#397), but a hold comes only from a
-    seated office: a guard is named by somebody in the world, and an admin
-    who wants to name one takes the office of a hold like anybody.
+    The ten holds, as the ledgers, the boards, the jails and the office roles
+    name them (Build-Discord.py names the role by the town).
   */
   var HOLD_TOWN = {
     whiterun: 'Whiterun', solitude: 'Solitude', riften: 'Riften', markarth: 'Markarth',
@@ -36038,69 +36498,104 @@ log('gamemode loaded:',
     winterhold: 'Winterhold', ravenrock: 'Raven Rock'
   };
 
-  /*
-    ONE JARL A HOLD (#502). Patrick, 12 October evening: a second character
-    cannot take a hold that already has a seated Jarl; the office is kept in
-    law.json, and the Office page has a Give up the office button. So each
-    hold's seat is in the law register (law.jarls: the profile, the
-    character and its name), written when the office is taken and removed
-    when it is given up (jarlCmd). The character still carries s.office and
-    s.officeHold, but a hold is this character's only while the seat says
-    so: the seat is the one record two characters cannot both write.
-  */
-  function seatOf(hold) {
-    var h = String(hold || '');
-    return Object.prototype.hasOwnProperty.call(law.jarls, h) ? law.jarls[h] : null;
-  }
-
-  /** The hold whose seat this character holds, or ''. */
-  function seatHeldBy(actorId) {
-    var a = Number(actorId) || 0;
-    if (!a) { return ''; }
-    for (var h in law.jarls) {
-      if (Object.prototype.hasOwnProperty.call(law.jarls, h) && law.jarls[h].actor === a) { return h; }
+  /* The holds whose Jarl role this profile's account holds with another account (#2551). */
+  function jarlClashOf(profileId, onRecord) {
+    var fn = g['__thornswoodJarlClash'];
+    var got = [];
+    try { got = (typeof fn === 'function') ? (fn(Number(profileId) || 0, !!onRecord) || []) : []; } catch (e) { got = []; }
+    var out = [];
+    for (var i = 0; i < got.length; i++) {
+      var h = String(got[i]);
+      if (Object.prototype.hasOwnProperty.call(HOLD_TOWN, h) && out.indexOf(h) === -1) { out.push(h); }
     }
-    return '';
-  }
-
-  /** The hold of the Jarl office in this character state, while its seat is this character's, or ''. */
-  function officeHoldOf(s, actorId) {
-    var h = (s && s.office === 'jarl') ? String(s.officeHold || '') : '';
-    if (!Object.prototype.hasOwnProperty.call(HOLD_TOWN, h)) { return ''; }
-    var seat = seatOf(h);
-    return (seat && seat.actor === (Number(actorId) || 0)) ? h : '';
-  }
-
-  /** The hold this person is Jarl of, on the character in the world, or ''. */
-  function jarlHoldOf(profileId, actorId) {
-    if (!actorId || !isJarl(profileId, actorId)) { return ''; }
-    var c = g['__thornswoodCharacter'];
-    if (!c || typeof c.stateOf !== 'function') { return ''; }
-    var s = null;
-    try { s = c.stateOf(actorId); } catch (e) { s = null; }
-    return officeHoldOf(s, actorId);
+    return out;
   }
 
   /*
-    EVERY OFFICE A PERSON HOLDS, READ IN ONE PLACE. The offices live in three
-    homes: the Jarl office on the character (s.office, s.officeHold) with
-    each hold's seat in law.json, the stewards in property.json, the guards
-    in law.json. Anything outside this
-    block that asks who holds what (a hold's box, a drop box, a court once
-    there is one) asks this, through g.__thornswoodProperty.officeOf, rather
-    than reading any of the three itself, so a rule about who holds an
-    office is written once. The page's officeView is the one exception: it
-    is handed the state by writeState and must not ask for it (see there).
+    EVERY OFFICE A CHARACTER HOLDS, READ IN ONE PLACE. Since #2551 every
+    office is a Discord role on the account, which the door reads from the
+    site, held by the one character of the account the register names.
+    Anything outside this block that asks who holds what (the drop box, the
+    jails, the board) asks this, through g.__thornswoodProperty.officeOf, and
+    the readers above are the same rule inside the block, so a rule about
+    who holds an office is written once.
 
-      jarl      true when isJarl says so (an admin counts, #397)
-      jarlOf    the hold of the seated Jarl office, or ''
-      steward   true when isSteward says so (a Jarl counts)
-      guardOf   the hold this profile guards, or ''
+      jarlOf     the holds this character is Jarl of: its account holds the
+                 role, alone, and this is the character that holds it
+      courtOf    the holds whose Court this character sits on
+      stewardOf  the holds it keeps as a steward: Steward of, and Jarl of
+      guardOf    the holds it guards
+      toHold     the offices its account holds that another of its
+                 characters, or none yet, holds: { office, hold, by }
+      clash      the holds whose Jarl role its account holds with another
+                 account, so it does not act as their Jarl (Patrick, 15 Oct)
+      jarl, steward   whether jarlOf, stewardOf hold anything
   */
-  function officeOf(profileId, actorId) {
-    return { jarl: isJarl(profileId, actorId), jarlOf: jarlHoldOf(profileId, actorId),
-             steward: isSteward(profileId, actorId), guardOf: guardHoldOf(profileId) };
+  function officeOf(profileId) {
+    var o = officesOfProfile(profileId);
+    var stewardOf = stewardHoldsOf(profileId);
+    return { jarl: o.jarl.length > 0, jarlOf: o.jarl, courtOf: o.court, stewardOf: stewardOf,
+             steward: stewardOf.length > 0, guardOf: o.guard, toHold: officesToHold(profileId),
+             clash: jarlClashOf(profileId) };
   }
+
+  /*
+    THE ROLES WERE READ AGAIN (#2551). The door calls this each time it has
+    written a new list from the site, and the block calls it once as it
+    loads. A held office whose account no longer holds the role, in Discord,
+    ends here: its record goes, the server log says whose and which, the
+    character is told if they are in the world, and the cells and pages
+    follow. So a role taken away in Discord, by the bot's panel or by hand,
+    takes the office from the character at the next read, and a role given
+    back later is held again only when somebody chooses the character. A
+    Jarl role two accounts hold is left as it is while they clash: neither
+    acts, and the one staff leave it with keeps their character.
+
+    It is not a timer and repairs nothing: it is the register reading the
+    one truth it hangs off, when that truth arrives.
+  */
+  function rolesRead() {
+    // Only against a list the door has: with none (no door.json, a file that
+    // will not read) nothing is known about the roles, and nothing ends.
+    var known = g['__thornswoodRolesKnown'];
+    var have = false;
+    try { have = typeof known === 'function' && !!known(); } catch (e) { have = false; }
+    if (!have) { return 0; }
+    var ended = [];
+    for (var key in law.held) {
+      if (!Object.prototype.hasOwnProperty.call(law.held, key)) { continue; }
+      var bits = key.split(':');
+      var row = law.held[key];
+      for (var acct in row) {
+        if (!Object.prototype.hasOwnProperty.call(row, acct)) { continue; }
+        var rec = row[acct];
+        var roles = rolesOfProfile(rec.pid, true);
+        var holds = roles[bits[0]].indexOf(bits[1]) !== -1 && officeAccountOf(rec.pid) === acct;
+        var clashed = bits[0] === 'jarl' && jarlClashOf(rec.pid, true).indexOf(bits[1]) !== -1;
+        if (holds || clashed) { continue; }
+        delete row[acct];
+        ended.push({ office: bits[0], hold: bits[1], pid: rec.pid, name: rec.name });
+      }
+      if (!Object.keys(row).length) { delete law.held[key]; }
+    }
+    if (!ended.length) { return 0; }
+    saveLaw();
+    pushAll();
+    for (var i = 0; i < ended.length; i++) {
+      var e = ended[i];
+      plog('law: the', officeRole(e.office, e.hold), 'role is no longer on the account of', e.name,
+           '(profile ' + e.pid + ') in Discord, so that character holds the office no more');
+      var them = onlineActorOf(e.pid);
+      var tell = g.__thornswoodToProfile;
+      if (them && typeof tell === 'function') {
+        tell(e.pid, 'Your account no longer holds the ' + officeRole(e.office, e.hold) +
+                     ' role in Discord, so this character is no longer ' + officeRole(e.office, e.hold) + '.');
+        redrawPanel(them);
+      }
+    }
+    return ended.length;
+  }
+  g.__thornswoodRolesRead = function () { rolesRead(); };
 
   /** The hold whose jail this door is in, or null. */
   function jailHoldOf(doorDesc) {
@@ -36151,7 +36646,7 @@ log('gamemode loaded:',
   /** May this person hold this building: anybody, but a jail is its hold's Jarl's alone. */
   function mayHold(actorId, profileId, building) {
     var jh = jailOfBuilding(building);
-    return !jh || jarlHoldOf(profileId, actorId) === jh;
+    return !jh || isJarlOf(profileId, jh);
   }
 
   /** The hold whose cell door a key the game made opens, or null, by the key's descriptor. */
@@ -36239,7 +36734,7 @@ log('gamemode loaded:',
       return true;
     }
     if (!isGuard(profileId, hold)) {
-      var mine = guardHoldOf(profileId);
+      var mine = guardHoldsOf(profileId).length > 0;
       toProfile(profileId, mine
         ? 'That cell is in ' + JAIL_NAME[hold] + '. A guard keeps the cells of their own hold.'
         : 'A cell is a guard\'s to lock.');
@@ -36322,6 +36817,107 @@ log('gamemode loaded:',
   function buildingOf(doorDesc) {
     return Object.prototype.hasOwnProperty.call(BUILDING_BY_DOOR, doorDesc)
       ? BUILDING_BY_DOOR[doorDesc] : null;
+  }
+
+  /*
+    WHOSE HOLD A BUILDING IS IN (#2551). Patrick, 16 October, answer C: a
+    Steward evicts and sets rent only in their own hold, by a table giving
+    every claimable building the hold its door opens onto.
+    scripts\dev\Build-BuildingHolds.py measures it out of the plugins: the
+    places the building's doors open onto, and the hold whose location record
+    those places' locations reach. A building none of that gives a hold is
+    left out, and holdOfBuilding answers null for it: no Steward settles it.
+  */
+  // ==== BUILDING_HOLD, generated ====
+  // Generated by scripts\dev\Build-BuildingHolds.py from the load order; do not
+  // hand edit. Each claimable building, to the hold its doors open onto, in the
+  // town keys the offices use. A building the plugins give no hold is not here;
+  // game\data\building-holds.json says how each was measured and why each
+  // building left out was.
+  var BUILDING_HOLD = {"103e1d:Arena - Markarth Side.esp":"morthal","1041:Solitude Arena.esp":"solitude","10574:The Great City of Solitude.esp":"solitude","10665b:WindhelmSSE.esp":"windhelm","1096b5:Arena - Markarth Side.esp":"morthal","109d6d:Riften Expansion.esp":"riften","10a65f:aaaGraniteHill.esp":"falkreath","10ceea:Skyrim.esm":"morthal","115c21:WindhelmSSE.esp":"windhelm","115c8e:WindhelmSSE.esp":"windhelm","115cfd:WindhelmSSE.esp":"windhelm","11cb3:HearthFires.esm":"morthal","12f61e:WindhelmSSE.esp":"windhelm","12f7a9:WindhelmSSE.esp":"windhelm","12fba4:WindhelmSSE.esp":"windhelm","12fcff:WindhelmSSE.esp":"windhelm","1323c:SkyrimSewers.esp":"solitude","133c6:Skyrim.esm":"whiterun","133c7:Skyrim.esm":"whiterun","133c8:Skyrim.esm":"whiterun","133c9:Skyrim.esm":"whiterun","133ca:Skyrim.esm":"whiterun","13502e:WindhelmSSE.esp":"windhelm","1380e:Skyrim.esm":"winterhold","1380f:Skyrim.esm":"winterhold","13810:Skyrim.esm":"winterhold","13812:Skyrim.esm":"winterhold","13813:Skyrim.esm":"winterhold","13814:Skyrim.esm":"winterhold","13818:Skyrim.esm":"winterhold","1382d:Skyrim.esm":"morthal","1382e:Skyrim.esm":"riften","1383a:Skyrim.esm":"riften","13850:Skyrim.esm":"riften","13856:Skyrim.esm":"riften","13867:Skyrim.esm":"whiterun","1386c:Skyrim.esm":"whiterun","13870:Skyrim.esm":"whiterun","13871:Skyrim.esm":"whiterun","138be:Skyrim.esm":"markarth","138ca:Skyrim.esm":"morthal","138cb:Skyrim.esm":"morthal","138cc:Skyrim.esm":"morthal","138cd:Skyrim.esm":"morthal","138ce:Skyrim.esm":"morthal","138cf:Skyrim.esm":"morthal","138d0:Skyrim.esm":"morthal","138e1:Skyrim.esm":"morthal","13901:Skyrim.esm":"windhelm","13907:Skyrim.esm":"windhelm","13909:Skyrim.esm":"markarth","13978:Skyrim.esm":"markarth","13979:Skyrim.esm":"markarth","139d1:Skyrim.esm":"markarth","139d2:Skyrim.esm":"markarth","139e7:Skyrim.esm":"riften","13a48:Skyrim.esm":"riften","13a5c:Skyrim.esm":"riften","13a5d:Skyrim.esm":"dawnstar","13a67:Skyrim.esm":"falkreath","13a71:Skyrim.esm":"falkreath","13a72:Skyrim.esm":"falkreath","13a73:Skyrim.esm":"falkreath","13a76:Skyrim.esm":"falkreath","13a78:Skyrim.esm":"falkreath","13a79:Skyrim.esm":"falkreath","13a7a:Skyrim.esm":"solitude","13a7b:Skyrim.esm":"solitude","13a7c:Skyrim.esm":"solitude","13a7d:Skyrim.esm":"solitude","13a7e:Skyrim.esm":"solitude","13a7f:Skyrim.esm":"dawnstar","13a80:Skyrim.esm":"dawnstar","13a81:Skyrim.esm":"dawnstar","13a83:Skyrim.esm":"dawnstar","13a84:Skyrim.esm":"dawnstar","13a85:Skyrim.esm":"dawnstar","13a86:Skyrim.esm":"dawnstar","13a87:Skyrim.esm":"dawnstar","13a88:Skyrim.esm":"dawnstar","13a89:Skyrim.esm":"dawnstar","13a8a:Skyrim.esm":"windhelm","13a8c:Skyrim.esm":"windhelm","140a:Dawnguard.esm":"falkreath","142e2:Dragonborn.esm":"ravenrock","142ed:Dragonborn.esm":"ravenrock","142ee:Dragonborn.esm":"ravenrock","142ef:Dragonborn.esm":"ravenrock","142f0:Dragonborn.esm":"ravenrock","142f1:Dragonborn.esm":"ravenrock","142f6:Dragonborn.esm":"ravenrock","142f7:Dragonborn.esm":"ravenrock","142f8:Dragonborn.esm":"ravenrock","142f9:Dragonborn.esm":"ravenrock","142fa:Dragonborn.esm":"ravenrock","142fb:Dragonborn.esm":"ravenrock","142fc:Dragonborn.esm":"ravenrock","14987c:WindhelmSSE.esp":"windhelm","14c095:Riften Expansion.esp":"riften","15154:HearthFires.esm":"morthal","151f2:Skyrim.esm":"solitude","151f3:Skyrim.esm":"markarth","151f4:Skyrim.esm":"winterhold","151f5:Skyrim.esm":"winterhold","151f6:Skyrim.esm":"solitude","151f9:Skyrim.esm":"whiterun","151fa:Skyrim.esm":"whiterun","151fb:Skyrim.esm":"dawnstar","151fc:Skyrim.esm":"solitude","15200:Skyrim.esm":"riften","15201:Skyrim.esm":"riften","15206:Skyrim.esm":"winterhold","15207:Skyrim.esm":"whiterun","15208:Skyrim.esm":"winterhold","1520a:Skyrim.esm":"whiterun","15210:Skyrim.esm":"dawnstar","15211:Skyrim.esm":"whiterun","15215:Skyrim.esm":"dawnstar","1521b:Skyrim.esm":"morthal","1521c:Skyrim.esm":"whiterun","15220:Skyrim.esm":"winterhold","15223:Skyrim.esm":"solitude","15224:Skyrim.esm":"whiterun","15226:Skyrim.esm":"markarth","15227:Skyrim.esm":"markarth","15229:Skyrim.esm":"whiterun","1522a:Skyrim.esm":"markarth","1522c:Skyrim.esm":"markarth","1522f:Skyrim.esm":"falkreath","15230:Skyrim.esm":"riften","15231:Skyrim.esm":"solitude","15233:Skyrim.esm":"morthal","15235:Skyrim.esm":"solitude","15237:Skyrim.esm":"markarth","15238:Skyrim.esm":"windhelm","15239:Skyrim.esm":"windhelm","1523c:Skyrim.esm":"markarth","1523d:Skyrim.esm":"morthal","1523f:Skyrim.esm":"windhelm","15251:Skyrim.esm":"windhelm","15253:Skyrim.esm":"falkreath","15254:Skyrim.esm":"winterhold","15255:Skyrim.esm":"solitude","15257:Skyrim.esm":"dawnstar","15258:Skyrim.esm":"falkreath","1525c:Skyrim.esm":"riften","1525d:Skyrim.esm":"riften","1525f:Skyrim.esm":"winterhold","15261:Skyrim.esm":"dawnstar","15262:Skyrim.esm":"dawnstar","15265:Skyrim.esm":"falkreath","15267:Skyrim.esm":"markarth","15268:Skyrim.esm":"falkreath","15269:Skyrim.esm":"whiterun","1526a:Skyrim.esm":"falkreath","1526b:Skyrim.esm":"falkreath","1526c:Skyrim.esm":"whiterun","1526d:Skyrim.esm":"markarth","1526e:Skyrim.esm":"falkreath","1526f:Skyrim.esm":"morthal","15273:Skyrim.esm":"windhelm","15274:Skyrim.esm":"winterhold","15275:Skyrim.esm":"markarth","15276:Skyrim.esm":"morthal","15277:Skyrim.esm":"falkreath","15279:Skyrim.esm":"winterhold","1527b:Skyrim.esm":"riften","1527c:Skyrim.esm":"whiterun","1527d:Skyrim.esm":"windhelm","1527e:Skyrim.esm":"dawnstar","1527f:Skyrim.esm":"riften","15280:Skyrim.esm":"morthal","15281:Skyrim.esm":"winterhold","15282:Skyrim.esm":"dawnstar","15283:Skyrim.esm":"whiterun","15284:Skyrim.esm":"winterhold","15286:Skyrim.esm":"riften","15288:Skyrim.esm":"winterhold","1528a:Skyrim.esm":"markarth","1528c:Skyrim.esm":"markarth","15290:Skyrim.esm":"dawnstar","15294:Skyrim.esm":"riften","15295:Skyrim.esm":"markarth","15296:Skyrim.esm":"falkreath","1529c:Skyrim.esm":"markarth","1529d:Skyrim.esm":"morthal","1529f:Skyrim.esm":"riften","152a0:Skyrim.esm":"riften","152a1:Skyrim.esm":"dawnstar","152a2:Skyrim.esm":"riften","152a5:Skyrim.esm":"windhelm","152a7:Skyrim.esm":"windhelm","152a8:Skyrim.esm":"windhelm","152aa:Skyrim.esm":"morthal","152ad:Skyrim.esm":"markarth","152ae:Skyrim.esm":"morthal","152af:Skyrim.esm":"markarth","152b0:Skyrim.esm":"riften","152b1:Skyrim.esm":"whiterun","152b7:Skyrim.esm":"markarth","152ba:Skyrim.esm":"winterhold","152bb:Skyrim.esm":"winterhold","152be:Skyrim.esm":"riften","152c0:Skyrim.esm":"windhelm","152c1:Skyrim.esm":"riften","152c3:Skyrim.esm":"winterhold","15cc6f:WindhelmSSE.esp":"windhelm","1605e:Skyrim.esm":"whiterun","161e7:Skyrim.esm":"winterhold","161e9:Skyrim.esm":"solitude","161ea:Skyrim.esm":"riften","161eb:Skyrim.esm":"markarth","161ec:Skyrim.esm":"riften","161ed:Skyrim.esm":"markarth","161ee:Skyrim.esm":"whiterun","161ef:Skyrim.esm":"falkreath","161f0:Skyrim.esm":"windhelm","161f1:Skyrim.esm":"windhelm","161f3:Skyrim.esm":"riften","161f4:Skyrim.esm":"dawnstar","161f5:Skyrim.esm":"markarth","161f6:Skyrim.esm":"markarth","161f7:Skyrim.esm":"solitude","161fb:Skyrim.esm":"windhelm","161fc:Skyrim.esm":"windhelm","161fe:Skyrim.esm":"riften","161ff:Skyrim.esm":"riften","16200:Skyrim.esm":"windhelm","16203:Skyrim.esm":"markarth","16204:Skyrim.esm":"whiterun","16205:Skyrim.esm":"windhelm","16207:Skyrim.esm":"whiterun","16209:Skyrim.esm":"dawnstar","1620b:Skyrim.esm":"dawnstar","1644d:SkyrimSewers.esp":"solitude","165a0:Skyrim.esm":"whiterun","165a3:Skyrim.esm":"whiterun","165a6:Skyrim.esm":"whiterun","165a7:Skyrim.esm":"whiterun","165a8:Skyrim.esm":"whiterun","165aa:Skyrim.esm":"whiterun","165ab:Skyrim.esm":"whiterun","165ac:Skyrim.esm":"whiterun","165ad:Skyrim.esm":"whiterun","165ae:Skyrim.esm":"whiterun","165af:Skyrim.esm":"whiterun","165b1:Skyrim.esm":"whiterun","165b2:Skyrim.esm":"whiterun","165b3:Skyrim.esm":"whiterun","165b5:Skyrim.esm":"whiterun","165b6:Skyrim.esm":"whiterun","165b7:Skyrim.esm":"whiterun","16774:Skyrim.esm":"windhelm","16775:Skyrim.esm":"windhelm","16776:Skyrim.esm":"windhelm","16777:Skyrim.esm":"windhelm","16778:Skyrim.esm":"windhelm","16779:Skyrim.esm":"windhelm","1677a:Skyrim.esm":"windhelm","1677c:Skyrim.esm":"windhelm","1677d:Skyrim.esm":"windhelm","1677e:Skyrim.esm":"windhelm","1677f:Skyrim.esm":"windhelm","16780:Skyrim.esm":"windhelm","16781:Skyrim.esm":"windhelm","16782:Skyrim.esm":"windhelm","16784:Skyrim.esm":"windhelm","16785:Skyrim.esm":"windhelm","16786:Skyrim.esm":"windhelm","16787:Skyrim.esm":"windhelm","16788:Skyrim.esm":"windhelm","16789:Skyrim.esm":"windhelm","1678b:Skyrim.esm":"windhelm","1678c:Skyrim.esm":"windhelm","169fe:Skyrim.esm":"solitude","16a00:Skyrim.esm":"solitude","16a02:Skyrim.esm":"solitude","16a03:Skyrim.esm":"solitude","16a04:Skyrim.esm":"solitude","16a05:Skyrim.esm":"solitude","16a06:Skyrim.esm":"solitude","16a07:Skyrim.esm":"solitude","16a08:Skyrim.esm":"solitude","16a09:Skyrim.esm":"solitude","16a0b:Skyrim.esm":"solitude","16a0c:Skyrim.esm":"solitude","16a0d:Skyrim.esm":"solitude","16a0e:Skyrim.esm":"solitude","16a0f:Skyrim.esm":"solitude","16a10:Skyrim.esm":"solitude","16a11:Skyrim.esm":"solitude","16a55:HearthFires.esm":"dawnstar","16a56:HearthFires.esm":"dawnstar","16bce:Skyrim.esm":"riften","16bcf:Skyrim.esm":"riften","16bd0:Skyrim.esm":"riften","16bd1:Skyrim.esm":"riften","16bd2:Skyrim.esm":"riften","16bd3:Skyrim.esm":"riften","16bd4:Skyrim.esm":"riften","16bd5:Skyrim.esm":"riften","16bd6:Skyrim.esm":"riften","16bd7:Skyrim.esm":"riften","16bd8:Skyrim.esm":"riften","16bd9:Skyrim.esm":"riften","16bda:Skyrim.esm":"riften","16bdb:Skyrim.esm":"riften","16bdc:Skyrim.esm":"riften","16bdd:Skyrim.esm":"riften","16bde:Skyrim.esm":"riften","16bdf:Skyrim.esm":"riften","16d72:Skyrim.esm":"markarth","16d761:WindhelmSSE.esp":"windhelm","16df2:Skyrim.esm":"markarth","16df3:Skyrim.esm":"markarth","16df4:Skyrim.esm":"markarth","16df5:Skyrim.esm":"markarth","16df6:Skyrim.esm":"markarth","16df7:Skyrim.esm":"markarth","16dfa:Skyrim.esm":"markarth","16dfb:Skyrim.esm":"markarth","16dfc:Skyrim.esm":"markarth","16dfd:Skyrim.esm":"markarth","16dfe:Skyrim.esm":"markarth","16dff:Skyrim.esm":"markarth","16e00:Skyrim.esm":"markarth","16ea1:Skyrim.esm":"falkreath","16feb:Dragonborn.esm":"ravenrock","172b90:WindhelmSSE.esp":"windhelm","172bec:WindhelmSSE.esp":"windhelm","172c4c:WindhelmSSE.esp":"windhelm","173b2:Dragonborn.esm":"ravenrock","173b3:Dragonborn.esm":"ravenrock","17728:Dragonborn.esm":"ravenrock","17729:Dragonborn.esm":"ravenrock","1772a:Dragonborn.esm":"ravenrock","17787:Dragonborn.esm":"ravenrock","17a00:Dragonborn.esm":"ravenrock","17b6a:Dragonborn.esm":"ravenrock","17bbd4:WindhelmSSE.esp":"windhelm","17be56:WindhelmSSE.esp":"windhelm","17c14f:WindhelmSSE.esp":"windhelm","17ebe:Dragonborn.esm":"ravenrock","17ebf:Dragonborn.esm":"ravenrock","17ec0:Dragonborn.esm":"ravenrock","17ec1:Dragonborn.esm":"ravenrock","17ec2:Dragonborn.esm":"ravenrock","17ec3:Dragonborn.esm":"ravenrock","17ec4:Dragonborn.esm":"ravenrock","18195d:WindhelmSSE.esp":"windhelm","18276:Dragonborn.esm":"ravenrock","18277:Dragonborn.esm":"ravenrock","1844f:Dragonborn.esm":"ravenrock","18460:Skyrim.esm":"riften","184f0:Dragonborn.esm":"ravenrock","18682:Dragonborn.esm":"ravenrock","186c2:SkyrimSewers.esp":"solitude","18b3ba:WindhelmSSE.esp":"windhelm","18be0:Skyrim.esm":"riften","18be9:Skyrim.esm":"markarth","18bfda:WindhelmSSE.esp":"windhelm","18f45:Dragonborn.esm":"ravenrock","18f46:Dragonborn.esm":"ravenrock","18f47:Dragonborn.esm":"ravenrock","18f48:Dragonborn.esm":"ravenrock","18f49:Dragonborn.esm":"ravenrock","18f4a:Dragonborn.esm":"ravenrock","18f4b:Dragonborn.esm":"ravenrock","193ee:Skyrim.esm":"dawnstar","19454:Skyrim.esm":"solitude","198dd:Skyrim.esm":"markarth","198de:Skyrim.esm":"markarth","198df:Skyrim.esm":"markarth","198e0:Skyrim.esm":"markarth","198e2:Skyrim.esm":"markarth","19ad8:Dragonborn.esm":"ravenrock","19cd7:Dragonborn.esm":"ravenrock","19d5d9:Riften Expansion.esp":"riften","1a337:Skyrim.esm":"windhelm","1a7a8:Dragonborn.esm":"ravenrock","1ab5f:Skyrim.esm":"markarth","1ab60:Skyrim.esm":"markarth","1aec3:Skyrim.esm":"winterhold","1b147:Skyrim.esm":"falkreath","1b7c0:Skyrim.esm":"markarth","1ba33:SkyrimSewers.esp":"solitude","1bbfb:Dragonborn.esm":"ravenrock","1be37:Dragonborn.esm":"ravenrock","1c080:Dragonborn.esm":"ravenrock","1c197:The Great City of Solitude.esp":"solitude","1cb84:Skyrim.esm":"whiterun","1cd86:The Great City of Solitude.esp":"solitude","1ce8a:Skyrim.esm":"falkreath","1d09a:Skyrim.esm":"markarth","1d235:The Great City of Solitude.esp":"solitude","1d502:Dragonborn.esm":"ravenrock","1d98:SkyrimSewers.esp":"solitude","1da5d:Dragonborn.esm":"ravenrock","1db4e:Skyrim.esm":"whiterun","1dd03:Dragonborn.esm":"ravenrock","1dd04:Dragonborn.esm":"ravenrock","1e11e:Skyrim.esm":"windhelm","1e8cc:Dragonborn.esm":"ravenrock","1e9e2b:Riften Expansion.esp":"riften","1f288:Dragonborn.esm":"ravenrock","1f358:Skyrim.esm":"windhelm","1f359:Skyrim.esm":"falkreath","1f7b3:Skyrim.esm":"markarth","1fc66:Skyrim.esm":"whiterun","2031a:Skyrim.esm":"dawnstar","21074:Dragonborn.esm":"ravenrock","213a0:Skyrim.esm":"solitude","21594:Skyrim.esm":"windhelm","216bb:Skyrim.esm":"falkreath","21d5c:SkyrimSewers.esp":"solitude","21d8:JKs Skyrim.esp":"dawnstar","2210d9:WindhelmSSE.esp":"windhelm","227b9:Skyrim.esm":"winterhold","22d89:Populated Cities Towns Villages Legendary.esp":"dawnstar","22f52:Skyrim.esm":"riften","22f53:Skyrim.esm":"riften","23ae5:JKs Skyrim.esp":"dawnstar","23cd0:Populated Cities Towns Villages Legendary.esp":"falkreath","23df9:Populated Cities Towns Villages Legendary.esp":"whiterun","23f22:Populated Cities Towns Villages Legendary.esp":"solitude","23fd4:Skyrim.esm":"markarth","2404b:Populated Cities Towns Villages Legendary.esp":"windhelm","240b7:Skyrim.esm":"dawnstar","24174:Populated Cities Towns Villages Legendary.esp":"riften","241f2:JKs Skyrim.esp":"morthal","2429d:Populated Cities Towns Villages Legendary.esp":"markarth","242f3:JKs Skyrim.esp":"morthal","243c6:Populated Cities Towns Villages Legendary.esp":"solitude","244ef:Populated Cities Towns Villages Legendary.esp":"morthal","2471a:Skyrim.esm":"solitude","24771:Skyrim.esm":"winterhold","24887:JKs Skyrim.esp":"whiterun","24cad:Dragonborn.esm":"ravenrock","24d9d:Dragonborn.esm":"ravenrock","25195:Skyrim.esm":"winterhold","2529e:Skyrim.esm":"dawnstar","25e24:Skyrim.esm":"winterhold","261c6:Skyrim.esm":"solitude","263ef:Skyrim.esm":"solitude","26e93:Dragonborn.esm":"ravenrock","270ab:Skyrim.esm":"morthal","27552:Skyrim.esm":"dawnstar","275d8:Skyrim.esm":"riften","275d9:Skyrim.esm":"riften","27d1c:Skyrim.esm":"solitude","27ea3:Populated Cities Towns Villages Legendary.esp":"winterhold","27f1a:Skyrim.esm":"solitude","2802a:Populated Cities Towns Villages Legendary.esp":"whiterun","285d:Dawnguard.esm":"whiterun","28c444:WindhelmSSE.esp":"windhelm","28edf:Skyrim.esm":"windhelm","2954c:Skyrim.esm":"dawnstar","2954d:Skyrim.esm":"dawnstar","298bc:SkyrimSewers.esp":"windhelm","2a03a:Skyrim.esm":"markarth","2a436:SkyrimSewers.esp":"windhelm","2ba8d:SkyrimSewers.esp":"windhelm","2bcd7:Skyrim.esm":"winterhold","2c778:Skyrim.esm":"dawnstar","2c779:Skyrim.esm":"dawnstar","2cc83:SkyrimSewers.esp":"windhelm","2d38b:SkyrimSewers.esp":"windhelm","2d3e7:Skyrim.esm":"riften","2d3e8:Skyrim.esm":"riften","2d4e3:Skyrim.esm":"winterhold","2d4e4:Skyrim.esm":"winterhold","2d524:Skyrim.esm":"riften","2d525:Skyrim.esm":"riften","2d5d1:Skyrim.esm":"windhelm","2df5b:SkyrimSewers.esp":"windhelm","2e521:Skyrim.esm":"falkreath","2e760:Skyrim.esm":"morthal","2eac1:SkyrimSewers.esp":"windhelm","2f83d:Skyrim.esm":"dawnstar","2f83e:Skyrim.esm":"dawnstar","2f98:Update.esm":"riften","2f9c:Update.esm":"solitude","2fd0:Update.esm":"windhelm","2fd4:Update.esm":"falkreath","2fd85:Skyrim.esm":"dawnstar","2fec:HearthFires.esm":"falkreath","3016a:Skyrim.esm":"solitude","301c70:WindhelmSSE.esp":"windhelm","301d64:WindhelmSSE.esp":"windhelm","30313:Skyrim.esm":"markarth","30442:Skyrim.esm":"markarth","30934:aaaGraniteHill.esp":"falkreath","30e5:Update.esm":"riften","30e7:Update.esm":"ravenrock","30e8:Update.esm":"ravenrock","317e7:Skyrim.esm":"windhelm","31edd:SkyrimSewers.esp":"windhelm","32b8:JKs Skyrim.esp":"dawnstar","32fb04:WindhelmSSE.esp":"windhelm","336fb:Skyrim.esm":"markarth","33779:Skyrim.esm":"markarth","3377b:Dragonborn.esm":"ravenrock","33d68:Skyrim.esm":"markarth","34864:Skyrim.esm":"markarth","3486e:Skyrim.esm":"markarth","34955:Skyrim.esm":"windhelm","34e548:WindhelmSSE.esp":"windhelm","34ef4:ElysiumEstate.esp":"whiterun","34fd2:Dragonborn.esm":"ravenrock","3519:JKs Skyrim.esp":"riften","35299:Skyrim.esm":"winterhold","352c7:Skyrim.esm":"whiterun","3538d:Skyrim.esm":"falkreath","35a22:Dragonborn.esm":"ravenrock","35dec:ElysiumEstate.esp":"whiterun","35f67:Dragonborn.esm":"ravenrock","361f9:Skyrim.esm":"markarth","361fa:Skyrim.esm":"markarth","362d8:Skyrim.esm":"solitude","3678a:SkyrimSewers.esp":"whiterun","36798:Dragonborn.esm":"ravenrock","36a72:Skyrim.esm":"markarth","36d10e:WindhelmSSE.esp":"windhelm","36ed5:Skyrim.esm":"whiterun","36ed6:Skyrim.esm":"whiterun","371dd:Skyrim.esm":"falkreath","371de:Skyrim.esm":"falkreath","37a22:AnotherOakwood.esp":"falkreath","37a25:AnotherOakwood.esp":"falkreath","37a26:AnotherOakwood.esp":"falkreath","37a27:AnotherOakwood.esp":"falkreath","37a28:AnotherOakwood.esp":"falkreath","37a29:AnotherOakwood.esp":"falkreath","37a2a:AnotherOakwood.esp":"falkreath","37b76:Skyrim.esm":"riften","37cc6:Skyrim.esm":"riften","37ee0:Skyrim.esm":"solitude","38e652:Riften Expansion.esp":"riften","38f3a:SkyrimSewers.esp":"whiterun","3929e:Dragonborn.esm":"ravenrock","399d1:Skyrim.esm":"markarth","39eac:Dragonborn.esm":"ravenrock","3a183:Skyrim.esm":"falkreath","3a184:Skyrim.esm":"falkreath","3a985:North Keep.esp":"falkreath","3a986:North Keep.esp":"falkreath","3a987:North Keep.esp":"falkreath","3a988:North Keep.esp":"falkreath","3a989:North Keep.esp":"falkreath","3a98a:North Keep.esp":"falkreath","3a98b:North Keep.esp":"falkreath","3a98c:North Keep.esp":"falkreath","3ac5:JKs Skyrim.esp":"dawnstar","3b21f:SkyrimSewers.esp":"whiterun","3b696:Skyrim.esm":"riften","3b698:Skyrim.esm":"riften","3b87d:Skyrim.esm":"riften","3bf0:Dawnguard.esm":"riften","3bf9f:SkyrimSewers.esp":"whiterun","3c7f5:Dragonborn.esm":"ravenrock","3c90e:SkyrimSewers.esp":"whiterun","3cbcb:Skyrim.esm":"riften","3cfa:OarsRest.esp":"falkreath","3d35a:Skyrim.esm":"whiterun","3d61b:SkyrimSewers.esp":"whiterun","3dd34:Skyrim.esm":"winterhold","3e908:Skyrim.esm":"morthal","3ea9d:Skyrim.esm":"markarth","3f516:Skyrim.esm":"windhelm","3f78:JKs Skyrim.esp":"whiterun","3fc8f:Skyrim.esm":"falkreath","3ff10:Skyrim.esm":"whiterun","414dd:Skyrim.esm":"winterhold","41777:Skyrim.esm":"whiterun","41cd2:AnotherOakwood.esp":"falkreath","42ab0:Arena - Markarth Side.esp":"morthal","42bec:Skyrim.esm":"windhelm","42bed:Skyrim.esm":"windhelm","439e7:SkyrimSewers.esp":"windhelm","43fab:Skyrim.esm":"whiterun","4401b:Skyrim.esm":"markarth","446bf:Skyrim.esm":"winterhold","45a1d:Skyrim.esm":"riften","4624f:Skyrim.esm":"solitude","4637:JKs Skyrim.esp":"solitude","466cb:Skyrim.esm":"dawnstar","470e7:AnotherOakwood.esp":"falkreath","471dc:Skyrim.esm":"winterhold","4761b:Skyrim.esm":"riften","47817:Skyrim.esm":"falkreath","479d5:JK's Whiterun's Outskirts.esp":"whiterun","47aac:JK's Whiterun's Outskirts.esp":"whiterun","480ff:SkyrimSewers.esp":"whiterun","4823a:WindhelmSSE.esp":"windhelm","4849:HearthFires.esm":"falkreath","4a376:Skyrim.esm":"whiterun","4b8fb:Skyrim.esm":"windhelm","4bbac:SkyrimSewers.esp":"markarth","4c35:AnotherOakwood.esp":"falkreath","4c36:AnotherOakwood.esp":"falkreath","4c37:AnotherOakwood.esp":"falkreath","4c38:AnotherOakwood.esp":"falkreath","4c39:AnotherOakwood.esp":"falkreath","4c3a:AnotherOakwood.esp":"falkreath","4c3b:AnotherOakwood.esp":"falkreath","4c3d:AnotherOakwood.esp":"falkreath","4c6dd:Skyrim.esm":"riften","4d322:SkyrimSewers.esp":"markarth","4d3bb:WindhelmSSE.esp":"windhelm","4d45c:WindhelmSSE.esp":"windhelm","4d674:WindhelmSSE.esp":"windhelm","4d7bf:WindhelmSSE.esp":"windhelm","4d912:WindhelmSSE.esp":"windhelm","4da84:WindhelmSSE.esp":"windhelm","4dbf4:WindhelmSSE.esp":"windhelm","4dd75:WindhelmSSE.esp":"windhelm","4dfba:WindhelmSSE.esp":"windhelm","4fcdf:SkyrimSewers.esp":"markarth","5015c:Skyrim.esm":"riften","5015d:Skyrim.esm":"windhelm","50f1e:Skyrim.esm":"morthal","52390:Skyrim.esm":"dawnstar","5258c:Skyrim.esm":"dawnstar","527f2:Skyrim.esm":"dawnstar","529dd:Skyrim.esm":"riften","52cb5:Skyrim.esm":"dawnstar","52feb:Skyrim.esm":"windhelm","53081:Skyrim.esm":"riften","54226:Skyrim.esm":"dawnstar","542c:OarsRest.esp":"falkreath","544ab:SkyrimSewers.esp":"windhelm","547f0:Skyrim.esm":"markarth","54b6f:Skyrim.esm":"windhelm","54b70:Skyrim.esm":"windhelm","54d0e:Skyrim.esm":"whiterun","55215:Skyrim.esm":"markarth","5554a:Skyrim.esm":"riften","563e2:Skyrim.esm":"morthal","56c1b:Skyrim.esm":"winterhold","56e88:Skyrim.esm":"solitude","571b4:Skyrim.esm":"markarth","5734:Dawnguard.esm":"riften","580a2:Skyrim.esm":"whiterun","58663:Skyrim.esm":"morthal","58b4c:Skyrim.esm":"markarth","58b4d:Skyrim.esm":"markarth","5900:Arena - Markarth Side.esp":"windhelm","5912d:Skyrim.esm":"markarth","59398:Skyrim.esm":"markarth","597d4:Skyrim.esm":"markarth","59eb:OarsRest.esp":"falkreath","5a856:Skyrim.esm":"markarth","5a857:Skyrim.esm":"markarth","5b5dd:Skyrim.esm":"markarth","5b88b:Skyrim.esm":"riften","5b91b:Skyrim.esm":"falkreath","5c483:Skyrim.esm":"riften","5c591:Arena - Markarth Side.esp":"morthal","5c98:aaaGraniteHill.esp":"falkreath","5d010:Skyrim.esm":"morthal","5d01d:Skyrim.esm":"winterhold","5de24:Skyrim.esm":"falkreath","5e1f9:SkyrimSewers.esp":"markarth","5eaa:Dawnguard.esm":"riften","5eab:Dawnguard.esm":"riften","5f496:SkyrimSewers.esp":"riften","5f536:Skyrim.esm":"markarth","626a:aaaGraniteHill.esp":"falkreath","633a:JKs Skyrim.esp":"whiterun","64fc2:SkyrimSewers.esp":"solitude","6554:OarsRest.esp":"falkreath","656ca:SkyrimSewers.esp":"markarth","65ab5:Skyrim.esm":"markarth","65ab6:Skyrim.esm":"falkreath","67f2a:Skyrim.esm":"windhelm","681dd:Skyrim.esm":"riften","68b99:Skyrim.esm":"solitude","69858:Skyrim.esm":"winterhold","6c3b6:Skyrim.esm":"solitude","6c532:WindhelmSSE.esp":"windhelm","6c62b:SkyrimSewers.esp":"windhelm","6c658:WindhelmSSE.esp":"windhelm","6ccbb:Skyrim.esm":"riften","6daa0:Skyrim.esm":"solitude","6dcd5:SkyrimSewers.esp":"whiterun","6e2ac:Skyrim.esm":"markarth","70469:Skyrim.esm":"solitude","7066:Dawnguard.esm":"riften","7144c:Skyrim.esm":"dawnstar","71ffe:Skyrim.esm":"solitude","7284e:Skyrim.esm":"markarth","75669:Skyrim.esm":"falkreath","760a:AnotherOakwood.esp":"falkreath","7614c:Skyrim.esm":"dawnstar","778f1:Skyrim.esm":"morthal","78124:Skyrim.esm":"dawnstar","7843:The Great City of Solitude.esp":"solitude","7947a:Skyrim.esm":"whiterun","79f9f:Skyrim.esm":"falkreath","7b7ab:Skyrim.esm":"solitude","7bc27:Skyrim.esm":"windhelm","7bef7:Skyrim.esm":"winterhold","7bef8:Skyrim.esm":"winterhold","7c98b:Skyrim.esm":"solitude","7d033:Skyrim.esm":"windhelm","7dcfc:Skyrim.esm":"solitude","7f93:SkyrimSewers.esp":"solitude","7fcdd:Skyrim.esm":"winterhold","801:Arena - Markarth Side.esp":"morthal","801b3:Arena - Markarth Side.esp":"morthal","80c6a:Skyrim.esm":"whiterun","81972:Skyrim.esm":"winterhold","81dec:Skyrim.esm":"falkreath","83559:Skyrim.esm":"morthal","83c1:aaaGraniteHill.esp":"falkreath","87764:Skyrim.esm":"whiterun","89d51:Skyrim.esm":"riften","8a04c:Riften Expansion.esp":"riften","8a43:aaaGraniteHill.esp":"falkreath","8afc:The Great City of Solitude.esp":"solitude","8b84d:Skyrim.esm":"falkreath","8c81:The Great City of Solitude.esp":"solitude","8cdee:Skyrim.esm":"markarth","8e906:Skyrim.esm":"markarth","8ed5:The Great City of Solitude.esp":"solitude","90232:WindhelmSSE.esp":"windhelm","90335:WindhelmSSE.esp":"windhelm","91872:Skyrim.esm":"morthal","918d3:Skyrim.esm":"whiterun","94322:Skyrim.esm":"dawnstar","94bab:Skyrim.esm":"whiterun","961ff:Skyrim.esm":"winterhold","965b3:Skyrim.esm":"windhelm","97298:Skyrim.esm":"windhelm","97299:Skyrim.esm":"windhelm","9aa4a:Skyrim.esm":"dawnstar","9b238:Skyrim.esm":"solitude","9ccdd:Skyrim.esm":"riften","9ccde:Skyrim.esm":"riften","9ccdf:Skyrim.esm":"riften","a013b:Skyrim.esm":"riften","a0877:Skyrim.esm":"windhelm","a1793:Skyrim.esm":"solitude","a1a61:Skyrim.esm":"falkreath","a1bfd:Skyrim.esm":"riften","a37a0:Riften Expansion.esp":"riften","a5a71:Skyrim.esm":"riften","a6d8e:Skyrim.esm":"riften","a73f4:Skyrim.esm":"windhelm","a87c5:Skyrim.esm":"solitude","a8b23:Skyrim.esm":"riften","a8b24:Skyrim.esm":"riften","a9194:Skyrim.esm":"markarth","aa20c:Skyrim.esm":"markarth","aac5:Riften Expansion.esp":"riften","ab531:Skyrim.esm":"morthal","abd31:Skyrim.esm":"dawnstar","ac5d2:Skyrim.esm":"solitude","ad5a1:Skyrim.esm":"falkreath","addb:The Great City of Solitude.esp":"solitude","ae783:Skyrim.esm":"winterhold","af227:Skyrim.esm":"windhelm","afdb:The Great City of Solitude.esp":"solitude","b1783:Skyrim.esm":"solitude","b213:The Great City of Solitude.esp":"solitude","b29d4:Skyrim.esm":"winterhold","b29d5:Skyrim.esm":"winterhold","b29d6:Skyrim.esm":"winterhold","b64b4:Skyrim.esm":"solitude","b6be6:Skyrim.esm":"falkreath","ba599:Skyrim.esm":"solitude","bbb2f:Skyrim.esm":"solitude","be46a:Skyrim.esm":"morthal","c5aa0:Skyrim.esm":"whiterun","c7348:Skyrim.esm":"dawnstar","c849d:WindhelmSSE.esp":"windhelm","c8b44:WindhelmSSE.esp":"windhelm","c9dab:Skyrim.esm":"whiterun","cab91:Skyrim.esm":"winterhold","cab92:Skyrim.esm":"winterhold","cc3f6:Riften Expansion.esp":"riften","cc616:Riften Expansion.esp":"riften","cd4a:SkyrimSewers.esp":"solitude","d9ac:aaaGraniteHill.esp":"falkreath","d9dc7:Skyrim.esm":"riften","da07:aaaGraniteHill.esp":"falkreath","db070:Skyrim.esm":"whiterun","dbf12:Skyrim.esm":"windhelm","dd216:Skyrim.esm":"solitude","dd95b:WindhelmSSE.esp":"windhelm","ddf7c:Skyrim.esm":"falkreath","debcd:Skyrim.esm":"whiterun","e09c:The Great City of Solitude.esp":"solitude","e1e6:The Great City of Solitude.esp":"solitude","e348:The Great City of Solitude.esp":"solitude","e48e:The Great City of Solitude.esp":"solitude","e6114:Riften Expansion.esp":"riften","eb440:Skyrim.esm":"dawnstar","eb7:Dawnguard.esm":"dawnstar","eb8:Dawnguard.esm":"dawnstar","ed8e0:Skyrim.esm":"winterhold","eec53:Skyrim.esm":"winterhold","eec55:Skyrim.esm":"winterhold","ef324:Skyrim.esm":"falkreath","ef325:Skyrim.esm":"falkreath","f10d:The Great City of Solitude.esp":"solitude","f453:The Great City of Solitude.esp":"solitude","f9a47:Arena - Markarth Side.esp":"morthal","f9b2a:Arena - Markarth Side.esp":"morthal","fd2b:The Great City of Solitude.esp":"solitude","fee74:JK's Whiterun's Outskirts.esp":"whiterun"};
+  // ==== end BUILDING_HOLD ====
+
+  /** The hold a building is in, in the offices' town keys, or null. */
+  function holdOfBuilding(building) {
+    return Object.prototype.hasOwnProperty.call(BUILDING_HOLD, building) ? BUILDING_HOLD[building] : null;
+  }
+
+  /*
+    A steward ends a claim and sets rent only in their own hold (#2551): the
+    Steward of the building's hold, or its Jarl, who keeps the hold too. Null
+    when they may; otherwise what to tell them. Asked again at every press.
+  */
+  function notStewardHere(profileId, building) {
+    var hold = holdOfBuilding(building);
+    if (!hold) {
+      return nameOf(building) + ' answers to no hold the server knows, so no steward ends a claim or sets rent there.';
+    }
+    if (isStewardOf(profileId, hold)) { return null; }
+    var town = HOLD_TOWN[hold] || hold;
+    return nameOf(building) + ' answers to ' + town + '. Only the Steward of ' + town + ' or its Jarl ends a claim ' +
+      'or sets rent there.';
+  }
+
+  /*
+    STAFF AT ANY DOOR (#2551). Patrick, 17 October, decision 1, answer B:
+    staff end claims and set rent at any building, the ones no hold covers
+    included, and every such press is logged for staff. Staff hold no office
+    by being staff (offices.md), so this is a power of its own and not an
+    office: a staff member is never a Steward or a Jarl here, and a Steward
+    or a Jarl is still of their own hold only.
+
+    WHO IS STAFF is the test every staff command uses, asked of the chat
+    block (__thornswoodIsStaff, which is isStaff there): the site's staff
+    roles (Owner, Dev, Gamemaster, Moderator, Loremaster, by devProfiles in
+    allowed.json), the admins and the written thornswoodDevs list. And for a
+    press, the staff block's own proof (unproven): a chat connection the
+    voice service proved, and the launcher's pass on hand, whatever
+    thornswoodRequirePass says.
+
+    THE LOG is the staff log, the staff block's record: one line in
+    thornswood.log and one in for-bot/moderation.log, which the Discord bot
+    says in the staff channel (did evict, rent or norent). It names who
+    pressed, whose claim, the building and its hold, what was set, and when
+    (at). The press is refused when that log cannot be reached, so no staff
+    press goes unlogged.
+
+    Somebody who keeps the building's hold acts as its steward, as anybody
+    who keeps it does; the staff power is for every other door.
+  */
+  function isStaffHere(profileId) {
+    var f = g['__thornswoodIsStaff'];
+    try { return typeof f === 'function' && !!f(Number(profileId) || 0); } catch (e) { return false; }
+  }
+
+  /*
+    How this press at this building is allowed: { as: 'steward' } for a
+    steward of its hold, { as: 'staff' } for staff, or { why } to tell them.
+    cmd is the queued line, for the staff block's proof.
+  */
+  function settleAs(profileId, building, cmd) {
+    var notHere = notStewardHere(profileId, building);
+    if (!notHere) { return { as: 'steward' }; }
+    if (!isStaffHere(profileId)) { return { why: notHere }; }
+    var st = g['__thornswoodStaff'];
+    if (!st || typeof st.unproven !== 'function' || typeof st.record !== 'function') {
+      return { why: 'The staff log is not loaded on this server, so no staff press is taken. Say so in the dev channel.' };
+    }
+    var unproven = st.unproven(cmd, profileId);
+    if (unproven) { return { why: unproven }; }
+    return { as: 'staff' };
+  }
+
+  /* The building and its hold, as the staff log and the staff member read them. */
+  function settleWhere(building) {
+    var hold = holdOfBuilding(building);
+    return nameOf(building) + (hold ? ', in ' + (HOLD_TOWN[hold] || hold) : ', which answers to no hold');
+  }
+
+  /* One staff press in the staff log (the staff block's record): who, what, whose claim, where, and when. */
+  function staffRecord(did, actorId, profileId, building, held, why) {
+    g['__thornswoodStaff'].record(did, Number(profileId) || 0, personName(actorId),
+      Number(held.by) || 0, String(held.name || 'somebody'), why, 0,
+      { building: building, buildingName: nameOf(building), hold: holdOfBuilding(building), as: 'staff' });
   }
 
   // ------------------------------------------------------------ the doors --
@@ -38064,10 +38660,11 @@ log('gamemode loaded:',
     /box               say which hold's box you are standing at
 
     A steward's, because designating the city's treasury is city business.
-    Sent by the Office page of the K panel (#1638), which offers the ten
-    holds for the container the steward just opened, never typed. Only one of
-    the ten is taken, the same as a board: any other word would start a box
-    no hold's ledger knows about.
+    Sent by the Office page of the K panel (#1638), which offers the holds
+    the steward keeps for the container they just opened, never typed. Only
+    one of the ten is taken, the same as a board: any other word would start
+    a box no hold's ledger knows about. And only a hold the steward keeps
+    (#2551): the Steward of it, or its Jarl, the same rule as its board.
   */
   function boxCmd(parts, actorId, profileId, toProfile) {
     var at = boxAt(actorId);
@@ -38108,7 +38705,7 @@ log('gamemode loaded:',
       return true;
     }
 
-    if (!isSteward(profileId, actorId)) {
+    if (!isSteward(profileId)) {
       toProfile(profileId, 'Only a steward sets a hold\'s box.');
       return true;
     }
@@ -38118,6 +38715,10 @@ log('gamemode loaded:',
     }
     if (LEDGER_HOLDS.indexOf(arg) < 0) {
       toProfile(profileId, 'No hold called ' + arg + '. The holds are ' + LEDGER_HOLDS.join(', ') + '.');
+      return true;
+    }
+    if (!isStewardOf(profileId, arg)) {
+      toProfile(profileId, 'Only the Steward of ' + (HOLD_TOWN[arg] || arg) + ' or its Jarl names its box.');
       return true;
     }
     boxes[arg] = at;
@@ -38307,11 +38908,11 @@ log('gamemode loaded:',
     standing at the board's spot is standing at the box (boardHere), as it
     always was.
 
-    WHO IS AN OFFICER OF A HOLD, AS THE SERVER KNOWS IT TODAY: that hold's
-    Jarl, that hold's guards, and a steward. Stewards are one list for every
-    hold (stewardCmd records no hold), so a steward is an officer at every
-    box; and there is no Court office in the server. Both are written on
-    #2298 as questions.
+    WHO IS AN OFFICER OF A HOLD (Patrick, 15 October, #2298 and #2551): that
+    hold's Court, its Guards, its Jarl and its Steward, each a Discord role of
+    that hold ("Whiterun Court", "Guard of Whiterun", "Jarl of Whiterun",
+    "Steward of Whiterun"), read through officeOf. An officer of one hold is
+    anybody at another hold's box (boxOfficer).
 
     Every line here comes from the box's own panel (game/ui/thornswood-box.js)
     and is never typed (Patrick, 4 Oct: no chat commands for what people do).
@@ -38395,16 +38996,14 @@ log('gamemode loaded:',
 
   /*
     May this person take anything out of this hold's box: its officers.
-    That hold's Jarl and that hold's guards; and a steward Jarl named, from
-    the one list there is (isSteward also counts every Jarl, of any hold, so
-    it is not asked here: a Jarl is an officer of their own hold's box).
+    Patrick, 15 October (#2298, #2551): that hold's Court, Guards, Jarl and
+    Steward, each by their Discord role, and only at that hold's box. A
+    Steward is an officer only at their own hold's box.
   */
-  function boxOfficer(hold, profileId, actorId) {
+  function boxOfficer(hold, profileId) {
     var pid = Number(profileId) || 0;
     if (!pid || !hold) { return false; }
-    if (isGuard(pid, hold)) { return true; }
-    if (stewards.indexOf(pid) !== -1) { return true; }
-    return jarlHoldOf(pid, actorId) === hold;
+    return isGuard(pid, hold) || isCourtOf(pid, hold) || isStewardOf(pid, hold);
   }
 
   function boxLog(hold, row) {
@@ -38421,7 +39020,7 @@ log('gamemode loaded:',
   */
   function boxView(actorId, profileId, hold, said, withRecords) {
     var d = dropboxOf(hold);
-    var officer = boxOfficer(hold, profileId, actorId);
+    var officer = boxOfficer(hold, profileId);
     var rows = [];
     var mineGold = 0;
     var allGold = 0;
@@ -38565,7 +39164,7 @@ log('gamemode loaded:',
     if (at < 0) { return 'That is not in the box.'; }
     var it = d.items[at];
     var own = Number(it.by) > 0 && Number(it.by) === Number(profileId);
-    if (!own && !boxOfficer(hold, profileId, actorId)) {
+    if (!own && !boxOfficer(hold, profileId)) {
       return 'That is not yours to take. Only what you put in, unless you are one of this hold\'s officers.';
     }
     var have = Number(it.count) || 0;
@@ -38662,7 +39261,7 @@ log('gamemode loaded:',
     } else if (sub === 'take') {
       said = boxTake(hold, actorId, profileId, parts[2], parts[3]);
     } else if (sub === 'records') {
-      records = boxOfficer(hold, profileId, actorId);
+      records = boxOfficer(hold, profileId);
       if (!records) { said = 'Only this hold\'s officers keep the records.'; }
     } else if (sub !== 'open') {
       said = 'The box does not know that.';
@@ -38719,11 +39318,13 @@ log('gamemode loaded:',
 
     Sent by Set rent and No rent on the Office page of the K panel (#1638),
     never typed; the page shows a steward what is owed at the door they just
-    opened. See officeView.
+    opened. See officeView. Only a steward of the building's hold sets or
+    waives it (#2551, notStewardHere), or staff at any building, logged for
+    staff (settleAs); anybody at the door reads it.
   */
   var OFFICE_AT_DOOR = 'Open the door of the building, then press the button on the Office page of K within a minute.';
 
-  function rentCmd(parts, actorId, profileId, toProfile) {
+  function rentCmd(parts, actorId, profileId, toProfile, cmd) {
     var building = here(actorId);
     if (!building) {
       toProfile(profileId, OFFICE_AT_DOOR);
@@ -38744,19 +39345,31 @@ log('gamemode loaded:',
       return true;
     }
 
-    if (!isSteward(profileId, actorId)) {
+    // A steward, or staff at any door (#2551, settleAs).
+    if (!isSteward(profileId) && !isStaffHere(profileId)) {
       toProfile(profileId, 'Only a steward sets rent.');
+      return true;
+    }
+    var how = settleAs(profileId, building, cmd);
+    if (!how.as) {
+      toProfile(profileId, how.why);
       return true;
     }
     if (!held) {
       toProfile(profileId, 'Nobody holds ' + nameOf(building) + ', so there is nobody to pay.');
       return true;
     }
+    var asStaff = how.as === 'staff';
     if (arg === '-') {
       delete held.rent;
       save();
-      plog('a steward waived the rent on', nameOf(building));
-      toProfile(profileId, 'No rent on ' + nameOf(building) + ' now.');
+      if (asStaff) {
+        staffRecord('norent', actorId, profileId, building, held, settleWhere(building));
+      } else {
+        plog('a steward waived the rent on', nameOf(building));
+      }
+      toProfile(profileId, (asStaff ? 'As staff: no' : 'No') + ' rent on ' + nameOf(building) + ' now.' +
+                (asStaff ? ' It is in the staff log.' : ''));
       redrawPanel(actorId);
       return true;
     }
@@ -38767,8 +39380,13 @@ log('gamemode loaded:',
     }
     held.rent = { amount: amount, everyDays: 7, owed: 0, since: Date.now() };
     save();
-    plog('a steward set the rent on', nameOf(building), 'to', amount);
-    toProfile(profileId, nameOf(building) + ' pays ' + amount + ' gold every 7 days now.');
+    if (asStaff) {
+      staffRecord('rent', actorId, profileId, building, held, amount + ' gold every 7 days on ' + settleWhere(building));
+    } else {
+      plog('a steward set the rent on', nameOf(building), 'to', amount);
+    }
+    toProfile(profileId, (asStaff ? 'As staff: ' : '') + nameOf(building) + ' pays ' + amount + ' gold every 7 days now.' +
+              (asStaff ? ' It is in the staff log.' : ''));
     redrawPanel(actorId);
     return true;
   }
@@ -38907,9 +39525,10 @@ log('gamemode loaded:',
     somebody rests or logs out should decide how much comes back: an inn or a
     temple the most, out in the wild the least. Until this, a bed in an inn
     nobody holds was "a bed nobody can lend you", the same 25 an hour as a
-    bedroll on the road, and no logout fill. Every new character arrives in
-    one of nine inns (CHARGEN), and none of those is held unless a person
-    claimed it, so that was every new character's first night.
+    bedroll on the road, and no logout fill. Every new character used to
+    arrive in one of nine inns (CHARGEN), and arrives a short walk from one
+    since #2622; none of those is held unless a person claimed it, so it is
+    most new characters' first night.
 
     So the beds now know an inn or a temple when they see one, and hand the
     needs block two kinds of their own: common, a bed there, and commonfire,
@@ -39976,9 +40595,11 @@ log('gamemode loaded:',
       two confirmHaul lets through. A steward also takes a haul down from
       the wall, which unpin lets them do.
     */
-    var steward = here && isSteward(profileId, actorId);
-    // A guard of this board's hold takes down any post on it (#502).
-    var guard = here && isGuard(profileId, hold);
+    // A steward of this board's hold (#2551): Steward of it, or its Jarl.
+    var steward = here && isStewardOf(profileId, hold);
+    // A guard of this board's hold takes down any post on it (#502), and so
+    // does its Jarl (#2551, Patrick, 15 Oct: that hold's Guard or Jarl).
+    var guard = here && (isGuard(profileId, hold) || isJarlOf(profileId, hold));
     var dests = [];
     var arrivals = [];
     if (here) {
@@ -40085,10 +40706,12 @@ log('gamemode loaded:',
   /*
     A steward moves a hold's board to where they stand. Move it here, beside
     each board on the Office page of the K panel, sends /board move <hold>
-    (#1638); nobody types it.
+    (#1638); nobody types it. Only that hold's board (#2551): a steward is the
+    Steward of one hold, so they move its board and no other, and its Jarl
+    keeps the hold too.
   */
   function moveBoard(hold, actorId, profileId, toProfile) {
-    if (!isSteward(profileId, actorId)) {
+    if (!isSteward(profileId)) {
       toProfile(profileId, 'Only a steward moves a board.');
       return true;
     }
@@ -40100,6 +40723,11 @@ log('gamemode loaded:',
     if (!Object.prototype.hasOwnProperty.call(boards, hold)) {
       toProfile(profileId, 'No board in ' + hold + '. The boards are ' +
                 Object.keys(boards).join(', ') + '.');
+      return true;
+    }
+    if (!isStewardOf(profileId, hold)) {
+      toProfile(profileId, 'That is ' + ((boards[hold] && boards[hold].where) || hold) +
+                '\'s board. Its Steward or its Jarl moves it.');
       return true;
     }
     var cell = null, pos = null;
@@ -40372,7 +41000,7 @@ log('gamemode loaded:',
   // Generated by scripts\dev\Build-WoodworkingBenches.py from the load order; do not hand
   // edit. game\data\woodworking-benches.json says what was measured at each spot.
   var WOODWORKING_BENCH_BASE = "154e2:Thornswood-Content.esp";
-  var WOODWORKING_BENCHES = {"dawnstar": {"angle": 130.35, "cell": "3c:Skyrim.esm", "forge": "cadf6:Skyrim.esm", "pos": [30481.4, 104218.9, -13771.6], "where": "Dawnstar"}, "falkreath": {"angle": 43.35, "cell": "3c:Skyrim.esm", "forge": "99b8a:Skyrim.esm", "pos": [-30171.7, -88225.6, -3025.4], "where": "Falkreath"}, "markarth": {"angle": 280.27, "cell": "16d71:Skyrim.esm", "forge": "514d8:Skyrim.esm", "pos": [-176057.9, 2936.6, -3311.9], "where": "Markarth"}, "morthal": {"angle": 26.75, "cell": "3c:Skyrim.esm", "forge": "24588:JKs Skyrim.esp", "pos": [-37281.6, 64496.6, -13944.3], "where": "Morthal"}, "riften": {"angle": 270.0, "cell": "16bb4:Skyrim.esm", "forge": "53481:Skyrim.esm", "pos": [172389.5, -96783.8, 11128.0], "where": "Riften"}, "riverwood": {"angle": 152.8, "cell": "3c:Skyrim.esm", "forge": "d6987:Skyrim.esm", "pos": [20853.5, -45292.2, -82.4], "where": "Riverwood"}, "solitude": {"angle": 203.46, "cell": "37edf:Skyrim.esm", "forge": "4e3e9:Skyrim.esm", "pos": [-60773.1, 106679.1, -7936.0], "where": "Solitude"}, "whiterun": {"angle": 90.0, "cell": "1a26f:Skyrim.esm", "forge": "c430a:Skyrim.esm", "pos": [20756.5, -7749.2, -3626.9], "where": "Whiterun"}, "windhelm": {"angle": 180.0, "cell": "1691d:Skyrim.esm", "forge": "f7798:Skyrim.esm", "pos": [131919.1, 36095.7, -12271.7], "where": "Windhelm"}};
+  var WOODWORKING_BENCHES = {"dawnstar": {"angle": 130.35, "cell": "3c:Skyrim.esm", "forge": "cadf6:Skyrim.esm", "pos": [30481.4, 104218.9, -13771.6], "where": "Dawnstar"}, "falkreath": {"angle": 43.35, "cell": "3c:Skyrim.esm", "forge": "99b8a:Skyrim.esm", "pos": [-30171.7, -88225.6, -3025.4], "where": "Falkreath"}, "markarth": {"angle": 280.27, "cell": "16d71:Skyrim.esm", "forge": "514d8:Skyrim.esm", "pos": [-176057.9, 2936.6, -3311.9], "where": "Markarth"}, "morthal": {"angle": 26.75, "cell": "3c:Skyrim.esm", "forge": "24588:JKs Skyrim.esp", "pos": [-37281.6, 64496.6, -13944.3], "where": "Morthal"}, "riften": {"angle": 272.34, "cell": "16bb4:Skyrim.esm", "forge": "53481:Skyrim.esm", "pos": [172658.6, -97074.5, 11128.0], "where": "Riften"}, "riverwood": {"angle": 152.8, "cell": "3c:Skyrim.esm", "forge": "d6987:Skyrim.esm", "pos": [20853.5, -45292.2, -82.4], "where": "Riverwood"}, "solitude": {"angle": 203.46, "cell": "37edf:Skyrim.esm", "forge": "4e3e9:Skyrim.esm", "pos": [-60773.1, 106679.1, -7936.0], "where": "Solitude"}, "whiterun": {"angle": 90.0, "cell": "1a26f:Skyrim.esm", "forge": "c430a:Skyrim.esm", "pos": [20756.8, -7749.2, -3626.9], "where": "Whiterun"}, "windhelm": {"angle": 0.0, "cell": "1691d:Skyrim.esm", "forge": "f7798:Skyrim.esm", "pos": [131759.1, 36455.7, -12268.4], "where": "Windhelm"}};
   // ==== end WOODWORKING_BENCHES ====
 
   function benchBookPath() {
@@ -41042,8 +41670,11 @@ log('gamemode loaded:',
       posted on. The pay goes back to the poster and the fee stays, the same
       as the poster's own /unpin before anybody has taken it.
     */
-    var stewardHaul = !!n.haul && isSteward(profileId, actorId);
-    if (n.by !== profileId && !stewardHaul && isGuard(profileId, hold)) {
+    // A steward of this board's hold (#2551).
+    var stewardHaul = !!n.haul && isStewardOf(profileId, hold);
+    // That hold's Guard or Jarl takes down any post on its board (#502,
+    // #2551), and on no other hold's.
+    if (n.by !== profileId && !stewardHaul && (isGuard(profileId, hold) || isJarlOf(profileId, hold))) {
       return guardTakedown(hold, at, n, actorId, profileId, toProfile);
     }
     if (n.by !== profileId && !stewardHaul) {
@@ -41090,17 +41721,20 @@ log('gamemode loaded:',
   /*
     A GUARD TAKES A POST DOWN (#502). Patrick, 11 October: guards have "the
     ability to remove posts from a notice board ... only within their own
-    hold". unpin sends a guard of the board's hold here for any post on it
-    that is not their own; a guard of another hold, at this board, is
-    anybody. The fee stays with the hold, as it does when a poster takes
+    hold". And 15 October (#2551): taking down a post needs that hold's Guard
+    or Jarl. unpin sends a guard or the Jarl of the board's hold here for any
+    post on it that is not their own; a guard or Jarl of another hold, at
+    this board, is anybody. The fee stays with the hold, as it does when a poster takes
     their own down. Gold the post holds goes back to its poster, the way a
     steward's take down of a haul sends the pay back: a haul through
     cancelHaul, a letter's 15 through handHaul, held for them while they are
     away. Whoever had taken it is told it is off their list.
   */
   function guardTakedown(hold, at, n, actorId, profileId, toProfile) {
+    var how = isGuard(profileId, hold) ? 'guard' : 'jarl';
+    var byWhom = how === 'guard' ? 'a guard' : 'the Jarl';
     if (n.haul) {
-      return cancelHaul(hold, at, n, 'guard', actorId, profileId, toProfile);
+      return cancelHaul(hold, at, n, how, actorId, profileId, toProfile);
     }
     var back = 0, owed = false;
     // A letter's 15, or a job's reward (#2554): what the post holds goes back to its poster.
@@ -41109,7 +41743,7 @@ log('gamemode loaded:',
       if (pay > 0) {
         var r = handHaul(hold, n, Number(n.by), pay,
                          (n.letter ? 'a letter for ' + (n.to || 'somebody') : 'job ' + (at + 1)) +
-                         ' taken down by a guard, the pay back to ' + (n.name || 'its poster'),
+                         ' taken down by ' + byWhom + ', the pay back to ' + (n.name || 'its poster'),
                          n.letter ? 'letter' : 'job');
         if (r.why) {
           toProfile(profileId, 'That did not work: ' + r.why + ' The ' + (n.letter ? 'letter' : 'job') +
@@ -41125,18 +41759,18 @@ log('gamemode loaded:',
     var fee = 'The fee stays with ' + hold + '.';
     var held = n.letter ? 'gold for the courier' : 'gold reward';
     // A letter's words are sealed, and the log does not record them either.
-    plog('law: a guard of', hold, '(' + personName(actorId) + ', profile ' + profileId + ') took down',
+    plog('law:', how === 'guard' ? 'a guard of' : 'the Jarl of', hold, '(' + personName(actorId) + ', profile ' + profileId + ') took down',
          (n.name || 'somebody') + '\'s', kind, at + 1, 'in',
          hold + (n.letter ? '' : ': ' + (n.title || '') + ': ' + (n.text || '')));
     toProfile(profileId, 'You take ' + (n.name || 'somebody') + '\'s ' + kind + ' down.' +
               (back ? ' The ' + back + ' ' + held + ' goes back to them' +
                       (owed ? ' when they are next in the world' : '') + '.' : '') + ' ' + fee);
     if (onlineActorOf(Number(n.by))) {
-      toProfile(n.by, 'A guard took your ' + kind + ' in ' + hold + ' down.' +
+      toProfile(n.by, byWhom.charAt(0).toUpperCase() + byWhom.slice(1) + ' took your ' + kind + ' in ' + hold + ' down.' +
                 (back && !owed ? ' The ' + back + ' ' + held + ' is back in your pack.' : '') + ' ' + fee);
     }
     if (n.taken && Number(n.taken) !== Number(profileId) && onlineActorOf(Number(n.taken))) {
-      toProfile(n.taken, 'The ' + kind + ' in ' + hold + ' you took was taken down by a guard. It is off your list.');
+      toProfile(n.taken, 'The ' + kind + ' in ' + hold + ' you took was taken down by ' + byWhom + '. It is off your list.');
     }
     refreshPanel(actorId);
     return true;
@@ -41523,8 +42157,11 @@ log('gamemode loaded:',
       toProfile(profileId, 'That haul goes to ' + n.dest + '. It is confirmed at ' + n.dest + '\'s board.');
       return true;
     }
-    if (Number(n.by) !== Number(profileId) && !isSteward(profileId, actorId)) {
-      toProfile(profileId, 'Only the person who posted it, or a steward, confirms a haul.');
+    // A steward of the hold it came to (#2551): the board it is confirmed at is theirs.
+    if (Number(n.by) !== Number(profileId) && !isStewardOf(profileId, n.dest)) {
+      toProfile(profileId, 'Only the person who posted it, or a steward of ' +
+                ((boards[n.dest] && boards[n.dest].where) || n.dest) +
+                ', confirms a haul.');
       return true;
     }
     if (!n.taken) {
@@ -41700,7 +42337,7 @@ log('gamemode loaded:',
     takedown(hold, at, profileId);
     var later = owed ? ' when they are next in the world' : '';
     var fee = 'The fee stays with ' + hold + '.';
-    var office = how === 'guard' ? 'a guard' : 'a steward';
+    var office = how === 'guard' ? 'a guard' : (how === 'jarl' ? 'the Jarl' : 'a steward');
     plog(how === 'drop' ? (n.takenName || 'the hauler') + ' dropped' : (how === 'own' ? n.name : office) + ' took down',
          'a haul to', n.dest, 'in', hold, 'and', pay, owed ? 'is held for' : 'went back to', n.name);
     if (how === 'own') {
@@ -41716,7 +42353,7 @@ log('gamemode loaded:',
       toProfile(profileId, 'You take ' + n.name + '\'s haul to ' + n.dest + ' down. The ' + pay +
                 ' gold pay goes back to them' + later + '. ' + fee);
       if (!owed) {
-        toProfile(n.by, (how === 'guard' ? 'A guard' : 'A steward') + ' took your haul to ' + n.dest + ' down. The ' + pay +
+        toProfile(n.by, office.charAt(0).toUpperCase() + office.slice(1) + ' took your haul to ' + n.dest + ' down. The ' + pay +
                   ' gold pay is back in your pack. ' + fee);
       }
     }
@@ -41774,7 +42411,7 @@ log('gamemode loaded:',
     try { return typeof fn === 'function' && !!fn(profileId); } catch (e2) { return false; }
   }
 
-  function command(word, parts, actorId, profileId, toProfile) {
+  function command(word, parts, actorId, profileId, toProfile, cmd) {
     if (word === '/deed' || word === '/deeds') {
       return deeds(actorId, profileId, toProfile);
     }
@@ -41814,13 +42451,12 @@ log('gamemode loaded:',
       }
       return claimAway(parts, actorId, profileId, toProfile);
     }
-    if (word === '/jarl') { return jarlCmd(parts, actorId, profileId, toProfile); }
-    if (word === '/steward') { return stewardCmd(parts, actorId, profileId, toProfile); }
-    if (word === '/guard') { return guardCmd(parts, actorId, profileId, toProfile); }
-    if (word === '/evict') { return evict(actorId, profileId, toProfile); }
+    // A Jarl gives or takes an office of their hold (#2551): the Office page sends it.
+    if (word === '/office') { return officeCmd(parts, actorId, profileId, toProfile); }
+    if (word === '/evict') { return evict(actorId, profileId, toProfile, cmd); }
     if (word === '/box') { return boxCmd(parts, actorId, profileId, toProfile); }
     if (word === '/dropbox') { return dropboxCmd(parts, actorId, profileId, toProfile); }
-    if (word === '/rent') { return rentCmd(parts, actorId, profileId, toProfile); }
+    if (word === '/rent') { return rentCmd(parts, actorId, profileId, toProfile, cmd); }
     if (word === '/sleephere') { return sleepHere(parts, actorId, profileId, toProfile); }
     if (word === '/notice') { return post(parts, actorId, profileId, toProfile, false); }
     if (word === '/job') {
@@ -41841,276 +42477,199 @@ log('gamemode loaded:',
   }
 
   /*
-    A jarl names a steward, or takes the office back.
+    A JARL GIVES OR TAKES AN OFFICE OF THEIR HOLD, AND A CHARACTER HOLDS IT
+    (#2551).
 
-        /steward                 who holds it
-        /steward 1893288986      name one
-        /steward -1893288986     take it back
+        /office <court|steward|guard> <hold> <id>      the Jarl names that character
+        /office <court|steward|guard> <hold> -<id>     the Jarl takes the office back
+        /office hold <office> <hold>                    this character holds an office
+                                                        its account's role gives
 
-    Sent by the Office page of the K panel (#1638), never typed: Name steward
-    beside a person in the world, Remove beside a steward. See officeView.
+    Sent by the Office page of K, never typed (Patrick, 4 Oct: no chat
+    commands for what people do): Name beside a person in the world, Remove
+    beside a holder, and Hold it here beside an office the account holds.
+    Patrick, 15 October: that hold's Jarl gives and takes its Court, Steward
+    and Guard, for their own hold only, and in the game "the game asks the
+    site, and the bot sets the Discord role, so the role stays the one
+    truth". And 16 October: the office is one character's.
 
-    A PROFILE ID AND NOT A NAME, and that is a limit rather than a choice: two
-    characters can carry the same name and this block has no way to tell them
-    apart. The id is what the register keys on everywhere else, and the page
-    sends the id of the person picked, so picking somebody by name on the page
-    still names exactly that person.
+    NAMING A CHARACTER. The Jarl picks a character in the world, by its
+    profile id, because two characters can carry the same name. When its
+    account already holds the role, the office simply moves to that
+    character. Otherwise the site checks the Jarl's role again and sets the
+    role on the character's account with the bot's account, and once it has,
+    this character is the one that holds it. The door reads the roles back
+    at once (__thornswoodDoorReadNow), which is when it holds in the world:
+    the cells follow (pushAll) and both pages are written again.
+
+    TAKING IT BACK takes the role off the account, and the character with it.
+
+    HOLDING IT HERE. A role given in Discord (the bot's panel, or staff for a
+    Jarl) names an account and no character, so its holder chooses: the
+    Office page offers it on each of the account's characters, and pressing
+    Hold it here makes this one the one that holds it, moving it off another.
+
+    NOTHING IS RETRIED. A change the site or Discord refused is said to the
+    Jarl in the site's own words, and pressing again is theirs.
   */
-  /*
-    Seat the Jarl office on THIS character.
+  function officeRole(office, hold) {
+    var town = HOLD_TOWN[hold] || hold;
+    if (office === 'jarl') { return 'Jarl of ' + town; }
+    if (office === 'court') { return town + ' Court'; }
+    if (office === 'steward') { return 'Steward of ' + town; }
+    return 'Guard of ' + town;
+  }
 
-        /jarl <hold>     take the office of that hold, while it has no Jarl
-        /jarl -          give the office up (giveUpJarl)
+  /* What an office lets its holder do, said to them when it is theirs. */
+  function officeDoes(office, hold) {
+    var town = HOLD_TOWN[hold] || hold;
+    if (office === 'jarl') {
+      return 'You name and remove ' + town + '\'s Court, Steward and Guards on the Office page of K, claim its jail, ' +
+             'keep it as its steward, and take anything out of its drop box.';
+    }
+    if (office === 'court') {
+      return 'You take anything out of ' + town + '\'s drop box and read its records.';
+    }
+    if (office === 'steward') {
+      return 'You end claims and set rent at a door, move ' + town + '\'s notice board, and take anything out of ' +
+             'its drop box.';
+    }
+    return 'The cells of ' + (JAIL_NAME[hold] || 'the hold\'s jail') + ' are yours to lock, you take down posts on ' +
+           town + '\'s notice board, and you take anything out of its drop box.';
+  }
 
-    Sent by Take the office on the Office page of the K panel (#1638), never
-    typed. Discord Jarl (or admin) eligibility is required. The office is the
-    character property, so a second character on the same account stays
-    ordinary. Admins may seat without the Discord role so the first
-    office can be placed out of character (#397).
-  */
-  function jarlCmd(parts, actorId, profileId, toProfile) {
-    var arg0 = (parts && parts.length > 1) ? String(parts[1]).trim() : '';
-    // Give up the office (#502): the page's button sends /jarl -. Asked
-    // before the role, so a Jarl whose role was taken can still leave the seat.
-    if (arg0 === '-') { return giveUpJarl(actorId, profileId, toProfile); }
-    var adm = g['__thornswoodIsAdmin'];
-    var isAdmin = false;
-    try { if (typeof adm === 'function' && adm(profileId)) { isAdmin = true; } } catch (e) { }
-    var fn = g['__thornswoodIsJarl'];
-    var eligible = isAdmin;
-    try { if (typeof fn === 'function' && fn(profileId)) { eligible = true; } } catch (e2) { }
-    if (!eligible) {
-      toProfile(profileId, 'Only someone with the Jarl role (or an admin) can take the office.');
-      return true;
-    }
-    var c = g['__thornswoodCharacter'];
-    if (!c || typeof c.stateOf !== 'function' || typeof c.writeState !== 'function') {
-      toProfile(profileId, 'The character block is not loaded.');
-      return true;
-    }
-    var s = c.stateOf(actorId);
-    if (!s) {
-      toProfile(profileId, 'Your character is not ready yet.');
-      return true;
-    }
-    /*
-      THE OFFICE IS OF ONE HOLD (#502). Patrick, 12 October: taking the Jarl
-      office asks for a hold. The page sends it with the hold pressed; a
-      Jarl seated before there was a hold sends it once to choose theirs.
-      Chosen once: a Jarl does not move to another hold by a button.
-    */
-    var had = officeHoldOf(s, actorId) || seatHeldBy(actorId);
-    if (had) {
-      toProfile(profileId, 'This character already holds the Jarl office of ' + HOLD_TOWN[had] + '.');
-      return true;
-    }
-    var want = arg0.toLowerCase();
-    if (!want) {
-      toProfile(profileId, 'The Jarl office is of one hold. Press the hold on the Office page of K.');
-      return true;
-    }
-    if (!Object.prototype.hasOwnProperty.call(HOLD_TOWN, want)) {
-      toProfile(profileId, 'There is no hold called ' + want.slice(0, 30) + '.');
-      return true;
-    }
-    // One Jarl a hold (#502): a seat somebody else holds is theirs until
-    // they give the office up.
-    var seat = seatOf(want);
-    if (seat) {
-      toProfile(profileId, seat.name + ' holds the Jarl\'s seat of ' + HOLD_TOWN[want] + '. A hold has one ' +
-                           'Jarl, and the seat comes free when they give up the office.');
-      return true;
-    }
-    var was = s.office === 'jarl';
-    law.jarls[want] = { pid: Number(profileId) || 0, actor: Number(actorId) || 0,
-                        name: personName(actorId), at: Date.now() };
+  /* This character holds this office for its account, and no other character of the account does. */
+  function holdHere(office, hold, pid, name) {
+    var key = office + ':' + hold;
+    var acct = officeAccountOf(pid);
+    var had = officeHeldBy(office, hold, acct);
+    if (!law.held[key]) { law.held[key] = {}; }
+    law.held[key][acct] = { pid: Number(pid) || 0, name: String(name || 'somebody').slice(0, 60), at: Date.now() };
     saveLaw();
-    s.office = 'jarl';
-    s.officeHold = want;
-    c.writeState(actorId, s, true);
-    plog('law:', was ? 'gave the jarl office on actor' : 'seated jarl office on actor', actorId, 'profile', profileId,
-         '(' + law.jarls[want].name + ') the seat of', want);
-    toProfile(profileId, 'This character holds the Jarl office of ' + HOLD_TOWN[want] + ' now. ' +
-                         'You name its guards on the Office page.');
+    return had;
+  }
+
+  /* /office hold <office> <hold>: this character holds an office its account's role gives. */
+  function officeHoldHere(parts, actorId, profileId, toProfile) {
+    var office = String((parts && parts[2]) || '').toLowerCase();
+    var hold = String((parts && parts[3]) || '').toLowerCase();
+    if (OFFICE_KINDS.indexOf(office) === -1 || !Object.prototype.hasOwnProperty.call(HOLD_TOWN, hold)) {
+      toProfile(profileId, 'Choose the office on the Office page of K.');
+      return true;
+    }
+    var role = officeRole(office, hold);
+    if (rolesOfProfile(profileId)[office].indexOf(hold) === -1) {
+      toProfile(profileId, office === 'jarl' && jarlClashOf(profileId).indexOf(hold) !== -1
+        ? 'Two Discord accounts hold the ' + role + ' role, so neither acts as Jarl until staff fix it. Staff have been told.'
+        : 'Your account does not hold the ' + role + ' role in Discord.');
+      return true;
+    }
+    if (holdsOffice(profileId, office, hold)) {
+      toProfile(profileId, 'This character holds ' + role + ' already.');
+      return true;
+    }
+    var name = personName(actorId);
+    var had = holdHere(office, hold, profileId, name);
+    pushAll();
+    officeRedraw(actorId, had ? had.pid : 0);
+    plog('law:', name, '(profile ' + profileId + ') holds', role, 'for their account' +
+         (had ? ', in place of ' + had.name + ' (profile ' + had.pid + ')' : ''));
+    toProfile(profileId, 'This character holds ' + role + ' now' + (had ? ', in place of ' + had.name : '') + '. ' +
+              officeDoes(office, hold));
     return true;
   }
 
-  /*
-    GIVE UP THE OFFICE (#502). Patrick, 12 October evening: the Office page
-    gains a Give up the office button. The seat comes free for the next
-    Jarl-role character, the character holds no office, and the hold's jail,
-    which only its Jarl holds, goes back to nobody with its claim. The guards
-    the office named stay guards: they are the hold's, and the next Jarl
-    keeps or removes them.
-  */
-  function giveUpJarl(actorId, profileId, toProfile) {
-    var c = g['__thornswoodCharacter'];
-    var s = (c && typeof c.stateOf === 'function') ? c.stateOf(actorId) : null;
-    var hold = seatHeldBy(actorId);
-    if (!hold && !(s && s.office === 'jarl')) {
-      toProfile(profileId, 'This character holds no Jarl office.');
+  function officeCmd(parts, actorId, profileId, toProfile) {
+    var office = String((parts && parts[1]) || '').toLowerCase();
+    if (office === 'hold') { return officeHoldHere(parts, actorId, profileId, toProfile); }
+    var hold = String((parts && parts[2]) || '').toLowerCase();
+    var arg = String((parts && parts[3]) || '').trim();
+    if (!Object.prototype.hasOwnProperty.call(OFFICE_GIVEN, office) ||
+        !Object.prototype.hasOwnProperty.call(HOLD_TOWN, hold)) {
+      toProfile(profileId, 'A Jarl gives the Court, a Steward and Guards of their own hold, on the Office page of K.');
       return true;
     }
-    if (hold) {
-      delete law.jarls[hold];
-      saveLaw();
-    }
-    if (s && s.office === 'jarl' && c && typeof c.writeState === 'function') {
-      s.office = null;
-      s.officeHold = null;
-      c.writeState(actorId, s, true);
-    }
-    var ended = [];
-    for (var b in claims) {
-      if (!Object.prototype.hasOwnProperty.call(claims, b)) { continue; }
-      if (hold && jailOfBuilding(b) === hold && claims[b].by === Number(profileId)) {
-        ended.push(nameOf(b));
-        delete claims[b];
-      }
-    }
-    if (ended.length) { save(); pushAll(); }
-    plog('law: actor', actorId, 'profile', profileId, 'gave up the jarl office',
-         hold ? 'and the seat of ' + hold : '(no seat)', ended.length ? 'and the claim on ' + ended.join(', ') : '');
-    toProfile(profileId, 'You give up the Jarl office' + (hold ? ' of ' + HOLD_TOWN[hold] : '') + '.' +
-              (ended.length ? ' ' + ended.join(', ') + ' is the next Jarl\'s to claim.' : ''));
-    return true;
-  }
-
-  /*
-    A Jarl names a guard of their own hold, or takes the office back (#502).
-
-        /guard                 who guards your hold
-        /guard 1893288986      name one
-        /guard -1893288986     take it back
-
-    Sent by the Office page of the K panel, never typed: Name guard beside a
-    person in the world, Remove beside a guard. Patrick, 12 October: guards
-    are named by the Jarl of that hold. So the hold is the Jarl's own
-    (jarlHoldOf), never one the line names, and a Jarl removes only their
-    own hold's guards. Somebody who guards another hold is that hold's: its
-    Jarl removes them first. Kept by profile in the law register, the way a
-    steward is, and the cells each guard's game has open follow at once.
-  */
-  function guardCmd(parts, actorId, profileId, toProfile) {
-    var hold = jarlHoldOf(profileId, actorId);
-    var arg = (parts && parts.length > 1) ? String(parts[1]).trim() : '';
-    if (!arg) {
-      var mine = [];
-      for (var k in law.guards) {
-        if (Object.prototype.hasOwnProperty.call(law.guards, k) && hold && law.guards[k] === hold) { mine.push(k); }
-      }
-      toProfile(profileId, hold
-        ? (mine.length ? 'Guards of ' + HOLD_TOWN[hold] + ': ' + mine.join(', ') + '.'
-                       : 'No guards of ' + HOLD_TOWN[hold] + '. Name one on the Office page of K.')
-        : 'The Jarl of a hold names its guards on the Office page of K.');
+    var town = HOLD_TOWN[hold];
+    if (!isJarlOf(profileId, hold)) {
+      toProfile(profileId, jarlClashOf(profileId).indexOf(hold) !== -1
+        ? 'Two Discord accounts hold the Jarl of ' + town + ' role, so neither acts as Jarl until staff fix it. ' +
+          'Staff have been told.'
+        : 'Only the Jarl of ' + town + ' gives its offices.');
       return true;
     }
-    if (!isJarl(profileId, actorId)) {
-      toProfile(profileId, 'Only the Jarl of a hold names its guards.');
+    var take = arg.charAt(0) === '-';
+    var pid = Number(take ? arg.slice(1) : arg) || 0;
+    if (!(pid > 0) || Math.floor(pid) !== pid) {
+      toProfile(profileId, 'Pick somebody on the Office page of K.');
       return true;
     }
-    if (!hold) {
-      toProfile(profileId, 'Your Jarl office has no hold yet. Choose it on the Office page of K, ' +
-                           'then name its guards.');
-      return true;
-    }
-    var drop = arg.charAt(0) === '-';
-    var pid = Number(drop ? arg.slice(1) : arg) || 0;
-    if (!pid) {
-      toProfile(profileId, 'That is not a profile id.');
-      return true;
-    }
+    var role = officeRole(office, hold);
     var them = onlineActorOf(pid);
     var who = them ? personName(them) : 'Profile ' + pid;
-    var theirs = guardHoldOf(pid);
-    if (drop) {
-      if (theirs !== hold) {
-        toProfile(profileId, who + ' is not a guard of ' + HOLD_TOWN[hold] + '.');
+    var jarlName = personName(actorId);
+    var told = function () {
+      pushAll();
+      officeRedraw(actorId, pid);
+      if (onlineActorOf(pid)) {
+        toProfile(pid, take ? 'The Jarl of ' + town + ' takes the ' + role + ' office back from you.'
+                            : 'The Jarl of ' + town + ' names this character ' + role + '. ' + officeDoes(office, hold));
+      }
+    };
+    // The account already holds the role: the office moves to this character, and Discord has nothing to change.
+    if (!take && rolesOfProfile(pid, true)[office].indexOf(hold) !== -1) {
+      if (holdsOffice(pid, office, hold) || (officeHeldBy(office, hold, officeAccountOf(pid)) || {}).pid === pid) {
+        toProfile(profileId, who + ' holds ' + role + ' already.');
         return true;
       }
-      delete law.guards[pid];
-      saveLaw();
-      pushAll();
-      plog('law: the Jarl of', hold, '(profile ' + profileId + ') took the guard\'s office back from', pid);
-      toProfile(profileId, who + ' is no longer a guard of ' + HOLD_TOWN[hold] + '.');
-      if (them) { toProfile(pid, 'You are no longer a guard of ' + HOLD_TOWN[hold] + '.'); }
-      officeRedraw(actorId, pid);
+      var had = holdHere(office, hold, pid, who);
+      plog('law: the Jarl of', hold, '(' + jarlName + ', profile ' + profileId + ') names', who, '(profile ' + pid + ')',
+           role + ', a role their account holds' + (had ? ', in place of ' + had.name + ' (profile ' + had.pid + ')' : ''));
+      toProfile(profileId, who + ' holds ' + role + ' now' + (had ? ', in place of ' + had.name : '') + '.');
+      if (had && had.pid !== pid) { officeRedraw(actorId, had.pid); }
+      told();
       return true;
     }
-    if (theirs === hold) {
-      toProfile(profileId, who + ' is already a guard of ' + HOLD_TOWN[hold] + '.');
+    var ask = g['__thornswoodAskSite'];
+    if (typeof ask !== 'function') {
+      toProfile(profileId, 'This server cannot ask the site, so no office changes here.');
       return true;
     }
-    if (theirs) {
-      toProfile(profileId, who + ' is a guard of ' + HOLD_TOWN[theirs] + '. A guard keeps one hold, ' +
-                           'and the Jarl of ' + HOLD_TOWN[theirs] + ' takes that office back first.');
-      return true;
-    }
-    law.guards[pid] = hold;
-    saveLaw();
-    pushAll();
-    plog('law: the Jarl of', hold, '(profile ' + profileId + ') named', pid, 'a guard of', hold);
-    toProfile(profileId, who + ' is a guard of ' + HOLD_TOWN[hold] + ' now.');
-    if (them) {
-      toProfile(pid, 'The Jarl of ' + HOLD_TOWN[hold] + ' names you a guard of the hold. The cells of ' +
-                     JAIL_NAME[hold] + ' are yours to lock, and you take down posts on ' + HOLD_TOWN[hold] +
-                     '\'s notice board.');
-    }
-    officeRedraw(actorId, pid);
-    return true;
-  }
-
-  function stewardCmd(parts, actorId, profileId, toProfile) {
-    var who = [];
-    for (var i = 0; i < stewards.length; i++) { who.push(String(stewards[i])); }
-
-    var arg = (parts && parts.length > 1) ? String(parts[1]).trim() : '';
-    if (!arg) {
-      toProfile(profileId, who.length
-        ? 'Stewards: ' + who.join(', ') + '.'
-        : 'No stewards. A Jarl names one on the Office page of K.');
-      return true;
-    }
-
-    if (!isJarl(profileId, actorId)) {
-      toProfile(profileId, 'Only a jarl names a steward.');
-      return true;
-    }
-
-    var drop = arg.charAt(0) === '-';
-    var pid = Number(drop ? arg.slice(1) : arg) || 0;
-    if (!pid) {
-      toProfile(profileId, 'That is not a profile id.');
-      return true;
-    }
-
-    var at = stewards.indexOf(pid);
-    // The person picked on the page, by name when they are in the world.
-    var them = onlineActorOf(pid);
-    var who = them ? personName(them) : 'Profile ' + pid;
-    if (drop) {
-      if (at === -1) { toProfile(profileId, who + ' is not a steward.'); return true; }
-      stewards.splice(at, 1);
-      save();
-      plog('a jarl took the stewardship back from', pid);
-      toProfile(profileId, who + ' is no longer a steward.');
-      officeRedraw(actorId, pid);
-      return true;
-    }
-
-    if (at !== -1) { toProfile(profileId, who + ' is already a steward.'); return true; }
-    stewards.push(pid);
-    save();
-    plog('a jarl named', pid, 'steward');
-    toProfile(profileId, who + ' is a steward now.');
-    officeRedraw(actorId, pid);
+    plog('law: the Jarl of', hold, '(' + jarlName + ', profile ' + profileId + ') asks the site to',
+         take ? 'take ' + role + ' from' : 'give ' + role + ' to', who, '(profile ' + pid + ')');
+    ask('/api/office', { by: Number(profileId) || 0, byName: jarlName, who: pid, whoName: who,
+                         office: office, hold: hold, give: !take }, function (why, doc) {
+      var said = (doc && typeof doc.said === 'string') ? doc.said : '';
+      if (why || !doc || doc.ok !== true) {
+        plog('law: the site did not change', role, 'for profile', pid + ':', why || said || 'no answer');
+        toProfile(profileId, said || ('The office did not change: ' + (why || 'the site did not say why') + '.'));
+        return;
+      }
+      // Who holds it in the game: the character named; and nobody of that account once it is taken back.
+      if (take) {
+        var row = law.held[office + ':' + hold];
+        if (row && row[officeAccountOf(pid)]) { delete row[officeAccountOf(pid)]; saveLaw(); }
+      } else {
+        holdHere(office, hold, pid, who);
+      }
+      plog('law: the Jarl of', hold, '(profile ' + profileId + ')', take ? 'took ' + role + ' from' : 'gave ' + role + ' to',
+           who, '(profile ' + pid + '); the role is set in Discord');
+      toProfile(profileId, said);
+      var readNow = g['__thornswoodDoorReadNow'];
+      var after = function (read) {
+        if (!read) {
+          toProfile(profileId, 'The game reads the new role at its next look at the site, within five minutes.');
+        }
+        told();
+      };
+      if (typeof readNow === 'function') { readNow(function (ok) { after(!!ok); }); } else { after(false); }
+    });
     return true;
   }
 
   /*
     The Office page again (#1638): the K panel of whoever pressed, and of the
-    person a steward was named or removed, when they are in the world, so the
-    page in front of each of them says what is true now.
+    person an office was given or taken from, when they are in the world, so
+    the page in front of each of them says what is true now.
   */
   function officeRedraw(actorId, pid) {
     redrawPanel(actorId);
@@ -42121,8 +42680,9 @@ log('gamemode loaded:',
   /*
     The city takes a house back.
 
-    THE ONLY THING A STEWARD CAN DO THAT NOBODY ELSE CAN, and it ends a CLAIM
-    and nothing else. It does not touch what is in the house, because the
+    THE ONLY THING A STEWARD CAN DO THAT NOBODY ELSE IN THE WORLD CAN (staff
+    can too, at any building, and every time is in the staff log: #2551,
+    settleAs), and it ends a CLAIM and nothing else. It does not touch what is in the house, because the
     alternative is a server that deletes people's possessions on somebody's
     say so, and the next holder inherits the containers as they stand. It does
     not take back a key either: nothing in the engine can change which key a
@@ -42131,14 +42691,20 @@ log('gamemode loaded:',
     is the squatter story Patrick asked for, and it falls out of the constraint
     rather than being written.
   */
-  function evict(actorId, profileId, toProfile) {
-    if (!isSteward(profileId, actorId)) {
+  function evict(actorId, profileId, toProfile, cmd) {
+    // A steward, or staff at any door (#2551, settleAs).
+    if (!isSteward(profileId) && !isStaffHere(profileId)) {
       toProfile(profileId, 'Only a steward ends a claim.');
       return true;
     }
     var building = here(actorId);
     if (!building) {
       toProfile(profileId, OFFICE_AT_DOOR);
+      return true;
+    }
+    var how = settleAs(profileId, building, cmd);
+    if (!how.as) {
+      toProfile(profileId, how.why);
       return true;
     }
     var held = holderOf(building);
@@ -42160,9 +42726,15 @@ log('gamemode loaded:',
     delete claims[building];
     save();
     pushAll();
-    plog('a steward ended', was + '\'s claim on', nameOf(building));
-    toProfile(profileId, 'You end ' + was + '\'s claim on ' + nameOf(building) +
-              '. What is inside is untouched, and any key they hold still works.');
+    if (how.as === 'staff') {
+      staffRecord('evict', actorId, profileId, building, held, settleWhere(building));
+      toProfile(profileId, 'As staff, you end ' + was + '\'s claim on ' + nameOf(building) +
+                '. What is inside is untouched, and any key they hold still works. It is in the staff log.');
+    } else {
+      plog('a steward ended', was + '\'s claim on', nameOf(building));
+      toProfile(profileId, 'You end ' + was + '\'s claim on ' + nameOf(building) +
+                '. What is inside is untouched, and any key they hold still works.');
+    }
     redrawPanel(actorId);
     return true;
   }
@@ -42172,15 +42744,21 @@ log('gamemode loaded:',
 
     Patrick, 4 Oct: no commands for things people do, and a Jarl and a
     steward are people in the world (offices.md: "A steward is not staff").
-    So the offices' powers are buttons on a page of the K panel, for the
-    character that may hold one: Take the office; name a steward by picking
-    a person in the world, and remove one; evict and set or clear the rent at
-    the door the steward just opened, with what is owed there; make the
-    container they just opened a hold's box; and move any of the ten boards
-    to where they stand. Each button sends the line the command was (/jarl,
-    /steward, /evict, /rent, /box, /board move), and every rule is checked
+    So the offices' powers are buttons on a page of the K panel, for anybody
+    who holds an office: name and remove a hold's Court, Steward and Guards
+    (the Jarl), evict and set or clear the rent at the door the steward just
+    opened, make the container they just opened a hold's box, and move their
+    hold's board to where they stand. Each button sends the server's own line
+    (/office, /evict, /rent, /box, /board move), and every rule is checked
     again when it arrives. This only says what is true, so the page can draw
     it.
+
+    THE OFFICES ARE THE DISCORD ROLES (#2551), read through officesOfProfile:
+    nobody takes an office or picks a hold here. The Jarl of a hold sees, for
+    each of its three offices, who holds it (by a character of theirs in the
+    world, or by profile when none is) with Remove, and the people in the
+    world who do not, with Name. Somebody whose Jarl role another account
+    holds too sees why they do not act as Jarl.
 
     "Just opened" is the same minute the lines have always used (here and
     boxAt): the door or container is read when the panel is written, and K
@@ -42189,29 +42767,63 @@ log('gamemode loaded:',
     THE STATE IS HANDED IN, NEVER READ. This is called from the character
     block's writeState, and that block's stateOf writes a character it has
     not seen through writeState, so reading it from here would ask for
-    itself. So the office is worked out from s, the way isJarl and isSteward
-    work it out, and the two are held together by tests/test-1638-office.js.
+    itself. Nothing on the page comes from the character since #2551, so s
+    is not read at all.
 
-    Null for anybody who holds no office and could not take one, and then the
-    page is not drawn at all.
+    STAFF SEE IT TOO (#2551, Patrick, 17 Oct): staff end claims and set rent
+    at any building, so for staff the page carries the door card at every
+    door, with door.staff true where they act as staff and not as a steward
+    of its hold. The box and the boards stay a steward's.
+
+    Null for anybody who holds no office and is not staff, and then the page
+    is not drawn.
   */
   var OFFICE_PEOPLE_MAX = 40;
 
-  function officeView(actorId, profileId, s) {
+  /*
+    Who holds one office of one hold, for the Jarl's page: one row an
+    account whose role gives it, by the character that holds it (#2551),
+    named when it is in the world and by the name it had when it took the
+    office when not; an account none of whose characters holds it yet is
+    shown by a character of it in the world, or its first profile, with
+    chosen false.
+  */
+  function officeHolders(office, hold, names) {
+    var fn = g['__thornswoodOfficeHolders'];
+    var rows = [];
+    try { rows = (typeof fn === 'function') ? (fn(office, hold) || []) : []; } catch (e) { rows = []; }
+    var out = [];
+    for (var i = 0; i < rows.length; i++) {
+      var ps = Array.isArray(rows[i] && rows[i].profiles) ? rows[i].profiles.map(Number) : [];
+      if (!ps.length) { continue; }
+      var rec = officeHeldBy(office, hold, String(rows[i].account));
+      if (rec && ps.indexOf(rec.pid) !== -1) {
+        out.push({ pid: rec.pid, name: Object.prototype.hasOwnProperty.call(names, rec.pid) ? names[rec.pid] : '',
+                   was: rec.name, chosen: true, profiles: ps });
+        continue;
+      }
+      var shown = ps[0], name = '';
+      for (var j = 0; j < ps.length; j++) {
+        if (Object.prototype.hasOwnProperty.call(names, ps[j])) { shown = ps[j]; name = names[ps[j]]; break; }
+      }
+      out.push({ pid: shown, name: name, was: '', chosen: false, profiles: ps });
+    }
+    return out;
+  }
+
+  function officeView(actorId, profileId) {
     var pid = Number(profileId) || 0;
     if (!pid || !actorId) { return null; }
-    var adm = g['__thornswoodIsAdmin'];
-    var fn = g['__thornswoodIsJarl'];
-    var admin = false, role = false;
-    try { admin = typeof adm === 'function' && !!adm(pid); } catch (e) { admin = false; }
-    try { role = typeof fn === 'function' && !!fn(pid); } catch (e2) { role = false; }
-    var holds = !!(s && s.office === 'jarl');
-    var jarl = admin || (role && holds);                     // isJarl
-    var steward = jarl || stewards.indexOf(pid) !== -1;      // isSteward
-    var hold = jarl ? officeHoldOf(s, actorId) : '';                  // jarlHoldOf
-    var guarding = guardHoldOf(pid);
-    // A Jarl whose role was taken still sees the page, to give the office up.
-    if (!admin && !role && !steward && !guarding && !holds) { return null; }
+    var o = officesOfProfile(pid);
+    var clash = jarlClashOf(pid);
+    var keeps = stewardHoldsOf(pid);
+    var toHold = officesToHold(pid);
+    // Staff, who hold no office, see the page for the door card (#2551, settleAs).
+    var staff = isStaffHere(pid);
+    if (!o.jarl.length && !o.court.length && !keeps.length && !o.guard.length && !clash.length && !toHold.length &&
+        !staff) {
+      return null;
+    }
 
     // Who is in the world, by profile, named the way a guest is named.
     var names = {};
@@ -42229,72 +42841,74 @@ log('gamemode loaded:',
       names[op] = nm;
       order.push(op);
     }
-
-    var view = { jarl: holds, may: (admin || role) && !holds, name: jarl, steward: steward,
-                 stewards: [], people: [], door: null, box: null, boards: [],
-                 // The guards (#502): the Jarl's hold, the ten to choose from
-                 // while the office has none, that hold's guards, the people
-                 // who could be named one, and the hold this person guards.
-                 hold: hold || null, giveUp: holds, holds: [], guards: [], guardPeople: [],
-                 guardOf: guarding ? { hold: guarding, where: HOLD_TOWN[guarding], jail: JAIL_NAME[guarding] } : null };
-    for (var k = 0; k < stewards.length; k++) {
-      view.stewards.push({ pid: stewards[k],
-                           name: Object.prototype.hasOwnProperty.call(names, stewards[k]) ? names[stewards[k]] : '' });
-    }
     var byName = function (a, b) {
       return a.name < b.name ? -1 : (a.name > b.name ? 1 : a.pid - b.pid);
     };
-    if (jarl) {
-      // Anybody in the world who is not a steward already, by name. The id
-      // goes with the name, because the id is what the button sends.
-      for (var j = 0; j < order.length; j++) {
-        if (order[j] === pid || stewards.indexOf(order[j]) !== -1) { continue; }
-        view.people.push({ pid: order[j], name: names[order[j]] });
+    var where = function (h) { return { hold: h, where: HOLD_TOWN[h] }; };
+
+    var view = { jarls: [], clash: clash.map(where), courtOf: o.court.map(where),
+                 stewardOf: o.steward.map(where),
+                 guardOf: o.guard.map(function (h) { return { hold: h, where: HOLD_TOWN[h], jail: JAIL_NAME[h] || null }; }),
+                 // The offices this character's account holds that another of
+                 // its characters, or none yet, holds (#2551): Hold it here.
+                 toHold: toHold.map(function (t) {
+                   return { office: t.office, hold: t.hold, where: HOLD_TOWN[t.hold], role: officeRole(t.office, t.hold),
+                            by: t.by ? t.by.name : null };
+                 }),
+                 steward: keeps.length > 0, staff: staff, door: null, box: null, boards: [] };
+    for (var j = 0; j < o.jarl.length; j++) {
+      var hold = o.jarl[j];
+      var row = { hold: hold, where: HOLD_TOWN[hold], offices: {} };
+      for (var office in OFFICE_GIVEN) {
+        if (!Object.prototype.hasOwnProperty.call(OFFICE_GIVEN, office)) { continue; }
+        var holders = officeHolders(office, hold, names);
+        var holding = {};
+        // The characters that hold it are not offered; any other character
+        // may be named, which for an account holding the role moves it there.
+        for (var hh = 0; hh < holders.length; hh++) {
+          if (holders[hh].chosen) { holding[holders[hh].pid] = true; }
+        }
+        var people = [];
+        for (var q = 0; q < order.length; q++) {
+          if (holding[order[q]]) { continue; }
+          people.push({ pid: order[q], name: names[order[q]] });
+        }
+        people.sort(byName);
+        row.offices[office] = {
+          role: officeRole(office, hold), label: OFFICE_GIVEN[office],
+          holders: holders.map(function (x) { return { pid: x.pid, name: x.name, was: x.was, chosen: x.chosen }; })
+                          .sort(byName),
+          people: people.slice(0, OFFICE_PEOPLE_MAX)
+        };
       }
-      view.people.sort(byName);
-      view.people = view.people.slice(0, OFFICE_PEOPLE_MAX);
+      view.jarls.push(row);
     }
-    if ((view.may || (holds && !hold))) {
-      for (var t in HOLD_TOWN) {
-        if (!Object.prototype.hasOwnProperty.call(HOLD_TOWN, t)) { continue; }
-        // A hold with a seated Jarl names them, and its button is not drawn (#502).
-        var tseat = seatOf(t);
-        view.holds.push({ hold: t, where: HOLD_TOWN[t], by: (tseat && tseat.actor !== actorId) ? tseat.name : null });
-      }
-    }
-    if (hold) {
-      view.where = HOLD_TOWN[hold];
-      for (var gk in law.guards) {
-        if (!Object.prototype.hasOwnProperty.call(law.guards, gk) || law.guards[gk] !== hold) { continue; }
-        var gp = Number(gk);
-        view.guards.push({ pid: gp, name: Object.prototype.hasOwnProperty.call(names, gp) ? names[gp] : '' });
-      }
-      view.guards.sort(byName);
-      // Anybody in the world who guards no hold, themselves included: a
-      // Jarl may stand a watch too.
-      for (var q = 0; q < order.length; q++) {
-        if (guardHoldOf(order[q])) { continue; }
-        view.guardPeople.push({ pid: order[q], name: names[order[q]] });
-      }
-      view.guardPeople.sort(byName);
-      view.guardPeople = view.guardPeople.slice(0, OFFICE_PEOPLE_MAX);
-    }
-    if (!steward) { return view; }
+    if (!view.steward && !staff) { return view; }
 
     var building = here(actorId);
     if (building) {
       var held = holderOf(building);
       if (held && held.rent) { rentDue(); }
+      // The building's hold (#2551): the page offers Evict and the rent to a
+      // steward of it, and to staff at any building, saying they act as
+      // staff there; it says whose it is to anybody else.
+      var bhold = holdOfBuilding(building);
+      var ours = !!bhold && keeps.indexOf(bhold) !== -1;
       view.door = { name: nameOf(building), by: held ? held.name : null,
+                    hold: bhold, where: bhold ? (HOLD_TOWN[bhold] || bhold) : null,
+                    ours: ours, staff: staff && !ours,
                     rent: (held && held.rent) ? { amount: Number(held.rent.amount) || 0,
                                                   every: Number(held.rent.everyDays) || 7,
                                                   owed: Number(held.rent.owed) || 0 } : null };
     }
+    // The box and the boards are a steward's own hold's; staff are no steward.
+    if (!view.steward) { return view; }
     var at = boxAt(actorId);
     if (at) { view.box = { hold: holdOfBox(at) || null }; }
+    // The boards of the holds this person keeps, and no other (#2551).
     for (var h = 0; h < LEDGER_HOLDS.length; h++) {
       var bh = LEDGER_HOLDS[h];
-      if (!Object.prototype.hasOwnProperty.call(boards, bh)) { continue; }
+      if (!Object.prototype.hasOwnProperty.call(boards, bh) || keeps.indexOf(bh) === -1) { continue; }
       view.boards.push({ hold: bh, where: (boards[bh] && boards[bh].where) || bh });
     }
     return view;
@@ -42305,13 +42919,18 @@ log('gamemode loaded:',
 
     Patrick, 12 October evening: jail claims made before the jail rule end
     once, and then the rule holds. Before #2497 anybody could claim a jail
-    building; since, only the seated Jarl of its hold may. So at the first
-    server start with this code, every claim on a jail building whose holder
-    is not that hold's seated Jarl ends, each logged by building, holder and
-    profile, and steps.jailRule records that it ran, in the same save. With
-    no such claim nothing ends and the mark is still written. It runs here,
-    after every part of the register is read, because save() writes all of
-    them, and it never runs again: a claim after this is made under the rule.
+    building; since, only the Jarl of its hold may, and since #2551 the Jarl
+    is whoever holds that hold's Jarl role. So at the first server start with
+    the rule, every claim on a jail building whose holder is not that hold's
+    Jarl ends, each logged by building, holder and profile, and
+    steps.jailRule records that it ran, in the same save. With no such claim
+    nothing ends and the mark is still written. It runs here, after every
+    part of the register is read, because save() writes all of them, and it
+    never runs again: a claim after this is made under the rule.
+
+    The holder is read on record (__thornswoodOfficesOnRecord): at server
+    start nobody has sent a pass, and this is about a claim the server
+    already holds, not a press arriving now.
   */
   function endPreRuleJailClaims() {
     if (steps.jailRule) { return 0; }
@@ -42320,10 +42939,10 @@ log('gamemode loaded:',
       if (!Object.prototype.hasOwnProperty.call(claims, b)) { continue; }
       var hold = jailOfBuilding(b);
       if (!hold) { continue; }
-      var seat = seatOf(hold);
-      if (seat && seat.pid === claims[b].by) { continue; }
+      // The character that holds the hold's Jarl office (#2551), read on record.
+      if (officesOfProfile(claims[b].by, true).jarl.indexOf(hold) !== -1) { continue; }
       plog('law: the jail rule ends', claims[b].name + '\'s claim (profile ' + claims[b].by + ') on',
-           nameOf(b) + ', made before only the seated Jarl of', hold, 'could hold it');
+           nameOf(b) + ', made before only the Jarl of', hold, 'could hold it');
       delete claims[b];
       ended++;
     }
@@ -42332,6 +42951,7 @@ log('gamemode loaded:',
     plog('law: the jail rule was applied to the claims made before it once:', ended, 'claim(s) ended');
     return ended;
   }
+  rolesRead();
   endPreRuleJailClaims();
 
   ready();
@@ -42355,15 +42975,16 @@ log('gamemode loaded:',
     coversGround: coversGround, groundHere: groundHere,
     DOOR_PROPERTY: DOOR_PROPERTY,
     claims: function () { return claims; },
-    isJarl: isJarl, isSteward: isSteward, officeView: officeView, jarlHoldOf: jarlHoldOf, HOLD_TOWN: HOLD_TOWN,
-    seatOf: function (h) { var s0 = seatOf(h); return s0 ? Object.assign({}, s0) : null; },
+    // The hold offices (#2551), every one a Discord role: officeOf is the one place.
+    officeOf: officeOf, officeView: officeView, officeCmd: officeCmd, HOLD_TOWN: HOLD_TOWN,
+    isJarl: isJarl, isJarlOf: isJarlOf, jarlHoldsOf: jarlHoldsOf, isCourtOf: isCourtOf,
+    rolesRead: rolesRead, held: function () { return JSON.parse(JSON.stringify(law.held)); },
+    isSteward: isSteward, isStewardOf: isStewardOf, stewardHoldsOf: stewardHoldsOf,
     endPreRuleJailClaims: endPreRuleJailClaims, steps: function () { return Object.assign({}, steps); },
-    officeOf: officeOf,
-    isGuard: isGuard, guardHoldOf: guardHoldOf, jailHoldOf: jailHoldOf, cellLocked: cellLocked,
+    isGuard: isGuard, guardHoldsOf: guardHoldsOf, jailHoldOf: jailHoldOf, cellLocked: cellLocked,
     mayPassCell: mayPassCell, lockCell: lockCell,
     jailOfBuilding: jailOfBuilding, mayHold: mayHold, jailKeyHold: jailKeyHold, lockedJailHere: lockedJailHere,
     JAIL_KEY: JAIL_KEY,
-    guards: function () { return Object.assign({}, law.guards); },
     touchedBox: touchedBox, putIn: putIn, holdOfBox: holdOfBox,
     dropboxCmd: dropboxCmd, boxView: boxView, boxFare: boxFare, boxOfficer: boxOfficer,
     dropbox: function () { return dropbox; },
@@ -42380,8 +43001,7 @@ log('gamemode loaded:',
     standBench: standBench, standBenches: standBenches,
     benchRefs: function () { return Object.assign({}, benchRefs); },
     WOODWORKING_BENCHES: WOODWORKING_BENCHES,
-    boardsView: boardsView, lettersCarried: lettersCarried,
-    stewards: function () { return stewards.slice(); }
+    boardsView: boardsView, lettersCarried: lettersCarried
   };
   plog('ready,', Object.keys(BUILDING_BY_DOOR).length, 'doors across',
        Object.keys(BUILDING_NAME).length, 'buildings,',
@@ -45661,8 +46281,6 @@ log('gamemode loaded:',
       profession: s.prof || null,
       'class': s.cls || null,
       half: s.half || null,
-      // Jarl or steward office on this character, not the account (#397).
-      office: s.office || null,
       schools: s.schools || [],
       ranks: s.ranks || {},
       tree: s.tree || {},
@@ -45913,13 +46531,14 @@ log('gamemode loaded:',
       var held = propertyView(actorId, pid);
       if (held) { view.property = held; }
       /*
-        The Office page (#1638), for a character that holds an office or may
-        take one, and left off for everybody else. The property block owns
-        the offices; it is handed s, because asking stateOf from inside
+        The Office page (#1638), for anybody who holds an office or is staff
+        (#2551), and left off for everybody else. The property block owns the offices, which
+        are Discord roles on the account since #2551, so it needs only the
+        actor and the profile; it never asks stateOf, which from inside
         writeState would ask for itself. See officeView.
       */
       var W = g.__thornswoodProperty;
-      var desk = (W && W.officeView) ? W.officeView(actorId, pid, s) : null;
+      var desk = (W && W.officeView) ? W.officeView(actorId, pid) : null;
       if (desk) { view.officePage = desk; }
     }
     var sig = drawn(view);
@@ -46694,7 +47313,7 @@ log('gamemode loaded:',
     Class and profession can be set there too, or later in the world, since
     only a second pick of either is refused. Nothing else moves anybody.
   */
-  function command(word, parts, actorId, profileId, toProfile) {
+  function command(word, parts, actorId, profileId, toProfile, cmd) {
     /*
       THE FARMING WORDS, handed straight on.
 
@@ -46706,7 +47325,7 @@ log('gamemode loaded:',
     if (word === '/plant' || word === '/claim' || word === '/plot' ||
         word === '/deed' || word === '/deeds' || word === '/lock' ||
         word === '/unlock' || word === '/mold' || word === '/moldhere' || word === '/key' ||
-        word === '/jarl' || word === '/steward' || word === '/guard' || word === '/evict' || word === '/box' || word === '/dropbox' ||
+        word === '/office' || word === '/evict' || word === '/box' || word === '/dropbox' ||
         word === '/rent' || word === '/sleephere' || word === '/notice' || word === '/job' ||
         word === '/board' || word === '/take' ||
         word === '/haul' ||
@@ -46732,7 +47351,7 @@ log('gamemode loaded:',
       var prop = g.__thornswoodProperty;
       if (prop && prop.command) {
         try {
-          if (prop.command(word, parts, actorId, profileId, toProfile)) { return true; }
+          if (prop.command(word, parts, actorId, profileId, toProfile, cmd)) { return true; }
         } catch (eProp) {
           clog('the property word', word, 'threw:', eProp);
           toProfile(profileId, 'That did not work. Say which door you were at in the dev channel.');
@@ -50397,7 +51016,7 @@ function thornswoodBooks(env) {
   var path = env.path;
   if (!fs) { fs = require('fs'); }
   if (!path) { path = require('path'); }
-  var dataDir = env.dataDir || 'data';
+  var privDir = env.privDir || 'private';
   var OFFER_MS = 45000;
   var MAX_MEMBERS = 40;
   var MAX_PRICES = 100;
@@ -50509,8 +51128,17 @@ function thornswoodBooks(env) {
     fs.renameSync(tmp, file);
   }
 
-  function booksFile() { return path.join(dataDir, 'books.json'); }
-  function leftFile() { return path.join(dataDir, 'last-left.json'); }
+  /*
+    Both in the private folder, never data (#2582, 16 Oct). The resources
+    port hands anything under data to anybody who asks, and both name
+    people: every member of a book by profile id, and the moment each
+    profile last left the world. Measured that morning: last-left.json
+    answered 200 on 3000 (3 profile ids) and on 7788 (43). #541 moved the
+    property register, the farm claims and the door list out of data for
+    the same reason on 25 Sep. tests\test-2582-nothing-personal-served.js.
+  */
+  function booksFile() { return path.join(privDir, 'books.json'); }
+  function leftFile() { return path.join(privDir, 'last-left.json'); }
 
   function loadStore() {
     var doc = null;
@@ -51430,11 +52058,28 @@ function thornswoodBooks(env) {
     var fs = require('fs');
     var path = require('path');
     var dataDir = 'data';
+    var privDir = 'private';
     try {
       var cfg = JSON.parse(fs.readFileSync('server-settings.json', 'utf8'));
       if (cfg && cfg.dataDir) { dataDir = String(cfg.dataDir); }
+      if (cfg && cfg.privDir) { privDir = String(cfg.privDir); }
     } catch (e) { }
-    var api = thornswoodBooks({ fs: fs, path: path, dataDir: dataDir });
+    /*
+      The copies the gamemode before #2582 wrote into data are served to
+      anybody until they are gone, so they are removed, not carried across:
+      the alpha keeps no data over a change (Patrick, 15 Oct). One that
+      cannot be removed stops the books here with the reason in the log,
+      the same as saved books that cannot be verified.
+    */
+    var served = ['books.json', 'last-left.json'];
+    for (var si = 0; si < served.length; si++) {
+      var old = path.join(dataDir, served[si]);
+      if (fs.existsSync(old)) {
+        fs.unlinkSync(old);
+        log('books: removed ' + old + ', which the resources port served to anybody');
+      }
+    }
+    var api = thornswoodBooks({ fs: fs, path: path, privDir: privDir });
     g.__thornswoodBooks = api;
     g.__thornswoodBooksTimer = setInterval(function () {
       try { api.noteTick(); } catch (e3) { }
@@ -51516,10 +52161,11 @@ const WORDS = ['/ooc', '/o',
                // K panel, never typed, and so deliberately NOT in
                // PLAYER_WORDS: Patrick, 4 October, no chat commands for
                // anything people do, and a Jarl and a steward are people.
-               '/jarl', '/steward', '/evict', '/box', '/rent',
-               // A Jarl names a guard of their hold (#502): Name guard and
-               // Remove on the Office page send it, never typed.
-               '/guard',
+               '/evict', '/box', '/rent',
+               // A Jarl gives or takes their hold's Court, Steward and Guard
+               // (#2551): Name and Remove on the Office page send it, never
+               // typed. It replaced /jarl, /steward and /guard.
+               '/office',
                // The hold's drop box on the board (#2298). E on the box sends
                // /dropbox open, and its panel's buttons send the rest; never
                // typed, so NOT in PLAYER_WORDS.
@@ -51556,6 +52202,9 @@ const WORDS = ['/ooc', '/o',
                // A wound, a disease or an agreed loss written onto somebody
                // by staff (#1383). See the injury and disease block.
                '/hurt',
+               // A creature a spawn command made, taken out for good by
+               // staff, kept or not (#2623). See the staff block.
+               '/despawn',
                /*
                  NOT A COMMAND ANYBODY TYPES. The client reports each fall of
                  the axe with it, because the server sees a press and Skyrim's
@@ -51635,7 +52284,7 @@ const WORDS = ['/ooc', '/o',
 */
 // Not /plot, /plant or /claim: a farm is worked and claimed at the plot, and
 // a building at its door, with the line under the crosshair (#1636, #1637).
-// Not /jarl, /steward, /evict, /box or /rent: the offices' powers are buttons
+// Not /office, /evict, /box or /rent: the offices' powers are buttons
 // on the Office page of K (#1638), and the board panel says what the box
 // holds. Not /rest: sitting or lying down is how you rest (#1603). Not /eat,
 // /drink or /bard (#1631): eating or drinking the item is the meal, and
@@ -52020,14 +52669,22 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
     }
   }
 
-  /** key -> the arrival point the launcher would have used. */
+  /** key -> where /tp sends staff: each town's start spot, and "<town> inn" for its inn (#2622). */
   function places() {
     var out = {};
     for (var d in PASSAGES) {
       var t = PASSAGES[d];
-      if (!t || !t.arrival) { continue; }
-      out[t.key] = { desc: t.arrival.desc, pos: t.arrival.pos, rot: t.arrival.rot,
-                     town: t.town };
+      if (!t) { continue; }
+      // /tp <town> goes where a new character arrives, and /tp <town> inn
+      // to the inn spot it used to be (#2622).
+      if (t.start) {
+        out[t.key] = { desc: t.start.desc, pos: t.start.pos, rot: t.start.rot,
+                       town: t.town };
+      }
+      if (t.arrival) {
+        out[t.key + ' inn'] = { desc: t.arrival.desc, pos: t.arrival.pos, rot: t.arrival.rot,
+                                town: t.town + '\'s inn' };
+      }
     }
     out.hall = { desc: HALL.desc, pos: HALL.pos, rot: HALL.rot, town: 'the creation hall' };
     return out;
@@ -52319,6 +52976,20 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
   };
 
   function findBeast(want) { return findIn(buildBeasts(), want, 'creatures'); }
+  /*
+    A creature's name from its base record, for /despawn's answer, or ''.
+    Read out of the /spawn index (buildBeasts), the one reader of
+    ADMIN_ACTORS (test-one-mint.js), so a record is turned into the name
+    /spawn knows it by and nothing else reads that table.
+  */
+  function beastName(desc) {
+    if (!desc) { return ''; }
+    var idx = buildBeasts();
+    for (var k in idx) {
+      if (Object.prototype.hasOwnProperty.call(idx, k) && idx[k].desc === desc) { return idx[k].name; }
+    }
+    return '';
+  }
 
   /*
     Any record by its form id, for the things with no name: "/spawn 23aba",
@@ -52661,7 +53332,7 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
     // words; it gets the same actor and profile id this function has.
     try {
       var charCmd = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodCharacter;
-      if (charCmd && charCmd.command(word, parts, actorId, profileId, toProfile)) { return; }
+      if (charCmd && charCmd.command(word, parts, actorId, profileId, toProfile, cmd)) { return; }
     } catch (eChar) { log('character command failed:', eChar); }
 
     /*
@@ -53305,7 +53976,8 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
       try {
         if (staffCmd.command(cmd, word, parts, profileId, actorId, isStaff,
                              { findThing: findThing, findBeast: findBeast,
-                               byFormId: byFormId, findPlace: findPlace })) { return; }
+                               byFormId: byFormId, findPlace: findPlace,
+                               beastName: beastName })) { return; }
       } catch (eStaff) { log('staff command failed:', eStaff); }
     }
 
@@ -53461,6 +54133,23 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
         when it parses as one AND there is something left in front of it.
       */
       var words = parts.slice(1);
+      /*
+        KEEP, AS THE LAST WORD, MAKES A SPAWN PERMANENT (#2623). Djinn, 17
+        October: a spawned creature is never permanent "unless we want to make
+        it permanent". So "/spawn wolf 3" is temporary and "/spawn wolf 3
+        keep" stays and comes back after it dies. Read before the count, so
+        the count is still the last word once keep is off.
+      */
+      var keep = false;
+      if (word === '/spawn' && words.length > 1 && String(words[words.length - 1]).toLowerCase() === 'keep') {
+        keep = true;
+        words = words.slice(0, words.length - 1);
+        if (!mayKeepSpawn(profileId)) {
+          toProfile(profileId, 'Only staff can keep a spawn. Leave keep off and it is temporary.');
+          log('command: /spawn keep refused profile', profileId);
+          return;
+        }
+      }
       var count = 1;
       if (words.length > 1) {
         var tail = Number(words[words.length - 1]);
@@ -53515,15 +54204,17 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
         toProfile(profileId, 'The server cannot tell where you are standing.');
         return;
       }
-      var put = placeActors(baseId, { desc: inCell, pos: at, rot: facing || [0, 0, 0] }, count, 150, true);
+      var put = placeActors(baseId, { desc: inCell, pos: at, rot: facing || [0, 0, 0] }, count, 150, true, keep);
       var made = put.made;
       if (!made) {
         log('/spawn failed on', hit.name + ':', put.why);
         toProfile(profileId, 'Nothing was spawned: ' + (put.why || 'the server would not place it') + '.');
         return;
       }
-      toProfile(profileId, 'Spawned ' + made + ' ' + hit.name + (made < count ? ' of the ' + count + ' asked for: ' + put.why : '') + '.');
-      log('command: /spawn', actorId.toString(16), '->', made, hit.name, hit.desc);
+      toProfile(profileId, 'Spawned ' + made + ' ' + hit.name + (made < count ? ' of the ' + count + ' asked for: ' + put.why : '') + '.' +
+        (keep ? ' Kept: it stays, and comes back after it dies.'
+              : ' Temporary: when it dies its body lies the usual time, then it is gone, and a restart takes it too. Add keep to make one stay.'));
+      log('command: /spawn', actorId.toString(16), '->', made, hit.name, hit.desc, keep ? 'kept' : 'temporary');
       return;
     }
 
@@ -53930,6 +54621,24 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
   */
   function isStaff(profileId) {
     return isDev(profileId);
+  }
+  /*
+    The same question for the other blocks (#2551): staff end claims and set
+    rent at any building (Patrick, 17 Oct), and the property block asks it
+    here, so there is one staff test and not a second copy of it.
+  */
+  g.__thornswoodIsStaff = isStaff;
+
+  /*
+    WHO MAY ADD keep TO /spawn (#2623). Djinn, 17 October: "testers and
+    staff for right now. can change later. so make it able to change later
+    easily". This one word is the switch: 'playtester' lets testers and staff
+    keep a spawn, 'staff' lets only staff. Staff's own aimed spawns
+    (/spawnat, /spawn x on someone) are staff only already.
+  */
+  var SPAWN_KEEP_WHO = 'playtester';
+  function mayKeepSpawn(profileId) {
+    return SPAWN_KEEP_WHO === 'staff' ? isStaff(profileId) : isPlaytester(profileId);
   }
 
   function isPlaytester(profileId) {
@@ -64274,7 +64983,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   var WORDS_STAFF = ['/kick', '/freeze', '/unfreeze', '/bring', '/goto',
                      '/silence', '/unsilence', '/warn', '/spawnat',
                      '/ban', '/unban', '/note', '/banaccount', '/unbanaccount', '/pk', '/unpk',
-                     '/hurt'];
+                     '/hurt', '/despawn'];
+  var DESPAWN_REACH = 1500;         // units: about 21 m, the creature beside or near you
   var BAN_SWEEP_MS = 10000;        // how often online people are checked against bans
   var SITE_WAIT_MS = 8000;
   // Everybody's (or a playtester's) words that staff can also aim at a person.
@@ -64410,8 +65120,12 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     return '';
   }
 
-  /* One line in thornswood.log and one in moderation.log for the bot. */
-  function record(did, by, byName, who, whoName, why, minutes) {
+  /*
+    One line in thornswood.log and one in moderation.log for the bot. extra,
+    when given, is more of the same row: the property block's staff presses
+    name the building and its hold (#2551).
+  */
+  function record(did, by, byName, who, whoName, why, minutes, extra) {
     log('staff: ' + byName + ' (profile ' + by + ') ' + did + ' ' + whoName +
         ' (profile ' + who + ')' + (minutes ? ' for ' + minutes + ' minutes' : '') +
         (why ? ': ' + why : ''));
@@ -64420,6 +65134,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
                 by: by, byName: byName, who: who, whoName: whoName,
                 why: String(why || '').slice(0, 300) };
     if (minutes) { row.minutes = minutes; }
+    for (var k in (extra || {})) {
+      if (Object.prototype.hasOwnProperty.call(extra, k) && !Object.prototype.hasOwnProperty.call(row, k)) { row[k] = extra[k]; }
+    }
     try {
       fs.mkdirSync(path.dirname(recordFile()), { recursive: true });
       fs.appendFileSync(recordFile(), JSON.stringify(row) + '\n');
@@ -64500,6 +65217,13 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     return { words: words, count: 1 };
   }
   function lower(ws) { return ws.join(' ').trim().toLowerCase(); }
+  /* keep as the last word: the spawn stays for good (#2623). */
+  function keepOff(words) {
+    if (words.length && String(words[words.length - 1]).toLowerCase() === 'keep') {
+      return { words: words.slice(0, words.length - 1), keep: true };
+    }
+    return { words: words, keep: false };
+  }
 
   /*
     What an aimed line asks for, or null when it names no person, which leaves
@@ -64510,10 +65234,15 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     if (word === '/give' || word === '/spawnat') {
       var p = takePerson(words);
       if (!p.actorId || !p.rest.length) { return word === '/spawnat' ? { kind: 'spawn', them: p, want: '' } : null; }
-      var c = countOff(p.rest);
-      return { kind: word === '/give' ? 'give' : 'spawn', them: p, want: lower(c.words), count: c.count };
+      var k = word === '/spawnat' ? keepOff(p.rest) : { words: p.rest, keep: false };
+      var c = countOff(k.words);
+      return { kind: word === '/give' ? 'give' : 'spawn', them: p, want: lower(c.words), count: c.count, keep: k.keep };
     }
     if (word === '/spawn') {
+      // keep may close the line ("/spawn wolf 3 on Bob keep") or the part
+      // before on ("/spawn wolf 3 keep on Bob").
+      var kEnd = keepOff(words);
+      words = kEnd.words;
       var at = -1;
       for (var i = words.length - 2; i >= 1; i--) {
         if (String(words[i]).toLowerCase() === 'on') { at = i; break; }
@@ -64521,11 +65250,12 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       if (at < 0) { return null; }
       var who = takePerson(words.slice(at + 1));
       if (!who.actorId) { return null; }
-      var left = countOff(words.slice(0, at));
+      var kLeft = keepOff(words.slice(0, at));
+      var left = countOff(kLeft.words);
       var n = left.count;
       if (who.rest.length === 1 && /^\d+$/.test(who.rest[0])) { n = Number(who.rest[0]); }
       else if (who.rest.length) { return null; }
-      return { kind: 'spawn', them: who, want: lower(left.words), count: n };
+      return { kind: 'spawn', them: who, want: lower(left.words), count: n, keep: kEnd.keep || kLeft.keep };
     }
     if (word === '/tp') {
       var t = takePerson(words);
@@ -64538,9 +65268,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   /* Places a creature beside where, spread round them. The new reference from
      mp.place(base) and then a locationalData move, because createActor's first
      argument is the id the NEW actor gets, not the record to make it from. */
-  function spawnBeside(baseId, where, count) {
+  function spawnBeside(baseId, where, count, keep) {
     // The one placing /spawn uses too, so a fix to it reaches both (#959).
-    return placeActors(baseId, where, count, SPAWN_AWAY, true);
+    return placeActors(baseId, where, count, SPAWN_AWAY, true, keep);
   }
 
   function doAimed(a, pid, actorId, me, look) {
@@ -64574,13 +65304,15 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       if (!baseId) { tell(pid, beast.name + '\'s plugin is not in this load order.'); return true; }
       var spot = placeOf(them.actorId);
       if (!spot || !spot.desc) { tell(pid, 'The server cannot tell where ' + them.name + ' is right now. Try again.'); return true; }
-      var r = spawnBeside(baseId, spot, Math.min(a.count, SPAWN_MOST));
+      var r = spawnBeside(baseId, spot, Math.min(a.count, SPAWN_MOST), a.keep === true);
       if (!r.made) {
         tell(pid, 'Nothing was spawned beside ' + them.name + ': ' + (r.why || 'the server would not place it') + '.');
         log('staff: spawning ' + beast.name + ' beside ' + them.name + ' failed: ' + r.why);
         return true;
       }
-      tell(pid, 'Spawned ' + r.made + ' ' + beast.name + ' beside ' + them.name + '.');
+      tell(pid, 'Spawned ' + r.made + ' ' + beast.name + ' beside ' + them.name + '.' +
+        (a.keep ? ' Kept: it stays, and comes back after it dies.'
+                : ' Temporary: when it dies its body lies the usual time, then it is gone, and a restart takes it too. Add keep to make one stay.'));
       if (them.pid !== pid) { tell(them.pid, 'Staff put ' + r.made + ' ' + beast.name + ' beside you.'); }
       record('spawn', pid, me, them.pid, them.name, r.made + ' ' + beast.name, 0);
       return true;
@@ -65014,6 +65746,37 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     }
 
     var me = actorId ? nameOf(actorId) : ('profile ' + pid);
+    /*
+      /DESPAWN: TAKE A SPAWNED CREATURE OUT FOR GOOD (#2623). Djinn, 17 Oct:
+      a creature made with keep stays and comes back, and staff need a way
+      to end that once it is no longer wanted. Takes no person: it is the
+      spawned creature nearest you, within DESPAWN_REACH and in your own cell
+      or worldspace, alive or dead, kept or not. Only something a spawn
+      command made (the NPC population's commanded rule), never a creature
+      or a person the world put there. removeSpawned does the removal, the
+      same one a temporary spawn gets, so it does not come back at a restart.
+    */
+    if (word === '/despawn') {
+      var here = actorId ? placeOf(actorId) : null;
+      if (!here || !here.desc) { tell(pid, 'The server cannot tell where you are right now. Try again.'); return true; }
+      var pop = g.__thornswoodNpcPopulation;
+      var made = (pop && pop.spawned) ? pop.spawned() : [];
+      var best = null, bestD = DESPAWN_REACH * DESPAWN_REACH;
+      for (var di = 0; di < made.length; di++) {
+        var at = placeOf(made[di].id);
+        if (!at || at.desc !== here.desc) { continue; }
+        var dx = at.pos[0] - here.pos[0], dy = at.pos[1] - here.pos[1], dz = at.pos[2] - here.pos[2];
+        var d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 <= bestD) { best = made[di]; bestD = d2; }
+      }
+      if (!best) { tell(pid, 'No spawned creature within about 20 metres of you. Stand next to it and try again.'); return true; }
+      var what = 'creature';
+      try { what = (look && look.beastName && look.beastName(String(mp.get(best.id, 'baseDesc') || ''))) || what; } catch (eName) { }
+      if (!removeSpawned(best.id)) { tell(pid, 'The ' + what + ' could not be removed. The server log says why.'); return true; }
+      tell(pid, 'Removed the ' + (best.keep ? 'kept ' : '') + what + ' nearest you, for good. It does not come back.');
+      record('despawn', pid, me, 0, '', (best.keep ? 'kept ' : '') + what + ' ' + best.id.toString(16), 0);
+      return true;
+    }
     if (!words.length) {
       tell(pid, word + ' who? ' + word + ' <name, or the start of it, or a profile number>.');
       return true;
@@ -65158,7 +65921,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   pushSilenced();
 
   g.__thornswoodStaff = {
-    command: command, find: find, takePerson: takePerson, unproven: unproven,
+    command: command, find: find, takePerson: takePerson, unproven: unproven, record: record,
     freezeTick: freezeTick, pushSilenced: pushSilenced, silencedFor: silencedFor,
     banSweep: banSweep, banLength: banLength, bansNow: bansNow, pkNow: pkNow,
     state: state, REFUSED: REFUSED, WORDS: WORDS_STAFF
@@ -65570,12 +66333,25 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
       const validHome=saved && Number.isInteger(saved.cell) && Array.isArray(saved.home) &&
         saved.home.length===3 && saved.home.every(Number.isFinite);
       const anchor=validHome ? saved.home : state.pos,cell=validHome ? saved.cell : state.cellOrWorld;
-      const commanded=call('get',id,'thornswoodNpcCommanded')===true;
+      // The spawn command's marker (#2623): {keep:true} for one staff kept,
+      // {run} for a temporary one, and plain true from before that split,
+      // which nobody chose to keep.
+      const marker=call('get',id,'thornswoodNpcCommanded');
+      const commanded=marker===true || (!!marker && typeof marker==='object' &&
+        (marker.keep===true || typeof marker.run==='string'));
+      const kept=commanded && marker!==true && marker.keep===true;
+      if(commanded && !kept && !(options && typeof options.run==='string' && marker.run===options.run)) {
+        // A temporary spawn from an earlier run of the server, standing
+        // because it never died. It is not admitted, and the gamemode takes
+        // it out of the world (removeSpawned) after this returns.
+        if(options && typeof options.discard==='function') options.discard(id);
+        return null;
+      }
       if(commanded && Number.isInteger(cell) && cell>0 && Array.isArray(anchor) &&
           anchor.length===3 && anchor.every(Number.isFinite)) {
         // Only trusted spawn commands set this private marker. They keep
         // authority and a saved home without joining a natural habitat cap.
-        rule={cell,commanded:true,row:[null,base,call('getDescFromId',cell),anchor,1024,45,null,null,0]};
+        rule={cell,commanded:true,keep:kept,row:[null,base,call('getDescFromId',cell),anchor,1024,45,null,null,0]};
       } else if(!commanded) rule=(byBase.get(base)||[]).filter(r=>r.cell===cell &&
         (!saved || !saved.source || saved.source===r.row[0]) &&
         Math.hypot(...r.row[3].map((v,j)=>v-anchor[j]))<=r.row[4])
@@ -65643,6 +66419,16 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
   }),returnMinutes:id=>{
     const entry=configured.get(id),rule=entry ? entry.rule : allowed.get(id);
     return rule && rule.row[5];
+  },isTemporary:id=>{
+    // A spawn staff did not keep (#2623): removed when it dies.
+    const entry=configured.get(id);
+    return !!(entry && entry.rule.commanded && !entry.rule.keep);
+  },spawned:()=>{
+    // Every creature a spawn command made that is still held here, kept or
+    // not, alive or dead: what staff's /despawn chooses from (#2623).
+    const out=[];
+    for(const [id,entry] of configured) if(entry && entry.rule && entry.rule.commanded) out.push({id,keep:entry.rule.keep===true});
+    return out;
   }};
 }
 // NPC POPULATION POLICY END
@@ -66737,7 +67523,26 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
   schedule(preload,0);schedule(prepareTick,10);schedule(meshTick,10);
   schedule(humanTick,0);schedule(backgroundTick,20);schedule(nearTick,100);schedule(searchTick,10);
   if(population) schedule(discover,5000);
-  return {stop,start,enroll,getHeldIds:()=>[...held.keys(),...searching.map(job=>job.id)],getActorStatus:id=>{const a=actors.get(id);return a && {
+  /*
+    LETS GO OF AN ACTOR THAT IS ABOUT TO BE DESTROYED (#2623). Nothing about
+    it may stay here: not its activity, its place in the walk order or on the
+    map tiles, its policy, or the excluded and enrolled marks, so the runtime
+    never steps or reports on an actor that is gone.
+  */
+  function forget(id) {
+    const a=actors.get(id);
+    if(a && a.tile && npcTiles.has(a.tile)) npcTiles.get(a.tile).delete(id);
+    actors.delete(id);policies.delete(id);owned.delete(id);unavailable.delete(id);
+    enrolled.delete(id);excluded.delete(id);held.delete(id);near.delete(id);
+    const without=list=>{for(let i=list.length-1;i>=0;i--) {
+      const entry=list[i],entryId=typeof entry==='number' ? entry : entry && entry.id;
+      if(entryId===id) list.splice(i,1);
+    }};
+    without(order);without(nearOrder);without(preparing);without(searching);
+    for(const bank of banks.values()) if(bank && Array.isArray(bank.waiting)) without(bank.waiting);
+    failed=unavailable.size;
+  }
+  return {stop,start,enroll,forget,getHeldIds:()=>[...held.keys(),...searching.map(job=>job.id)],getActorStatus:id=>{const a=actors.get(id);return a && {
     mode:a.mode,target:a.target,pos:a.pos.slice(),path:a.path.map(p=>p.slice()),
     triangle:a.node.index,mesh:a.node.mesh,lastUpdate:a.last,paused:!!a.paused};},
     getStatus:()=>({loaded,controlled:owned.size,active:actors.size,unavailable:failed,held:held.size+searching.length,
@@ -68478,7 +69283,11 @@ try {
       current();
     }
     ready();
-    population=createNpcPopulation(mp,NPC_POPULATION_DATA,plugins,merchants,{suspended:true});
+    population=createNpcPopulation(mp,NPC_POPULATION_DATA,plugins,merchants,{suspended:true,
+      // #2623: a temporary spawn left from an earlier run is taken out of
+      // the world on the next turn of the event loop, never inside the
+      // runtime's own preparation pass that asked about it.
+      run:serverRunId(),discard:id=>setTimeout(()=>removeSpawned(id),0)});
     current();
     runtime = startSharedNpcServerRuntime(
       mp, {setTimeout, clearTimeout}, Date.now, text=>log(text),population,{suspended:true});
