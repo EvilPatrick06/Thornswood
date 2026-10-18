@@ -266,7 +266,14 @@ In the server's folder, `C:\Thornswood-Server` live and
 | the folder itself | `thornswood.log`, rolled at 4 MB with five kept (`gamemode.js:LOG_MAX_BYTES`) | No |
 
 `scripts\ops\Wipe-Saves.ps1` starts the world over by moving `world`,
-`private\characters.json`, `private\property.json` and `private\farm-claims.json` (and the old copies in `data`, for a server still on the older gamemode).
+`private\characters.json`, `private\property.json`, `private\farm-claims.json`
+and, since 17 October (issue #2351), every other register naming a character:
+`law.json`, `beds.json`, `embassy.json`, `books.json`, `last-left.json`,
+`take-limit.json`, the dungeon chests' ledger with its `.initialized` mark,
+and a waiting `deleted-characters.json` (and the old copies in `data`, for a
+server still on the older gamemode). It leaves `mod-settings.json`, each
+person's menu choices, and `merchant-ledger.json`, which the merchant code
+needs to start.
 
 ## Generated tables
 
