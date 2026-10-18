@@ -477,8 +477,9 @@ no licence this file can name.
   More Craftable Equipment's executioner) ship as ours for now, until
   Thornswood builds them itself from the collection's BodySlide projects
   (#1259, #2454, `scripts\release\built-until-1259.txt`). The 18 Bosmer
-  armour morphs no longer ship; Build-Generated builds that armour from the
-  collection (#2454). What each mod's page permits for that built output is in
+  armour morphs leave in the next release, and nothing built from Immersive
+  Armors is handed on: it is used as-is through the collection (Patrick,
+  17 Oct, #2454). What each mod's page permits for that built output is in
   `records\asset-provenance.json`. Packs
   and records already on the site, and the installer there, still carry the
   rest until they are scrubbed.

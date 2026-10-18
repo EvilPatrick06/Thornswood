@@ -876,19 +876,6 @@
       "status": "cleared"
     },
     {
-      "path": "The 18 Bosmer armour meshes Build-Generated builds (Data\\meshes\\armor\\bosmerarmormaty743\\, $ShipGeneratedOutfitFiles)",
-      "what": "Immersive Armors' women's Bosmer armour fitted to the covered body by Build-Generated from the collection's 'Immersive Armours SSE CBBE.osp' sets (#2454 part one). Replaces the 18 .tri morphs built on another machine.",
-      "published": "Packs and the installer, once #2454 merges and a release is built with them",
-      "source": "Immersive Armours - SSE CBBE 3BA BodySlide (Nexus SE 22382, by Jeir) over Immersive Armors (Nexus SE 3479, by Hothtrooper44); the Bosmer Armor by Maty743",
-      "creator": "Maty743 (Bosmer Armor), Hothtrooper44 (Immersive Armors), Jeir (CBBE conversion); built by Build-Generated",
-      "licence": "22382: files BodySlide generates may be used in other mods only while those stay free to download on Nexus, with Hothtrooper44's permission and credit to Jeir and those Jeir credits. 3479: asset use needs Hothtrooper44's permission first; no use in anything sold or earning Donation Points. Thornswood's packs are not on Nexus and no such permission is recorded.",
-      "attribution": "Bosmer Armor by Maty743, Immersive Armors by Hothtrooper44 (Nexus SE 3479), CBBE conversion by Jeir (Nexus SE 22382). Not yet on any credits page.",
-      "approved": "Patrick, 15 Oct: build them from the deployed CBBE sets (#2454); permission not asked",
-      "evidence": "Nexus SE 22382 Author's instructions and 3479 distribution permission, read on Nexus 17 Oct 2026 (#2454).",
-      "status": "no-licence-found",
-      "issue": 2454
-    },
-    {
       "path": "Thornswood Content (Nexus mod 192001): SkyrimSoulsRE.ini, OpenAnimationReplacer.ini and four face files",
       "what": "Two other mods' settings files with Thornswood's values, and the face meshes and tints the Creation Kit made for two people Fishing In Skyrim adds.",
       "published": "Nexus Mods, to everybody who installs the collection",

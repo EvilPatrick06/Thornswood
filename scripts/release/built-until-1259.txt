@@ -8,8 +8,9 @@
 # Clothes' travel clothes from Common Clothes and Armors 3BA BodySlide (Nexus
 # 83980, 120 files) and More Craftable Equipment's executioner from its CBBE
 # BodySlide file (44666, 2 files). Immersive Armours' Bosmer armour (18 .tri
-# morphs) left this list in #2454: Build-Generated builds its .nif files from
-# the collection's 'Immersive Armours SSE CBBE.osp', and the morphs no longer ship. Built output is
+# morphs) left this list in #2454: Patrick, 17 Oct, Immersive Armors is used
+# as-is through the collection and nothing built from it is redistributed
+# (permission-held.txt), so its morphs leave installs too. Built output is
 # ours only when we build it from the collection, as Nemesis's is.
 #
 # Patrick, 29 September: Thornswood builds the outfits itself from the

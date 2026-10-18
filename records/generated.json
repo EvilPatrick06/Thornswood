@@ -5,17 +5,7 @@
   },
   "bodyslide": {
     "sets": ["CBBE 3BBB Amazing NeverNude", "HIMBO Body - Vanilla Nevernude", "CBBE Vanilla - Body - Astrid"],
-    "outfits": [
-      "IA CBBE - Bosmer",
-      "IA CBBE - Bosmer Engraved",
-      "IA CBBE - Bosmer Reinforced",
-      "IA CBBE - Bosmer Bracers",
-      "IA CBBE - Bosmer Engraved Bracers",
-      "IA CBBE - Bosmer Gauntlets",
-      "IA CBBE - Bosmer Full Cape",
-      "IA CBBE - Bosmer Shoulder Cape",
-      "IA CBBE - Bosmer Engraved Shoulder Cape"
-    ],
+    "outfits": [],
     "sliders": {}
   }
 }
