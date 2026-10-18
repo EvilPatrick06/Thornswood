@@ -59944,12 +59944,17 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   var BREWS_MOST = 16;
 
   /*
-    A COOKED MEAL'S HELP AGAINST DISEASE. food.md: one of a cooked meal's
-    helps is "the chance of catching a disease cut in half while it lasts",
-    for 20 real minutes, and a feast is "double the help and half the time,
-    so the disease chance is a quarter". chanceFor reads it. Which meal gives
-    this help rather than another is Patrick's to say (#2682, split from
-    #1383 on 17 October), so nothing in the meal work calls guarded() yet.
+    A COOKED MEAL'S HELP AGAINST DISEASE, the guard. food.md: "the chance of
+    catching a disease cut in half while it lasts", for 20 real minutes, and
+    a feast is "double the help and half the time, so the disease chance is a
+    quarter". chanceFor reads it. Patrick, 18 October (#2682): a cooked meal
+    gives only its temperature help unless the cook adds one extra ingredient
+    at the pot, so the guard comes ONLY from a dish seasoned at the cooking
+    pot with garlic. Which extra that is stays data (the one
+    FOOD_GROUPS.season.extras maps to 'guard'). This is the only guard; there
+    is no second one. The needs block's meal help (#2682) calls
+    guarded(actorId, false) for it, and unguarded() when a later meal's
+    warmth or stamina replaces it.
   */
   var MEAL_GUARD = { cooked: { mult: 0.5, min: 20 }, feast: { mult: 0.25, min: 10 } };
 
@@ -60866,6 +60871,21 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   }
 
   /*
+    THE GUARD TAKEN OFF (#2682). The latest meal's help is the one that
+    counts, so a later meal's warmth or stamina replaces the guard. The 20
+    minutes is rec.guard.until, which chanceFor compares against; there is no
+    timer to stop. True when a guard was on the record and is now gone; false
+    when there was none, and then nothing is written.
+  */
+  function unguarded(actorId) {
+    var rec = read(actorId);
+    if (!rec.guard) { return false; }
+    rec.guard = null;
+    write(actorId, rec);
+    return true;
+  }
+
+  /*
     THE TEMPLE RITE: a shrine pressed inside one of the temples the wake uses
     (the stuck block's TEMPLES, the same cells). injury.md and disease.md: a
     temple sets breaks, clears a crooked heal and clears ordinary disease, and
@@ -61544,7 +61564,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     HURT: HURT, DISEASE: DISEASE, EXPOSED: EXPOSED, HEALING: HEALING, TWO_HANDS: TWO_HANDS,
     CURE_DISEASE: CURE_DISEASE, CAUGHT_MIN: CAUGHT_MIN, BAD_AFTER_MIN: BAD_AFTER_MIN,
     CURE_DISEASE_EFFECT: CURE_DISEASE_EFFECT, MEAL_GUARD: MEAL_GUARD, BREWS_MOST: BREWS_MOST,
-    brewed: brewed, guarded: guarded, limbsOf: limbsOf,
+    brewed: brewed, guarded: guarded, unguarded: unguarded, limbsOf: limbsOf,
     CHILL_AFTER_MIN: CHILL_AFTER_MIN,
     read: read, write: write, step: step, tick: tick, bleedTick: bleedTick, bleedRate: bleedRate,
     stageOf: stageOf, lines: lines, chanceFor: chanceFor,

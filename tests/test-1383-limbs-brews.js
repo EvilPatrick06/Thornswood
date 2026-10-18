@@ -10,7 +10,7 @@
 //   - a brewed bottle of cure disease cures when drunk, by the runtime id the
 //     alchemy gate told the injury block about;
 //   - a cooked meal's help against disease halves the chance (a quarter for a
-//     feast) while it lasts.
+//     feast) while it lasts, and unguarded() takes it off (#2682).
 //
 // It drives the REAL injury and needs blocks out of gamemode.js and the REAL
 // broken limbs block out of thornswood-front.js, over fakes. Read only.
@@ -180,6 +180,38 @@ if (NEEDS_SRC && HURT_SRC && P) {
     yes('a feast makes it a quarter', Math.abs(r.H.chanceFor(me, 0.4) - 0.1) < 1e-9);
     r.minutes(10);
     yes('for 10 minutes', r.H.chanceFor(me, 0.4) === 0.4);
+  }
+
+  // ------------------------------------------ the guard taken off (#2682)
+  {
+    const r = rig();
+    const me = r.person(0x61);
+    yes('unguarded is exported beside guarded', typeof r.H.unguarded === 'function' && typeof r.H.guarded === 'function');
+    yes('with no guard on the record, unguarded answers false', r.H.unguarded(me) === false);
+    yes('and writes nothing', r.raw(me) === undefined);
+    r.H.guarded(me, false);
+    yes('guarded still answers true and halves the chance', !!r.rec(me).guard && Math.abs(r.H.chanceFor(me, 0.4) - 0.2) < 1e-9);
+    yes('unguarded takes the guard off and answers true', r.H.unguarded(me) === true);
+    yes('the guard is gone from the record', r.rec(me).guard === null && r.raw(me).guard === null);
+    yes('and the chance is whole again before the 20 minutes are up', r.H.chanceFor(me, 0.4) === 0.4);
+    yes('a second unguarded answers false', r.H.unguarded(me) === false);
+    r.H.guarded(me, false);
+    yes('guarding again after it was taken off works', Math.abs(r.H.chanceFor(me, 0.4) - 0.2) < 1e-9);
+    r.minutes(20);
+    yes('and still runs out after 20 minutes', r.H.chanceFor(me, 0.4) === 0.4);
+    r.H.guarded(me, true);
+    yes('a feast\'s guard comes off the same way', r.H.unguarded(me) === true && r.H.chanceFor(me, 0.4) === 0.4);
+
+    // Bad ids: guarded() checks nothing and reads through read(), so does
+    // unguarded(). A bad id reads as a fresh record with no guard.
+    const other = r.person(0x62);
+    r.H.guarded(other, false);
+    let threw = false, answers = [];
+    try { answers = [undefined, null, 0, NaN, 'x', {}].map(function (bad) { return r.H.unguarded(bad); }); }
+    catch (e) { threw = true; }
+    yes('a bad id does not throw and answers false', !threw && answers.length === 6 && answers.every(function (a) { return a === false; }));
+    yes('and takes nobody else\'s guard off', Math.abs(r.H.chanceFor(other, 0.4) - 0.2) < 1e-9);
+    yes('and writes no record for a bad id', [undefined, null, 0, 'x', {}].every(function (bad) { return r.raw(bad) === undefined; }));
   }
 }
 
