@@ -127,7 +127,7 @@ if ($Remove) {
 $artifact = $null
 if (-not $PutBack -and -not $Remove -and -not $Restart -and -not $TaskOnly) {
     $artifact = New-ThornswoodArtifact -Component voice -RepoDir (Join-Path $Here '..\..') -Paths 'voice/voice-server.js', 'voice/headlines.js' `
-        -AlsoSends 'scripts/vps/Roll-Log.ps1'
+        -AlsoSends 'scripts/vps/Server-Log.js'
     Say ('artifact ' + (Format-ThornswoodArtifact $artifact)) 'DarkGray'
 }
 
@@ -292,9 +292,9 @@ if (-not $PutBack -and -not $TaskOnly) {
     $send = [ordered]@{}
     $send['voice-server.js'] = Join-Path $src 'voice-server.js'
     $send['headlines.js'] = Join-Path $src 'headlines.js'
-    # The roller the task runs in front of the service. See Roll-Log.ps1 for
-    # why a log cmd holds open can only be rolled at start.
-    $send['roll-log.ps1'] = Join-Path $Here '..\vps\Roll-Log.ps1'
+    # The log writer the task runs the service under (#2166), the game
+    # server's since #2349. See Server-Log.js.
+    $send['server-log.js'] = Join-Path $Here '..\vps\Server-Log.js'
     # A stage a run that died part way left behind was never swapped in.
     $made = @(Remote @"
 New-Item -ItemType Directory -Force -Path '$Root' | Out-Null
@@ -374,27 +374,36 @@ if ('$Bind' -eq '127.0.0.1') {
 # and the health probe, and nothing else, so -Port 7789 opened 7789, checked
 # 7789 was free, and then started a service that bound 7778 on top of live.
 #
-# roll-log.ps1 runs in front of node, because cmd holds voice.log open for as
-# long as node runs and nothing can move it until then. & rather than &&, so
-# a roll that fails still starts voice. The relay line, when there is one,
-# sits with the other settings ahead of the roll, so it is set in this cmd
-# before node starts whatever the roll does.
+# VOICE RUNS UNDER server-log.js (#2166), which writes voice.log. Until 17
+# Oct 2026 it was cmd's >> voice.log 2>&1 with roll-log.ps1 in front, and cmd
+# holds that file open for as long as node runs, so voice.log was rolled only
+# at a start, by size, five kept, and nothing aged it: a voice service that
+# was not restarted kept one file growing, holding profile numbers and
+# character names, for as long as it ran. Decided by Patrick on 17 Oct
+# (#2166, G5): voice.log goes after 90 days. server-log.js holds the file
+# itself, so it rolls it at midnight and at 4 MB and cuts every rolled copy
+# to 90 days (--days 90), at a start, at each roll and once an hour, and the
+# copies roll-log.ps1 left (.1 to .5) the same way. Voice's own lines carry
+# no time, so --stamp puts one in front of each; that is what lets a line be
+# aged. The relay line, when there is one, sits with the other settings, so
+# it is set in this cmd before node starts.
 #
 # node goes through cmd's start /high, so it runs High (#2491, the task's
-# settings below say why): /b keeps it in this cmd's console, so the
-# environment and the redirection to voice.log hold, and /wait keeps the task
-# running until node ends. start leaves cmd's exit code 0 whatever node's
-# was, so call exit %^errorlevel% hands node's back as the task's last
-# result, as before (measured 12 Oct).
+# settings below say why), and server-log.js gives voice its own priority as
+# it starts it: /b keeps it in this cmd's console, so the environment holds,
+# and /wait keeps the task running until voice ends. server-log.js ends with
+# voice's exit code and start leaves cmd's exit code 0 whatever that was, so
+# call exit %^errorlevel% hands it back as the task's last result, as before
+# (measured 12 Oct). The log path is still on the line, which is how this
+# installer finds its own process.
 #
 # THORNSWOOD_VOICE_AUTH=on is not read by this voice-server.js, which refuses
 # every join that cannot prove itself (#1303). It stays on the line because
 # -PutBack puts the files the last install replaced back under this same
 # task, and a copy from before #1303 reads it and lets unproven joins in
 # without it.
-`$roll = Join-Path '$Root' 'roll-log.ps1'
-`$psExe = Join-Path `$env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-`$cmd = ('/c "set THORNSWOOD_SITE=$Site&& set THORNSWOOD_VOICE_PORT=$Port&& set THORNSWOOD_VOICE_BIND=$Bind&& set THORNSWOOD_VOICE_AUTH=on&& set THORNSWOOD_CHAT_RANGE=$ChatRange&& $mostSet$turnSet"{2}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{3}" -Path "{1}" & start "" /b /wait /high "{0}" voice-server.js >> "{1}" 2>&1 & call exit %^errorlevel%"' -f `$node.Source, `$log, `$psExe, `$roll)
+`$writer = Join-Path '$Root' 'server-log.js'
+`$cmd = ('/c "set THORNSWOOD_SITE=$Site&& set THORNSWOOD_VOICE_PORT=$Port&& set THORNSWOOD_VOICE_BIND=$Bind&& set THORNSWOOD_VOICE_AUTH=on&& set THORNSWOOD_CHAT_RANGE=$ChatRange&& $mostSet$turnSet start "" /b /wait /high "{0}" "{2}" --log "{1}" --days 90 --stamp voice-server.js & call exit %^errorlevel%"' -f `$node.Source, `$log, `$writer)
 
 # The task as it is now, for the way back: a new install that does not answer
 # gets its old files AND its old settings back.
@@ -556,8 +565,9 @@ function StartIt {
         }
     }
     # Rolled whatever its size rather than deleted, so the run before this
-    # install is voice.log.1 and the tails below read only this one.
-    try { & `$roll -Path `$log -Force } catch { 'could not roll voice.log: ' + `$_.Exception.Message }
+    # install is a voice.log.<digits> of its own and the tails below read only
+    # this one, and every rolled copy cut to 90 days (#2166).
+    try { & `$node.Source `$writer --log `$log --days 90 --roll } catch { 'could not roll voice.log: ' + `$_.Exception.Message }
     Start-ScheduledTask -TaskName '$TaskName'
 }
 

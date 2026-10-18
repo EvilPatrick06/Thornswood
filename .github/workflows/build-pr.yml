@@ -333,6 +333,11 @@ jobs:
           # Read-Availability.ps1, the reader of the watchdog's down and back
           # lines, to its counting on made-up lines, under pwsh and Windows
           # PowerShell 5.1, and to reading only. About ten seconds.
+          # tests\test-2166-kept-chat-and-logs.js holds the two Patrick
+          # decided: a kept session keeps a copy of its chat (on a scratch
+          # site and lifted), and site.log, voice.log, thornswood.log and
+          # bot.log keep nothing past 90 days, with the privacy line naming
+          # them. A second or two.
           $six ='test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
@@ -562,6 +567,7 @@ jobs:
                  'test-2349-server-log.js',
                  'test-2351-delete-person.ps1',
                  'test-2166-retention-fixes.js',
+                 'test-2166-kept-chat-and-logs.js',
                  'test-missing-files-stop.ps1',
                  'test-ship-launcher-drift.ps1',
                  'test-client-by-hash.ps1',

@@ -64,14 +64,14 @@ const m = /\$cmd = \('(\/c [^\r\n]*?)' -f ([^\r\n]+)\)/.exec(inst);
 yes('the installer builds the server task line', !!m);
 const line = m ? m[1] : '';
 yes('  it starts node through start /high on server-log.js, which runs the server',
-  /start "" \/b \/wait \/high "\{0\}" "\{1\}" --log "\{2\}" dist_back\/skymp5-server\.js/.test(line));
+  /start "" \/b \/wait \/high "\{0\}" "\{1\}" --log "\{2\}" --also thornswood\.log dist_back\/skymp5-server\.js/.test(line));
 yes('  and hands the exit code back as the task\'s', line.indexOf('& call exit %^errorlevel%"') >= 0);
 yes('  and no >> redirect holds server.log any more', line.indexOf('>>') < 0);
 yes('the installer copies the writer in, beside itself first, then scripts\\vps',
   inst.indexOf("Join-Path $here 'Server-Log.js'") >= 0 && inst.indexOf("Join-Path $here '..\\vps\\Server-Log.js'") > inst.indexOf("Join-Path $here 'Server-Log.js'") &&
   inst.indexOf("Join-Path $Root 'server-log.js'") >= 0);
 yes('  and rolls server.log with it at an install, never deleting it',
-  /& \$node\.Source \$writer --log \$log --roll/.test(inst) && !/Remove-Item -LiteralPath \$log\b/.test(inst));
+  /& \$node\.Source \$writer --log \$log --also \$gm --roll/.test(inst) && !/Remove-Item -LiteralPath \$log\b/.test(inst));
 yes('  and no longer runs Roll-Log.ps1 for the server', !/& \$roller\b/.test(inst) && inst.indexOf("Join-Path $here 'Roll-Log.ps1'") < 0);
 const pub = rd(path.join(REPO, 'scripts', 'release', 'Publish-Server.ps1')) || '';
 yes('Publish-Server sends the writer beside the installer', /scp (@ssh )?\$serverLog "\$\{target\}:C:\/Server-Log\.js"/.test(pub));

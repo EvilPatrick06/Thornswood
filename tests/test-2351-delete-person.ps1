@@ -143,7 +143,7 @@ function Build {
     Put (Join-Path $D 'linked.json') ('{"' + $ME + '":{"name":"Me","profiles":[' + $P1 + ',' + $P2 + ']},"' + $YOU + '":{"name":"You","profiles":[' + $PY + ',' + $P2 + ']},"' + $THEM + '":{"name":"Them","profiles":[' + $PT + ']}}')
     Put (Join-Path $D 'rules-accepted.json') ('{"' + $ME + '":{"yes":true},"' + $YOU + '":{"yes":true}}')
     Put (Join-Path $D 'signins.json') ('[{"id":"' + $ME + '","ip":"203.0.113.1"},{"id":"' + $YOU + '","ip":"203.0.113.2"},{"id":"' + $ME + '","ip":"203.0.113.3"}]')
-    Put (Join-Path $D 'sessions.json') ('[{"session":"s1","who":"' + $ME + '","profile":' + $P1 + '},{"session":"s2","who":"' + $ME + '","profile":' + $P1 + ',"keep":true},{"session":"s3","who":"' + $YOU + '","profile":' + $PY + '},{"session":"s4","who":"' + $THEM + '","profile":' + $PT + '}]')
+    Put (Join-Path $D 'sessions.json') ('[{"session":"s1","who":"' + $ME + '","profile":' + $P1 + '},{"session":"s2","who":"' + $ME + '","profile":' + $P1 + ',"start":100000,"end":200000,"keep":true},{"session":"s3","who":"' + $YOU + '","profile":' + $PY + '},{"session":"s4","who":"' + $THEM + '","profile":' + $PT + '}]')
     Put (Join-Path $D 'session-logs\s1.json') ('{"session":"s1","who":"' + $ME + '","logs":{"launcher.log":"x"}}')
     Put (Join-Path $D 'session-logs\s2.json') ('{"session":"s2","who":"' + $ME + '","logs":{"launcher.log":"kept"}}')
     Put (Join-Path $D 'session-logs\s3.json') ('{"session":"s3","who":"' + $YOU + '","logs":{"launcher.log":"y"}}')
@@ -195,9 +195,13 @@ function Build {
     $mine = '{"at":1,"kind":"say","profileId":' + $P1 + ',"name":"Mine","text":"hello"}'
     $yours = '{"at":2,"kind":"say","profileId":' + $PY + ',"name":"Yours","text":"hi"}'
     $shared = '{"at":3,"kind":"say","profileId":' + $P2 + ',"name":"Shared","text":"hey"}'
-    Put (Join-Path $Vl 'chat\2026-10-01.jsonl') ($mine + "`n" + $yours + "`n" + $mine + "`n" + $shared + "`n")
+    # Said inside the session staff kept (s2, live, 100000 to 200000), so it
+    # stays with it (#2166). The same moment on the dev service is not that
+    # session and goes.
+    $inKept = '{"at":150000,"kind":"say","profileId":' + $P1 + ',"name":"Mine","text":"kept"}'
+    Put (Join-Path $Vl 'chat\2026-10-01.jsonl') ($mine + "`n" + $yours + "`n" + $inKept + "`n" + $mine + "`n" + $shared + "`n")
     Put (Join-Path $Vl 'chat\2026-10-02.jsonl') ($yours + "`n")
-    Put (Join-Path $Vd 'chat\2026-10-01.jsonl') ($mine + "`n")
+    Put (Join-Path $Vd 'chat\2026-10-01.jsonl') ($mine + "`n" + $inKept + "`n")
     Put (Join-Path $Bot 'data\joins.json') ('{"900":{"last":40,"members":{"' + $ME + '":39,"' + $YOU + '":40}}}')
     Put (Join-Path $Bot 'data\open-tickets.json') ('{"900:' + $ME + '":123,"900:' + $YOU + '":456}')
 }
@@ -244,7 +248,9 @@ try {
     Yes '  and what stays: bans, notes, PK, reports, the kept session' (
         (Said 'kept\s+1\s+site: bans') -and (Said 'kept\s+2\s+site: staff notes') -and (Said 'kept\s+1\s+site: PK records') -and
         (Said 'kept\s+1\s+site: reports they made') -and (Said 'kept\s+1\s+site: reports about them') -and
-        (Said 'kept\s+1\s+site: session rows staff marked kept'))
+        (Said 'kept\s+1\s+site: session rows staff marked kept') -and
+        (Said 'kept\s+1\s+live voice: chat lines in sessions staff marked kept\s*$') -and
+        -not (Said 'dev voice: chat lines in sessions staff marked kept'))
     Yes '  and counts their approved gallery picture, and leaves the one a report is about' (
         (Said 'remove\s+1\s+site: approved gallery pictures') -and (Said 'kept\s+1\s+site: gallery pictures held while a report about them is looked into'))
     Yes '  and counts the game registers naming their character without changing them' (Said 'left\s+1\s+live game server: places in private\\property\.json naming their character')
@@ -320,11 +326,11 @@ try {
     Yes 'the live server''s folder an install set aside loses their change form too' (-not (Test-Path (Join-Path $Box 'Thornswood-Server.prev-20261001-000000\world\changeForms\ff000a07.json')))
 
     $day = Get (Join-Path $Vl 'chat\2026-10-01.jsonl')
-    Yes 'their chat lines are gone from the day, the other lines stay byte for byte' (
-        $day -eq ('{"at":2,"kind":"say","profileId":' + $PY + ',"name":"Yours","text":"hi"}' + "`n" + '{"at":3,"kind":"say","profileId":' + $P2 + ',"name":"Shared","text":"hey"}' + "`n"))
+    Yes 'their chat lines are gone from the day, the other lines and the one in the kept session stay byte for byte' (
+        $day -eq ('{"at":2,"kind":"say","profileId":' + $PY + ',"name":"Yours","text":"hi"}' + "`n" + '{"at":150000,"kind":"say","profileId":' + $P1 + ',"name":"Mine","text":"kept"}' + "`n" + '{"at":3,"kind":"say","profileId":' + $P2 + ',"name":"Shared","text":"hey"}' + "`n"))
     Yes '  a day with none of theirs is not touched' ($before['\Thornswood-Voice\chat\2026-10-02.jsonl'] -eq (Get-FileHash (Join-Path $Vl 'chat\2026-10-02.jsonl')).Hash)
     Yes '  and a dev day of only theirs is left empty, not deleted' ((Get (Join-Path $Vd 'chat\2026-10-01.jsonl')) -eq '')
-    Yes '  and the run says each edited day with its line count before and after' (Said 'chat\s+live 2026-10-01\.jsonl: 4 lines before, 2 after')
+    Yes '  and the run says each edited day with its line count before and after' (Said 'chat\s+live 2026-10-01\.jsonl: 5 lines before, 3 after')
     $jn = J (Join-Path $Bot 'data\joins.json')
     Yes 'their join number is gone and the last number given out stays' ($null -eq $jn.'900'.members.$ME -and $jn.'900'.members.$YOU -eq 40 -and $jn.'900'.last -eq 40)
     $ot = J (Join-Path $Bot 'data\open-tickets.json')
