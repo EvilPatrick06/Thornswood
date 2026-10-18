@@ -485,9 +485,20 @@ if ($Rehearse) {
   Head 'Making it a rehearsal'
   $others = @()
   foreach ($sr in $ServerRoots) {
+    # A server folder this account may not look into (the runner's account
+    # on the VPS cannot read the live one) still has its usual ports kept
+    # off by Get-ReservedPorts, and a running server's ports are refused as
+    # in use; what it cannot see is a port someone changed, so it says so.
     $sp = Join-Path $sr 'server-settings.json'
-    if (Test-Path -LiteralPath $sp) {
-      try { $others += ([IO.File]::ReadAllText($sp) -replace '^\uFEFF', '' | ConvertFrom-Json) } catch { }
+    $there = $false
+    try { $there = Test-Path -LiteralPath $sp -EA Stop } catch {
+      Say ("  {0} could not be read ({1}); only the usual live and dev ports are kept off for it" -f $sp, $_.Exception.Message) 'Yellow'
+      continue
+    }
+    if ($there) {
+      try { $others += ([IO.File]::ReadAllText($sp) -replace '^\uFEFF', '' | ConvertFrom-Json) } catch {
+        Say ("  {0} could not be read ({1}); only the usual live and dev ports are kept off for it" -f $sp, $_.Exception.Message) 'Yellow'
+      }
     }
   }
   $reserved = Get-ReservedPorts (@($backupSettings) + $others)

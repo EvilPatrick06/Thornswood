@@ -71,6 +71,10 @@ Yes 'and it refuses one before anything is put back' ($text.IndexOf('Get-Rehears
 Yes 'the rehearsal step runs after the character check and before RESTORE OK' (
     $text.IndexOf("Head 'Making it a rehearsal'") -gt $text.IndexOf("Head 'Are the characters there'") -and
     $text.IndexOf("Head 'Making it a rehearsal'") -lt $text.IndexOf('RESTORE OK: {0} character'))
+# CI's runner account on the VPS may not read C:\Thornswood-Server: that is said, not a stop.
+Yes 'a server folder this account may not read is said, and its usual ports are still kept off' (
+    $text -match 'try \{ \$there = Test-Path -LiteralPath \$sp -EA Stop \} catch \{' -and
+    $text -match 'could not be read \(\{1\}\); only the usual live and dev ports are kept off for it')
 
 # ---- 1. the pieces ---------------------------------------------------------
 $roots = @('C:\Thornswood-Server', 'C:\Thornswood-Server-Dev')
