@@ -86,6 +86,18 @@ attempt('the table', function () {
   yes('T4 every stage has an id, a name and words',
       (stagesFile.stages || []).every(function (s) { return s && typeof s.id === 'string' && s.id &&
         typeof s.name === 'string' && s.name && typeof s.text === 'string'; }));
+  // The patrol file's key rule (#1390): thalmor-patrols.json gives a cap per
+  // stage under stageMost and takes a key only when it is /^[a-z0-9-]{1,32}$/.
+  const RULE = /^[a-z0-9-]{1,32}$/;
+  const bad = (stagesFile.stages || []).filter(function (s) { return !RULE.test(s.id); }).map(function (s) { return s.id; });
+  yes('T11 every id in war-stages.json follows the patrol file\'s key rule' + (bad.length ? ' (' + bad.join(', ') + ')' : ''),
+      bad.length === 0);
+  yes('T12 the block holds ids to that rule, written the same way',
+      /var STAGE_ID = \/\^\[a-z0-9-\]\{1,32\}\$\/;/.test(worldBlock));
+  // Once the patrol block is in the same file, the two rules must still agree.
+  const patrolRule = /stageMost\)\.every\(k=>(\/[^\/]+\/)\.test\(k\)/.exec(gm);
+  yes('T13 and when the patrol block is beside it, its stageMost rule is this one' + (patrolRule ? '' : ' (not in this file yet)'),
+      !patrolRule || patrolRule[1] === '/^[a-z0-9-]{1,32}$/');
   yes('T5 the block comes after the season block',
       gm.indexOf('// ==== end thornswood season ====') >= 0 &&
       gm.indexOf('// ==== end thornswood season ====') < gm.indexOf('// ==== thornswood world stage ===='));
@@ -98,8 +110,10 @@ attempt('the table', function () {
   yes('T10 and no force: nothing in its code reads dominion, remnant, proxy or mixed',
       !/dominion|remnant|proxy|mixed/i.test(code));
   yes('T7 and nothing in it touches the NPC population or the patrol cap (#1390)',
+      // Its words may name thalmor-patrols.json, whose key rule the stage ids
+      // follow; its code may not touch the patrols.
       !/createNpcPopulation|placeActors|thornswoodNpcCommanded|NPC_POPULATION|patrol/i.test(
-        worldBlock.replace(/\/\*[\s\S]*?\*\//g, '')));
+        worldBlock.replace(/\/\*[\s\S]*?\*\//g, '').replace(/'(?:[^'\\\n]|\\.)*'/g, "''")));
 });
 
 /* A second stage, only here, so a move can be made and read back. */
@@ -231,6 +245,14 @@ attempt('the stage', function () {
   yes('S4 a move that does not say who made it is refused', r && r.ok === false && /who moved/.test(r.why) && warText() === null);
   r = call(s, 'setWorldStage', 'test-landing', 'x'.repeat(81));
   yes('S4 and so is a who past 80 characters', r && r.ok === false && warText() === null);
+  ['Test-Landing', 'test_landing', 'test landing', 'a'.repeat(33), ''].forEach(function (bad) {
+    const m = call(s, 'setWorldStage', bad, 'Gavin');
+    const p = call(s, 'proposeWorldStage', bad, 'Gavin');
+    yes('S4b an id that breaks the patrol file\'s key rule is refused by a move and a proposal: ' + JSON.stringify(bad),
+        m && m.ok === false && p && p.ok === false &&
+        /A stage id is lower case letters, digits and dashes, 1 to 32 of them/.test(m.why) && m.why === p.why &&
+        m.why.indexOf(JSON.stringify(bad)) >= 0 && warText() === null && call(s, 'pendingWorldStage') === null);
+  });
 
   const t1 = clock.t;
   r = call(s, 'setWorldStage', 'test-landing', 'Gavin  (a test)');
@@ -436,6 +458,28 @@ attempt('the proclamation', function () {
       s.said[s.said.length - 1][1] === 'A notice from The Crown is up on the board: Twice?');
   yes('P11 after all of it, still no fee and no ledger change',
       JSON.stringify(PEOPLE.map(gold)) === JSON.stringify(gold0) && JSON.stringify(s.W.funds()) === funds0);
+});
+
+/* A list with ids the patrol file could never key (#1390's rule). */
+attempt('the id rule', function () {
+  const LONGEST = { id: 'a'.repeat(32), name: 'The longest id', text: 'Thirty two characters.' };
+  const s = boot(withStages([stagesFile.stages[0], LONGEST,
+    { id: 'Upper', name: 'Upper', text: 'x' }, { id: 'b'.repeat(33), name: 'Too long', text: 'x' },
+    { id: 'has space', name: 'Spaced', text: 'x' }, { id: 7, name: 'A number', text: 'x' }]));
+  const left = s.logs.filter(function (l) { return /war-stages\.json has a stage left out of the list: A stage id is/.test(l); });
+  yes('I1 each stage whose id breaks the rule is left out, and the log says so once each (' + left.length + ')',
+      left.length === 4 && /"Upper"/.test(left[0]) && /"has space"/.test(left[2]) && /"7"/.test(left[3]));
+  const ids = call(s, 'stages').map(function (r) { return r.id; });
+  yes('I2 the list is what is left, in order', ids.join() === ['peace', LONGEST.id].join());
+  let r = call(s, 'setWorldStage', 'Upper', 'Gavin');
+  yes('I3 a move to one of them is refused with the rule', r.ok === false && /1 to 32 of them/.test(r.why));
+  r = call(s, 'proposeWorldStage', 'b'.repeat(33), 'Gavin');
+  yes('I3 and so is a proposal', r.ok === false && /1 to 32 of them/.test(r.why));
+  r = call(s, 'setWorldStage', LONGEST.id, 'Gavin');
+  yes('I4 an id of exactly 32 is a stage the world can reach', r.ok === true && call(s, 'worldStage').id === LONGEST.id);
+  const plain = boot(worldTest);
+  yes('I5 a list that keeps the rule leaves nothing out and logs nothing about it',
+      !plain.logs.some(function (l) { return /left out of the list/.test(l); }));
 });
 
 try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { }

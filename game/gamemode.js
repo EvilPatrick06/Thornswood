@@ -34360,6 +34360,16 @@ log('gamemode loaded:',
   never taken off it, so a change that is meant to be permanent stays on
   record even when a later stage undoes it in the world.
 
+  STAGE IDS FOLLOW THE PATROL FILE'S KEY RULE. thalmor-patrols.json (#1390)
+  gives a patrol cap for each stage under stageMost, keyed by these ids, and
+  it takes a key only when it is 1 to 32 lower case letters, digits and
+  dashes (/^[a-z0-9-]{1,32}$/, the same as its road ids). So the stage list
+  holds ids to that same rule, STAGE_ID below: a stage in war-stages.json
+  whose id breaks it is left out of the list and the log says so once when
+  this block loads, and a move or a proposal to such an id is refused with
+  the rule in words. A stage the patrol file could never key is never a
+  stage the world can reach.
+
   setWorldStage(id, by) moves it, and is a function only: nothing in play
   calls it. An id the list does not have is refused. So is the stage the
   world is already at, so the time it was reached is never reset by
@@ -34405,6 +34415,15 @@ log('gamemode loaded:',
 
   var BY_CHARS = 80;
 
+  /* The patrol file's rule for a stage id (#1390, thalmorPatrolTable's
+     stageMost keys and road ids): see STAGE IDS above. */
+  var STAGE_ID = /^[a-z0-9-]{1,32}$/;
+  var STAGE_ID_WORDS = 'lower case letters, digits and dashes, 1 to 32 of them';
+  function idRefusal(id) {
+    return 'A stage id is ' + STAGE_ID_WORDS + ', the rule thalmor-patrols.json keys its stages by, and ' +
+           JSON.stringify(String(id)) + ' is not one.';
+  }
+
   function wlog() {
     var a = ['[thornswood world stage]'];
     for (var i = 0; i < arguments.length; i++) { a.push(arguments[i]); }
@@ -34423,7 +34442,15 @@ log('gamemode loaded:',
     return path.join(priv, 'war.json');
   }
 
-  function stageList() { return (WAR_STAGES && Array.isArray(WAR_STAGES.stages)) ? WAR_STAGES.stages : []; }
+  /* The list as staff wrote it, less any stage whose id breaks STAGE_ID. */
+  var LISTED = (WAR_STAGES && Array.isArray(WAR_STAGES.stages)) ? WAR_STAGES.stages : [];
+  var STAGES = LISTED.filter(function (s) { return !!s && typeof s.id === 'string' && STAGE_ID.test(s.id); });
+  LISTED.forEach(function (s) {
+    if (STAGES.indexOf(s) < 0) {
+      wlog('war-stages.json has a stage left out of the list:', idRefusal(s && s.id));
+    }
+  });
+  function stageList() { return STAGES; }
 
   /** The stage row for an id, or null when the list has no such stage. */
   function stageOf(id) {
@@ -34540,6 +34567,7 @@ log('gamemode loaded:',
 
   /* Why a move to id by who cannot be made, or '' when it can. */
   function refusal(id, who, doing) {
+    if (typeof id === 'string' && !STAGE_ID.test(id)) { return idRefusal(id); }
     if (typeof id !== 'string' || !stageOf(id)) { return 'There is no stage called ' + JSON.stringify(String(id)) + '.'; }
     if (!who) { return 'Say who ' + doing + '.'; }
     if (who.length > BY_CHARS) { return 'Who ' + doing + ' is up to ' + BY_CHARS + ' characters.'; }

@@ -240,6 +240,13 @@ attempt('the server', function () {
   press(s, ALICE, '/world propose dragons');
   yes('W5 a stage the list does not have is refused and not logged: "' + said() + '"',
       /dragons/.test(said()) && pending(s) === null && records.length === 0);
+  ['Test-Landing', 'a'.repeat(33), 'test_landing'].forEach(function (bad) {
+    press(s, ALICE, '/world propose ' + bad);
+    yes('W5b a proposal from the card whose id breaks the patrol file\'s key rule is refused, in words staff can act on: "' + said() + '"',
+        /^A stage id is lower case letters, digits and dashes, 1 to 32 of them, the rule thalmor-patrols\.json keys its stages by, and /.test(said()) &&
+        said().indexOf(JSON.stringify(bad)) >= 0 && /Nothing changed\.$/.test(said()) &&
+        pending(s) === null && warText() === null && records.length === 0);
+  });
   press(s, ALICE, '/world propose peace');
   yes('W5 and so is the stage the world is already at', /already at Peace/.test(said()) && pending(s) === null && records.length === 0);
 

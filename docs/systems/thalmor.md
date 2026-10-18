@@ -103,6 +103,9 @@ the tools and never plays it out by itself. It keeps one stage for the
 whole province, and a restart does not reset it. The stages are a list
 staff write, each with a name, its words, and who is behind it if they
 say so. Today the only stage is peace, so nothing in the world changes.
+A stage's id is 1 to 32 lower case letters, digits and dashes, the same
+rule the patrol file uses for the stage ids it gives a cap to, so every
+stage can have one. A stage whose id breaks it is left out of the list.
 No timer moves a stage. Every move is kept on record with when and who,
 so a change meant to last is never lost.
 
