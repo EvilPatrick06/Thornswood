@@ -411,6 +411,10 @@ jobs:
           # site and lifted), and site.log, voice.log, thornswood.log and
           # bot.log keep nothing past 90 days, with the privacy line naming
           # them. A second or two.
+          # Issue #511: tests\test-511-trade-cargo.js holds the trade ship manifest
+          # (game\trade-cargo.js) to its rule that a cargo never grows: no piece
+          # aboard without a debit receipt, coin refused, two-step hand out, and a
+          # tampered save refused. Under a second.
           $six ='test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
@@ -441,7 +445,7 @@ jobs:
                  'test-2612-backup-principal.ps1',
                  'test-site-account.ps1',
                  'test-1320-pass-one-session.js',
-                 'test-1373-scarce-scene.js', 'test-quest-eligibility.js', 'test-quest-transactions.js', 'test-kill-contracts.js',
+                 'test-1373-scarce-scene.js', 'test-quest-eligibility.js', 'test-quest-transactions.js', 'test-kill-contracts.js', 'test-511-trade-cargo.js',
                  'test-nobody-makes.js', 'test-614-riekling-shift.js',
                  'test-1378-shared-gather.js',
                  'test-special-edition-only.js',
