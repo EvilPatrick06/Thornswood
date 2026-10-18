@@ -91,9 +91,25 @@ const FOR_BOT = path.join(DATA, 'for-bot');
 // says so and the file stops growing, lines carry on to the console only,
 // until a roll succeeds, which is said once too. Disk space for this folder
 // as a whole is #2178's storage alerts, not this.
+//
+// BY AGE AS WELL AS BY SIZE (#2166). Until 17 Oct 2026 this rolled at 4 MB
+// and kept five, and nothing aged it: a quiet site kept months in site.log,
+// profile numbers and character names among them, while the privacy page
+// said nothing about it. Patrick decided on 17 Oct (#2166, G5): the logs
+// that name people go after 90 days. So with opts.liveDays and
+// opts.copyDays, once an hour and once as the log is made, the live file is
+// rolled once its first line is liveDays old, and a rolled copy is deleted
+// once its last write is copyDays old. A copy's oldest line is at most
+// liveDays older than its last write, so at 30 and 59 nothing in any of them
+// is 90 days old (59 + 30 and the hour between passes). The count and the
+// size stay the bound on disk. Each roll or delete it makes, and each one
+// that fails, is one line here and on the console, naming the file and the
+// error, never what the file held.
 function makeLog(dir, name, maxBytes, keep, opts) {
   const file = path.join(dir, name);
   const retryMs = (opts && typeof opts.retryMs === 'number') ? opts.retryMs : 60000;
+  const liveMs = (opts && opts.liveDays > 0) ? opts.liveDays * 86400000 : 0;
+  const copyMs = (opts && opts.copyDays > 0) ? opts.copyDays * 86400000 : 0;
   const ceiling = maxBytes * 2;
   let broken = false;
   let rollError = null;      // the last roll's error, null when the last roll worked
@@ -182,8 +198,54 @@ function makeLog(dir, name, maxBytes, keep, opts) {
     }
   }
 
+  // The time of the live file's first line, from its stamp, or null.
+  function firstLineAt() {
+    let fd = null;
+    try {
+      fd = fs.openSync(file, 'r');
+      const buf = Buffer.alloc(32);
+      const n = fs.readSync(fd, buf, 0, 32, 0);
+      const m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/.exec(buf.toString('latin1', 0, n));
+      return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]).getTime() : null;
+    } catch (e) { return null; }
+    finally { if (fd !== null) { try { fs.closeSync(fd); } catch (e) { } } }
+  }
+
+  function age() {
+    const out = { rolled: false, deleted: 0, failed: [] };
+    if (!liveMs || !copyMs || broken) { return out; }
+    const now = Date.now();
+    for (let i = 1; i <= keep; i++) {
+      const f = file + '.' + i;
+      let st;
+      try { st = fs.statSync(f); } catch (e) { continue; }
+      if (now - st.mtimeMs < copyMs) { continue; }
+      try { fs.unlinkSync(f); out.deleted++; }
+      catch (e) { out.failed.push({ file: name + '.' + i, code: (e && e.code) || 'unknown' }); }
+    }
+    const first = firstLineAt();
+    if (first !== null && now - first >= liveMs) {
+      if (roll()) { out.rolled = true; }
+      else { out.failed.push({ file: name, code: (rollError && (rollError.code || rollError.message)) || 'unknown' }); }
+    }
+    if (out.rolled || out.deleted || out.failed.length) {
+      const line = name + ' by age: ' + (out.rolled ? 'rolled, its first line ' + (opts.liveDays) + ' days old; ' : '') +
+        out.deleted + ' rolled cop' + (out.deleted === 1 ? 'y' : 'ies') + ' past ' + opts.copyDays + ' days deleted' +
+        (out.failed.length ? '; could not change ' + out.failed.map(function (x) { return x.file + ' (' + x.code + ')'; }).join(', ') +
+          ', tried again within the hour' : '');
+      say(line);
+      write(line);
+    }
+    return out;
+  }
+  if (liveMs && copyMs) {
+    age();
+    const t = setInterval(age, (opts && opts.ageEveryMs) || 3600000);
+    if (t && t.unref) { t.unref(); }
+  }
+
   return {
-    file: file, write: write, roll: roll, ceiling: ceiling,
+    file: file, write: write, roll: roll, ceiling: ceiling, age: age,
     broken: function () { return broken; },
     rolling: function () { return { failures: rollFailures, held: held, error: rollError ? (rollError.code || rollError.message) : null }; }
   };
@@ -191,7 +253,8 @@ function makeLog(dir, name, maxBytes, keep, opts) {
 
 // Four megabytes is a few days of a closed playtest and opens in anything.
 // Five kept, so a crash on Saturday night is still readable on Monday.
-const siteLog = makeLog(ROOT, 'site.log', 4 * 1024 * 1024, 5);
+// Nothing in it, or in a rolled copy, reaches 90 days (#2166).
+const siteLog = makeLog(ROOT, 'site.log', 4 * 1024 * 1024, 5, { liveDays: 30, copyDays: 59 });
 
 // Said through the console as well, so running the site by hand is unchanged
 // and so a person watching a deploy sees what they always saw. The console
@@ -3140,8 +3203,19 @@ function putSessionLogs(key, who, logs) {
 
     /* Write once. A second set for the same session is not written over the
        first; the attempt is recorded on the original so a replay shows up as
-       what it is rather than as nothing. */
+       what it is rather than as nothing.
+
+       The one exception is a set that holds only a kept session's chat
+       (#2166): the session was kept before the launcher had sent anything,
+       so the file is there but the logs are not. Those logs are the first
+       set, not a second one, and they go in beside the chat. */
+    let keptChat = null;
     if (fs.existsSync(file)) {
+      let first = null;
+      try { first = JSON.parse(fs.readFileSync(file, 'utf8')) || null; } catch (e) { first = null; }
+      if (first && first.chatOnly && isObjectLike(first.chat)) keptChat = first.chat;
+    }
+    if (fs.existsSync(file) && !keptChat) {
       try {
         const had = JSON.parse(fs.readFileSync(file, 'utf8')) || {};
         had.resent = (Number(had.resent) || 0) + 1;
@@ -3165,14 +3239,16 @@ function putSessionLogs(key, who, logs) {
     }
     if (!Object.keys(keep).length) return 'nothing';
 
-    fs.writeFileSync(file, JSON.stringify({
+    const set = {
       session: key,
       who: String(who),      /* off the ticket, never off the body */
       at: Date.now(),
       bytes: total,
       sha256: hash,
       logs: keep
-    }));
+    };
+    if (keptChat) set.chat = keptChat;
+    fs.writeFileSync(file, JSON.stringify(set));
     return 'saved';
   } catch (e) { return 'nothing'; }
 }
@@ -3249,9 +3325,123 @@ function pruneSessionLogs() {
   gallery files whose hold has ended go too (#2352, pruneRemovedUploads).
 */
 const RETENTION_EVERY_MS = 60 * 60 * 1000;
+/*
+  A KEPT SESSION KEEPS ITS CHAT (#2166 G1). Keeping a session used to hold
+  its row and its launcher logs and nothing else. What the person said in it
+  was read live, every time, out of the voice service's day files
+  (chatSlice), and the voice service deletes a whole day 365 days on
+  (voice-server.js chatPrune) without knowing which sessions staff kept, so
+  the words a suspension rests on went a year later while the page said the
+  session was held.
+
+  So keeping a session copies its chat, the same window /api/session-logs
+  reads, into the session's own log set (session-logs/<session>.json, a
+  "chat" field), which is already what a kept session holds past
+  SLOG_DAYS: pruneSessionLogs skips kept sets and Delete-Person.ps1 leaves
+  them alone. A session kept before the launcher sent anything gets a set
+  holding only the chat (chatOnly), and putSessionLogs fills the logs in
+  beside it when they come.
+
+  The day files stay the voice service's, pruned whole by date: the copy is
+  what outlives them, not an edit to them, and the site never writes in the
+  voice service's folder.
+
+  A copy is made only from day files that are there. A copy already made is
+  never written over by a read that found no day files, because that read
+  would be an empty list standing in for words that were said. A session
+  kept while it was still open is copied again once it has ended and the
+  copy is short of its end. Letting the session go drops the copy, so it
+  cannot outlive the hold it was made for.
+*/
+function isObjectLike(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
+function sessionWindow(row, now) {
+  return { from: (Number(row.start) || Number(row.end) || 0) - 60000,
+           to: (Number(row.end) || now || Date.now()) + 60000 };
+}
+function readSlogSet(key) {
+  try {
+    const f = slogFile(key);
+    if (!fs.existsSync(f)) return { there: false, set: null };
+    return { there: true, set: JSON.parse(fs.readFileSync(f, 'utf8')) };
+  } catch (e) { return { there: true, set: null, code: (e && e.code) || 'unreadable' }; }
+}
+function keptChatCurrent(row, chat) {
+  if (!isObjectLike(chat) || !Array.isArray(chat.lines)) return false;
+  if (!Number(row.end)) return true;
+  return (Number(chat.to) || 0) >= Number(row.end) + 60000;
+}
+function copyKeptChat(row, now) {
+  now = now || Date.now();
+  const key = sessionKey(row && row.session);
+  if (!key) return 'no-session';
+  /* A row with neither a start nor an end has no window to copy. */
+  if (!Number(row.start) && !Number(row.end)) return 'no-window';
+  const had = readSlogSet(key);
+  if (had.there && !isObjectLike(had.set)) {
+    retentionSay('kept-chat', { event: 'copy-failed', session: key, code: had.code || 'unreadable' });
+    return 'failed';
+  }
+  if (had.set && keptChatCurrent(row, had.set.chat)) return 'already';
+  const w = sessionWindow(row, now);
+  const slice = chatSlice(row.profile, w.from, w.to, row.channel);
+  if (slice.why) return had.set && had.set.chat ? 'already' : 'no-chat-log';
+  const text = JSON.stringify(slice.lines);
+  const chat = {
+    copiedAt: now, from: w.from, to: w.to,
+    channel: row.channel === 'dev' ? 'dev' : 'main',
+    lines: slice.lines,
+    sha256: crypto.createHash('sha256').update(text, 'utf8').digest('hex')
+  };
+  const set = had.set || { session: key, who: String(row.who || ''), at: now, bytes: 0,
+                           sha256: {}, logs: {}, chatOnly: true };
+  set.chat = chat;
+  try {
+    if (!fs.existsSync(SLOGS)) fs.mkdirSync(SLOGS, { recursive: true });
+    fs.writeFileSync(slogFile(key), JSON.stringify(set));
+    return 'copied';
+  } catch (e) {
+    retentionSay('kept-chat', { event: 'copy-failed', session: key, code: (e && e.code) || 'unknown' });
+    return 'failed';
+  }
+}
+function dropKeptChat(key) {
+  key = sessionKey(key);
+  if (!key) return 'no-session';
+  const had = readSlogSet(key);
+  if (!had.set || !had.set.chat) return 'none';
+  try {
+    if (had.set.chatOnly) fs.unlinkSync(slogFile(key));
+    else { delete had.set.chat; fs.writeFileSync(slogFile(key), JSON.stringify(had.set)); }
+    return 'dropped';
+  } catch (e) {
+    retentionSay('kept-chat', { event: 'drop-failed', session: key, code: (e && e.code) || 'unknown' });
+    return 'failed';
+  }
+}
+/* Every kept session has its copy: the ones kept before this existed, and
+   the ones kept while still open. Hourly with the rest of the retention
+   sweep, so a day file is copied long before its 365 days are up. */
+function copyKeptChats(now) {
+  const out = { copied: 0, failed: 0, noChatLog: 0 };
+  let rows;
+  try { rows = sessionRows(); } catch (e) { return out; }
+  for (const r of rows) {
+    if (!r || !r.keep) continue;
+    const got = copyKeptChat(r, now);
+    if (got === 'copied') out.copied++;
+    else if (got === 'failed') out.failed++;
+    else if (got === 'no-chat-log') out.noChatLog++;
+  }
+  return out;
+}
+
 function retentionSweep() {
   const now = Date.now();
-  return { sessions: sweepSessions(now), sessionLogs: pruneSessionLogs(),
+  const sessions = sweepSessions(now);
+  /* Copies before the prune, so a kept session's chat is in its set before
+     anything goes. */
+  const keptChat = copyKeptChats(now);
+  return { sessions, keptChat, sessionLogs: pruneSessionLogs(),
            trouble: sweepTrouble(now), removedUploads: pruneRemovedUploads(now) };
 }
 setInterval(retentionSweep, RETENTION_EVERY_MS).unref?.();
@@ -7131,14 +7321,17 @@ async function handle(req, res) {
 
       let client = {};
       let sent = null;
+      let keptChat = null;
       try {
         const f = slogFile(key);
         if (fs.existsSync(f)) {
           const set = JSON.parse(fs.readFileSync(f, 'utf8')) || {};
           client = set.logs || {};
+          if (row.keep && isObjectLike(set.chat) && Array.isArray(set.chat.lines)) keptChat = set.chat;
           /* The provenance, so the page can show where this came from and
-             whether anybody tried to send a second set over it. */
-          sent = {
+             whether anybody tried to send a second set over it. A set that
+             holds only a kept session's chat was not sent by anybody. */
+          if (!set.chatOnly) sent = {
             who: String(set.who || ''),
             at: Number(set.at) || 0,
             bytes: Number(set.bytes) || 0,
@@ -7152,10 +7345,11 @@ async function handle(req, res) {
          server stamps its own lines, and the two clocks are the same clock but
          the moments are not: the start is sent as the game launches and the
          server sees the connection a little after. */
-      const from = (Number(row.start) || Number(row.end) || 0) - 60000;
-      const to = (Number(row.end) || Date.now()) + 60000;
+      const { from, to } = sessionWindow(row);
       const server = serverLogSlice(row.channel, from, to);
-      const chat = chatSlice(row.profile, from, to, row.channel);
+      /* A kept session's chat is its copy (#2166), which outlives the voice
+         service's day files; otherwise the day files, read now. */
+      const chat = keptChat ? { why: '', lines: keptChat.lines } : chatSlice(row.profile, from, to, row.channel);
 
       return sendJson(res, 200, {
         session: key,
@@ -7166,6 +7360,8 @@ async function handle(req, res) {
            logs rather than on a page of its own. */
         chat: chat.lines,
         chatWhy: chat.why,
+        chatKept: !!keptChat,
+        chatCopiedAt: keptChat ? Number(keptChat.copiedAt) || 0 : 0,
         /* Whether this one is held past the retention rule, so the button
            beside the provenance shows the right state. */
         keep: !!row.keep,
@@ -7205,7 +7401,9 @@ async function handle(req, res) {
       if (on) { rows[at].keptBy = String(w.name || ''); rows[at].keptAt = Date.now(); }
       else { delete rows[at].keptBy; delete rows[at].keptAt; }
       if (!putSessions(rows)) return sendJson(res, 500, { error: 'could not save' });
-      return sendJson(res, 200, { ok: true, keep: on });
+      /* The chat it rests on is held with it (#2166), or let go with it. */
+      const chatCopy = on ? copyKeptChat(rows[at]) : dropKeptChat(key);
+      return sendJson(res, 200, { ok: true, keep: on, chatCopy });
     }
 
     /* The sheet part: what a staff member writes against one session.

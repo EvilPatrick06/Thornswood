@@ -22,6 +22,9 @@
 //   issue #1104), and rolls it by
 //   size while the bot runs: at 4 MB bot.log becomes bot.log.1, what was .1
 //   becomes .2, five kept. The same rule as Roll-Log.ps1 and the site's log.
+//   And by age (#2166): bot.log is rolled once its first line is 30 days old,
+//   and a rolled copy is deleted once its last write is 59 days old, checked
+//   once an hour and at each write, so no line of it reaches 90 days.
 //   Nothing re-encodes the text on the way, which is what went wrong when
 //   run.ps1 piped it through PowerShell before 16 September.
 //   Starts python again when it exits: 15 seconds after a run that lasted,
@@ -74,6 +77,12 @@ namespace Thornswood
         public long MaxBytes = 4L * 1024 * 1024;
         public int Keep = 5;
         public int RetrySeconds = 30;
+        // By age (#2166): the live file rolls once its first line is this
+        // old, a rolled copy goes once its last write is that old, looked at
+        // every AgeCheckSeconds. Settable in host.json for a test only.
+        public double LiveSeconds = 30 * 86400;
+        public double CopySeconds = 59 * 86400;
+        public double AgeCheckSeconds = 3600;
         public string Problem = "";
 
         public static BotSettings Load(string exeDir)
@@ -96,6 +105,9 @@ namespace Thornswood
                 if (d.Contains("maxBytes")) s.MaxBytes = Convert.ToInt64(d["maxBytes"], CultureInfo.InvariantCulture);
                 if (d.Contains("keep")) s.Keep = Convert.ToInt32(d["keep"], CultureInfo.InvariantCulture);
                 if (d.Contains("retrySeconds")) s.RetrySeconds = Convert.ToInt32(d["retrySeconds"], CultureInfo.InvariantCulture);
+                if (d.Contains("liveSeconds")) s.LiveSeconds = Convert.ToDouble(d["liveSeconds"], CultureInfo.InvariantCulture);
+                if (d.Contains("copySeconds")) s.CopySeconds = Convert.ToDouble(d["copySeconds"], CultureInfo.InvariantCulture);
+                if (d.Contains("ageCheckSeconds")) s.AgeCheckSeconds = Convert.ToDouble(d["ageCheckSeconds"], CultureInfo.InvariantCulture);
             }
             catch (Exception e) { s.Problem = "cannot read " + file + ": " + e.Message; }
             if (String.IsNullOrEmpty(s.Data)) s.Data = Path.Combine(s.Root, "data");
@@ -111,6 +123,16 @@ namespace Thornswood
     // writes. A reader that did not allow deleting holds the rename up, so a
     // roll that cannot happen is left for RetrySeconds, and the older files are
     // not moved round a file that cannot move, which is Roll-Log's rule too.
+    //
+    // BY AGE (#2166). python's lines carry no time this program can trust, so
+    // the age of the live file is when it was begun: its creation time, set
+    // to now whenever an empty file is opened, because Windows hands a file
+    // made again under a name renamed a moment ago the old file's creation
+    // time (file tunnelling) and the roll would then think the new file as
+    // old as the last. Begun is never later than the first line, so the
+    // file rolls no later than its first line is liveSeconds old. A rolled
+    // copy goes once its last write is copySeconds old; a rename keeps that
+    // time, so .1 to .5 age by when each stopped being written.
     public class RollingLog : IDisposable
     {
         readonly object sync = new object();
@@ -118,9 +140,13 @@ namespace Thornswood
         readonly long maxBytes;
         readonly int keep;
         readonly int retrySeconds;
+        double liveSeconds;
+        double copySeconds;
         FileStream stream;
+        DateTime begun = DateTime.UtcNow;
         DateTime nextTry = DateTime.MinValue;
         bool saidHeld;
+        Timer ager;
 
         public RollingLog(string path, long maxBytes, int keep, int retrySeconds)
         {
@@ -133,10 +159,36 @@ namespace Thornswood
 
         public string Path { get { return path; } }
 
+        // Turns the age rule on: once now, then every checkSeconds.
+        public void AgeBy(double liveSeconds, double copySeconds, double checkSeconds)
+        {
+            lock (sync)
+            {
+                this.liveSeconds = liveSeconds;
+                this.copySeconds = copySeconds;
+            }
+            Age();
+            long every = (long)(Math.Max(1, checkSeconds) * 1000);
+            ager = new Timer(delegate (object o) { Age(); }, null, every, every);
+        }
+
         void Open()
         {
             stream = new FileStream(path, FileMode.Append, FileAccess.Write,
                 FileShare.ReadWrite | FileShare.Delete, 4096, FileOptions.None);
+            begun = DateTime.UtcNow;
+            try
+            {
+                if (stream.Length == 0) File.SetCreationTimeUtc(path, begun);
+                else begun = File.GetCreationTimeUtc(path);
+            }
+            catch (Exception) { }
+        }
+
+        bool Old()
+        {
+            return liveSeconds > 0 && stream != null && stream.Length > 0 &&
+                (DateTime.UtcNow - begun).TotalSeconds >= liveSeconds;
         }
 
         public void Write(byte[] data, int count)
@@ -146,7 +198,40 @@ namespace Thornswood
                 if (stream == null) return;
                 stream.Write(data, 0, count);
                 stream.Flush();
-                if (stream.Length >= maxBytes && DateTime.UtcNow >= nextTry) Roll();
+                if ((stream.Length >= maxBytes || Old()) && DateTime.UtcNow >= nextTry) Roll();
+            }
+        }
+
+        // The hourly pass: rolled copies past copySeconds deleted, and the
+        // live file rolled once it is old. Each delete that fails is a line
+        // in bot.log, tried again on the next pass.
+        public void Age()
+        {
+            lock (sync)
+            {
+                if (stream == null || copySeconds <= 0) return;
+                List<string> said = new List<string>();
+                int gone = 0;
+                for (int i = 1; i <= keep; i++)
+                {
+                    string f = path + "." + i;
+                    try
+                    {
+                        if (!File.Exists(f)) continue;
+                        if ((DateTime.UtcNow - File.GetLastWriteTimeUtc(f)).TotalSeconds < copySeconds) continue;
+                        File.Delete(f);
+                        gone++;
+                    }
+                    catch (Exception e) { said.Add("[run] could not delete " + System.IO.Path.GetFileName(f) + " by age: " + e.Message + ". Trying again within the hour."); }
+                }
+                if (gone > 0) said.Insert(0, "[run] by age: " + gone + " rolled bot.log cop" + (gone == 1 ? "y" : "ies") + " past " + (copySeconds / 86400).ToString("0.##", CultureInfo.InvariantCulture) + " days deleted");
+                foreach (string l in said)
+                {
+                    byte[] b = new UTF8Encoding(false).GetBytes(l + "\r\n");
+                    stream.Write(b, 0, b.Length);
+                }
+                stream.Flush();
+                if (Old() && DateTime.UtcNow >= nextTry) Roll();
             }
         }
 
@@ -204,7 +289,7 @@ namespace Thornswood
                 {
                     saidHeld = true;
                     string m = held ? "something else has it open" : why;
-                    byte[] b = new UTF8Encoding(false).GetBytes("[run] bot.log is past " + maxBytes + " bytes and could not be rolled yet, " + m + ". Trying again in " + retrySeconds + " seconds.\r\n");
+                    byte[] b = new UTF8Encoding(false).GetBytes("[run] bot.log is past " + maxBytes + " bytes or its first line is past its days, and could not be rolled yet, " + m + ". Trying again in " + retrySeconds + " seconds.\r\n");
                     stream.Write(b, 0, b.Length);
                     stream.Flush();
                 }
@@ -213,6 +298,7 @@ namespace Thornswood
 
         public void Dispose()
         {
+            if (ager != null) { ager.Dispose(); ager = null; }
             lock (sync)
             {
                 if (stream != null) stream.Dispose();
@@ -572,6 +658,7 @@ namespace Thornswood
             // Install-Bot makes it and grants the account Modify on it.
             try { Directory.CreateDirectory(s.Data); } catch (Exception) { }
             RollingLog log = new RollingLog(Path.Combine(s.Data, "bot.log"), s.MaxBytes, s.Keep, s.RetrySeconds);
+            log.AgeBy(s.LiveSeconds, s.CopySeconds, s.AgeCheckSeconds);
             BotRunner runner = new BotRunner(s, log);
             if (console)
             {

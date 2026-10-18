@@ -51,7 +51,9 @@
                     left (private\last-left.json, and data\last-left.json in a
                     folder set aside before #2582 moved it), live and dev
     voice           every chat line their characters wrote, out of each day's
-                    file, live and dev. The voice service never edits a day
+                    file, live and dev, except the lines said inside a
+                    session staff marked kept (#2166), which stay with it.
+                    The voice service never edits a day
                     (voice\voice-server.js); these are the only edits, and the
                     record keeps each file's line count before and after, so
                     an edited day says so
@@ -64,7 +66,8 @@
       notes.json), the staff logs' lines naming them (moderation.log on the
       site and on each game server, the game server's door.log), reports they
       made and reports made about them (inbox.json, gallery-reports.json), and
-      a session staff marked kept, with its launcher logs and alerts. The
+      a session staff marked kept, with its launcher logs, alerts, the copy
+      of its chat and the chat lines in the day files inside its window. The
       privacy page: "What cannot be undone is something you said that
       somebody else has already quoted in a report, because that now belongs
       to the report."
@@ -414,6 +417,11 @@ for (const person of people) {
   }
   r.profiles = Array.from(P).sort((x, y) => x - y);
   const hasP = (v) => P.has(Number(v));
+  // The windows of their sessions staff marked kept, from every copy of the
+  // site, so the chat said in them stays (#2166). The same window the site's
+  // /api/session-logs reads: a minute either side of start and end, and to
+  // now for one still open.
+  const keptWindows = [];
 
   // ---- the site, and each copy of its data a restore set aside
   for (const s of siteSets(a.site)) {
@@ -433,7 +441,15 @@ for (const person of people) {
       const keep = [];
       for (const x of sessions.value) {
         if (isObj(x) && String(x.who) === id) {
-          if (x.keep) { keep.push(x); kept.add(String(x.session)); held(T + ': session rows staff marked kept', 1); }
+          if (x.keep) {
+            keep.push(x); kept.add(String(x.session)); held(T + ': session rows staff marked kept', 1);
+            // A row with neither a start nor an end has no window to keep.
+            if (Number(x.start) || Number(x.end)) {
+              keptWindows.push({ voice: x.channel === 'dev' ? 'dev' : 'live', profile: Number(x.profile) || 0,
+                                 from: (Number(x.start) || Number(x.end)) - 60000,
+                                 to: (Number(x.end) || Number(a.now) || Date.now()) + 60000 });
+            }
+          }
           else { gone.add(String(x.session)); removed(T + ': session rows', 1); }
         } else keep.push(x);
       }
@@ -636,11 +652,16 @@ for (const person of people) {
       const p = path.join(dir, f);
       const t = text(p, 'voice:' + v.tag);
       if (!t) continue;
+      let inKept = 0;
       const keep = t.lines.filter((line) => {
         let o = null;
         try { o = JSON.parse(line); } catch (e) { return true; }
-        return !(isObj(o) && hasP(o.profileId));
+        if (!(isObj(o) && hasP(o.profileId))) return true;
+        const at = Number(o.at) || 0;
+        if (keptWindows.some((w) => w.voice === v.tag && w.profile === Number(o.profileId) && at >= w.from && at <= w.to)) { inKept++; return true; }
+        return false;
       });
+      held(v.tag + ' voice: chat lines in sessions staff marked kept', inKept);
       if (keep.length !== t.lines.length) {
         r.chat.push({ voice: v.tag, file: f, before: t.lines.length, after: keep.length });
         removed(v.tag + ' voice: chat lines', t.lines.length - keep.length);
