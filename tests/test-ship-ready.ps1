@@ -264,7 +264,7 @@ try {
     $r = @(Get-LauncherRows 'main' $mainRoot)
     Yes '8. main, no Launcher folder: one row, and it passes' ($r.Count -eq 1 -and $r[0].Ok)
     Yes '8.   it is a need row, so it counts as passed, not as a warning' ($r[0].Level -eq 'need')
-    Yes '8.   it says a main Ship puts the launcher CI built there itself' ($r[0].Detail -match 'none yet' -and $r[0].Detail -match 'CI built' -and $r[0].Detail -match 'Install-Launcher')
+    Yes '8.   it says a main Ship puts the launcher CI built there itself' ($r[0].Detail -match 'none yet' -and $r[0].Detail -match 'CI built' -and $r[0].Detail -match 'its own install step')
     Yes '8.   and no fix line, least of all installing Thornswood' (-not $r[0].Fix)
     Yes '8.   the verdict with it alone is READY' ((Get-ShipVerdict $r).Ready)
     Put $mainRoot 'Launcher\Thornswood.exe' 'a launcher'

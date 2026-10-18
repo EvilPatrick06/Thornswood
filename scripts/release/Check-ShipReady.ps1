@@ -238,7 +238,7 @@ function Get-LauncherRows([string]$Channel, [string]$Root) {
     $exe = $(if ($launchDir) { Join-Path $launchDir 'Thornswood.exe' } else { '' })
     $has = [bool]($exe -and (Test-Path -LiteralPath $exe -PathType Leaf))
     $detail = $(if ($has) { $exe + ', which a main Ship that builds a launcher replaces' }
-                else { 'none yet: a main Ship that builds a launcher puts the one CI built for main''s tag there itself (Install-Launcher.ps1), and asks for none before that' })
+                else { 'none yet: a main Ship that builds a launcher puts the one CI built for main''s tag there itself, in its own install step, and asks for none before that' })
     return @(New-Row 'the launcher in it, which a main Ship puts there itself' $true $detail $null)
   }
   $has = [bool]($launchDir -and (Test-Path -LiteralPath $launchDir -PathType Container))
