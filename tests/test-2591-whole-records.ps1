@@ -26,7 +26,9 @@
        through the one rename: SteamUpdates through its own (it is compiled
        alone, in test-steam-updates.ps1), Sync and FeedNews through
        OwnGame.WriteRecord, the feed store through Move-FeedStoreInto, whose
-       C# is Generated.ps1's word for word.
+       type is its own (Thornswood.FeedSwap, a rename with POSIX semantics
+       since #2727, tests\test-2727-feed-swap-readers.ps1), so it never
+       shares a name with Generated.ps1's Thornswood.RecordSwap.
     2. SteamUpdates.cs compiled with the launcher's compiler: its write
        replaces a manifest, and killed 40 times while it swaps a manifest in
        a loop, the manifest is whole every time.
@@ -96,7 +98,9 @@ Yes '...the received copy and read.json on this machine go through it too' (
     $store -match 'Move-FeedStoreInto \$down \$local' -and $store -match "Move-FeedStoreInto \(\`$f \+ '\.new'\) \`$f")
 $csStore = [regex]::Match($swap.Groups[1].Value, '(?s)namespace Thornswood\n\{.*?\n\}')
 $csGen = [regex]::Match($gen, '(?s)namespace Thornswood\n\{.*?\n\}')
-Yes '...its C# is Generated.ps1''s, word for word, so either may load the type first' ($csStore.Success -and $csGen.Success -and $csStore.Value -ceq $csGen.Value)
+Yes '...its type is its own, not Generated.ps1''s, so neither loads the other''s rename first (#2727)' (
+    $csStore.Success -and $csGen.Success -and $csStore.Value -match 'public static class FeedSwap' -and $csStore.Value -notmatch 'class RecordSwap' -and
+    $csGen.Value -match 'public static class RecordSwap' -and $csGen.Value -notmatch 'class FeedSwap')
 
 $work = Join-Path $Scratch ('thornswood-2591-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $null = New-Item -ItemType Directory -Force -Path $work

@@ -99,8 +99,9 @@ function Get-FeedStoreSha([string]$path) {
     # .NET rather than Get-FileHash: that one comes from a module, and Windows
     # PowerShell started from a PowerShell 7 shell inherits a PSModulePath
     # whose Utility module it cannot load, so the command is not there.
+    # Shared for delete as well, so this read never stops the swap (#2727).
     $h = [Security.Cryptography.SHA256]::Create()
-    $s = [IO.File]::OpenRead((Resolve-Path -LiteralPath $path).ProviderPath)
+    $s = New-Object IO.FileStream((Resolve-Path -LiteralPath $path).ProviderPath, [IO.FileMode]::Open, [IO.FileAccess]::Read, ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
     try { return (-join ($h.ComputeHash($s) | ForEach-Object { $_.ToString('x2') })) }
     finally { $s.Dispose(); $h.Dispose() }
 }
@@ -120,44 +121,90 @@ function Get-FeedStoreVps([hashtable]$To) {
 }
 
 # ------------------------------------------------------------ the one rename
-# A file into the place of another in one call, MoveFileEx with
-# MOVEFILE_REPLACE_EXISTING, the call OwnGame.WriteRecord makes in the
-# launcher and Write-GeneratedRecord in scripts\mods\Generated.ps1 (#2586).
-# Until it the file is the old one, after it the new one. Not File.Replace
-# (#2591): ReplaceFile moves the old file aside first and then the new one
-# in, so a send stopped between the two left the feed file missing, and the
-# site answered 404 for it until the next send. Measured 16 Oct on One: a
-# Windows PowerShell 5.1 swapping a feed sized file that way in a loop,
-# killed over and over, left it missing; through this call, never
-# (tests\test-2591-whole-records.ps1). Windows PowerShell 5.1, which runs
-# this on the VPS, has no File.Move that replaces, so the call is declared.
-# The type is the one Generated.ps1 declares, word for word, so either can
-# load it first in one session.
+# A file into the place of another in one rename. Until it the file is the
+# old one, after it the new one. Not File.Replace (#2591): ReplaceFile moves
+# the old file aside first and then the new one in, so a send stopped
+# between the two left the feed file missing, and the site answered 404 for
+# it until the next send (tests\test-2591-whole-records.ps1 kills a swap in
+# a loop and finds the file whole every time).
+#
+# The rename keeps POSIX semantics (#2727): SetFileInformationByHandle with
+# FileRenameInfoEx and FILE_RENAME_FLAG_POSIX_SEMANTICS. The plain rename,
+# MoveFileEx with MOVEFILE_REPLACE_EXISTING, which this was from #2591 to
+# #2727, is refused with "Access is denied" while ANY handle is open on the
+# file it replaces, even one opened with share-delete, even a stat. The site
+# (site\server.js) stats version.json for every launcher's 304 and every
+# feed watch tick and reads it for every 200, so a Ship could stop with NOT
+# SHIPPED because a launcher asked for the feed at that moment. Measured 18
+# Oct on One, 2000 swaps beside a node loop doing server.js's statSync and
+# readFileSync: MoveFileEx refused 1616 of them, this rename none. A reader
+# that opened the file with share-delete keeps reading the old bytes, and
+# the name is the new file at once. A handle opened WITHOUT share-delete
+# still refuses it, with "being used by another process"; every reader in
+# this file and the site's node open with share-delete. Needs NTFS on
+# Windows 10 1709 or Windows Server 2019 or later: the VPS is Windows Server
+# 2022, and the working folder is under LOCALAPPDATA on the system drive.
+# Windows PowerShell 5.1, which runs this on the VPS, has no such call in
+# .NET, so it is declared. Its own type, not Generated.ps1's RecordSwap, so
+# neither can load the other's rename first in one session.
 $script:FeedStoreSwap = @'
 function Move-FeedStoreInto([string]$from, [string]$to) {
-  if (-not ('Thornswood.RecordSwap' -as [type])) {
+  if (-not ('Thornswood.FeedSwap' -as [type])) {
     Add-Type -TypeDefinition @"
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
 namespace Thornswood
 {
-    public static class RecordSwap
+    public static class FeedSwap
     {
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        static extern bool MoveFileEx(string existing, string replacement, int flags);
-        // MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
+        static extern SafeFileHandle CreateFileW(string name, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern bool SetFileInformationByHandle(SafeFileHandle file, int infoClass, IntPtr info, uint size);
+        // DELETE | SYNCHRONIZE | FILE_READ_ATTRIBUTES on the new file, shared
+        // all ways, write-through as MOVEFILE_WRITE_THROUGH opened it.
+        const uint Access = 0x00010000 | 0x00100000 | 0x80;
+        const uint ShareAll = 0x1 | 0x2 | 0x4;
+        const uint OpenExisting = 3;
+        const uint WriteThrough = 0x80000000;
+        const int FileRenameInfoEx = 22;
+        // FILE_RENAME_FLAG_REPLACE_IF_EXISTS | FILE_RENAME_FLAG_POSIX_SEMANTICS
+        const int Flags = 0x1 | 0x2;
         public static void Into(string from, string to)
         {
-            if (!MoveFileEx(from, to, 0x1 | 0x8))
-                throw new IOException(to + " could not be replaced by " + from + ": " +
-                                      new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error()).Message);
+            string source = Path.GetFullPath(from), target = Path.GetFullPath(to);
+            using (SafeFileHandle h = CreateFileW(source, Access, ShareAll, IntPtr.Zero, OpenExisting, WriteThrough, IntPtr.Zero))
+            {
+                if (h.IsInvalid) Fail(from, to, Marshal.GetLastWin32Error());
+                // FILE_RENAME_INFO: Flags, RootDirectory (none), FileNameLength
+                // in bytes, then the name.
+                byte[] name = System.Text.Encoding.Unicode.GetBytes(target);
+                int lengthAt = IntPtr.Size * 2, nameAt = lengthAt + 4;
+                int size = nameAt + name.Length + 2;
+                IntPtr info = Marshal.AllocHGlobal(size);
+                try
+                {
+                    for (int i = 0; i < size; i++) Marshal.WriteByte(info, i, 0);
+                    Marshal.WriteInt32(info, 0, Flags);
+                    Marshal.WriteInt32(info, lengthAt, name.Length);
+                    Marshal.Copy(name, 0, IntPtr.Add(info, nameAt), name.Length);
+                    if (!SetFileInformationByHandle(h, FileRenameInfoEx, info, (uint)size)) Fail(from, to, Marshal.GetLastWin32Error());
+                }
+                finally { Marshal.FreeHGlobal(info); }
+            }
+        }
+        static void Fail(string from, string to, int error)
+        {
+            throw new IOException(to + " could not be replaced by " + from + ": " +
+                                  new System.ComponentModel.Win32Exception(error).Message);
         }
     }
 }
 "@
   }
-  [Thornswood.RecordSwap]::Into($from, $to)
+  [Thornswood.FeedSwap]::Into($from, $to)
 }
 '@
 . ([scriptblock]::Create($script:FeedStoreSwap))
@@ -176,12 +223,21 @@ $ErrorActionPreference = 'Stop'
 $dir = Join-Path $root $prefix
 $hist = Join-Path $dir 'history'
 $launchers = Join-Path $dir 'launchers.txt'
+# Every read of a store file here shares delete, so an op landing beside
+# another machine's swap never stops it (#2727, the rename above).
+function OpenShared($p) {
+  return New-Object IO.FileStream((Resolve-Path -LiteralPath $p).ProviderPath, [IO.FileMode]::Open, [IO.FileAccess]::Read, ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+}
 function Sha($p) {
   if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { return '' }
   $h = [Security.Cryptography.SHA256]::Create()
-  $s = [IO.File]::OpenRead((Resolve-Path -LiteralPath $p).ProviderPath)
+  $s = OpenShared $p
   try { return (-join ($h.ComputeHash($s) | ForEach-Object { $_.ToString('x2') })) }
   finally { $s.Dispose(); $h.Dispose() }
+}
+function ReadShared($p) {
+  $r = New-Object IO.StreamReader((OpenShared $p), (New-Object Text.UTF8Encoding($false)), $true)
+  try { return $r.ReadToEnd() } finally { $r.Dispose() }
 }
 function DropParts { foreach ($n in $names) { Remove-Item -LiteralPath (Join-Path $dir ($n + '.part')) -Force -ErrorAction SilentlyContinue } }
 if ($op -eq 'look') {
@@ -230,12 +286,12 @@ if ($op -eq 'forget') {
   foreach ($f in @('feed\version.json', 'feed-dev\version.json', 'feed\releases.json', 'feed-dev\releases.json')) {
     $p = Join-Path $root $f
     if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { continue }
-    foreach ($m in [regex]::Matches([IO.File]::ReadAllText($p), '[0-9a-fA-F]{64}')) { [void]$said.Add($m.Value.ToLowerInvariant()) }
+    foreach ($m in [regex]::Matches((ReadShared $p), '[0-9a-fA-F]{64}')) { [void]$said.Add($m.Value.ToLowerInvariant()) }
   }
   foreach ($f in @('feed\published.json', 'feed-dev\published.json')) {
     $p = Join-Path $root $f
     if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { continue }
-    foreach ($m in [regex]::Matches([IO.File]::ReadAllText($p), '(?i)(\d+):([0-9a-f]{64})')) { [void]$said.Add($m.Groups[2].Value.ToLowerInvariant()) }
+    foreach ($m in [regex]::Matches((ReadShared $p), '(?i)(\d+):([0-9a-f]{64})')) { [void]$said.Add($m.Groups[2].Value.ToLowerInvariant()) }
   }
   $assets = Join-Path $dir 'assets'
   foreach ($n in $names) {
@@ -286,7 +342,7 @@ if ($op -eq 'swap') {
     # file or the new one whole (FeedStoreSwap, above).
     Move-FeedStoreInto $part $p
     if ($n -eq 'version.json') {
-      $m = [regex]::Match([IO.File]::ReadAllText($p), '"launcherVersion"\s*:\s*"([^"]+)"')
+      $m = [regex]::Match((ReadShared $p), '"launcherVersion"\s*:\s*"([^"]+)"')
       if ($m.Success) {
         $v = $m.Groups[1].Value
         $had = @()
@@ -297,7 +353,7 @@ if ($op -eq 'swap') {
       # then channel, launcher, packs, baseline, commit, tag, so its one name
       # finds the rest. Never a reason to fail a send that has already landed.
       try {
-        $rd = ([IO.File]::ReadAllText($p) -replace '^\uFEFF', '') | ConvertFrom-Json
+        $rd = ((ReadShared $p) -replace '^\uFEFF', '') | ConvertFrom-Json
         if ($rd.PSObject.Properties['release'] -and $rd.release -and [string]$rd.release.id) {
           $r = $rd.release
           $f = @('id', 'channel', 'launcherVersion', 'packs', 'baseline', 'commit', 'tag') | ForEach-Object {
