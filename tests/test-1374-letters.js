@@ -74,8 +74,9 @@ const seeding = prop ? (function () {
 })() : null;
 yes('the board seeding is in the property block', seeding !== null);
 const holds = prop ? slice(prop, '  var LEDGER_HOLDS = [', '];') : null;
-const tenthFrom = prop ? slice(prop, '  var HAUL_TENTH_FROM = ', ';') : null;
-yes('the ten ledgers and the company\'s tenth are in the property block', holds !== null && tenthFrom !== null);
+// The company's cut of a haul is its terms now (#512, #2695), read by the company terms block.
+const COMPANY = require('./fixtures/company-block').companyApi(gm);
+yes('the ten ledgers are in the property block, and the company\'s terms are in the gamemode', holds !== null && !!COMPANY);
 
 // The real chargen town table, which is where nine of the boards come from.
 const chargenLine = gm.split('\n').find(function (l) { return l.indexOf('const CHARGEN = ') === 0; });
@@ -161,7 +162,6 @@ function boot(reg, w, opts) {
     'var GOLD_ID = ' + GOLD + ';',
     'var boardReads = {};',
     holds,
-    tenthFrom,
     fees,
     block,
     'function save() { reg.funds = JSON.parse(JSON.stringify(funds)); ' +
@@ -185,7 +185,7 @@ function boot(reg, w, opts) {
             'notices: function () { return notices; }, command: command, boardPanel: boardPanel, ' +
             'boardsView: boardsView, ' +
             'nameIs: nameIs, seed: BOARD_SEED };');
-  const g = { __thornswoodSocial: social(w), __thornswoodTrade: { TRADE: { reach: 700 } } };
+  const g = { __thornswoodSocial: social(w), __thornswoodTrade: { TRADE: { reach: 700 } }, __thornswoodCompany: COMPANY };
   const make = new Function('reg', 'mp', 'plog', 'loadPart', 'PASSAGES', 'g', 'isSteward', body.join('\n'));
   const api = make(reg, w.mp, function () { },
                    function (key, fallback) {

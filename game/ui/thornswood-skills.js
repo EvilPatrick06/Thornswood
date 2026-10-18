@@ -2041,6 +2041,81 @@
     drawFoot();
   }
 
+  /*
+    THE COMPANY'S TERMS, FOR STAFF (#512, #2695, Patrick, 18 Oct): the server
+    proposes, staff confirm. The terms in force, the proposal waiting with
+    each change, who proposed it and when, and every term to set and
+    propose. Confirm asks twice. Everything here is the server's, under
+    officePage.company, and the server checks staff again on every line.
+  */
+  function officeCompany(c) {
+    var card = el('div', 'card');
+    card.appendChild(el('div', 'name', 'The company\'s terms'));
+    var fields = Array.isArray(c && c.fields) ? c.fields : [];
+    card.appendChild(el('div', 'desc', (c && c.changed)
+      ? 'Last changed ' + whenOpens(Number(c.changed.at) || 0) + ', by ' + String(c.changed.by || 'staff') + '.'
+      : 'These are the terms the company shipped with.'));
+    var p = c && c.pending;
+    if (p) {
+      var list = (Array.isArray(p.changes) ? p.changes : []).map(function (ch) {
+        return String(ch.label || ch.term) + ' from ' + String(ch.from) + ' to ' + String(ch.to);
+      }).join('; ');
+      officeRow(card, 'Proposed: ' + list, 'by ' + String(p.by || 'somebody') + ', ' + whenOpens(Number(p.at) || 0), [
+        officeButton('Confirm', '/companyterms confirm ' + String(Number(p.at) || 0), 'Press again to change the company\'s terms'),
+        officeButton('Drop', '/companyterms drop ' + String(Number(p.at) || 0))
+      ]);
+      var keep = Number(p.openHaulsKeepTerms) || 0;
+      card.appendChild(el('div', 'desc', keep + (keep === 1 ? ' open haul keeps' : ' open hauls keep') +
+        ' the terms it was posted under.'));
+    } else {
+      card.appendChild(el('div', 'desc', 'Nothing is proposed.'));
+    }
+    var inputs = [];
+    fields.forEach(function (f) {
+      if (!f || typeof f.key !== 'string') return;
+      var box;
+      if (f.kind === 'choice') {
+        box = document.createElement('select');
+        (Array.isArray(f.choices) ? f.choices : []).forEach(function (ch) {
+          var opt = document.createElement('option');
+          opt.value = String(ch);
+          opt.textContent = String(ch);
+          if (String(ch) === String(f.value)) opt.selected = true;
+          box.appendChild(opt);
+        });
+      } else {
+        box = document.createElement('input');
+        box.value = String(f.value);
+        box.placeholder = f.kind === 'percent' ? 'percent' : 'gold';
+      }
+      inputs.push({ f: f, box: box });
+      officeRow(card, String(f.label || f.key), f.kind === 'percent' ? String(f.value) + '%' : String(f.value), [box]);
+    });
+    var send = officeButton('Propose', function () {
+      var pairs = [];
+      for (var i = 0; i < inputs.length; i++) {
+        var f = inputs[i].f;
+        var v = String(inputs[i].box.value || '').trim();
+        if (f.kind !== 'choice' && !/^\d+$/.test(v)) {
+          status = String(f.label || f.key) + ' is a whole number.'; statusKind = 'no';
+          drawFoot();
+          return '';
+        }
+        if (v !== String(f.value)) pairs.push(f.key + '=' + v);
+      }
+      if (!pairs.length) {
+        status = 'Change a term first. Those are the terms in force.'; statusKind = 'no';
+        drawFoot();
+        return '';
+      }
+      return '/companyterms propose ' + pairs.join(' ');
+    });
+    officeRow(card, '', '', [send]);
+    card.appendChild(el('div', 'desc', 'The terms change only when staff confirm a proposal here, and every press ' +
+      'goes in the staff log with your name. Hauls already posted keep the terms they were posted under.'));
+    return card;
+  }
+
   /* A button on the Office page. With twice, the first press only says what the second does. */
   function officeButton(text, line, twice) {
     var b = el('span', 'stop', text);
@@ -2174,6 +2249,8 @@
       wrap.appendChild(officeBox(o.box, o.boards));
       wrap.appendChild(officeBoards(o.boards));
     }
+    // The company's terms, for staff (#512, #2695): propose, confirm and drop.
+    if (o.company) wrap.appendChild(officeCompany(o.company));
     elBody.appendChild(wrap);
   }
 
