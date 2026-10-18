@@ -2,7 +2,7 @@
 
 What Thornswood keeps about you, why, and how to have it deleted.
 
-Last changed: 16 October 2026.
+Last changed: 17 October 2026.
 
 Thornswood is a free fan project run by two people. It is not a company. This
 page is written plainly rather than legally, and it is meant to be the whole
@@ -113,6 +113,10 @@ both are served from here now.
   came from, beside the Discord account it signed in as. It keeps nothing
   older than 30 days: the server checks every hour and deletes each line as
   it passes 30 days. Staff read it to look into a fault or a report.
+- **The site's, voice's, gamemode's and bot's own logs** (site.log, voice.log,
+  thornswood.log and bot.log) record what each service did, with profile
+  numbers, character names and some Discord ids, never an address. Nothing in
+  them is kept past 90 days.
 - **Session records and chat** are kept for 365 days, then dropped. That is
   the record of each session and the launcher log sent with it. The site
   checks every hour, so nothing waits for somebody to play first. A session

@@ -35,8 +35,12 @@ the hold's officers, with their name off it.
 
 A farm plot has its own claim, made in the field, and it lapses 14 real
 days after the last work on it. The two clocks use the same 14 days. A
-house and the ground it sits on are settled together by the people
-involved. The server does not glue them into one record.
+house and the ground outside its front door are one claim (Patrick, 21
+Sep: "the farm and property being one property in the code"). The
+ground is written on the house's claim when it is claimed, and a field
+within the farm's claim radius of that door answers to the house while
+it is held, so nobody claims it in the field. Ground with no building
+on it is a farm claim of its own.
 
 ## The deed
 

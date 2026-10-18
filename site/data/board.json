@@ -325,8 +325,8 @@
             "id": "rk6",
             "done": false,
             "cells": {
-              "ck2": "Killmoves and stagger do not show on other people",
-              "ck3": "Those animation events are blanked"
+              "ck2": "Killmoves do not show on other people",
+              "ck3": "That animation event is blanked. A stagger shows to everybody nearby"
             },
             "at": 0,
             "by": ""
@@ -1637,7 +1637,7 @@
             "by": "",
             "cells": {
               "c1rm": "Property you actually own",
-              "c2rm": "Buy it, furnish it, lock it, defend it. Land inside a hold means a steward you speak with, not a menu you buy from"
+              "c2rm": "Claim a building for free at its door and the deed in your pack says it is yours. Lock it, have a smith cut keys, and carry its master key. The hold's steward can set rent and evict, and a claim nobody goes into for 14 days lapses"
             }
           },
           {

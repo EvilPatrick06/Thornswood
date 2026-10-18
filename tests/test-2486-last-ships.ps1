@@ -171,6 +171,9 @@ try {
     Yes 'Deploy-Server -GamemodeOnly refuses a live order that does not end with it' ($ds -match 'live load order does not end with Thornswood-Last\.esp')
     $dg = [IO.File]::ReadAllText((Join-Path $repo 'scripts\deploy\Deploy-Gamemode.ps1'))
     Yes 'Deploy-Gamemode builds an order that ends with it, read from the repository' ($dg.Contains('if ($lastHeld) { $keep = @($keep | Where-Object { $_ -ine $lastName }) + $lastName }') -and $dg.Contains('$lastRepo -replace'))
+    Yes 'Deploy-Gamemode takes the places between full and light plugins from the order it was built against, and stops on any other' (
+        $dg.Contains('$rs = Get-ThornswoodRecordedSequence ([string[]]$wanted) ([string[]]$lastOrder)') -and
+        $dg.Contains('$so = Get-ThornswoodServerOrder $sequence') -and $dg.Contains('throw "$lastName was built against another load order"'))
 } finally {
     $env:THORNSWOOD_TEST_SERVER_DIR = ''
     try { Remove-Item -LiteralPath $Scratch -Recurse -Force -ErrorAction SilentlyContinue } catch { }

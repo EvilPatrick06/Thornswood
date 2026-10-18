@@ -6,9 +6,29 @@
   rolled copy of it, for longer than 30 days. It goes up beside the server as
   server-log.js, and the server's scheduled task runs the server under it:
 
-      cmd /c "start "" /b /wait /high node server-log.js --log <root>\server.log dist_back/skymp5-server.js & call exit %^errorlevel%"
+      cmd /c "start "" /b /wait /high node server-log.js --log <root>\server.log --also thornswood.log dist_back/skymp5-server.js & call exit %^errorlevel%"
 
       node server-log.js --log <root>\server.log --roll     rolls it now and applies the 30 days, then exits (an install)
+
+  And since #2166 two other logs that name people, which used to roll by
+  size only, with nothing aging them:
+
+      --also thornswood.log      the gamemode's own log, beside server.log, kept
+                                 to 90 days (--also-days). The gamemode writes
+                                 and rolls it by size (game/gamemode.js); this
+                                 moves it aside once its first line is from an
+                                 earlier day, and cuts every rolled copy of it
+                                 (its .1 to .5 and the dated ones) to 90 days,
+                                 at a start, at a roll and once an hour, the same
+                                 way as server.log's own. Nothing in game\ changes.
+      --days 90 --stamp          the voice service runs under this too
+                                 (Install-Voice.ps1, vps-dev-instance.ps1), so
+                                 voice.log is rolled at midnight and at 4 MB and
+                                 kept to 90 days rather than held open by cmd's
+                                 >> and rolled only at a start. Voice's lines carry
+                                 no time of their own, so --stamp puts this
+                                 process's in front of each one, which is what
+                                 lets a line be aged at all.
 
   WHY (#2349). The engine writes the address of every connection into its
   console ("Connecting a user N with ip ...", skymp5-server ts/systems/login.ts),
@@ -44,7 +64,10 @@
   belong to them, and a file with nothing left is deleted. So no line older
   than 30 days and an hour is ever on disk, and the files Roll-Log.ps1 left
   (server.log.1 to .5, weeks in each) are cut the same way on the first start.
-  A file with no stamped line at all goes by its last write.
+  A file with no stamped line at all goes by its last write, or by when it
+  was made if that is earlier (a copy Roll-Log.ps1 rolled holds weeks, from
+  when it was made to its last write). A line stamped without the brackets,
+  "2026-10-12 21:40:03 [thornswood] ...", the gamemode's, counts too.
 
   WHAT IS SAID. Each roll that deletes or cuts anything, and every failure, is
   a line in server.log itself, "[<time>] [server-log] ...", stamped like the
@@ -71,11 +94,12 @@ const os = require('os');
 const cp = require('child_process');
 
 const KEEP_DAYS = 30;
+const ALSO_DAYS = 90;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_BYTES = 4 * 1024 * 1024;
 const SWEEP_MS = 60 * 60 * 1000;
 const HEAD_BYTES = 64 * 1024;
-const STAMP = /^\[(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
+const STAMP = /^\[?(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
 
 function pad(n, w) { return String(n).padStart(w || 2, '0'); }
 function stampOf(d) {
@@ -152,7 +176,8 @@ function trimFile(file, cutoff) {
     at = nl + 1;
   }
   if (!stamped) {
-    if (st.mtimeMs >= cutoff) return 'kept';
+    const made = st.birthtimeMs > 0 ? Math.min(st.birthtimeMs, st.mtimeMs) : st.mtimeMs;
+    if (made >= cutoff) return 'kept';
     fs.unlinkSync(file);
     return 'deleted';
   }
@@ -173,8 +198,9 @@ function trimFile(file, cutoff) {
 }
 
 // Every rolled file brought inside the window. Returns the lines to say.
-function sweep(log, now) {
-  const cutoff = now - KEEP_DAYS * DAY_MS;
+function sweep(log, now, days) {
+  const keepDays = days || KEEP_DAYS;
+  const cutoff = now - keepDays * DAY_MS;
   const said = [];
   let deleted = 0, cut = 0;
   for (const f of rolledFiles(log)) {
@@ -183,13 +209,13 @@ function sweep(log, now) {
       if (r === 'deleted') deleted++;
       if (r === 'cut') cut++;
     } catch (e) {
-      said.push('could not take the lines older than ' + KEEP_DAYS + ' days out of ' + path.basename(f) +
+      said.push('could not take the lines older than ' + keepDays + ' days out of ' + path.basename(f) +
         ': ' + e.message + '. The next pass, within the hour, tries it again.');
     }
   }
   if (deleted || cut) {
-    said.unshift('older than ' + KEEP_DAYS + ' days: ' + deleted + ' rolled log' + (deleted === 1 ? '' : 's') + ' deleted, ' +
-      cut + ' cut to the last ' + KEEP_DAYS + ' days');
+    said.unshift('older than ' + keepDays + ' days: ' + deleted + ' rolled log' + (deleted === 1 ? '' : 's') + ' deleted, ' +
+      cut + ' cut to the last ' + keepDays + ' days');
   }
   return said;
 }
@@ -202,6 +228,36 @@ function rollFile(log, now) {
   const to = rolledName(log, now);
   fs.renameSync(log, to);
   return to;
+}
+
+/*
+  Another log kept to its days (--also, #2166): moved aside once its first
+  line is from an earlier day, then every rolled copy of it cut to the
+  window. The program that writes it opens it for each line, as the
+  gamemode does, so a rename here is never held up by it, and its next line
+  starts a new file. Returns the lines to say.
+*/
+function ageAlso(file, now, days) {
+  const said = [];
+  try {
+    const st = fs.statSync(file);
+    if (st.size) {
+      let first = null;
+      try { first = firstStamp(readHead(file)); } catch (e) { first = null; }
+      if (dayKey(first === null ? st.mtimeMs : first) !== dayKey(now)) {
+        const to = rollFile(file, now);
+        if (to) said.push('rolled ' + path.basename(file) + ' to ' + path.basename(to) + ', its first line being from an earlier day');
+      }
+    }
+  } catch (e) {
+    if (e.code !== 'ENOENT') said.push('could not roll ' + path.basename(file) + ': ' + (e.code || e.message) + '. The next pass, within the hour, tries it again.');
+  }
+  return said.concat(sweep(file, now, days).map((l) => path.basename(file) + ': ' + l));
+}
+function ageAlsos(o, now) {
+  let said = [];
+  for (const f of o.also) said = said.concat(ageAlso(f, now, o.alsoDays));
+  return said;
 }
 
 // Whether the server.log found at a start is appended to (today's, under the
@@ -217,11 +273,16 @@ function rollAtStart(log, now) {
 }
 
 function parseArgs(argv) {
-  const o = { log: path.resolve('server.log'), roll: false, program: [] };
+  const o = { log: path.resolve('server.log'), roll: false, program: [], days: KEEP_DAYS, stamp: false, also: [], alsoDays: ALSO_DAYS };
+  const days = (v, was) => { const n = Number(v); return n > 0 ? n : was; };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (!o.program.length && a === '--log') { o.log = path.resolve(argv[++i] || 'server.log'); continue; }
     if (!o.program.length && a === '--roll') { o.roll = true; continue; }
+    if (!o.program.length && a === '--days') { o.days = days(argv[++i], o.days); continue; }
+    if (!o.program.length && a === '--stamp') { o.stamp = true; continue; }
+    if (!o.program.length && a === '--also') { if (argv[i + 1]) o.also.push(path.resolve(argv[++i])); continue; }
+    if (!o.program.length && a === '--also-days') { o.alsoDays = days(argv[++i], o.alsoDays); continue; }
     o.program.push(a);
   }
   return o;
@@ -229,7 +290,8 @@ function parseArgs(argv) {
 
 // --roll: an install's roll. Whatever the size, so the run the install starts
 // has a file of its own, and the 30 days applied. Says what it did and exits 0.
-function rollNow(log, now) {
+function rollNow(log, now, o) {
+  o = o || { days: KEEP_DAYS, also: [], alsoDays: ALSO_DAYS };
   const out = [];
   try {
     const to = rollFile(log, now);
@@ -237,7 +299,7 @@ function rollNow(log, now) {
   } catch (e) {
     out.push('could not roll ' + path.basename(log) + ': ' + (e.code || e.message) + '. It is appended to, and rolled at midnight.');
   }
-  return out.concat(sweep(log, now));
+  return out.concat(sweep(log, now, o.days), ageAlsos(o, now));
 }
 
 function run(o) {
@@ -311,9 +373,26 @@ function run(o) {
     // Not rolled, it is still the earlier day's file, so the roll stays due
     // (the size is counted from the file itself either way).
     if (!rolled) state.day = wasDay;
-    for (const l of lines.concat(sweep(log, now))) say(l);
+    for (const l of lines.concat(sweep(log, now, o.days), ageAlsos(o, now))) say(l);
+  }
+  // --stamp: this process's time in front of every line, for a program whose
+  // lines carry none, so each can be aged (#2166).
+  function stamped(buf) {
+    if (!o.stamp || !buf.length) return buf;
+    const parts = [];
+    let at = 0, lineStart = state.atLineStart;
+    while (at < buf.length) {
+      if (lineStart) parts.push(Buffer.from('[' + stampOf(new Date()) + '] '));
+      const nl = buf.indexOf(10, at);
+      const end = nl < 0 ? buf.length : nl + 1;
+      parts.push(buf.subarray(at, end));
+      lineStart = nl >= 0;
+      at = end;
+    }
+    return Buffer.concat(parts);
   }
   function write(buf) {
+    buf = stamped(buf);
     const now = Date.now();
     if (due(now)) {
       if (state.atLineStart) { roll(now); }
@@ -334,7 +413,7 @@ function run(o) {
         '. Something else has it open; writing on in it, and trying again with the next line, then once a minute.');
     }
   }
-  pending.push(...sweep(log, now));
+  pending.push(...sweep(log, now, o.days), ...ageAlsos(o, now));
   try { open(now); } catch (e) { lose(Buffer.alloc(0), e); }
   for (const l of pending) say(l);
 
@@ -353,7 +432,7 @@ function run(o) {
   const tick = setInterval(() => {
     const t = Date.now();
     if (due(t) && state.atLineStart) roll(t);
-    else for (const l of sweep(log, t)) say(l);
+    else for (const l of sweep(log, t, o.days).concat(ageAlsos(o, t))) say(l);
   }, SWEEP_MS);
   child.on('error', (e) => {
     say('could not start ' + o.program.join(' ') + ': ' + (e.code || e.message));
@@ -371,10 +450,10 @@ function run(o) {
 if (require.main === module) {
   const o = parseArgs(process.argv.slice(2));
   if (o.roll) {
-    for (const l of rollNow(o.log, Date.now())) console.log(l);
+    for (const l of rollNow(o.log, Date.now(), o)) console.log(l);
     process.exit(0);
   }
   run(o);
 } else {
-  module.exports = { KEEP_DAYS, MAX_BYTES, rolledFiles, trimFile, sweep, rollFile, rollAtStart, rollNow, lineTime, parseArgs };
+  module.exports = { KEEP_DAYS, ALSO_DAYS, MAX_BYTES, rolledFiles, trimFile, sweep, rollFile, rollAtStart, rollNow, lineTime, parseArgs, ageAlso };
 }

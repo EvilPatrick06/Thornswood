@@ -645,8 +645,13 @@ exit code $code"
     Move-Item -LiteralPath ($record + '.aside') -Destination $record
     $row = @(Get-GeneratedRows $root $list 'dev')[0]
     Yes 'B: and yes once it is current' ($row.Ok)
+    # With -Root given, the command names that folder, not the recorded one (#2603).
+    Move-Item -LiteralPath $record -Destination ($record + '.aside')
+    $row = @(Get-GeneratedRows $root $list 'main' (' -Root "' + $root + '"'))[0]
+    Yes 'B: with -Root given to Check-ShipReady, the command builds in that folder' ($row.Fix.Contains('Build-Generated.ps1 -Channel main -Root "' + $root + '"'))
+    Move-Item -LiteralPath ($record + '.aside') -Destination $record
     $readyText = [IO.File]::ReadAllText($Ready)
-    Yes 'B: Check-ShipReady asks it whenever there is a game folder' ($readyText -match "if \(\`$hasGame\) \{\s*foreach \(\`$r in @\(Get-GeneratedRows \`$Root \(Join-Path \`$RepoDir 'records\\generated\.json'\) \`$Channel\)\) \{ Show-Row \`$r \}")
+    Yes 'B: Check-ShipReady asks it whenever there is a game folder' ($readyText -match "if \(\`$hasGame\) \{\s*foreach \(\`$r in @\(Get-GeneratedRows \`$Root \(Join-Path \`$RepoDir 'records\\generated\.json'\) \`$Channel \`$rootArg\)\) \{ Show-Row \`$r \}")
 
     # Ship's step, read out of Ship.ps1.
     $shipText = [IO.File]::ReadAllText($Ship)
