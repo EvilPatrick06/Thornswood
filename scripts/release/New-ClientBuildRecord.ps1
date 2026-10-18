@@ -33,6 +33,13 @@
 .PARAMETER Out
   The record to write. Committed to this repo.
 
+.PARAMETER BuiltBy
+  The run that built -Dist on another machine, from the commit -Clone is at
+  (the fork's own build on GitHub's runner, #459, ForkEngineBuild.ps1). The
+  clone's sources were checked out after that build, so their dates say
+  nothing about it: the build is held to the commit's own time instead, and
+  one older than the commit is refused.
+
 .EXAMPLE
   .\scripts\release\New-ClientBuildRecord.ps1
 #>
@@ -40,7 +47,8 @@
 param(
   [string]$Dist  = (& (Join-Path $PSScriptRoot 'Where.ps1') ClientDist),
   [string]$Clone = (& (Join-Path $PSScriptRoot 'Where.ps1') Engine),
-  [string]$Out
+  [string]$Out,
+  [string]$BuiltBy
 )
 $ErrorActionPreference = 'Stop'
 if (-not $Out) { $Out = Join-Path $PSScriptRoot '..\..\records\client-build.json' }
@@ -117,6 +125,20 @@ $commit = ''; $branch = ''; $base = ''; $dirty = $false; $stale = @()
 $ErrorActionPreference = 'Continue'
 $commit = ((& git -C $Clone rev-parse --short=8 HEAD 2>$null) -join '').Trim()
 if ($LASTEXITCODE -ne 0 -or -not $commit) { $ErrorActionPreference = 'Stop'; throw "not a git clone, or it has no commit: $Clone" }
+# A build made on another machine (-BuiltBy) is held to the commit's own
+# time: the clone's sources were written when it was checked out, after the
+# build, so the stale check below would name every one of them.
+if ($BuiltBy) {
+  $ct = ((& git -C $Clone show -s --format=%cI HEAD 2>$null) -join '').Trim()
+  $ErrorActionPreference = 'Stop'
+  try { $commitUtc = [DateTime]::Parse($ct, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::AdjustToUniversal) }
+  catch { throw "cannot read the time of commit $commit from $Clone ('$ct'), and a build made elsewhere is held to it" }
+  if ($newest -lt $commitUtc) {
+    throw ("the newest of the six was written at {0:yyyy-MM-dd HH:mm:ss} UTC, before commit {1} was made ({2:yyyy-MM-dd HH:mm:ss} UTC), so this is not a build of that commit" -f $newest, $commit, $commitUtc)
+  }
+  Write-Host ('  built by {0}, on another machine: held to the time of commit {1}, {2:yyyy-MM-dd HH:mm:ss} UTC' -f $BuiltBy, $commit, $commitUtc)
+  $ErrorActionPreference = 'Continue'
+}
 # Every git call below may write "fatal" to stderr for something the clone
 # does not have (no upstream remote, an old recorded base). Under Stop, Windows
 # PowerShell throws on that, and the catch used to skip the base, the dirty
@@ -128,7 +150,7 @@ try {
   $base   = Get-UpstreamBase $Clone ((& git -C $Clone merge-base HEAD upstream/main 2>$null) -join '').Trim() $recordedBase
   if ($base) { $base = $base.Substring(0, [Math]::Min(8, $base.Length)) } else { $base = 'unknown, fetch upstream to fill this in' }
   $dirty  = [bool]((& git -C $Clone status --porcelain -- skymp5-client skymp5-server 2>$null) | Where-Object { $_ })
-  foreach ($src in (Get-ChildItem -LiteralPath (Join-Path $Clone 'skymp5-client\src') -Recurse -File -Include *.ts -EA SilentlyContinue)) {
+  foreach ($src in @(if (-not $BuiltBy) { Get-ChildItem -LiteralPath (Join-Path $Clone 'skymp5-client\src') -Recurse -File -Include *.ts -EA SilentlyContinue })) {
     if ($src.LastWriteTimeUtc -gt $newest) { $stale += $src.FullName.Substring($Clone.Length + 1) }
   }
 } catch { }
