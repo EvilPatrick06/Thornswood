@@ -202,7 +202,7 @@ function withFile(doc) { const files = {}; files[DATA_FILE] = JSON.stringify(doc
   const s = server(files);
   const r = s.start();
   yes('K1 as shipped (off) nothing is stood up and no register is written', r.made.length === 0 && !(REG_FILE in files));
-  yes('K1 the keeper says it is off', r.logs.some(l => /\[patrols\] off - 0 road\(s\)/.test(l)));
+  yes('K1 the keeper says it is off', r.logs.some(l => /\[patrols\] off - stage \(none\) cap 3 - 0 road\(s\)/.test(l)));
 }
 
 const ON = clone(SHIPPED); ON.on = true;
@@ -324,6 +324,58 @@ const ON = clone(SHIPPED); ON.on = true;
   s.mp.set(n, 'thornswoodNpcPatrol', { road: 'pale', slot: 1 });
   yes('P3 a released slot takes its replacement', !!s.ctx.__thornswoodNpcPopulation.configure(n, s.mp.getNpcAIState(n)));
 }
+
+// ------------------------------------------------ the cap for each stage (#2697) --
+
+{
+  const doc = clone(ON); doc.stageMost = { peace: 1, war: 3 };
+  yes('S1 as shipped stageMost is empty, so the cap is most at every stage',
+      JSON.stringify(SHIPPED.stageMost) === '{}' && thalmorPatrolTable(ON, KEEP, 'peace').roads.length === 3);
+  yes('S1 with no stage (no world stage register) the cap is the plain most',
+      thalmorPatrolTable(doc, KEEP).roads.length === 3 && thalmorPatrolTable(doc, KEEP, null).stage === null);
+  const t = thalmorPatrolTable(doc, KEEP, 'peace');
+  yes('S2 a stage staff gave a cap of 1 lets one road stand, the first in the file, and refuses the rest over that cap',
+      t.stage === 'peace' && t.roads.map(r => r.id).join() === 'pale' &&
+      t.refused.length === 2 && t.refused.every(r => /province cap of 1/.test(r.why)));
+  yes('S3 a stage with no entry keeps most', thalmorPatrolTable(doc, KEEP, 'siege').roads.length === 3);
+  const zero = clone(doc); zero.stageMost.truce = 0;
+  yes('S3 a stage with a cap of 0 has no patrol', thalmorPatrolTable(zero, KEEP, 'truce').roads.length === 0);
+  const throwsOn = d => { try { thalmorPatrolTable(d, KEEP, 'peace'); return false; } catch (e) { return true; } };
+  yes('S4 a stageMost out of range, with a bad id, or not an object is thrown out whole',
+      throwsOn(Object.assign(clone(ON), { stageMost: { peace: 11 } })) && throwsOn(Object.assign(clone(ON), { stageMost: { 'Open War': 1 } })) &&
+      throwsOn(Object.assign(clone(ON), { stageMost: [1] })) && throwsOn(Object.assign(clone(ON), { stageMost: { peace: 1.5 } })));
+}
+{
+  const doc = clone(ON); doc.stageMost = { peace: 1, war: 3 };
+  const files = withFile(doc);
+  const s = server(files);
+  const r0 = s.start();
+  yes('K11 with no world stage register the keeper uses most: twelve stand', r0.made.length === 12 &&
+      r0.logs.some(l => /stage \(none\) cap 3 - 3 road\(s\)/.test(l)));
+  let asked = 0;
+  s.ctx.__thornswoodWorldStage = { worldStage: () => { asked++; return { id: 'peace', name: 'Peace', text: '', force: '', since: 1, by: 'staff' }; },
+    setWorldStage: () => { throw new Error('the keeper must not move the world'); } };
+  const r1 = s.start();
+  const reg1 = JSON.parse(files[REG_FILE]);
+  yes('K12 staff confirmed peace (cap 1): at the next start the two roads past the cap lose their members',
+      r1.made.length === 0 && Object.keys(reg1.roads).join() === 'pale' && s.mp.removed.length === 8 &&
+      r1.logs.some(l => /stage peace cap 1 - 1 road\(s\)/.test(l)) && asked === 1);
+  const seen = s.discover();
+  yes('K12 the policy agrees: the four on the Pale are admitted at that start', seen.filter(([, p]) => !!p).length === 4);
+  s.ctx.__thornswoodWorldStage.worldStage = () => ({ id: 'war' });
+  const r2 = s.start();
+  yes('K13 the world moves to war (cap 3): the next start stands the other two roads up again', r2.made.length === 8 &&
+      Object.keys(JSON.parse(files[REG_FILE]).roads).length === 3);
+  s.ctx.__thornswoodWorldStage.worldStage = () => { throw new Error('register broken'); };
+  const r3 = s.start();
+  yes('K14 a register that throws is no stage: the cap is most and nothing changes', r3.made.length === 0 && s.mp.removed.length === 8 &&
+      r3.logs.some(l => /stage \(none\) cap 3/.test(l)));
+  s.ctx.__thornswoodWorldStage = { worldStage: () => ({ id: 'siege' }) };
+  yes('K14 a stage with no entry keeps most', s.start().made.length === 0 && s.mp.removed.length === 8);
+}
+yes('N3 the keeper reads the world stage register through worldStage() only, once, and never moves it',
+    (KEEPER.match(/__thornswoodWorldStage/g) || []).length === 1 && /reg\.worldStage\(\)/.test(KEEPER) &&
+    !/setWorldStage\(|proposeWorldStage\(|confirmWorldStage\(|dropWorldStageProposal\(/.test(KEEPER));
 
 // ------------------------------------------------------- what it never does --
 

@@ -93,7 +93,9 @@ actors and the server does not run their AI. The server knows no item
 that is a Dominion flag, so a flag is not read yet.
 
 The patrols are staff settings in `game/data/thalmor-patrols.json`:
-whether any patrol is out at all, the most roads with one at once, and
+whether any patrol is out at all, the most roads with one at once (and,
+if staff set one, a different most for a world stage, read at each start
+from the world stage the staff confirmed), and
 for each road its points (one member each, 2 to 4), the record each
 member is made from, how long a dead one takes to come back, and how far
 one strays. It ships off, with three candidate roads from the cut

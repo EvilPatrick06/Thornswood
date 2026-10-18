@@ -66277,13 +66277,17 @@ function createNpcMerchantPurses(api,data,storage) {
 */
 const THALMOR_PATROL_WORLD='3c:Skyrim.esm';
 const THALMOR_PATROL_CITY_CLEARANCE=8192;
-// The one place the province cap is read. The follow-up agreed on #513 (a
-// per-stage cap from game/data/war-stages.json, once #2685 is on main)
-// changes this line and nothing else.
+// The one place the province cap is read (#2697). Staff may give a cap for
+// each world stage in the same file (stageMost, by stage id); the patrol
+// keeper reads the current stage from the world stage register (#2685) and
+// hands it in as table.stage. With no stage, no register, or no entry for the
+// stage, the cap is the plain most. Code names no stage and no number.
 function thalmorPatrolCap(table) {
+  if(typeof table.stage==='string' && table.stageMost &&
+      Object.prototype.hasOwnProperty.call(table.stageMost,table.stage)) return table.stageMost[table.stage];
   return table.most;
 }
-function thalmorPatrolTable(doc,keep) {
+function thalmorPatrolTable(doc,keep,stage) {
   const desc=/^[0-9a-f]{1,8}:[^:\\/]+\.es[mpl]$/i;
   const whole=(v,lo,hi)=>Number.isInteger(v) && v>=lo && v<=hi;
   if(!doc || typeof doc!=='object' || Array.isArray(doc) || doc.version!==1 ||
@@ -66296,9 +66300,14 @@ function thalmorPatrolTable(doc,keep) {
   if(!whole(most,0,10) || !whole(returnMinutes,1,1440) || !whole(leash,256,8192) ||
       !(tier===null || whole(tier,0,5)))
     throw new Error('thalmor-patrols.json has most, returnMinutes, leash or tier out of range');
+  const stageMost=doc.stageMost===undefined ? {} : doc.stageMost;
+  if(!stageMost || typeof stageMost!=='object' || Array.isArray(stageMost) ||
+      !Object.keys(stageMost).every(k=>/^[a-z0-9-]{1,32}$/.test(k) && whole(stageMost[k],0,10)))
+    throw new Error('thalmor-patrols.json has a stageMost that is not stage ids with a cap of 0 to 10');
   const towns=(Array.isArray(keep) ? keep : []).filter(r=>Array.isArray(r) && r[7]==='city' &&
     r[2]===THALMOR_PATROL_WORLD && Array.isArray(r[3]) && r[3].length===3);
-  const table={on:doc.on,most,roads:[],refused:[]},seen=new Set();
+  const table={on:doc.on,most,stageMost:Object.assign({},stageMost),
+    stage:typeof stage==='string' && stage ? stage : null,roads:[],refused:[]},seen=new Set();
   for(const r of doc.roads) {
     const id=r && typeof r.id==='string' ? r.id : '';
     const refuse=why=>table.refused.push({id:id || '?',why});
@@ -69427,221 +69436,6 @@ try {
 })();
 // NPC SERVER STARTUP END
 
-// ==== thornswood thalmor patrols ====
-/*
-  THE THALMOR PATROLS ARE STOOD UP HERE (#1390). docs/systems/thalmor.md,
-  Patrols: 2 to 4 on a road between holds, never inside a walled city, at
-  most 3 patrols in the province and one on a road; not people; no coin.
-
-  WHAT STAFF DECIDE. game/data/thalmor-patrols.json: whether any patrol is
-  out (on, false as shipped), the province cap (most), and for each road its
-  points (one member each, 2 to 4), the record each member is made from, how
-  long a dead one takes to come back and how far one strays. The three roads
-  it ships with are the cut Immersive Patrols II Justiciar placements in the
-  Pale, Haafingar and Hjaalmarch, at their own positions: candidates, all on,
-  under the file's own on. thalmorPatrolTable (the NPC population policy)
-  checks the file; nothing in code names a road, a number of members or a
-  time.
-
-  WHAT THIS DOES, ONCE AT START AND ON A GAMEMODE RELOAD, WITH NO TIMER. For
-  each road that may stand, each point is a slot. The register, in the
-  private folder and naming nobody, says which form fills each slot. A slot
-  whose form is still there and still carries that road's marker and record
-  is left alone, standing or dead: the engine brings a dead member back at
-  its point after the road's return time (spawnDelay, set by the policy), so a
-  return replaces it and never stacks a second group. A slot whose form is
-  gone gets a new member: made from its record at its point, marked with
-  {road, slot}, admitted by the population (which gives it the road's rule)
-  and enrolled in the shared NPC runtime. Members of a road that is off, gone,
-  over the cap or changed are taken out of the world (removeSpawned). Running
-  it again changes nothing.
-
-  WHAT IT NEVER DOES. With the file unreadable or the register unreadable it
-  stands nobody up and takes nobody down, and writes nothing. It sets no
-  timer, adds no command, and tells nobody to do anything: a patrol is a fight
-  on the road for whoever meets it, and the people decide what comes of it.
-
-  NOT PEOPLE, NO COIN. A member has no profile, so it does not wake in a
-  temple, and killing one is a warrior's work as for a bandit. Nobody can open
-  a body (the spoils block), and the dungeon body roll answers no key for a
-  runtime reference, so a body gives no coin and nothing else.
-
-  WALKING THE ROAD. The shared runtime keeps an NPC inside a leash around its
-  home. A member's home is its own point on the road and the leash is the
-  road's, so the group keeps to its stretch of road. A route between holds is
-  not built.
-*/
-(function () {
-  'use strict';
-  var g = globalThis;
-  var fs = require('fs');
-  var path = require('path');
-  var REGISTER = 'thalmor-patrol-slots.json';
-  var HEX = /^[0-9a-f]{1,8}$/;
-
-  function tlog() {
-    var a = Array.prototype.slice.call(arguments);
-    a.unshift('[patrols]');
-    console.log(a.join(' '));
-  }
-
-  function privateDir() {
-    var dir = 'private';
-    try {
-      var cfg = mp.getServerSettings();
-      if (cfg && cfg.privDir) { dir = String(cfg.privDir); }
-    } catch (e) { }
-    return dir;
-  }
-
-  // The staff's file, checked. null when it cannot be used at all.
-  function readTable() {
-    var doc = null;
-    try {
-      doc = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'thalmor-patrols.json'), 'utf8').replace(/^\uFEFF/, ''));
-    } catch (e) {
-      tlog('game/data/thalmor-patrols.json would not read, so no patrol is stood up or taken down:', e && e.message);
-      return null;
-    }
-    try {
-      return thalmorPatrolTable(doc, NPC_POPULATION_DATA.keep);
-    } catch (e2) {
-      tlog(String(e2 && e2.message) + ', so no patrol is stood up or taken down');
-      return null;
-    }
-  }
-
-  // { roads: { <road>: { <slot>: <form id in hex> } } }. No file yet is an
-  // empty register. A file that is there and will not read is null, and then
-  // nothing is changed or written over.
-  function readRegister() {
-    var text = null;
-    try {
-      text = fs.readFileSync(path.join(privateDir(), REGISTER), 'utf8');
-    } catch (e) {
-      if (e && e.code === 'ENOENT') { return { version: 1, roads: {} }; }
-      return null;
-    }
-    try {
-      var doc = JSON.parse(String(text).replace(/^\uFEFF/, ''));
-      if (!doc || doc.version !== 1 || !doc.roads || typeof doc.roads !== 'object' || Array.isArray(doc.roads)) { return null; }
-      var clean = { version: 1, roads: {} };
-      Object.keys(doc.roads).forEach(function (road) {
-        var slots = doc.roads[road];
-        if (!/^[a-z0-9-]{1,32}$/.test(road) || !slots || typeof slots !== 'object') { return; }
-        var keep = {};
-        Object.keys(slots).forEach(function (s) {
-          if (/^[0-3]$/.test(s) && typeof slots[s] === 'string' && HEX.test(slots[s])) { keep[s] = slots[s]; }
-        });
-        clean.roads[road] = keep;
-      });
-      return clean;
-    } catch (e2) {
-      return null;
-    }
-  }
-
-  function writeRegister(reg) {
-    var dir = privateDir();
-    try { fs.mkdirSync(dir, { recursive: true }); } catch (e) { }
-    var file = path.join(dir, REGISTER);
-    fs.writeFileSync(file + '.tmp', JSON.stringify(reg, null, 2) + '\n', 'utf8');
-    fs.renameSync(file + '.tmp', file);
-  }
-
-  // The form is still there, still this road's slot, still made from the
-  // record staff gave that point. A form id the engine reused for something
-  // else carries no such marker.
-  function holds(id, road, slot, base) {
-    try {
-      var mark = mp.get(id, 'thornswoodNpcPatrol');
-      if (!mark || mark.road !== road || mark.slot !== slot) { return false; }
-      if (base === undefined) { return true; }
-      return mp.getIdFromDesc(String(mp.get(id, 'baseDesc'))) === mp.getIdFromDesc(base);
-    } catch (e) {
-      return false;
-    }
-  }
-
-  function place(road, slot, population, runtime) {
-    var ref = 0;
-    try {
-      ref = mp.place(mp.getIdFromDesc(road.bases[slot]));
-      mp.set(ref, 'locationalData', {
-        cellOrWorldDesc: THALMOR_PATROL_WORLD,
-        pos: road.points[slot].slice(),
-        rot: [0, 0, 0]
-      });
-      // Before admission, so the population and every later start read it.
-      mp.set(ref, 'thornswoodNpcPatrol', { road: road.id, slot: slot });
-      if (!population.admit(ref, mp.getNpcAIState(ref))) { throw new Error('the NPC population did not admit it'); }
-      if (runtime && typeof runtime.enroll === 'function') { runtime.enroll(ref); }
-      return ref;
-    } catch (e) {
-      tlog(road.id, 'slot', slot, 'could not be stood up:', e && e.message);
-      if (ref) {
-        try { mp.destroyActor(ref); } catch (e2) { }
-        try { population.release(ref); } catch (e3) { }
-      }
-      return 0;
-    }
-  }
-
-  function keepPatrols() {
-    var table = readTable();
-    g.__thornswoodThalmorPatrols = table;
-    if (!table) { return; }
-    table.refused.forEach(function (r) { tlog('road', r.id, r.why); });
-    var population = g.__thornswoodNpcPopulation;
-    var runtime = g.__thornswoodNpcRuntime;
-    if (!population || typeof population.admit !== 'function') {
-      tlog('no NPC population on this server, so no patrol is stood up or taken down');
-      return;
-    }
-    var reg = readRegister();
-    if (!reg) {
-      tlog(REGISTER, 'would not read, so no patrol is stood up or taken down');
-      return;
-    }
-    var standing = {};
-    table.roads.forEach(function (r) { standing[r.id] = r; });
-    var changed = false, made = 0, kept = 0, gone = 0;
-
-    Object.keys(reg.roads).forEach(function (rid) {
-      var slots = reg.roads[rid], road = standing[rid];
-      Object.keys(slots).forEach(function (s) {
-        var slot = Number(s), id = parseInt(slots[s], 16) >>> 0;
-        if (road && slot < road.points.length && (!holds(id, rid, slot) || holds(id, rid, slot, road.bases[slot]))) { return; }
-        if (holds(id, rid, slot)) { removeSpawned(id); gone++; }
-        delete slots[s];
-        changed = true;
-      });
-      if (!Object.keys(slots).length) { delete reg.roads[rid]; changed = true; }
-    });
-
-    table.roads.forEach(function (road) {
-      var slots = reg.roads[road.id] || {};
-      for (var slot = 0; slot < road.points.length; slot++) {
-        var had = slots[slot] ? parseInt(slots[slot], 16) >>> 0 : 0;
-        if (had && holds(had, road.id, slot, road.bases[slot])) { kept++; continue; }
-        var ref = place(road, slot, population, runtime);
-        if (ref) { slots[slot] = (ref >>> 0).toString(16); made++; changed = true; }
-        else if (had) { delete slots[slot]; changed = true; }
-      }
-      if (Object.keys(slots).length) { reg.roads[road.id] = slots; }
-    });
-
-    if (changed) {
-      try { writeRegister(reg); } catch (e) { tlog('the register could not be written:', e && e.message); }
-    }
-    tlog(table.on ? 'on' : 'off', '-', table.roads.length, 'road(s) may stand;', made, 'stood up,', kept, 'already there,', gone, 'taken down');
-  }
-
-  try { keepPatrols(); } catch (e) { tlog('the patrol keeper failed:', e && e.message); }
-})();
-// ==== end thornswood thalmor patrols ====
-
-
 // ==== thornswood custom quests ====
 /*
   Scarce quests and scene quests, from the two tables on
@@ -70298,3 +70092,235 @@ try {
   globalThis.__thornswoodCustomQuestsCreate = createCustomQuests;
 })();
 // ==== end thornswood custom quests ====
+
+// ==== thornswood thalmor patrols ====
+/*
+  THE THALMOR PATROLS ARE STOOD UP HERE (#1390). docs/systems/thalmor.md,
+  Patrols: 2 to 4 on a road between holds, never inside a walled city, at
+  most 3 patrols in the province and one on a road; not people; no coin.
+
+  WHAT STAFF DECIDE. game/data/thalmor-patrols.json: whether any patrol is
+  out (on, false as shipped), the province cap (most), and for each road its
+  points (one member each, 2 to 4), the record each member is made from, how
+  long a dead one takes to come back and how far one strays. The three roads
+  it ships with are the cut Immersive Patrols II Justiciar placements in the
+  Pale, Haafingar and Hjaalmarch, at their own positions: candidates, all on,
+  under the file's own on. thalmorPatrolTable (the NPC population policy)
+  checks the file; nothing in code names a road, a number of members or a
+  time.
+
+  WHAT THIS DOES, ONCE AT START AND ON A GAMEMODE RELOAD, WITH NO TIMER. For
+  each road that may stand, each point is a slot. The register, in the
+  private folder and naming nobody, says which form fills each slot. A slot
+  whose form is still there and still carries that road's marker and record
+  is left alone, standing or dead: the engine brings a dead member back at
+  its point after the road's return time (spawnDelay, set by the policy), so a
+  return replaces it and never stacks a second group. A slot whose form is
+  gone gets a new member: made from its record at its point, marked with
+  {road, slot}, admitted by the population (which gives it the road's rule)
+  and enrolled in the shared NPC runtime. Members of a road that is off, gone,
+  over the cap or changed are taken out of the world (removeSpawned). Running
+  it again changes nothing.
+
+  WHAT IT NEVER DOES. With the file unreadable or the register unreadable it
+  stands nobody up and takes nobody down, and writes nothing. It sets no
+  timer, adds no command, and tells nobody to do anything: a patrol is a fight
+  on the road for whoever meets it, and the people decide what comes of it.
+
+  NOT PEOPLE, NO COIN. A member has no profile, so it does not wake in a
+  temple, and killing one is a warrior's work as for a bandit. Nobody can open
+  a body (the spoils block), and the dungeon body roll answers no key for a
+  runtime reference, so a body gives no coin and nothing else.
+
+  WALKING THE ROAD. The shared runtime keeps an NPC inside a leash around its
+  home. A member's home is its own point on the road and the leash is the
+  road's, so the group keeps to its stretch of road. A route between holds is
+  not built.
+*/
+(function () {
+  'use strict';
+  var g = globalThis;
+  var fs = require('fs');
+  var path = require('path');
+  var REGISTER = 'thalmor-patrol-slots.json';
+  var HEX = /^[0-9a-f]{1,8}$/;
+
+  function tlog() {
+    var a = Array.prototype.slice.call(arguments);
+    a.unshift('[patrols]');
+    console.log(a.join(' '));
+  }
+
+  function privateDir() {
+    var dir = 'private';
+    try {
+      var cfg = mp.getServerSettings();
+      if (cfg && cfg.privDir) { dir = String(cfg.privDir); }
+    } catch (e) { }
+    return dir;
+  }
+
+  /*
+    THE WORLD STAGE, FOR THE PER-STAGE CAP (#2697). The one read of the world
+    stage register (#2685): its worldStage().id, nothing else. No register
+    (not merged, or it failed to load), no worldStage, a throw or no id is no
+    stage, and then the cap is the plain most. Read once per start or reload,
+    so a stage staff confirm takes effect the next time the gamemode loads.
+  */
+  function currentStage() {
+    try {
+      var reg = g.__thornswoodWorldStage;
+      if (!reg || typeof reg.worldStage !== 'function') { return null; }
+      var st = reg.worldStage();
+      return st && typeof st.id === 'string' && st.id ? st.id : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // The staff's file, checked. null when it cannot be used at all.
+  function readTable() {
+    var doc = null;
+    try {
+      doc = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'thalmor-patrols.json'), 'utf8').replace(/^\uFEFF/, ''));
+    } catch (e) {
+      tlog('game/data/thalmor-patrols.json would not read, so no patrol is stood up or taken down:', e && e.message);
+      return null;
+    }
+    try {
+      return thalmorPatrolTable(doc, NPC_POPULATION_DATA.keep, currentStage());
+    } catch (e2) {
+      tlog(String(e2 && e2.message) + ', so no patrol is stood up or taken down');
+      return null;
+    }
+  }
+
+  // { roads: { <road>: { <slot>: <form id in hex> } } }. No file yet is an
+  // empty register. A file that is there and will not read is null, and then
+  // nothing is changed or written over.
+  function readRegister() {
+    var text = null;
+    try {
+      text = fs.readFileSync(path.join(privateDir(), REGISTER), 'utf8');
+    } catch (e) {
+      if (e && e.code === 'ENOENT') { return { version: 1, roads: {} }; }
+      return null;
+    }
+    try {
+      var doc = JSON.parse(String(text).replace(/^\uFEFF/, ''));
+      if (!doc || doc.version !== 1 || !doc.roads || typeof doc.roads !== 'object' || Array.isArray(doc.roads)) { return null; }
+      var clean = { version: 1, roads: {} };
+      Object.keys(doc.roads).forEach(function (road) {
+        var slots = doc.roads[road];
+        if (!/^[a-z0-9-]{1,32}$/.test(road) || !slots || typeof slots !== 'object') { return; }
+        var keep = {};
+        Object.keys(slots).forEach(function (s) {
+          if (/^[0-3]$/.test(s) && typeof slots[s] === 'string' && HEX.test(slots[s])) { keep[s] = slots[s]; }
+        });
+        clean.roads[road] = keep;
+      });
+      return clean;
+    } catch (e2) {
+      return null;
+    }
+  }
+
+  function writeRegister(reg) {
+    var dir = privateDir();
+    try { fs.mkdirSync(dir, { recursive: true }); } catch (e) { }
+    var file = path.join(dir, REGISTER);
+    fs.writeFileSync(file + '.tmp', JSON.stringify(reg, null, 2) + '\n', 'utf8');
+    fs.renameSync(file + '.tmp', file);
+  }
+
+  // The form is still there, still this road's slot, still made from the
+  // record staff gave that point. A form id the engine reused for something
+  // else carries no such marker.
+  function holds(id, road, slot, base) {
+    try {
+      var mark = mp.get(id, 'thornswoodNpcPatrol');
+      if (!mark || mark.road !== road || mark.slot !== slot) { return false; }
+      if (base === undefined) { return true; }
+      return mp.getIdFromDesc(String(mp.get(id, 'baseDesc'))) === mp.getIdFromDesc(base);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function place(road, slot, population, runtime) {
+    var ref = 0;
+    try {
+      ref = mp.place(mp.getIdFromDesc(road.bases[slot]));
+      mp.set(ref, 'locationalData', {
+        cellOrWorldDesc: THALMOR_PATROL_WORLD,
+        pos: road.points[slot].slice(),
+        rot: [0, 0, 0]
+      });
+      // Before admission, so the population and every later start read it.
+      mp.set(ref, 'thornswoodNpcPatrol', { road: road.id, slot: slot });
+      if (!population.admit(ref, mp.getNpcAIState(ref))) { throw new Error('the NPC population did not admit it'); }
+      if (runtime && typeof runtime.enroll === 'function') { runtime.enroll(ref); }
+      return ref;
+    } catch (e) {
+      tlog(road.id, 'slot', slot, 'could not be stood up:', e && e.message);
+      if (ref) {
+        try { mp.destroyActor(ref); } catch (e2) { }
+        try { population.release(ref); } catch (e3) { }
+      }
+      return 0;
+    }
+  }
+
+  function keepPatrols() {
+    var table = readTable();
+    g.__thornswoodThalmorPatrols = table;
+    if (!table) { return; }
+    table.refused.forEach(function (r) { tlog('road', r.id, r.why); });
+    var population = g.__thornswoodNpcPopulation;
+    var runtime = g.__thornswoodNpcRuntime;
+    if (!population || typeof population.admit !== 'function') {
+      tlog('no NPC population on this server, so no patrol is stood up or taken down');
+      return;
+    }
+    var reg = readRegister();
+    if (!reg) {
+      tlog(REGISTER, 'would not read, so no patrol is stood up or taken down');
+      return;
+    }
+    var standing = {};
+    table.roads.forEach(function (r) { standing[r.id] = r; });
+    var changed = false, made = 0, kept = 0, gone = 0;
+
+    Object.keys(reg.roads).forEach(function (rid) {
+      var slots = reg.roads[rid], road = standing[rid];
+      Object.keys(slots).forEach(function (s) {
+        var slot = Number(s), id = parseInt(slots[s], 16) >>> 0;
+        if (road && slot < road.points.length && (!holds(id, rid, slot) || holds(id, rid, slot, road.bases[slot]))) { return; }
+        if (holds(id, rid, slot)) { removeSpawned(id); gone++; }
+        delete slots[s];
+        changed = true;
+      });
+      if (!Object.keys(slots).length) { delete reg.roads[rid]; changed = true; }
+    });
+
+    table.roads.forEach(function (road) {
+      var slots = reg.roads[road.id] || {};
+      for (var slot = 0; slot < road.points.length; slot++) {
+        var had = slots[slot] ? parseInt(slots[slot], 16) >>> 0 : 0;
+        if (had && holds(had, road.id, slot, road.bases[slot])) { kept++; continue; }
+        var ref = place(road, slot, population, runtime);
+        if (ref) { slots[slot] = (ref >>> 0).toString(16); made++; changed = true; }
+        else if (had) { delete slots[slot]; changed = true; }
+      }
+      if (Object.keys(slots).length) { reg.roads[road.id] = slots; }
+    });
+
+    if (changed) {
+      try { writeRegister(reg); } catch (e) { tlog('the register could not be written:', e && e.message); }
+    }
+    tlog(table.on ? 'on' : 'off', '- stage', table.stage || '(none)', 'cap', thalmorPatrolCap(table), '-', table.roads.length, 'road(s) may stand;', made, 'stood up,', kept, 'already there,', gone, 'taken down');
+  }
+
+  try { keepPatrols(); } catch (e) { tlog('the patrol keeper failed:', e && e.message); }
+})();
+// ==== end thornswood thalmor patrols ====
