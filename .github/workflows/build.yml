@@ -442,6 +442,11 @@ jobs:
           # tampered save refused, a deleted character taken off with every piece
           # kept, and the trade ships block of gamemode.js (off by default, its
           # register never written over) with its bundle current. Under a second.
+          # Issue #2700: tests\test-2700-trade-ship-dock.js holds the dock, the
+          # staff panel and the clock (game\trade-ship-dock.js and the trade ships
+          # block): a crate opens the dock, coin and a full hold refused before the
+          # pack, the one charter call, a staff draft confirmed against the list it
+          # was proposed on, and arrivals on their own. Under a second.
           $six ='test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
@@ -472,7 +477,7 @@ jobs:
                  'test-2612-backup-principal.ps1',
                  'test-site-account.ps1',
                  'test-1320-pass-one-session.js',
-                 'test-1373-scarce-scene.js', 'test-quest-eligibility.js', 'test-quest-transactions.js', 'test-kill-contracts.js', 'test-511-trade-cargo.js',
+                 'test-1373-scarce-scene.js', 'test-quest-eligibility.js', 'test-quest-transactions.js', 'test-kill-contracts.js', 'test-511-trade-cargo.js', 'test-2700-trade-ship-dock.js',
                  'test-nobody-makes.js', 'test-614-riekling-shift.js',
                  'test-1378-shared-gather.js',
                  'test-special-edition-only.js',

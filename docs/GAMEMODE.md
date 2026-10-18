@@ -92,7 +92,8 @@ working directory (`gamemode.js:logPath`). The gamemode reads `dataDir`
 (`gamemode.js:voicePort`), `thornswoodChargen` (`gamemode.js:s.thornswoodChargen === false`),
 `thornswoodAdmins` (`gamemode.js:cfg.thornswoodAdmins`), `thornswoodTradeShips`
 (`gamemode.js:settings.thornswoodTradeShips === true`, off unless it is true: the trade ships of
-issue #511, whose register is still read and counted while off) and `loadOrder`
+issue #511, whose register is still read and counted while off; on, a port's crate opens the dock and staff
+keep the ports and routes from the Office page of K, issue #2700) and `loadOrder`
 (`gamemode.js:Array.isArray(doc.loadOrder)`). `Deploy-Gamemode.ps1` writes that file on every deploy
 (`scripts\deploy\Deploy-Gamemode.ps1:-NotePropertyName dataDir -NotePropertyValue 'data'`).
 

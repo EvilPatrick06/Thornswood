@@ -420,11 +420,15 @@ function createTradeCargo(opts) {
   Nothing about where ships go is written in code. Staff keep one list:
 
     { v: 1,
-      ports:  [{ key, name, hold, world, pos: [x, y, z] }],
+      ports:  [{ key, name, hold, world, pos: [x, y, z], crate: '<ref>' }],
       routes: [{ from, to, minutes, crew: ['<ref>', ...] }] }
 
   A port is a place a hold can stand: its key, the name people read, the hold
-  whose drop box takes what nobody collects, and where it stands. A route is
+  whose drop box takes what nobody collects, and where it stands. crate is
+  the reference of the container already in the world that is its dock
+  (Patrick, 18 Oct 2026: a ship at the dock is a crate, with no new plugin;
+  #2700): E on it opens the dock, never the container. One crate is one
+  port's. A port with no crate yet is on the list with nothing to press. A route is
   one way between two ports with the real minutes a leg takes; the way back is
   its own row, so staff can make it longer, shorter or absent. crew is the
   references of any NPCs or special characters staff have stood up for it;
@@ -440,21 +444,26 @@ var HOLD_KEYS = { whiterun: 1, solitude: 1, riften: 1, markarth: 1, windhelm: 1,
 var REF_RE = /^[0-9a-f]{1,8}:[^:\s][^:]{0,95}$/i;
 var MAX_ROUTE_MINUTES = 7 * 24 * 60;
 var NO_ROUTES = { v: 1, ports: [], routes: [] };
+var PORT_KEYS = ['key', 'name', 'hold', 'world', 'pos', 'crate'];
 
 function checkRoutes(cfg) {
   if (!isObj(cfg) || cfg.v !== 1 || !Array.isArray(cfg.ports) || !Array.isArray(cfg.routes) ||
       Object.keys(cfg).some(function (k) { return k !== 'v' && k !== 'ports' && k !== 'routes'; })) {
     throw new Error('The ship routes cannot be verified.');
   }
-  var keys = {}, pairs = {};
+  var keys = {}, pairs = {}, crates = {};
   var ports = cfg.ports.map(function (p, i) {
     if (!isObj(p) || typeof p.key !== 'string' || !ID_RE.test(p.key) || keys[p.key] || !text(p.name, 64) ||
         !HOLD_KEYS[p.hold] || typeof p.world !== 'string' || !REF_RE.test(p.world) ||
-        !Array.isArray(p.pos) || p.pos.length !== 3 || !p.pos.every(function (n) { return typeof n === 'number' && isFinite(n); })) {
+        !Array.isArray(p.pos) || p.pos.length !== 3 || !p.pos.every(function (n) { return typeof n === 'number' && isFinite(n); }) ||
+        Object.keys(p).some(function (k) { return PORT_KEYS.indexOf(k) < 0; }) ||
+        (p.crate !== undefined && (typeof p.crate !== 'string' || !REF_RE.test(p.crate) || crates[p.crate.toLowerCase()]))) {
       throw new Error('Port ' + (i + 1) + ' cannot be verified.');
     }
     keys[p.key] = true;
-    return { key: p.key, name: p.name, hold: p.hold, world: p.world, pos: p.pos.slice() };
+    var out = { key: p.key, name: p.name, hold: p.hold, world: p.world, pos: p.pos.slice() };
+    if (p.crate !== undefined) { crates[p.crate.toLowerCase()] = true; out.crate = p.crate; }
+    return out;
   });
   var routes = cfg.routes.map(function (r, i) {
     var crew = r && r.crew === undefined ? [] : r && r.crew;

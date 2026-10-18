@@ -345,6 +345,8 @@ const WRITERS = {
   'outer/markWoven': [1, 'names a garment a Master Weaver just made: units split off a plain stack of the same base, so no base is added and the count is the same after (#1398, test-1398-fuel.js)'],
   'durability/writePack': [1, 'writes back a pack or chest it has just read: a stack renamed for its condition, or a kit or a broken piece taken away. No base is added and no count grows (test-1384-condition.js)'],
   'property/boxLeave': [1, 'takes a stack off the pack into the drop box record, and refuses gold, which goes in through takeGold (#2298); it never adds'],
+  'trade ships/packTake': [1, 'the dock\'s load (#2700): a stack off the pack onto a trade ship\'s manifest, coin refused before the pack is read; it only takes away (test-2700-trade-ship-dock.js)'],
+  'trade ships/packGive': [1, 'the dock\'s hand out (#2700): only a piece the manifest begin() hands back, or the piece a refused load just took, each first debited off a pack, so never coin (trade-cargo refuses base 0xF aboard) and never more than was loaded (test-2700-trade-ship-dock.js)'],
   'property/boxTake': [1, 'hands back a thing out of the drop box record, which holds only what boxLeave took off a pack; gold comes out through payOut, never more than the row holds, and the row goes down by the same (#2298, test-2298-dropbox.js)']
 };
 
