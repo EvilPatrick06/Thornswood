@@ -651,8 +651,29 @@ if ($moved -and (Test-Path variable:Owns) -and @($Owns | Where-Object { $_ }).Co
   }
 }
 
+# WHAT LEFT THE REPOSITORY. A caller that sends only what changed (the site)
+# cannot use $Owns, which would take every unchanged file aside, so it names
+# in $Gone the files it no longer has. On 17 Oct the site's looks.js and
+# looks.css were still served after #2572 took them out, because nothing
+# ever took a public file away. They go aside the way a stray does: a
+# rollback and -PutBack put them back.
+if (-not (Test-Path variable:Gone)) { $Gone = @() }
+$goneAside = @()
+if ($moved) {
+  foreach ($rel in @($Gone | Where-Object { $_ })) {
+    $r = $rel -replace '/', '\'
+    $at = Join-Path $Root $r
+    if (-not (Test-Path -LiteralPath $at -PathType Leaf)) { continue }
+    if (-not (Shift $at (Join-Path $prevDir $r))) { 'could not move ' + $rel + ', which this deploy no longer has, aside'; $moved = $false; break }
+    $aside += $rel
+    $moveRels += $rel
+    $goneAside += $rel
+  }
+}
+
 if ($moved) {
   'swapped in ' + $placed.Count + ' file(s), the ones they replaced are in ' + $prevDir
+  if ($goneAside.Count) { 'took out ' + $goneAside.Count + ' file(s) this deploy no longer has, into ' + $prevDir + ': ' + ($goneAside -join ', ') }
   if ($strays.Count) { 'moved aside ' + $strays.Count + ' thing(s) at ' + $Root + ' that this deploy did not send and that are not its own, into ' + $prevDir + ': ' + ($strays -join ', ') }
   StartIt
   'started, giving it ' + $Wait + ' seconds to answer'
