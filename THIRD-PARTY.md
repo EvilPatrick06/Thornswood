@@ -624,7 +624,7 @@ pin points and are not listed separately here.
 | Package | Version | Licence | Source |
 |---|---|---|---|
 | `discord.py` | 2.7.1 | MIT | https://pypi.org/project/discord.py/2.7.1/ |
-| `Pillow` | 12.3.0 | MIT-CMU | https://pypi.org/project/Pillow/12.3.0/ |
+| `Pillow` | 13.0.0 | MIT-CMU | https://pypi.org/project/Pillow/13.0.0/ |
 | `certifi` | 2026.7.22 | MPL-2.0 | https://pypi.org/project/certifi/2026.7.22/ |
 
 discord.py is by Rapptz. Pillow is by Jeffrey A. Clark (Alex) and contributors

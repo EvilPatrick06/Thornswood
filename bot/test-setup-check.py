@@ -8,7 +8,7 @@
 # When the stand-in is already the way the build wants, the output has no set
 # line for the AFK channel or the join message. When a change would happen,
 # the line says would change, and still not set.
-import _pyguard  # noqa: F401  (first: Python 3.10 or newer, #2276)
+import _pyguard  # noqa: F401  (first: Python 3.11 or newer, #2276)
 
 import asyncio
 import importlib.util

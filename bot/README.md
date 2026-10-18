@@ -390,7 +390,8 @@ time rather than adding a second copy, so the rules never end up posted twice.
 
 ## Running the bot's tests
 
-The bot and its tests need Python 3.10 or newer, and the bot runs on 3.12.
+The bot and its tests need Python 3.11 or newer (Pillow 13 needs it, #1401),
+and the bot runs on 3.12.
 On a Windows PC with more than one Python installed, plain `python` is
 whichever comes first on PATH (on One that is 3.9), so run them with the
 launcher:
