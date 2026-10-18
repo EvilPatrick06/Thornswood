@@ -28,7 +28,7 @@ Only what touches the world is replaced: the guild, the thread, the
 interaction, the push to the site and the file of open tickets, which goes in
 a temporary folder. Never connects to anything.
 """
-import _pyguard  # noqa: F401  (first: Python 3.10 or newer, #2276)
+import _pyguard  # noqa: F401  (first: Python 3.11 or newer, #2276)
 import asyncio
 import os
 import re

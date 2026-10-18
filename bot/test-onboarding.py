@@ -17,7 +17,7 @@ server when it runs. This runs it against a fake server and proves:
 
 Never connects to anything. Needs no discord.py.
 """
-import _pyguard  # noqa: F401  (first: Python 3.10 or newer, #2276)
+import _pyguard  # noqa: F401  (first: Python 3.11 or newer, #2276)
 import importlib.util
 import json
 import os
