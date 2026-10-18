@@ -105,8 +105,17 @@ clone, in PowerShell 7.
    .\scripts\vps\Remote.ps1 -File .\scripts\vps\Delete-Person.ps1 -Arguments '-DiscordId <their id>'
    ```
    It ends `DRY RUN: nothing was changed` and names the services a real run
-   stops for a moment.
-4. **The real run**, when nobody is on either game server (it refuses while
+   stops for a moment. Its `release` lines count what the game's registers
+   say about their characters (a house, a farm, an office, a post on a
+   board, a place on a roll or in a book, a dungeon chest's record): the
+   game server lets go of those itself as it starts again (below).
+4. **A faction or business book they own** is disbanded when the game
+   server lets go of their character, with its members' place in it. If the
+   dry run counts one (`faction and business books they own`) and the group
+   wants to keep it, a staff member hands it to another member in the game
+   first (Hand it on, on the book's tab, which only staff see), then runs the dry run
+   again.
+5. **The real run**, when nobody is on either game server (it refuses while
    anybody is, unless `-Now` is added, which drops them):
    ```powershell
    .\scripts\vps\Remote.ps1 -File .\scripts\vps\Delete-Person.ps1 -Arguments '-DiscordId <their id> -Delete -By <your name>'
@@ -115,18 +124,37 @@ clone, in PowerShell 7.
    files hold something of the person's, removes it, starts each one again,
    and ends `DELETED, and written down in C:\Thornswood-Deletions\requests.jsonl`.
    `NOT FINISHED` names a file it could not change; run it again.
-5. **What the run cannot find**, by hand: a gallery picture of theirs
+   For each game server that holds something of theirs it also writes
+   `private\deleted-characters.json`, their profile ids and their
+   characters' form ids, and its last line names those servers. As each
+   starts again, the gamemode lets go of every entry that list names
+   through that register's own rule (issue #2351, Patrick's option A of
+   16 October): their house and farm are free, an office their character
+   held ends, their posts come down with their words off, a job they had
+   taken goes back on the board, they leave every roll and book, the bed
+   nights end, and the drop box and the ledgers keep every coin and every
+   line with their name off it. Then it deletes the list. Its
+   `thornswood.log` says `release:` with counts and never a name or a
+   number; read it with
+   ```powershell
+   .\scripts\vps\Remote.ps1 'Select-String -Path C:\Thornswood-Server\thornswood.log -Pattern "release:" | Select-Object -Last 8 | ForEach-Object { $_.Line }'
+   ```
+   (`C:\Thornswood-Server-Dev` for dev). It ends `every part is done, and
+   the list is gone`; a part that says it waits runs again at that server's
+   next start, and the line says why.
+6. **What the run cannot find**, by hand: a gallery picture of theirs
    approved before 16 October 2026, removed in the hub by name. Until then the
    site kept no account with a picture once it was approved, so nothing ties
    those to them; the run finds every one sent since.
-6. **Tell them** in the ticket that it is done, and what stays: staff's
+7. **Tell them** in the ticket that it is done, and what stays: staff's
    records about them (bans, PKs, notes, the staff logs), reports they made or
-   that were made about them, a session staff marked kept, and what the game's
-   registers still say about a house or a bounty their character held (#2351
-   has the decision on those). Logs age out by their own rule, and the
-   encrypted backups expire on their schedule; the record below is why a
-   restore never brings the person back.
-7. **Then delete their ticket threads** in the Discord, which is the last
+   that were made about them, and a session staff marked kept. In the game,
+   what somebody else wrote naming their character (a letter addressed to
+   them, a thing left in a drop box for them) is that person's and stays,
+   and gold that was held for them on a hold's ledger stays with the hold.
+   Logs age out by their own rule, and the encrypted backups expire on their
+   schedule; the record below is why a restore never brings the person back.
+8. **Then delete their ticket threads** in the Discord, which is the last
    place on our side that holds what they wrote.
 
 **The record.** `C:\Thornswood-Deletions\requests.jsonl` on the box, one line
@@ -138,8 +166,19 @@ back with any of them. A request made after the last backup is only on the
 box until the next nightly run.
 
 **After a restore**, before anything starts, `Delete-Person.ps1 -Reapply`
-removes everybody in the record again. `Restore-Box.ps1` does it as its last
-step; [RESTORING.md](RESTORING.md) has the commands for every other restore.
+removes everybody in the record again, and writes each game server's list of
+deleted characters again, so each lets go of what its restored registers say
+about them as it starts. `Restore-Box.ps1` does it as its last step;
+[RESTORING.md](RESTORING.md) has the commands for every other restore,
+putting back a folder an install or a wipe set aside among them.
+
+**What the game does not let go of yet.** The guild traders' ledger
+(`private\merchant-ledger.json`) keys a supply wait, and a trade still waiting
+on a character, by that character's form id and profile; the dry run counts
+those as `left`. The merchant code is the work on #1373, and #2351 says what
+its release has to do. A crop they sowed stays in the ground with their
+number as the one who sowed it, which nobody holds any more; whoever brings
+it in empties it, and a wipe takes it.
 
 ## Accessibility scope
 
