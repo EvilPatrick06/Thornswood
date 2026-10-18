@@ -1,8 +1,8 @@
 # How gamemode.js is put together
 
 This page is for somebody opening `game\gamemode.js` for the first time. It
-is the whole of Thornswood's server side: 64,664 lines and 6 MB in one file on
-12 October (about 24,000 when this page was written), loaded by skymp5-server. It says where each system lives, which generated
+is the whole of Thornswood's server side: 69,961 lines and 6 MB in one file on
+17 October (about 24,000 when this page was written), loaded by skymp5-server. It says where each system lives, which generated
 table each script writes into it, how it reaches the server, how it talks to
 the plugins, what it keeps on disk, and which tests read it.
 
