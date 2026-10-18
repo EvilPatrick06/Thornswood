@@ -249,7 +249,7 @@ function Get-LauncherRows([string]$Channel, [string]$Root, [bool]$Named = $false
   if (-not $has -and $Root -and $Named) {
     return @(New-Row 'its Launcher folder, which a dev Ship makes itself for a folder it was named' $true `
       ('none yet in ' + $Root + ': the folder was named (-Root or Setup-ShipMachine.ps1 -Root), so a dev Ship asks for none before the build, ' +
-       'and its launcher step makes it with Install-Launcher.ps1; one that keeps the feed''s launcher publishes no exe') $null)
+       'and its launcher step makes it, as it makes it on main; one that keeps the feed''s launcher publishes no exe') $null)
   }
   $detail = $(if ($has) { $launchDir } else { 'no Launcher folder in ' + $Root + ', and a dev Ship stops on that ("No dev build at")' })
   # The main install whose dev build would go here: <root> less -DevBuild,

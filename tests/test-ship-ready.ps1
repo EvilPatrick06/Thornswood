@@ -306,7 +306,7 @@ try {
     $r = @(Get-LauncherRows 'dev' $relDev $true)
     Yes '8. dev, a named ship root with no Launcher folder: one need row, and it passes' ($r.Count -eq 1 -and $r[0].Ok -and $r[0].Level -eq 'need')
     Yes '8.   saying the Ship''s launcher step makes it, and no fix line' (
-        $r[0].Detail -match 'none yet in' -and $r[0].Detail -match 'Install-Launcher\.ps1' -and -not $r[0].Fix -and $r[0].Detail -notmatch 'No dev build at')
+        $r[0].Detail -match 'none yet in' -and $r[0].Detail -match 'its launcher step makes it' -and -not $r[0].Fix -and $r[0].Detail -notmatch 'No dev build at')
     Yes '8.   the verdict with it alone is READY' ((Get-ShipVerdict $r).Ready)
     Yes '8.   named or not, <install>-DevBuild with no Launcher folder passes only when named' (
         (@(Get-LauncherRows 'dev' $devRoot $true))[0].Ok -and -not (@(Get-LauncherRows 'dev' $devRoot $false))[0].Ok)
