@@ -71,11 +71,9 @@
       privacy page: "What cannot be undone is something you said that
       somebody else has already quoted in a report, because that now belongs
       to the report."
-    - the game's registers that name a character (property, farm claims,
-      beds, benches, the law, the books, the ledgers, the embassy roll and the
-      rest of the game server's private and data files): counted, never
-      changed, because what happens to a house or a bounty held by a deleted
-      character is the game's rule to decide (#2351 says which decision).
+    - the game's registers that it does not let go (below): the old copies a
+      game server kept in data, and the merchant ledger, whose release is the
+      merchant code's to write (#2351): counted, never changed.
     - a gallery picture with an open report against it, or taken down after
       one and still held, which is staff's while they look into it (#2352);
       and one approved before the site kept the sending account in its
@@ -85,6 +83,25 @@
       site's, the gamemode's, voice's and the bot's by size), and the
       encrypted backups, which expire on their schedule and are why the
       record exists.
+
+  WHAT THE GAME SERVER LETS GO AT ITS NEXT START (Patrick, 16 October, option
+  A on #2351: "Delete-Person.ps1 writes a list, and the gamemode releases
+  those entries at its next start"). The game's registers in a server's
+  private folder name a character: a house and its master key in
+  property.json, with the notice boards' posts and the drop box and its
+  record; a farm in farm-claims.json; an office in law.json; a bed's guests
+  and takings in beds.json; the embassy and remnant rolls in embassy.json; a
+  dungeon chest's reservation in dungeon-rewards-ledger.json; a faction or
+  business book's members, chat and owner in books.json. This script never
+  edits those: what happens to a house or a post held by somebody who is gone
+  is each register's own rule, and that rule is in the gamemode. So it counts
+  them ("release" in what it prints) and, for every server that holds
+  something of theirs, writes private\deleted-characters.json beside them:
+  their profile ids and the form ids of the characters it found there. The
+  game server's release block reads it at its start, lets go of every entry
+  through the register's own code, logs counts only and deletes the list. A
+  faction or business book they own is disbanded then, so the procedure says
+  to have staff hand it on in the game first when the group wants to keep it.
 
   A REAL RUN STOPS WHAT WRITES THOSE STORES, and only those. The site, a game
   server, a voice service and the bot each write their files while they run,
@@ -362,10 +379,12 @@ function serverSets(s) {
   holding it, or an array of numbers holding it. A count for the person
   running this to read, never a reason to change anything.
 */
-const REF_KEY = /^(pid|profile|profileid|owner|ownerpid|holder|who|by|byid|account|discordid|member|guard|tenant|guest|claimant|leader)$/i;
-function refs(v, P, id) {
+const REF_KEY = /^(pid|profile|profileid|owner|ownerpid|holder|who|by|byid|account|discordid|member|guard|tenant|guest|claimant|leader|taken|owedto|deliveredto|downby|doneby|for)$/i;
+function refs(v, P, id, A) {
   let n = 0;
   const hit = (x) => (typeof x === 'number' || (typeof x === 'string' && /^\d{1,20}$/.test(x))) && (P.has(Number(x)) || String(x) === id);
+  // A character's form id, kept as `actor` by the embassy rolls and the dungeon chests' record.
+  const hitActor = (k, x) => !!A && /^actor$/i.test(k) && typeof x === 'number' && A.has(x);
   (function walk(x, depth) {
     if (depth > 40 || x === null || typeof x !== 'object') return;
     if (Array.isArray(x)) {
@@ -375,8 +394,12 @@ function refs(v, P, id) {
     }
     let mine = false;
     for (const k of Object.keys(x)) {
-      if (hit(k)) mine = true;
+      // The merchant ledger keys a supply wait by [form id, profile, what].
+      let inKey = false;
+      if (k[0] === '[') { try { const ks = JSON.parse(k); inKey = Array.isArray(ks) && ks.some(hit); } catch (e) { inKey = false; } }
+      if (hit(k) || inKey) mine = true;
       else if (REF_KEY.test(k) && hit(x[k])) mine = true;
+      else if (hitActor(k, x[k])) mine = true;
     }
     if (mine) n++;
     for (const k of Object.keys(x)) walk(x[k], depth + 1);
@@ -402,8 +425,9 @@ const results = [];
 
 for (const person of people) {
   const id = person.discordId;
-  const r = { discordId: id, profiles: [], skipped: [], removed: {}, held: {}, left: {}, chat: [], notes: [] };
+  const r = { discordId: id, profiles: [], skipped: [], removed: {}, held: {}, left: {}, release: {}, chat: [], notes: [] };
   const removed = (k, n) => { if (n) r.removed[k] = (r.removed[k] || 0) + n; };
+  const releases = (k, n) => { if (n) r.release[k] = (r.release[k] || 0) + n; };
   const held = (k, n) => { if (n) r.held[k] = (r.held[k] || 0) + n; };
   const left = (k, n) => { if (n) r.left[k] = (r.left[k] || 0) + n; };
 
@@ -575,6 +599,8 @@ for (const person of people) {
     for (const g of serverSets(s)) {
       const R = g.root, T = g.tag;
       if (!isDir(R)) continue;
+      // The form ids of their characters found here, for the release list.
+      const A = new Set();
       const worlds = names(R).filter((n) => /^world(-before-.+)?$/i.test(n)).sort();
       for (const w of worlds) {
         const forms = path.join(R, w, 'changeForms');
@@ -594,6 +620,8 @@ for (const person of people) {
             if (isObj(o) && Number(o.profileId) > 0 && hasP(o.profileId) && !unlinks.has(p)) {
               unlinks.set(p, g.writer);
               removed(T + ': characters' + (w === 'world' && dir === forms ? '' : ' in ' + path.relative(R, dir)), 1);
+              // A character made in the world has a form id of its own, no plugin (FormDesc::ToString).
+              if (/^[0-9a-f]{1,8}$/i.test(String(o.formDesc || ''))) A.add(parseInt(o.formDesc, 16));
             }
           }
         }
@@ -622,7 +650,26 @@ for (const person of people) {
           for (const k of Object.keys(lastLeft.value)) if (hasP(k)) { delete lastLeft.value[k]; lastLeft.dirty = true; removed(T + ': when they last left', 1); }
         }
       }
-      // Every other register: counted, never changed.
+      /*
+        The game's registers (#2351, Patrick's A of 16 October): the ones the
+        gamemode keeps in private are let go by the game server itself, at
+        its next start, through each register's own rule, from the list this
+        writes beside them (private\deleted-characters.json, the release
+        block in game\gamemode.js). So here they are counted, never edited.
+        A server that holds something of theirs gets the list: their profile
+        ids and the form ids of their characters found here, merged into a
+        list still waiting there, with what was already done cleared so every
+        part runs for the new ids too. It is written like any other file of
+        that server's, so a real run stops the server, writes it and starts
+        it again, and the start lets go of it then. A copy set aside gets one
+        too, which nothing runs from until it is put back. Every other file
+        is counted and left: the old copies in data, and the merchant ledger,
+        whose release is the merchant code's to write (#2351).
+      */
+      const LIST = 'deleted-characters.json';
+      const RELEASED = /^(property|law|beds|farm-claims|embassy|books|dungeon-rewards-ledger)\.json$/i;
+      handled.add(path.join(priv, LIST).toLowerCase());
+      let theirs = 0;
       if (P.size) {
         for (const dir of [priv, data]) {
           for (const f of names(dir).sort()) {
@@ -633,9 +680,30 @@ for (const person of people) {
             let v;
             try { v = JSON.parse(fs.readFileSync(p, 'utf8').replace(/^\uFEFF/, '')); }
             catch (e) { left(T + ': ' + path.relative(R, p) + ' would not parse, so was not read', 1); continue; }
-            left(T + ': places in ' + path.relative(R, p) + ' naming their character', refs(v, P, id));
+            const n = refs(v, P, id, A);
+            if (dir === priv && RELEASED.test(f)) {
+              releases(T + ': places in ' + path.relative(R, p) + ' naming their character', n);
+              theirs += n;
+              if (f.toLowerCase() === 'books.json' && isObj(v) && Array.isArray(v.books)) {
+                releases(T + ': faction and business books they own, disbanded unless staff hand them on first',
+                         v.books.filter((b) => isObj(b) && hasP(b.owner)).length);
+              }
+            } else left(T + ': places in ' + path.relative(R, p) + ' naming their character', n);
           }
         }
+      }
+      if (P.size && (theirs || A.size)) {
+        const lf = json(path.join(priv, LIST), g.writer);
+        if (!lf.missing && !(isObj(lf.value) && Array.isArray(lf.value.profiles))) {
+          stop(lf.p + ' is not a list of deleted characters, so nothing was changed');
+        }
+        const was = lf.missing ? {} : lf.value;
+        const ids = (xs) => (Array.isArray(xs) ? xs : []).map(Number).filter((x) => Number.isSafeInteger(x) && x > 0);
+        const profiles = Array.from(new Set(ids(was.profiles).concat(Array.from(P)))).sort((x, y) => x - y);
+        const actors = Array.from(new Set(ids(was.actors).concat(Array.from(A)))).sort((x, y) => x - y);
+        lf.value = { profiles, actors };
+        lf.dirty = true;
+        releases(T + ': ' + path.relative(R, lf.p) + ', the list the game server lets go of at its next start', 1);
       }
       for (const lg of [path.join(priv, 'moderation.log'), path.join(R, 'for-bot', 'moderation.log'), path.join(priv, 'door.log')]) {
         held(T + ': staff log lines naming them (' + path.relative(R, lg) + ')', logLinesNaming(lg, P, id));
@@ -751,6 +819,8 @@ function Show([string[]]$lines, [string]$verb) {
         foreach ($n in @($r.skipped)) { if ($n) { Say ('  left       profile ' + $n + ': another account holds it too, so it is not theirs to delete') } }
         $any = $false
         foreach ($p in $r.removed.PSObject.Properties) { $any = $true; Say ('  {0,-10} {1,6}  {2}' -f $verb, $p.Value, $p.Name) }
+        # The game's registers, let go by the game server at its next start (#2351).
+        foreach ($p in $r.release.PSObject.Properties) { $any = $true; Say ('  {0,-10} {1,6}  {2}' -f 'release', $p.Value, $p.Name) }
         foreach ($p in $r.held.PSObject.Properties) { $any = $true; Say ('  {0,-10} {1,6}  {2}' -f 'kept', $p.Value, $p.Name) }
         foreach ($p in $r.left.PSObject.Properties) { $any = $true; Say ('  {0,-10} {1,6}  {2}' -f 'left', $p.Value, $p.Name) }
         foreach ($c in @($r.chat)) { if ($c) { Say ('  chat       {0} {1}: {2} lines before, {3} after' -f $c.voice, $c.file, $c.before, $c.after) } }
@@ -760,6 +830,21 @@ function Show([string[]]$lines, [string]$verb) {
     Say '  Not on this box, so not done here: their Discord tickets (staff delete those in the Discord),'
     Say '  gallery pictures approved before the site kept the sending account (remove theirs in the hub by name),'
     Say '  and the encrypted backups (they expire on their schedule; the record reapplies this after a restore).'
+}
+# Where a game server was given the list of characters to let go (#2351):
+# it does that as it starts, so what to read afterwards, and where.
+function Say-Release([string[]]$lines) {
+    $at = @()
+    foreach ($l in $lines) {
+        if ($l -notlike 'PERSON|*') { continue }
+        foreach ($p in ($l.Substring(7) | ConvertFrom-Json).release.PSObject.Properties) {
+            # A copy set aside starts nowhere until it is put back, and then a restore reapplies the record.
+            if ($p.Name -like '*deleted-characters.json*' -and $p.Name -notlike '*set aside*') { $at += ($p.Name -split ':')[0] }
+        }
+    }
+    $at = @($at | Sort-Object -Unique)
+    if (-not $at.Count) { return }
+    Say ('The game''s registers are let go as each of these starts: ' + ($at -join ', ') + '. Its thornswood.log says release: with the counts, and private\deleted-characters.json is gone once every part is done.')
 }
 function Stopped([string[]]$lines) {
     $s = @($lines | Where-Object { $_ -like 'STOP|*' } | Select-Object -First 1)
@@ -873,6 +958,7 @@ try {
             }
             Say ''
             Say ('REAPPLIED: every request in ' + $record + ' is removed again.')
+            Say-Release $done
         } else {
             $r = ((@($done | Where-Object { $_ -like 'PERSON|*' }))[0]).Substring(7) | ConvertFrom-Json
             $row = [ordered]@{
@@ -887,6 +973,7 @@ try {
             [IO.File]::AppendAllText($record, (ConvertTo-Json -InputObject $row -Depth 6 -Compress) + "`n", $utf8)
             Say ''
             Say ('DELETED, and written down in ' + $record + ' so a restore reapplies it. The nightly backup takes the record from tonight.')
+            Say-Release $done
         }
     } finally {
         foreach ($w in $stoppedHere) {
