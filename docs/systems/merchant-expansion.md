@@ -140,6 +140,25 @@ opening an offer cannot replace progression after a failed read. Only a valid
 saved rank qualifies. Existing character initialization owns migration. This
 does not enable the expanded profession, half and school quest catalogue.
 
+The source-only `game/quest-eligibility.js` contract is the next prerequisite.
+`createQuestEligibility({table, spellIds})` captures the canonical progression
+`TABLE` and `SPELL_IDS`; it does not read or write a character. `validate(gate)`
+returns a copied, frozen definition or throws. Gates are exactly `{open:true}`,
+`{classKey,rank}`, or `{profession,rank,half?,school?}`. Unknown, mixed or
+inherited fields cannot grant work. Master profession work names its owning
+half, or a school for Mage. Master class work has no half.
+
+`allows(gate,state)` returns a boolean from a saved version1 character snapshot.
+The chosen class/profession and canonical standing must match. An earned sister
+half counts, while a taught outside trade is not a chosen profession. Mage
+Master work additionally requires an exactly named, mapped rulebook Master
+spell in the learned book for the named selected school. Staff permissions,
+tomes, lower spells and unknown metadata do not count. No migration, repair,
+spell grant or input mutation occurs. The module has no production caller yet:
+the later offer/acceptance integration must capture session identity around
+non-migrating reads and use this same evaluator immediately before acceptance.
+No new quest, gate, roster cut or reward is activated by this prerequisite.
+
 ## Build order and checks
 
 | Part | Responsibility | Requires |
