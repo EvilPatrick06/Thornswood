@@ -127,8 +127,14 @@ if (-not $PSBoundParameters.ContainsKey('Root')) { $Root = Find-Root }
 # The dev launcher lives beside the main one. Its config.json carries the dev
 # ports and its Launcher folder holds the exe that gets uploaded.
 if ($Dev -and -not $PSBoundParameters.ContainsKey('Root')) { $Root = $Root + '-DevBuild' }
-if ($Dev -and -not (Test-Path (Join-Path $Root 'Launcher'))) {
-    Die "No dev build at $Root. Install it from the main launcher's Settings page first."
+# Only the folder worked out here is asked for a Launcher folder (#2662): no
+# Launcher folder in <install>-DevBuild means the dev build was never
+# installed. A folder named by -Root is not: Ship always passes one, the ship
+# root Update-ShipRoot.ps1 makes has no Launcher folder, and the exe is read
+# from it only with -Launcher, after Ship's launcher step has put it there
+# ("No launcher at" below says so when it has not).
+if ($Dev -and -not $PSBoundParameters.ContainsKey('Root') -and -not (Test-Path (Join-Path $Root 'Launcher'))) {
+    Die "No dev build at $Root. Install it from the main launcher's Settings page first, or name the folder with -Root."
 }
 
 # ------------------------------------------------------------ the feed store

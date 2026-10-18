@@ -41,9 +41,12 @@
        Get-LauncherRows: on main a folder with no launcher passes, saying
        the Ship puts the one CI built there itself, and no fix says to
        install Thornswood; on dev the Launcher folder, not the exe, is the
-       need, as Ship asks it, with the main launcher's dev build as the fix
-       only for <install>-DevBuild, where it installs, and #2662 for any
-       other folder. Get-PackageLauncherRows: a
+       need, as Ship asks it, but only of the install rule's folder: with
+       the main launcher's dev build as the fix for <install>-DevBuild,
+       where it installs, and recording a folder with Setup-ShipMachine for
+       any other; since #2662 a folder named by -Root or recorded passes
+       with no Launcher folder, as a dev Ship makes one there itself.
+       Get-PackageLauncherRows: a
        warning only, passing when the Ship builds a launcher (another number
        on main's feed), when the folder holds the feed's, and, since #2661,
        when the Ship keeps the feed's and the feed names a whole launcher
@@ -281,8 +284,9 @@ try {
     $r = @(Get-LauncherRows 'dev' $devRoot)
     Yes '8. dev, no Launcher folder: a need that fails, as a dev Ship stops' ($r.Count -eq 1 -and -not $r[0].Ok -and $r[0].Level -eq 'need')
     Yes '8.   saying a dev Ship stops on it' ($r[0].Detail -match 'No dev build at')
-    Yes '8.   <install>-DevBuild with no main launcher beside it: the fix says so, and points at #2662' (
-        $r[0].Fix -notmatch 'Settings, The dev build' -and $r[0].Fix.Contains('no main launcher is installed at ' + $mainInstall) -and $r[0].Fix -match '#2662')
+    Yes '8.   <install>-DevBuild with no main launcher beside it: the fix says so, and offers recording a folder of your own' (
+        $r[0].Fix -notmatch 'Settings, The dev build' -and $r[0].Fix.Contains('no main launcher is installed at ' + $mainInstall) -and
+        $r[0].Fix -match 'Setup-ShipMachine\.ps1 -Channel dev -Root <folder>' -and $r[0].Fix -notmatch '#2662')
     Put $mainInstall 'Launcher\Thornswood.exe' 'the main launcher'
     $r = @(Get-LauncherRows 'dev' $devRoot)
     Yes '8.   with the main install beside it: that launcher''s dev build, naming both folders' (
@@ -291,11 +295,22 @@ try {
     $relDev = Join-Path $tmp 'local\release-devbuild'
     Fresh $relDev
     $r = @(Get-LauncherRows 'dev' $relDev)
-    Yes '8. dev, a ship root like local\release-devbuild with no Launcher folder fails the same' (-not $r[0].Ok)
-    Yes '8.   and its fix is neither the main launcher''s dev build, which installs elsewhere, nor recording it again, but #2662' (
-        $r[0].Fix -notmatch 'Settings, The dev build' -and $r[0].Fix -notmatch 'Setup-ShipMachine' -and $r[0].Fix -match 'nothing else makes one' -and $r[0].Fix -match '#2662')
+    Yes '8. dev, a ship root like local\release-devbuild with no Launcher folder, as the install rule''s answer, fails the same' (-not $r[0].Ok)
+    Yes '8.   and its fix is not the main launcher''s dev build, which installs elsewhere, but recording the folder' (
+        $r[0].Fix -notmatch 'Settings, The dev build' -and $r[0].Fix -match 'Setup-ShipMachine\.ps1 -Channel dev -Root <folder>' -and $r[0].Fix -notmatch '#2662')
     $r = @(Get-LauncherRows 'dev' (Join-Path $tmp 'release-dev'))
-    Yes '8.   a folder not ending in -DevBuild names no main install' ($r[0].Fix -notmatch 'installed at' -and $r[0].Fix -match '#2662')
+    Yes '8.   a folder not ending in -DevBuild names no main install' ($r[0].Fix -notmatch 'installed at' -and $r[0].Fix -match 'Setup-ShipMachine')
+    # #2662: the same folder named by -Root or recorded in ship-roots.json is
+    # a ship root Update-ShipRoot.ps1 made, and a dev Ship makes its Launcher
+    # folder itself.
+    $r = @(Get-LauncherRows 'dev' $relDev $true)
+    Yes '8. dev, a named ship root with no Launcher folder: one need row, and it passes' ($r.Count -eq 1 -and $r[0].Ok -and $r[0].Level -eq 'need')
+    Yes '8.   saying the Ship''s launcher step makes it, and no fix line' (
+        $r[0].Detail -match 'none yet in' -and $r[0].Detail -match 'its launcher step makes it' -and -not $r[0].Fix -and $r[0].Detail -notmatch 'No dev build at')
+    Yes '8.   the verdict with it alone is READY' ((Get-ShipVerdict $r).Ready)
+    Yes '8.   named or not, <install>-DevBuild with no Launcher folder passes only when named' (
+        (@(Get-LauncherRows 'dev' $devRoot $true))[0].Ok -and -not (@(Get-LauncherRows 'dev' $devRoot $false))[0].Ok)
+    Yes '8.   main is the same named or not' ((@(Get-LauncherRows 'main' $mainRoot $true))[0].Ok -and (@(Get-LauncherRows 'main' $mainRoot))[0].Ok)
     New-Item -ItemType Directory -Force -Path (Join-Path $relDev 'Launcher') | Out-Null
     $r = @(Get-LauncherRows 'dev' $relDev)
     Yes '8. dev, an empty Launcher folder passes: Ship asks for the folder, and builds and puts the exe there' ($r[0].Ok -and $r[0].Detail -eq (Join-Path $relDev 'Launcher'))
@@ -303,6 +318,7 @@ try {
     Yes '8. dev, a file named Launcher is not the folder' (-not (@(Get-LauncherRows 'dev' $devRoot))[0].Ok)
     Yes '8. no folder known: the dev row fails, the main row still passes' (
         -not (@(Get-LauncherRows 'dev' ''))[0].Ok -and (@(Get-LauncherRows 'main' ''))[0].Ok)
+    Yes '8.   and named makes no difference to a folder that is not known' (-not (@(Get-LauncherRows 'dev' '' $true))[0].Ok)
 
     # What -Package packs as the launcher, a warning on main.
     $exe = Join-Path $mainRoot 'Launcher\Thornswood.exe'
@@ -348,7 +364,7 @@ try {
     Yes '8. the old row is gone' ($text -notmatch "Ready 'a launcher is installed'")
     Yes '8. the game folder''s fix is Update-ShipRoot, with -SkyrimFrom named, then Build-Generated' (
         $text -match "(?s)Ready 'it has its own game folder'.{0,400}Update-ShipRoot\.ps1 -Channel.{0,300}-SkyrimFrom.{0,200}Build-Generated\.ps1 -Channel")
-    Yes '8. the launcher row is asked of the folder Ship would build from' ($text -match 'foreach \(\$r in @\(Get-LauncherRows \$Channel \$Root\)\) \{ Show-Row \$r \}')
+    Yes '8. the launcher row is asked of the folder Ship would build from' ($text -match 'foreach \(\$r in @\(Get-LauncherRows \$Channel \$Root \$rootNamed\)\) \{ Show-Row \$r \}')
     Yes '8. the -Package launcher row is asked on main only, beside the other -Package row' (
         $text -match '(?s)if \(-not \$Dev\) \{\s*Head [^\n]*\n\s*foreach \(\$r in @\(Get-MainOnlyRows.{0,1200}Get-PackageLauncherRows')
 }
