@@ -103,24 +103,32 @@ function freePort(host) {
 
 let srv = null;
 let log = '';
-function listening(port) {
+/* Waits for srv's own "listening on ...:port" line, the same wait as
+   voice\test-line-close.js; tests\test-1703-test-ports.js lifts it and holds
+   it to saying when something else took the port. */
+function listening(srv, port) {
   return new Promise((ok, bad) => {
-    const said = () => {
-      const m = /\[voice\] listening on \S+:(\d+)/.exec(log);
+    let out = '';
+    const said = (d) => {
+      out += d;
+      const m = /\[voice\] listening on \S+:(\d+)/.exec(out);
       if (m && Number(m[1]) === port) { end(null); }
     };
-    const gone = (code) => end(new Error('the voice service stopped (exit ' + code + ') before it was listening. It printed:\n' + log));
+    const more = (d) => { out += d; };
+    const gone = (code) => end(new Error((/EADDRINUSE/.test(out) ? 'something else already holds port ' + port + ', so ' : '') +
+                                         'the voice service stopped (exit ' + code + ') before it was listening. It printed:\n' + out));
     const late = setTimeout(() => end(new Error('the voice service did not say it was listening on ' + port +
-                                                ' within fifteen seconds. It printed:\n' + log)), BOUND_MS);
+                                                ' within fifteen seconds. It printed:\n' + out)), 15000);
     function end(err) {
       clearTimeout(late);
       srv.stdout.removeListener('data', said);
+      srv.stderr.removeListener('data', more);
       srv.removeListener('exit', gone);
       if (err) { bad(err); } else { ok(); }
     }
     srv.stdout.on('data', said);
+    srv.stderr.on('data', more);
     srv.on('exit', gone);
-    said();
   });
 }
 
@@ -137,7 +145,7 @@ async function start() {
   });
   srv.stdout.on('data', (d) => { log += d; });
   srv.stderr.on('data', (d) => { log += d; });
-  await listening(PORT);
+  await listening(srv, PORT);
 }
 
 function done(code) {
