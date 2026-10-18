@@ -72,6 +72,8 @@ function done() {
 
 try {
   // ================================================================== N
+  const code = fs.readFileSync(path.join(REPO, 'game', 'trade-cargo.js'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  yes('N0 the module calls nothing: no require, the world, a purse or the merchant code (#512 and #1373 are their own)', !/require\(|\bmp\.|merchant|purse|price/i.test(code));
   const ships = T.createTradeCargo({ ports: ['solitude', 'windhelm', 'dawnstar'], routes: ROUTES.routes });
   const s = ships.empty();
   ships.open(s, 'ship-1', 'solitude');
