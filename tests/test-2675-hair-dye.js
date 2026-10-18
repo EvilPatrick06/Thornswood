@@ -4,7 +4,8 @@
 //
 // #2675, the first slice of hair dye: the staff's list in
 // game/data/hair-dyes.json and the pure module game/hair-dye.js that reads it.
-// Nothing in play calls either yet.
+// The gamemode's hair dye block carries both and calls them; that wiring
+// is tests/test-2675-hair-dye-wiring.js.
 //
 // D: THE LIST. The real list passes checkDyes, and every bad shape a staff
 //    edit could make is refused with a sentence, never fallen back from.
@@ -139,8 +140,14 @@ const gmHits = [];
 gm.split('\n').forEach((l, i) => { if (l.indexOf(base) >= 0) gmHits.push(i + 1); });
 const adminFrom = gm.split('\n').findIndex((l) => l === '  // ==== ADMIN_NAMES ====') + 1;
 const adminTo = gm.split('\n').findIndex((l) => l === '  // ==== end ADMIN_NAMES ====') + 1;
-yes('B1 the gamemode names the dye base only in ADMIN_NAMES, the /give lookup',
-    gmHits.length >= 1 && gmHits.every((n) => n > adminFrom && n < adminTo), 'lines ' + gmHits.join(', '));
+// And in the HAIR_DYES region, the list itself as Build-HairDyeGamemode.js
+// carries it into the hair dye block (slice 2), which test-2675-hair-dye-wiring.js
+// checks is the list byte for byte.
+const dyesFrom = gm.split('\n').findIndex((l) => l === '  // ==== HAIR_DYES ====') + 1;
+const dyesTo = gm.split('\n').findIndex((l) => l === '  // ==== end HAIR_DYES ====') + 1;
+const inList = (n) => dyesFrom > 0 && n > dyesFrom && n < dyesTo;
+yes('B1 the gamemode names the dye base only in ADMIN_NAMES, the /give lookup, and the carried list',
+    gmHits.length >= 1 && gmHits.every((n) => (n > adminFrom && n < adminTo) || inList(n)), 'lines ' + gmHits.join(', '));
 yes('B2 ...and not by its bare form id either', !new RegExp('0x0*' + fid.toString(16) + '\\b', 'i').test(gm) &&
     !new RegExp('\\b' + fid + '\\b').test(gm.replace(/[0-9.]*\.[0-9]+/g, '')));
 const others = [];

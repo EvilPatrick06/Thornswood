@@ -7,9 +7,9 @@
   stored appearance. It names no colour, no ingredient, no item and no bench;
   every one of those is in the data, which is the staff's to change.
 
-  Nothing in play calls it yet. The wiring (the steep at a cooking spot, the
-  K panel's button, the offer to dye somebody else, the one mp.set write) is
-  the next slice, and it is held like this one until 1.2.4.
+  The gamemode carries this file and the list inside its hair dye block
+  (scripts/dev/Build-HairDyeGamemode.js writes them there), and that block
+  does the steep, the K panel's button, the offer and the one write.
 
   A hair colour is the engine's int32 RGB, 0xRRGGBB. TESModPlatform's
   SetNpcHairColor reads red, green and blue out of bits 16 to 23, 8 to 15 and
@@ -17,11 +17,12 @@
   24 bits and every colour written here is 0 to 0xFFFFFF.
 */
 var RANKS = ['novice', 'advanced', 'master'];
-var TOP_KEYS = ['about', 'item', 'steepSeconds', 'steepAt', 'who', 'dyes'];
+var TOP_KEYS = ['about', 'item', 'steepSeconds', 'steepAt', 'reach', 'who', 'dyes'];
 var WHO_KEYS = ['anyone', 'halves'];
 var DYE_KEYS = ['id', 'name', 'colour', 'wash', 'strength', 'wander', 'inputs'];
 var INPUT_KEYS = ['item', 'count'];
 var WANDER_MAX = 64;
+var REACH_MAX = 2000;
 var FORM = /^[0-9a-f]{1,8}:[^:\\\/]+\.(esm|esp|esl)$/;
 var HEX = /^#[0-9a-f]{6}$/;
 var ID = /^[a-z][a-z0-9-]*$/;
@@ -49,6 +50,9 @@ function checkDyes(data) {
   if (!form(data.item)) { out.push('item is not a record such as 1a2b:Skyrim.esm'); }
   if (!count(data.steepSeconds)) { out.push('steepSeconds is not a whole number above 0'); }
   if (!form(data.steepAt)) { out.push('steepAt is not a bench keyword record'); }
+  if (typeof data.reach !== 'number' || !(data.reach > 0 && data.reach <= REACH_MAX)) {
+    out.push('reach is not a distance above 0 and at most ' + REACH_MAX);
+  }
   if (!object(data.who)) { out.push('who is not an object'); }
   else {
     strays(data.who, WHO_KEYS, 'who', out);
@@ -123,6 +127,11 @@ function covers(inputs, carried) {
   return inputs.every(function (p) { return own(carried, p.item) && count(carried[p.item]) && carried[p.item] >= p.count; });
 }
 
+// Whether everything this one dye takes is carried, as many of each as it takes.
+function hasInputs(dye, carried) {
+  return object(dye) && Array.isArray(dye.inputs) && object(carried) && covers(dye.inputs, carried);
+}
+
 // The first dye in the staff list whose inputs are all carried, or null.
 // carried is record -> how many, as the caller counted the pack.
 function dyeFor(carried, data) {
@@ -183,6 +192,93 @@ function dyeOf(entry, data, itemBaseId) {
   return null;
 }
 
+/*
+  THE PACK. entries is an inventory's entries as the engine keeps them. A dye
+  is an entry on the list's item with a dye's name; every other entry on that
+  item, and every entry on any other record, is plain. Nothing a dye is ever
+  counts as a plain item, and nothing plain is ever taken as a dye.
+*/
+function isDyeEntry(entry, data, itemBaseId) { return dyeOf(entry, data, itemBaseId) !== null; }
+
+// How many of a record's plain entries the pack holds.
+function plainCount(entries, baseId, data, itemBaseId) {
+  var n = 0;
+  (Array.isArray(entries) ? entries : []).forEach(function (e) {
+    if (object(e) && e.baseId === baseId && !isDyeEntry(e, data, itemBaseId) && count(e.count)) { n += e.count; }
+  });
+  return n;
+}
+
+// record -> how many plain ones are carried, for every record any dye takes.
+// ids is record -> the engine's base id, as the caller resolved it.
+function carriedFor(entries, data, ids, itemBaseId) {
+  var out = {};
+  data.dyes.forEach(function (d) {
+    d.inputs.forEach(function (p) {
+      if (!own(out, p.item)) { out[p.item] = own(ids, p.item) && ids[p.item] ? plainCount(entries, ids[p.item], data, itemBaseId) : 0; }
+    });
+  });
+  return out;
+}
+
+// The dyes carried, in the list's order: [{ id, name, count }].
+function dyesCarried(entries, data, itemBaseId) {
+  var held = {};
+  (Array.isArray(entries) ? entries : []).forEach(function (e) {
+    var d = dyeOf(e, data, itemBaseId);
+    if (d && count(e.count)) { held[d.id] = (held[d.id] || 0) + e.count; }
+  });
+  return data.dyes.filter(function (d) { return own(held, d.id); })
+    .map(function (d) { return { id: d.id, name: d.name, count: held[d.id] }; });
+}
+
+function copyEntries(entries) { return JSON.parse(JSON.stringify(Array.isArray(entries) ? entries : [])); }
+
+// Take n plain entries of one record out of a copy. False when short.
+function takePlain(next, baseId, n, data, itemBaseId) {
+  var left = n;
+  for (var i = 0; i < next.length && left > 0; i++) {
+    var e = next[i];
+    if (!object(e) || e.baseId !== baseId || isDyeEntry(e, data, itemBaseId) || !count(e.count)) { continue; }
+    var k = Math.min(left, e.count);
+    e.count -= k; left -= k;
+  }
+  return left === 0;
+}
+function tidy(next) { return next.filter(function (e) { return !object(e) || !own(e, 'count') || e.count > 0; }); }
+
+// The pack after a steep: the dye's inputs taken from plain entries and one
+// of the dye added under its name, on a plain entry of its own. null when an
+// input is short or a record has no base id, and then nothing changes.
+function afterSteep(entries, dye, data, ids, itemBaseId) {
+  if (!object(dye) || !Number.isSafeInteger(itemBaseId) || itemBaseId <= 0) { return null; }
+  var next = copyEntries(entries);
+  for (var i = 0; i < dye.inputs.length; i++) {
+    var p = dye.inputs[i];
+    if (!own(ids, p.item) || !ids[p.item] || !takePlain(next, ids[p.item], p.count, data, itemBaseId)) { return null; }
+  }
+  next = tidy(next);
+  var same = null;
+  for (var j = 0; j < next.length; j++) {
+    var e = next[j];
+    if (object(e) && e.baseId === itemBaseId && e.name === dye.name && Object.keys(e).length === 3) { same = e; break; }
+  }
+  if (same) { same.count += 1; } else { next.push({ baseId: itemBaseId, count: 1, name: dyeName(dye) }); }
+  return next;
+}
+
+// The pack with one of that dye used up, or null when none is carried.
+function afterUse(entries, dye, data, itemBaseId) {
+  var next = copyEntries(entries);
+  for (var i = 0; i < next.length; i++) {
+    if (dyeOf(next[i], data, itemBaseId) === dye && count(next[i].count)) {
+      next[i].count -= 1;
+      return tidy(next);
+    }
+  }
+  return null;
+}
+
 // A copy of a stored appearance with only its hair colour changed, or null
 // when it is not an appearance or the colour is not 0 to 0xFFFFFF. It never
 // touches the one it is handed.
@@ -196,6 +292,8 @@ function withHairColour(appearance, rgb) {
 }
 
 module.exports = {
-  checkDyes: checkDyes, dyeFor: dyeFor, mayMake: mayMake, mixColour: mixColour,
-  dyeName: dyeName, dyeOf: dyeOf, withHairColour: withHairColour, WANDER_MAX: WANDER_MAX
+  checkDyes: checkDyes, dyeFor: dyeFor, hasInputs: hasInputs, mayMake: mayMake, mixColour: mixColour,
+  dyeName: dyeName, dyeOf: dyeOf, withHairColour: withHairColour,
+  isDyeEntry: isDyeEntry, plainCount: plainCount, carriedFor: carriedFor, dyesCarried: dyesCarried,
+  afterSteep: afterSteep, afterUse: afterUse, WANDER_MAX: WANDER_MAX, REACH_MAX: REACH_MAX
 };

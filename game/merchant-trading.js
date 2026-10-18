@@ -128,6 +128,9 @@ function createMerchantTrading(deps) {
   var prices = deps.prices;
   var transfer = deps.transfer;
   var world = deps.world;
+  // An entry the server made into something else on a plain record (a hair
+  // dye on the Bowl, #2675) is neither counted nor taken as the plain item.
+  var minted = typeof deps.minted === 'function' ? deps.minted : function () { return false; };
   var places = deps.places || {};
   var permits = createRolePermissions(places,deps.roleTables);
   var now = deps.now || function () { return Date.now(); };
@@ -271,6 +274,7 @@ function createMerchantTrading(deps) {
     if (settlement.available()) {
       try {
         SETTLEMENT.inventory(transfer.inventory(actorId)).entries.forEach(function (entry) {
+          if (minted(entry)) return;
           counts[entry.baseId] = (counts[entry.baseId] || 0) + entry.count;
         });
       } catch (error) { packReady = false; }
@@ -606,7 +610,7 @@ function createMerchantTrading(deps) {
       if (!currentHuman || currentHuman.desc !== tradingHuman.desc || currentHuman.profileId !== tradingHuman.profileId)
         return fail('That request is not yours.');
       var expected = SETTLEMENT.inventory(transfer.inventory(actorId));
-      var outgoing = SETTLEMENT.takeEntries(expected, npcBuys ? resolved.baseId : GOLD_BASE, npcBuys ? asked.count : gold);
+      var outgoing = SETTLEMENT.takeEntries(expected, npcBuys ? resolved.baseId : GOLD_BASE, npcBuys ? asked.count : gold, minted);
       var stock = stockCopy(state.stock), credit;
       if (npcBuys) {
         stock = addStock(stock, outgoing.entries, itemName);
@@ -718,8 +722,10 @@ function installMerchantTrading(env) {
       } catch (e) {}
     });
   }
+  var minted = typeof env.minted === 'function' ? env.minted : function () { return false; };
   var trading = createMerchantTrading({
     purses: env.purses,
+    minted: minted,
     log:log,
     prices: {
       quote: function (hold, item) {
@@ -766,7 +772,7 @@ function installMerchantTrading(env) {
         var entries = (inv && inv.entries) || [];
         var n = 0;
         for (var i = 0; i < entries.length; i++) {
-          if (entries[i] && Number(entries[i].baseId) === Number(baseId)) n += Number(entries[i].count) || 0;
+          if (entries[i] && Number(entries[i].baseId) === Number(baseId) && !minted(entries[i])) n += Number(entries[i].count) || 0;
         }
         return n;
       }

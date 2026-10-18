@@ -1,8 +1,9 @@
 {
-  "about": "Hair dye (#2675). The staff's list: what a dye is carried as, where and how long it steeps, who may steep, and each dye's colour and what it takes. game/hair-dye.js reads it and names none of it. docs/systems/hair-dye.md says what each field does.",
+  "about": "Hair dye (#2675). The staff's list: what a dye is carried as, where and how long it steeps, how close you stand to dye somebody else's hair, who may steep, and each dye's colour and what it takes. game/hair-dye.js reads it and names none of it. docs/systems/hair-dye.md says what each field does.",
   "item": "98626:Skyrim.esm",
   "steepSeconds": 60,
   "steepAt": "a5cb3:Skyrim.esm",
+  "reach": 300,
   "who": { "anyone": true, "halves": {} },
   "dyes": [
     { "id": "black", "name": "Black Hair Dye", "colour": "#1b1918", "strength": 0.75, "wander": 10,

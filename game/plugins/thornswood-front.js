@@ -381,6 +381,15 @@
   */
   const APPRENTICE_KEY = SKILLS_KEY;
   /*
+    "Dye their hair" on the look prompt (#2675). K again, for the same
+    reason: it opens the K panel, on its Hair dye page with the person under
+    the crosshair and an Offer to dye on each dye you carry. Only while the
+    server's near list says you carry one (hd). A Master's Take on wins the
+    key when both apply; Dye hair under Near you on P is there either way.
+    See hairDyePress.
+  */
+  const HAIR_DYE_KEY = SKILLS_KEY;
+  /*
     "Tend their wounds" on the look prompt (#1383). THE LOCK KEY, X, and not
     a new one: every letter is already Skyrim's or ours. The two never meet:
     the lock key answers only with a door, a crop or a forge under the
@@ -444,6 +453,7 @@
   const MOLD_NAME = keyName(MOLD_KEY);
   const SLEEP_NAME = keyName(SLEEP_KEY);
   const APPRENTICE_NAME = keyName(APPRENTICE_KEY);
+  const HAIR_DYE_NAME = keyName(HAIR_DYE_KEY);
   const LOCK_NAME = keyName(LOCK_KEY);
   const MANEUVER_NAME = keyName(MANEUVER_KEY);
   const HELP_NAME = keyName(HELP_KEY);
@@ -4953,7 +4963,8 @@
   /** Draw or clear the little panel that names them and the three keys. */
   function drawPrompt(row) {
     const sig = row ? (row.n + '|' + row.f + '|' + row.m + '|' + row.y + '|' + (row.s || 0) + '|' + (row.c || '') +
-                       '|' + (row.d || 0) + '|' + (row.a ? JSON.stringify(row.a) : '') + '|' + (row.t || 0)) : '';
+                       '|' + (row.d || 0) + '|' + (row.a ? JSON.stringify(row.a) : '') + '|' + (row.hd || 0) +
+                       '|' + (row.t || 0)) : '';
     if (sig === lookingSig) { return; }
     lookingSig = sig;
     if (!row) {
@@ -4998,6 +5009,9 @@
       // server's near list says so, with the halves (#1634). See
       // apprenticePress.
       (Array.isArray(row.a) && row.a.length ? keyRow(APPRENTICE_NAME, 'Take on as apprentice', false) : '') +
+      // Only while you carry a hair dye, and the key is not Take on's: the
+      // near list's hd (#2675). See hairDyePress.
+      (row.hd && !(Array.isArray(row.a) && row.a.length) ? keyRow(HAIR_DYE_NAME, 'Dye their hair', false) : '') +
       // Only while they have a wound somebody could tend: the near list's t
       // (#1383). See treatPress.
       (row.t ? keyRow(TREAT_NAME, 'Tend their wounds', false) : '');
@@ -5242,6 +5256,55 @@
     say('take on as apprentice: ' + lookingAt);
     return true;
   }
+
+  /*
+    Offer to dye the hair of the person under the crosshair (#2675). Only
+    while the prompt offers it: the server's near list saying you carry a
+    dye. Nothing is sent from here: the K panel opens on Hair dye with that
+    person, and its Offer to dye sends the line once the dye is chosen. The
+    server checks it all again. Answers whether it was used.
+  */
+  function hairDyePress() {
+    if (!lookingAt) { return false; }
+    if (claims.chat) { return false; }
+    if (T.hasFocus('skills')) { return false; }
+    if (busyMenuOpenNow()) { return false; }
+    const near = nearList();
+    const row = (near && Object.prototype.hasOwnProperty.call(near, lookingAt)) ? near[lookingAt] : null;
+    if (!row || !row.hd) { return false; }
+    const who = { id: lookingAt, name: String(row.n || '') };
+    T.js('try{if(window.thornswoodSkills&&window.thornswoodSkills.dyeFor){' +
+         'window.thornswoodSkills.dyeFor(' + JSON.stringify(who) + ');}}catch(e){}');
+    say('dye their hair: ' + lookingAt);
+    return true;
+  }
+
+  /*
+    HAIR COLOUR (#2675). The server writes a dyed hair colour into the
+    stored appearance, and the client puts it on the character's record, but
+    the hair already drawn keeps its old colour until the game is told to
+    redraw it. So the colour on the record is read twice a second, and the
+    first time it changes after the first reading, Game.updateHairColor runs
+    once. Reading costs nothing and changes nothing; only a change redraws.
+  */
+  let hairSeen = null, hairReadAt = 0;
+  sp.on('update', guard('hair colour', () => {
+    const now = Date.now();
+    if (now - hairReadAt < 500) { return; }
+    hairReadAt = now;
+    let colour = null;
+    try {
+      const pc = sp.Game.getPlayer();
+      const form = pc ? sp.ActorBase.from(pc.getBaseObject()).getHairColor() : null;
+      colour = form ? (form.getColor() & 0xFFFFFF) : null;
+    } catch (e) { colour = null; }
+    if (colour === null) { return; }
+    if (hairSeen === null) { hairSeen = colour; return; }
+    if (colour === hairSeen) { return; }
+    hairSeen = colour;
+    try { sp.Game.updateHairColor(); } catch (e) { log('hair colour: could not redraw the hair:', e); return; }
+    log('hair colour: redrawn as ' + ('000000' + colour.toString(16)).slice(-6));
+  }));
 
   /*
     Tend the wounds of the person under the crosshair (#1383). Only while the
@@ -8473,6 +8536,8 @@
 
     // K on a person a Master could take on opens K on them (#1634).
     if (e.code === APPRENTICE_KEY && apprenticePress()) { return; }
+    // K on a person while you carry a hair dye opens K's Hair dye on them (#2675).
+    if (e.code === HAIR_DYE_KEY && hairDyePress()) { return; }
     if (e.code === SKILLS_KEY) {
       if (claims.chat) { return; }
       const busyNow = busyMenuOpen();

@@ -49,11 +49,14 @@ function addEntries(snapshot, entries) {
   });
   return inventory(next);
 }
-function takeEntries(snapshot, baseId, count) {
+// skip, when given, names entries that are not the plain item even though
+// they are on its record (a hair dye on the Bowl, #2675): they are never taken.
+function takeEntries(snapshot, baseId, count, skip) {
   var next = inventory(snapshot), taken = [], left = count;
   for (var i = 0; i < next.entries.length && left > 0; i++) {
     var row = next.entries[i];
     if (row.baseId !== baseId) continue;
+    if (typeof skip === 'function' && skip(row)) continue;
     var n = Math.min(left, row.count);
     taken.push(Object.assign({}, copy(row), {count:n}));
     row.count -= n; left -= n;
