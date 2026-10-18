@@ -60,7 +60,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1-tls-only-1-ice-socket-1-no-page-1-most-1-roster-once-1-long-command-1-captions-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1-tls-only-1-ice-socket-1-no-page-1-most-1-roster-once-1-long-command-1-captions-2';
 
 // ==== thornswood deploy record ====
 // Which commit this copy came from (#459): Install-Voice.ps1 leaves the deploy
@@ -2329,9 +2329,6 @@ const server = http.createServer((req, res) => {
                             bind: BIND,
                             turn: TURN_URL ? (TURN_SECRET ? 'ephemeral' : (TURN_USER ? 'static' : 'MISCONFIGURED')) : 'none',
                             chatRange: CHAT_RANGE,
-                            captions: { on: CAPTIONS, sent: captionCounts.sent, dropped: captionCounts.dropped,
-                                        tailMs: CAPTION_TAIL_MS, burst: CAPTION_BURST, refillMs: CAPTION_REFILL_MS,
-                                        reach: CAPTION_REACH || 'voice', textMute: CAPTION_TEXT_MUTE },
                             peers: peers.size, tracked: positions.size,
                             most: MOST, people: heldBy.size, refusedFull: refusedFull,
                             queuedCommands: commands.length,
@@ -2340,7 +2337,11 @@ const server = http.createServer((req, res) => {
                             skippedRosters: skippedRosters,
                             closedBacklogged: closedBacklogged,
                             closedSilent: closedSilent,
-                            chatRetention: { overdueDays: chatOverdue, pruneError: chatPruneError } }));
+                            chatRetention: { overdueDays: chatOverdue, pruneError: chatPruneError },
+                            // Last: /health's fields only ever go on the end (voice/test-turn-key.js).
+                            captions: { on: CAPTIONS, sent: captionCounts.sent, dropped: captionCounts.dropped,
+                                        tailMs: CAPTION_TAIL_MS, burst: CAPTION_BURST, refillMs: CAPTION_REFILL_MS,
+                                        reach: CAPTION_REACH || 'voice', textMute: CAPTION_TEXT_MUTE } }));
     return;
   }
 

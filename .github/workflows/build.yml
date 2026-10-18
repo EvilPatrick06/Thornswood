@@ -680,6 +680,20 @@ jobs:
             exit 1
           }
 
+      - name: Run the voice service's /health harness
+        shell: pwsh
+        run: |
+          # Issue #2475. voice\test-turn-key.js checks /health's fields, in
+          # order, and #2677 broke it while this build stayed green, because
+          # the harness list above runs only tests\ and voice\test-*.js ran
+          # only at night. It starts the real service on a port of its own
+          # (#1703), a few seconds.
+          & node voice\test-turn-key.js
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::error file=voice/test-turn-key.js::the voice /health harness failed, the FAIL lines above say what'
+            exit 1
+          }
+
       - name: Run the generated-files build harness
         shell: pwsh
         run: |
