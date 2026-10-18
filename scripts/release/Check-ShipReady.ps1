@@ -225,14 +225,18 @@ function Get-MainOnlyRows([string]$Channel, [string]$ServerRecord, [string[]]$Se
 #     Ship needs: main's own root, local\release-main, made on 16 Oct by
 #     Update-ShipRoot.ps1, has no Launcher folder and was NOT READY on it.
 #   - dev: "No dev build at <root>" unless <root>\Launcher is there, the folder,
-#     not the exe, before anything else; Publish-Update.ps1 asks the same.
-#     The main launcher's Settings page (The dev build) makes it, and only in
-#     <its own folder>-DevBuild (DevBuild.Root), the install rule's dev
-#     folder. Any other folder, such as one recorded with
-#     Setup-ShipMachine.ps1 -Root, is made by Update-ShipRoot.ps1, which makes
-#     no Launcher folder, so nothing a person runs makes one there (#2662).
-# One row, a need, as Ship asks it.
-function Get-LauncherRows([string]$Channel, [string]$Root) {
+#     not the exe, before anything else, but only when the folder is the
+#     install rule's (#2662): no -Root, and ship-roots.json records no dev
+#     folder (Get-DevRootRefusal). The main launcher's Settings page (The dev
+#     build) makes it, and only in <its own folder>-DevBuild (DevBuild.Root),
+#     the install rule's dev folder. A folder named by -Root or recorded with
+#     Setup-ShipMachine.ps1 -Root is made by Update-ShipRoot.ps1, which makes
+#     no Launcher folder, and a dev Ship does not ask it for one: its launcher
+#     step makes it. Publish-Update.ps1 asks only when it is given no -Root,
+#     and Ship always gives it one. Until 18 Oct both refused every folder.
+# One row, a need, as Ship asks it. $Named: the folder came from -Root or
+# ship-roots.json, not from the install rule.
+function Get-LauncherRows([string]$Channel, [string]$Root, [bool]$Named = $false) {
   $launchDir = $(if ($Root) { Join-Path $Root 'Launcher' } else { '' })
   if ($Channel -ne 'dev') {
     $exe = $(if ($launchDir) { Join-Path $launchDir 'Thornswood.exe' } else { '' })
@@ -242,6 +246,11 @@ function Get-LauncherRows([string]$Channel, [string]$Root) {
     return @(New-Row 'the launcher in it, which a main Ship puts there itself' $true $detail $null)
   }
   $has = [bool]($launchDir -and (Test-Path -LiteralPath $launchDir -PathType Container))
+  if (-not $has -and $Root -and $Named) {
+    return @(New-Row 'its Launcher folder, which a dev Ship makes itself for a folder it was named' $true `
+      ('none yet in ' + $Root + ': the folder was named (-Root or Setup-ShipMachine.ps1 -Root), so a dev Ship asks for none before the build, ' +
+       'and its launcher step makes it with Install-Launcher.ps1; one that keeps the feed''s launcher publishes no exe') $null)
+  }
   $detail = $(if ($has) { $launchDir } else { 'no Launcher folder in ' + $Root + ', and a dev Ship stops on that ("No dev build at")' })
   # The main install whose dev build would go here: <root> less -DevBuild,
   # when a main launcher is installed there. One's dev root,
@@ -250,9 +259,10 @@ function Get-LauncherRows([string]$Channel, [string]$Root) {
   if ($main -and (Test-Path -LiteralPath (Join-Path $main 'Launcher\Thornswood.exe') -PathType Leaf)) {
     $fix = 'In the main launcher installed at ' + $main + ': Settings, The dev build, Install it; it installs into ' + $Root
   } else {
-    $fix = 'A dev Ship refuses a folder with no Launcher folder (#2662). The main launcher''s dev build makes one only in <its own folder>-DevBuild' +
+    $fix = 'The main launcher''s dev build makes it only in <its own folder>-DevBuild' +
            $(if ($main) { ', and no main launcher is installed at ' + $main } else { '' }) +
-           '; a release folder Update-ShipRoot.ps1 made has none, and nothing else makes one'
+           '. Or build dev from a folder of your own: .\scripts\release\Setup-ShipMachine.ps1 -Channel dev -Root <folder> records it, ' +
+           'Update-ShipRoot.ps1 makes it, and a dev Ship asks it for no Launcher folder'
   }
   return @(New-Row 'it has the Launcher folder a dev Ship asks for' $has $detail $fix)
 }
@@ -391,8 +401,14 @@ Head 'The release folder'
 # The folder Ship would build from (#1692): -Root, or what Where.ps1 answers.
 $rootSaid = ''
 $rootGiven = [bool]$Root
+# Named: -Root, or what ship-roots.json records, as Ship tells them from the
+# install rule's folder (#2662).
+$rootNamed = $rootGiven
 if (-not $Root) {
-  try { $Root = [string](& (Join-Path $Here 'Where.ps1') $(if ($Dev) { 'ShipRootDev' } else { 'ShipRoot' })) }
+  try {
+    $Root = [string](& (Join-Path $Here 'Where.ps1') $(if ($Dev) { 'ShipRootDev' } else { 'ShipRoot' }))
+    $rootNamed = [bool][string](& (Join-Path $Here 'Where.ps1') $(if ($Dev) { 'ShipRootNamedDev' } else { 'ShipRootNamed' }))
+  }
   catch { $rootSaid = $_.Exception.Message; $Root = '' }
 }
 # What the fix lines below add, so a command names the folder this checked
@@ -400,7 +416,7 @@ if (-not $Root) {
 $rootArg = $(if ($rootGiven) { ' -Root "' + $Root + '"' } else { '' })
 Ready 'which folder the release is built from is known' (-not $rootSaid) $(if ($rootSaid) { $rootSaid } else { $Root }) `
   ('.\scripts\release\Setup-ShipMachine.ps1 -Channel ' + $Channel + ' -Root <the release folder>   (writes the file Where.ps1 ShipRoots names)')
-foreach ($r in @(Get-LauncherRows $Channel $Root)) { Show-Row $r }
+foreach ($r in @(Get-LauncherRows $Channel $Root $rootNamed)) { Show-Row $r }
 # Ship refuses a folder Vortex deploys into before anything is built (#1692).
 $vortexHere = [bool]($Root -and (Test-Path -LiteralPath (Join-Path $Root 'Game\Data\vortex.deployment.json')))
 Ready 'it is not a folder Vortex deploys into' (-not $vortexHere) $(if ($vortexHere) { 'Game\Data\vortex.deployment.json is there' } else { '' }) `
