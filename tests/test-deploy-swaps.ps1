@@ -576,7 +576,7 @@ try {
         @{ Name = 'Install-Voice.ps1'; File = 'voice/headlines.js'; How = 'changed'
            Args = @{ VpsHost = '127.0.0.1'; VpsUser = 'nobody'; Root = (Join-Path $box 'Thornswood-Voice'); Port = (PickPort); Site = ''; Bind = '0.0.0.0'
                      ChatRange = 'off'; TurnUrl = ''; TaskName = ($TaskPrefix + ' Voice'); NoPause = $true; Wait = 10 } },
-        @{ Name = 'Install-Voice.ps1'; File = 'scripts/vps/Roll-Log.ps1'; How = 'changed'
+        @{ Name = 'Install-Voice.ps1'; File = 'scripts/vps/Server-Log.js'; How = 'changed'
            Args = @{ VpsHost = '127.0.0.1'; VpsUser = 'nobody'; Root = (Join-Path $box 'Thornswood-Voice'); Port = (PickPort); Site = ''; Bind = '0.0.0.0'
                      ChatRange = 'off'; TurnUrl = ''; TaskName = ($TaskPrefix + ' Voice'); NoPause = $true; Wait = 10 } },
         @{ Name = 'Install-Bot.ps1'; File = 'bot/card.py'; How = 'staged'
@@ -794,7 +794,7 @@ try {
     $failed = $script:fail
     Yes 'Install-Voice -TaskOnly is TASK OK, the same build answering as a new process' (
         $r.Ok -and $r.Said -match 'TASK OK' -and (WaitFor { ((Build) -eq 'voice-v1') -and ((Listener $voicePort) -ne $pidBefore) }))
-    Yes '  and the task starts node through start /high' ((TaskArg ($TaskPrefix + ' Voice')) -like '*start "" /b /wait /high "*" voice-server.js >> *')
+    Yes '  and the task starts node through start /high, on server-log.js running voice (#2166)' ((TaskArg ($TaskPrefix + ' Voice')) -like '*start "" /b /wait /high "*" "*\server-log.js" --log "*\voice.log" --days 90 --stamp voice-server.js & call exit*')
     Yes '  and reads node back at High' ($r.Said -match 'node, pid \d+, runs at High priority')
     Yes '  and no file was staged, sent or swapped' (((Live $voiceRoot) -eq $live) -and $r.Said -notmatch 'Staging' -and @(Kept $voiceRoot '.stage-*').Count -eq 0)
     if ($script:fail -gt $failed) { Show }

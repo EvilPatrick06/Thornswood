@@ -454,16 +454,21 @@ and are listed below.
   it is kept for 30 days. What it deleted or cut, and any file it could not
   change, is a `[server-log]` line in `server.log` itself. An install rolls it
   whatever the size, so the run it starts has a file of its own.
-- `voice.log` (live and dev) is written by cmd's `>>` from the scheduled
-  task, and Windows will not move a file held that way while the service
-  runs. So `roll-log.ps1`, beside the service, rolls it just before the
-  service starts. A service that runs for days grows one file until its next
-  restart. An install of voice rolls its log whatever the size, so the run it
-  starts has a file of its own and the one before is `.1`.
-- `thornswood.log` (the gamemode), `site.log` (the website) and `bot.log`
-  roll themselves. The bot's is written by its Windows service,
-  `ThornswoodBot` (`scripts\vps\BotService.cs`, issue #465), which rolls it
-  by size while the bot runs.
+- `voice.log` (live and dev) is written by the same `server-log.js`, beside
+  the voice service, which its task runs voice under with `--days 90
+  --stamp` (#2166): rolled at midnight and at 4 MB into
+  `voice.log.<when it was rolled>`, each line stamped with its time, and no
+  line in any of them kept past 90 days. Until 17 Oct 2026 it was cmd's `>>`
+  with `roll-log.ps1` in front, rolled only at a start. An install of voice
+  rolls its log whatever the size, so the run it starts has a file of its own.
+- `thornswood.log` (the gamemode) rolls itself by size, and the game server's
+  `server-log.js` (`--also thornswood.log`) moves it aside once its first
+  line is from an earlier day and cuts every rolled copy of it to 90 days
+  (#2166). `site.log` (the website) and `bot.log` roll themselves, by size,
+  and since #2166 by age as well: the live file once its first line is 30
+  days old, and a rolled copy deleted once its last write is 59 days old, so
+  nothing in either reaches 90 days. The bot's is written by its Windows
+  service, `ThornswoodBot` (`scripts\vps\BotService.cs`, issue #465).
 - `C:\Thornswood-Watch\watch.log` and `restarts.txt` beside it are not
   rolled. Past 2,000 lines the watcher keeps the last 1,000 of each and the
   rest is gone.

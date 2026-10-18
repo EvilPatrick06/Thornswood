@@ -133,7 +133,7 @@ if ($cmdAsts.Count -eq 1) {
         $n -is [System.Management.Automation.Language.BinaryExpressionAst] -and $n.Operator -eq 'Format' }, $true)
     if ($fmtAst -and $fmtAst.Left -is [System.Management.Automation.Language.StringConstantExpressionAst]) { $format = $fmtAst.Left.Value }
 }
-Yes 'it starts node through start "" /b /wait /high, on server-log.js running the server' ($format -and $format.Contains('start "" /b /wait /high "{0}" "{1}" --log "{2}" dist_back/skymp5-server.js'))
+Yes 'it starts node through start "" /b /wait /high, on server-log.js running the server' ($format -and $format.Contains('start "" /b /wait /high "{0}" "{1}" --log "{2}" --also thornswood.log dist_back/skymp5-server.js'))
 Yes '  and hands the server''s exit code back as the task''s' ($format -and $format.Contains('& call exit %^errorlevel%"'))
 
 # ---- 2. run, through Task Scheduler ----------------------------------------------

@@ -271,24 +271,25 @@ if (Test-Path $liveVoice) {
     if (-not (Test-Path $devVoice)) { New-Item -ItemType Directory -Path $devVoice | Out-Null }
     Lock-Dir $devVoice
     Say "  $devVoice is SYSTEM's and Administrators' only"
-    # By name: the program, every file it requires, and the roller.
+    # By name: the program, every file it requires, and the log writer it runs
+    # under (#2166).
     # voice-server.js requires headlines.js at its first lines since #1406,
     # and stops there without it (#1870); tests\test-dev-instance.ps1 reads
     # the requires out of voice\voice-server.js and holds this list to them.
     # Nothing else in live's folder is dev's to have, the page live may still
     # keep in public included: the service serves none since #1822.
-    & robocopy $liveVoice $devVoice voice-server.js headlines.js roll-log.ps1 /XF *.log *.log.* /NFL /NDL /NJH /NJS /NP | Out-Null
+    & robocopy $liveVoice $devVoice voice-server.js headlines.js server-log.js /XF *.log *.log.* /NFL /NDL /NJH /NJS /NP | Out-Null
     Say ("  voice program copied (robocopy code {0})" -f $LASTEXITCODE)
     # The settings come from the environment. A run file sets them, so the
     # task command stays free of cmd's quoting rules. Auth on and loopback,
     # as live runs; Install-Voice.ps1 -Root C:\Thornswood-Voice-Dev keeps both.
-    # roll-log.ps1 came across with the rest and runs before node opens
-    # voice.log, the one moment nothing holds it. See Roll-Log.ps1.
+    # server-log.js came across with the rest and runs voice, writing
+    # voice.log itself: rolled at midnight and at 4 MB, each line stamped, and
+    # nothing kept past 90 days (#2166), the way Install-Voice.ps1 runs live.
     # node goes through start /high, so dev voice runs High the way
     # Install-Voice.ps1 starts it (#2491); the task's own priority, copied
     # from live voice's, makes only this cmd.exe High.
     $run = Join-Path $devVoice 'run-dev-voice.cmd'
-    $psExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
     $lines = @(
         '@echo off',
         ('set THORNSWOOD_VOICE_PORT={0}' -f $devVoicePort),
@@ -296,8 +297,7 @@ if (Test-Path $liveVoice) {
         'set THORNSWOOD_VOICE_BIND=127.0.0.1',
         'set THORNSWOOD_SITE=https://thornswood.net',
         ('cd /d "{0}"' -f $devVoice),
-        ('"{0}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{1}\roll-log.ps1" -Path "{1}\voice.log"' -f $psExe, $devVoice),
-        ('start "" /b /wait /high "{0}" voice-server.js >> "{1}\voice.log" 2>&1' -f $node, $devVoice)
+        ('start "" /b /wait /high "{0}" "{1}\server-log.js" --log "{1}\voice.log" --days 90 --stamp voice-server.js' -f $node, $devVoice)
     )
     [IO.File]::WriteAllLines($run, [string[]]$lines, (New-Object Text.ASCIIEncoding))
     Say '  dev voice runs with auth on, on 127.0.0.1 only'
