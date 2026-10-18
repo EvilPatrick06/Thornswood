@@ -627,8 +627,13 @@ function Register-ServerTask([string]$writer) {
     # server ended, as it did before (measured 12 Oct: 3 for a node that
     # exited 3, 0 without it). The log path is on the line, which is how
     # ServerProcesses finds this root's cmd.exe.
+    #
+    # --also thornswood.log (#2166): the gamemode's own log, in this same
+    # folder (the task's working directory), names people too and used to
+    # roll by size only. server-log.js moves it aside daily and cuts every
+    # rolled copy of it to 90 days, so nothing in game\ had to change.
     $log = Join-Path $Root 'server.log'
-    $cmd = ('/c "start "" /b /wait /high "{0}" "{1}" --log "{2}" dist_back/skymp5-server.js & call exit %^errorlevel%"' -f $node.Source, $writer, $log)
+    $cmd = ('/c "start "" /b /wait /high "{0}" "{1}" --log "{2}" --also thornswood.log dist_back/skymp5-server.js & call exit %^errorlevel%"' -f $node.Source, $writer, $log)
     $action = New-ScheduledTaskAction -Execute "$env:SystemRoot\System32\cmd.exe" `
                                       -Argument $cmd `
                                       -WorkingDirectory $Root
@@ -737,9 +742,11 @@ function Copy-LogWriter {
 # run this install starts has a file of its own and the tail read after it is
 # only this run, and every rolled file cut to the last 30 days. Never deleted
 # whole: deleting it is how the evidence for the last crash disappeared.
+# thornswood.log is aged with it, to 90 days (#2166).
 function Roll-ServerLog([string]$writer) {
     $log = Join-Path $Root 'server.log'
-    & $node.Source $writer --log $log --roll | ForEach-Object { Write-Host $_ -ForegroundColor DarkGray }
+    $gm = Join-Path $Root 'thornswood.log'
+    & $node.Source $writer --log $log --also $gm --roll | ForEach-Object { Write-Host $_ -ForegroundColor DarkGray }
     if ($LASTEXITCODE -ne 0) { Say ("server-log.js could not roll server.log (exit {0}); the server appends to it and rolls it at midnight" -f $LASTEXITCODE) 'Yellow' }
 }
 
