@@ -63,9 +63,10 @@
   not the world, and a profile keeps its id through a wipe, so the menu
   stays as they set it. private\merchant-ledger.json is the guild traders'
   purses and shelves, and the merchant code refuses to start without it
-  (requireMerchantEvidence), so it is never moved by hand; its supply waits
-  and any trade waiting on a character are the merchant code's (#1373,
-  #2351). Season, the benches and the door are the server's, not anybody's.
+  (requireMerchantEvidence), so it is never moved by hand. A deleted
+  character's supply waits and waiting trade are let go by the purse service
+  from the list (#2351, #2652); a wipe writes no list, so a trade waiting on
+  a wiped character stays waiting (#2652 says so). Season, the benches and the door are the server's, not anybody's.
 
   It does NOT delete anything. It stops the server, renames the storage out of
   the way with today's date on it, and starts the server again on an empty one.

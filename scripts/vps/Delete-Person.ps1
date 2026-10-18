@@ -69,8 +69,7 @@
       somebody else has already quoted in a report, because that now belongs
       to the report."
     - the game's registers that it does not let go (below): the old copies a
-      game server kept in data, and the merchant ledger, whose release is the
-      merchant code's to write (#2351): counted, never changed.
+      game server kept in data: counted, never changed.
     - a gallery picture with an open report against it, or taken down after
       one and still held, which is staff's while they look into it (#2352);
       and one approved before the site kept the sending account in its
@@ -647,11 +646,11 @@ for (const person of people) {
         that server's, so a real run stops the server, writes it and starts
         it again, and the start lets go of it then. A copy set aside gets one
         too, which nothing runs from until it is put back. Every other file
-        is counted and left: the old copies in data, and the merchant ledger,
-        whose release is the merchant code's to write (#2351).
+        is counted and left: the old copies in data. The merchant ledger is
+        released like the rest, by the purse service at NPC startup (#2652).
       */
       const LIST = 'deleted-characters.json';
-      const RELEASED = /^(property|law|beds|farm-claims|embassy|books|dungeon-rewards-ledger)\.json$/i;
+      const RELEASED = /^(property|law|beds|farm-claims|embassy|books|dungeon-rewards-ledger|merchant-ledger)\.json$/i;
       handled.add(path.join(priv, LIST).toLowerCase());
       let theirs = 0;
       if (P.size) {

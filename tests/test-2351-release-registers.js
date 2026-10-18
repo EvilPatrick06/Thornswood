@@ -28,6 +28,9 @@
        the file still verifies and loads again
     K  the books: a book they own is disbanded with its ledger entries, their
        membership and their chat lines go, and when they last left
+    M  the guild traders' ledger, as the NPC startup reads the purses
+       (#2652): their supply waits go and a trade waiting on them is cleared,
+       somebody else's stay, and every purse and shelf is the same
     L  the log says counts and nothing else
     W  a part that cannot write waits, alone, for the next start; a list that
        is not one releases nothing and is left
@@ -64,7 +67,10 @@ const parts = {
   embassy: slice('// ==== thornswood embassy and remnant ====', '// ==== end thornswood embassy and remnant ===='),
   ledger: slice('function createPrivateMerchantLedger(', 'function npcMerchantManifest('),
   dungeon: slice('// ==== thornswood dungeon loot ====', '// ==== end thornswood dungeon loot ===='),
-  books: slice('/* BOOKS-START */', '// ==== thornswood chat commands ====')
+  books: slice('/* BOOKS-START */', '// ==== thornswood chat commands ===='),
+  purses: slice('function npcMerchantManifest(', '// NPC MERCHANT PURSES END'),
+  startup: slice('// NPC SERVER STARTUP BEGIN', '// NPC SERVER STARTUP END', true),
+  waiting: slice('// NPC SERVER STARTUP END', '// ==== thornswood custom quests ====')
 };
 for (const k of Object.keys(parts)) { yes('R0 ' + k + ' is in gamemode.js where this harness looks', !!parts[k]); }
 if (Object.keys(parts).some(function (k) { return !parts[k]; })) { done(); }
@@ -79,8 +85,10 @@ for (const [part, where] of [['farms', parts.farming], ['property', parts.proper
 yes('R2 the books ask for theirs as they start', parts.books.indexOf("g.__thornswoodRelease('books', api.release)") >= 0);
 yes('R3 property lets go before rolesRead, which would name the character in the log',
     parts.property.indexOf("g.__thornswoodRelease('property', release)") < parts.property.lastIndexOf('rolesRead();'));
-yes('R4 and every part waiting is said once the books have loaded',
-    parts.books.indexOf('__thornswoodReleaseWaiting();') > parts.books.indexOf("g.__thornswoodRelease('books'"));
+yes('R2 the NPC startup asks for the merchants\' part once the purses are read (#2652)',
+    parts.startup.indexOf("globalThis.__thornswoodRelease('merchants',merchants.release)") > parts.startup.indexOf('merchants=createNpcMerchantPurses('));
+yes('R4 and every part waiting is said once, after the NPC startup, the last block that asks',
+    parts.waiting.indexOf('__thornswoodReleaseWaiting();') > 0 && parts.books.indexOf('__thornswoodReleaseWaiting();') < 0);
 
 // ------------------------------------------------------------- stand-ins --
 const ME = '111111111111111111', YOU = '222222222222222222';
@@ -88,6 +96,8 @@ const P1 = 5001, P2 = 5002, PY = 6001, PZ = 6002;     // P1 and P2 are theirs; P
 const A1 = 0xff000a01, A2 = 0xff000a02, AY = 0xff000a09;  // form ids: theirs, theirs, yours
 const NOW = Date.now();
 const GOLD = 15;
+const MKEY_1 = JSON.stringify([A1.toString(16), P1, 'iron ore']), MKEY_2 = JSON.stringify([A2.toString(16), 77, 'wheat']);
+const MKEY_Y = JSON.stringify([AY.toString(16), PY, 'iron ore']);
 
 function checksum(doc) {
   return crypto.createHash('sha256').update(JSON.stringify([doc.version, doc.entries])).digest('hex');
@@ -193,6 +203,17 @@ function registers(dir) {
   });
   w('last-left.json', { [P1]: NOW, [PY]: NOW });
   w('benches.json', { whiterun: 4278190081 });
+  const merchants = { version: 1, entries: {
+    '9:Skyrim.esm': { version: 1, reference: '9:Skyrim.esm', base: 'a:Skyrim.esm', purse: 280, stock: [{ baseId: 4096, count: 3 }], revision: 4,
+      supply: { [MKEY_1]: NOW, [MKEY_2]: NOW, [MKEY_Y]: NOW },
+      pending: { version: 3, id: 'dev:9:4', human: { desc: A1.toString(16), profileId: P1 }, kind: 'supply', phase: 'credit',
+                 previous: { supply: { [MKEY_2]: NOW, [MKEY_Y]: NOW } }, next: { purse: 280, stock: [{ baseId: 4096, count: 3 }], supply: {} } } },
+    '8:Skyrim.esm': { version: 1, reference: '8:Skyrim.esm', base: 'a:Skyrim.esm', purse: 300, stock: [], revision: 2, supply: {},
+      pending: { version: 3, id: 'dev:8:2', human: { desc: AY.toString(16), profileId: PY }, kind: 'sell', phase: 'debit',
+                 previous: { purse: 300, stock: [], supply: {} }, next: { purse: 290, stock: [{ baseId: 4096, count: 1 }], supply: {} } } }
+  } };
+  fs.writeFileSync(path.join(P, 'merchant-ledger.json'), JSON.stringify({ version: merchants.version, entries: merchants.entries, sha256: checksum(merchants) }));
+  fs.writeFileSync(path.join(P, 'merchant-ledger.initialized'), '1');
   w('deleted-characters.json', { profiles: [P1, P2], actors: [A1, A2] });
   return P;
 }
@@ -254,12 +275,27 @@ function start(dir, opt) {
   const was = process.cwd();
   process.chdir(dir);
   try {
-    for (const k of ['release', 'crops', 'farming', 'property', 'embassy', 'ledger', 'dungeon', 'books']) {
+    for (const k of ['release', 'crops', 'farming', 'property', 'embassy', 'ledger', 'dungeon', 'books', 'purses']) {
       vm.runInContext(parts[k], box, { filename: 'gamemode.js (' + k + ')' });
     }
+    // The NPC startup as far as its part (#2652): the real purse service on
+    // the real ledger file, asking as the startup does (R2 checks the line).
+    vm.runInContext(MERCHANT_START, box, { filename: 'NPC startup (merchant purses)' });
+    vm.runInContext(parts.waiting, box, { filename: 'gamemode.js (after the NPC startup)' });
   } finally { process.chdir(was); }
   return { box: box, logged: logged };
 }
+
+const MERCHANT_START = '(function () {' +
+  "  var cfg = { privDir: 'private', dataDir: 'data', thornswoodServer: 'dev' };" +
+  "  var refs = ['9:Skyrim.esm', '8:Skyrim.esm'];" +
+  "  var api = { makeProperty: function () { }, getIdFromDesc: function (d) { return d === '9:Skyrim.esm' ? 9 : d === '8:Skyrim.esm' ? 8 : 0; }," +
+  "    getNpcAIState: function () { return { isHuman: false }; }, get: function (id, k) { return k === 'baseDesc' ? 'a:Skyrim.esm' : undefined; }, set: function () { } };" +
+  "  var merchants = createNpcMerchantPurses(api, { keep: refs.map(function (r) { return [r, 'a:Skyrim.esm', null, null, null, null, 'trader']; }) }," +
+  "    createPrivateMerchantLedger(require('fs'), require('path'), cfg, refs, null));" +
+  "  globalThis.__thornswoodTestMerchants = merchants;" +
+  "  if (typeof globalThis.__thornswoodRelease === 'function') globalThis.__thornswoodRelease('merchants', merchants.release);" +
+  '})();';
 
 function j(dir, f) { return JSON.parse(fs.readFileSync(path.join(dir, 'private', f), 'utf8')); }
 function held(n) {
@@ -288,11 +324,11 @@ try {
   const L = run.logged.filter(function (l) { return /^release: /.test(l); });
 
   yes('R5 the list is read once and every part is let go at this start (' + L.length + ' lines)',
-      L.length === 7 && /a list of 2 profile\(s\) and 2 character\(s\) to let go, at server start/.test(L[0]));
-  yes('R6 in the order the blocks load', ['farms', 'property', 'embassy', 'dungeon', 'books'].every(function (p, i) {
+      L.length === 8 && /a list of 2 profile\(s\) and 2 character\(s\) to let go, at server start/.test(L[0]));
+  yes('R6 in the order the blocks load', ['farms', 'property', 'embassy', 'dungeon', 'books', 'merchants'].every(function (p, i) {
     return new RegExp('^release: ' + p + ': ').test(L[i + 1]);
   }));
-  yes('R7 and then the list is gone', /every part is done, and the list is gone/.test(L[6]) &&
+  yes('R7 and then the list is gone', /every part is done, and the list is gone/.test(L[7]) &&
       !fs.existsSync(path.join(dir, 'private', 'deleted-characters.json')));
 
   // ---- F
@@ -379,6 +415,19 @@ try {
   // ---- untouched
   yes('R8 a register that names nobody is not written', fs.readFileSync(path.join(dir, 'private', 'benches.json'), 'utf8') === before['benches.json']);
 
+  // ---- M (#2652)
+  const ml = j(dir, 'merchant-ledger.json');
+  const m9 = ml.entries['9:Skyrim.esm'];
+  const mWas = JSON.parse(before['merchant-ledger.json']);
+  yes('M1 their supply waits go, by profile and by form id, and somebody else\'s stays',
+      JSON.stringify(Object.keys(m9.supply)) === JSON.stringify([MKEY_Y]) && m9.supply[MKEY_Y] === NOW);
+  yes('M2 the trade waiting on them is cleared, the trader keeping what it already held',
+      m9.pending === null && m9.purse === 280 && JSON.stringify(m9.stock) === JSON.stringify([{ baseId: 4096, count: 3 }]) && m9.revision === 5);
+  yes('M3 a trade waiting on somebody else is as it was',
+      JSON.stringify(ml.entries['8:Skyrim.esm']) === JSON.stringify(mWas.entries['8:Skyrim.esm']));
+  yes('M4 the ledger still verifies', ml.sha256 === checksum(ml));
+  yes('M5 the log says counts: ' + (L[6] || '').replace('release: merchants: ', ''), L[6] === 'release: merchants: merchants 1, supply 2, trades 1');
+
   // ---- L
   const all = run.logged.join('\n');
   yes('L1 the log says counts: property ' + (L[2] || '').replace('release: property: ', ''),
@@ -405,8 +454,8 @@ try {
   yes('W1 a roll file that cannot be read keeps the embassy\'s part waiting, said in the log',
       w1.logged.some(function (l) { return l === 'release: embassy could not write what it let go, so its part waits for the next start'; }) &&
       w1.logged.some(function (l) { return l === 'release: embassy did not let go at this start, so the list waits for the next one'; }));
-  yes('W2 the list stays with the other four parts marked done',
-      JSON.stringify(Object.keys(list1.done).sort()) === JSON.stringify(['books', 'dungeon', 'farms', 'property']) &&
+  yes('W2 the list stays with the other five parts marked done',
+      JSON.stringify(Object.keys(list1.done).sort()) === JSON.stringify(['books', 'dungeon', 'farms', 'merchants', 'property']) &&
       JSON.stringify(list1.profiles) === JSON.stringify([P1, P2]));
   // A claim made by a listed profile after the first start is not a released one.
   const p2 = j(dir2, 'property.json');

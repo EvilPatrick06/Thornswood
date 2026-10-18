@@ -279,7 +279,7 @@ try {
     Yes '  and the list it writes for each server that holds something of theirs, the copy an install set aside too' (
         (Said 'release\s+1\s+live game server: private\\deleted-characters\.json, the list') -and (Said 'release\s+1\s+dev game server: private\\deleted-characters\.json') -and
         (Said 'release\s+1\s+live game server, set aside as Thornswood-Server\.prev-20261001-000000: private\\deleted-characters\.json'))
-    Yes '  and counts the merchant ledger as left, its release being the merchant code''s' (Said 'left\s+1\s+live game server: places in private\\merchant-ledger\.json naming their character')
+    Yes '  and counts the merchant ledger as released, which the purse service lets go at the next start (#2652)' (Said 'release\s+1\s+live game server: places in private\\merchant-ledger\.json naming their character')
     Yes '  and says nothing of a register that names nobody of theirs' (-not (Said 'benches\.json') -and -not (Said 'deleted-characters\.json naming'))
     if (-not (Said 'A real run stops these')) { Show }
     Yes '  and names the services a real run would stop' (Said 'A real run stops these while it changes their files, then starts them again: the site, the live game server, the dev game server, live voice, dev voice, the bot\.')
