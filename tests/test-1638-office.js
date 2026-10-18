@@ -98,7 +98,9 @@ const NAMES = ['officeView', 'officeHolders', 'officeRedraw', 'officeCmd', 'offi
                'isStewardOf', 'stewardHoldsOf', 'isSteward', 'isGuard', 'guardHoldsOf', 'jarlClashOf', 'officeOf',
                'evict', 'rentCmd', 'boxCmd', 'moveBoard', 'board', 'command', 'holderOf', 'here', 'buildingOf',
                'boxAt', 'holdOfBox', 'rentDue', 'nameOf', 'profileOf', 'onlineActorOf', 'redrawPanel', 'personName',
-               'boardHere', 'holdOfBuilding', 'notStewardHere'];
+               'boardHere', 'holdOfBuilding', 'notStewardHere',
+               // Staff at any door (#2551, Patrick, 17 Oct).
+               'isStaffHere', 'settleAs', 'settleWhere', 'staffRecord'];
 const lifted = {};
 const missing = [];
 NAMES.forEach(function (n) { lifted[n] = fn(n); if (!lifted[n]) { missing.push(n); } });
@@ -166,7 +168,15 @@ function server() {
       .concat(Object.prototype.hasOwnProperty.call(all, pid) ? [] : [Number(pid)]);
   };
   const told = [];
+  // Staff (#2551): the chat block's staff test, and the staff block's proof and log, as tables.
+  const staff = {};
+  const staffLog = [];
   const g = {
+    __thornswoodIsStaff: function (pid) { return !!staff[pid]; },
+    __thornswoodStaff: {
+      unproven: function (cmd) { return cmd && cmd.proven === true ? '' : 'Staff commands need the chat to have proved who you are.'; },
+      record: function () { staffLog.push(Array.prototype.slice.call(arguments)); }
+    },
     __thornswoodOffices: function (pid) { return JSON.parse(JSON.stringify(roles[pid] || blank())); },
     __thornswoodOfficesOnRecord: function (pid) { return JSON.parse(JSON.stringify(roles[pid] || blank())); },
     __thornswoodAccountOf: function (pid) { return account[pid] || ''; },
@@ -240,7 +250,7 @@ function server() {
   const make = new Function('mp', 'g', 'boards', 'reg', body.join('\n'));
   const api = make(mp, g, boards, reg);
   api.people = people; api.writes = writes; api.roles = roles; api.account = account; api.clash = clash;
-  api.site = site; api.reg = reg; api.toldOut = told;
+  api.site = site; api.reg = reg; api.toldOut = told; api.staff = staff; api.staffLog = staffLog;
   /*
     The role, given in Discord to the account of pid, and, unless noChar, this
     character holding the office for it, as if named or chosen.
@@ -261,10 +271,12 @@ function server() {
     online.push(actor);
   };
   api.view = function (actor) { return api.officeView(actor, people[actor].pid); };
-  api.say = function (actor, text) {
+  // cmd is the queued line handle() hands on (#2551): proven, unless a test says otherwise.
+  api.say = function (actor, text, cmd) {
     const parts = text.trim().split(/\s+/);
     const told = [];
-    const answered = api.command(parts[0], parts, actor, people[actor].pid, function (pid, m) { told.push([pid, m]); });
+    const answered = api.command(parts[0], parts, actor, people[actor].pid, function (pid, m) { told.push([pid, m]); },
+                                 cmd || { proven: true, profileId: people[actor].pid, text: text });
     return { answered: answered, told: told.filter(function (t) { return t[0] === people[actor].pid; })
                                            .map(function (t) { return t[1]; }).join('\n'),
              all: told };
@@ -290,6 +302,8 @@ function world() {
   srv.add(RJARL, P_RJARL, 'Laila');
   srv.give(P_JARL, 'jarl', 'whiterun');
   srv.give(P_RJARL, 'jarl', 'riften');
+  // The admin is staff, by the chat block's staff test, and holds no role (#2551).
+  srv.staff[P_ADMIN] = true;
   return srv;
 }
 
@@ -298,7 +312,12 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
   {
     const srv = world();
     yes('A1 somebody with no office gets no Office page', srv.view(NOBODY) === null);
-    yes('A2 nor does an admin with no role: staff hold no office by being staff', srv.view(ADMIN) === null);
+    const sv = srv.view(ADMIN);
+    yes('A2 staff with no role hold no office by being staff, but get the page for the door (#2551): staff, ' +
+        'no office, no box and no boards',
+        !!sv && sv.staff === true && sv.steward === false && sv.jarls.length === 0 && sv.stewardOf.length === 0 &&
+        sv.courtOf.length === 0 && sv.guardOf.length === 0 && sv.door === null && sv.box === null && sv.boards.length === 0);
+    yes('A2 and nobody else is staff here', srv.view(JARL).staff === false);
     const v = srv.view(JARL);
     yes('A3 the Jarl of Whiterun, by the role, gets the page with Whiterun and its three offices, and nothing to take or pick',
         !!v && v.jarls.length === 1 && v.jarls[0].hold === 'whiterun' && v.jarls[0].where === 'Whiterun' &&
@@ -505,7 +524,13 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
     yes('E6 somebody who is not a steward cannot set it', srv.say(NOBODY, '/rent 5').told === 'Only a steward sets rent.' &&
         srv.claims[HOUSE].rent.amount === 50);
     srv.atDoor(ADMIN);
-    yes('E6 nor can an admin with no role', srv.say(ADMIN, '/rent 5').told === 'Only a steward sets rent.');
+    const sr = srv.say(ADMIN, '/rent 50');
+    yes('E6 staff with no role set it, as staff, and it is in the staff log (#2551) (' + sr.told + ')',
+        sr.told === 'As staff: Breezehome pays 50 gold every 7 days now. It is in the staff log.' &&
+        srv.claims[HOUSE].rent.amount === 50 && srv.staffLog.length === 1 &&
+        JSON.stringify(srv.staffLog[0]) === JSON.stringify(['rent', P_ADMIN, 'Staff', P_ALICE, 'Alice',
+          '50 gold every 7 days on Breezehome, in Whiterun', 0,
+          { building: HOUSE, buildingName: 'Breezehome', hold: 'whiterun', as: 'staff' }]));
     yes('E7 a rent that is not a number of gold is refused in words that type nothing',
         srv.say(STEW, '/rent lots').told === 'The rent is a number of gold above 0.' && srv.claims[HOUSE].rent.amount === 50);
     srv.say(STEW, '/rent -');
@@ -540,6 +565,52 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
     srv.atDoor(RJARL);
     yes('E14 nor does the Jarl of Riften', srv.say(RJARL, '/evict').told === WHOSE && srv.claims[HOUSE].by === P_ALICE);
     yes('E15 anybody still reads the rent at the door', srv.say(NOBODY, '/rent').told === 'Breezehome has no rent on it.');
+  }
+
+  // --------------------------- S. staff at any door (#2551, Patrick, 17 Oct)
+  {
+    const srv = world();
+    const alices = function () { return { by: P_ALICE, name: 'Alice', at: Date.now(), touched: Date.now(), locked: false }; };
+    srv.claims[HOUSE] = alices();
+    srv.atDoor(ADMIN);
+    const d = srv.view(ADMIN).door;
+    yes('S1 staff at a Whiterun door get the door card, acting as staff and not as its steward',
+        !!d && d.name === 'Breezehome' && d.by === 'Alice' && d.where === 'Whiterun' && d.ours === false && d.staff === true);
+    const un = srv.say(ADMIN, '/evict', { proven: false, profileId: P_ADMIN, text: '/evict' });
+    yes('S2 a staff press the chat did not prove is refused with the staff block\'s reason; nothing ends, nothing is logged (' +
+        un.told + ')', /proved who you are/.test(un.told) && !!srv.claims[HOUSE] && srv.staffLog.length === 0);
+    srv.writes.length = 0;
+    const ev = srv.say(ADMIN, '/evict');
+    yes('S3 a proven staff press ends the claim, says it is in the staff log, and the page is written again (' + ev.told + ')',
+        !srv.claims[HOUSE] && srv.writesFor(ADMIN) === 1 &&
+        ev.told === 'As staff, you end Alice\'s claim on Breezehome. What is inside is untouched, and any key they hold ' +
+                    'still works. It is in the staff log.');
+    const row = srv.staffLog[0] || [];
+    yes('S3 and the staff log has who pressed, whose claim, the building and its hold',
+        srv.staffLog.length === 1 && row[0] === 'evict' && row[1] === P_ADMIN && row[2] === 'Staff' && row[3] === P_ALICE &&
+        row[4] === 'Alice' && row[5] === 'Breezehome, in Whiterun' && row[7] && row[7].building === HOUSE &&
+        row[7].hold === 'whiterun' && row[7].as === 'staff');
+    // Staff who keep the building's hold act as its steward, as anybody who keeps it does.
+    srv.give(P_STEW, 'steward', 'whiterun');
+    srv.staff[P_STEW] = true;
+    srv.claims[HOUSE] = alices();
+    srv.atDoor(STEW);
+    const sd = srv.view(STEW).door;
+    const sr = srv.say(STEW, '/rent 20');
+    yes('S4 staff who are the Steward of Whiterun act as its steward there: the card is theirs, and it is not a staff press (' +
+        sr.told + ')', sd.ours === true && sd.staff === false && srv.claims[HOUSE].rent.amount === 20 &&
+        sr.told === 'Breezehome pays 20 gold every 7 days now.' && srv.staffLog.length === 1);
+    srv.atDoor(NOBODY);
+    const no1 = srv.say(NOBODY, '/evict'), no2 = srv.say(NOBODY, '/rent 5'), no3 = srv.say(NOBODY, '/rent -');
+    yes('S5 somebody who is neither staff nor a steward is still refused all three, and nothing is logged',
+        no1.told === 'Only a steward ends a claim.' && no2.told === 'Only a steward sets rent.' &&
+        no3.told === 'Only a steward sets rent.' && !!srv.claims[HOUSE] && srv.claims[HOUSE].rent.amount === 20 &&
+        srv.staffLog.length === 1 && srv.view(NOBODY) === null);
+    srv.atDoor(RJARL);
+    const rj = srv.say(RJARL, '/evict');
+    yes('S6 the Jarl of Riften, who is not staff, is still refused at a Whiterun door, as #2634 built (' + rj.told + ')',
+        rj.told === 'Breezehome answers to Whiterun. Only the Steward of Whiterun or its Jarl ends a claim or sets rent there.' &&
+        !!srv.claims[HOUSE] && srv.view(RJARL).door.staff === false && srv.staffLog.length === 1);
   }
 
   // ----------------------------------------------------------- F. the box
@@ -828,6 +899,24 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
     yes('H16 a Jarl whose role another account holds sees why they do not act, and nothing to press',
         !!jrow && /held twice/.test(jrow.textContent) && /neither\s+of you acts as Jarl until staff/.test(body.textContent) &&
         all(body).every(function (n) { return n.className !== 'stop'; }));
+
+    // Staff (#2551, Patrick, 17 Oct): no office, and the door card at any door, acting as staff.
+    srv.claims[HOUSE] = { by: P_ALICE, name: 'Alice', at: Date.now(), touched: Date.now(), locked: false };
+    srv.atDoor(ADMIN);
+    srv.atBox(ADMIN);
+    show(srv.view(ADMIN));
+    const strow = goOffice();
+    yes('H18 staff with no office have an Office page that says they are staff (' + (strow ? strow.textContent : '') + ')',
+        !!strow && /staff, at any door/.test(strow.textContent) && /Staff hold no office/.test(body.textContent));
+    yes('H18 and at a Whiterun door the card says they act as staff, with Evict and the rent',
+        /It answers to Whiterun\. You act as staff here: what you press goes in the staff log with your name\./.test(body.textContent) &&
+        buttons('Evict').length === 1 && buttons('Set rent').length === 1);
+    lines.length = 0;
+    const sev = buttons('Evict');
+    if (sev.length) { sev[0].onclick({}); sev[0].onclick({}); }
+    yes('H18 Evict asks first and then sends /evict, the same line a steward sends', lines.join() === '/evict');
+    yes('H18 and no box and no boards: those are a steward\'s',
+        buttons('Whiterun').length === 0 && !/A hold's box/.test(body.textContent) && !/The notice boards/.test(body.textContent));
   }
 }
 

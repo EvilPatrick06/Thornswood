@@ -99,7 +99,9 @@ yes('the door writes it into allowed.json, and keeps it for a profile Discord co
     /staffRoleProfiles: Array\.isArray\(doc\.staffRoleProfiles\) \? doc\.staffRoleProfiles : \[\]/.test(src) &&
     /staffRoleProfiles: merged\(doc\.staffRoleProfiles, had\.staffRoleProfiles\)/.test(src) &&
     /doc\.staffRoleProfiles = kept\.staffRoleProfiles;/.test(src));
-yes('the seats block no longer borrows the chat commands staff check', !/g\.__thornswoodIsStaff = isStaff;/.test(src));
+// The chat block publishes isStaff again since #2551, for the property block's staff at any door; the seats keep to the role.
+yes('the seats block no longer borrows the chat commands staff check',
+    !/__thornswoodIsStaff/.test(block.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')));
 yes('the online count file carries max, how many wait, and whether it is full',
     /restarting: restarting, max: max, line: line, full: full/.test(src));
 yes('and max is every seat, the number and the staff seats over it, from the seats block',

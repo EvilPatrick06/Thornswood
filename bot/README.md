@@ -351,6 +351,9 @@ said in the staff channel with who changed what (`office_change`). A Jarl's
 change from the game's Office page is made by the site with the bot's token
 and comes to the same channel through the site's `moderation.log`, and so do
 two accounts holding one Jarl role and the end of that (`office_text`).
+Staff ending a claim or setting or taking off the rent at a building's door
+(#2551) comes from the game's own `moderation.log` as `evict`, `rent` and
+`norent`, said like the other staff actions with the building and its hold.
 `test-2551-hold-offices.py` holds the roles and the panel.
 
 Eighteen hold roles sounds like a lot for a small server. Discord only shows a
