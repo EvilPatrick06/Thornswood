@@ -69,7 +69,10 @@ function allRecords(d) {
 const problems = dye.checkDyes(data);
 yes('D1 the real list passes checkDyes', problems.length === 0, problems.join('; '));
 yes('D2 the list has dyes and a wash', data.dyes.some((d) => d.wash !== true) && data.dyes.some((d) => d.wash === true));
-yes('D3 who is the default the open questions leave it at: anyone', data.who.anyone === true && Object.keys(data.who.halves).length === 0);
+// Patrick, 18 Oct 2026 (#2675): making dye is a tailor's job. The Tailor's two
+// halves, the loom's own row in BENCH_ACCESS, each from novice.
+yes('D3 who is the Tailor\'s two halves, from novice: anyone false', data.who.anyone === false &&
+    JSON.stringify(data.who.halves) === JSON.stringify({ haberdasher: 'novice', liverywright: 'novice' }));
 
 const BAD = [
   ['a key nobody reads at the top', (d) => { d.fades = true; }, /key nobody reads: fades/],
@@ -80,7 +83,7 @@ const BAD = [
   ['no bench to steep at', (d) => { d.steepAt = ''; }, /steepAt/],
   ['who missing', (d) => { delete d.who; }, /who is not an object/],
   ['who.anyone not a yes or no', (d) => { d.who.anyone = 'yes'; }, /who\.anyone/],
-  ['a rank that is not a rank', (d) => { d.who.halves = { hearthcook: 'grandmaster' }; }, /not novice, advanced or master/],
+  ['a rank that is not a rank', (d) => { d.who.halves = { hearthcook: 'grandmaster' }; }, /not novice, advanced, expert or master/],
   ['nobody at all may steep', (d) => { d.who.anyone = false; d.who.halves = {}; }, /lets nobody/],
   ['an empty list', (d) => { d.dyes = []; }, /dyes is not a list/],
   ['two dyes with one id', (d) => { d.dyes[1].id = d.dyes[0].id; }, /same id/],
@@ -129,6 +132,18 @@ const halves = {};
 Object.keys(access).forEach((k) => Object.keys(access[k].halves || {}).forEach((h) => { halves[h] = true; }));
 const strange = Object.keys(data.who.halves).filter((h) => !halves[h]);
 yes('T4 every half the list names is a half BENCH_ACCESS knows', Object.keys(halves).length > 5 && strange.length === 0, strange.join(', '));
+// Making dye is a tailor's job (Patrick, 18 Oct): the halves are the Tailor
+// profession's, exactly, and the loom (the Tailor's own bench) names the same.
+const tailorRow = /tailor:\s*\{ name: 'Tailor',\s*halves: \{ ([^}]*) \}/.exec(gm);
+const tailorHalves = tailorRow ? tailorRow[1].split(',').map((s) => s.split(':')[0].trim()).sort() : [];
+yes('T6 who names the Tailor\'s halves and nobody else\'s', tailorHalves.length === 2 &&
+    JSON.stringify(Object.keys(data.who.halves).sort()) === JSON.stringify(tailorHalves), tailorHalves.join(', '));
+const loom = Object.keys(access).map((k) => access[k]).find((b) => b.name === 'MCE_CraftingLoom');
+yes('T7 ...the same halves the loom row in BENCH_ACCESS names', !!loom &&
+    JSON.stringify(Object.keys(loom.halves).sort()) === JSON.stringify(tailorHalves));
+const expert = clone(data); expert.who = { anyone: false, halves: { haberdasher: 'expert' } };
+yes('T8 expert is a rank the list may name, as RANK_LADDER has it', dye.checkDyes(expert).length === 0 &&
+    /const RANK_LADDER = \['novice', 'advanced', 'expert', 'master'\];/.test(gm));
 const water = /waterItems: \{ empty: '([^']+)', full: '([^']+)' \}/.exec(gm);
 const waterless = data.dyes.filter((d) => !water || !d.inputs.some((p) => p.item === water[2])).map((d) => d.id);
 yes('T5 every dye takes a bottle of water, the record the needs code fills', !!water && waterless.length === 0, waterless.join(', '));
@@ -300,7 +315,11 @@ const both = Object.assign(carry(data.dyes[2]), carry(data.dyes[1]));
 yes('N6 carrying two dyes\' inputs makes the one first in the list', dye.dyeFor(both, data) === data.dyes[1]);
 const short = carry(dyes[0]); short[dyes[0].inputs[0].item] -= 1;
 yes('N7 one short of an input makes nothing', dye.dyeFor(short, data) === null && dye.dyeFor({}, data) === null && dye.dyeFor(null, data) === null);
-yes('N8 the list as it is lets anyone steep', dye.mayMake(data) === true && dye.mayMake(data, () => false) === true);
+yes('N8 the list as it is lets a Haberdasher or a Liverywright steep, and nobody else',
+    dye.mayMake(data, (h) => h === 'haberdasher') === true && dye.mayMake(data, (h) => h === 'liverywright') === true &&
+    dye.mayMake(data, (h) => h === 'hearthcook') === false && dye.mayMake(data) === false);
+const open = clone(data); open.who = { anyone: true, halves: {} };
+yes('N8b a list set back to anyone lets anyone steep', dye.mayMake(open) === true && dye.mayMake(open, () => false) === true);
 const closed = clone(data); closed.who = { anyone: false, halves: { hearthcook: 'advanced' } };
 const asked = [];
 yes('N9 a closed list asks the caller about each half at its rank', dye.mayMake(closed, (h, r) => { asked.push(h + ' ' + r); return h === 'hearthcook' && r === 'advanced'; }) === true &&

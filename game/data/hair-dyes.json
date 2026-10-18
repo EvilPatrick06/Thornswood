@@ -4,7 +4,7 @@
   "steepSeconds": 60,
   "steepAt": "a5cb3:Skyrim.esm",
   "reach": 300,
-  "who": { "anyone": true, "halves": {} },
+  "who": { "anyone": false, "halves": { "haberdasher": "novice", "liverywright": "novice" } },
   "dyes": [
     { "id": "black", "name": "Black Hair Dye", "colour": "#1b1918", "strength": 0.75, "wander": 10,
       "inputs": [ { "item": "15482:Thornswood-Content.esp", "count": 1 }, { "item": "16e26:Dragonborn.esm", "count": 1 }, { "item": "13f598:WindhelmSSE.esp", "count": 1 } ] },

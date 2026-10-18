@@ -16,7 +16,8 @@
   0 to 7 and ignores the top byte, so a stored colour is read by its low
   24 bits and every colour written here is 0 to 0xFFFFFF.
 */
-var RANKS = ['novice', 'advanced', 'master'];
+// The rank ladder, the gamemode's RANK_LADDER: a half named at expert is a real rank.
+var RANKS = ['novice', 'advanced', 'expert', 'master'];
 var TOP_KEYS = ['about', 'item', 'steepSeconds', 'steepAt', 'reach', 'who', 'dyes'];
 var WHO_KEYS = ['anyone', 'halves'];
 var DYE_KEYS = ['id', 'name', 'colour', 'wash', 'strength', 'wander', 'inputs'];
@@ -61,7 +62,7 @@ function checkDyes(data) {
     else {
       Object.keys(data.who.halves).forEach(function (h) {
         if (!ID.test(h)) { out.push('who.halves names ' + JSON.stringify(h) + ', which is not a half'); }
-        if (RANKS.indexOf(data.who.halves[h]) < 0) { out.push('who.halves.' + h + ' is not novice, advanced or master'); }
+        if (RANKS.indexOf(data.who.halves[h]) < 0) { out.push('who.halves.' + h + ' is not novice, advanced, expert or master'); }
       });
       if (data.who.anyone === false && !Object.keys(data.who.halves).length) {
         out.push('who lets nobody make a dye: anyone is false and no half is named');

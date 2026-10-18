@@ -59882,6 +59882,11 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   is the staff's list, and game/hair-dye.js the sums. Both are carried below,
   between the HAIR_DYES markers, by scripts/dev/Build-HairDyeGamemode.js.
 
+  WHO MAKES ONE is the list's who, in BENCH_ACCESS's shape: as it ships, a
+  Tailor, either half from novice (Patrick, 18 Oct 2026). Anybody else
+  pressing E there with a dye's inputs is told whose work it is and nothing
+  is taken; their water still boils. Using a dye is anybody's.
+
   MAKING ONE. E on a cooking spot (the list's steepAt, the bench keyword water
   boils at) while carrying one dye's inputs starts a steep. It answers nothing
   to the engine, so the cooking menu opens as it always has. After the list's
@@ -59932,7 +59937,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   // ==== HAIR_DYES ====
   /* Built by scripts\dev\Build-HairDyeGamemode.js out of game\data\hair-dyes.json and
      game\hair-dye.js. Do not hand edit: change those two and run it again. */
-  var HAIR_DYES = {"about":"Hair dye (#2675). The staff's list: what a dye is carried as, where and how long it steeps, how close you stand to dye somebody else's hair, who may steep, and each dye's colour and what it takes. game/hair-dye.js reads it and names none of it. docs/systems/hair-dye.md says what each field does.","item":"98626:Skyrim.esm","steepSeconds":60,"steepAt":"a5cb3:Skyrim.esm","reach":300,"who":{"anyone":true,"halves":{}},"dyes":[{"id":"black","name":"Black Hair Dye","colour":"#1b1918","strength":0.75,"wander":10,"inputs":[{"item":"15482:Thornswood-Content.esp","count":1},{"item":"16e26:Dragonborn.esm","count":1},{"item":"13f598:WindhelmSSE.esp","count":1}]},{"id":"brown","name":"Brown Hair Dye","colour":"#4a3020","strength":0.6,"wander":14,"inputs":[{"item":"5076e:Skyrim.esm","count":3},{"item":"13f598:WindhelmSSE.esp","count":1}]},{"id":"red","name":"Red Hair Dye","colour":"#7a2418","strength":0.55,"wander":16,"inputs":[{"item":"1b3bd:Skyrim.esm","count":2},{"item":"77e1d:Skyrim.esm","count":2},{"item":"13f598:WindhelmSSE.esp","count":1}]},{"id":"deep-red","name":"Deep Red Hair Dye","colour":"#5a1014","strength":0.6,"wander":12,"inputs":[{"item":"4da20:Skyrim.esm","count":1},{"item":"b701a:Skyrim.esm","count":1},{"item":"13f598:WindhelmSSE.esp","count":1}]},{"id":"gold","name":"Gold Hair Dye","colour":"#b8945a","strength":0.5,"wander":14,"inputs":[{"item":"4b0ba:Skyrim.esm","count":2},{"item":"2a78:Dawnguard.esm","count":1},{"item":"13f598:WindhelmSSE.esp","count":1}]},{"id":"copper","name":"Copper Hair Dye","colour":"#a4512a","strength":0.55,"wander":16,"inputs":[{"item":"889a2:Skyrim.esm","count":2},{"item":"13f598:WindhelmSSE.esp","count":1}]},{"id":"blue","name":"Blue Hair Dye","colour":"#2b3f6e","strength":0.5,"wander":18,"inputs":[{"item":"77e1c:Skyrim.esm","count":3},{"item":"13f598:WindhelmSSE.esp","count":1}]},{"id":"purple","name":"Purple Hair Dye","colour":"#4e2c5e","strength":0.5,"wander":18,"inputs":[{"item":"77e1e:Skyrim.esm","count":2},{"item":"45c28:Skyrim.esm","count":2},{"item":"13f598:WindhelmSSE.esp","count":1}]},{"id":"nightshade","name":"Nightshade Hair Dye","colour":"#2a1a30","strength":0.65,"wander":10,"inputs":[{"item":"516c8:Skyrim.esm","count":1},{"item":"2f44c:Skyrim.esm","count":1},{"item":"13f598:WindhelmSSE.esp","count":1}]},{"id":"green","name":"Green Hair Dye","colour":"#3d5a2c","strength":0.5,"wander":18,"inputs":[{"item":"57f91:Skyrim.esm","count":2},{"item":"134aa:Skyrim.esm","count":1},{"item":"13f598:WindhelmSSE.esp","count":1}]},{"id":"hair-wash","name":"Hair Wash","wash":true,"strength":0.6,"wander":6,"inputs":[{"item":"34cdd:Skyrim.esm","count":1},{"item":"34cdf:Skyrim.esm","count":1},{"item":"3f7f8:Skyrim.esm","count":1},{"item":"13f598:WindhelmSSE.esp","count":1}]}]};
+  var HAIR_DYES = {"about":"Hair dye (#2675). The staff's list: what a dye is carried as, where and how long it steeps, how close you stand to dye somebody else's hair, who may steep, and each dye's colour and what it takes. game/hair-dye.js reads it and names none of it. docs/systems/hair-dye.md says what each field does.","item":"98626:Skyrim.esm","steepSeconds":60,"steepAt":"a5cb3:Skyrim.esm","reach":300,"who":{"anyone":false,"halves":{"haberdasher":"novice","liverywright":"novice"}},"dyes":[{"id":"black","name":"Black Hair Dye","colour":"#1b1918","strength":0.75,"wander":10,"inputs":[{"item":"15482:Thornswood-Content.esp","count":1},{"item":"16e26:Dragonborn.esm","count":1},{"item":"13f598:WindhelmSSE.esp","count":1}]},{"id":"brown","name":"Brown Hair Dye","colour":"#4a3020","strength":0.6,"wander":14,"inputs":[{"item":"5076e:Skyrim.esm","count":3},{"item":"13f598:WindhelmSSE.esp","count":1}]},{"id":"red","name":"Red Hair Dye","colour":"#7a2418","strength":0.55,"wander":16,"inputs":[{"item":"1b3bd:Skyrim.esm","count":2},{"item":"77e1d:Skyrim.esm","count":2},{"item":"13f598:WindhelmSSE.esp","count":1}]},{"id":"deep-red","name":"Deep Red Hair Dye","colour":"#5a1014","strength":0.6,"wander":12,"inputs":[{"item":"4da20:Skyrim.esm","count":1},{"item":"b701a:Skyrim.esm","count":1},{"item":"13f598:WindhelmSSE.esp","count":1}]},{"id":"gold","name":"Gold Hair Dye","colour":"#b8945a","strength":0.5,"wander":14,"inputs":[{"item":"4b0ba:Skyrim.esm","count":2},{"item":"2a78:Dawnguard.esm","count":1},{"item":"13f598:WindhelmSSE.esp","count":1}]},{"id":"copper","name":"Copper Hair Dye","colour":"#a4512a","strength":0.55,"wander":16,"inputs":[{"item":"889a2:Skyrim.esm","count":2},{"item":"13f598:WindhelmSSE.esp","count":1}]},{"id":"blue","name":"Blue Hair Dye","colour":"#2b3f6e","strength":0.5,"wander":18,"inputs":[{"item":"77e1c:Skyrim.esm","count":3},{"item":"13f598:WindhelmSSE.esp","count":1}]},{"id":"purple","name":"Purple Hair Dye","colour":"#4e2c5e","strength":0.5,"wander":18,"inputs":[{"item":"77e1e:Skyrim.esm","count":2},{"item":"45c28:Skyrim.esm","count":2},{"item":"13f598:WindhelmSSE.esp","count":1}]},{"id":"nightshade","name":"Nightshade Hair Dye","colour":"#2a1a30","strength":0.65,"wander":10,"inputs":[{"item":"516c8:Skyrim.esm","count":1},{"item":"2f44c:Skyrim.esm","count":1},{"item":"13f598:WindhelmSSE.esp","count":1}]},{"id":"green","name":"Green Hair Dye","colour":"#3d5a2c","strength":0.5,"wander":18,"inputs":[{"item":"57f91:Skyrim.esm","count":2},{"item":"134aa:Skyrim.esm","count":1},{"item":"13f598:WindhelmSSE.esp","count":1}]},{"id":"hair-wash","name":"Hair Wash","wash":true,"strength":0.6,"wander":6,"inputs":[{"item":"34cdd:Skyrim.esm","count":1},{"item":"34cdf:Skyrim.esm","count":1},{"item":"3f7f8:Skyrim.esm","count":1},{"item":"13f598:WindhelmSSE.esp","count":1}]}]};
   var HAIR_DYE = (function () {
   var module = { exports: {} };
 'use strict';
@@ -59953,7 +59958,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   0 to 7 and ignores the top byte, so a stored colour is read by its low
   24 bits and every colour written here is 0 to 0xFFFFFF.
 */
-var RANKS = ['novice', 'advanced', 'master'];
+// The rank ladder, the gamemode's RANK_LADDER: a half named at expert is a real rank.
+var RANKS = ['novice', 'advanced', 'expert', 'master'];
 var TOP_KEYS = ['about', 'item', 'steepSeconds', 'steepAt', 'reach', 'who', 'dyes'];
 var WHO_KEYS = ['anyone', 'halves'];
 var DYE_KEYS = ['id', 'name', 'colour', 'wash', 'strength', 'wander', 'inputs'];
@@ -59998,7 +60004,7 @@ function checkDyes(data) {
     else {
       Object.keys(data.who.halves).forEach(function (h) {
         if (!ID.test(h)) { out.push('who.halves names ' + JSON.stringify(h) + ', which is not a half'); }
-        if (RANKS.indexOf(data.who.halves[h]) < 0) { out.push('who.halves.' + h + ' is not novice, advanced or master'); }
+        if (RANKS.indexOf(data.who.halves[h]) < 0) { out.push('who.halves.' + h + ' is not novice, advanced, expert or master'); }
       });
       if (data.who.anyone === false && !Object.keys(data.who.halves).length) {
         out.push('who lets nobody make a dye: anyone is false and no half is named');
@@ -60248,7 +60254,6 @@ module.exports = {
   var LIST = problems.length ? null : HAIR_DYES;
   if (!LIST) { hlog('the dye list is refused, so no dye is made or used:', problems.join('; ')); }
 
-  var RANKS = ['novice', 'advanced', 'master'];
   var MADE_PROPERTY = 'thornswoodHairMade';
   try {
     mp.makeProperty(MADE_PROPERTY, {
@@ -60302,13 +60307,39 @@ module.exports = {
   }
   function carries(actorId) { return carried(actorId).length > 0; }
 
+  /*
+    Whether somebody works a half at a rank, asked the way a bench asks it
+    (benchGate): the progression block's canWork on their character, so an
+    apprentice's sister half and every rank on the ladder count the same at
+    the cooking spot as at the loom. Without the character or progression
+    block nobody may steep: the list is closed, and the press says so.
+  */
   function canWork(actorId) {
     return function (half, rank) {
-      var C = g.__thornswoodCharacter;
-      if (!C || !C.rankOf) { return false; }
-      var have = RANKS.indexOf(String(C.rankOf(actorId, half) || ''));
-      return have >= 0 && have >= RANKS.indexOf(rank);
+      var C = g.__thornswoodCharacter, P = g.__thornswoodProgression;
+      if (!C || !C.stateOf || !P || !P.canWork) { return false; }
+      try { return !!P.canWork(C.stateOf(actorId), half, rank); } catch (e) { return false; }
     };
+  }
+
+  /*
+    THE LINE FOR SOMEBODY THE LIST DOES NOT LET STEEP (Patrick, 18 Oct: making
+    dye is a tailor's job). Built from the list's own halves, named the way
+    the bench refusal names them, so it says whose work it is without naming
+    a half in code. Nothing is taken, and the boil on the same press still
+    runs: this answers only for the dye.
+  */
+  function notYours() {
+    var C = g.__thornswoodCharacter;
+    var who = Object.keys(LIST.who.halves).map(function (h) {
+      var name = h;
+      try { name = (C && C.nameOf) ? C.nameOf(h) : h; } catch (e) { name = h; }
+      var rank = LIST.who.halves[h];
+      return name + (rank === 'novice' ? '' : ' at ' + rank);
+    });
+    var whose = who.length === 1 ? who[0] : who.slice(0, -1).join(', ') + ' or ' + who[who.length - 1];
+    return 'Steeping hair dye is ' + (whose ? 'work for a ' + whose : 'nobody\'s work here') +
+           '. Nothing was taken from your pack.';
   }
 
   function hex6(c) { return '#' + ('000000' + ((Number(c) >>> 0) & 0xFFFFFF).toString(16)).slice(-6); }
@@ -60337,7 +60368,7 @@ module.exports = {
     if (Object.prototype.hasOwnProperty.call(steeps, actorId)) { return ''; }
     var dye = HAIR_DYE.dyeFor(HAIR_DYE.carriedFor(packOf(actorId), LIST, inputIds(), dyeItemId()), LIST);
     if (!dye) { return ''; }
-    if (!HAIR_DYE.mayMake(LIST, canWork(actorId))) { return 'Making hair dye is not your trade.'; }
+    if (!HAIR_DYE.mayMake(LIST, canWork(actorId))) { return notYours(); }
     var N = g.__thornswoodNeeds;
     var fire = !!(N && N.fireNear && N.fireNear(actorId));
     steeps[actorId] = { dye: dye.id, from: Date.now(), fire: fire };
@@ -60366,7 +60397,7 @@ module.exports = {
   }
 
   function finishSteep(actorId, dye) {
-    if (!HAIR_DYE.mayMake(LIST, canWork(actorId))) { return 'Making hair dye is not your trade.'; }
+    if (!HAIR_DYE.mayMake(LIST, canWork(actorId))) { return notYours(); }
     var pack = packOf(actorId);
     var next = HAIR_DYE.afterSteep(pack, dye, LIST, inputIds(), dyeItemId());
     if (!next) { return 'You no longer carry everything ' + dye.name + ' takes, so nothing steeped.'; }

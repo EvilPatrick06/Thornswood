@@ -4,10 +4,16 @@ Issue #2675. A dye is made at a cooking spot from things people already
 gather, and it changes the colour of somebody's hair in the world. Nobody's
 hair changes without their own press. The colours, what makes them and who
 may make them are the staff's list, `game/data/hair-dyes.json`; the code
-names none of it.
+names none of it. Making a dye is a tailor's job (Patrick, 18 October);
+using one is anybody's.
 
 ## What a dye does
 
+- **Who makes one.** A Tailor, either half, Haberdasher or Liverywright,
+  from novice. That is the list's `who`, in the benches' shape, the same
+  two halves the loom names. Anybody else who presses E at the cooking spot
+  with a dye's inputs is told it is a Haberdasher's or Liverywright's work,
+  and nothing is taken. Their water still boils.
 - **Making one.** At a cooking spot (the same bench keyword water boils at),
   carrying a bottle of water and one dye's inputs, a dye steeps for
   `steepSeconds`, a minute in the list as it ships. Press E on the cooking
@@ -16,6 +22,10 @@ names none of it.
   done the inputs are taken and the dye is in the pack. If the pack holds
   the inputs of more than one dye, the first in the list is made. One steep
   at a time, and a relog loses one under way.
+- **Why the cooking spot and not the loom.** A dye steeps in hot water,
+  and the steep keeps the boil's rule that walking away from the fire loses
+  it. The loom is the Tailor's own bench but has no fire, so a dye steeps at
+  the cooking spot. `steepAt` moves it if staff ever decide otherwise.
 - **The bottle of water.** The bottle a dye takes comes out of the server's
   count of where your water came from, by the rule a drink uses: the worst
   water carried first. So a dye takes an unboiled bottle before a boiled one,
@@ -58,7 +68,7 @@ names none of it.
 | `steepSeconds` | How long a dye steeps, in real seconds. |
 | `steepAt` | The bench keyword a dye steeps at. |
 | `reach` | How close, in game units, you stand to dye somebody else's hair (above 0, at most 2000). Ships as 300. |
-| `who` | Who may steep: `anyone` true, or `halves`, each half at the lowest rank that may, the same shape as the benches. Ships as anyone. |
+| `who` | Who may steep: `anyone` true, or `halves`, each half at the lowest rank that may (novice, advanced, expert or master), the same shape as the benches. Ships as the Tailor's two halves, `haberdasher` and `liverywright`, each from novice. |
 | `dyes` | Each dye: `id`, `name` (what the entry is called), `colour` (#rrggbb, lower case) or `wash: true`, `strength` (above 0, at most 1), `wander` (0 to 64), and `inputs` (each a record and a count). |
 
 A list with any problem is refused whole, never half used: a key nobody

@@ -11,6 +11,9 @@
 // S: THE STEEP. E at the list's cooking spot with one dye's inputs starts a
 //    steep, one at a time; walking off before steepSeconds loses it and takes
 //    nothing; after it the inputs go and one named entry comes.
+// T: A TAILOR'S JOB (Patrick, 18 Oct). Only the list's halves may steep, asked
+//    the way a bench asks; anybody else is told whose work it is, nothing is
+//    taken, and their boil still runs. Using a dye stays anybody's.
 // W: THE WATER LEDGER. The bottle a dye takes is spent from n.water by the
 //    rule a drink uses, worst first. With a dye and a boil on one press the
 //    dye takes its bottle first and the boil turns what is left; a boil left
@@ -132,7 +135,18 @@ function world() {
     'this.boilSay = boilSay; this.fireSettle = fireSettle; this.addItem = addItem; this.takeItem = takeItem;' +
     'this.takeItemById = takeItemById; this.mintedEntry = mintedEntry; this.addItemsAtomic = addItemsAtomic;\n', ctx);
   // The character and social stand-ins.
-  g.__thornswoodCharacter = { rankOf: () => 'novice', stateOf: () => ({}), writeState: () => {} };
+  // Who works what (#2675, Patrick 18 Oct: making dye is a tailor's job). Everybody
+  // here is a novice Haberdasher unless a test says otherwise; canWork is the
+  // progression block's question, on the same ladder.
+  W.ranks = {};
+  const LADDER = ['novice', 'advanced', 'expert', 'master'];
+  g.__thornswoodCharacter = {
+    stateOf: (id) => ({ ranks: Object.prototype.hasOwnProperty.call(W.ranks, id) ? W.ranks[id] : { haberdasher: 'novice' } }),
+    nameOf: (h) => h.charAt(0).toUpperCase() + h.slice(1), writeState: () => {}
+  };
+  g.__thornswoodProgression = {
+    canWork: (s, half, rank) => !!(s && s.ranks && s.ranks[half]) && LADDER.indexOf(s.ranks[half]) >= LADDER.indexOf(rank || 'novice')
+  };
   const offers = {};
   g.__thornswoodSocial = {
     SOCIAL: { offerFor: 45000 }, offers: offers,
@@ -218,6 +232,44 @@ const BOWL = idFor(DATA.item);
   yes('S12 K\'s view lists the dye carried', !!v && v.dyes.length === 1 && v.dyes[0].id === 'brown' && v.dyes[0].count === 2 && v.steeping === null);
   W.HD.pressed(A, COOK);
   yes('S13 nothing to steep and nothing carried: no view', world().HD.view(A) === null);
+}
+
+// ------------------------------------------------- T: a tailor's job (18 Oct)
+{
+  const NOT = 'Steeping hair dye is work for a Haberdasher or Liverywright. Nothing was taken from your pack.';
+  const W = world(); people(W);
+  W.ranks[A] = { hearthcook: 'master' };
+  W.mp.set(A, 'inventory', { entries: packWith(brown) });
+  W.needs[A] = { water: { river: 1 }, fire: 10, boilFrom: W.clock, boilFire: true };
+  const line = W.HD.pressed(A, COOK);
+  yes('T1 somebody who is not a tailor pressing E with a dye\'s inputs is told whose work it is', line === NOT, line);
+  yes('T2 ...no steep starts and nothing is taken', !Object.prototype.hasOwnProperty.call(W.HD.steeps, A) &&
+      JSON.stringify(W.mp.get(A, 'inventory').entries) === JSON.stringify(packWith(brown)));
+  W.clock += 61000; W.said.length = 0;
+  W.ctx.boilSay(A, W.ctx.read(A));
+  yes('T3 ...and the boil on the same press still runs', W.said.length === 1 && /The water has boiled/.test(W.said[0][1]) &&
+      W.needs[A].water.boiled === 1 && !W.needs[A].water.river, JSON.stringify(W.said));
+  yes('T4 the onActivate hook runs the boil whatever the dye answered',
+      /if \(dLine\) \{ notify\(casterRefrId, dLine\); say\(casterRefrId, dLine\); \}\n\s*var wLine = needsW\.activatedWater\(/.test(gm));
+  W.ranks[A] = { liverywright: 'novice' };
+  yes('T5 a Liverywright may steep', /You set Brown Hair Dye to steep/.test(W.HD.pressed(A, COOK)));
+  delete W.HD.steeps[A];
+  W.ranks[A] = { haberdasher: 'expert' };
+  yes('T6 so may an expert Haberdasher: every rung of the ladder counts', /to steep/.test(W.HD.pressed(A, COOK)));
+  W.ranks[A] = {};
+  W.clock += DATA.steepSeconds * 1000;
+  W.said.length = 0;
+  W.ctx.boilSay(A, W.ctx.read(A));
+  yes('T7 a steep whose maker is no longer a tailor when it is done takes nothing', W.said.some((s) => s[1] === NOT) &&
+      JSON.stringify(W.mp.get(A, 'inventory').entries) === JSON.stringify(packWith(brown)));
+  W.mp.set(A, 'inventory', { entries: [{ baseId: BOWL, count: 1, name: 'Brown Hair Dye' }] });
+  yes('T8 using a dye is still anybody\'s', W.HD.command(['/hairdye', 'self', 'brown'], A) === 'You dye your hair with Brown Hair Dye.');
+  const W2 = world(); people(W2);
+  delete W2.g.__thornswoodProgression;
+  W2.mp.set(A, 'inventory', { entries: packWith(brown) });
+  yes('T9 without the progression block nobody may steep: the list is closed, not open', W2.HD.pressed(A, COOK) === NOT);
+  yes('T10 the line names no half in code: it is built from the list', !/haberdasher|liverywright|tailor'/i.test(
+      blockSrc.replace(lift('  // ==== HAIR_DYES ====', '  // ==== end HAIR_DYES ====', blockSrc), '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')));
 }
 
 // -------------------------------------------------------- W: water ledger
