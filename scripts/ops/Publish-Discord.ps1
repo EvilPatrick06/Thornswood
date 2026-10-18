@@ -349,6 +349,7 @@ if (-not $GamemodeDeploy) {
       Write-Host ('  COULD NOT READ what was already announced from the VPS store, so nothing was posted: ' + $_.Exception.Message) -ForegroundColor Red
       Write-Host '  -Force posts anyway' -ForegroundColor DarkGray
       $global:ThornswoodDiscordResult = 'failed'
+      if ($Record) { exit 1 }
       return
     }
     if (-not $Quiet) { Write-Host '  could not read the shared record, -Force given, going ahead' -ForegroundColor Yellow }
@@ -360,14 +361,22 @@ if (-not $GamemodeDeploy) {
     $from = if (Test-Path -LiteralPath $legacy) { $legacy } else { '' }
   }
   if ($from -and (Test-Path -LiteralPath $from)) {
-    # A file that will not parse is treated as no file at all. It is a note to
-    # ourselves about what was posted, and refusing to ship over a corrupted
-    # note would be the tail wagging the dog.
+    # A record that will not parse says nothing about what was posted, the
+    # same as one that could not be fetched, so it stops here the same way.
+    # Read as empty, it posted the release again and then wrote over the
+    # record (#2645). The Ship goes on either way; only the post waits.
     try {
       $raw = ([IO.File]::ReadAllText($from) -replace '^\uFEFF', '') | ConvertFrom-Json
       foreach ($p in $raw.PSObject.Properties) { $said[$p.Name] = $p.Value }
     } catch {
-      if (-not $Quiet) { Write-Host '  announced.json will not parse, treating it as empty' -ForegroundColor DarkGray }
+      if (-not $Force) {
+        Write-Host ('  COULD NOT READ what was already announced, ' + $from + ' will not parse, so nothing was posted: ' + $_.Exception.Message) -ForegroundColor Red
+        Write-Host '  -Force posts anyway and writes the record again' -ForegroundColor DarkGray
+        $global:ThornswoodDiscordResult = 'failed'
+        if ($Record) { exit 1 }
+        return
+      }
+      if (-not $Quiet) { Write-Host '  announced.json will not parse, -Force given, going ahead and writing it again' -ForegroundColor Yellow }
     }
   }
   # Writes this release into the record and sends it to the store. Returns ''

@@ -14,7 +14,9 @@
     - a new release is not taken for an old one, and -Force still posts;
     - an old bot\announced.json is still read while the store has none;
     - a store that cannot be read posts nothing;
-    - a -Record whose send fails says so, exits 1 and records nothing.
+    - a -Record whose send fails says so, exits 1 and records nothing;
+    - a record that will not parse, or a store that cannot be read, posts
+      nothing, and -Record over either exits 1.
 #>
 [CmdletBinding()]
 param()
@@ -164,6 +166,18 @@ try {
     $o = Run $D @('-Record')
     Yes 'a -Record whose send fails says why and exits 1' ($o -match 'could not record it: stand-in: the send was refused' -and $script:last.Code -eq 1)
     Yes '  and the store still holds no record' (-not (Test-Path -LiteralPath $store))
+    $o = Run $C @('-Record')
+    Yes 'a -Record that cannot read the store says so and exits 1' ($o -match 'COULD NOT READ what was already announced' -and $script:last.Code -eq 1)
+
+    # A record in the store that will not parse says nothing about what was
+    # posted: it used to be read as empty, so the release went out again and
+    # the record was written over. Now nothing is posted and the record stays.
+    [IO.File]::WriteAllText($store, '{"dev": {"stamp": "1.2.3|')
+    $o = Run $A @()
+    Yes 'a record that will not parse: nothing posted, and it says so' ($script:posts -eq 2 -and $o -match 'will not parse, so nothing was posted')
+    Yes '  and the record is left as it was' ([IO.File]::ReadAllText($store) -eq '{"dev": {"stamp": "1.2.3|')
+    $o = Run $A @('-Record')
+    Yes '  and -Record over it exits 1' ($script:last.Code -eq 1 -and [IO.File]::ReadAllText($store) -eq '{"dev": {"stamp": "1.2.3|')
 
     $src = [IO.File]::ReadAllText((Join-Path $Repo 'scripts\ops\Publish-Discord.ps1'))
     Yes 'Publish-Discord.ps1 never writes bot\announced.json any more' ($src -notmatch 'Set-Content -LiteralPath \$stateFile' -and $src -match 'Send-FeedStore')
