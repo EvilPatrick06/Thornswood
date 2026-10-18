@@ -140,7 +140,7 @@ opening an offer cannot replace progression after a failed read. Only a valid
 saved rank qualifies. Existing character initialization owns migration. This
 does not enable the expanded profession, half and school quest catalogue.
 
-The source-only `game/quest-eligibility.js` contract is the next prerequisite.
+`game/quest-eligibility.js` supplies the shared eligibility contract.
 `createQuestEligibility({table, spellIds})` captures the canonical progression
 `TABLE` and `SPELL_IDS`; it does not read or write a character. `validate(gate)`
 returns a copied, frozen definition or throws. Gates are exactly `{open:true}`,
@@ -154,10 +154,21 @@ half counts, while a taught outside trade is not a chosen profession. Mage
 Master work additionally requires an exactly named, mapped rulebook Master
 spell in the learned book for the named selected school. Staff permissions,
 tomes, lower spells and unknown metadata do not count. No migration, repair,
-spell grant or input mutation occurs. The module has no production caller yet:
-the later offer/acceptance integration must capture session identity around
-non-migrating reads and use this same evaluator immediately before acceptance.
-No new quest, gate, roster cut or reward is activated by this prerequisite.
+spell grant or input mutation occurs. The source bundler embeds the module;
+the custom quest controller validates each definition before it starts. The
+existing scarce work has explicit gates, and legacy scenes are explicitly
+open. Both scarce and kill offers and acceptance use the same evaluator over
+non-migrating character reads fenced by the original owner and controller.
+
+Acceptance revalidates at the transaction's final admission boundary. Caller
+callbacks run first, then the character snapshot is the last native read.
+Only callback-free service flags, pure evaluation and the captured session
+check follow it. The native CAS owns the final body/record fence. This prevents
+an identity callback from invalidating standing after it was checked, or a
+panel closed during a read from authorizing work. Scarce harvesting also keeps
+its existing class-rank gate at the final inventory write.
+Turn-in, cancellation and kill credit preserve accepted work without rechecking
+eligibility. No new quest, unbound objective, roster cut or reward is enabled.
 
 ## Build order and checks
 
