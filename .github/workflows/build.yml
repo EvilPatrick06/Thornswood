@@ -396,6 +396,13 @@ jobs:
           # Delete-Person.ps1 under Windows PowerShell 5.1 on stand-ins of
           # every store in a temp folder: the dry run, the deletion, the
           # record and its reapply after a restore. About half a minute.
+          # tests\test-2351-release-registers.js starts the real gamemode
+          # blocks that keep a register naming a character, in a temp
+          # server folder with a list of deleted characters, and holds what
+          # each lets go of, the ledgers balanced and the log to counts. A
+          # second. tests\test-2351-wipe-registers.ps1 runs the survey, the
+          # stop and the move Wipe-Saves.ps1 sends to the box, under Windows
+          # PowerShell 5.1 on a stand-in server folder. A few seconds.
           # Issue #2166: tests\test-2166-retention-fixes.js holds three
           # retention fixes to what the privacy page already says: trouble.json
           # ages by 365 days in the hourly sweep on a scratch site (a kept
@@ -634,6 +641,8 @@ jobs:
                  'test-page-changed.js',
                  'test-2349-server-log.js',
                  'test-2351-delete-person.ps1',
+                 'test-2351-release-registers.js',
+                 'test-2351-wipe-registers.ps1',
                  'test-2166-retention-fixes.js',
                  'test-missing-files-stop.ps1',
                  'test-ship-launcher-drift.ps1',

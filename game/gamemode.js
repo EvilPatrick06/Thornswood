@@ -34322,6 +34322,163 @@ log('gamemode loaded:',
 })();
 // ==== end thornswood season ====
 
+// ==== thornswood release of deleted characters ====
+/*
+  WHAT A DELETED CHARACTER HELD IS LET GO AT SERVER START (#2351).
+
+  Patrick, 16 October, option A on #2351: "Delete-Person.ps1 writes a list,
+  and the gamemode releases those entries at its next start." When somebody
+  asks to be deleted, scripts\vps\Delete-Person.ps1 removes their character's
+  change form, card and the rest, and writes their profile ids, and the form
+  ids of the characters it found, into private\deleted-characters.json:
+
+      { "profiles": [ 5001 ], "actors": [ 4278192641 ] }
+
+  Every block that keeps a register naming a character lets go of what the
+  list names through its own release(), so a register's rule stays in the
+  one place that knows it, and each does it once, as it loads, in the same
+  pass as the rest of its start: no timer. Each calls
+  g.__thornswoodRelease(part, release) when its register is read and before
+  anything else at start acts on it:
+
+    farms     farm claims and the seed handed out (the farming block)
+    property  claims, offices (law.held), the boards' posts, the drop box and
+              its record, and the beds (the property block, before rolesRead,
+              which would otherwise end the office and name the character in
+              the log)
+    embassy   the embassy and remnant rolls (the embassy block)
+    dungeon   the character on each dungeon chest's reservation (dungeon loot)
+    books     members, their book chat, books they own, when they last left
+              (the books)
+
+  A part that answers that it took is marked done in the file, the time it
+  ran, so it never runs again; when every part is done the file is deleted,
+  and nothing about who was released stays on the server. A part whose write
+  did not take is said in the log and waits for the next start, and so does
+  one whose block never got as far as asking; only those run then
+  (__thornswoodReleaseWaiting, at the end of the books, says which).
+  Delete-Person.ps1 merges a new request into a list still waiting and clears
+  done, so every part runs for the new ids too; running again for an id
+  already let go finds nothing.
+
+  The log says counts and nothing else: never a name, a profile id or a form
+  id. A list that cannot be read, or does not have the shape above, releases
+  nothing, is left as it is, and the log says so.
+
+  The merchant ledger (merchant-ledger.json) is not a part: its supply waits
+  and a trade still waiting on a character name them by form id and
+  profile, and that code belongs to the work on #1373. #2351 says what its
+  release has to do.
+*/
+(function () {
+  'use strict';
+  var g = (typeof globalThis !== 'undefined' ? globalThis : this);
+  var PARTS = ['farms', 'property', 'embassy', 'dungeon', 'books'];
+  var has = function (o, k) { return Object.prototype.hasOwnProperty.call(o, k); };
+  // Into thornswood.log with the rest of the gamemode's own lines (log, at the top of the file).
+  function rlog(line) {
+    if (typeof log === 'function') { log('release: ' + line); } else { console.log('[thornswood] release: ' + line); }
+  }
+  var st;          // undefined until read: the list, or null for none
+  var fs = null, path = null;
+  try { fs = require('fs'); path = require('path'); } catch (e) { st = null; }
+
+  function where() {
+    var privDir = 'private';
+    try {
+      var cfg = JSON.parse(fs.readFileSync('server-settings.json', 'utf8'));
+      if (cfg && cfg.privDir) { privDir = String(cfg.privDir); }
+    } catch (e) { }
+    return path.join(privDir, 'deleted-characters.json');
+  }
+
+  // The list, read once a load, field by field. Anything that is not a whole
+  // number above 0 (a form id at most 0xffffffff), or a done mark that is not
+  // a time, makes the whole list unreadable rather than half read.
+  function read() {
+    if (st !== undefined) { return st; }
+    st = null;
+    var file = where();
+    var text = null;
+    try { text = fs.readFileSync(file, 'utf8'); }
+    catch (e) {
+      if (e && e.code !== 'ENOENT') { rlog(file + ' could not be read (' + e.code + '), so nothing was let go'); }
+      return st;
+    }
+    var list = null;
+    try { list = JSON.parse(String(text).replace(/^\uFEFF/, '')); } catch (e) { list = null; }
+    var idsOk = function (a, top) {
+      return Array.isArray(a) && a.every(function (n) { return Number.isSafeInteger(n) && n > 0 && n <= top; });
+    };
+    var ok = !!list && typeof list === 'object' && !Array.isArray(list) &&
+      idsOk(list.profiles, Number.MAX_SAFE_INTEGER) && idsOk(list.actors === undefined ? [] : list.actors, 0xffffffff) &&
+      (list.done === undefined || (!!list.done && typeof list.done === 'object' && !Array.isArray(list.done) &&
+        Object.keys(list.done).every(function (k) { return Number.isSafeInteger(list.done[k]) && list.done[k] > 0; })));
+    if (!ok) {
+      rlog(file + ' is not a list of deleted characters, so nothing was let go and it is left as it is');
+      return st;
+    }
+    var P = {}, A = {};
+    list.profiles.forEach(function (n) { P[n] = true; });
+    (list.actors || []).forEach(function (n) { A[n] = true; });
+    st = {
+      file: file,
+      profiles: list.profiles.slice(),
+      actors: (list.actors || []).slice(),
+      done: list.done ? Object.assign({}, list.done) : {},
+      who: {
+        profile: function (n) { n = Number(n) || 0; return n > 0 && has(P, n); },
+        actor: function (n) { n = Number(n) || 0; return n > 0 && has(A, n); }
+      }
+    };
+    rlog('a list of ' + st.profiles.length + ' profile(s) and ' + st.actors.length +
+         ' character(s) to let go, at server start');
+    return st;
+  }
+
+  // The marks back into the file, or the file gone once every part is done.
+  function mark() {
+    try {
+      if (PARTS.every(function (p) { return has(st.done, p); })) {
+        fs.unlinkSync(st.file);
+        rlog('every part is done, and the list is gone');
+        return;
+      }
+      fs.writeFileSync(st.file + '.tmp', JSON.stringify({ profiles: st.profiles, actors: st.actors, done: st.done }));
+      fs.renameSync(st.file + '.tmp', st.file);
+    } catch (e) {
+      rlog('the list could not be marked (' + ((e && e.code) || e) + '), so the parts that ran run again at the next start');
+    }
+  }
+
+  g.__thornswoodRelease = function (part, release) {
+    if (PARTS.indexOf(part) < 0 || typeof release !== 'function') { return; }
+    if (!read() || has(st.done, part)) { return; }
+    var r = null;
+    try { r = release(st.who); }
+    catch (e) { rlog(part + ' stopped: ' + ((e && e.message) || e) + '; its part waits for the next start'); return; }
+    if (!r || !r.saved) {
+      rlog(part + ' could not write what it let go, so its part waits for the next start');
+      return;
+    }
+    st.done[part] = Date.now();
+    var out = [];
+    for (var k in r.counts) { if (has(r.counts, k) && r.counts[k]) { out.push(k + ' ' + r.counts[k]); } }
+    rlog(part + ': ' + (out.length ? out.join(', ') : 'nothing of theirs'));
+    mark();
+  };
+
+  // Which parts are still waiting once every block has loaded: a block that
+  // never got as far as asking is said here, not passed over.
+  g.__thornswoodReleaseWaiting = function () {
+    if (!read()) { return []; }
+    var left = PARTS.filter(function (p) { return !has(st.done, p); });
+    if (left.length) { rlog(left.join(', ') + ' did not let go at this start, so the list waits for the next one'); }
+    return left;
+  };
+})();
+// ==== end thornswood release of deleted characters ====
+
 // ==== thornswood farming ====
 /*
   FARMING: claiming ground, sowing it, waiting, and bringing it in.
@@ -35840,8 +35997,32 @@ log('gamemode loaded:',
     }
   }
 
+  /*
+    A DELETED CHARACTER'S FARM, LET GO (#2351). Asked once, as this block
+    loads, through __thornswoodRelease (the release of deleted characters,
+    above), with the list Delete-Person.ps1 wrote: the farm
+    they claimed is free, as a lapsed claim is, and when they were last
+    handed seed is forgotten. A crop they sowed is not here: it is on the
+    plot (PLOT_PROPERTY) in the world save, which no call lists by property,
+    and it gives their number, which nobody holds any more, the right to
+    bring it in; whoever brings it in empties it (clearPlot), and a wipe
+    takes it. Answers the counts and whether the write took.
+  */
+  function release(who) {
+    var c = { farms: 0, seed: 0 };
+    for (var k in claims) {
+      if (!Object.prototype.hasOwnProperty.call(claims, k)) { continue; }
+      if (who.profile(Number(k)) || who.profile(Number(claims[k] && claims[k].by))) { delete claims[k]; c.farms++; }
+    }
+    for (var s in seeded) {
+      if (Object.prototype.hasOwnProperty.call(seeded, s) && who.profile(Number(s))) { delete seeded[s]; c.seed++; }
+    }
+    return { counts: c, saved: (c.farms || c.seed) ? saveClaims() : true };
+  }
+  if (typeof g.__thornswoodRelease === 'function') { g.__thornswoodRelease('farms', release); }
+
   g.__thornswoodFarming = {
-    PROPERTY: PLOT_PROPERTY,
+    PROPERTY: PLOT_PROPERTY, release: release,
     activate: press, command: command, giveSeeds: giveSeeds,
     readPlot: readPlot, claimCovering: claimCovering, groundOf: groundOf,
     farmOf: farmOf,
@@ -36142,8 +36323,10 @@ log('gamemode loaded:',
         JSON.stringify({ claims: claims, boxes: boxes,
                         funds: funds, notices: notices, boards: boards, steps: steps,
                         masters: masterCut, dropbox: dropbox }, null, 1));
+      return true;
     } catch (e) {
       plog('could not write the register:', e);
+      return false;
     }
   }
 
@@ -36475,8 +36658,10 @@ log('gamemode loaded:',
       var fs = require('fs');
       try { fs.mkdirSync(require('path').dirname(lawPath()), { recursive: true }); } catch (e) { }
       fs.writeFileSync(lawPath(), JSON.stringify({ cells: law.cells, held: law.held }, null, 1));
+      return true;
     } catch (e) {
       plog('law: could not write the register:', e);
+      return false;
     }
   }
 
@@ -39700,8 +39885,10 @@ log('gamemode loaded:',
       var file = bedBookPath();
       try { fs.mkdirSync(require('path').dirname(file), { recursive: true }); } catch (e) { }
       fs.writeFileSync(file, JSON.stringify({ guests: bedBook.guests, takings: bedBook.takings }, null, 1));
+      return true;
     } catch (e) {
       plog('could not write the bed book:', e);
+      return false;
     }
   }
 
@@ -42951,6 +43138,142 @@ log('gamemode loaded:',
     plog('law: the jail rule was applied to the claims made before it once:', ended, 'claim(s) ended');
     return ended;
   }
+
+  /*
+    WHAT A DELETED CHARACTER HELD, LET GO (#2351, Patrick's A of 16 October:
+    "Delete-Person.ps1 writes a list, and the gamemode releases those entries
+    at its next start"). Asked once, as this block loads and before
+    rolesRead, through __thornswoodRelease (the release of deleted
+    characters, before the farming block), with `who` answering whether a
+    profile id is on the list. rolesRead would end an office whose role the
+    account no longer holds, and say the character's name and profile in the
+    log as it did; let go first, there is nothing of theirs left to say.
+    Every register this block keeps is walked, and each entry goes the way its
+    own rule already sends it when the person is simply gone:
+
+      claims      a building they held is free, as a steward's evict leaves
+                  it; a master key record cut for them on somebody else's
+                  claim is dropped (it already opens nothing, liveMaster)
+      offices     law.held: the office their character held is let go, so the
+                  account's role, if it is still held, is chosen again
+      the boards  a post of theirs comes down, keeping its number, with its
+                  name and words taken off; a job, letter or haul of somebody
+                  else's that they had taken goes back on the board untaken,
+                  as a job handed back does; gold owed to them stops being
+                  held for them
+      drop box    what they put in stays in the box with their name off it, so
+                  the hold's officers may take it; the box's record keeps every
+                  line with their name off it
+      beds        a night they were let sleep, and every guest of a building
+                  they held, ends; the takings #1392 kept for them go
+
+    THE BOOKS STAY BALANCED BECAUSE NO COIN MOVES. Not a hold's ledger
+    (funds), not the box, not a pack. A release only changes who a coin is
+    held for: gold a post held for them (a letter's 15, a job's reward, a
+    haul's pay, gold owed to them) stays on the hold's ledger and becomes the
+    hold's, as the fee always was, so funds is unchanged and never smaller
+    than what is still held (mayWithdraw). The box keeps every coin it had.
+    Lines are anonymised, never cut, so every count in the box's record and
+    every number on a board still adds up. The one thing that goes is the
+    bed takings kept for them: no ledger counts that gold, it was theirs
+    alone, and it goes with them like the gold in their pack.
+
+    The three files are written only when something in them changed, and
+    the answer says whether every write that was needed took, so the list
+    waits for the next start when one did not. Counts only; the log never
+    names them.
+  */
+  function release(who) {
+    var mine = function (pid) { var n = Number(pid) || 0; return n > 0 && who.profile(n); };
+    var has = function (o, k) { return Object.prototype.hasOwnProperty.call(o, k); };
+    var c = { claims: 0, masterKeys: 0, offices: 0, posts: 0, handedBack: 0, owed: 0, lines: 0,
+              box: 0, boxRecord: 0, guests: 0, takings: 0 };
+    var reg = false, lawChanged = false, beds = false;
+    var b;
+    for (b in claims) {
+      if (!has(claims, b)) { continue; }
+      if (mine(claims[b].by)) { delete claims[b]; c.claims++; reg = true; continue; }
+      if (claims[b].master && mine(claims[b].master.for)) { delete claims[b].master; c.masterKeys++; reg = true; }
+    }
+    for (var key in law.held) {
+      if (!has(law.held, key)) { continue; }
+      var accts = law.held[key];
+      for (var acct in accts) {
+        if (has(accts, acct) && accts[acct] && mine(accts[acct].pid)) { delete accts[acct]; c.offices++; lawChanged = true; }
+      }
+      if (!Object.keys(accts).length) { delete law.held[key]; }
+    }
+    var at = Date.now();
+    for (var h in notices) {
+      if (!has(notices, h) || !Array.isArray(notices[h])) { continue; }
+      var list = notices[h];
+      for (var i = 0; i < list.length; i++) {
+        var n = list[i];
+        if (!n || typeof n !== 'object') { continue; }
+        var touched = false;
+        if (mine(n.by)) {
+          if (!n.down) { n.down = at; n.downBy = 0; c.posts++; }
+          n.by = 0;
+          n.name = 'somebody';
+          delete n.title; delete n.text; delete n.to;
+          touched = true;
+        }
+        if (mine(n.taken)) {
+          if (!n.down) { n.takenName = null; c.handedBack++; }
+          else { n.takenName = 'somebody'; }
+          n.taken = 0;
+          touched = true;
+        }
+        if (mine(n.owedTo)) {
+          if ((Math.floor(Number(n.owed)) || 0) > 0) { c.owed++; }
+          n.owed = 0;
+          n.owedTo = 0;
+          touched = true;
+        }
+        if (mine(n.deliveredTo)) { n.deliveredTo = 0; touched = true; }
+        if (mine(n.downBy)) { n.downBy = 0; touched = true; }
+        if (mine(n.doneBy)) { n.doneBy = 0; touched = true; }
+        if (touched) { c.lines++; reg = true; }
+      }
+    }
+    for (var bh in dropbox) {
+      if (!has(dropbox, bh) || !dropbox[bh] || typeof dropbox[bh] !== 'object') { continue; }
+      var d = dropbox[bh];
+      var items = Array.isArray(d.items) ? d.items : [];
+      for (var j = 0; j < items.length; j++) {
+        var it = items[j];
+        if (it && mine(it.by)) { it.by = 0; it.name = 'somebody'; delete it.rent; c.box++; reg = true; }
+      }
+      var record = Array.isArray(d.log) ? d.log : [];
+      for (var k = 0; k < record.length; k++) {
+        var l = record[k];
+        if (!l) { continue; }
+        var named = false;
+        if (mine(l.who)) { l.who = 0; l.whoName = 'somebody'; named = true; }
+        if (mine(l.by)) { l.by = 0; l.byName = 'somebody'; named = true; }
+        if (named) { c.boxRecord++; reg = true; }
+      }
+    }
+    for (var bb in bedBook.guests) {
+      if (!bedHas(bedBook.guests, bb)) { continue; }
+      var row = bedBook.guests[bb];
+      for (var gp in row) {
+        if (bedHas(row, gp) && (mine(gp) || mine(row[gp] && row[gp].by))) { delete row[gp]; c.guests++; beds = true; }
+      }
+      if (!Object.keys(row).length) { delete bedBook.guests[bb]; }
+    }
+    for (var tp in bedBook.takings) {
+      if (bedHas(bedBook.takings, tp) && mine(tp)) { delete bedBook.takings[tp]; c.takings++; beds = true; }
+    }
+    var saved = true;
+    if (reg && !save()) { saved = false; }
+    if (lawChanged && !saveLaw()) { saved = false; }
+    if (beds && !saveBedBook()) { saved = false; }
+    if (c.claims) { pushAll(); }
+    return { counts: c, saved: saved };
+  }
+
+  if (typeof g.__thornswoodRelease === 'function') { g.__thornswoodRelease('property', release); }
   rolesRead();
   endPreRuleJailClaims();
 
@@ -42981,6 +43304,8 @@ log('gamemode loaded:',
     rolesRead: rolesRead, held: function () { return JSON.parse(JSON.stringify(law.held)); },
     isSteward: isSteward, isStewardOf: isStewardOf, stewardHoldsOf: stewardHoldsOf,
     endPreRuleJailClaims: endPreRuleJailClaims, steps: function () { return Object.assign({}, steps); },
+    // What a deleted character held, let go at server start (#2351).
+    release: release,
     isGuard: isGuard, guardHoldsOf: guardHoldsOf, jailHoldOf: jailHoldOf, cellLocked: cellLocked,
     mayPassCell: mayPassCell, lockCell: lockCell,
     jailOfBuilding: jailOfBuilding, mayHold: mayHold, jailKeyHold: jailKeyHold, lockedJailHere: lockedJailHere,
@@ -43457,7 +43782,35 @@ log('gamemode loaded:',
     return false;
   }
 
+  /*
+    A DELETED CHARACTER OFF BOTH ROLLS (#2351). Asked once, as this block
+    loads, through __thornswoodRelease, with the list Delete-Person.ps1
+    wrote. A row is
+    theirs by its profile, or, on a row written before rows kept a profile,
+    by its character's form id. A form id on a row that names another
+    profile is somebody else's, whatever the list says. Written through
+    commit, so the rolls change only when the file does; a roll file that
+    could not be read is never written over (unreadable), and then nothing
+    is released and the list waits.
+  */
+  function release(who) {
+    var c = { embassy: 0, remnant: 0 };
+    var next = {};
+    ['embassy', 'remnant'].forEach(function (roll) {
+      next[roll] = reg[roll].filter(function (r) {
+        var gone = who.profile(r.profile) || (!(r.profile > 0) && who.actor(r.actor));
+        if (gone) { c[roll]++; }
+        return !gone;
+      });
+    });
+    if (!c.embassy && !c.remnant) { return { counts: c, saved: !unreadable }; }
+    var saved = (!c.embassy || commit('embassy', next.embassy)) && (!c.remnant || commit('remnant', next.remnant));
+    return { counts: c, saved: saved };
+  }
+  if (typeof g.__thornswoodRelease === 'function') { g.__thornswoodRelease('embassy', release); }
+
   g.__thornswoodEmbassy = {
+    release: release,
     holds: holds, command: command, enter: enter, setArmed: setArmed, leave: leave,
     listing: listing, rolls: function () { return reg; },
     CLAIM_REFUSED: CLAIM_REFUSED, EVICT_REFUSED: EVICT_REFUSED,
@@ -44624,8 +44977,9 @@ log('gamemode loaded:',
             !Array.isArray(saved.items)) throw new Error('Invalid body reward reservation');
           continue;
         }
+        // actor 0 is a reservation whose character was deleted (#2351, release below).
         if(!saved ||
-          !Number.isSafeInteger(saved.at) || saved.at<=0 || !Number.isInteger(saved.actor) || saved.actor<=0 ||
+          !Number.isSafeInteger(saved.at) || saved.at<=0 || !Number.isInteger(saved.actor) || saved.actor<0 ||
           !Number.isInteger(saved.tier) || saved.tier<1 || saved.tier>4 ||
           !Number.isInteger(saved.gold) || saved.gold<GOLD_SPAN[saved.tier][0] || saved.gold>GOLD_SPAN[saved.tier][1] ||
           !Array.isArray(saved.items)) throw new Error('Invalid dungeon reward reservation');
@@ -45538,7 +45892,40 @@ log('gamemode loaded:',
     return line || null;
   }
 
+  /*
+    A DELETED CHARACTER OFF THE CHEST RECORD (#2351). Asked once, as this
+    block loads, through __thornswoodRelease, with the list Delete-Person.ps1
+    wrote. A
+    chest's reservation keeps the character it paid by form id (actor); that
+    becomes 0. The reservation itself stays, with its time, tier, gold and
+    goods: it is what holds the chest's wait (RETURN_MIN), so cutting it would
+    let the chest pay again early, and every pile it records was paid. So the
+    record still adds up and only the name is off it. Saved like a
+    reservation, durably before it is used. A server where the rewards are not
+    kept (not main or dev) has nothing to release; one whose ledger could not
+    be read says so, and the list waits.
+  */
+  function release(who) {
+    var c = { chests: 0 };
+    if (!active) { return { counts: c, saved: false }; }
+    if (!storage || !ledger) { return { counts: c, saved: true }; }
+    var next = JSON.parse(JSON.stringify(ledger));
+    Object.keys(next.entries).forEach(function (key) {
+      var e = next.entries[key];
+      if (e && e.kind !== 'body' && e.legacy !== true && e.actor > 0 && who.actor(e.actor)) { e.actor = 0; c.chests++; }
+    });
+    if (!c.chests) { return { counts: c, saved: true }; }
+    try { storage.save(next); } catch (error) {
+      console.log('[dungeon] release failed: ' + error);
+      return { counts: c, saved: false };
+    }
+    ledger = next;
+    return { counts: c, saved: true };
+  }
+  if (typeof g.__thornswoodRelease === 'function') { g.__thornswoodRelease('dungeon', release); }
+
   g.__thornswoodDungeonLoot = {
+    release: release,
     shutdown:function(){active=false;},
     roll: roll,
     rollBody: rollBody,
@@ -52029,7 +52416,57 @@ function thornswoodBooks(env) {
     }
   }
 
+  /*
+    A DELETED CHARACTER OUT OF THE BOOKS (#2351). Asked once, as the books
+    start, through __thornswoodRelease, with the list Delete-Person.ps1
+    wrote. Their place
+    in every book goes, as a member's leave does, and so do the lines they
+    wrote in a book's chat, which are their words. A book they own is
+    disbanded, as its owner's disband does, with its ledger entries: a book
+    has to have its owner among its members (loadStore), and handing it on is
+    staff's (hand), so the procedure for a deletion request says to hand it on
+    in the game before the real run when the group wants to keep it. When
+    they last left goes too. A save that fails puts everything back, as
+    mutate does, and the list waits. Answers the counts and whether it took.
+  */
+  function release(who) {
+    var c = { books: 0, members: 0, lines: 0, left: 0 };
+    if (!active) { return { counts: c, saved: false }; }
+    var before = JSON.parse(JSON.stringify({ store: store, ledgers: ledgers, leftAt: leftAt }));
+    var keep = [];
+    for (var i = 0; i < store.length; i++) {
+      var book = store[i];
+      if (who.profile(book.owner)) { forgetLedger(book.id); c.books++; continue; }
+      var m = book.members.length, l = book.chat.length;
+      book.members = book.members.filter(function (x) { return !who.profile(x.pid); });
+      book.chat = book.chat.filter(function (x) { return !who.profile(x.pid); });
+      c.members += m - book.members.length;
+      c.lines += l - book.chat.length;
+      keep.push(book);
+    }
+    store = keep;
+    for (var k in leftAt) {
+      if (Object.prototype.hasOwnProperty.call(leftAt, k) && who.profile(Number(k))) { delete leftAt[k]; c.left++; }
+    }
+    for (var p in pending) {
+      if (Object.prototype.hasOwnProperty.call(pending, p) && who.profile(Number(p))) { delete pending[p]; }
+    }
+    if (!c.books && !c.members && !c.lines && !c.left) { return { counts: c, saved: true }; }
+    try {
+      if (c.books || c.members || c.lines) { save(); }
+      if (c.left) { saveLeft(); }
+    } catch (e) {
+      store = before.store;
+      ledgers = before.ledgers;
+      leftAt = before.leftAt;
+      return { counts: c, saved: false };
+    }
+    refresh();
+    return { counts: c, saved: true };
+  }
+
   return {
+    release: release,
     command: function (ctx) { return mutate(function () { return command(ctx); }, false); },
     accept: function (pid, name) { return mutate(function () { return accept(pid, name); }, true); },
     decline: function (pid) { if (active) { decline(pid); } },
@@ -52081,6 +52518,7 @@ function thornswoodBooks(env) {
     }
     var api = thornswoodBooks({ fs: fs, path: path, privDir: privDir });
     g.__thornswoodBooks = api;
+    if (typeof g.__thornswoodRelease === 'function') { g.__thornswoodRelease('books', api.release); }
     g.__thornswoodBooksTimer = setInterval(function () {
       try { api.noteTick(); } catch (e3) { }
     }, 5000);
@@ -52088,6 +52526,10 @@ function thornswoodBooks(env) {
     try { log('books: ' + ((e && e.message) || e)); } catch (e4) { }
   }
 })();
+
+// The release of deleted characters (#2351): which parts did not let go at
+// this start, now that every block that keeps a register has loaded.
+if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__thornswoodReleaseWaiting(); }
 
 // ==== thornswood chat commands ====
 /*

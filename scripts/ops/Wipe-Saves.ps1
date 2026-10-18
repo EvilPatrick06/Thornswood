@@ -13,8 +13,8 @@
   script rather than a second one beside it, because a second one would have
   overlapped this by three quarters and the two would have drifted apart.
 
-  FOUR THINGS MOVE, and between them they are the whole of what the world
-  remembers:
+  THESE MOVE, and between them they are the whole of what the world
+  remembers about the characters in it:
 
     world                    the changeform database. Every reference the
                              server has ever written to: what is in each
@@ -24,16 +24,48 @@
                              full again and untouched.
     private\characters.json  who everybody is.
     private\property.json    who holds which building, which are locked, and
-                             the ground each one covers.
+                             the ground each one covers; the notice boards'
+                             posts, the hold ledgers and the drop boxes.
     private\farm-claims.json the farms on ground with no building on it.
+    private\law.json         which character holds each hold office, and the
+                             cell doors guards have turned.
+    private\beds.json        who may sleep where tonight, and takings kept.
+    private\embassy.json     the embassy and remnant rolls, by character.
+    private\books.json       the faction and business books: owners, members,
+                             their chat and the prices they sent the guild.
+    private\last-left.json   when each character last left the world.
+    private\take-limit.json  how much each character has taken from each
+                             container lately.
+    private\dungeon-rewards-ledger.json and its .initialized mark, every
+                             dungeon chest's reservation and the character it
+                             paid. Both go, so the next start makes a fresh
+                             one, as on a first deploy: one without the other
+                             stops the dungeon rewards.
+    private\deleted-characters.json, a list of deleted characters the server
+                             has not let go of yet (#2351). It names entries in
+                             the registers above, so it goes aside with them
+                             and comes back with them if the wipe is undone.
     data\property.json and data\farm-claims.json, where both were until
                              25 September (issue #541: data is served to
                              anybody), so a wipe on a server still running
                              the older gamemode takes them too.
 
-  The first two were here from the start. The last two are the gamemode's own
-  and were added on 21 September: without them a fresh world would have come
-  up with every house still claimed by somebody who no longer exists.
+  The first two were here from the start. property.json and farm-claims.json
+  were added on 21 September: without them a fresh world would have come up
+  with every house still claimed by somebody who no longer exists. The rest
+  were added on 17 October (#2351): each is a register the gamemode keeps
+  that names characters, and a wipe that left them came up with offices, bed
+  nights, roll places, book memberships and chest records held by
+  characters that no longer exist, and with the embassy rolls pointing at
+  form ids the new world hands to new characters.
+
+  TWO STAY. private\mod-settings.json is each person's mod menu choices,
+  not the world, and a profile keeps its id through a wipe, so the menu
+  stays as they set it. private\merchant-ledger.json is the guild traders'
+  purses and shelves, and the merchant code refuses to start without it
+  (requireMerchantEvidence), so it is never moved by hand; its supply waits
+  and any trade waiting on a character are the merchant code's (#1373,
+  #2351). Season, the benches and the door are the server's, not anybody's.
 
   It does NOT delete anything. It stops the server, renames the storage out of
   the way with today's date on it, and starts the server again on an empty one.
@@ -100,6 +132,17 @@ function Remote($script) {
 }
 
 $stamp = (Get-Date).ToString('yyyyMMdd-HHmm')
+# What a wipe moves aside, in each server folder: the header says why each one.
+$Moves = @('world', 'private\characters.json', 'private\property.json', 'private\farm-claims.json',
+           'private\law.json', 'private\beds.json', 'private\embassy.json', 'private\books.json',
+           'private\last-left.json', 'private\take-limit.json',
+           'private\dungeon-rewards-ledger.json', 'private\dungeon-rewards-ledger.initialized',
+           'private\deleted-characters.json',
+           'data\property.json', 'data\farm-claims.json')
+# Both lists go across as literals. A single quote inside either would end the
+# string early on the far side, so it is doubled first.
+function Lit($a) { return (($a | ForEach-Object { "'" + ($_ -replace "'", "''") + "'" }) -join ',') }
+$movesLit = Lit $Moves
 
 Write-Host ''
 Write-Host '  THORNSWOOD  -  wipe the characters' -ForegroundColor White
@@ -138,7 +181,7 @@ foreach (`$t in (Get-ScheduledTask -EA SilentlyContinue)) {
 foreach (`$r in `$roots) {
   'ROOT|' + `$r
   if (`$taskOf.ContainsKey(`$r)) { 'TASK|' + `$r + '|' + `$taskOf[`$r] } else { 'NOTASK|' + `$r }
-  foreach (`$n in @('world', 'private\characters.json', 'private\property.json', 'private\farm-claims.json', 'data\property.json', 'data\farm-claims.json')) {
+  foreach (`$n in @($movesLit)) {
     `$p = Join-Path `$r `$n
     if (-not (Test-Path `$p)) { 'NONE|' + `$n; continue }
     `$b = 0; `$c = 0
@@ -146,10 +189,10 @@ foreach (`$r in `$roots) {
       foreach (`$f in (Get-ChildItem `$p -Recurse -File -EA SilentlyContinue)) { `$b += `$f.Length; `$c++ }
     } else {
       `$b = (Get-Item `$p).Length; `$c = 1
-      try {
-        `$j = Get-Content `$p -Raw | ConvertFrom-Json
-        'CHARS|' + @(`$j).Count
-      } catch { }
+      # The cards are each character's row under who; any other file is not counted as people.
+      if ((Split-Path -Leaf `$p) -eq 'characters.json') {
+        try { 'CHARS|' + @((Get-Content `$p -Raw | ConvertFrom-Json).who.PSObject.Properties).Count } catch { }
+      }
     }
     'ITEM|' + `$p + '|' + `$b + '|' + `$c
   }
@@ -194,32 +237,59 @@ else {
 }
 
 # ------------------------------------------------------------------- do it ---
-# Both lists go across as literals. A single quote inside either would end the
-# string early on the far side, so it is doubled first.
-function Lit($a) { return (($a | ForEach-Object { "'" + ($_ -replace "'", "''") + "'" }) -join ',') }
 $rootsLit = Lit $roots
 $tasksLit = Lit @($roots | Where-Object { $taskOf.ContainsKey($_) } | ForEach-Object { $taskOf[$_] })
 
 Head 'Stopping the servers'
+<#
+  NOTHING MOVES UNDER A SERVER THAT IS STILL RUNNING. A game server writes
+  world and private while it runs, so a file moved from under it is written
+  straight back, and the wipe is half done. Until 17 October this slept three
+  seconds after ending the tasks and printed what it found still running by
+  the program's path, which for the server is node.exe in Program Files and
+  never matched, and moved everything anyway. Now: each task is ended, then
+  every node or cmd whose command line names a server folder (with its
+  trailing backslash, since C:\Thornswood-Server is a prefix of
+  C:\Thornswood-Server-Dev), and the node each of those started, is ended
+  too, the way Delete-Person.ps1 finds what runs from a folder. It is then
+  asked again until none is left, ten seconds at most, and if any still is,
+  the wipe stops here with nothing moved.
+#>
 $out = Remote @"
 `$ErrorActionPreference = 'Continue'
 foreach (`$t in @($tasksLit)) {
   `$null = & schtasks /end /tn `$t 2>&1
   'ended ' + `$t
 }
-Start-Sleep -Seconds 3
-foreach (`$p in (Get-Process -Name 'skymp*','node' -EA SilentlyContinue)) {
-  if ("`$(`$p.Path)" -like '*Thornswood-Server*') { 'still running: ' + `$p.ProcessName + ' ' + `$p.Id }
+function Holders {
+  `$all = @(Get-CimInstance Win32_Process -EA SilentlyContinue | Where-Object { `$_.CommandLine })
+  `$ids = @()
+  foreach (`$r in @($rootsLit)) {
+    `$mark = `$r.TrimEnd('\') + '\'
+    foreach (`$p in `$all) {
+      if (`$p.Name -match '^(node|cmd)(\d|\.)*\.exe$' -and `$p.CommandLine.IndexOf(`$mark, [StringComparison]::OrdinalIgnoreCase) -ge 0) { `$ids += [int]`$p.ProcessId }
+    }
+  }
+  foreach (`$p in `$all) { if (`$p.Name -match '^node(\d|\.)*\.exe$' -and `$ids -contains [int]`$p.ParentProcessId) { `$ids += [int]`$p.ProcessId } }
+  return @(`$ids | Where-Object { `$_ -gt 0 -and `$_ -ne `$PID } | Sort-Object -Unique)
 }
-'stopped'
+foreach (`$id in @(Holders)) { Stop-Process -Id `$id -Force -EA SilentlyContinue; 'ended process ' + `$id }
+for (`$i = 0; `$i -lt 20 -and @(Holders).Count; `$i++) { Start-Sleep -Milliseconds 500 }
+`$still = @(Holders)
+if (`$still.Count) { 'STILLRUNNING|' + (`$still -join ',') } else { 'stopped' }
 "@
-foreach ($l in $out) { Say "  $l" }
+$running = $false
+foreach ($l in $out) {
+  if ("$l" -like 'STILLRUNNING|*') { $running = $true; Say ("  still running from a server folder after being stopped: process " + "$l".Substring(13)) 'Red' }
+  else { Say "  $l" }
+}
+if ($running) { Die 'A server is still running, so nothing was moved. Find what holds the folder (the process above) and run this again.' }
 
 Head 'Moving the old storage aside'
 $moved = Remote @"
 `$ErrorActionPreference = 'Continue'
 foreach (`$r in @($rootsLit)) {
-foreach (`$n in @('world', 'private\characters.json', 'private\property.json', 'private\farm-claims.json', 'data\property.json', 'data\farm-claims.json')) {
+foreach (`$n in @($movesLit)) {
   `$p = Join-Path `$r `$n
   if (-not (Test-Path `$p)) { continue }
   `$leaf = Split-Path -Leaf `$p
@@ -229,7 +299,9 @@ foreach (`$n in @('world', 'private\characters.json', 'private\property.json', '
     # come up with the property register saved as characters-before-<stamp>.
     `$to = Join-Path `$dir ((`$leaf -replace '[.]json$', '') + '-before-$stamp.json')
   }
-  else { `$to = Join-Path `$dir ('world-before-$stamp') }
+  elseif (`$leaf -eq 'world') { `$to = Join-Path `$dir ('world-before-$stamp') }
+  # Anything else (the dungeon ledger's .initialized mark) keeps its own name too.
+  else { `$to = Join-Path `$dir (`$leaf + '-before-$stamp') }
   try { Move-Item -LiteralPath `$p -Destination `$to -Force -EA Stop; 'moved  ' + `$p + '  ->  ' + `$to }
   catch { 'FAILED ' + `$p + '  ' + `$_.Exception.Message }
 }
@@ -253,7 +325,7 @@ foreach (`$r in @($rootsLit)) {
   `$r
   `$cf = Join-Path `$r 'private\characters.json'
   if (Test-Path `$cf) {
-    try { `$j = Get-Content `$cf -Raw | ConvertFrom-Json; '  now  ' + @(`$j).Count + ' character record(s)' } catch { '  now  characters.json is there but unreadable yet' }
+    try { `$j = Get-Content `$cf -Raw | ConvertFrom-Json; '  now  ' + @(`$j.who.PSObject.Properties).Count + ' character record(s)' } catch { '  now  characters.json is there but unreadable yet' }
   } else { '  now  no characters.json yet, which is what empty looks like' }
   # The tail is read per server and only two lines each, because six lines of
   # one server's log was what made a wipe that touched one of them read as

@@ -27,6 +27,12 @@ of its doors. Living there keeps it. When it lapses, the register drops
 the claim and the doors unlock. What is in the chests stays in the
 chests.
 
+When somebody's account is deleted at their request, the game lets go of
+what their characters held at its next start (#2351): a building or a farm
+they held is free, as a lapsed one is, their bed nights end, and a master key
+record cut for them comes off. The drop box keeps every coin they put in, for
+the hold's officers, with their name off it.
+
 A farm plot has its own claim, made in the field, and it lapses 14 real
 days after the last work on it. The two clocks use the same 14 days. A
 house and the ground it sits on are settled together by the people
