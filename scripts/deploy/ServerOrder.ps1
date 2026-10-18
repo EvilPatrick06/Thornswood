@@ -245,3 +245,51 @@ function Get-ThornswoodServerOrder([string[]]$Wanted, [string[]]$Ccc, [hashtable
         LightKept = $kept
     }
 }
+
+<#
+  The plugin list in the order Thornswood-Last.esp was built against (#2468).
+
+    $Wanted    the plugin list's enabled names
+    $Recorded  game\data\last-plugin.json's loadOrder
+
+  Get-ThornswoodServerOrder keeps each kind's order but takes the places
+  full and light plugins hold among each other from the list it is given,
+  and that is the order every machine loads: the launcher puts the named
+  plugins into the server's whole order (LoadOrder.ReorderWhole). Which of
+  two plugins wins a record depends on those places, and the last plugin
+  copies the winners of one order. On One on 17 Oct Vortex sorted its list
+  again at 6:32 PM: the same full order and the same light order, 26 places
+  between them changed, and the live deploy took them from the list, so
+  the main Ship refused the plugin ("at position 10 this release loads
+  RaceCompatibility.esm and the plugin was built with
+  AHZmoreHUDInventory.esl"). The list given here is in the recorded order,
+  so the places come from the plugin's own record and never from a
+  machine's sort.
+
+  Returns Wanted (the recorded names the list enables, in the recorded
+  order, then any it enables that the record does not name) and NotRecorded
+  (those last ones, which mean the plugin was built for another list).
+#>
+function Get-ThornswoodRecordedSequence([string[]]$Wanted, [string[]]$Recorded) {
+    $byLower = @{}
+    foreach ($w in @($Wanted)) { $t = "$w".Trim(); if ($t.Length -and -not $byLower.ContainsKey($t.ToLowerInvariant())) { $byLower[$t.ToLowerInvariant()] = $t } }
+    $out = New-Object Collections.Generic.List[string]
+    $placed = @{}
+    foreach ($r in @($Recorded)) {
+        $k = "$r".Trim().ToLowerInvariant()
+        if ($k.Length -eq 0 -or $placed.ContainsKey($k) -or -not $byLower.ContainsKey($k)) { continue }
+        $placed[$k] = $true
+        [void]$out.Add($byLower[$k])
+    }
+    $notRecorded = New-Object Collections.Generic.List[string]
+    foreach ($w in @($Wanted)) {
+        $t = "$w".Trim(); $k = $t.ToLowerInvariant()
+        if ($t.Length -eq 0 -or $placed.ContainsKey($k)) { continue }
+        $placed[$k] = $true
+        [void]$out.Add($t); [void]$notRecorded.Add($t)
+    }
+    return [pscustomobject]@{
+        Wanted = [string[]]$out.ToArray()
+        NotRecorded = [string[]]$notRecorded.ToArray()
+    }
+}
