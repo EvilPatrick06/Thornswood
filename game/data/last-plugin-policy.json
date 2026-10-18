@@ -1,8 +1,8 @@
 {
- "version": 2,
+ "version": 3,
  "issue": 2468,
  "readBy": "scripts/mods/Build-LastPlugin.py",
- "why": "What Thornswood-Last.esp leaves alone, and the mod quests it stops as well. Patrick, 12 Oct 2026: every vanilla quest can be cut. His answers the same evening to the eight decisions on issue 2468 were 'all recommended': the barter, carriage, follower, courier and start-up quests are stopped with the rest, the creature voices and the authored corpses stay, and the sixteen mod quests with gate, door or arrival talk are stopped too.",
+ "why": "What Thornswood-Last.esp leaves alone, the mod quests it stops as well, and the places it gives a hold. Patrick, 12 Oct 2026: every vanilla quest can be cut. His answers the same evening to the eight decisions on issue 2468 were 'all recommended': the barter, carriage, follower, courier and start-up quests are stopped with the rest, the creature voices and the authored corpses stay, and the sixteen mod quests with gate, door or arrival talk are stopped too.",
  "corpses": {
   "action": "keep",
   "why": "The 1,361 authored corpses (startsDead) are cut from the living population, but they never flashed: the client's world cleaner leaves a dead placed actor where it lies, so they stand as scenery. Patrick, 12 Oct 2026: keep them as scenery (decision 7 on issue 2468)."
@@ -28,5 +28,23 @@
   {"quest": "2ddff3:WindhelmSSE.esp", "edid": "0WindhelmSceneGuardVampireAftermath"},
   {"quest": "301e05:WindhelmSSE.esp", "edid": "OWindhelmDecorationMurder"},
   {"quest": "3ec170:WindhelmSSE.esp", "edid": "0WHQuestArenaFightRepeating"}
- ]
+ ],
+ "placeHolds": {
+  "why": "Patrick, 17 Oct 2026, decision 2 = B on issue 2551: the places on Tamriel's ground that Skyrim and the collection's mods put in no hold get one, so the Steward and Jarl of that hold settle their buildings and the main menu's last location names the hold. Apocrypha, the Soul Cairn, Sovngarde, the Forgotten Vale, Misty Grove and the test and Creation Club cells stay in no hold. A location is given its hold, or the place of Patrick's list it lies in, as its parent; a room with no location of its own is given the location of the place it belongs to, or the hold's own when no location covers it.",
+  "locations": [
+   {"location": "4c20:Dawnguard.esm", "edid": "DLC1VampireCastleLocation", "place": "Castle Volkihar", "parent": "16770:Skyrim.esm", "parentEdid": "HaafingarHoldLocation", "holdEdid": "HaafingarHoldLocation"},
+   {"location": "39aa9:Skyrim.esm", "edid": "NightingaleHallLocation", "place": "Nightingale Hall", "parent": "1676c:Skyrim.esm", "parentEdid": "RiftHoldLocation", "holdEdid": "RiftHoldLocation"},
+   {"location": "350bc:Skyrim.esm", "edid": "IronbindBarrowLocation", "place": "Ironbind Barrow", "parent": "1676b:Skyrim.esm", "parentEdid": "WinterholdHoldLocation", "holdEdid": "WinterholdHoldLocation"},
+   {"location": "1b261:The Great City of Solitude.esp", "edid": "JakobsFarmInteriorLocation", "place": "Jakob's House", "parent": "16770:Skyrim.esm", "parentEdid": "HaafingarHoldLocation", "holdEdid": "HaafingarHoldLocation"},
+   {"location": "1b3c9:The Great City of Solitude.esp", "edid": "FrederiksFarmInteriorLocation", "place": "Frederik's House", "parent": "16770:Skyrim.esm", "parentEdid": "HaafingarHoldLocation", "holdEdid": "HaafingarHoldLocation"},
+   {"location": "a87a:Dawnguard.esm", "edid": "DLC1DarkfallCaveLocation", "place": "Darkfall Cave", "parent": "16769:Skyrim.esm", "parentEdid": "ReachHoldLocation", "holdEdid": "ReachHoldLocation"},
+   {"location": "4c1f:Dawnguard.esm", "edid": "DLC1HunterHQLocation", "place": "Fort Dawnguard's valley", "parent": "1676c:Skyrim.esm", "parentEdid": "RiftHoldLocation", "holdEdid": "RiftHoldLocation"},
+   {"location": "19c8e:Dawnguard.esm", "edid": "DLC1DeadDropFallsLocation", "place": "Dead Drop Falls and Dead Drop Mine, caves of Fort Dawnguard's valley", "parent": "4c1f:Dawnguard.esm", "parentEdid": "DLC1HunterHQLocation", "holdEdid": "RiftHoldLocation", "why": "Their doors open onto the valley, and Dawnguard.esm gives their location Tamriel as its parent, not the valley's."}
+  ],
+  "cells": [
+   {"cell": "1a618:OarsRest.esp", "edid": "ORUtility", "place": "Oar's Rest's utility room", "location": "3740:OarsRest.esp", "locationEdid": "OR_Location_OarsRest", "holdEdid": "FalkreathHoldLocation", "why": "The room has no location of its own. It takes Oar's Rest's, which OarsRest.esp already puts in Falkreath Hold."},
+   {"cell": "660d:Solitude Arena.esp", "edid": "aamaisonchamp", "place": "the Lost Hut", "location": "16769:Skyrim.esm", "locationEdid": "ReachHoldLocation", "holdEdid": "ReachHoldLocation", "why": "The hut has no location of its own and no location of Solitude Arena.esp covers it, so it takes the Reach's own."},
+   {"cell": "8e52:Dawnguard.esm", "edid": "DLC1HunterValleyCave01", "place": "Mossy Glen Cave, a cave of Fort Dawnguard's valley", "location": "4c1f:Dawnguard.esm", "locationEdid": "DLC1HunterHQLocation", "holdEdid": "RiftHoldLocation", "why": "The cave has no location of its own. Its doors open onto the valley, so it takes the valley's."}
+  ]
+ }
 }
