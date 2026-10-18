@@ -69,13 +69,18 @@ yes('B4 every line keeps who and whether proven', lines.every((l) => l.profileId
 try { fs.rmSync(CHAT_DIR, { recursive: true, force: true }); } catch (e) { }
 // Since #1131 the text a command writes comes from commandLogText (the pass
 // masked, a waiting menu's repeated /line left out); the press flag is passed
-// on exactly as before.
+// on exactly as before. Since #2723 commandLogText also reads it, to leave
+// the front plugin's own reports out (tests\test-2723-plugin-reports.js).
 yes('B5 the chat handler passes msg.press on only when it is exactly true',
-    /const logged = commandLogText\(me, text\);\s*if \(logged\) chatWrite\('command', myId, me, logged, msg\.press === true \? 'press' : ''\);/.test(VOICE));
+    /const press = msg\.press === true;\s*const logged = commandLogText\(me, text, press\);\s*if \(logged\) chatWrite\('command', myId, me, logged, press \? 'press' : ''\);/.test(VOICE));
 const lbox = {};
-vm.runInNewContext(grab(VOICE, 'commandLogText') + '\nthis.commandLogText = commandLogText;', lbox);
-yes('B6 and still masks /joinpass', typeof lbox.commandLogText === 'function' &&
-    lbox.commandLogText(me, '/joinpass jp1.abc.def') === '/joinpass [pass]' && lbox.commandLogText(me, '/lock 1a2b') === '/lock 1a2b');
+const reportsAt = VOICE.indexOf('const PLUGIN_REPORTS = [');
+const reports = reportsAt >= 0 ? VOICE.slice(reportsAt, VOICE.indexOf('];', reportsAt) + 2) : '';
+vm.runInNewContext(reports + '\n' + grab(VOICE, 'pluginReport') + '\n' + grab(VOICE, 'commandLogText') +
+  '\nthis.commandLogText = commandLogText;', lbox);
+yes('B6 and still masks /joinpass, and a key\'s /lock is still written', typeof lbox.commandLogText === 'function' &&
+    lbox.commandLogText(me, '/joinpass jp1.abc.def') === '/joinpass [pass]' && lbox.commandLogText(me, '/lock 1a2b') === '/lock 1a2b' &&
+    lbox.commandLogText(me, '/lock 1a2b', true) === '/lock 1a2b');
 
 // C
 yes('C1 the site hands via to the hub, and only the word press', /via: o\.via === 'press' \? 'press' : ''/.test(SITE));
