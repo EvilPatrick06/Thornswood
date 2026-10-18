@@ -327,11 +327,13 @@ if (lifted && ORES) {
       String: String, Buffer: Buffer, JSON: JSON, Object: Object, Array: Array, RegExp: RegExp, Error: Error };
     ctx.globalThis = ctx;
     vm.createContext(ctx);
+    const eligibility=require('./quest-eligibility-fixture')(ctx,gm);
     vm.runInContext(qBlock, ctx);
     const inv = {};
     const ranks = { '1:miner': 'master', '2:miner': 'expert', '3:miner': 'master' };
     const kept = {};
     const svc = ctx.__thornswoodCustomQuestsCreate({
+      eligibility,readCharacter:a=>({v:1,cls:'miner',ranks:{miner:ranks[a+':miner']}}),
       now: function () { return 5000; },
       goldDesc: 'f:Skyrim.esm',
       // Each person's quests are kept on the character (#1621).
@@ -352,7 +354,6 @@ if (lifted && ORES) {
         if ((inv[a + '|' + item] || 0) < n) { return false; }
         inv[a + '|' + item] -= n; return true;
       },
-      rankOf: function (a, key) { return ranks[a + ':' + key] || ''; },
       classGate: function () { return null; },
       toolGate: function () { return null; },
       mining: function () { return false; },
@@ -453,7 +454,7 @@ if (ORES && qBlock2) {
             const prefix = id + ':';
             if (entry.indexOf(prefix) === 0) savedRanks[entry.slice(prefix.length)] = ranks[entry];
           });
-          return {v: 1, ranks: savedRanks};
+          return {v: 1, cls:'miner', ranks: savedRanks};
         }
         if (key === 'locationalData') { return veinCell[id] ? { cellOrWorldDesc: veinCell[id], pos: [0, 0, 0] } : undefined; }
         return props[id + '|' + key] ? JSON.parse(props[id + '|' + key]) : undefined;
@@ -491,6 +492,7 @@ if (ORES && qBlock2) {
     questAdmission: function(a,ref){return traderOpen && ref===9000 ? function(){return traderOpen;} : null;}};
   ctx.__thornswoodCharacter = { PROPERTY: 'thornswoodCharacter' };
   vm.createContext(ctx);
+  require('./quest-eligibility-fixture')(ctx,gm);
   vm.runInContext(qBlock2, ctx);
   const svc = ctx.__thornswoodQuests;
   yes('the server starts the quest service', !!svc && !!svc.mineRare && logged.length === 0);
