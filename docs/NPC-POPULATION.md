@@ -17,15 +17,15 @@ listed interval; the deadline persists through restart. A corpse yields one shar
 |---|---:|
 | Eastmarch | 512 |
 | Falkreath | 432 |
-| Haafingar | 339 |
+| Haafingar | 368 |
 | Hjaalmarch | 392 |
 | Solstheim | 462 |
 | Whiterun | 543 |
-| Winterhold | 504 |
-| no hold | 360 |
+| Winterhold | 512 |
+| no hold | 306 |
 | the Pale | 381 |
-| the Reach | 539 |
-| the Rift | 608 |
+| the Reach | 551 |
+| the Rift | 613 |
 
 City animals: at most six per location. Farm livestock: at most eight per location.
 Bandit camps: at most seven enemies, 45-minute returns. Giant camps: at most two giants
@@ -116,7 +116,7 @@ and six of each other animal species per tile. Cave and dungeon caps are shared 
 | Riften | the Rift | city |  | 28 | 20, 45, 360 |
 | Markarth | the Reach | city |  | 23 | 20, 45, 360 |
 | Solitude | Haafingar | city |  | 21 | 45, 360 |
-| open ground in Tamriel | no hold | wilderness |  | 1 | 45 |
+| open ground in Tamriel | Haafingar | wilderness |  | 1 | 45 |
 | Anga's Mill | the Pale | wilderness |  | 9 | 20 |
 | Barleydark Farm | Whiterun | wilderness |  | 2 | 20 |
 | Battle-Born Farm | Whiterun | farm |  | 4 | 20 |
@@ -353,8 +353,8 @@ and six of each other animal species per tile. Cave and dungeon caps are shared 
 | BlackreachOverpass | no hold | wilderness |  | 1 | 45 |
 | ThroatofTheWorldPath01 | Whiterun | wilderness |  | 6 | 20, 45 |
 | Reeking Cave | Haafingar | cave | 1 | 1 | 30 |
-| Volkihar Ruins | no hold | dungeon | 2 | 12 | 45 |
-| Volkihar Undercroft | no hold | dungeon | 2 | 12 | 45 |
+| Volkihar Ruins | Haafingar | dungeon | 2 | 12 | 45 |
+| Volkihar Undercroft | Haafingar | dungeon | 2 | 12 | 45 |
 | DLC2 WarehouseSpiders | no hold | interior |  | 13 | 20 |
 | open ground in DLC01SoulCairn | no hold | wilderness |  | 13 | 45 |
 | open ground in DLC01SoulCairn | no hold | wilderness |  | 1 | 45 |
@@ -410,7 +410,7 @@ and six of each other animal species per tile. Cave and dungeon caps are shared 
 | Valthume | the Reach | dungeon | 3 | 16 | 60 |
 | open ground in BluePalaceWingWorld | no hold | wilderness |  | 1 | 45 |
 | Ramshackle Trading Post | Solstheim | wilderness |  | 1 | 360 |
-| Ironbind Barrow | no hold | dungeon | 1 | 8 | 30 |
+| Ironbind Barrow | Winterhold | dungeon | 1 | 8 | 30 |
 | Ebony Warrior's Camp | the Rift | wilderness |  | 1 | 30 |
 | Oars Rest | Falkreath | city |  | 4 | 360 |
 | SolitudeTemple | Haafingar | city |  | 3 | 360 |
@@ -466,7 +466,7 @@ and six of each other animal species per tile. Cave and dungeon caps are shared 
 | open ground in Tamriel | Haafingar | wilderness |  | 1 | 20 |
 | open ground in Tamriel | Haafingar | wilderness |  | 1 | 20 |
 | open ground in Tamriel | Haafingar | wilderness |  | 1 | 20 |
-| Darkfall Cave | no hold | cave | 2 | 12 | 45 |
+| Darkfall Cave | the Reach | cave | 2 | 12 | 45 |
 | Whiterun Sewers | Whiterun | sewer | 1 | 9 | 30, 360 |
 | Windhelm Sewers | Eastmarch | sewer | 1 | 9 | 30, 360 |
 | Bronze Water Cave | the Pale | cave | 1 | 2 | 30 |
@@ -478,7 +478,7 @@ and six of each other animal species per tile. Cave and dungeon caps are shared 
 | open ground in DLC1AncestorsGladeWorld | no hold | wilderness |  | 1 | 45 |
 | North Skybound Watch | Falkreath | dungeon | 1 | 8 | 30 |
 | open ground in DLC1DarkfallPassageWorld | no hold | wilderness |  | 5 | 20 |
-| Castle Volkihar | no hold | wilderness |  | 4 | 45 |
+| Castle Volkihar | Haafingar | wilderness |  | 4 | 45 |
 | Arkngthamz | Falkreath | dungeon | 2 | 12 | 45 |
 | Redwater Den | the Rift | dungeon | 1 | 8 | 30 |
 | Dimhollow Crypt | the Pale | cave | 1 | 8 | 30 |
@@ -658,7 +658,7 @@ and six of each other animal species per tile. Cave and dungeon caps are shared 
 | open ground in Tamriel | Winterhold | wilderness |  | 1 | 20 |
 | open ground in Tamriel | Winterhold | wilderness |  | 1 | 30 |
 | open ground in Tamriel | Winterhold | wilderness |  | 1 | 20 |
-| Mossy Glen Cave | no hold | cave | 2 | 5 | 45 |
+| Mossy Glen Cave | the Rift | cave | 2 | 5 | 45 |
 | open ground in Tamriel | the Pale | wilderness |  | 3 | 20 |
 | open ground in Tamriel | the Pale | wilderness |  | 2 | 20 |
 | open ground in Tamriel | Winterhold | wilderness |  | 1 | 30 |

@@ -265,14 +265,12 @@ of the places its doors open onto: an exterior cell's location, or its
 worldspace's, or a room's own, walking through a room with none, such
 as a cellar, to where its doors open. Two holds there, the building's
 own location picks between them; none, the building's own location
-answers. Measured 17 Oct: 811 of the 850 buildings have a hold, and all
-601 that `DATA.cellToHold` names agree with it. The 39 left out (the
-Soul Cairn, Apocrypha, the Forgotten Vale, Sovngarde, Castle Volkihar,
-Fort Dawnguard, Nightingale Hall, Ironbind Barrow, test and Creation
-Club cells, Misty Grove, whose only door starts disabled, and four
-from mods) open onto places no hold's location covers, and the table
-says why for each. No steward evicts or sets
-rent at those; staff do.
+answers. Measured 17 Oct: 828 of the 850 buildings have a hold, and all
+601 that `DATA.cellToHold` names agree with it. The 22 left out (the
+Soul Cairn, Apocrypha, the Forgotten Vale, Sovngarde, test and Creation
+Club cells, and Misty Grove, whose only door starts disabled) open onto
+places no hold's location covers, and the table says why for each. No
+steward evicts or sets rent at those; staff do.
 
 Staff at a door (#2551) are `settleAs` in the property block: a
 steward of the building's hold acts as its steward, and anybody else
@@ -284,6 +282,23 @@ norent, `by`, `byName`, `who`, `whoName`, `why` (the building and its
 hold, and the rent set), `building`, `buildingName`, `hold` and `at`.
 A press is refused when that log cannot be reached.
 `tests\test-2551-building-holds.js` drives it at all 850 buildings.
+
+Skyrim and the collection's mods put 17 more buildings on Tamriel's
+ground in no hold. Patrick, 17 Oct, decision 2 = B on #2551, gave them
+one, and `Thornswood-Last.esp` carries it (the policy's `placeHolds` in
+`game\data\last-plugin-policy.json`, built by
+`scripts\mods\Build-LastPlugin.py`): Castle Volkihar's location and
+Jakob's and Frederik's houses' are put in Haafingar, Nightingale Hall's
+and Dayspring Canyon's (Fort Dawnguard's valley) in the Rift, with Dead
+Drop Falls' put in the valley, Ironbind Barrow's in Winterhold and
+Darkfall Cave's in the Reach. Three rooms have no location at all and
+are given one: Oar's Rest's utility room takes Oar's Rest's, which the
+mod puts in Falkreath Hold, Mossy Glen Cave the valley's, and the Lost
+Hut the Reach's own. Each is a copy of the record that wins the load
+order with only its parent or its location changed, so the game, the
+server and this table all read the same hold. The roster's place name,
+the main menu's Last location and the launcher's "last seen in", reads
+the same parents and names the hold: "Volkihar Keep, Haafingar".
 
 Claiming, locking, unlocking and cutting a key are the lock key, with
 nothing typed (#1637). The server writes the door's word, Claim, Lock or
