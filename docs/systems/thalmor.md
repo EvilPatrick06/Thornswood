@@ -103,7 +103,11 @@ Immersive Patrols II Justiciar placements in the Pale, Haafingar and
 Hjaalmarch. A road off Tamriel's ground, with fewer than 2 or more than
 4 points, or with a point beside a walled town or village is refused.
 At each start the server stands up any member that is missing, at its
-own point, and takes down the members of a road staff turned off. A dead
+own point, and takes down the members of a road staff turned off. If the
+world stage cannot be read at a start, nobody is stood up or taken down
+that start, and the members already out stay. A world stage in that list
+that the war has no stage for (a typo) is named in the server log at
+start and never used. A dead
 member comes back at its point after the return time; nothing stacks a
 second group. A member keeps to its stretch of road, inside its leash;
 there is no route between holds. A body cannot be opened, so it gives no

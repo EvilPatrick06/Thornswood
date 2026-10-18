@@ -66377,19 +66377,23 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
   // takes it out of the world: its road is off, gone or over the province cap,
   // its slot is past the road's points or already filled, or staff changed the
   // record for that point. With no readable table nothing is decided: it stays
-  // switched off and nothing is deleted.
+  // switched off and nothing is deleted. A held table (the keeper could not
+  // read the world stage, so this stage's cap is not known) keeps what stands:
+  // a member that is its road's, slot's and record's own is admitted with no
+  // cap, and anything else stays switched off, never deleted.
   function patrolRule(id,mark,base,call) {
     const table=options && typeof options.patrols==='function' ? options.patrols() : null;
     if(!table || !Array.isArray(table.roads)) return null;
+    const out=table.hold===true ? null : 'discard';
     const road=table.roads.find(r=>r.id===mark.road);
-    if(!road || !Number.isInteger(mark.slot) || mark.slot<0 || mark.slot>=road.points.length) return 'discard';
+    if(!road || !Number.isInteger(mark.slot) || mark.slot<0 || mark.slot>=road.points.length) return out;
     let wanted=0;
     try {wanted=resolve(road.bases[mark.slot],call);} catch(e) {return null;}
-    if(wanted!==base) return 'discard';
+    if(wanted!==base) return out;
     const key=road.id+'#'+mark.slot,holder=patrolSlots.get(key);
-    if(holder!==undefined && holder!==id) return 'discard';
+    if(holder!==undefined && holder!==id) return out;
     const up=new Set([...patrolSlots.keys()].map(k=>k.split('#')[0]));
-    if(!up.has(road.id) && up.size>=thalmorPatrolCap(table)) return 'discard';
+    if(table.hold!==true && !up.has(road.id) && up.size>=thalmorPatrolCap(table)) return 'discard';
     return {cell:resolve(THALMOR_PATROL_WORLD,call),patrol:key,bucket:'patrol:'+road.id,
       row:[null,road.bases[mark.slot],THALMOR_PATROL_WORLD,road.points[mark.slot].slice(),road.leash,
         road.returnMinutes,'enemy','road',road.tier,road.points.length,'patrol:'+road.id,0,'highelf']};
@@ -70162,24 +70166,46 @@ try {
 
   /*
     THE WORLD STAGE, FOR THE PER-STAGE CAP (#2697). The one read of the world
-    stage register (#2685): its worldStage().id, nothing else. No register
-    (not merged, or it failed to load), no worldStage, a throw or no id is no
-    stage, and then the cap is the plain most. Read once per start or reload,
-    so a stage staff confirm takes effect the next time the gamemode loads.
+    stage register (#2685): its worldStage().id and its stages(), nothing else.
+    No register (not merged, or it failed to load), no worldStage or no id is
+    no stage, and then the cap is the plain most. A register that is there
+    and throws is not "no stage": the cap for the stage the world is at is not
+    known, so, as for an unreadable slot register, no patrol is stood up or
+    taken down (broken, below). Read once per start or reload, so a stage staff
+    confirm takes effect the next time the gamemode loads.
   */
-  function currentStage() {
+  function stageRegister() {
+    var reg = g.__thornswoodWorldStage;
+    return reg && typeof reg.worldStage === 'function' ? reg : null;
+  }
+
+  // { id: the stage id or null, broken: the error when the register threw }
+  function currentStage(reg) {
+    if (!reg) { return { id: null, broken: null }; }
     try {
-      var reg = g.__thornswoodWorldStage;
-      if (!reg || typeof reg.worldStage !== 'function') { return null; }
       var st = reg.worldStage();
-      return st && typeof st.id === 'string' && st.id ? st.id : null;
+      return { id: st && typeof st.id === 'string' && st.id ? st.id : null, broken: null };
     } catch (e) {
-      return null;
+      return { id: null, broken: String((e && e.message) || e) };
     }
   }
 
+  // Each stageMost key the register does not list (a typo, or a stage taken
+  // out of war-stages.json): logged, never refused. No register, or no list
+  // from it, logs nothing.
+  function unknownStageKeys(table, reg) {
+    var keys = Object.keys(table.stageMost || {});
+    if (!reg || typeof reg.stages !== 'function' || !keys.length) { return []; }
+    var list;
+    try { list = reg.stages(); } catch (e) { return []; }
+    if (!Array.isArray(list)) { return []; }
+    var known = {};
+    list.forEach(function (s) { if (s && typeof s.id === 'string') { known[s.id] = true; } });
+    return keys.filter(function (k) { return !Object.prototype.hasOwnProperty.call(known, k); });
+  }
+
   // The staff's file, checked. null when it cannot be used at all.
-  function readTable() {
+  function readTable(stage) {
     var doc = null;
     try {
       doc = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'thalmor-patrols.json'), 'utf8').replace(/^\uFEFF/, ''));
@@ -70188,7 +70214,7 @@ try {
       return null;
     }
     try {
-      return thalmorPatrolTable(doc, NPC_POPULATION_DATA.keep, currentStage());
+      return thalmorPatrolTable(doc, NPC_POPULATION_DATA.keep, stage.id);
     } catch (e2) {
       tlog(String(e2 && e2.message) + ', so no patrol is stood up or taken down');
       return null;
@@ -70272,10 +70298,23 @@ try {
   }
 
   function keepPatrols() {
-    var table = readTable();
+    var worldReg = stageRegister();
+    var stage = currentStage(worldReg);
+    var table = readTable(stage);
+    if (table && stage.broken !== null) {
+      // The cap for this stage is not known. The population keeps what stands
+      // (hold) and the keeper stands nobody up and takes nobody down.
+      table.hold = true;
+      g.__thornswoodThalmorPatrols = table;
+      tlog('the world stage register failed (' + stage.broken + '), so no patrol is stood up or taken down');
+      return;
+    }
     g.__thornswoodThalmorPatrols = table;
     if (!table) { return; }
     table.refused.forEach(function (r) { tlog('road', r.id, r.why); });
+    unknownStageKeys(table, worldReg).forEach(function (k) {
+      tlog('stageMost names', k, 'but the world stage list has no such stage, so that cap is never used');
+    });
     var population = g.__thornswoodNpcPopulation;
     var runtime = g.__thornswoodNpcRuntime;
     if (!population || typeof population.admit !== 'function') {

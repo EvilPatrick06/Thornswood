@@ -367,14 +367,73 @@ const ON = clone(SHIPPED); ON.on = true;
   yes('K13 the world moves to war (cap 3): the next start stands the other two roads up again', r2.made.length === 8 &&
       Object.keys(JSON.parse(files[REG_FILE]).roads).length === 3);
   s.ctx.__thornswoodWorldStage.worldStage = () => { throw new Error('register broken'); };
+  const regText = files[REG_FILE];
   const r3 = s.start();
-  yes('K14 a register that throws is no stage: the cap is most and nothing changes', r3.made.length === 0 && s.mp.removed.length === 8 &&
-      r3.logs.some(l => /stage \(none\) cap 3/.test(l)));
+  yes('K14 a register that throws stands nobody up, takes nobody down and writes nothing',
+      r3.made.length === 0 && s.mp.removed.length === 8 && files[REG_FILE] === regText && s.discarded.length === 0);
+  yes('K14 it says so once, and never falls back to most',
+      r3.logs.filter(l => /world stage register failed \(register broken\), so no patrol is stood up or taken down/.test(l)).length === 1 &&
+      !r3.logs.some(l => /cap 3/.test(l)) && s.ctx.__thornswoodThalmorPatrols.hold === true);
+  const seen3 = s.discover();
+  yes('K14 the population keeps the twelve that stand, admitted, none discarded or switched off',
+      seen3.filter(([, p]) => !!p).length === 12 && s.discarded.length === 0);
   s.ctx.__thornswoodWorldStage = { worldStage: () => ({ id: 'siege' }) };
   yes('K14 a stage with no entry keeps most', s.start().made.length === 0 && s.mp.removed.length === 8);
 }
-yes('N3 the keeper reads the world stage register through worldStage() only, once, and never moves it',
-    (KEEPER.match(/__thornswoodWorldStage/g) || []).length === 1 && /reg\.worldStage\(\)/.test(KEEPER) &&
+{
+  // Codex's case (#2698 review, finding 1): a stage cap of 0, then the register throws
+  const doc = clone(ON); doc.stageMost = { truce: 0, war: 1 };
+  const files = withFile(doc);
+  const s = server(files);
+  s.ctx.__thornswoodWorldStage = { worldStage: () => ({ id: 'truce' }) };
+  const r0 = s.start();
+  yes('K15 at a stage with a cap of 0 nobody stands', r0.made.length === 0 && r0.logs.some(l => /stage truce cap 0 - 0 road\(s\)/.test(l)));
+  s.ctx.__thornswoodWorldStage.worldStage = () => { throw new Error('war.json lost'); };
+  const r1 = s.start();
+  yes('K15 the register then throws: the cap does not come back as 3, nobody is stood up',
+      r1.made.length === 0 && !(REG_FILE in files) && r1.logs.some(l => /world stage register failed \(war\.json lost\)/.test(l)));
+  s.ctx.__thornswoodWorldStage.worldStage = () => ({ id: 'war' });
+  const r2 = s.start();
+  yes('K15 at a stage with a cap of 1, one road stands', r2.made.length === 4);
+  s.ctx.__thornswoodWorldStage.worldStage = () => { throw new Error('again'); };
+  const r3 = s.start();
+  const seen = s.discover();
+  yes('K15 the register throws at a cap of 1: still one road, its four admitted, nobody new',
+      r3.made.length === 0 && s.mp.removed.length === 0 && seen.filter(([, p]) => !!p).length === 4 &&
+      Object.keys(JSON.parse(files[REG_FILE]).roads).length === 1);
+}
+{
+  // finding 2: stage ids are 1 to 32 of a-z, 0-9 and dash, the rule #2685's stage list
+  // now uses as well (Wyrd's change on #2685). The two rules must stay matched.
+  const id32 = 'a'.repeat(32), id33 = 'a'.repeat(33);
+  const ok = d => { try { thalmorPatrolTable(d, KEEP, id32); return true; } catch (e) { return false; } };
+  yes('S5 a stageMost key of 32 characters is a stage id and its cap is used',
+      ok(Object.assign(clone(ON), { stageMost: { [id32]: 1 } })) &&
+      thalmorPatrolTable(Object.assign(clone(ON), { stageMost: { [id32]: 1 } }), KEEP, id32).roads.length === 1);
+  yes('S5 a key of 33 characters, or empty, is not a stage id and throws the file out',
+      !ok(Object.assign(clone(ON), { stageMost: { [id33]: 1 } })) && !ok(Object.assign(clone(ON), { stageMost: { '': 1 } })));
+}
+{
+  // finding 3: a stageMost key that names no stage is logged once at start, never refused
+  const doc = clone(ON); doc.stageMost = { peace: 1, wra: 2 };
+  const s = server(withFile(doc));
+  const r0 = s.start();
+  yes('U1 with no world stage register nothing is said about the keys', !r0.logs.some(l => /stageMost names/.test(l)));
+  s.ctx.__thornswoodWorldStage = { worldStage: () => ({ id: 'peace' }), stages: () => [{ id: 'peace' }, { id: 'war' }] };
+  const r1 = s.start();
+  const named = r1.logs.filter(l => /stageMost names/.test(l));
+  yes('U1 a key the stage list does not have (a typo) is logged once, by name, and only that one',
+      named.length === 1 && /stageMost names wra but the world stage list has no such stage/.test(named[0]));
+  yes('U1 it is logged, not refused: the file still stands, at peace\'s cap of 1',
+      r1.logs.some(l => /stage peace cap 1 - 1 road\(s\)/.test(l)));
+  s.ctx.__thornswoodWorldStage = { worldStage: () => ({ id: 'peace' }) };
+  yes('U1 a register with no stage list logs nothing about the keys', !s.start().logs.some(l => /stageMost names/.test(l)));
+  s.ctx.__thornswoodWorldStage = { worldStage: () => ({ id: 'peace' }), stages: () => { throw new Error('x'); } };
+  yes('U1 a stage list that throws logs nothing about the keys and changes nothing',
+      (r => !r.logs.some(l => /stageMost names/.test(l)) && r.made.length === 0)(s.start()));
+}
+yes('N3 the keeper reads the world stage register through worldStage() and stages() only, once, and never moves it',
+    (KEEPER.match(/__thornswoodWorldStage/g) || []).length === 1 && /reg\.worldStage\(\)/.test(KEEPER) && /reg\.stages\(\)/.test(KEEPER) &&
     !/setWorldStage\(|proposeWorldStage\(|confirmWorldStage\(|dropWorldStageProposal\(/.test(KEEPER));
 
 // ------------------------------------------------------- what it never does --
