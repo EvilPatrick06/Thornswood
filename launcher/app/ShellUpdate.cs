@@ -56,7 +56,8 @@ namespace Thornswood
                             LogOnly("The update feed tip said the feed moved; checking now.");
                             CheckUpdatesBackground(false);
                         }
-                        // 204 / timeout: tip again immediately.
+                        // 204, the wait ran out unchanged: tip again at once.
+                        // A timeout or any other answer threw, below.
                     }
                     catch (Exception ex)
                     {
