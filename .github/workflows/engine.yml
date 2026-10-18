@@ -178,10 +178,20 @@ jobs:
           # own build does since fork #79. A runner's git turns text to CR LF
           # (Windows images set core.autocrlf true), and the records hold the
           # server's package.json, yarn.lock and bundle to the fork's bytes.
+          # This run's own clone of the fork, whole. A runner keeps the
+          # repository's .git between jobs, and in it the fork's git folder an
+          # earlier job left: nightly.yml fetches the fork --depth 1, which
+          # follows the fork's main alone, so a reused folder never gets
+          # origin/thornswood/engine-changes and holds too little history
+          # for the records (#459, run 39149317535).
+          $modules = Join-Path "$(git rev-parse --git-dir)".Trim() 'modules\engine\skymp'
+          if (Test-Path -LiteralPath $modules) { Remove-Item -LiteralPath $modules -Recurse -Force }
           git -c core.autocrlf=false submodule update --init engine/skymp
           if ($LASTEXITCODE -ne 0) { Write-Host '::error::could not fetch engine/skymp'; exit 1 }
           git -C engine/skymp config core.autocrlf false
-          git -C engine/skymp fetch origin thornswood/engine-changes
+          # The branch named into the ref the checks below read, whatever the
+          # clone's own fetch line follows.
+          git -C engine/skymp fetch origin '+refs/heads/thornswood/engine-changes:refs/remotes/origin/thornswood/engine-changes'
           if ($LASTEXITCODE -ne 0) { Write-Host '::error::could not fetch thornswood/engine-changes'; exit 1 }
           git -C engine/skymp cat-file -e "$env:COMMIT^{commit}" 2>$null
           if ($LASTEXITCODE -ne 0) { git -C engine/skymp fetch origin $env:COMMIT }
@@ -388,6 +398,10 @@ jobs:
           if (Test-Path -LiteralPath engine/skymp) {
             Get-ChildItem -LiteralPath engine/skymp -Force | Remove-Item -Recurse -Force -ErrorAction Continue
           }
+          # The fork's git folder too: the next run makes its own (Fetch the
+          # fork at that commit), and nothing else here wants a whole fork.
+          $modules = Join-Path "$(git rev-parse --git-dir)".Trim() 'modules\engine\skymp'
+          if (Test-Path -LiteralPath $modules) { Remove-Item -LiteralPath $modules -Recurse -Force -ErrorAction Continue }
           $left = @(Get-ChildItem -LiteralPath engine/skymp -Force -ErrorAction SilentlyContinue).Count
           $cache = Join-Path $env:RUNNER_WORKSPACE 'engine-vcpkg-cache'
           $kb = [Math]::Round((@(Get-ChildItem -LiteralPath $cache -Recurse -File -ErrorAction SilentlyContinue) | Measure-Object Length -Sum).Sum / 1KB)
