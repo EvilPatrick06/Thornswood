@@ -3,10 +3,12 @@
 // #1638. A Jarl and a steward are people in the world, not staff, so their
 // powers are buttons (Patrick, 4 Oct: no commands for things people do).
 // They live on an Office page of the K panel: for a steward, evict and set or
-// clear the rent at the door just opened, make the container just opened a
-// hold's box, and move their hold's board to where they stand. Each button
+// clear the rent at the door just opened, and move their hold's board to
+// where they stand. Each button
 // sends the line the command was, which the server still answers; none is
-// named to anybody.
+// named to anybody. The container a steward used to mark as a hold's box
+// is retired (#2298, Patrick, 15 Oct): the board's drop box is the only box,
+// and F below checks nothing of the marking is left.
 //
 // #2551, Patrick, 15 Oct: every office is a Discord role. A Jarl's hold is
 // their "Jarl of <Hold>" role, nobody takes an office or picks a hold in the
@@ -96,8 +98,8 @@ const NAMES = ['officeView', 'officeHolders', 'officeRedraw', 'officeCmd', 'offi
                'rolesOfProfile', 'officeAccountOf', 'officeHeldBy', 'officesToHold', 'holdHere', 'officeHoldHere',
                'rolesRead', 'officesOfProfile', 'holdsOffice', 'isJarlOf', 'jarlHoldsOf', 'isJarl', 'isCourtOf',
                'isStewardOf', 'stewardHoldsOf', 'isSteward', 'isGuard', 'guardHoldsOf', 'jarlClashOf', 'officeOf',
-               'evict', 'rentCmd', 'boxCmd', 'moveBoard', 'board', 'command', 'holderOf', 'here', 'buildingOf',
-               'boxAt', 'holdOfBox', 'rentDue', 'nameOf', 'profileOf', 'onlineActorOf', 'redrawPanel', 'personName',
+               'evict', 'rentCmd', 'moveBoard', 'board', 'command', 'holderOf', 'here', 'buildingOf',
+               'rentDue', 'nameOf', 'profileOf', 'onlineActorOf', 'redrawPanel', 'personName',
                'boardHere', 'holdOfBuilding', 'notStewardHere',
                // Staff at any door (#2551, Patrick, 17 Oct).
                'isStaffHere', 'settleAs', 'settleWhere', 'staffRecord'];
@@ -114,7 +116,6 @@ const VARS = [
   line(/  var OFFICE_GIVEN = \{[^}]*\};/),
   line(/  var DOOR_MEMORY_MS = \d+;/),
   line(/  var DOOR_PROPERTY = '[^']*';/),
-  line(/  var BOX_PROPERTY = '[^']*';/),
   line(/  var BOARD_REACH = \d+;/),
   line(/  var HOLD_TOWN = \{[^}]*\};/),
   line(/  var JAIL_NAME = \{[^\n]*\};/)
@@ -124,7 +125,6 @@ yes('and the numbers and names they read', VARS.every(function (v) { return !!v;
 const TAMRIEL = '3c:Skyrim.esm';
 const DOOR = '1a2b3:Skyrim.esm';
 const HOUSE = 'breezehome';
-const CHEST = 0x0004cafe;
 const HOLDS10 = ['whiterun', 'solitude', 'riften', 'markarth', 'windhelm',
                  'falkreath', 'morthal', 'dawnstar', 'winterhold', 'ravenrock'];
 
@@ -134,7 +134,7 @@ const HOLDS10 = ['whiterun', 'solitude', 'riften', 'markarth', 'windhelm',
   that checks nothing the game did not and sets the role it is asked to.
 */
 function server() {
-  const people = {};       // actor -> { pid, name, cell, pos, door, box }
+  const people = {};       // actor -> { pid, name, cell, pos, door }
   const online = [];
   const writes = [];       // [actor, redraw]
   const roles = {};        // pid -> { jarl, court, steward, guard }
@@ -152,7 +152,6 @@ function server() {
       if (key === 'worldOrCellDesc') { return p.cell; }
       if (key === 'pos') { return p.pos.slice(); }
       if (key === 'thornswoodDoor') { return p.door || undefined; }
-      if (key === 'thornswoodBoxAt') { return p.box || undefined; }
       return undefined;
     },
     set: function () { }
@@ -224,7 +223,7 @@ function server() {
                   where: h === 'ravenrock' ? 'Raven Rock' : h.charAt(0).toUpperCase() + h.slice(1) };
   });
   const body = [
-    'var claims = {}; var boxes = {}; var funds = {}; var notices = {};',
+    'var claims = {}; var funds = {}; var notices = {};',
     // Which character of an account holds each office (#2551, Patrick, 16 Oct).
     'var law = { cells: {}, held: {} };',
     'function saveLaw() { reg.lawSaves = (reg.lawSaves || 0) + 1; }',
@@ -244,7 +243,7 @@ function server() {
       .map(function (n) { return 'function ' + n + '() { return true; }'; }).join('\n')
   ].concat(VARS, NAMES.map(function (n) { return lifted[n]; }));
   body.push('return { command: command, officeView: officeView, officeOf: officeOf, isSteward: isSteward, ' +
-            'isStewardOf: isStewardOf, isJarlOf: isJarlOf, claims: claims, boxes: boxes, boards: boards, ' +
+            'isStewardOf: isStewardOf, isJarlOf: isJarlOf, claims: claims, boards: boards, ' +
             'law: law, rolesRead: rolesRead, officesToHold: officesToHold, ' +
             'OFFICE_AT_DOOR: OFFICE_AT_DOOR };');
   const make = new Function('mp', 'g', 'boards', 'reg', body.join('\n'));
@@ -282,7 +281,6 @@ function server() {
              all: told };
   };
   api.atDoor = function (actor, ago) { people[actor].door = { door: DOOR, at: Date.now() - (ago || 0) }; };
-  api.atBox = function (actor, ago) { people[actor].box = { refr: CHEST, at: Date.now() - (ago || 0) }; };
   api.writesFor = function (actor) { return writes.filter(function (w) { return w[0] === actor; }).length; };
   return api;
 }
@@ -316,7 +314,7 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
     yes('A2 staff with no role hold no office by being staff, but get the page for the door (#2551): staff, ' +
         'no office, no box and no boards',
         !!sv && sv.staff === true && sv.steward === false && sv.jarls.length === 0 && sv.stewardOf.length === 0 &&
-        sv.courtOf.length === 0 && sv.guardOf.length === 0 && sv.door === null && sv.box === null && sv.boards.length === 0);
+        sv.courtOf.length === 0 && sv.guardOf.length === 0 && sv.door === null && !Object.prototype.hasOwnProperty.call(sv, 'box') && sv.boards.length === 0);
     yes('A2 and nobody else is staff here', srv.view(JARL).staff === false);
     const v = srv.view(JARL);
     yes('A3 the Jarl of Whiterun, by the role, gets the page with Whiterun and its three offices, and nothing to take or pick',
@@ -613,23 +611,22 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
         !!srv.claims[HOUSE] && srv.view(RJARL).door.staff === false && srv.staffLog.length === 1);
   }
 
-  // ----------------------------------------------------------- F. the box
+  // ------------------------------------------- F. no box but the board's
+  // The steward-marked chest is retired (#2298, Patrick, 15 Oct, decision
+  // 3 A). The page has no box card to draw, and /box is a line the property
+  // block no longer answers, so it changes nothing.
   {
     const srv = world();
     srv.give(P_STEW, 'steward', 'whiterun');
-    yes('F1 with no container opened, the page has none', srv.view(STEW).box === null);
-    srv.atBox(STEW);
-    yes('F2 the container just opened is nobody\'s box yet', JSON.stringify(srv.view(STEW).box) === '{"hold":null}');
-    const other = srv.say(STEW, '/box riften');
-    yes('F3 the Steward of Whiterun does not name Riften\'s box (#2551), and is told whose it is (' + other.told + ')',
-        !srv.boxes.riften && other.told === 'Only the Steward of Riften or its Jarl names its box.');
+    const v = srv.view(STEW);
+    yes('F1 a steward\'s page carries no container and no box', !!v && !Object.prototype.hasOwnProperty.call(v, 'box'));
+    const saves = srv.reg.saves;
     srv.writes.length = 0;
     const r = srv.say(STEW, '/box whiterun');
-    yes('F3 pressing Whiterun makes it Whiterun\'s box, and the page says so (' + r.told + ')',
-        srv.boxes.whiterun === CHEST && srv.view(STEW).box.hold === 'whiterun' && srv.writesFor(STEW) === 1);
-    srv.atBox(NOBODY);
-    yes('F4 somebody who is not a steward cannot', srv.say(NOBODY, '/box solitude').told === 'Only a steward sets a hold\'s box.' &&
-        !srv.boxes.solitude);
+    yes('F2 /box is not answered by the property block, and nothing is saved or drawn (' + r.told + ')',
+        !r.answered && r.told === '' && srv.reg.saves === saves && srv.writesFor(STEW) === 0);
+    yes('F3 and the property block has no box of its own to keep',
+        !/var boxes\b|loadPart\('boxes'|'thornswoodBoxAt'|BOX_PROPERTY|function boxCmd|function putIn|function touchedBox|function boxAt|function holdOfBox/.test(prop));
   }
 
   // -------------------------------------------------------- G. the boards
@@ -682,10 +679,10 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
   };
   const WORDS = arrayOf('WORDS');
   const PLAYER = arrayOf('PLAYER_WORDS');
-  const four = ['/office', '/evict', '/box', '/rent'];
-  yes('N1 the server still answers the lines the page sends, and no longer /jarl, /steward or /guard',
+  const four = ['/office', '/evict', '/rent'];
+  yes('N1 the server still answers the lines the page sends, and no longer /jarl, /steward, /guard or /box',
       !!WORDS && four.every(function (w) { return WORDS.indexOf(w) !== -1; }) && WORDS.indexOf('/board') !== -1 &&
-      ['/jarl', '/steward', '/guard'].every(function (w) { return WORDS.indexOf(w) === -1; }));
+      ['/jarl', '/steward', '/guard', '/box'].every(function (w) { return WORDS.indexOf(w) === -1; }));
   yes('N2 and none of them is in the list named to everybody, which /help and the unknown command reply read',
       !!PLAYER && four.every(function (w) { return PLAYER.indexOf(w) === -1; }));
   // The help is a panel since #1633: its Land topic, as a fresh install reads it.
@@ -695,7 +692,7 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
       /Office page on K/.test(help));
   // What the server says, in the functions the buttons reach: no line to type.
   const said = [];
-  ['officeCmd', 'officeDoes', 'evict', 'rentCmd', 'boxCmd', 'moveBoard', 'board'].forEach(function (n) {
+  ['officeCmd', 'officeDoes', 'evict', 'rentCmd', 'moveBoard', 'board'].forEach(function (n) {
     const code = strip(lifted[n]);
     const re = /'((?:[^'\\]|\\.)*)'/g;
     let m;
@@ -809,7 +806,6 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
     srv.claims[HOUSE] = { by: P_ALICE, name: 'Alice', at: Date.now(), touched: Date.now(), locked: false,
                           rent: { amount: 30, everyDays: 7, owed: 0, since: Date.now() } };
     srv.atDoor(STEW);
-    srv.atBox(STEW);
     show(srv.view(STEW));
     const srow = goOffice();
     yes('H6 the Steward of Whiterun\'s page names their office (' + (srow ? srow.textContent : '') + ')',
@@ -837,14 +833,12 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
     yes('H10 No rent sends /rent -', lines.join() === '/rent -');
     lines.length = 0;
     const whiterun = buttons('Whiterun');
-    yes('H11 the box offers the hold\'s own board, and the boards card only Whiterun\'s', whiterun.length === 2 &&
-        buttons('Riften').length === 0);
-    if (whiterun.length === 2) { whiterun[0].onclick({}); }
-    yes('H11 a town under the container sends /box whiterun at once (' + lines.join(' | ') + ')', lines.join() === '/box whiterun');
-    lines.length = 0;
-    if (whiterun.length === 2) { whiterun[1].onclick({}); }
-    yes('H12 a town under the boards asks first', lines.length === 0 && whiterun[1].textContent === 'Press again to move Whiterun\'s board here');
-    if (whiterun.length === 2) { whiterun[1].onclick({}); }
+    yes('H11 the only town on the page is the boards card\'s Whiterun: there is no box card (#2298)', whiterun.length === 1 &&
+        buttons('Riften').length === 0 && !/A hold's box/.test(body.textContent) && /The notice boards/.test(body.textContent));
+    if (whiterun.length === 1) { whiterun[0].onclick({}); }
+    yes('H12 a town under the boards asks first', lines.length === 0 && whiterun.length === 1 &&
+        whiterun[0].textContent === 'Press again to move Whiterun\'s board here');
+    if (whiterun.length === 1) { whiterun[0].onclick({}); }
     yes('H12 and the second press sends /board move whiterun', lines.join() === '/board move whiterun');
     // A steward settles their own hold's buildings only (#2551): Riften's Steward at a Whiterun door.
     srv.roles[P_STEW].steward = [];
@@ -903,7 +897,6 @@ if (missing.length === 0 && VARS.every(function (v) { return !!v; })) {
     // Staff (#2551, Patrick, 17 Oct): no office, and the door card at any door, acting as staff.
     srv.claims[HOUSE] = { by: P_ALICE, name: 'Alice', at: Date.now(), touched: Date.now(), locked: false };
     srv.atDoor(ADMIN);
-    srv.atBox(ADMIN);
     show(srv.view(ADMIN));
     const strow = goOffice();
     yes('H18 staff with no office have an Office page that says they are staff (' + (strow ? strow.textContent : '') + ')',

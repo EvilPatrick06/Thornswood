@@ -806,9 +806,9 @@ function between(src, start, end) { return slice(src, start, end) || ''; }
 const onActivate = between(code, "mp.onActivate = guard('onActivate'", '\n});');
 const onDrop = between(code, "mp.onDropItem = guard('onDropItem'", '\n});');
 const recipeless = between(code, 'function recipelessCraft(actorId, craftedItemBaseId, workbenchId, effects) {', '\n}\n');
-yes('a press reaches the durability block, after the box is remembered',
+yes('a press reaches the durability block, and no container is remembered as a box any more (#2298)',
     /wear\.pressed\(casterRefrId, refrId, baseDesc\)/.test(onActivate) &&
-    onActivate.indexOf('touchedBox(casterRefrId, refrId)') < onActivate.indexOf('wear.pressed('));
+    onActivate.indexOf('touchedBox') === -1);
 yes('a drop no longer reaches it, and the drop watcher still returns nothing',
     onDrop !== '' && !/wear\.dropped\(/.test(onDrop) && !/\breturn\b/.test(onDrop));
 const onHitLines = gm.split('\n').filter(function (l) { return /^mp\['onPapyrusEvent:OnHit'\] = guard\('onPapyrusEvent:OnHit', function/.test(l); });
