@@ -143,6 +143,20 @@ closed.
 - **F1** turns the names over heads off and on, and **F2** hides and shows the
   overlay.
 
+## Dyeing your hair
+
+Hair dye is made at a cooking spot, the way water is boiled. Carry a bottle of
+water and what the dye needs, press **E** on the cooking spot, and stay by the
+fire until the dye is done. Walk away before then and nothing is made or used.
+The dye goes into your pack, named for its colour.
+
+To dye your own hair, open the Hair dye page of the **K** panel and press Dye
+my hair. To dye somebody else's, look at them and press **K**, then Offer to
+dye, or press Dye hair beside them under Near you on the **P** panel. They get
+Accept and Refuse, and nothing is used or changed until they press Accept.
+Hair, beard and brows take the one colour, and it stays until it is dyed
+again.
+
 ## Voice
 
 Voice runs in the launcher, not in the game. Leave the launcher open while you
