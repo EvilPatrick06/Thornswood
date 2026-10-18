@@ -359,17 +359,51 @@ alone (`tests	est-install-server.ps1` holds it to that).
 
 ### Not done yet: starting it and connecting
 
-A restored folder has not been started and connected to. Before anybody does:
+A restored folder has not been started and connected to yet. A plain restore
+makes the folder be the server it came from, so starting it as restored is not
+safe:
 
-1. Give it free ports in its `server-settings.json` (`port`, and
+1. It has the live ports in its `server-settings.json` (`port`, and
    `thornswoodVoicePort`): Restore-Server has just set them to the live ones.
-2. Move `private\door.json` out of the folder. It names the live site and
-   holds the key the site trusts, so a test server started with it pushes its
-   roster to the live site and asks the live site who is allowed in.
-3. Start it by hand (`node dist_back/skymp5-server.js` in that folder), watch
-   `thornswood.log`, connect with a launcher pointed at that port and load a
-   character.
-4. Delete the folder.
+2. It has `private\door.json`. That file names the live site and holds the key
+   the site trusts, so a test server started with it pushes its roster to the
+   live site and asks the live site who is allowed in. It also holds the join
+   pass key (`passKey`).
+3. It is started by hand (`node dist_back/skymp5-server.js` in that folder),
+   with `thornswood.log` watched, a launcher pointed at that port, and a
+   character loaded.
+4. Then the folder is deleted.
+
+Since issue #1046, `Restore-Server.ps1 -Rehearse` does steps 1 and 2 and
+prints 3 and 4. It refuses `C:\Thornswood-Server` and
+`C:\Thornswood-Server-Dev`, and it acts only after every check above has
+passed:
+
+```powershell
+.\scripts\deploy\Install-ThornswoodServer.ps1 -Zip <payload> -Root C:\Thornswood-RestoreTest -NoTask -RequirePass on
+.\scripts\vps\Restore-Server.ps1 -Backup <file>.zip.enc -Root C:\Thornswood-RestoreTest -Rehearse
+```
+
+- **Ports**: `port` and `thornswoodVoicePort` become free ones. That means the
+  first game port from 7800 up whose UDP and TCP are free and whose resources
+  port (port+1, which the server opens itself) is free, then the next free TCP
+  port for voice. They are never the live or dev ports, read from both server
+  folders and the backup, and never 7777, 7778, 3000, 7787 or 7788.
+  `-Port` and `-VoicePort` name them instead and are checked the same way.
+- **Door**: `private\door.json` is deleted from the throwaway folder. The
+  backup still holds it.
+- **Join pass**: `thornswoodRequirePass` is set to false, because the join pass
+  key left with `door.json`. So start a rehearsal only where its ports are not
+  open to the internet: on a PC behind its router, with a launcher on the same
+  machine pointed at `127.0.0.1`.
+- **Name**: ` (restore rehearsal)` goes on the end of the server's name.
+- **Record**: `rehearsal.json` in the folder says when, from which backup,
+  the ports and what was taken out.
+
+It ends `REHEARSAL READY` with the start line, the launcher's `ServerAddress`
+and `ServerPort` for its `config.json`, and the `Remove-Item` that ends it. It
+does not change the line below: that waits for somebody who has started the
+folder, connected and loaded a character from the backup.
 
 **Last rehearsed: 28 September 2026** (unpack and restore, on Patrick's machine
 and on the VPS; not started or connected to).
