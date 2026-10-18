@@ -65,7 +65,7 @@ const WORLD_CHEST = 0x000a1b2c;  // a chest in a building nobody holds
 const BOB_CHEST = 0x000b0b0b;    // a chest in Bob's house
 const ALICE_CHEST = 0x000a11ce;  // a chest in Alice's own house
 const CAROL_CHEST = 0x000ca401;  // a chest in Carol's house, Carol offline
-const HOLD_BOX = 0x0000aaaa;     // Whiterun's box, in a hall nobody holds
+const HOLD_BOX = 0x0000aaaa;     // a chest that was Whiterun's marked box (#2298), in a hall nobody holds
 
 const ORE = 0x00071cf3;
 const GOLD = 0x0000000f;
@@ -110,8 +110,7 @@ claims[BREEZEHOME] = { by: 202, name: 'Bob' };
 claims[HONEYSIDE] = { by: 101, name: 'Alice' };
 claims[PROUDSPIRE] = { by: 303, name: 'Carol' };
 const property = {
-  holderOf: function (b) { return Object.prototype.hasOwnProperty.call(claims, b) ? claims[b] : null; },
-  holdOfBox: function (id) { return id === HOLD_BOX ? 'whiterun' : null; }
+  holderOf: function (b) { return Object.prototype.hasOwnProperty.call(claims, b) ? claims[b] : null; }
 };
 
 const box = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-take-limit-'));
@@ -249,7 +248,7 @@ yes('the block publishes the take limit', !!(s.limit && typeof s.limit.take === 
   yes('T5 ten whole-stack takes from a chest in her own house all go through', ownHouse);
   yes('T5 ten whole-stack takes from a chest in a building nobody holds all go through', world);
   yes('T5 ten whole-stack takes from an NPC\'s body all go through', npc);
-  yes('T5 ten whole-stack takes from a hold\'s box nobody\'s house holds all go through', hold);
+  yes('T5 ten whole-stack takes from a chest that was a hold\'s box, in a building nobody holds, all go through', hold);
   yes('T5 and nobody was told anything', t.said.length === 0);
   yes('T5 and no take refused: line', !t.lines.some(function (l) { return l.indexOf('take refused:') === 0; }));
 }

@@ -105,7 +105,6 @@ function registers(dir) {
       'b2:Skyrim.esm': { by: PY, name: 'Yours', at: NOW, touched: NOW, master: { for: P1, no: 3 } },
       'b3:Skyrim.esm': { by: PZ, name: 'Theirs', at: NOW, touched: NOW, master: { for: PZ, no: 4 } }
     },
-    boxes: {},
     funds: { whiterun: 200, riften: 50 },
     notices: {
       whiterun: [

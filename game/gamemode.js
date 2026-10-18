@@ -8820,18 +8820,6 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
   }
 
   /*
-    WHICH CONTAINER THEY JUST OPENED, so /box knows which one they mean.
-
-    The same shape as the bench remembered for /key on the next line: one
-    write on a press that opened a container, and nothing on the rest. A hold's
-    box is designated by a steward standing at it rather than by a coordinate
-    in this file, so this is how the server knows what they are standing at.
-  */
-  if (prop && prop.touchedBox && kindIsContainer(baseDesc)) {
-    try { prop.touchedBox(casterRefrId, refrId); } catch (e) { }
-  }
-
-  /*
     THE DULL CLOCK (#1384). See the durability block. A container in a held
     building loses what its days have taken before the engine sends what is
     in it. It refuses nothing. A dropped piece keeps its condition in the
@@ -36210,33 +36198,6 @@ log('gamemode loaded:',
         updateOwner: '', updateNeighbor: ''
       });
     } catch (e) { }
-    /*
-      THE ONE THAT WAS MISSED, AND IT KILLED THE WHOLE DROP BOX.
-
-      Every custom property has to be made before it can be set. ScampServer
-      routes any name that is not a standard binding to CustomPropertyBinding,
-      whose Set calls EnsurePropertyExists and throws "Property
-      'thornswoodBoxAt' doesn't exist" for anything that was never created and
-      does not start with "private.".
-
-      So touchedBox's mp.set threw into its own empty catch on every container
-      press, boxAt's mp.get threw and answered 0 every time, and /box with a
-      hold name always came back "Open the container you mean, then say that
-      again." No container could ever be designated, so no hold could have a
-      box, so rent had nowhere to be paid and no notice could be posted. The
-      entire block was dead and nothing said a word, because both failures are
-      inside catches that are right to be there.
-
-      Found by the audit of 21 September. The other three properties in this
-      block were made here from the day they were written; this one was added
-      the same night as the box and did not come with it.
-    */
-    try {
-      mp.makeProperty(BOX_PROPERTY, {
-        isVisibleByOwner: false, isVisibleByNeighbors: false,
-        updateOwner: '', updateNeighbor: ''
-      });
-    } catch (e) { }
     try {
       /*
         The one property here the client reads. Visible to its owner and to
@@ -36401,7 +36362,7 @@ log('gamemode loaded:',
       var dir = require('path').dirname(registerPath());
       try { require('fs').mkdirSync(dir, { recursive: true }); } catch (e) { }
       require('fs').writeFileSync(registerPath(),
-        JSON.stringify({ claims: claims, boxes: boxes,
+        JSON.stringify({ claims: claims,
                         funds: funds, notices: notices, boards: boards, steps: steps,
                         masters: masterCut, dropbox: dropbox }, null, 1));
       return true;
@@ -38808,36 +38769,27 @@ log('gamemode loaded:',
 
 
   /*
-    ---------------------------------------------- the drop box, and what it is for
+    ------------------------------------------- the hold's ledger and its board
 
-    Patrick's design, 21 September: the fee for a notice routes into the drop
-    box, which is the hold's money and only the City Court may draw from it,
-    and the same box takes rent, Merchant's Guild ledgers and Free Skyrim
-    Trading Company payment.
+    Patrick's design, 21 September: a notice's fee goes to the hold, and
+    rent, Merchant's Guild price lists and Free Skyrim Trading Company
+    payment are the hold's business too. funds is each hold's ledger of what
+    has been paid in, a record on the server; notices are what hang on its
+    board.
 
-    THE BOX IS MEASURED AND NOT INVENTED. mp.onPutItem(containerRefrId,
-    actorId, baseId, count) exists in the fork and PutItemEvent::OnFireSuccess
-    is the thing that removes the items, so returning false REFUSES the put and
-    the gold stays in the hand. The server knows who paid, what, and how much,
-    and can refuse anything that should not be in there. Nothing here needs a
-    new record or a client change.
+    THE HOLD'S BOX IS THE ONE ON ITS BOARD (#2298). Patrick, 15 October,
+    decision 3 A: the container a steward used to mark as a hold's box from
+    the Office page is retired, and the drop box on the board's post is the
+    only box. Its rules are the drop box block below. A chest that was
+    marked is an ordinary container again, and Skyrim decides what goes in
+    it, as for any other.
 
-    THE BOX IS THE NOTICE BOARD. The nine mainland towns already have a spot
-    each, the coordinates given for the boards, and standing within reach of
-    that spot is standing at the hold's box. A steward who moves the board
-    moves the box with it. A container a steward has also marked still takes
-    gold, and it is not required to submit a list.
-
-    ONLY GOLD GOES IN. Everything else is handed back, because a box that
-    accepts a sword is a box somebody loses a sword in: the server has no way
-    to give it back to the right person later and no rule that says whose it
-    became. Refusing costs the person nothing at all, which is the whole point
-    of the event returning false.
+    Standing at a hold's board is standing at the hold (boardHere): within
+    reach of the board's spot. A steward who moves the board moves its box
+    with it.
   */
-  var boxes = loadPart('boxes', {});
   var funds = loadPart('funds', {});
   var notices = loadPart('notices', {});
-  var BOX_PROPERTY = 'thornswoodBoxAt';
   var GOLD_ID = 0x0000000F;
   var NOTICE_FEE = 20;
   var JOB_FEE = 30;
@@ -38876,170 +38828,9 @@ log('gamemode loaded:',
     }
   }
 
-  /** The container somebody most recently pressed, so /box knows which. */
-  function touchedBox(actorId, refrId) {
-    try {
-      mp.set(actorId, BOX_PROPERTY, { refr: refrId, at: Date.now() });
-    } catch (e) { }
-  }
-
-  function boxAt(actorId) {
-    var v = null;
-    try { v = mp.get(actorId, BOX_PROPERTY); } catch (e) { v = null; }
-    if (!v || typeof v !== 'object') { return 0; }
-    if ((Date.now() - (Number(v.at) || 0)) > DOOR_MEMORY_MS) { return 0; }
-    return Number(v.refr) || 0;
-  }
-
-  /** Which hold's box this container is, or null. */
-  function holdOfBox(refrId) {
-    var id = Number(refrId) || 0;
-    if (!id) { return null; }
-    for (var hold in boxes) {
-      if (!Object.prototype.hasOwnProperty.call(boxes, hold)) { continue; }
-      if (Number(boxes[hold]) === id) { return hold; }
-    }
-    return null;
-  }
-
-  /** The hold whose notice board this character is standing at, or a marked chest. */
+  /** The hold whose notice board this character is standing at, or ''. */
   function holdStanding(actorId) {
-    var atBoard = boardHere(actorId);
-    if (atBoard) { return atBoard; }
-    var at = boxAt(actorId);
-    if (!at) { return ''; }
-    var hold = holdOfBox(at);
-    if (!hold) { return ''; }
-    try {
-      var cell = mp.get(actorId, 'worldOrCellDesc');
-      if (typeof cell !== 'string' || !cell || cell !== mp.get(at, 'worldOrCellDesc')) { return ''; }
-      var a = mp.get(actorId, 'pos'), b = mp.get(at, 'pos');
-      if (!Array.isArray(a) || !Array.isArray(b) || a.length !== 3 || b.length !== 3 ||
-          !a.every(Number.isFinite) || !b.every(Number.isFinite)) { return ''; }
-      var dx = a[0] - b[0], dy = a[1] - b[1], dz = a[2] - b[2];
-      return dx * dx + dy * dy + dz * dz <= 400 * 400 ? hold : '';
-    } catch (e) { return ''; }
-  }
-
-  /*
-    /box whiterun      make the container you are at the hold's box
-    /box               say which hold's box you are standing at
-
-    A steward's, because designating the city's treasury is city business.
-    Sent by the Office page of the K panel (#1638), which offers the holds
-    the steward keeps for the container they just opened, never typed. Only
-    one of the ten is taken, the same as a board: any other word would start
-    a box no hold's ledger knows about. And only a hold the steward keeps
-    (#2551): the Steward of it, or its Jarl, the same rule as its board.
-  */
-  function boxCmd(parts, actorId, profileId, toProfile) {
-    var at = boxAt(actorId);
-    var arg = (parts && parts.length > 1) ? String(parts[1]).trim().toLowerCase() : '';
-
-    if (!arg) {
-      var atBoard = boardHere(actorId);
-      var hold = atBoard || (at ? holdOfBox(at) : null);
-      if (hold && atBoard) {
-        // The fees are a record and never in the box (#2298); the box is
-        // on the board's post and answers E itself.
-        toProfile(profileId, 'This is ' + hold + '\'s notice board. Its drop box is on the shelf ' +
-          'on the board\'s post: press E on it.');
-        return true;
-      }
-      toProfile(profileId, hold
-        /*
-          WHAT THIS NUMBER IS, said accurately rather than conveniently.
-
-          It used to read "It holds N gold" and that was wrong twice over.
-          funds is a LEDGER of what has been paid in, not the contents of the
-          chest, and the two are not the same thing: gold put in the box is
-          physically moved into the chest by the engine AND counted here, so it
-          exists in both places, while a notice fee is taken out of the pack and
-          only counted, so it exists in neither. Nothing subtracts from it
-          either, because there is no withdrawal word and no take handler, so it
-          only ever goes up.
-
-          Making it the truth is a decision about which one is the treasury and
-          it is on the list. Until then it says what it actually is, because a
-          steward reading "it holds 400 gold" and finding 120 in the chest is
-          worse than a steward who was told plainly.
-        */
-        ? 'This is ' + hold + '\'s box. ' + (Number(funds[hold]) || 0) +
-          ' gold has been paid into it. Open it to see what is actually in there.'
-        : (at ? 'That container is nobody\'s box.'
-              : 'Stand at the hold\'s notice board.'));
-      return true;
-    }
-
-    if (!isSteward(profileId)) {
-      toProfile(profileId, 'Only a steward sets a hold\'s box.');
-      return true;
-    }
-    if (!at) {
-      toProfile(profileId, 'Open the container, then press the hold on the Office page of K within a minute.');
-      return true;
-    }
-    if (LEDGER_HOLDS.indexOf(arg) < 0) {
-      toProfile(profileId, 'No hold called ' + arg + '. The holds are ' + LEDGER_HOLDS.join(', ') + '.');
-      return true;
-    }
-    if (!isStewardOf(profileId, arg)) {
-      toProfile(profileId, 'Only the Steward of ' + (HOLD_TOWN[arg] || arg) + ' or its Jarl names its box.');
-      return true;
-    }
-    boxes[arg] = at;
-    if (!Object.prototype.hasOwnProperty.call(funds, arg)) { funds[arg] = 0; }
-    save();
-    plog('a steward made', at.toString(16), 'the box for', arg);
-    toProfile(profileId, 'That container is ' + arg + '\'s box now. Rent and fees go in it.');
-    redrawPanel(actorId);
-    return true;
-  }
-
-  /*
-    THE ANSWER TO A PUT. False refuses it and the item stays in the hand.
-
-    Gold into a hold's box is money to the hold, and it pays down whatever rent
-    the payer owes first, because that is what somebody putting gold in the
-    city's box almost always means. What is left over stays as the hold's.
-  */
-  function putIn(containerRefrId, actorId, baseId, count) {
-    var hold = holdOfBox(containerRefrId);
-    if (!hold) { return; }
-
-    var n = Number(count) || 0;
-    if (Number(baseId) !== GOLD_ID || n <= 0) {
-      var back = 'Only coin goes in ' + hold + '\'s box. Anything else would be lost in there.';
-      notify(actorId, back);
-      say(actorId, back);
-      return false;
-    }
-
-    var pid = 0;
-    try { pid = Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { pid = 0; }
-
-    var owed = rentOwedBy(pid);
-    var paid = 0;
-    for (var i = 0; i < owed.length && n > 0; i++) {
-      var c = claims[owed[i]];
-      if (!c || !c.rent) { continue; }
-      var due = Number(c.rent.owed) || 0;
-      var take = (n >= due) ? due : n;
-      c.rent.owed = due - take;
-      if (c.rent.owed <= 0) { c.rent.owed = 0; c.rent.since = Date.now(); }
-      n -= take;
-      paid += take;
-    }
-
-    funds[hold] = (Number(funds[hold]) || 0) + (Number(count) || 0);
-    save();
-    plog(pid, 'put', count, 'gold in', hold + '\'s box', paid ? '(' + paid + ' of it rent)' : '');
-
-    var line = 'You put ' + count + ' gold in ' + hold + '\'s box.' +
-               (paid ? ' ' + paid + ' of it goes against your rent.' : '');
-    notify(actorId, line);
-    say(actorId, line);
-    return;
+    return boardHere(actorId) || '';
   }
 
   /*
@@ -41395,12 +41186,13 @@ log('gamemode loaded:',
     ---------------------------------------------------------- the boards
 
     Twenty gold to post a notice, which is read only; thirty for a job, which
-    goes on the taker's list. The fee routes into the box.
+    goes on the taker's list. The fee is counted on the hold's ledger, and
+    never goes in the drop box (#2298).
 
     THE BOARD IS NOT A PLACE YET AND THAT IS SAID OUT LOUD. The design puts one
     outside each keep, at our own records at our own coordinates, and neither
     the records nor the coordinates exist. So the words work wherever the hold
-    has a box, and the board becomes the place to say them the day it is
+    has a ledger, and the board becomes the place to say them the day it is
     placed. The alternative was a placeholder coordinate nobody could stand at.
   */
   function takeGold(actorId, amount) {
@@ -41891,8 +41683,8 @@ log('gamemode loaded:',
     it out from under them would take it off their Your jobs with no word to
     either of them. It can come down once they hand it back.
 
-    NO REFUND. The fee went into the hold's box the moment the notice was
-    posted, and the box is the hold's money, which only the City Court draws.
+    NO REFUND. The fee went onto the hold's ledger the moment the notice was
+    posted, and the ledger is the hold's money.
 
     THE NUMBERS DO NOT MOVE. The panel's Take, Put it back and Take down send
     a notice's place in the list, drawn on the wall a moment before. Cutting a
@@ -42722,7 +42514,6 @@ log('gamemode loaded:',
     // A Jarl gives or takes an office of their hold (#2551): the Office page sends it.
     if (word === '/office') { return officeCmd(parts, actorId, profileId, toProfile); }
     if (word === '/evict') { return evict(actorId, profileId, toProfile, cmd); }
-    if (word === '/box') { return boxCmd(parts, actorId, profileId, toProfile); }
     if (word === '/dropbox') { return dropboxCmd(parts, actorId, profileId, toProfile); }
     if (word === '/rent') { return rentCmd(parts, actorId, profileId, toProfile, cmd); }
     if (word === '/sleephere') { return sleepHere(parts, actorId, profileId, toProfile); }
@@ -43015,11 +42806,11 @@ log('gamemode loaded:',
     So the offices' powers are buttons on a page of the K panel, for anybody
     who holds an office: name and remove a hold's Court, Steward and Guards
     (the Jarl), evict and set or clear the rent at the door the steward just
-    opened, make the container they just opened a hold's box, and move their
-    hold's board to where they stand. Each button sends the server's own line
-    (/office, /evict, /rent, /box, /board move), and every rule is checked
-    again when it arrives. This only says what is true, so the page can draw
-    it.
+    opened, and move their hold's board to where they stand. Each button
+    sends the server's own line (/office, /evict, /rent, /board move), and
+    every rule is checked again when it arrives. This only says what is
+    true, so the page can draw it. A steward no longer marks a container as a hold's box: the drop box
+    on the board is the only one (#2298, Patrick, 15 Oct).
 
     THE OFFICES ARE THE DISCORD ROLES (#2551), read through officesOfProfile:
     nobody takes an office or picks a hold here. The Jarl of a hold sees, for
@@ -43028,8 +42819,8 @@ log('gamemode loaded:',
     world who do not, with Name. Somebody whose Jarl role another account
     holds too sees why they do not act as Jarl.
 
-    "Just opened" is the same minute the lines have always used (here and
-    boxAt): the door or container is read when the panel is written, and K
+    "Just opened" is the same minute the lines have always used (here):
+    the door is read when the panel is written, and K
     asks for that the moment it opens.
 
     THE STATE IS HANDED IN, NEVER READ. This is called from the character
@@ -43041,7 +42832,7 @@ log('gamemode loaded:',
     STAFF SEE IT TOO (#2551, Patrick, 17 Oct): staff end claims and set rent
     at any building, so for staff the page carries the door card at every
     door, with door.staff true where they act as staff and not as a steward
-    of its hold. The box and the boards stay a steward's.
+    of its hold. The boards stay a steward's.
 
     Null for anybody who holds no office and is not staff, and then the page
     is not drawn.
@@ -43123,7 +42914,7 @@ log('gamemode loaded:',
                    return { office: t.office, hold: t.hold, where: HOLD_TOWN[t.hold], role: officeRole(t.office, t.hold),
                             by: t.by ? t.by.name : null };
                  }),
-                 steward: keeps.length > 0, staff: staff, door: null, box: null, boards: [] };
+                 steward: keeps.length > 0, staff: staff, door: null, boards: [] };
     for (var j = 0; j < o.jarl.length; j++) {
       var hold = o.jarl[j];
       var row = { hold: hold, where: HOLD_TOWN[hold], offices: {} };
@@ -43169,10 +42960,8 @@ log('gamemode loaded:',
                                                   every: Number(held.rent.everyDays) || 7,
                                                   owed: Number(held.rent.owed) || 0 } : null };
     }
-    // The box and the boards are a steward's own hold's; staff are no steward.
+    // The boards are a steward's own hold's; staff are no steward.
     if (!view.steward) { return view; }
-    var at = boxAt(actorId);
-    if (at) { view.box = { hold: holdOfBox(at) || null }; }
     // The boards of the holds this person keeps, and no other (#2551).
     for (var h = 0; h < LEDGER_HOLDS.length; h++) {
       var bh = LEDGER_HOLDS[h];
@@ -43391,7 +43180,6 @@ log('gamemode loaded:',
     mayPassCell: mayPassCell, lockCell: lockCell,
     jailOfBuilding: jailOfBuilding, mayHold: mayHold, jailKeyHold: jailKeyHold, lockedJailHere: lockedJailHere,
     JAIL_KEY: JAIL_KEY,
-    touchedBox: touchedBox, putIn: putIn, holdOfBox: holdOfBox,
     dropboxCmd: dropboxCmd, boxView: boxView, boxFare: boxFare, boxOfficer: boxOfficer,
     dropbox: function () { return dropbox; },
     deposit: deposit, takeGold: takeGold, LEDGER_HOLDS: LEDGER_HOLDS,
@@ -43399,7 +43187,6 @@ log('gamemode loaded:',
     haulTenth: haulTenth, haulTick: haulTick, saleCuts: saleCuts, inCompany: inCompany,
     holdStanding: holdStanding,
     rentDue: rentDue, funds: function () { return funds; },
-    boxes: function () { return boxes; },
     notices: function () { return notices; }, takedown: takedown,
     boards: function () { return boards; }, boardHere: boardHere, boardPanel: boardPanel,
     standBoard: standBoard, standBoards: standBoards, boardActivated: boardActivated,
@@ -47793,7 +47580,7 @@ log('gamemode loaded:',
     if (word === '/plant' || word === '/claim' || word === '/plot' ||
         word === '/deed' || word === '/deeds' || word === '/lock' ||
         word === '/unlock' || word === '/mold' || word === '/moldhere' || word === '/key' ||
-        word === '/office' || word === '/evict' || word === '/box' || word === '/dropbox' ||
+        word === '/office' || word === '/evict' || word === '/dropbox' ||
         word === '/rent' || word === '/sleephere' || word === '/notice' || word === '/job' ||
         word === '/board' || word === '/take' ||
         word === '/haul' ||
@@ -52684,7 +52471,7 @@ const WORDS = ['/ooc', '/o',
                // K panel, never typed, and so deliberately NOT in
                // PLAYER_WORDS: Patrick, 4 October, no chat commands for
                // anything people do, and a Jarl and a steward are people.
-               '/evict', '/box', '/rent',
+               '/evict', '/rent',
                // A Jarl gives or takes their hold's Court, Steward and Guard
                // (#2551): Name and Remove on the Office page send it, never
                // typed. It replaced /jarl, /steward and /guard.
@@ -52807,9 +52594,9 @@ const WORDS = ['/ooc', '/o',
 */
 // Not /plot, /plant or /claim: a farm is worked and claimed at the plot, and
 // a building at its door, with the line under the crosshair (#1636, #1637).
-// Not /office, /evict, /box or /rent: the offices' powers are buttons
-// on the Office page of K (#1638), and the board panel says what the box
-// holds. Not /rest: sitting or lying down is how you rest (#1603). Not /eat,
+// Not /office, /evict or /rent: the offices' powers are buttons
+// on the Office page of K (#1638), and the board panel says what the hold
+// has been paid. Not /rest: sitting or lying down is how you rest (#1603). Not /eat,
 // /drink or /bard (#1631): eating or drinking the item is the meal, and
 // playing an instrument or Sing on the emote wheel is the bard. Not /party: P on somebody asks and
 // the P panel runs the party (#1629). Not /journal or /book: J sends those
@@ -55631,20 +55418,23 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
 
 
 /*
-  WHAT GOES IN A CONTAINER, and it exists so a hold can have a treasury.
+  WHAT GOES IN A CONTAINER: whatever Skyrim lets in, for every container.
 
   mp.onPutItem(containerRefrId, actorId, baseId, count) fires before anything
   moves, and PutItemEvent::OnFireSuccess is what removes the items, so
   returning false REFUSES the put and the thing stays in the hand. Measured in
   the fork rather than assumed.
 
-  It answers for one kind of container and says nothing at all about any other,
-  so every chest in Skyrim behaves exactly as it did.
+  No container here has a rule of its own any more. The one that did, a chest
+  a steward marked as a hold's box, which took only gold and counted it onto
+  the hold's ledger, was retired (#2298, Patrick, 15 Oct, decision 3 A): the
+  drop box on the notice board is the only box, and it is an activator whose
+  contents are the server's record, never a container. The handler stays for
+  guard(): a session that has not shown its join pass is refused a put like
+  every other act (ACTS_AS, #410). Everybody else falls off the end.
 */
-mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, count) {
-  var prop = globalThis.__thornswoodProperty;
-  if (!prop || !prop.putIn) { return; }
-  return prop.putIn(containerRefrId, actorId, baseId, count);
+mp.onPutItem = guard('onPutItem', function () {
+  return;
 });
 
 /*
@@ -55692,9 +55482,9 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
                   race, profession and rank question; and a temper at the
                   sharpening wheel or the armour table (#1384). A refusal
                   keeps their materials.
-    onPutItem     Putting into a container. mp.onPutItem refuses anything but
-                  coin into a hold's box, and says nothing about any other
-                  container.
+    onPutItem     Putting into a container. mp.onPutItem refuses only what
+                  guard() refuses for the join pass, and says nothing about
+                  any container.
     onTakeItem    Taking out of a container or a body. Watched below, and
                   refused on one path only: THE TAKE LIMIT, another person's
                   body or a container in a building another person holds.
@@ -55916,10 +55706,6 @@ function auditItem(baseId) {
 
 function auditSource(refrId) {
   var id = Number(refrId) || 0;
-  var prop = globalThis.__thornswoodProperty;
-  var hold = null;
-  try { hold = (prop && prop.holdOfBox) ? prop.holdOfBox(id) : null; } catch (e) { hold = null; }
-  if (hold) { return hold + '\'s box 0x' + id.toString(16); }
   if (auditProfile(id)) { return 'the body of ' + auditPerson(id); }
   var base = '';
   try { base = String(mp.get(id, 'baseDesc') || ''); } catch (e) { base = ''; }
@@ -56094,8 +55880,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   holderOf, which is the one record of who owns what). Whether that person is
   online makes no difference. Everything else is let through untouched: a
   world container nobody holds, an NPC's body, your own body and anything in
-  a building you hold. A hold's box belongs to the hold rather than to a
-  person, so it is not limited either, unless it stands in somebody's house.
+  a building you hold.
 
   THE RULE. At most TAKE_LIMIT takes per taker, per body or container, per
   TAKE_WINDOW_MS. A stack counts as one take, and one take may carry off no
