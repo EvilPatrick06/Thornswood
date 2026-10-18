@@ -25,6 +25,25 @@
   comment does not count. tests\ is not read: a harness's catches are its own cleanup, and
   a check a harness hides fails the harness, not a release.
 
+  THE SITE, VOICE AND THE BOT TOO, since #2736 (18 Oct). Until then nothing
+  read a .js or a .py, so the /api/play/logs handler in site\server.js stored
+  a session's logs, answered ok, and lost the session's trouble colour and
+  the bot's crash note inside try { ... } catch (e) { } with nothing said.
+  The JavaScript under site\ and voice\ and the Python under bot\ are read
+  now, keyed by the path from the repository root like a script, as
+  site\server.js or bot\bot.py. A JavaScript catch counts in the C# shapes,
+  catch (e) and a bare catch, and so does a promise's .catch handed a
+  function whose braces hold nothing but whitespace, as .catch(() => { })
+  or .catch(function () { }), because that drops the failure the same way.
+  A Python except counts when its whole body is pass: except Exception: pass
+  on one line, or pass alone on the lines under it. A # comment on the
+  except line, beside the pass or in the body says why, and does not count.
+  Not read: node_modules (somebody else's packages), a .min.js (a vendored
+  library, minified onto one line, such as site\public\marked-12.0.2.min.js),
+  __pycache__ and a venv or .venv (the bot's installed packages), and the
+  harnesses kept beside the code, test-*.js in voice\ and test-*.py in bot\,
+  for the same reason tests\ is not read.
+
   WHY. Entry 239 on the To Do List. Measured on 24 Sep: 386 of the 618 catch
   clauses in launcher\app\*.cs had nothing between their braces, so a failure in
   any of them left no line anywhere. A tester says the Save button did
@@ -65,6 +84,12 @@ param(
   # Folders whose .ps1 and .psm1 files are counted, every level down. Default:
   # scripts\ and installer\. A script is keyed by its path from -Root.
   [string[]]$ScriptDirs,
+  # Folders whose .js, .mjs and .cjs files are counted, every level down
+  # (#2736). Default: site\ and voice\. Keyed by the path from -Root.
+  [string[]]$JsDirs,
+  # Folders whose .py files are counted, every level down (#2736). Default:
+  # bot\. Keyed by the path from -Root.
+  [string[]]$PyDirs,
   [string]$Root,
   [switch]$List
 )
@@ -77,12 +102,14 @@ $Root = [IO.Path]::GetFullPath($Root).TrimEnd('\')
 if (-not $AppDir)   { $AppDir   = Join-Path $Root 'launcher\app' }
 if (-not $Baseline) { $Baseline = Join-Path $Here 'swallow-baseline.txt' }
 if (-not $PSBoundParameters.ContainsKey('ScriptDirs')) { $ScriptDirs = @((Join-Path $Root 'scripts'), (Join-Path $Root 'installer')) }
+if (-not $PSBoundParameters.ContainsKey('JsDirs')) { $JsDirs = @((Join-Path $Root 'site'), (Join-Path $Root 'voice')) }
+if (-not $PSBoundParameters.ContainsKey('PyDirs')) { $PyDirs = @((Join-Path $Root 'bot')) }
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 
 if (-not (Test-Path -LiteralPath $AppDir)) { Say "  no app folder at $AppDir" 'Red'; exit 1 }
-foreach ($d in @($ScriptDirs)) {
-  if (-not (Test-Path -LiteralPath $d -PathType Container)) { Say "  no script folder at $d" 'Red'; exit 1 }
+foreach ($d in (@($ScriptDirs) + @($JsDirs) + @($PyDirs))) {
+  if (-not (Test-Path -LiteralPath $d -PathType Container)) { Say "  no source folder at $d" 'Red'; exit 1 }
 }
 
 # The rule as a pattern. \s takes new lines as well as spaces, so a catch whose
@@ -93,6 +120,15 @@ foreach ($d in @($ScriptDirs)) {
 # brackets, one or more, comma separated: catch [System.IO.IOException].
 $Silent = [regex]'\bcatch\s*(\([^)]*\))?\s*\{\s*\}'
 $SilentPs = [regex]'\bcatch\s*(\[[^\]\r\n]*\]\s*(,\s*\[[^\]\r\n]*\]\s*)*)?\{\s*\}'
+# JavaScript (#2736): the C# shape, kept off a promise's .catch by the look
+# behind, and a promise's .catch handed an arrow or a function with nothing
+# between its braces, as .catch(() => { }), .catch((e) => {}), .catch(e => {})
+# or .catch(function () { }).
+$SilentJs = [regex]('(?<![.\w$])catch\s*(\([^)]*\))?\s*\{\s*\}' +
+  '|\.catch\(\s*(?:async\s+)?(?:\(\s*[\w$]*\s*\)|[\w$]+)\s*=>\s*\{\s*\}\s*\)' +
+  '|\.catch\(\s*(?:async\s+)?function\b[\w$\s]*\([^)]*\)\s*\{\s*\}\s*\)')
+# Python (#2736): the except line, its indent, and what follows its colon.
+$PyExcept = [regex]'^(?<ind>[ \t]*)except\b(?<head>[^#\r\n]*?):(?<rest>.*)$'
 $NewLine = [regex]'\n'
 
 # Key to the line numbers of its silent catches: every .cs file by its name,
@@ -110,17 +146,82 @@ function Find-Silent([string]$full, [regex]$rule) {
   }
   return , $at
 }
+# A Python except whose whole body is pass, by its line number. Read line by
+# line, because the body is whatever sits indented under the except: pass on
+# the except line itself, or the lines below it down to the first one that
+# is not indented past it. A # comment on the except line, beside the pass or
+# on a line of the body is somebody saying why, and stops it counting.
+function Find-SilentPy([string]$full) {
+  $lines = [IO.File]::ReadAllLines($full)
+  $at = New-Object 'System.Collections.Generic.List[int]'
+  for ($i = 0; $i -lt $lines.Length; $i++) {
+    $m = $PyExcept.Match($lines[$i])
+    if (-not $m.Success) { continue }
+    $rest = $m.Groups['rest'].Value.Trim()
+    if ($rest) {
+      if ($rest -eq 'pass') { $at.Add($i + 1) }
+      continue
+    }
+    $ind = $m.Groups['ind'].Value.Length
+    $body = New-Object 'System.Collections.Generic.List[string]'
+    $said = $false
+    for ($j = $i + 1; $j -lt $lines.Length; $j++) {
+      $t = $lines[$j].TrimStart()
+      if (-not $t.Trim()) { continue }
+      $lead = $lines[$j].Length - $t.Length
+      if ($t.StartsWith('#')) { if ($lead -gt $ind) { $said = $true }; continue }
+      if ($lead -le $ind) { break }
+      $body.Add($t.Trim())
+      if ($body.Count -gt 1) { break }
+    }
+    if (-not $said -and $body.Count -eq 1 -and $body[0] -eq 'pass') { $at.Add($i + 1) }
+  }
+  return , $at
+}
+# A file's key in the baseline is its path from -Root, for the scripts, the
+# site, voice and the bot alike.
+function Key-Of($f) {
+  if (-not $f.FullName.StartsWith($Root + '\', [StringComparison]::OrdinalIgnoreCase)) {
+    Say "  $($f.FullName) is not under $Root, so it has no key in the baseline" 'Red'; exit 1
+  }
+  return $f.FullName.Substring($Root.Length + 1)
+}
+# What is never read under site\, voice\ and bot\, by its path below the
+# folder named: other people's packages, a vendored minified library, and a
+# harness kept beside the code (the header says why for each).
+function Skip-Source($f, [string]$dir) {
+  $below = '\' + $f.FullName.Substring($dir.TrimEnd('\').Length + 1)
+  if ($below -match '\\(node_modules|__pycache__|venv|\.venv)\\') { return $true }
+  if ($f.Name -like '*.min.js') { return $true }
+  if ($f.Name -like 'test-*') { return $true }
+  return $false
+}
 foreach ($f in @(Get-ChildItem -LiteralPath $AppDir -Filter '*.cs' -File | Sort-Object Name)) {
   $found[$f.Name] = (Find-Silent $f.FullName $Silent)
   $paths[$f.Name] = $f.FullName
 }
 foreach ($d in @($ScriptDirs)) {
   foreach ($f in @(Get-ChildItem -LiteralPath $d -Recurse -File | Where-Object { $_.Extension -eq '.ps1' -or $_.Extension -eq '.psm1' } | Sort-Object FullName)) {
-    if (-not $f.FullName.StartsWith($Root + '\', [StringComparison]::OrdinalIgnoreCase)) {
-      Say "  $($f.FullName) is not under $Root, so it has no key in the baseline" 'Red'; exit 1
-    }
-    $key = $f.FullName.Substring($Root.Length + 1)
+    $key = Key-Of $f
     $found[$key] = (Find-Silent $f.FullName $SilentPs)
+    $paths[$key] = $f.FullName
+  }
+}
+foreach ($d in @($JsDirs)) {
+  $full = [IO.Path]::GetFullPath($d)
+  foreach ($f in @(Get-ChildItem -LiteralPath $full -Recurse -File | Where-Object { $_.Extension -in '.js', '.mjs', '.cjs' } | Sort-Object FullName)) {
+    if (Skip-Source $f $full) { continue }
+    $key = Key-Of $f
+    $found[$key] = (Find-Silent $f.FullName $SilentJs)
+    $paths[$key] = $f.FullName
+  }
+}
+foreach ($d in @($PyDirs)) {
+  $full = [IO.Path]::GetFullPath($d)
+  foreach ($f in @(Get-ChildItem -LiteralPath $full -Recurse -File | Where-Object { $_.Extension -eq '.py' } | Sort-Object FullName)) {
+    if (Skip-Source $f $full) { continue }
+    $key = Key-Of $f
+    $found[$key] = (Find-SilentPy $f.FullName)
     $paths[$key] = $f.FullName
   }
 }
@@ -150,7 +251,7 @@ foreach ($l in @(Get-Content -LiteralPath $Baseline)) {
 }
 
 Write-Host ''
-Write-Host '  THORNSWOOD  -  silent catches in the launcher and the scripts' -ForegroundColor White
+Write-Host '  THORNSWOOD  -  silent catches in the launcher, the scripts, the site, voice and the bot' -ForegroundColor White
 
 $rose = 0; $fell = 0; $total = 0; $cap = 0
 foreach ($v in $allowed.Values) { $cap += $v }
@@ -164,7 +265,7 @@ foreach ($name in @($found.Keys | Sort-Object)) {
     $where = ($found[$name] | ForEach-Object { "$_" }) -join ', '
     Say ("  NEW   {0} has {1} silent catches and the baseline allows {2}. They are on lines {3}." -f $name, $now, $may, $where) 'Red'
     if ($env:GITHUB_ACTIONS -eq 'true') {
-      Write-Host ("::error file={0}::{1} has {2} silent catches and swallow-baseline.txt allows {3}. Log the new one with Swallow.Note, or in a script let the error stop it." -f $paths[$name], $name, $now, $may)
+      Write-Host ("::error file={0}::{1} has {2} silent catches and swallow-baseline.txt allows {3}. Log the new one with Swallow.Note; in a script let the error stop it; in the site, voice or the bot say what failed in its log." -f $paths[$name], $name, $now, $may)
     }
   } elseif ($now -lt $may) {
     $fell++
@@ -177,9 +278,9 @@ foreach ($name in @($found.Keys | Sort-Object)) {
 foreach ($name in @($allowed.Keys | Sort-Object)) {
   if (-not $found.ContainsKey($name) -and $allowed[$name] -gt 0) {
     $fell++
-    Say ("  GONE  {0} is in the baseline and not in the launcher or the scripts. Take its line out." -f $name) 'Red'
+    Say ("  GONE  {0} is in the baseline and not among the files this reads. Take its line out." -f $name) 'Red'
     if ($env:GITHUB_ACTIONS -eq 'true') {
-      Write-Host ("::error file={0}::{1} is in swallow-baseline.txt and not in the launcher or the scripts any more. Take its line out in this pull request." -f $Baseline, $name)
+      Write-Host ("::error file={0}::{1} is in swallow-baseline.txt and not among the files Check-Swallow reads any more. Take its line out in this pull request." -f $Baseline, $name)
     }
   }
 }
@@ -188,8 +289,9 @@ Write-Host ''
 Say ("  {0} silent catches in {1} source files; the baseline allows {2}." -f $total, $found.Count, $cap)
 if ($rose) {
   Say ("  {0} file(s) have more than the baseline allows. Log the new catch with" -f $rose) 'Red'
-  Say '  Swallow.Note (in a script, let the error stop it), or say why in a' 'Red'
-  Say '  comment inside its braces.' 'Red'
+  Say '  Swallow.Note (in a script, let the error stop it; in the site, voice or' 'Red'
+  Say '  the bot, say what failed in its log), or say why in a comment inside' 'Red'
+  Say '  its braces, or on the except line.' 'Red'
 }
 if ($fell) {
   Say ("  {0} line(s) in the baseline stand above what the files hold. Put them" -f $fell) 'Red'

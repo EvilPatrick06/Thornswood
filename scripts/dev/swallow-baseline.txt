@@ -220,3 +220,33 @@ scripts\vps\Vps.ps1 1
 scripts\vps\Watch-Outside.ps1 6
 scripts\vps\Watch-Services.ps1 9
 scripts\vps\Write-BotToken.ps1 1
+#
+# THE SITE, VOICE AND THE BOT, since #2736 (18 Oct). Check-Swallow.ps1 reads
+# the JavaScript under site\ and voice\ and the Python under bot\ as well,
+# keyed by the path from the repository root. Nothing counted a .js or a .py
+# before, so the /api/play/logs handler in site\server.js stored a session's
+# logs, answered ok, and lost the trouble colour and the bot's crash note in
+# a try whose catch was empty, with nothing said. The same rule, in each
+# language's shapes: a JavaScript catch, or a promise's .catch handed a
+# function, whose braces hold nothing but whitespace; a Python except whose
+# whole body is pass. A comment in the body, or on the except line, says why
+# and does not count. Not read: node_modules, a .min.js (the vendored
+# marked-12.0.2.min.js), __pycache__, a venv, and the harnesses kept beside
+# the code (test-*.js in voice\, test-*.py in bot\).
+#
+# Measured on 18 Oct on main at a49b90e2: 84 in 10 files, 32 of them in
+# site\server.js. #2736 took out all 32 there: each one now says what failed
+# in site.log (codes and file names, never what a person wrote, a Discord id
+# or an address), tests for the absence it expected, or was a try around a
+# call that does not throw. So site\server.js has no line below. The 52 left
+# are later work, each a catch that hides a failure; converting one lowers
+# its line.
+bot\bot.py 3
+bot\Build-Discord.py 5
+bot\Build-Onboarding.py 1
+bot\card.py 5
+site\public\home.js 9
+site\public\hub.js 5
+voice\gamemode-voice.js 6
+voice\load-voice.js 5
+voice\voice-server.js 13
