@@ -67,8 +67,15 @@ yes('B2 the lock key\'s line is still logged, as a command, with via: press', li
 yes('B3 a said line has no via', lines[2].kind === 'say' && !('via' in lines[2]));
 yes('B4 every line keeps who and whether proven', lines.every((l) => l.profileId === 77 && l.proven === true));
 try { fs.rmSync(CHAT_DIR, { recursive: true, force: true }); } catch (e) { }
+// Since #1131 the text a command writes comes from commandLogText (the pass
+// masked, a waiting menu's repeated /line left out); the press flag is passed
+// on exactly as before.
 yes('B5 the chat handler passes msg.press on only when it is exactly true',
-    /chatWrite\('command', myId, me, \/\^\\\/joinpass\\b\/i\.test\(text\) \? '\/joinpass \[pass\]' : text,\s*msg\.press === true \? 'press' : ''\);/.test(VOICE));
+    /const logged = commandLogText\(me, text\);\s*if \(logged\) chatWrite\('command', myId, me, logged, msg\.press === true \? 'press' : ''\);/.test(VOICE));
+const lbox = {};
+vm.runInNewContext(grab(VOICE, 'commandLogText') + '\nthis.commandLogText = commandLogText;', lbox);
+yes('B6 and still masks /joinpass', typeof lbox.commandLogText === 'function' &&
+    lbox.commandLogText(me, '/joinpass jp1.abc.def') === '/joinpass [pass]' && lbox.commandLogText(me, '/lock 1a2b') === '/lock 1a2b');
 
 // C
 yes('C1 the site hands via to the hub, and only the word press', /via: o\.via === 'press' \? 'press' : ''/.test(SITE));

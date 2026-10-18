@@ -60,7 +60,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1-tls-only-1-ice-socket-1-no-page-1-most-1-roster-once-1-long-command-1-captions-2';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1-tls-only-1-ice-socket-1-no-page-1-most-1-roster-once-1-long-command-1-captions-2-line-log-1';
 
 // ==== thornswood deploy record ====
 // Which commit this copy came from (#459): Install-Voice.ps1 leaves the deploy
@@ -390,6 +390,31 @@ function chatWrite(kind, peerId, me, text, via) {
        chat because a disk was full would be a worse fault than a gap here. */
     console.log('[voice] could not write the chat log: ' + (e && e.message));
   }
+}
+
+/* WHAT A SLASH LINE WRITES TO THE CHAT LOG, or '' for nothing (#1131).
+
+   A join pass is good for ten minutes to whoever holds it, so the log keeps
+   that one was sent and never the pass itself (#937).
+
+   A bare "/line" from a connection that is already waiting writes nothing.
+   That "/line" is not something a person typed: the menu's front plugin says
+   it every ten seconds while somebody waits for a seat (every two for the
+   first twenty), so the gamemode keeps the place and a menu can ask again
+   after this service restarts. It was written every time, about six lines a
+   minute for each person waiting and seven thousand an hour for twenty, and
+   staff reading the log for a report scrolled past them. The connection's
+   own waiting mark (me.inLine, set by lineMark after this is asked) already
+   says whether it is waiting, so the "/line" that starts the wait is written,
+   and so is the first one after "/line leave", on a new connection, or after
+   this service restarts. "/line leave" ends the wait and "/line hand" gives
+   the place away; each is said once and written once, like every other
+   command. Every "/line" still goes to the game server: this decides the log
+   and nothing else. */
+function commandLogText(me, text) {
+  if (/^\/joinpass\b/i.test(text)) return '/joinpass [pass]';
+  if (/^\/line\s*$/i.test(text) && me && me.inLine) return '';
+  return text;
 }
 
 /* Whole days go, never lines out of a day, so a file is either all there or
@@ -2737,10 +2762,11 @@ server.on('upgrade', (req, socket, head) => {
       // placeatme, disable, mp) and coc is not one of them, so a coc moves you
       // in your own game and the server puts you straight back.
       if (text.charAt(0) === '/') {
-        // A join pass is good for ten minutes to whoever holds it, so the
-        // chat log keeps that one was sent and never the pass itself (#937).
-        chatWrite('command', myId, me, /^\/joinpass\b/i.test(text) ? '/joinpass [pass]' : text,
-                  msg.press === true ? 'press' : '');
+        // What the chat log keeps of it: the pass masked, and a waiting
+        // menu's repeated "/line" not at all (commandLogText). Asked before
+        // lineMark below, which is what moves the waiting mark it reads.
+        const logged = commandLogText(me, text);
+        if (logged) chatWrite('command', myId, me, logged, msg.press === true ? 'press' : '');
         // Full: the newest is refused and its sender told, and everything
         // already taken stays. See the note over COMMAND_CAP.
         if (commands.length >= COMMAND_CAP) {
