@@ -339,6 +339,7 @@ jobs:
                  'test-third-party.js',
                  'test-asset-provenance.js',
                  'test-ship-rules.ps1',
+                 'test-ship-permission-held.ps1',
                  'test-chargen-gone.ps1',
                  'test-2177-platform-unused.ps1',
                  'test-hand-install-retired.ps1',
