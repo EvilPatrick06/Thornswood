@@ -26,6 +26,10 @@
     private\property.json    who holds which building, which are locked, and
                              the ground each one covers.
     private\farm-claims.json the farms on ground with no building on it.
+    private\furniture.json   the furniture set down in held buildings (#2679).
+                             The pieces are references in the world, so the
+                             register goes aside with it, or a fresh world
+                             would stand last world's furniture again.
     data\property.json and data\farm-claims.json, where both were until
                              25 September (issue #541: data is served to
                              anybody), so a wipe on a server still running
@@ -138,7 +142,7 @@ foreach (`$t in (Get-ScheduledTask -EA SilentlyContinue)) {
 foreach (`$r in `$roots) {
   'ROOT|' + `$r
   if (`$taskOf.ContainsKey(`$r)) { 'TASK|' + `$r + '|' + `$taskOf[`$r] } else { 'NOTASK|' + `$r }
-  foreach (`$n in @('world', 'private\characters.json', 'private\property.json', 'private\farm-claims.json', 'data\property.json', 'data\farm-claims.json')) {
+  foreach (`$n in @('world', 'private\characters.json', 'private\property.json', 'private\furniture.json', 'private\farm-claims.json', 'data\property.json', 'data\farm-claims.json')) {
     `$p = Join-Path `$r `$n
     if (-not (Test-Path `$p)) { 'NONE|' + `$n; continue }
     `$b = 0; `$c = 0
@@ -219,7 +223,7 @@ Head 'Moving the old storage aside'
 $moved = Remote @"
 `$ErrorActionPreference = 'Continue'
 foreach (`$r in @($rootsLit)) {
-foreach (`$n in @('world', 'private\characters.json', 'private\property.json', 'private\farm-claims.json', 'data\property.json', 'data\farm-claims.json')) {
+foreach (`$n in @('world', 'private\characters.json', 'private\property.json', 'private\furniture.json', 'private\farm-claims.json', 'data\property.json', 'data\farm-claims.json')) {
   `$p = Join-Path `$r `$n
   if (-not (Test-Path `$p)) { continue }
   `$leaf = Split-Path -Leaf `$p

@@ -258,6 +258,8 @@ function rig(opts) {
     // The same key's check in the inventory (#1384). No inventory is open
     // here, so it passes every key on as well.
     "function repairPress() { return false; }\n" +
+    "function furniturePress() { return false; }\n" +
+    "function arrangePress() { return false; }\n" +
     // The same key at a forge with a stamped mold, the master key (#2254).
     // No forge is looked at here; test-1637-door-gui.js has the press.
     'function masterPress() { return false; }\n' +

@@ -142,6 +142,8 @@ function rig(opts) {
     'function moldPress() { return false; }\n' +
     'function sleepPress() { return false; }\n' +
     'function repairPress() { return false; }\n' +
+    'function furniturePress() { return false; }\n' +
+    'function arrangePress() { return false; }\n' +
     'function deliverPress() { return false; }\n' +
     'function boxPress() { return false; }\n' +
     'function boardPress() { return false; }\n' +

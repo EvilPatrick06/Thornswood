@@ -115,6 +115,8 @@ function rig(opts) {
     'function sleepPress() { return false; }\n' +
     // The same key in the inventory (#1384); no inventory is open here.
     'function repairPress() { return false; }\n' +
+    'function furniturePress() { return false; }\n' +
+    'function arrangePress() { return false; }\n' +
     // The board, ride and merchant presses (#1430, #1394) answer only the
     // game's Activate event, and the lock key (#1472) only X; none of the
     // presses here is either. Each has its own harness.

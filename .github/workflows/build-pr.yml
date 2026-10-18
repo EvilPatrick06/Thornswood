@@ -378,6 +378,7 @@ jobs:
                  'test-2298-dropbox.js',
                  'test-2516-server-boards.js',
                  'test-516-woodworking-benches.js',
+                 'test-2679-furniture.js',
                  'test-2554-board-posts.js',
                  'test-1380-rare-mines.js',
                  'test-1621-quest-state.js',
