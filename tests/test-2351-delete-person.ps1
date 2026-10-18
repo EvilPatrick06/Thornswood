@@ -136,6 +136,7 @@ $YOU = '222222222222222222'     # did not
 $THEM = '333333333333333333'    # asked, in another copy of the record
 $P1 = 5001; $P2 = 5002          # P2 is held by both accounts
 $PY = 6001; $PT = 7001
+$A1 = 4278192641; $AY = 4278192642  # the form ids of their character (ff000a01) and of yours
 
 function Build {
     if (Test-Path -LiteralPath $Box) { Remove-Item -LiteralPath $Box -Recurse -Force }
@@ -182,7 +183,21 @@ function Build {
         Put (Join-Path $PV 'characters-before-20260930-000000.json') ('{"who":{"' + $P1 + '":{"name":"Mine"}}}')
         Put (Join-Path $PV 'mod-settings.json') ('{"who":{"' + $P1 + '":{"a":1},"' + $PY + '":{"a":2}}}')
         Put (Join-Path $PV 'take-limit.json') ('{"counts":{"' + $P1 + '|1a2b3":{"n":1},"' + $PY + '|1a2b3":{"n":2}}}')
-        Put (Join-Path $PV 'property.json') ('{"houses":[{"id":"h1","owner":' + $P1 + '},{"id":"h2","owner":' + $PY + '}]}')
+        # The game's registers, in the shapes the gamemode writes, each naming
+        # their character and somebody else's (#2351, released at the game
+        # server's next start, never edited here).
+        Put (Join-Path $PV 'property.json') ('{"claims":{"b1:Skyrim.esm":{"by":' + $P1 + ',"name":"Mine","at":1,"touched":1},"b2:Skyrim.esm":{"by":' + $PY + ',"name":"Yours","at":1,"touched":1,"master":{"for":' + $P1 + ',"no":3}}},' +
+            '"notices":{"whiterun":[{"by":' + $P1 + ',"name":"Mine","title":"t","text":"x","at":1,"job":false,"taken":0},{"by":' + $PY + ',"name":"Yours","title":"u","text":"y","at":1,"job":true,"pay":5,"taken":' + $P1 + ',"takenName":"Mine"}]},' +
+            '"dropbox":{"whiterun":{"items":[{"n":1,"by":' + $P1 + ',"name":"Mine","kind":"gold","baseId":15,"count":5,"what":"Gold","at":1}],"log":[],"next":2}}}')
+        Put (Join-Path $PV 'law.json') ('{"cells":{},"held":{"jarl:whiterun":{"' + $ME + '":{"pid":' + $P1 + ',"name":"Mine","at":1}},"guard:riften":{"' + $YOU + '":{"pid":' + $PY + ',"name":"Yours","at":1}}}}')
+        Put (Join-Path $PV 'beds.json') ('{"guests":{"b2:Skyrim.esm":{"' + $P1 + '":{"by":' + $PY + ',"at":1,"name":"Mine"}}},"takings":{"' + $P1 + '":10,"' + $PY + '":4}}')
+        Put (Join-Path $PV 'farm-claims.json') ('{"at":1,"claims":{"' + $P1 + '":{"by":' + $P1 + ',"name":"Mine","at":1,"cell":"3c:Skyrim.esm","x":0,"y":0}},"seeded":{"' + $P1 + '":1,"' + $PY + '":1}}')
+        Put (Join-Path $PV 'embassy.json') ('{"embassy":[{"actor":' + $A1 + ',"profile":0,"name":"Mine","at":1,"armed":false},{"actor":' + $AY + ',"profile":' + $PY + ',"name":"Yours","at":1,"armed":false}],"remnant":[]}')
+        Put (Join-Path $PV 'books.json') ('{"books":[{"id":"b1","kind":"faction","name":"F","account":"' + $ME + '","owner":' + $P1 + ',"members":[{"pid":' + $P1 + ',"name":"Mine","role":"Member"}],"roles":[{"name":"Member","perms":[]}],"chat":[],"prices":[]},' +
+            '{"id":"b2","kind":"business","name":"G","account":"' + $YOU + '","owner":' + $PY + ',"members":[{"pid":' + $PY + ',"name":"Yours","role":"Member"},{"pid":' + $P1 + ',"name":"Mine","role":"Member"}],"roles":[{"name":"Member","perms":[]}],"chat":[{"pid":' + $P1 + ',"name":"Mine","text":"hello","at":1}],"prices":[]}],"ledgers":{}}')
+        Put (Join-Path $PV 'dungeon-rewards-ledger.json') ('{"version":1,"entries":{"1a2b3:Skyrim.esm":{"at":1,"actor":' + $A1 + ',"tier":1,"gold":5,"items":[]}},"sha256":"x"}')
+        Put (Join-Path $PV 'merchant-ledger.json') ('{"version":1,"entries":{"9:Skyrim.esm":{"version":1,"purse":250,"stock":[],"supply":{"[\"ff000a01\",' + $P1 + ',\"ore\"]":1}}},"sha256":"x"}')
+        Put (Join-Path $PV 'benches.json') '{"whiterun":4278190081}'
         Put (Join-Path $PV 'moderation.log') ('{"what":"stuck","pid":' + $P1 + '}' + "`n")
         Put (Join-Path $PV 'door.log') ("2026-10-01 WOULD TURN AWAY profile $P1`n")
         Put (Join-Path $PV 'last-left.json') ('{"' + $P1 + '":1790000000000,"' + $PY + '":1790000000001}')
@@ -190,7 +205,10 @@ function Build {
         Put (Join-Path $R 'data\last-left.json') ('{"' + $P1 + '":1780000000000,"' + $PY + '":1780000000001}')
         Put (Join-Path $R 'data\online.json') '{"now":0}'
     }
-    Put (Join-Path $Box 'Thornswood-Server.prev-20261001-000000\world\changeForms\ff000a07.json') ('{"profileId":' + $P1 + '}')
+    Put (Join-Path $Box 'Thornswood-Server.prev-20261001-000000\world\changeForms\ff000a07.json') ('{"formDesc":"ff000a07","profileId":' + $P1 + '}')
+    Put (Join-Path $Box 'Thornswood-Server.prev-20261001-000000\private\farm-claims.json') ('{"at":1,"claims":{"' + $P1 + '":{"by":' + $P1 + ',"name":"Mine","at":1,"cell":"3c:Skyrim.esm","x":0,"y":0}},"seeded":{}}')
+    # A list the dev server has not let go of yet, part of it done.
+    Put (Join-Path $Dev 'private\deleted-characters.json') '{"profiles":[9999],"actors":[4278199999],"done":{"property":1}}'
 
     $mine = '{"at":1,"kind":"say","profileId":' + $P1 + ',"name":"Mine","text":"hello"}'
     $yours = '{"at":2,"kind":"say","profileId":' + $PY + ',"name":"Yours","text":"hi"}'
@@ -223,6 +241,11 @@ try {
     $c = Run (@('-DiscordId', $ME, '-Delete', '-By', 'Tester') + $roots)
     Yes 'a store that will not parse refuses the run' ($c -eq 1 -and (Said 'roster\.json will not parse, so nothing was changed'))
     Put $roster $keepRoster
+    $lst = Join-Path $Live 'private\deleted-characters.json'
+    Put $lst '["not a list"]'
+    $c = Run (@('-DiscordId', $ME, '-Delete', '-By', 'Tester') + $roots)
+    Yes 'a list of deleted characters that is not one refuses the run' ($c -eq 1 -and (Said 'deleted-characters\.json is not a list of deleted characters, so nothing was changed'))
+    Remove-Item -LiteralPath $lst -Force
     $pend = Join-Path $Dev 'world\changeForms\.pending-batch'
     Put $pend '{}'
     $c = Run (@('-DiscordId', $ME, '-Delete', '-By', 'Tester') + $roots)
@@ -247,7 +270,17 @@ try {
         (Said 'kept\s+1\s+site: session rows staff marked kept'))
     Yes '  and counts their approved gallery picture, and leaves the one a report is about' (
         (Said 'remove\s+1\s+site: approved gallery pictures') -and (Said 'kept\s+1\s+site: gallery pictures held while a report about them is looked into'))
-    Yes '  and counts the game registers naming their character without changing them' (Said 'left\s+1\s+live game server: places in private\\property\.json naming their character')
+    Yes '  and counts each game register the game server lets go at its next start' (
+        (Said 'release\s+5\s+live game server: places in private\\property\.json naming their character') -and
+        (Said 'release\s+2\s+live game server: places in private\\law\.json') -and (Said 'release\s+2\s+live game server: places in private\\beds\.json') -and
+        (Said 'release\s+3\s+live game server: places in private\\farm-claims\.json') -and (Said 'release\s+1\s+live game server: places in private\\embassy\.json') -and
+        (Said 'release\s+1\s+live game server: places in private\\dungeon-rewards-ledger\.json') -and (Said 'release\s+4\s+live game server: places in private\\books\.json'))
+    Yes '  and the books they own, which close unless staff hand them on first' (Said 'release\s+1\s+live game server: faction and business books they own, disbanded unless staff hand them on first')
+    Yes '  and the list it writes for each server that holds something of theirs, the copy an install set aside too' (
+        (Said 'release\s+1\s+live game server: private\\deleted-characters\.json, the list') -and (Said 'release\s+1\s+dev game server: private\\deleted-characters\.json') -and
+        (Said 'release\s+1\s+live game server, set aside as Thornswood-Server\.prev-20261001-000000: private\\deleted-characters\.json'))
+    Yes '  and counts the merchant ledger as left, its release being the merchant code''s' (Said 'left\s+1\s+live game server: places in private\\merchant-ledger\.json naming their character')
+    Yes '  and says nothing of a register that names nobody of theirs' (-not (Said 'benches\.json') -and -not (Said 'deleted-characters\.json naming'))
     if (-not (Said 'A real run stops these')) { Show }
     Yes '  and names the services a real run would stop' (Said 'A real run stops these while it changes their files, then starts them again: the site, the live game server, the dev game server, live voice, dev voice, the bot\.')
     Yes '  and never prints an address or what a record says' (-not (Said '203\.0\.113') -and -not (Said 'hello'))
@@ -312,12 +345,26 @@ try {
             $null -eq (J (Join-Path $PV 'last-left.json'))."$P1" -and $null -ne (J (Join-Path $PV 'last-left.json'))."$PY" -and
             $null -eq (J (Join-Path $R 'data\last-left.json'))."$P1" -and $null -ne (J (Join-Path $R 'data\last-left.json'))."$PY")
         $rel = $R.Substring($Box.Length)
-        Yes "$tag`: the property register, the staff log and the door log are as they were" (
-            $before["$rel\private\property.json"] -eq (Get-FileHash (Join-Path $PV 'property.json')).Hash -and
-            $before["$rel\private\moderation.log"] -eq (Get-FileHash (Join-Path $PV 'moderation.log')).Hash -and
-            $before["$rel\private\door.log"] -eq (Get-FileHash (Join-Path $PV 'door.log')).Hash)
+        $same = $true
+        foreach ($f in 'property.json', 'law.json', 'beds.json', 'farm-claims.json', 'embassy.json', 'books.json', 'dungeon-rewards-ledger.json', 'merchant-ledger.json', 'benches.json', 'moderation.log', 'door.log') {
+            if ($before["$rel\private\$f"] -ne (Get-FileHash (Join-Path $PV $f)).Hash) { $same = $false; Write-Host "        changed: $tag private\$f" }
+        }
+        Yes "$tag`: every game register, the staff log and the door log are as they were (the game server lets go, not this)" $same
+        $list = J (Join-Path $PV 'deleted-characters.json')
+        $want = if ($tag -eq 'live') { "$P1" } else { "$P1,9999" }
+        $wantA = if ($tag -eq 'live') { "$A1" } else { "$A1,4278199999" }
+        Yes "$tag`: the list names their profile and their character's form id, never the shared one or a name" (
+            (@($list.profiles) -join ',') -eq $want -and (@($list.actors) -join ',') -eq $wantA -and
+            (Get (Join-Path $PV 'deleted-characters.json')) -notmatch 'Mine|5002')
+        if ($tag -eq 'dev') {
+            Yes 'dev: merged into the list still waiting there, with what was done cleared so every part runs again' ($null -eq $list.done)
+        }
     }
     Yes 'the live server''s folder an install set aside loses their change form too' (-not (Test-Path (Join-Path $Box 'Thornswood-Server.prev-20261001-000000\world\changeForms\ff000a07.json')))
+    $prevList = J (Join-Path $Box 'Thornswood-Server.prev-20261001-000000\private\deleted-characters.json')
+    Yes '  and gets the list, so it lets go of them too if it is ever put back' ((@($prevList.actors) -join ',') -eq '4278192647' -and (@($prevList.profiles) -join ',') -eq "$P1")
+    Yes 'the run says which game servers let go of the registers as they start, and not the copy set aside' (
+        (Said 'registers are let go as each of these starts: dev game server, live game server\.') -and (Said 'thornswood\.log says release:'))
 
     $day = Get (Join-Path $Vl 'chat\2026-10-01.jsonl')
     Yes 'their chat lines are gone from the day, the other lines stay byte for byte' (
