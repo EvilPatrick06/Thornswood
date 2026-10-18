@@ -345,7 +345,11 @@ at `<drive>:\Thornswood-DevBuild`, beside the main install. Then open it once an
 `<Root>-DevBuild\Game`: it offers at startup, and its own Settings, Maintenance
 has "Make it". Ship refuses `-Channel dev` without the dev build, and with the
 dev build but without that folder it builds the dev release out of the Steam
-copy instead. `.\scripts\release\Check-ShipReady.ps1 -Channel dev` says whether both are
+copy instead. That refusal is for `<drive>:\Thornswood-DevBuild` only, the folder
+Ship finds for itself: a folder you name with `-Root`, or record once with
+`.\scripts\release\Setup-ShipMachine.ps1 -Channel dev -Root <folder>`, is a release
+folder `Update-ShipRoot.ps1` makes with no `Launcher` folder, and the Ship's own
+launcher step makes one there (#2662). `.\scripts\release\Check-ShipReady.ps1 -Channel dev` says whether both are
 in place, without shipping anything.
 
 Then in `Thornswood-Repo`:
@@ -2305,7 +2309,7 @@ In the main launcher, on the Play page, open the Server dropdown and choose Dev.
 .\scripts\release\Check-ShipReady.ps1 -Channel dev
 ```
 
-That says whether the dev build and its game folder are in place, and ships nothing. Ship refuses `-Channel dev` without the dev build. The publish steps are [section 3](#3-how-to-release-to-dev).
+That says whether the dev build and its game folder are in place, and ships nothing. Ship refuses `-Channel dev` without the dev build, unless the folder was named with `-Root` or recorded with Setup-ShipMachine.ps1 (#2662). The publish steps are [section 3](#3-how-to-release-to-dev).
 
 #### The Play page
 
