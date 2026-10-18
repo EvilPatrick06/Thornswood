@@ -104,6 +104,12 @@ Yes 'the commit asked for reaches the script through env, never pasted into it' 
                                                                                 $named.Count -eq 2 -and @($named | Where-Object { $_ -match '^\s+INPUT_COMMIT: ' -or $_ -match '^  group: engine-' }).Count -eq 2)
 Yes 'with none asked, the commit is the one this branch pins' ($which -match 'git ls-tree HEAD engine/skymp')
 $fetch = Get-Step $vps 'Fetch the fork at that commit'
+# Run 39149317535: the runner reused a fork git folder nightly.yml had fetched
+# --depth 1, which follows main alone, and origin/thornswood/engine-changes
+# was never made.
+$fresh = $fetch.IndexOf("'modules\engine\skymp'"); $init = $fetch.IndexOf('submodule update --init engine/skymp')
+Yes 'the run clones the fork itself, never reusing a git folder an earlier job left' ($fresh -gt 0 -and $init -gt $fresh -and $fetch -match 'Remove-Item -LiteralPath \$modules -Recurse -Force')
+Yes 'the fork''s branch is fetched into the ref the One engine check reads' ($fetch -match [regex]::Escape("fetch origin '+refs/heads/thornswood/engine-changes:refs/remotes/origin/thornswood/engine-changes'"))
 Yes 'only a commit on the fork''s thornswood/engine-changes is built (One engine)' ($fetch -match 'merge-base --is-ancestor \$env:COMMIT origin/thornswood/engine-changes')
 Yes 'the fork''s upstream is fetched, for the records'' upstreamBase' ($fetch -match 'skyrim-multiplayer/skymp\.git' -and $fetch -match 'fetch upstream main')
 $vc = Get-Step $vps 'Where vcpkg keeps'
