@@ -34652,13 +34652,17 @@ log('gamemode loaded:',
     dungeon   the character on each dungeon chest's reservation (dungeon loot)
     books     members, their book chat, books they own, when they last left
               (the books)
+    merchants the guild traders' supply waits, commission promises and a
+              trade still waiting on the character (the purse service, at
+              NPC startup, #2652)
 
   A part that answers that it took is marked done in the file, the time it
   ran, so it never runs again; when every part is done the file is deleted,
   and nothing about who was released stays on the server. A part whose write
   did not take is said in the log and waits for the next start, and so does
   one whose block never got as far as asking; only those run then
-  (__thornswoodReleaseWaiting, at the end of the books, says which).
+  (__thornswoodReleaseWaiting, after the NPC startup, the last block that
+  asks, says which).
   Delete-Person.ps1 merges a new request into a list still waiting and clears
   done, so every part runs for the new ids too; running again for an id
   already let go finds nothing.
@@ -34666,16 +34670,11 @@ log('gamemode loaded:',
   The log says counts and nothing else: never a name, a profile id or a form
   id. A list that cannot be read, or does not have the shape above, releases
   nothing, is left as it is, and the log says so.
-
-  The merchant ledger (merchant-ledger.json) is not a part: its supply waits
-  and a trade still waiting on a character name them by form id and
-  profile, and that code belongs to the work on #1373. #2351 says what its
-  release has to do.
 */
 (function () {
   'use strict';
   var g = (typeof globalThis !== 'undefined' ? globalThis : this);
-  var PARTS = ['saves', 'farms', 'property', 'embassy', 'dungeon', 'books'];
+  var PARTS = ['saves', 'farms', 'property', 'embassy', 'dungeon', 'books', 'merchants'];
   var has = function (o, k) { return Object.prototype.hasOwnProperty.call(o, k); };
   // Into thornswood.log with the rest of the gamemode's own lines (log, at the top of the file).
   function rlog(line) {
@@ -54077,9 +54076,6 @@ function thornswoodBooks(env) {
   }
 })();
 
-// The release of deleted characters (#2351): which parts did not let go at
-// this start, now that every block that keeps a register has loaded.
-if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__thornswoodReleaseWaiting(); }
 
 // ==== thornswood chat commands ====
 /*
@@ -68378,8 +68374,95 @@ function createNpcMerchantPurses(api,data,storage) {
     return Array.from(catalogue,([merchantId,identity])=>({merchantId,reference:identity.reference,
       state:JSON.parse(JSON.stringify(ledger.entries[identity.reference]))}));
   }
+  // LETTING GO OF A DELETED CHARACTER (#2351, #2652). who is the release
+  // block's: who.profile(profile id) and who.actor(form id) say whether a
+  // character is on private\deleted-characters.json. In every entry, retired
+  // traders' too:
+  //   supply       a supply wait keyed by [desc, profile, what] of theirs
+  //                is dropped
+  //   commissions  a promise the trader holds for them (commissions.held)
+  //                is dropped, so its gold is the trader's to spend again
+  //                and it no longer counts toward MAX_HELD; a finished one
+  //                cooling down (commissions.cool) goes too. Both are keyed
+  //                by the owner merchant-commission-state.js writes,
+  //                [local form id, plugin, profile]
+  //   a trade      still waiting on them is cleared:
+  //     debit      the trader's state is still pending.previous (records()
+  //                in the trading checks it), so clearing pending leaves it
+  //                as it was, as a refused debit does; for a commission the
+  //                promise it would have paid is dropped above
+  //     credit     the trader already holds pending.next; what was due to
+  //                the character goes with their pack, so next stays, and
+  //                nothing stamped for them (a supply wait, a commission
+  //                cooling down) is kept
+  // Purse and stock are never touched: no coin or goods are made or lost.
+  // A trader holding something of theirs while a trade with somebody else
+  // is still waiting is not changed at all: that trade's saved snapshots
+  // and terms are what the trader's state is checked against, so taking
+  // the row out of the state alone would stop every trade. The part says so
+  // and waits for the next start, by when that trade has settled.
+  // Every changed entry goes out in one acknowledged save, as
+  // compareAndCommit's are, before the ledger in memory changes; a save
+  // that fails revokes this service, as a failed commit does. The trader's
+  // own mirror (property) is not written here: prepare() is its one reader
+  // and puts it right from the ledger before the trader is used.
+  function characterOf(desc) {
+    // A runtime human's desc is its form id in hex alone (FormDesc); a
+    // placed form's has a plugin and is never a character.
+    return typeof desc==='string' && /^[0-9a-f]{1,8}$/i.test(desc) ? parseInt(desc,16) : 0;
+  }
+  function release(who) {
+    return mutate(()=>{
+      const counts={merchants:0,supply:0,commissions:0,trades:0};
+      const theirs=(desc,profile)=>!!(who.profile(profile) || who.actor(characterOf(desc)));
+      // A commission key is JSON [owner, job], the owner JSON [local form id, plugin, profile].
+      const promisedTo=key=>{
+        const row=JSON.parse(JSON.parse(key)[0]);
+        return !!(who.profile(row[2]) || (!row[1] && who.actor(row[0])));
+      };
+      const next=JSON.parse(JSON.stringify(ledger)),changed=[];
+      let busy=0;
+      for(const [id,identity] of catalogue) {
+        const state=next.entries[identity.reference];
+        if(!state) continue;
+        let rows=0;
+        for(const k of Object.keys(state.supply || {})) {
+          let owner=null;
+          try {owner=JSON.parse(k);} catch(error) {owner=null;}
+          if(Array.isArray(owner) && owner.length===3 && theirs(owner[0],owner[1])) {delete state.supply[k];counts.supply++;rows++;}
+        }
+        if(state.commissions!==undefined) {
+          for(const book of ['held','cool']) {
+            for(const k of Object.keys(state.commissions[book])) {
+              if(promisedTo(k)) {delete state.commissions[book][k];counts.commissions++;rows++;}
+            }
+          }
+        }
+        const pending=state.pending;
+        const trade=!!(pending && pending.human && theirs(pending.human.desc,pending.human.profileId));
+        if(!trade && !rows) continue;
+        if(pending && !trade) {busy++;continue;}
+        if(trade) {state.pending=null;counts.trades++;}
+        if(!valid(state,identity)) throw new Error('Merchant state cannot be verified');
+        const revision=state.revision || 0;
+        if(revision>=Number.MAX_SAFE_INTEGER) throw new Error('Merchant revision is exhausted');
+        state.revision=revision+1;
+        counts.merchants++;
+        changed.push([id,identity,state]);
+      }
+      if(busy) throw new Error(busy+' trader(s) holding something of theirs are waiting on a trade with somebody else, so nothing was let go');
+      if(!changed.length) return {counts,saved:true};
+      try {
+        assertOwner();
+        if(storage.save(next)!==true) throw new Error('Durable merchant save acknowledgement is missing');
+      } catch(error) {active=false;throw error;}
+      assertOwner();
+      ledger=next;
+      return {counts,saved:true};
+    });
+  }
   const activeCount=Array.from(catalogue.values()).filter(identity=>identity.active).length;
-  return {prepare,read,commit,compareAndCommit,pendingRecords,ledgerStates,callerGuard:true,durable:storage.durable===true,namespace:storage.namespace,shutdown:()=>{active=false;},stats:()=>({catalogue:activeCount,retired:catalogue.size-activeCount,verified:verified.size,initialized})};
+  return {prepare,read,commit,compareAndCommit,pendingRecords,ledgerStates,release,callerGuard:true,durable:storage.durable===true,namespace:storage.namespace,shutdown:()=>{active=false;},stats:()=>({catalogue:activeCount,retired:catalogue.size-activeCount,verified:verified.size,initialized})};
   } finally {lease.busy=false;}
 }
 // NPC MERCHANT PURSES END
@@ -72356,6 +72439,11 @@ try {
         npcMerchantManifest(populationData).map(identity=>identity.reference),
         typeof mp.writePrivateEconomyLedger==='function' ? mp.writePrivateEconomyLedger.bind(mp) : null));
     current();
+    // A deleted character's supply waits and waiting trade are let go here,
+    // once the purses are read and before trading or any tick can act on
+    // them (#2351, #2652).
+    if(typeof globalThis.__thornswoodRelease==='function') globalThis.__thornswoodRelease('merchants',merchants.release);
+    current();
     trading = MERCHANT_TRADING.installMerchantTrading({
         mp: mp,
         g: globalThis,
@@ -72406,6 +72494,11 @@ try {
 }
 })();
 // NPC SERVER STARTUP END
+
+// The release of deleted characters (#2351): which parts did not let go at
+// this start, now that every block that keeps a register has loaded. The
+// NPC startup, where the merchant purses are read (#2652), is the last.
+if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__thornswoodReleaseWaiting(); }
 
 // ==== thornswood custom quests ====
 /*

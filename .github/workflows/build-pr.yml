@@ -347,6 +347,12 @@ jobs:
           # server-log.js on a stand-in game server and voice folder, and the
           # site's start block on a stand-in data folder, each taking a
           # deletion request out of its own files as it starts. A few seconds.
+          # Issue #2652: tests\test-2652-merchant-release.js runs the real
+          # merchant purse service on a real ledger file and holds what its
+          # release lets go of for a deleted character: supply waits,
+          # commission promises, a waiting trade in debit and in credit,
+          # purses and shelves the same, a trader busy with somebody else's
+          # trade and a failed save waiting. A second.
           # Issue #2166: tests\test-2166-retention-fixes.js holds three
           # retention fixes to what the privacy page already says: trouble.json
           # ages by 365 days in the hourly sweep on a scratch site (a kept
@@ -669,6 +675,7 @@ jobs:
                  'test-2351-release-registers.js',
                  'test-2351-wipe-registers.ps1',
                  'test-2758-start-deletions.js',
+                 'test-2652-merchant-release.js',
                  'test-2166-retention-fixes.js',
                  'test-2353-keeping-times.js',
                  'test-2166-kept-chat-and-logs.js',

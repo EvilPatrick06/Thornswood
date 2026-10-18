@@ -78,8 +78,7 @@
       to the report." Each of these still goes when its keeping time on the
       privacy page is up, by the code that writes it (#2353).
     - the game's registers that it does not let go (below): the old copies a
-      game server kept in data, and the merchant ledger, whose release is the
-      merchant code's to write (#2351): counted, never changed.
+      game server kept in data: counted, never changed.
     - a gallery picture with an open report against it, or taken down after
       one and still held, which is staff's while they look into it (#2352);
       and one approved before the site kept the sending account in its
@@ -494,6 +493,16 @@ function refs(v, P, id, A) {
   const hit = (x) => (typeof x === 'number' || (typeof x === 'string' && /^\d{1,20}$/.test(x))) && (P.has(Number(x)) || String(x) === id);
   // A character's form id, kept as `actor` by the embassy rolls and the dungeon chests' record.
   const hitActor = (k, x) => !!A && /^actor$/i.test(k) && typeof x === 'number' && A.has(x);
+  // The merchant ledger keys a supply wait by [form id, profile, what], and a
+  // commission promise (held, or cooling down) by [owner, job], its owner
+  // itself [form id, plugin, profile] (game\merchant-commission-state.js).
+  // A key that is not JSON names nobody.
+  const inKey = (k, depth) => {
+    if (typeof k !== 'string' || k[0] !== '[' || depth > 1) return false;
+    let ks;
+    try { ks = JSON.parse(k); } catch (e) { return false; }
+    return Array.isArray(ks) && ks.some((y) => hit(y) || inKey(y, depth + 1));
+  };
   (function walk(x, depth) {
     if (depth > 40 || x === null || typeof x !== 'object') return;
     if (Array.isArray(x)) {
@@ -503,10 +512,7 @@ function refs(v, P, id, A) {
     }
     let mine = false;
     for (const k of Object.keys(x)) {
-      // The merchant ledger keys a supply wait by [form id, profile, what].
-      let inKey = false;
-      if (k[0] === '[') { try { const ks = JSON.parse(k); inKey = Array.isArray(ks) && ks.some(hit); } catch (e) { inKey = false; } }
-      if (hit(k) || inKey) mine = true;
+      if (hit(k) || inKey(k, 0)) mine = true;
       else if (REF_KEY.test(k) && hit(x[k])) mine = true;
       else if (hitActor(k, x[k])) mine = true;
     }
@@ -796,14 +802,14 @@ for (const person of people) {
         part runs for the new ids too. Nothing is stopped for it (#2758): the
         list is the request, and at the server's next start server-log.js
         takes out their saves (the part "saves") and the gamemode lets go of
-        the registers. A copy set aside gets one too when it holds a register
-        of theirs, which nothing runs from until it is put back; its saves go
-        now. Every other file is counted and left: the old copies in data,
-        and the merchant ledger, whose release is the merchant code's to
-        write (#2351).
+        the registers, the merchant ledger among them, which the purse
+        service lets go of at NPC startup (#2652). A copy set aside gets one
+        too when it holds a register of theirs, which nothing runs from until
+        it is put back; its saves go now. Every other file is counted and
+        left: the old copies in data.
       */
       const LIST = 'deleted-characters.json';
-      const RELEASED = /^(property|law|beds|farm-claims|embassy|books|dungeon-rewards-ledger)\.json$/i;
+      const RELEASED = /^(property|law|beds|farm-claims|embassy|books|dungeon-rewards-ledger|merchant-ledger)\.json$/i;
       handled.add(path.join(priv, LIST).toLowerCase());
       let theirs = 0;
       if (P.size) {
