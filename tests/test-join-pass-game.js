@@ -291,7 +291,9 @@ door(null);
 
 // ------------------------------------------------------------ the voice log
 // Since #1131 what a command writes to the chat log is commandLogText's word,
-// run here: the pass masked, whatever the case of the command.
+// run here: the pass masked, whatever the case of the command. The front
+// plugin's own pass, sent with press, is not written at all since #2723
+// (tests\test-2723-plugin-reports.js); this is the typed one.
 {
   const at = voice.indexOf('function commandLogText(');
   let body = '';
@@ -305,7 +307,7 @@ door(null);
   const box = {};
   if (body) vm.runInNewContext(body + '\nthis.commandLogText = commandLogText;', box);
   yes('the voice service writes /joinpass to the chat log without the pass',
-      /const logged = commandLogText\(me, text\);\s*if \(logged\) chatWrite\('command', myId, me, logged,/.test(voice) &&
+      /const logged = commandLogText\(me, text, press\);\s*if \(logged\) chatWrite\('command', myId, me, logged,/.test(voice) &&
       typeof box.commandLogText === 'function' &&
       box.commandLogText({ profileId: 700 }, '/joinpass ' + VECTOR_PASS) === '/joinpass [pass]' &&
       box.commandLogText(null, '/JOINPASS ' + VECTOR_PASS) === '/joinpass [pass]');
