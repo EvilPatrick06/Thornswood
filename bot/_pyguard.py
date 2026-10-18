@@ -7,8 +7,8 @@ it first, before anything else:
     import _pyguard  # noqa: F401
 
 The bot runs on Python 3.12 (Install-Bot.ps1, bot/requirements.txt), and what
-it pins needs 3.10 or newer: Pillow 12 will not install on less. An older
-Python fails later and far from the cause (an AttributeError deep in a test),
+it pins needs 3.11 or newer: Pillow 13 will not install on less (#1401).
+An older Python fails later and far from the cause (an AttributeError deep in a test),
 so it is refused here, at import, in plain words. On a Windows PC with more
 than one Python, plain python is whichever is first on PATH; py -3.12 picks
 the right one.
@@ -18,7 +18,7 @@ the message is what an old Python sees.
 """
 import sys
 
-PYTHON_MIN = (3, 10)
+PYTHON_MIN = (3, 11)
 
 
 def python_too_old(version=None, exe=None):
