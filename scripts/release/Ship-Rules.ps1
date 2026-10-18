@@ -1474,6 +1474,45 @@ foreach ($ShipBuiltLine in @(& {
     } catch { }
 })) { [void]$ShipBuiltUntil1259.Add($ShipBuiltLine) }
 
+# NEVER HANDED ON (#2454). A file used only as the collection installs it
+# never ships, whichever list above calls it ours: permission-held.txt beside
+# this file. Patrick, 17 Oct: Immersive Armors is used as-is through the
+# collection and nothing built from it is redistributed, so its Bosmer armour
+# folder is held. One hold a line: a path under the game folder (a folder ends
+# in \), two or more spaces or a tab, then a reason naming its issue. A line
+# with no reason, or no issue, stops the script. The repo's own list is kept by
+# tests\test-ship-permission-held.ps1 in the gate, which fails without it; a
+# copy of this file alone (as test fixtures make) has no list and no holds,
+# like the lists above. Read-ShipPermissionHeld refuses a missing list. A release
+# that drops a held file an earlier one shipped lists it as gone with its
+# sha256 (Publish-Update, #1261), so installs lose our copy and keep any other.
+function Read-ShipPermissionHeld([string]$List) {
+    if (-not (Test-Path -LiteralPath $List -PathType Leaf)) { throw "The permission hold list is missing: $List. A hold is released by taking its line out; keep the file." }
+    $out = @()
+    foreach ($line in [IO.File]::ReadAllLines($List)) {
+        $one = $line.Trim()
+        if (-not $one -or $one.StartsWith('#')) { continue }
+        $parts = ([regex]'\t+| {2,}').Split($one, 2)
+        if ($parts.Count -lt 2 -or -not $parts[1].Trim()) { throw "A permission hold gives no reason: $one" }
+        if ($parts[1] -notmatch '#\d+') { throw "A permission hold names no issue: $one" }
+        $out += [pscustomobject]@{ Path = $parts[0].Trim().Replace('/', '\'); Reason = $parts[1].Trim() }
+    }
+    return $out
+}
+$ShipPermissionHeldList = Join-Path $PSScriptRoot 'permission-held.txt'
+$ShipPermissionHeld = @(if (Test-Path -LiteralPath $ShipPermissionHeldList -PathType Leaf) { Read-ShipPermissionHeld $ShipPermissionHeldList })
+
+# Whether a path is held until its maker's permission is recorded. Either slash.
+function Test-ShipPermissionHeld([string]$rel) {
+    $rel = $rel.Replace('/', '\')
+    foreach ($h in $ShipPermissionHeld) {
+        $p = [string]$h.Path
+        if ($p.EndsWith('\')) { if ($rel.StartsWith($p, 'OrdinalIgnoreCase')) { return $true } }
+        elseif ($rel -ieq $p) { return $true }
+    }
+    return $false
+}
+
 function Test-ShipGenerated([string]$rel) {
     foreach ($p in $ShipGeneratedPatterns) { if ($rel -like $p) { return $true } }
     return $false
@@ -1544,6 +1583,8 @@ function Test-ShipHeld([string]$rel, [int]$Revision = $ShipCollectionRevision) {
 # the generator's output. Inside Data\Platform this answers yes; that folder is
 # Test-ShipOtherServer's to decide.
 function Test-ShipOurs([string]$rel) {
+    # Never handed on (permission-held.txt, #2454): not ours to ship.
+    if (Test-ShipPermissionHeld $rel) { return $false }
     if ($rel.StartsWith('Data\Platform\', 'OrdinalIgnoreCase')) { return $true }
     if ($ShipClientFiles.Contains($rel)) { return $true }
     foreach ($o in $ShipOursFiles) { if ($rel -ieq $o) { return $true } }
@@ -1556,6 +1597,8 @@ function Test-ShipOurs([string]$rel) {
 # Somebody else's loose file, which never ships: not ours, and not held for the
 # collection at this revision.
 function Test-ShipNotOurs([string]$rel, [int]$Revision = $ShipCollectionRevision) {
+    # Never handed on (permission-held.txt, #2454), at every revision.
+    if (Test-ShipPermissionHeld $rel) { return $true }
     if (Test-ShipOurs $rel) { return $false }
     return (-not (Test-ShipHeld $rel $Revision))
 }
