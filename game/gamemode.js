@@ -35874,17 +35874,18 @@ log('gamemode loaded:',
   Claiming hands you the deed there and then, which is why it has to happen at
   the door.
 
-  WHAT THIS BLOCK IS AND IS NOT, because the system is bigger than what is built.
-  This is the claim, the deed and the lapse. Locks, keys, key molds, the offices
-  that grant stewardship, rent and the drop box are not here yet and are their
-  own entries on the list.
+  WHAT THIS BLOCK IS. It began as the claim, the deed and the lapse. Locks,
+  keys and key molds (#615, #1637), the master key (#2254), the hold offices
+  (#2551), rent, the drop box (#2298), beds (#1603) and the notice boards
+  (#1627) have joined it since, each with its own note further down.
 
   WHERE THE DOOR COMES FROM. mp.onActivate is handed the door, so the door a
-  person last opened is written on them and /claim reads it back. That is why
+  person last opened is written on them and the lock key's Claim, which sends
+  /claim (#1637), reads it back. That is why
   there is no proximity search here: the engine has already told us which door
   they touched, and searching for the nearest one would be a worse answer to a
   question already answered. A door touched longer ago than DOOR_MEMORY_MS does
-  not count, so /claim typed in a field claims nothing.
+  not count, so a /claim that reaches the server from a field claims no house.
 
   A DEED IS ONE RECORD. ThornswoodBookDeed, and the property it is for is the
   per-instance name on the inventory entry: Inventory::Entry in the fork carries
@@ -35892,7 +35893,8 @@ log('gamemode loaded:',
   to Breezehome' in one pack and 'Deed to Honeyside' in another. 852 buildings,
   one record.
 
-  THE SERVER KEEPS ITS OWN RECORD of every claim it made, in data/property.json,
+  THE SERVER KEEPS ITS OWN RECORD of every claim it made, in private/property.json
+  (registerPath, #541),
   and that record is what decides who holds a building. The deed in somebody's
   pack is the thing that can be stolen; it is not the register. A book somebody
   renamed by hand is not a deed, because the server never issued it.
@@ -47345,8 +47347,10 @@ log('gamemode loaded:',
         to guess: the property block answers false unless the engine has just
         told us they opened a door of a building it knows.
 
-        A home and its farm are one claim in the design and they are two claims
-        in the code today. That is the next piece of this and it is on the list.
+        A home and its farm are one claim, in the code as in the design: the
+        house's claim carries the ground outside its front door, and
+        claimCovering asks the property block (coversGround) before this
+        block's own claims.
       */
       var prop = g.__thornswoodProperty;
       if (prop && prop.command) {
