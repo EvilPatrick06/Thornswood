@@ -134,6 +134,12 @@ the character. Existing actor identities and inventory receipts remain fenced
 by the native transaction. The current roleless roster keeps its earlier offers
 until the six-trade roster and its item tables are explicitly activated together.
 
+Quest rank checks read the saved character record without initializing or
+migrating it. A missing, unreadable or malformed record refuses eligibility;
+opening an offer cannot replace progression after a failed read. Only a valid
+saved rank qualifies. Existing character initialization owns migration. This
+does not enable the expanded profession, half and school quest catalogue.
+
 ## Build order and checks
 
 | Part | Responsibility | Requires |
