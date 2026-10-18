@@ -2,20 +2,22 @@
   Release-List.ps1
 
   The release list a game server lets go of at its next start (#2351), as
-  Reset-Character.ps1 and Wipe-Saves.ps1 write it (#2668). Dot-sourced by
-  both; it does nothing on its own. $ThornswoodReleaseList is the text of
-  the functions below, sent with the step each script already runs on the
-  server (Windows PowerShell 5.1 there), so there is one copy of it and the
-  two scripts cannot drift apart.
+  Reset-Character.ps1, Wipe-Saves.ps1 (#2668) and New-Character.ps1 (#2673)
+  write it. Dot-sourced by all three; it does nothing on its own.
+  $ThornswoodReleaseList is the text of the functions below, sent with the
+  step each script already runs on the server (Windows PowerShell 5.1 there)
+  or, for New-Character on a local test server, run in place, so there is
+  one copy of it and the scripts cannot drift apart.
 
   The list is private\deleted-characters.json (the server's privDir), the
   same shape Delete-Person.ps1 writes and game\gamemode.js reads:
 
       { "profiles": [ ... ], "actors": [ form ids ], "done": { part: time } }
 
-  WHO IT NAMES. A reset or a wipe throws characters away and keeps every
-  profile: the profile keeps its id, its mod menu choices and, after a
-  reset, its house, offices, books and farm. So both name the thrown-away
+  WHO IT NAMES. A reset, a new character or a wipe throws characters away
+  and keeps every profile: the profile keeps its id, its mod menu choices
+  and, after a reset or a new character, its house, offices, books and
+  farm. So each names the thrown-away
   characters by form id only and never a profile. Each register's release
   in gamemode.js lets go by profile what a profile holds and by form id
   only what the character held (a dungeon chest's reservation, an embassy
