@@ -338,6 +338,10 @@ jobs:
           # site and lifted), and site.log, voice.log, thornswood.log and
           # bot.log keep nothing past 90 days, with the privacy line naming
           # them. A second or two.
+          # Issue #2636: tests\test-2636-feed-watch-quiet.ps1 compiles the
+          # launcher and holds the feed watch to reading the site's 204 as
+          # "not moved", a 200 as "moved", and no answer or any other answer
+          # as a fault, against a tip of its own. About half a minute.
           $six ='test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
@@ -532,7 +536,7 @@ jobs:
                  'test-download-button.js', 'test-gallery-ux.js', 'test-gallery.js', 'test-site-local.js',
                  'test-release-baseline.ps1', 'test-publish-refusals.ps1', 'test-2513-every-harness-listed.ps1', 'test-release-workflow.ps1',
                  'test-2460-winps-module-path.ps1',
-                 'test-feed-watch.js',
+                 'test-feed-watch.js', 'test-2636-feed-watch-quiet.ps1',
                  'test-session-cards.js', 'test-staff-bans.js', 'test-hub-staff-gallery.js', 'test-known-issues.js', 'test-known-page.js', 'test-sunhelm-gone.js', 'test-known-npcs.js', 'test-2414-known-one-copy.js', 'test-2560-roadmap-done.js',
                  'test-join-outage.js', 'test-join-pass-site.js', 'test-open-switch.js', 'test-component-readmes.js',
                  'test-site-front-resilience.js', 'test-site-upload-guard.js',
