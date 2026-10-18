@@ -230,9 +230,23 @@ Worth an hour, and it is the only thing that turns this file from a guess into
 a runbook.
 
 It is also the only measure of how long a restore takes, the RTO row of
-[SERVICE-OBJECTIVES.md](SERVICE-OBJECTIVES.md). The alert proposed there, a
-rehearsal that starts the server and connects at a cadence Patrick sets, is
-Proposed, needs Patrick's agreement (#2183).
+[SERVICE-OBJECTIVES.md](SERVICE-OBJECTIVES.md).
+
+**It is due monthly.** Patrick ruled on 18 October 2026 (#1046) that the
+hands-on rehearsal runs once a month: restore the newest backup with
+`Restore-Server.ps1 -Rehearse`, start the folder, connect, load a character
+from the backup, then delete the folder ("Not done yet: starting it and
+connecting", below). The record of when it last ran is the Last rehearsed
+line at the end of this section, written by hand only after a real run.
+`scripts\vps\Check-RehearsalDue.ps1` reads that line, and the nightly checks
+run it: once the line is more than 35 days old (a month with a few days'
+slack, `-Days`), the night fails and the board's "Nightly checks failed"
+issue says the rehearsal is overdue, until somebody does one and writes the
+date. Run it by hand to see when the next is due:
+
+```powershell
+.\scripts\vps\Check-RehearsalDue.ps1
+```
 
 `tests\test-backup-restore.ps1` does the scripted half every night on
 scratch folders: backs up a stand-in live and dev server, deletes the
