@@ -310,9 +310,10 @@ Needs: Windows 10 or 11, Skyrim Special Edition on Steam (any Steam library,
 any drive; the scripts find it through Steam) with the Thornswood collection
 deployed through Vortex, the Thornswood launcher installed on any drive and
 signed in, git, the GitHub CLI (`gh`) signed in to an account that is a
-collaborator on the source repo, PowerShell 7, node, Python 3 with `discord.py`
-and `Pillow` for the bot scripts, and an SSH key the VPS knows. There is no
-releases clone any more: the feed and its baseline are on the VPS (#907).
+collaborator on the source repo, PowerShell 7, node, Python 3.11 or newer (the
+bot runs on 3.12) with `discord.py` and `Pillow` for the bot scripts, and an
+SSH key the VPS knows. There is no releases clone any more: the feed and its
+baseline are on the VPS (#907).
 
 ```
 cd C:\Users\<you>\Downloads
@@ -2530,7 +2531,7 @@ These are part of a normal week and do not each need a letter of their own. Pyth
 
 #### Python
 
-The bot scripts need Python 3 with `discord.py` and `Pillow`. [Setting up a machine](#setting-up-a-machine) names that install. The bot deploy is [I. Bot](#i-bot).
+The bot scripts need Python 3.11 or newer (the bot runs on 3.12; Pillow 13 needs 3.11) with `discord.py` and `Pillow`. [Setting up a machine](#setting-up-a-machine) names that install. The bot deploy is [I. Bot](#i-bot).
 
 #### The .NET Framework
 

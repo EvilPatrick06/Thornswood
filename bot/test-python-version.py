@@ -1,20 +1,21 @@
 """
 test-python-version.py
 
-#2276: the bot and its tests need Python 3.10 or newer (the bot runs on
-3.12). The check is one shared module, _pyguard.py.
+#2276: the bot and its tests need Python 3.11 or newer (the bot runs on
+3.12; Pillow 13 needs 3.11, #1401). The check is one shared module,
+_pyguard.py.
 
-  1. python_too_old() says nothing on 3.10, 3.12 and later, and on 3.9 names
-     the version, the path and py -3.12.
+  1. python_too_old() says nothing on 3.11, 3.12 and later, and on 3.10 and
+     3.9 names the version, the path and py -3.12.
   2. bot.py and every bot/test-*.py import _pyguard as their first import,
      before anything else.
-  3. bot.py and every bot/test-*.py, run on a faked 3.9 in a child Python,
+  3. bot.py and every bot/test-*.py, run on a faked 3.10 in a child Python,
      stop with that message: non-zero, no traceback, never reaching discord.
   4. Install-Bot.ps1 sends _pyguard.py with bot.py.
 
 Never connects to anything.
 """
-import _pyguard  # noqa: F401  (first: Python 3.10 or newer, #2276)
+import _pyguard  # noqa: F401  (first: Python 3.11 or newer, #2276)
 import ast
 import glob
 import os
@@ -32,12 +33,15 @@ def yes(what, cond):
 
 too_old = _pyguard.python_too_old
 yes('3.12 is fine', too_old((3, 12, 10)) is None)
-yes('3.10 is fine', too_old((3, 10, 0)) is None)
+yes('3.11 is fine', too_old((3, 11, 0)) is None)
 yes('3.14 is fine', too_old((3, 14, 5)) is None)
 said = too_old((3, 9, 13), r'C:\Python39\python.exe') or ''
 yes('3.9 is refused, naming the version, the path and py -3.12',
     '3.9.13' in said and 'Python39' in said and 'py -3.12' in said
-    and '3.10 or newer' in said)
+    and '3.11 or newer' in said)
+said = too_old((3, 10, 14), r'C:\Python310\python.exe') or ''
+yes('3.10 is refused too: Pillow 13 needs 3.11 (#1401)',
+    '3.10.14' in said and '3.11 or newer' in said)
 
 
 def first_import(path):
@@ -61,7 +65,7 @@ yes('bot.py and all %d bot tests import _pyguard first (wrong: %s)'
 
 CHILD = (
     'import sys, runpy\n'
-    'sys.version_info = (3, 9, 13, "final", 0)\n'
+    'sys.version_info = (3, 10, 14, "final", 0)\n'
     'class Stop(object):\n'
     '    def find_module(self, n, p=None):\n'
     '        return None\n'
@@ -79,11 +83,11 @@ for f in files:
     p = subprocess.run([sys.executable, '-c', CHILD, f], capture_output=True,
                        text=True, env=env, timeout=60)
     out = (p.stdout or '') + (p.stderr or '')
-    if not (p.returncode != 0 and 'needs Python 3.10 or newer' in out
+    if not (p.returncode != 0 and 'needs Python 3.11 or newer' in out
             and 'reached ' not in out and 'Traceback' not in out):
         bad.append('%s (exit %s: %s)' % (os.path.basename(f), p.returncode,
                                          out.strip()[-160:]))
-yes('on a faked 3.9, bot.py and every bot test stop with the plain message '
+yes('on a faked 3.10, bot.py and every bot test stop with the plain message '
     'and nothing else (%d run; bad: %s)' % (len(files), bad), not bad)
 
 install = open(os.path.join(HERE, '..', 'scripts', 'deploy', 'Install-Bot.ps1'),

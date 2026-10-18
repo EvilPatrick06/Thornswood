@@ -27,7 +27,7 @@ So this checks four things.
 
 Read only, apart from a temporary folder it removes.
 """
-import _pyguard  # noqa: F401  (first: Python 3.10 or newer, #2276)
+import _pyguard  # noqa: F401  (first: Python 3.11 or newer, #2276)
 import importlib.util
 import os
 import re
