@@ -44,15 +44,16 @@ enough to make war.
 
 Justiciars who had not made the border went to ground. Some died in it. Some
 did not, and their grandchildren are still here, running gold and poison and
-worse through the holds under other names. They call themselves nothing. Other
-people call them the Remnant.
+worse through the holds and along the coast under other names. They call
+themselves nothing. Other people call them the Remnant.
 
-They do not want Skyrim back. There is no Dominion order to retake it and no
-fleet coming. What they want is what people want when the cause that made them
-is forty years dead: coin, safety, and revenge on whoever is nearest.
+Most of them do not want Skyrim back. No Dominion order to retake it has
+reached them yet, and no Dominion fleet has yet been seen off the coast. What
+they want is what people want when the cause that made them looks forty years
+dead: coin, safety, and revenge on whoever is nearest.
 
-They are the most dangerous thing in Skyrim precisely because they answer to
-nobody any more.
+They are the most dangerous thing in Skyrim precisely because, as far as
+anyone can tell, they answer to nobody any more.
 
 ## The White Harbour Accord
 
@@ -61,7 +62,8 @@ soldiers. It came back with a ledger.
 
 By 4E 218 the harvests had failed twice, the eastern roads were shut, and
 Skyrim was discovering that governing Skyrim included feeding it. Cyrodiil had
-grain. Skyrim had ore, timber, and a coastline the Dominion could not blockade.
+grain. Skyrim had ore, timber, and a coastline the Dominion had not yet tried
+to blockade.
 
 The talking took three years and one walkout. The Accord was signed at Dawnstar
 in 4E 221 and it is the reason there is an Imperial embassy in Solitude today.
@@ -74,6 +76,27 @@ for good. It got grain.
 The full text is kept at the Blue Palace and a copy hangs in every hold's
 longhouse, because the High King of the day wanted every Nord able to read
 exactly what had and had not been given away.
+
+## The Free Skyrim Trading Company
+
+Article the Third left the Empire one house in Skyrim, and the East Empire
+Company was not it. In the spring of 4E 222 its factors at Solitude and
+Windhelm sold what they could carry and walked away from what they could not.
+The piers had never been theirs to sell. They went back to the holds that stood
+over them, as Article the First said every harbour would.
+
+What was left on the docks was a habit: the long, dull business of getting a
+crate from one hold to another and being paid for it. The Free Skyrim Trading
+Company picked it up. It rents the old warehouses from the Jarls, owns no pier
+and no ship, and hires both from whoever has them. It carries for anyone who
+pays, keeps its cut when a load arrives, and buys the things that leave Skyrim
+for good. The one warehouse the Empire kept is its embassy, and the Company's
+are not that one.
+
+Who first put a name to the charter, and whose silver paid for it, is told
+three ways in Solitude and a fourth in Windhelm. The signs over the old doors
+still say East Empire in places. Paint costs money, and the Company has not yet
+decided it is worth spending.
 
 ## Now
 
@@ -94,8 +117,8 @@ The roads are safer than they were and less safe than they should be. The mines
 are running. There is an embassy in Solitude flying a flag that used to fly
 over all of this, and its staff are polite to a degree that fools nobody.
 
-Somewhere out past the lantern light there are elves with old orders and no one
-left to give them new ones.
+Somewhere out past the lantern light there are elves with old orders, and
+nobody in Skyrim knows yet whether anyone is left to give them new ones.
 
 Fifty years is not long. Plenty of people remember.
 
@@ -240,10 +263,14 @@ Fourth Era.*
   armed inside those walls and nowhere else. Walk out the gate carrying and
   you have broken the Accord, and the Ambassador will hand you over rather
   than answer for you.
+- **You can work for the Free Skyrim Trading Company.** It hauls, buys and
+  sells between the holds, out of buildings with the wrong name over the door.
+  Its lead seat is given rather than chosen, like a Jarl's.
 - **You can play a Thalmor.** You are a criminal. There is no embassy to run
-  to, no immunity, no orders from home. Article the Fifth means the Empire will
-  hand you over as fast as a Nord will. Play it as what it is: a hunted thing
-  with a long memory.
+  to and no immunity. Whether orders still come from home, and who sends them,
+  is yours to play out. Article the Fifth means the Empire will hand you over
+  as fast as a Nord will. Play it as what it is: a hunted thing with a long
+  memory.
 - **You can play a Jarl or a steward.** Those are positions, not characters,
   and they are given rather than chosen. How one comes free, and who decides, is
   something you find out in character.
