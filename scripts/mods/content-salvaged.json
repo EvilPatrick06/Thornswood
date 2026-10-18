@@ -88,8 +88,8 @@
  "counts": {
   "ACTI remade": 1,
   "BOOK gone before #2553": 15,
-  "CELL Bethesda's": 43,
-  "CELL dropped": 58,
+  "CELL Bethesda's": 5,
+  "CELL dropped": 96,
   "COBJ remade": 6,
   "CONT dropped": 1,
   "FLOR remade": 1,
@@ -97,11 +97,10 @@
   "FURN remade": 3,
   "KYWD remade": 2,
   "MISC remade": 4,
-  "REFR awaiting sites": 57,
-  "REFR dropped": 177,
+  "REFR dropped": 234,
   "REFR gone before #2553": 1,
-  "WRLD Bethesda's": 2,
-  "WRLD dropped": 4
+  "WRLD Bethesda's": 1,
+  "WRLD dropped": 5
  },
  "records": [
   {
@@ -569,8 +568,8 @@
    "formId": "1dba:Dawnguard.esm",
    "type": "CELL",
    "editorId": "DLC1DawnguardHQ01",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "62f75f89b23ff12d6555fe6fdcd147eaa027fb9a1c5a4f58b30cb58b0ac768bf"
    ]
@@ -626,8 +625,8 @@
    "editorId": "",
    "base": "42e69:Thornswood-Content.esp",
    "cell": "1dba:Dawnguard.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 25 placements of Thornswood's alchemy lab: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "2c8271a424745964ef910e2915d726551fac917da4c659997edf70d63d4608c6"
    ]
@@ -688,8 +687,8 @@
    "formId": "ddf7c:Skyrim.esm",
    "type": "CELL",
    "editorId": "AnisesCabin01",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "bc15c2d61a78fed68bc5d73bc54a86d7edd0b4dd4b3561193382d35befe173c9"
    ]
@@ -715,8 +714,8 @@
    "editorId": "",
    "base": "42e69:Thornswood-Content.esp",
    "cell": "ddf7c:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 25 placements of Thornswood's alchemy lab: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "976a04c595d4be11f91d35a125c57acaf64a431d582269a1fad30acfb4232692"
    ]
@@ -725,8 +724,8 @@
    "formId": "1677f:Skyrim.esm",
    "type": "CELL",
    "editorId": "WindhelmNewGnisisCornerclub",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "7c84f1baa9574da8252701ec2517ed06a97068dae531b2f79ed1a6b68ff7eb2c"
    ]
@@ -752,8 +751,8 @@
    "editorId": "",
    "base": "42e69:Thornswood-Content.esp",
    "cell": "1677f:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 25 placements of Thornswood's alchemy lab: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "904a1bdb8ef4d4c3b1e9c8f836ebe9dedc1d4c5c9e226028979dccbeee6d2b9c"
    ]
@@ -774,8 +773,8 @@
    "formId": "803:Dawnguard.esm",
    "type": "CELL",
    "editorId": "DLC1VampireCastleGuildhall",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "05d9989f09b3fd16dd38c1c07f7166edc5f5d1b2d4e5de2bce29102851315e97"
    ]
@@ -813,8 +812,8 @@
    "editorId": "",
    "base": "42e69:Thornswood-Content.esp",
    "cell": "803:Dawnguard.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 25 placements of Thornswood's alchemy lab: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "13ad0d794660c98c921ffc1babb148ad389f37d4f6f097de9104de4103733dd8"
    ]
@@ -823,8 +822,8 @@
    "formId": "97299:Skyrim.esm",
    "type": "CELL",
    "editorId": "WindhelmPalaceUpstairs01",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "aeb0bef7e00b5610343a7dab8a716672dda86ebd362c730f0d30d2a07fd8395e"
    ]
@@ -850,8 +849,8 @@
    "editorId": "",
    "base": "42e69:Thornswood-Content.esp",
    "cell": "97299:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 25 placements of Thornswood's alchemy lab: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "dc78e52fd620c47baf4a2c8a3365234d8ce08d82c3425102df24e0629aa31460"
    ]
@@ -1011,8 +1010,8 @@
    "formId": "c5aa0:Skyrim.esm",
    "type": "CELL",
    "editorId": "HonningbrewMeadery03",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "b8efbfa2d4ad846620a9fa1f56e2d5f3cb58eee024b99a1d613c3311c4913099"
    ]
@@ -1023,8 +1022,8 @@
    "editorId": "",
    "base": "42e69:Thornswood-Content.esp",
    "cell": "c5aa0:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 25 placements of Thornswood's alchemy lab: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "577d6832fb404e1fa41fd41bf5b174101f2be61d55a60960d6fdd9db76d531b3"
    ]
@@ -1120,8 +1119,8 @@
    "formId": "161ff:Skyrim.esm",
    "type": "CELL",
    "editorId": "GoldenglowEstate01",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "5bb6db9c2733e5c2af7092e7fbfb738c9de80f5dfb05f54494b0297c8e95c547"
    ]
@@ -1132,8 +1131,8 @@
    "editorId": "",
    "base": "42e69:Thornswood-Content.esp",
    "cell": "161ff:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 25 placements of Thornswood's alchemy lab: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "2c6a338abed0e640079a325e39cb3f99fbaba2c1ea3e5aefa093f3754bec2dbf"
    ]
@@ -1409,7 +1408,7 @@
    "type": "CELL",
    "editorId": "RiftenElgrimsElixirs",
    "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "why": "a station Thornswood places stands in it (game/data/station-sites.json), so it stays, written by the tool from the winning master's own record",
    "dataSha256": [
     "862af51be639b0f2de501c48e2e48e653b1ad08bb20674247d0ba4f5c7ebd8fb"
    ]
@@ -1435,8 +1434,8 @@
    "editorId": "",
    "base": "42e69:Thornswood-Content.esp",
    "cell": "16bce:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 25 placements of Thornswood's alchemy lab: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "c023d461a477678effc636dec869a04b85a7402e46194ba5479bdf09aaadcf10"
    ]
@@ -1445,8 +1444,8 @@
    "formId": "1678c:Skyrim.esm",
    "type": "CELL",
    "editorId": "WindhelmWhitePhial",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "69375b69ab43b346f329060859fa4bdb8cedbe50aa356e9ff92d05ac01f8efad"
    ]
@@ -1472,8 +1471,8 @@
    "editorId": "",
    "base": "42e69:Thornswood-Content.esp",
    "cell": "1678c:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 25 placements of Thornswood's alchemy lab: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "8e9cd034ff19298ed0c456e1de2b9ca80a210e9ba36fd1222d3d14c5f40cd42f"
    ]
@@ -1508,7 +1507,7 @@
    "type": "CELL",
    "editorId": "WhiterunArcadiasCauldron",
    "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "why": "a station Thornswood places stands in it (game/data/station-sites.json), so it stays, written by the tool from the winning master's own record",
    "dataSha256": [
     "763ac39cfa02ebd886dda2e2527480e00276960e4727feaf3dff4403f07a291f"
    ]
@@ -1582,8 +1581,8 @@
    "editorId": "",
    "base": "42e69:Thornswood-Content.esp",
    "cell": "165b6:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 25 placements of Thornswood's alchemy lab: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "6ca84c4f02df9a038d9ff4f28f3a1ef374361ee04f9a987bcf45b70a5f4632fe"
    ]
@@ -1592,8 +1591,8 @@
    "formId": "13870:Skyrim.esm",
    "type": "CELL",
    "editorId": "RoriksteadFrostfruitInn",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "ef0321c92dd4a21b7774675865b416d2c76d3eeae5f1e7291c0abc492409f9c0"
    ]
@@ -1652,8 +1651,8 @@
    "editorId": "",
    "base": "42e69:Thornswood-Content.esp",
    "cell": "13870:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 25 placements of Thornswood's alchemy lab: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "6e02d406b5b8ada5c29079acd92e514c76cd0537a9b81ea325b092a3bb680570"
    ]
@@ -1749,8 +1748,8 @@
    "formId": "2bcd7:Skyrim.esm",
    "type": "CELL",
    "editorId": "WinterholdCollegeMidden01",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "6270d81dd612f597ca4120d5762ceb4dc84efeb079fc74cfbf7b1db34f2a3742"
    ]
@@ -1761,8 +1760,8 @@
    "editorId": "",
    "base": "dde4ef:Thornswood-Content.esp",
    "cell": "2bcd7:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 11 placements of Thornswood's salt quarry: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 11 placements of Thornswood's salt quarry, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "e5798af0478d00fc17e81f3bad266c2b6c3293466f53d325ea3e6462a89685e5"
    ]
@@ -1846,8 +1845,8 @@
    "formId": "5eab:Dawnguard.esm",
    "type": "CELL",
    "editorId": "DLC1RedwaterDen01",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "7cb32d45faf476258d5dd3979e346c26c2a1283a76e90ccbe946b81c268a447f"
    ]
@@ -1888,8 +1887,8 @@
    "editorId": "",
    "base": "42e69:Thornswood-Content.esp",
    "cell": "5eab:Dawnguard.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 25 placements of Thornswood's alchemy lab: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "49487e480aeb286201ac960277b4064ba220561157cad28b44dc25c29edf27c4"
    ]
@@ -1995,8 +1994,8 @@
    "formId": "165a3:Skyrim.esm",
    "type": "CELL",
    "editorId": "WhiterunDragonsreach",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "fc25817672349cee0698f6478a405a8cc4f1878e41a08331df10014353557d1c"
    ]
@@ -2022,8 +2021,8 @@
    "editorId": "",
    "base": "42e69:Thornswood-Content.esp",
    "cell": "165a3:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 25 placements of Thornswood's alchemy lab: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "5d82b3b8cd3094cfe75700a31516e8e88efb8e7cefd9e771cad8e1457137e674"
    ]
@@ -2249,8 +2248,8 @@
    "formId": "16a04:Skyrim.esm",
    "type": "CELL",
    "editorId": "SolitudeBluePalace",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "98969889f0f78fbab6cc596c3476d00e48dc3421ff1a40375e6f31250d49a8bd"
    ]
@@ -2276,8 +2275,8 @@
    "editorId": "",
    "base": "42e69:Thornswood-Content.esp",
    "cell": "16a04:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 25 placements of Thornswood's alchemy lab: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "eab440f9e15584c5f7dbef3394f838d035cecb0721f6471e180b190ff1b92361"
    ]
@@ -2298,8 +2297,8 @@
    "formId": "1380e:Skyrim.esm",
    "type": "CELL",
    "editorId": "WinterholdCollegeHallofTheElements",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "e4a1792d1e06708f3f5c2a2229c05a9c6509095510202c9eb92e29f3e657e5da"
    ]
@@ -2310,8 +2309,8 @@
    "editorId": "",
    "base": "42e69:Thornswood-Content.esp",
    "cell": "1380e:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 25 placements of Thornswood's alchemy lab: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "88ca104f71db8b1df114be938dad56fae56c5cecaedfd1ea686026cebc2b5449"
    ]
@@ -2322,8 +2321,8 @@
    "editorId": "",
    "base": "42e69:Thornswood-Content.esp",
    "cell": "1380e:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 25 placements of Thornswood's alchemy lab: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "4e313a8df91b1a21f61d03d934377b23835271f1074cd31b9e7d7f6c0c3a7d36"
    ]
@@ -2334,8 +2333,8 @@
    "editorId": "",
    "base": "42e69:Thornswood-Content.esp",
    "cell": "1380e:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 25 placements of Thornswood's alchemy lab: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "835cc0e1d96edc56c8fc48c8bc0f7538a865ea1f19e72baf778cd578fd29c641"
    ]
@@ -2346,8 +2345,8 @@
    "editorId": "",
    "base": "42e69:Thornswood-Content.esp",
    "cell": "1380e:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 25 placements of Thornswood's alchemy lab: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "e5ae30ee03c34c781c50b5a6e6613e4f2936005b554279e162e78e7c9d5793b8"
    ]
@@ -2356,8 +2355,8 @@
    "formId": "16a0e:Skyrim.esm",
    "type": "CELL",
    "editorId": "SolitudeWinkingSkeever",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "dd8430d52903b727753fb8ceaedd9c6e463121f16ee7f4d164ab1d059303d815"
    ]
@@ -2368,8 +2367,8 @@
    "editorId": "",
    "base": "42e69:Thornswood-Content.esp",
    "cell": "16a0e:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 25 placements of Thornswood's alchemy lab: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "007cba3d934bfc4db3c400869c32d3d9040fa7016e29cda15cb5d3fa38b15d74"
    ]
@@ -2390,8 +2389,8 @@
    "formId": "213a0:Skyrim.esm",
    "type": "CELL",
    "editorId": "SolitudeCastleDour",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "d7dce01d9ba1f0c71d7b61697798a3d1369e81bb1cfb1820cdf259920fe044ef"
    ]
@@ -2429,8 +2428,8 @@
    "editorId": "",
    "base": "42e69:Thornswood-Content.esp",
    "cell": "213a0:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 25 placements of Thornswood's alchemy lab: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "d3becd51561cbe85d7d02656034f5a43af3c04bfef3f1482eb044bae6e794c1f"
    ]
@@ -2439,8 +2438,8 @@
    "formId": "13a7c:Skyrim.esm",
    "type": "CELL",
    "editorId": "DragonBridgeFourShieldsTavern",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "ecac41ad59b68b6b811e97e044c14db9e9866e625873e5027b579be5e825feeb"
    ]
@@ -2451,8 +2450,8 @@
    "editorId": "",
    "base": "42e69:Thornswood-Content.esp",
    "cell": "13a7c:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 25 placements of Thornswood's alchemy lab: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "3bc235069d80d9614935b2f8768d4b57aa6b69caa763c9480584bcc4ba739839"
    ]
@@ -2516,8 +2515,8 @@
    "formId": "16bd2:Skyrim.esm",
    "type": "CELL",
    "editorId": "RiftenMistveilKeep",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "27b603addd9909352c51080690bf68fc373359fbdaf1016bdc0c5b9c7f84b074"
    ]
@@ -2543,8 +2542,8 @@
    "editorId": "",
    "base": "42e69:Thornswood-Content.esp",
    "cell": "16bd2:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 25 placements of Thornswood's alchemy lab: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "96e6675b61ae9442a60d39304108794873e29dd5993f6d22ee60b5b27c779563"
    ]
@@ -2553,8 +2552,8 @@
    "formId": "16bdc:Skyrim.esm",
    "type": "CELL",
    "editorId": "RiftenBlackBriarMeadery",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "fdf4997c3167563469d696a9962c6f8abd53f3dc7e4bf2b5c32104273b8e2882"
    ]
@@ -2607,8 +2606,8 @@
    "editorId": "",
    "base": "42e69:Thornswood-Content.esp",
    "cell": "16bdc:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 25 placements of Thornswood's alchemy lab: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "1a1eee02249e82774e96906006e2574fb2921d445cfaff281fd51e26344af4c3"
    ]
@@ -2896,7 +2895,7 @@
    "type": "CELL",
    "editorId": "SolitudeAngelinesAromatics",
    "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "why": "a station Thornswood places stands in it (game/data/station-sites.json), so it stays, written by the tool from the winning master's own record",
    "dataSha256": [
     "cd291d0c3fc1ffa45e60e6823c9393f747572a6b42a234c3c917119ad897bd6e"
    ]
@@ -2922,8 +2921,8 @@
    "editorId": "",
    "base": "42e69:Thornswood-Content.esp",
    "cell": "16a11:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 25 placements of Thornswood's alchemy lab: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "d6c9e0b51d76fbe3c31409db14c6205eb04c25f0a85f4d60a01bf3a084eb371c"
    ]
@@ -2988,7 +2987,7 @@
    "type": "WRLD",
    "editorId": "Tamriel",
    "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "why": "a station Thornswood places stands in it (game/data/station-sites.json), so it stays, written by the tool from the winning master's own record",
    "dataSha256": [
     "499fd2f9506ddafd80e3bd942ce7540d869047508fbad0cd821cc80c2c10e473"
    ]
@@ -3204,8 +3203,8 @@
    "formId": "90cc:Skyrim.esm",
    "type": "CELL",
    "editorId": "",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "db9733f82ab703ef3dfae6f3f54afae3859a3b3919f2f3c8d929487b151fa5a5"
    ]
@@ -3216,8 +3215,8 @@
    "editorId": "",
    "base": "dde4ef:Thornswood-Content.esp",
    "cell": "90cc:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 11 placements of Thornswood's salt quarry: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 11 placements of Thornswood's salt quarry, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "712ecc94cfcb1398d40ff8f361b30c494b9a107c69621551c3e9804272cad76e"
    ]
@@ -3226,8 +3225,8 @@
    "formId": "90eb:Skyrim.esm",
    "type": "CELL",
    "editorId": "",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "13efbaf50e5156185a40beb15853b63816150f9fb722ae702bc38424c1598c36"
    ]
@@ -3238,8 +3237,8 @@
    "editorId": "",
    "base": "dde4ef:Thornswood-Content.esp",
    "cell": "90eb:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 11 placements of Thornswood's salt quarry: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 11 placements of Thornswood's salt quarry, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "0e233e2919c8c829b7e16564327395fa661e8a23bfdab0d37b9e15b8debcfca7"
    ]
@@ -3248,8 +3247,8 @@
    "formId": "9713:Skyrim.esm",
    "type": "CELL",
    "editorId": "Riverwood01",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "94be3a98260db3ff8c35a8497350ce7036bfee0f423829be8925d65c89ac0aa9"
    ]
@@ -3260,8 +3259,8 @@
    "editorId": "",
    "base": "1547e:Thornswood-Content.esp",
    "cell": "9713:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 8 placements of Thornswood's charcoal kiln: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 8 placements of Thornswood's charcoal kiln, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "152996c81ee17673d177b7413edf55fe4e904c19baf4ee9d8fdbf34cf7866eb6"
    ]
@@ -3316,8 +3315,8 @@
    "formId": "9618:Skyrim.esm",
    "type": "CELL",
    "editorId": "ChillfurrowFarmExterior",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "e24315e084e73aa83ce0048cec6be01c6394a341bb70853a3319d570a2d3ea15"
    ]
@@ -3340,8 +3339,8 @@
    "editorId": "",
    "base": "dbf8b3:Thornswood-Content.esp",
    "cell": "9618:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 13 placements of Thornswood's beehive: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 13 placements of Thornswood's beehive, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "43b3e7c71d8a782a84c8213fc27b41a1a1ebc5235481dc156cefda07d6cc538d"
    ]
@@ -3352,8 +3351,8 @@
    "editorId": "",
    "base": "dbf8b3:Thornswood-Content.esp",
    "cell": "9618:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 13 placements of Thornswood's beehive: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 13 placements of Thornswood's beehive, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "f171db7953583a70c9992a9ba50fa6d006779f09c23768f5a712da1a6fdb8220"
    ]
@@ -3374,8 +3373,8 @@
    "formId": "9656:Skyrim.esm",
    "type": "CELL",
    "editorId": "HonningbrewMeaderyExterior01",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "029969ecc036ecba547e833e3597f2280c088c04e3e9ddf4d9db880f127559c9"
    ]
@@ -3386,8 +3385,8 @@
    "editorId": "",
    "base": "dbf8b3:Thornswood-Content.esp",
    "cell": "9656:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 13 placements of Thornswood's beehive: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 13 placements of Thornswood's beehive, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "69ac0d7e71c3010f3e83bfefb59f31f4f289b540e5bf33ba505e3fe784e6f01f"
    ]
@@ -3398,8 +3397,8 @@
    "editorId": "",
    "base": "dbf8b3:Thornswood-Content.esp",
    "cell": "9656:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 13 placements of Thornswood's beehive: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 13 placements of Thornswood's beehive, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "40d3e29ceca0d6b134eae30c86b09509d28bead227daa92c9edea1df51fec6d7"
    ]
@@ -3408,8 +3407,8 @@
    "formId": "9781:Skyrim.esm",
    "type": "CELL",
    "editorId": "IvarsteadExterior04",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "48cc10701bc8701e7f6e95f28f8be22f81fe23d57b36d8c201588627f691f2ae"
    ]
@@ -3420,8 +3419,8 @@
    "editorId": "",
    "base": "1547e:Thornswood-Content.esp",
    "cell": "9781:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 8 placements of Thornswood's charcoal kiln: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 8 placements of Thornswood's charcoal kiln, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "f660a1f154cd26099dbd175ead8c47e495112b86a8897adbb937a9b96c014ca5"
    ]
@@ -3430,8 +3429,8 @@
    "formId": "96bc:Skyrim.esm",
    "type": "CELL",
    "editorId": "DarkwaterCrossingExterior01",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "d0cd9fa5917cca42503baf791ff8a55d042480882875d97e6d2288255d5a98b0"
    ]
@@ -3458,8 +3457,8 @@
    "editorId": "",
    "base": "dbf8b3:Thornswood-Content.esp",
    "cell": "96bc:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 13 placements of Thornswood's beehive: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 13 placements of Thornswood's beehive, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "4a782a2895d96c0d804d4afdb156b17a254d2b5e0a2e66169379893e880a875f"
    ]
@@ -3470,8 +3469,8 @@
    "editorId": "",
    "base": "dbf8b3:Thornswood-Content.esp",
    "cell": "96bc:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 13 placements of Thornswood's beehive: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 13 placements of Thornswood's beehive, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "92c863b0ba0086738242864d19beb3bbb4f1a17e228a131be82a86f84601fbd5"
    ]
@@ -3482,8 +3481,8 @@
    "editorId": "",
    "base": "1547e:Thornswood-Content.esp",
    "cell": "96bc:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 8 placements of Thornswood's charcoal kiln: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 8 placements of Thornswood's charcoal kiln, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "5f105678c2dbe4cb5377be1ee15307d7ad08a95524571d006a63435e65453e51"
    ]
@@ -3517,8 +3516,8 @@
    "formId": "95e6:Skyrim.esm",
    "type": "CELL",
    "editorId": "MixwaterMillExterior",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "588c74d33443df61bce2b874e4866b59f40e9545b5476f3a82a8d62c4bbb23e3"
    ]
@@ -3529,8 +3528,8 @@
    "editorId": "",
    "base": "1547e:Thornswood-Content.esp",
    "cell": "95e6:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 8 placements of Thornswood's charcoal kiln: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 8 placements of Thornswood's charcoal kiln, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "53ef3ac0561e3a79cdffc4c1f7571123703169fafba2d84144e485c81732fc8e"
    ]
@@ -3551,8 +3550,8 @@
    "formId": "b4dc:Skyrim.esm",
    "type": "CELL",
    "editorId": "WindhelmBridge04",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "43a92011316ca0d790bbf2ee8372fec9902b45953531cff678bd94b25c581a84"
    ]
@@ -3563,8 +3562,8 @@
    "editorId": "",
    "base": "dde4ef:Thornswood-Content.esp",
    "cell": "b4dc:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 11 placements of Thornswood's salt quarry: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 11 placements of Thornswood's salt quarry, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "1fc1544d58f8e4b2b2cf2ec22b90e35dad65e73d7e1513e0aa85d38ae86142a7"
    ]
@@ -3575,8 +3574,8 @@
    "editorId": "",
    "base": "dde4ef:Thornswood-Content.esp",
    "cell": "b4dc:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 11 placements of Thornswood's salt quarry: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 11 placements of Thornswood's salt quarry, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "ebb4113be25024901456fadc7bb07db70fb087d0ffd7d314c29ae57c85fc009c"
    ]
@@ -3585,8 +3584,8 @@
    "formId": "b57b:Skyrim.esm",
    "type": "CELL",
    "editorId": "NarzulburExterior01",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "0bdf950c88392b4df8cd299372618715438dee9e914d8bee0d2c3396f169a1ba"
    ]
@@ -3612,8 +3611,8 @@
    "editorId": "",
    "base": "42e69:Thornswood-Content.esp",
    "cell": "b57b:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 25 placements of Thornswood's alchemy lab: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "3b96f0ad240a4ad203d684a65931c552e206d45e22ed35fc5707d2848c85283a"
    ]
@@ -3622,8 +3621,8 @@
    "formId": "b580:Skyrim.esm",
    "type": "CELL",
    "editorId": "Kynesgrove",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "af2235edaca61d162102728fb28c6d045ce75d1663922b623f601984a5c7d8fb"
    ]
@@ -3634,8 +3633,8 @@
    "editorId": "",
    "base": "1547e:Thornswood-Content.esp",
    "cell": "b580:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 8 placements of Thornswood's charcoal kiln: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 8 placements of Thornswood's charcoal kiln, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "72338ea466b0a4f53bf283cbde206dd8addd878c4f8f0b1a1abb72f97e5369d1"
    ]
@@ -3760,8 +3759,8 @@
    "formId": "bcf7:Skyrim.esm",
    "type": "CELL",
    "editorId": "GoldenglowEstateExterior01",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "00fa47f50bd0379262bcb30fe03ee4628210e6d7d1829670b09b50071134db7b"
    ]
@@ -3896,8 +3895,8 @@
    "editorId": "",
    "base": "dbf8b3:Thornswood-Content.esp",
    "cell": "bcf7:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 13 placements of Thornswood's beehive: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 13 placements of Thornswood's beehive, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "515fe0d6d62e070e391a3e073c36de22e1e108adea2785a0d86294b4dd2a15dc"
    ]
@@ -3908,8 +3907,8 @@
    "editorId": "",
    "base": "dbf8b3:Thornswood-Content.esp",
    "cell": "bcf7:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 13 placements of Thornswood's beehive: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 13 placements of Thornswood's beehive, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "da4e340574efa1e8b06488e883b0187f174e1200359eaac71483899bf4afadc9"
    ]
@@ -3920,8 +3919,8 @@
    "editorId": "",
    "base": "dbf8b3:Thornswood-Content.esp",
    "cell": "bcf7:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 13 placements of Thornswood's beehive: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 13 placements of Thornswood's beehive, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "0c148034056e75b65cba5f3165cd7b4b2b52143b67369b01c2eecf2fa884fc26"
    ]
@@ -3932,8 +3931,8 @@
    "editorId": "",
    "base": "dbf8b3:Thornswood-Content.esp",
    "cell": "bcf7:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 13 placements of Thornswood's beehive: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 13 placements of Thornswood's beehive, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "ea3756bcc221b787782a932f76ef46de73ec4a9b25f9b8ce36ad8cf0a3f92688"
    ]
@@ -3968,8 +3967,8 @@
    "formId": "bcd6:Skyrim.esm",
    "type": "CELL",
    "editorId": "",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "00803aea14f5a7cb79ebcdab428399cfb98594becca03bd620a77d671161d391"
    ]
@@ -4042,8 +4041,8 @@
    "editorId": "",
    "base": "dbf8b3:Thornswood-Content.esp",
    "cell": "bcd6:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 13 placements of Thornswood's beehive: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 13 placements of Thornswood's beehive, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "13f4499f5833576d487bb015944fb5ac7a18aae32b7edeeae2e0668f5b1ee143"
    ]
@@ -4054,8 +4053,8 @@
    "editorId": "",
    "base": "dbf8b3:Thornswood-Content.esp",
    "cell": "bcd6:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 13 placements of Thornswood's beehive: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 13 placements of Thornswood's beehive, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "d005d7445df632318434708fa9cecc30dc2ce6a5409949c72cc1348d45f1b6ce"
    ]
@@ -4064,8 +4063,8 @@
    "formId": "bcda:Skyrim.esm",
    "type": "CELL",
    "editorId": "HeartwoodMillExterior",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "4ef14a0bc6d2d12ff7ed3df1b0c06e33c29e2f3474df8f5281be15aad78b88a9"
    ]
@@ -4088,8 +4087,8 @@
    "editorId": "",
    "base": "1547e:Thornswood-Content.esp",
    "cell": "bcda:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 8 placements of Thornswood's charcoal kiln: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 8 placements of Thornswood's charcoal kiln, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "86cea7fb379d056a2f05775948dfe0689c52b4f91ffa93276b4525a6c4985df2"
    ]
@@ -4189,8 +4188,8 @@
    "formId": "9328:Skyrim.esm",
    "type": "CELL",
    "editorId": "DragonBridgeExterior01",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "be5c9ca1de6ecaea73219cd823ccd4649fd44736ecbc694bfe1eb1a04355b4ae"
    ]
@@ -4201,8 +4200,8 @@
    "editorId": "",
    "base": "1547e:Thornswood-Content.esp",
    "cell": "9328:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 8 placements of Thornswood's charcoal kiln: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 8 placements of Thornswood's charcoal kiln, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "99de8d85c1e6287178752fd96fe1d5d96af01cb7ebd766888cd9a6d8b46e21c4"
    ]
@@ -4234,7 +4233,7 @@
    "type": "CELL",
    "editorId": "RoriksteadExterior03",
    "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "why": "a station Thornswood places stands in it (game/data/station-sites.json), so it stays, written by the tool from the winning master's own record",
    "dataSha256": [
     "e75e33bcc27e881563b8a3534626b3615982a597ced1856bba5d764c04a78fef"
    ]
@@ -4245,8 +4244,8 @@
    "editorId": "",
    "base": "dbf8b3:Thornswood-Content.esp",
    "cell": "9597:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 13 placements of Thornswood's beehive: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 13 placements of Thornswood's beehive, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "19ba891c20d8c651f29f30d11e8b3c5492d048c3d7b67148ce2ad263f9fb8055"
    ]
@@ -4255,8 +4254,8 @@
    "formId": "92bf:Skyrim.esm",
    "type": "CELL",
    "editorId": "KatlasFarmExterior",
-   "disposition": "dropped",
-   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "disposition": "Bethesda's",
+   "why": "a station Thornswood places stands in it (game/data/station-sites.json), so it stays, written by the tool from the winning master's own record",
    "dataSha256": [
     "b30db61a20c3e9088eff098a4e2e5c71f6d18717e89171865d8a3cc7bfde562d"
    ]
@@ -4277,8 +4276,8 @@
    "formId": "92df:Skyrim.esm",
    "type": "CELL",
    "editorId": "",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "65068e4b0ee3d6505e94025a8f7f6cf54bc95cc6bf2c7913e7d57f578fbe1a44"
    ]
@@ -4289,8 +4288,8 @@
    "editorId": "",
    "base": "dde4ef:Thornswood-Content.esp",
    "cell": "92df:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 11 placements of Thornswood's salt quarry: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 11 placements of Thornswood's salt quarry, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "927021ec779bddb171f00bb9b7d46dd36017c2d4a1cc92dc89bc8988659d46dd"
    ]
@@ -4301,8 +4300,8 @@
    "editorId": "",
    "base": "dde4ef:Thornswood-Content.esp",
    "cell": "92df:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 11 placements of Thornswood's salt quarry: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 11 placements of Thornswood's salt quarry, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "aef92c66971aa3c878785141c243fe80f5366428051a50238ca69fd040b531e1"
    ]
@@ -4311,8 +4310,8 @@
    "formId": "92fd:Skyrim.esm",
    "type": "CELL",
    "editorId": "POITundra25",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "74c47d0a9ad36440afed9606538145b1ef2d8212ffe264ddb3a4473b46aa3118"
    ]
@@ -4323,8 +4322,8 @@
    "editorId": "",
    "base": "dde4ef:Thornswood-Content.esp",
    "cell": "92fd:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 11 placements of Thornswood's salt quarry: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 11 placements of Thornswood's salt quarry, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "9ecb6123525c88f0ea0fed9451cbb5a93ccad5b6d15c3dced048211ca7150669"
    ]
@@ -4335,8 +4334,8 @@
    "editorId": "",
    "base": "dde4ef:Thornswood-Content.esp",
    "cell": "92fd:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 11 placements of Thornswood's salt quarry: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 11 placements of Thornswood's salt quarry, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "bf43110f6a366ff3c344adaa88fcc2ad89ea04545dc9b4fc81866d4a7388a179"
    ]
@@ -4345,8 +4344,8 @@
    "formId": "931f:Skyrim.esm",
    "type": "CELL",
    "editorId": "",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "c279bded3b1c66588368a7a3248d4dd94d2c10e2a1fa1387de390014f7788805"
    ]
@@ -4357,8 +4356,8 @@
    "editorId": "",
    "base": "dde4ef:Thornswood-Content.esp",
    "cell": "931f:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 11 placements of Thornswood's salt quarry: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 11 placements of Thornswood's salt quarry, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "f7d542bbf435bac80b23fa7a263f366aa3064d3e497d308773e0a575aa9a41fa"
    ]
@@ -4367,8 +4366,8 @@
    "formId": "9340:Skyrim.esm",
    "type": "CELL",
    "editorId": "",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "8259c73b2d9878d5d165584ba7489c8e0bcb0d321d36f4dbb52274eab091eda1"
    ]
@@ -4379,8 +4378,8 @@
    "editorId": "",
    "base": "dde4ef:Thornswood-Content.esp",
    "cell": "9340:Skyrim.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 11 placements of Thornswood's salt quarry: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 11 placements of Thornswood's salt quarry, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "475fef136f522423ff36e63039227cbed58e39fa9d6284d8a00619dc532278da"
    ]
@@ -4806,8 +4805,8 @@
    "formId": "1db8:Dawnguard.esm",
    "type": "WRLD",
    "editorId": "DLC1HunterHQWorld",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "189f45e7317024b3afd60c030ab3b4b131414ebc766346b15a4826b1df5b84b6"
    ]
@@ -4816,8 +4815,8 @@
    "formId": "7bbf:Dawnguard.esm",
    "type": "CELL",
    "editorId": "DLC1HunterWorldFort01",
-   "disposition": "Bethesda's",
-   "why": "it holds placements awaiting sites, so it stays, written by the tool from the winning master's own record",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
    "dataSha256": [
     "236a0d4a37f1d24afcb516a32caecce511eade577600a7cbcf6be4f702853241"
    ]
@@ -4828,8 +4827,8 @@
    "editorId": "",
    "base": "1547e:Thornswood-Content.esp",
    "cell": "7bbf:Dawnguard.esm",
-   "disposition": "awaiting sites",
-   "why": "one of the 8 placements of Thornswood's charcoal kiln: it stays until Thornswood stands its own (#2553)",
+   "disposition": "dropped",
+   "why": "one of the other server's 8 placements of Thornswood's charcoal kiln, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
    "dataSha256": [
     "a59c8fafbb511fda3d950a067722a5d8885b7ad6f0650e77641de2f43a60eb95"
    ]

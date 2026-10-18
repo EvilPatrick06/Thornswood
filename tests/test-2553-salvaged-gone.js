@@ -12,14 +12,14 @@
 // plugin with its own reader and proves:
 //
 //   1. no record in it is a salvaged record: none has the bytes of any
-//      salvaged version, under any editor id, but two kinds the register
-//      names: the placements waiting on where Thornswood stands its own
-//      stations, and the six recipes every field of which Thornswood's
-//      rulebook states, each rebuilt here from its page's table row;
+//      salvaged version, under any editor id, but the six recipes every
+//      field of which Thornswood's rulebook states, each rebuilt here from
+//      its page's table row, and the register keeps nothing waiting;
 //   2. nothing the register says goes, or went before #2553, is there, and
 //      every record it says is remade is, of the same type;
-//   3. the placements left are exactly the register's, each one of the kiln,
-//      the salt quarry, the hive or the lab;
+//   3. the placements are exactly game/data/station-sites.json's, Thornswood's
+//      own spots for the kiln, the salt quarry, the hive and the lab (Patrick,
+//      A on #2553), each at its point and turn in its cell;
 //   4. the tool, run over a copy with no game to read, writes nothing: every
 //      record it writes is already what it writes;
 //   5. where the repository's history is here (not a shallow clone), the
@@ -189,16 +189,16 @@ yes('the register names exactly the six recipes the rulebook states', byDesign.s
     Object.keys(DESIGN).length === 6 && reg.records.filter(r => r.sameByDesign).length === 6);
 
 // ------------------------------------------------- 1. nothing salvaged ----
-const awaiting = new Set(reg.records.filter(r => r.disposition === 'awaiting sites').map(r => localFid(r.formId)));
+yes('1 the register keeps nothing salvaged waiting on anything (Patrick, A on #2553)',
+    reg.records.every(r => ['dropped', 'remade', "Bethesda's", 'gone before #2553'].indexOf(r.disposition) >= 0));
 const left = [];
 for (const r of plugin.records) {
   const h = bodyHash(r);
   if (!byHash.has(h)) { continue; }
-  if (awaiting.has(r.fid) && r.tag === 'REFR') { continue; }
   if (byDesign.has(r.fid)) { continue; }
   left.push(r.tag + ' ' + hex(r.fid) + ' ' + edid(r) + ', the bytes of salvaged ' + hex(byHash.get(h)));
 }
-yes('1 no record is a salvaged record, under any editor id, but the placements waiting on sites and the six by design', left.length === 0);
+yes('1 no record is a salvaged record, under any editor id, but the six by design', left.length === 0);
 for (const l of left) { console.log('      ' + l); }
 
 // ---------------------------------------------- 2. what goes is gone ------
@@ -209,6 +209,9 @@ yes('2 nothing the register says goes, or went before #2553, is in the plugin ('
     reg.records.filter(r => r.disposition === 'dropped').length + ' dropped, ' +
     reg.records.filter(r => r.disposition === 'gone before #2553').length + ' gone before)', stillHere.length === 0);
 for (const r of stillHere) { console.log('      ' + r.type + ' ' + r.formId); }
+const theirs = reg.records.filter(r => r.type === 'REFR' && /placements of Thornswood's/.test(r.why || ''));
+yes('2 the other server\'s 57 placements of the four stations are among what goes',
+    theirs.length === 57 && theirs.every(r => r.disposition === 'dropped' && !here.has(localFid(r.formId))));
 const remade = reg.records.filter(r => r.disposition === 'remade');
 yes('2 every record the register says is remade is there, the same type (' + remade.length + ')',
     remade.every(r => here.has(localFid(r.formId)) && here.get(localFid(r.formId)).tag === r.type));
@@ -217,13 +220,34 @@ yes('2 every cell and world the register keeps is there and holds a placement ('
     bethesdas.every(r => here.has(localFid(r.formId)) && plugin.records.some(x => x.tag === 'REFR' &&
       x.groups.some(g => g[0] === localFid(r.formId) && (g[1] === 1 || g[1] === 6 || g[1] === 8 || g[1] === 9)))));
 
-// --------------------------------------- 3. the placements left ----------
+// ------------------------------- 3. the placements are Thornswood's own --
+// Every placement is one game/data/station-sites.json measures (written by
+// scripts/dev/Build-StationSites.py), at its point and turn, in its cell.
 const STATIONS = new Set([0x05042E69, 0x0501547E, 0x05DBF8B3, 0x05DDE4EF]);
+const table = JSON.parse(fs.readFileSync(path.join(ROOT, 'game', 'data', 'station-sites.json'), 'utf8'));
+const sites = Object.keys(table.sites).map(k => table.sites[k]);
 const refs = plugin.records.filter(r => r.tag === 'REFR');
-yes('3 the placements in the plugin are exactly the ' + awaiting.size + ' waiting on sites',
-    refs.length === awaiting.size && refs.every(r => awaiting.has(r.fid)));
-yes('3 each is of the kiln, the salt quarry, the hive or the lab, and switched on',
-    refs.every(r => { const n = r.subs.find(s => s.tag === 'NAME'); return n && STATIONS.has(n.body.readUInt32LE(0)) && !(r.flags & 0x800); }));
+const bySite = new Map(sites.map(s => [localFid(s.ref), s]));
+yes('3 the placements in the plugin are exactly the station table\'s ' + sites.length,
+    sites.length > 0 && refs.length === sites.length && refs.every(r => bySite.has(r.fid)));
+yes('3 each is of the kiln, the salt quarry, the hive or the lab, switched on, the table\'s base',
+    refs.every(r => {
+      const n = r.subs.find(s => s.tag === 'NAME');
+      const s = bySite.get(r.fid);
+      return n && STATIONS.has(n.body.readUInt32LE(0)) && !(r.flags & 0x800) && s && n.body.readUInt32LE(0) === localFid(s.base);
+    }));
+yes('3 each stands at the table\'s point and turn, in the table\'s cell',
+    refs.every(r => {
+      const s = bySite.get(r.fid);
+      const d = r.subs.find(x => x.tag === 'DATA');
+      if (!s || !d || d.body.length !== 24) { return false; }
+      const v = [0, 1, 2, 3, 4, 5].map(i => d.body.readFloatLE(i * 4));
+      const f32 = x => Math.fround(x);
+      return v[0] === f32(s.pos[0]) && v[1] === f32(s.pos[1]) && v[2] === f32(s.pos[2]) && v[3] === 0 && v[4] === 0 &&
+        v[5] === f32(s.angle * Math.PI / 180) && r.groups.some(g => g[0] === localFid(s.cell) && g[1] === 9);
+    }));
+yes('3 no placement carries anything but its base and where it stands',
+    refs.every(r => r.subs.map(x => x.tag).join(',') === 'NAME,DATA'));
 const byStation = {};
 for (const r of refs) { const b = r.subs.find(s => s.tag === 'NAME').body.readUInt32LE(0); byStation[hex(b)] = (byStation[hex(b)] || 0) + 1; }
 console.log('      ' + JSON.stringify(byStation));

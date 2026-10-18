@@ -354,13 +354,15 @@ collection and Vortex's staging folder on the shipping machine:
   drop box, house parts, and their recipes." The collection's copy keeps the
   old one until a later revision patches it. Since 16 October (#2553, Patrick,
   15 October, option B on #2177) the repository's plugin is remade as
-  Thornswood's own: 132,868 bytes, sha256
-  `56efd81b767e12d2e736b841abb395b3ca6a9c8c15a587bbce00cd6502be3b89`, 205
+  Thornswood's own. Since 17 October (#2553, Patrick, 16 October, A) it is
+  110,915 bytes, sha256
+  `491e5c78915a2dea1104ec44e4304728ac44ddfddf4ee594c7f81b5e8c2a7cb3`, 161
   records. `scripts\mods\Add-ContentRecords.py` writes every record of it from
-  its own numbers, or copies Bethesda's own, except 57 placements of the kiln,
-  the salt quarry, the hive and the alchemy lab, which stand where the other
-  server put them until Thornswood stands its own; the rest of that server's
-  placements and its changes to Skyrim's own are gone.
+  its own numbers, or copies Bethesda's own, and places the kiln, the salt
+  quarry, the hive and the alchemy lab where `scripts\dev\Build-StationSites.py`
+  measured Thornswood's own spots (`game\data\station-sites.json`). The other
+  server's placements, its 57 of those stations included, and its changes to
+  Skyrim's own are gone.
   `scripts\mods\content-salvaged.json` lists every salvaged record and what
   became of it. The collection's copy and the release plugins in the table
   below still carry the salvaged records until they carry this one. Until 12 October this
