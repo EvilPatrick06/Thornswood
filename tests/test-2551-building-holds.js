@@ -24,8 +24,17 @@
        test-offices.js and test-1638-office.js hold) ends a claim and sets
        rent there; whoever keeps any of the nine other holds is refused,
        told whose it is, and nothing changes; a building refused a hold is
-       nobody's to settle; an admin with no role is no steward (staff hold
-       no office by being staff, #2551)
+       nobody's to settle; somebody who is neither staff nor a steward is
+       refused everywhere. Staff (Patrick, 17 Oct, decision 1, B) set rent,
+       take it off and end the claim at every building, the ones with no
+       hold included, each press one row in the staff log; a press the chat
+       did not prove, or with no staff log to write to, is refused; staff
+       who keep the building's hold act as its steward
+    L  the staff log is the staff commands' own: the staff block's record,
+       run for real, writes the row to for-bot/moderation.log with the
+       building and its hold; the staff test is the chat block's isStaff;
+       the line a press arrives on reaches evict and rentCmd; the bot has a
+       sentence for each
 
   On a machine with the game (C:\Thornswood\Game\Data, or THORNSWOOD_DATA)
   holding the collection's bytes it also runs the builder with --check: the
@@ -178,9 +187,12 @@ yes('B3 and ours are the repository\'s (rebuild the table after a content change
 /*
   The real evict and rentCmd, with the real building names and holds, over
   a door register and the office readers as a table: who keeps which hold as
-  a steward (Steward of it, or its Jarl).
+  a steward (Steward of it, or its Jarl). Staff (#2551, Patrick, 17 Oct,
+  decision 1, B) are the chat block's staff test as a table, and the staff
+  block's proof and log as a stand-in that keeps every row it is handed.
 */
-const LIFT = ['holdOfBuilding', 'notStewardHere', 'nameOf', 'evict', 'rentCmd'];
+const LIFT = ['holdOfBuilding', 'notStewardHere', 'nameOf', 'evict', 'rentCmd',
+              'isStaffHere', 'settleAs', 'settleWhere', 'staffRecord'];
 const lifted = LIFT.map((n) => fnSrc(prop, n));
 const holdTown = slice(gm, '  var HOLD_TOWN = {', '};');
 const officeAtDoor = /\n  var OFFICE_AT_DOOR = '[^\n]*';/.exec(gm);
@@ -188,24 +200,47 @@ yes('S0 the eviction, the rent and the building\'s hold are in the property bloc
     (lifted.some((s) => !s) ? ' (missing: ' + LIFT.filter((n, i) => !lifted[i]).join(', ') + ')' : ''),
     lifted.every((s) => !!s) && !!holdTown && !!officeAtDoor && !!inBlock && !!NAME);
 
-const OWNER = 7, STEW = 100, ADMIN = 500;
-function steward(keeps) {
+const OWNER = 7, STEW = 100, NOBODY = 500, STAFF = 600;
+const PROVEN = { proven: true };
+const UNPROVEN_SAID = 'Staff commands need the chat to have proved who you are, and this connection has not.';
+/*
+  keeps: the holds STEW keeps as a steward. staff: the profiles the chat
+  block's staff test says are staff. The staff block's unproven refuses a
+  line the chat did not prove, as the real one does, and record keeps rows.
+*/
+function steward(keeps, staff) {
+  staff = staff || [];
   const claims = {};
   let at = null;
   const said = [];
+  const logged = [];
+  const plogged = [];
+  const g = {
+    __thornswoodIsStaff: function (pid) { return staff.indexOf(pid) !== -1; },
+    __thornswoodStaff: {
+      unproven: function (cmd) { return cmd && cmd.proven === true ? '' : UNPROVEN_SAID; },
+      record: function () { logged.push(Array.prototype.slice.call(arguments)); }
+    }
+  };
   const make = new Function('BUILDING_HOLD', 'BUILDING_NAME', 'claims', 'here', 'isSteward', 'isStewardOf',
-    'holderOf', 'save', 'pushAll', 'plog', 'redrawPanel', 'rentDue', 'globalThis',
+    'holderOf', 'save', 'pushAll', 'plog', 'redrawPanel', 'rentDue', 'globalThis', 'g', 'personName',
     holdTown + '\n' + officeAtDoor[0] + '\n' + lifted.join('\n') + '\nreturn { evict: evict, rentCmd: rentCmd };');
   const f = make(inBlock, NAME, claims, function () { return at; },
     function (pid) { return pid === STEW && keeps.length > 0; },
     function (pid, hold) { return pid === STEW && keeps.indexOf(hold) !== -1; },
-    function (b) { return claims[b] || null; }, function () { }, function () { }, function () { }, function () { },
-    function () { }, {});
+    function (b) { return claims[b] || null; }, function () { }, function () { },
+    function () { plogged.push(Array.prototype.join.call(arguments, ' ')); }, function () { },
+    function () { }, {}, g, function (actorId) { return actorId === 1 ? 'Hadvar' : 'somebody'; });
   return {
     at: function (b) { at = b; claims[b] = { by: OWNER, name: 'Alice', at: 1, touched: Date.now() }; said.length = 0; },
-    evict: function (pid) { f.evict(1, pid, function (p, m) { said.push(m); }); return said.slice(); },
-    rent: function (pid, n) { f.rentCmd(['/rent', String(n)], 1, pid, function (p, m) { said.push(m); }); return said.slice(); },
-    claims: claims
+    evict: function (pid, cmd) {
+      f.evict(1, pid, function (p, m) { said.push(m); }, cmd === undefined ? PROVEN : cmd); return said.slice();
+    },
+    rent: function (pid, n, cmd) {
+      f.rentCmd(['/rent', String(n)], 1, pid, function (p, m) { said.push(m); }, cmd === undefined ? PROVEN : cmd);
+      return said.slice();
+    },
+    claims: claims, logged: logged, plogged: plogged
   };
 }
 
@@ -262,14 +297,157 @@ if (lifted.every((s) => !!s) && holdTown && officeAtDoor && inBlock && NAME) {
   all.evict(STEW);
   yes('S4 Breezehome is Whiterun\'s, and somebody who keeps all ten ends a claim there', rows[breezehome] &&
       rows[breezehome].hold === 'whiterun' && !all.claims[breezehome]);
-  const nobody = steward([]);
-  nobody.at(breezehome);
-  const t = nobody.evict(ADMIN);
-  const r = nobody.rent(ADMIN, 25);
-  yes('S5 an admin with no role is no steward anywhere, as since #2551: staff hold no office by being staff (' + t[0] + ')',
-      t[0] === 'Only a steward ends a claim.' && r[1] === 'Only a steward sets rent.' && !!nobody.claims[breezehome] &&
-      !nobody.claims[breezehome].rent);
+  // Somebody who is neither staff nor a steward, at every building: refused, nothing changes, nothing logged.
+  const nobody = steward([], [STAFF]);
+  let nobodyOk = 0;
+  const nobodyBad = [];
+  for (const b of served) {
+    nobody.at(b);
+    const t = nobody.evict(NOBODY);
+    const r = nobody.rent(NOBODY, 25);
+    nobody.claims[b].rent = { amount: 9, everyDays: 7, owed: 0, since: 1 };
+    const w = nobody.rent(NOBODY, '-');
+    if (t[0] === 'Only a steward ends a claim.' && r[1] === 'Only a steward sets rent.' && w[2] === 'Only a steward sets rent.' &&
+        !!nobody.claims[b] && nobody.claims[b].rent.amount === 9) { nobodyOk++; } else { nobodyBad.push(b); }
+  }
+  yes('S5 somebody who is neither staff nor a steward is refused Evict, Set rent and No rent at all ' + served.length +
+      ' buildings, nothing changes, and nothing is logged' + (nobodyBad.length ? ' (not: ' + nobodyBad.slice(0, 3).join(', ') + ')' : ''),
+      nobodyOk === served.length && nobody.logged.length === 0);
+
+  /*
+    Staff (#2551, Patrick, 17 Oct, decision 1, B): at every building, the 811
+    with a hold and the 39 without, staff set the rent, take it off and end
+    the claim, and each press is one row in the staff log naming who, whose
+    claim, the building and its hold, and what was set.
+  */
+  const st = steward([], [STAFF]);
+  let staffOk = 0;
+  const staffBad = [];
+  for (const b of served) {
+    const hold = rows[b] ? rows[b].hold : null;
+    const town = hold ? ({ ravenrock: 'Raven Rock' }[hold] || hold.charAt(0).toUpperCase() + hold.slice(1)) : null;
+    const where = NAME[b] + (town ? ', in ' + town : ', which answers to no hold');
+    const before = st.logged.length;
+    st.at(b);
+    const r1 = st.rent(STAFF, 25);
+    const set = st.claims[b] && st.claims[b].rent && st.claims[b].rent.amount === 25;
+    const r2 = st.rent(STAFF, '-');
+    const off = st.claims[b] && !st.claims[b].rent;
+    const r3 = st.evict(STAFF);
+    const rowsNow = st.logged.slice(before);
+    const extra = { building: b, buildingName: NAME[b], hold: hold, as: 'staff' };
+    const want = [
+      ['rent', STAFF, 'Hadvar', OWNER, 'Alice', '25 gold every 7 days on ' + where, 0, extra],
+      ['norent', STAFF, 'Hadvar', OWNER, 'Alice', where, 0, extra],
+      ['evict', STAFF, 'Hadvar', OWNER, 'Alice', where, 0, extra]
+    ];
+    if (set && off && !st.claims[b] && JSON.stringify(rowsNow) === JSON.stringify(want) &&
+        r1[0] === 'As staff: ' + NAME[b] + ' pays 25 gold every 7 days now. It is in the staff log.' &&
+        r2[1] === 'As staff: no rent on ' + NAME[b] + ' now. It is in the staff log.' &&
+        r3[2] === 'As staff, you end Alice\'s claim on ' + NAME[b] + '. What is inside is untouched, and any key they ' +
+                  'hold still works. It is in the staff log.') { staffOk++; } else { staffBad.push(b); }
+  }
+  yes('S6 staff set the rent, take it off and end the claim at all ' + served.length + ' buildings, the ' +
+      Object.keys(refused).length + ' with no hold included, each told it is in the staff log' +
+      (staffBad.length ? ' (not: ' + staffBad.slice(0, 3).join(', ') + ')' : ''), staffOk === served.length);
+  yes('S7 and every press is one row in the staff log: who, whose claim, the building and its hold, what was set (' +
+      st.logged.length + ' rows)', st.logged.length === served.length * 3 && st.plogged.length === 0);
+
+  // A staff press the chat did not prove is refused with the staff block's reason, at a building of a hold and one of none.
+  const un = steward([], [STAFF]);
+  const vale = Object.keys(refused)[0];
+  let unOk = true;
+  for (const b of [breezehome, vale]) {
+    un.at(b);
+    const t1 = un.evict(STAFF, { proven: false });
+    const t2 = un.rent(STAFF, 25, null);
+    if (!(t1[0] === UNPROVEN_SAID && t2[1] === UNPROVEN_SAID && !!un.claims[b] && !un.claims[b].rent)) { unOk = false; }
+  }
+  yes('S8 a staff press the chat did not prove (or with no line at all) is refused with the staff block\'s own reason, ' +
+      'nothing changes, and nothing is logged', unOk && un.logged.length === 0);
+
+  // Staff who keep the building's hold act as its steward: no staff row. Anywhere else they act as staff.
+  const both = steward(['whiterun'], [STEW]);
+  both.at(breezehome);
+  both.rent(STEW, 30);
+  both.evict(STEW);
+  const riftenHouse = Object.keys(rows).filter((b) => rows[b].hold === 'riften')[0];
+  both.at(riftenHouse);
+  both.evict(STEW);
+  yes('S9 staff who are the Steward of Whiterun settle Breezehome as its steward, not logged as staff, and a Riften ' +
+      'building as staff, logged', !both.claims[breezehome] && !both.claims[riftenHouse] && both.logged.length === 1 &&
+      both.logged[0][0] === 'evict' && both.logged[0][7].hold === 'riften' && both.plogged.length === 2);
+
+  // The staff log is unreachable: the press is refused, never made unlogged.
+  const nolog = steward([], [STAFF]);
+  nolog.at(breezehome);
+  const keepRecord = null;
+  const f2 = new Function('BUILDING_HOLD', 'BUILDING_NAME', 'claims', 'here', 'isSteward', 'isStewardOf',
+    'holderOf', 'save', 'pushAll', 'plog', 'redrawPanel', 'rentDue', 'globalThis', 'g', 'personName',
+    holdTown + '\n' + officeAtDoor[0] + '\n' + lifted.join('\n') + '\nreturn { evict: evict };')(
+    inBlock, NAME, nolog.claims, function () { return breezehome; }, function () { return false; }, function () { return false; },
+    function (b) { return nolog.claims[b] || null; }, function () { }, function () { }, function () { }, function () { },
+    function () { }, {}, { __thornswoodIsStaff: function () { return true; }, __thornswoodStaff: { unproven: function () { return ''; }, record: keepRecord } },
+    function () { return 'Hadvar'; });
+  const toldNolog = [];
+  f2.evict(1, STAFF, function (p, m) { toldNolog.push(m); }, PROVEN);
+  yes('S10 with no staff log to write to, a staff press is refused and the claim stays (' + toldNolog[0] + ')',
+      !!nolog.claims[breezehome] && /staff log is not loaded/.test(toldNolog[0] || ''));
 }
+
+// ---------------------------------------------------------------- L
+/*
+  The staff log is the one the staff commands write (#412): the staff
+  block's record, run for real over a scratch for-bot folder, writes the
+  row to moderation.log with the building and its hold; the chat block's
+  staff test is the one handed to the staff commands; and the line a press
+  arrives on reaches evict and rentCmd, so the staff block's proof is asked
+  of it.
+*/
+const staffBlock = slice(gm, '// ==== thornswood staff ====', '// ==== end thornswood staff ====');
+const chatBlock = slice(gm, '// ==== thornswood chat commands ====', '// ==== end thornswood chat commands ====');
+const charBlock = slice(gm, '// ==== thornswood character ====', '// ==== end thornswood character ====');
+const recordSrc = ['settings', 'serverName', 'recordFile', 'record'].map((n) => fnSrc(staffBlock, n));
+yes('L0 the staff block\'s record, and what it reads, are there once each', recordSrc.every((s) => !!s));
+if (recordSrc.every((s) => !!s)) {
+  const os = require('os');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-2551-staff-'));
+  try {
+    const lines = [];
+    const rec = new Function('fs', 'path', 'mp', 'log', recordSrc.join('\n') + '\nreturn record;')(
+      fs, path, { getServerSettings: function () { return { forBotDir: dir, thornswoodServer: 'dev' }; } },
+      function (l) { lines.push(l); });
+    rec('evict', STAFF, 'Hadvar', OWNER, 'Alice', 'Breezehome, in Whiterun', 0,
+        { building: '165a8:Skyrim.esm', buildingName: 'Breezehome', hold: 'whiterun', as: 'staff', did: 'kick' });
+    const got = fs.readFileSync(path.join(dir, 'moderation.log'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+    const row = got[0] || {};
+    yes('L1 the staff block\'s record writes one row to for-bot/moderation.log with who, whose claim, where and when',
+        got.length === 1 && row.did === 'evict' && row.server === 'dev' && row.by === STAFF && row.byName === 'Hadvar' &&
+        row.who === OWNER && row.whoName === 'Alice' && row.why === 'Breezehome, in Whiterun' &&
+        row.building === '165a8:Skyrim.esm' && row.buildingName === 'Breezehome' && row.hold === 'whiterun' &&
+        row.as === 'staff' && !isNaN(Date.parse(row.at)));
+    yes('L2 and one line in thornswood.log; the building\'s fields never overwrite the row\'s own',
+        lines.length === 1 && /^staff: Hadvar \(profile 600\) evict Alice \(profile 7\): Breezehome, in Whiterun$/.test(lines[0]));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+yes('L3 the staff block hands record on with its proof', !!staffBlock &&
+    /g\.__thornswoodStaff = \{[^}]*unproven: unproven, record: record,/.test(staffBlock));
+const isStaffSrc = chatBlock ? fnSrc(chatBlock, 'isStaff') : null;
+yes('L4 the staff test is the chat block\'s isStaff, the one the staff commands are handed, published once',
+    !!isStaffSrc && /return isDev\(profileId\);/.test(isStaffSrc) &&
+    (chatBlock.match(/g\.__thornswoodIsStaff = isStaff;/g) || []).length === 1 &&
+    (gm.match(/__thornswoodIsStaff = /g) || []).length === 1 &&
+    /staffCmd\.command\(cmd, word, parts, profileId, actorId, isStaff,/.test(chatBlock));
+yes('L5 the line a press arrives on reaches evict and rentCmd: handle, the character block, the property block',
+    !!chatBlock && chatBlock.indexOf('charCmd.command(word, parts, actorId, profileId, toProfile, cmd)') !== -1 &&
+    !!charBlock && charBlock.indexOf('prop.command(word, parts, actorId, profileId, toProfile, cmd)') !== -1 &&
+    !!prop && prop.indexOf("if (word === '/evict') { return evict(actorId, profileId, toProfile, cmd); }") !== -1 &&
+    prop.indexOf("if (word === '/rent') { return rentCmd(parts, actorId, profileId, toProfile, cmd); }") !== -1);
+const bot = read(path.join(ROOT, 'bot', 'bot.py'));
+yes('L6 the bot has a sentence for each, so the staff channel says it (bot/test-moderation.py, M14)',
+    ['evict', 'rent', 'norent'].every((d) => new RegExp("\\n    '" + d + "': '[^']+%s'").test(bot)));
 
 // ---------------------------------------------------------------- rebuild
 function python(args) {

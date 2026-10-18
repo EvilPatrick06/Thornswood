@@ -168,10 +168,11 @@
                   toHold: [ { office, hold, where, role, by } ],
                   clash: [ { hold, where } ], courtOf: [ { hold, where } ],
                   stewardOf: [ { hold, where } ], guardOf: [ { hold, where, jail } ],
-                  steward: <bool>,
-                  door: { name, by, rent: { amount, every, owed } | null } | null,
+                  steward: <bool>, staff: <bool>,
+                  door: { name, by, hold, where, ours, staff, rent: { amount, every, owed } | null } | null,
                   box: { hold } | null, boards: [ { hold, where } ] }
-      The offices (#1638), sent to anybody who holds one, and to nobody else.
+      The offices (#1638), sent to anybody who holds one or is staff, and to
+      nobody else.
       Every office is a Discord role on the account (#2551): jarls are the
       holds whose Jarl role it holds, each with its Court, Steward and Guard:
       holders (by a character in the world, or by profile with no name) and
@@ -181,7 +182,13 @@
       stewardOf and guardOf are the offices it was given. steward: it keeps a
       hold (Steward of it, or its Jarl), so it evicts, sets rent, marks a box
       and moves its own hold's board; boards are those boards only. door and
-      box are what the steward opened in the last minute. An office is one
+      box are what the steward opened in the last minute; door.where is the
+      town whose hold the building is in (null for none), and door.ours is
+      true when this character keeps it. staff (#2551, Patrick, 17 Oct): staff
+      hold no office, but end claims and set rent at any building, so they
+      get the door card at every door, with door.staff true where they act
+      as staff rather than as its steward; the server logs each press for
+      staff. The box and the boards stay a steward's. An office is one
       character's (Patrick, 16 Oct): a holder row is the character that
       holds it, or chosen false for an account none of whose characters
       does yet, and toHold are the offices this account's roles give that
@@ -398,7 +405,7 @@
     },
     office: {
       title: 'Office',
-      lead: 'The offices your Discord roles give you. The Jarl of a hold names its Court, its Steward and its Guards. A steward ends a claim and sets the rent at a door, makes a container a hold\'s box, and moves their hold\'s notice board. A guard keeps the cells of their hold\'s jail. The Court, the Guards, the Steward and the Jarl take anything out of their hold\'s drop box.',
+      lead: 'The offices your Discord roles give you. The Jarl of a hold names its Court, its Steward and its Guards. A steward ends a claim and sets the rent at a door, makes a container a hold\'s box, and moves their hold\'s notice board. A guard keeps the cells of their hold\'s jail. The Court, the Guards, the Steward and the Jarl take anything out of their hold\'s drop box. Staff hold no office, but end a claim and set the rent at any door, and each press is logged for staff.',
       rows: []
     },
     home: {
@@ -1540,6 +1547,8 @@
       if (first(ov.courtOf)) return { t: first(ov.courtOf) + ' Court', c: 'set' };
       if (first(ov.guardOf)) return { t: 'Guard of ' + first(ov.guardOf), c: 'set' };
       if (Array.isArray(ov.toHold) && ov.toHold.length) return { t: String(ov.toHold[0].role) + ', not held here', c: 'need' };
+      // Staff hold no office, and settle any building as staff (#2551).
+      if (ov.staff) return { t: 'staff, at any door', c: 'set' };
       return { t: 'an office', c: 'set' };
     }
     if (sec === 'staff') {
@@ -2154,8 +2163,14 @@
         'of its drop box.');
     });
 
+    // Staff (#2551, Patrick, 17 Oct): no office, and the door card at any building.
+    if (o.staff) {
+      officeHeld(wrap, 'Staff', 'Staff hold no office, but you end claims and set rent at any building, in any ' +
+        'hold or none. At a building whose hold you do not keep you act as staff, and every press goes in the ' +
+        'staff log with your name.');
+    }
+    if (o.steward || o.staff) wrap.appendChild(officeDoor(o.door));
     if (o.steward) {
-      wrap.appendChild(officeDoor(o.door));
       wrap.appendChild(officeBox(o.box, o.boards));
       wrap.appendChild(officeBoards(o.boards));
     }
@@ -2174,7 +2189,11 @@
     card.appendChild(el('div', 'desc', (d.by ? 'Held by ' + d.by + '. ' : 'Nobody holds it. ') +
       (r ? 'Rent ' + r.amount + ' gold every ' + r.every + ' days, ' + r.owed + ' owed.' : 'No rent on it.')));
     // A steward settles only their own hold's buildings (#2551); the server says whose this one is.
-    if (!d.ours) {
+    // Staff settle any building, as staff, and the server logs it.
+    if (d.staff) {
+      card.appendChild(el('div', 'desc', (d.where ? 'It answers to ' + String(d.where) + '. ' : 'It answers to no hold. ') +
+        'You act as staff here: what you press goes in the staff log with your name.'));
+    } else if (!d.ours) {
       card.appendChild(el('div', 'desc', d.where
         ? 'It answers to ' + String(d.where) + '. Only the Steward of ' + String(d.where) + ' or its Jarl ends a claim or sets rent here.'
         : 'It answers to no hold the server knows, so no steward ends a claim or sets rent here.'));

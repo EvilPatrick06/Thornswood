@@ -116,7 +116,22 @@ buildings and no other's. A building's hold is the hold its doors
 open onto, measured from the game's own records (see Where this
 is). At another hold's door the page says whose it is and offers
 nothing to press. A few buildings answer to no hold at all, and no
-steward settles those. Eviction ends the claim. It does not empty the house. It does not
+steward settles those.
+
+Staff end claims and set rent at any building, those with no hold
+included (Patrick, 17 Oct, #2551). Staff hold no office by being staff,
+so this is not a steward's office: it is the same Evict, Set rent and
+No rent on the Office page of K, which staff get at every door, saying
+they act as staff there. Staff are who the staff commands take (the
+Owner, Dev, Gamemaster, Moderator and Loremaster roles, and the admins),
+and a press needs what a staff command needs: the chat proved who they
+are and the launcher's pass is on hand. Every press is one line in the
+staff log, the one the staff commands write, which the bot says in the
+staff channel: who pressed, whose claim, the building and its hold, the
+rent set, and when. Staff who are the Steward or Jarl of a building's
+hold settle it as its steward, like anybody who keeps it.
+
+Eviction ends the claim. It does not empty the house. It does not
 take a key back, so a tenant who kept one can still walk in. That is a
 person's problem, handled like a person.
 
@@ -253,7 +268,18 @@ Fort Dawnguard, Nightingale Hall, Ironbind Barrow, test and Creation
 Club cells, Misty Grove, whose only door starts disabled, and four
 from mods) open onto places no hold's location covers, and the table
 says why for each. No steward evicts or sets
-rent at those.
+rent at those; staff do.
+
+Staff at a door (#2551) are `settleAs` in the property block: a
+steward of the building's hold acts as its steward, and anybody else
+must be staff by the chat block's `isStaff` (`__thornswoodIsStaff`) and
+pass the staff block's `unproven` on the line the press arrived on.
+`staffRecord` writes the press through the staff block's `record`:
+thornswood.log, and `for-bot\moderation.log` with `did` evict, rent or
+norent, `by`, `byName`, `who`, `whoName`, `why` (the building and its
+hold, and the rent set), `building`, `buildingName`, `hold` and `at`.
+A press is refused when that log cannot be reached.
+`tests\test-2551-building-holds.js` drives it at all 850 buildings.
 
 Claiming, locking, unlocking and cutting a key are the lock key, with
 nothing typed (#1637). The server writes the door's word, Claim, Lock or
