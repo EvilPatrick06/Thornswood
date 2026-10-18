@@ -7,7 +7,10 @@ carries its own WebSocket code. The game server posts where everybody is to it
 five times a second over loopback (`POST /positions`). Every client holds a
 WebSocket to it for those positions, for the WebRTC signalling that sets up
 voice between two people, and for text chat, which it relays to the room and
-writes to `chat\`, one file a day. The audio goes straight between people and
+writes to `chat\`, one file a day. Slash lines are written there too, a
+key's or a panel's marked as a key press, but not the front plugin's own
+reports to the game server (`PLUGIN_REPORTS`, `tests\test-2723-plugin-reports.js`).
+The audio goes straight between people and
 never passes through it. The `test-*.js` files beside it are its harnesses.
 It serves no page of its own: its two clients are the launcher's voice page
 and the game's overlay, both loaded off disk. The plain browser page it used

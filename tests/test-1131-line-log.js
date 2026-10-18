@@ -28,8 +28,9 @@
     - "/line hand" is written
     - a new connection after a close starts a new wait, and the relay's own
       "/line gone" reaches the game server and never the chat log
-    - a key or panel line keeps via: press; /joinpass is still masked; any
-      other command is written exactly as typed
+    - a key or panel line keeps via: press; a typed /joinpass is still
+      masked and the plugin's own is not written (#2723); any other command
+      is written exactly as typed
 
   Spawns the service in a temp folder on a spare port with its own chat
   folder, as voice\test-line-close.js does. Read only apart from that folder.
@@ -275,13 +276,16 @@ const queuedOf = (q, pid, text) => q.filter((c) => c.profileId === pid && c.text
   // ---- every other command, as before ------------------------------------------
   const e = await person(605, 'Typist');
   said(e, '/joinpass jp1.aaaa.bbbb');
-  said(e, '/joinpass jp1.aaaa.bbbb');
+  typed(e, '/joinpass jp1.aaaa.bbbb');
   typed(e, '/tp riverwood');
   typed(e, '/tp riverwood');
   await settle(e);
   q = await commands();
   yes('both /joinpass lines are queued with the pass for the game server', queuedOf(q, 605, '/joinpass jp1.aaaa.bbbb') === 2);
-  yes('and each is written masked, as "/joinpass [pass]"', linesOf(605, '/joinpass [pass]').length === 2);
+  // The plugin's own pass is one of its reports and is not written at all
+  // (#2723, tests\test-2723-plugin-reports.js); a typed one is, masked.
+  yes('and the typed one is written masked, as "/joinpass [pass]", the plugin\'s not at all',
+      linesOf(605, '/joinpass [pass]').length === 1 && !('via' in linesOf(605, '/joinpass [pass]')[0]));
   yes('the pass itself is nowhere in the chat log', !fs.readdirSync(CHAT_DIR).some((f) =>
       fs.readFileSync(path.join(CHAT_DIR, f), 'utf8').indexOf('jp1.aaaa') >= 0));
   got = linesOf(605, '/tp riverwood');

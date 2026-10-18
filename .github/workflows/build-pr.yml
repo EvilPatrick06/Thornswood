@@ -354,6 +354,12 @@ jobs:
           # somebody starts waiting in line, not one for every "/line" the
           # menu repeats, while every "/line" still reaches the game server.
           # A few seconds.
+          # Issue #2723: tests\test-2723-plugin-reports.js holds the voice
+          # service's list of the front plugin's own reports to every line the
+          # plugin sends, and on the real service over real sockets holds the
+          # chat log to leaving those reports out while every one still reaches
+          # the game server, and writing the same shapes when they are typed.
+          # A few seconds.
           $six ='test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
@@ -402,7 +408,7 @@ jobs:
                  'test-1621-quest-state.js',
                  'test-unpin.js', 'test-coffers.js',
                  'test-1383-injury.js',
-                 'test-chat-log.js', 'test-1131-line-log.js',
+                 'test-chat-log.js', 'test-1131-line-log.js', 'test-2723-plugin-reports.js',
                  'test-2260-burn-relog.js',
                  'test-2259-forge-burn.js',
                  'test-2337-kiln-menu.js',
