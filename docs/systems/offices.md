@@ -48,7 +48,8 @@ character on the account is ordinary.
 - **The Court** of a hold is everybody holding its "<Hold> Court" role.
   They are officers at that hold's drop box.
 - **The Steward** of a hold holds its "Steward of <Hold>" role. A steward
-  is the only one who evicts, sets rent and names a hold's box, and moves
+  is the only one in the world who evicts, sets rent and names a hold's
+  box (staff evict and set rent too, below), and moves
   their own hold's notice board, and the Jarl of a hold keeps it as its
   steward too. All of it in their own hold only: a building's hold is the
   hold its doors open onto ([Property](property.md), Where this is).
@@ -61,7 +62,11 @@ game, with Name and Remove on the Office page of the K panel. In the game
 the server asks the site, and the bot's account sets the role in Discord.
 Every change is said in the staff channel with who changed what, and
 Discord's audit log keeps it with the reason. Staff hold no office by
-being staff. All of it is buttons, and nothing is typed. See
+being staff. They do end claims and set rent at any building, in any
+hold or none, with the same buttons on the Office page of K, which says
+they act as staff there, and every press is in the staff log (Patrick,
+17 October, #2551; [Property](property.md)). All of it is buttons, and
+nothing is typed. See
 [Property](property.md) and [Notice boards](noticeboards.md).
 
 The roles are made for the nine holds of Skyrim and for Raven Rock

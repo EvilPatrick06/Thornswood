@@ -4738,6 +4738,11 @@ _MOD_DID = {
     # An admin undoing a PK made by mistake (#1010, 29 September).
     'unpk': 'undid the PK of %s, so the character can be played again',
     'note': 'wrote a note on %s',
+    # Staff at a building's door, from the Office page of K (#2551, Patrick,
+    # 17 Oct): the why names the building and its hold, and the rent set.
+    'evict': 'ended the claim of %s',
+    'rent': 'set the rent on the claim of %s',
+    'norent': 'took the rent off the claim of %s',
     # Not staff: somebody's own /stuck (#414), said as its why reads.
     'stuck': 'used /stuck',
     # Not staff either: the server took somebody idle out of the world (#1142).

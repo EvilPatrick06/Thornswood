@@ -36858,6 +36858,68 @@ log('gamemode loaded:',
       'or sets rent there.';
   }
 
+  /*
+    STAFF AT ANY DOOR (#2551). Patrick, 17 October, decision 1, answer B:
+    staff end claims and set rent at any building, the ones no hold covers
+    included, and every such press is logged for staff. Staff hold no office
+    by being staff (offices.md), so this is a power of its own and not an
+    office: a staff member is never a Steward or a Jarl here, and a Steward
+    or a Jarl is still of their own hold only.
+
+    WHO IS STAFF is the test every staff command uses, asked of the chat
+    block (__thornswoodIsStaff, which is isStaff there): the site's staff
+    roles (Owner, Dev, Gamemaster, Moderator, Loremaster, by devProfiles in
+    allowed.json), the admins and the written thornswoodDevs list. And for a
+    press, the staff block's own proof (unproven): a chat connection the
+    voice service proved, and the launcher's pass on hand, whatever
+    thornswoodRequirePass says.
+
+    THE LOG is the staff log, the staff block's record: one line in
+    thornswood.log and one in for-bot/moderation.log, which the Discord bot
+    says in the staff channel (did evict, rent or norent). It names who
+    pressed, whose claim, the building and its hold, what was set, and when
+    (at). The press is refused when that log cannot be reached, so no staff
+    press goes unlogged.
+
+    Somebody who keeps the building's hold acts as its steward, as anybody
+    who keeps it does; the staff power is for every other door.
+  */
+  function isStaffHere(profileId) {
+    var f = g['__thornswoodIsStaff'];
+    try { return typeof f === 'function' && !!f(Number(profileId) || 0); } catch (e) { return false; }
+  }
+
+  /*
+    How this press at this building is allowed: { as: 'steward' } for a
+    steward of its hold, { as: 'staff' } for staff, or { why } to tell them.
+    cmd is the queued line, for the staff block's proof.
+  */
+  function settleAs(profileId, building, cmd) {
+    var notHere = notStewardHere(profileId, building);
+    if (!notHere) { return { as: 'steward' }; }
+    if (!isStaffHere(profileId)) { return { why: notHere }; }
+    var st = g['__thornswoodStaff'];
+    if (!st || typeof st.unproven !== 'function' || typeof st.record !== 'function') {
+      return { why: 'The staff log is not loaded on this server, so no staff press is taken. Say so in the dev channel.' };
+    }
+    var unproven = st.unproven(cmd, profileId);
+    if (unproven) { return { why: unproven }; }
+    return { as: 'staff' };
+  }
+
+  /* The building and its hold, as the staff log and the staff member read them. */
+  function settleWhere(building) {
+    var hold = holdOfBuilding(building);
+    return nameOf(building) + (hold ? ', in ' + (HOLD_TOWN[hold] || hold) : ', which answers to no hold');
+  }
+
+  /* One staff press in the staff log (the staff block's record): who, what, whose claim, where, and when. */
+  function staffRecord(did, actorId, profileId, building, held, why) {
+    g['__thornswoodStaff'].record(did, Number(profileId) || 0, personName(actorId),
+      Number(held.by) || 0, String(held.name || 'somebody'), why, 0,
+      { building: building, buildingName: nameOf(building), hold: holdOfBuilding(building), as: 'staff' });
+  }
+
   // ------------------------------------------------------------ the doors --
 
   /*
@@ -39257,11 +39319,12 @@ log('gamemode loaded:',
     Sent by Set rent and No rent on the Office page of the K panel (#1638),
     never typed; the page shows a steward what is owed at the door they just
     opened. See officeView. Only a steward of the building's hold sets or
-    waives it (#2551, notStewardHere); anybody at the door reads it.
+    waives it (#2551, notStewardHere), or staff at any building, logged for
+    staff (settleAs); anybody at the door reads it.
   */
   var OFFICE_AT_DOOR = 'Open the door of the building, then press the button on the Office page of K within a minute.';
 
-  function rentCmd(parts, actorId, profileId, toProfile) {
+  function rentCmd(parts, actorId, profileId, toProfile, cmd) {
     var building = here(actorId);
     if (!building) {
       toProfile(profileId, OFFICE_AT_DOOR);
@@ -39282,24 +39345,31 @@ log('gamemode loaded:',
       return true;
     }
 
-    if (!isSteward(profileId)) {
+    // A steward, or staff at any door (#2551, settleAs).
+    if (!isSteward(profileId) && !isStaffHere(profileId)) {
       toProfile(profileId, 'Only a steward sets rent.');
       return true;
     }
-    var notHere = notStewardHere(profileId, building);
-    if (notHere) {
-      toProfile(profileId, notHere);
+    var how = settleAs(profileId, building, cmd);
+    if (!how.as) {
+      toProfile(profileId, how.why);
       return true;
     }
     if (!held) {
       toProfile(profileId, 'Nobody holds ' + nameOf(building) + ', so there is nobody to pay.');
       return true;
     }
+    var asStaff = how.as === 'staff';
     if (arg === '-') {
       delete held.rent;
       save();
-      plog('a steward waived the rent on', nameOf(building));
-      toProfile(profileId, 'No rent on ' + nameOf(building) + ' now.');
+      if (asStaff) {
+        staffRecord('norent', actorId, profileId, building, held, settleWhere(building));
+      } else {
+        plog('a steward waived the rent on', nameOf(building));
+      }
+      toProfile(profileId, (asStaff ? 'As staff: no' : 'No') + ' rent on ' + nameOf(building) + ' now.' +
+                (asStaff ? ' It is in the staff log.' : ''));
       redrawPanel(actorId);
       return true;
     }
@@ -39310,8 +39380,13 @@ log('gamemode loaded:',
     }
     held.rent = { amount: amount, everyDays: 7, owed: 0, since: Date.now() };
     save();
-    plog('a steward set the rent on', nameOf(building), 'to', amount);
-    toProfile(profileId, nameOf(building) + ' pays ' + amount + ' gold every 7 days now.');
+    if (asStaff) {
+      staffRecord('rent', actorId, profileId, building, held, amount + ' gold every 7 days on ' + settleWhere(building));
+    } else {
+      plog('a steward set the rent on', nameOf(building), 'to', amount);
+    }
+    toProfile(profileId, (asStaff ? 'As staff: ' : '') + nameOf(building) + ' pays ' + amount + ' gold every 7 days now.' +
+              (asStaff ? ' It is in the staff log.' : ''));
     redrawPanel(actorId);
     return true;
   }
@@ -42336,7 +42411,7 @@ log('gamemode loaded:',
     try { return typeof fn === 'function' && !!fn(profileId); } catch (e2) { return false; }
   }
 
-  function command(word, parts, actorId, profileId, toProfile) {
+  function command(word, parts, actorId, profileId, toProfile, cmd) {
     if (word === '/deed' || word === '/deeds') {
       return deeds(actorId, profileId, toProfile);
     }
@@ -42378,10 +42453,10 @@ log('gamemode loaded:',
     }
     // A Jarl gives or takes an office of their hold (#2551): the Office page sends it.
     if (word === '/office') { return officeCmd(parts, actorId, profileId, toProfile); }
-    if (word === '/evict') { return evict(actorId, profileId, toProfile); }
+    if (word === '/evict') { return evict(actorId, profileId, toProfile, cmd); }
     if (word === '/box') { return boxCmd(parts, actorId, profileId, toProfile); }
     if (word === '/dropbox') { return dropboxCmd(parts, actorId, profileId, toProfile); }
-    if (word === '/rent') { return rentCmd(parts, actorId, profileId, toProfile); }
+    if (word === '/rent') { return rentCmd(parts, actorId, profileId, toProfile, cmd); }
     if (word === '/sleephere') { return sleepHere(parts, actorId, profileId, toProfile); }
     if (word === '/notice') { return post(parts, actorId, profileId, toProfile, false); }
     if (word === '/job') {
@@ -42605,8 +42680,9 @@ log('gamemode loaded:',
   /*
     The city takes a house back.
 
-    THE ONLY THING A STEWARD CAN DO THAT NOBODY ELSE CAN, and it ends a CLAIM
-    and nothing else. It does not touch what is in the house, because the
+    THE ONLY THING A STEWARD CAN DO THAT NOBODY ELSE IN THE WORLD CAN (staff
+    can too, at any building, and every time is in the staff log: #2551,
+    settleAs), and it ends a CLAIM and nothing else. It does not touch what is in the house, because the
     alternative is a server that deletes people's possessions on somebody's
     say so, and the next holder inherits the containers as they stand. It does
     not take back a key either: nothing in the engine can change which key a
@@ -42615,8 +42691,9 @@ log('gamemode loaded:',
     is the squatter story Patrick asked for, and it falls out of the constraint
     rather than being written.
   */
-  function evict(actorId, profileId, toProfile) {
-    if (!isSteward(profileId)) {
+  function evict(actorId, profileId, toProfile, cmd) {
+    // A steward, or staff at any door (#2551, settleAs).
+    if (!isSteward(profileId) && !isStaffHere(profileId)) {
       toProfile(profileId, 'Only a steward ends a claim.');
       return true;
     }
@@ -42625,9 +42702,9 @@ log('gamemode loaded:',
       toProfile(profileId, OFFICE_AT_DOOR);
       return true;
     }
-    var notHere = notStewardHere(profileId, building);
-    if (notHere) {
-      toProfile(profileId, notHere);
+    var how = settleAs(profileId, building, cmd);
+    if (!how.as) {
+      toProfile(profileId, how.why);
       return true;
     }
     var held = holderOf(building);
@@ -42649,9 +42726,15 @@ log('gamemode loaded:',
     delete claims[building];
     save();
     pushAll();
-    plog('a steward ended', was + '\'s claim on', nameOf(building));
-    toProfile(profileId, 'You end ' + was + '\'s claim on ' + nameOf(building) +
-              '. What is inside is untouched, and any key they hold still works.');
+    if (how.as === 'staff') {
+      staffRecord('evict', actorId, profileId, building, held, settleWhere(building));
+      toProfile(profileId, 'As staff, you end ' + was + '\'s claim on ' + nameOf(building) +
+                '. What is inside is untouched, and any key they hold still works. It is in the staff log.');
+    } else {
+      plog('a steward ended', was + '\'s claim on', nameOf(building));
+      toProfile(profileId, 'You end ' + was + '\'s claim on ' + nameOf(building) +
+                '. What is inside is untouched, and any key they hold still works.');
+    }
     redrawPanel(actorId);
     return true;
   }
@@ -42687,7 +42770,13 @@ log('gamemode loaded:',
     itself. Nothing on the page comes from the character since #2551, so s
     is not read at all.
 
-    Null for anybody who holds no office, and then the page is not drawn.
+    STAFF SEE IT TOO (#2551, Patrick, 17 Oct): staff end claims and set rent
+    at any building, so for staff the page carries the door card at every
+    door, with door.staff true where they act as staff and not as a steward
+    of its hold. The box and the boards stay a steward's.
+
+    Null for anybody who holds no office and is not staff, and then the page
+    is not drawn.
   */
   var OFFICE_PEOPLE_MAX = 40;
 
@@ -42729,7 +42818,10 @@ log('gamemode loaded:',
     var clash = jarlClashOf(pid);
     var keeps = stewardHoldsOf(pid);
     var toHold = officesToHold(pid);
-    if (!o.jarl.length && !o.court.length && !keeps.length && !o.guard.length && !clash.length && !toHold.length) {
+    // Staff, who hold no office, see the page for the door card (#2551, settleAs).
+    var staff = isStaffHere(pid);
+    if (!o.jarl.length && !o.court.length && !keeps.length && !o.guard.length && !clash.length && !toHold.length &&
+        !staff) {
       return null;
     }
 
@@ -42763,7 +42855,7 @@ log('gamemode loaded:',
                    return { office: t.office, hold: t.hold, where: HOLD_TOWN[t.hold], role: officeRole(t.office, t.hold),
                             by: t.by ? t.by.name : null };
                  }),
-                 steward: keeps.length > 0, door: null, box: null, boards: [] };
+                 steward: keeps.length > 0, staff: staff, door: null, box: null, boards: [] };
     for (var j = 0; j < o.jarl.length; j++) {
       var hold = o.jarl[j];
       var row = { hold: hold, where: HOLD_TOWN[hold], offices: {} };
@@ -42791,22 +42883,26 @@ log('gamemode loaded:',
       }
       view.jarls.push(row);
     }
-    if (!view.steward) { return view; }
+    if (!view.steward && !staff) { return view; }
 
     var building = here(actorId);
     if (building) {
       var held = holderOf(building);
       if (held && held.rent) { rentDue(); }
-      // The building's hold (#2551): the page offers Evict and the rent only
-      // to a steward of it, and says whose it is to anybody else.
+      // The building's hold (#2551): the page offers Evict and the rent to a
+      // steward of it, and to staff at any building, saying they act as
+      // staff there; it says whose it is to anybody else.
       var bhold = holdOfBuilding(building);
+      var ours = !!bhold && keeps.indexOf(bhold) !== -1;
       view.door = { name: nameOf(building), by: held ? held.name : null,
                     hold: bhold, where: bhold ? (HOLD_TOWN[bhold] || bhold) : null,
-                    ours: !!bhold && keeps.indexOf(bhold) !== -1,
+                    ours: ours, staff: staff && !ours,
                     rent: (held && held.rent) ? { amount: Number(held.rent.amount) || 0,
                                                   every: Number(held.rent.everyDays) || 7,
                                                   owed: Number(held.rent.owed) || 0 } : null };
     }
+    // The box and the boards are a steward's own hold's; staff are no steward.
+    if (!view.steward) { return view; }
     var at = boxAt(actorId);
     if (at) { view.box = { hold: holdOfBox(at) || null }; }
     // The boards of the holds this person keeps, and no other (#2551).
@@ -46435,8 +46531,8 @@ log('gamemode loaded:',
       var held = propertyView(actorId, pid);
       if (held) { view.property = held; }
       /*
-        The Office page (#1638), for anybody who holds an office, and left
-        off for everybody else. The property block owns the offices, which
+        The Office page (#1638), for anybody who holds an office or is staff
+        (#2551), and left off for everybody else. The property block owns the offices, which
         are Discord roles on the account since #2551, so it needs only the
         actor and the profile; it never asks stateOf, which from inside
         writeState would ask for itself. See officeView.
@@ -47217,7 +47313,7 @@ log('gamemode loaded:',
     Class and profession can be set there too, or later in the world, since
     only a second pick of either is refused. Nothing else moves anybody.
   */
-  function command(word, parts, actorId, profileId, toProfile) {
+  function command(word, parts, actorId, profileId, toProfile, cmd) {
     /*
       THE FARMING WORDS, handed straight on.
 
@@ -47255,7 +47351,7 @@ log('gamemode loaded:',
       var prop = g.__thornswoodProperty;
       if (prop && prop.command) {
         try {
-          if (prop.command(word, parts, actorId, profileId, toProfile)) { return true; }
+          if (prop.command(word, parts, actorId, profileId, toProfile, cmd)) { return true; }
         } catch (eProp) {
           clog('the property word', word, 'threw:', eProp);
           toProfile(profileId, 'That did not work. Say which door you were at in the dev channel.');
@@ -53236,7 +53332,7 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
     // words; it gets the same actor and profile id this function has.
     try {
       var charCmd = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodCharacter;
-      if (charCmd && charCmd.command(word, parts, actorId, profileId, toProfile)) { return; }
+      if (charCmd && charCmd.command(word, parts, actorId, profileId, toProfile, cmd)) { return; }
     } catch (eChar) { log('character command failed:', eChar); }
 
     /*
@@ -54526,6 +54622,12 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
   function isStaff(profileId) {
     return isDev(profileId);
   }
+  /*
+    The same question for the other blocks (#2551): staff end claims and set
+    rent at any building (Patrick, 17 Oct), and the property block asks it
+    here, so there is one staff test and not a second copy of it.
+  */
+  g.__thornswoodIsStaff = isStaff;
 
   /*
     WHO MAY ADD keep TO /spawn (#2623). Djinn, 17 October: "testers and
@@ -65018,8 +65120,12 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     return '';
   }
 
-  /* One line in thornswood.log and one in moderation.log for the bot. */
-  function record(did, by, byName, who, whoName, why, minutes) {
+  /*
+    One line in thornswood.log and one in moderation.log for the bot. extra,
+    when given, is more of the same row: the property block's staff presses
+    name the building and its hold (#2551).
+  */
+  function record(did, by, byName, who, whoName, why, minutes, extra) {
     log('staff: ' + byName + ' (profile ' + by + ') ' + did + ' ' + whoName +
         ' (profile ' + who + ')' + (minutes ? ' for ' + minutes + ' minutes' : '') +
         (why ? ': ' + why : ''));
@@ -65028,6 +65134,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
                 by: by, byName: byName, who: who, whoName: whoName,
                 why: String(why || '').slice(0, 300) };
     if (minutes) { row.minutes = minutes; }
+    for (var k in (extra || {})) {
+      if (Object.prototype.hasOwnProperty.call(extra, k) && !Object.prototype.hasOwnProperty.call(row, k)) { row[k] = extra[k]; }
+    }
     try {
       fs.mkdirSync(path.dirname(recordFile()), { recursive: true });
       fs.appendFileSync(recordFile(), JSON.stringify(row) + '\n');
@@ -65812,7 +65921,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   pushSilenced();
 
   g.__thornswoodStaff = {
-    command: command, find: find, takePerson: takePerson, unproven: unproven,
+    command: command, find: find, takePerson: takePerson, unproven: unproven, record: record,
     freezeTick: freezeTick, pushSilenced: pushSilenced, silencedFor: silencedFor,
     banSweep: banSweep, banLength: banLength, bansNow: bansNow, pkNow: pkNow,
     state: state, REFUSED: REFUSED, WORDS: WORDS_STAFF
