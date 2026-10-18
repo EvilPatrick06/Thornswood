@@ -436,7 +436,7 @@ jobs:
                  'test-2612-backup-principal.ps1',
                  'test-site-account.ps1',
                  'test-1320-pass-one-session.js',
-                 'test-1373-scarce-scene.js', 'test-quest-transactions.js', 'test-kill-contracts.js',
+                 'test-1373-scarce-scene.js', 'test-quest-eligibility.js', 'test-quest-transactions.js', 'test-kill-contracts.js',
                  'test-nobody-makes.js', 'test-614-riekling-shift.js',
                  'test-1378-shared-gather.js',
                  'test-special-edition-only.js',
