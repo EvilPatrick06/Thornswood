@@ -381,7 +381,12 @@ jobs:
                  'test-2554-board-posts.js',
                  'test-1380-rare-mines.js',
                  'test-1621-quest-state.js',
-                 'test-unpin.js', 'test-coffers.js',
+                 # Issue #512: tests\test-512-trading-company.js holds the Free Skyrim
+                 # Trading Company's terms (game\trading-company.js, game\data\trading-company.json)
+                 # to gamemode.js's haul fee, haul tenth and sale cuts for every pay up to 5000,
+                 # refuses bad terms instead of defaulting, keeps a posted haul's cut, and
+                 # checks that a proposal changes nothing until staff confirm. Under a second.
+                 'test-unpin.js', 'test-coffers.js', 'test-512-trading-company.js',
                  'test-1383-injury.js',
                  'test-chat-log.js',
                  'test-2260-burn-relog.js',
