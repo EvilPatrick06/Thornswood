@@ -285,4 +285,62 @@ const mineBody = gm.slice(gm.indexOf('function mineOre'), gm.indexOf('function c
 assert.ok(mineBody.indexOf('isRareSeam') >= 0, 'mineOre sends a rare seam to the scarce place');
 assert.ok(gm.indexOf('noteKill(killerId, actorId)') >= 0, 'a death can count for a scene kill');
 assert.equal(box.touches(), 0);
+
+// The production quest rank adapter must not invoke the character reader
+// that migrates on a missing or failed read. Compile those actual functions;
+// only their native storage and presentation dependencies are controlled.
+const characterBlock = gm.slice(gm.indexOf('// ==== thornswood character ===='), gm.indexOf('// ==== end thornswood character ===='));
+assert.ok(characterBlock.length > 0, 'production character block envelope');
+function productionFunction(name, parameter) {
+  const signature = '  function ' + name + '(' + parameter + ') {';
+  assert.equal(characterBlock.split(signature).length, 2, 'unique production ' + name);
+  const begin = characterBlock.indexOf(signature), end = characterBlock.indexOf('\n  }', begin);
+  assert.ok(end > begin);
+  return characterBlock.slice(begin, end + '\n  }'.length);
+}
+const rankBegin = '        rankOf: function (actor, key) {';
+assert.equal(gm.split(rankBegin).length, 2, 'unique production quest rank adapter');
+const rankStart = gm.indexOf(rankBegin);
+const rankEnd = gm.indexOf('        creatureName:', rankStart);
+assert.ok(rankEnd > rankStart);
+const rankAdapter = gm.slice(rankStart + '        rankOf: '.length, rankEnd).trim().replace(/,$/, '');
+const characterRank = /rankOf: (function \(actorId, key\) \{ return P\.rankOf\(stateOf\(actorId\), key\); \})/.exec(gm);
+assert.ok(characterRank, 'production character rank adapter envelope');
+for (const sample of ['throw', undefined, null, [], {}, {v: 2, ranks: {miner: 'master'}},
+  {v: 1, ranks: []}, {v: 1, ranks: {miner: 'invalid'}}, {v: 1, ranks: {miner: true}},
+  {v: 1, ranks: {miner: 'master'}}, {v: 1, ranks: {miner: 'novice'}}]) {
+  const writes = [];
+  const rankContext = {
+    CHAR_PROPERTY: 'thornswoodCharacter', RANK: ['novice', 'advanced', 'expert', 'master'],
+    mp: {
+      get(actor, property) {
+        if (property !== 'thornswoodCharacter') return null;
+        if (sample === 'throw') throw Error('transient character read failure');
+        return sample;
+      },
+      set(...args) { writes.push(args); }
+    },
+    P: {
+      fresh: () => ({v: 1, ranks: {}}),
+      rankOf: (state, key) => state && state.ranks && Object.hasOwn(state.ranks, key) ? state.ranks[key] : null
+    },
+    writeState(actor, state) { rankContext.mp.set(actor, 'thornswoodCharacter', state); return state; },
+    mapHalf: () => null,
+    clog: () => {}
+  };
+  rankContext.globalThis = rankContext;
+  vm.createContext(rankContext);
+  vm.runInContext(productionFunction('readState', 'actorId') + '\n' +
+    productionFunction('migrate', 'actorId') + '\n' + productionFunction('stateOf', 'actorId'), rankContext);
+  rankContext.__thornswoodCharacter = {
+    PROPERTY: 'thornswoodCharacter',
+    rankOf: vm.runInContext('(' + characterRank[1] + ')', rankContext)
+  };
+  const readRank = vm.runInContext('(' + rankAdapter + ')', rankContext);
+  const rank = readRank(91, 'miner');
+  assert.equal(writes.length, 0, 'quest eligibility never migrates or writes progression on a read');
+  const expected = sample && sample.v === 1 && sample.ranks && ['master', 'novice'].includes(sample.ranks.miner)
+    ? sample.ranks.miner : '';
+  assert.equal(rank, expected, 'only canonical saved rank entries qualify');
+}
 console.log('PASS scarce and scene quests match docs/systems/quests.md');

@@ -447,6 +447,14 @@ if (ORES && qBlock2) {
     mp: {
       makeProperty: function (name) { made[name] = true; },
       get: function (id, key) {
+        if (key === 'thornswoodCharacter') {
+          const savedRanks = {};
+          Object.keys(ranks).forEach(function (entry) {
+            const prefix = id + ':';
+            if (entry.indexOf(prefix) === 0) savedRanks[entry.slice(prefix.length)] = ranks[entry];
+          });
+          return {v: 1, ranks: savedRanks};
+        }
         if (key === 'locationalData') { return veinCell[id] ? { cellOrWorldDesc: veinCell[id], pos: [0, 0, 0] } : undefined; }
         return props[id + '|' + key] ? JSON.parse(props[id + '|' + key]) : undefined;
       },
@@ -481,7 +489,7 @@ if (ORES && qBlock2) {
   ctx.__thornswoodMerchantTrade = {questReady: function () {return true;},
     questRole: function(ref){return ref===9000?'':null;},
     questAdmission: function(a,ref){return traderOpen && ref===9000 ? function(){return traderOpen;} : null;}};
-  ctx.__thornswoodCharacter = { rankOf: function (a, key) { return ranks[a + ':' + key] || ''; } };
+  ctx.__thornswoodCharacter = { PROPERTY: 'thornswoodCharacter' };
   vm.createContext(ctx);
   vm.runInContext(qBlock2, ctx);
   const svc = ctx.__thornswoodQuests;
