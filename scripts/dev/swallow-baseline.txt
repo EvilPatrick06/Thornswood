@@ -1,6 +1,7 @@
-# Silent catches in the launcher, per file. Read by scripts\dev\Check-Swallow.ps1,
-# which fails when any file in launcher\app has more than its line here allows.
-# A file that is not listed is allowed none.
+# Silent catches in the launcher and the scripts, per file. Read by
+# scripts\dev\Check-Swallow.ps1, which fails when any file in launcher\app, or
+# any .ps1 under scripts\ or installer\ (since #2711, the section at the end),
+# has more than its line here allows. A file that is not listed is allowed none.
 #
 # THE RULE. A catch counts when the body between its braces is empty or holds
 # nothing but whitespace, whether the braces sit on one line or on lines of
@@ -135,3 +136,87 @@
 # Swap.Restore / Hold.Release / Keep.Unpark is still log-only; stop-
 # swallowing remains later work. No silent-catch file lines remain in this
 # baseline.
+#
+# THE SCRIPTS, since #2711 (18 Oct). Check-Swallow.ps1 counts the PowerShell
+# under scripts\ and installer\ as well, keyed by the path from the
+# repository root. Nothing counted a .ps1 before, so two empty catches in
+# scripts\release\New-ClientBuildRecord.ps1 wrote the client record over a
+# base, dirty and stale check that had not run. The same rule: a catch whose
+# braces hold nothing but whitespace counts, with its type in square brackets
+# or none; one whose braces hold a # comment does not. The text is read, so
+# a catch spelled out inside a here-string counts too: that is a script
+# another machine runs (Feed-Store.ps1's, for one).
+#
+# Measured on 18 Oct, on main at e35ab7ae with #2711's fixes: 183 in 67
+# files, below. #2711 took out the five in the record scripts
+# (New-ClientBuildRecord.ps1 two, New-ServerBuildRecord.ps1 two,
+# Check-Records.ps1 one), which is why none of them is listed. tests\ is not
+# read. Each line below is somebody's catch that hides a failure; converting
+# one lowers its line.
+installer\Setup-Thornswood.ps1 7
+scripts\deploy\Artifact.ps1 1
+scripts\deploy\Deploy-DevGamemode.ps1 5
+scripts\deploy\Deploy-Docs.ps1 4
+scripts\deploy\Deploy-Gamemode.ps1 1
+scripts\deploy\Deploy-Server.ps1 7
+scripts\deploy\DeployedBuild.ps1 1
+scripts\deploy\Install-Bot.ps1 6
+scripts\deploy\Install-Runner.ps1 3
+scripts\deploy\Install-ThornswoodServer.ps1 9
+scripts\deploy\Install-Voice.ps1 6
+scripts\deploy\Rotate-ServerPassword.ps1 1
+scripts\deploy\ServerSettings.ps1 4
+scripts\deploy\Set-DiscordLogin.ps1 2
+scripts\deploy\Setup-Domain.ps1 2
+scripts\deploy\SiteConfigSet.ps1 1
+scripts\deploy\Swap.ps1 5
+scripts\dev\Check-Outside.ps1 6
+scripts\dev\Close-Launcher.ps1 8
+scripts\dev\Start-Thornswood.ps1 3
+scripts\dev\Watch-Foreground.ps1 1
+scripts\mods\Align-LoadOrder.ps1 1
+scripts\mods\Check-CollectionRules.ps1 1
+scripts\mods\Check-Manifest.ps1 1
+scripts\mods\Fix-Icons.ps1 1
+scripts\mods\LoadOrder.ps1 3
+scripts\oneoff\Undo-DiscordBuild.ps1 3
+scripts\ops\Publish-News.ps1 1
+scripts\ops\Reset-Character.ps1 1
+scripts\ops\Set-Door.ps1 6
+scripts\ops\Set-Server.ps1 1
+scripts\ops\Wipe-Saves.ps1 1
+scripts\release\Build-Engine.ps1 1
+scripts\release\Build-Server.ps1 4
+scripts\release\BuildStamp.ps1 1
+scripts\release\Bump-Version.ps1 1
+scripts\release\Check-ShipReady.ps1 3
+scripts\release\Feed-Store.ps1 1
+scripts\release\Go.ps1 3
+scripts\release\Install-Launcher.ps1 5
+scripts\release\Package-Thornswood.ps1 1
+scripts\release\Publish-Installer.ps1 1
+scripts\release\Publish-Server.ps1 4
+scripts\release\Publish-Update.ps1 4
+scripts\release\Rollback-Feed.ps1 2
+scripts\release\Scrub-Feed.ps1 1
+scripts\release\Setup-ShipMachine.ps1 1
+scripts\release\Ship-Rules.ps1 4
+scripts\release\Ship.ps1 6
+scripts\vps\Bootstrap-VPS.ps1 1
+scripts\vps\Check-Load.ps1 1
+scripts\vps\Check-ServerPriority.ps1 1
+scripts\vps\Check-Site.ps1 2
+scripts\vps\Fetch-Backups.ps1 1
+scripts\vps\Get-Logs.ps1 1
+scripts\vps\Get-ProdFacts.ps1 1
+scripts\vps\Lock-VpsFolders.ps1 3
+scripts\vps\Prove-SecretOffCommandLines.ps1 2
+scripts\vps\Send-Secret.ps1 1
+scripts\vps\vps-freeze.ps1 1
+scripts\vps\vps-load.ps1 2
+scripts\vps\vps-nightly-backup.ps1 2
+scripts\vps\vps-restore-services.ps1 1
+scripts\vps\Vps.ps1 1
+scripts\vps\Watch-Outside.ps1 6
+scripts\vps\Watch-Services.ps1 9
+scripts\vps\Write-BotToken.ps1 1
