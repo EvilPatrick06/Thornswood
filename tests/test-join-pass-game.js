@@ -290,8 +290,26 @@ door(null);
 }
 
 // ------------------------------------------------------------ the voice log
-yes('the voice service writes /joinpass to the chat log without the pass',
-    /chatWrite\('command', myId, me, \/\^\\\/joinpass\\b\/i\.test\(text\) \? '\/joinpass \[pass\]' : text,\s*msg\.press === true \? 'press' : ''\);/.test(voice));
+// Since #1131 what a command writes to the chat log is commandLogText's word,
+// run here: the pass masked, whatever the case of the command.
+{
+  const at = voice.indexOf('function commandLogText(');
+  let body = '';
+  if (at >= 0) {
+    let d = 0;
+    for (let i = voice.indexOf('{', at); i < voice.length; i++) {
+      if (voice[i] === '{') d++;
+      else if (voice[i] === '}') { d--; if (d === 0) { body = voice.slice(at, i + 1); break; } }
+    }
+  }
+  const box = {};
+  if (body) vm.runInNewContext(body + '\nthis.commandLogText = commandLogText;', box);
+  yes('the voice service writes /joinpass to the chat log without the pass',
+      /const logged = commandLogText\(me, text\);\s*if \(logged\) chatWrite\('command', myId, me, logged,/.test(voice) &&
+      typeof box.commandLogText === 'function' &&
+      box.commandLogText({ profileId: 700 }, '/joinpass ' + VECTOR_PASS) === '/joinpass [pass]' &&
+      box.commandLogText(null, '/JOINPASS ' + VECTOR_PASS) === '/joinpass [pass]');
+}
 
 // ------------------------------------------------------------ the front plugin
 {

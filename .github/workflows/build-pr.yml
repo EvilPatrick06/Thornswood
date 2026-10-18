@@ -349,6 +349,11 @@ jobs:
           # launcher and holds the feed watch to reading the site's 204 as
           # "not moved", a 200 as "moved", and no answer or any other answer
           # as a fault, against a tip of its own. About half a minute.
+          # Issue #1131: tests\test-1131-line-log.js runs the real voice
+          # service over real sockets and holds the chat log to one line when
+          # somebody starts waiting in line, not one for every "/line" the
+          # menu repeats, while every "/line" still reaches the game server.
+          # A few seconds.
           $six ='test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
@@ -397,7 +402,7 @@ jobs:
                  'test-1621-quest-state.js',
                  'test-unpin.js', 'test-coffers.js',
                  'test-1383-injury.js',
-                 'test-chat-log.js',
+                 'test-chat-log.js', 'test-1131-line-log.js',
                  'test-2260-burn-relog.js',
                  'test-2259-forge-burn.js',
                  'test-2337-kiln-menu.js',
