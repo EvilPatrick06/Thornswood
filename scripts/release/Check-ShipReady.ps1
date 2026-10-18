@@ -263,8 +263,12 @@ function Get-LauncherRows([string]$Channel, [string]$Root) {
 # there is none, after the feed is out (Ship carries on, #2243). A main Ship
 # that builds a launcher puts it there first. One that keeps the feed's
 # launcher (Test-KeepFeedLauncher: nothing it is built from changed since)
-# puts none there, so -Package packs whatever the folder holds, and a ship
-# root's launcher is never started to update itself (#2661). Which of the two
+# used to put none there, so -Package packed whatever the folder held, and a
+# ship root's launcher is never started to update itself. Since #2661 it
+# downloads the feed's launcherUrl, checks it against launcherSha256 and its
+# signature, and puts it there before anything is published, so that passes
+# too; a feed that names no whole launcher (no launcherUrl or no 64 digit
+# launcherSha256) is what still warns, because that Ship stops. Which of the two
 # a Ship does: a launcher on main's feed under another number than
 # launcher\app\Updater.cs is never kept, because Updater.cs is one of the
 # files the launcher is built from, and one under the same number may be.
@@ -289,10 +293,16 @@ function Get-PackageLauncherRows([string]$Current, $Feed, [string]$Exe) {
   if ($has -and $fsha -and $sha -eq $fsha) {
     return @(New-Row $what $true ($Exe + ' is the ' + $fv + ' main''s feed offers') $null 'either' 'warn')
   }
-  $now = $(if ($has) { $Exe + ' is not the ' + $fv + ' main''s feed offers, and -Package would pack it' }
-           else { 'there is no ' + $Exe + ', and the installer rebuild would stop at MISSING the launcher' })
-  return @(New-Row $what $false ($now + ' when the Ship keeps the feed''s ' + $fv + ' (nothing it is built from changed since)') `
-    'Nothing a person runs puts the feed''s launcher in a ship root: a Ship that keeps it does not (#2661)' 'either' 'warn')
+  $now = $(if ($has) { $Exe + ' is not the ' + $fv + ' main''s feed offers' } else { 'there is no ' + $Exe })
+  $fu = ''
+  if ($Feed.PSObject.Properties['launcherUrl']) { $fu = ([string]$Feed.launcherUrl).Trim() }
+  if (-not $fu -or $fsha -notmatch '^[0-9a-f]{64}$') {
+    return @(New-Row $what $false ($now + ', and main''s feed names no whole launcher (launcherUrl and launcherSha256), so a Ship ' +
+      'that keeps the feed''s ' + $fv + ' with -Package stops before anything is published') `
+      'Ship with -RebuildLauncher, which builds the launcher and puts it in the folder first' 'either' 'warn')
+  }
+  return @(New-Row $what $true ($now + '; a Ship that keeps the feed''s ' + $fv + ' (nothing it is built from changed since) ' +
+    'downloads it from the feed, checks its sha256 and signature, and puts it there before -Package (#2661)') $null 'either' 'warn')
 }
 
 # WHETHER THIS MACHINE SIGNS (issue #458). Ship refuses every release, dev and
