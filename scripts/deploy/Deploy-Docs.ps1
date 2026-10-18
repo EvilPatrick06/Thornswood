@@ -251,6 +251,7 @@ $prevName  = '.prev-' + $stamp
 $stageFar  = ($Root -replace '\\', '/') + '/' + $stageName
 $hashes    = [ordered]@{}
 $appUnchanged = $false
+$gonePublic = @()
 
 if (-not $PutBack) {
 Write-Host 'Making room...'
@@ -322,10 +323,16 @@ Get-ChildItem (Join-Path $App 'public') -File -EA SilentlyContinue | ForEach-Obj
 }
 if ($sentPublic.Count) { Write-Host ('  ' + ($sentPublic -join ', ')) }
 Write-Host ('  ' + $samePublic + ' public file(s) already the same up there, not sent')
+# And the ones the repository no longer has, which the swap takes out
+# (Swap.ps1, $Gone). Only files at the top of public: the folders in it,
+# such as downloads, are filled by other scripts.
+$repoPublic = @(Get-ChildItem (Join-Path $App 'public') -File -EA SilentlyContinue | ForEach-Object Name)
+$gonePublic = @($publicThere.Keys | Where-Object { $repoPublic -notcontains $_ } | Sort-Object | ForEach-Object { 'public/' + $_ })
+if ($gonePublic.Count) { Write-Host ('  to take out, no longer in the repository: ' + ($gonePublic -join ', ')) }
 
 # When nothing in the app changed, skip the stage, the stop and the swap
 # (issue #1118). Documents and the task step still run below.
-$appUnchanged = ($send.Count -eq 0)
+$appUnchanged = ($send.Count -eq 0 -and $gonePublic.Count -eq 0)
 if ($appUnchanged) {
   Remote "Remove-Item -LiteralPath '$rootWin\$stageName' -Recurse -Force -EA SilentlyContinue" | Out-Null
   Write-Host '  nothing in the app changed, so the site will not be stopped'
@@ -896,7 +903,8 @@ elseif ($appUnchanged) { Write-Host 'Nothing in the app to swap; site left runni
 else { Write-Host 'Stopping, swapping in and starting...' }
 if ($PutBack -or -not $appUnchanged) {
 $vars = (ServiceSwapVars $Root $stageName $prevName $Wait $hashes @()) +
-        ("`$Task = '" + $Task.Replace("'", "''") + "'`r`n`$Port = " + $Port + "`r`n")
+        ("`$Task = '" + $Task.Replace("'", "''") + "'`r`n`$Port = " + $Port + "`r`n") +
+        ('$Gone = @(' + ((@($gonePublic) | ForEach-Object { "'" + $_.Replace("'", "''") + "'" }) -join ', ') + ")`r`n")
 $pick = ''
 if ($PutBack) { $pick = $putBackPick }
 $eap = $ErrorActionPreference
