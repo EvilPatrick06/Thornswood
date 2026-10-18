@@ -325,8 +325,8 @@
             "id": "rk6",
             "done": false,
             "cells": {
-              "ck2": "Killmoves and stagger do not show on other people",
-              "ck3": "Those animation events are blanked"
+              "ck2": "Killmoves do not show on other people",
+              "ck3": "That animation event is blanked. A stagger shows to everybody nearby"
             },
             "at": 0,
             "by": ""
