@@ -505,6 +505,7 @@ function createMerchantTrading(deps) {
       var result=quests.act(actorId,String(parts[2]),String(parts[3]),parts[4],merchantId,heldQuest,
         function(){return sessionCurrent(actorId,profileId,originalSession);});
       var reasons={class:'This work takes a different class.',rank:'This work takes a higher rank.',
+        eligibility:'You do not meet this work\'s class or profession requirements.',
         cooldown:'This work is still resting.',open:'You already hold this work.',gem:'Choose a gem first.',
         short:'You have not drawn enough to turn this work in.',none:'You do not hold this work.',
         unbound:'This work has no appointed place yet.',unwritten:'The work could not be committed just now.',
