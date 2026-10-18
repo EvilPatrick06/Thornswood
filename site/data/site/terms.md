@@ -3,7 +3,7 @@
 The agreement between you and Thornswood, in the shortest form that is still
 honest.
 
-Last changed: 29 September 2026.
+Last changed: 18 October 2026.
 
 Thornswood is a free fan project run by two people in their own time. Using the
 site, the launcher, the Discord or the server means you accept what is below.
@@ -68,8 +68,8 @@ Do not try to get around a ban with another account.
 - Anything illegal where you are, or anything that makes Thornswood a party to
   it.
 
-Finding a bug and telling us is the opposite of this and is always welcome.
-`SECURITY.md` in the repository says how to report a security one.
+Finding a bug and telling us is the opposite of this and is always welcome. A
+security one goes to the owner as a Discord direct message, never in a channel.
 
 ## What you make here
 
