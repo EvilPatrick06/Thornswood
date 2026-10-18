@@ -160,7 +160,7 @@ try {
         return ($o -join "`n")
     }
     $out = Ready @('-Root', $vx)
-    Yes '-Root is the folder it checks' ($out -match ('yes\s+a launcher is installed\s+\(' + [regex]::Escape($vx) + '\)'))
+    Yes '-Root is the folder it checks' ($out -match ('yes\s+it has the Launcher folder a dev Ship asks for\s+\(' + [regex]::Escape((Join-Path $vx 'Launcher')) + '\)'))
     Yes '  and a folder Vortex deploys into is a gap' ($out -match 'NO\s+it is not a folder Vortex deploys into')
     Save-ShipRoot $file 'dev' $relDev
     $out = Ready @()
