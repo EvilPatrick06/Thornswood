@@ -408,9 +408,9 @@ function chatWrite(kind, peerId, me, text, via) {
    changes, /afk active while somebody is at the keys, /racemenu every minute
    while the race menu is up) or as a panel opens and asks for its view
    (/pick refresh, /party refresh, /trade refresh). The game server reads
-   them as reports and answers most with nothing, and what it makes of them
-   is in its own log. The chat log is for what somebody said, typed or
-   pressed, so staff reading it for a report read that and not the client.
+   them as reports and answers most with nothing. The chat log is for what
+   somebody said, typed or pressed, so staff reading it for a report read
+   that and not the client.
 
    WHAT DECIDES IT. The line's whole text has to be one of the shapes below,
    each exactly what thornswood-front.js builds, and the line has to come
