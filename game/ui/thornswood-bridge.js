@@ -420,8 +420,10 @@
     send: function (text) {
       try {
         if (isSkillSpam(text)) { return; }
-        if (window.thornswoodNet && window.thornswoodNet.say) {
-          window.thornswoodNet.say(text);
+        // typed is the one door that sends a line as typed; every other
+        // caller is a key or a button and uses say (#2732).
+        if (window.thornswoodNet && window.thornswoodNet.typed) {
+          window.thornswoodNet.typed(text);
           return;
         }
 
@@ -453,8 +455,8 @@
       if (draining) { clearInterval(draining); draining = null; }
       return;
     }
-    if (window.thornswoodNet && window.thornswoodNet.say) {
-      while (held.length) { window.thornswoodNet.say(held.shift()); }
+    if (window.thornswoodNet && window.thornswoodNet.typed) {
+      while (held.length) { window.thornswoodNet.typed(held.shift()); }
       if (draining) { clearInterval(draining); draining = null; }
       return;
     }

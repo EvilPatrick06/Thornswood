@@ -1191,7 +1191,7 @@
   */
   function lineHand(id) {
     const from = lineId;
-    T.js('try{window.thornswoodNet&&window.thornswoodNet.say(' + JSON.stringify('/line hand ' + id) + ',true);}catch(e){}');
+    T.js('try{window.thornswoodNet&&window.thornswoodNet.say(' + JSON.stringify('/line hand ' + id) + ',{quiet:true});}catch(e){}');
     log('menu: profile', from, 'hands its place in line to profile', id);
     lineStart(id, null);
   }
@@ -1256,15 +1256,15 @@
     if (passOk && (early || pass !== linePassSent || now - linePassAt >= LINE_PASS_EVERY_MS)) {
       linePassSent = pass;
       linePassAt = now;
-      T.js('try{window.thornswoodNet&&window.thornswoodNet.say(' + JSON.stringify('/joinpass ' + pass) + ',true);}catch(e){}');
+      T.js('try{window.thornswoodNet&&window.thornswoodNet.say(' + JSON.stringify('/joinpass ' + pass) + ',{quiet:true});}catch(e){}');
     }
-    T.js('try{window.thornswoodNet&&window.thornswoodNet.say("/line",true);}catch(e){}');
+    T.js('try{window.thornswoodNet&&window.thornswoodNet.say("/line",{quiet:true});}catch(e){}');
   }
 
   /* Close the game from the page: give the place up now, before the connection closes. */
   function lineLeave() {
     if (!lineId) { return; }
-    T.js('try{window.thornswoodNet&&window.thornswoodNet.say("/line leave",true);}catch(e){}');
+    T.js('try{window.thornswoodNet&&window.thornswoodNet.say("/line leave",{quiet:true});}catch(e){}');
     log('menu: profile', lineId, 'gave up their place in line');
     lineId = 0;
   }
@@ -2797,11 +2797,11 @@
   const toServer = [];
 
   /*
-    The true after the line marks it as the plugin's own, so the chat page
-    queues it without saying "Not connected yet" over it. Patrick, 24
-    September, over a tester in the creation hall who had typed nothing: "it
-    says mulitple trimes he wasnt connected yet". A page from before the
-    marker ignores it and says what it always said.
+    say marks every line as pressed rather than typed (#2251, #2732), and
+    quiet asks the chat page to queue it without saying "Not connected yet"
+    over it. Patrick, 24 September, over a tester in the creation hall who
+    had typed nothing: "it says mulitple trimes he wasnt connected yet". The
+    two are separate answers in thornswood-chat.js (TWO ANSWERS, over send).
   */
   function tellServer(line) {
     if (line) { toServer.push(line); }
@@ -2809,7 +2809,7 @@
     if (!T.ready) { return; }
     while (toServer.length) {
       const sent = T.js('try{window.thornswoodNet&&window.thornswoodNet.say(' +
-                        JSON.stringify(toServer[0]) + ',true);}catch(e){}');
+                        JSON.stringify(toServer[0]) + ',{quiet:true});}catch(e){}');
       if (!sent) { return; }
       toServer.shift();
     }
@@ -5174,7 +5174,8 @@
     if (!lookingAt) { return false; }
     const line = '/' + cmd + ' ' + lookingAt;
     if (!T.ready) { note('The social connection is loading. Try again in a moment.'); return true; }
-    // These are deliberate actions; chat reports an offline queued request.
+    // These are deliberate actions: say marks the line as a key press, and
+    // with no quiet the chat says when it is queued offline (#2732).
     const sent = T.js('(function(){try{if(window.thornswoodNet&&window.thornswoodNet.say){' +
       'window.thornswoodNet.say(' + JSON.stringify(line) + ');return;}}catch(e){}' +
       'try{window.skyrimPlatform.sendMessage("thornswood-front","social:unavailable");}catch(e){}})();');

@@ -142,7 +142,8 @@ the ones the front plugin sends by itself (#2723,
 `/loadorder` and `/loadorderlight`, `/afk active`, `/face done`,
 `/racemenu` and `/racedown`, `/modset`, `/ate`, `/chopped`, `/tspicks`,
 `/rest`, and the panels' `refresh`. It writes the ones a key, E, a pick
-or a button sends, marked as a key press (#2251), and the wait in line
+or a button sends, marked as a key press (#2251; the chat page marks
+every line that does not come from the chat box, #2732), and the wait in line
 once when it starts and once when it ends (#1131). Every one of them
 still reaches the game server, and the same line typed in the chat box
 is written as typed.
