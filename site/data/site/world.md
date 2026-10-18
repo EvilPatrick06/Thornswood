@@ -44,7 +44,7 @@ enough to make war.
 
 Justiciars who had not made the border went to ground. Some died in it. Some
 did not, and their grandchildren are still here, running gold and poison and
-worse through the holds and along the coast under other names. They call
+worse under other names, through the holds and along the coast. They call
 themselves nothing. Other people call them the Remnant.
 
 Most of them do not want Skyrim back. No Dominion order to retake it has
