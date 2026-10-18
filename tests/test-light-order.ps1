@@ -34,6 +34,10 @@
        plugins only; and again over that order with a new light plugin and a
        new light master, the first put on the end of the light order and the
        second refused.
+    4. The places full and light plugins hold among each other (#2468): a
+       re-sorted list keeps each kind's order and still moves those places,
+       and the same list in Thornswood-Last.esp's recorded order
+       (Get-ThornswoodRecordedSequence) gives the recorded whole order.
 
   -Repo points it at another checkout, which is how it was shown to fail on
   main before the change.
@@ -184,6 +188,22 @@ try {
     $so5 = Get-ThornswoodServerOrder $gone $ccc $info $so.Order
     Same 'a light plugin that is gone is said, and every light plugin after it moves up one' (@($so5.Removed) + @('|') + @($so5.Light)) (
         @('Light Beards.esp', '|', '_ResourcePack.esl', 'Expressive Facegen Morphs.esl', 'Late Light.esp', 'New Light.esp'))
+
+    # The places full and light plugins hold among each other (#2468). A
+    # re-sorted list keeps each kind's order, but the places come from the
+    # list, so the whole order moves: what Vortex did on One on 17 Oct.
+    # Given in the order the last plugin's record has, it does not.
+    $sameSet = [string[]]@($resorted | Where-Object { $_ -ne 'New Light.esp' })
+    $drift = Get-ThornswoodServerOrder $sameSet $ccc $info $so.Order
+    Same 'a re-sorted list keeps the full and light orders' (@($drift.Full) + @('|') + @($drift.Light)) (@($so.Full) + @('|') + @($so.Light))
+    Yes 'and still moves the places between them, so the whole order is not the one kept' ((@($drift.Order) -join '|') -ne (@($so.Order) -join '|'))
+    $rs = Get-ThornswoodRecordedSequence $sameSet $so.Order
+    Same 'the list in the recorded order: the names it enables, where the record has them' $rs.Wanted @($so.Order | Where-Object { $sameSet -contains $_ })
+    Same 'nothing it enables is missing from the record' $rs.NotRecorded @()
+    $kept = Get-ThornswoodServerOrder $rs.Wanted $ccc $info $so.Order
+    Same 'given in the recorded order, the whole order is the recorded one' $kept.Order $so.Order
+    $rs2 = Get-ThornswoodRecordedSequence ([string[]]($sameSet + @('New Light.esp', 'menu glue.ESP'))) $so.Order
+    Same 'a name the record does not have goes on the end and is said; one it has, any case, takes its place once' (@($rs2.Wanted[-1]) + @('|') + @($rs2.NotRecorded) + @('|') + @(@($rs2.Wanted | Where-Object { $_ -ieq 'Menu Glue.esp' }).Count)) @('New Light.esp', '|', 'New Light.esp', '|', 1)
 
     # ---- 2. the record, and a plugin's header ------------------------------------
     Write-Host ''

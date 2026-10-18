@@ -541,7 +541,22 @@ if ($loadsLight) {
     # kind (ServerOrder.ps1). The first deploy that lists light plugins has no
     # light order to keep, so the light order is the game's for this list,
     # which is the order a machine that takes the pack's list gets.
-    $so = Get-ThornswoodServerOrder ([string[]]$wanted) ([string[]]$ccc) $info ([string[]]$prior)
+    # With the last plugin held, the places full and light plugins hold among
+    # each other are the ones it was built against, read from its record, not
+    # this machine's list (ServerOrder.ps1, Get-ThornswoodRecordedSequence).
+    $sequence = [string[]]$wanted
+    $lastOrder = @()
+    if ($lastHeld) {
+        $lastRecord = [IO.Path]::GetFullPath((Join-Path $Here '..\..\game\data\last-plugin.json'))
+        if (-not (Test-Path -LiteralPath $lastRecord)) { throw "the checkout holds $lastName and no game\data\last-plugin.json saying which load order it was built against" }
+        $lastOrder = @((ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($lastRecord)) $lastRecord).loadOrder | ForEach-Object { [string]$_ })
+        $rs = Get-ThornswoodRecordedSequence ([string[]]$wanted) ([string[]]$lastOrder)
+        $sequence = $rs.Wanted
+    }
+    # Its own place is last, put there below, so the kept order is read
+    # without it and it is never counted as gone.
+    $keptPrior = @($prior | Where-Object { -not ($lastHeld -and $_ -ieq $lastName) })
+    $so = Get-ThornswoodServerOrder $sequence ([string[]]$ccc) $info ([string[]]$keptPrior)
     $keep = @($so.Order)
     if ($prior.Count) {
         Write-Host ("  order kept from the server's own list, full and light apart: {0} full and {1} light, {2} full and {3} light new on the end of their own kind, {4} gone" -f `
@@ -566,6 +581,29 @@ if ($loadsLight) {
         Write-Host '  Either take it out of the collection, or wipe the world and rebuild the' -ForegroundColor Red
         Write-Host '  order with -NewOrder, which re-keys everything on purpose.' -ForegroundColor Red
         throw 'a plugin the game loads ahead of its kind cannot be appended to the live order'
+    }
+    # The server's order is the one the last plugin was built against, or it
+    # does not go out: the plugin would undo whatever a plugin that wins in
+    # this order changed. Publish-Update refuses the same at the Ship
+    # (Get-ShipLastPluginProblem); this stops it before a server runs it.
+    if ($lastHeld) {
+        $built = @($so.Order | Where-Object { $_ -ine $lastName })
+        $at = -1
+        for ($i = 0; $i -lt [Math]::Max($built.Count, $lastOrder.Count); $i++) {
+            $a = if ($i -lt $built.Count) { $built[$i] } else { '(nothing)' }
+            $b = if ($i -lt $lastOrder.Count) { $lastOrder[$i] } else { '(nothing)' }
+            if ($a -ine $b) { $at = $i; break }
+        }
+        if ($at -ge 0) {
+            Write-Host ''
+            Write-Host "  STOP. $lastName was built against another load order than the one this server keeps." -ForegroundColor Red
+            Write-Host ("    at position {0} the server would load {1} and the plugin was built with {2}" -f ($at + 1), $a, $b) -ForegroundColor Red
+            foreach ($n in $rs.NotRecorded) { Write-Host "    $n is enabled here and the plugin's record does not name it" -ForegroundColor Red }
+            Write-Host '  Build it again for this order: python scripts\mods\Build-LastPlugin.py --data <a Data folder holding the collection''s bytes>,' -ForegroundColor Red
+            Write-Host '  then commit the plugin and game\data\last-plugin.json.' -ForegroundColor Red
+            throw "$lastName was built against another load order"
+        }
+        Write-Host ("  the order {0} was built against: {1} plugins, full and light where its record has them" -f $lastName, $built.Count) -ForegroundColor Cyan
     }
 } elseif ($prior.Count) {
     $keepBy = @{}
