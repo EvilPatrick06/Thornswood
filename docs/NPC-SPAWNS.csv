@@ -789,7 +789,7 @@ ref,name,base,hold,locationName,location,habitat,role,species,tier,cap,returnMin
 107d65:Skyrim.esm,Snow Fox,ec96a:Skyrim.esm,the Rift,open ground in Tamriel,bd8e:Skyrim.esm,wilderness,animal,fox,,6,20,1536,bd8e:Skyrim.esm,3c:Skyrim.esm,205618.96875,-119476.90625,13162.9599609375
 107d66:Skyrim.esm,Fox,ec968:Skyrim.esm,the Rift,open ground in Tamriel,bd6e:Skyrim.esm,wilderness,animal,fox,,6,20,1536,bd6e:Skyrim.esm,3c:Skyrim.esm,202219.265625,-115582.96875,8469.705078125
 107d67:Skyrim.esm,Fox,ec968:Skyrim.esm,the Rift,open ground in Tamriel,bd4d:Skyrim.esm,wilderness,animal,fox,,6,20,1536,bd4d:Skyrim.esm,3c:Skyrim.esm,203979.875,-111171.9765625,7125.732421875
-107de1:Skyrim.esm,Skeleton,9362b:Skyrim.esm,no hold,Ironbind Barrow,350bc:Skyrim.esm,dungeon,enemy,skeleton,1,8,30,1536,35604:Skyrim.esm,,4040.3759765625,5346.79150390625,-1313.962158203125
+107de1:Skyrim.esm,Skeleton,9362b:Skyrim.esm,Winterhold,Ironbind Barrow,350bc:Skyrim.esm,dungeon,enemy,skeleton,1,8,30,1536,35604:Skyrim.esm,,4040.3759765625,5346.79150390625,-1313.962158203125
 107e0f:Skyrim.esm,Ice Wraith,84095:Skyrim.esm,Winterhold,POISnowy24,8fde:Skyrim.esm,wilderness,enemy,icewraith,,4,45,1536,8fde:Skyrim.esm,3c:Skyrim.esm,85428.0,64903.40234375,6548.67529296875
 107e11:Skyrim.esm,Ice Wraith,84095:Skyrim.esm,Winterhold,POISnowy24,8fde:Skyrim.esm,wilderness,enemy,icewraith,,4,45,1536,8fde:Skyrim.esm,3c:Skyrim.esm,84181.1015625,65046.5234375,6423.583984375
 10807:Dawnguard.esm,Ice Wraith,84095:Skyrim.esm,no hold,FalmerTempleExterior01,cdb:Dawnguard.esm,wilderness,enemy,icewraith,,4,45,1536,cdb:Dawnguard.esm,bb5:Dawnguard.esm,-8791.802734375,-8375.6337890625,3245.77392578125
@@ -1038,9 +1038,9 @@ ref,name,base,hold,locationName,location,habitat,role,species,tier,cap,returnMin
 10f540:Skyrim.esm,Draugr,567c8:Skyrim.esm,the Pale,Hillgrund's Tomb,19196:Skyrim.esm,dungeon,enemy,draugr,1,8,30,1536,15261:Skyrim.esm,,-7649.5029296875,3653.6396484375,-1855.7203369140625
 10f654:Skyrim.esm,Dwarven Sphere,10ec92:Skyrim.esm,the Reach,Markarth Ruins,597d4:Skyrim.esm,dungeon,enemy,dwarvensphere,2,12,45,1536,597d4:Skyrim.esm,,-12359.798828125,-54.43211364746094,28.873291015625
 10f656:Skyrim.esm,Dwarven Sphere,10ee51:Skyrim.esm,the Reach,Markarth Ruins,597d4:Skyrim.esm,dungeon,enemy,dwarvensphere,2,12,45,1536,597d4:Skyrim.esm,,-12022.9130859375,1150.962646484375,-544.0
-112f9:Dawnguard.esm,Frostbite Spider,5d007:Skyrim.esm,no hold,Darkfall Cave,4346:Dawnguard.esm,cave,animal,spider,2,12,45,1536,4346:Dawnguard.esm,,-2925.27587890625,-8699.6259765625,-2974.752197265625
-112fb:Dawnguard.esm,Frostbite Spider,5d007:Skyrim.esm,no hold,Darkfall Cave,4346:Dawnguard.esm,cave,animal,spider,2,12,45,1536,4346:Dawnguard.esm,,-3217.52099609375,-8697.603515625,-2751.09375
-112fd:Dawnguard.esm,Frostbite Spider,5d007:Skyrim.esm,no hold,Darkfall Cave,4346:Dawnguard.esm,cave,animal,spider,2,12,45,1536,4346:Dawnguard.esm,,-3223.423583984375,-8788.6220703125,-2769.1787109375
+112f9:Dawnguard.esm,Frostbite Spider,5d007:Skyrim.esm,the Reach,Darkfall Cave,4346:Dawnguard.esm,cave,animal,spider,2,12,45,1536,4346:Dawnguard.esm,,-2925.27587890625,-8699.6259765625,-2974.752197265625
+112fb:Dawnguard.esm,Frostbite Spider,5d007:Skyrim.esm,the Reach,Darkfall Cave,4346:Dawnguard.esm,cave,animal,spider,2,12,45,1536,4346:Dawnguard.esm,,-3217.52099609375,-8697.603515625,-2751.09375
+112fd:Dawnguard.esm,Frostbite Spider,5d007:Skyrim.esm,the Reach,Darkfall Cave,4346:Dawnguard.esm,cave,animal,spider,2,12,45,1536,4346:Dawnguard.esm,,-3223.423583984375,-8788.6220703125,-2769.1787109375
 11333:Dawnguard.esm,Vale Deer,2c02:Dawnguard.esm,no hold,open ground in DLC1DarkfallPassageWorld,5ac9:Dawnguard.esm,wilderness,animal,deer,,6,20,1536,5ac9:Dawnguard.esm,4bea:Dawnguard.esm,-157895.484375,77344.6796875,-2435.85009765625
 11334:Dawnguard.esm,Vale Deer,2c02:Dawnguard.esm,no hold,open ground in DLC1DarkfallPassageWorld,5ac9:Dawnguard.esm,wilderness,animal,deer,,6,20,1536,5ac9:Dawnguard.esm,4bea:Dawnguard.esm,-157827.3125,77480.0546875,-2447.888427734375
 11335:Dawnguard.esm,Vale Deer,2c02:Dawnguard.esm,no hold,open ground in DLC1DarkfallPassageWorld,5ac9:Dawnguard.esm,wilderness,animal,deer,,6,20,1536,5ac9:Dawnguard.esm,4bea:Dawnguard.esm,-158246.90625,77179.765625,-2445.1796875
@@ -1087,11 +1087,11 @@ ref,name,base,hold,locationName,location,habitat,role,species,tier,cap,returnMin
 12b9d:Dawnguard.esm,Falmer,1e7b3:Skyrim.esm,no hold,Sharpslope Cave,8995:Dawnguard.esm,cave,enemy,falmer,2,12,45,1536,8995:Dawnguard.esm,,2565.63671875,-1178.822021484375,794.6493530273438
 12b9e:Dawnguard.esm,Falmer,1e7b4:Skyrim.esm,no hold,Sharpslope Cave,8995:Dawnguard.esm,cave,enemy,falmer,2,12,45,1536,8995:Dawnguard.esm,,2418.638671875,-846.6739501953125,733.814697265625
 12f179:WindhelmSSE.esp,Riekling,26ec8:Dragonborn.esm,Eastmarch,Dockside Warehouse,1767cf:WindhelmSSE.esp,dungeon,enemy,dlc2riekling,1,8,30,1536,90232:WindhelmSSE.esp,,2272.641357421875,-1260.0609130859375,56.0
-1320a:Dawnguard.esm,Bear,42265:Skyrim.esm,no hold,Mossy Glen Cave,8e52:Dawnguard.esm,cave,animal,bear,2,12,45,1536,8e52:Dawnguard.esm,,318.1802062988281,-2156.612548828125,-290.0948486328125
-1320b:Dawnguard.esm,Bear,42265:Skyrim.esm,no hold,Mossy Glen Cave,8e52:Dawnguard.esm,cave,animal,bear,2,12,45,1536,8e52:Dawnguard.esm,,196.3634033203125,-3304.393798828125,-283.70477294921875
-1320c:Dawnguard.esm,Bear,42265:Skyrim.esm,no hold,Mossy Glen Cave,8e52:Dawnguard.esm,cave,animal,bear,2,12,45,1536,8e52:Dawnguard.esm,,-321.51373291015625,-3275.8876953125,-282.526123046875
-1320d:Dawnguard.esm,Bear,42265:Skyrim.esm,no hold,Mossy Glen Cave,8e52:Dawnguard.esm,cave,animal,bear,2,12,45,1536,8e52:Dawnguard.esm,,-1494.7265625,-2323.859375,-287.98583984375
-1320f:Dawnguard.esm,Skeever,23ab7:Skyrim.esm,no hold,Mossy Glen Cave,8e52:Dawnguard.esm,cave,animal,skeever,2,12,45,1536,8e52:Dawnguard.esm,,1050.52392578125,-581.2789916992188,-271.7867126464844
+1320a:Dawnguard.esm,Bear,42265:Skyrim.esm,the Rift,Mossy Glen Cave,8e52:Dawnguard.esm,cave,animal,bear,2,12,45,1536,8e52:Dawnguard.esm,,318.1802062988281,-2156.612548828125,-290.0948486328125
+1320b:Dawnguard.esm,Bear,42265:Skyrim.esm,the Rift,Mossy Glen Cave,8e52:Dawnguard.esm,cave,animal,bear,2,12,45,1536,8e52:Dawnguard.esm,,196.3634033203125,-3304.393798828125,-283.70477294921875
+1320c:Dawnguard.esm,Bear,42265:Skyrim.esm,the Rift,Mossy Glen Cave,8e52:Dawnguard.esm,cave,animal,bear,2,12,45,1536,8e52:Dawnguard.esm,,-321.51373291015625,-3275.8876953125,-282.526123046875
+1320d:Dawnguard.esm,Bear,42265:Skyrim.esm,the Rift,Mossy Glen Cave,8e52:Dawnguard.esm,cave,animal,bear,2,12,45,1536,8e52:Dawnguard.esm,,-1494.7265625,-2323.859375,-287.98583984375
+1320f:Dawnguard.esm,Skeever,23ab7:Skyrim.esm,the Rift,Mossy Glen Cave,8e52:Dawnguard.esm,cave,animal,skeever,2,12,45,1536,8e52:Dawnguard.esm,,1050.52392578125,-581.2789916992188,-271.7867126464844
 13382:Dawnguard.esm,Falmer,9c959:Skyrim.esm,no hold,TempleStart,c1d:Dawnguard.esm,wilderness,enemy,falmer,,4,45,1536,c1d:Dawnguard.esm,bb5:Dawnguard.esm,-24806.005859375,-17928.22265625,4451.84521484375
 13389:Dawnguard.esm,Falmer,f21dd:Skyrim.esm,no hold,TempleStart,c1d:Dawnguard.esm,wilderness,enemy,falmer,,4,45,1536,c1d:Dawnguard.esm,bb5:Dawnguard.esm,-24689.67578125,-17496.525390625,4364.89404296875
 1338a:Dawnguard.esm,Falmer,1e7b4:Skyrim.esm,no hold,TempleStart,c1d:Dawnguard.esm,wilderness,enemy,falmer,,4,45,1536,c1d:Dawnguard.esm,bb5:Dawnguard.esm,-26981.693359375,-17801.634765625,3931.7705078125
@@ -1108,10 +1108,10 @@ ref,name,base,hold,locationName,location,habitat,role,species,tier,cap,returnMin
 13bd7:Dawnguard.esm,Falmer,2b5a:Dawnguard.esm,no hold,open ground in DLC01FalmerValley,c1e:Dawnguard.esm,wilderness,enemy,falmer,,4,45,1536,c1e:Dawnguard.esm,bb5:Dawnguard.esm,-26217.857421875,-23603.087890625,6660.7119140625
 13bffc:Arena - Markarth Side.esp,Gunnr,13bffb:Arena - Markarth Side.esp,Hjaalmarch,Markarth Side,122a30:Arena - Markarth Side.esp,city,trader,redguard,,,360,512,f9a47:Arena - Markarth Side.esp,,48.0,-8.0,0.0
 13c008:Arena - Markarth Side.esp,Hild,13c004:Arena - Markarth Side.esp,Hjaalmarch,Markarth Side,122a30:Arena - Markarth Side.esp,city,trader,nord,,,360,512,f9a47:Arena - Markarth Side.esp,,-56.0,0.0,0.0
-13cbf:Dawnguard.esm,Skeleton,17e95:Dawnguard.esm,no hold,Castle Volkihar,4c20:Dawnguard.esm,wilderness,enemy,skeletonarmor,,4,45,1536,18de:Skyrim.esm,3c:Skyrim.esm,-172967.1875,153853.578125,-13939.0791015625
-13cc0:Dawnguard.esm,Skeleton,17e92:Dawnguard.esm,no hold,Castle Volkihar,4c20:Dawnguard.esm,wilderness,enemy,skeletonarmor,,4,45,1536,18de:Skyrim.esm,3c:Skyrim.esm,-173260.234375,153695.84375,-13171.1005859375
-13cc1:Dawnguard.esm,Skeleton,17e96:Dawnguard.esm,no hold,Castle Volkihar,4c20:Dawnguard.esm,wilderness,enemy,skeletonarmor,,4,45,1536,18de:Skyrim.esm,3c:Skyrim.esm,-174640.59375,153705.578125,-13426.2431640625
-13cc2:Dawnguard.esm,Skeleton,cadb:Dawnguard.esm,no hold,Castle Volkihar,4c20:Dawnguard.esm,wilderness,enemy,skeletonarmor,,4,45,1536,18de:Skyrim.esm,3c:Skyrim.esm,-172936.453125,155170.5625,-13442.8134765625
+13cbf:Dawnguard.esm,Skeleton,17e95:Dawnguard.esm,Haafingar,Castle Volkihar,4c20:Dawnguard.esm,wilderness,enemy,skeletonarmor,,4,45,1536,18de:Skyrim.esm,3c:Skyrim.esm,-172967.1875,153853.578125,-13939.0791015625
+13cc0:Dawnguard.esm,Skeleton,17e92:Dawnguard.esm,Haafingar,Castle Volkihar,4c20:Dawnguard.esm,wilderness,enemy,skeletonarmor,,4,45,1536,18de:Skyrim.esm,3c:Skyrim.esm,-173260.234375,153695.84375,-13171.1005859375
+13cc1:Dawnguard.esm,Skeleton,17e96:Dawnguard.esm,Haafingar,Castle Volkihar,4c20:Dawnguard.esm,wilderness,enemy,skeletonarmor,,4,45,1536,18de:Skyrim.esm,3c:Skyrim.esm,-174640.59375,153705.578125,-13426.2431640625
+13cc2:Dawnguard.esm,Skeleton,cadb:Dawnguard.esm,Haafingar,Castle Volkihar,4c20:Dawnguard.esm,wilderness,enemy,skeletonarmor,,4,45,1536,18de:Skyrim.esm,3c:Skyrim.esm,-172936.453125,155170.5625,-13442.8134765625
 13e2f:Dawnguard.esm,Ice Wraith,84095:Skyrim.esm,no hold,DLC1FalmerValleyPOI06,d0e:Dawnguard.esm,wilderness,enemy,icewraith,,4,45,1536,d0e:Dawnguard.esm,bb5:Dawnguard.esm,2243.875244140625,-3507.732421875,133.0792694091797
 13e40:Dawnguard.esm,Giant Frostbite Spider,424f6:Skyrim.esm,no hold,DLC1FalmerValleyPOI07,d07:Dawnguard.esm,wilderness,enemy,giant,,4,45,1536,d07:Dawnguard.esm,bb5:Dawnguard.esm,5169.875,9901.724609375,2883.53125
 13e60:Dawnguard.esm,Frostbite Spider,42264:Skyrim.esm,no hold,DLC1FalmerValleyPOI07,d07:Dawnguard.esm,wilderness,animal,spider,,6,20,1536,d07:Dawnguard.esm,bb5:Dawnguard.esm,5513.287109375,9936.0810546875,2854.348876953125
@@ -1181,7 +1181,7 @@ ref,name,base,hold,locationName,location,habitat,role,species,tier,cap,returnMin
 161a9:Dawnguard.esm,Boneman,150af:Dawnguard.esm,no hold,SoulCairnPOI08,2ce3:Dawnguard.esm,wilderness,enemy,dlc1blackskeleton,,4,45,1536,2ce3:Dawnguard.esm,1408:Dawnguard.esm,-11740.7138671875,16431.837890625,278.6983642578125
 161ad:Dawnguard.esm,Boneman,150af:Dawnguard.esm,no hold,SoulCairnPOIMaze,2ce4:Dawnguard.esm,wilderness,enemy,dlc1blackskeleton,,4,45,1536,2ce4:Dawnguard.esm,1408:Dawnguard.esm,-8742.4365234375,15540.8359375,252.7594451904297
 161b3:Dawnguard.esm,Wrathman,4575:Dawnguard.esm,no hold,open ground in DLC01SoulCairn,2cd8:Dawnguard.esm,wilderness,enemy,dlc1soulcairnskeletonarmor,,4,45,1536,2cd8:Dawnguard.esm,1408:Dawnguard.esm,-8179.318359375,17514.48828125,101.69819641113281
-161bc:Dawnguard.esm,Gargoyle,3dcf:Dawnguard.esm,no hold,Volkihar Ruins,285a:Dawnguard.esm,dungeon,enemy,dlc1gargoylevariantgreen,2,12,45,1536,285a:Dawnguard.esm,,-344.8438720703125,3167.174560546875,3026.09423828125
+161bc:Dawnguard.esm,Gargoyle,3dcf:Dawnguard.esm,Haafingar,Volkihar Ruins,285a:Dawnguard.esm,dungeon,enemy,dlc1gargoylevariantgreen,2,12,45,1536,285a:Dawnguard.esm,,-344.8438720703125,3167.174560546875,3026.09423828125
 163ff:Skyrim.esm,Mammoth,dd641:Skyrim.esm,the Pale,Tumble Arch Pass,192be:Skyrim.esm,giant-camp,animal,mammoth,,4,240,2048,90da:Skyrim.esm,3c:Skyrim.esm,65877.953125,31158.216796875,-7142.9765625
 1688e:Dawnguard.esm,Dwarven Sphere,10ee51:Skyrim.esm,Falkreath,Arkngthamz,4d6d:Dawnguard.esm,dungeon,enemy,dwarvensphere,2,12,45,1536,140a:Dawnguard.esm,,2140.38525390625,-8221.056640625,1307.6656494140625
 16896:Dawnguard.esm,Dwarven Spider Worker,10ee4d:Skyrim.esm,Falkreath,Arkngthamz,4d6d:Dawnguard.esm,dungeon,animal,spider,2,12,45,1536,140a:Dawnguard.esm,,-898.3115844726562,216.70530700683594,-768.4931640625
@@ -1205,7 +1205,7 @@ ref,name,base,hold,locationName,location,habitat,role,species,tier,cap,returnMin
 17514:Dragonborn.esm,Dwarven Centurion,1d4ee:Dragonborn.esm,Solstheim,Nchardak,142b4:Dragonborn.esm,dungeon,enemy,dwarvencenturion,3,16,60,1536,142f1:Dragonborn.esm,,80.91263580322266,-318.9944763183594,235.0355987548828
 17668:Dawnguard.esm,Falmer,9c959:Skyrim.esm,no hold,FalmerPlayground,ce5:Dawnguard.esm,wilderness,enemy,falmer,,4,45,1536,ce5:Dawnguard.esm,bb5:Dawnguard.esm,-19840.91796875,21843.712890625,4771.189453125
 1766a:Dawnguard.esm,Falmer,9c959:Skyrim.esm,no hold,open ground in DLC01FalmerValley,ce6:Dawnguard.esm,wilderness,enemy,falmer,,4,45,1536,ce6:Dawnguard.esm,bb5:Dawnguard.esm,-19057.189453125,19920.69140625,6434.82763671875
-176dd:Dawnguard.esm,Skeleton,da06b:Skyrim.esm,no hold,Volkihar Ruins,285a:Dawnguard.esm,dungeon,enemy,skeleton,2,12,45,1536,285a:Dawnguard.esm,,-2339.17529296875,4903.80859375,2642.09423828125
+176dd:Dawnguard.esm,Skeleton,da06b:Skyrim.esm,Haafingar,Volkihar Ruins,285a:Dawnguard.esm,dungeon,enemy,skeleton,2,12,45,1536,285a:Dawnguard.esm,,-2339.17529296875,4903.80859375,2642.09423828125
 1772b:Dawnguard.esm,Draugr,6f83a:Skyrim.esm,the Pale,Dimhollow Crypt,4ee8:Dawnguard.esm,cave,enemy,draugr,1,8,30,1536,eb7:Dawnguard.esm,,12202.193359375,1239.1339111328125,489.3704833984375
 1772c:Dawnguard.esm,Draugr,567c8:Skyrim.esm,the Pale,Dimhollow Crypt,4ee8:Dawnguard.esm,cave,enemy,draugr,1,8,30,1536,eb7:Dawnguard.esm,,12142.9716796875,1583.0467529296875,492.4251708984375
 1772f:Dawnguard.esm,Skeleton,da06b:Skyrim.esm,the Pale,Dimhollow Crypt,4ee8:Dawnguard.esm,cave,enemy,skeleton,1,8,30,1536,eb7:Dawnguard.esm,,10305.916015625,929.3379516601562,36.842010498046875
@@ -1223,13 +1223,13 @@ ref,name,base,hold,locationName,location,habitat,role,species,tier,cap,returnMin
 182a0:Dragonborn.esm,Garyn Ienth,1829f:Dragonborn.esm,Solstheim,Raven Rock,143b9:Dragonborn.esm,city,trader,darkelf,,,360,512,18277:Dragonborn.esm,,-64.05123138427734,194.41407775878906,0.0
 182a2:Dragonborn.esm,Milore Ienth,182a1:Dragonborn.esm,Solstheim,Raven Rock,143b9:Dragonborn.esm,city,trader,darkelf,,,360,512,18277:Dragonborn.esm,,-3.5353641510009766,232.098876953125,0.0
 182af:Dragonborn.esm,Gjalund Salt-Sage,182ae:Dragonborn.esm,Eastmarch,Windhelm,18a57:Skyrim.esm,city,transport,nord,,,45,512,d74:Skyrim.esm,3c:Skyrim.esm,141309.96875,34083.70703125,-13995.53125
-18305:Dawnguard.esm,Gargoyle,3dcf:Dawnguard.esm,no hold,Volkihar Ruins,285a:Dawnguard.esm,dungeon,enemy,dlc1gargoylevariantgreen,2,12,45,1536,285a:Dawnguard.esm,,2585.92578125,1928.16943359375,3840.0
-1830f:Dawnguard.esm,Skeleton,1830d:Dawnguard.esm,no hold,Volkihar Ruins,285a:Dawnguard.esm,dungeon,enemy,skeletonarmor,2,12,45,1536,285a:Dawnguard.esm,,-2115.03173828125,4608.1650390625,2642.09423828125
-18312:Dawnguard.esm,Skeleton,524e5:Skyrim.esm,no hold,Volkihar Ruins,285a:Dawnguard.esm,dungeon,enemy,skeleton,2,12,45,1536,285a:Dawnguard.esm,,-1794.066650390625,4934.63720703125,2642.09423828125
-18315:Dawnguard.esm,Skeleton,1830c:Dawnguard.esm,no hold,Volkihar Ruins,285a:Dawnguard.esm,dungeon,enemy,skeletonarmor,2,12,45,1536,285a:Dawnguard.esm,,-2002.5382080078125,5223.50390625,2642.09423828125
-18318:Dawnguard.esm,Skeleton,524e5:Skyrim.esm,no hold,Volkihar Ruins,285a:Dawnguard.esm,dungeon,enemy,skeleton,2,12,45,1536,285a:Dawnguard.esm,,-1954.393798828125,4445.5009765625,2642.09423828125
-1831b:Dawnguard.esm,Skeleton,1830e:Dawnguard.esm,no hold,Volkihar Ruins,285a:Dawnguard.esm,dungeon,enemy,skeletonarmor,2,12,45,1536,285a:Dawnguard.esm,,-1604.8818359375,4829.06201171875,2642.09423828125
-1831e:Dawnguard.esm,Skeleton,1830b:Dawnguard.esm,no hold,Volkihar Ruins,285a:Dawnguard.esm,dungeon,enemy,skeletonarmor,2,12,45,1536,285a:Dawnguard.esm,,-2436.80810546875,5420.126953125,2642.09423828125
+18305:Dawnguard.esm,Gargoyle,3dcf:Dawnguard.esm,Haafingar,Volkihar Ruins,285a:Dawnguard.esm,dungeon,enemy,dlc1gargoylevariantgreen,2,12,45,1536,285a:Dawnguard.esm,,2585.92578125,1928.16943359375,3840.0
+1830f:Dawnguard.esm,Skeleton,1830d:Dawnguard.esm,Haafingar,Volkihar Ruins,285a:Dawnguard.esm,dungeon,enemy,skeletonarmor,2,12,45,1536,285a:Dawnguard.esm,,-2115.03173828125,4608.1650390625,2642.09423828125
+18312:Dawnguard.esm,Skeleton,524e5:Skyrim.esm,Haafingar,Volkihar Ruins,285a:Dawnguard.esm,dungeon,enemy,skeleton,2,12,45,1536,285a:Dawnguard.esm,,-1794.066650390625,4934.63720703125,2642.09423828125
+18315:Dawnguard.esm,Skeleton,1830c:Dawnguard.esm,Haafingar,Volkihar Ruins,285a:Dawnguard.esm,dungeon,enemy,skeletonarmor,2,12,45,1536,285a:Dawnguard.esm,,-2002.5382080078125,5223.50390625,2642.09423828125
+18318:Dawnguard.esm,Skeleton,524e5:Skyrim.esm,Haafingar,Volkihar Ruins,285a:Dawnguard.esm,dungeon,enemy,skeleton,2,12,45,1536,285a:Dawnguard.esm,,-1954.393798828125,4445.5009765625,2642.09423828125
+1831b:Dawnguard.esm,Skeleton,1830e:Dawnguard.esm,Haafingar,Volkihar Ruins,285a:Dawnguard.esm,dungeon,enemy,skeletonarmor,2,12,45,1536,285a:Dawnguard.esm,,-1604.8818359375,4829.06201171875,2642.09423828125
+1831e:Dawnguard.esm,Skeleton,1830b:Dawnguard.esm,Haafingar,Volkihar Ruins,285a:Dawnguard.esm,dungeon,enemy,skeletonarmor,2,12,45,1536,285a:Dawnguard.esm,,-2436.80810546875,5420.126953125,2642.09423828125
 183fa:Dawnguard.esm,Wolf,1e7a3:Skyrim.esm,the Pale,Dimhollow Crypt,4ee8:Dawnguard.esm,dungeon,animal,wolf,1,8,30,1536,eb8:Dawnguard.esm,,1932.6248779296875,1158.00341796875,59.98858642578125
 183fb:Dawnguard.esm,Wolf,1e7a3:Skyrim.esm,the Pale,Dimhollow Crypt,4ee8:Dawnguard.esm,dungeon,animal,wolf,1,8,30,1536,eb8:Dawnguard.esm,,2513.385009765625,941.940673828125,32.31280517578125
 183fc:Dawnguard.esm,Wolf,1e7a3:Skyrim.esm,the Pale,Dimhollow Crypt,4ee8:Dawnguard.esm,dungeon,animal,wolf,1,8,30,1536,eb8:Dawnguard.esm,,3257.9404296875,-849.284912109375,84.4276123046875
@@ -1241,9 +1241,9 @@ ref,name,base,hold,locationName,location,habitat,role,species,tier,cap,returnMin
 1867a:Dawnguard.esm,Falmer,1e7b4:Skyrim.esm,no hold,open ground in DLC01FalmerValley,cac:Dawnguard.esm,wilderness,enemy,falmer,,4,45,1536,cac:Dawnguard.esm,bb5:Dawnguard.esm,-24731.83203125,3471.25732421875,4047.920654296875
 1867b:Dawnguard.esm,Falmer,6322c:Skyrim.esm,no hold,open ground in DLC01FalmerValley,cac:Dawnguard.esm,wilderness,enemy,falmer,,4,45,1536,cac:Dawnguard.esm,bb5:Dawnguard.esm,-25175.208984375,3552.635009765625,4046.648681640625
 18726:Skyrim.esm,Restless Draugr,6f83e:Skyrim.esm,Hjaalmarch,Dead Men's Respite,19161:Skyrim.esm,dungeon,enemy,draugr,1,8,30,1536,1529d:Skyrim.esm,,-5138.55078125,3400.3310546875,-1648.0
-1891e:Dawnguard.esm,Skeleton,cade:Dawnguard.esm,no hold,Volkihar Ruins,285a:Dawnguard.esm,dungeon,enemy,skeletonarmor,2,12,45,1536,285a:Dawnguard.esm,,535.4395751953125,1888.8046875,3216.6533203125
-18921:Dawnguard.esm,Skeleton,cadc:Dawnguard.esm,no hold,Volkihar Ruins,285a:Dawnguard.esm,dungeon,enemy,skeletonarmor,2,12,45,1536,285a:Dawnguard.esm,,537.4774780273438,2095.607666015625,3216.6533203125
-1896a:Dawnguard.esm,Skeleton,17e96:Dawnguard.esm,no hold,Volkihar Ruins,285a:Dawnguard.esm,dungeon,enemy,skeletonarmor,2,12,45,1536,285a:Dawnguard.esm,,2398.080322265625,2533.432373046875,4040.09619140625
+1891e:Dawnguard.esm,Skeleton,cade:Dawnguard.esm,Haafingar,Volkihar Ruins,285a:Dawnguard.esm,dungeon,enemy,skeletonarmor,2,12,45,1536,285a:Dawnguard.esm,,535.4395751953125,1888.8046875,3216.6533203125
+18921:Dawnguard.esm,Skeleton,cadc:Dawnguard.esm,Haafingar,Volkihar Ruins,285a:Dawnguard.esm,dungeon,enemy,skeletonarmor,2,12,45,1536,285a:Dawnguard.esm,,537.4774780273438,2095.607666015625,3216.6533203125
+1896a:Dawnguard.esm,Skeleton,17e96:Dawnguard.esm,Haafingar,Volkihar Ruins,285a:Dawnguard.esm,dungeon,enemy,skeletonarmor,2,12,45,1536,285a:Dawnguard.esm,,2398.080322265625,2533.432373046875,4040.09619140625
 18cd3:Dawnguard.esm,Skeleton,2d1fc:Skyrim.esm,the Pale,Dimhollow Crypt,4ee8:Dawnguard.esm,cave,enemy,skeleton,1,8,30,1536,eb7:Dawnguard.esm,,9345.7138671875,6824.6845703125,-110.37371826171875
 18d31:Dragonborn.esm,Reaver,35360:Dragonborn.esm,Solstheim,Gyldenhul Barrow,142a8:Dragonborn.esm,dungeon,enemy,darkelf,4,20,90,1536,eda0:Dragonborn.esm,800:Dragonborn.esm,84499.0,72295.5625,506.8791198730469
 18d32:Dragonborn.esm,Reaver,3535f:Dragonborn.esm,Solstheim,Gyldenhul Barrow,142a8:Dragonborn.esm,dungeon,enemy,darkelf,4,20,90,1536,eda0:Dragonborn.esm,800:Dragonborn.esm,84634.7109375,72375.5625,506.8791809082031
@@ -1618,8 +1618,8 @@ ref,name,base,hold,locationName,location,habitat,role,species,tier,cap,returnMin
 223f7:Skyrim.esm,Giant,c0be5:Skyrim.esm,the Rift,Fallowstone Cave,19176:Skyrim.esm,dungeon,enemy,giant,1,8,30,1536,243e0:Skyrim.esm,204c7:Skyrim.esm,195419.1875,-75021.96875,750.490234375
 227a7:Skyrim.esm,Draugr,f82f7:Skyrim.esm,Hjaalmarch,Labyrinthian,19262:Skyrim.esm,dungeon,enemy,draugrmagic,3,16,60,1536,21eef:Skyrim.esm,21edb:Skyrim.esm,-17892.69140625,43074.27734375,2490.039306640625
 227a8:Skyrim.esm,Draugr,f82f7:Skyrim.esm,Hjaalmarch,Labyrinthian,19262:Skyrim.esm,dungeon,enemy,draugrmagic,3,16,60,1536,21eef:Skyrim.esm,21edb:Skyrim.esm,-18109.66796875,42607.62109375,2480.70361328125
-22ee4:Skyrim.esm,Skeleton,2d1fc:Skyrim.esm,no hold,Ironbind Barrow,350bc:Skyrim.esm,dungeon,enemy,skeleton,1,8,30,1536,35604:Skyrim.esm,,3303.615478515625,5393.45703125,-911.2246704101562
-22ee5:Skyrim.esm,Skeleton,2d1fc:Skyrim.esm,no hold,Ironbind Barrow,350bc:Skyrim.esm,dungeon,enemy,skeleton,1,8,30,1536,35604:Skyrim.esm,,4748.17529296875,5516.78857421875,-856.9996948242188
+22ee4:Skyrim.esm,Skeleton,2d1fc:Skyrim.esm,Winterhold,Ironbind Barrow,350bc:Skyrim.esm,dungeon,enemy,skeleton,1,8,30,1536,35604:Skyrim.esm,,3303.615478515625,5393.45703125,-911.2246704101562
+22ee5:Skyrim.esm,Skeleton,2d1fc:Skyrim.esm,Winterhold,Ironbind Barrow,350bc:Skyrim.esm,dungeon,enemy,skeleton,1,8,30,1536,35604:Skyrim.esm,,4748.17529296875,5516.78857421875,-856.9996948242188
 2355f:Skyrim.esm,Falmer,bdfae:Skyrim.esm,Eastmarch,Kagrenzel,233ee:Skyrim.esm,dungeon,enemy,falmer,2,12,45,1536,52feb:Skyrim.esm,,2356.69677734375,-2078.890625,-12256.3779296875
 23562:Skyrim.esm,Falmer,bdfae:Skyrim.esm,Eastmarch,Kagrenzel,233ee:Skyrim.esm,dungeon,enemy,falmer,2,12,45,1536,52feb:Skyrim.esm,,1276.5458984375,-4029.24267578125,-13028.8203125
 23565:Skyrim.esm,Falmer,bdfae:Skyrim.esm,Eastmarch,Kagrenzel,233ee:Skyrim.esm,dungeon,enemy,falmer,2,12,45,1536,52feb:Skyrim.esm,,2150.267578125,2314.771728515625,-12277.318359375
@@ -2055,7 +2055,7 @@ ref,name,base,hold,locationName,location,habitat,role,species,tier,cap,returnMin
 34d13:Skyrim.esm,Wolf,23abe:Skyrim.esm,Hjaalmarch,POISnowy09,9048:Skyrim.esm,wilderness,animal,wolf,,3,30,1536,9048:Skyrim.esm,3c:Skyrim.esm,32488.458984375,50963.52734375,-9057.72265625
 34f45:Skyrim.esm,Pit Wolf,e160d:Skyrim.esm,Eastmarch,Cragslane Cavern,19159:Skyrim.esm,bandit-camp,animal,wolf,,,45,2048,bae3:Skyrim.esm,3c:Skyrim.esm,167134.421875,-33933.09375,-1829.544921875
 34f46:Skyrim.esm,Pit Wolf,e160d:Skyrim.esm,Eastmarch,Cragslane Cavern,19159:Skyrim.esm,bandit-camp,animal,wolf,,,45,2048,bae3:Skyrim.esm,3c:Skyrim.esm,166870.390625,-33986.5,-1810.486328125
-350bd:Skyrim.esm,Draugr Overlord,b7989:Skyrim.esm,no hold,Ironbind Barrow,350bc:Skyrim.esm,dungeon,enemy,draugr,1,8,30,1536,35604:Skyrim.esm,,4035.01123046875,6071.66259765625,-895.4005126953125
+350bd:Skyrim.esm,Draugr Overlord,b7989:Skyrim.esm,Winterhold,Ironbind Barrow,350bc:Skyrim.esm,dungeon,enemy,draugr,1,8,30,1536,35604:Skyrim.esm,,4035.01123046875,6071.66259765625,-895.4005126953125
 3512a:Dragonborn.esm,Lurker,2b0ea:Dragonborn.esm,no hold,Apocrypha,142f3:Dragonborn.esm,dungeon,enemy,dlc2lurker,3,16,60,1536,142f3:Dragonborn.esm,,-5177.4443359375,6345.83984375,2003.6226806640625
 3512d:Dragonborn.esm,Seeker,38fca:Dragonborn.esm,no hold,Apocrypha,142f3:Dragonborn.esm,dungeon,enemy,dlc2seeker,3,16,60,1536,142f3:Dragonborn.esm,,-6869.3388671875,10176.111328125,1792.0
 3513a:Dragonborn.esm,Reaver,374bd:Dragonborn.esm,Solstheim,Hrodulf's House,142c3:Dragonborn.esm,bandit-camp,enemy,darkelf,,7,45,2048,21074:Dragonborn.esm,,808.4817504882812,-829.1856079101562,546.1442260742188
@@ -2064,10 +2064,10 @@ ref,name,base,hold,locationName,location,habitat,role,species,tier,cap,returnMin
 3535c:Dragonborn.esm,Reaver,35360:Dragonborn.esm,Solstheim,DLC2POIAsh01,eead:Dragonborn.esm,wilderness,enemy,darkelf,,4,45,1536,eead:Dragonborn.esm,800:Dragonborn.esm,61798.96484375,40159.4296875,3186.865966796875
 35380:Skyrim.esm,Bandit,4192b:Skyrim.esm,Haafingar,Volskygge,192c2:Skyrim.esm,dungeon,enemy,imperial,3,16,60,1536,151fc:Skyrim.esm,,-992.5204467773438,-629.0115966796875,-696.2584838867188
 35381:Skyrim.esm,Bandit,4192a:Skyrim.esm,Haafingar,Volskygge,192c2:Skyrim.esm,dungeon,enemy,imperial,3,16,60,1536,151fc:Skyrim.esm,,-1440.062744140625,-995.651123046875,-702.922607421875
-35655:Skyrim.esm,Frostbite Spider,41fb5:Skyrim.esm,no hold,Ironbind Barrow,350bc:Skyrim.esm,dungeon,animal,spider,1,8,30,1536,35604:Skyrim.esm,,-1657.4971923828125,-6943.66748046875,189.49142456054688
-35656:Skyrim.esm,Frostbite Spider,41fb5:Skyrim.esm,no hold,Ironbind Barrow,350bc:Skyrim.esm,dungeon,animal,spider,1,8,30,1536,35604:Skyrim.esm,,-1643.42529296875,-7096.23291015625,189.49142456054688
-35657:Skyrim.esm,Frostbite Spider,41fb5:Skyrim.esm,no hold,Ironbind Barrow,350bc:Skyrim.esm,dungeon,animal,spider,1,8,30,1536,35604:Skyrim.esm,,-1794.18212890625,-5009.30517578125,-282.2123107910156
-35658:Skyrim.esm,Frostbite Spider,41fb5:Skyrim.esm,no hold,Ironbind Barrow,350bc:Skyrim.esm,dungeon,animal,spider,1,8,30,1536,35604:Skyrim.esm,,-1691.677490234375,-4837.29443359375,-282.2123107910156
+35655:Skyrim.esm,Frostbite Spider,41fb5:Skyrim.esm,Winterhold,Ironbind Barrow,350bc:Skyrim.esm,dungeon,animal,spider,1,8,30,1536,35604:Skyrim.esm,,-1657.4971923828125,-6943.66748046875,189.49142456054688
+35656:Skyrim.esm,Frostbite Spider,41fb5:Skyrim.esm,Winterhold,Ironbind Barrow,350bc:Skyrim.esm,dungeon,animal,spider,1,8,30,1536,35604:Skyrim.esm,,-1643.42529296875,-7096.23291015625,189.49142456054688
+35657:Skyrim.esm,Frostbite Spider,41fb5:Skyrim.esm,Winterhold,Ironbind Barrow,350bc:Skyrim.esm,dungeon,animal,spider,1,8,30,1536,35604:Skyrim.esm,,-1794.18212890625,-5009.30517578125,-282.2123107910156
+35658:Skyrim.esm,Frostbite Spider,41fb5:Skyrim.esm,Winterhold,Ironbind Barrow,350bc:Skyrim.esm,dungeon,animal,spider,1,8,30,1536,35604:Skyrim.esm,,-1691.677490234375,-4837.29443359375,-282.2123107910156
 35b3f:Dragonborn.esm,Riekling,24850:Dragonborn.esm,Solstheim,Moesring Pass,142da:Dragonborn.esm,dungeon,enemy,dlc2riekling,1,8,30,1536,edcb:Dragonborn.esm,800:Dragonborn.esm,42214.51171875,67253.9921875,12544.0
 35b4c:Dragonborn.esm,Riekling,24850:Dragonborn.esm,Solstheim,Moesring Pass,142da:Dragonborn.esm,dungeon,enemy,dlc2riekling,1,8,30,1536,edcb:Dragonborn.esm,800:Dragonborn.esm,42423.8203125,68772.6328125,12709.443359375
 35b55:Dragonborn.esm,Riekling Rider,25e19:Dragonborn.esm,Solstheim,Moesring Pass,142da:Dragonborn.esm,dungeon,enemy,dlc2mountedriekling,1,8,30,1536,edaa:Dragonborn.esm,800:Dragonborn.esm,43502.015625,69824.2265625,12864.0
@@ -2562,7 +2562,7 @@ ref,name,base,hold,locationName,location,habitat,role,species,tier,cap,returnMin
 4658f:Skyrim.esm,Forsworn,1e7b5:Skyrim.esm,the Reach,Fort Sungard,19185:Skyrim.esm,wilderness,enemy,breton,,4,45,1536,9a9a:Skyrim.esm,3c:Skyrim.esm,-68330.0078125,-24789.125,1210.1856689453125
 46593:Skyrim.esm,Forsworn,3e08a:Skyrim.esm,the Reach,Fort Sungard,19185:Skyrim.esm,wilderness,enemy,breton,,4,45,1536,9a9a:Skyrim.esm,3c:Skyrim.esm,-68329.4140625,-25060.65625,1227.5933837890625
 4659e:Skyrim.esm,Forsworn,3e08a:Skyrim.esm,the Reach,Fort Sungard,19185:Skyrim.esm,wilderness,enemy,breton,,4,45,1536,9a7b:Skyrim.esm,3c:Skyrim.esm,-74011.3828125,-23448.611328125,-240.9381103515625
-465a:Dawnguard.esm,Troll,23aba:Skyrim.esm,no hold,Darkfall Cave,4346:Dawnguard.esm,cave,animal,troll,2,12,45,1536,4346:Dawnguard.esm,,2591.4208984375,1341.73193359375,-2752.680908203125
+465a:Dawnguard.esm,Troll,23aba:Skyrim.esm,the Reach,Darkfall Cave,4346:Dawnguard.esm,cave,animal,troll,2,12,45,1536,4346:Dawnguard.esm,,2591.4208984375,1341.73193359375,-2752.680908203125
 46731:Skyrim.esm,Giant,3053f:Skyrim.esm,the Pale,Tumble Arch Pass,192be:Skyrim.esm,giant-camp,enemy,giant,,2,240,2048,90da:Skyrim.esm,3c:Skyrim.esm,67430.25,30909.5703125,-7153.22265625
 46746:Skyrim.esm,Bear,1e7a4:Skyrim.esm,the Rift,Honeystrand Grove,19199:Skyrim.esm,dungeon,animal,bear,1,8,30,1536,97fc:Skyrim.esm,3c:Skyrim.esm,79616.9453125,-76012.78125,11022.0048828125
 46e65:Skyrim.esm,Forsworn,442cb:Skyrim.esm,the Reach,Blind Cliff Cave,18eed:Skyrim.esm,dungeon,enemy,breton,1,8,30,1536,21ef9:Skyrim.esm,20dcb:Skyrim.esm,-144078.625,20500.232421875,-176.874267578125
@@ -2790,9 +2790,9 @@ ref,name,base,hold,locationName,location,habitat,role,species,tier,cap,returnMin
 5d1b8:SkyrimSewers.esp,Peddler,5d1b7:SkyrimSewers.esp,Whiterun,Whiterun Sewers,460a6:SkyrimSewers.esp,sewer,trader,nord,1,,360,1536,3b21f:SkyrimSewers.esp,,-1188.6650390625,1978.4561767578125,2082.087890625
 5d366:Skyrim.esm,Horker,23ab1:Skyrim.esm,no hold,BrinewaterGrottoStart,5001c:Skyrim.esm,wilderness,animal,horker,,6,20,1536,5001c:Skyrim.esm,50015:Skyrim.esm,1823.113525390625,2430.809814453125,244.1438751220703
 5d4c7:Skyrim.esm,Forsworn,3e085:Skyrim.esm,the Reach,Dead Crone Rock,19160:Skyrim.esm,dungeon,enemy,breton,1,8,30,1536,15295:Skyrim.esm,,-1021.4700927734375,-1049.645263671875,-1280.0
-5da8:Dawnguard.esm,Death Hound,8d79:Dawnguard.esm,no hold,Volkihar Undercroft,285b:Dawnguard.esm,dungeon,enemy,dlc1deathhound,2,12,45,1536,285b:Dawnguard.esm,,-6379.93798828125,175.1510009765625,6591.0
-5dae:Dawnguard.esm,Death Hound,8d79:Dawnguard.esm,no hold,Volkihar Undercroft,285b:Dawnguard.esm,dungeon,enemy,dlc1deathhound,2,12,45,1536,285b:Dawnguard.esm,,-5970.94482421875,1040.14599609375,6591.0
-5dbd:Dawnguard.esm,Death Hound,8d79:Dawnguard.esm,no hold,Volkihar Undercroft,285b:Dawnguard.esm,dungeon,enemy,dlc1deathhound,2,12,45,1536,285b:Dawnguard.esm,,-6384.0,976.0,6586.99609375
+5da8:Dawnguard.esm,Death Hound,8d79:Dawnguard.esm,Haafingar,Volkihar Undercroft,285b:Dawnguard.esm,dungeon,enemy,dlc1deathhound,2,12,45,1536,285b:Dawnguard.esm,,-6379.93798828125,175.1510009765625,6591.0
+5dae:Dawnguard.esm,Death Hound,8d79:Dawnguard.esm,Haafingar,Volkihar Undercroft,285b:Dawnguard.esm,dungeon,enemy,dlc1deathhound,2,12,45,1536,285b:Dawnguard.esm,,-5970.94482421875,1040.14599609375,6591.0
+5dbd:Dawnguard.esm,Death Hound,8d79:Dawnguard.esm,Haafingar,Volkihar Undercroft,285b:Dawnguard.esm,dungeon,enemy,dlc1deathhound,2,12,45,1536,285b:Dawnguard.esm,,-6384.0,976.0,6586.99609375
 5e926:Skyrim.esm,Skeleton,2d1fc:Skyrim.esm,Winterhold,Fort Kastav,19182:Skyrim.esm,wilderness,enemy,skeleton,,4,45,1536,9014:Skyrim.esm,3c:Skyrim.esm,116741.921875,56350.296875,-2892.5703125
 5e93a:Skyrim.esm,Skeleton,bccc7:Skyrim.esm,Winterhold,Fort Kastav,19182:Skyrim.esm,wilderness,enemy,skeleton,,4,45,1536,9014:Skyrim.esm,3c:Skyrim.esm,116632.0078125,56312.671875,-2907.04052734375
 5e97c:Skyrim.esm,Novice Necromancer,1e7ca:Skyrim.esm,Winterhold,Fort Kastav,19182:Skyrim.esm,wilderness,enemy,breton,,4,45,1536,9014:Skyrim.esm,3c:Skyrim.esm,116627.5390625,56419.35546875,-2917.4990234375
@@ -4318,9 +4318,9 @@ a4618:Skyrim.esm,Bandit,3decc:Skyrim.esm,the Pale,Korvanjund,19261:Skyrim.esm,du
 a4910:WindhelmSSE.esp,Tinos Drothan,a490e:WindhelmSSE.esp,Eastmarch,WindhelmOrigin,1691d:Skyrim.esm,city,trader,darkelf,,,360,512,3837e:Skyrim.esm,1691d:Skyrim.esm,137790.1875,38238.38671875,-12642.90234375
 a4982:WindhelmSSE.esp,Ingjar,a4983:WindhelmSSE.esp,Eastmarch,Windhelm,18a57:Skyrim.esm,city,trader,nord,,,360,512,4d674:WindhelmSSE.esp,,672.62451171875,-1772.472412109375,64.0
 a4e67:Skyrim.esm,Forsworn,a4e60:Skyrim.esm,the Reach,Hag's End,19191:Skyrim.esm,dungeon,enemy,breton,2,12,45,1536,9829c:Skyrim.esm,29ab7:Skyrim.esm,-124872.265625,78407.0234375,-3528.0
-a4f0:Dawnguard.esm,Frostbite Spider,5d007:Skyrim.esm,no hold,Darkfall Cave,4346:Dawnguard.esm,cave,animal,spider,2,12,45,1536,4346:Dawnguard.esm,,2720.0791015625,-8816.787109375,-3863.5107421875
-a4f4:Dawnguard.esm,Frostbite Spider,5d007:Skyrim.esm,no hold,Darkfall Cave,4346:Dawnguard.esm,cave,animal,spider,2,12,45,1536,4346:Dawnguard.esm,,2736.394287109375,-8323.9853515625,-3863.5107421875
-a4f5:Dawnguard.esm,Frostbite Spider,5d007:Skyrim.esm,no hold,Darkfall Cave,4346:Dawnguard.esm,cave,animal,spider,2,12,45,1536,4346:Dawnguard.esm,,1287.896484375,-8379.8701171875,-3898.710205078125
+a4f0:Dawnguard.esm,Frostbite Spider,5d007:Skyrim.esm,the Reach,Darkfall Cave,4346:Dawnguard.esm,cave,animal,spider,2,12,45,1536,4346:Dawnguard.esm,,2720.0791015625,-8816.787109375,-3863.5107421875
+a4f4:Dawnguard.esm,Frostbite Spider,5d007:Skyrim.esm,the Reach,Darkfall Cave,4346:Dawnguard.esm,cave,animal,spider,2,12,45,1536,4346:Dawnguard.esm,,2736.394287109375,-8323.9853515625,-3863.5107421875
+a4f5:Dawnguard.esm,Frostbite Spider,5d007:Skyrim.esm,the Reach,Darkfall Cave,4346:Dawnguard.esm,cave,animal,spider,2,12,45,1536,4346:Dawnguard.esm,,1287.896484375,-8379.8701171875,-3898.710205078125
 a547:AnotherOakwood.esp,Dragolf,a545:AnotherOakwood.esp,Falkreath,Oakwood,1a9c:AnotherOakwood.esp,city,trader,nord,,,360,512,4c37:AnotherOakwood.esp,,49.04106903076172,33.375762939453125,0.5
 a553:AnotherOakwood.esp,Idir,a552:AnotherOakwood.esp,Falkreath,Oakwood,1a9c:AnotherOakwood.esp,city,trader,redguard,,,360,512,4c3b:AnotherOakwood.esp,,213.50990295410156,-91.9915771484375,0.0
 a5b92:Skyrim.esm,Skeever,23ab7:Skyrim.esm,the Rift,Geirmund's Hall,19188:Skyrim.esm,dungeon,animal,skeever,1,8,30,1536,a5a71:Skyrim.esm,,-981.7041625976562,871.5946044921875,-11.957191467285156
@@ -4339,9 +4339,9 @@ a8426:Skyrim.esm,Witch,74f9e:Skyrim.esm,Falkreath,Glenmoril Coven,19189:Skyrim.e
 a843b:Skyrim.esm,Frostbite Spider,4b473:Skyrim.esm,Falkreath,Glenmoril Coven,19189:Skyrim.esm,dungeon,animal,spider,2,12,45,1536,1526e:Skyrim.esm,,-1532.336669921875,4039.379638671875,-2104.0791015625
 a843e:Skyrim.esm,Frostbite Spider,4b473:Skyrim.esm,Falkreath,Glenmoril Coven,19189:Skyrim.esm,dungeon,animal,spider,2,12,45,1536,1526e:Skyrim.esm,,-3216.560791015625,5210.25244140625,-1823.7713623046875
 a9544:Skyrim.esm,Werewolf,aa0a3:Skyrim.esm,Eastmarch,Gallows Rock,19187:Skyrim.esm,bandit-camp,animal,wolf,,,45,2048,15273:Skyrim.esm,,6022.9736328125,-5034.3603515625,521.4921875
-a97a:Dawnguard.esm,Troll,23aba:Skyrim.esm,no hold,Darkfall Cave,4346:Dawnguard.esm,cave,animal,troll,2,12,45,1536,4346:Dawnguard.esm,,10066.9716796875,5325.94970703125,-2772.463623046875
-a989:Dawnguard.esm,Troll,23aba:Skyrim.esm,no hold,Darkfall Cave,4346:Dawnguard.esm,cave,animal,troll,2,12,45,1536,4346:Dawnguard.esm,,8933.2509765625,5219.76318359375,-2539.3759765625
-a9c0:Dawnguard.esm,Giant Frostbite Spider,23aab:Skyrim.esm,no hold,Darkfall Cave,4346:Dawnguard.esm,cave,enemy,giant,2,12,45,1536,4346:Dawnguard.esm,,5953.86083984375,-7234.87255859375,-3703.703369140625
+a97a:Dawnguard.esm,Troll,23aba:Skyrim.esm,the Reach,Darkfall Cave,4346:Dawnguard.esm,cave,animal,troll,2,12,45,1536,4346:Dawnguard.esm,,10066.9716796875,5325.94970703125,-2772.463623046875
+a989:Dawnguard.esm,Troll,23aba:Skyrim.esm,the Reach,Darkfall Cave,4346:Dawnguard.esm,cave,animal,troll,2,12,45,1536,4346:Dawnguard.esm,,8933.2509765625,5219.76318359375,-2539.3759765625
+a9c0:Dawnguard.esm,Giant Frostbite Spider,23aab:Skyrim.esm,the Reach,Darkfall Cave,4346:Dawnguard.esm,cave,enemy,giant,2,12,45,1536,4346:Dawnguard.esm,,5953.86083984375,-7234.87255859375,-3703.703369140625
 a9ef9:Skyrim.esm,Deer,42478:Skyrim.esm,Hjaalmarch,Folgunthur,19179:Skyrim.esm,dungeon,animal,deer,1,8,30,1536,92fa:Skyrim.esm,3c:Skyrim.esm,-47519.01171875,88501.7265625,-13726.8271484375
 a9f60:Skyrim.esm,Goat,4359c:Skyrim.esm,Haafingar,Katla's Farm,18e38:Skyrim.esm,farm,animal,goat,,8,20,512,92bf:Skyrim.esm,3c:Skyrim.esm,-74250.9453125,97584.46875,-11466.6865234375
 aa0c:CFTO.esp,Radding,aa0b:CFTO.esp,Hjaalmarch,Morthal,18a53:Skyrim.esm,city,transport,nord,,,45,512,939d:Skyrim.esm,3c:Skyrim.esm,-36995.05859375,65794.9140625,-13940.7353515625
@@ -4377,7 +4377,7 @@ ae01f:Skyrim.esm,Mammoth,dd641:Skyrim.esm,Whiterun,Sleeping Tree Camp,192ad:Skyr
 ae020:Skyrim.esm,Mammoth,dd641:Skyrim.esm,Whiterun,Sleeping Tree Camp,192ad:Skyrim.esm,giant-camp,animal,mammoth,,4,240,2048,d74:Skyrim.esm,3c:Skyrim.esm,-38551.203125,-19588.076171875,-5745.1953125
 aedc7:Skyrim.esm,Giant,3053f:Skyrim.esm,Whiterun,Sleeping Tree Camp,192ad:Skyrim.esm,cave,enemy,giant,1,8,30,1536,1520a:Skyrim.esm,,445.8123779296875,443.8883056640625,-145.95083618164062
 af8:JK's Riften Outskirts.esp,Horse,68d07:Skyrim.esm,the Rift,Snow-Shod Farm,18e43:Skyrim.esm,farm,animal,horse,,8,20,512,bd35:Skyrim.esm,3c:Skyrim.esm,163853.515625,-107739.4765625,11007.869140625
-b0a:JK's Castle Volkihar.esp,Skeleton,cadb:Dawnguard.esm,no hold,open ground in Tamriel,18bf:Skyrim.esm,wilderness,enemy,skeletonarmor,,4,45,1536,18bf:Skyrim.esm,3c:Skyrim.esm,-174466.203125,156101.015625,-12349.0
+b0a:JK's Castle Volkihar.esp,Skeleton,cadb:Dawnguard.esm,Haafingar,open ground in Tamriel,18bf:Skyrim.esm,wilderness,enemy,skeletonarmor,,4,45,1536,18bf:Skyrim.esm,3c:Skyrim.esm,-174466.203125,156101.015625,-12349.0
 b10cf:Skyrim.esm,Goat,4359c:Skyrim.esm,Eastmarch,Narzulbur,19282:Skyrim.esm,wilderness,animal,goat,,6,20,1536,b57b:Skyrim.esm,3c:Skyrim.esm,156789.453125,10496.302734375,-4497.6640625
 b10d0:Skyrim.esm,Goat,4359c:Skyrim.esm,Eastmarch,Narzulbur,19282:Skyrim.esm,wilderness,animal,goat,,6,20,1536,b57b:Skyrim.esm,3c:Skyrim.esm,156996.984375,10432.333984375,-4488.6337890625
 b20dd:Skyrim.esm,Skeleton,bccc7:Skyrim.esm,Winterhold,The Midden Dark,ae783:Skyrim.esm,dungeon,enemy,skeleton,1,8,30,1536,ae783:Skyrim.esm,,1243.031982421875,898.5422973632812,-579.1405029296875
@@ -4550,9 +4550,9 @@ d07b8:Skyrim.esm,Bandit,d07b6:Skyrim.esm,the Pale,Frostmere Crypt,192b8:Skyrim.e
 d07cb:Skyrim.esm,Bandit,d07c9:Skyrim.esm,the Pale,Frostmere Crypt,192b8:Skyrim.esm,dungeon,enemy,nord,1,8,30,1536,abd31:Skyrim.esm,,-1584.1854248046875,1049.805419921875,-768.0000610351562
 d07cc:Skyrim.esm,Bandit,d07ca:Skyrim.esm,the Pale,Frostmere Crypt,192b8:Skyrim.esm,dungeon,enemy,breton,1,8,30,1536,abd31:Skyrim.esm,,-1318.8797607421875,1262.241455078125,-768.0
 d0bf8:Skyrim.esm,Bandit,3decc:Skyrim.esm,the Pale,Frostmere Crypt,192b8:Skyrim.esm,dungeon,enemy,nord,1,8,30,1536,abd31:Skyrim.esm,,190.15248107910156,60.47661590576172,-391.89862060546875
-d0ed:Dawnguard.esm,Death Hound,8d79:Dawnguard.esm,no hold,Volkihar Undercroft,285b:Dawnguard.esm,dungeon,enemy,dlc1deathhound,2,12,45,1536,285b:Dawnguard.esm,,-2978.601806640625,1540.2288818359375,6672.0
-d0ee:Dawnguard.esm,Death Hound,8d79:Dawnguard.esm,no hold,Volkihar Undercroft,285b:Dawnguard.esm,dungeon,enemy,dlc1deathhound,2,12,45,1536,285b:Dawnguard.esm,,-1924.084716796875,827.7972412109375,6608.0
-d0f0:Dawnguard.esm,Death Hound,8d79:Dawnguard.esm,no hold,Volkihar Undercroft,285b:Dawnguard.esm,dungeon,enemy,dlc1deathhound,2,12,45,1536,285b:Dawnguard.esm,,-1959.15869140625,1761.04052734375,6672.0
+d0ed:Dawnguard.esm,Death Hound,8d79:Dawnguard.esm,Haafingar,Volkihar Undercroft,285b:Dawnguard.esm,dungeon,enemy,dlc1deathhound,2,12,45,1536,285b:Dawnguard.esm,,-2978.601806640625,1540.2288818359375,6672.0
+d0ee:Dawnguard.esm,Death Hound,8d79:Dawnguard.esm,Haafingar,Volkihar Undercroft,285b:Dawnguard.esm,dungeon,enemy,dlc1deathhound,2,12,45,1536,285b:Dawnguard.esm,,-1924.084716796875,827.7972412109375,6608.0
+d0f0:Dawnguard.esm,Death Hound,8d79:Dawnguard.esm,Haafingar,Volkihar Undercroft,285b:Dawnguard.esm,dungeon,enemy,dlc1deathhound,2,12,45,1536,285b:Dawnguard.esm,,-1959.15869140625,1761.04052734375,6672.0
 d12f:Dawnguard.esm,Chaurus Hunter Fledgling,29a4:Dawnguard.esm,no hold,open ground in DLC01FalmerValley,cae:Dawnguard.esm,wilderness,animal,chaurus,,6,20,1536,cae:Dawnguard.esm,bb5:Dawnguard.esm,-25111.369140625,10608.91015625,2985.26318359375
 d1339:Skyrim.esm,Bandit,1e79e:Skyrim.esm,the Rift,Bthalft,d566f:Skyrim.esm,bandit-camp,enemy,imperial,,7,45,2048,9857:Skyrim.esm,3c:Skyrim.esm,88823.0234375,-86295.671875,11953.7548828125
 d133a:Skyrim.esm,Bandit,3decc:Skyrim.esm,the Rift,Bthalft,d566f:Skyrim.esm,bandit-camp,enemy,nord,,7,45,2048,9857:Skyrim.esm,3c:Skyrim.esm,87581.421875,-86639.640625,11597.5712890625
@@ -4646,15 +4646,15 @@ d96d5:Skyrim.esm,Poacher,d96d3:Skyrim.esm,the Pale,POITundra03,9103:Skyrim.esm,w
 d9793:Skyrim.esm,Horse,d9806:Skyrim.esm,Whiterun,open ground in Tamriel,919f:Skyrim.esm,wilderness,animal,horse,,6,20,1536,919f:Skyrim.esm,3c:Skyrim.esm,21911.64453125,4803.1708984375,-4480.0
 d97dd:Skyrim.esm,Bandit,d97f0:Skyrim.esm,Whiterun,open ground in Tamriel,919f:Skyrim.esm,wilderness,enemy,imperial,,4,45,1536,919f:Skyrim.esm,3c:Skyrim.esm,21347.72265625,4840.60009765625,-4508.9970703125
 d97f1:Skyrim.esm,Bandit,d97ee:Skyrim.esm,Whiterun,POITundra01,95bd:Skyrim.esm,wilderness,enemy,imperial,,4,45,1536,95bd:Skyrim.esm,3c:Skyrim.esm,22093.166015625,3858.96875,-4398.8828125
-d9f8:Dawnguard.esm,Skeever,b5559:Skyrim.esm,no hold,Volkihar Undercroft,285b:Dawnguard.esm,dungeon,animal,skeever,2,12,45,1536,285b:Dawnguard.esm,,-2479.499267578125,-1211.0556640625,6960.42431640625
+d9f8:Dawnguard.esm,Skeever,b5559:Skyrim.esm,Haafingar,Volkihar Undercroft,285b:Dawnguard.esm,dungeon,animal,skeever,2,12,45,1536,285b:Dawnguard.esm,,-2479.499267578125,-1211.0556640625,6960.42431640625
 db0a7:Skyrim.esm,Skeleton,bccc7:Skyrim.esm,Whiterun,POITundra11,9a4e:Skyrim.esm,wilderness,enemy,skeleton,,4,45,1536,9a4e:Skyrim.esm,3c:Skyrim.esm,-28529.072265625,-18203.8515625,-5312.0
 db0a8:Skyrim.esm,Skeleton,bccc7:Skyrim.esm,Whiterun,POITundra11,9a4e:Skyrim.esm,wilderness,enemy,skeleton,,4,45,1536,9a4e:Skyrim.esm,3c:Skyrim.esm,-28407.64453125,-18369.359375,-5312.0
 dba54:Skyrim.esm,Draugr,567c8:Skyrim.esm,the Reach,Reachcliff Cave,19292:Skyrim.esm,cave,enemy,draugr,1,8,30,1536,15227:Skyrim.esm,,-384.0002136230469,-0.00018310546875,32.0
-dbad:Dawnguard.esm,Skeleton,17e92:Dawnguard.esm,no hold,Volkihar Undercroft,285b:Dawnguard.esm,dungeon,enemy,skeletonarmor,2,12,45,1536,285b:Dawnguard.esm,,-4455.34716796875,2532.113525390625,6689.54248046875
-dbae:Dawnguard.esm,Feral Vampire,cadf:Dawnguard.esm,no hold,Volkihar Undercroft,285b:Dawnguard.esm,dungeon,enemy,highelfracevampire,2,12,45,1536,285b:Dawnguard.esm,,-2884.61962890625,2383.61474609375,6800.6767578125
-dbb4:Dawnguard.esm,Death Hound,8d79:Dawnguard.esm,no hold,Volkihar Undercroft,285b:Dawnguard.esm,dungeon,enemy,dlc1deathhound,2,12,45,1536,285b:Dawnguard.esm,,-3067.511474609375,2282.97705078125,6800.67333984375
-dbbb:Dawnguard.esm,Skeever,b5559:Skyrim.esm,no hold,Volkihar Undercroft,285b:Dawnguard.esm,dungeon,animal,skeever,2,12,45,1536,285b:Dawnguard.esm,,-5197.8115234375,2495.240478515625,6479.515625
-dbc0:Dawnguard.esm,Giant Frostbite Spider,138b8:Dawnguard.esm,no hold,Volkihar Undercroft,285b:Dawnguard.esm,dungeon,enemy,giant,2,12,45,1536,285b:Dawnguard.esm,,-4677.8271484375,963.9359130859375,6914.74365234375
+dbad:Dawnguard.esm,Skeleton,17e92:Dawnguard.esm,Haafingar,Volkihar Undercroft,285b:Dawnguard.esm,dungeon,enemy,skeletonarmor,2,12,45,1536,285b:Dawnguard.esm,,-4455.34716796875,2532.113525390625,6689.54248046875
+dbae:Dawnguard.esm,Feral Vampire,cadf:Dawnguard.esm,Haafingar,Volkihar Undercroft,285b:Dawnguard.esm,dungeon,enemy,highelfracevampire,2,12,45,1536,285b:Dawnguard.esm,,-2884.61962890625,2383.61474609375,6800.6767578125
+dbb4:Dawnguard.esm,Death Hound,8d79:Dawnguard.esm,Haafingar,Volkihar Undercroft,285b:Dawnguard.esm,dungeon,enemy,dlc1deathhound,2,12,45,1536,285b:Dawnguard.esm,,-3067.511474609375,2282.97705078125,6800.67333984375
+dbbb:Dawnguard.esm,Skeever,b5559:Skyrim.esm,Haafingar,Volkihar Undercroft,285b:Dawnguard.esm,dungeon,animal,skeever,2,12,45,1536,285b:Dawnguard.esm,,-5197.8115234375,2495.240478515625,6479.515625
+dbc0:Dawnguard.esm,Giant Frostbite Spider,138b8:Dawnguard.esm,Haafingar,Volkihar Undercroft,285b:Dawnguard.esm,dungeon,enemy,giant,2,12,45,1536,285b:Dawnguard.esm,,-4677.8271484375,963.9359130859375,6914.74365234375
 dbc1c:Skyrim.esm,Frostbite Spider,23aaa:Skyrim.esm,Winterhold,Ysgramor's Tomb,19265:Skyrim.esm,dungeon,animal,spider,1,8,30,1536,15254:Skyrim.esm,,-3968.79638671875,-2326.521484375,-1677.2791748046875
 dbc1d:Skyrim.esm,Frostbite Spider,23aaa:Skyrim.esm,Winterhold,Ysgramor's Tomb,19265:Skyrim.esm,dungeon,animal,spider,1,8,30,1536,15254:Skyrim.esm,,-3369.480224609375,-2179.78466796875,-1686.2760009765625
 dbf74:Skyrim.esm,Vampire Fledgling,2f9e1:Skyrim.esm,Eastmarch,Mara's Eye Pond,ecf53:Skyrim.esm,dungeon,enemy,bretonracevampire,1,8,30,1536,dbf12:Skyrim.esm,,1587.1700439453125,2022.167236328125,-586.2376098632812
@@ -4797,12 +4797,12 @@ dcc80:Skyrim.esm,Frostbite Spider,41fb5:Skyrim.esm,Winterhold,Ysgramor's Tomb,19
 dcde6:Skyrim.esm,Sabre Cat,23ab5:Skyrim.esm,Hjaalmarch,POITundra20,944f:Skyrim.esm,wilderness,animal,sabre-cat,,2,60,1536,944f:Skyrim.esm,3c:Skyrim.esm,-93400.7890625,46238.90234375,-10752.203125
 dcde8:Skyrim.esm,Sabre Cat,23ab5:Skyrim.esm,Hjaalmarch,open ground in Tamriel,d74:Skyrim.esm,wilderness,animal,sabre-cat,,2,60,1536,d74:Skyrim.esm,3c:Skyrim.esm,-92884.1640625,46354.95703125,-11195.177734375
 dcff3:Skyrim.esm,Novice Fire Mage,dcff4:Skyrim.esm,Haafingar,open ground in Tamriel,d74:Skyrim.esm,wilderness,enemy,breton,,4,45,1536,d74:Skyrim.esm,3c:Skyrim.esm,-90753.6953125,79615.796875,-12648.130859375
-dd07:Dawnguard.esm,Frostbite Spider,41fb5:Skyrim.esm,no hold,Darkfall Cave,4346:Dawnguard.esm,cave,animal,spider,2,12,45,1536,4346:Dawnguard.esm,,-584.6768798828125,-2197.6865234375,-496.09808349609375
+dd07:Dawnguard.esm,Frostbite Spider,41fb5:Skyrim.esm,the Reach,Darkfall Cave,4346:Dawnguard.esm,cave,animal,spider,2,12,45,1536,4346:Dawnguard.esm,,-584.6768798828125,-2197.6865234375,-496.09808349609375
 dd12c:Skyrim.esm,Bear,1e7a4:Skyrim.esm,Hjaalmarch,POITundra23,9404:Skyrim.esm,wilderness,animal,bear,,2,60,1536,9404:Skyrim.esm,3c:Skyrim.esm,-55703.875,54782.95703125,-11789.6005859375
 dd256:Skyrim.esm,Skeleton,bccc7:Skyrim.esm,Haafingar,Solitude Catacombs,dd216:Skyrim.esm,dungeon,enemy,skeleton,1,8,30,1536,dd216:Skyrim.esm,,-840.82861328125,-1926.446533203125,-231.55120849609375
 dd257:Skyrim.esm,Skeleton,bccc7:Skyrim.esm,Haafingar,Solitude Catacombs,dd216:Skyrim.esm,dungeon,enemy,skeleton,1,8,30,1536,dd216:Skyrim.esm,,1034.0185546875,-1982.3447265625,-224.0
 dd258:Skyrim.esm,Skeleton,bccc7:Skyrim.esm,Haafingar,Solitude Catacombs,dd216:Skyrim.esm,dungeon,enemy,skeleton,1,8,30,1536,dd216:Skyrim.esm,,-61.85349655151367,-3582.30810546875,-466.83868408203125
-dd51:Dawnguard.esm,Troll,23aba:Skyrim.esm,no hold,Darkfall Cave,4346:Dawnguard.esm,cave,animal,troll,2,12,45,1536,4346:Dawnguard.esm,,2877.25146484375,1839.06494140625,-2721.014404296875
+dd51:Dawnguard.esm,Troll,23aba:Skyrim.esm,the Reach,Darkfall Cave,4346:Dawnguard.esm,cave,animal,troll,2,12,45,1536,4346:Dawnguard.esm,,2877.25146484375,1839.06494140625,-2721.014404296875
 dd935:WindhelmSSE.esp,Volkihar Exile,dd91c:WindhelmSSE.esp,Eastmarch,Frozen Caverns,39fe09:WindhelmSSE.esp,cave,enemy,nordracevampire,1,8,30,1536,d842d:WindhelmSSE.esp,,772.6416625976562,650.9114990234375,-1193.5584716796875
 ddde6:Skyrim.esm,Deer,422b1:Skyrim.esm,Falkreath,open ground in Tamriel,9ad6:Skyrim.esm,wilderness,animal,deer,,6,20,1536,9ad6:Skyrim.esm,3c:Skyrim.esm,-44333.74609375,-33499.09765625,-3795.96142578125
 ddde7:Skyrim.esm,Deer,422b1:Skyrim.esm,Falkreath,open ground in Tamriel,9ad6:Skyrim.esm,wilderness,animal,deer,,6,20,1536,9ad6:Skyrim.esm,3c:Skyrim.esm,-44492.25390625,-33475.90625,-3797.254150390625

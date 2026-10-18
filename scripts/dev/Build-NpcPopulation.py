@@ -342,9 +342,27 @@ def build(paths, strings_dir=None):
         # would make every cut actor "Deleted or initially switched off", and
         # a rule changed later (keep the guards again, say) could never bring
         # one back. So it is in the load order the gamemode checks, by name
-        # and sha256, and its records are not read.
+        # and sha256, and its actors are not read.
+        #
+        # Its places are (#2551): the location records it gives a hold and
+        # the rooms it gives a location come from its policy, never from this
+        # catalogue, and without them a kept animal in Dayspring Canyon would
+        # be in no hold here while the game puts it in the Rift. So its
+        # locations are read over the ones before it, and of its cells only
+        # the location: every other field of a cell there is the winner's own
+        # copy, which read_details has already read with more than C.read
+        # gives. Its actors go into a table nobody reads.
         if name == LAST_PLUGIN:
             sources.append({'name': name, 'sha256': hashlib.sha256(plugin.buf).hexdigest()})
+            plugin.masters = [canon.get(m.lower(), m) for m in plugin.masters]
+            places = {tag: {} for tag in tables}
+            places[b'LCTN'] = tables[b'LCTN']
+            C.read(plugin, places)
+            if plugin.failed:
+                raise ValueError('Failed compressed records: ' + name)
+            for desc, row in places[b'CELL'].items():
+                if row.get('location') and desc in tables[b'CELL']:
+                    tables[b'CELL'][desc]['location'] = row['location']
             continue
         plugin.masters = [canon.get(m.lower(), m) for m in plugin.masters]
         if plugin.localised:
