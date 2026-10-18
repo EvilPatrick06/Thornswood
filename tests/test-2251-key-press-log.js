@@ -17,7 +17,7 @@
   C. The site (site/server.js) hands via on to the hub, only as 'press'.
   D. The hub (site/public/hub.js): the real chatText run on both kinds.
   E. The front (game/plugins/thornswood-front.js): the lock key sends through
-     tellServer, which says auto (true).
+     tellServer, which sends through say (a press) with quiet (#2732).
 */
 const fs = require('fs');
 const os = require('os');
@@ -46,8 +46,10 @@ yes('A0 chatFrame is in thornswood-chat.js', cf.length > 0);
 const box = {}; vm.runInNewContext(cf + '\nthis.chatFrame = chatFrame;', box);
 yes('A1 a typed line goes as { t: chat, text } with no press', JSON.stringify(box.chatFrame('/journal new')) === '{"t":"chat","text":"/journal new"}');
 yes('A2 a key line goes with press: true', JSON.stringify(box.chatFrame({ text: '/lock 1a2b', press: true })) === '{"t":"chat","text":"/lock 1a2b","press":true}');
-const say = CHAT.slice(CHAT.indexOf('say: function (text, auto) {'), CHAT.indexOf('state: function ()'));
-yes('A3 say() wraps an auto line as { text, press: true }', /var item = auto \? \{ text: text, press: true \} : text;/.test(say));
+// Since #2732 say() and typed() share send(text, press, notice); say passes
+// press, typed does not. test-2732-press-mark.js runs them.
+const say = CHAT.slice(CHAT.indexOf('function send(text, press, notice) {'), CHAT.indexOf('state: function ()'));
+yes('A3 send() wraps a pressed line as { text, press: true }', /var item = press \? \{ text: text, press: true \} : text;/.test(say));
 yes('A4 sends it through chatFrame, and queues the same item', /ws\.send\(JSON\.stringify\(chatFrame\(item\)\)\)/.test(say) && /queue\.push\(item\);/.test(say));
 yes('A5 the queue flush after a reconnect goes through chatFrame too, so the flag survives an outage',
     /ws\.send\(JSON\.stringify\(chatFrame\(queue\.shift\(\)\)\)\)/.test(CHAT) && !/text: queue\.shift\(\)/.test(CHAT));
@@ -100,7 +102,7 @@ yes('D3 the session table labels it key press too', /l\.via === 'press' \? '<spa
 // E
 const lp = grab(FRONT, 'lockPress');
 yes('E1 the lock key sends through tellServer', /tellServer\('\/' \+ sig\);/.test(lp));
-yes('E2 and tellServer says auto (true), which is what marks it a press', /window\.thornswoodNet\.say\(' \+\s*JSON\.stringify\(toServer\[0\]\) \+ ',true\);/.test(grab(FRONT, 'tellServer')));
+yes('E2 and tellServer sends through say, which marks it a press, quiet', /window\.thornswoodNet\.say\(' \+\s*JSON\.stringify\(toServer\[0\]\) \+ ',\{quiet:true\}\);/.test(grab(FRONT, 'tellServer')));
 
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');

@@ -513,7 +513,7 @@ yes('the front joins the relay only with this character own voice token, and ask
     /function tokenProfile\(tok\) \{ return Number\(String\(tok \|\| ''\)\.split\('\.'\)\[1\]\) \|\| 0; \}/.test(front) &&
     /askToken\(lineId\)/.test(front));
 yes('the front says /line every ten seconds, sends the pass, and tells the client to stay',
-    /const LINE_EVERY_MS = 10000;/.test(front) && /thornswoodNet\.say\("\/line",true\)/.test(front) &&
+    /const LINE_EVERY_MS = 10000;/.test(front) && /thornswoodNet\.say\("\/line",\{quiet:true\}\)/.test(front) &&
     /'\/joinpass ' \+ pass/.test(front) && /sendMessage\("thornswood","stay"\)/.test(front));
 yes('closing the game from the page gives the place up', /log\('menu: closing the game, asked from the character choice page'\);[\s\S]{0,80}try \{ lineLeave\(\); \} catch \(e\) \{ \}/.test(front));
 yes('the words on the page have no em dash and never the forbidden word',

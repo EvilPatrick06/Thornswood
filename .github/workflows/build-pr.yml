@@ -360,6 +360,12 @@ jobs:
           # chat log to leaving those reports out while every one still reaches
           # the game server, and writing the same shapes when they are typed.
           # A few seconds.
+          # Issue #2732: tests\test-2732-press-mark.js runs every
+          # thornswoodNet.say and typed in game\ui and the front plugin
+          # against the real chat page and holds each to its kind: a key or
+          # a panel button goes with press and is told when it is queued, the
+          # plugin's own lines go with press and quiet, and only the chat
+          # box sends a line as typed. Under a second.
           $six ='test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
@@ -408,7 +414,7 @@ jobs:
                  'test-1621-quest-state.js',
                  'test-unpin.js', 'test-coffers.js',
                  'test-1383-injury.js',
-                 'test-chat-log.js', 'test-1131-line-log.js', 'test-2723-plugin-reports.js',
+                 'test-chat-log.js', 'test-1131-line-log.js', 'test-2723-plugin-reports.js', 'test-2732-press-mark.js',
                  'test-2260-burn-relog.js',
                  'test-2259-forge-burn.js',
                  'test-2337-kiln-menu.js',
