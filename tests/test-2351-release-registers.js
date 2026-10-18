@@ -34,6 +34,14 @@
     L  the log says counts and nothing else
     W  a part that cannot write waits, alone, for the next start; a list that
        is not one releases nothing and is left
+    C  a list naming characters only, no profile, as Reset-Character.ps1 and
+       Wipe-Saves.ps1 write it (#2668): what a character held goes (an
+       embassy row with no profile, a dungeon chest's reservation, a trader's
+       supply waits and a trade waiting on it) and nothing a profile holds is
+       touched: every claim, office, bed, farm, book and roll place held by a
+       profile stays byte for byte
+    X  a wipe's list, every part but the merchants' marked done: only the
+       merchant ledger lets go, and the list is gone
 
   Nothing leaves this machine. The scratch folder goes at the end.
 */
@@ -484,6 +492,61 @@ try {
   }
   yes('W5 a list that is not one lets go of nothing and is left as it is, said in the log',
       same && n1.logged.some(function (l) { return /is not a list of deleted characters, so nothing was let go and it is left as it is/.test(l); }));
+
+  // ============================================================ C: characters only (#2668)
+  // Reset-Character.ps1 and Wipe-Saves.ps1 name the characters they throw
+  // away by form id and never a profile, which keeps its id and what it holds.
+  // The door knows no roles here, so rolesRead ends nothing and only the list
+  // is measured (as W5).
+  const quiet = { before: function (b) { b.__thornswoodRolesKnown = function () { return false; }; } };
+  function charactersOnly(name, list) {
+    const d = path.join(scratch, name);
+    registers(d);
+    fs.writeFileSync(path.join(d, 'private', 'deleted-characters.json'), JSON.stringify(list));
+    const k = {};
+    for (const f of fs.readdirSync(path.join(d, 'private'))) { k[f] = fs.readFileSync(path.join(d, 'private', f), 'utf8'); }
+    const r = start(d, quiet);
+    const changed = Object.keys(k).filter(function (f) {
+      if (f === 'deleted-characters.json' || /^dungeon-rewards-ledger\./.test(f)) { return false; }
+      return !fs.existsSync(path.join(d, 'private', f)) || fs.readFileSync(path.join(d, 'private', f), 'utf8') !== k[f];
+    }).sort();
+    return { dir: d, run: r, keep: k, changed: changed, lines: r.logged.filter(function (l) { return /^release: /.test(l); }) };
+  }
+  const c = charactersOnly('characters-only', { profiles: [], actors: [A1, A2] });
+  yes('C1 the list of characters only is read and every part runs (' + c.lines.length + ' lines)',
+      /a list of 0 profile\(s\) and 2 character\(s\) to let go, at server start/.test(c.lines[0] || '') &&
+      /every part is done, and the list is gone/.test(c.lines[c.lines.length - 1] || '') &&
+      !fs.existsSync(path.join(c.dir, 'private', 'deleted-characters.json')));
+  yes('C2 only the rolls and the merchant ledger are written (' + c.changed.join(', ') + ')',
+      JSON.stringify(c.changed) === JSON.stringify(['embassy.json', 'merchant-ledger.json']));
+  const profileHeld = ['property.json', 'law.json', 'beds.json', 'farm-claims.json', 'books.json', 'last-left.json'];
+  yes('C3 nothing a profile holds is touched: claims, keys, offices, posts, the drop box, beds, the farm, books and when they last left, byte for byte',
+      profileHeld.every(function (f) { return fs.readFileSync(path.join(c.dir, 'private', f), 'utf8') === c.keep[f]; }));
+  yes('C4 the parts that keep those say they found nothing of the characters\'',
+      ['farms', 'property', 'books'].every(function (p) { return c.lines.indexOf('release: ' + p + ': nothing of theirs') >= 0; }));
+  const cr = j(c.dir, 'embassy.json');
+  yes('C5 an embassy row with no profile goes by its form id; a row a profile holds stays, though its character is named',
+      cr.embassy.length === 1 && cr.embassy[0].actor === AY &&
+      cr.remnant.length === 2 && cr.remnant.some(function (r) { return r.actor === A2 && r.profile === P2; }));
+  const cd = j(c.dir, 'dungeon-rewards-ledger.json');
+  yes('C6 the chest the character opened keeps its reservation with the character off it, and the record verifies',
+      cd.entries['1a2b3:Skyrim.esm'].actor === 0 && cd.entries['1a2b4:Skyrim.esm'].actor === AY && cd.sha256 === checksum(cd));
+  const cm = j(c.dir, 'merchant-ledger.json'), cm9 = cm.entries['9:Skyrim.esm'];
+  yes('C7 the characters\' supply waits go by form id, the trade waiting on one is cleared, somebody else\'s stay',
+      JSON.stringify(Object.keys(cm9.supply)) === JSON.stringify([MKEY_Y]) && cm9.pending === null &&
+      JSON.stringify(cm.entries['8:Skyrim.esm']) === JSON.stringify(JSON.parse(c.keep['merchant-ledger.json']).entries['8:Skyrim.esm']) &&
+      cm.sha256 === checksum(cm));
+
+  // ============================================================ X: a wipe's list (#2668)
+  const x = charactersOnly('wipe-list', { profiles: [], actors: [A1],
+    done: { farms: NOW, property: NOW, embassy: NOW, dungeon: NOW, books: NOW } });
+  yes('X1 only the merchants\' part runs, and then the list is gone (' + x.lines.join(' / ') + ')',
+      x.lines.length === 3 && /^release: merchants: /.test(x.lines[1]) && /the list is gone/.test(x.lines[2]) &&
+      !fs.existsSync(path.join(x.dir, 'private', 'deleted-characters.json')));
+  yes('X2 only the merchant ledger is written (' + x.changed.join(', ') + ')', JSON.stringify(x.changed) === JSON.stringify(['merchant-ledger.json']));
+  const xm9 = j(x.dir, 'merchant-ledger.json').entries['9:Skyrim.esm'];
+  yes('X3 the wiped character\'s supply wait and waiting trade go; another character\'s stays',
+      xm9.pending === null && !(MKEY_1 in xm9.supply) && (MKEY_2 in xm9.supply) && (MKEY_Y in xm9.supply));
 } catch (e) {
   yes('the harness ran to the end: ' + (e && e.stack || e), false);
 }

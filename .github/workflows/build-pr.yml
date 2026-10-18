@@ -335,6 +335,12 @@ jobs:
           # release lets go of for a deleted character: supply waits, a
           # waiting trade in debit and in credit, purses and shelves the same,
           # a failed save waiting. A second.
+          # Issue #2668: tests\test-2668-reset-wipe-release.ps1 runs the body
+          # Reset-Character.ps1 sends and the move Wipe-Saves.ps1 sends, under
+          # Windows PowerShell 5.1 on stand-in server folders, and holds the
+          # release list each writes: characters by form id and never a
+          # profile, merged, a wipe's waiting only on the merchants' part, and
+          # read by the gamemode's own release block. Half a minute.
           # Issue #2166: tests\test-2166-retention-fixes.js holds three
           # retention fixes to what the privacy page already says: trouble.json
           # ages by 365 days in the hourly sweep on a scratch site (a kept
@@ -576,6 +582,7 @@ jobs:
                  'test-2351-release-registers.js',
                  'test-2351-wipe-registers.ps1',
                  'test-2652-merchant-release.js',
+                 'test-2668-reset-wipe-release.ps1',
                  'test-2166-retention-fixes.js',
                  'test-missing-files-stop.ps1',
                  'test-ship-launcher-drift.ps1',
