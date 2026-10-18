@@ -18,10 +18,32 @@
 #     on a machine with no engine build;
 #   client\, the six client files at the paths the record names, which
 #     Sync-Client.ps1 -Dist puts in a game folder;
+#   fork-build.json, when the fork built it (below): the fork's run, and
+#     each file it kept with its sha256 and time;
 #   SHA256SUMS over all of it.
 # Nothing is sent anywhere and nothing is committed: the records reach main
 # only through a pull request a person opens, and the server build reaches a
 # server only through a deploy that names it.
+#
+# THE FORK'S OWN BUILD FIRST (Patrick's B on #459, 16 Oct). The fork,
+# EvilPatrick06/skymp, is public, so GitHub builds it at no cost: every push
+# to thornswood/engine-changes builds the engine there and keeps what this
+# records as the artifact thornswood-engine-<commit> (the fork's
+# thornswood-pr-windows.yml, since fork #79). So before anything is compiled,
+# "Look for the fork's build of this commit" takes that build, holds it to the
+# commit, the run and every file's sha256, and puts it where Build-Engine.ps1
+# and Build-Server.ps1 would have (scripts\release\ForkEngineBuild.ps1 says
+# which build counts and what is held). The records are then made from it as
+# from any build, with -BuiltBy naming the fork's run, and the compile steps
+# are skipped. The engine is built here, hosted first and then on the box,
+# only when the fork has no build of the commit (a commit from before fork
+# #79, or one whose artifact's 90 days are over). A fork build still running,
+# or one that ended red, stops this run with its link instead: the first
+# would build twice what GitHub builds free, and the second is a red engine.
+# The fork's artifacts are read with this run's own token (GitHub serves a
+# public repository's artifacts to any token, never to none); no secret of
+# this repository goes near the fork, and no runner here ever runs a job of
+# the fork's.
 #
 # WHERE IT RUNS (Patrick's decision on #459, 15 Oct: C, then B): "just like
 # everything else GitHub runner are always used for everything first than if
@@ -152,8 +174,13 @@ jobs:
         env:
           COMMIT: ${{ steps.which.outputs.commit }}
         run: |
-          git submodule update --init engine/skymp
+          # As committed, LF, the way One checks the fork out and the fork's
+          # own build does since fork #79. A runner's git turns text to CR LF
+          # (Windows images set core.autocrlf true), and the records hold the
+          # server's package.json, yarn.lock and bundle to the fork's bytes.
+          git -c core.autocrlf=false submodule update --init engine/skymp
           if ($LASTEXITCODE -ne 0) { Write-Host '::error::could not fetch engine/skymp'; exit 1 }
+          git -C engine/skymp config core.autocrlf false
           git -C engine/skymp fetch origin thornswood/engine-changes
           if ($LASTEXITCODE -ne 0) { Write-Host '::error::could not fetch thornswood/engine-changes'; exit 1 }
           git -C engine/skymp cat-file -e "$env:COMMIT^{commit}" 2>$null
@@ -174,8 +201,43 @@ jobs:
           if ($LASTEXITCODE -ne 0) { Write-Host '::error::could not fetch upstream main'; exit 1 }
           Write-Host "the fork is at $head, on thornswood/engine-changes"
 
+      - name: Look for the fork's build of this commit
+        id: fork
+        shell: pwsh
+        env:
+          COMMIT: ${{ steps.which.outputs.commit }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Header, THE FORK'S OWN BUILD FIRST. found=true puts the fork's
+          # build in engine\skymp\build and the compile steps are skipped;
+          # found=false builds it here; a fork build still running or red
+          # stops the run. A lookup or download that fails stops it too: that
+          # is not a fork with no build.
+          . .\scripts\release\ForkEngineBuild.ps1
+          $ProgressPreference = 'SilentlyContinue'
+          $headers = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
+          $get = { param($path) Invoke-RestMethod -Headers $headers -Uri ('https://api.github.com/' + $path) }.GetNewClosure()
+          $f = Find-ForkEngineBuild $env:COMMIT $get
+          Write-Host $f.Why
+          if ($f.State -eq 'stop') { Write-Host "::error::$($f.Why)"; exit 1 }
+          if ($f.State -ne 'found') { Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value 'found=false'; exit 0 }
+          $zip = Join-Path $env:RUNNER_TEMP 'fork-build.zip'
+          $scratch = Join-Path $env:RUNNER_TEMP 'fork-build'
+          foreach ($p in $zip, $scratch) { if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Recurse -Force } }
+          # The download is sent on to GitHub's storage, which is given no
+          # token: pwsh drops it when a request moves to another host.
+          Invoke-WebRequest -Headers $headers -Uri $f.Artifact.archive_download_url -OutFile $zip
+          $m = Expand-ForkEngineBuild -Zip $zip -Commit $env:COMMIT -RunId $f.Run.id -Digest ([string]$f.Artifact.digest) -Fork engine\skymp -Scratch $scratch
+          $kept = Join-Path $env:RUNNER_TEMP 'fork-build.json'
+          Copy-Item -LiteralPath (Join-Path $scratch 'fork-build.json') -Destination $kept -Force
+          Write-Host ("the fork's build of {0}, {1} files held to fork-build.json, is in engine\skymp\build" -f $env:COMMIT.Substring(0, 12), @($m.files.PSObject.Properties).Count)
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value 'found=true'
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ('run=' + $f.Run.html_url)
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ('manifest=' + $kept)
+
       - name: Where vcpkg keeps the libraries it built
         id: vcpkg
+        if: steps.fork.outputs.found != 'true'
         shell: pwsh
         run: |
           # Beside the checkout, the runner's own (header, THE LIBRARIES ARE
@@ -196,7 +258,7 @@ jobs:
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value ("key=engine-vcpkg-" + $vc + "-" + $sum)
 
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        if: runner.environment == 'github-hosted'
+        if: runner.environment == 'github-hosted' && steps.fork.outputs.found != 'true'
         with:
           path: ${{ steps.vcpkg.outputs.dir }}
           key: ${{ steps.vcpkg.outputs.key }}
@@ -204,6 +266,7 @@ jobs:
 
       - name: Build the engine
         id: build
+        if: steps.fork.outputs.found != 'true'
         shell: pwsh
         run: |
           # Exit 2 is "built, and the six client files are not the ones
@@ -221,6 +284,7 @@ jobs:
           key: ${{ steps.vcpkg.outputs.key }}
 
       - name: Build every server file again and record it
+        if: steps.fork.outputs.found != 'true'
         shell: pwsh
         run: |
           # Writes records\server-build.json in this checkout, every file tied
@@ -228,10 +292,31 @@ jobs:
           .\scripts\release\Build-Server.ps1 -NoPause
           if ($LASTEXITCODE -ne 0) { Write-Host "::error::Build-Server.ps1 exited with $LASTEXITCODE; the lines above say why"; exit 1 }
 
+      - name: Record the fork's server build
+        if: steps.fork.outputs.found == 'true'
+        shell: pwsh
+        env:
+          FORK_RUN: ${{ steps.fork.outputs.run }}
+        run: |
+          # What Build-Server.ps1 does around its compile: the server's
+          # packages from its yarn.lock first, which the record holds the
+          # bundle's packages to, then the record. Run in the folder: yarn is
+          # a .cmd. -BuiltBy, because this checkout is newer than the build.
+          Push-Location -LiteralPath engine\skymp\skymp5-server
+          try { yarn install --frozen-lockfile --non-interactive; $code = $LASTEXITCODE } finally { Pop-Location }
+          if ($code -ne 0) { Write-Host "::error::yarn install --frozen-lockfile in engine\skymp\skymp5-server exited with $code"; exit 1 }
+          .\scripts\release\New-ServerBuildRecord.ps1 -Dist engine\skymp\build\dist\server -Clone engine\skymp -BuiltBy $env:FORK_RUN
+          if (-not $?) { exit 1 }
+
       - name: Record the client
         shell: pwsh
+        env:
+          FORK_RUN: ${{ steps.fork.outputs.run }}
         run: |
-          .\scripts\release\New-ClientBuildRecord.ps1 -Dist engine\skymp\build\dist\client -Clone engine\skymp
+          # -BuiltBy for the fork's build (the step before says why).
+          $by = @{}
+          if ($env:FORK_RUN) { $by.BuiltBy = $env:FORK_RUN }
+          .\scripts\release\New-ClientBuildRecord.ps1 -Dist engine\skymp\build\dist\client -Clone engine\skymp @by
           if (-not $?) { exit 1 }
 
       - name: Check the records name this commit
@@ -252,11 +337,14 @@ jobs:
         shell: pwsh
         env:
           SHORT: ${{ steps.which.outputs.short }}
+          FORK_BUILD: ${{ steps.fork.outputs.manifest }}
         run: |
           $out = Join-Path $env:RUNNER_TEMP 'engine-out'
           if (Test-Path -LiteralPath $out) { Remove-Item -LiteralPath $out -Recurse -Force }
           New-Item -ItemType Directory -Force -Path (Join-Path $out 'records'), (Join-Path $out 'server'), (Join-Path $out 'client') | Out-Null
           foreach ($r in 'server-build.json', 'client-build.json') { Copy-Item -LiteralPath (Join-Path 'records' $r) -Destination (Join-Path $out "records\$r") }
+          # Which fork run built it, when the fork did.
+          if ($env:FORK_BUILD) { Copy-Item -LiteralPath $env:FORK_BUILD -Destination (Join-Path $out 'fork-build.json') }
           # The server build as the store keeps it, held to the record as it
           # is read (ServerArtifact.ps1).
           . .\scripts\deploy\ServerArtifact.ps1

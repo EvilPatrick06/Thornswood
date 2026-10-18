@@ -626,6 +626,7 @@ jobs:
                  'test-459-server-artifact.ps1',
                  'test-459-store-deploy.ps1',
                  'test-459-engine-workflow.ps1',
+                 'test-459-fork-build.ps1',
                  'test-2320-short-load-order.ps1',
                  'test-1929-dev-gamemode-note.ps1',
                  'test-1938-server-ready-wait.ps1',

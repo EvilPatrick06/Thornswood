@@ -359,6 +359,23 @@ take it out of their own environment first (`EngineJobs.ps1`,
 PowerShell to lose on a runner: its checkout path has no `&` in it, and its
 pwsh is an installed one.
 
+The fork's own build comes first (Patrick's B on #459, 16 October). The
+fork is public, so GitHub builds it at no cost: since fork #79 every push to
+`thornswood/engine-changes` builds the engine on GitHub's runner
+(`.github\workflows\thornswood-pr-windows.yml` in the fork) and keeps what
+the records need as the artifact `thornswood-engine-<commit>`, with
+`fork-build.json` naming the run and each file's sha256 and time. Before
+anything is compiled, `engine.yml` looks for that build of the commit
+(`scripts\release\ForkEngineBuild.ps1`), holds it to the commit, the run and
+every file, puts it in the fork's build folder, and makes both records from
+it with `-BuiltBy` naming the fork's run. The engine is compiled here, on
+GitHub's runner and then the VPS, only when the fork has no build of the
+commit (one from before fork #79, or one whose 90 days are over). A fork
+build still running, or one that ended red, stops the run with its link.
+Both check the fork out as committed, LF, as One does: the image's git turns
+text to CR LF, and the records hold the server's `package.json`, `yarn.lock`
+and bundle to the fork's bytes.
+
 Start it from the Actions tab, or from the repository folder:
 
 ```powershell
@@ -371,8 +388,9 @@ by hand: a pull request's code reaches the box through the build check alone
 holds `records\server-build.json` and `records\client-build.json`, the server
 build as the store on the box keeps it (`server\server-<fork commit
 12>-<zip hash 16>.zip` and its `.json`, `scripts\deploy\ServerArtifact.ps1`),
-the six client files under `client\` at the paths the record names, and
-`SHA256SUMS` over all of it. The run commits nothing and sends nothing.
+the six client files under `client\` at the paths the record names,
+`fork-build.json` when the fork built it, and `SHA256SUMS` over all of it.
+The run commits nothing and sends nothing.
 
 The pin pull request from it, step 4 of "One engine" with the records CI
 made instead of a machine's own build, from the repository folder on a branch:
@@ -399,4 +417,6 @@ yarn, which the box did not have on 16 October:
 `.\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeEngineTools -SkipFirewall'`
 puts them there. Until it has run, the fallback stops at Build-Engine's tool
 check and says what is missing. `tests\test-459-engine-workflow.ps1` holds the
-workflow's shape and these two scripts' part in it.
+workflow's shape and these two scripts' part in it, and
+`tests\test-459-fork-build.ps1` which fork build is taken, what it is held
+to, and the records' `-BuiltBy`.
