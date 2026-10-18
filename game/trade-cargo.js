@@ -23,9 +23,14 @@
   - Coin is not cargo. Gold (base 0xF) is refused; freight is #512's rule.
   - Saved state that does not verify is refused. It never starts empty.
 
-  WHAT IT LEAVES TO ITS CALLER, because Patrick has not decided it yet: the
-  ports, the leg times, who may load, when a hold can be robbed, and what
-  happens to cargo nobody claims. Those arrive as arguments.
+  WHAT IT NEVER DECIDES. Thornswood is a player-driven RP server (Patrick,
+  17 Oct 2026, 10:13 PM MT): a trade ship is a tool, and the players decide
+  what happens with it in the world. So nothing here says who sails, where,
+  when or for how long. The ports, the routes, their leg times and the crews
+  are staff data: checkRoutes() below reads and checks them, and
+  proposeRoutes() lists what a change would do so staff can confirm it before
+  it is kept. Who may load, and whether opening a hold is a crime, are the
+  world's business, not this file's.
 
   Ownership of who may run a ship, contracts and freight belong to #512 (the
   Free Skyrim Trading Company). Prices, purses and trading belong to #1373.
@@ -70,6 +75,15 @@ function createTradeCargo(opts) {
     if (typeof p !== 'string' || !ID_RE.test(p) || ports[p]) { throw new Error('A port cannot be verified: ' + p); }
     ports[p] = true;
   });
+  var routes = null;
+  if (opts.routes !== undefined) {
+    routes = {};
+    if (!Array.isArray(opts.routes)) { throw new Error('The routes cannot be verified.'); }
+    opts.routes.forEach(function (r) {
+      if (!isObj(r) || !ports[r.from] || !ports[r.to] || r.from === r.to) { throw new Error('A route cannot be verified.'); }
+      routes[r.from + '>' + r.to] = true;
+    });
+  }
   var maxLines = opts.maxLines === undefined ? MAX_LINES_DEFAULT : opts.maxLines;
   if (!Number.isInteger(maxLines) || maxLines < 1 || maxLines > 256) { throw new Error('The line limit cannot be verified.'); }
 
@@ -190,12 +204,35 @@ function createTradeCargo(opts) {
     return change(state, function (s) {
       var h = holdOf(s, id);
       if (h.sailing) { throw new Error('The hold is already at sea.'); }
-      if (!ports[to] || to === h.port) { throw new Error('No voyage from ' + h.port + ' to ' + to + '.'); }
+      if (!ports[to] || to === h.port || (routes && !routes[h.port + '>' + to])) {
+        throw new Error('No voyage from ' + h.port + ' to ' + to + '.');
+      }
       if (!time(at) || !time(arriveAt) || arriveAt <= at) { throw new Error('A voyage needs a time to leave and a later time to arrive.'); }
       var carrying = Object.keys(h.lines).some(function (k) { return h.lines[k].aboard > 0; });
       if (!carrying) { throw new Error('The hold is empty.'); }
       if (h.outs.some(function (o) { return o.receipt === null; })) { throw new Error('Something is still being handed out.'); }
       h.sailing = { from: h.port, to: to, at: at, arriveAt: arriveAt };
+      return h.sailing;
+    });
+  }
+
+  /*
+    A staff tool, for narration: change a voyage that is under way, to another
+    port on the list or to another time to arrive, or both. It never touches
+    what is aboard. Staff routes do not bind it, because staff are the ones
+    who wrote them; the port still has to be one a hold can stand at.
+  */
+  function amend(state, id, change_) {
+    return change(state, function (s) {
+      var h = holdOf(s, id);
+      if (!h.sailing) { throw new Error('The hold is not at sea.'); }
+      if (!isObj(change_)) { throw new Error('Say what changes.'); }
+      var to = change_.to === undefined ? h.sailing.to : change_.to;
+      var arriveAt = change_.arriveAt === undefined ? h.sailing.arriveAt : change_.arriveAt;
+      if (!ports[to] || to === h.sailing.from) { throw new Error('No voyage from ' + h.sailing.from + ' to ' + to + '.'); }
+      if (!time(arriveAt) || arriveAt <= h.sailing.at) { throw new Error('A voyage arrives after it left.'); }
+      h.sailing.to = to;
+      h.sailing.arriveAt = arriveAt;
       return h.sailing;
     });
   }
@@ -302,10 +339,101 @@ function createTradeCargo(opts) {
   }
 
   return {
-    empty: empty, audit: audit, open: open, load: load, depart: depart, arrive: arrive,
+    empty: empty, audit: audit, open: open, load: load, depart: depart, amend: amend, arrive: arrive,
     begin: begin, finish: finish, undo: undo, aboard: aboard, save: save, parse: load_,
     PORTS: Object.keys(ports), MAX_LINES: maxLines
   };
 }
 
-module.exports = { createTradeCargo: createTradeCargo, GOLD_BASE: GOLD_BASE, MAX_LINES_DEFAULT: MAX_LINES_DEFAULT };
+/*
+  STAFF DATA: THE PORTS, ROUTES AND CREWS.
+
+  Nothing about where ships go is written in code. Staff keep one list:
+
+    { v: 1,
+      ports:  [{ key, name, hold, world, pos: [x, y, z] }],
+      routes: [{ from, to, minutes, crew: ['<ref>', ...] }] }
+
+  A port is a place a hold can stand: its key, the name people read, the hold
+  whose drop box takes what nobody collects, and where it stands. A route is
+  one way between two ports with the real minutes a leg takes; the way back is
+  its own row, so staff can make it longer, shorter or absent. crew is the
+  references of any NPCs or special characters staff have stood up for it;
+  empty is a route nobody crews. An empty list is a world with no ships.
+
+  checkRoutes() refuses the whole list on the first thing wrong, so a bad edit
+  never half applies. proposeRoutes() compares the list in force with an edit
+  and says, line by line, what would change, including the holds a removed
+  port or route would strand, so staff confirm it knowing that.
+*/
+var HOLD_KEYS = { whiterun: 1, solitude: 1, riften: 1, markarth: 1, windhelm: 1, falkreath: 1,
+  morthal: 1, dawnstar: 1, winterhold: 1, ravenrock: 1 };
+var REF_RE = /^[0-9a-f]{1,8}:[^:\s][^:]{0,95}$/i;
+var MAX_ROUTE_MINUTES = 7 * 24 * 60;
+
+function checkRoutes(cfg) {
+  if (!isObj(cfg) || cfg.v !== 1 || !Array.isArray(cfg.ports) || !Array.isArray(cfg.routes) ||
+      Object.keys(cfg).some(function (k) { return k !== 'v' && k !== 'ports' && k !== 'routes'; })) {
+    throw new Error('The ship routes cannot be verified.');
+  }
+  var keys = {}, pairs = {};
+  var ports = cfg.ports.map(function (p, i) {
+    if (!isObj(p) || typeof p.key !== 'string' || !ID_RE.test(p.key) || keys[p.key] || !text(p.name, 64) ||
+        !HOLD_KEYS[p.hold] || typeof p.world !== 'string' || !REF_RE.test(p.world) ||
+        !Array.isArray(p.pos) || p.pos.length !== 3 || !p.pos.every(function (n) { return typeof n === 'number' && isFinite(n); })) {
+      throw new Error('Port ' + (i + 1) + ' cannot be verified.');
+    }
+    keys[p.key] = true;
+    return { key: p.key, name: p.name, hold: p.hold, world: p.world, pos: p.pos.slice() };
+  });
+  var routes = cfg.routes.map(function (r, i) {
+    var crew = r && r.crew === undefined ? [] : r && r.crew;
+    if (!isObj(r) || !keys[r.from] || !keys[r.to] || r.from === r.to || pairs[r.from + '>' + r.to] ||
+        !Number.isInteger(r.minutes) || r.minutes < 1 || r.minutes > MAX_ROUTE_MINUTES ||
+        !Array.isArray(crew) || crew.length > 64 ||
+        !crew.every(function (c, j) { return typeof c === 'string' && REF_RE.test(c) && crew.indexOf(c) === j; })) {
+      throw new Error('Route ' + (i + 1) + ' cannot be verified.');
+    }
+    pairs[r.from + '>' + r.to] = true;
+    return { from: r.from, to: r.to, minutes: r.minutes, crew: crew.slice() };
+  });
+  return { v: 1, ports: ports, routes: routes };
+}
+
+/*
+  What an edit would do, for staff to confirm. state is the manifest in force
+  (or null), so a port or route that holds are at or sailing on is named.
+*/
+function proposeRoutes(current, next, state) {
+  var a = checkRoutes(current), b = checkRoutes(next);
+  var lines = [], strands = [];
+  function byKey(list) { var o = {}; list.forEach(function (p) { o[p.key] = p; }); return o; }
+  function byPair(list) { var o = {}; list.forEach(function (r) { o[r.from + '>' + r.to] = r; }); return o; }
+  var pa = byKey(a.ports), pb = byKey(b.ports), ra = byPair(a.routes), rb = byPair(b.routes);
+  Object.keys(pb).forEach(function (k) {
+    if (!pa[k]) { lines.push('Add the port ' + pb[k].name + ' (' + k + ').'); }
+    else if (JSON.stringify(pa[k]) !== JSON.stringify(pb[k])) { lines.push('Change the port ' + pb[k].name + ' (' + k + ').'); }
+  });
+  Object.keys(pa).forEach(function (k) { if (!pb[k]) { lines.push('Remove the port ' + pa[k].name + ' (' + k + ').'); } });
+  Object.keys(rb).forEach(function (k) {
+    var r = rb[k];
+    if (!ra[k]) { lines.push('Add the route ' + r.from + ' to ' + r.to + ', ' + r.minutes + ' minutes.'); }
+    else {
+      if (ra[k].minutes !== r.minutes) { lines.push('The route ' + r.from + ' to ' + r.to + ' takes ' + r.minutes + ' minutes, not ' + ra[k].minutes + '.'); }
+      if (JSON.stringify(ra[k].crew) !== JSON.stringify(r.crew)) { lines.push('The route ' + r.from + ' to ' + r.to + ' has a new crew of ' + r.crew.length + '.'); }
+    }
+  });
+  Object.keys(ra).forEach(function (k) { if (!rb[k]) { lines.push('Remove the route ' + ra[k].from + ' to ' + ra[k].to + '.'); } });
+  if (state && isObj(state.holds)) {
+    Object.keys(state.holds).sort().forEach(function (id) {
+      var h = state.holds[id];
+      if (!pb[h.port]) { strands.push(id + ' is at ' + h.port + ', which this removes.'); }
+      if (h.sailing && (!pb[h.sailing.to] || !rb[h.sailing.from + '>' + h.sailing.to])) {
+        strands.push(id + ' is sailing ' + h.sailing.from + ' to ' + h.sailing.to + ', which this removes.');
+      }
+    });
+  }
+  return { changes: lines, strands: strands, next: b };
+}
+
+module.exports = { createTradeCargo: createTradeCargo, checkRoutes: checkRoutes, proposeRoutes: proposeRoutes, GOLD_BASE: GOLD_BASE, MAX_LINES_DEFAULT: MAX_LINES_DEFAULT };

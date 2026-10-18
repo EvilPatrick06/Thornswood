@@ -20,11 +20,16 @@
   - a refused change leaves the state as it was;
   - saved state that has been tampered with is refused, never started empty.
 
-  The ports here are stand-ins; which ports sail is question 2 on #511.
+  - the ports, routes, leg times and crews are staff data, never code: a bad
+    list is refused whole, and an edit is first a proposal that says what it
+    would change and which holds it would strand (Patrick, 17 Oct, 10:13 PM
+    MT: the server proposes, staff confirm, players decide).
+
+  The ports here are stand-ins written as staff would write them.
   Read only: no world, no files.
 */
 const path = require('path');
-const { createTradeCargo, GOLD_BASE } = require(path.join(__dirname, '..', 'game', 'trade-cargo.js'));
+const { createTradeCargo, checkRoutes, proposeRoutes, GOLD_BASE } = require(path.join(__dirname, '..', 'game', 'trade-cargo.js'));
 
 let pass = 0, fail = 0;
 function yes(what, cond) {
@@ -137,7 +142,7 @@ refused('an empty hold does not sail', () => ships.depart(s, 'red-wave', 'solitu
   const l = ships.load(t, 'maiden', { by: 'Gjalund', for: 'Raven', receipt: 'd1', entry: ore });
   ships.depart(t, 'maiden', 'dawnstar', 0, 10);
   const r = ships.begin(t, 'maiden', l, 3, 'taken', 'Raider', 5);
-  yes('this file lets a hold at sea be taken from; when is the gamemode\'s rule (#511 question 4)', r.entry.count === 3);
+  yes('this file lets a hold at sea be taken from; when is for the world to decide, not this file', r.entry.count === 3);
 }
 
 // ------------------------------------------------------------- a refused change changes nothing
@@ -172,6 +177,55 @@ refused('an empty hold does not sail', () => ships.depart(s, 'red-wave', 'solitu
   tamper('it is not a manifest at all', x => { delete x.v; });
   refused('a save that is not JSON is refused', () => ships.parse('{'), /cannot be verified/);
   refused('nothing saved is refused, not started empty', () => ships.parse(''), /cannot be verified/);
+}
+
+// ------------------------------------------------------------- staff data
+{
+  const port = (key, name, hold, x) => ({ key, name, hold, world: '3c:Skyrim.esm', pos: [x, 0, 0] });
+  const cfg = { v: 1,
+    ports: [port('solitude', 'Solitude docks', 'solitude', 1), port('windhelm', 'Windhelm docks', 'windhelm', 2)],
+    routes: [{ from: 'solitude', to: 'windhelm', minutes: 30, crew: ['fb18:CFTO.esp'] }] };
+  const ok = checkRoutes(cfg);
+  yes('staff routes read back as written', ok.ports.length === 2 && ok.routes[0].minutes === 30 && ok.routes[0].crew[0] === 'fb18:CFTO.esp');
+  yes('an empty list is a world with no ships, not an error', checkRoutes({ v: 1, ports: [], routes: [] }).routes.length === 0);
+  yes('a route with no crew is allowed', checkRoutes({ v: 1, ports: cfg.ports, routes: [{ from: 'windhelm', to: 'solitude', minutes: 45 }] }).routes[0].crew.length === 0);
+  const bad = (what, edit) => { const x = JSON.parse(JSON.stringify(cfg)); edit(x); refused('staff routes are refused whole when ' + what, () => checkRoutes(x)); };
+  bad('a route names a port that is not on the list', x => { x.routes[0].to = 'dawnstar'; });
+  bad('a port is listed twice', x => { x.ports.push(x.ports[0]); });
+  bad('a route is listed twice', x => { x.routes.push(x.routes[0]); });
+  bad('a leg takes no time', x => { x.routes[0].minutes = 0; });
+  bad('a leg is longer than a week', x => { x.routes[0].minutes = 7 * 24 * 60 + 1; });
+  bad('a port is in no hold', x => { x.ports[0].hold = 'cyrodiil'; });
+  bad('a crew member is not a reference', x => { x.routes[0].crew = ['Captain']; });
+  bad('a field nobody reads is added', x => { x.schedule = 'noon'; });
+
+  const ships2 = createTradeCargo({ ports: ok.ports.map(p => p.key), routes: ok.routes });
+  const t = ships2.empty();
+  ships2.open(t, 'h', 'windhelm');
+  ships2.load(t, 'h', { by: 'P', for: 'Q', receipt: 'r', entry: ore });
+  refused('with staff routes in force, a hold sails only a route staff listed', () => ships2.depart(t, 'h', 'solitude', 0, 10), /No voyage/);
+  {
+    const u = ships.empty();
+    ships.open(u, 'm', 'solitude');
+    ships.load(u, 'm', { by: 'P', for: 'Q', receipt: 'r', entry: ore });
+    refused('staff cannot amend a voyage that has not started', () => ships.amend(u, 'm', { arriveAt: 50 }), /not at sea/);
+    ships.depart(u, 'm', 'windhelm', 0, 100);
+    ships.amend(u, 'm', { to: 'dawnstar', arriveAt: 500 });
+    yes('staff can turn a ship to another port and another time, for the story', u.holds.m.sailing.to === 'dawnstar' && u.holds.m.sailing.arriveAt === 500);
+    refused('but not back to where it left', () => ships.amend(u, 'm', { to: 'solitude' }), /No voyage/);
+    refused('and not to arrive before it left', () => ships.amend(u, 'm', { arriveAt: 0 }), /after it left/);
+    yes('and what is aboard is untouched', ships.aboard(u, 'm')[0].entry.count === 20 && same(ships.arrive(u, 499), []) && same(ships.arrive(u, 500), ['m']));
+  }
+
+  const edit = { v: 1, ports: [cfg.ports[0], port('dawnstar', 'Dawnstar docks', 'dawnstar', 3)],
+    routes: [{ from: 'solitude', to: 'dawnstar', minutes: 40 }] };
+  const p = proposeRoutes(cfg, edit, t);
+  yes('a proposal names every change for staff to confirm',
+      p.changes.some(l => /Add the port Dawnstar/.test(l)) && p.changes.some(l => /Remove the port Windhelm/.test(l)) &&
+      p.changes.some(l => /Add the route solitude to dawnstar, 40/.test(l)) && p.changes.some(l => /Remove the route solitude to windhelm/.test(l)));
+  yes('and names the hold it would strand', p.strands.length === 1 && /h is at windhelm/.test(p.strands[0]));
+  yes('a proposal changes nothing by itself', checkRoutes(cfg).ports.length === 2 && t.holds.h.port === 'windhelm');
+  refused('a proposal of a bad list is refused', () => proposeRoutes(cfg, { v: 1, ports: [], routes: [{ from: 'a', to: 'b', minutes: 1 }] }, null));
 }
 
 // ------------------------------------------------------------- boundaries
