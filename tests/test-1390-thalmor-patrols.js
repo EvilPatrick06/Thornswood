@@ -49,7 +49,7 @@ const KEEP = JSON.parse(dataLine.slice(0, dataLine.indexOf('\n')).replace(/;\s*$
 const policyCtx = { Math, JSON, Number, Array, Object, Set, Map, Error, Reflect, String, console };
 vm.createContext(policyCtx);
 vm.runInContext(POLICY + '\nglobalThis.T={thalmorPatrolTable,thalmorPatrolCap,createNpcPopulation,THALMOR_PATROL_WORLD};', policyCtx);
-const { thalmorPatrolTable, createNpcPopulation } = policyCtx.T;
+const { thalmorPatrolTable } = policyCtx.T;
 const clone = o => JSON.parse(JSON.stringify(o));
 
 // ------------------------------------------------------- the staff's file --
