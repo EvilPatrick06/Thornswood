@@ -81,7 +81,15 @@ hand), with the services it wrote under still stopped, on the box:
 The first is a dry run that counts what goes; the second removes it, and
 refuses while a service it would write under is running. When the backup
 being put back carries a record the box's own does not, add
-`-Merge <its deletions\requests.jsonl>` to both. "Deletion requests" in
+`-Merge <its deletions\requests.jsonl>` to both. The second also writes
+`private\deleted-characters.json` again in each game server whose restored
+registers name one of those characters (a house, an office, a place on a
+roll or in a book), and each game server lets go of those entries as it
+starts (#2351): its `thornswood.log` says `release:` with counts, and the
+list is gone once every part is done. Putting back a folder an install or a
+wipe set aside (`C:\Thornswood-Server.prev-<date>`, `world-before-<date>`
+and the `*-before-<date>.json` registers in `private`) is a restore too: run
+the two lines above with that server still stopped, before it starts. "Deletion requests" in
 `docs\WEBSITE-OPERATIONS.md` is the whole procedure. Restrict the rehearsal
 destination to the operators: an unpacked archive contains credentials and
 private records. A restore rehearsal must use a disposable destination, never
