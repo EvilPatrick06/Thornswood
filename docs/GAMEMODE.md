@@ -198,9 +198,9 @@ and carried by the deed (`giveDeed`). Locks and keys follow
 door reads from the site (`__thornswoodOffices`, read through `officeOf`,
 #2551): a Jarl gives their hold's Court, Steward and Guard on the Office
 page (`officeCmd`, which asks the site to set the role), and only a
-steward can `evict`. A hold's box takes gold only (`putIn`);
-rent (`rentDue`, `rentCmd`) and board fees (`takeGold`)
-land in it. Notice boards come after them. Coin enters the world in one
+steward can `evict`. A hold's box is the drop box on its board
+(`dropboxCmd`), where rent (`rentDue`, `rentCmd`) is paid; board fees
+(`takeGold`) are counted on the hold's ledger (`funds`). Notice boards come after them. Coin enters the world in one
 place, the starting purse (`purse`, `test-one-mint.js`), and otherwise
 moves by trade (`gold`). The spoils block strips spawned gold from the
 world, and a coin purse found in it counts as gold.
@@ -383,7 +383,7 @@ These read `gamemode.js`, most by running one block against a stubbed `mp`.
 | Chargen and arrival | `test-arrivals.js`, `test-arrival-line.js`, `test-creation-close.js`, `test-creation-lines.js`, `test-creation-quiet.js`, `test-dressed-at-creation.js`, `test-new-character.js`, `test-stuck-in-the-hall.js`, `test-1269-kept-character.js` |
 | Gathering and mining | `test-deposit.js`, `test-chopping-gate.js`, `test-cooldown-sweep.js`, `test-mine-buildings.js`, `test-farming.js`, `test-eggs.js` |
 | Crafting and rules | `test-rulebook.js`, `test-nobody-makes.js`, `test-race-gate.js`, `test-race-table.js`, `test-recipeless-craft.js`, `test-bard-instruments.js`, `test-staff-spells.js`, `test-spell-tomes.js`, `test-enchanter-staff-spells.js`, `test-classes-page.js` |
-| Property and economy | `test-deed-title.js`, `test-locks.js`, `test-key-chain.js`, `test-mold-key.js`, `test-cut-key.js`, `test-offices.js`, `test-coffers.js`, `test-boards.js`, `test-unpin.js`, `test-spoils.js`, `test-one-mint.js` |
+| Property and economy | `test-deed-title.js`, `test-locks.js`, `test-key-chain.js`, `test-mold-key.js`, `test-cut-key.js`, `test-offices.js`, `test-coffers.js`, `test-2298-box-retired.js`, `test-boards.js`, `test-unpin.js`, `test-spoils.js`, `test-one-mint.js` |
 | Needs | `test-needs.js`, `test-temp.js`, `test-food-table.js`, `test-hud.js` |
 | Chat, commands, door | `test-command-ack.js`, `test-held-commands.js`, `test-help.js`, `test-tp.js`, `test-dice.js`, `test-door.js`, `test-allowed-failed.js`, `test-audit-handlers.js` |
 | Social | `test-social.js`, `test-party-markers.js`, `test-2474-heads.js` |
