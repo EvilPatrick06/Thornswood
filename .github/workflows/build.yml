@@ -611,7 +611,7 @@ jobs:
                  'test-site-front-resilience.js', 'test-site-upload-guard.js',
                  'test-report-limits.js', 'test-site-hangs.js',
                  'test-site-oauth-gaps.js', 'test-site-escaping.js', 'test-2185-site-bind.js', 'test-2193-hero-video.js', 'test-2187-signin-addr.js', 'test-2192-age-expiry.js', 'test-2189-log-rotation.js', 'test-2188-board-revision.js', 'test-2235-dev-ship-guard.ps1', 'test-2436-installer-hotfix.ps1', 'test-2243-installer-throw.ps1', 'test-2251-key-press-log.js', 'test-swap-helpers.ps1',
-                 'test-backup-restore.ps1', 'test-1046-restore-rehearse.ps1', 'test-backup-streaming.ps1', 'test-fetch-verify-all.ps1', 'test-2199-zip-policy.ps1', 'test-2199-fetch-whole-path.ps1',
+                 'test-backup-restore.ps1', 'test-1046-restore-rehearse.ps1', 'test-1046-rehearsal-due.ps1', 'test-backup-streaming.ps1', 'test-fetch-verify-all.ps1', 'test-2199-zip-policy.ps1', 'test-2199-fetch-whole-path.ps1',
                  'test-content-release.ps1',
                  'test-cooldown-sweep.js', 'test-voice-moved-clients.js',
                  'test-release-parity.ps1', 'test-dev-version.ps1', 'test-ship-launcher-reuse.ps1', 'test-2347-dev-launcher-version.ps1', 'test-2347-publish-launcher-number.ps1', 'test-2661-keep-feed-launcher.ps1', 'test-2662-dev-root-launcher.ps1',

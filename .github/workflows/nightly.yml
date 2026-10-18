@@ -8,6 +8,8 @@
 #             launcher window check and the launcher build
 #   GitHub    pull requests open more than two days and branches other than
 #             main, which CONTRIBUTING.md says are merged or closed
+#   restore   whether the monthly hands-on restore rehearsal is overdue
+#             (Check-RehearsalDue.ps1, issue #1046)
 #
 # Every action here is named by a full length commit SHA with its tag in the
 # comment, for the reason build.yml gives: a tag is a moving pointer, and this
@@ -263,6 +265,23 @@ jobs:
           name: Thornswood.exe
           path: ${{ runner.temp }}/Thornswood/Launcher/Thornswood.exe
           retention-days: 7
+
+      - name: Is the monthly restore rehearsal due
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          # Issue #1046. Patrick, 18 Oct 2026: the hands-on restore rehearsal
+          # runs monthly. Its record is the Last rehearsed line in
+          # docs\RESTORING.md, written by hand after a real run, and this reads
+          # it. Older than 35 days fails the night, so the board's issue says
+          # the rehearsal is overdue until one is done and the line written. A
+          # page whose line cannot be read fails too (exit 3): no record is not
+          # a pass. tests\test-1046-rehearsal-due.ps1 holds it to that.
+          .\scripts\vps\Check-RehearsalDue.ps1
+          $code = $LASTEXITCODE
+          if ($code -eq 1) { Write-Host '::error file=docs/RESTORING.md::the monthly restore rehearsal is overdue; do it ("Rehearsing it") and write the date in the Last rehearsed line' }
+          elseif ($code -ne 0) { Write-Host '::error file=docs/RESTORING.md::the Last rehearsed line could not be read; the line above says why' }
+          exit $code
 
       - name: Stray pull requests and branches
         if: ${{ !cancelled() }}
