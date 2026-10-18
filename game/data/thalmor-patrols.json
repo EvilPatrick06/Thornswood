@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "about": [
+    "Thalmor patrols (#1390, docs/systems/thalmor.md). Staff settings, naming nobody.",
+    "on: whether any patrol is out at all. Off until staff turn it on.",
+    "most: the most roads with a patrol in the province at once (the page says 3).",
+    "returnMinutes: how long a dead member takes to come back at its point. leash: how far one strays from its point.",
+    "tier: the difficulty tier the members fight at, or null for none.",
+    "roads: one patrol each. A road is refused if it is not in Tamriel, has fewer than 2 or more than 4 points, or a point is near a walled town.",
+    "Each point is one member, made from the base at the same place in bases. A road may set its own returnMinutes and leash.",
+    "Changes take effect at the next start or gamemode reload. A road turned off loses its members then."
+  ],
+  "on": false,
+  "most": 3,
+  "returnMinutes": 45,
+  "leash": 1536,
+  "tier": null,
+  "roads": [
+    {
+      "id": "pale",
+      "name": "the Pale road",
+      "on": true,
+      "world": "3c:Skyrim.esm",
+      "from": "the cut Immersive Patrols II Justiciar placements in the Pale: 2422ce:Immersive Patrols II.esp, 2422d0:Immersive Patrols II.esp, 2422d1:Immersive Patrols II.esp, 2422cc:Immersive Patrols II.esp",
+      "bases": [
+        "23d1b6:Immersive Patrols II.esp",
+        "23d1b6:Immersive Patrols II.esp",
+        "23d1b6:Immersive Patrols II.esp",
+        "23d1b7:Immersive Patrols II.esp"
+      ],
+      "points": [
+        [
+          42204.65,
+          61535.45,
+          -7697.89
+        ],
+        [
+          42792.77,
+          58992.17,
+          -7899.64
+        ],
+        [
+          42415.52,
+          60846.96,
+          -7642.09
+        ],
+        [
+          41325.44,
+          59586.77,
+          -7582.31
+        ]
+      ]
+    },
+    {
+      "id": "haafingar",
+      "name": "the Haafingar road",
+      "on": true,
+      "world": "3c:Skyrim.esm",
+      "from": "the cut Immersive Patrols II Justiciar placements in Haafingar: 274d83:Immersive Patrols II.esp, 274d84:Immersive Patrols II.esp, 274d85:Immersive Patrols II.esp, 274d86:Immersive Patrols II.esp",
+      "bases": [
+        "60f90:Immersive Patrols II.esp",
+        "60f91:Immersive Patrols II.esp",
+        "60f91:Immersive Patrols II.esp",
+        "60f91:Immersive Patrols II.esp"
+      ],
+      "points": [
+        [
+          -96155.64,
+          90703.16,
+          -10613
+        ],
+        [
+          -96411.34,
+          90665.63,
+          -10628.01
+        ],
+        [
+          -96272.46,
+          90564.34,
+          -10628.63
+        ],
+        [
+          -96112.45,
+          90458.13,
+          -10628.67
+        ]
+      ]
+    },
+    {
+      "id": "hjaalmarch",
+      "name": "the Hjaalmarch road",
+      "on": true,
+      "world": "3c:Skyrim.esm",
+      "from": "the cut Immersive Patrols II Justiciar placements in Hjaalmarch: 274d87:Immersive Patrols II.esp, 274d88:Immersive Patrols II.esp, 274d89:Immersive Patrols II.esp, 274d8a:Immersive Patrols II.esp",
+      "bases": [
+        "60fa2:Immersive Patrols II.esp",
+        "60fa2:Immersive Patrols II.esp",
+        "60fa2:Immersive Patrols II.esp",
+        "60f9e:Immersive Patrols II.esp"
+      ],
+      "points": [
+        [
+          -54940.8,
+          60060.26,
+          -13541.87
+        ],
+        [
+          -55096.18,
+          60241.4,
+          -13532.52
+        ],
+        [
+          -55182.89,
+          60086.05,
+          -13502.88
+        ],
+        [
+          -55383.89,
+          60339.38,
+          -13504.62
+        ]
+      ]
+    }
+  ]
+}

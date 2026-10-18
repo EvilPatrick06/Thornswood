@@ -92,8 +92,19 @@ not attack on sight, because most of them are still the game's own
 actors and the server does not run their AI. The server knows no item
 that is a Dominion flag, so a flag is not read yet.
 
-No patrol is spawned by the server yet. Every actor the server stands
-up goes through the shared NPC population and its runtime, and the
-patrols wait on that work. The known-issues page still says the cast
-that stays is traders and the carriage workers. This page adds the
-patrols to that cast. See [People who are not people](npcs.md).
+The patrols are staff settings in `game/data/thalmor-patrols.json`:
+whether any patrol is out at all, the most roads with one at once, and
+for each road its points (one member each, 2 to 4), the record each
+member is made from, how long a dead one takes to come back, and how far
+one strays. It ships off, with three candidate roads from the cut
+Immersive Patrols II Justiciar placements in the Pale, Haafingar and
+Hjaalmarch. A road off Tamriel's ground, with fewer than 2 or more than
+4 points, or with a point beside a walled town or village is refused.
+At each start the server stands up any member that is missing, at its
+own point, and takes down the members of a road staff turned off. A dead
+member comes back at its point after the return time; nothing stacks a
+second group. A member keeps to its stretch of road, inside its leash;
+there is no route between holds. A body cannot be opened, so it gives no
+coin. The known-issues page still says the cast that stays is traders
+and the carriage workers. This page adds the patrols to that cast. See
+[People who are not people](npcs.md).

@@ -43059,13 +43059,9 @@ log('gamemode loaded:',
   robes are not race locked: races.md says Thalmor robes are a faction,
   not a people.
 
-  THE PATROLS ARE NOT HERE. "A patrol is 2 to 4. They are on the roads
-  between holds. At most 3 patrols in the province at once, and only one on
-  a given road." Every actor the server stands up goes through the NPC
-  population policy and the shared NPC runtime: placeActors admits and
-  enrolls what it places, and the policy switches off any runtime actor it
-  has no rule for. Those are the NPC lane's, so the patrols wait on it.
-  What a patrol needs from it is written on issue #1390.
+  THE PATROLS ARE NOT IN THIS BLOCK. They are the Thalmor patrols block,
+  after the NPC startup, and a patrol rule in the NPC population policy
+  (#1390). Nothing here waits on them, and they do not read either roll.
 */
 (function () {
   'use strict';
@@ -66258,6 +66254,76 @@ function createNpcMerchantPurses(api,data,storage) {
 // NPC MERCHANT PURSES END
 
 // NPC POPULATION POLICY BEGIN
+/*
+  THALMOR PATROLS (#1390). docs/systems/thalmor.md: "A patrol is 2 to 4. They
+  are on the roads between holds. They do not spawn inside a walled city. At
+  most 3 patrols in the province at once, and only one on a given road."
+
+  Which roads, how many on each, how long a dead one takes to come back, how
+  far one strays and whether any patrol is out at all are staff settings in
+  game/data/thalmor-patrols.json, never code. thalmorPatrolTable checks that
+  file and answers the roads that may stand: on, in Tamriel, clear of every
+  walled town and village, 2 to 4 points each, and no more roads than
+  thalmorPatrolCap. A road that fails is refused with its reason and the rest
+  still stand. A file that is not version 1, or has a setting out of range, is
+  thrown out whole, and then nothing is stood up or taken down.
+
+  WALLED TOWNS. A city worldspace is not Tamriel, so the world check keeps a
+  patrol out of every walled city with its own worldspace. A town or village
+  on Tamriel's own ground is known by the catalogue's kept city placements
+  (traders and the few town animals, habitat city): no point of a road may be
+  closer to one than THALMOR_PATROL_CITY_CLEARANCE plus the road's leash, so
+  a member never strays into the street either.
+*/
+const THALMOR_PATROL_WORLD='3c:Skyrim.esm';
+const THALMOR_PATROL_CITY_CLEARANCE=8192;
+// The one place the province cap is read. The follow-up agreed on #513 (a
+// per-stage cap from game/data/war-stages.json, once #2685 is on main)
+// changes this line and nothing else.
+function thalmorPatrolCap(table) {
+  return table.most;
+}
+function thalmorPatrolTable(doc,keep) {
+  const desc=/^[0-9a-f]{1,8}:[^:\\/]+\.es[mpl]$/i;
+  const whole=(v,lo,hi)=>Number.isInteger(v) && v>=lo && v<=hi;
+  if(!doc || typeof doc!=='object' || Array.isArray(doc) || doc.version!==1 ||
+      typeof doc.on!=='boolean' || !Array.isArray(doc.roads))
+    throw new Error('thalmor-patrols.json needs version 1, on and roads');
+  const most=doc.most===undefined ? 3 : doc.most;
+  const returnMinutes=doc.returnMinutes===undefined ? 45 : doc.returnMinutes;
+  const leash=doc.leash===undefined ? 1536 : doc.leash;
+  const tier=doc.tier===undefined ? null : doc.tier;
+  if(!whole(most,0,10) || !whole(returnMinutes,1,1440) || !whole(leash,256,8192) ||
+      !(tier===null || whole(tier,0,5)))
+    throw new Error('thalmor-patrols.json has most, returnMinutes, leash or tier out of range');
+  const towns=(Array.isArray(keep) ? keep : []).filter(r=>Array.isArray(r) && r[7]==='city' &&
+    r[2]===THALMOR_PATROL_WORLD && Array.isArray(r[3]) && r[3].length===3);
+  const table={on:doc.on,most,roads:[],refused:[]},seen=new Set();
+  for(const r of doc.roads) {
+    const id=r && typeof r.id==='string' ? r.id : '';
+    const refuse=why=>table.refused.push({id:id || '?',why});
+    if(!/^[a-z0-9-]{1,32}$/.test(id) || seen.has(id)) {refuse('needs an id of its own: lower case letters, digits and dashes');continue;}
+    seen.add(id);
+    if(typeof r.on!=='boolean') {refuse('needs on, true or false');continue;}
+    if(r.world!==THALMOR_PATROL_WORLD) {refuse('is not on Tamriel\'s roads ('+THALMOR_PATROL_WORLD+')');continue;}
+    if(!Array.isArray(r.points) || r.points.length<2 || r.points.length>4 ||
+        !r.points.every(p=>Array.isArray(p) && p.length===3 && p.every(Number.isFinite)))
+      {refuse('needs 2 to 4 points, one for each of the patrol');continue;}
+    if(!Array.isArray(r.bases) || r.bases.length!==r.points.length ||
+        !r.bases.every(b=>typeof b==='string' && desc.test(b)))
+      {refuse('needs one base, an NPC record as a descriptor, for each point');continue;}
+    const back=r.returnMinutes===undefined ? returnMinutes : r.returnMinutes;
+    const reach=r.leash===undefined ? leash : r.leash;
+    if(!whole(back,1,1440) || !whole(reach,256,8192)) {refuse('has returnMinutes or leash out of range');continue;}
+    const town=towns.find(t=>r.points.some(p=>Math.hypot(p[0]-t[3][0],p[1]-t[3][1])<THALMOR_PATROL_CITY_CLEARANCE+reach));
+    if(town) {refuse('has a point in or beside a walled town or village (near '+town[0]+')');continue;}
+    if(!r.on || !doc.on) continue;
+    if(table.roads.length>=thalmorPatrolCap(table)) {refuse('is over the province cap of '+thalmorPatrolCap(table));continue;}
+    table.roads.push({id,name:typeof r.name==='string' ? r.name.slice(0,80) : id,bases:r.bases.slice(),
+      points:r.points.map(p=>p.slice()),returnMinutes:back,leash:reach,tier});
+  }
+  return table;
+}
 function createNpcPopulation(api,data,plugins,merchants,options) {
   const invoke=Reflect.apply;
   if(data.version!==1 || JSON.stringify(data.plugins)!==JSON.stringify(plugins))
@@ -66291,6 +66357,34 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
   }
   api.makeProperty('thornswoodNpcHome',{isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
   api.makeProperty('thornswoodNpcCommanded',{isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
+  // A Thalmor patrol member (#1390) carries {road, slot}, set by the patrol
+  // keeper before admission. Never the commanded marker: a patrol is not a
+  // staff spawn, and it never joins a natural habitat bucket either.
+  api.makeProperty('thornswoodNpcPatrol',{isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
+  const patrolSlots=new Map();
+  // The rule for a patrol member, from the staff's road: its home is its own
+  // point, its leash and return are the road's, its bucket is the road, capped
+  // at the road's points, so there is only one group on a road. 'discard'
+  // takes it out of the world: its road is off, gone or over the province cap,
+  // its slot is past the road's points or already filled, or staff changed the
+  // record for that point. With no readable table nothing is decided: it stays
+  // switched off and nothing is deleted.
+  function patrolRule(id,mark,base,call) {
+    const table=options && typeof options.patrols==='function' ? options.patrols() : null;
+    if(!table || !Array.isArray(table.roads)) return null;
+    const road=table.roads.find(r=>r.id===mark.road);
+    if(!road || !Number.isInteger(mark.slot) || mark.slot<0 || mark.slot>=road.points.length) return 'discard';
+    let wanted=0;
+    try {wanted=resolve(road.bases[mark.slot],call);} catch(e) {return null;}
+    if(wanted!==base) return 'discard';
+    const key=road.id+'#'+mark.slot,holder=patrolSlots.get(key);
+    if(holder!==undefined && holder!==id) return 'discard';
+    const up=new Set([...patrolSlots.keys()].map(k=>k.split('#')[0]));
+    if(!up.has(road.id) && up.size>=thalmorPatrolCap(table)) return 'discard';
+    return {cell:resolve(THALMOR_PATROL_WORLD,call),patrol:key,bucket:'patrol:'+road.id,
+      row:[null,road.bases[mark.slot],THALMOR_PATROL_WORLD,road.points[mark.slot].slice(),road.leash,
+        road.returnMinutes,'enemy','road',road.tier,road.points.length,'patrol:'+road.id,0,'highelf']};
+  }
   let committed=false,closed=false,attempted=false;
   function commit() {
     if(closed) throw new Error('NPC population activation is revoked');
@@ -66333,10 +66427,22 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
       const validHome=saved && Number.isInteger(saved.cell) && Array.isArray(saved.home) &&
         saved.home.length===3 && saved.home.every(Number.isFinite);
       const anchor=validHome ? saved.home : state.pos,cell=validHome ? saved.cell : state.cellOrWorld;
+      // A Thalmor patrol member (#1390): its road and slot decide, never a
+      // habitat row or the spawn command's marker.
+      const patrolMark=call('get',id,'thornswoodNpcPatrol');
+      const patrolled=!!patrolMark && typeof patrolMark==='object' && typeof patrolMark.road==='string';
+      if(patrolled) {
+        const verdict=patrolRule(id,patrolMark,base,call);
+        if(verdict==='discard') {
+          if(options && typeof options.discard==='function') options.discard(id);
+          return null;
+        }
+        rule=verdict;
+      }
       // The spawn command's marker (#2623): {keep:true} for one staff kept,
       // {run} for a temporary one, and plain true from before that split,
       // which nobody chose to keep.
-      const marker=call('get',id,'thornswoodNpcCommanded');
+      const marker=patrolled ? null : call('get',id,'thornswoodNpcCommanded');
       const commanded=marker===true || (!!marker && typeof marker==='object' &&
         (marker.keep===true || typeof marker.run==='string'));
       const kept=commanded && marker!==true && marker.keep===true;
@@ -66352,16 +66458,19 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
         // Only trusted spawn commands set this private marker. They keep
         // authority and a saved home without joining a natural habitat cap.
         rule={cell,commanded:true,keep:kept,row:[null,base,call('getDescFromId',cell),anchor,1024,45,null,null,0]};
-      } else if(!commanded) rule=(byBase.get(base)||[]).filter(r=>r.cell===cell &&
+      } else if(!commanded && !patrolled) rule=(byBase.get(base)||[]).filter(r=>r.cell===cell &&
         (!saved || !saved.source || saved.source===r.row[0]) &&
         Math.hypot(...r.row[3].map((v,j)=>v-anchor[j]))<=r.row[4])
         .sort((a,b)=>Math.hypot(...a.row[3].map((v,j)=>v-anchor[j]))-
           Math.hypot(...b.row[3].map((v,j)=>v-anchor[j])))[0];
-      if(rule && !rule.commanded && (counts.get(rule.bucket)||0)>=(rule.row[9]||4)) rule=null;
+      if(rule && !rule.commanded && !rule.patrol && (counts.get(rule.bucket)||0)>=(rule.row[9]||4)) rule=null;
       if(closed) return null;
       if(rule) {
-        home=validHome ? saved.home.slice() : state.pos.slice();
-        call('set',id,'thornswoodNpcHome',{home,cell:rule.cell,source:rule.commanded ? 'command' : rule.row[0]});
+        // A patrol member's home is always its road's point, so staff moving
+        // a point moves the member's home at the next start.
+        home=rule.patrol ? rule.row[3].slice() : validHome ? saved.home.slice() : state.pos.slice();
+        call('set',id,'thornswoodNpcHome',{home,cell:rule.cell,
+          source:rule.commanded ? 'command' : rule.patrol ? rule.bucket : rule.row[0]});
         if(closed) return null;
         call('set',id,'spawnPoint',{cellOrWorldDesc:rule.row[2],pos:home,rot:[0,0,0]});
         if(closed) return null;
@@ -66390,6 +66499,7 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
     if(policy.swims) policy.top=rule.row[3][2];
     if(id>=0xff000000 && !rule.commanded) counts.set(rule.bucket,(counts.get(rule.bucket)||0)+1);
     configured.set(id,{policy,rule});
+    if(rule.patrol) patrolSlots.set(rule.patrol,id);
     return policy;
   }
   function afterOwnership(id,owner) {
@@ -66405,6 +66515,7 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
     const entry=configured.get(id);
     if(id>=0xff000000 && entry) {
       if(!entry.rule.commanded) counts.set(entry.rule.bucket,Math.max(0,(counts.get(entry.rule.bucket)||0)-1));
+      if(entry.rule.patrol && patrolSlots.get(entry.rule.patrol)===id) patrolSlots.delete(entry.rule.patrol);
       configured.delete(id);
     }
   }
@@ -69287,7 +69398,9 @@ try {
       // #2623: a temporary spawn left from an earlier run is taken out of
       // the world on the next turn of the event loop, never inside the
       // runtime's own preparation pass that asked about it.
-      run:serverRunId(),discard:id=>setTimeout(()=>removeSpawned(id),0)});
+      run:serverRunId(),discard:id=>setTimeout(()=>removeSpawned(id),0),
+      // #1390: the staff's patrol roads, as the patrol keeper below read them.
+      patrols:()=>globalThis.__thornswoodThalmorPatrols});
     current();
     runtime = startSharedNpcServerRuntime(
       mp, {setTimeout, clearTimeout}, Date.now, text=>log(text),population,{suspended:true});
@@ -69313,6 +69426,221 @@ try {
 }
 })();
 // NPC SERVER STARTUP END
+
+// ==== thornswood thalmor patrols ====
+/*
+  THE THALMOR PATROLS ARE STOOD UP HERE (#1390). docs/systems/thalmor.md,
+  Patrols: 2 to 4 on a road between holds, never inside a walled city, at
+  most 3 patrols in the province and one on a road; not people; no coin.
+
+  WHAT STAFF DECIDE. game/data/thalmor-patrols.json: whether any patrol is
+  out (on, false as shipped), the province cap (most), and for each road its
+  points (one member each, 2 to 4), the record each member is made from, how
+  long a dead one takes to come back and how far one strays. The three roads
+  it ships with are the cut Immersive Patrols II Justiciar placements in the
+  Pale, Haafingar and Hjaalmarch, at their own positions: candidates, all on,
+  under the file's own on. thalmorPatrolTable (the NPC population policy)
+  checks the file; nothing in code names a road, a number of members or a
+  time.
+
+  WHAT THIS DOES, ONCE AT START AND ON A GAMEMODE RELOAD, WITH NO TIMER. For
+  each road that may stand, each point is a slot. The register, in the
+  private folder and naming nobody, says which form fills each slot. A slot
+  whose form is still there and still carries that road's marker and record
+  is left alone, standing or dead: the engine brings a dead member back at
+  its point after the road's return time (spawnDelay, set by the policy), so a
+  return replaces it and never stacks a second group. A slot whose form is
+  gone gets a new member: made from its record at its point, marked with
+  {road, slot}, admitted by the population (which gives it the road's rule)
+  and enrolled in the shared NPC runtime. Members of a road that is off, gone,
+  over the cap or changed are taken out of the world (removeSpawned). Running
+  it again changes nothing.
+
+  WHAT IT NEVER DOES. With the file unreadable or the register unreadable it
+  stands nobody up and takes nobody down, and writes nothing. It sets no
+  timer, adds no command, and tells nobody to do anything: a patrol is a fight
+  on the road for whoever meets it, and the people decide what comes of it.
+
+  NOT PEOPLE, NO COIN. A member has no profile, so it does not wake in a
+  temple, and killing one is a warrior's work as for a bandit. Nobody can open
+  a body (the spoils block), and the dungeon body roll answers no key for a
+  runtime reference, so a body gives no coin and nothing else.
+
+  WALKING THE ROAD. The shared runtime keeps an NPC inside a leash around its
+  home. A member's home is its own point on the road and the leash is the
+  road's, so the group keeps to its stretch of road. A route between holds is
+  not built.
+*/
+(function () {
+  'use strict';
+  var g = globalThis;
+  var fs = require('fs');
+  var path = require('path');
+  var REGISTER = 'thalmor-patrol-slots.json';
+  var HEX = /^[0-9a-f]{1,8}$/;
+
+  function tlog() {
+    var a = Array.prototype.slice.call(arguments);
+    a.unshift('[patrols]');
+    console.log(a.join(' '));
+  }
+
+  function privateDir() {
+    var dir = 'private';
+    try {
+      var cfg = mp.getServerSettings();
+      if (cfg && cfg.privDir) { dir = String(cfg.privDir); }
+    } catch (e) { }
+    return dir;
+  }
+
+  // The staff's file, checked. null when it cannot be used at all.
+  function readTable() {
+    var doc = null;
+    try {
+      doc = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'thalmor-patrols.json'), 'utf8').replace(/^\uFEFF/, ''));
+    } catch (e) {
+      tlog('game/data/thalmor-patrols.json would not read, so no patrol is stood up or taken down:', e && e.message);
+      return null;
+    }
+    try {
+      return thalmorPatrolTable(doc, NPC_POPULATION_DATA.keep);
+    } catch (e2) {
+      tlog(String(e2 && e2.message) + ', so no patrol is stood up or taken down');
+      return null;
+    }
+  }
+
+  // { roads: { <road>: { <slot>: <form id in hex> } } }. No file yet is an
+  // empty register. A file that is there and will not read is null, and then
+  // nothing is changed or written over.
+  function readRegister() {
+    var text = null;
+    try {
+      text = fs.readFileSync(path.join(privateDir(), REGISTER), 'utf8');
+    } catch (e) {
+      if (e && e.code === 'ENOENT') { return { version: 1, roads: {} }; }
+      return null;
+    }
+    try {
+      var doc = JSON.parse(String(text).replace(/^\uFEFF/, ''));
+      if (!doc || doc.version !== 1 || !doc.roads || typeof doc.roads !== 'object' || Array.isArray(doc.roads)) { return null; }
+      var clean = { version: 1, roads: {} };
+      Object.keys(doc.roads).forEach(function (road) {
+        var slots = doc.roads[road];
+        if (!/^[a-z0-9-]{1,32}$/.test(road) || !slots || typeof slots !== 'object') { return; }
+        var keep = {};
+        Object.keys(slots).forEach(function (s) {
+          if (/^[0-3]$/.test(s) && typeof slots[s] === 'string' && HEX.test(slots[s])) { keep[s] = slots[s]; }
+        });
+        clean.roads[road] = keep;
+      });
+      return clean;
+    } catch (e2) {
+      return null;
+    }
+  }
+
+  function writeRegister(reg) {
+    var dir = privateDir();
+    try { fs.mkdirSync(dir, { recursive: true }); } catch (e) { }
+    var file = path.join(dir, REGISTER);
+    fs.writeFileSync(file + '.tmp', JSON.stringify(reg, null, 2) + '\n', 'utf8');
+    fs.renameSync(file + '.tmp', file);
+  }
+
+  // The form is still there, still this road's slot, still made from the
+  // record staff gave that point. A form id the engine reused for something
+  // else carries no such marker.
+  function holds(id, road, slot, base) {
+    try {
+      var mark = mp.get(id, 'thornswoodNpcPatrol');
+      if (!mark || mark.road !== road || mark.slot !== slot) { return false; }
+      if (base === undefined) { return true; }
+      return mp.getIdFromDesc(String(mp.get(id, 'baseDesc'))) === mp.getIdFromDesc(base);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function place(road, slot, population, runtime) {
+    var ref = 0;
+    try {
+      ref = mp.place(mp.getIdFromDesc(road.bases[slot]));
+      mp.set(ref, 'locationalData', {
+        cellOrWorldDesc: THALMOR_PATROL_WORLD,
+        pos: road.points[slot].slice(),
+        rot: [0, 0, 0]
+      });
+      // Before admission, so the population and every later start read it.
+      mp.set(ref, 'thornswoodNpcPatrol', { road: road.id, slot: slot });
+      if (!population.admit(ref, mp.getNpcAIState(ref))) { throw new Error('the NPC population did not admit it'); }
+      if (runtime && typeof runtime.enroll === 'function') { runtime.enroll(ref); }
+      return ref;
+    } catch (e) {
+      tlog(road.id, 'slot', slot, 'could not be stood up:', e && e.message);
+      if (ref) {
+        try { mp.destroyActor(ref); } catch (e2) { }
+        try { population.release(ref); } catch (e3) { }
+      }
+      return 0;
+    }
+  }
+
+  function keepPatrols() {
+    var table = readTable();
+    g.__thornswoodThalmorPatrols = table;
+    if (!table) { return; }
+    table.refused.forEach(function (r) { tlog('road', r.id, r.why); });
+    var population = g.__thornswoodNpcPopulation;
+    var runtime = g.__thornswoodNpcRuntime;
+    if (!population || typeof population.admit !== 'function') {
+      tlog('no NPC population on this server, so no patrol is stood up or taken down');
+      return;
+    }
+    var reg = readRegister();
+    if (!reg) {
+      tlog(REGISTER, 'would not read, so no patrol is stood up or taken down');
+      return;
+    }
+    var standing = {};
+    table.roads.forEach(function (r) { standing[r.id] = r; });
+    var changed = false, made = 0, kept = 0, gone = 0;
+
+    Object.keys(reg.roads).forEach(function (rid) {
+      var slots = reg.roads[rid], road = standing[rid];
+      Object.keys(slots).forEach(function (s) {
+        var slot = Number(s), id = parseInt(slots[s], 16) >>> 0;
+        if (road && slot < road.points.length && (!holds(id, rid, slot) || holds(id, rid, slot, road.bases[slot]))) { return; }
+        if (holds(id, rid, slot)) { removeSpawned(id); gone++; }
+        delete slots[s];
+        changed = true;
+      });
+      if (!Object.keys(slots).length) { delete reg.roads[rid]; changed = true; }
+    });
+
+    table.roads.forEach(function (road) {
+      var slots = reg.roads[road.id] || {};
+      for (var slot = 0; slot < road.points.length; slot++) {
+        var had = slots[slot] ? parseInt(slots[slot], 16) >>> 0 : 0;
+        if (had && holds(had, road.id, slot, road.bases[slot])) { kept++; continue; }
+        var ref = place(road, slot, population, runtime);
+        if (ref) { slots[slot] = (ref >>> 0).toString(16); made++; changed = true; }
+        else if (had) { delete slots[slot]; changed = true; }
+      }
+      if (Object.keys(slots).length) { reg.roads[road.id] = slots; }
+    });
+
+    if (changed) {
+      try { writeRegister(reg); } catch (e) { tlog('the register could not be written:', e && e.message); }
+    }
+    tlog(table.on ? 'on' : 'off', '-', table.roads.length, 'road(s) may stand;', made, 'stood up,', kept, 'already there,', gone, 'taken down');
+  }
+
+  try { keepPatrols(); } catch (e) { tlog('the patrol keeper failed:', e && e.message); }
+})();
+// ==== end thornswood thalmor patrols ====
+
 
 // ==== thornswood custom quests ====
 /*
