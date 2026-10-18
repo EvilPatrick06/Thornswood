@@ -13,7 +13,10 @@
     - -Record from one checkout is seen by the other;
     - a new release is not taken for an old one, and -Force still posts;
     - an old bot\announced.json is still read while the store has none;
-    - a store that cannot be read posts nothing.
+    - a store that cannot be read posts nothing;
+    - a -Record whose send fails says so, exits 1 and records nothing;
+    - a record that will not parse, or a store that cannot be read, posts
+      nothing, and -Record over either exits 1.
 #>
 [CmdletBinding()]
 param()
@@ -24,8 +27,38 @@ $Repo = Split-Path -Parent $Here
 $pwshExe = (Get-Process -Id $PID).Path
 
 $script:pass = 0; $script:fail = 0
+# A FAIL says what it judged (#2645). Twice on the VPS runners, and never on
+# One, -Record from B failed and then A's dry run did not find 1.2.3, and the
+# log could not say why: the check had Publish-Discord's words and the post
+# count in hand and printed neither. Now a FAIL prints the run it judged (its
+# arguments, exit code and every line it wrote), the post count, and what the
+# store and the shared working folder held straight after it.
+$script:last = $null
 function Yes([string]$what, [bool]$cond) {
-    if ($cond) { $script:pass++; Write-Host "PASS  $what" } else { $script:fail++; Write-Host "FAIL  $what" -ForegroundColor Red }
+    if ($cond) { $script:pass++; Write-Host "PASS  $what"; return }
+    $script:fail++; Write-Host "FAIL  $what" -ForegroundColor Red
+    Write-Host ("      posts the stand-in webhook has answered: {0}" -f $script:posts)
+    if ($script:last) {
+        Write-Host ("      the run it judged: Publish-Discord.ps1 {0}, from {1}, exit {2}" -f ($script:last.Args -join ' '), $script:last.Checkout, $script:last.Code)
+        foreach ($l in @($script:last.Text -split "`r?`n")) { Write-Host "      | $l" }
+        foreach ($f in @($script:last.After)) { Write-Host "      $f" }
+    }
+}
+# Every file in the store and the shared working folder, with its size and
+# sha256, and the text of each announced.json and read.json, as one list.
+function Get-StoreState {
+    $o = @()
+    foreach ($d in @((Join-Path $site 'feed-dev'), (Join-Path $local 'Thornswood\feed\announced-dev'))) {
+        if (-not (Test-Path -LiteralPath $d)) { $o += "no folder $d"; continue }
+        foreach ($f in @(Get-ChildItem -LiteralPath $d -Recurse -File | Sort-Object FullName)) {
+            $sha = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash.Substring(0, 12).ToLowerInvariant()
+            $o += ("{0}  {1} bytes  {2}  {3:HH:mm:ss.fff} UTC" -f $f.FullName.Substring($tmp.Length + 1), $f.Length, $sha, $f.LastWriteTimeUtc)
+            if ($f.Name -eq 'announced.json' -or $f.Name -eq 'read.json') {
+                $o += ('    ' + ([IO.File]::ReadAllText($f.FullName) -replace '\s+', ' '))
+            }
+        }
+    }
+    return $o
 }
 
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('tw-announced-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
@@ -76,6 +109,7 @@ function Run([string]$checkout, [string[]]$more, [switch]$Serve) {
     }
     if (-not $p.WaitForExit(120000)) { $p.Kill(); throw 'Publish-Discord did not finish' }
     $text = ([IO.File]::ReadAllText($out) + [IO.File]::ReadAllText($out + '.err'))
+    $script:last = @{ Args = @($more); Checkout = (Split-Path -Leaf $checkout); Code = $p.ExitCode; Text = $text; After = @(Get-StoreState) }
     return $text
 }
 $script:siteNow = $site
@@ -106,7 +140,7 @@ try {
     $o = Run $B @('-DryRun')
     Yes 'a new release is not taken for the old one' ($o -match 'would post' -and $o -notmatch 'already announced')
     $o = Run $B @('-Record')
-    Yes '-Record from B records 1.2.3 and posts nothing' ($script:posts -eq 2 -and $o -match 'recorded 1\.2\.3 as announced')
+    Yes '-Record from B records 1.2.3 and posts nothing, exit 0' ($script:posts -eq 2 -and $o -match 'recorded 1\.2\.3 as announced' -and $script:last.Code -eq 0)
     $o = Run $A @('-DryRun')
     Yes '  and a dry run from A then says already announced 1.2.3' ($o -match 'already announced 1\.2\.3')
 
@@ -123,6 +157,27 @@ try {
     Add-Content -LiteralPath (Join-Path $C 'scripts\release\Feed-Store.ps1') -Value "`r`nfunction Receive-FeedStore { throw 'stand-in: the VPS did not answer' }"
     $o = Run $C @()
     Yes 'a store that cannot be read: nothing posted, and it says so' ($script:posts -eq 2 -and $o -match 'COULD NOT READ what was already announced')
+
+    # A -Record whose send fails (a fourth checkout whose store refuses every
+    # send). From outside it looks like the two VPS failures in #2645: it says
+    # why, exits 1, and the store still has no record.
+    $D = New-Checkout 'D'
+    Add-Content -LiteralPath (Join-Path $D 'scripts\release\Feed-Store.ps1') -Value "`r`nfunction Send-FeedStore { throw 'stand-in: the send was refused' }"
+    $o = Run $D @('-Record')
+    Yes 'a -Record whose send fails says why and exits 1' ($o -match 'could not record it: stand-in: the send was refused' -and $script:last.Code -eq 1)
+    Yes '  and the store still holds no record' (-not (Test-Path -LiteralPath $store))
+    $o = Run $C @('-Record')
+    Yes 'a -Record that cannot read the store says so and exits 1' ($o -match 'COULD NOT READ what was already announced' -and $script:last.Code -eq 1)
+
+    # A record in the store that will not parse says nothing about what was
+    # posted: it used to be read as empty, so the release went out again and
+    # the record was written over. Now nothing is posted and the record stays.
+    [IO.File]::WriteAllText($store, '{"dev": {"stamp": "1.2.3|')
+    $o = Run $A @()
+    Yes 'a record that will not parse: nothing posted, and it says so' ($script:posts -eq 2 -and $o -match 'will not parse, so nothing was posted')
+    Yes '  and the record is left as it was' ([IO.File]::ReadAllText($store) -eq '{"dev": {"stamp": "1.2.3|')
+    $o = Run $A @('-Record')
+    Yes '  and -Record over it exits 1' ($script:last.Code -eq 1 -and [IO.File]::ReadAllText($store) -eq '{"dev": {"stamp": "1.2.3|')
 
     $src = [IO.File]::ReadAllText((Join-Path $Repo 'scripts\ops\Publish-Discord.ps1'))
     Yes 'Publish-Discord.ps1 never writes bot\announced.json any more' ($src -notmatch 'Set-Content -LiteralPath \$stateFile' -and $src -match 'Send-FeedStore')
