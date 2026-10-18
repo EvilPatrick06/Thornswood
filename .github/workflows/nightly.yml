@@ -225,13 +225,14 @@ jobs:
           if ($bad) { exit 1 }
           Write-Host 'every bot harness passed'
 
-      - name: Count the silent catches in the launcher
+      - name: Count the silent catches in the launcher and the scripts
         if: ${{ !cancelled() }}
         shell: pwsh
         run: |
           # Entry 239. A catch with nothing in it leaves no line in
           # launcher.log when it fires, and there were 386 of them on 24 Sep.
-          # Red when any file in launcher\app has more than
+          # Since #2711 the PowerShell under scripts\ and installer\ as well.
+          # Red when any of those files has more than
           # scripts\dev\swallow-baseline.txt allows, and since #756 red when a
           # file has fewer and its line has not been lowered with it. The
           # script says what to do.

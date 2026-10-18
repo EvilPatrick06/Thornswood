@@ -51,6 +51,7 @@ param(
   [string]$BuiltBy
 )
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 if (-not $Out) { $Out = Join-Path $PSScriptRoot '..\..\records\client-build.json' }
 
 # The six. Everything else the build produces is byte for byte what is already
@@ -139,22 +140,57 @@ if ($BuiltBy) {
   Write-Host ('  built by {0}, on another machine: held to the time of commit {1}, {2:yyyy-MM-dd HH:mm:ss} UTC' -f $BuiltBy, $commit, $commitUtc)
   $ErrorActionPreference = 'Continue'
 }
-# Every git call below may write "fatal" to stderr for something the clone
-# does not have (no upstream remote, an old recorded base). Under Stop, Windows
-# PowerShell throws on that, and the catch used to skip the base, the dirty
-# check and the stale check without a word.
-try {
-  $branch = Get-ForkBranch $Clone ((& git -C $Clone branch --show-current 2>$null) -join '').Trim()
-  $recordedBase = ''
-  try { $recordedBase = [string]((Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\..\records\client-build.json') -Raw | ConvertFrom-Json).upstreamBase) } catch { }
-  $base   = Get-UpstreamBase $Clone ((& git -C $Clone merge-base HEAD upstream/main 2>$null) -join '').Trim() $recordedBase
-  if ($base) { $base = $base.Substring(0, [Math]::Min(8, $base.Length)) } else { $base = 'unknown, fetch upstream to fill this in' }
-  $dirty  = [bool]((& git -C $Clone status --porcelain -- skymp5-client skymp5-server 2>$null) | Where-Object { $_ })
-  foreach ($src in @(if (-not $BuiltBy) { Get-ChildItem -LiteralPath (Join-Path $Clone 'skymp5-client\src') -Recurse -File -Include *.ts -EA SilentlyContinue })) {
-    if ($src.LastWriteTimeUtc -gt $newest) { $stale += $src.FullName.Substring($Clone.Length + 1) }
-  }
-} catch { }
 $ErrorActionPreference = 'Stop'
+
+# The branch, the base, the dirty check and the stale check. Each one answers
+# or stops the record here, before anything is written (#2711). They used to
+# sit in a try whose catch was empty, with a second empty catch around the
+# recorded base, so a check that threw (a git that could not answer, a record
+# that did not read, a source folder that could not be walked) wrote a record
+# and said nothing was dirty and nothing was stale: the record Ship and the
+# deploys hold the client to, claiming a check that never ran.
+#
+# git is read by its exit code, not by its stderr: under Stop, Windows
+# PowerShell throws on any line git writes there, even through 2>$null.
+# -Optional is for the one question a clone may rightly have no answer to,
+# the merge-base with upstream/main when it has no upstream remote, and gives
+# back '' for it; the record then says the base is unknown, in words.
+function Read-CloneGit([string[]]$GitArgs, [string]$What, [switch]$Optional) {
+  $ErrorActionPreference = 'Continue'
+  $said = @(& git -C $Clone @GitArgs 2>&1)
+  $code = $LASTEXITCODE
+  $out = @($said | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] } | ForEach-Object { "$_" })
+  if ($code -ne 0) {
+    if ($Optional) { return '' }
+    $err = (@($said | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] } | ForEach-Object { "$_" }) -join ' ').Trim()
+    throw ("cannot read {0} from {1}: git {2} exited {3} ({4}). Nothing was recorded." -f $What, $Clone, ($GitArgs -join ' '), $code, $err)
+  }
+  return ($out -join "`n").Trim()
+}
+
+$branch = Get-ForkBranch $Clone (Read-CloneGit @('branch', '--show-current') 'the branch that is checked out')
+# No record yet is a first record, with no base to carry over. A record that
+# is there and does not read stops it: carrying on would drop the base it holds.
+$recordedBase = ''
+$recordPath = Join-Path $PSScriptRoot '..\..\records\client-build.json'
+if (Test-Path -LiteralPath $recordPath) {
+  $was = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $recordPath -Raw) $recordPath
+  if ($was.PSObject.Properties['upstreamBase']) { $recordedBase = [string]$was.upstreamBase }
+}
+$base = Get-UpstreamBase $Clone (Read-CloneGit @('merge-base', 'HEAD', 'upstream/main') 'the merge-base with upstream/main' -Optional) $recordedBase
+if ($base) { $base = $base.Substring(0, [Math]::Min(8, $base.Length)) } else { $base = 'unknown, fetch upstream to fill this in' }
+$dirty = [bool](Read-CloneGit @('status', '--porcelain', '--', 'skymp5-client', 'skymp5-server') 'whether the client and server sources are committed')
+# A build made elsewhere is held to the commit's time above instead.
+if (-not $BuiltBy) {
+  $src = Join-Path $Clone 'skymp5-client\src'
+  if (-not (Test-Path -LiteralPath $src -PathType Container)) {
+    throw "there is no skymp5-client\src in $Clone, so whether the build is older than its sources cannot be checked. Nothing was recorded."
+  }
+  $srcFull = (Resolve-Path -LiteralPath $src).ProviderPath.TrimEnd('\')
+  foreach ($f in @(Get-ChildItem -LiteralPath $srcFull -Recurse -File -Include *.ts)) {
+    if ($f.LastWriteTimeUtc -gt $newest) { $stale += ('skymp5-client\src' + $f.FullName.Substring($srcFull.Length)) }
+  }
+}
 
 $record = [ordered]@{
   recordedUtc          = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
