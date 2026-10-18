@@ -69911,8 +69911,19 @@ try {
         },
         rankOf: function (actor, key) {
           var c = globalThis.__thornswoodCharacter;
-          if (!c || !c.rankOf) return '';
-          try { return c.rankOf(actor, key) || ''; } catch (e) { return ''; }
+          if (!c || typeof c.PROPERTY !== 'string' || !c.PROPERTY) return '';
+          try {
+            // Character.rankOf enters migration on a failed read. Eligibility
+            // only reads persisted standing; initialization owns migration.
+            var raw = mp.get(actor, c.PROPERTY);
+            if (!raw || typeof raw !== 'object' || Array.isArray(raw) ||
+                !Object.prototype.hasOwnProperty.call(raw, 'v') || raw.v !== 1 ||
+                !Object.prototype.hasOwnProperty.call(raw, 'ranks') ||
+                !raw.ranks || typeof raw.ranks !== 'object' || Array.isArray(raw.ranks) ||
+                !Object.prototype.hasOwnProperty.call(raw.ranks, key)) return '';
+            var rank = raw.ranks[key];
+            return RANK.indexOf(rank) >= 0 ? rank : '';
+          } catch (e) { return ''; }
         },
         creatureName: function (id) {
           try {

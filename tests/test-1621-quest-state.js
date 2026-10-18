@@ -109,6 +109,15 @@ function boot(into) {
       ctx.__made[name] = opts;
     },
     get: function (id, key) {
+      if (key === 'thornswoodCharacter') {
+        if (ctx.__questRankRead) return ctx.__questRankRead(id);
+        const savedRanks = {};
+        Object.keys(ranks).forEach(function (entry) {
+          const prefix = id + ':';
+          if (entry.indexOf(prefix) === 0) savedRanks[entry.slice(prefix.length)] = ranks[entry];
+        });
+        return {v: 1, ranks: savedRanks};
+      }
       if(npcStates[id] && key==='baseDesc')return npcStates[id].base;
       if(npcStates[id] && key==='worldOrCellDesc')return npcStates[id].world;
       if (key === 'locationalData') { return veinCell[id] ? { cellOrWorldDesc: veinCell[id], pos: [0, 0, 0] } : undefined; }
@@ -170,7 +179,7 @@ function boot(into) {
     questAdmission:function(){return ()=>true;},
     questHold:function(id){return id===9000?'Whiterun':id===9001?'Eastmarch':'';}};
   ctx.globalThis = ctx;
-  ctx.__thornswoodCharacter = { rankOf: function (a, key) { return ranks[a + ':' + key] || ''; } };
+  ctx.__thornswoodCharacter = { PROPERTY: 'thornswoodCharacter' };
   ctx.__thornswoodDungeonLoot = { GOLD_DESC: 'f:Skyrim.esm' };
   if (!into) { vm.createContext(ctx); }
   vm.runInContext(block, ctx);
@@ -552,9 +561,9 @@ yes('the miner page says the same', /kept on the character/.test(mWhere) &&
 {
   ranks['80:miner']='master';w=restart();w.svc.offer(80,'ebony');
   let entered=false;
-  w.ctx.__thornswoodCharacter.rankOf=function(){
+  w.ctx.__questRankRead=function(){
     if(!entered){entered=true;w.svc.mineRare(80,here[0],EBONY);}
-    return 'master';
+    return {v:1,ranks:{miner:'master'}};
   };
   const result=w.svc.offer(80,'stalhrim');
   yes('a metadata offer refuses a snapshot superseded by a nested inventory commit',
@@ -563,7 +572,7 @@ yes('the miner page says the same', /kept on the character/.test(mWhere) &&
 }
 {
   ranks['81:miner']='master';w=restart();w.ctx.__identityToken='old-session';
-  w.ctx.__thornswoodCharacter.rankOf=function(){w.ctx.__identityToken='new-session';return 'master';};
+  w.ctx.__questRankRead=function(){w.ctx.__identityToken='new-session';return {v:1,ranks:{miner:'master'}};};
   const result=w.svc.offer(81,'ebony');
   yes('a metadata offer cannot cross its actor session during qualification',
     result.why==='unwritten' && !form(81).props[PROP]);
@@ -571,7 +580,7 @@ yes('the miner page says the same', /kept on the character/.test(mWhere) &&
 
 {
   ranks['82:miner']='master';w=restart();w.ctx.__identityToken='old';w.svc.offer(82,'ebony');
-  w.ctx.__thornswoodCharacter.rankOf=function(){w.ctx.__identityToken='new';return 'master';};
+  w.ctx.__questRankRead=function(){w.ctx.__identityToken='new';return {v:1,ranks:{miner:'master'}};};
   w.svc.mineRare(82,here[0],EBONY);
   yes('mining qualification cannot adopt a new actor session',have(82,EBONY.ore)===0 && forms[82].props[PROP].open.ebony.drawn===0);
 }
