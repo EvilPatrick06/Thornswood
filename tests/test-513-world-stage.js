@@ -29,7 +29,8 @@
       the board posts across a restart, and one line to each person within
       400 of one of those boards. An unknown hold refuses the whole call and
       nothing is written.
-    - Nothing calls either in play yet, and the block leaves the NPC
+    - Nothing in play calls either but the staff card on the Office page
+      (tests/test-513-world-staff.js), and the block leaves the NPC
       population and the patrol cap (#1390) alone.
 
   The real world stage block and the real property block of

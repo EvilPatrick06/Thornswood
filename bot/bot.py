@@ -4743,6 +4743,11 @@ _MOD_DID = {
     'evict': 'ended the claim of %s',
     'rent': 'set the rent on the claim of %s',
     'norent': 'took the rent off the claim of %s',
+    # Staff on the world's card, the Office page of K (#513): the stage is
+    # the who, and the why says from where, to where, and the force.
+    'worldpropose': 'proposed moving the world to %s',
+    'worldconfirm': 'confirmed moving the world to %s',
+    'worlddrop': 'dropped the proposal to move the world to %s',
     # Not staff: somebody's own /stuck (#414), said as its why reads.
     'stuck': 'used /stuck',
     # Not staff either: the server took somebody idle out of the world (#1142).

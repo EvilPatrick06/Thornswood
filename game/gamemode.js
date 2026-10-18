@@ -34373,9 +34373,9 @@ log('gamemode loaded:',
   makes the move it proposed, as a move by whoever confirmed it, and clears
   it. dropWorldStageProposal(by) clears it without a move. A direct
   setWorldStage clears it too, because it no longer says where the world
-  goes from here. pendingWorldStage() reads it. Who proposes and who may
-  confirm, and from where in the world, is the next step on #513 and is not
-  built here.
+  goes from here. pendingWorldStage() reads it. Staff propose, confirm and
+  drop on the Office page of K: THE STAFF CARD, below. Nothing proposes by
+  itself yet.
 
   proclaim(holds, office, title, body) puts one notice on the board of each
   hold named, in the name of an office (the Crown, the Jarl of Haafingar),
@@ -34390,8 +34390,9 @@ log('gamemode loaded:',
   nothing is written and nobody is told. 'all' names every hold that has a
   board.
 
-  NOTHING CALLS ANY OF THIS IN PLAY YET. The patrol cap is #1390's, and
-  nothing here touches it.
+  THE STAFF CARD below is the only thing in play that calls any of this, and
+  only on a staff member's press. Nothing is scripted. The patrol cap is
+  #1390's, and nothing here touches it.
 */
 (function () {
   'use strict';
@@ -34637,6 +34638,184 @@ log('gamemode loaded:',
     return { ok: true, holds: r.holds.slice(), told: told };
   }
 
+  /*
+    THE STAFF CARD ON THE OFFICE PAGE (#513, Patrick, 17 Oct): server
+    proposes, staff confirm, and nothing is typed. Staff see a card on the
+    Office page of K: where the world is, its force when the stage names one,
+    and any proposal waiting, with the stage it moves to, who proposed it and
+    when. They propose a move to any other stage in the list, and confirm or
+    drop the one waiting. The card's buttons send /world, which nobody is
+    told to type, and Confirm asks twice on the page before it sends.
+
+    STAFF ONLY, CHECKED HERE ON EVERY LINE. The card is drawn only for staff,
+    and the line is never trusted for that: each one asks the same two things
+    the #2551 staff buttons ask (settleAs in the property block). Who is staff
+    is the chat block's isStaff (__thornswoodIsStaff), and the staff block's
+    proof (unproven) wants a chat connection the voice service proved and the
+    launcher's pass on hand. Somebody who is not staff is told only that this
+    is staff's, and nothing changes.
+
+    A CONFIRM OR A DROP NAMES THE PROPOSAL, its stage and when it was made,
+    so a press on a card drawn before somebody else's proposal cannot confirm
+    or drop the newer one.
+
+    THE LOG is the staff log, the record the #2551 buttons write: one line in
+    thornswood.log and one in for-bot/moderation.log, which the Discord bot
+    says in the staff channel (worldpropose, worldconfirm, worlddrop). No
+    press is taken when that log is not loaded.
+
+    THE STAGE'S NOTICE. A stage may carry proclamation, { office, holds,
+    title, body }, in war-stages.json. When a confirm moves the world to it,
+    that notice goes up through proclaim above. It is optional, and a stage
+    with none puts nothing up. If the notice is refused, the move still
+    stands, the staff member is told why, and the log says so.
+  */
+  var STAFF_LOG_GONE = 'The staff log is not loaded on this server, so no staff press is taken. Say so in the dev channel.';
+
+  function isStaffNow(pid) {
+    var f = g['__thornswoodIsStaff'];
+    try { return typeof f === 'function' && !!f(Number(pid) || 0); } catch (e) { return false; }
+  }
+
+  function nameOfActor(actorId) {
+    try {
+      var ap = mp.get(actorId, 'appearance');
+      if (ap && ap.name) { return String(ap.name); }
+    } catch (e) { }
+    return 'somebody';
+  }
+
+  /* One stage as the card shows it: id, name, force, and the office of its notice when it has one. */
+  function stageCard(row) {
+    var out = { id: row.id, name: String(row.name || row.id), force: typeof row.force === 'string' ? row.force : '' };
+    var p = row.proclamation;
+    if (p && typeof p === 'object' && typeof p.office === 'string' && p.office) { out.notice = p.office; }
+    return out;
+  }
+
+  /** What the staff card on the Office page draws, or null for anybody who is not staff. */
+  function staffView(profileId) {
+    if (!isStaffNow(profileId)) { return null; }
+    var st = worldStage();
+    var p = state.pending;
+    var target = p ? stageOf(p.id) : null;
+    var tc = target ? stageCard(target) : null;
+    return {
+      stage: { id: st.id, name: st.name || st.id, force: st.force, text: st.text, since: st.since, by: st.by },
+      pending: tc ? { id: p.id, name: tc.name, force: tc.force, notice: tc.notice || '', at: p.at, by: p.by } : null,
+      stages: stageList().filter(function (r) { return r && typeof r.id === 'string'; }).map(stageCard)
+    };
+  }
+
+  /* Every staff member's K panel again, so each card says what is true now. */
+  function redrawStaff() {
+    var c = g.__thornswoodCharacter;
+    if (!c || !c.stateOf || !c.writeState) { return; }
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return; }
+    for (var i = 0; i < online.length; i++) {
+      var pid = 0;
+      try { pid = Number(mp.get(online[i], 'profileId')) || 0; } catch (e2) { pid = 0; }
+      if (!pid || !isStaffNow(pid)) { continue; }
+      try {
+        var s = c.stateOf(online[i]);
+        if (s) { c.writeState(online[i], s); }
+      } catch (e3) { }
+    }
+  }
+
+  function samePending(id, at) {
+    var p = state.pending;
+    return !!p && p.id === String(id || '') && String(at) === String(p.at);
+  }
+
+  /*
+    The staff card's lines: propose <stage>, confirm <stage> <when> and
+    drop <when>. Answers true, because the word is always this block's.
+  */
+  function command(parts, actorId, profileId, toProfile, cmd) {
+    var pid = Number(profileId) || 0;
+    var verb = String((parts && parts[1]) || '').toLowerCase();
+    if (!isStaffNow(pid)) {
+      wlog('a line for the world from profile', pid, 'who is not staff; nothing changed');
+      toProfile(profileId, 'Moving the world is staff\'s. Nothing changed.');
+      return true;
+    }
+    var log = g['__thornswoodStaff'];
+    if (!log || typeof log.unproven !== 'function' || typeof log.record !== 'function') {
+      toProfile(profileId, STAFF_LOG_GONE);
+      return true;
+    }
+    var unproven = log.unproven(cmd, pid);
+    if (unproven) { toProfile(profileId, unproven); return true; }
+    var name = nameOfActor(actorId);
+    // Who, as the history keeps it: the name cut to 60, so it always fits.
+    var by = name.slice(0, 60) + ' (profile ' + pid + ')';
+    var from = currentId();
+    var r;
+
+    if (verb === 'propose') {
+      var want = String((parts && parts[2]) || '');
+      var replaced = state.pending ? state.pending.id : '';
+      r = proposeWorldStage(want, by);
+      if (!r.ok) { toProfile(profileId, r.why + ' Nothing changed.'); return true; }
+      var row = stageOf(want);
+      var force = typeof row.force === 'string' ? row.force : '';
+      log.record('worldpropose', pid, name, 0, String(row.name || want),
+                 'from ' + from + ' to ' + want + (force ? ', force: ' + force : '') +
+                 (replaced ? ', in place of the proposal to ' + replaced : ''),
+                 0, { stage: want, from: from, force: force });
+      toProfile(profileId, 'You propose moving the world to ' + (row.name || want) + '. It moves only when staff ' +
+                'confirm it on this page. It is in the staff log.');
+      redrawStaff();
+      return true;
+    }
+
+    if (verb === 'confirm' || verb === 'drop') {
+      if (!state.pending) { toProfile(profileId, 'Nothing is proposed. Nothing changed.'); return true; }
+      var id = verb === 'confirm' ? String((parts && parts[2]) || '') : state.pending.id;
+      var at = verb === 'confirm' ? (parts && parts[3]) : (parts && parts[2]);
+      if (!samePending(id, at)) {
+        toProfile(profileId, 'That is not the proposal waiting now. Open the page again to see the one that is. Nothing changed.');
+        return true;
+      }
+      var p = state.pending;
+      var target = stageOf(p.id);
+      var tname = String((target && target.name) || p.id);
+      if (verb === 'drop') {
+        r = dropWorldStageProposal(by);
+        if (!r.ok) { toProfile(profileId, r.why); return true; }
+        log.record('worlddrop', pid, name, 0, tname, 'proposed by ' + p.by + '; the world stays at ' + from,
+                   0, { stage: p.id, from: from });
+        toProfile(profileId, 'You drop the proposal to move the world to ' + tname +
+                  '. The world stays where it is. It is in the staff log.');
+        redrawStaff();
+        return true;
+      }
+      r = confirmWorldStage(by);
+      if (!r.ok) { toProfile(profileId, r.why + ' Nothing changed.'); return true; }
+      var tforce = typeof target.force === 'string' ? target.force : '';
+      var notice = target.proclamation;
+      var put = (notice && typeof notice === 'object')
+        ? proclaim(notice.holds, notice.office, notice.title, notice.body) : null;
+      if (put && !put.ok) { wlog('the notice for', p.id, 'was refused:', put.why); }
+      log.record('worldconfirm', pid, name, 0, tname,
+                 'from ' + from + ' to ' + p.id + ', proposed by ' + p.by + (tforce ? ', force: ' + tforce : '') +
+                 (put ? (put.ok ? '; its notice is up in ' + put.holds.join(', ') : '; its notice was refused: ' + put.why) : ''),
+                 0, { stage: p.id, from: from, force: tforce, proposedBy: p.by,
+                      notice: put ? (put.ok ? put.holds.slice() : false) : null });
+      toProfile(profileId, 'The world moves to ' + tname + '. It is in the staff log.' +
+                (put ? (put.ok ? ' Its notice is up on the board in ' + put.holds.length +
+                                 (put.holds.length === 1 ? ' hold.' : ' holds.')
+                               : ' Its notice did not go up: ' + put.why) : ''));
+      redrawStaff();
+      return true;
+    }
+
+    toProfile(profileId, 'The world\'s card on the Office page of K proposes, confirms and drops. Nothing changed.');
+    return true;
+  }
+
   g.__thornswoodWorldStage = {
     worldStage: worldStage,
     worldHistory: worldHistory,
@@ -34646,6 +34825,9 @@ log('gamemode loaded:',
     dropWorldStageProposal: dropWorldStageProposal,
     pendingWorldStage: pendingWorldStage,
     proclaim: proclaim,
+    // The staff card on the Office page of K: what it draws, and its lines.
+    staffView: staffView,
+    command: command,
     stages: function () { return JSON.parse(JSON.stringify(stageList())); }
   };
   if (!startId()) { wlog('the stage list is empty; nothing here can move'); }
@@ -42843,6 +43025,15 @@ log('gamemode loaded:',
     // A Jarl gives or takes an office of their hold (#2551): the Office page sends it.
     if (word === '/office') { return officeCmd(parts, actorId, profileId, toProfile); }
     if (word === '/evict') { return evict(actorId, profileId, toProfile, cmd); }
+    // The world's card on the Office page, for staff (#513): the world stage block answers it.
+    if (word === '/world') {
+      var worldStage = g['__thornswoodWorldStage'];
+      if (worldStage && typeof worldStage.command === 'function') {
+        return worldStage.command(parts, actorId, profileId, toProfile, cmd);
+      }
+      toProfile(profileId, 'The world stage is not running on this server. Say so in the dev channel.');
+      return true;
+    }
     if (word === '/box') { return boxCmd(parts, actorId, profileId, toProfile); }
     if (word === '/dropbox') { return dropboxCmd(parts, actorId, profileId, toProfile); }
     if (word === '/rent') { return rentCmd(parts, actorId, profileId, toProfile, cmd); }
@@ -43245,6 +43436,10 @@ log('gamemode loaded:',
                             by: t.by ? t.by.name : null };
                  }),
                  steward: keeps.length > 0, staff: staff, door: null, box: null, boards: [] };
+    // Where the world is, for staff only (#513): the world stage block's staff card.
+    var worldStageApi = g['__thornswoodWorldStage'];
+    try { view.world = (staff && worldStageApi && worldStageApi.staffView) ? worldStageApi.staffView(pid) : null; }
+    catch (eWorld) { view.world = null; }
     for (var j = 0; j < o.jarl.length; j++) {
       var hold = o.jarl[j];
       var row = { hold: hold, where: HOLD_TOWN[hold], offices: {} };
@@ -47719,7 +47914,7 @@ log('gamemode loaded:',
         word === '/office' || word === '/evict' || word === '/box' || word === '/dropbox' ||
         word === '/rent' || word === '/sleephere' || word === '/notice' || word === '/job' ||
         word === '/board' || word === '/take' ||
-        word === '/haul' ||
+        word === '/haul' || word === '/world' ||
         word === '/letter' || word === '/deliver' ||
         word === '/dropjob' || word === '/unpin') {
       if (!actorId) {
@@ -52576,6 +52771,10 @@ const WORDS = ['/ooc', '/o',
                // Confirm buttons, never typed, and so deliberately NOT in
                // PLAYER_WORDS. See the property block.
                '/haul',
+               // The world's card on the Office page of K, for staff (#513):
+               // propose, confirm and drop a move of the world stage. Sent by
+               // the page, never typed, and so NOT in PLAYER_WORDS.
+               '/world',
                '/tp', '/goto', '/face', '/restart', '/shutdown', '/tspicks',
                // Playtesters', like /tp, and gated the same way. Deliberately
                // absent from PLAYER_WORDS: naming them in /help would be an

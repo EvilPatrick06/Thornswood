@@ -109,7 +109,9 @@ so a change meant to last is never lost.
 The server can also put a notice on a hold's board in the name of an
 office, such as the Crown or a Jarl, never a person. It costs nothing,
 no gold moves, and the people standing at that board are told once.
-Nothing puts one up yet, and nothing moves a stage yet. When it does,
-the server proposes and staff confirm, from somewhere in the world.
+Staff move the world from a card on the Office page of K: one of them
+proposes a stage, and staff confirm it with a second press or drop it,
+and every press goes in the staff log. A stage can carry a notice that
+goes up on the boards when the move is confirmed.
 The patrols above are #1390's, and the war does not change their
 numbers.
