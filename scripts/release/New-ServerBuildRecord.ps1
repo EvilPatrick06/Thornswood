@@ -49,13 +49,23 @@
   The record to write. Committed to this repo, so a reader can answer what the
   live server is running without guessing from timestamps.
 
+.PARAMETER BuiltBy
+  The run that built -Dist on another machine, from the commit -Clone is at:
+  the fork's own build on GitHub's runner, which engine.yml takes (#459,
+  ForkEngineBuild.ps1). The clone was checked out after that build, so its
+  files' dates say nothing about it; each time the build is held to is the
+  commit's own time instead, and a file written before the commit was made
+  stops it. Without it, the files' dates in the clone are read as they are on
+  the machine that built them.
+
 .EXAMPLE
   .\scripts\release\New-ServerBuildRecord.ps1
 #>
 param(
   [string]$Dist  = (& (Join-Path $PSScriptRoot 'Where.ps1') ServerDist),
   [string]$Clone = (& (Join-Path $PSScriptRoot 'Where.ps1') Engine),
-  [string]$Out
+  [string]$Out,
+  [string]$BuiltBy
 )
 
 $ErrorActionPreference = 'Stop'
@@ -135,6 +145,17 @@ $dirty = Read-Git @('status', '--porcelain')
 
 if (-not $commit) { throw "cannot read a commit from $Clone. Is it a git clone?" }
 
+# A build made on another machine (-BuiltBy): the time every date below is
+# held to is the commit's, since this clone's files were written when it was
+# checked out, after the build. Nothing built from the commit can be older.
+$commitUtc = $null
+if ($BuiltBy) {
+  $ct = Read-Git @('show', '-s', '--format=%cI', $commit)
+  try { $commitUtc = [DateTime]::Parse($ct, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::AdjustToUniversal) }
+  catch { throw "cannot read the time of commit $commit from $Clone ('$ct'), and a build made elsewhere is held to it" }
+  Write-Host ('  built by {0}, on another machine: each date is held to the time of commit {1}, {2:yyyy-MM-dd HH:mm:ss} UTC' -f $BuiltBy, $commit.Substring(0, 12), $commitUtc)
+}
+
 if ($dirty) {
   Write-Host ''
   Write-Host '  The clone has uncommitted changes.' -ForegroundColor Yellow
@@ -156,7 +177,8 @@ if ($dirty) {
 # map, below, which is stronger than any timestamp.
 $newest = $null
 $d = Join-Path $Clone 'skymp5-server\cpp'
-if (Test-Path -LiteralPath $d) {
+# A build made elsewhere is held to the commit's time instead, below.
+if (-not $BuiltBy -and (Test-Path -LiteralPath $d)) {
   $newest = Get-ChildItem -LiteralPath $d -Recurse -File -EA SilentlyContinue |
        Where-Object { $_.Extension -in '.cpp', '.h' -and $_.FullName -notlike '*\node_modules\*' } |
        Sort-Object LastWriteTime -Descending | Select-Object -First 1
@@ -172,6 +194,9 @@ if ($newest -and $newest.LastWriteTime -gt $item.LastWriteTime) {
 # See the header for what each is held to. Every reason is gathered, then all of
 # them are said, so one run shows everything that is wrong.
 $why = @()
+if ($BuiltBy -and $item.LastWriteTimeUtc -lt $commitUtc) {
+  $why += ('scam_native.node was written at {0:yyyy-MM-dd HH:mm:ss} UTC, before commit {1} was made ({2:yyyy-MM-dd HH:mm:ss} UTC), so it is not a build of that commit' -f $item.LastWriteTimeUtc, $commit.Substring(0, 12), $commitUtc)
+}
 function Test-SameBytes([string]$a, [string]$b) {
   if (-not (Test-Path -LiteralPath $a) -or -not (Test-Path -LiteralPath $b)) { return $false }
   return (Get-FileHash -LiteralPath $a -Algorithm SHA256).Hash -eq (Get-FileHash -LiteralPath $b -Algorithm SHA256).Hash
@@ -194,8 +219,10 @@ if (Test-Path -LiteralPath $builtPex) {
   $psc = @(if (Test-Path -LiteralPath $pscDir) { Get-ChildItem -LiteralPath $pscDir -File -Filter '*.psc' })
   foreach ($s in $psc) {
     $p = Join-Path $builtPex ($s.BaseName + '.pex')
+    # The .psc's own date, or for a build made elsewhere the commit's.
+    $pscUtc = if ($BuiltBy) { $commitUtc } else { $s.LastWriteTimeUtc }
     if (-not (Test-Path -LiteralPath $p)) { $why += "the build compiled the fork's Papyrus into $builtPexName but has no $($s.BaseName).pex for skymp5-scripts\psc\$($s.Name)" }
-    elseif ((Get-Item -LiteralPath $p).LastWriteTime -lt $s.LastWriteTime) { $why += "$builtPexName\$($s.BaseName).pex is older than skymp5-scripts\psc\$($s.Name), so it was not compiled from it" }
+    elseif ((Get-Item -LiteralPath $p).LastWriteTimeUtc -lt $pscUtc) { $why += "$builtPexName\$($s.BaseName).pex is older than skymp5-scripts\psc\$($s.Name), so it was not compiled from it" }
   }
   foreach ($p in @(Get-ChildItem -LiteralPath $builtPex -File)) {
     if (-not (@($psc | Where-Object { $_.BaseName -eq $p.BaseName }).Count)) { $why += "$builtPexName\$($p.Name) has no .psc in the fork's skymp5-scripts\psc" }
