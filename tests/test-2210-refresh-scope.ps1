@@ -91,6 +91,15 @@ for ($n = 14; $n -le [int]$rulesNum.Groups[1].Value; $n++) {
 }
 Yes ("every rule from 14 to " + $rulesNum.Groups[1].Value + " has a line in RuleTouches (null walks everything)" + $(if ($missing) { '; missing: ' + ($missing -join ', ') } else { '' })) ($missing.Count -eq 0)
 
+# Vortex's plugin list is copied even when nothing was deployed (17 Oct):
+# a refresh that returns "already matches" used to skip the copy, so a list
+# changed in Vortex alone (a plugin enabled, a reinstall) never reached a
+# release folder, and a Ship built from the stale list refused.
+$early = [regex]::Match($og, '(?s)static string RefreshNow\(.*?if \(!string\.IsNullOrEmpty\(src\)(.*?)return "Thornswood''s own Skyrim folder already matches what Vortex has deployed\.";')
+Yes 'the refresh that finds nothing to bring in still copies Vortex''s plugin list first' ($early.Success -and $early.Groups[1].Value -match 'BakeVortexList\(\);')
+$settle = [regex]::Match($og, '(?s)static void SettleSettings\(bool first\)\s*\{(.*?)\n        \}')
+Yes 'a refresh that brings files in copies it too (SettleSettings)' ($settle.Success -and $settle.Groups[1].Value -match 'BakeVortexList\(\);')
+
 $csc = @(
     (Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'),
     (Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe')
