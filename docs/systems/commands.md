@@ -148,6 +148,7 @@ client reports what only it can see. They stay.
 | `/chopped` | The front plugin | A fall of the axe at a chopping block | `gamemode.js:if (word === '/chopped') {` |
 | `/loadorder` | The front plugin | The client's load order | `gamemode.js:word === '/loadorder'` |
 | `/tspicks <n>` | The front plugin | Lockpicks that broke | `gamemode.js:word === '/tspicks'` |
+| `/tspicked <id>` | The front plugin | A property door shut to you opened on its lock, a pick, so its holder is sent word (#2680) | `gamemode.js:word === '/tspicked'` |
 | `/moldhere <id>` | U at a door | A key mold pressed into that door | `gamemode.js:word === '/moldhere'` |
 | `/claim <id>`, `/lock <id>`, `/unlock <id>`, `/key <id>` | X at a door just opened, or at a forge (#1637) | Claims, locks or unlocks the building of the door just opened; cuts a key from the mold in the pack | The property block's `command`, `forgeHere` |
 | `/plot <id>`, `/claim <id>` at a crop | A crop under the crosshair, and X at it (#1636) | Asks for the line at that plot; claims the farm around it | The farming block's `command`, `plotLine` and `claim` |

@@ -153,6 +153,8 @@ function boot(dir, eng) {
     'var claims = {};',
     // The master key counter save() writes beside the claims (#2254).
     'var masterCut = 0;',
+    // The holders' word save() writes beside them (#2680).
+    'var wordBook = { list: [] };',
     // Nobody guards this board, keeps it or is its Jarl; a guard's take down
     // (#502) is tests/test-502-guard-board.js, the offices (#2551)
     // tests/test-2551-hold-offices.js.

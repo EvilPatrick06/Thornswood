@@ -53,6 +53,7 @@ const PUBLIC = {
 };
 // Shipped with the gamemode from game\data in the repository, read only.
 const SHIPPED = {
+  'property-word.json': 'the limits on word to a holder (#2680), from the repository, naming nobody',
   'guild-sites.json': 'the ten guild sites, from the repository',
   'merchant-traders.json': 'the merchant table, from the repository',
 };
