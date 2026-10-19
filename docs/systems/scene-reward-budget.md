@@ -1,19 +1,18 @@
-# Source-only expanded scene reward accounting
+# Expanded scene reward accounting
 
-`game/scene-reward-budget.js` projects a proposed accounting record. It has no
-runtime import, writes no state and grants no gold. Existing quests and their
-accepted terms are unchanged. The complete merchant catalogue, account and
-world economy assessment, full saved-state capacity, objective proof and
-runtime integration remain unfinished.
+`game/scene-reward-budget.js` projects the accounting record used by the
+four explicitly admitted merchant kill scenes. It is bundled with the quest
+controller. The pure helper writes no state and grants no gold; only the
+controller's fenced native actor transaction can commit either. Existing
+legacy quests and accepted terms remain outside this allowance. The complete
+merchant catalogue and account/world economy assessment remain unfinished.
 
-For future expanded scenes, the proposed allowance is 150 gold per character
-in a half-open rolling 24-hour window. This is a source design value, not an
-active or account-wide cap. At acceptance, reserve the original reward of
+The allowance is150 gold per character in a half-open rolling24-hour window,
+shared by all newly admitted scenes. It is not an account or world cap. At acceptance, reserve the original reward of
 10 through 150 gold. Recent payouts plus all outstanding reservations cannot
 exceed 150. There can be at most three held scenes. Reservations never expire;
 completion moves their original amount into payout history, while cancellation
-releases it without payment. Personal cooldowns belong to the future quest
-controller and are not implemented here.
+releases it without payment. The quest controller saves personal cooldowns alongside the completion.
 
 The record is `{v:1,clock,serial,held,paid}`. Each held ID maps to
 `{gold,at,token}`. The counter never resets when reservations empty, and both
@@ -38,7 +37,7 @@ safe integers. Time cannot move backward. Saved accounting must be consistent
 at its saved clock before expiry is considered. Payouts exactly 24 hours old
 are outside the window. Successful outputs are detached from their inputs.
 
-The future controller must preserve unknown quest fields and keep accounting,
+The controller preserves unknown quest fields and keeps accounting,
 accepted original terms, progress and any inventory change in the same actor
 property transaction. Two projections from one snapshot are alternatives;
 the existing native expected-record CAS must admit only one. A projection
@@ -48,8 +47,12 @@ from a lost reply. Existing legacy work is not retroactively charged.
 
 `node tests/test-scene-reward-budget.js` exercises arithmetic, boundaries,
 tokens, corruption and small operation sequences. The synthetic transaction
-fixture in `node tests/test-quest-transactions.js` carries a proposed budget
+fixture in `node tests/test-quest-transactions.js` carries the budget
 through the real JavaScript adapter with modeled native comparisons, including
 competing reservations, an inventory refusal and a stale repeated payout.
 These are source tests, not a game/server or connected acceptance test.
-Claude owns any later operational step after the full prerequisites land.
+The production-controller fixture in `node tests/test-merchant-expanded-scenes.js`
+checks all four objectives, gates, original terms, allowance, cancellation and
+recovery, competing writes and full-property capacity. Claude owns Dev delivery
+after this playable section passes CI and merges; the complete catalogue need
+not finish before that handoff runs.

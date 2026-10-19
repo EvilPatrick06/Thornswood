@@ -510,6 +510,9 @@ function createMerchantTrading(deps) {
         short:'You have not drawn enough to turn this work in.',none:'You do not hold this work.',
         unbound:'This work has no appointed place yet.',unwritten:'The work could not be committed just now.',
         unavailable:'Quest work is unavailable.',role:'This trader does not handle that work.',
+        allowance:'Your new scene work has reached its shared daily gold allowance.',
+        'open-limit':'Finish or leave one of your three open scene jobs first.',
+        recovery:'This work needs its saved payment checked. You can leave it without payment, or ask staff for recovery.',
         session:'Choose the work again from the trader.'};
       var text=result.ok ? (parts[2]==='take'?'You take the work.':parts[2]==='return'?'The work is turned in.':'You give back what you drew and leave the work.') :
         reasons[result.why] || 'The work could not be changed.';

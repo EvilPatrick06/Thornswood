@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "killScenes": [
+    {
+      "id": "q-whiterun-tailor-cloth-road",
+      "sha256": "6f6cf4c63de266dff8edfee2ab72213ed9699756c274004d62f775ec3cbfb68f"
+    },
+    {
+      "id": "q-winterhold-enchanter-coast",
+      "sha256": "518c9b2210f63ee6ec1b6b6f388c862c6f5ed9dca284dfb21b115f9350928146"
+    },
+    {
+      "id": "q-rift-tailor-northwind-work",
+      "sha256": "fcddb1a76415ade5c37bd149b28a0235a90d9a57ffb7c07176a6ccfd6a0ad239"
+    },
+    {
+      "id": "q-whiterun-enchanter-shimmermist",
+      "sha256": "402f870a3f8d330987e97d83c14a5ef54f1474fd3b3fbb644ec38e00928041f4"
+    }
+  ]
+}

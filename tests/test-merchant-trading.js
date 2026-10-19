@@ -207,7 +207,7 @@ assert.equal(legacyRole.purses.read(1).pending,null,'new role restrictions do no
 assert.equal(legacyRole.world.inv[10][15],43);assert.equal(legacyRole.purses.read(1).stock[0].baseId,100);
 legacyRecovery.shutdown();
 
-const roleQuestContext={log(){},mp:{makeProperty(){}}};
+const roleQuestContext={Buffer,log(){},mp:{makeProperty(){}}};
 vm.runInNewContext(mode.slice(mode.indexOf('// ==== thornswood custom quests ===='),
   mode.indexOf('// ==== end thornswood custom quests ====')),roleQuestContext);
 const roleEligibility=require('./quest-eligibility-fixture')(roleQuestContext,mode);
