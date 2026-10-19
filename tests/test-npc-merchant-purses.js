@@ -50,7 +50,7 @@ assert.equal(current.prepare(1).purse,0,'returned state does not mutate the save
 saved.get('1:thornswoodMerchant').reference='other:Skyrim.esm';
 assert.throws(()=>current.prepare(1),/saved merchant/i,'saved identity must match the authored reference');
 const population=JSON.parse(fs.readFileSync(path.join(__dirname,'../game/data/npc-population.json'),'utf8'));
-assert.equal(population.npcs.filter(n=>n.keep && n.role==='trader').length,249);
+assert.equal(population.npcs.filter(n=>n.keep && n.role==='trader').length,60);
 console.log('PASS NPC merchant purse initialization, depletion, reload, identity and failure checks');
 
 for(const method of ['getNpcAIState','get','save','set']) for(const boundary of ['lookup','return']) {

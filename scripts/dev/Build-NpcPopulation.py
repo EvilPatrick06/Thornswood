@@ -5,6 +5,7 @@ The optional installed settings input is used only for its loadOrder paths.
 """
 import argparse
 import collections
+import copy
 import csv
 import hashlib
 import importlib.util
@@ -14,6 +15,7 @@ import os
 import pathlib
 import re
 import struct
+from MerchantRoster import apply_roster, BOOK_HOLDS, ROLES
 
 HERE = pathlib.Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location('npc_cast', HERE / 'Build-CastTable.py')
@@ -437,6 +439,29 @@ def build(paths, strings_dir=None):
             'tierRules': TIERS, 'npcs': rows, 'locations': locations}
 
 
+def activate_guild(payload):
+    result = copy.deepcopy(payload)
+    policy = json.loads((HERE.parent.parent / 'game/data/merchant-roster.json').read_text(encoding='utf-8'))
+    result['merchantHistory'] = apply_roster(result['npcs'], policy)
+    result['merchantRoster'] = {'version': 1, 'worldMode': 'alpha'}
+    kept = [row for row in result['npcs'] if row['keep']]
+    counts = collections.Counter(row['role'] for row in kept)
+    result['summary'].update(retained=len(kept), excluded=len(result['npcs'])-len(kept), retainedByRole=dict(counts))
+    grouped = collections.defaultdict(list)
+    for row in kept:
+        grouped[row['location']].append(row)
+    result['locations'] = []
+    for identity, residents in sorted(grouped.items()):
+        first = residents[0]
+        result['locations'].append({'id': identity, 'name': first['locationName'], 'hold': first['hold'],
+            'habitat': first['habitat'], 'tier': first['tier'], 'count': len(residents),
+            'species': dict(collections.Counter(row['species'] for row in residents)),
+            'roles': dict(collections.Counter(row['role'] for row in residents)),
+            'returnMinutes': sorted({row['returnMinutes'] for row in residents}),
+            'refs': [row['ref'] for row in residents]})
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--settings', required=True)
@@ -446,7 +471,7 @@ def main():
     args = parser.parse_args()
     with open(args.settings, encoding='utf-8-sig') as source:
         paths = json.load(source)['loadOrder']
-    payload = build(paths, args.strings_dir)
+    payload = activate_guild(build(paths, args.strings_dir))
     with open(args.out, 'w', encoding='utf-8', newline='\n') as output:
         json.dump(payload, output, ensure_ascii=False, separators=(',', ':'))
         output.write('\n')
@@ -457,9 +482,12 @@ def main():
 
 
 def write_runtime(payload):
+    payload = activate_guild(payload)
     # No cut list: Thornswood-Last.esp switches every cut actor off at the
     # record, and the gamemode no longer hands the server one (#2468, #2486).
     compact = {'version': 1, 'plugins': [s['name'] for s in payload['loadOrder']],
+        'merchantHistory': payload['merchantHistory'], 'merchantRoster': payload['merchantRoster'],
+        'merchantRoles': {r['ref']: r['guildRole'] for r in payload['npcs'] if r['keep'] and r['role'] == 'trader'},
         'keep': [[r['ref'], r['base'], r['world'] or r['cell'], r['pos'], r['leash'],
                   r['returnMinutes'], r['role'], r['habitat'], r['tier'], r.get('cap'),
                   r.get('populationBucket'),
@@ -519,6 +547,7 @@ def write_hunting_spots(npcs):
 
 
 def write_catalogues(payload):
+    payload = activate_guild(payload)
     root = HERE.parent.parent / 'docs'
     columns = ['ref', 'name', 'base', 'hold', 'locationName', 'location', 'habitat', 'role',
                'species', 'tier', 'cap', 'returnMinutes', 'leash', 'cell', 'world', 'x', 'y', 'z']
@@ -527,13 +556,14 @@ def write_catalogues(payload):
         writer = csv.DictWriter(output, fieldnames=columns)
         writer.writeheader()
         for r in kept:
-            writer.writerow(dict({k: r.get(k) for k in columns if k not in {'x', 'y', 'z'}},
+            writer.writerow(dict({k: r.get('displayName', r.get(k)) if k == 'name' else r.get(k)
+                                  for k in columns if k not in {'x', 'y', 'z'}},
                                  x=r['pos'][0], y=r['pos'][1], z=r['pos'][2]))
     write_hunting_spots(payload['npcs'])
     summary = payload['summary']
     lines = ['# NPC population catalogue', '',
-        'Generated from the winning records in the 48-plugin dev load order.',
-        'This is the policy release 1.2.3 runs on dev and main; release proof is recorded separately.', '',
+        f"Generated from the winning records in the {len(payload['loadOrder'])}-plugin load order.",
+        'These are source policies and counts. Release proof is recorded separately.', '',
         f"{summary['catalogued']:,} placements inspected; {summary['retained']:,} retained; {summary['excluded']:,} excluded.", '',
         'Named pets and named enemies are excluded even when their source record lacks the Unique flag.',
         'Merchant traders and exterior transport services remain available.', '',
@@ -557,6 +587,28 @@ def write_catalogues(payload):
         lines.append(f"| {name} | {row['hold']} | {row['habitat']} | {row['tier'] or ''} | {row['count']} | " +
                      ', '.join(map(str, row['returnMinutes'])) + ' |')
     (root / 'NPC-POPULATION.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+    write_merchants(payload)
+
+
+def write_merchants(payload):
+    root = HERE.parent.parent
+    reverse_holds = {value: key for key, value in BOOK_HOLDS.items()}
+    merchants = [row for row in payload['npcs'] if row['keep'] and row['role'] == 'trader']
+    by_ref = {row['ref']: {'name': row['guildRole'], 'role': row['guildRole'], 'hold': row['hold'],
+        'bookHold': reverse_holds[row['hold']], 'locationName': row['locationName'],
+        'cell': row['cell'], 'world': row['world'], 'pos': row['pos']} for row in merchants}
+    (root / 'game/data/merchant-traders.json').write_text(json.dumps(
+        {'version': 1, 'count': len(by_ref), 'byRef': by_ref}, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    lines = ['# Merchant trader counts', '',
+        '60 authored guild traders: one Smith, Woodworker, Tailor, Enchanter, Cook and Alchemist in each hold.',
+        'People cannot join. Exact guild relocation remains separate. These are source counts, not release proof.', '',
+        '| Hold | Role | Place | Reference | Book hold |', '| --- | --- | --- | --- | --- |']
+    for ref, row in sorted(by_ref.items(), key=lambda item: (item[1]['hold'], item[1]['role'])):
+        lines.append('| ' + ' | '.join([row['hold'], row['role'], row['locationName'], ref, row['bookHold']]) + ' |')
+    lines += ['', 'Total: 60', '',
+        'Each authored identity returns after360 minutes and keeps its existing512-unit home radius.',
+        'Exact coordinates and the shared population rules are in [NPC spawns](../NPC-SPAWNS.csv).']
+    (root / 'docs/systems/merchant-traders.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
 
 
 if __name__ == '__main__':

@@ -3,12 +3,20 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 const root=path.join(__dirname,'..'),read=name=>JSON.parse(fs.readFileSync(path.join(root,'game/data',name+'.json'),'utf8'));
 const copy=value=>JSON.parse(JSON.stringify(value));
 const {prepareMerchantRoleStage}=require('../game/merchant-role-stage');
-const roster=read('merchant-roster'),catalog=read('merchant-traders'),roleDoc=read('merchant-role-tables'),tables=roleDoc.tables;
+const roster=read('merchant-roster'),currentCatalog=read('merchant-traders'),roleDoc=read('merchant-role-tables'),tables=roleDoc.tables;
 const source=fs.readFileSync(path.join(root,'game/gamemode.js'),'utf8'),context={};vm.createContext(context);
 assert.ok(!source.slice(source.indexOf('// MERCHANT TRADING BUNDLE BEGIN'),source.indexOf('// MERCHANT TRADING BUNDLE END'))
   .includes('"f:Skyrim.esm"'),'unused currency evidence must not enter a role bundle');
 vm.runInContext(source.slice(source.indexOf('// NPC POPULATION DATA BEGIN'),source.indexOf('// NPC POPULATION DATA END'))+'\nglobalThis.data=NPC_POPULATION_DATA;',context);
-const population=copy(context.data),stage={version:1,history:roster.history,merchants:roster.merchants,tables,types:Object.fromEntries(Object.entries(roleDoc.records).map(([d,r])=>[d,r.type]))};
+const currentPopulation=copy(context.data),population=copy(currentPopulation);
+delete population.merchantRoster;delete population.merchantHistory;delete population.merchantRoles;
+const sourceRows=read('npc-population').npcs.filter(row=>row.role==='trader');
+const catalog={version:1,count:249,byRef:{}};
+for(const row of sourceRows) {
+ if(!population.keep.some(kept=>kept[0]===row.ref))population.keep.push([row.ref,row.base,row.world||row.cell,row.pos,row.leash,row.returnMinutes,row.role,row.habitat,row.tier,row.cap||null,row.populationBucket||null,0,row.species]);
+ catalog.byRef[row.ref]={name:row.name,hold:row.hold,bookHold:roster.merchants.find(m=>m.hold===row.hold)?.bookHold || 'whiterun',locationName:row.locationName,cell:row.cell,world:row.world,pos:row.pos};
+}
+const stage={version:1,history:roster.history,merchants:roster.merchants,tables,types:Object.fromEntries(Object.entries(roleDoc.records).map(([d,r])=>[d,r.type]))};
 function fixture() {
   const ids=new Map();let serial=1000;
   return {population:copy(population),catalog:copy(catalog),stage:copy(stage),
@@ -83,7 +91,7 @@ for(const merchant of roster.merchants.filter(row=>row.bookHold==='whiterun')) {
     get:(value,key)=>key==='inventory'?box.transfer.inventory(value):undefined,
     getInventoryReceipt:value=>box.transfer.receipt(value),getSavedInventoryReceipt:value=>box.transfer.saved(value),
     compareAndSetInventory:(...args)=>box.transfer.cas(...args)};
-  const prepared=bundleContext.bundle.prepareRoles(f.population,native);
+  const prepared=bundleContext.bundle.prepareRoles(currentPopulation,native);
   const allowed=tables[merchant.role].supply[0],forbidden=Object.values(tables).flatMap(row=>row.buy)
     .find(desc=>!tables[merchant.role].buy.includes(desc));
   const goods=[allowed,forbidden],names=new Map(goods.map((desc,i)=>[desc,'Test Good '+i]));
@@ -111,10 +119,10 @@ console.log('PASS production bundled installer enforces all six role tables for 
 {
   let writers=0,reads=0;
   const startup=source.slice(source.lastIndexOf('// NPC SERVER STARTUP BEGIN'),source.indexOf('// NPC SERVER STARTUP END',source.lastIndexOf('// NPC SERVER STARTUP BEGIN')));
-  const ctx={require,Buffer,Uint8Array,setTimeout,clearTimeout,NPC_POPULATION_DATA:population,
+  const ctx={require,Buffer,Uint8Array,setTimeout,clearTimeout,NPC_POPULATION_DATA:currentPopulation,
     MERCHANT_TRADING:bundleContext.bundle,log(){},
     createNpcMerchantPurses(){writers++;},createPrivateMerchantLedger(){writers++;},
-    mp:{getServerSettings:()=>({thornswoodServer:'dev',loadOrder:population.plugins}),prepareNpcLoad(){},
+    mp:{getServerSettings:()=>({thornswoodServer:'dev',loadOrder:currentPopulation.plugins}),prepareNpcLoad(){},
       getIdFromDesc(){reads++;ctx.__thornswoodNpcStartupOwner={};return 100;},
       getDescFromId(){throw Error('revoked native read');},lookupEspmRecordById(){throw Error('revoked native read');},
       validateInventoryTransaction:()=>true}};
