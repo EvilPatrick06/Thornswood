@@ -6,6 +6,18 @@ it does not describe a completed release.
 
 ## Roster and tables
 
+Patrick clarified during alpha testing that current merchant purses, stock
+and pending trades are disposable. Preserving that test economy is not a
+prerequisite for the sixty-merchant cut. Any one-time reset belongs to
+Claude's stopped-server rollout, never to recurring startup or a timed repair.
+
+Deliver usable sections before the whole quest catalogue is complete. The
+first runtime section assigns the selected sixty merchants their role names,
+item tables and matching legacy quest offers. It keeps the other189 traders
+temporarily until the coordinated client/server population cut. It adds no
+quest or gold, and it is not completion of the sixty-only roster. New offers
+still need their own objective, eligibility and transaction checks.
+
 Each of the ten existing book holds, including Raven Rock, has exactly six
 guild NPCs: Smith, Woodworker, Tailor, Enchanter, Cook and Alchemist. There
 is one of each, for 60 total. Reuse suitable authored identities. Exact
@@ -49,8 +61,8 @@ price is still required before an item can be traded.
 | --- | ---: | ---: | ---: |
 | Smith | 265 | 265 | 40 |
 | Woodworker | 54 | 54 | 16 |
-| Tailor | 271 | 271 | 23 |
-| Enchanter | 408 | 408 | 16 |
+| Tailor | 269 | 269 | 23 |
+| Enchanter | 406 | 406 | 16 |
 | Cook | 116 | 116 | 53 |
 | Alchemist | 70 | 70 | 68 |
 
