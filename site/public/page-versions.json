@@ -89,6 +89,22 @@
       {
         "sha256": "af027d72c82615813151b2cbb386f1893d5d900e83e13a62f2453baa535fb097",
         "changed": "2026-10-18"
+      },
+      {
+        "sha256": "230da872113d81294ee5d55310f8e298f8ddad90dc8878f71434a2252a029c12",
+        "changed": "2026-10-19"
+      },
+      {
+        "sha256": "20596f8e066ac961ef16d677068b8191d53f87b75b2bcb8eb8464de946d63a51",
+        "changed": "2026-10-19"
+      },
+      {
+        "sha256": "cf7fd6e8b1742ed92422f8115b6ffaf90e43130f3ce02d60f81ccde72c1c2580",
+        "changed": "2026-10-19"
+      },
+      {
+        "sha256": "abbbf6683ebbeaba242da080de256625ea8f81c9f42654b93cf93054994c17a4",
+        "changed": "2026-10-19"
       }
     ],
     "privacy": [
