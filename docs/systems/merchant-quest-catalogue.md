@@ -1,13 +1,13 @@
 # Draft merchant quest catalogue
 
-There are **7 authored draft definitions** in
+There are **9 authored draft definitions** in
 `game/data/merchant-quests.json`, toward the required 240 or more distinct
 offers for the 60 retained merchants. All are inactive. The file is marked
 `active:false` and `complete:false` and is not imported into the gamemode.
 The current runtime still has the 23 legacy definitions and ten bound routes.
 These candidates are not available in the game.
 
-The two scenes give a beginning Warrior and Mage different work. Five further
+Four scenes give Novice and Advanced Warriors and Mages different work. Five
 drafts request goods for specific trades and holds. These are deliveries,
 which can include goods obtained from other craftspeople; they do not assert
 that the person returning them crafted them. Neither kind grants ordinary
@@ -19,11 +19,19 @@ buy, sell or supply permissions.
 | --- | --- | --- | --- | ---: | --- |
 | A clear road for cloth | Whiterun Tailor | Novice Warrior | Defeat the one bound bandit in Redoran's Retreat | 15 | 6 hours |
 | Coastal preparations | Winterhold Enchanter | Novice Mage | Defeat the one bound skeever on Winterhold's coast | 10 | 6 hours |
+| Northwind work clothes | Rift Tailor | Advanced Warrior | Defeat both bound skeletons inside Northwind Mine | 35 | 6 hours |
+| Shimmermist preparations | Whiterun Enchanter | Advanced Mage | Defeat both bound Falmer inside Shimmermist Cave | 40 | 6 hours |
 
 The offering references are `1a684:Skyrim.esm` (base `13b9c:Skyrim.esm`,
 book hold `whiterun`) and `1e7d6:Skyrim.esm` (base `1e7d5:Skyrim.esm`,
 book hold `winterhold`). These are exact proposed roster bindings, not a
-change to the existing 249-trader population.
+change to the existing 249-trader population. The Advanced offers bind
+`31efc3:Riften Expansion.esp` (base `1d0769:Riften Expansion.esp`, book hold
+`riften`) and `1a672:Skyrim.esm` (base `13ba1:Skyrim.esm`, book hold
+`whiterun`), respectively. Their saved profession gates require Advanced
+Warrior or Mage standing. Neither is Master work or needs a Master half or
+school. These fill the two planned Advanced exceptions; they do not replace
+the class-gated Novice reservations or any owning-trade work.
 
 ## Targets and their existing returns
 
@@ -35,6 +43,19 @@ Source positions and normal leashes are recorded in the JSON.
 | --- | --- | --- | --- | ---: | --- |
 | Bandit | `36ce1:Skyrim.esm`, base `1e79d:Skyrim.esm` | Interior cell `15224:Skyrim.esm` | `[-2136.4208984375, 1534.8690185546875, -212.0419921875]` | 2,048 | 45 minutes |
 | Skeever | `ef60f:Skyrim.esm`, base `23ab7:Skyrim.esm` | Tamriel `3c:Skyrim.esm`, source cell `8dea:Skyrim.esm` | `[99232, 128672, -13824]` | 1,536 | 20 minutes |
+| Northwind skeleton | `476c9:Skyrim.esm`, base `2d1fc:Skyrim.esm` | Interior cell `15294:Skyrim.esm` | `[407.26873779296875, 3681.330322265625, 159.30126953125]` | 1,536 | 45 minutes |
+| Northwind skeleton | `476ca:Skyrim.esm`, base `2d1fd:Skyrim.esm` | Interior cell `15294:Skyrim.esm` | `[-145.48818969726562, 2940.852783203125, 153.1743927001953]` | 1,536 | 45 minutes |
+| Shimmermist Falmer | `530c0:Skyrim.esm`, base `1e7b3:Skyrim.esm` | Interior cell `1521c:Skyrim.esm` | `[3485.25244140625, -723.4301147460938, -624.6600341796875]` | 1,536 | 45 minutes |
+| Shimmermist Falmer | `530c4:Skyrim.esm`, base `1e7b4:Skyrim.esm` | Interior cell `1521c:Skyrim.esm` | `[5013.04150390625, -3487.726806640625, -631.1539916992188]` | 1,536 | 45 minutes |
+
+Northwind Mine's location identifier is `fdbdf:Skyrim.esm`; Shimmermist
+Cave's is `1929d:Skyrim.esm`. Both already have population tier two and a
+site cap of 12. Neither cap changes or promises all targets will be available
+at once. Both selected Falmer are ordinary retained placements, not the
+ambush or the deeper chamber's centurion. The proposed work-party and warding
+survey are reasons for these kill objectives, not additional escort,
+shipment or survey mechanics. Population tier is not a measured guarantee
+of combat balance for the quest rank. No connected balance test ran.
 
 Population location identifiers such as `19295:Skyrim.esm` identify a named
 place; they are not the runtime cell or worldspace. The future adapter must
@@ -96,13 +117,17 @@ apply to these transfers of existing purse gold.
 
 ## Reward and activation limits
 
-One finish of each scene candidate creates **25 gold**. Their cooldowns alone permit
-at most **100 gold** in a half-open 24-hour window if both could be completed
+One finish of each scene candidate creates **100 gold**. Their cooldowns alone permit
+at most **400 gold** in a half-open 24-hour window if all four could be completed
 by one character. This is an arithmetic upper bound before eligibility,
 travel, target availability and competition, not an approved aggregate
 economy budget or measured income. These proposed scene rewards would be
 created at completion, like legacy scene rewards; they are not supply
-purchases from a finite purse. The five commissions transfer existing purse
+purchases from a finite purse. The separate unbundled scene-accounting
+proposal reserves rewards within 150 gold per character per rolling 24 hours,
+but is not integrated here. That proposal is a further limit, not a reason
+to call the 400-gold cooldown bound actual earnings or an account/world cap.
+The five commissions transfer existing purse
 money at their future accepted submitted prices, which are not invented or
 included as newly created gold in that bound.
 
