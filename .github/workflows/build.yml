@@ -511,7 +511,7 @@ jobs:
                  'test-516-woodworking-benches.js',
                  'test-2554-board-posts.js',
                  'test-1380-rare-mines.js',
-                 'test-1621-quest-state.js',
+                 'test-1621-quest-state.js', 'test-merchant-expanded-scenes.js',
                  'test-unpin.js', 'test-coffers.js',
                  'test-1383-injury.js',
                  'test-chat-log.js', 'test-1131-line-log.js', 'test-2723-plugin-reports.js', 'test-2732-press-mark.js',

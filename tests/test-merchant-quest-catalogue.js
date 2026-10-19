@@ -1,5 +1,5 @@
 'use strict';
-// Inactive authored candidates only. This reads source, not a game or world.
+// Authored source and explicit activation only. No game or world is accessed.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -10,6 +10,11 @@ const catalogue = JSON.parse(read('game/data/merchant-quests.json'));
 const roster = JSON.parse(read('game/data/merchant-roster.json'));
 const population = JSON.parse(read('game/data/npc-population.json'));
 const gm = read('game/gamemode.js');
+const activation=JSON.parse(read('game/data/merchant-quest-activation.json'));
+assert.deepEqual(Object.keys(activation).sort(),['killScenes','version']);
+assert.equal(activation.version,1);assert.equal(activation.killScenes.length,4);
+const enabled=new Set(activation.killScenes.map(row=>row.id));
+assert.equal(enabled.size,activation.killScenes.length);
 const begin = gm.indexOf('// ==== thornswood progression ====');
 const end = gm.indexOf('// ==== end thornswood progression ====');
 assert.ok(begin >= 0 && end > begin);
@@ -35,7 +40,7 @@ function validate(catalogue, source = {recipes, tables, harvests}) {
   assert.equal(catalogue.active, false, 'Draft data cannot activate work');
   assert.equal(catalogue.complete, false, 'The full catalogue and runtime prerequisites remain unfinished');
   assert.ok(Array.isArray(catalogue.quests) && catalogue.quests.length > 0);
-  assert.ok(!read('scripts/dev/Build-MerchantGamemode.js').includes('merchant-quests.json'), 'No draft runtime import');
+  assert.ok(read('scripts/dev/Build-MerchantGamemode.js').includes('merchant-quest-activation.json'), 'Runtime uses explicit pinned admission');
 
   // Compare actual objective identities, not titles or merchant/hold labels.
   const killSource = read('game/kill-contracts.js');
@@ -70,7 +75,7 @@ function validate(catalogue, source = {recipes, tables, harvests}) {
     assert.ok(sourceMerchant && sourceMerchant.keep && sourceMerchant.role === 'trader');
     assert.equal(sourceMerchant.base, row.merchant.base);
     assert.ok(Number.isSafeInteger(row.cooldownHours) && row.cooldownHours > 0);
-    assert.ok(!gm.includes("'" + row.id + "'") && !gm.includes('"' + row.id + '"'), 'No bundled draft definition');
+    assert.equal(gm.includes("'" + row.id + "'") || gm.includes('"' + row.id + '"'),enabled.has(row.id), 'Only explicitly admitted IDs are bundled');
     if (row.kind === 'commission') {
       assert.equal(row.tier, 'novice', 'Higher commissions need their own producer/cadence review');
       assert.equal(row.cooldownHours, 6);
@@ -141,13 +146,18 @@ function validate(catalogue, source = {recipes, tables, harvests}) {
     assert.ok(Number.isSafeInteger(row.cooldownHours) && row.cooldownHours > 0);
     firstFinishGold += row.rewardGold;
     dailyBound += Math.ceil(24 / row.cooldownHours) * row.rewardGold;
-    assert.ok(!gm.includes("'" + row.id + "'") && !gm.includes('"' + row.id + '"'), 'No bundled draft definition');
+    assert.equal(gm.includes("'" + row.id + "'") || gm.includes('"' + row.id + '"'),enabled.has(row.id), 'Only explicitly admitted IDs are bundled');
   }
   return {ids, firstFinishGold, dailyBound};
 }
 const {ids, firstFinishGold, dailyBound} = validate(catalogue);
+for(const pin of activation.killScenes) {
+  assert.deepEqual(Object.keys(pin).sort(),['id','sha256']);
+  const row=catalogue.quests.find(row=>row.id===pin.id);assert.ok(row);assert.equal(row.kind,'kill');
+  assert.equal(require('node:crypto').createHash('sha256').update(JSON.stringify(row)).digest('hex'),pin.sha256);
+}
 const docs = read('docs/systems/merchant-quest-catalogue.md');
-assert.ok(docs.includes('**' + catalogue.quests.length + ' authored draft definitions**'));
+assert.ok(docs.includes('**' + catalogue.quests.length + ' authored definitions**'));
 assert.ok(docs.includes('**' + firstFinishGold + ' gold**'));
 assert.ok(docs.includes('**' + dailyBound + ' gold**'));
 function proof(ref) {
@@ -256,7 +266,7 @@ for (const classKey of ['miner', 'fisher', 'hunter', 'farmer', 'gatherer']) {
     assert.equal(rules.allows(gate, snapshot), allowed); classEligibility++;
   }
 }
-console.log('PASS ' + ids.size + ' inactive quest candidates, exact source bindings and real gates; ' + dailyBound + ' gold cooldown-only 24h bound, 0 enabled');
+console.log('PASS ' + ids.size + ' authored quests, exact bindings and gates; ' + dailyBound + ' gold cooldown-only bound, '+enabled.size+' explicitly enabled');
 console.log('PASS explicit commission source authority and ' + refusals + ' malformed-source/permission/quantity/bundle refusals');
 console.log('PASS ' + classRefusals + ' class-allocation/source refusals and ' + classEligibility + ' cross-profession class eligibility cases');
 console.log('PASS ' + harvestRefusals + ' harvest provenance/allocation/permission/bundle refusals');
