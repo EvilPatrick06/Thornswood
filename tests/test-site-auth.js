@@ -204,6 +204,8 @@ function grabRefresh() {
 function runRefresh(refreshSrc, privDir, FILE, sent, notes) {
   let doorSaid = false, readAt = 0, listAt = 0;
   const note = (line) => { notes.push(String(line)); };
+  // The engine's whole-file write (#2740), as far as the door can tell.
+  const mp = { writeFileWhole: (p, text) => fs.writeFileSync(p, text) };
   // The scratch site is plain http, so the door's https is http here, with
   // every call written down on the way past.
   const require = (m) => {

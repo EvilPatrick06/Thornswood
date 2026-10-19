@@ -148,7 +148,10 @@ try {
 } catch { }
 `$f = Join-Path (Join-Path `$root `$privDir) 'allowed.json'
 if (-not (Test-Path `$f)) { 'NO LIST YET. Run -Connect first and give it five minutes.'; exit }
-`$d = Get-Content `$f -Raw | ConvertFrom-Json
+# Read sharing write and delete, so this read never refuses the gamemode's
+# whole write of the list, a POSIX rename (#2740).
+`$h = New-Object IO.FileStream(`$f, [IO.FileMode]::Open, [IO.FileAccess]::Read, ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+try { `$d = (New-Object IO.StreamReader(`$h, (New-Object Text.UTF8Encoding(`$false)), `$true)).ReadToEnd() | ConvertFrom-Json } finally { `$h.Dispose() }
 `$n = @(`$d.profiles).Count
 if ('$want' -eq 'true' -and `$n -lt 1) {
   'THE LIST IS EMPTY. Turning the door on now would turn away everybody.'
@@ -180,7 +183,9 @@ try {
 if (-not (Test-Path `$f)) {
   'NO allowed.json. The door is OFF and anybody can connect.'
 } else {
-  `$d = Get-Content `$f -Raw | ConvertFrom-Json
+  # Sharing write and delete, as above (#2740).
+  `$h = New-Object IO.FileStream(`$f, [IO.FileMode]::Open, [IO.FileAccess]::Read, ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+  try { `$d = (New-Object IO.StreamReader(`$h, (New-Object Text.UTF8Encoding(`$false)), `$true)).ReadToEnd() | ConvertFrom-Json } finally { `$h.Dispose() }
   'mode      ' + `$(if (`$d.enforce) { 'ENFORCING, people not on the list are turned away' } else { 'watching only, nobody is turned away' })
   'profiles  ' + @(`$d.profiles).Count
   'updated   ' + `$(if (`$d.at) { `$d.at } else { 'never, this list was written by hand' })

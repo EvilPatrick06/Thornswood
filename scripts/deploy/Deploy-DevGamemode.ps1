@@ -614,13 +614,21 @@ function Get-DevRoom {
   # reads it, because restart.json only reaches the room if it lands where the
   # gamemode looks, and online.json is written to the same place. No
   # online.json at all means the server has never run there, so nobody. A
-  # file with no count in it is unknown: node empties it before it writes, and
-  # Windows PowerShell reads an empty file as nothing at all rather than an
-  # error, which came out as nobody on until the test for this caught it.
+  # file with no count in it is unknown, not nobody: Windows PowerShell reads
+  # an empty file as nothing at all rather than an error, which came out as
+  # nobody on until the test for this caught it.
+  # Both files are read sharing write and delete (#2740). The gamemode
+  # replaces them whole with a POSIX rename, which a reader that does not
+  # share delete refuses (Get-Content does not share it), and a refused write
+  # leaves the count it was replacing.
   # UP says whether anything is on the game port. Every endpoint is listed and
   # filtered here, because -LocalPort with nothing on it is an error, and an
   # error has to stay distinct from nothing there.
   Read-DevRoom (Remote @"
+function ReadShared(`$f) {
+  `$h = New-Object IO.FileStream(`$f, [IO.FileMode]::Open, [IO.FileAccess]::Read, ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+  try { return (New-Object IO.StreamReader(`$h, (New-Object Text.UTF8Encoding(`$false)), `$true)).ReadToEnd() } finally { `$h.Dispose() }
+}
 `$s = Get-Content '$rootWin\server-settings.json' -Raw | ConvertFrom-Json
 `$port = [int]`$s.port
 'PORT ' + `$port
@@ -640,7 +648,7 @@ if (`$port -gt 0) {
 if (-not (Test-Path `$o)) { 'ONLINE 0' }
 else {
   try {
-    `$j = Get-Content `$o -Raw -EA Stop | ConvertFrom-Json -EA Stop
+    `$j = ReadShared `$o | ConvertFrom-Json -EA Stop
     if (`$null -eq `$j -or `$null -eq `$j.now) { throw 'no count' }
     'ONLINE ' + [int]`$j.now
   } catch { 'ONLINE unreadable' }
@@ -651,7 +659,7 @@ else {
 `$nf = [IO.Path]::Combine('$rootWin', `$p, 'online-names.json')
 if (Test-Path -LiteralPath `$nf) {
   try {
-    `$n = Get-Content `$nf -Raw -EA Stop | ConvertFrom-Json
+    `$n = ReadShared `$nf | ConvertFrom-Json
     foreach (`$x in @(`$n.names)) { if (`$x) { 'NAME ' + `$x } }
   } catch { 'NOTE ' + `$nf + ' does not read (' + `$_.Exception.Message + '), so nobody is named' }
 }
@@ -665,13 +673,10 @@ function Format-DevNames($names) {
 }
 
 function Warn-DevRoom {
+  # One look. The second look two seconds on that was here, for a read that
+  # landed on online.json half written, came out with its cause (#2740): the
+  # gamemode writes the file whole, so a read gets one count or the other.
   $room = Get-DevRoom
-  # The gamemode rewrites online.json whenever the count moves, so a read can
-  # land on it half written. One more look before calling it unknown.
-  if ($room.Port -gt 0 -and $room.Online -lt 0) {
-    Start-Sleep -Seconds 2
-    $room = Get-DevRoom
-  }
   # The stop below refuses 7777 as well, but by then the live room would
   # already have been told an update was coming.
   if ($room.Port -eq 7777) {

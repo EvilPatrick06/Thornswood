@@ -55,6 +55,8 @@ fs.writeFileSync(path.join(box, 'server-settings.json'),
 // a name, or not.
 let room = {};
 const mp = {
+  // The engine's whole-file write (#2740), as far as the gamemode can tell.
+  writeFileWhole: function (p, text) { fs.writeFileSync(p, text); },
   get: function (id, what) {
     if (id === 0 && what === 'onlinePlayers') return Object.keys(room).map(Number);
     const who = room[id];

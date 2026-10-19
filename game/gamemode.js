@@ -109,8 +109,13 @@ function rollLog(where) {
   7788 for dev, readable with no ssh. It says whether the log works and, when
   it does not, why, and nothing about anybody. Written when the first line of
   a load lands, so a restart that fixed it says so, and once when it breaks.
+
+  Written whole with the engine's mp.writeFileWhole (#2740), never in place:
+  the port may be handing the file out at that moment. A write that fails
+  goes to the console, the one place left when this log is the thing broken.
 */
 function sayLogState(state) {
+  let where = 'thornswood-log.json';
   try {
     const fs = require('fs');
     const path = require('path');
@@ -120,8 +125,11 @@ function sayLogState(state) {
       if (cfg && cfg.dataDir) { dataDir = String(cfg.dataDir); }
     } catch (e) { }
     state.at = Date.now();
-    fs.writeFileSync(path.join(dataDir, 'thornswood-log.json'), JSON.stringify(state));
-  } catch (e) { }
+    where = path.join(dataDir, 'thornswood-log.json');
+    mp.writeFileWhole(where, JSON.stringify(state));
+  } catch (e) {
+    console.log('[thornswood] could not write ' + where + ': ' + (e && e.message ? e.message : e));
+  }
 }
 
 function logPath() {
@@ -9119,7 +9127,9 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
       var cfgB = JSON.parse(fsb.readFileSync('server-settings.json', 'utf8'));
       if (cfgB && cfgB.dataDir) { dataDirB = String(cfgB.dataDir); }
     } catch (e) { }
-    fsb.writeFileSync(pathb.join(dataDirB, 'server-bases.json'),
+    // Whole, never in place (#2740): the port may be handing it to a client
+    // that is loading at that moment, a hot reload included.
+    mp.writeFileWhole(pathb.join(dataDirB, 'server-bases.json'),
                       JSON.stringify({ at: Date.now(), bases: ids }));
     log('published', ids.length, 'server handled bases for the client');
   } catch (e) {
@@ -28500,6 +28510,24 @@ log('gamemode loaded:',
     var lastWritten = -1;
 
     /*
+      Both files below are written whole with the engine's mp.writeFileWhole
+      (#2740), never in place: the site reads online.json from disk, every
+      launcher and game asks the port for it, and the deploys read both over
+      ssh, so a read that landed on an in-place write found an empty or cut
+      short file. A write the engine refuses (a reader that opened the file
+      without sharing delete) leaves the file as it was and is said on the
+      console, once for each new reason, and what it held is not counted as
+      written, so the next pass two seconds on writes what is true then.
+    */
+    var namesFailed = '';
+    var onlineFailed = '';
+    var sayWriteFailed = function (file, e, said) {
+      var why = String((e && e.message) || e);
+      if (why !== said) { console.log('[thornswood] could not write ' + file + ': ' + why); }
+      return why;
+    };
+
+    /*
       Who is on, by character name, for the deploy scripts (issue #520).
 
       Deploy-DevGamemode and Deploy-Server read the count before they stop
@@ -28542,9 +28570,12 @@ log('gamemode loaded:',
       var namesKey = names.join('\n');
       if (namesKey !== lastNames) {
         try {
-          fs.writeFileSync(namesFile, JSON.stringify({ at: Date.now(), names: names }));
+          mp.writeFileWhole(namesFile, JSON.stringify({ at: Date.now(), names: names }));
           lastNames = namesKey;
-        } catch (e) { }
+          namesFailed = '';
+        } catch (e) {
+          namesFailed = sayWriteFailed(namesFile, e, namesFailed);
+        }
       }
 
       /*
@@ -28607,16 +28638,20 @@ log('gamemode loaded:',
       } catch (e) { line = 0; full = false; }
       if (n === lastWritten && restarting === lastRestarting && max === lastMax &&
           line === lastLine && full === lastFull) return;
+      try {
+        mp.writeFileWhole(onlineFile, JSON.stringify({
+          now: n, at: Date.now(), restarting: restarting, max: max, line: line, full: full
+        }));
+      } catch (e) {
+        onlineFailed = sayWriteFailed(onlineFile, e, onlineFailed);
+        return;
+      }
+      onlineFailed = '';
       lastWritten = n;
       lastRestarting = restarting;
       lastMax = max;
       lastLine = line;
       lastFull = full;
-      try {
-        fs.writeFileSync(onlineFile, JSON.stringify({
-          now: n, at: Date.now(), restarting: restarting, max: max, line: line, full: full
-        }));
-      } catch (e) { }
     }, 2000);
 
     console.log('[thornswood] online count published at ' + onlineFile);
@@ -28928,22 +28963,31 @@ log('gamemode loaded:',
     write could still be running when a hot reload starts the next copy of
     this block writing the same two files.
 
-    If the rename is refused, which Windows does while something else holds
-    the file open, the book is written in place the way it always was.
+    The engine's mp.writeFileWhole does the write and the rename (#2740).
+    Until then this was node's renameSync, MoveFileEx on Windows, which is
+    refused while any other program has the file open, share-delete or not,
+    and a refused rename wrote the book in place after all, the very write
+    this exists to avoid. mp.writeFileWhole renames with POSIX
+    semantics, which a reader sharing delete does not stop; one that does not
+    share delete still refuses it, and then the book on disk stays the last
+    one written whole, the console says why (once for each new reason), and
+    the book stays marked unwritten, so the next pass four seconds on puts
+    the whole book there.
   */
+  var writeFailed = '';
   function write() {
-    var text = JSON.stringify({ at: Date.now(), who: book });
-    var tmp = FILE + '.tmp';
+    var wrote = false;
     try {
-      fs.writeFileSync(tmp, text);
-      try {
-        fs.renameSync(tmp, FILE);
-      } catch (e) {
-        fs.writeFileSync(FILE, text);
-        try { fs.unlinkSync(tmp); } catch (e2) { }
-      }
-    } catch (e) { }
+      mp.writeFileWhole(FILE, JSON.stringify({ at: Date.now(), who: book }));
+      wrote = true;
+      writeFailed = '';
+    } catch (e) {
+      var why = String((e && e.message) || e);
+      if (why !== writeFailed) { console.log('[thornswood] could not write ' + FILE + ': ' + why); }
+      writeFailed = why;
+    }
     push();
+    return wrote;
   }
 
   /*
@@ -29109,7 +29153,8 @@ log('gamemode loaded:',
       } catch (e) { }
     }
 
-    if (dirty) { dirty = false; write(); }
+    // Still dirty when the write was refused: the file is behind the book.
+    if (dirty) { dirty = !write(); }
   }, EVERY_MS);
 
   console.log('[thornswood] character roster published at ' + FILE);
@@ -29944,8 +29989,10 @@ log('gamemode loaded:',
                  (doc.lookupFailedWhy ? ': ' + doc.lookupFailedWhy : ''));
           }
 
+          // Whole, never in place (#2740): Set-Door reads it on the box while
+          // the server runs, and an in-place write read half way is no list.
           try {
-            fs.writeFileSync(FILE, JSON.stringify({
+            mp.writeFileWhole(FILE, JSON.stringify({
               enforce: enforce,
               profiles: doc.profiles,
               devProfiles: Array.isArray(doc.devProfiles) ? doc.devProfiles : [],
@@ -30096,7 +30143,7 @@ log('gamemode loaded:',
 //
 // The server already writes the real thing. manifestGen.generateManifest runs
 // at startup and puts filename, size and crc32 for every plugin in the load
-// order into data/manifest.json, which koa-static serves. It is simply not at
+// order into data/manifest.json, which the resources port serves. It is simply not at
 // the path the client asks for. So it is published there as well.
 //
 // Filtered to plugins on the way past. The client compares this array
@@ -30181,9 +30228,11 @@ log('gamemode loaded:',
     };
     if (hasLight) { out.light = light; }
 
+    // Whole, never in place (#2740): a hot reload publishes it again while
+    // clients and launchers may be asking the port for it.
     try {
       fs.mkdirSync(DIR, { recursive: true });
-      fs.writeFileSync(DST, JSON.stringify(out));
+      mp.writeFileWhole(DST, JSON.stringify(out));
     } catch (e) {
       return 'could not write ' + DST + ': ' + e.message;
     }
@@ -55972,17 +56021,14 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
         delete counts[k];
       }
     }
-    var text = JSON.stringify({ at: t, counts: counts });
-    var tmp = FILE + '.tmp';
+    // Whole, with the engine's mp.writeFileWhole (#2740). Until then a temp
+    // file and node's renameSync, and when Windows refused the rename (it
+    // does while any other program has the file open) the counts were
+    // written in place after all. A refused write now leaves the last counts
+    // written whole and says so here.
     try {
-      try { fs.mkdirSync(privDir, { recursive: true }); } catch (e) { }
-      fs.writeFileSync(tmp, text);
-      try {
-        fs.renameSync(tmp, FILE);
-      } catch (e) {
-        fs.writeFileSync(FILE, text);
-        try { fs.unlinkSync(tmp); } catch (e2) { }
-      }
+      fs.mkdirSync(privDir, { recursive: true });
+      mp.writeFileWhole(FILE, JSON.stringify({ at: t, counts: counts }));
     } catch (e) {
       console.log('[thornswood] could not write the take limit: ' + e);
     }
@@ -64120,18 +64166,10 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     }
   } catch (e) { book = {}; }
 
-  /* Into a temp file beside it and renamed over it; see the roster's write(). */
+  /* Whole, with the engine's mp.writeFileWhole (#2740); see the roster's write(). */
   function write() {
-    var text = JSON.stringify({ at: Date.now(), who: book });
-    var tmp = FILE + '.tmp';
     try {
-      fs.writeFileSync(tmp, text);
-      try {
-        fs.renameSync(tmp, FILE);
-      } catch (e) {
-        fs.writeFileSync(FILE, text);
-        try { fs.unlinkSync(tmp); } catch (e2) { }
-      }
+      mp.writeFileWhole(FILE, JSON.stringify({ at: Date.now(), who: book }));
       return true;
     } catch (e) {
       mlog('could not write', FILE + ':', e);
