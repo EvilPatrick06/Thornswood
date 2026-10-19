@@ -79,7 +79,8 @@ yes('every piece of the letter is in the property block, once' +
     (missing.length ? ' (missing: ' + missing.join(', ') + ')' : ''), missing.length === 0);
 const fees = slice(prop, '  var NOTICE_FEE = ', 'var LETTER_REACH = 700;');
 const holds = slice(prop, '  var LEDGER_HOLDS = [', '];');
-const tenthFrom = slice(prop, '  var HAUL_TENTH_FROM = ', ';');
+// The company's cut of a haul is its terms now (#512, #2695), read by the company terms block.
+const COMPANY = require('./fixtures/company-block').companyApi(gm);
 const reads = slice(prop, '  var boardReads = ', ';');
 const seeding = (function () {
   const a = prop.indexOf('  var BOARD_REACH = 400;');
@@ -88,8 +89,8 @@ const seeding = (function () {
 })();
 const chargenLine = gm.split('\n').find(function (l) { return l.indexOf('const CHARGEN = ') === 0; });
 const PASSAGES = chargenLine ? JSON.parse(chargenLine.slice('const CHARGEN = '.length).replace(/;$/, '')).towns : null;
-yes('the fees, the ledgers, the seeding and the town table read', !!fees && !!holds && !!tenthFrom && !!reads && !!seeding && !!PASSAGES);
-if (missing.length || !fees || !holds || !tenthFrom || !reads || !seeding || !PASSAGES) { done(); }
+yes('the fees, the ledgers, the seeding and the town table read', !!fees && !!holds && !!COMPANY && !!reads && !!seeding && !!PASSAGES);
+if (missing.length || !fees || !holds || !COMPANY || !reads || !seeding || !PASSAGES) { done(); }
 
 const GOLD = 15;
 const TAMRIEL = '3c:Skyrim.esm';
@@ -151,6 +152,7 @@ function social(w) {
   };
   ctx.globalThis = ctx;
   vm.createContext(ctx);
+  ctx.__thornswoodCompany = COMPANY;
   vm.runInContext(SOCIAL, ctx, { filename: 'gamemode.js social' });
   return ctx;
 }
@@ -161,7 +163,7 @@ function boot(w) {
   const ctx = social(w);
   const body = [
     'var boxes = {};', 'var funds = {};', 'var notices = {};', 'var GOLD_ID = ' + GOLD + ';',
-    reads, holds, tenthFrom, fees, seeding,
+    reads, holds, fees, seeding,
     'function save() { }',
     'function refreshPanel() { }',
     'function cancelHaul() { return true; }', 'function haulCmd() { return true; }',

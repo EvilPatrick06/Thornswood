@@ -26,14 +26,15 @@ belong to somebody under eighteen is removed rather than warned.
 
 Thornswood contains sexual content between adult characters, violence, and language that is not written for children. Confirming on the download or join page, and the checkbox in the installer, are kept as a record of a statement somebody made, not as verification of age.
 
-You also need to own Skyrim Special Edition on Steam. Thornswood hands on one
-of the game's own files and no other: the main menu's interface file,
-`Data\Interface\startmenu.swf`, which is Bethesda's, edited so the menu shows
-no Bethesda logo and no button list. Two of its meshes, the notice board
-(`noticeboard01.nif`) and the drop box (`dropbox01.nif`), are put together from
-pieces of Skyrim's own. Everything else it ships is its own, or other people's
-work that the [credits](/credits) page names, and none of it can be played
-without the game.
+You also need to own Skyrim Special Edition on Steam. Thornswood ships no game
+files. Three files it uses are made on your own computer from your own copy of
+the game: the main menu's interface file, `Data\Interface\startmenu.swf`,
+which is the game's own with its Bethesda logo and button list taken out, and
+the notice board (`noticeboard01.nif`) and drop box (`dropbox01.nif`) meshes,
+put together from pieces of Skyrim's own. The launcher makes them from the
+game's archives before you play, and none of them is sent to you. Everything
+Thornswood ships is its own, or other people's work that the
+[credits](/credits) page names, and none of it can be played without the game.
 
 ## The rules of the world are part of this
 

@@ -247,7 +247,7 @@ try {
     }
     $clean = Join-Path $T 'clean'
     $dirty = Join-Path $T 'dirty'
-    foreach ($f in @('payload\Data\Platform\UI\index.html', 'payload\Data\Scripts\fnis.pex', 'payload\Data\Interface\startmenu.swf')) {
+    foreach ($f in @('payload\Data\Platform\UI\index.html', 'payload\Data\Scripts\fnis.pex', 'payload\Data\Interface\loadwaitspinner.swf')) {
         foreach ($d in $clean, $dirty) {
             $p = Join-Path $d $f; New-Item -ItemType Directory -Force -Path (Split-Path -Parent $p) | Out-Null
             [IO.File]::WriteAllText($p, 'x')
@@ -260,6 +260,14 @@ try {
     Yes 'Check-Secrets passes a stage of ours alone' ($rc.Code -eq 0)
     $rd = Invoke-Secrets $dirty
     Yes '  and fails one that carries RaceMenu''s loose menu, by rule name' ($rd.Code -ne 0 -and $rd.Out -match 'never-ship-not-ours')
+    # The main menu is made on each machine from its own game since #2827,
+    # so a stage that carries it hands on Bethesda's file.
+    $menu = Join-Path $T 'menu'
+    $p = Join-Path $menu 'payload\Data\Interface\startmenu.swf'
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $p) | Out-Null
+    [IO.File]::WriteAllText($p, 'x')
+    $rm = Invoke-Secrets $menu
+    Yes '  and one that carries the main menu, which is made from each game (#2827)' ($rm.Code -ne 0 -and $rm.Out -match 'never-ship-bethesda')
 
     # ---- 5. Rollback-Feed --------------------------------------------------------------
     $roll = Get-Content -LiteralPath $RollPath -Raw

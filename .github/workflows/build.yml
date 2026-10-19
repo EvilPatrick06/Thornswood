@@ -465,11 +465,21 @@ jobs:
           # plugin's own lines go with press and quiet, and only the chat
           # box sends a line as typed. Under a second.
           # Issue #2792: tests\test-2792-terms-game-files.js holds the terms
-          # page to the pack list: every file $ShipOursFiles ships that the
-          # asset register says is Bethesda's, or built from Bethesda's, is
-          # named there, the count of the game's own files it says it hands
-          # on matches, and it and the credits page carry the notice line
-          # Bethesda's terms for mods ask for. Under a second.
+          # page to the pack list: no file $ShipOursFiles ships is one the
+          # asset register says is Bethesda's, or built from Bethesda's, the
+          # page says Thornswood ships no game files and names the three the
+          # launcher makes from the game (#2827), and it and the credits page
+          # carry the notice line Bethesda's terms for mods ask for. Under a
+          # second.
+          # Issue #2827: tests\test-2827-from-game.ps1 writes a made-up game
+          # with Python, compiles the launcher's FromGame files at the build's
+          # C# and at C# 5 (Go.ps1's Add-Type under PowerShell 5.1), and holds
+          # the start menu and the notice board's two meshes it makes to the
+          # bytes Build-StartMenu.py and Build-NoticeBoard.py make, a changed
+          # game to a reason naming the file that differs, ZlibLevel6 to
+          # Python's zlib, the shipped recipes to the files that shipped, and
+          # Ship-Rules.ps1, Go.ps1, Play, Scan and Fix to making the three and
+          # never shipping them. About twenty seconds.
           # Issue #2742: tests\test-2459-artifact-unpack-race.ps1 puts a whole
           # second build of one artifact in the moment before a run names its
           # zip, its record and its unpacked folder, holds a different file at
@@ -501,7 +511,7 @@ jobs:
                  'test-mold-key.js', 'test-putback-flora.js', 'test-staff-spells.js', 'test-join-pass-trust.js',
                  'test-npc-shared-runtime.js', 'test-npc-navigation-equivalence.js', 'test-npc-population-runtime.js', 'test-npc-role-titles.js',
                  'test-shared-resource-stock.js', 'test-resource-stock-integration.js',
-                 'test-npc-death-policy.js', 'test-vortex-profile-state.ps1',
+                 'test-npc-death-policy.js', 'test-vortex-profile-state.ps1', 'test-2827-from-game.ps1',
                  'test-books.js', 'test-guild-ledger-safety.js', 'test-book-review-regressions.js', 'test-2582-nothing-personal-served.js',
                  'test-recipeless-craft.js',
                  'test-npc-merchant-purses.js', 'test-merchant-ledger-storage.js', 'test-npc-merchant-startup.js',
@@ -517,6 +527,7 @@ jobs:
                  'test-site-gone-public.ps1',
                  'test-1320-pass-one-session.js',
                  'test-1373-scarce-scene.js', 'test-quest-eligibility.js', 'test-merchant-quest-catalogue.js', 'test-quest-transactions.js', 'test-scene-reward-budget.js', 'test-kill-contracts.js',
+                 'test-511-trade-cargo.js',
                  'test-nobody-makes.js', 'test-614-riekling-shift.js',
                  'test-1378-shared-gather.js',
                  'test-special-edition-only.js',
@@ -528,10 +539,12 @@ jobs:
                  'test-2516-server-boards.js',
                  'test-516-woodworking-benches.js',
                  'test-2554-board-posts.js',
+                 'test-2563-journal-length.js',
                  'test-1380-rare-mines.js',
                  'test-1621-quest-state.js', 'test-merchant-expanded-scenes.js',
                  'test-merchant-commission-state.js', 'test-merchant-commission-settlement.js', 'test-merchant-commissions.js',
                  'test-unpin.js', 'test-coffers.js',
+                 'test-512-trading-company.js',
                  'test-1383-injury.js',
                  'test-chat-log.js', 'test-1131-line-log.js', 'test-2723-plugin-reports.js', 'test-2732-press-mark.js',
                  'test-2260-burn-relog.js',
@@ -542,7 +555,9 @@ jobs:
                  'test-2261-tome-refused.js',
                  'test-papyrus-event-list.js',
                  'test-1383-treatments.js',
+                 'test-1383-limbs-brews.js',
                  'test-1384-condition.js',
+                 'test-1384-shut-benches.js',
                  'test-1385-perks.js',
                  'test-1127-unplaceable-tomes.js',
                  'test-1386-warrior.js',
@@ -576,6 +591,7 @@ jobs:
                  'test-502-jail-cells.js',
                  'test-502-guard-board.js',
                  'test-502-jail-rules.js',
+                 'test-2479-cut-outs.js',
                  'test-1636-farm-gui.js',
                  'test-1394-fares.js',
                  'test-1635-ride-panel.js',
@@ -607,6 +623,7 @@ jobs:
                  'test-1628-social-gui.js',
                  'test-1630-journal-gui.js',
                  'test-fire-walk.js',
+                 'test-2302-placed-water.js',
                  'test-1629-party-gui.js',
                  'test-1695-party-ask-id.js',
                  'test-1640-jarl-word.js',
