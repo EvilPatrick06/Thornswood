@@ -84,6 +84,24 @@ for(const method of ['getNpcAIState','get','save','set']) for(const boundary of 
   }
 }
 console.log('PASS scoped merchant preparation at native lookup, return and durable-save boundaries');
+for(const boundary of ['native-return','save-lookup','guard-reentry']) {
+ let current=true,armed=false,saves=0;
+ let document={version:1,entries:{'1:Skyrim.esm':null}};
+ const native={makeProperty(){},getIdFromDesc:d=>ids[d],
+  getNpcAIState:()=>{if(armed&&boundary==='native-return')current=false;return {isHuman:false,profileId:0};},
+  get:(_id,key)=>key==='baseDesc'?'a:Skyrim.esm':null,set(){}};
+ const disk={namespace:{},durable:true,load:()=>JSON.parse(JSON.stringify(document))};
+ Object.defineProperty(disk,'save',{get(){if(armed&&boundary==='save-lookup')current=false;
+  return next=>{saves++;document=JSON.parse(JSON.stringify(next));return true;};}});
+ const purse=ctx.createNpcMerchantPurses(native,data,disk);const state=purse.prepare(1);armed=true;
+ const rejected=purse.compareAndCommit(1,state.revision||0,{...state,purse:200},()=>{
+  if(boundary==='guard-reentry')assert.throws(()=>purse.compareAndCommit(1,0,{...state,purse:1}),/busy/);
+  return boundary==='guard-reentry'?false:current;
+ });
+ assert.equal(rejected,null,boundary+' revokes the final caller before any write');
+ assert.equal(saves,1);assert.equal(document.entries['1:Skyrim.esm'].purse,250);
+ assert.equal(purse.callerGuard,true);assert.equal(purse.ledgerStates().length,1);
+}
 
 {
   let current=true,armed=false,saves=0;

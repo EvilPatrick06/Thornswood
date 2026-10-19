@@ -3,14 +3,14 @@
 There are **14 authored definitions** in
 `game/data/merchant-quests.json`, toward the required 240 or more distinct
 offers for the60 retained merchants. Four kill scenes are explicitly admitted
-by the pinned activation manifest; the ten delivery commissions remain
-inactive. The aggregate authoring file stays `active:false` and
+by the pinned activation manifest, along with ten delivery commissions.
+The aggregate authoring file stays `active:false` and
 `complete:false`, so adding a draft does not enable it. Runtime includes the23
-legacy definitions and ten bound routes plus these four scenes. Source
+legacy definitions and ten bound routes plus these fourteen offers. Source
 activation is not proof of a completed Dev deployment.
 
 Four scenes give Novice and Advanced Warriors and Mages different work. Ten
-drafts request goods for specific trades and holds. These are deliveries,
+commissions request goods for specific trades and holds. These are deliveries,
 which can include goods obtained from other craftspeople; they do not assert
 that the person returning them crafted them. Neither kind grants ordinary
 buy, sell or supply permissions.
@@ -66,11 +66,11 @@ identity, species, authored leash, kill attribution and original conversation
 and transaction fences. A similarly named bandit or skeever elsewhere does
 not count. Existing camp difficulty and animal habitat remain unchanged.
 
-## Draft finite-purse commissions
+## Finite-purse commissions
 
 The five profession deliveries require the named Novice half. Five additional
 deliveries require a Novice class, independently of crafting profession.
-All ten propose a six-hour completion cooldown. Each row copies its complete offering roster identity
+All ten have a six-hour cooldown after the trade settles. Each row copies its complete offering roster identity
 and either its selected public recipe's owner, half, rank, output, amount,
 bench, inputs and conditions, or its canonical Gatherer harvest evidence.
 Their goods already belong to that trade's ordinary
@@ -100,9 +100,9 @@ The source checker preserves these five exact merchant/class allocations.
 Recipe ownership and buy permission still belong to the merchant's trade.
 For profession deliveries the named half must still match the recipe.
 The class allocation is separate from the exact authored goods in the JSON;
-the future compiler must derive commission authority from that reviewed
+the compiler derives commission authority from that reviewed
 catalogue, never from every item that could pass a source check. All five
-planned class-Novice slots now have drafts. The second distinct quest for
+planned class-Novice slots now have playable definitions. The second distinct quest for
 each class, Master work and full catalogue coverage remain unfinished.
 
 The pickaxe recipe makes one from one Iron Ingot and one Tool Handle. The
@@ -122,7 +122,7 @@ requested item must match its produce and the Alchemist's buy permission.
 This is a delivery from any legitimate supplier, with no particular harvest
 event required. It adds no plant, stock, yield, coordinates or return rate
 and does not claim cotton is newly placed in Hjaalmarch or currently ready
-to harvest. The future exact commission authority is still unimplemented.
+to harvest. Only its explicit published quest grants this delivery authority.
 
 Leather's selected recipe produces two from one Novice Deer Hide. Iron
 Arrows produce 24 from one Firewood and one Iron Ingot. Thread produces one
@@ -137,27 +137,30 @@ The copied recipe conditions matter. Leather requires at least one
 `MAG_FoodUpgradePerk03`. Their `canBeMadeOnDayOne:false` flag does not mean
 their ingredients have no Novice producer. It also does not prove every
 qualified customer can personally run that recipe. No condition or rank is
-changed for these drafts. Potato Soup also retains its requirement for
+changed for these offers. Potato Soup also retains its requirement for
 `MAG_RecipePerkPotatoSoup` and exclusion of `MAG_FoodUpgradePerk03`. Novice
 Farmer standing alone does not establish those recipe conditions; this is
 a delivery request and does not require personal crafting.
 
-Commission payment is the future accepted submitted hold price multiplied
+Commission payment is the accepted submitted hold price multiplied
 by the original quantity, from the merchant's finite purse. No default price,
 fixed bonus or new gold is granted here. Missing price, unsupported goods or
 insufficient unreserved purse must explain why new acceptance is refused.
-Customers need not own the goods when accepting work. The future transaction
-must reserve the promised purse amount and preserve the accepted quote
+Customers need not own the goods when accepting work. Existing and traded
+goods are valid; acceptance does not claim they were freshly crafted or harvested.
+The transaction reserves the promised purse amount and preserves the accepted quote
 through its exact conserved pending-transfer protocol. At delivery, missing
 matching inventory refuses completion while keeping the work and its purse
 reservation. A changed current price or lack of other spendable purse money
 must not invalidate that accepted promise. Ordinary stock for sale remains
-visible. This source slice implements none of that runtime protocol.
+visible. The panel shows promised purse money separately; ordinary purchases
+and supplies use only the remainder. A submitted zero price remains valid;
+there is no invented fallback price or reward bonus.
 
-Authored commissions need an explicit source-derived authority keyed by
+Authored commissions have an explicit source-derived authority keyed by
 their exact reviewed quest and merchant, plus their own conserved transfer
 kind, cooldown persistence and recovery. Several finished goods are absent
-from ordinary supply. Never widen that table, treat all buy goods as approved
+from ordinary supply. This does not widen that table, treat all buy goods as approved
 commissions or pass these rows as legacy supply. Its existing five-good and
 six-hour dynamic rules remain intact. The scene reward allowance does not
 apply to these transfers of existing purse gold.
@@ -171,19 +174,57 @@ travel, target availability and competition, not an approved aggregate
 economy budget or measured income. These scene rewards are
 created at completion, like legacy scene rewards; they are not supply
 purchases from a finite purse. The bundled scene-accounting
-proposal reserves rewards within 150 gold per character per rolling 24 hours,
-but is not integrated here. That proposal is a further limit, not a reason
+reserves rewards within 150 gold per character per rolling 24 hours.
+That additional limit is not a reason
 to call the 400-gold cooldown bound actual earnings or an account/world cap.
 The ten commissions transfer existing purse
-money at their future accepted submitted prices, which are not invented or
+money at their accepted submitted prices, which are not invented or
 included as newly created gold in that bound.
 
-Before activation, finish the full distinct catalogue and its numerical
-aggregate budget and cadence, bounded saved-state representation, generic
-target support, original-term recovery and coupled roster admission. Existing
-accepted quests keep their original terms. Neither changing these flags nor
-putting these IDs into the bundle is permitted as a shortcut. The source test
-rejects activation or a runtime import in this incomplete slice.
+Further definitions need their own source evidence, reward/cadence review,
+bounded state, exact bindings and explicit pinned admission. The full distinct
+catalogue is still unfinished; its aggregate flags remain false. Existing
+accepted quests keep their original terms. Editing a draft or changing the
+aggregate flags does not enable another quest. Published definitions use
+stable hashes and IDs; changing an objective or reward needs a new ID.
+
+## Commission persistence and admission
+
+The private merchant ledger owns each original promise and its monotonic
+action token. A character may hold three commissions across the complete
+merchant namespace, including retired identities. Each merchant admits at
+most100 promises and1024 combined promises and active cooldowns, reserving
+space for each accepted job's later cooldown. Expired cooldowns may be pruned;
+active ones and accepted promises are never evicted for capacity. This is
+separate from the three-open-scene limit and scene mint allowance.
+
+Acceptance and abandonment use a guarded ledger revision compare-and-set.
+The namespace writer lock stays held across native identity callbacks, the
+last current-conversation/character/rank/quote/count check and synchronous
+private write. A stale button cannot release a newer promise. Abandonment
+removes one authenticated owner's token without payment, preserving other
+jobs, cooldowns and the serial. Malformed state refuses changes instead of
+recreating a purse or dropping payment evidence.
+
+Commission-bearing transfers use an explicit version4 pending format.
+Normal trades retain the promises; a commission transfer removes exactly
+its original quantity, conserves each inventory entry's metadata in merchant
+stock, transfers its reserved gold and releases its promise. Full and compact
+recovery bind the original terms. Previous version2/3 pending formats retain
+their exact snapshot and digest representation, tested against serialized
+pre-change full and compact fixtures.
+
+The six-hour cooldown starts at successful final NPC-ledger settlement,
+after the exact final native inventory receipt has reached storage. If a
+crash delays reconciliation, the job remains pending until settlement and
+then begins its six hours. This is not the native receipt's timestamp, which
+the current protocol does not preserve. Reconnecting does not move an already
+committed cooldown. Pending saves, missing goods and native inventory/stock
+capacity refusals preserve the accepted job and its original payment.
+
+The ten commissions add no actor, spawn, harvest, purse refill, new currency
+or character inventory grant. Native inventory, pending-record and private
+ledger byte limits remain in force. No alpha reset is required for this slice.
 
 `node tests/test-merchant-quest-catalogue.js` checks actual rulebook gates,
 exact merchant and retained-target bindings, distinct objectives, source
