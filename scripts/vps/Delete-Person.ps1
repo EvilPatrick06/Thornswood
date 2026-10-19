@@ -75,7 +75,8 @@
       of its chat and the chat lines in the day files inside its window. The
       privacy page: "What cannot be undone is something you said that
       somebody else has already quoted in a report, because that now belongs
-      to the report."
+      to the report." Each of these still goes when its keeping time on the
+      privacy page is up, by the code that writes it (#2353).
     - the game's registers that it does not let go (below): the old copies a
       game server kept in data, and the merchant ledger, whose release is the
       merchant code's to write (#2351): counted, never changed.
@@ -85,7 +86,7 @@
       uploads note (16 Oct 2026, #2351), which nothing ties to them, so staff
       remove theirs in the hub by name.
     - logs, which age by their own rule (server.log 30 days, #2349; the
-      site's, the gamemode's, voice's and the bot's by size), and the
+      site's, the gamemode's, voice's and the bot's 90 days, #2166), and the
       encrypted backups, which expire on their schedule and are why the
       record exists.
 
