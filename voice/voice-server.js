@@ -882,24 +882,27 @@ function accept(key) {
   return crypto.createHash('sha1').update(key + GUID).digest('base64');
 }
 
+/*
+  One buffer, the head and the text written straight into it (#2390). It
+  used to encode the text into one buffer, the head into another and copy
+  both into a third, three allocations and two copies for every message.
+*/
 function frame(payload) {
-  const data = Buffer.from(payload, 'utf8');
-  const len = data.length;
-  let head;
-  if (len < 126) {
-    head = Buffer.alloc(2);
-    head[1] = len;
-  } else if (len < 65536) {
-    head = Buffer.alloc(4);
-    head[1] = 126;
-    head.writeUInt16BE(len, 2);
+  const len = Buffer.byteLength(payload, 'utf8');
+  const head = len < 126 ? 2 : len < 65536 ? 4 : 10;
+  const out = Buffer.allocUnsafe(head + len);
+  out[0] = 0x81;             // FIN + text
+  if (head === 2) {
+    out[1] = len;
+  } else if (head === 4) {
+    out[1] = 126;
+    out.writeUInt16BE(len, 2);
   } else {
-    head = Buffer.alloc(10);
-    head[1] = 127;
-    head.writeBigUInt64BE(BigInt(len), 2);
+    out[1] = 127;
+    out.writeBigUInt64BE(BigInt(len), 2);
   }
-  head[0] = 0x81;            // FIN + text
-  return Buffer.concat([head, data]);
+  out.write(payload, head, 'utf8');
+  return out;
 }
 
 /*
@@ -1013,6 +1016,47 @@ let droppedPositions = 0;   // ticks not sent to a backed socket, for /health
 let skippedRosters = 0;     // rosters replaced by a newer one unsent, for /health
 let closedBacklogged = 0;   // sockets closed at the ceiling, for /health
 
+/*
+  WHAT ONE TURN SENDS A SOCKET GOES TO THE KERNEL IN BATCHES (#2390).
+
+  Every message used to be its own socket.write, and each one went to the
+  kernel on its own. When a room fills, every pair of voice pages trades an
+  offer, an answer and their candidates through here, about fourteen
+  messages a pair: N squared writes. Profiled on 19 Oct with
+  voice/load-voice.js at 200 people (19,900 pairs, 278,600 relayed
+  messages): handling what pages sent took 4.1 s of the one thread, and
+  3.0 s of that was inside socket.write, the kernel write per message.
+  Everything else (reading the frames, signal(), JSON and framing) came to
+  about 1.1 s, and the copies in that are cut too (frame, and feed).
+
+  So a socket is corked by its first write in a turn of the event loop and
+  uncorked after every I/O callback of that turn has run (setImmediate, as
+  the roster does, with no timer in between), or sooner, the moment a write
+  returns false: what is corked has reached the socket's high water mark
+  (16 KB), and it goes to the kernel then as one writev rather than waiting
+  for the end of the turn. So the kernel is handed a turn's messages in
+  batches of about 16 KB, in the order they were written, and nothing is
+  held past the turn. A write returned false at 16 KB before this as well,
+  whether or not the kernel took it, so backed means what it meant, and the
+  drain that follows clears it before the next position tick for a socket
+  that reads. The ceiling is checked after that uncork, so it still
+  measures what the kernel would not take, at the same write it did. A
+  socket closed here is uncorked first, so whatever was written ahead of
+  the close still goes.
+
+  Measured with voice/load-signalling.js on 19 Oct, which times the service
+  rather than the one thread sending to it, three runs each: every pair at
+  200 people took 5.5 to 6.0 s before and 2.4 to 2.6 s after, and at 400
+  people 21.5 to 22.4 s before and 9.9 to 10.2 s after, nothing lost and
+  no socket closed at the ceiling either way.
+*/
+const corked = new Set();
+let uncorkDue = false;
+function uncorkAll() {
+  uncorkDue = false;
+  for (const s of corked) s.uncork();
+}
+
 class Sock {
   constructor(socket) {
     this.socket = socket;
@@ -1056,9 +1100,15 @@ class Sock {
     try { this.write(Buffer.from([0x89, 0])); } catch (e) { this.close(); }
   }
 
-  /* Where what socket.write says is heard. See the note over QUEUE_CEILING. */
+  /* Where what socket.write says is heard. See the note over QUEUE_CEILING.
+     Corked for the rest of this turn: see the note over corked. */
   write(buf) {
-    if (this.socket.write(buf) === false) this.backed = true;
+    if (!corked.has(this)) {
+      corked.add(this);
+      this.socket.cork();
+      if (!uncorkDue) { uncorkDue = true; setImmediate(uncorkAll); }
+    }
+    if (this.socket.write(buf) === false) { this.backed = true; this.uncork(); }
     const queued = this.socket.writableLength;
     if (queued > QUEUE_CEILING) {
       closedBacklogged++;
@@ -1131,16 +1181,25 @@ class Sock {
     try { this.write(framed); } catch (e) { this.close(); }
   }
 
+  /* What this turn wrote goes to the kernel now. See the note over corked. */
+  uncork() {
+    if (!corked.delete(this)) return;
+    this.socket.uncork();
+  }
+
   close() {
     live.delete(this);
     if (this.closed) return;
     this.closed = true;
+    // What was written before the close (a close frame among it) still goes,
+    // as it did when every write reached the kernel at once.
+    this.uncork();
     this.socket.destroy();
     if (this.onclose) this.onclose();
   }
 
   feed(chunk) {
-    this.buf = Buffer.concat([this.buf, chunk]);
+    this.buf = this.buf.length ? Buffer.concat([this.buf, chunk]) : chunk;
     // A frame can arrive split across reads, and several can arrive in one, so
     // this loops until what is left is not a whole frame.
     for (;;) {
@@ -1193,9 +1252,11 @@ class Sock {
       }
       if (this.buf.length < off + len) return;
 
-      const body = Buffer.from(this.buf.slice(off, off + len));
+      // Unmasked where it lies: this.buf is this socket's own (a chunk the
+      // socket handed over, or a concat of them), so it needs no copy (#2390).
+      const body = this.buf.subarray(off, off + len);
       if (mask) for (let i = 0; i < body.length; i++) body[i] ^= mask[i & 3];
-      this.buf = this.buf.slice(off + len);
+      this.buf = this.buf.subarray(off + len);
 
       /*
         A close is ANSWERED with a close, which RFC 6455 section 5.5.1 asks

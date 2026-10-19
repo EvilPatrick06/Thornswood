@@ -20,7 +20,12 @@
 //                and every page comes back
 //   signalling   once the room is in, every pair of voice pages trades what
 //                a WebRTC connection costs through the relay: an offer and
-//                an answer of about 3 KB, and six candidates each way
+//                an answer of about 3 KB, and six candidates each way,
+//                timed from the first offer sent to the last candidate
+//                arriving. This process sends all of it from its one
+//                thread, so past a hundred or so people that is what sets
+//                the time (#2390); load-signalling.js measures the
+//                service's own cost
 //   talk         each person says a plain line every --talk seconds
 //
 // People stand about twenty to a cell across as many cells as that takes,
@@ -205,7 +210,7 @@ async function run(n, site) {
     toks.push(...await Promise.all(crowd.slice(i, i + 50).map(async (p) => [p, await token(s.port, p.profileId), await token(s.port, p.profileId)])));
   }
 
-  const meter = { bytes: 0, msgs: 0 };
+  const meter = { bytes: 0, msgs: 0, signals: 0 };
   const socks = live.socks;
   const voicePages = [];
   const stormFrom = Date.now();
@@ -220,6 +225,7 @@ async function run(n, site) {
     ws.onmessage = (ev) => {
       const text = String(ev.data);
       meter.bytes += text.length; meter.msgs++;
+      if (text.startsWith('{"t":"sdp"') || text.startsWith('{"t":"ice"')) meter.signals++;
       if (!me.peer && text.startsWith('{"t":"welcome"')) { me.peer = JSON.parse(text).peer; if (voice) voicePages.push(me); }
       if (!me.pos && text.startsWith('{"t":"pos"')) me.pos = true;
       if (me.peer && me.pos && late) { clearTimeout(late); ok(); }
@@ -250,8 +256,17 @@ async function run(n, site) {
     }
     if (i % 20 === 19) await new Promise((r) => setImmediate(r));
   }
-  await new Promise((r) => setTimeout(r, 3000));
+  // Signalling is done when the last offer, answer and candidate has reached
+  // the page it was sent to, not when this process has finished sending: the
+  // service can still be working through them long after. A message that
+  // never comes (a socket closed at the ceiling) is counted, not waited for.
+  // Until #2390 this stopped three seconds after the last send, whatever had
+  // arrived by then, so its number was mostly how long this process took.
+  const sigSent = voicePages.length * (voicePages.length - 1) * 7;
+  const sigBy = Date.now() + 300000;
+  while (meter.signals < sigSent && Date.now() < sigBy) await new Promise((r) => setTimeout(r, 20));
   const sigMs = Date.now() - sigFrom;
+  await new Promise((r) => setTimeout(r, 1000));
   const sig = s.probes.slice(sigMark);
 
   // The evening: walking, talking, for SECONDS.
@@ -286,7 +301,7 @@ async function run(n, site) {
   return {
     people: n, sockets: sockets, crowd: CROWD,
     storm: { ms: stormMs, cores: +most(storm, 'cores').toFixed(2), p99: +most(storm, 'p99').toFixed(1), max: +most(storm, 'max').toFixed(1) },
-    signalling: { pairs: voicePages.length * (voicePages.length - 1) / 2, ms: sigMs, cores: +most(sig, 'cores').toFixed(2), p99: +most(sig, 'p99').toFixed(1), max: +most(sig, 'max').toFixed(1) },
+    signalling: { pairs: voicePages.length * (voicePages.length - 1) / 2, ms: sigMs, undelivered: sigSent - meter.signals, cores: +most(sig, 'cores').toFixed(2), p99: +most(sig, 'p99').toFixed(1), max: +most(sig, 'max').toFixed(1) },
     evening: { cores: +avg(evening, 'cores').toFixed(3), coresPeak: +most(evening, 'cores').toFixed(2), p99: +most(evening, 'p99').toFixed(1),
                max: +most(evening, 'max').toFixed(1), rssMB: Math.round(most(evening, 'rss') / 1048576),
                kbPerSecond: Math.round(evBytes / 1024), msgsPerSecond: Math.round(evMsgs) },
