@@ -4,9 +4,14 @@
       node .\tests\test-feed-watch.js
 
   The long-poll tip at /feed/watch and /feed-dev/watch (#2440): a launcher
-  holding an ETag waits until version.json changes (or the wait times out),
+  holding an ETag waits until the feed changes (or the wait times out),
   then runs one ordinary feed check. Lifts the route out of site\server.js
   the same way test-feed-serve.js does for version.json.
+
+  Since #2727 the feed on disk is a folder of write-once generations,
+  <channel>\version\<8 digits>.json, and the newest is the feed, so the
+  generations block (feedFile) is lifted too and a Ship here is a new
+  generation.
 */
 const fs = require('fs');
 const path = require('path');
@@ -44,10 +49,24 @@ function route(first, guard) {
   if (g < 0) return '';
   return src.slice(at, block(g));
 }
+// The generations block, from const feedNewest through the end of feedFile.
+function generations() {
+  const at = src.indexOf('const feedNewest = {};');
+  if (at < 0) return '';
+  const fn = src.indexOf('function feedFile(', at);
+  if (fn < 0) return '';
+  return src.slice(at, block(fn));
+}
 
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-feed-watch-'));
 fs.mkdirSync(path.join(ROOT, 'feed', 'assets'), { recursive: true });
+fs.mkdirSync(path.join(ROOT, 'feed', 'version'), { recursive: true });
 fs.mkdirSync(path.join(ROOT, 'feed-dev', 'assets'), { recursive: true });
+fs.mkdirSync(path.join(ROOT, 'feed-dev', 'version'), { recursive: true });
+
+const genSrc = generations();
+yes('server.js has the feed generations block (feedFile)', !!genSrc);
+const feedFile = eval('(function () {\n' + genSrc + '\nreturn feedFile;\n})()');
 
 const sendSrc = grab('function send(');
 yes('server.js still has send()', !!sendSrc);
@@ -61,9 +80,9 @@ yes('watch answers 200 when the ETag differs', /have !== tag/.test(watchSrc) || 
 
 const watchRoute = eval('(function (p, req, res, head) {\n' + watchSrc + '\n})');
 
-fs.writeFileSync(path.join(ROOT, 'feed', 'version.json'),
+fs.writeFileSync(path.join(ROOT, 'feed', 'version', '00000001.json'),
   JSON.stringify({ launcherVersion: '1.2.4' }));
-fs.writeFileSync(path.join(ROOT, 'feed-dev', 'version.json'),
+fs.writeFileSync(path.join(ROOT, 'feed-dev', 'version', '00000001.json'),
   JSON.stringify({ launcherVersion: '1.2.4.1' }));
 
 const server = http.createServer((req, res) => {
@@ -103,8 +122,7 @@ function etagOf(file) {
 async function main() {
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
 
-  const file = path.join(ROOT, 'feed', 'version.json');
-  const tag = etagOf(file);
+  const tag = etagOf(path.join(ROOT, 'feed', 'version', '00000001.json'));
 
   const fresh = await ask('GET', '/feed/watch');
   yes('GET /feed/watch with no If-None-Match is 200 at once', fresh.code === 200);
@@ -114,9 +132,12 @@ async function main() {
 
   const changedPromise = ask('GET', '/feed/watch', { 'If-None-Match': tag });
   await new Promise((r) => setTimeout(r, 800));
+  // A Ship is the next generation; the one before it stays.
+  const file = path.join(ROOT, 'feed', 'version', '00000002.json');
   fs.writeFileSync(file, JSON.stringify({ launcherVersion: '1.2.5', note: 'shipped-for-watch-test' }));
   const changed = await changedPromise;
   yes('a watch holding the old ETag returns 200 when the feed is written', changed.code === 200);
+  yes('and the new ETag is the new generation', changed.h['etag'] === etagOf(file));
   yes('with a new ETag', !!changed.h['etag'] && changed.h['etag'] !== tag);
 
   // Shorten wait for the timeout case by patching WAIT_MS is hard once eval'd.

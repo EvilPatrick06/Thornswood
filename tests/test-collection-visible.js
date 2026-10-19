@@ -46,13 +46,16 @@ const nextPage = XAML.indexOf('x:Name="PageGallery"');
 const diagXaml = pageAt >= 0 && nextPage > pageAt ? XAML.slice(pageAt, nextPage) : '';
 const statusList = diagXaml.indexOf('x:Name="StatusList"');
 const collectionHost = diagXaml.indexOf('x:Name="DiagCollection"');
-const vortexHead = diagXaml.indexOf('Text="Bring it up to date from Vortex"');
+// Bring it up to date from Vortex was the first section here until #2627,
+// when Scan and Fix took it over; the section after the collection line is
+// the icon refresh now.
+const vortexHead = diagXaml.indexOf('Text="Refresh the shortcut icon"');
 const readingsHead = diagXaml.indexOf('Text="What the launcher can see right now"');
-yes('Diagnostics has the Ready to launch list, the collection host, and the Vortex section',
+yes('Diagnostics has the Ready to launch list, the collection host, and the maintenance section',
     statusList >= 0 && collectionHost >= 0 && vortexHead >= 0);
-yes('the collection host sits after StatusList and before Bring it up to date from Vortex',
+yes('the collection host sits after StatusList and before the maintenance section',
     statusList >= 0 && collectionHost > statusList && vortexHead > collectionHost);
-yes('Bring it up to date from Vortex is still above What the launcher can see right now',
+yes('the maintenance section is still above What the launcher can see right now',
     vortexHead >= 0 && readingsHead > vortexHead);
 yes('the collection host is not under the readings heading',
     collectionHost >= 0 && readingsHead > collectionHost);

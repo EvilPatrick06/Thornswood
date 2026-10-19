@@ -72,10 +72,10 @@ function stage(tag) {
     fs.copyFileSync(path.join(REPO_DIR, "scripts", "dev", n), path.join(tmp, "scripts", "dev", n));
   });
   fs.mkdirSync(path.join(tmp, "game", "data"), { recursive: true });
-  ["npc-population.json", "hunts.json"].forEach(function (n) {
+  ["npc-population.json", "hunts.json", "merchant-roster.json"].forEach(function (n) {
     fs.copyFileSync(path.join(REPO_DIR, "game", "data", n), path.join(tmp, "game", "data", n));
   });
-  fs.mkdirSync(path.join(tmp, "docs"), { recursive: true });
+  fs.mkdirSync(path.join(tmp, "docs", "systems"), { recursive: true });
   fs.copyFileSync(path.join(REPO_DIR, CSV), path.join(tmp, CSV));
   return tmp;
 }

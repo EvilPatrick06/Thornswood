@@ -576,7 +576,7 @@ try {
         @{ Name = 'Install-Voice.ps1'; File = 'voice/headlines.js'; How = 'changed'
            Args = @{ VpsHost = '127.0.0.1'; VpsUser = 'nobody'; Root = (Join-Path $box 'Thornswood-Voice'); Port = (PickPort); Site = ''; Bind = '0.0.0.0'
                      ChatRange = 'off'; TurnUrl = ''; TaskName = ($TaskPrefix + ' Voice'); NoPause = $true; Wait = 10 } },
-        @{ Name = 'Install-Voice.ps1'; File = 'scripts/vps/Roll-Log.ps1'; How = 'changed'
+        @{ Name = 'Install-Voice.ps1'; File = 'scripts/vps/Server-Log.js'; How = 'changed'
            Args = @{ VpsHost = '127.0.0.1'; VpsUser = 'nobody'; Root = (Join-Path $box 'Thornswood-Voice'); Port = (PickPort); Site = ''; Bind = '0.0.0.0'
                      ChatRange = 'off'; TurnUrl = ''; TaskName = ($TaskPrefix + ' Voice'); NoPause = $true; Wait = 10 } },
         @{ Name = 'Install-Bot.ps1'; File = 'bot/card.py'; How = 'staged'
@@ -641,7 +641,9 @@ try {
         $prev.Count -eq 1 -and (Get (Join-Path $prev[0] 'server.js')) -match 'docs v1' -and
         (Get (Join-Path $prev[0] 'public\home.html')) -eq 'home one' -and -not (Test-Path -LiteralPath (Join-Path $prev[0] 'public\robots.txt')))
     Yes '  and it is a new process' ((Listener $docsPort) -ne $pidBefore)
-    $v1rec = Get (Join-Path $prev[0] 'thornswood-deploy.json')
+    # Only with the one .prev there: a run that failed left none, and indexing
+    # it would end every case after this one (#1273).
+    $v1rec = $(if ($prev.Count -eq 1) { Get (Join-Path $prev[0] 'thornswood-deploy.json') })
     $v2rec = Get (Join-Path $docsRoot 'thornswood-deploy.json')
     Yes '  and the box records the new artifact, beside the site and in the store' (
         $v2rec -and (Current 'thornswood-docs') -and (Current 'thornswood-docs').name -like 'site-*' -and
@@ -750,12 +752,24 @@ try {
     $live = Live $voiceRoot
     $pidBefore = Listener $voicePort
     $taskBefore = TaskArg ($TaskPrefix + ' Voice')
-    Put (Join-Path $repo 'voice\voice-server.js') 'function ( { not javascript'
+    # With its BUILD line, so this is the box's parse check and not the
+    # install's own read of the build (#2711, below).
+    Put (Join-Path $repo 'voice\voice-server.js') "const BUILD = 'voice-bad';`nfunction ( { not javascript"
     $r = Deploy 'Install-Voice.ps1' $voice.Clone()
     $failed = $script:fail
     Yes 'Install-Voice: a voice-server.js that does not parse stops the install, saying why' ((-not $r.Ok) -and $r.Said -match 'voice-server\.js does not parse')
     Yes '  and the running service is untouched, the same process, the same build' (
         ((Live $voiceRoot) -eq $live) -and ((Listener $voicePort) -eq $pidBefore) -and ((Build) -eq 'voice-v2'))
+    if ($script:fail -gt $failed) { Show }
+
+    # #2711: the build the check after the start holds the service to was read
+    # in a try with an empty catch, and with none that check passed whatever
+    # answered. A voice-server.js naming no BUILD now stops before it is sent.
+    Put (Join-Path $repo 'voice\voice-server.js') "'use strict';`nconsole.log('no build here');`n"
+    $r = Deploy 'Install-Voice.ps1' $voice.Clone()
+    $failed = $script:fail
+    Yes 'Install-Voice: a voice-server.js that names no BUILD stops the install before anything is sent' ((-not $r.Ok) -and $r.Said -match 'names no const BUILD, so there is no build to check the new service by\. Nothing was sent\.')
+    Yes '  and the running service is untouched' (((Live $voiceRoot) -eq $live) -and ((Listener $voicePort) -eq $pidBefore) -and ((Build) -eq 'voice-v2'))
     if ($script:fail -gt $failed) { Show }
 
     Voice 'voice-v3'
@@ -794,7 +808,7 @@ try {
     $failed = $script:fail
     Yes 'Install-Voice -TaskOnly is TASK OK, the same build answering as a new process' (
         $r.Ok -and $r.Said -match 'TASK OK' -and (WaitFor { ((Build) -eq 'voice-v1') -and ((Listener $voicePort) -ne $pidBefore) }))
-    Yes '  and the task starts node through start /high' ((TaskArg ($TaskPrefix + ' Voice')) -like '*start "" /b /wait /high "*" voice-server.js >> *')
+    Yes '  and the task starts node through start /high, on server-log.js running voice (#2166)' ((TaskArg ($TaskPrefix + ' Voice')) -like '*start "" /b /wait /high "*" "*\server-log.js" --log "*\voice.log" --days 90 --stamp voice-server.js & call exit*')
     Yes '  and reads node back at High' ($r.Said -match 'node, pid \d+, runs at High priority')
     Yes '  and no file was staged, sent or swapped' (((Live $voiceRoot) -eq $live) -and $r.Said -notmatch 'Staging' -and @(Kept $voiceRoot '.stage-*').Count -eq 0)
     if ($script:fail -gt $failed) { Show }
@@ -985,13 +999,14 @@ try {
     $r = Deploy 'Install-Bot.ps1' $bot.Clone()
     $failed = $script:fail
     $prev = @(Kept $botRoot '.prev-*')
-    $newest = $prev[-1]
+    # None when the run failed: the checks on it then fail, not end the run (#1273).
+    $newest = $(if ($prev.Count) { $prev[-1] } else { '' })
     Yes 'Install-Bot -CodeOnly: with files in the bot''s folder that nothing sent, the new code is SWAP OK and the bot says it is watching' (
         $r.Ok -and $r.Said -match 'SWAP OK' -and (WaitFor { BotSays 'bot v7' }))
     Yes '  and the stray .py, the stray .png, the one in assets and the stray folder are gone from the bot''s folder' (
         -not @($strays.Keys | Where-Object { Test-Path -LiteralPath (Join-Path $botRoot $_) }).Count)
     Yes '  and each is in the .prev this run made, as it was, beside the code it replaced' (
-        -not @($strays.Keys | Where-Object { (Get (Join-Path $newest $_)) -ne $strays[$_] }).Count -and
+        $newest -and -not @($strays.Keys | Where-Object { (Get (Join-Path $newest $_)) -ne $strays[$_] }).Count -and
         (Get (Join-Path $newest 'bot.py')) -match 'bot v6')
     # A folder nothing sent goes aside whole, so it is named as the folder.
     $named = ([regex]::Match($r.Said, 'moved aside 4 thing\(s\) .* into ' + [regex]::Escape($newest) + ': (.*)')).Groups[1].Value

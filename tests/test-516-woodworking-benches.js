@@ -150,10 +150,14 @@ const placed = [];       // { base (full id), pos, world (full id) }
 })(24 + hs, esp.length, 0);
 function edid(r) { const e = r && r.subs.find((s) => s.t === 'EDID'); return e ? e.b.toString('latin1').replace(/\0+$/, '') : ''; }
 const kilnBases = Object.keys(records).filter((k) => /^ThornswoodCraftingCharcoalKiln/.test(edid(records[k]))).map(Number);
-const kilns = placed.filter((r) => (r.base >>> 24) === own && kilnBases.indexOf(r.base & 0xffffff) >= 0 && r.world === 0x3c);
-yes('T8 no bench stands within 1,000 units of a charcoal kiln (' + kilns.length + ' kilns in Tamriel read)',
-    kilns.length > 0 && names.filter((s) => sites[s].cell === '3c:Skyrim.esm').every((s) =>
-      kilns.every((k) => Math.hypot(k.pos[0] - sites[s].pos[0], k.pos[1] - sites[s].pos[1]) > 1000)));
+// Since #2553 a kiln stands in each bench town, the walled cities' own worldspaces included, so each
+// bench is held against every kiln in its worldspace (the content plugin's masters start with Skyrim.esm,
+// so a Skyrim.esm worldspace keeps its own id there).
+const kilns = placed.filter((r) => (r.base >>> 24) === own && kilnBases.indexOf(r.base & 0xffffff) >= 0 && r.world);
+const worldOf = (cell) => /:Skyrim\.esm$/i.test(cell) ? parseInt(cell, 16) : -1;
+yes('T8 no bench stands within 1,000 units of a charcoal kiln in its worldspace (' + kilns.length + ' kilns read)',
+    kilns.length > 0 && names.every((s) =>
+      kilns.every((k) => k.world !== worldOf(sites[s].cell) || Math.hypot(k.pos[0] - sites[s].pos[0], k.pos[1] - sites[s].pos[1]) > 1000)));
 
 // ---------------------------------------------------------------- P
 const benchRec = records[0x154e2];

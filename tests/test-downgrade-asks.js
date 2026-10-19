@@ -62,18 +62,24 @@ function literals(src) {
 // ---- one way in --------------------------------------------------------------
 const csFiles = fs.readdirSync(APP).filter(f => f.endsWith('.cs'));
 let starts = 0, startWhere = [];
-let runs = 0;
+const runsIn = {};
 for (const f of csFiles) {
   const src = fs.readFileSync(path.join(APP, f), 'utf8');
   const s = (src.match(/\bDowngrade\.Start\(/g) || []).length;
   if (s) { starts += s; startWhere.push(f); }
-  runs += (src.match(/\bRunDowngrade\(\)/g) || []).length;
+  const r = (src.match(/\bRunDowngrade\(\)/g) || []).length;
+  if (r) runsIn[f] = r;
 }
 yes('Downgrade.Start is called from exactly one place in the launcher', starts === 1);
 yes('and that place is Shell.cs', startWhere.length === 1 && startWhere[0] === 'Shell.cs');
-// The definition plus the button's Click handler, and nothing else.
-yes('RunDowngrade is reached from one place only, the button',
-    runs === 2 && /btnDowngrade\.Click \+= delegate \{ RunDowngrade\(\); \};/.test(SHELL));
+// In Shell.cs the definition plus the button's Click handler. Since #2627
+// Fix on Diagnostics also starts it when Scan found the Skyrim build wrong,
+// through the same RunDowngrade, so the question still comes first; nothing
+// else reaches it.
+const elsewhere = Object.keys(runsIn).filter(f => f !== 'Shell.cs' && f !== 'ShellScanFix.cs');
+yes('RunDowngrade is reached from the button and from Fix only, and both go through its question',
+    runsIn['Shell.cs'] === 2 && /btnDowngrade\.Click \+= delegate \{ RunDowngrade\(\); \};/.test(SHELL) &&
+    elsewhere.length === 0 && (runsIn['ShellScanFix.cs'] || 0) > 0);
 
 // ---- the question comes first ------------------------------------------------
 const run = body(SHELL, 'static void RunDowngrade()');

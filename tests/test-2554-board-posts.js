@@ -74,13 +74,16 @@ const PEOPLE = [GUARD, ALICE, BOB, CAROL, POOR];
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-2554-posts-'));
 fs.writeFileSync(path.join(dir, 'server-settings.json'), JSON.stringify({ dataDir: 'data', privDir: 'private' }));
 fs.mkdirSync(path.join(dir, 'private'));
+// An office is one character's (#2551, Patrick, 16 Oct): the law register
+// names the character that holds each office for its account. A profile the
+// door ties to no account is an account of its own, 'p:<profile>'.
+fs.writeFileSync(path.join(dir, 'private', 'law.json'), JSON.stringify({ cells: {}, held: { 'guard:whiterun': { 'p:101': { pid: 101, name: 'Hrongar' } } } }));
 fs.writeFileSync(path.join(dir, 'private', 'property.json'), JSON.stringify({
-  claims: {}, stewards: [], boxes: {},
+  claims: {}, boxes: {},
   // A board a steward placed, so the seeding leaves it where it is.
   boards: { whiterun: { cell: '3c:Skyrim.esm', pos: [0, 0, 0], where: 'Whiterun', placed: true } },
   funds: {}, notices: {}
 }));
-fs.writeFileSync(path.join(dir, 'private', 'law.json'), JSON.stringify({ guards: { '101': 'whiterun' }, cells: {} }));
 function inDir(f) {
   const was = process.cwd();
   process.chdir(dir);
@@ -119,7 +122,11 @@ const box = {
   guard: function (n, f) { return f; },
   setInterval: function () { return 1; }, clearInterval: function () { },
   log: function () { },
-  __thornswoodCharacter: { stateOf: function () { return { prof: 'cook' }; }, writeState: function () { } }
+  __thornswoodCharacter: { stateOf: function () { return { prof: 'cook' }; }, writeState: function () { } },
+  // Hrongar holds the Guard of Whiterun role (#2551): the role is who guards.
+  __thornswoodOffices: function (pid) {
+    return { jarl: [], court: [], steward: [], guard: pid === GUARD.pid ? ['whiterun'] : [] };
+  }
 };
 box.globalThis = box;
 inDir(function () { vm.runInNewContext(propBlock, box, { filename: 'gamemode.js property' }); });

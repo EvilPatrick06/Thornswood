@@ -59,11 +59,11 @@ only at the board of the town it named, once somebody has taken it.
 At the posting board there is nothing to confirm. The person who took
 it does not confirm their own haul.
 
-A steward here is anybody a jarl has named steward, or a jarl. The
-server keeps one list of stewards for every hold, so any of them can
-confirm a haul at the destination's board or take one down at the
-posting board. Decided by Patrick on 4 Oct (#1646): "the person who
-posted or a steward."
+A steward here is a steward of that board's hold: whoever holds its
+"Steward of <Hold>" Discord role, or its Jarl (#2551). The Steward of
+the destination confirms a haul at its board, and the Steward of the
+posting hold takes one down at its board. Decided by Patrick on 4 Oct
+(#1646): "the person who posted or a steward."
 
 On confirm, the company keeps a tenth of the pay, rounded down to a
 whole gold. A pay under 10 gold keeps nothing, and the hauler receives
@@ -169,5 +169,6 @@ seller's pack and the world. The worker pays the price less their
 10%, another 10% is destroyed, and the seller receives the rest.
 Under 10 gold the seller receives the whole price. No ledger is
 touched by a sale: the price comes from the worker's pack, as decided
-on #1646. A steward is anybody on the one list of stewards, or a
-jarl (`isSteward` in the property block), at any hold's board.
+on #1646. A steward is the Steward or the Jarl of the board's hold,
+by the Discord role (`isStewardOf` in the property block), at that
+hold's board alone.

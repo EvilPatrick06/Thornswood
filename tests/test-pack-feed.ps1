@@ -127,6 +127,14 @@ function Feed([string]$dir, $doc) {
     New-Item -ItemType Directory -Path $dir -Force | Out-Null
     [IO.File]::WriteAllText((Join-Path $dir 'version.json'), ($doc | ConvertTo-Json -Depth 8), (New-Object Text.UTF8Encoding($false)))
 }
+# The stand-in site keeps no version.json: its feed is the newest of the
+# channel's write-once generations, version\<8 digits>.json (#2727), so a
+# release from another machine is the next one, the way the store sends it.
+function SiteFeed([string]$channelDir, $doc) {
+    $v = Join-Path $channelDir 'version'
+    New-Item -ItemType Directory -Path $v -Force | Out-Null
+    [IO.File]::WriteAllText((Join-Path $v (Get-FeedVersionNext $channelDir)), ($doc | ConvertTo-Json -Depth 8), (New-Object Text.UTF8Encoding($false)))
+}
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-pack-feed-' + [Guid]::NewGuid().ToString('N'))
 $oldSite = $env:THORNSWOOD_TEST_SITE_DIR
@@ -136,7 +144,8 @@ try {
     $env:THORNSWOOD_TEST_SITE_DIR = $siteRoot
     $up = Join-Path $siteRoot 'feed'
     $mine = Join-Path $work 'store\main'
-    Feed $up ([pscustomobject]@{ launcherVersion = '1.1.101'; optional = @() })
+    SiteFeed $up ([pscustomobject]@{ launcherVersion = '1.1.101'; optional = @() })
+    Yes 'the stand-in site''s feed starts as its first generation' ((Get-FeedVersionName $up) -eq '00000001.json')
     [IO.File]::WriteAllText((Join-Path $up 'published.json'), '{}')
     $siteAsset = 'https://thornswood.net/feed/assets/' + ('c' * 64)
 
@@ -147,7 +156,7 @@ try {
         (Test-Path -LiteralPath (Join-Path $mine 'read.json')))
 
     # ---- somebody else published while this machine was building
-    Feed $up ([pscustomobject]@{ launcherVersion = '1.1.102'; optional = @() })
+    SiteFeed $up ([pscustomobject]@{ launcherVersion = '1.1.102'; optional = @() })
     $r = Run-Block $mine @((Pack 'hd-textures' $siteAsset))
     Yes 'the run receives it again, so the edit lands on their release and not over it' ($r.Died -eq '' -and $r.Doc.launcherVersion -eq '1.1.102')
 

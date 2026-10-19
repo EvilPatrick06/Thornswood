@@ -24,7 +24,8 @@
        so it is always this checkout's rules.
     2. Runs it on the root: OwnGame.Make for a root with no game folder
        (Thornswood's own files of the channel's release synced into it first,
-       as an install that chose its own folder gets them), otherwise
+       as an install that chose its own folder gets them, and with
+       -SkyrimFrom the game's own files copied from that folder), otherwise
        OwnGame.Refresh, then the check that the folder is on record as made
        from the folder Vortex deploys into now, from that deployment, to the
        current rules. A root made at older rules or from another folder is
@@ -51,6 +52,16 @@
   Changes nothing: builds the tool and asks it whether the root is current,
   and Sync-Client -Check whether the client is in it.
 
+.PARAMETER SkyrimFrom
+  For a root with no game folder yet: a folder that holds Skyrim 1.6.1170's
+  own files, such as the other channel's root's Game, to copy them from
+  instead of the Steam copy (#2603). The tool checks every one it takes
+  against records\skyrim-files.json before anything is placed and refuses,
+  naming the first that is not the build's. Needed where the Steam copy is
+  not on 1.6.1170 and the launcher's Downgrade, a Steam download under the
+  person's account, is not something a script can run. A root that is made
+  already never takes the game's own files again, so it is not used there.
+
 .PARAMETER Tool
   A Thornswood-ShipRoot.exe already built, instead of building one. For a
   harness, which runs a stand-in.
@@ -61,12 +72,18 @@
 .EXAMPLE
   .\scripts\release\Update-ShipRoot.ps1 -Channel dev
   Brings the dev root up to date and puts the recorded client in it.
+
+.EXAMPLE
+  .\scripts\release\Update-ShipRoot.ps1 -Channel main -SkyrimFrom C:\Users\evilp\Downloads\Thornswood-Repo\local\release-devbuild\Game
+  Makes main's root with the game's own files copied from the dev root's
+  Game, on a machine whose Steam copy is not on 1.6.1170.
 #>
 [CmdletBinding()]
 param(
     [ValidateSet('main', 'dev')][string]$Channel = 'dev',
     [string]$Root,
     [switch]$Check,
+    [string]$SkyrimFrom,
     [string]$Tool,
     [switch]$NoPause
 )
@@ -120,6 +137,7 @@ $global:LASTEXITCODE = 0
 $said = New-Object System.Collections.Generic.List[string]
 $show = { $l = [string]$_; $said.Add($l); Say $l $(if ($l -like 'STOP.*') { 'Red' } else { 'Gray' }) }
 if ($Check) { & $Tool -Root $Root -Channel $Channel -Check 2>&1 | ForEach-Object $show }
+elseif ($SkyrimFrom) { & $Tool -Root $Root -Channel $Channel -SkyrimFrom ([IO.Path]::GetFullPath($SkyrimFrom).TrimEnd('\')) 2>&1 | ForEach-Object $show }
 else { & $Tool -Root $Root -Channel $Channel 2>&1 | ForEach-Object $show }
 $toolCode = $LASTEXITCODE
 if ($toolCode -ne 0) {

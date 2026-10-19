@@ -106,13 +106,15 @@ Skyrim.esm that nothing in the load order changes:
 | Windwalker, the fall | `fJumpFallHeightMult` | 0.1 | 0, so a fall comes to nothing |
 | Tireless, a sprint | `fSprintStaminaDrainMult` | 7 | half |
 | Tireless, a power attack | `fStaminaAttackWeaponBase` and `fStaminaAttackWeaponMult` | 20 and 1 | half of each |
+| Tireless, a shield bash | `fStaminaBashBase` and `fStaminaPowerBashBase` | 35 and 55 | half of each |
 
 The fall's settings are your own character's: everybody else's are the same
 names ending in NPC, so nobody else's fall changes. Tireless's have no
-second set, so an NPC your machine runs pays half for a sprint and a power
-attack too (issue #1385 asks whether that stays). Running costs nothing in
-this game and neither does a plain swing; a sprint and a power attack are
-what cost stamina.
+second set, so an NPC your machine runs pays half for a sprint, a power
+attack and a bash too, which Patrick kept (12 Oct). Running costs nothing
+in this game and neither does a plain swing; a sprint, a power attack and
+a shield bash are what cost stamina. A bash counts as a swing for Tireless
+(Patrick, 12 Oct: one rule for every attack).
 
 Nothing here is a command. Font of Magic, the one perk a person starts,
 is the Use button beside it on the K panel. The K panel also says, beside
@@ -140,7 +142,7 @@ not left on you (issue #1642).
 | Overcharge | Yes, the damage. Every fifth spell of yours that takes health takes double | Holding twice as long |
 | Spellbreaker | Yes. A spell you hold up, like Flames, counts once a second | |
 | Font of Magic | Yes, from the Use button on the K panel. For 15 seconds each school's cost is taken off in full, the way the game's own Fortify enchantments take it off, so the game takes no magicka at all | |
-| Tireless | Yes, on your own machine: a sprint and a power attack cost half | |
+| Tireless | Yes, on your own machine: a sprint, a power attack and a shield bash cost half | |
 | Second Wind | Yes | |
 | Windwalker | Yes. The speed from the server, the fall on your own machine | |
 | Pack Mule | No | All of it. Being overloaded makes the game walk you, on your own machine, and no game setting changes that. What it should be waits on Patrick (issue #1385) |

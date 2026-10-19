@@ -83,11 +83,10 @@ namespace Thornswood
             var lines = new List<string>();
             if (s.Synced.Length > 0) lines.Add("synced " + s.Synced + (s.SyncedId.Length > 0 ? " " + s.SyncedId : ""));
             if (s.PacksOnly.Length > 0) lines.Add("packs " + s.PacksOnly);
-            Directory.CreateDirectory(Paths.ProfileDir);
-            string tmp = SyncStateFile + ".tmp";
-            File.WriteAllLines(tmp, lines.ToArray());
-            if (File.Exists(SyncStateFile)) File.Delete(SyncStateFile);
-            File.Move(tmp, SyncStateFile);
+            // Whole or not at all (#2591): deleting release.txt and then moving
+            // the new one in left no record when the launcher was stopped in
+            // between, and the next start read that as never synced.
+            OwnGame.WriteRecord(SyncStateFile, lines);
         }
 
         /// <summary>The release this install last synced to, or "" when it has
@@ -117,11 +116,8 @@ namespace Thornswood
             var sorted = new List<string>(rels);
             sorted.Sort(StringComparer.OrdinalIgnoreCase);
             lines.AddRange(sorted);
-            Directory.CreateDirectory(Paths.ProfileDir);
-            string tmp = ReleaseFilesFile + ".tmp";
-            File.WriteAllLines(tmp, lines.ToArray());
-            if (File.Exists(ReleaseFilesFile)) File.Delete(ReleaseFilesFile);
-            File.Move(tmp, ReleaseFilesFile);
+            // Whole or not at all (#2591), as release.txt above.
+            OwnGame.WriteRecord(ReleaseFilesFile, lines);
         }
 
         /// <summary>The sha256 of the release the kept list is for, or "".</summary>

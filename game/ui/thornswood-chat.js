@@ -556,46 +556,75 @@
     return { t: 'chat', text: item };
   }
 
-  window.thornswoodNet = {
-    /*
-      auto is true for every line thornswood-front.js sends through
-      tellServer: /place, /ate, /face done, /pick refresh, and the K panel's
-      picks, whose answer comes back on the panel or in chat when they land.
-      Deliberate look-key actions keep the same feedback as typed commands. Patrick, 24 September, over a tester in the
-      creation hall: "it says mulitple trimes he wasnt connected yet". Nobody
-      there had typed a word. So the notice is for the chat box and the
-      journal, party and trade buttons, and an automatic line is queued and
-      sent exactly the same way without it.
-    */
-    say: function (text, auto) {
-      text = String(text == null ? '' : text).trim();
-      if (!text) return false;
+  /*
+    TWO ANSWERS, NOT ONE FLAG (#2732). Every line asks two things of send:
+    whether somebody typed it, and whether a line held for the socket says
+    "Not connected yet". Until #2732 one flag, auto, answered both: it marked
+    a line as pressed (#2251) and it kept the notice quiet. A panel button
+    wants the mark and the notice, because somebody pressed it and should be
+    told it is waiting, so no panel could pass auto and none did, and the
+    party, trade, merchant and ride buttons and the look keys went into the
+    chat log as if somebody had typed them.
 
-      var dice = ROLL.exec(text);
-      if (dice) {
-        var spec = rollOf(dice[2]);
-        if (!spec) {
-          note('The number is the sides: /roll 20, /roll 1000, or /roll 6x3 for three of them. ' +
-               'Whole numbers, 1 to ' + MAX_SIDES + ', up to ' + MAX_DICE + ' dice.', C_WARN);
-          return false;
-        }
-        // The command, not the answer. See the note over ROLL.
-        text = '/roll ' + spec;
+    So which door a line comes in by says whether it was typed, and quiet is
+    asked on its own:
+
+      typed(text)              the chat box (thornswood-bridge.js) and nothing
+                               else: no press, and told when it is queued.
+      say(text)                a key or a panel button: press, and told when
+                               it is queued.
+      say(text, { quiet: true })
+                               a line the front plugin sends by itself or for
+                               a key it handles (tellServer, the wait in line,
+                               the join pass): press, and queued without a
+                               word. Patrick, 24 September, over a tester in
+                               the creation hall who had typed nothing: "it
+                               says mulitple trimes he wasnt connected yet".
+
+    A line that is not typed is pressed whatever the notice does, and only the
+    chat box can send a line as typed. tests/test-2732-press-mark.js holds
+    every caller to one of the three.
+  */
+  function send(text, press, notice) {
+    text = String(text == null ? '' : text).trim();
+    if (!text) return false;
+
+    var dice = ROLL.exec(text);
+    if (dice) {
+      var spec = rollOf(dice[2]);
+      if (!spec) {
+        note('The number is the sides: /roll 20, /roll 1000, or /roll 6x3 for three of them. ' +
+             'Whole numbers, 1 to ' + MAX_SIDES + ', up to ' + MAX_DICE + ' dice.', C_WARN);
+        return false;
       }
-      // A line a key or a button sent says so (#2251), so the chat log does
-      // not record the lock key as somebody typing /lock. Queued with the
-      // flag, so a line held through an outage keeps it.
-      var item = auto ? { text: text, press: true } : text;
-      if (ws && ws.readyState === 1 && joined) {
-        try { ws.send(JSON.stringify(chatFrame(item))); return true; }
-        catch (e) { }
-      }
-      // Held rather than dropped, and capped so a long outage does not grow
-      // without limit.
-      queue.push(item);
-      while (queue.length > 20) queue.shift();
-      if (!auto) note('Not connected yet, that is queued.', C_WARN);
-      return false;
+      // The command, not the answer. See the note over ROLL.
+      text = '/roll ' + spec;
+    }
+    // A line a key or a button sent says so (#2251), so the chat log does
+    // not record the lock key as somebody typing /lock. Queued with the
+    // flag, so a line held through an outage keeps it.
+    var item = press ? { text: text, press: true } : text;
+    if (ws && ws.readyState === 1 && joined) {
+      try { ws.send(JSON.stringify(chatFrame(item))); return true; }
+      catch (e) { }
+    }
+    // Held rather than dropped, and capped so a long outage does not grow
+    // without limit.
+    queue.push(item);
+    while (queue.length > 20) queue.shift();
+    if (notice) note('Not connected yet, that is queued.', C_WARN);
+    return false;
+  }
+
+  window.thornswoodNet = {
+    /* A key or a panel button. See TWO ANSWERS above send. */
+    say: function (text, how) {
+      return send(text, true, !(how && how.quiet === true));
+    },
+
+    /* What somebody typed in the chat box, from thornswood-bridge.js alone. */
+    typed: function (text) {
+      return send(text, false, true);
     },
 
     state: function () {

@@ -117,10 +117,14 @@ Fourth Era.*
   night away from being told to leave.
 - **You cannot play a Legion soldier in Skyrim.** Article the Third. A veteran
   who served forty years ago and lives here now is a different thing.
+- **You can work for the Free Skyrim Trading Company.** It hauls, buys and
+  sells between the holds, out of buildings with the wrong name over the door.
+  Its lead seat is given rather than chosen, like a Jarl's.
 - **You can play a Thalmor.** You are a criminal. There is no embassy to run
-  to, no immunity, no orders from home. Article the Fifth means the Empire will
-  hand you over as fast as a Nord will. Play it as what it is: a hunted thing
-  with a long memory.
+  to and no immunity. Whether orders still come from home, and who sends them,
+  is yours to play out. Article the Fifth means the Empire will hand you over
+  as fast as a Nord will. Play it as what it is: a hunted thing with a long
+  memory.
 - **You can play a Jarl or a steward.** Those are positions, not characters.
   Found out in character.
 - **Arguing about the Accord in character is encouraged.** Half of Skyrim

@@ -113,7 +113,8 @@ try {
     Put (Join-Path $live 'data\api\a.json') '{}'
     Put (Join-Path $lv 'voice-server.js') '// voice'
     foreach ($r in $required) { Put (Join-Path $lv $r) "// $r" }
-    Put (Join-Path $lv 'roll-log.ps1') '# roller'
+    Put (Join-Path $lv 'roll-log.ps1') '# the roller voice ran behind before #2166'
+    Put (Join-Path $lv 'server-log.js') '// the log writer voice runs under (#2166)'
     Put (Join-Path $lv 'public\index.html') '<html></html>'
     Put (Join-Path $lv 'chat\20260928.jsonl') '{"text":"what live people said"}'
     Put (Join-Path $lv 'token-key.txt') 'LIVE-TOKEN-KEY'
@@ -160,8 +161,8 @@ try {
     # ---- voice ----------------------------------------------------------------
     $v = @(Get-ChildItem -LiteralPath $dv -Recurse -File -Force | ForEach-Object { $_.FullName.Substring($dv.Length + 1) } | Sort-Object)
     # Not the page live may still keep in public: the service serves none (#1822).
-    $want = @(@('voice-server.js', 'roll-log.ps1', 'run-dev-voice.cmd') + $required | Sort-Object)
-    Yes ('dev voice has the program, what it requires, the roller and its run file, and nothing else (' + ($v -join ', ') + ')') (
+    $want = @(@('voice-server.js', 'server-log.js', 'run-dev-voice.cmd') + $required | Sort-Object)
+    Yes ('dev voice has the program, what it requires, the log writer and its run file, and nothing else (' + ($v -join ', ') + ')') (
         ($v -join ',') -eq ($want -join ','))
     Yes 'none of live''s chat logs, keys or old secret' (
         -not (Test-Path -LiteralPath (Join-Path $dv 'chat')) -and -not (Test-Path -LiteralPath (Join-Path $dv 'token-key.txt')) -and
@@ -197,8 +198,8 @@ try {
     $named = @($copy.Groups[1].Value.Trim() -split '\s+' | Where-Object { $_ })
     Yes ('voice-server.js requires ' + ($required -join ', ') + ', each a file beside it in voice\') ($required.Count -ge 1 -and $outside.Count -eq 0)
     foreach ($o in $outside) { Write-Host "      $o" }
-    Yes ('the script copies each of them to dev voice by name, with the program and the roller (' + ($named -join ' ') + ')') (
-        $copy.Success -and $named -contains 'voice-server.js' -and $named -contains 'roll-log.ps1' -and
+    Yes ('the script copies each of them to dev voice by name, with the program and the log writer (' + ($named -join ' ') + ')') (
+        $copy.Success -and $named -contains 'voice-server.js' -and $named -contains 'server-log.js' -and
         @($required | Where-Object { $named -notcontains $_ }).Count -eq 0)
     Yes 'the script opens no firewall rule for dev voice' ($body -notmatch "Name = 'Thornswood Dev Voice'")
     Yes 'and takes an old one down' ($body -match "Remove-NetFirewallRule -DisplayName 'Thornswood Dev Voice'")

@@ -388,15 +388,16 @@ def fetch(api, guild_id):
     g['channels'] = api.call('GET', '/guilds/%s/channels' % guild_id) or []
     onboarding = api.call('GET', '/guilds/%s/onboarding' % guild_id) or {}
     me = api.call('GET', '/users/@me') or {}
+    # The bot's own member. A refusal here goes to the caller like the reads
+    # above (#2736): it used to leave perms at 0, which then said the bot
+    # lacked Manage Server and Manage Roles when Discord had only refused a
+    # read.
     perms = 0
-    try:
-        member = api.call('GET', '/guilds/%s/members/%s' % (guild_id, me.get('id')))
-        held = set(str(x) for x in (member or {}).get('roles') or []) | set([str(guild_id)])
-        for r in g.get('roles', []):
-            if str(r['id']) in held:
-                perms |= int(r.get('permissions', 0))
-    except Refused:
-        pass
+    member = api.call('GET', '/guilds/%s/members/%s' % (guild_id, me.get('id')))
+    held = set(str(x) for x in (member or {}).get('roles') or []) | set([str(guild_id)])
+    for r in g.get('roles', []):
+        if str(r['id']) in held:
+            perms |= int(r.get('permissions', 0))
     return g, onboarding, perms
 
 

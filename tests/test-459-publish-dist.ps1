@@ -138,6 +138,20 @@ try {
     Yes 'a folder with no server-settings.json stops, naming it' ($r.Code -eq 1 -and $r.Out.Contains("$empty holds no server-settings.json") -and $r.Calls.Count -eq 0)
     Yes '  and nothing went into it' (@(Get-ChildItem -LiteralPath $empty -Force).Count -eq 0)
 
+    # ---- 2b. a record that does not read (#2711) ------------------------------------------------
+    # It was read here in a try with an empty catch, and the refusal came only
+    # after the payload was built. Now it stops first, saying why, under both
+    # PowerShells. -Record names a scratch file, so the checkout stays clean.
+    $badRecord = Join-Path $Scratch 'server-build-cut-off.json'
+    Put $badRecord '{ "binary": "scam_native.node", "sha256": '
+    foreach ($sh in $shells) {
+        Write-Host ''; Write-Host ("a record that does not read, under {0}" -f $sh.Name)
+        $r = Run $sh.Path @('-Dist', $none, '-Record', $badRecord)
+        Yes '  stops with exit 1, naming the record and saying it does not read' ($r.Code -eq 1 -and $r.Out.Contains("$badRecord does not read") -and $r.Out.Contains('Nothing was built or sent'))
+        Yes ("  before anything is built or sent ({0} ssh or scp calls)" -f $r.Calls.Count) ($r.Calls.Count -eq 0 -and $r.Out -notmatch 'gamemode artifact' -and $r.Out -notmatch 'Packing the payload')
+        if ($r.Code -ne 1 -or -not $r.Out.Contains('does not read')) { Write-Host $r.Out }
+    }
+
     # ---- 3. -Dist naming a build that is not the recorded one ---------------------------------
     Write-Host ''; Write-Host '-Dist naming a build of another engine commit'
     $other = Join-Path $Scratch 'other-build\dist\server'

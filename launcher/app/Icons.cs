@@ -76,31 +76,10 @@ namespace Thornswood
         {
             try
             {
-                Assembly asm = Assembly.GetExecutingAssembly();
-                string pick = null;
-                // The dev build's shortcuts get the dev icon, app-dev.ico; the
-                // main build keeps app.ico. A dev build without it uses app.ico.
-                if (Art.Dev)
-                    foreach (string n in asm.GetManifestResourceNames())
-                        if (n.EndsWith("app-dev.ico", StringComparison.OrdinalIgnoreCase)) { pick = n; break; }
-                if (pick == null)
-                    foreach (string n in asm.GetManifestResourceNames())
-                        if (n.EndsWith("app.ico", StringComparison.OrdinalIgnoreCase)) { pick = n; break; }
-                if (pick == null) return null;
-
-                byte[] bytes;
-                using (Stream st = asm.GetManifestResourceStream(pick))
-                {
-                    if (st == null) return null;
-                    var ms = new MemoryStream();
-                    st.CopyTo(ms);
-                    bytes = ms.ToArray();
-                }
-                if (bytes.Length == 0) return null;
-
-                string hash;
-                using (SHA256 sha = SHA256.Create())
-                    hash = BitConverter.ToString(sha.ComputeHash(bytes), 0, 4).Replace("-", "").ToLowerInvariant();
+                string pick;
+                byte[] bytes = IconBytes(out pick);
+                if (bytes == null) return null;
+                string hash = Hash(bytes);
 
                 if (!Directory.Exists(Paths.LauncherDir)) return null;
                 string want = Path.Combine(Paths.LauncherDir, "icon-" + hash + ".ico");
@@ -117,6 +96,40 @@ namespace Thornswood
         }
 
         static bool iconWritten;
+
+        /// <summary>
+        /// The artwork this build's shortcuts show, out of the exe, or null
+        /// when it carries none. The dev build's shortcuts get the dev icon,
+        /// app-dev.ico; the main build keeps app.ico. A dev build without it
+        /// uses app.ico.
+        /// </summary>
+        static byte[] IconBytes(out string pick)
+        {
+            pick = null;
+            Assembly asm = Assembly.GetExecutingAssembly();
+            if (Art.Dev)
+                foreach (string n in asm.GetManifestResourceNames())
+                    if (n.EndsWith("app-dev.ico", StringComparison.OrdinalIgnoreCase)) { pick = n; break; }
+            if (pick == null)
+                foreach (string n in asm.GetManifestResourceNames())
+                    if (n.EndsWith("app.ico", StringComparison.OrdinalIgnoreCase)) { pick = n; break; }
+            if (pick == null) return null;
+            using (Stream st = asm.GetManifestResourceStream(pick))
+            {
+                if (st == null) return null;
+                var ms = new MemoryStream();
+                st.CopyTo(ms);
+                byte[] bytes = ms.ToArray();
+                return bytes.Length == 0 ? null : bytes;
+            }
+        }
+
+        /// <summary>The first eight hex digits of the artwork's SHA-256, which name its file.</summary>
+        static string Hash(byte[] bytes)
+        {
+            using (SHA256 sha = SHA256.Create())
+                return BitConverter.ToString(sha.ComputeHash(bytes), 0, 4).Replace("-", "").ToLowerInvariant();
+        }
 
         /// <summary>
         /// Whether the shortcuts need redrawing even where IconLocation already
@@ -381,6 +394,87 @@ namespace Thornswood
                 AskIconCache();
             }
             return changed;
+        }
+
+        /// <summary>
+        /// What Ensure would change, said and not done (#2627): each shortcut
+        /// to this launcher that names another icon or another label or has
+        /// an old name, the desktop or the Start menu without one, the icon
+        /// file not written yet, and a launcher that changed since the
+        /// shortcuts were last redrawn (Due). Empty when Ensure would find
+        /// nothing to do. Scan asks this; Fix then runs Ensure. Never writes
+        /// and never throws.
+        /// </summary>
+        public static List<string> OutOfDate()
+        {
+            var l = new List<string>();
+            string exe = LauncherExe;
+            string icon = null;
+            try
+            {
+                string pick;
+                byte[] bytes = IconBytes(out pick);
+                if (bytes != null && Directory.Exists(Paths.LauncherDir))
+                {
+                    icon = Path.Combine(Paths.LauncherDir, "icon-" + Hash(bytes) + ".ico");
+                    if (!File.Exists(icon) || new FileInfo(icon).Length != bytes.Length) l.Add("the icon file " + Path.GetFileName(icon) + " is not beside the launcher");
+                }
+            }
+            catch (Exception ex) { Swallow.Note("Icons.OutOfDate, the icon file", ex); }
+            string want = (icon == null ? exe : icon) + ",0";
+            if (l.Count == 0 && Due(exe, want, false)) l.Add("the launcher changed since the shortcuts were last redrawn");
+
+            object shell = null;
+            Type shellType = null;
+            try
+            {
+                shellType = Type.GetTypeFromProgID("WScript.Shell");
+                if (shellType == null) return l;
+                shell = Activator.CreateInstance(shellType);
+                foreach (Place spot in Places())
+                {
+                    string place = spot.Dir;
+                    if (string.IsNullOrEmpty(place) || !Directory.Exists(place)) continue;
+                    string[] links;
+                    try { links = Directory.GetFiles(place, "*.lnk"); }
+                    catch (Exception ex) { Swallow.Note("Icons.OutOfDate, listing " + place, ex); continue; }
+                    bool found = false;
+                    foreach (string lnk in links)
+                    {
+                        object sc = null;
+                        try
+                        {
+                            sc = shellType.InvokeMember("CreateShortcut", BindingFlags.InvokeMethod, null, shell, new object[] { lnk });
+                            if (sc == null) continue;
+                            Type t = sc.GetType();
+                            string target = t.InvokeMember("TargetPath", BindingFlags.GetProperty, null, sc, null) as string;
+                            if (string.IsNullOrEmpty(target) || !string.Equals(Full(target), Full(exe), StringComparison.OrdinalIgnoreCase)) continue;
+                            found = true;
+                            if (spot.MayRename && !string.Equals(Path.GetFileName(lnk), Name, StringComparison.OrdinalIgnoreCase))
+                            {
+                                l.Add(lnk + " has an old name");
+                                continue;
+                            }
+                            string now = t.InvokeMember("IconLocation", BindingFlags.GetProperty, null, sc, null) as string;
+                            string desc = t.InvokeMember("Description", BindingFlags.GetProperty, null, sc, null) as string;
+                            if (!string.Equals(now, want, StringComparison.OrdinalIgnoreCase)) l.Add(lnk + " shows another icon");
+                            else if (!string.Equals(desc, Label, StringComparison.Ordinal)) l.Add(lnk + " has another label");
+                        }
+                        catch (Exception ex) { Swallow.Note("Icons.OutOfDate, shortcut", ex); }
+                        finally
+                        {
+                            if (sc != null) try { Marshal.ReleaseComObject(sc); } catch (Exception ex) { Swallow.Note("Icons.OutOfDate, release shortcut", ex); }
+                        }
+                    }
+                    if (!found && spot.MakeIfMissing && File.Exists(exe)) l.Add(Path.Combine(place, Name) + " is missing");
+                }
+            }
+            catch (Exception ex) { Swallow.Note("Icons.OutOfDate", ex); }
+            finally
+            {
+                if (shell != null) try { Marshal.ReleaseComObject(shell); } catch (Exception ex) { Swallow.Note("Icons.OutOfDate, release shell", ex); }
+            }
+            return l;
         }
 
         /// <summary>

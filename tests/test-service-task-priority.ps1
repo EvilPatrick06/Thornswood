@@ -161,7 +161,7 @@ foreach ($ins in $installers) {
         $m = [regex]::Match([IO.File]::ReadAllText($ins.Path), '`\$cmd = \(''(/c "set THORNSWOOD_SITE=[^\r\n]*?)'' -f ([^\r\n]+)\)')
         Yes '  its task command line is in the script it sends' $m.Success
         if ($m.Success) { $ins.Format = $m.Groups[1].Value }
-        Yes '  and starts node through start "" /b /wait /high' ($ins.Format -and $ins.Format.Contains('start "" /b /wait /high "{0}" voice-server.js'))
+        Yes '  and starts node through start "" /b /wait /high, on server-log.js running voice (#2166)' ($ins.Format -and $ins.Format.Contains('start "" /b /wait /high "{0}" "{2}" --log "{1}" --days 90 --stamp voice-server.js'))
         Yes '  and hands node''s exit code back as the task''s' ($ins.Format -and $ins.Format.Contains('& call exit %^errorlevel%"'))
     }
 }
@@ -242,19 +242,26 @@ foreach ($ins in $installers) {
     if ($ins.High) {
         if (-not $ins.Format) { Write-Host '  SKIP  there is no task command line to run'; continue }
         # Voice's own line: what the outer script fills in at install time,
-        # then a scratch log, an empty roller, and Windows PowerShell for node.
+        # then node, the real Server-Log.js and a stand-in voice that sleeps,
+        # in a scratch folder whose name carries the mark (#2166). The
+        # measured program is the log writer start starts under cmd, and the
+        # voice it starts is measured too, as on the VPS.
+        $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
+        if (-not $nodeCmd) { Write-Host '  SKIP  node is not on this machine, and the task runs voice under it'; continue }
         $scratch = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-priority-' + $mark)
         New-Item -ItemType Directory -Force -Path $scratch | Out-Null
-        $rollerAt = Join-Path $scratch 'roll-log.ps1'
-        [IO.File]::WriteAllText($rollerAt, '')
-        $fmt = $ins.Format.Replace('$Site', 'https://site.invalid').Replace('$Port', '7999').Replace('$Bind', '127.0.0.1').Replace('$ChatRange', 'off').Replace('$mostSet', '').Replace('$turnSet', '').Replace('voice-server.js', $sleep)
-        $action = New-ScheduledTaskAction -Execute $cmdExe -Argument ($fmt -f $ps51, (Join-Path $scratch 'voice.log'), $ps51, $rollerAt) -WorkingDirectory $scratch
+        $writerAt = Join-Path $scratch 'server-log.js'
+        Copy-Item -LiteralPath ([IO.Path]::Combine($Repo, 'scripts', 'vps', 'Server-Log.js')) -Destination $writerAt
+        [IO.File]::WriteAllText((Join-Path $scratch 'voice-server.js'), "setTimeout(function () { }, 90000);`n")
+        $fmt = $ins.Format.Replace('$Site', 'https://site.invalid').Replace('$Port', '7999').Replace('$Bind', '127.0.0.1').Replace('$ChatRange', 'off').Replace('$mostSet', '').Replace('$turnSet', '')
+        $action = New-ScheduledTaskAction -Execute $cmdExe -Argument ($fmt -f $nodeCmd.Source, (Join-Path $scratch 'voice.log'), $writerAt) -WorkingDirectory $scratch
     } else {
         $action = New-ScheduledTaskAction -Execute $cmdExe `
                                           -Argument ('/c ""' + $ps51 + '" ' + $sleep + '"')
     }
     $child = $null
     $parent = $null
+    $voiceKid = $null
     $skip = $null
     Write-Host ("  registering a scratch task, $name, for $who")
     try {
@@ -265,11 +272,18 @@ foreach ($ins in $installers) {
         }
         if (-not $skip) {
             Start-ScheduledTask -TaskName $name
-            for ($i = 0; $i -lt 40 -and -not $child; $i++) {
+            for ($i = 0; $i -lt 40 -and -not ($child -and ($voiceKid -or -not $ins.High)); $i++) {
                 Start-Sleep -Milliseconds 500
-                $child = @(Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" |
-                           Where-Object { "$($_.CommandLine)" -like "*$mark*" }) | Select-Object -First 1
+                if ($ins.High) {
+                    $child = @(Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" |
+                               Where-Object { "$($_.CommandLine)" -like "*$mark*" -and "$($_.CommandLine)" -like '*server-log.js*' }) | Select-Object -First 1
+                    if ($child) { $voiceKid = @(Get-CimInstance Win32_Process -Filter ("Name = 'node.exe' AND ParentProcessId = " + [int]$child.ProcessId)) | Select-Object -First 1 }
+                } else {
+                    $child = @(Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" |
+                               Where-Object { "$($_.CommandLine)" -like "*$mark*" }) | Select-Object -First 1
+                }
             }
+            if ($ins.High -and $child -and -not $voiceKid) { $child = $null }
             if (-not $child) {
                 $info = Get-ScheduledTaskInfo -TaskName $name -ErrorAction SilentlyContinue
                 $skip = 'the task was registered but no process of it appeared in 20 s (last result ' + $info.LastTaskResult + '); an account with no session cannot start an interactive task'
@@ -294,15 +308,21 @@ foreach ($ins in $installers) {
                 Yes ('    with normal I/O priority, 2 (1, low, at priority 7)') ($m[1].Io -eq 2)
                 Yes ('    and normal memory priority, 5 (2 at priority 7)') ($m[1].Memory -eq 5)
             }
+            if ($voiceKid) {
+                $vk = Measure-Priority ([int]$voiceKid.ProcessId)
+                Write-Host ("  the voice the log writer started:        {0}, I/O priority {1}, memory priority {2}" -f $vk.Class, $vk.Io, $vk.Memory)
+                Yes '  the voice server-log.js starts runs High too, the writer''s own (Windows starts a child of a High process at Normal)' ($vk.Class -eq 'High' -and $vk.Io -eq 2 -and $vk.Memory -eq 5)
+            }
         }
     }
     finally {
         Stop-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue
         Unregister-ScheduledTask -TaskName $name -Confirm:$false -ErrorAction SilentlyContinue
+        if ($voiceKid) { Stop-Process -Id ([int]$voiceKid.ProcessId) -Force -ErrorAction SilentlyContinue }
         if ($child) { Stop-Process -Id ([int]$child.ProcessId) -Force -ErrorAction SilentlyContinue }
         if ($parent) { Stop-Process -Id ([int]$parent.ProcessId) -Force -ErrorAction SilentlyContinue }
-        # Tried a few times: cmd.exe, stopped a moment ago, can still hold
-        # voice.log open, a file another program has open. Checked below.
+        # Tried a few times: the log writer, stopped a moment ago, can still
+        # hold voice.log open, a file another program has open. Checked below.
         for ($i = 0; $scratch -and $i -lt 20 -and (Test-Path -LiteralPath $scratch); $i++) {
             Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue
             if (Test-Path -LiteralPath $scratch) { Start-Sleep -Milliseconds 250 }
@@ -311,7 +331,8 @@ foreach ($ins in $installers) {
     if ($skip) { Write-Host ('  SKIP  ' + $skip) }
     Yes '  the scratch task is gone again' (-not (Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue))
     if ($child) {
-        Yes '    and so are its processes' (-not (Get-Process -Id ([int]$child.ProcessId), ([int]$child.ParentProcessId) -ErrorAction SilentlyContinue))
+        $ids = @([int]$child.ProcessId, [int]$child.ParentProcessId) + @(if ($voiceKid) { [int]$voiceKid.ProcessId })
+        Yes '    and so are its processes' (-not (Get-Process -Id $ids -ErrorAction SilentlyContinue))
     }
     if ($scratch) { Yes '    and its scratch folder' (-not (Test-Path -LiteralPath $scratch)) }
 }

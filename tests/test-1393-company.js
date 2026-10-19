@@ -223,9 +223,13 @@ function boot(reg, w, opts) {
     'reg.notices = JSON.parse(JSON.stringify(notices)); reg.boards = JSON.parse(JSON.stringify(boards)); reg.saves = (reg.saves || 0) + 1; }',
     'function refreshPanel() { }',
     // Nobody guards these boards; a guard's take down (#502) is
-    // tests/test-502-guard-board.js.
+    // tests/test-502-guard-board.js. Nobody is a Jarl here either, and the
+    // stewards given are stewards of every board here (#2551, a steward is
+    // of one hold: tests/test-2551-hold-offices.js).
     'function isGuard() { return false; }',
-    ['deeds', 'setLock', 'mold', 'moldHere', 'cutKey', 'here', 'claim', 'jarlCmd', 'stewardCmd',
+    'function isJarlOf() { return false; }',
+    'function isStewardOf(pid) { return isSteward(pid); }',
+    ['deeds', 'setLock', 'mold', 'moldHere', 'cutKey', 'here', 'claim', 'officeCmd',
      'evict', 'boxCmd', 'rentCmd', 'bedCmd'].map(function (n) { return 'function ' + n + '() { return true; }'; }).join('\n')
   ];
   NAMES.forEach(function (n) { body.push(lifted[n]); });
