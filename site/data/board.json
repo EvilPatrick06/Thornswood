@@ -325,8 +325,8 @@
             "id": "rk6",
             "done": false,
             "cells": {
-              "ck2": "Killmoves and stagger do not show on other people",
-              "ck3": "Those animation events are blanked"
+              "ck2": "Killmoves do not show on other people",
+              "ck3": "That animation event is blanked. A stagger shows to everybody nearby"
             },
             "at": 0,
             "by": ""
@@ -373,7 +373,7 @@
       {
         "id": "sk12",
         "name": "What the collection took out",
-        "note": "Revision 5 of the collection, from 22 September, took out four mods that\nworked against the server and a patch that needs one of them, and swapped\nImmersive Armors for a version that does without a script. Each one is named\nby its plugin file as well, because that is what your plugin list shows.\nImmersive Armors, for one, is Hothtrooper44_ArmorCompilation.esp, and a\nsearch for the words Immersive Armors finds nothing.\n\nIf a file marked Out is still in your plugin list, your collection is out of\ndate. Update it in Vortex.\n\nSunHelm's diseases went with it. Disease comes back from the server\ninstead: Injury, being downed and disease is on the roadmap.",
+        "note": "Revision 5 of the collection, from 22 September, took out four mods that\nworked against the server and a patch that needs one of them, and swapped\nImmersive Armors for a version that does without a script. Each one is named\nby its plugin file as well, because that is what your plugin list shows.\nImmersive Armors, for one, is Hothtrooper44_ArmorCompilation.esp, and a\nsearch for the words Immersive Armors finds nothing.\n\nIf a file marked Out is still in your plugin list, your collection is out of\ndate. Update it in Vortex.\n\nDisease comes back from the server instead of from a mod:\nInjury, being downed and disease is on the roadmap.",
         "columns": [
           {
             "id": "ck13",
@@ -1411,7 +1411,7 @@
             "cells": {
               "c1pt": "**The page blurb**",
               "c2pt": "Settings, then the page editor. Tagline first, then the long one. Check the last line of About against the open switch whenever it changes.",
-              "c3pt": "Tagline:\n\n```\nA modded Skyrim roleplay server. Fewer NPCs, more people who matter.\n```\n\nAbout:\n\n```\nThornswood is a modded Skyrim co-op roleplay server set in 4E 252, fifty years after the civil war. The Stormcloaks won. Skyrim has a High King and no Emperor above him. The Thalmor are a criminal remnant, hunted rather than feared.\n\nThe world runs with fewer NPCs than vanilla, not none. Enough that a hold still feels lived in at three in the morning, few enough that the person standing next to you is actually a person.\n\nThe server is free and always will be. Patreon pays for the machine it runs on, the domain, and the time that goes into building it.\n\nNothing here affects what happens in the world. No gold, no gear, no skills, no land, no favours.\n\nThornswood is in alpha, and the world is open by application in the Discord. Anyone can download it at thornswood.net.\n```\n\nThe last line of About follows the site's open switch (#428, #998). While the alpha is open by application it is the line above. The day the switch is on and anyone in the Discord can play, replace that last line with:\n\n```\nThornswood is open: anyone in the Discord can play, and anyone can download it at thornswood.net.\n```"
+              "c3pt": "Tagline:\n\n```\nA modded Skyrim roleplay server. Fewer NPCs, more people who matter.\n```\n\nAbout:\n\n```\nThornswood is a modded Skyrim co-op roleplay server set in 4E 252, fifty years after the civil war. The Stormcloaks won. Skyrim has a High King and no Emperor above him. The Thalmor are a criminal remnant, hunted rather than feared.\n\nThe world runs with fewer NPCs than vanilla, not none. Enough that a hold still feels lived in at three in the morning, few enough that the person standing next to you is actually a person.\n\nThe server is free and always will be. Patreon pays for the server, the domain, and other expenses of keeping it running, never for anybody's time making mods.\n\nNothing here affects what happens in the world. No gold, no gear, no skills, no land, no favours.\n\nThornswood is in alpha, and the world is open by application in the Discord. Anyone can download it at thornswood.net.\n```\n\nThe last line of About follows the site's open switch (#428, #998). While the alpha is open by application it is the line above. The day the switch is on and anyone in the Discord can play, replace that last line with:\n\n```\nThornswood is open: anyone in the Discord can play, and anyone can download it at thornswood.net.\n```"
             }
           },
           {
@@ -1637,7 +1637,7 @@
             "by": "",
             "cells": {
               "c1rm": "Property you actually own",
-              "c2rm": "Buy it, furnish it, lock it, defend it. Land inside a hold means a steward you speak with, not a menu you buy from"
+              "c2rm": "Claim a building for free at its door and the deed in your pack says it is yours. Lock it, have a smith cut keys, and carry its master key. The hold's steward can set rent and evict, and a claim nobody goes into for 14 days lapses"
             }
           },
           {

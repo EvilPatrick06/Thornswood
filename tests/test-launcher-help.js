@@ -422,8 +422,8 @@ function tableNames(src, name) {
     const t = JSON.parse(cg[1]).towns;
     towns = Object.keys(t).map(function (k) { return t[k].town; });
   } catch (e) { towns = []; }
-  yes('the gamemode has ' + towns.length + ' towns to wake up in', towns.length > 0);
-  const lostT = towns.filter(function (x) { return item('Character', 'Where you wake up').indexOf(x) === -1; });
+  yes('the gamemode has ' + towns.length + ' towns to start in', towns.length > 0);
+  const lostT = towns.filter(function (x) { return item('Character', 'Where you start').indexOf(x) === -1; });
   yes('and the page names every one' + (lostT.length ? ' (not: ' + lostT.join(', ') + ')' : ''), lostT.length === 0);
 
   const purse = num(gm, /var PURSE = (\d+);/);
@@ -493,7 +493,7 @@ function tableNames(src, name) {
       /only says so in the chat if it could not/.test(panel));
   yes('the town is the pick that ends creation, as the page says',
       /The home is the one pick that ends creation/.test(gm) &&
-      /The town is the choice that ends creation/.test(item('Character', 'Where you wake up')));
+      /The town is the choice that ends creation/.test(item('Character', 'Where you start')));
 }
 
 // --------------------------------------------------------- dying, address

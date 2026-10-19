@@ -82,6 +82,7 @@ function rig(opts) {
 
   return fn(
     { 'x:Y.esp': { key: 'whiterun', town: 'Whiterun',
+                   start: { desc: '3c:Skyrim.esm', pos: [19189.1, -12006.5, -4558.4], rot: [0, 0, 309.9] },
                    arrival: { desc: '1605e:Skyrim.esm', pos: [1, 2, 3], rot: [0, 0, 0] } } },
     { desc: 'hall:Y.esp', pos: [0, 0, 0], rot: [0, 0, 0] },
     BYDOOR, NAME, DATA,
@@ -109,6 +110,11 @@ if (api && NAME && BYDOOR) {
   {
     const r = api.findPlace('whiterun');
     yes('S1 a hold still resolves', !!r.where && r.where.town === 'Whiterun');
+    // #2622: the town is where a new character arrives, the inn is "<town> inn".
+    yes('S1 /tp whiterun goes to the start spot, not the inn', !!r.where && r.where.desc === '3c:Skyrim.esm');
+    const inn = api.findPlace('whiterun inn');
+    yes('S1 /tp whiterun inn goes to the inn spot', !!inn.where && inn.where.desc === '1605e:Skyrim.esm' &&
+        JSON.stringify(inn.where.pos) === '[1,2,3]');
     const h = api.findPlace('hall');
     yes('S1 and so does the creation hall', !!h.where);
   }

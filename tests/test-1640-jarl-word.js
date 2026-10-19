@@ -38,7 +38,7 @@ function slice(src, start, end) {
   return b < 0 ? null : src.slice(a, b + end.length);
 }
 
-const HEAD = '  function command(word, parts, actorId, profileId, toProfile) {';
+const HEAD = '  function command(word, parts, actorId, profileId, toProfile, cmd) {';
 const propBlock = slice(gm, '// ==== thornswood property ====', '// ==== end thornswood property ====');
 const charBlock = slice(gm, '// ==== thornswood character ====', '// ==== end thornswood character ====');
 const propCommand = slice(propBlock, HEAD, '\n  }\n');
@@ -190,7 +190,7 @@ if (propCommand && charCommand && officeSrc.every(function (s) { return !!s; }))
   const seen = code.match(/word === '\/office'/g) || [];
   yes('J8 /office is matched in exactly two places, the hand-on list and the property block',
       seen.length === 2);
-  const handle = code.indexOf('charCmd.command(word, parts, actorId, profileId, toProfile)');
+  const handle = code.indexOf('charCmd.command(word, parts, actorId, profileId, toProfile, cmd)');
   const unknown = code.indexOf("'No command called ' + word");
   yes('J9 handle() asks the character block before it answers "No command called"',
       handle > 0 && unknown > handle);

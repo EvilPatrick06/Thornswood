@@ -214,7 +214,22 @@ $port     = [int]$new.port
 $resPort  = if ($port -eq 7777) { 3000 } else { $port + 1 }
 $clean    = $true
 
-function Held { @(Get-NetUDPEndpoint -LocalPort $port -EA SilentlyContinue).Count -gt 0 }
+# What holds UDP $port, listed whole and filtered as the installer's waits do
+# (#2711): -LocalPort with nothing on it is an error, and nothing there is what
+# most of these looks are for. A list that cannot be had is not a free port.
+# Held says it is held and leaves why in $heldWhy, and each caller says so.
+# Until 19 Oct this was -LocalPort with -EA SilentlyContinue, which made a box
+# that could not list its ports look exactly like a server that never started
+# (#2466).
+$heldWhy = ''
+$heldBy  = @()
+function Held {
+  $script:heldWhy = ''
+  $script:heldBy = @()
+  try { $script:heldBy = @(Get-NetUDPEndpoint -EA Stop | Where-Object { $_.LocalPort -eq $port } | ForEach-Object { [int]$_.OwningProcess }) }
+  catch { $script:heldWhy = $_.Exception.Message; return $true }
+  return $script:heldBy.Count -gt 0
+}
 
 function StopOurs {
   Stop-ScheduledTask -TaskName $Task -EA SilentlyContinue
@@ -223,7 +238,8 @@ function StopOurs {
   # and only started the live one back up.
   'stopping whatever holds UDP ' + $port
   $pids = @()
-  $pids += @(Get-NetUDPEndpoint -LocalPort $port -EA SilentlyContinue | Select-Object -ExpandProperty OwningProcess)
+  try { $pids = @(Get-NetUDPEndpoint -EA Stop | Where-Object { $_.LocalPort -eq $port } | ForEach-Object { [int]$_.OwningProcess }) }
+  catch { 'COULD NOT LIST the UDP ports to find what holds ' + $port + ', so nothing was stopped by its port: ' + $_.Exception.Message }
   # Only the UDP port. The line that also stopped whatever listened on the TCP
   # port one above it was copied from the dev script, where that port is the
   # server's own HTTP and belongs to the same process. On the live root it is
@@ -242,15 +258,22 @@ function StopOurs {
   # -Mode notice a "Pushing a server update in 1 minute" with nothing behind
   # it, and under -Mode restart a kick a minute after boot with no restart
   # behind it. Same gap Deploy-DevGamemode closed on 24 September.
+  # Settings that do not read name no data folder: the default is not guessed
+  # for them, and the line says the restart.json was not looked for.
   $d = 'data'
+  $dWhy = ''
   try {
     $s = [IO.File]::ReadAllText((Join-Path $Root 'server-settings.json')) | ConvertFrom-Json
     if ($s.dataDir) { $d = [string]$s.dataDir }
-  } catch { }
-  $rq = Join-Path ([IO.Path]::Combine($Root, $d)) 'restart.json'
-  if (Test-Path -LiteralPath $rq) {
-    try { Remove-Item -LiteralPath $rq -Force -EA Stop; 'removed a restart.json the old process never read' }
-    catch { 'COULD NOT REMOVE ' + $rq + ', so the new process will count down on its own: ' + $_.Exception.Message }
+  } catch { $dWhy = $_.Exception.Message }
+  if ($dWhy) {
+    'COULD NOT READ ' + (Join-Path $Root 'server-settings.json') + ' for its data folder (' + $dWhy + '), so a restart.json the old process never read was not looked for, and the new process may count down on its own'
+  } else {
+    $rq = Join-Path ([IO.Path]::Combine($Root, $d)) 'restart.json'
+    if (Test-Path -LiteralPath $rq) {
+      try { Remove-Item -LiteralPath $rq -Force -EA Stop; 'removed a restart.json the old process never read' }
+      catch { 'COULD NOT REMOVE ' + $rq + ', so the new process will count down on its own: ' + $_.Exception.Message }
+    }
   }
 }
 
@@ -258,17 +281,32 @@ function StopOurs {
 # is what the launcher and the client fetch from, and it only opens once the
 # native server has been built without throwing. $Wait is the shared ceiling
 # unless the caller passed -Wait (ServerReadyWait.ps1, #1938).
+$answerWhy = ''
+# A look that could not list the UDP ports is not answering, and how many of
+# the looks were like that is said with the FAIL line (#2466).
+$blindWhy = ''
 function Answering {
   $until = (Get-Date).AddSeconds($Wait)
+  $looks = 0
+  $blind = 0
+  $script:blindWhy = ''
   while ($true) {
     $tcp = $false
-    if (Held) {
+    $looks++
+    $udp = Held
+    if ($heldWhy) {
+      $udp = $false
+      $blind++
+      $script:blindWhy = 'the UDP ports could not be listed on ' + $blind + ' of ' + $looks + ' looks, the last saying: ' + $heldWhy
+    }
+    if ($udp) {
+      # A try that throws is kept for the FAIL line, which says it.
+      $c = New-Object Net.Sockets.TcpClient
       try {
-        $c = New-Object Net.Sockets.TcpClient
         $null = $c.BeginConnect('127.0.0.1', $resPort, $null, $null).AsyncWaitHandle.WaitOne(500)
         $tcp = $c.Connected
-        $c.Close()
-      } catch { }
+      } catch { $script:answerWhy = $_.Exception.Message }
+      finally { $c.Close() }
     }
     if ($tcp) { return $true }
     if ((Get-Date) -gt $until) { return $false }
@@ -312,7 +350,8 @@ if (-not $port) {
 }
 StopOurs
 if (Held) {
-  'UDP ' + $port + ' is still held by pid ' + @(Get-NetUDPEndpoint -LocalPort $port -EA SilentlyContinue)[0].OwningProcess + ' after the stop, so nothing was swapped'
+  if ($heldWhy) { 'the UDP ports could not be listed after the stop (' + $heldWhy + '), so whether UDP ' + $port + ' let go is not known, and nothing was swapped' }
+  else { 'UDP ' + $port + ' is still held by pid ' + ($heldBy -join ', ') + ' after the stop, so nothing was swapped' }
   Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue
   'SWAP REFUSED'
   exit 1
@@ -340,11 +379,11 @@ foreach ($rel in @($Want.Keys)) {
 if ($moved -and $null -ne $ReleaseKeys -and $placed -contains 'server-settings.json') {
   $was = $null
   $got = $null
-  try { $was = [IO.File]::ReadAllText((Join-Path $prevDir 'server-settings.json')) | ConvertFrom-Json } catch { }
-  try { $got = [IO.File]::ReadAllText((Join-Path $Root 'server-settings.json')) | ConvertFrom-Json } catch { }
   $drift = @()
-  if ($null -eq $was -or $null -eq $got) { $drift += 'server-settings.json, which cannot be read' }
-  else {
+  try { $was = [IO.File]::ReadAllText((Join-Path $prevDir 'server-settings.json')) | ConvertFrom-Json } catch { $drift += ('the server-settings.json the server had, which cannot be read (' + $_.Exception.Message + ')') }
+  try { $got = [IO.File]::ReadAllText((Join-Path $Root 'server-settings.json')) | ConvertFrom-Json } catch { $drift += ('the server-settings.json now in place, which cannot be read (' + $_.Exception.Message + ')') }
+  if (-not $drift.Count -and ($null -eq $was -or $null -eq $got)) { $drift += 'server-settings.json, which is empty' }
+  if (-not $drift.Count) {
     $wn = @($was.PSObject.Properties | ForEach-Object { $_.Name })
     $gn = @($got.PSObject.Properties | ForEach-Object { $_.Name })
     foreach ($k in @($wn + $gn | Sort-Object -Unique)) {
@@ -368,7 +407,7 @@ if ($moved) {
   Start-ScheduledTask -TaskName $Task -EA SilentlyContinue
   'started, giving it ' + $Wait + ' seconds to answer on UDP ' + $port + ' and on ' + $resPort
   if (Answering) {
-    'PASS: the server is answering on ' + $resPort + ', game port ' + $port + ', pid ' + @(Get-NetUDPEndpoint -LocalPort $port -EA SilentlyContinue)[0].OwningProcess
+    'PASS: the server is answering on ' + $resPort + ', game port ' + $port + ', pid ' + ($heldBy -join ', ')
     Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue
     # The last two sets of replaced files stay, newest first by their stamp,
     # and the last two a -PutBack took out.
@@ -381,6 +420,8 @@ if ($moved) {
     exit 0
   }
   'FAIL: nothing answered on UDP ' + $port + ' and ' + $resPort + ' within ' + $Wait + ' seconds'
+  if ($answerWhy) { 'the last try at ' + $resPort + ' said: ' + $answerWhy }
+  if ($blindWhy) { $blindWhy }
   if (Test-Path -LiteralPath $log) { '--- server.log, last 30 ---'; Get-Content -LiteralPath $log -Tail 30 }
   StopOurs
 }
@@ -390,7 +431,11 @@ PutBack
 TaskShape
 Start-ScheduledTask -TaskName $Task -EA SilentlyContinue
 if (Answering) { 'the previous files are back and the server is answering on ' + $resPort + ' again' }
-else { 'THE PREVIOUS FILES ARE BACK AND THE SERVER STILL IS NOT ANSWERING on ' + $resPort }
+else {
+  'THE PREVIOUS FILES ARE BACK AND THE SERVER STILL IS NOT ANSWERING on ' + $resPort
+  if ($answerWhy) { 'the last try at ' + $resPort + ' said: ' + $answerWhy }
+  if ($blindWhy) { $blindWhy }
+}
 if ($clean) {
   # A put-back's stage is the .prev folder it was putting back, full again.
   if (-not $KeepStage) { Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue }
@@ -651,8 +696,29 @@ if ($moved -and (Test-Path variable:Owns) -and @($Owns | Where-Object { $_ }).Co
   }
 }
 
+# WHAT LEFT THE REPOSITORY. A caller that sends only what changed (the site)
+# cannot use $Owns, which would take every unchanged file aside, so it names
+# in $Gone the files it no longer has. On 17 Oct the site's looks.js and
+# looks.css were still served after #2572 took them out, because nothing
+# ever took a public file away. They go aside the way a stray does: a
+# rollback and -PutBack put them back.
+if (-not (Test-Path variable:Gone)) { $Gone = @() }
+$goneAside = @()
+if ($moved) {
+  foreach ($rel in @($Gone | Where-Object { $_ })) {
+    $r = $rel -replace '/', '\'
+    $at = Join-Path $Root $r
+    if (-not (Test-Path -LiteralPath $at -PathType Leaf)) { continue }
+    if (-not (Shift $at (Join-Path $prevDir $r))) { 'could not move ' + $rel + ', which this deploy no longer has, aside'; $moved = $false; break }
+    $aside += $rel
+    $moveRels += $rel
+    $goneAside += $rel
+  }
+}
+
 if ($moved) {
   'swapped in ' + $placed.Count + ' file(s), the ones they replaced are in ' + $prevDir
+  if ($goneAside.Count) { 'took out ' + $goneAside.Count + ' file(s) this deploy no longer has, into ' + $prevDir + ': ' + ($goneAside -join ', ') }
   if ($strays.Count) { 'moved aside ' + $strays.Count + ' thing(s) at ' + $Root + ' that this deploy did not send and that are not its own, into ' + $prevDir + ': ' + ($strays -join ', ') }
   StartIt
   'started, giving it ' + $Wait + ' seconds to answer'
@@ -810,7 +876,7 @@ New-Item -ItemType Directory -Force -Path (Split-Path -Parent `$cur) | Out-Null
 if ('$came' -eq 'True' -and (Test-Path -LiteralPath `$beside)) {
   Copy-Item -LiteralPath `$beside -Destination `$cur -Force
   `$name = ''
-  try { `$name = [string]([IO.File]::ReadAllText(`$beside) | ConvertFrom-Json).name } catch { }
+  try { `$name = [string]([IO.File]::ReadAllText(`$beside) | ConvertFrom-Json).name } catch { `$name = 'a record that does not read (' + `$_.Exception.Message + ')' }
 } else {
   `$name = 'an older copy kept before deploys were recorded'
   `$rec = [ordered]@{ part = $(& $q $part); component = $(& $q $Component); name = `$name; commit = ''; putBack = `$true; deployedUtc = `$when; from = `$env:COMPUTERNAME }

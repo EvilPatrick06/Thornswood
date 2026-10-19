@@ -104,12 +104,12 @@ the VPS now, beside the feed the site already serves:
 
 | On the VPS | What | Served |
 | --- | --- | --- |
-| `C:\Thornswood-Docs\feed\version.json` | the live feed | yes, `/feed/version.json` |
+| `C:\Thornswood-Docs\feed\version\<8 digits>.json` | every feed ever sent, one new file each, never replaced or deleted; the newest is the live feed (#2727) | the newest, as `/feed/version.json` |
 | `C:\Thornswood-Docs\feed\published.json` | the live baseline | no |
 | `C:\Thornswood-Docs\feed\launchers.txt` | every launcher version the channel has published, oldest first | no |
 | `C:\Thornswood-Docs\feed\releases.txt` | every release the feed has named, oldest first, one tab separated line each: id, channel, launcher, packs, baseline, commit, tag (#444, `Get-FeedStoreReleases`) | no |
 | `C:\Thornswood-Docs\feed\releases.json` | the record of each of the last thirty releases, newest first, which `Rollback-Feed.ps1` goes back to (#442); `"releases"` in version.json until #1050. Received and sent by name beside the feed (`Get-StoreReleases`, `Save-StoreReleases` in `Release-Baseline.ps1`) | no |
-| `C:\Thornswood-Docs\feed\history\<utc stamp>-<name>` | each of those files as it was before it was replaced | no |
+| `C:\Thornswood-Docs\feed\history\<utc stamp>-<name>` | each of the other files as it was before it was replaced (version.json's history is `version\`) | no |
 | `C:\Thornswood-Docs\feed\assets\<sha256>` | the downloads | yes |
 
 and the same under `feed-dev` for dev. `site\server.js` answers only
@@ -125,13 +125,32 @@ process write to both folders (#923), so only a publisher over ssh writes them.
   each against the sha256 the VPS gave for it, writes `read.json` with those
   sha256s, and keeps the last twenty of each in `backup\`. `Send-FeedStore`
   sends a file back to `<name>.part` and, in one step on the VPS, checks that
-  every file this folder read still has the sha256 it had, copies the one it
-  replaces into `history\`, and renames the `.part` over it in one call
-  (MoveFileEx with MOVEFILE_REPLACE_EXISTING, `Move-FeedStoreInto`), so the
-  site never answers 404 in between and a send stopped there leaves the old
-  file or the new one whole. Until #2591 (16 Oct) it was `File.Replace`, which
+  every file this folder read still has the sha256 it had, then puts each in.
+  `version.json` goes in as a new file, `version\<8 digits>.json` one past the
+  newest, renamed to a name that is not there yet, and the one before stays;
+  nothing ever replaces or deletes a generation, and the site and the store
+  read the newest (#2727). The other files are copied into `history\` and
+  the `.part` renamed over them in one call (`Move-FeedStoreInto`), so a send
+  stopped there leaves the old file or the new one whole. Until #2591 (16 Oct) it was `File.Replace`, which
   moves the old file aside first and left it missing when stopped between
-  the two. If anything moved up there it
+  the two. From #2591 to #2727 (18 Oct) it was MoveFileEx with
+  MOVEFILE_REPLACE_EXISTING, which Windows refuses with "Access is denied"
+  while any handle is open on the old file, and the site opens version.json
+  for every launcher's feed check, so a Ship could stop with NOT SHIPPED
+  because somebody's launcher asked at that moment. The rename now keeps
+  POSIX semantics (SetFileInformationByHandle, FileRenameInfoEx): a reader
+  that opened the file with share-delete, as the site's node does, keeps the
+  old bytes it is reading. A handle opened without share-delete still
+  refuses it, so every read of a store file in `Feed-Store.ps1` shares
+  delete. What no rename gives is a name that is always there: measured 19
+  Oct on the VPS with 6 swappers and 6 readers for 10 s a run, the POSIX
+  rename left 363 to 4791 opens of about 300k finding nothing, MoveFileEx
+  801 to 4127, a replacing hard link up to 1487, and One showed it too, less
+  often. The site opens the feed for every launcher's check, every `/watch`
+  tick and every join pass, so a request in a Ship's swap found no feed.
+  That is why version.json is never replaced: a generation's name only ever
+  appears, and the one before it stays (`feedFile` in `site\server.js`,
+  `tests\test-2727-feed-swap-readers.ps1`). If anything moved up there it
   replaces nothing and throws: that is two publishers at once, the push git
   used to refuse.
 - **Who uses it.** Ship and Publish-Update receive both files at the start
@@ -274,6 +293,7 @@ saved fields that come from elsewhere, as their rows say.
 | `baseline` | object `{ id, sha256, url, entries, notes? }` | `Publish-Update.ps1` on every release that sends to the site (the release manifest block, #441); taken out by a `-NoUpload` run. `notes`, the release note, since #1050: the update card of a launcher that syncs shows it (`Sync.cs RecordDue`), the packs that used to carry it being off the feed | The launcher from #1050 on, which syncs the install to it (`Updater.SyncRecord`, `launcher\app\Sync.cs`; see "Syncing to the release record"). The next `Publish-Update.ps1`, through `Resolve-ReleaseBaseline` (`Release-Baseline.ps1`) | The release record: what that release left installed, every file of ours as `<bytes>:<sha256>`, at `/feed[-dev]/assets/<sha256>`, the same bytes as the store's `published.json`. The next release is diffed against it; a missing or stale store copy is replaced by it, checked by sha256. The launcher reads it apart from the rest of the feed (`RecordRef.FromFeed`), so a `baseline` of any other shape costs that one field and never the whole feed. |
 | `releases` | array, newest first, at most 30, of `{ id, sha256, url, entries, lastPack, to? }` | Gone from the feed since #1050: the list is `releases.json` in the channel's store beside the feed (see "The feed store on the VPS"), written by `Publish-Update.ps1` on every release that names a `baseline` (the release list block, #442) and by `Rollback-Feed.ps1`, with `to` naming the release a rollback went back to. A feed that still carries the field (written before #1050, or by a Ship from a branch without it) is read too, merged by id, and the next write takes it out | No launcher. `Rollback-Feed.ps1`, `Scrub-Feed.ps1`, Ship's release tag check (`Get-StoreReleases`, `Release-Baseline.ps1`; `Read-ReleaseListFile`, `Release-Name.ps1`) | The record each release published, the same shape as `baseline`, plus `lastPack`, the last pack on the feed once that release was out, whose plugin list is the one it shipped ('' once the packs are gone: the record's own `:golden:` entries hold it). What a channel can be put back to; a release older than the newest thirty cannot be. The first release after #442 started the list with the `baseline` the feed already named. |
 | `release` | object `{ id, channel, launcherVersion, packs, baseline, commit, branch, uncommitted, tag }` | `Publish-Update.ps1` on every release (the release record block, #444) | No launcher. Ship, which tags `commit` as `tag` once the feed is out (`Add-ReleaseTag`, `Release-Name.ps1`); the store's `releases.txt` | The release's one name is `id`, the id its packs and its `baseline` carry (`20260928-1630`, dev `20260928-2324-dev`). The rest is what else it is known by: the launcher the feed offers with it (the same across Ships that keep their launcher, #921), the packs it added, its baseline id (empty on a `-NoUpload` run), the commit it was built from and how many tracked files differed from it, and the tag `release/main/<id>` or `release/dev/<id>` (empty when it was not built from a git checkout). `Get-ReleaseDisagreements` says whether they agree, with each other and with `releases`, whose newest entry is the same id ending on its last pack. After a main Ship the dev feed carries main's, `channel` main. `Rollback-Feed.ps1` does not rewrite it yet, so after a rollback it still names the last Ship until the next. |
+| `signedManifest` | object `{ url, sha256, catalogUrl, catalogSha256 }` | `Publish-Update.ps1` on every release that sends to the site (the signed manifest block, #2163 phase B); taken out by a `-NoUpload` run | No launcher yet (phase C of `docs\SIGNED-RELEASES.md`) | `release.json`, the sha256 of every asset of the release that carries code or names files (launcher, client runtime, packs, optional packs, the baseline record) with the commit it was built from, and a Windows catalog over it signed by ThornswoodRelease, both at `/feed[-dev]/assets/<sha256>`. Written only after the catalog was signed and passed the publish gate and `Signature.cs`; a signing failure stops the Ship before this file moves. Feed edits after a Ship carry it forward untouched. |
 | `news` | array, newest first, at most 40 | `Publish-Update.ps1:Set-Prop $doc 'news' $news`; `Publish-Server.ps1:$newsList`. On the dev feed each entry's `channel` is `"dev"` while main has not had it, set by `Dev-News.ps1:Update-DevNewsChannels` | News tab (`ShellNews.cs:BuildNews`); `Publish-News.ps1` copies it to the site | Cosmetic. Every launcher up to 1.2.3 reads the notes only here, so they stay here until the channel's minLauncher reads `newsFile` (#1050), and from then it is `[]`. Every script reads and writes the notes through `scripts\release\Feed-News.ps1` (`Get-FeedNewsList`, `Open-FeedNewsList`, `Set-FeedNewsList`), wherever the channel keeps them. |
 | `newsFile` | object `{ url, sha256, count }` or absent | `Set-FeedNewsList` (`Feed-News.ps1`), called by Publish-Update (the news out block), Rollback-Feed, Publish-Server's news entry and a dev marks refresh (`Update-DevFeedMarks`), once the channel's minLauncher is at or above `$FeedNewsFileLauncher` (1.2.4, the first launcher with FeedNews.cs): every note, at most 40, as one asset at `/feed[-dev]/assets/<sha256>`, sent to the site before the feed names it. Absent before that. `Remirror-Site-Feed.ps1` checks it is on the site like any asset | The launcher from #1050 on (`Updater.FillNews`, `launcher\app\FeedNews.cs`): fetched once on the update check's thread, checked (https, the host list, stored under its own sha256, the bytes hash to it), kept in `Profile\news.json`, and its notes put after the ones `news` carries, each note once by date and title. Read apart from the rest of the feed (`NewsRef.FromFeed`), so one of another shape costs only itself | Cosmetic. A file that cannot be had or read leaves the notes `news` carries and one line in launcher.log; the update check goes on. |
 | `mainVersion` | string | `Dev-News.ps1:Set-DevFeedMarks`: the main feed's `launcherVersion`, read off the site, with the DEV marks, on every dev ship (one with nothing new included), after every main ship (`Refresh-DevNews.ps1`), and by `Refresh-DevNews.ps1` run by hand; `""` on a main ship (`Publish-Update.ps1:Set-Prop $doc 'mainVersion' ''`) | Dev News tab header (`ShellNews.cs:pendingDoc.mainVersion`) | Cosmetic. |

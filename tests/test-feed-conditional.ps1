@@ -29,13 +29,13 @@
       launcher always read a feed
     - the feed is asked for compressed and read the same
 
-  HOW. Compiles launcher\app\*.cs into a library with the same csc and the same
-  references Build-Launcher.ps1 uses, as test-updater.ps1 does, and calls
-  Updater.Conditional by reflection. That is the request FromSite makes after
-  CheckUrl, which only lets https to thornswood.net through, so the local
-  server is reached without loosening what a real launcher accepts. Paths
-  points at a temp folder. Nothing under C:\Thornswood is read or written, and
-  nothing leaves 127.0.0.1.
+  HOW. Compiles launcher\app\*.cs into a library with the same compiler and
+  the same references the build uses (tests\Launcher-Csc.ps1), as
+  test-updater.ps1 does, and calls Updater.Conditional by reflection. That is
+  the request FromSite makes after CheckUrl, which only lets https to
+  thornswood.net through, so the local server is reached without loosening
+  what a real launcher accepts. Paths points at a temp folder. Nothing under
+  C:\Thornswood is read or written, and nothing leaves 127.0.0.1.
 
   Runs under Windows PowerShell 5.1 and restarts itself there from pwsh,
   because the launcher runs on the .NET Framework.
@@ -70,38 +70,7 @@ function Yes([string]$what, [bool]$cond) {
     else { $script:fail++; Write-Host "FAIL  $what" }
 }
 
-# ---- the compiler and the references, the way Build-Launcher.ps1 finds them --
-$csc = @(
-    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
-    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe"
-) | Where-Object { Test-Path $_ } | Select-Object -First 1
-
-$refDirs = @(
-    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8"
-    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.7.2"
-    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.6.1"
-    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\WPF"
-    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319"
-    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\WPF"
-    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319"
-) | Where-Object { Test-Path $_ }
-
-function Find-Ref([string]$name) {
-    foreach ($d in $refDirs) {
-        $p = Join-Path $d $name
-        if (Test-Path $p) { return $p }
-    }
-    $stem = [IO.Path]::GetFileNameWithoutExtension($name)
-    foreach ($gacRoot in 'GAC_MSIL', 'GAC_64', 'GAC_32', 'GAC') {
-        $gac = Join-Path "$env:WINDIR\Microsoft.NET\assembly\$gacRoot" $stem
-        if (Test-Path $gac) {
-            $hit = Get-ChildItem $gac -Filter $name -Recurse -File -EA SilentlyContinue |
-                   Sort-Object FullName -Descending | Select-Object -First 1
-            if ($hit) { return $hit.FullName }
-        }
-    }
-    $null
-}
+# ---- the compiler and the references the build uses (Launcher-Csc.ps1) ------
 
 $needed = @($LauncherNeeded)
 $wv2 = @($LauncherWv2Managed)
@@ -272,12 +241,12 @@ function New-Feed([int]$packs, [string]$launcher = '1.1.101') {
 }
 
 function Run {
-    Yes 'the .NET Framework 4 compiler is here' ($null -ne $csc)
-    if (-not $csc -or $needed.Count -eq 0) { Yes 'Thornswood.csproj names the references' $false; return }
+    Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+    if (-not (Test-Path -LiteralPath $LauncherCsc) -or $needed.Count -eq 0) { Yes 'Thornswood.csproj names the references' $false; return }
 
     $refs = @(); $missing = @()
     foreach ($n in $needed) {
-        $p = Find-Ref $n
+        $p = Find-LauncherRef $n
         if ($p) { $refs += $p } else { $missing += $n }
     }
     foreach ($n in $wv2) {
@@ -297,7 +266,7 @@ function Run {
     $rc = $LASTEXITCODE
     $ErrorActionPreference = $old
     $built = ($rc -eq 0) -and (Test-Path -LiteralPath $dll)
-    Yes ('the launcher''s {0} source files compile as C# 5' -f $cs.Count) $built
+    Yes ('the launcher''s {0} source files compile with the compiler the build runs' -f $cs.Count) $built
     if (-not $built) {
         foreach ($l in @($said | Where-Object { "$_" -match 'error' } | Select-Object -First 20)) { Write-Host "      $l" }
         return

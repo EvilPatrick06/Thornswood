@@ -65,7 +65,9 @@ function fixture(options = {}) {
     'A shared production entry must replace the single-actor deployed entry');
   let time = 0, sequence = 0, callback = null;
   const pending = new Map(), states = new Map(), persisted = new Map();
-  for(const id of options.commanded || []) persisted.set(id+':thornswoodNpcCommanded',true);
+  // A spawn made in this run of the server (#2623); kept and temporary are
+  // checked in test-npc-population-runtime.js.
+  for(const id of options.commanded || []) persisted.set(id+':thornswoodNpcCommanded',{run:'run-now'});
   const ids = options.ids || Array.from({length:options.count || 3}, (_, i) => i + 1);
   ids.forEach(id => states.set(id, actor(options.npc && options.npc[id])));
   const humanIds = options.humans || [];
@@ -224,7 +226,7 @@ function fixture(options = {}) {
     const policyBegin=source.indexOf('// NPC POPULATION POLICY BEGIN');
     const policyEnd=source.indexOf('// NPC POPULATION POLICY END');
     vm.runInContext(source.slice(policyBegin,policyEnd),context);
-    population=context.createNpcPopulation(api,options.populationData,['Skyrim.esm']);
+    population=context.createNpcPopulation(api,options.populationData,['Skyrim.esm'],null,{run:'run-now'});
   }
   runtime = context.startSharedNpcServerRuntime(api, timers, () => time,
     text => logs.push(text), population);
@@ -252,7 +254,8 @@ function fixture(options = {}) {
       originalIds.push(id);
     },
     time:() => time, status:() => plain(runtime.getStatus()),
-    advance, stop, disconnect(id) { online = online.filter(other => other !== id); }};
+    advance, stop, disconnect(id) { online = online.filter(other => other !== id); },
+    forget(id) { runtime.forget(id); }};
 }
 
 let failed = 0, passed = 0;
@@ -800,6 +803,19 @@ test('A sloped face keeps an in-home actor moving when vertical home projection 
   f.advance(30000);
   assert.ok(f.moves.some(move=>move.speed>0),'An in-home actor must keep moving on slopes');
   checkLeash(f.moves,home,leash);f.stop();
+});
+
+test('A forgotten actor is let go of at once, before it is destroyed (#2623)', () => {
+  const gone=0xff000040,stays=0xff000041;
+  const f=fixture({ids:[gone,stays],commanded:[gone,stays],
+    populationData:{version:1,plugins:['Skyrim.esm'],keep:[],cut:[]}});
+  f.advance(3000);
+  assert.ok(f.moves.some(move=>move.id===gone),'Both are active before');
+  const at=f.time();f.forget(gone);
+  f.advance(1500);
+  assert.ok(!f.moves.some(move=>move.id===gone && move.at>at),'A forgotten actor is never stepped again');
+  assert.ok(f.moves.some(move=>move.id===stays && move.at>at),'The rest carry on');
+  f.stop();
 });
 
 test('A commanded actor survives five-second discovery under the real population policy', () => {

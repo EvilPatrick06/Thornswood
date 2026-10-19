@@ -39,7 +39,7 @@ function Yes([string]$what, [bool]$ok) {
 
 $m = [regex]::Match($src, '(?s)# ==== thornswood baseline send ====.*?# ==== end thornswood baseline send ====')
 Yes 'the baseline send block is in Publish-Update.ps1' $m.Success
-Yes 'it runs after the release is saved' ($src -match '(?s)Save-State\s+Clear-Pending \$StateFile\s+Send-Baseline \$Id')
+Yes 'it runs after the release is saved' ($src -match '(?s)Save-State\s+\$pendingWhy = Clear-Pending \$StateFile\s+Send-Baseline \$Id')
 $send = [regex]::Match($src, '(?s)# ==== thornswood feed send ====.*?# ==== end thornswood feed send ====')
 Yes 'the feed send block is in Publish-Update.ps1' $send.Success
 if ($send.Success) {
@@ -49,7 +49,7 @@ if ($send.Success) {
     $feedAt = $b.IndexOf("Send-FeedStore `$Channel `$ReleaseDir `$feedFiles")
     $listAt = $b.IndexOf("`$feedFiles = @('version.json')")
     Yes 'the feed goes to the VPS before the baseline moves' ($listAt -ge 0 -and $listAt -lt $feedAt -and $feedAt -lt $b.IndexOf('Save-State'))
-    Yes 'and a feed that did not go leaves the baseline where it was, with a note to finish it' ($b -match '(?s)if \(\$pushFailed\) \{\s+Write-Pending')
+    Yes 'and a feed that did not go leaves the baseline where it was, with a note to finish it' ($b -match '(?s)if \(\$pushFailed\) \{\s+\$pendingWhy = Write-Pending')
 }
 Yes 'nothing in Publish-Update commits or pushes a baseline any more' (-not ($src -match 'git -C \$ReleaseDir (add|commit|push|pull)'))
 
@@ -66,30 +66,30 @@ try {
     $Channel = 'dev'
     New-Item -ItemType Directory -Path (Join-Path $SiteDir 'feed-dev') -Force | Out-Null
     [IO.File]::WriteAllText((Join-Path $SiteDir 'feed-dev\version.json'), '{"launcherVersion":"1.1.102.1"}')
-    [IO.File]::WriteAllText((Join-Path $SiteDir 'feed-dev\published.json'), '{"a":1}')
+    [IO.File]::WriteAllText((Join-Path $SiteDir 'feed-dev\published.json'), '{"a":"1"}')
     [void](Receive-FeedStore $Channel $ReleaseDir -SiteDir $SiteDir)
     function Up { [IO.File]::ReadAllText((Join-Path $SiteDir 'feed-dev\published.json')) }
 
     # 1. after a release
     $NoPush = $false
     $script:said = @()
-    [IO.File]::WriteAllText((Join-Path $ReleaseDir 'published.json'), '{"a":2}')
+    [IO.File]::WriteAllText((Join-Path $ReleaseDir 'published.json'), '{"a":"2"}')
     Send-Baseline '20260928-1902-dev'
-    Yes 'after a release the baseline is on the VPS' ((Up) -eq '{"a":2}')
+    Yes 'after a release the baseline is on the VPS' ((Up) -eq '{"a":"2"}')
     Yes 'and the one it replaced is kept in history' (@(Get-ChildItem -LiteralPath (Join-Path $SiteDir 'feed-dev\history') -Filter '*-published.json').Count -eq 1)
     Yes 'and it says so' (($script:said -join "`n") -like '*baseline 20260928-1902-dev sent to the VPS*')
 
     # 2. -NoPush
     $NoPush = $true
-    [IO.File]::WriteAllText((Join-Path $ReleaseDir 'published.json'), '{"a":3}')
+    [IO.File]::WriteAllText((Join-Path $ReleaseDir 'published.json'), '{"a":"3"}')
     Send-Baseline 'x'
-    Yes '-NoPush sends nothing' ((Up) -eq '{"a":2}')
+    Yes '-NoPush sends nothing' ((Up) -eq '{"a":"2"}')
 
     # 3. another Ship moved it meanwhile
     $NoPush = $false
     $script:said = @()
     [IO.File]::WriteAllText((Join-Path $SiteDir 'feed-dev\published.json'), '{"other":"machine"}')
-    [IO.File]::WriteAllText((Join-Path $ReleaseDir 'published.json'), '{"a":4}')
+    [IO.File]::WriteAllText((Join-Path $ReleaseDir 'published.json'), '{"a":"4"}')
     $threw = $false
     try { Send-Baseline 'y' } catch { $threw = $true }
     Yes 'a baseline another Ship moved up there is not overwritten' ((Up) -eq '{"other":"machine"}')

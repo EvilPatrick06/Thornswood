@@ -189,7 +189,7 @@ function load() {
       }
     },
     thornswoodNet: {
-      say: function (text) { said.push(String(text)); }
+      typed: function (text) { said.push(String(text)); }
     },
     JSON: JSON, Math: Math, Array: Array, String: String,
     Number: Number, Object: Object

@@ -1,19 +1,20 @@
 // test-coffers.js
 //
-// The drop box, rent and the notice boards. One system, because the box is
-// where the rent and the fees land.
-//
-// THE BOX IS MEASURED AND NOT INVENTED. mp.onPutItem(containerRefrId, actorId,
-// baseId, count) exists in the fork and PutItemEvent::OnFireSuccess is the
-// thing that removes the items, so returning false REFUSES the put and the
-// gold stays in the hand. That is what makes a treasury possible without a new
-// record, a client change or a release.
+// The hold's fees, rent and the notice boards.
 //
 // Patrick's design, 21 September: twenty gold for a notice which is read only,
-// thirty for a job which goes on the taker's list, the fee routes into the drop
-// box which is the hold's money, and the same box takes rent. Rent is handed to
-// a steward in person or put in the box; the server counts and does not seize,
-// even though it owns everybody's pack and could.
+// thirty for a job which goes on the taker's list, and the fee is the hold's.
+// Rent is handed to a steward in person or put in the hold's drop box; the
+// server counts and does not seize, even though it owns everybody's pack and
+// could.
+//
+// THE MARKED CHEST IS RETIRED (#2298, Patrick, 15 Oct, decision 3 A). This
+// file used to drive putIn, the answer to mp.onPutItem for a container a
+// steward had marked as a hold's box: only gold went in, and it was counted
+// onto the hold's ledger. The drop box on the board is the only box now, and
+// tests/test-2298-dropbox.js drives it, rent first included. What is left
+// here checks the put hook answers for no container, and drives posting and
+// taking at a board.
 //
 // Read only.
 const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
@@ -45,124 +46,31 @@ function lift(from, to) {
   return b < 0 ? null : prop.slice(a, b + to.length);
 }
 
-const putBlock = lift('  function putIn(containerRefrId, actorId, baseId, count) {', '\n  }\n');
 const postBlock = lift('  function post(parts, actorId, profileId, toProfile, isJob) {', '\n  }\n');
 // The line a post arrives on, a title and a body (#2554).
 const wordsBlock = lift('  function postWords(line) {', '\n  }\n');
 
-yes('the drop box answer is in the gamemode', putBlock !== null);
-yes('and posting to a board is too', postBlock !== null && wordsBlock !== null);
+yes('the marked chest\'s answer is gone from the property block (#2298)',
+    prop.indexOf('function putIn(') === -1);
+yes('and posting to a board is in it', postBlock !== null && wordsBlock !== null);
 
-const GOLD = 0x0000000F;
-const SWORD = 0x12eb7;
-const BOX = 0xaaaa;
 const ALICE = 101;
 
-/** Drive putIn with a hold that owns BOX. */
-function put(opts) {
-  const said = [];
-  const claims = opts.claims || {};
-  const funds = opts.funds || { whiterun: 0 };
-  const fn = new Function(
-    'containerRefrId', 'actorId', 'baseId', 'count',
-    'holdOfBox', 'claims', 'funds', 'rentOwedBy', 'save', 'plog',
-    'notify', 'say', 'mp', 'Number', 'GOLD_ID',
-    putBlock + '\nreturn putIn;');
-  const call = fn(
-    null, null, null, null,
-    function (id) { return id === BOX ? 'whiterun' : null; },
-    claims, funds,
-    function (pid) {
-      const out = [];
-      for (const b in claims) {
-        const c = claims[b];
-        if (c.by === pid && c.rent && c.rent.owed > 0) { out.push(b); }
-      }
-      return out;
-    },
-    function () { }, function () { },
-    function (id, m) { said.push(m); },
-    function (id, m) { said.push(m); },
-    { get: function () { return ALICE; } },
-    Number, GOLD);
-  const out = call(opts.into === undefined ? BOX : opts.into,
-                   0xff000058, opts.baseId, opts.count);
-  return { refused: out === false, said: said, claims: claims, funds: funds };
-}
-
-if (putBlock !== null) {
-  // S1: gold in the hold's box is money to the hold.
-  {
-    const r = put({ baseId: GOLD, count: 40 });
-    yes('S1 gold in the box is accepted', !r.refused);
-    yes('S1 and the hold is forty richer', r.funds.whiterun === 40);
-    // Twice, because every message in this file goes to both notify and say:
-    // the corner of the screen and the chat log. One of them is missed.
-    yes('S1 and the person is told, on screen and in chat',
-        r.said.length === 2 && r.said[0] === r.said[1] &&
-        r.said[0].indexOf('40 gold') !== -1);
-  }
-
-  // S2: ONLY COIN. A box that takes a sword is a box somebody loses a sword
-  //     in: the server has no way to give it back and no rule saying whose it
-  //     became. Refusing costs them nothing, which is what the event is for.
-  {
-    const r = put({ baseId: SWORD, count: 1 });
-    yes('S2 anything that is not coin is refused', r.refused);
-    yes('S2 and the reason names losing it',
-        r.said[0].indexOf('lost in there') !== -1);
-    yes('S2 and the hold gains nothing', r.funds.whiterun === 0);
-  }
-
-  // S3: EVERY OTHER CHEST IN SKYRIM IS UNTOUCHED. This is the check that keeps
-  //     one feature from changing the whole world.
-  {
-    const r = put({ baseId: SWORD, count: 1, into: 0xbbbb });
-    yes('S3 a container that is not a box says nothing at all',
-        !r.refused && r.said.length === 0);
-  }
-
-  // S4: gold pays down what the payer owes first, because that is what putting
-  //     coin in the city's box almost always means.
-  {
-    const claims = {
-      breezehome: { by: ALICE, name: 'Alice', at: 1,
-                    rent: { amount: 50, everyDays: 7, owed: 50, since: 1 } }
-    };
-    const r = put({ baseId: GOLD, count: 30, claims: claims });
-    yes('S4 rent is paid down first', claims.breezehome.rent.owed === 20);
-    yes('S4 and the person is told how much went to it',
-        r.said[0].indexOf('30 of it goes against your rent') !== -1);
-  }
-
-  // S5: and paying it off clears it rather than going negative.
-  {
-    const claims = {
-      breezehome: { by: ALICE, name: 'Alice', at: 1,
-                    rent: { amount: 50, everyDays: 7, owed: 20, since: 1 } }
-    };
-    put({ baseId: GOLD, count: 100, claims: claims });
-    yes('S5 overpaying clears the debt and does not go below nothing',
-        claims.breezehome.rent.owed === 0);
-  }
-}
-
 if (postBlock !== null && wordsBlock !== null) {
-  /** Drive post with a pack and a hold that has a box. */
+  /** Drive post with a pack, at Whiterun's board. */
   function posting(opts) {
     const told = [];
     const notices = opts.notices || {};
     const funds = { whiterun: 0 };
-    const boxes = opts.noBox ? {} : { whiterun: BOX };
     const took = { n: 0 };
     const fn = new Function(
       'parts', 'actorId', 'profileId', 'toProfile', 'isJob',
-      'boxes', 'notices', 'funds', 'takeGold', 'save', 'plog', 'mp',
+      'notices', 'funds', 'takeGold', 'save', 'plog', 'mp',
       'NOTICE_FEE', 'JOB_FEE', 'POST_TITLE_CHARS', 'POST_BODY_CHARS', 'Number', 'boardHere', 'refreshPanel',
       wordsBlock + '\n' + postBlock + '\nreturn post;');
     const call = fn(
       null, null, null, null, null,
-      boxes, notices, funds,
+      notices, funds,
       function (id, amount) {
         if (opts.broke) { return false; }
         took.n += amount;
@@ -311,16 +219,17 @@ if (postBlock !== null && wordsBlock !== null) {
   const code = src
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .replace(/\/\/[^\n]*/g, ' ');
-  yes('the put hook is registered with the engine',
+  yes('the put hook is registered with the engine, under guard() for the join pass',
       /mp\.onPutItem = guard\('onPutItem'/.test(code));
-  yes('and it hands straight to the property block',
-      /return prop\.putIn\(containerRefrId, actorId, baseId, count\)/.test(code));
-  yes('all five words are in the one list',
-      /'\/box', '\/rent',/.test(code) && /'\/notice', '\/job', '\/board',/.test(code));
-  yes('and the dispatcher routes them',
-      /word === '\/box' \|\|/.test(code) && /word === '\/board'\)/.test(code));
-  yes('the container somebody opened is only remembered for containers',
-      /prop\.touchedBox && kindIsContainer\(baseDesc\)/.test(code));
+  yes('and it asks the property block nothing: no container has a rule of its own (#2298)',
+      !/prop\.putIn|__thornswoodProperty[\s\S]{0,40}putIn/.test(code) &&
+      /mp\.onPutItem = guard\('onPutItem', function \(\) \{\s*return;\s*\}\);/.test(code));
+  yes('the board words are in the one list, and /box is not',
+      /'\/evict', '\/rent',/.test(code) && /'\/notice', '\/job', '\/board',/.test(code) && !/'\/box'/.test(code));
+  yes('and the dispatcher routes them, and never /box',
+      /word === '\/board'\)/.test(code) && !/word === '\/box'/.test(code));
+  yes('a container somebody opens is not remembered as a box',
+      !/touchedBox/.test(code));
 }
 
 console.log('');

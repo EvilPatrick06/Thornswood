@@ -3,10 +3,11 @@ Add-ContentRecords.py
 
 Writes Thornswood-Content.esp's records: every record of Thornswood's own from
 the numbers in this script, the overrides of Bethesda's records it carries, and
-the cells and worldspaces its placements stand in from Bethesda's own records.
-Since #2553 nothing in it is the salvaged plugin's but the 57 placements of
-Thornswood's stations that wait on where Thornswood stands its own (see THE
-SALVAGED RECORDS, REMADE, below).
+the cells and worldspaces its placements stand in from Bethesda's own records,
+and the placements of Thornswood's kilns, salt quarries, hives and labs from
+game\\data\\station-sites.json. Since #2553 nothing in it is the salvaged
+plugin's (see THE SALVAGED RECORDS, REMADE, and WHERE THE STATIONS STAND,
+below).
 
 THE SALVAGED RECORDS, REMADE (#2553)
 
@@ -25,20 +26,33 @@ scripts\\mods\\content-salvaged.json, with what became of each:
             the saves name them. Six recipes come out the bytes the plugin
             held, because every field of them is a fact the rulebook states
             (the Charburner and Edgewright pages); the register says which.
-  dropped   the other server's other placements (Skyrim's own objects put
-            where it chose, notice boards placed switched off), its changes to
-            Skyrim's own placements (80 switched off, 32 moved, turned or
-            resized, 3 relinked, 4 that change nothing), the cells and
-            worldspaces left holding nothing of Thornswood's, and a chest
-            of ore nothing names.
-  Bethesda's  the cells and worldspaces that hold the placements left, each
-            written from the winning master's own record by
+  dropped   the other server's placements: its 57 of Thornswood's kiln (8),
+            salt quarry (11), hive (13) and alchemy lab (25) at the spots it
+            chose, which went on Patrick's A of 16 October when Thornswood
+            stood its own; Skyrim's own objects put where it chose and notice
+            boards placed switched off; its changes to Skyrim's own
+            placements (80 switched off, 32 moved, turned or resized, 3
+            relinked, 4 that change nothing); the cells and worldspaces left
+            holding nothing of Thornswood's; and a chest of ore nothing names.
+  Bethesda's  the salvaged cells and worldspaces a station Thornswood places
+            stands in, each written from the winning master's own record by
             Build-LastPlugin.py's copier, never the salvaged copy.
-  awaiting sites  the 57 placements of Thornswood's kiln (8), salt quarry
-            (11), hive (13) and alchemy lab (25), at the spots the other
-            server chose. Taking them out would take the only kilns, salt
-            quarries, placed hives and Thornswood labs out of the world, so
-            they stay until Patrick says where Thornswood stands its own.
+
+WHERE THE STATIONS STAND (#2553)
+
+Patrick, 16 October 2026, A on #2553: Thornswood measures its own spots for
+its kilns, salt quarries, hives and labs, the way the woodworking benches were
+placed, and this plugin places them. scripts\\dev\\Build-StationSites.py
+measures each spot over the whole load order into game\\data\\station-sites.json
+(docs\\systems\\station-placement.md says the rule for each kind); this writes
+one placement for each row, its base, its point and its turn and nothing
+else, in the cell the row names, under the form id the row gives. A cell or
+worldspace a placement needs and the plugin does not carry yet is copied from
+the winning master's own record, which needs --masters the first time; the
+builder has already refused any spot whose cell a mod changes, so the copy
+changes nothing in the game. The placements' form ids start at 0x05015500,
+which no version of this plugin ever used, so no change form a save holds for
+an old placement can land on a new one.
 
 Before #2553 most of Thornswood's own items here were clones of the salvaged
 charcoal and its recipe; they are written from their own numbers now as well.
@@ -252,8 +266,8 @@ keyword, with no new master. The repair kits stayed off the loom because
 they named only Skyrim.esm; Patrick asked for the bandage at the loom.
 
 THE ALCHEMY LAB IS THIS PLUGIN'S OWN. ThornswoodCraftingAlchemyWorkbench
-(FURN 0x5042E69) is a create-object bench, WBDT 01 10, placed 25 times, and
-carries ThornswoodCraftingAlchemy (KYWD 0x5042E6B), which no recipe named
+(FURN 0x5042E69) is a create-object bench, WBDT 01 10, placed in the apothecary
+of each hold capital (WHERE THE STATIONS STAND, above), and carries ThornswoodCraftingAlchemy (KYWD 0x5042E6B), which no recipe named
 until now. Skyrim's own alchemy lab cannot show a recipe at all: it brews from
 the effects ingredients share. So the physicker's two are made at this one.
 
@@ -337,6 +351,7 @@ if anything it was asked to add is already there.
 
 import argparse
 import json
+import math
 import os
 import struct
 import sys
@@ -1002,9 +1017,161 @@ def bethesdas_world_records(masters_dir, plugin_masters, wanted):
                              % (t.decode(), f))
         src, e = win[key]
         what = '%s %s 0x%08X' % (src.name, t.decode(), e.fid)
+        # Where an interior or exterior cell sits among the groups: its block
+        # and sub-block labels, the master's own, which are the same in every
+        # file because they come from the cell's grid or its object id.
+        ctx = None
+        if t == b'CELL':
+            world, block, sub, persistent = e.ctx
+            if persistent or block is None or sub is None:
+                raise SystemExit('STOP. %s is a worldspace\'s persistent cell, which this does not place in. '
+                                 'Nothing was written.' % what)
+            ctx = (block, sub, world is not None)
         out[(t, f)] = (e.flags & ~COMPRESSED,
-                       last.pack_subrecords(last.copy_record(src, e, rn, strings, what)), src.name)
+                       last.pack_subrecords(last.copy_record(src, e, rn, strings, what)), src.name, ctx)
     return out
+
+
+# THE STATIONS' PLACEMENTS (#2553). Patrick, 16 October 2026, A on #2553:
+# Thornswood measures its own spots for its kilns, salt quarries, beehives and
+# alchemy labs, the way the woodworking benches were placed, and this plugin
+# places them. scripts\dev\Build-StationSites.py measures them over the load
+# order into game\data\station-sites.json; each placement is written from that
+# table and nothing else: its base, its point and its turn about the upright.
+STATION_SITES = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..',
+                                              'game', 'data', 'station-sites.json'))
+STATION_NAMES = {KILN: 'charcoal kilns', SALT_QUARRY: 'salt quarries', BEEHIVE: 'beehives',
+                 ALCHEMY_LAB: 'alchemy labs'}
+STATION_BASES = set(STATION_NAMES)
+
+
+def placement(fid, base, pos, angle):
+    """A placed station: its base and where it stands, turned angle degrees."""
+    x, y, z = pos
+    return own_record(b'REFR', fid, [(b'NAME', struct.pack('<I', base)),
+                                     (b'DATA', struct.pack('<6f', x, y, z, 0.0, 0.0, math.radians(angle)))])
+
+
+def group_type(g):
+    return struct.unpack_from('<i', g.label, 4)[0]
+
+
+def group_id(g):
+    return struct.unpack_from('<I', g.label, 0)[0]
+
+
+def placements_in(kids, cell=None):
+    """(REFR, the list it sits in, its cell's form id) for every placement."""
+    out = []
+    for k in kids:
+        if isinstance(k, Grup):
+            out += placements_in(k.kids, group_id(k) if group_type(k) in (6, 8, 9, 10) else cell)
+        elif k.tag == b'REFR':
+            out.append((k, kids, cell))
+    return out
+
+
+def placed_ids(tree):
+    return set(r.fid for r, _, _ in placements_in(tree))
+
+
+def find_cell(kids, fid):
+    """(the list a cell's record sits in, its index), or None."""
+    for i, k in enumerate(kids):
+        if isinstance(k, Grup):
+            got = find_cell(k.kids, fid)
+            if got:
+                return got
+        elif k.tag == b'CELL' and k.fid == fid:
+            return kids, i
+    return None
+
+
+def find_world(tree, fid):
+    top = next((k for k in tree if isinstance(k, Grup) and k.label[:4] == b'WRLD'), None)
+    if top is None:
+        return None
+    for i, k in enumerate(top.kids):
+        if isinstance(k, Rec) and k.tag == b'WRLD' and k.fid == fid:
+            return top.kids, i
+    return None
+
+
+def new_group(label, gtype, stamp, kids=None):
+    return Grup(label + struct.pack('<i', gtype) + b'\x00' * 4 + stamp, kids or [])
+
+
+def children_of(kids, i, gtype, stamp):
+    """The children group straight after the record at kids[i], made if missing."""
+    rec = kids[i]
+    nxt = kids[i + 1] if i + 1 < len(kids) else None
+    if isinstance(nxt, Grup) and group_type(nxt) == gtype and group_id(nxt) == rec.fid:
+        return nxt
+    g = new_group(struct.pack('<I', rec.fid), gtype, stamp)
+    kids.insert(i + 1, g)
+    return g
+
+
+def sub_group(kids, label, gtype, stamp):
+    """The block or sub-block group with that label, made in its sorted place."""
+    def key(lb):
+        if gtype in (4, 5):
+            return struct.unpack('<hh', lb)[::-1]
+        return (struct.unpack('<i', lb)[0],)
+    for k in kids:
+        if isinstance(k, Grup) and group_type(k) == gtype and k.label[:4] == label:
+            return k
+    g = new_group(label, gtype, stamp)
+    at = next((i for i, k in enumerate(kids) if isinstance(k, Grup) and group_type(k) == gtype
+               and key(k.label[:4]) > key(label)), None)
+    if at is None:
+        at = max([i + 1 for i, k in enumerate(kids) if isinstance(k, Grup) and group_type(k) == gtype] or
+                 [len(kids)])
+    kids.insert(at, g)
+    return g
+
+
+def insert_pair(kids, rec, tag):
+    """A CELL or WRLD record in its sorted place among its kind, before the
+    next record of that kind (whose children group follows it)."""
+    at = next((i for i, k in enumerate(kids) if isinstance(k, Rec) and k.tag == tag and k.fid > rec.fid),
+              len(kids))
+    kids.insert(at, rec)
+    return at
+
+
+def put_world(tree, rec, stamp):
+    top = next((k for k in tree if isinstance(k, Grup) and k.label[:4] == b'WRLD'), None)
+    if top is None:
+        top = ensure_top_group(tree, b'WRLD')
+    insert_pair(top.kids, rec, b'WRLD')
+
+
+def put_cell(tree, rec, ctx, world, stamp):
+    (bgt, blabel), (sgt, slabel), exterior = ctx
+    if exterior:
+        kids, i = find_world(tree, world)
+        parent = children_of(kids, i, 1, stamp).kids
+    else:
+        top = next((k for k in tree if isinstance(k, Grup) and k.label[:4] == b'CELL'), None)
+        if top is None:
+            top = ensure_top_group(tree, b'CELL')
+        parent = top.kids
+    block = sub_group(parent, blabel, bgt, stamp)
+    sub = sub_group(block.kids, slabel, sgt, stamp)
+    at = insert_pair(sub.kids, rec, b'CELL')
+    children_of(sub.kids, at, 6, stamp)
+
+
+def put_placement(tree, rec, cell, stamp):
+    kids, i = find_cell(tree, cell)
+    children = children_of(kids, i, 6, stamp)
+    temp = next((k for k in children.kids if isinstance(k, Grup) and group_type(k) == 9), None)
+    if temp is None:
+        temp = new_group(struct.pack('<I', cell), 9, stamp)
+        children.kids.append(temp)
+    at = next((j for j, k in enumerate(temp.kids) if isinstance(k, Rec) and k.fid > rec.fid), len(temp.kids))
+    temp.kids.insert(at, rec)
 
 
 def cnto(base, count):
@@ -1395,7 +1562,7 @@ def main():
     register = json.load(open(SALVAGED_REGISTER, encoding='utf-8'))
     plugin_masters = masters_of(raw)
     salvaged_hashes = {}
-    awaiting, dropping, bethesdas, remade, same_by_design = set(), set(), set(), set(), set()
+    dropping, bethesdas, remade, same_by_design = set(), set(), set(), set()
     gone_before = set()
     for row in register['records']:
         fid = local_fid(row['formId'], plugin_masters, args.plugin)
@@ -1404,8 +1571,13 @@ def main():
         d = row['disposition']
         if d == 'gone before #2553':
             gone_before.add(fid)
-        elif d == 'awaiting sites':
-            awaiting.add(fid)
+        elif d not in ('dropped', "Bethesda's", 'remade'):
+            # Since Patrick's A of 16 October nothing salvaged waits on
+            # anything: the 57 placements are the other server's spots and go.
+            print('')
+            print('STOP. the register keeps %s 0x%07X as "%s". Run scripts\\mods\\List-SalvagedRecords.py. '
+                  'Nothing was written.' % (row['type'], fid, d))
+            return 1
         elif d == 'dropped':
             dropping.add(fid)
         elif d == "Bethesda's":
@@ -1534,7 +1706,7 @@ def main():
     going = set(f for f in dropping if f in by_fid)
     removing |= going
 
-    # The cell and world records that stay hold the placements awaiting sites.
+    # The cell and world records that stay hold the stations' placements.
     # Each is written from the winning master's own record, Bethesda's, never
     # the salvaged copy. That needs the masters; without them a record that is
     # already Bethesda's is left as it is, and one that is still the salvaged
@@ -1546,10 +1718,75 @@ def main():
     world_from = {}
     if world_new is not None:
         for r in world_keep:
-            flags, data, src = world_new[(r.tag, r.fid)]
+            flags, data, src, ctx = world_new[(r.tag, r.fid)]
             world_from[r.fid] = src
             if (r.data, r.flags, r.extra) != (data, flags, FORM_TAIL):
                 rewritten.append((r, Rec(r.tag, flags, r.fid, FORM_TAIL, data)))
+
+    # WHERE THE STATIONS STAND (#2553, Patrick's A of 16 October): every
+    # placement game\data\station-sites.json measures, and nothing else. A
+    # placement already where the table puts it stays; one the table moved is
+    # written over, or taken out of its old cell and put in its new one; a
+    # cell or worldspace a placement needs that the plugin does not carry is
+    # copied from the winning master's own record.
+    sites = json.load(open(STATION_SITES, encoding='utf-8'))
+    want, want_cell, want_world = {}, {}, {}
+    own_index = len(plugin_masters)
+    for name, row in sorted(sites['sites'].items()):
+        fid = local_fid(row['ref'], plugin_masters, args.plugin)
+        base = local_fid(row['base'], plugin_masters, args.plugin)
+        cell = local_fid(row['cell'], plugin_masters, args.plugin)
+        if base not in STATION_BASES or (fid >> 24) != own_index or (cell >> 24) >= own_index or fid in want:
+            print('')
+            print('STOP. the station table\'s %s is not a placement of a station in this plugin, in a cell of '
+                  'its masters, under a form id of its own. Nothing was written.' % name)
+            return 1
+        if fid in taken and fid not in placed_ids(tree):
+            print('')
+            print('STOP. the station table gives %s 0x%07X, which this plugin uses for something else. '
+                  'Nothing was written.' % (name, fid))
+            return 1
+        want[fid] = placement(fid, base, row['pos'], row['angle'])
+        want_cell[fid] = cell
+        want_world[fid] = None if row['interior'] else local_fid(row['space'], plugin_masters, args.plugin)
+    stays, moved, to_place = set(), set(), []
+    for r, parent, cell in placements_in(tree):
+        if r.fid in removing:
+            continue
+        if r.fid not in want:
+            print('')
+            print('STOP. REFR 0x%07X is a placement neither the station table nor the register knows. '
+                  'Nothing was written.' % r.fid)
+            return 1
+        if cell != want_cell[r.fid]:
+            moved.add(r.fid)
+            continue
+        stays.add(r.fid)
+        if (r.data, r.flags, r.extra) != (want[r.fid].data, want[r.fid].flags, want[r.fid].extra):
+            rewritten.append((r, want[r.fid]))
+    to_place = [want[f] for f in sorted(want) if f not in stays]
+    need = set()
+    for r in to_place:
+        cell = want_cell[r.fid]
+        if cell in removing or find_cell(tree, cell) is None:
+            if cell in removing:
+                print('')
+                print('STOP. the register says cell 0x%08X goes, and the station table places 0x%07X in it. '
+                      'Run scripts\\mods\\List-SalvagedRecords.py. Nothing was written.' % (cell, r.fid))
+                return 1
+            need.add((b'CELL', cell))
+        w = want_world[r.fid]
+        if w is not None and find_world(tree, w) is None:
+            need.add((b'WRLD', w))
+    copies = {}
+    if need:
+        copies = bethesdas_world_records(args.masters, plugin_masters, sorted(need))
+        if copies is None:
+            print('')
+            print('STOP. %d cell or worldspace record(s) the stations need are not in this plugin, and the '
+                  'masters are not in %s. Give --masters the game\'s Data folder. Nothing was written.'
+                  % (len(need), args.masters))
+            return 1
 
     # A salvaged record that is not going and not written over is refused
     # here, before anything else: put back by hand, or by an old copy, it
@@ -1561,8 +1798,7 @@ def main():
         # One the register says left before #2553 (the skill manuals, the
         # Execution Block and its placement) is refused by its form id too,
         # however it was edited since.
-        salvaged_bytes = (body_hash(plain(r)) in salvaged_hashes and
-                          not (r.fid in awaiting and r.tag == b'REFR') and r.fid not in same_by_design)
+        salvaged_bytes = body_hash(plain(r)) in salvaged_hashes and r.fid not in same_by_design
         if r.fid in gone_before or salvaged_bytes:
             print('')
             print('STOP. %s 0x%07X %s is a salvaged record (#2553), by its %s, and the register '
@@ -1607,12 +1843,16 @@ def main():
             kinds[by_fid[f].tag.decode()] = kinds.get(by_fid[f].tag.decode(), 0) + 1
         print('  salvaged, nothing of Thornswood\'s asks for them (#2553): %s'
               % ', '.join('%d %s' % (n, t) for t, n in sorted(kinds.items())))
-    left_waiting = sorted(f for f in awaiting if f in by_fid)
-    if left_waiting:
-        print('')
-        print('Waiting on where Thornswood stands its own stations (#2553)')
-        print('  %d placements of the kiln, the salt quarry, the hive and the lab stay until then'
-              % len(left_waiting))
+    print('')
+    print('Where the stations stand (#2553, game\\data\\station-sites.json)')
+    kinds = {}
+    for r in want.values():
+        b = struct.unpack_from('<I', dict(subrecords(r.data))[b'NAME'])[0]
+        kinds[b] = kinds.get(b, 0) + 1
+    print('  %s' % ', '.join('%d %s' % (kinds.get(b, 0), n) for b, n in sorted(STATION_NAMES.items())))
+    print('  %d already where the table puts them, %d moved to another cell, %d placed now, %d cell and '
+          'worldspace record(s) copied from the masters for them'
+          % (len(stays), len(moved), len(to_place) - len(moved), len(copies)))
 
     new_head, head_changed = described(head)
     print('')
@@ -1640,12 +1880,32 @@ def main():
     for r in wood_have:
         if set_bnam(r, WOODWORKING_KEYWORD):
             edited.add(r.fid)
-    if not built and not edited and not removing and not head_changed:
+    if not built and not edited and not removing and not head_changed and not to_place:
         print('')
         print('  Everything this writes is already in the plugin as it writes it. Nothing was written.')
         return 0
     old_head = bytes(head)
     head = new_head
+    # The stations go in before anything comes out, so a cell that loses the
+    # other server's placement and gains Thornswood's keeps its record.
+    for f in moved:
+        for r, parent, cell in placements_in(tree):
+            if r.fid == f:
+                parent.remove(r)
+                break
+    stamp = next(k for k in tree if isinstance(k, Grup)).label[12:16]
+    built_world = []
+    for (tag, fid), (flags, data, src, ctx) in sorted(copies.items(), key=lambda x: (x[0][0] != b'WRLD', x[0][1])):
+        rec = Rec(tag, flags, fid, FORM_TAIL, data)
+        built_world.append(rec)
+        if tag == b'WRLD':
+            put_world(tree, rec, stamp)
+        else:
+            w = next(want_world[f] for f in want if want_cell[f] == fid)
+            put_cell(tree, rec, ctx, w, stamp)
+    for r in to_place:
+        put_placement(tree, r, want_cell[r.fid], stamp)
+    built_world += to_place
     tree = take_out(tree, removing)
     tree = drop_bare_parents(tree)
     # A record this adds goes where it belongs in the order this tool writes
@@ -1661,9 +1921,11 @@ def main():
                    if isinstance(k, Rec) and rank.get(k.fid, -1) > rank.get(r.fid, len(order))),
                   len(group.kids))
         group.kids.insert(at, r)
+    built += built_world
     added = set(r.fid for r in built)
     kept_ids = set(r.fid for r in every_record(tree)) - added
-    gone_unasked = sorted(f for f in before if f not in kept_ids and f not in removing)
+    # A placement the table moved to another cell is in the file again, added.
+    gone_unasked = sorted(f for f in before if f not in kept_ids and f not in removing and f not in moved)
     if gone_unasked:
         print('')
         print('STOP. 0x%07X went with nothing left under it, and the register does not say it goes. '
@@ -1748,14 +2010,19 @@ def main():
     if orphan_groups(tree):
         print('  STOP. a cell or world group is left without its record. Nothing was written.')
         return 1
-    # NOTHING SALVAGED IS LEFT (#2553), but the placements waiting on sites,
-    # and the four kiln recipes, every field of which the Charburner page
-    # states (the register's sameByDesign says which line).
+    # THE PLACEMENTS ARE THE STATION TABLE'S, each in its cell, and no other.
+    there = dict((r.fid, (r, cell)) for r, parent, cell in placements_in(tree))
+    if sorted(there) != sorted(want) or any(there[f][0].data != want[f].data or there[f][1] != want_cell[f]
+                                            for f in want):
+        print("  STOP. the placements are not the station table's, each in its cell. Nothing was written.")
+        return 1
+    # NOTHING SALVAGED IS LEFT (#2553), but the four kiln recipes and the
+    # pickaxe and the axe, every field of which the rulebook states (the
+    # register's sameByDesign says which line).
     left_salvaged = []
     for r in after_records:
         h = body_hash(plain(r))
-        if h in salvaged_hashes and not (r.fid in awaiting and r.tag == b'REFR') \
-                and r.fid not in same_by_design:
+        if h in salvaged_hashes and r.fid not in same_by_design:
             left_salvaged.append(r)
     if left_salvaged:
         for r in left_salvaged:
@@ -1780,8 +2047,8 @@ def main():
     print('  ok    %d added, %d edited, %d taken out, every other byte untouched'
           % (len(built), len(edited), len(removing)))
     print('  ok    every record this tool writes is what it writes')
-    print('  ok    no salvaged record is left but the %d placements waiting on sites'
-          % len([r for r in after_records if r.fid in awaiting]))
+    print("  ok    the %d placements are the station table's, each in its cell" % len(want))
+    print('  ok    no salvaged record is left')
     print('  ok    the header record count reads %d, which is what is in the file' % count)
     print('  ok    no record carries the other server\'s name or its short forms, '
           'compressed ones included')
