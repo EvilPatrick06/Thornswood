@@ -174,7 +174,7 @@ try {
     $out = Join-Path $work 'backups'
     $code = Run $Nightly @('-GameRoot', $live, '-DevGameRoot', (Join-Path $work 'no-dev'), '-SiteRoot', (Join-Path $work 'no-site'),
                            '-BotRoot', (Join-Path $work 'no-bot'), '-CaddyRoot', (Join-Path $work 'no-caddy'),
-                           '-VoiceRoot', (Join-Path $work 'no-voice'), '-Out', $out, '-KeyFile', $key)
+                           '-VoiceRoot', (Join-Path $work 'no-voice'), '-DeletionRoot', (Join-Path $work 'no-del'), '-Out', $out, '-KeyFile', $key)
     $enc = @(Get-ChildItem -LiteralPath $out -Filter 'thornswood-*.zip.enc' -File -EA SilentlyContinue)
     Yes "the nightly backup of a stand-in live server is made (exit $code)" ($code -eq 0 -and $enc.Count -eq 1)
     if ($enc.Count -ne 1) { Show; Done }

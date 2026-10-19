@@ -201,7 +201,7 @@ try {
     # ---- the nightly backup --------------------------------------------------
     $common = @('-GameRoot', $live, '-DevGameRoot', $dev,
                 '-SiteRoot', $site, '-BotRoot', (Join-Path $work 'no-bot'),
-                '-CaddyRoot', (Join-Path $work 'no-caddy'), '-VoiceRoot', (Join-Path $work 'no-voice'))
+                '-CaddyRoot', (Join-Path $work 'no-caddy'), '-VoiceRoot', (Join-Path $work 'no-voice'), '-DeletionRoot', (Join-Path $work 'no-del'))
     $code = Run $Nightly ($common + @('-Out', $out, '-KeyFile', $key))
     Yes "vps-nightly-backup.ps1 runs (exit $code)" ($code -eq 0)
     if ($code -ne 0) { Show }
@@ -256,7 +256,7 @@ try {
     Put (Join-Path $work 'bot-only\bot.env.json') '{}'
     $code = Run $Nightly @('-GameRoot', (Join-Path $work 'gone'), '-DevGameRoot', (Join-Path $work 'gone-dev'),
                            '-SiteRoot', (Join-Path $work 'no-site'), '-BotRoot', (Join-Path $work 'bot-only'),
-                           '-CaddyRoot', (Join-Path $work 'no-caddy'), '-VoiceRoot', (Join-Path $work 'no-voice'),
+                           '-CaddyRoot', (Join-Path $work 'no-caddy'), '-VoiceRoot', (Join-Path $work 'no-voice'), '-DeletionRoot', (Join-Path $work 'no-del'),
                            '-Out', $emptyOut, '-KeyFile', $key, '-Plain')
     $empty = @(Get-ChildItem -LiteralPath $emptyOut -Filter 'thornswood-*.zip' -File -EA SilentlyContinue)
     if ($empty.Count) {
@@ -361,7 +361,7 @@ try {
     $deadOut = Join-Path $work 'dead-out'
     $code = Run $Nightly @('-GameRoot', $dead, '-DevGameRoot', $dev,
                            '-SiteRoot', (Join-Path $work 'no-site'), '-BotRoot', (Join-Path $work 'no-bot'),
-                           '-CaddyRoot', (Join-Path $work 'no-caddy'), '-VoiceRoot', (Join-Path $work 'no-voice'),
+                           '-CaddyRoot', (Join-Path $work 'no-caddy'), '-VoiceRoot', (Join-Path $work 'no-voice'), '-DeletionRoot', (Join-Path $work 'no-del'),
                            '-Out', $deadOut, '-KeyFile', $key, '-Plain')
     Yes '  the nightly log counts 0 characters in a world of deleted slots' ($code -eq 0 -and (Said 'game\\world\s+0 character'))
     $deadZip = @(Get-ChildItem -LiteralPath $deadOut -Filter 'thornswood-*.zip' -File -EA SilentlyContinue)

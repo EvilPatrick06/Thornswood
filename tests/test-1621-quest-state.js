@@ -79,7 +79,7 @@ const fault = { read: null, write: false, noAdd: [], throwAdd: [] };
 const said = [];
 function lastSaid() { return said.length ? said[said.length - 1] : ''; }
 
-function boot(into, source) {
+function boot(into, source, expanded) {
   const made = {};
   const logged = [];
   const ctx = into || {
@@ -149,7 +149,8 @@ function boot(into, source) {
   };
   ctx.NPC_POPULATION_DATA=compactPopulation;
   ctx.raceEdidOf=id=>npcStates[id].race;
-  ctx.MERCHANT_TRADING = {createKillContracts: require('../game/kill-contracts').createKillContracts,
+  ctx.MERCHANT_TRADING = {expandedScenes:()=>expanded || [],sceneBudget:require('../game/scene-reward-budget'),
+    createKillContracts: require('../game/kill-contracts').createKillContracts,
     createQuestTransactions: function () {
     return {identity: function (a) {
       if(ctx.__runtimeIdentityApi)return require('../game/quest-transactions').actorIdentity(ctx.__runtimeIdentityApi,a);
@@ -185,6 +186,7 @@ function boot(into, source) {
   ctx.__thornswoodDungeonLoot = { GOLD_DESC: 'f:Skyrim.esm' };
   if (!into) { vm.createContext(ctx); }
   require('./quest-eligibility-fixture')(ctx, gm);
+  ctx.MERCHANT_TRADING.expandedScenes=vm.runInContext('(function(){return '+JSON.stringify(expanded || [])+';})',ctx);
   vm.runInContext(source || block, ctx);
   return { svc: ctx.__thornswoodQuests, ctx: ctx, logged: logged };
 }

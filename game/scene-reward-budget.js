@@ -1,5 +1,5 @@
 'use strict';
-// Pure, currently unbundled projection. Only the caller's fenced native CAS
+// Pure projection. Only the caller's fenced native CAS
 // can commit this state together with original quest terms and any reward.
 var DAY = 86400000, LIMIT = 150;
 function integer(n, min) { return Number.isSafeInteger(n) && n >= min; }
