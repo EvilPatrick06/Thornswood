@@ -39,7 +39,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Repo = Split-Path -Parent $Here
 $App = Join-Path $Repo 'launcher\app'
-$Fix = Join-Path $Here 'fixtures\2163-manifest'
+$Fix = Join-Path $PSScriptRoot 'fixtures\2163-manifest'
 
 $script:pass = 0
 $script:fail = 0
@@ -51,7 +51,7 @@ function Yes([string]$what, [bool]$cond) {
 # Compiled the way the build compiles the launcher (Launcher-Csc.ps1), the two
 # files on their own, under a namespace of their own so a session that already
 # loaded another copy is not answered by it.
-. (Join-Path $Here 'Launcher-Csc.ps1')
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')
 Yes 'the build''s compiler is on this machine' (Test-Path -LiteralPath $LauncherCsc)
 $fw = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319'
 if (-not (Test-Path -LiteralPath $fw)) { $fw = Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319' }
