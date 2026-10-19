@@ -3782,13 +3782,12 @@ function retentionSweep() {
   /* Copies before the prune, so a kept session's chat is in its set before
      anything goes. */
   const keptChat = copyKeptChats(now);
-  const sessionLogs = pruneSessionLogs();
-  const trouble = sweepTrouble(now);
-  /* The queue's expired submissions are marked removed before the prune, so
-     their files go in this same pass (#2353). */
-  const pending = expirePending(now);
-  const removedUploads = pruneRemovedUploads(now);
-  return { sessions, keptChat, sessionLogs, trouble, pending, removedUploads,
+  /* In this order, an object literal's own: the queue's expired submissions
+     are marked removed before the prune, so their files go in this same pass
+     (#2353). */
+  return { sessions, keptChat, sessionLogs: pruneSessionLogs(),
+           trouble: sweepTrouble(now), pending: expirePending(now),
+           removedUploads: pruneRemovedUploads(now),
            signIns: sweepSignIns(now), inbox: sweepInbox(now),
            staff: sweepStaffRecords(now), moderationLog: sweepModLog(now),
            galleryReports: sweepGalleryReports(now) };
