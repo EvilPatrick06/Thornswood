@@ -48308,9 +48308,13 @@ log('gamemode loaded:',
     Windwalker         +4 speed, through the tree's totals. The fall is the
                        game's own sum on your own machine, so the front plugin
                        holds its multiplier at nothing there.
-    Pack Mule          NOT IN THE GAME YET. Being overloaded makes the game
-                       walk you, on your own machine, and no game setting
-                       changes that. What it should be is Patrick's (#1385).
+    Pack Mule          Being overloaded makes the game walk you, on your own
+                       machine, and no game setting changes that. So the
+                       engine fork's client keeps a list of characters the
+                       game does not hold to their carry weight (Patrick, 12
+                       Oct: the engine change), and the front plugin puts your
+                       own character on it while Pack Mule is held. Nothing
+                       here reads carry weight.
     Lethal Aim         An arrow or a bolt takes what it would have taken
                        against half the armour: the engine's own armour sum
                        (TES5DamageFormula, worn ARMO and their enchantments),
@@ -48394,9 +48398,8 @@ log('gamemode loaded:',
                          say: 'When stamina hits 0 it fills, once every 5 minutes.' },
     windwalker:        { name: 'Windwalker', skill: 'agility',
                          say: '+4 speed, and a fall deals no damage.' },
-    packmule:          { name: 'Pack Mule', skill: 'burden', none: true,
-                         say: 'Being overloaded does not slow you.',
-                         not: 'That is not in the game yet: the slowing is the game\'s own, on your machine.' },
+    packmule:          { name: 'Pack Mule', skill: 'burden',
+                         say: 'Being overloaded does not slow you.' },
     lethalaim:         { name: 'Lethal Aim', skill: 'precision', armour: 0.5,
                          say: 'An arrow ignores half the armour it hits.' }
   };
