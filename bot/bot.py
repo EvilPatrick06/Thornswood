@@ -97,7 +97,6 @@ import datetime
 import json
 import os
 import re
-import ssl
 import time
 import traceback
 import sys
@@ -108,16 +107,15 @@ import urllib.request
 # Windows Server ships with an empty root certificate store and the automatic
 # update for it switched off, so Python cannot verify discord.com and the
 # handshake dies with "unable to get local issuer certificate". Install-Bot
-# normally sets SSL_CERT_FILE for us; this is the belt to that braces, so a bot
-# copied somewhere by hand still connects.
+# sets SSL_CERT_FILE for the service; a bot started any other way points it at
+# certifi's bundle here. certifi is in requirements.txt beside discord.py, so
+# a bot without it is missing its libraries and stops on this import, saying
+# so, rather than connecting without its roots (#2736). Each SSL context made
+# from here on reads the variable.
 if not os.environ.get('SSL_CERT_FILE'):
-    try:
-        import certifi
-        os.environ['SSL_CERT_FILE'] = certifi.where()
-        os.environ.setdefault('REQUESTS_CA_BUNDLE', certifi.where())
-        ssl.create_default_context()      # picked up on the next context made
-    except Exception:
-        pass
+    import certifi
+    os.environ['SSL_CERT_FILE'] = certifi.where()
+    os.environ.setdefault('REQUESTS_CA_BUNDLE', certifi.where())
 
 import discord
 
@@ -1987,21 +1985,20 @@ async def ensure_panel(guild):
     # channel. The server owner bypasses every overwrite, so /close looked
     # fine to the one person who could never have been blocked by it while
     # staff saw nothing at all. Named here rather than left to be discovered.
-    try:
-        blocked = []
-        for r in guild.roles:
-            if not (_role_hit(r, STAFF_IDS, STAFF_NAMES)
-                    or _role_hit(r, CREATOR_IDS, CREATOR_NAMES)):
-                continue
-            if not getattr(ch.permissions_for(r), 'use_application_commands', True):
-                blocked.append(r.name)
-        if blocked:
-            log('%s cannot use /close in #%s: Use Application Commands is off '
-                'for them there. Turn it on in that channel\'s permissions. The '
-                'Close button on the ticket works for them either way.'
-                % (', '.join(blocked), ch.name))
-    except Exception:
-        pass
+    # Read from the cache with no request, so nothing here waits on Discord or
+    # throws: it is no longer in a try that dropped any error unsaid (#2736).
+    blocked = []
+    for r in guild.roles:
+        if not (_role_hit(r, STAFF_IDS, STAFF_NAMES)
+                or _role_hit(r, CREATOR_IDS, CREATOR_NAMES)):
+            continue
+        if not getattr(ch.permissions_for(r), 'use_application_commands', True):
+            blocked.append(r.name)
+    if blocked:
+        log('%s cannot use /close in #%s: Use Application Commands is off '
+            'for them there. Turn it on in that channel\'s permissions. The '
+            'Close button on the ticket works for them either way.'
+            % (', '.join(blocked), ch.name))
 
     book = await log_channel(guild)
     if book is not None:
@@ -5060,23 +5057,22 @@ def ping_once(url, timeout=None):
             why = 'it answered %d' % code
         else:
             why = '%s: %s' % (type(e).__name__, getattr(e, 'reason', None) or e)
-    try:
-        if ok:
-            if _ping['down']:
-                log('uptime ping: the outside monitor hears from this bot again')
-            elif not _ping['ok_once']:
-                log('uptime ping: reached the outside monitor, and pings it every '
-                    '%ds while on Discord' % PING_EVERY)
-            _ping['down'] = False
-            _ping['ok_once'] = True
-        else:
-            if not _ping['down']:
-                log('uptime ping FAILED (%s). The outside monitor alerts if it '
-                    'hears nothing past its grace. Said once until it works '
-                    'again.' % _ping_scrub(why, url))
-            _ping['down'] = True
-    except Exception:
-        pass
+    # Only the log lines and the record of what was said, none of which
+    # throws, so they sit outside the try (#2736).
+    if ok:
+        if _ping['down']:
+            log('uptime ping: the outside monitor hears from this bot again')
+        elif not _ping['ok_once']:
+            log('uptime ping: reached the outside monitor, and pings it every '
+                '%ds while on Discord' % PING_EVERY)
+        _ping['down'] = False
+        _ping['ok_once'] = True
+    else:
+        if not _ping['down']:
+            log('uptime ping FAILED (%s). The outside monitor alerts if it '
+                'hears nothing past its grace. Said once until it works '
+                'again.' % _ping_scrub(why, url))
+        _ping['down'] = True
     return ok
 
 
