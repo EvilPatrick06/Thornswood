@@ -390,8 +390,17 @@ else {
     . $lo
     $cfgPath = Join-Path (Split-Path -Parent $Data) 'config.json'
     if (-not (Test-Path -LiteralPath $cfgPath)) { $cfgPath = Join-Path (Find-Root) 'config.json' }
+    # Which collection is read from config.json. One that is not there, or does
+    # not read, names none, so the revision cannot be read below either, and
+    # the stop there says why.
     $colUrl = ''
-    try { $colUrl = [string](ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $cfgPath -Raw) $cfgPath).CollectionUrl } catch { }
+    $cfgWhy = ''
+    if (-not (Test-Path -LiteralPath $cfgPath)) { $cfgWhy = "there is no $cfgPath to name the collection" }
+    else {
+        try { $colUrl = [string](ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $cfgPath -Raw) $cfgPath).CollectionUrl }
+        catch { $cfgWhy = $_.Exception.Message }
+        if (-not $cfgWhy -and -not $colUrl) { $cfgWhy = "$cfgPath names no CollectionUrl" }
+    }
     $cs = Get-CollectionState $colUrl
     if ($cs.Known) {
         if ($cs.Behind -and -not $IgnoreRevision) {
@@ -431,6 +440,7 @@ else {
         Write-Host ("  installed here: {0}    newest Vortex knows of: {1}" -f `
             $(if ($cs.Have -gt 0) { $cs.Have } else { 'unreadable' }), `
             $(if ($cs.Newest -gt 0) { $cs.Newest } else { 'unreadable' })) -ForegroundColor Red
+        if ($cfgWhy) { Write-Host ("  no collection to read it for: {0}" -f $cfgWhy) -ForegroundColor Red }
         Write-Host '  The server''s load order is derived from what Vortex has deployed here.' -ForegroundColor Red
         Write-Host '  Deploying without knowing the revision is how the server was built against' -ForegroundColor Red
         Write-Host '  a two revision old collection for days with nothing saying so.' -ForegroundColor Red
@@ -438,6 +448,9 @@ else {
         Write-Host '  Close Vortex and run this again: it holds its own state open while running.' -ForegroundColor Yellow
         Write-Host '  -IgnoreRevision if you mean to deploy without the check.' -ForegroundColor DarkGray
         throw 'the collection revision could not be read, so it was not checked'
+    }
+    else {
+        Write-Host ("  collection revision NOT checked: it could not be read{0}, carrying on because -IgnoreRevision" -f $(if ($cfgWhy) { " ($cfgWhy)" } else { '' })) -ForegroundColor Yellow
     }
 }
 

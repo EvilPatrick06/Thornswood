@@ -19,7 +19,8 @@
                   out would cut this machine off, so it stops.
     the rules     every enabled inbound Allow rule for TCP on port 22. An
                   enabled Allow rule for every port that also takes sshd's
-                  traffic (any program, or sshd.exe) would let 22 in from
+                  traffic (any program or sshd.exe, no app container, any
+                  service or sshd) would let 22 in from
                   anywhere whatever the list says, so it stops and names it.
                   So does finding no rule for 22 at all.
     the change    the rules' remote addresses are saved to
@@ -77,23 +78,40 @@ function Test-IsServer {
     return ($pt -ne 1)
 }
 
-# Enabled inbound Allow rules as Name, DisplayName, Protocol, Ports, Program
-# and Remote (the remote addresses, 'Any' when open to all).
+# Enabled inbound Allow rules as Name, DisplayName, Protocol, Ports, Program,
+# Package (the app container the rule is for, '' when none), Service ('Any'
+# when not bound to one) and Remote (the remote addresses, 'Any' when open to
+# all).
 function Get-AllowRules {
     foreach ($r in @(Get-NetFirewallRule -Direction Inbound -Enabled True -Action Allow -ErrorAction SilentlyContinue)) {
         $pf = $r | Get-NetFirewallPortFilter -ErrorAction SilentlyContinue
         $af = $r | Get-NetFirewallAddressFilter -ErrorAction SilentlyContinue
         $ap = $r | Get-NetFirewallApplicationFilter -ErrorAction SilentlyContinue
+        $sf = $r | Get-NetFirewallServiceFilter -ErrorAction SilentlyContinue
         [pscustomobject]@{
             Name = [string]$r.Name; DisplayName = [string]$r.DisplayName
             Protocol = [string]$pf.Protocol
             Ports = @(@($pf.LocalPort) | ForEach-Object { [string]$_ })
             Program = [string]$ap.Program
+            Package = [string]$ap.Package
+            Service = [string]$sf.Service
             Remote = @(@($af.RemoteAddress) | ForEach-Object { [string]$_ })
         }
     }
 }
 function Set-RuleRemote([string]$Name, [string[]]$Remote) { Set-NetFirewallRule -Name $Name -RemoteAddress $Remote }
+
+# Whether a rule's filters match sshd's own traffic: any program or sshd.exe,
+# no app container, and any service or sshd. A rule bound to an app container
+# (the per-user rules Windows makes for Start, Search, Windows Security and the
+# like) or to another service matches only that app's or service's traffic, so
+# it never lets sshd in, whatever ports it names.
+function Test-TakesSshd($Rule) {
+    $program = (-not $Rule.Program) -or $Rule.Program -eq 'Any' -or $Rule.Program -match '(?i)\\sshd\.exe$'
+    $package = -not $Rule.Package
+    $service = (-not $Rule.Service) -or $Rule.Service -eq 'Any' -or $Rule.Service -eq 'sshd'
+    return ($program -and $package -and $service)
+}
 
 # Puts every saved rule's remote addresses back in ten minutes, then removes
 # itself, unless Set-SshScope.ps1 cancels it first.
@@ -179,7 +197,7 @@ function Invoke-Scope {
     $rules = @(Get-AllowRules)
     $tcp = @($rules | Where-Object { $_.Protocol -eq 'TCP' -or $_.Protocol -eq 'Any' })
     $for22 = @($tcp | Where-Object { $_.Ports -contains '22' })
-    $wide = @($tcp | Where-Object { ($_.Ports -contains 'Any' -or -not $_.Ports.Count) -and ($_.Program -eq 'Any' -or -not $_.Program -or $_.Program -match '(?i)\\sshd\.exe$') -and ($_.Remote -contains 'Any') })
+    $wide = @($tcp | Where-Object { ($_.Ports -contains 'Any' -or -not $_.Ports.Count) -and (Test-TakesSshd $_) -and ($_.Remote -contains 'Any') })
     if ($wide.Count -and -not $any) {
         $script:stopped = $true
         Say 'STOP' ('these rules allow every port from anywhere, so they let port 22 in whatever the list says: ' + (($wide | ForEach-Object { "'" + $_.DisplayName + "'" }) -join ', ') + '. Decide about them first. Nothing was changed.')

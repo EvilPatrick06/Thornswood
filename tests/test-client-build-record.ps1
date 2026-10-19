@@ -22,7 +22,10 @@
     - it warns when the clone has uncommitted client changes, and when a
       client source file is newer than the build;
     - a -Clone that is not a git clone is refused, not recorded with an empty
-      commit.
+      commit;
+    - a check that cannot run stops the record and writes nothing (#2711): a
+      dirty check git cannot answer, a stale check with no client sources to
+      walk, and a records\client-build.json that does not read.
 #>
 [CmdletBinding()]
 param([string]$Scratch)
@@ -137,10 +140,10 @@ try {
         Get-ChildItem -LiteralPath $d -Recurse -File | ForEach-Object { $_.LastWriteTimeUtc = [DateTime]::UtcNow.AddMinutes(5) }
         $d
     }
-    function Run([string]$dist, [string]$cl) {
+    function Run([string]$dist, [string]$cl, [string]$recorder = $script) {
         $out = Join-Path $root ('rec-' + [guid]::NewGuid().ToString('N').Substring(0, 6) + '.json')
         $eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-        $o = (& powershell -NoProfile -ExecutionPolicy Bypass -File $script -Dist $dist -Clone $cl -Out $out 2>&1 | Out-String)
+        $o = (& powershell -NoProfile -ExecutionPolicy Bypass -File $recorder -Dist $dist -Clone $cl -Out $out 2>&1 | Out-String)
         $code = $LASTEXITCODE; $ErrorActionPreference = $eap
         [pscustomobject]@{ Code = $code; Out = $o; Path = $out; Doc = $(if (Test-Path -LiteralPath $out) { Get-Content -LiteralPath $out -Raw | ConvertFrom-Json } else { $null }) }
     }
@@ -184,6 +187,38 @@ try {
     Yes 'uncommitted client changes are warned about' ($r.Code -eq 0 -and $r.Out -match 'uncommitted client or server changes')
     Yes 'a source file newer than the build is warned about, by name' ($r.Out -match 'newer than the build' -and $r.Out -match 'index\.ts')
     $null = G -C $clone checkout -q -- .
+
+    # ---- 4. a check that cannot run stops the record (#2711) --------------------
+    # Each of these used to land in an empty catch, and the record was written
+    # with nothing dirty and nothing stale.
+    $index = Join-Path $clone '.git\index'
+    $indexBytes = [IO.File]::ReadAllBytes($index)
+    [IO.File]::WriteAllText($index, 'not an index')
+    $r = Run (NewDist '/* THORNSWOOD PATCH */') $clone
+    [IO.File]::WriteAllBytes($index, $indexBytes)
+    Yes 'a dirty check git cannot answer stops the record, nothing written' ($r.Code -ne 0 -and -not (Test-Path -LiteralPath $r.Path))
+    Yes '  and says which check could not run' ($r.Out -match 'cannot read whether the client and server sources are committed' -and $r.Out -match 'Nothing was recorded')
+
+    $noSrc = Join-Path $root 'clone-no-src'
+    $null = G clone -q --no-local $fork $noSrc
+    $null = G -C $noSrc rm -q -r skymp5-client
+    $null = G -C $noSrc commit -q -m 'no client sources'
+    $r = Run (NewDist '/* THORNSWOOD PATCH */') $noSrc
+    Yes 'a stale check with no client sources to walk stops the record, nothing written' ($r.Code -ne 0 -and -not (Test-Path -LiteralPath $r.Path))
+    Yes '  and says the stale check cannot be made' ($r.Out -match 'no skymp5-client\\src in' -and $r.Out -match 'older than its sources cannot be checked')
+
+    # A records\client-build.json that does not read: a copy of the script in a
+    # tree of its own, since the script reads the record beside it.
+    $tree = Join-Path $root 'tree'
+    $null = New-Item -ItemType Directory -Force -Path (Join-Path $tree 'scripts\release'), (Join-Path $tree 'records')
+    foreach ($n in 'New-ClientBuildRecord.ps1', 'Read-JsonFile.ps1') { Copy-Item -LiteralPath (Join-Path $repoRoot "scripts\release\$n") -Destination (Join-Path $tree 'scripts\release') }
+    [IO.File]::WriteAllText((Join-Path $tree 'records\client-build.json'), '{ "upstreamBase": ')
+    $r = Run (NewDist '/* THORNSWOOD PATCH */') $clone (Join-Path $tree 'scripts\release\New-ClientBuildRecord.ps1')
+    Yes 'a recorded base that does not read stops the record, nothing written' ($r.Code -ne 0 -and -not (Test-Path -LiteralPath $r.Path))
+    Yes '  and names the record' ($r.Out -match 'client-build\.json is not valid JSON')
+    Remove-Item -LiteralPath (Join-Path $tree 'records\client-build.json')
+    $r = Run (NewDist '/* THORNSWOOD PATCH */') $clone (Join-Path $tree 'scripts\release\New-ClientBuildRecord.ps1')
+    Yes 'with no record yet there is no base to carry, and the record is written' ($r.Code -eq 0 -and $null -ne $r.Doc)
 
     $notGit = Join-Path $root 'not-a-clone'
     $null = New-Item -ItemType Directory -Force -Path $notGit

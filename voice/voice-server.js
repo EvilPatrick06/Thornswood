@@ -60,7 +60,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1-tls-only-1-ice-socket-1-no-page-1-most-1-roster-once-1-long-command-1-captions-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1-tls-only-1-ice-socket-1-no-page-1-most-1-roster-once-1-long-command-1-captions-2-line-log-1-own-reports-1';
 
 // ==== thornswood deploy record ====
 // Which commit this copy came from (#459): Install-Voice.ps1 leaves the deploy
@@ -149,7 +149,7 @@ function owns(ticket, profileId, then) {
         if (size > OWNS_REPLY_MAX) {
           console.log('[voice] the site\'s answer to the ownership check passed ' + OWNS_REPLY_MAX +
                       ' bytes, so the rest was not read');
-          try { req2.destroy(); } catch (e) { }
+          req2.destroy();
           finish('unchecked');
           return;
         }
@@ -164,7 +164,7 @@ function owns(ticket, profileId, then) {
     });
   } catch (e) { finish('unchecked'); return; }
 
-  late = setTimeout(() => { try { req2.destroy(); } catch (e) { } finish('unchecked'); }, OWNS_WAIT_MS);
+  late = setTimeout(() => { req2.destroy(); finish('unchecked'); }, OWNS_WAIT_MS);
   req2.on('error', () => finish('unchecked'));
   req2.write(payload);
   req2.end();
@@ -311,13 +311,14 @@ function silencedLeft(profileId, now) {
 
 /* Staff silence is a moderation tool, so every connection is told, including
    people who are not in earshot: a connection opened earlier still carries
-   sound until the microphone is closed and the listener's level is nothing. */
+   sound until the microphone is closed and the listener's level is nothing.
+   Sock.send does not throw: a write that fails closes that connection, and
+   whoever reconnects is told their own hush at join (onJoin), so nobody is
+   left unhushed by a failed send. */
 function tellHush(profileId, on) {
   const msg = { t: 'hush', profileId: Number(profileId) || 0, on: !!on };
   if (!msg.profileId) return;
-  for (const [, p] of peers) {
-    try { p.ws.send(msg); } catch (e) { }
-  }
+  for (const [, p] of peers) p.ws.send(msg);
 }
 
 function sweepSilenced(now) {
@@ -353,6 +354,10 @@ function sweepSilenced(now) {
  * SLASH COMMANDS ARE KEPT TOO. They are queued for the game server rather
  * than broadcast, so nobody else sees them, but somebody typed them and
  * "what did they run" is the same kind of question as "what did they say".
+ * So is a line a key or a panel sent for somebody, kept as a key press
+ * (#2251). The front plugin's own reports are not kept: nobody typed or
+ * pressed them, and they were most of every day's file (#2723, see
+ * pluginReport below).
  */
 const CHAT_DIR = process.env.THORNSWOOD_CHAT_DIR || path.join(HERE, 'chat');
 const CHAT_DAYS = Number(process.env.THORNSWOOD_CHAT_DAYS || 365);
@@ -390,6 +395,90 @@ function chatWrite(kind, peerId, me, text, via) {
        chat because a disk was full would be a worse fault than a gap here. */
     console.log('[voice] could not write the chat log: ' + (e && e.message));
   }
+}
+
+/* THE FRONT PLUGIN'S OWN REPORTS ARE NOT WRITTEN (#2723).
+
+   Measured 18 Oct on the box: the dev chat log for 17 Oct had 444 lines and
+   every one was a command line, most of them the front plugin telling the
+   game server what only the client can see (docs\systems\commands.md, "Lines
+   the game sends itself"): /place 130, /joinpass 102, /loadorderlight and
+   /loadorder 42 each, /afk 33, /pick 33, /party 24. Nobody typed or pressed
+   any of them. They go on a change or a timer (the pass every minute, the
+   load order every two minutes, /place whenever the weather or the roof
+   changes, /afk active while somebody is at the keys, /racemenu every minute
+   while the race menu is up) or as a panel opens and asks for its view
+   (/pick refresh, /party refresh, /trade refresh). The game server reads
+   them as reports and answers most with nothing. The chat log is for what
+   somebody said, typed or pressed, so staff reading it for a report read
+   that and not the client.
+
+   WHAT DECIDES IT. The line's whole text has to be one of the shapes below,
+   each exactly what thornswood-front.js builds, and the line has to come
+   with press, which the chat page sets only on the plugin's own lines and a
+   key's (thornswood-chat.js, say with auto). Neither alone is enough. press
+   is the client's word and anybody with a console can put it on any line, so
+   on its own it would let somebody keep a typed /tp out of the log; here it
+   only ever leaves out a line that is a report by its shape, which the game
+   server takes the same way whoever sent it. A report shape typed into the
+   chat box comes with no press, so it is written: somebody typed it.
+   tests\test-2723-plugin-reports.js holds this list to the plugin's own
+   send sites, so a report added there without a shape here fails the build.
+
+   A report is still queued for the game server like every other line: this
+   decides the chat log and nothing else. What stays written of the plugin's
+   lines: the keys' and E's (/lock, /key, /moldhere, /plot, /ride e,
+   /merchant e, /repair, /treat), the K panel's picks (/pick <what>), the
+   "I am still here" button (/afk here), and the wait in line (#1131):
+   the /line that starts it, /afk out, /line leave and /line hand. */
+const PLUGIN_REPORTS = [
+  /^\/joinpass jp1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/,
+  /^\/place (?:outdoors|water|shallow|indoors|snow|rain) (?:[0-9a-f]+|-) [01] [01] -?\d+ (?:\d+|-)$/,
+  /^\/loadorder(?:light)? \d+ \d+ (?:[0-9a-f]{5})*$/,
+  /^\/afk active$/,
+  /^\/(?:pick|party|trade) refresh$/,
+  /^\/racemenu$/,
+  /^\/racedown$/,
+  /^\/face done$/,
+  /^\/burn [01]$/,
+  /^\/chopped$/,
+  /^\/ate [0-9a-f]+$/,
+  /^\/rest (?:bed|sit|up)$/,
+  /^\/tspicks \d+$/,
+  /^\/modset(?: [A-Za-z0-9_]+=-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)+$/
+];
+function pluginReport(text) {
+  for (const shape of PLUGIN_REPORTS) { if (shape.test(text)) return true; }
+  return false;
+}
+
+/* WHAT A SLASH LINE WRITES TO THE CHAT LOG, or '' for nothing (#1131, #2723).
+
+   press is true for a line the chat page sent with press. A report the
+   front plugin makes by itself writes nothing; see PLUGIN_REPORTS above.
+
+   A join pass is good for ten minutes to whoever holds it, so the log keeps
+   that one was sent and never the pass itself (#937).
+
+   A bare "/line" from a connection that is already waiting writes nothing.
+   That "/line" is not something a person typed: the menu's front plugin says
+   it every ten seconds while somebody waits for a seat (every two for the
+   first twenty), so the gamemode keeps the place and a menu can ask again
+   after this service restarts. It was written every time, about six lines a
+   minute for each person waiting and seven thousand an hour for twenty, and
+   staff reading the log for a report scrolled past them. The connection's
+   own waiting mark (me.inLine, set by lineMark after this is asked) already
+   says whether it is waiting, so the "/line" that starts the wait is written,
+   and so is the first one after "/line leave", on a new connection, or after
+   this service restarts. "/line leave" ends the wait and "/line hand" gives
+   the place away; each is said once and written once, like every other
+   command. Every "/line" still goes to the game server: this decides the log
+   and nothing else. */
+function commandLogText(me, text, press) {
+  if (press === true && pluginReport(text)) return '';
+  if (/^\/joinpass\b/i.test(text)) return '/joinpass [pass]';
+  if (/^\/line\s*$/i.test(text) && me && me.inLine) return '';
+  return text;
 }
 
 /* Whole days go, never lines out of a day, so a file is either all there or
@@ -793,24 +882,27 @@ function accept(key) {
   return crypto.createHash('sha1').update(key + GUID).digest('base64');
 }
 
+/*
+  One buffer, the head and the text written straight into it (#2390). It
+  used to encode the text into one buffer, the head into another and copy
+  both into a third, three allocations and two copies for every message.
+*/
 function frame(payload) {
-  const data = Buffer.from(payload, 'utf8');
-  const len = data.length;
-  let head;
-  if (len < 126) {
-    head = Buffer.alloc(2);
-    head[1] = len;
-  } else if (len < 65536) {
-    head = Buffer.alloc(4);
-    head[1] = 126;
-    head.writeUInt16BE(len, 2);
+  const len = Buffer.byteLength(payload, 'utf8');
+  const head = len < 126 ? 2 : len < 65536 ? 4 : 10;
+  const out = Buffer.allocUnsafe(head + len);
+  out[0] = 0x81;             // FIN + text
+  if (head === 2) {
+    out[1] = len;
+  } else if (head === 4) {
+    out[1] = 126;
+    out.writeUInt16BE(len, 2);
   } else {
-    head = Buffer.alloc(10);
-    head[1] = 127;
-    head.writeBigUInt64BE(BigInt(len), 2);
+    out[1] = 127;
+    out.writeBigUInt64BE(BigInt(len), 2);
   }
-  head[0] = 0x81;            // FIN + text
-  return Buffer.concat([head, data]);
+  out.write(payload, head, 'utf8');
+  return out;
 }
 
 /*
@@ -869,7 +961,7 @@ setInterval(() => {
       s.close();
       continue;
     }
-    try { s.ping(); } catch (e) { }
+    s.ping();   // does not throw: a ping that cannot be written closes s
   }
 }, PING_EVERY);
 
@@ -924,6 +1016,47 @@ let droppedPositions = 0;   // ticks not sent to a backed socket, for /health
 let skippedRosters = 0;     // rosters replaced by a newer one unsent, for /health
 let closedBacklogged = 0;   // sockets closed at the ceiling, for /health
 
+/*
+  WHAT ONE TURN SENDS A SOCKET GOES TO THE KERNEL IN BATCHES (#2390).
+
+  Every message used to be its own socket.write, and each one went to the
+  kernel on its own. When a room fills, every pair of voice pages trades an
+  offer, an answer and their candidates through here, about fourteen
+  messages a pair: N squared writes. Profiled on 19 Oct with
+  voice/load-voice.js at 200 people (19,900 pairs, 278,600 relayed
+  messages): handling what pages sent took 4.1 s of the one thread, and
+  3.0 s of that was inside socket.write, the kernel write per message.
+  Everything else (reading the frames, signal(), JSON and framing) came to
+  about 1.1 s, and the copies in that are cut too (frame, and feed).
+
+  So a socket is corked by its first write in a turn of the event loop and
+  uncorked after every I/O callback of that turn has run (setImmediate, as
+  the roster does, with no timer in between), or sooner, the moment a write
+  returns false: what is corked has reached the socket's high water mark
+  (16 KB), and it goes to the kernel then as one writev rather than waiting
+  for the end of the turn. So the kernel is handed a turn's messages in
+  batches of about 16 KB, in the order they were written, and nothing is
+  held past the turn. A write returned false at 16 KB before this as well,
+  whether or not the kernel took it, so backed means what it meant, and the
+  drain that follows clears it before the next position tick for a socket
+  that reads. The ceiling is checked after that uncork, so it still
+  measures what the kernel would not take, at the same write it did. A
+  socket closed here is uncorked first, so whatever was written ahead of
+  the close still goes.
+
+  Measured with voice/load-signalling.js on 19 Oct, which times the service
+  rather than the one thread sending to it, three runs each: every pair at
+  200 people took 5.5 to 6.0 s before and 2.4 to 2.6 s after, and at 400
+  people 21.5 to 22.4 s before and 9.9 to 10.2 s after, nothing lost and
+  no socket closed at the ceiling either way.
+*/
+const corked = new Set();
+let uncorkDue = false;
+function uncorkAll() {
+  uncorkDue = false;
+  for (const s of corked) s.uncork();
+}
+
 class Sock {
   constructor(socket) {
     this.socket = socket;
@@ -967,9 +1100,15 @@ class Sock {
     try { this.write(Buffer.from([0x89, 0])); } catch (e) { this.close(); }
   }
 
-  /* Where what socket.write says is heard. See the note over QUEUE_CEILING. */
+  /* Where what socket.write says is heard. See the note over QUEUE_CEILING.
+     Corked for the rest of this turn: see the note over corked. */
   write(buf) {
-    if (this.socket.write(buf) === false) this.backed = true;
+    if (!corked.has(this)) {
+      corked.add(this);
+      this.socket.cork();
+      if (!uncorkDue) { uncorkDue = true; setImmediate(uncorkAll); }
+    }
+    if (this.socket.write(buf) === false) { this.backed = true; this.uncork(); }
     const queued = this.socket.writableLength;
     if (queued > QUEUE_CEILING) {
       closedBacklogged++;
@@ -1042,16 +1181,25 @@ class Sock {
     try { this.write(framed); } catch (e) { this.close(); }
   }
 
+  /* What this turn wrote goes to the kernel now. See the note over corked. */
+  uncork() {
+    if (!corked.delete(this)) return;
+    this.socket.uncork();
+  }
+
   close() {
     live.delete(this);
     if (this.closed) return;
     this.closed = true;
-    try { this.socket.destroy(); } catch (e) { }
+    // What was written before the close (a close frame among it) still goes,
+    // as it did when every write reached the kernel at once.
+    this.uncork();
+    this.socket.destroy();
     if (this.onclose) this.onclose();
   }
 
   feed(chunk) {
-    this.buf = Buffer.concat([this.buf, chunk]);
+    this.buf = this.buf.length ? Buffer.concat([this.buf, chunk]) : chunk;
     // A frame can arrive split across reads, and several can arrive in one, so
     // this loops until what is left is not a whole frame.
     for (;;) {
@@ -1080,7 +1228,7 @@ class Sock {
         nothing that talks to this service sends one.
       */
       if (!masked) {
-        try { this.socket.write(Buffer.from([0x88, 2, 0x03, 0xea])); } catch (e) { }   // FIN+close, len 2, 1002
+        this.socket.write(Buffer.from([0x88, 2, 0x03, 0xea]));   // FIN+close, len 2, 1002
         this.close();
         return;
       }
@@ -1104,9 +1252,11 @@ class Sock {
       }
       if (this.buf.length < off + len) return;
 
-      const body = Buffer.from(this.buf.slice(off, off + len));
+      // Unmasked where it lies: this.buf is this socket's own (a chunk the
+      // socket handed over, or a concat of them), so it needs no copy (#2390).
+      const body = this.buf.subarray(off, off + len);
       if (mask) for (let i = 0; i < body.length; i++) body[i] ^= mask[i & 3];
-      this.buf = this.buf.slice(off + len);
+      this.buf = this.buf.subarray(off + len);
 
       /*
         A close is ANSWERED with a close, which RFC 6455 section 5.5.1 asks
@@ -1115,14 +1265,12 @@ class Sock {
         the reply until its own timeout.
 
         The body of a close frame is a two byte status code, big endian, and
-        1000 is a normal closure. Written before the teardown so a write that
-        throws cannot leave the socket open.
+        1000 is a normal closure. A socket's write does not throw: one the
+        other end has already dropped reports it on the socket's error event,
+        which closes this as well.
       */
       if (op === 0x8) {
-        try {
-          const bye = Buffer.from([0x88, 2, 0x03, 0xe8]);   // FIN+close, len 2, 1000
-          this.socket.write(bye);
-        } catch (e) { }
+        this.socket.write(Buffer.from([0x88, 2, 0x03, 0xe8]));   // FIN+close, len 2, 1000
         this.close();
         return;
       }
@@ -1336,7 +1484,7 @@ function onJoin(ws, msg, profileId) {
 
   ws.send({ t: 'welcome', peer: id, profileId: profileId });
   if (profileId && silencedLeft(profileId, Date.now())) {
-    try { ws.send({ t: 'hush', profileId: profileId, on: true }); } catch (e) { }
+    ws.send({ t: 'hush', profileId: profileId, on: true });
   }
   announce();
   return id;
@@ -1733,7 +1881,9 @@ function readBody(req, res, limit, then) {
     body += d;
     if (body.length > limit) {
       tooBig = true;
-      try { res.writeHead(413, { 'content-type': 'text/plain' }).end('too big'); } catch (e) { }
+      // The only answer this request gets: nothing is written before its end,
+      // which a destroyed request never reaches, so writeHead cannot throw.
+      res.writeHead(413, { 'content-type': 'text/plain' }).end('too big');
       req.destroy();
     }
   });
@@ -2046,7 +2196,7 @@ const server = http.createServer((req, res) => {
       body += d;
       if (body.length > 200000) {
         tooBig = true;
-        try { res.writeHead(413, { 'content-type': 'text/plain' }).end('too big'); } catch (e) { }
+        res.writeHead(413, { 'content-type': 'text/plain' }).end('too big');   // see readBody
         req.destroy();
       }
     });
@@ -2204,9 +2354,7 @@ const server = http.createServer((req, res) => {
       for (const pid of silenced.keys()) {
         const clear = { t: 'headclear', profileId: pid };
         const hush = { t: 'hush', profileId: Number(pid), on: true };
-        for (const [, p] of peers) {
-          try { p.ws.send(clear); p.ws.send(hush); } catch (e) { }
-        }
+        for (const [, p] of peers) { p.ws.send(clear); p.ws.send(hush); }   // see tellHush
       }
       for (const pid of before) {
         if (!silenced.has(pid)) tellHush(pid, false);
@@ -2329,9 +2477,6 @@ const server = http.createServer((req, res) => {
                             bind: BIND,
                             turn: TURN_URL ? (TURN_SECRET ? 'ephemeral' : (TURN_USER ? 'static' : 'MISCONFIGURED')) : 'none',
                             chatRange: CHAT_RANGE,
-                            captions: { on: CAPTIONS, sent: captionCounts.sent, dropped: captionCounts.dropped,
-                                        tailMs: CAPTION_TAIL_MS, burst: CAPTION_BURST, refillMs: CAPTION_REFILL_MS,
-                                        reach: CAPTION_REACH || 'voice', textMute: CAPTION_TEXT_MUTE },
                             peers: peers.size, tracked: positions.size,
                             most: MOST, people: heldBy.size, refusedFull: refusedFull,
                             queuedCommands: commands.length,
@@ -2340,7 +2485,11 @@ const server = http.createServer((req, res) => {
                             skippedRosters: skippedRosters,
                             closedBacklogged: closedBacklogged,
                             closedSilent: closedSilent,
-                            chatRetention: { overdueDays: chatOverdue, pruneError: chatPruneError } }));
+                            chatRetention: { overdueDays: chatOverdue, pruneError: chatPruneError },
+                            // Last: /health's fields only ever go on the end (voice/test-turn-key.js).
+                            captions: { on: CAPTIONS, sent: captionCounts.sent, dropped: captionCounts.dropped,
+                                        tailMs: CAPTION_TAIL_MS, burst: CAPTION_BURST, refillMs: CAPTION_REFILL_MS,
+                                        reach: CAPTION_REACH || 'voice', textMute: CAPTION_TEXT_MUTE } }));
     return;
   }
 
@@ -2432,15 +2581,15 @@ function plainFromOutside(req) {
 */
 const PROTOCOL = 'thornswood';
 
+/* The error listener is there for a client that hung up before the refusal
+   is written: the write's failure is reported as an error event, and that
+   client was being turned away anyway, so there is nobody to tell and the
+   socket is already gone. end() itself does not throw. */
 function refuseUpgrade(socket, why) {
   const body = 'no: ' + why + '\n';
-  try {
-    socket.on('error', () => { });
-    socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Type: text/plain\r\n' +
-               'Content-Length: ' + Buffer.byteLength(body) + '\r\n\r\n' + body);
-  } catch (e) {
-    try { socket.destroy(); } catch (x) { }
-  }
+  socket.on('error', () => { /* the client hung up first; see above */ });
+  socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Type: text/plain\r\n' +
+             'Content-Length: ' + Buffer.byteLength(body) + '\r\n\r\n' + body);
 }
 
 server.on('upgrade', (req, socket, head) => {
@@ -2511,14 +2660,10 @@ server.on('upgrade', (req, socket, head) => {
                   '(THORNSWOOD_VOICE_MOST), so profile ' + proven + ' was told and closed (' +
                   refusedFull + ' turned away so far)');
     }
-    socket.on('error', () => { });
+    socket.on('error', () => { /* the client hung up first; see refuseUpgrade */ });
     const why = Buffer.from('full', 'utf8');
-    try {
-      socket.write(frame(JSON.stringify({ t: 'chat', from: 0, profileId: 0, name: 'Thornswood', text: FULL_LINE, at: Date.now() })));
-      socket.end(Buffer.concat([Buffer.from([0x88, 2 + why.length, 0x03, 0xf5]), why]));   // FIN+close, 1013 try again later
-    } catch (e) {
-      try { socket.destroy(); } catch (x) { }
-    }
+    socket.write(frame(JSON.stringify({ t: 'chat', from: 0, profileId: 0, name: 'Thornswood', text: FULL_LINE, at: Date.now() })));
+    socket.end(Buffer.concat([Buffer.from([0x88, 2 + why.length, 0x03, 0xf5]), why]));   // FIN+close, 1013 try again later
     return;
   }
 
@@ -2736,10 +2881,13 @@ server.on('upgrade', (req, socket, head) => {
       // placeatme, disable, mp) and coc is not one of them, so a coc moves you
       // in your own game and the server puts you straight back.
       if (text.charAt(0) === '/') {
-        // A join pass is good for ten minutes to whoever holds it, so the
-        // chat log keeps that one was sent and never the pass itself (#937).
-        chatWrite('command', myId, me, /^\/joinpass\b/i.test(text) ? '/joinpass [pass]' : text,
-                  msg.press === true ? 'press' : '');
+        // What the chat log keeps of it: the pass masked, and a waiting
+        // menu's repeated "/line" and the front plugin's own reports not at
+        // all (commandLogText). Asked before lineMark below, which is what
+        // moves the waiting mark it reads.
+        const press = msg.press === true;
+        const logged = commandLogText(me, text, press);
+        if (logged) chatWrite('command', myId, me, logged, press ? 'press' : '');
         // Full: the newest is refused and its sender told, and everything
         // already taken stays. See the note over COMMAND_CAP.
         if (commands.length >= COMMAND_CAP) {

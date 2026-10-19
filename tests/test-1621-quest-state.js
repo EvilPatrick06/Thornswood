@@ -79,7 +79,7 @@ const fault = { read: null, write: false, noAdd: [], throwAdd: [] };
 const said = [];
 function lastSaid() { return said.length ? said[said.length - 1] : ''; }
 
-function boot(into) {
+function boot(into, source, expanded) {
   const made = {};
   const logged = [];
   const ctx = into || {
@@ -116,7 +116,7 @@ function boot(into) {
           const prefix = id + ':';
           if (entry.indexOf(prefix) === 0) savedRanks[entry.slice(prefix.length)] = ranks[entry];
         });
-        return {v: 1, ranks: savedRanks};
+        return {v: 1, cls: 'miner', ranks: savedRanks};
       }
       if(npcStates[id] && key==='baseDesc')return npcStates[id].base;
       if(npcStates[id] && key==='worldOrCellDesc')return npcStates[id].world;
@@ -149,14 +149,17 @@ function boot(into) {
   };
   ctx.NPC_POPULATION_DATA=compactPopulation;
   ctx.raceEdidOf=id=>npcStates[id].race;
-  ctx.MERCHANT_TRADING = {createKillContracts: require('../game/kill-contracts').createKillContracts,
+  ctx.MERCHANT_TRADING = {expandedScenes:()=>expanded || [],sceneBudget:require('../game/scene-reward-budget'),
+    createKillContracts: require('../game/kill-contracts').createKillContracts,
     createQuestTransactions: function () {
     return {identity: function (a) {
       if(ctx.__runtimeIdentityApi)return require('../game/quest-transactions').actorIdentity(ctx.__runtimeIdentityApi,a);
       return ctx.__identityToken || 'actor:' + a;
     }, shutdown: function () {},available:function(){return !ctx.__revoked;},
-      commit: function (a, expected, next, changes) {
+      commit: function (a, expected, next, changes, admission) {
         if (fault.write) throw new Error('the write was refused');
+        if(ctx.__beforeQuestCommit)ctx.__beforeQuestCommit();
+        if(admission!==undefined && (typeof admission!=='function' || admission()!==true))return {ok:false};
         const current = form(a);
         if (JSON.stringify(current.props[PROP] || null) !== JSON.stringify(expected)) return {ok:false};
         const pack = JSON.parse(JSON.stringify(current.inv));
@@ -182,7 +185,9 @@ function boot(into) {
   ctx.__thornswoodCharacter = { PROPERTY: 'thornswoodCharacter' };
   ctx.__thornswoodDungeonLoot = { GOLD_DESC: 'f:Skyrim.esm' };
   if (!into) { vm.createContext(ctx); }
-  vm.runInContext(block, ctx);
+  require('./quest-eligibility-fixture')(ctx, gm);
+  ctx.MERCHANT_TRADING.expandedScenes=vm.runInContext('(function(){return '+JSON.stringify(expanded || [])+';})',ctx);
+  vm.runInContext(source || block, ctx);
   return { svc: ctx.__thornswoodQuests, ctx: ctx, logged: logged };
 }
 function restart() {
@@ -563,7 +568,7 @@ yes('the miner page says the same', /kept on the character/.test(mWhere) &&
   let entered=false;
   w.ctx.__questRankRead=function(){
     if(!entered){entered=true;w.svc.mineRare(80,here[0],EBONY);}
-    return {v:1,ranks:{miner:'master'}};
+    return {v:1,cls:'miner',ranks:{miner:'master'}};
   };
   const result=w.svc.offer(80,'stalhrim');
   yes('a metadata offer refuses a snapshot superseded by a nested inventory commit',
@@ -572,7 +577,7 @@ yes('the miner page says the same', /kept on the character/.test(mWhere) &&
 }
 {
   ranks['81:miner']='master';w=restart();w.ctx.__identityToken='old-session';
-  w.ctx.__questRankRead=function(){w.ctx.__identityToken='new-session';return {v:1,ranks:{miner:'master'}};};
+  w.ctx.__questRankRead=function(){w.ctx.__identityToken='new-session';return {v:1,cls:'miner',ranks:{miner:'master'}};};
   const result=w.svc.offer(81,'ebony');
   yes('a metadata offer cannot cross its actor session during qualification',
     result.why==='unwritten' && !form(81).props[PROP]);
@@ -580,7 +585,7 @@ yes('the miner page says the same', /kept on the character/.test(mWhere) &&
 
 {
   ranks['82:miner']='master';w=restart();w.ctx.__identityToken='old';w.svc.offer(82,'ebony');
-  w.ctx.__questRankRead=function(){w.ctx.__identityToken='new';return {v:1,ranks:{miner:'master'}};};
+  w.ctx.__questRankRead=function(){w.ctx.__identityToken='new';return {v:1,cls:'miner',ranks:{miner:'master'}};};
   w.svc.mineRare(82,here[0],EBONY);
   yes('mining qualification cannot adopt a new actor session',have(82,EBONY.ore)===0 && forms[82].props[PROP].open.ebony.drawn===0);
 }
@@ -682,6 +687,8 @@ yes('the miner page says the same', /kept on the character/.test(mWhere) &&
     fn({desc:'ff000060:Skyrim.esm',profileId:42},()=>true):{ok:false,why:'waiting'}});
   const kills=createKillContracts({mp,population:compactPopulation,raceOf:id=>npcStates[id].race,identity:tx.identity});
   const svc=w.ctx.__thornswoodCustomQuestsCreate({now:()=>clock.now,goldDesc:'f:Skyrim.esm',
+    eligibility:w.ctx.MERCHANT_TRADING.createQuestEligibility({table:w.ctx.__thornswoodProgression.TABLE,
+      spellIds:w.ctx.__thornswoodProgression.SPELL_IDS}),readCharacter:()=>({v:1,cls:'miner',ranks:{miner:'master'}}),
     load:()=>clone(record),commit:tx.commit,identity:tx.identity,available:tx.available,killContracts:kills,
     traderHold:()=> 'Whiterun'});
   for(const ref of kills.rows.find(r=>r.id==='camp').refs) {
@@ -781,6 +788,98 @@ yes('a Smith displays three bound mines and its own Whiterun contracts',
 yes('an Enchanter displays the bound gem work only',w.svc.describe(230,9101).map(row=>row.id).join(',')==='gem');
 yes('a Tailor displays the local wolf work only',w.svc.describe(230,9102).map(row=>row.id).join(',')==='wolf');
 yes('a direct wrong-role offer cannot bypass the route',w.svc.offer(230,'ebony',{traderRef:9101}).why==='role');
+// Change only a source-owned fixture definition, retaining the actual factory.
+const gatedScene = block.replace('  var byId = {};',
+  "  SCENE.find(function(row){return row.id==='wolf';}).gate={classKey:'miner',rank:'master'};\n  var byId = {};");
+yes('the gated scene fixture changes exactly its source definition', gatedScene !== block);
+npcStates[41].isDead=false; npcStates[41].lifeGeneration++;
+ranks['300:miner']='advanced'; ranks['301:miner']='advanced';
+w=boot(undefined,gatedScene);
+const lockedScene=w.svc.describe(300,9000).find(row=>row.id==='wolf');
+yes('a gated scene panel refuses insufficient standing',lockedScene && !lockedScene.canTake && lockedScene.state==='locked');
+yes('a direct gated scene take refuses insufficient standing without a write',
+  w.svc.offer(301,'wolf',{traderRef:9000}).ok===false && !forms[301]);
+for(const boundary of ['rank','session','shutdown','metadata']) {
+  const actor=310+['rank','session','shutdown','metadata'].indexOf(boundary);
+  w=boot(undefined,gatedScene);
+  let standing='master';
+  w.ctx.__questRankRead=()=>({v:1,cls:'miner',ranks:{miner:standing}});
+  w.ctx.__beforeQuestCommit=()=>{
+    if(boundary==='rank')standing='advanced';
+    if(boundary==='session')w.ctx.__identityToken='replacement';
+    if(boundary==='shutdown')w.svc.shutdown();
+    if(boundary==='metadata')w.ctx.__thornswoodProgression={};
+  };
+  const outcome=w.svc.offer(actor,'wolf',{traderRef:9000});
+  yes('acceptance refuses '+boundary+' change at the transaction admission boundary',
+    outcome.ok===false && !(forms[actor] && forms[actor].props[PROP]) && have(actor,'f:Skyrim.esm')===0);
+}
+{
+  w=boot(undefined,gatedScene);let inCommit=false,snapshotRead=false,standing='master',lateIdentityReads=0;
+  w.ctx.__runtimeIdentityApi={getNpcAIState:()=>({isHuman:true,profileId:7,lifeGeneration:0}),
+    getDescFromId:()=> 'ff00013a:Skyrim.esm',getActorRuntimeIdentity:()=>{
+      if(inCommit && snapshotRead){lateIdentityReads++;standing='advanced';}return '100';
+    }};
+  w.ctx.__beforeQuestCommit=()=>{inCommit=true;};
+  w.ctx.__questRankRead=()=>{
+    if(inCommit)snapshotRead=true;
+    return {v:1,cls:'miner',ranks:{miner:standing}};
+  };
+  const outcome=w.svc.offer(314,'wolf',{traderRef:9000});
+  yes('the final skill snapshot is the last native read before acceptance',
+    outcome.ok===true && standing==='master' && snapshotRead && lateIdentityReads===0);
+}
+{
+  const actor=315;w=restart();ranks[actor+':miner']='master';
+  let standing='master';w.ctx.__questRankRead=()=>({v:1,cls:'miner',ranks:{miner:standing}});
+  yes('a scarce contract opens before its mining rank changes',w.svc.offer(actor,'ebony',{traderRef:9000}).ok===true);
+  w.ctx.__beforeQuestCommit=()=>{standing='advanced';};
+  w.svc.mineRare(actor,here[0],EBONY);
+  yes('scarce harvest checks ordinary class standing at the final inventory write',
+    have(actor,EBONY.ore)===0 && forms[actor].props[PROP].open.ebony.drawn===0);
+}
+for(const action of ['return','abandon']) {
+  const actor=action==='return'?320:321;
+  w=boot(undefined,gatedScene);let standing='master';
+  w.ctx.__questRankRead=()=>({v:1,cls:'miner',ranks:{miner:standing}});
+  npcStates[41].isDead=false;npcStates[41].lifeGeneration++;
+  yes('Master accepts the gated scene before losing standing for '+action,w.svc.offer(actor,'wolf',{traderRef:9000}).ok===true);
+  standing='advanced';
+  if(action==='return') {
+    npcStates[41].isDead=true;w.svc.noteKill(actor,41);
+    yes('accepted work retains its original reward after eligibility is lost',
+      w.svc.turnIn(actor,'wolf',9000).ok===true && have(actor,'f:Skyrim.esm')===25);
+  } else yes('accepted work remains cancellable after eligibility is lost',
+    w.svc.walkAway(actor,'wolf').ok===true && !forms[actor].props[PROP].open.wolf);
+}
+const schools=['destruction','restoration','alteration','conjuration','illusion'];
+for(const [index,school] of schools.entries()) {
+  const mageSource=block.replace('  var byId = {};',
+    "  SCENE.find(function(row){return row.id==='wolf';}).gate="+
+    JSON.stringify({profession:'mage',school,rank:'master'})+';\n  var byId = {};');
+  w=boot(undefined,mageSource);
+  const P=w.ctx.__thornswoodProgression,other=schools.find(s=>s!==school);
+  const master=P.TABLE.spells[school].master.find(name=>Object.hasOwn(P.SPELL_IDS,name));
+  const lower=P.TABLE.spells[school].novice[0],wrong=P.TABLE.spells[other].master[0];
+  let state={v:1,prof:'mage',schools:[school,other],ranks:{[school]:'master'},spells:{known:[master]}};
+  w.ctx.__questRankRead=()=>state;
+  npcStates[41].isDead=false;npcStates[41].lifeGeneration++;
+  const actor=330+index, valid=state;
+  for(const changed of [
+    {...valid,spells:{known:[]}}, {...valid,spells:{known:[lower]}}, {...valid,spells:{known:[wrong]}},
+    {...valid,spells:{known:['Unknown spell']}}, {...valid,ranks:{[school]:'expert'}},
+    {...valid,schools:[other]}, {...valid,prof:'smith'},
+    {...valid,spells:null,staffSpells:[P.SPELL_IDS[master]],inventory:[master]}
+  ]) {
+    state=changed;
+    const shown=w.svc.describe(actor,9000).find(row=>row.id==='wolf');
+    yes(school+': panel and direct take agree that missing Master evidence refuses',
+      shown && shown.state==='locked' && !shown.canTake && !w.svc.offer(actor,'wolf',{traderRef:9000}).ok && !forms[actor]);
+  }
+  state=valid;
+  yes(school+': learned mapped Master spell and standing permit panel and direct acceptance',
+    w.svc.describe(actor,9000).find(row=>row.id==='wolf').canTake && w.svc.offer(actor,'wolf',{traderRef:9000}).ok===true);
+}
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

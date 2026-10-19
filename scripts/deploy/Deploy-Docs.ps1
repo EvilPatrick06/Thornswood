@@ -245,12 +245,18 @@ function Push($local, $remote) {
 }
 
 $rootWin   = $Root.Replace('/','\')
+# The folder the Thornswood folders sit side by side in, C: on the box, with
+# no backslash at the end. The fail-safe and the site's grants name the other
+# folders from it, so a deploy into a scratch box never reaches the real ones
+# (#1273).
+$boxWin    = (Split-Path -Parent $rootWin.TrimEnd('\')).TrimEnd('\')
 $stamp     = Get-Date -Format 'yyyyMMdd-HHmmss'
 $stageName = '.stage-' + $stamp
 $prevName  = '.prev-' + $stamp
 $stageFar  = ($Root -replace '\\', '/') + '/' + $stageName
 $hashes    = [ordered]@{}
 $appUnchanged = $false
+$gonePublic = @()
 
 if (-not $PutBack) {
 Write-Host 'Making room...'
@@ -322,10 +328,16 @@ Get-ChildItem (Join-Path $App 'public') -File -EA SilentlyContinue | ForEach-Obj
 }
 if ($sentPublic.Count) { Write-Host ('  ' + ($sentPublic -join ', ')) }
 Write-Host ('  ' + $samePublic + ' public file(s) already the same up there, not sent')
+# And the ones the repository no longer has, which the swap takes out
+# (Swap.ps1, $Gone). Only files at the top of public: the folders in it,
+# such as downloads, are filled by other scripts.
+$repoPublic = @(Get-ChildItem (Join-Path $App 'public') -File -EA SilentlyContinue | ForEach-Object Name)
+$gonePublic = @($publicThere.Keys | Where-Object { $repoPublic -notcontains $_ } | Sort-Object | ForEach-Object { 'public/' + $_ })
+if ($gonePublic.Count) { Write-Host ('  to take out, no longer in the repository: ' + ($gonePublic -join ', ')) }
 
 # When nothing in the app changed, skip the stage, the stop and the swap
 # (issue #1118). Documents and the task step still run below.
-$appUnchanged = ($send.Count -eq 0)
+$appUnchanged = ($send.Count -eq 0 -and $gonePublic.Count -eq 0)
 if ($appUnchanged) {
   Remote "Remove-Item -LiteralPath '$rootWin\$stageName' -Recurse -Force -EA SilentlyContinue" | Out-Null
   Write-Host '  nothing in the app changed, so the site will not be stopped'
@@ -611,7 +623,8 @@ if (-not `$runAs) {
   `$runAs = 'LOCAL SERVICE'
   `$was = (Get-ScheduledTask -TaskName '$Task' -EA SilentlyContinue).Principal
   if (`$was) {
-    try { `$sid = (New-Object Security.Principal.NTAccount([string]`$was.UserId)).Translate([Security.Principal.SecurityIdentifier]).Value } catch { }
+    try { `$sid = (New-Object Security.Principal.NTAccount([string]`$was.UserId)).Translate([Security.Principal.SecurityIdentifier]).Value }
+    catch { 'the task runs as ' + `$was.UserId + ', which does not translate to an account here (' + `$_.Exception.Message + ')' }
     if (`$sid -eq 'S-1-5-19') { `$already = `$true; 'no -RunAs, so the task keeps the account it has: LOCAL SERVICE' }
     elseif (`$sid -eq 'S-1-5-18') { 'no -RunAs, and the task ran as SYSTEM: it moves to LOCAL SERVICE (#2613). -RunAs SYSTEM is the way back.' }
     else { `$runAs = [string]`$was.UserId; `$principal = `$was }
@@ -624,10 +637,10 @@ if (`$principal) {
   `$principal = New-ThornswoodServicePrincipal -AsSystem
 } else {
   `$sid = ''
-  try { `$sid = (New-Object Security.Principal.NTAccount('NT AUTHORITY', `$runAs)).Translate([Security.Principal.SecurityIdentifier]).Value } catch { }
-  if (-not `$sid) { 'NO SUCH ACCOUNT HERE: ' + `$runAs + '. Nothing was stopped or changed.'; return }
+  try { `$sid = (New-Object Security.Principal.NTAccount('NT AUTHORITY', `$runAs)).Translate([Security.Principal.SecurityIdentifier]).Value }
+  catch { 'NO SUCH ACCOUNT HERE: ' + `$runAs + ' (' + `$_.Exception.Message + '). Nothing was stopped or changed.'; return }
   if (-not `$already) {
-    `$cannot = @(Test-ThornswoodServiceCannotReach (Get-ThornswoodServiceNeverReach -Own '$rootWin'))
+    `$cannot = @(Test-ThornswoodServiceCannotReach (Get-ThornswoodServiceNeverReach -Own '$rootWin' -Box '$boxWin'))
     if (`$cannot.Count) {
       'LOCAL SERVICE COULD READ WHAT NO SERVICE MAY, so the site is not moved onto it:'
       foreach (`$c in `$cannot) { '  ' + `$c }
@@ -638,12 +651,12 @@ if (`$principal) {
   `$principal = New-ThornswoodServicePrincipal
   foreach (`$g in @(
       @('$rootWin', '(OI)(CI)M'),
-      @('C:\Thornswood-Server\data', '(OI)(NP)R'),
-      @('C:\Thornswood-Server', '(OI)(NP)R'),
-      @('C:\Thornswood-Server-Dev', '(OI)(NP)R'),
-      @('C:\Thornswood-Voice\chat', '(OI)(NP)R'),
-      @('C:\Thornswood-Voice-Dev\chat', '(OI)(NP)R'),
-      @('C:\Thornswood-Deploys\current', '(OI)(NP)R'))) {
+      @('$boxWin\Thornswood-Server\data', '(OI)(NP)R'),
+      @('$boxWin\Thornswood-Server', '(OI)(NP)R'),
+      @('$boxWin\Thornswood-Server-Dev', '(OI)(NP)R'),
+      @('$boxWin\Thornswood-Voice\chat', '(OI)(NP)R'),
+      @('$boxWin\Thornswood-Voice-Dev\chat', '(OI)(NP)R'),
+      @('$boxWin\Thornswood-Deploys\current', '(OI)(NP)R'))) {
     if (-not (Test-Path -LiteralPath `$g[0])) { 'not here, nothing granted: ' + `$g[0]; continue }
     `$said = & icacls `$g[0] /grant ('*' + `$sid + ':' + `$g[1]) 2>&1
     if (`$LASTEXITCODE -eq 0) { 'granted ' + `$runAs + ' ' + `$g[1] + ' on ' + `$g[0] }
@@ -782,8 +795,11 @@ if (`$chk) {
 `$who = (Get-ScheduledTask -TaskName '$Task' -EA SilentlyContinue).Principal
 if (`$who) {
   `$got = ''
-  try { `$got = (New-Object Security.Principal.NTAccount(`$who.UserId)).Translate([Security.Principal.SecurityIdentifier]).Value } catch { }
-  if (`$got -eq `$sid) { 'task runs as ' + `$who.UserId + ', run level ' + `$who.RunLevel }
+  `$gotWhy = ''
+  try { `$got = (New-Object Security.Principal.NTAccount(`$who.UserId)).Translate([Security.Principal.SecurityIdentifier]).Value }
+  catch { `$gotWhy = `$_.Exception.Message }
+  if (`$gotWhy) { 'THE TASK RUNS AS ' + `$who.UserId + ', WHICH DOES NOT TRANSLATE TO AN ACCOUNT HERE (' + `$gotWhy + '), NOT ' + `$runAs }
+  elseif (`$got -eq `$sid) { 'task runs as ' + `$who.UserId + ', run level ' + `$who.RunLevel }
   else { 'THE TASK RUNS AS ' + `$who.UserId + ', NOT ' + `$runAs }
   # The privilege cut too, because the account alone is not what makes it low
   # privilege, and a box that dropped the list would otherwise pass as done.
@@ -848,7 +864,7 @@ function Healthy {
       $r = Invoke-WebRequest -Uri ('http://127.0.0.1:' + $Port + '/') -UseBasicParsing -TimeoutSec 5
       $code = [int]$r.StatusCode
     } catch {
-      if ($_.Exception.Response) { try { $code = [int]$_.Exception.Response.StatusCode } catch { } }
+      if ($_.Exception.Response) { $code = [int]$_.Exception.Response.StatusCode }
     }
     if ($code -gt 0 -and $code -lt 500) { return $true }
     if ((Get-Date) -gt $until) { return $false }
@@ -866,6 +882,21 @@ function Answer {
   if ($open.Count -and [Environment]::GetEnvironmentVariable('THORNSWOOD_DOCS_EXPOSE','Machine') -ne '1') {
     'EXPOSED: the site listens on ' + ($open -join ', ') + ' port ' + $Port + ', not loopback only. Plain HTTP past the certificate (#2185).'
   } elseif ($l.Count) { 'listening on ' + ((@($l | ForEach-Object { $_.LocalAddress } | Sort-Object -Unique)) -join ', ') }
+  # Whether the files play and identity rest on read (#2180). Said, not
+  # fatal: the swap carries the app, not those files, so putting the old app
+  # back would mend nothing. A broken one is repaired from the backup.
+  try {
+    $null = Invoke-WebRequest -Uri ('http://127.0.0.1:' + $Port + '/api/ready') -UseBasicParsing -TimeoutSec 5
+    'state ready'
+  } catch {
+    $code = 0
+    if ($_.Exception.Response) { $code = [int]$_.Exception.Response.StatusCode }
+    $said = $null
+    if ($code -eq 503 -and $_.ErrorDetails -and $_.ErrorDetails.Message) { $said = $_.ErrorDetails.Message | ConvertFrom-Json }
+    if ($said) {
+      'STATE BROKEN: ' + ((@($said.broken) | ForEach-Object { $_.file + ' ' + $_.why + $(if ($_.play) { ', nobody can play' } else { '' }) }) -join '; ') + '. Repair it from the backup.'
+    } else { 'could not ask the site whether its state reads (' + $code + '): ' + $_.Exception.Message }
+  }
 }
 # Run by hand, to see why: a task swallows what node prints.
 function Why {
@@ -896,7 +927,8 @@ elseif ($appUnchanged) { Write-Host 'Nothing in the app to swap; site left runni
 else { Write-Host 'Stopping, swapping in and starting...' }
 if ($PutBack -or -not $appUnchanged) {
 $vars = (ServiceSwapVars $Root $stageName $prevName $Wait $hashes @()) +
-        ("`$Task = '" + $Task.Replace("'", "''") + "'`r`n`$Port = " + $Port + "`r`n")
+        ("`$Task = '" + $Task.Replace("'", "''") + "'`r`n`$Port = " + $Port + "`r`n") +
+        ('$Gone = @(' + ((@($gonePublic) | ForEach-Object { "'" + $_.Replace("'", "''") + "'" }) -join ', ') + ")`r`n")
 $pick = ''
 if ($PutBack) { $pick = $putBackPick }
 $eap = $ErrorActionPreference

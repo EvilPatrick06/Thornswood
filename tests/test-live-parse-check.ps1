@@ -186,6 +186,12 @@ Yes '  and a put-back, which sends no gamemode, does not ask for node' ($guard.C
 # ---- node --check really fails on a broken file -------------------------------
 if (Get-Command node -ErrorAction SilentlyContinue) {
     $tmp = Join-Path ([IO.Path]::GetTempPath()) ('ts-parse-' + [guid]::NewGuid().ToString('N') + '.js')
+    # node says why a file does not parse on stderr. Under Windows PowerShell
+    # 5.1 that line comes back through 2>&1 as an error record, and with Stop
+    # it ended this harness before the exit code was read (#2739); PowerShell
+    # 7 hands it over as text. The exit code is what is checked, so the line
+    # is let through to Out-Null here, and Stop is back after.
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     try {
         [IO.File]::WriteAllText($tmp, "function (\n")
         & node --check $tmp 2>&1 | Out-Null
@@ -194,7 +200,10 @@ if (Get-Command node -ErrorAction SilentlyContinue) {
         & node --check $tmp 2>&1 | Out-Null
         Yes '  and passes one that does' ($LASTEXITCODE -eq 0)
     }
-    finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
+    finally {
+        $ErrorActionPreference = $old
+        Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+    }
 }
 
 Write-Host ''

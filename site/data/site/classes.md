@@ -459,9 +459,9 @@ twice about if magic is not yours.
 Rank comes from doing the work. Nothing else moves it.
 
 **Not real money.** Thornswood is not pay to win and it is not going to become
-it. The Patreon pays for the machine it runs on, the domain, and the time that
-goes into building it. It buys nothing in the world: no rank, no recipe, no
-gear, no land, no profession, no seat in a hold.
+it. The Patreon pays for the server, the domain and the other expenses of
+keeping it running, never for anybody's time making it. It buys nothing in the
+world: no rank, no recipe, no gear, no land, no profession, no seat in a hold.
 
 **Not gold.** Coin buys goods and work off other people, which is the whole
 point of having it. It does not buy a rank and it does not unlock anything you

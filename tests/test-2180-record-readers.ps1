@@ -25,8 +25,8 @@ Yes 'Deploy-Server reads server-build.json through Read-ThornswoodRecord' ($i -g
 Yes '  before the first send or remote call' ($i -lt (At $ds 'Send-ThornswoodArtifact') -or (At $ds 'Send-ThornswoodArtifact') -lt 0)
 Yes '  and has no bare read of the record left' (-not $ds.Contains('$rec = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $recordPath'))
 $dd = Src 'scripts\deploy\Deploy-DevGamemode.ps1'
-$i = At $dd '(Read-ThornswoodRecord -Path $devRecordPath -Kind server-build).source.commit'
-Yes 'Deploy-DevGamemode takes the record commit through Read-ThornswoodRecord' ($i -gt 0 -and (At $dd "RecordShape.ps1')") -lt $i)
+$i = At $dd '$devRecord = Read-ThornswoodRecord -Path $devRecordPath -Kind server-build'
+Yes 'Deploy-DevGamemode takes the record, its commit and whether it loads light plugins, through Read-ThornswoodRecord' ($i -gt 0 -and (At $dd "RecordShape.ps1')") -lt $i -and (At $dd '$devRecordCommit = [string]$devRecord.source.commit') -gt $i)
 Yes '  before the artifact is sent' ($i -lt (At $dd 'Send-ThornswoodArtifact -Artifact'))
 $dg = Src 'scripts\deploy\Deploy-Gamemode.ps1'
 $i = At $dg 'Read-ThornswoodRecord -Path $serverRecord -Kind server-build'

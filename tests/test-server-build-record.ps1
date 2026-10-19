@@ -35,6 +35,11 @@
     4. ServerBuild.ps1 on a folder: a file from another build, a server file
        the record does not list, a record of the binary alone and a record
        whose files name another commit are each a problem
+    5. an engine that loads light plugins says so in the record (#1715)
+    6. a check that cannot run stops it, writing nothing (#2711): a dirty
+       check git cannot answer, no skymp5-server\cpp to walk, a bundle that
+       cannot be read (named as that), and a records\server-build.json that
+       does not read
 
   Run under whichever PowerShell runs this file. Needs node, yarn and git;
   connects to nothing.
@@ -107,6 +112,10 @@ function Record {
     if (Test-Path -LiteralPath $out) { Remove-Item -LiteralPath $out -Force }
     $r = Run-Native { & $shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $recorder -Dist $dist -Clone $fork -Out $out }
     $r | Add-Member -NotePropertyName Written -NotePropertyValue (Test-Path -LiteralPath $out)
+    # What it said as one line: PowerShell 7 colours a thrown message and
+    # wraps it at the window's width behind a "|", so a long path splits it.
+    $flat = (($r.Out -replace '\x1b\[[0-9;]*m', '') -replace '\s*\r?\n\s*\|?\s*', ' ')
+    $r | Add-Member -NotePropertyName Said -NotePropertyValue $flat
     return $r
 }
 
@@ -117,6 +126,7 @@ try {
     Put (Join-Path $fork 'skymp5-server\yarn.lock') "# yarn lockfile v1`n`n`n"
     Put (Join-Path $fork 'skymp5-scripts\pex\ActiveMagicEffect.pex') 'compiled papyrus'
     Put (Join-Path $fork 'skymp5-scripts\psc\ActiveMagicEffect.psc') 'Scriptname ActiveMagicEffect'
+    Put (Join-Path $fork 'skymp5-server\cpp\addon\main.cpp') 'int main() { return 0; }'
     Put (Join-Path $fork '.gitignore') "build/`nnode_modules/`n"
     [void](Run-Native { git -C $fork init -q })
     [void](Run-Native { git -C $fork -c user.email=t@t -c user.name=t add -A })
@@ -270,6 +280,49 @@ try {
     $rec = if ($r.Written) { [IO.File]::ReadAllText($out) | ConvertFrom-Json } else { $null }
     Yes ('a recorded commit with IsLightPlugin: "lightPlugins": true (exit {0})' -f $r.Code) ($rec -and $rec.lightPlugins -eq $true)
     Yes '  and it says so' ($r.Out -match 'light\s+loads light plugins')
+
+    # ---- 6. a check that cannot run stops the record (#2711) ------------------
+    # The dirty check read '' from a git that could not answer, which is what a
+    # clean clone says; the source walk skipped a cpp\ that was not there; the
+    # recorded base and the bundle's tail sat in empty catches.
+    Write-Host ''; Write-Host 'a check that cannot run'
+    Write-GoodBuild
+    $r = Record
+    Yes ('the good build still records (exit {0})' -f $r.Code) ($r.Code -eq 0 -and $r.Written)
+    $index = Join-Path $fork '.git\index'
+    $indexBytes = [IO.File]::ReadAllBytes($index)
+    [IO.File]::WriteAllText($index, 'not an index')
+    $r = Record
+    [IO.File]::WriteAllBytes($index, $indexBytes)
+    Yes 'a dirty check git cannot answer stops the record, nothing written' ($r.Code -ne 0 -and -not $r.Written)
+    Yes '  and says which check could not run' ($r.Said -match 'cannot read whether the clone is committed')
+
+    $cpp = Join-Path $fork 'skymp5-server\cpp'
+    Rename-Item -LiteralPath $cpp -NewName 'cpp-away'
+    try { $r = Record } finally { Rename-Item -LiteralPath (Join-Path $fork 'skymp5-server\cpp-away') -NewName 'cpp' }
+    Yes 'a source walk with no skymp5-server\cpp stops the record, nothing written' ($r.Code -ne 0 -and -not $r.Written)
+    Yes '  and says the check cannot be made' ($r.Said -match 'no skymp5-server\\cpp in' -and $r.Said -match 'older than its sources cannot be checked')
+
+    # The bundle held open by something else for the whole run.
+    $held = [IO.File]::Open((Join-Path $dist 'dist_back\skymp5-server.js'), 'Open', 'Read', 'None')
+    try { $r = Record } finally { $held.Dispose() }
+    Yes 'a bundle that cannot be read is refused, nothing written' ($r.Code -ne 0 -and -not $r.Written)
+    Yes '  and named as unreadable, not as naming no map' ($r.Said -match 'skymp5-server\.js could not be read' -and $r.Said -notmatch 'does not name skymp5-server\.js\.map')
+
+    # A records\server-build.json that does not read: a copy of the recorder
+    # in a tree of its own, since it reads the record beside it.
+    $tree = Join-Path $T 'tree'
+    foreach ($p in 'scripts\release\New-ServerBuildRecord.ps1', 'scripts\release\Read-JsonFile.ps1', 'scripts\release\server-bundle-sources.js', 'scripts\deploy\ServerBuild.ps1') {
+        $to = Join-Path $tree $p
+        $null = [IO.Directory]::CreateDirectory((Split-Path -Parent $to))
+        Copy-Item -LiteralPath (Join-Path $repo $p) -Destination $to
+    }
+    Put (Join-Path $tree 'records\server-build.json') '{ "source": '
+    $realRecorder = $recorder
+    $recorder = Join-Path $tree 'scripts\release\New-ServerBuildRecord.ps1'
+    try { $r = Record } finally { $recorder = $realRecorder }
+    Yes 'a recorded base that does not read stops the record, nothing written' ($r.Code -ne 0 -and -not $r.Written)
+    Yes '  and names the record' ($r.Said -match 'server-build\.json is not valid JSON')
 }
 finally {
     Remove-Item -LiteralPath $T -Recurse -Force -ErrorAction SilentlyContinue
