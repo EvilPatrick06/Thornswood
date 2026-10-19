@@ -349,8 +349,8 @@ const B1 = 'b1:Skyrim.esm';
 {
   const wipe = read('scripts/ops/Wipe-Saves.ps1');
   const lists = wipe.split('\n').filter(function (l) { return l.indexOf("@('world', 'private\\characters.json'") >= 0; });
-  yes('both of Wipe-Saves.ps1\'s lists take private\\furniture.json', lists.length === 2 &&
-      lists.every(function (l) { return l.indexOf("'private\\furniture.json'") >= 0; }));
+  yes('Wipe-Saves.ps1\'s one list of what a wipe moves aside, $Moves, takes private\\furniture.json', lists.length === 1 &&
+      /^\$Moves = @\(/.test(lists[0]) && lists[0].indexOf("'private\\furniture.json'") >= 0);
   const pm = read('docs/systems/property.md');
   yes('property.md has the furniture section', pm.indexOf('## Furniture') >= 0 && pm.indexOf('game/data/furniture.json') >= 0);
   yes('commands.md has the /furniture row', read('docs/systems/commands.md').indexOf('| `/furniture`') >= 0);

@@ -79,4 +79,13 @@ for(const value of [false,1,'true',undefined]) {
     error=>error.message==='Native merchant ledger evidence cannot be verified.');
 }
 assert.throws(()=>createLedgerNativeValidators(null),/cannot be verified/);
+for(const light of [false,true]) {
+  const f=fixture(light);f.npc.record.type='ARMO';f.npc.record.flags=0;
+  const adapter=createLedgerNativeValidators(f.mp);
+  assert.equal(adapter.resolveItem(f.base,'ARMO'),f.baseId);
+  assert.throws(()=>adapter.resolveItem(f.base,'WEAP'),/cannot be verified/,'resolvable wrong-type item refuses');
+  for(const flags of [4,0x20,undefined,-1,0x100000000]) {
+    f.npc.record.flags=flags;assert.throws(()=>adapter.resolveItem(f.base,'ARMO'),/cannot be verified/,'untradeable or malformed flags');
+  }
+}
 console.log('PASS native ledger full/light override identity binding, light aliases, read-only APIs and inventory validation');

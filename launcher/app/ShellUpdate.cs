@@ -56,7 +56,8 @@ namespace Thornswood
                             LogOnly("The update feed tip said the feed moved; checking now.");
                             CheckUpdatesBackground(false);
                         }
-                        // 204 / timeout: tip again immediately.
+                        // 204, the wait ran out unchanged: tip again at once.
+                        // A timeout or any other answer threw, below.
                     }
                     catch (Exception ex)
                     {
@@ -83,6 +84,16 @@ namespace Thornswood
                 // thread, so the News tab has it (#1050, FeedNews.cs). Never throws.
                 Updater.FillNews(cfg, v);
                 win.Dispatcher.BeginInvoke(new Action(delegate { OnVersionDoc(v, loud); }));
+                // Whether the release's signed manifest vouches for every
+                // asset the feed names (#2163, FeedManifest.cs). Only said in
+                // launcher.log for now (phase C), once per manifest, on a
+                // thread of its own after the feed was handed over, so a slow
+                // fetch never holds the update check or Play. Never throws.
+                ThreadPool.QueueUserWorkItem(delegate
+                {
+                    string manifest = Updater.ManifestLine(cfg, v);
+                    if (manifest != null) win.Dispatcher.BeginInvoke(new Action(delegate { LogOnly(manifest); }));
+                });
             }
             catch (Exception ex)
             {

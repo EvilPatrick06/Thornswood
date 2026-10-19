@@ -263,6 +263,15 @@ try {
     $none = Resolve-PackageClientRecord -LauncherExe (Join-Path $scratch 'missing.exe') -FeedVersion $badVersion -CheckoutRecord $checkoutPath
     Yes 'a feed zip whose sha256 is not clientRuntime is not the record, and neither is a drifted checkout' ($null -eq $none)
 
+    # A launcher that cannot be read stops it, rather than reading as a
+    # launcher with no record and falling back to the feed or the checkout (#2711).
+    $broken = Join-Path $scratch 'broken\Thornswood.exe'
+    $null = New-Item -ItemType Directory -Force -Path (Split-Path -Parent $broken)
+    [IO.File]::WriteAllText($broken, 'not a launcher')
+    $said = ''
+    try { $null = Resolve-PackageClientRecord -LauncherExe $broken -FeedVersion $versionPath -CheckoutRecord $checkoutPath } catch { $said = $_.Exception.Message }
+    Yes 'a launcher that cannot be read stops it, naming the launcher' ($said -match 'the launcher at .*broken\\Thornswood\.exe cannot be read')
+
     $sameCommit = 'cccc3333'
     $sameVersion = Join-Path $scratch 'same-feed\version.json'
     $same = [ordered]@{

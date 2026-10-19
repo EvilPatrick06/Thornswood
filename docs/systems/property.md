@@ -27,6 +27,12 @@ of its doors. Living there keeps it. When it lapses, the register drops
 the claim and the doors unlock. What is in the chests stays in the
 chests.
 
+When somebody's account is deleted at their request, the game lets go of
+what their characters held at its next start (#2351): a building or a farm
+they held is free, as a lapsed one is, their bed nights end, and a master key
+record cut for them comes off. The drop box keeps every coin they put in, for
+the hold's officers, with their name off it.
+
 A farm plot has its own claim, made in the field, and it lapses 14 real
 days after the last work on it. The two clocks use the same 14 days. A
 house and the ground outside its front door are one claim (Patrick, 21
@@ -145,16 +151,24 @@ rent and it owes nothing. The page shows the steward what is owed
 there.
 
 The server counts the debt. It does not take the gold out of a pack.
-Rent is handed to a steward, or put in the hold's box. Gold put in the
-box pays rent owed by that person first. What is left is the hold's.
+Rent is handed to a steward, or put in the hold's drop box. Gold put in
+the drop box pays rent owed by that person first. Taking it back out
+makes that rent owed again.
 
 ## The hold's box
 
-Each hold has one box, and it is that hold's notice board. The nine
-mainland towns already have a spot each, the coordinates given for
-the boards, and Raven Rock's is at its inn. You are at the box when
-you are within 400 of that spot. A steward of that hold who moves the
-board moves the box with it. See [Notice boards](noticeboards.md).
+Each hold has one box, the drop box on the shelf of its notice board's
+right post. The nine mainland towns already have a spot each, the
+coordinates given for the boards, and Raven Rock's is at its inn. You
+are at the box when you are within 400 of that spot. A steward of that
+hold who moves the board moves the box with it. What goes in it, who
+sees what, and who may take what out are on
+[Notice boards](noticeboards.md), under The drop box.
+
+There is no other box. A steward used to be able to mark any container
+as their hold's box from the Office page of the K panel. Patrick
+decided on 15 Oct to retire it (#2298): a chest that was marked is an ordinary
+container again, and Skyrim decides what goes in it.
 
 A price list is not dropped in as an item. Someone with the Prices
 permission on a faction or business book stands at the board and
@@ -162,21 +176,12 @@ submits the list. The guild of that hold keeps the copy. The rules
 are on [Factions and businesses](factions.md) and
 [Merchant's Guild](merchants-guild.md).
 
-A steward can still make a container their own hold's box: open it,
-then press the hold on the Office page of the K panel within a minute. Only
-gold goes in that chest. Anything else is handed back, still in the hand.
-The board itself is enough to submit a list.
-
-The number the board panel shows as paid in is a ledger of what has
-been paid in. Gold
-dropped in the chest is also in the chest. A fee taken for a notice is
-counted on the ledger and is not sitting in the chest. Nothing
-withdraws from the ledger except the payouts named on
+The number the board panel shows as paid in is the hold's ledger, a
+record on the server of the fees paid at its board. A fee taken for a
+notice or a job is counted on the ledger and is never in the drop box.
+Nothing withdraws from the ledger except the payouts named on
 [Free Skyrim Trading Company](trading-company.md), and a letter's 15,
 which goes to its courier or back to its sender.
-
-Notice fees, job fees, rent and company
-payment all use this box. There is no second treasury.
 See [Notice boards](noticeboards.md), [Gold](gold.md),
 [Merchant's Guild](merchants-guild.md).
 
@@ -281,13 +286,12 @@ not company wares.
 ## Where this is
 
 Claims, deeds, the 14 day lapse, locks, molds, keys, master keys,
-stewards, eviction, rent, the gold-only box and furniture are in the server. The register
+stewards, eviction, rent, the hold's drop box and furniture are in the server. The register
 is `private/property.json`, and the furniture's is `private/furniture.json`, which
-names no person (the furniture block in `game/gamemode.js`). Eviction, the rent and marking a box are
+names no person (the furniture block in `game/gamemode.js`). Eviction and the rent are
 the Office page of the K panel, for a steward (the Steward or the Jarl
 of a hold, by the Discord role); see
-[Offices](offices.md). A container is made one of the ten holds' boxes
-and no other, and only by a steward of that hold. The rent owed is on that page for the steward at the
+[Offices](offices.md). The rent owed is on that page for the steward at the
 door, and on the property page of K for the holder.
 
 Which hold a building is in is `BUILDING_HOLD` in the property block,
@@ -300,14 +304,12 @@ of the places its doors open onto: an exterior cell's location, or its
 worldspace's, or a room's own, walking through a room with none, such
 as a cellar, to where its doors open. Two holds there, the building's
 own location picks between them; none, the building's own location
-answers. Measured 17 Oct: 811 of the 850 buildings have a hold, and all
-601 that `DATA.cellToHold` names agree with it. The 39 left out (the
-Soul Cairn, Apocrypha, the Forgotten Vale, Sovngarde, Castle Volkihar,
-Fort Dawnguard, Nightingale Hall, Ironbind Barrow, test and Creation
-Club cells, Misty Grove, whose only door starts disabled, and four
-from mods) open onto places no hold's location covers, and the table
-says why for each. No steward evicts or sets
-rent at those; staff do.
+answers. Measured 17 Oct: 828 of the 850 buildings have a hold, and all
+601 that `DATA.cellToHold` names agree with it. The 22 left out (the
+Soul Cairn, Apocrypha, the Forgotten Vale, Sovngarde, test and Creation
+Club cells, and Misty Grove, whose only door starts disabled) open onto
+places no hold's location covers, and the table says why for each. No
+steward evicts or sets rent at those; staff do.
 
 Staff at a door (#2551) are `settleAs` in the property block: a
 steward of the building's hold acts as its steward, and anybody else
@@ -319,6 +321,23 @@ norent, `by`, `byName`, `who`, `whoName`, `why` (the building and its
 hold, and the rent set), `building`, `buildingName`, `hold` and `at`.
 A press is refused when that log cannot be reached.
 `tests\test-2551-building-holds.js` drives it at all 850 buildings.
+
+Skyrim and the collection's mods put 17 more buildings on Tamriel's
+ground in no hold. Patrick, 17 Oct, decision 2 = B on #2551, gave them
+one, and `Thornswood-Last.esp` carries it (the policy's `placeHolds` in
+`game\data\last-plugin-policy.json`, built by
+`scripts\mods\Build-LastPlugin.py`): Castle Volkihar's location and
+Jakob's and Frederik's houses' are put in Haafingar, Nightingale Hall's
+and Dayspring Canyon's (Fort Dawnguard's valley) in the Rift, with Dead
+Drop Falls' put in the valley, Ironbind Barrow's in Winterhold and
+Darkfall Cave's in the Reach. Three rooms have no location at all and
+are given one: Oar's Rest's utility room takes Oar's Rest's, which the
+mod puts in Falkreath Hold, Mossy Glen Cave the valley's, and the Lost
+Hut the Reach's own. Each is a copy of the record that wins the load
+order with only its parent or its location changed, so the game, the
+server and this table all read the same hold. The roster's place name,
+the main menu's Last location and the launcher's "last seen in", reads
+the same parents and names the hold: "Volkihar Keep, Haafingar".
 
 Claiming, locking, unlocking and cutting a key are the lock key, with
 nothing typed (#1637). The server writes the door's word, Claim, Lock or

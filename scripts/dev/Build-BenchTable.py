@@ -49,6 +49,9 @@ WHAT IT WRITES, between markers, the way the recipe table is written:
                               the door asks for, because a bench that opened only
                               at the rank of its dearest recipe would be shut to
                               somebody who can plainly make three things inside it.
+                      shut    only on a bench in SHUT_BENCHES below: the sentence
+                              the gate says instead of opening it, for anybody.
+                              Such a bench has anyone false and no halves.
 
 A bench with no owned recipes and no unowned ones is not in BENCH_ACCESS at all,
 and the gate refuses a base whose bench it cannot find. That is the "some benches
@@ -120,8 +123,36 @@ OPEN_FURNITURE = {
     'CraftingSmithingForge': 'Forge. Open furniture. A forge recipe still has an owner and a rank',
     'CraftingTanningRack': 'Tanning rack. Open furniture. A hide into leather is the Platewright\'s',
     'MCE_CraftingLoom': 'Loom. Open furniture. The garment still has an owner and a rank',
-    'CraftingSmithingArmorTable': 'Armour table. Open furniture. Tempering never reaches the server',
     'DLC1LD_CraftingForgeAetherium': 'Aetherium forge. Open furniture. The staff and the plate made there are master recipes',
+}
+
+
+# THE BENCHES NOTHING CAN BE MADE AT, WHOEVER YOU ARE (#1384).
+#
+# Tempering is cut. A piece is mended with a repair kit (docs/systems/durability.md),
+# and the 1809 temper rows are in docs/systems/cut-items.md, held so an event can
+# bring one back. Every recipe these two benches carry is a temper: 471 owned rows
+# at the sharpening wheel and 1334 at the armour table are all fires: false, and
+# the 11 rows nobody owns at the armour table are tempers too. The engine throws
+# every recipe at either bench out before a craft (CraftService RecipeItemsMatch,
+# isTemper), and the gamemode refuses one that gets through (recipelessCraft).
+#
+# Until #1384 this script still opened both. The wheel's temper rows counted as
+# Edgewright and Woodwright work, and the armour table was open furniture on the
+# premise "Tempering never reaches the server", which stopped being true when
+# the refusal went in. So Skyrim's crafting menu opened and listed every piece
+# you could temper, and only the pick was refused. A bench here is written shut,
+# whatever rows it holds and whatever OPEN_FURNITURE says: anyone false, no
+# halves, and the sentence the gate says instead of opening it. It stays in
+# BENCH_BY_BASE, because recipelessCraft and TWO_HANDS still name it. The
+# sentence is the gamemode's temper refusal, word for word, and
+# tests/test-1384-shut-benches.js holds the two equal. Taking a bench out of
+# here, with the cut list, is how a temper comes back for an event.
+SHUT_SAYS = ('Tempering is not done here. A piece is mended with a repair kit: '
+             'with one in your pack, your inventory names the key that mends a piece.')
+SHUT_BENCHES = {
+    'CraftingSmithingSharpeningWheel': SHUT_SAYS,
+    'CraftingSmithingArmorTable': SHUT_SAYS,
 }
 
 
@@ -327,6 +358,17 @@ def main():
         a = access.setdefault(bench, {'name': bname, 'anyone': False, 'halves': {}})
         a['anyone'] = True
 
+    # The benches nothing can be made at are shut for everybody, last, so no row
+    # and no line of OPEN_FURNITURE can open one again (#1384).
+    shut_not_here = []
+    for bname in sorted(SHUT_BENCHES):
+        bench = by_name.get(bname) or keywords.get(bname)
+        if not bench:
+            shut_not_here.append(bname)
+            continue
+        access[bench] = {'name': bname, 'anyone': False, 'halves': {},
+                         'shut': SHUT_BENCHES[bname]}
+
     # And the two stations whose work is a menu rather than a recipe.
     for spec in MENU_STATIONS.values():
         a = access.setdefault(spec['key'], {'name': spec['name'], 'anyone': False,
@@ -340,12 +382,19 @@ def main():
         a = access[bench]
         halves = ', '.join('%s %s' % (h, a['halves'][h]) for h in sorted(a['halves']))
         print('    %-32s %-27s %s%s' % (a['name'], bench,
-                                        'anyone' if a['anyone'] else '', halves and ' | ' + halves))
+                                        'shut' if a.get('shut') else ('anyone' if a['anyone'] else ''),
+                                        halves and ' | ' + halves))
     if not_here:
         print('')
         print('  %d bench(es) the professions page calls open furniture are not in this load order:'
               % len(not_here))
         for n in not_here:
+            print('    %s' % n)
+    if shut_not_here:
+        print('')
+        print('  %d shut bench(es) are not in this load order, so there is nothing to shut:'
+              % len(shut_not_here))
+        for n in shut_not_here:
             print('    %s' % n)
     if no_desc:
         print('')
@@ -430,7 +479,9 @@ def main():
              '     anyone  the professions page calls it open furniture, or it holds a recipe',
              '             nobody owns, so it opens for everybody',
              '     halves  each half that owns something here, at the LOWEST rank it owns',
-             '             something at, because that is the rank the door asks for. */',
+             '             something at, because that is the rank the door asks for',
+             '     shut    nothing can be made here by anybody (SHUT_BENCHES), and this is',
+             '             what the gate says instead of opening it */',
              'const BENCH_ACCESS = ' + json.dumps(access, sort_keys=True,
                                                   separators=(',', ':')) + ';']
     out = block('// ==== BENCH_ACCESS, generated ====',

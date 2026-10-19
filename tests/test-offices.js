@@ -236,8 +236,8 @@ if (evictBlock !== null) {
   const code = src
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .replace(/\/\/[^\n]*/g, ' ');
-  yes('the office line and evict are in the one list every command is registered in',
-      /'\/evict', '\/box', '\/rent',/.test(code) && /'\/office',/.test(code));
+  yes('the office line and evict are in the one list every command is registered in, and /box is not (#2298)',
+      /'\/evict', '\/rent',/.test(code) && /'\/office',/.test(code) && !/'\/box'/.test(code));
   yes('and the dispatcher hands /office and /evict to the property block',
       /word === '\/office'/.test(code) && /word === '\/evict'/.test(code));
   yes('the roles are read from outside, and the register keeps only which character holds an office: no stewards register, no guards or seats',

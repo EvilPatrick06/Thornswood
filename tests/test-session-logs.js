@@ -645,6 +645,73 @@ noteTrouble(
 const again = troubled().filter(r => r.session === 'late1111late1111');
 yes('a second note for the same session is not added twice', again.length === 1);
 
+// ---- what is said when it fails (#2736) ------------------------------------
+/*
+  The /api/play/logs handler stored the logs, then read the issues and the
+  trouble inside try { ... } with a catch that held nothing, and
+  putSessionLogs answered a set the folder would not take as 'nothing', so
+  the launcher was told 200 stored false and dropped the logs. Each failure is
+  said in the site's log now (the session key and the error code, never what
+  the logs hold) and answered for what it is.
+*/
+{
+  const said = [];
+  const wasError = console.error;
+  console.error = function () { said.push(Array.prototype.slice.call(arguments).join(' ')); };
+  try {
+    // A file where the folder should be: the set cannot be written.
+    const notAFolder = path.join(TMP, 'not-a-folder');
+    fs.writeFileSync(notAFolder, 'a file where the session-logs folder should be');
+    const putInto = new Function('fs', 'path', 'crypto', 'SLOGS', 'SLOG_ONE', 'SLOG_ALL', 'SLOG_NAMES',
+      grab('slogFile') + '\n' + grab('slogTrim') + '\n' + grab('putSessionLogs') + '\nreturn putSessionLogs;')(
+      fs, path, crypto, notAFolder, SLOG_ONE, SLOG_ALL, SLOG_NAMES);
+    const got = putInto('fail2736fail2736', '111', { 'launcher.log': 'a crash worth keeping\n' });
+    yes('a set the folder will not take answers failed, not nothing', got === 'failed');
+    const line = said.filter((l) => l.indexOf('session-logs ') >= 0 && l.indexOf('"write-failed"') >= 0)[0] || '';
+    yes('and is said in the site log as session-logs write-failed with its key and code',
+        /^\[thornswood-docs\] session-logs \{/.test(line) && line.indexOf('fail2736fail2736') >= 0 && /"code":"E[A-Z]+"/.test(line));
+    yes('and the line holds nothing the logs held', line.indexOf('a crash worth keeping') < 0);
+
+    // A first set that has gone bad on disk: a replay is still refused, the
+    // bad set is not written over, and both are said.
+    said.length = 0;
+    const BADK = 'bad27362736bad2';
+    fs.writeFileSync(slogFile(BADK), '{"logs": {"launcher.log": "truncat');
+    const before = fs.readFileSync(slogFile(BADK), 'utf8');
+    yes('a replay of a set that will not read is still refused', putSessionLogs(BADK, '111', { 'launcher.log': 'clean\n' }) === 'already');
+    yes('and the set that will not read is not written over', fs.readFileSync(slogFile(BADK), 'utf8') === before);
+    yes('and it is said as session-logs set-unreadable with its key',
+        said.some((l) => l.indexOf('session-logs ') >= 0 && l.indexOf('"set-unreadable"') >= 0 && l.indexOf(BADK) >= 0));
+    yes('and nothing it held is in the line', !said.some((l) => l.indexOf('truncat') >= 0));
+
+    // The bot's crash note: true when written, false and said when not.
+    said.length = 0;
+    const noteWith = (put) => new Function('jsonFile', 'putJson', 'freshTrouble', 'TROUBLE_FILE', 'TROUBLE_KEEP', 'path',
+      grab('noteTrouble') + '\nreturn noteTrouble;')(jsonFile, put, freshTrouble, path.join(TMP, 'trouble-2736.json'), TROUBLE_KEEP, path);
+    const crash = { why: 'the game crashed', file: 'crash.log', line: 'EXCEPTION', level: 'bad' };
+    yes('noteTrouble answers true when the bot\'s row is written',
+        noteWith(putJson)({ session: 'note2736note2736', who: '111', start: 1, end: 2 }, crash) === true);
+    yes('noteTrouble answers false when the row cannot be written',
+        noteWith(() => false)({ session: 'gone2736gone2736', who: '111', start: 1, end: 2 }, crash) === false);
+    yes('and says it as trouble write-failed with the session, never the line',
+        said.some((l) => /^\[thornswood-docs\] trouble \{/.test(l) && l.indexOf('"write-failed"') >= 0 && l.indexOf('gone2736gone2736') >= 0 && l.indexOf('EXCEPTION') < 0));
+  } finally {
+    console.error = wasError;
+  }
+
+  // The handler itself, read as text: no catch with nothing in it, a set
+  // that failed is a 500 the launcher sends again, and a row or a note that
+  // will not write is answered read false or noted false.
+  const from = src.indexOf("if (p === '/api/play/logs' && req.method === 'POST') {");
+  const to = src.indexOf('The character roster', from);
+  const handler = (from >= 0 && to > from) ? src.slice(from, to) : '';
+  yes('the /api/play/logs handler is found in server.js', handler.length > 0);
+  yes('and holds no catch with nothing in it', !/catch\s*(\([^)]*\))?\s*\{\s*\}/.test(handler));
+  yes('and answers a set that failed with 500, which the launcher sends again',
+      /what === 'failed'\) return sendJson\(res, 500/.test(handler));
+  yes('and answers a row that will not write with read false', /if \(!putSessions\(rows\)\)[\s\S]*?answer\.read = false/.test(handler));
+  yes('and a crash note that will not write with noted false', /!noteTrouble\(rows\[at\], found\)\) answer\.noted = false/.test(handler));
+}
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) { }

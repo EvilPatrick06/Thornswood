@@ -125,7 +125,7 @@ somebody's own machine:
 
 | Maneuver | In the server | Not yet |
 | --- | --- | --- |
-| Set | The stamina and the wait | Halving what a block costs. A block costs no stamina here yet, so there is nothing to halve: the server decides a block and takes health only, and nobody else's blow does damage on your own machine. Whether blocks should cost stamina is Patrick's to decide |
+| Set | The stamina and the wait. A block you make while it runs costs half the stamina | Nothing |
 | Plant | The stamina and the wait. A Break or a Wreck does not stagger you, and your own game refuses every other stagger while it runs | Nothing |
 | Cover | While you block and they stay within 3 metres, a fifth of what each hit took is given back | A hit that kills outright is not softened |
 | Wall | You, and your party within 3 metres of you, get a fifth of what each hit took back | A hit that kills outright is not softened |
@@ -133,6 +133,16 @@ somebody's own machine:
 | Heavy | The power attack takes a quarter again of what it took | Nothing |
 | Break | The hit staggers a person | Staggering a creature |
 | Wreck | The power attack takes a half again of what it took, and staggers a person | Staggering a creature |
+
+A block costs stamina (Patrick, 12 Oct). It is the game's own rule:
+a quarter of the damage the block stopped. A blocked blow lets a tenth
+of its damage through, so a blow that takes 2 health off you through
+your block stopped 18, and costs 4.5 stamina. It comes off your real
+most, the way a maneuver's stamina does (below), and a block with no
+stamina left still blocks, as in the game. Set halves it. Only a
+person pays for a block, and a spell is never blocked. The server
+decides each block itself, so a block against a creature or a
+character the server runs costs stamina too (issue #1386).
 
 Two of them on one person is still 20% less, not 40%, and Cover and
 Wall work as the table says (Patrick, 4 Oct). The stamina is taken

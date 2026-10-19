@@ -33,6 +33,9 @@
     G  -DryRun on dev with no -Root, on a machine that recorded its dev
        release folder (Where.ps1 ShipRootDev, #1692): that folder is built,
        installed and published
+    G2 the same with a recorded folder that has no Launcher folder, as
+       Update-ShipRoot.ps1 makes one: not refused, and its launcher step
+       makes the folder (#2662)
     H  -Root naming a folder Vortex deploys into: refused before anything is
        built, installed or published (#1692)
     I  a folder whose generated files are out of date: refused before the
@@ -252,6 +255,16 @@ function Hash([string]$path) {
     $sha = [Security.Cryptography.SHA256]::Create()
     try { return [BitConverter]::ToString($sha.ComputeHash([IO.File]::ReadAllBytes($path))) } finally { $sha.Dispose() }
 }
+# The stand-in store keeps each channel's feed as write-once generations,
+# version\<8 digits>.json in its folder, the newest being the feed (#2727,
+# Feed-Store.ps1). Its hash here is the newest's name and bytes, so a new
+# generation counts as a move even with the same bytes.
+. (Join-Path $Here 'scripts\release\Feed-Store.ps1')
+function Hash-SiteFeed([string]$channelDir) {
+    $f = Get-FeedVersionFile $channelDir
+    if (-not $f) { return 'absent' }
+    return ((Split-Path -Leaf $f) + '|' + (Hash $f))
+}
 function Read-Version([string]$path) {
     $m = [regex]::Match([IO.File]::ReadAllText($path), 'Version\s*=\s*"([^"]+)"')
     if ($m.Success) { return $m.Groups[1].Value }
@@ -307,7 +320,7 @@ function Get-LoadOrderCopyDiffs([hashtable]$Copies) { return @() }
     [IO.File]::WriteAllText((Join-Path $repo 'scripts\dev\Check-Words.ps1'), "param([string]`$Root)`r`nexit 0`r`n")
     # The VPS store (Feed-Store.ps1, #907), stood in for by a folder, and this
     # machine's working copies of it as the last run left them.
-    foreach ($d in (Join-Path $site 'feed'), (Join-Path $site 'feed-dev')) { New-Item -ItemType Directory -Force -Path $d | Out-Null }
+    foreach ($d in (Join-Path $site 'feed\version'), (Join-Path $site 'feed-dev\version')) { New-Item -ItemType Directory -Force -Path $d | Out-Null }
     foreach ($pair in @(@($rel, 'feed'), @($relDev, 'feed-dev'))) {
         # Main's feed offers 1.1.92: main moved to 1.1.93 with Bump-Version and has
         # not shipped it, the state a main Ship starts from. A main feed already
@@ -315,7 +328,7 @@ function Get-LoadOrderCopyDiffs([hashtable]$Copies) { return @() }
         # built (#2347, tests\test-2347-dev-launcher-version.ps1).
         $v = if ($pair[1] -eq 'feed') { '{"launcherVersion":"1.1.92","packs":[]}' } else { '{"launcherVersion":"1.1.93.2","packs":[],"serverPort":7001}' }
         $b = if ($pair[1] -eq 'feed') { '{"main":"as last published"}' } else { '{"dev":"as last published"}' }
-        [IO.File]::WriteAllText((Join-Path $site ($pair[1] + '\version.json')), $v)
+        [IO.File]::WriteAllText((Join-Path $site ($pair[1] + '\version\00000001.json')), $v)
         [IO.File]::WriteAllText((Join-Path $site ($pair[1] + '\published.json')), $b)
         [IO.File]::WriteAllText((Join-Path $pair[0] 'version.json'), $v)
         [IO.File]::WriteAllText((Join-Path $pair[0] 'published.json'), $b)
@@ -329,7 +342,10 @@ function Get-LoadOrderCopyDiffs([hashtable]$Copies) { return @() }
     }
 
     Stub 'Build-Launcher' '[string]$Root, [string]$OutDir, [switch]$NoPause' ''
+    # Makes the Launcher folder when there is none, as the real one does: a
+    # ship root Update-ShipRoot.ps1 made has none (G2, #2662).
     Stub 'Install-Launcher' '[string]$Root, [string]$From, [switch]$NoPause' @'
+[void](New-Item -ItemType Directory -Force -Path (Join-Path $Root 'Launcher'))
 [IO.File]::WriteAllText((Join-Path $Root 'Launcher\Thornswood.exe'), 'the launcher this run built')
 '@
     Stub 'Go' '[switch]$SkipServer, [string]$Game, [switch]$Vortex' ''
@@ -370,7 +386,7 @@ if ($VersionOverride) { $now = $VersionOverride }
 # With the release record the real one writes (#444): one name, 20990101-0000,
 # for the pack, the launcher it offers and the commit it was built from.
 $ch = if ($Channel -eq 'dev') { 'dev' } else { 'main' }
-[IO.File]::WriteAllText($vf, '{"launcherVersion":"' + $now + '","launcherInputs":"' + $inputsNow + '","packs":[{"id":"20990101-0000"}],' +
+[IO.File]::WriteAllText($vf, '{"launcherVersion":"' + $now + '","launcherInputs":"' + $inputsNow + '","packs":[{"id":"20990101-0000","url":"https://example.invalid/20990101-0000.zip","sha256":"' + ('d' * 64) + '"}],' +
     '"release":{"id":"20990101-0000","channel":"' + $ch + '","launcherVersion":"' + $now + '","packs":["20990101-0000"],' +
     '"baseline":"","commit":"' + ('ab12' * 10) + '","branch":"main","uncommitted":0,"tag":"release/' + $ch + '/20990101-0000"}}')
 [IO.File]::WriteAllText((Join-Path $ReleaseDir 'published.json'), '{"written":"by the publisher"}')
@@ -468,14 +484,14 @@ if ($target -match '^repos/[^/]+/[^/]+/releases\?per_page=100&page=(\d+)$') {
     $devFeed = Join-Path $relDev 'version.json'
     $base = Join-Path $rel 'published.json'
     $devBase = Join-Path $relDev 'published.json'
-    $siteFeed = Join-Path $site 'feed\version.json'
+    $siteFeedDir = Join-Path $site 'feed'
     $siteBase = Join-Path $site 'feed\published.json'
-    $siteDevFeed = Join-Path $site 'feed-dev\version.json'
+    $siteDevDir = Join-Path $site 'feed-dev'
     $siteDevBase = Join-Path $site 'feed-dev\published.json'
     $distDir = Join-Path $dist 'Play\_dist'
 
     # ---- D: -DryRun -Package on main ------------------------------------------------
-    $was = @{ feed = (Hash $feed); dev = (Hash $devFeed); base = (Hash $base); site = (Hash $siteFeed); siteBase = (Hash $siteBase); siteDev = (Hash $siteDevFeed) }
+    $was = @{ feed = (Hash $feed); dev = (Hash $devFeed); base = (Hash $base); site = (Hash-SiteFeed $siteFeedDir); siteBase = (Hash $siteBase); siteDev = (Hash-SiteFeed $siteDevDir) }
     $d = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-DryRun', '-Package', '-Root', $root, '-DistRoot', $dist, '-NoPause')
     Yes ("D a main -DryRun -Package runs to the end (exit {0})" -f $d.Code) ($d.Code -eq 0 -and $d.Out -match 'Dry run finished')
     $pub = Called $d 'Publish-Update'
@@ -496,7 +512,7 @@ if ($target -match '^repos/[^/]+/[^/]+/releases\?per_page=100&page=(\d+)$') {
     Yes 'D version.json is byte for byte what it was' ((Hash $feed) -eq $was.feed)
     Yes '  and so is the baseline' ((Hash $base) -eq $was.base)
     Yes '  and the dev feed is not reset to match' ((Hash $devFeed) -eq $was.dev)
-    Yes '  and nothing on the VPS store moved' ((Hash $siteFeed) -eq $was.site -and (Hash $siteBase) -eq $was.siteBase -and (Hash $siteDevFeed) -eq $was.siteDev)
+    Yes '  and nothing on the VPS store moved' ((Hash-SiteFeed $siteFeedDir) -eq $was.site -and (Hash $siteBase) -eq $was.siteBase -and (Hash-SiteFeed $siteDevDir) -eq $was.siteDev)
 
     # ---- V: -DryRun -Package on dev -------------------------------------------------
     $was = @{ dev = (Hash $devFeed); devBase = (Hash $devBase); feed = (Hash $feed) }
@@ -516,7 +532,7 @@ if ($target -match '^repos/[^/]+/[^/]+/releases\?per_page=100&page=(\d+)$') {
     Yes '  and Updater.cs is on the version it had' ((Read-Version $updaterCs) -eq '1.1.93')
 
     # ---- R: a real Ship -Package on main ----------------------------------------------
-    $devBeforeMain = Hash $siteDevFeed
+    $devBeforeMain = Hash-SiteFeed $siteDevDir
     $devBaselineBeforeMain = Hash $siteDevBase
     $r = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-Package', '-Root', $root, '-DistRoot', $dist, '-NoPause')
     Yes ("R a real main Ship -Package runs to the end (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Out -match 'Everyone in the world has')
@@ -562,7 +578,7 @@ if ($target -match '^repos/[^/]+/[^/]+/releases\?per_page=100&page=(\d+)$') {
         @($gone | Where-Object { $_ -match '^gh api -H Accept: application/octet-stream repos/\S+/releases/assets/22$' }).Count -eq 1 -and
         @($gone | Where-Object { $_ -match '^gh release download' }).Count -eq 0)
     Yes 'R the feed reaches the VPS store: the site serves what the publisher wrote' (
-        ([IO.File]::ReadAllText($siteFeed)) -match '20990101-0000')
+        ([IO.File]::ReadAllText((Get-FeedVersionFile $siteFeedDir))) -match '20990101-0000')
     # The one thing pushed is the release tag (#444), on the commit the feed
     # names, after the publisher has sent the feed.
     $pushes = @($gone | Where-Object { $_ -match '^git .*\bpush\b' })
@@ -580,8 +596,8 @@ if ($target -match '^repos/[^/]+/[^/]+/releases\?per_page=100&page=(\d+)$') {
         $at.ContainsKey('tag') -and $at.ContainsKey('Publish-Update') -and $at['tag'] -gt $at['Publish-Update'] -and
         $at.ContainsKey('Request-Restart') -and $at['tag'] -gt $at['Request-Restart'])
     Yes 'R and it says so' ($r.Out -match 'release/main/20990101-0000 marks ab12ab12ab12, and it is on GitHub')
-    $devNow = [IO.File]::ReadAllText($siteDevFeed) | ConvertFrom-Json
-    Yes 'R a main ship preserves the independently published dev feed' ((Hash $siteDevFeed) -eq $devBeforeMain)
+    $devNow = [IO.File]::ReadAllText((Get-FeedVersionFile $siteDevDir)) | ConvertFrom-Json
+    Yes 'R a main ship preserves the independently published dev feed' ((Hash-SiteFeed $siteDevDir) -eq $devBeforeMain)
     Yes '  and the independently published dev baseline' ((Hash $siteDevBase) -eq $devBaselineBeforeMain)
 
     # ---- E: a dev dry run numbers itself from the site store, not from git ------------
@@ -633,6 +649,24 @@ if ($target -match '^repos/[^/]+/[^/]+/releases\?per_page=100&page=(\d+)$') {
         $built.Count -eq 1 -and $built[0].Contains(' -Root ' + $relDevRoot) -and
         $inst.Count -eq 1 -and $inst[0].Contains(' -Root ' + $relDevRoot) -and
         $pub.Count -eq 1 -and $pub[0].Contains(' -Root ' + $relDevRoot))
+
+    # ---- G2: the recorded folder has no Launcher folder (#2662) -------------------------
+    # A ship root Update-ShipRoot.ps1 made: Game and Profile (config.json too,
+    # which this stand-in run does not need) and no Launcher folder. Until
+    # #2662 every dev Ship stopped on "No dev build at".
+    $bareRoot = Join-Path $T 'Release-Bare'
+    New-Item -ItemType Directory -Force -Path (Join-Path $bareRoot 'Game'), (Join-Path $bareRoot 'Profile') | Out-Null
+    [IO.File]::WriteAllText($shipRoots, (ConvertTo-Json -InputObject ([ordered]@{ dev = $bareRoot })))
+    try {
+        $g2 = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-Channel', 'dev', '-DryRun', '-DistRoot', $dist, '-NoPause')
+    } finally { Remove-Item -LiteralPath $shipRoots -Force -ErrorAction SilentlyContinue }
+    Yes ("G2 a dev dry run from a recorded folder with no Launcher folder runs to the end (exit {0})" -f $g2.Code) (
+        $g2.Code -eq 0 -and $g2.Out -match 'Dry run finished' -and $g2.Out -notmatch 'No dev build at')
+    $inst = Called $g2 'Install-Launcher'
+    $pub = Called $g2 'Publish-Update'
+    Yes '  installing into it and publishing it' (
+        $inst.Count -eq 1 -and $inst[0].Contains(' -Root ' + $bareRoot) -and $pub.Count -eq 1 -and $pub[0].Contains(' -Root ' + $bareRoot))
+    Yes '  and its launcher step made the Launcher folder' (Test-Path -LiteralPath (Join-Path $bareRoot 'Launcher\Thornswood.exe') -PathType Leaf)
 
     # ---- H: a folder Vortex deploys into (#1692) ---------------------------------------
     $vortexRoot = Join-Path $T 'Vortex-DevBuild'

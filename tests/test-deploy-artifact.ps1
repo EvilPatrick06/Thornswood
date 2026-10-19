@@ -231,6 +231,18 @@ try {
     try { $null = New-ThornswoodArtifact -Component site -RepoDir $src -Paths 'site/nothing-here' -OutDir (Join-Path $tmp 'out7') } catch { $threw = $true }
     Yes 'a path the commit lacks stops the build' $threw
 
+    # #2711: the blob reader closed git's input in a try with an empty catch.
+    # Now a read that fails closes it and says so beside the failure, and a
+    # read that finished is held to git ending cleanly.
+    $gitExe = (Get-Command git -CommandType Application | Select-Object -First 1).Source
+    $blobId = ((& git -C $src rev-parse 'HEAD:site/server.js') | Out-String).Trim()
+    $treeId = ((& git -C $src rev-parse 'HEAD:site') | Out-String).Trim()
+    $got = [ThornswoodArtifactZip]::ReadBlobs($gitExe, $src, [string[]]@($blobId))
+    Yes 'the blob reader gives a blob''s exact bytes' ((Hex $got[0]) -eq (Hex ([IO.File]::ReadAllBytes((Join-Path $src 'site\server.js')))))
+    $why = ''
+    try { $null = [ThornswoodArtifactZip]::ReadBlobs($gitExe, $src, [string[]]@($blobId, $treeId)) } catch { $why = $_.Exception.InnerException.Message; if (-not $why) { $why = $_.Exception.Message } }
+    Yes 'a read that fails stops, naming git and the repository, and git is let go' ($why -match 'git cat-file --batch in .+ failed: git cat-file answered: [0-9a-f]{40} tree')
+
     $params = @((Get-Command New-ThornswoodArtifact).Parameters.Keys | Where-Object { [System.Management.Automation.PSCmdlet]::CommonParameters -notcontains $_ })
     Yes 'New-ThornswoodArtifact takes no file from elsewhere and no switch past the refusal' (
         ((($params | Sort-Object) -join ',') -eq 'AlsoSends,Component,OutDir,Paths,RepoDir'))
@@ -247,6 +259,8 @@ try {
     $g = New-ThornswoodArtifact -Component gamemode -RepoDir $src -Paths 'game/gamemode.js' -OutDir (Join-Path $tmp 'out10')
     $stamp = New-ThornswoodBuildStamp -Gamemode (Join-Path $g.Folder 'game\gamemode.js') -Channel dev -RepoDir $src -Artifact $g
     Yes "the build stamp names the artifact's commit, and that the commit holds it" ($stamp.commit -eq $g.Short -and $stamp.gamemodeMatchesCommit -eq $true)
+    # 19 Oct: after #2747 every artifact's Short was '' and the stamp said "no commit".
+    Yes "  and that commit is the artifact's own twelve, not empty" ($g.Short -match '^[0-9a-f]{12}$' -and $g.Commit.StartsWith($g.Short) -and (Format-ThornswoodArtifact $g) -match (', commit ' + $g.Short + ','))
 
     # ---- 3b. site and voice source integrity, before anything is sent ------
     # Issue #1335. The check has to pass on the tree that would be sent, and
@@ -525,7 +539,8 @@ Yes "Artifact.ps1 names the store ($storeLine)" ($storeLine -eq 'C:/Thornswood-D
 $siteSrc = Get-Content -LiteralPath (Join-Path $Repo 'site\server.js') -Raw
 Yes "the site reads current\ in that store by default" ($siteSrc.Contains('process.env.THORNSWOOD_DEPLOYS_DIR || ''C:\\Thornswood-Deploys\\current'''))
 $docsSrc = Get-Content -LiteralPath (Join-Path $Repo 'scripts\deploy\Deploy-Docs.ps1') -Raw
-Yes "Deploy-Docs grants the site's account read on it" ($docsSrc.Contains("@('C:\Thornswood-Deploys\current', '(OI)(NP)R')"))
+# Named from the folder the site's root is in, C: on the box (#1273).
+Yes "Deploy-Docs grants the site's account read on it" ($docsSrc.Contains("@('`$boxWin\Thornswood-Deploys\current', '(OI)(NP)R')"))
 
 
 foreach ($rel in @('scripts\deploy\Deploy-Docs.ps1', 'scripts\deploy\Install-Voice.ps1')) {

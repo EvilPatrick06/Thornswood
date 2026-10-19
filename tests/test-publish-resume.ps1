@@ -106,6 +106,22 @@ try {
     Write-Pending $state '20260928-0101' 'gh exited with 1'
     Check 'and it is the one written' (Test-Path -LiteralPath $script:PendingFile) 'True'
     Check 'and read back' (Read-Pending $state).id '20260928-0101'
+
+    # ---- a note that cannot be written or removed (#2711)
+    # Both ran in a try with an empty catch, so Done said the next run would
+    # finish a release no note named, and a note never removed was left to
+    # name a release already out. Each now hands back what it could not do.
+    Check 'a note written answers nothing to say' (Write-Pending $state '20260928-0102' 'gh exited with 1') ''
+    $held = [IO.File]::Open($script:PendingFile, 'Open', 'Read', 'None')
+    try { $why = Clear-Pending $state } finally { $held.Dispose() }
+    Check 'a note that cannot be removed is said, naming it' ([bool]($why -match 'could not be removed' -and $why.Contains($script:PendingFile))) 'True'
+    Check '  and it is still there' (Test-Path -LiteralPath $script:PendingFile) 'True'
+    Check 'a note removed answers nothing to say' (Clear-Pending $state) ''
+    $blocker = Join-Path $work 'a-file-not-a-folder'
+    [IO.File]::WriteAllText($blocker, 'x')
+    $script:PendingFile = Join-Path $blocker 'published-pending.json'
+    $why = Write-Pending $state '20260928-0103' 'gh exited with 1'
+    Check 'a note that cannot be written is said, with the release it would finish' ([bool]($why -match 'could not be written' -and $why.Contains('20260928-0103'))) 'True'
     $script:PendingFile = ''
 }
 finally {

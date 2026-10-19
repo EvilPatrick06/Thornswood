@@ -18,13 +18,13 @@ try {
   const props = [];
   const trade = service.installMerchantTrading({
     mp: { getIdFromDesc() { return 20; }, makeProperty() {}, set(id, key, value) { props.push({ id, key, value }); } },
-    g: {}, purses: { prepare() { return null; } }, log() {}
+    catalog:{byRef:{}},g: {}, purses: { prepare() { return null; } }, log() {}
   });
   trade.push(10, { open: true });
   assert.equal(props[0].value.open, true);
   const broken = service.installMerchantTrading({
     mp: {getIdFromDesc(){return 20;},makeProperty(){},set(){throw Error('publication unavailable');}},
-    g:{},purses:{prepare(){return null;}},log(){}
+    catalog:{byRef:{}},g:{},purses:{prepare(){return null;}},log(){}
   });
   assert.throws(()=>broken.push(10,{open:true}),/publication unavailable/);
   assert.match(broken.command({actorId:10,profileId:7,parts:['/merchant','1']}).text,/unavailable/,

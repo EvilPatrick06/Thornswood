@@ -151,12 +151,14 @@ function refreshWith(before, answer, status) {
     }
   };
   const run = new Function(
-    'fs', 'path', 'privDir', 'FILE', 'note', 'require', 'console',
+    'fs', 'path', 'privDir', 'FILE', 'note', 'require', 'console', 'mp',
     'var readAt = 0, listAt = 0;\n' + door + '\nrefresh();');
   run(fakeFs, path, PRIV, FILE,
       function (line) { said.push(line); },
       function (m) { return m === 'https' ? fakeHttps : require(m); },
-      { log: function (line) { said.push(line); } });
+      { log: function (line) { said.push(line); } },
+      // The engine's whole-file write (#2740), onto the fake disk.
+      { writeFileWhole: function (p, s) { fakeFs.writeFileSync(p, s); } });
   const now = Object.prototype.hasOwnProperty.call(disk, FILE) ? disk[FILE] : null;
   const changed = now !== null && now !== (before === undefined ? null : JSON.stringify(before));
   return { file: changed ? JSON.parse(now) : null, said: said };

@@ -24,8 +24,15 @@
   one line, main's release at the commit of 20261011-174543-dev, as 7cece557
   was. Update-DevNewsChannels must leave DEV on the 4 newest and take it off
   the 1 to 3 Oct notes. One of those, "Merchant purses and dungeon rewards",
-  came with 20261002-015344-dev, built with 1 uncommitted change: nothing can
-  prove it, so it keeps the mark it has, DEV or not.
+  came with 20261002-015344-dev, built with 1 uncommitted change: no commit
+  proves it, and it clears because the next clean release,
+  20261002-143545-dev, holds its commit and is on main (Patrick's answer on
+  #2401, 12 Oct: option B). Until that is so, it keeps the mark it has.
+
+  Also driven: a note whose sourceCommit is empty, as Publish-Update writes it
+  for a release built with uncommitted files, is judged the same way and not
+  as a commit main lacks; and a later clean release that does not hold the
+  dirty release's commit settles nothing.
 
   Everything it writes is under its own temp folder, which it removes.
 #>
@@ -190,20 +197,20 @@ try {
         @($dev.news | Where-Object { $_.channel -eq 'dev' }).Count -eq 20 -and $legacy.Count -eq 16)
     $r = Set-DevFeedMarks $dev $mainFeed $git
     $still = @($dev.news | Where-Object { $_.channel -eq 'dev' } | ForEach-Object { $_.title })
-    Yes ("5 of 40 stay marked DEV ({0})" -f $r.Marked) ($r.Marked -eq 5)
+    Yes ("4 of 40 stay marked DEV ({0})" -f $r.Marked) ($r.Marked -eq 4)
     Yes '  the 4 newest, which main does not have' (@($newest4 | Where-Object { $still -contains $_ }).Count -eq 4)
-    Yes ("  and the one whose release was built with an uncommitted change, which keeps its mark ({0})" -f $dirtyOne) ($still -contains $dirtyOne)
-    Yes ("15 notes from 1 to 3 Oct lose the mark ({0} cleared)" -f @($r.Cleared).Count) (
-        @($r.Cleared).Count -eq 15 -and @($legacy | Where-Object { $_[1] -ne $dirtyOne -and @($r.Cleared) -notcontains $_[1] }).Count -eq 0)
-    Yes '  among them the one in two releases a minute apart from one commit' (@($r.Cleared) -contains 'Safer updates and a quieter journal key')
+    Yes ("all 16 notes from 1 to 3 Oct lose the mark ({0} cleared)" -f @($r.Cleared).Count) (
+        @($r.Cleared).Count -eq 16 -and @($legacy | Where-Object { @($r.Cleared) -notcontains $_[1] }).Count -eq 0)
+    Yes ("  among them the one whose release was built with an uncommitted change, settled by the next clean release ({0})" -f $dirtyOne) (@($r.Cleared) -contains $dirtyOne)
+    Yes '  and the one in two releases a minute apart from one commit' (@($r.Cleared) -contains 'Safer updates and a quieter journal key')
     Yes '  none gains it, and every note with a sourceCommit is left as it was' (@($r.Gained).Count -eq 0 -and
         @($dev.news | Where-Object { $_.PSObject.Properties['sourceCommit'] -and $newest4 -notcontains $_.title -and $_.channel -eq 'dev' }).Count -eq 0)
     Yes ("  and mainVersion is main's ({0})" -f $dev.mainVersion) ($dev.mainVersion -eq '1.2.3')
 
     $again = Set-DevFeedMarks $dev $mainFeed $git
-    Yes 'a second pass moves nothing' (-not $again.Changed -and $again.Marked -eq 5)
+    Yes 'a second pass moves nothing' (-not $again.Changed -and $again.Marked -eq 4)
 
-    # The dirty one with no mark keeps none: no proof either way.
+    # The dirty one with no mark gains none: it is settled, so it reads as main.
     $dev2 = Feed
     foreach ($n in @($dev2.news)) { if ($n.title -eq $dirtyOne) { $n.channel = '' } }
     $r2 = Set-DevFeedMarks $dev2 $mainFeed $git
@@ -216,7 +223,72 @@ try {
     $dev3 = Feed
     $r3 = Set-DevFeedMarks $dev3 $older $git
     Yes ("against an older main the old notes still clear and the 11 Oct ones gain DEV ({0} marked: {1})" -f $r3.Marked, (@($r3.Gained) -join '; ')) (
-        $r3.Marked -eq 7 -and @($r3.Gained).Count -eq 2 -and @($r3.Gained) -contains 'The launcher gets ready in seconds' -and @($r3.Cleared).Count -eq 15)
+        $r3.Marked -eq 6 -and @($r3.Gained).Count -eq 2 -and @($r3.Gained) -contains 'The launcher gets ready in seconds' -and @($r3.Cleared).Count -eq 16)
+
+    # Main at the dirty release's own commit: its commit is on main, but no
+    # clean release after it is, so nothing says what the uncommitted change
+    # carried, and the note keeps its mark.
+    $atDirty = [pscustomobject][ordered]@{ launcherVersion = '1.1.104'; news = @()
+        release = [pscustomobject][ordered]@{ id = '20261002-020000'; channel = 'main'; commit = $commitOf['20261002-015344-dev']; uncommitted = 0 } }
+    $dev5 = Feed
+    [void](Set-DevFeedMarks $dev5 $atDirty $git)
+    $five = @($dev5.news | Where-Object { $_.title -eq $dirtyOne })[0]
+    Yes ("with main at the dirty release's own commit and no clean release after it on main, it keeps DEV ({0})" -f $five.channel) ($five.channel -eq 'dev')
+    $dev5b = Feed
+    foreach ($n in @($dev5b.news)) { if ($n.title -eq $dirtyOne) { $n.channel = '' } }
+    [void](Set-DevFeedMarks $dev5b $atDirty $git)
+    Yes '  and with no mark, it gains none' (@($dev5b.news | Where-Object { $_.title -eq $dirtyOne })[0].channel -eq '')
+
+    # A note whose sourceCommit is empty, the way Publish-Update writes it for
+    # a release built with uncommitted files. "Covered bodies restored" came
+    # with 20261003-185740-dev (1 uncommitted); the next clean release is
+    # 20261003-224149-dev. Until 18 Oct the empty field read as a commit main
+    # did not have, so the note was marked DEV for good.
+    $covered = 'Covered bodies restored'
+    function EmptySource($feed, [string]$channel) {
+        foreach ($n in @($feed.news)) { if ($n.title -eq $covered) { $n.sourceCommit = ''; $n.channel = $channel } }
+        return $feed
+    }
+    $dev6 = EmptySource (Feed) 'dev'
+    $r6 = Set-DevFeedMarks $dev6 $mainFeed $git
+    Yes ("an empty sourceCommit is settled by the next clean release on main, and clears ({0})" -f (@($r6.Cleared) -join '; ')) (
+        @($r6.Cleared) -contains $covered -and $r6.Marked -eq 4)
+    $before224 = [pscustomobject][ordered]@{ launcherVersion = '1.1.105'; news = @()
+        release = [pscustomobject][ordered]@{ id = '20261003-200000'; channel = 'main'; commit = $commitOf['20261003-192349-dev']; uncommitted = 0 } }
+    $dev7 = EmptySource (Feed) 'dev'
+    [void](Set-DevFeedMarks $dev7 $before224 $git)
+    Yes '  with main before that clean release (at 20261003-192349-dev, dirty too), it keeps DEV' (
+        @($dev7.news | Where-Object { $_.title -eq $covered })[0].channel -eq 'dev')
+    $dev8 = EmptySource (Feed) ''
+    $r8 = Set-DevFeedMarks $dev8 $before224 $git
+    Yes '  and with no mark, it gains none' (@($r8.Gained) -notcontains $covered -and @($dev8.news | Where-Object { $_.title -eq $covered })[0].channel -eq '')
+
+    # A later clean release on main that does not hold the dirty release's
+    # commit settles nothing: the dirty release was built from a side line,
+    # and main wrote the same file its own way.
+    $tip = (G rev-parse HEAD)[0].Trim()
+    [void](G checkout -q -b side $tip)
+    [IO.File]::WriteAllText((Join-Path $git 'release.txt'), 'side work')
+    [void](G add release.txt)
+    [void](G commit -q -m 'side work')
+    $side = (G rev-parse HEAD)[0].Trim()
+    $env:GIT_COMMITTER_DATE = '2026-10-13T10:01:00-06:00'
+    try { [void](G tag -a 'release/dev/20261013-100000-dev' $side -m "Thornswood dev release 20261013-100000-dev`n`nbuilt with 1 uncommitted change(s) on top of this commit") }
+    finally { Remove-Item Env:GIT_COMMITTER_DATE -ErrorAction SilentlyContinue }
+    [void](G checkout -q --detach $tip)
+    [IO.File]::WriteAllText((Join-Path $git 'release.txt'), 'main work')
+    [void](G add release.txt)
+    [void](G commit -q -m 'main work')
+    $later = (G rev-parse HEAD)[0].Trim()
+    $env:GIT_COMMITTER_DATE = '2026-10-13T12:01:00-06:00'
+    try { [void](G tag -a 'release/dev/20261013-120000-dev' $later -m 'Thornswood dev release 20261013-120000-dev') }
+    finally { Remove-Item Env:GIT_COMMITTER_DATE -ErrorAction SilentlyContinue }
+    $atLater = [pscustomobject][ordered]@{ launcherVersion = '1.2.4'; news = @()
+        release = [pscustomobject][ordered]@{ id = '20261013-130000'; channel = 'main'; commit = $later; uncommitted = 0 } }
+    $dev9 = [pscustomobject][ordered]@{ launcherVersion = '1.2.4.1'; mainVersion = '1.2.3'
+        news = @([pscustomobject][ordered]@{ date = '10-13-2026 10:00 AM'; title = 'Side work'; body = ''; details = @('a line'); channel = 'dev'; sourceCommit = '' }) }
+    [void](Set-DevFeedMarks $dev9 $atLater $git)
+    Yes ("a later clean release on main that does not hold the dirty commit settles nothing ({0})" -f $dev9.news[0].channel) ($dev9.news[0].channel -eq 'dev')
 
     # A clone with no tags proves nothing about the old notes: they keep their marks.
     $made = G tag -l 'release/dev/*'

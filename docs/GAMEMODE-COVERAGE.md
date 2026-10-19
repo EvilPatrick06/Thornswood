@@ -14,7 +14,7 @@ grepping tests/*.js for each name, then reading the closest test.
 | mp.onCraft | 27679 | 12 files: test-1389-lists, test-1390-embassy, test-1398-fuel, test-1400-smith-tan, test-1676-rest-gate, and more. Left alone in this sweep: #1648 lands here |
 | mp.onUpdateEquipmentAttempt | 46859 | test-1387-college (drives it), test-audit-handlers |
 | mp.onReadBook | 47249 | test-spell-tomes, test-1127-unplaceable-tomes, test-1149-pick-spell-tome, test-enchanter-staff-spells, test-audit-handlers, test-join-pass-trust |
-| mp.onPutItem (putIn) | 51231 | test-coffers (drives putIn), test-audit-handlers, test-join-pass-trust |
+| mp.onPutItem | 51231 | test-2298-box-retired (drives it: no container has a rule since #2298, only the join pass refuses), test-coffers, test-join-pass-trust |
 | mp.onTakeItem | 51522 | test-take-limit (drives it), test-audit-handlers, test-join-pass-trust |
 | mp.onDropItem | 51536 | test-audit-handlers, test-1384-condition, test-join-pass-trust |
 | mp.onUpdateAppearanceAttempt | 51634 | test-body-shape, test-unpublished-until-appearance, test-audit-handlers, test-join-pass-trust |
@@ -39,7 +39,7 @@ checks its source text.
 | deposit | test-deposit, test-1393-company, test-1394-fares |
 | mayWithdraw, withdraw, heldOn, noticeHolds | test-1393-company, test-one-mint |
 | payout, payHeld | test-one-mint |
-| putIn (paying rent through a hold's box) | test-coffers |
+| boxPutGold (paying rent through the drop box) | test-2298-dropbox |
 
 ## Chat words
 
