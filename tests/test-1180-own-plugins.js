@@ -109,6 +109,8 @@ function run(opts) {
   const box = {
     require: function (name) { return name === "fs" ? d.fs : name === "path" ? path.posix : null; },
     console: { log: function () { d.log.push([].join.call(arguments, " ")); } },
+    // The engine's whole-file write (#2740), onto the fake disk.
+    mp: { writeFileWhole: function (p, text) { d.fs.writeFileSync(p, text); } },
     setInterval: function () { d.log.push("a retry was started"); return 0; },
     clearInterval: function () {}
   };

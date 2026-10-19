@@ -312,9 +312,10 @@ try {
     $r = Get-DevRoom
     Yes 'a half written online.json is unknown, not nobody' ($r.Online -eq -1)
 
-    # Node empties the file before it writes it. Windows PowerShell reads an
-    # empty file as no object at all rather than an error, and the first cut of
-    # this read turned that into nobody on.
+    # Windows PowerShell reads an empty file as no object at all rather than an
+    # error, and the first cut of this read turned that into nobody on. The
+    # gamemode writes the file whole since #2740, but an empty one still means
+    # nothing is known.
     [IO.File]::WriteAllText($online, '')
     $r = Get-DevRoom
     Yes 'an empty one is unknown too, not nobody' ($r.Online -eq -1)
@@ -477,12 +478,13 @@ function Held { $false }
 
     # ---- cannot tell who is on ------------------------------------------------------------
     Drive "$dev|$devDat|ONLINE unreadable"
-    Yes 'an unreadable count is looked at twice' ($script:reads -eq 2)
+    Yes 'an unreadable count is looked at once (#2740: the gamemode writes it whole, so no second look)' ($script:reads -eq 1)
     Yes 'and then stops the deploy rather than guessing nobody' ($script:threw -match 'could not read who is on')
     Yes 'without warning anybody' (@(Asked).Count -eq 0)
 
     Drive "$dev|$devDat|ONLINE unreadable", "$dev|$devDat|ONLINE 2"
-    Yes 'a second look that reads goes ahead with the warning' ($script:threw -eq '' -and @(Asked).Count -eq 1)
+    Yes 'a count that would read a moment later is not asked for: the two-second second look is gone' (
+        $script:reads -eq 1 -and $script:threw -match 'could not read who is on' -and @(Asked).Count -eq 0)
 
     Drive 'ssh: Could not resolve hostname'
     Yes 'a box that does not answer at all stops the deploy' ($script:threw -match 'could not read who is on')
