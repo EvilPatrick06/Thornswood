@@ -919,16 +919,13 @@ jobs:
           & pwsh -NoProfile -File tests\test-498-msbuild.ps1 -RequireMSBuild -Scratch (Join-Path $env:RUNNER_TEMP 'msbuild-498')
           if ($LASTEXITCODE -ne 0) { Write-Host '::error file=tests/test-498-msbuild.ps1::the MSBuild launcher does not match its sources, see the lines above'; exit 1 }
 
-      - name: Keep the exe from this build
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: Thornswood.exe
-          path: ${{ runner.temp }}/Thornswood/Launcher/Thornswood.exe
-          retention-days: 7
-
-      # No pdb artifact (#1356 / #462): the pdb carries absolute build-machine
-      # source paths. Packs and the installer already skip *.pdb. Keep the exe
-      # above; leave the pdb on the runner only.
+      # No artifact from this build (#2163, 19 Oct). It used to keep the exe
+      # for 7 days, and nothing read it: Ship takes the launcher from
+      # release.yml's draft, and no script or test downloads a build's
+      # artifacts. Measured 19 Oct: 488 copies, 1.30 GB of this account's 2 GB
+      # of Actions storage, which Patrick's billing page read at 1.8 GB. The
+      # pdb was never kept either (#1356 / #462): it carries absolute
+      # build-machine source paths.
 
   # The default: GitHub's hosted Windows runner (#1306). Skipped when
   # BUILD_RUNNER is vps or a manual run asked for the box, and then the
