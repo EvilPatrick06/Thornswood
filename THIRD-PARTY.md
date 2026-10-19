@@ -494,7 +494,35 @@ menu shows no Bethesda logo and no button list. Compared on 15 October: the
 same 871 SWF tags in the same order, only DefineShape tags differing, by a
 byte or two each, and no strings added or removed. It is Bethesda's work,
 edited, and recorded as that (Patrick, 15 Oct 2026, #2177); who edited it is
-not recorded.
+not recorded. It is the one file of the game Thornswood hands on, and the
+terms page says so (Patrick, 19 Oct 2026, #2792). The notice board and drop
+box meshes, `game\ours\Data\meshes\thornswood\noticeboard01.nif` and
+`dropbox01.nif`, are not the game's files but are built from pieces of them
+(`scripts\mods\Build-NoticeBoard.py`, #2502).
+
+Bethesda's terms for Skyrim Special Edition mods are the Creation Kit End User
+License Agreement (https://store.steampowered.com/eula/1946180_eula_0, Steam
+app 1946180), read on 19 October 2026 for #2792. What it says that bears on
+these three files:
+
+- Its preamble: "Any rights not granted to You in this Agreement are reserved
+  by ZeniMax."
+- 1.D.a: a mod goes out free, and "only ... to users who have purchased the
+  Product through authorized and legitimate distribution channels, solely for
+  use with such users' own authorized copies". Thornswood is free and needs
+  the game.
+- 2.B: every mod says ZeniMax is not its author and carries "THIS MOD IS NOT
+  MADE, GUARANTEED OR SUPPORTED BY ZENIMAX OR ITS AFFILIATES." The site's
+  terms and credits pages carry it; the two Nexus pages are #2829.
+- 3: whoever releases a mod represents "that each Game Mod is originally
+  created by You".
+
+No clause grants a right to hand on ZeniMax's own files, edited or not, or
+meshes put together from them. Free mods hand on edited game files all the
+time and ZeniMax does not act against them, but that is tolerance, not a
+written grant, so `records\asset-provenance.json` records the three as no
+licence found, and #2827 carries the decision. The same section 1.D.a forbids
+crowd funding for making mods, which is #2828.
 
 The other main menu files beside it are Thornswood's own:
 `game\menu\logo.nif`, the plate the backdrop is drawn on, which
@@ -732,8 +760,10 @@ branch any more.
   they are removed and deleted from installs (#1318), and so are the two
   pictures in `Images` and the ChainLink, NoticeIcon and VoiceIcon sprite
   fonts (#2177).
-- `Data\Interface\startmenu.swf` is Bethesda's file, edited (below), and
-  Bethesda's terms for a mod that hands on an edited game file were not read.
+- `Data\Interface\startmenu.swf` is Bethesda's file, edited, and the notice
+  board and drop box meshes are built from Bethesda's ("Bethesda's own file,
+  edited"). Bethesda's terms for mods were read on 19 October and grant no
+  right to hand any of the three on (#2827).
 
 ## Microsoft WebView2 SDK licence
 
