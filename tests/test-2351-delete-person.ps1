@@ -254,6 +254,33 @@ try {
     Put $pend '{}'
     $c = Run (@('-DiscordId', $ME, '-Delete', '-By', 'Tester') + $roots)
     Yes 'an unfinished save in a game server refuses the run' ($c -eq 1 -and (Said '\.pending-batch is an unfinished save'))
+
+    # 18 Oct: a running server's own save in flight refused the dry run, and a
+    # real run then refused before it had stopped anything. A stand-in dev
+    # server (a node process whose command line names its folder, as Holders
+    # finds one) holds the batch here; services are not skipped, -Now so
+    # nobody's online count is asked for.
+    $node = (Get-Command node -ErrorAction SilentlyContinue).Source
+    if ($node) {
+        $hold = Join-Path $Dev 'stand-in-server.js'
+        Put $hold 'setInterval(function () {}, 1000);'
+        $srv = Start-Process -FilePath $node -ArgumentList @($hold) -PassThru -WindowStyle Hidden
+        try {
+            $svcRoots = @($roots | Where-Object { $_ -ne '-NoServices' }) + @('-Now')
+            $c = Run (@('-DiscordId', $ME) + $svcRoots)
+            Yes 'a running server''s save in flight does not refuse the dry run' ($c -eq 0 -and (Said 'DRY RUN: nothing was changed') -and -not (Said '\.pending-batch is an unfinished save'))
+            $c = Run (@('-DiscordId', $ME, '-Delete', '-By', 'Tester') + $svcRoots)
+            Yes '  a real run stops that server first, then refuses the batch it left' ($c -ne 0 -and (Said 'stopped   the dev game server') -and (Said '\.pending-batch is an unfinished save'))
+            Yes '  and stopped it before looking' ($srv.HasExited)
+            # On a VPS runner the real tasks of the same names run from the
+            # real roots; a stand-in root never reaches them.
+            Yes '  and a task of the same name that runs from another root is not started for it' (Said 'not started again: the dev game server ran from')
+        } finally {
+            if (-not $srv.HasExited) { Stop-Process -Id $srv.Id -Force }
+            $srv.WaitForExit()
+            Remove-Item -LiteralPath $hold -Force
+        }
+    } else { Yes 'node is here, for the running-server case' $false }
     Remove-Item -LiteralPath $pend -Force
     Yes '  and none of the refusals changed a byte or wrote a record' ((Same $before (Hashes $Box)) -and -not (Test-Path -LiteralPath $Rec))
 

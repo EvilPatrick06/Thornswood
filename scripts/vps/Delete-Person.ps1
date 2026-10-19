@@ -112,8 +112,12 @@
   process still running from its folder is ended, the files are changed, and
   the service is started again, then the watchdog. A game server with anybody
   online is refused unless -Now: they would be dropped. A game server with an
-  unfinished save (.pending-batch in changeForms) is refused: the engine
-  replays it at its next start and could write a deleted character back.
+  unfinished save (.pending-batch in changeForms) once it is stopped is
+  refused: the engine replays it at its next start and could write a deleted
+  character back. While a server runs, a .pending-batch is its own save in
+  flight, there for a moment at every save, so the look before anything is
+  stopped does not refuse on a running server's batch; the look after the
+  stop does (#2351, refused on 18 Oct by a running dev server's save).
   Every file is read and checked before any is written, and each JSON file is
   written to a file beside it and swapped in, the way the site writes its own.
 
@@ -607,7 +611,10 @@ for (const person of people) {
         const dirs = [forms].concat(names(forms).filter((n) => /^_discarded-/.test(n)).map((n) => path.join(forms, n)));
         for (const dir of dirs) {
           const fl = names(dir);
-          if (P.size && fl.indexOf('.pending-batch') >= 0) {
+          // A running server's own save in flight is not left over: the look
+          // after it is stopped (apply) is the one that counts for it.
+          const inFlight = a.mode !== 'apply' && g.writer && (a.running || []).indexOf(g.writer) >= 0;
+          if (P.size && fl.indexOf('.pending-batch') >= 0 && !inFlight) {
             stop(path.join(dir, '.pending-batch') + ' is an unfinished save, which the server replays at its next start and which could write a character back. ' +
                  'Start that server once and stop it, then run this again. Nothing was changed');
           }
@@ -801,6 +808,9 @@ function Run-Core([string]$mode) {
         servers = @(@{ tag = 'live'; root = $GameRoot }, @{ tag = 'dev'; root = $DevGameRoot })
         voices  = @(@{ tag = 'live'; root = $VoiceRoot }, @{ tag = 'dev'; root = $DevVoiceRoot })
         bot     = $BotRoot
+        # The writers running now, for the plan's look at unfinished saves.
+        # With -NoServices nothing is stopped, so nothing is taken as running.
+        running = @(if ($mode -ne 'apply' -and -not $NoServices) { $svc.Keys | Where-Object { Running $svc[$_] } })
     }
     $af = Join-Path $work ($mode + '.json')
     [IO.File]::WriteAllText($af, (ConvertTo-Json -InputObject $plan -Depth 6), $utf8)
@@ -878,9 +888,27 @@ function Holders($it) {
     }
     return @($ids | Where-Object { $_ -gt 0 -and $_ -ne $PID } | Sort-Object -Unique)
 }
+# Whether the task or service of that name is the one that runs from this
+# root: its action, or the service's path, names the folder. Pointed at other
+# roots (a restore rehearsal, a harness on a box that also runs the real
+# servers), the real task of the same name is not theirs, so it is never read
+# as running, stopped, asked for its online count or started (#2351, 18 Oct: a
+# harness on a VPS runner took the real dev server's task for its stand-in's).
+function Owned($it) {
+    $mark = [regex]::Escape($it.Root.TrimEnd('\')) + '(\\|"|''|\s|$)'
+    if ($it.Svc) {
+        $s = Get-CimInstance Win32_Service -Filter ("Name='" + $it.Svc + "'") -ErrorAction SilentlyContinue
+        return [bool]($s -and $s.PathName -and $s.PathName -match $mark)
+    }
+    $t = Get-ScheduledTask -TaskName $it.Task -ErrorAction SilentlyContinue
+    if (-not $t) { return $false }
+    return ((@($t.Actions) | ForEach-Object { "$($_.Execute) $($_.Arguments) $($_.WorkingDirectory)" }) -join ' ') -match $mark
+}
 function Running($it) {
-    if ($it.Svc) { $s = Get-Service -Name $it.Svc -ErrorAction SilentlyContinue; if ($s -and $s.Status -ne 'Stopped') { return $true } }
-    else { $t = Get-ScheduledTask -TaskName $it.Task -ErrorAction SilentlyContinue; if ($t -and $t.State -eq 'Running') { return $true } }
+    if (Owned $it) {
+        if ($it.Svc) { $s = Get-Service -Name $it.Svc -ErrorAction SilentlyContinue; if ($s -and $s.Status -ne 'Stopped') { return $true } }
+        else { $t = Get-ScheduledTask -TaskName $it.Task -ErrorAction SilentlyContinue; if ($t -and $t.State -eq 'Running') { return $true } }
+    }
     return [bool](@(Holders $it).Count)
 }
 
@@ -911,22 +939,26 @@ try {
             }
             foreach ($w in $busy) {
                 $it = $svc[$w]
-                if (-not $it.Online -or $Now) { continue }
+                if (-not $it.Online -or $Now -or -not (Owned $it)) { continue }
                 $n = -1
                 try { $n = [int]((Invoke-WebRequest -Uri ('http://127.0.0.1:' + $it.Online + '/online.json') -TimeoutSec 15 -UseBasicParsing).Content | ConvertFrom-Json).now } catch { $n = -1 }
                 if ($n -ne 0) {
                     Refuse ($it.Say + ' has ' + $(if ($n -lt 0) { 'an online count that could not be read' } else { "$n online" }) + ', who would be dropped. Run it when nobody is on, or pass -Now. Nothing was changed.')
                 }
             }
-            if ($busy.Count -and (Get-ScheduledTask -TaskName $watch -ErrorAction SilentlyContinue)) {
+            # The watchdog watches the real roots: off only while one of them is stopped here.
+            if (@($busy | Where-Object { Owned $svc[$_] }).Count -and (Get-ScheduledTask -TaskName $watch -ErrorAction SilentlyContinue)) {
                 Disable-ScheduledTask -TaskName $watch | Out-Null
                 $watchOff = $true
                 Say ('disabled  ' + $watch + ', so it starts nothing again while this runs')
             }
             foreach ($w in $busy) {
                 $it = $svc[$w]
-                if ($it.Svc) { Stop-Service -Name $it.Svc -Force -ErrorAction SilentlyContinue }
-                else { Stop-ScheduledTask -TaskName $it.Task -ErrorAction SilentlyContinue }
+                $it.Ran = Owned $it
+                if ($it.Ran) {
+                    if ($it.Svc) { Stop-Service -Name $it.Svc -Force -ErrorAction SilentlyContinue }
+                    else { Stop-ScheduledTask -TaskName $it.Task -ErrorAction SilentlyContinue }
+                }
                 # A stopped task does not always take its child with it
                 # (vps-freeze.ps1), so whatever still runs from its folder goes too.
                 foreach ($id in @(Holders $it)) { Stop-Process -Id $id -Force -ErrorAction SilentlyContinue }
@@ -978,6 +1010,9 @@ try {
     } finally {
         foreach ($w in $stoppedHere) {
             $it = $svc[$w]
+            # Only what ran from its own task or service is started again; a
+            # process from that folder with neither is said, never guessed at.
+            if (-not $it.Ran) { Say ('not started again: ' + $it.Say + ' ran from ' + $it.Root + ' with no task or service of its own'); continue }
             try {
                 if ($it.Svc) { Start-Service -Name $it.Svc } else { Start-ScheduledTask -TaskName $it.Task }
                 Say ('started   ' + $it.Say)
