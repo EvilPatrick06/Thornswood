@@ -42,6 +42,16 @@
   deploy scripts send from that folder instead of from the working tree, so
   what goes up is exactly what the zip holds.
 
+  TWO RUNS AT ONE COMMIT (#2459, #2742). Two runs from one checkout at one
+  commit (a deploy and a Ship, two dev deploys) build the same artifact under
+  the same names. Each run writes its zip, its record and its unpacked folder
+  under names of its own, then gives each its real name in one step that
+  either takes the name or finds it taken (Set-ThornswoodArtifactName), with no
+  look first and never replacing what is there. A run that finds the name
+  taken holds what is there to what it built (the zip by its sha256, the
+  record field by field, the folder by every file's size), uses it when it is
+  the same and says so, and refuses, changing nothing, when it is not.
+
   ON THE BOX, C:\Thornswood-Deploys:
     <component>\<name>.zip and <name>.json   every artifact sent, kept
                                               (Send-ThornswoodArtifact); server\
@@ -73,6 +83,34 @@
 $script:ThornswoodDeployStore = 'C:/Thornswood-Deploys'
 
 function Initialize-ThornswoodArtifactType {
+  # Its own type, so a session that loaded ThornswoodArtifactZip before this
+  # was added still gets it.
+  if (-not ('ThornswoodArtifactName' -as [type])) {
+    Add-Type -Language CSharp -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.IO;
+using System.Runtime.InteropServices;
+
+public static class ThornswoodArtifactName {
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    static extern bool MoveFileExW(string from, string to, int flags);
+
+    // Gives a finished file or folder its name in one rename, or answers
+    // false when the name is already taken. MoveFileEx without
+    // MOVEFILE_REPLACE_EXISTING never replaces what is there: a file or a
+    // folder at the name, it answers ERROR_ALREADY_EXISTS (183) or
+    // ERROR_FILE_EXISTS (80). Any other refusal is thrown with its reason.
+    public static bool Claim(string from, string to) {
+        string source = Path.GetFullPath(from), target = Path.GetFullPath(to);
+        if (MoveFileExW(source, target, 0x8 /* MOVEFILE_WRITE_THROUGH */)) return true;
+        int code = Marshal.GetLastWin32Error();
+        if (code == 183 || code == 80) return false;
+        throw new IOException(source + " could not be named " + target + ": " + new Win32Exception(code).Message + " (Windows error " + code + ")");
+    }
+}
+'@
+  }
   if ('ThornswoodArtifactZip' -as [type]) { return }
   Add-Type -Language CSharp -TypeDefinition @'
 using System;
@@ -221,6 +259,81 @@ function Get-ThornswoodSha256Hex([byte[]]$Bytes) {
   try { return (-join ($h.ComputeHash($Bytes) | ForEach-Object { $_.ToString('x2') })) } finally { $h.Dispose() }
 }
 
+<#
+  The one step that gives an artifact's zip, record or unpacked folder its
+  name (#2742): $true when this run's took the name, $false when the name was
+  taken already. Nothing at the name is ever replaced. Until #2742 the zip was
+  looked for and then moved, so two runs could both find it missing and the
+  second's move failed with "Cannot create a file when that file already
+  exists". tests\test-2459-artifact-unpack-race.ps1 stands in front of this to
+  put another run's whole build in the moment before the name is given.
+#>
+function Set-ThornswoodArtifactName([string]$From, [string]$To) {
+  return [ThornswoodArtifactName]::Claim($From, $To)
+}
+
+# The zip this run built, under its name. When another run's is there first,
+# it has to be the same bytes by its whole sha256; then it is used and this
+# run's copy goes. A different file there is refused and left alone.
+function Save-ThornswoodArtifactZip([string]$Building, [string]$Zip, [string]$Sha256) {
+  if (Set-ThornswoodArtifactName $Building $Zip) { return }
+  Remove-Item -LiteralPath $Building -Force
+  $there = (Get-FileHash -LiteralPath $Zip -Algorithm SHA256).Hash.ToLowerInvariant()
+  if ($there -ne $Sha256) {
+    throw ("$Zip is already there and is not the zip this run built (its sha256 is $there, this build's is $Sha256). Nothing was replaced: remove that file and run again.")
+  }
+  Write-Host ('  ' + [IO.Path]::GetFileName($Zip) + ' was already here from a run at this commit, with the same sha256, so that one is used') -ForegroundColor DarkGray
+}
+
+# What differs between the record this run built and the one at its name, in
+# words, or '' when they say the same thing. Compared field by field, not as
+# text: Windows PowerShell 5.1 and PowerShell 7 lay the same JSON out apart.
+function Get-ThornswoodArtifactRecordDifference($Want, [string]$Path) {
+  $have = $null
+  try { $have = [IO.File]::ReadAllText($Path) | ConvertFrom-Json } catch { return ('it does not read as JSON (' + $_.Exception.Message + ')') }
+  if ($null -eq $have) { return 'it is empty' }
+  $names = @($have.PSObject.Properties | ForEach-Object { $_.Name })
+  foreach ($k in @($Want.Keys)) {
+    if ($names -notcontains $k) { return "it has no $k" }
+    if ($k -ne 'files') {
+      if ([string]$have.$k -ne [string]$Want[$k]) { return ("its $k is " + $have.$k + ", this build's is " + $Want[$k]) }
+      continue
+    }
+    $a = @($Want[$k]); $b = @($have.$k)
+    if ($a.Count -ne $b.Count) { return ('it lists ' + $b.Count + ' file(s), this build ' + $a.Count) }
+    for ($i = 0; $i -lt $a.Count; $i++) {
+      foreach ($f in 'path', 'size', 'sha256') {
+        if ([string]$b[$i].$f -ne [string]$a[$i][$f]) { return ('its file ' + ($i + 1) + ' has ' + $f + ' ' + $b[$i].$f + ", this build's " + $a[$i]['path'] + ' has ' + $a[$i][$f]) }
+      }
+    }
+  }
+  foreach ($n in $names) { if (-not $Want.Contains($n)) { return "it has $n, which this build's record does not" } }
+  return ''
+}
+
+# The record beside the zip, under its name the same way: written under a name
+# of this run's, then named. One already there has to say what this run's says.
+function Save-ThornswoodArtifactRecord([string]$RecordPath, $Record) {
+  $building = Join-Path (Split-Path -Parent $RecordPath) ('.building-' + [Guid]::NewGuid().ToString('N') + '.json')
+  [IO.File]::WriteAllText($building, (ConvertTo-Json -InputObject $Record -Depth 5), (New-Object Text.UTF8Encoding($false)))
+  if (Set-ThornswoodArtifactName $building $RecordPath) { return }
+  Remove-Item -LiteralPath $building -Force
+  $why = Get-ThornswoodArtifactRecordDifference $Record $RecordPath
+  if ($why) { throw ("$RecordPath is already there and is not the record of the zip this run built: $why. Nothing was replaced: remove it and run again.") }
+}
+
+# The first file of the record an unpacked folder does not hold at its size,
+# in words, or '' when it holds them all.
+function Get-ThornswoodArtifactFolderShort([string]$Folder, $Contents) {
+  if (-not (Test-Path -LiteralPath $Folder -PathType Container)) { return 'there is no folder there' }
+  foreach ($f in $Contents) {
+    $p = Join-Path $Folder (([string]$f.path) -replace '/', [IO.Path]::DirectorySeparatorChar)
+    if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { return ($f.path + ' is missing') }
+    if ((Get-Item -LiteralPath $p).Length -ne [long]$f.size) { return ($f.path + ' is not ' + $f.size + ' bytes') }
+  }
+  return ''
+}
+
 # Runs git in the repository and hands back its lines. git writes progress and
 # warnings on stderr, and the deploy scripts run with Stop, so stderr is left
 # out here and a failure is read from the exit code instead.
@@ -339,8 +452,7 @@ function New-ThornswoodArtifact {
   $short = $commit.Substring(0, 12)
   $name = $Component + '-' + $short + '-' + $sha.Substring(0, 16) + '.zip'
   $zip = Join-Path $OutDir $name
-  if (Test-Path -LiteralPath $zip) { Remove-Item -LiteralPath $building -Force }
-  else { Move-Item -LiteralPath $building -Destination $zip }
+  Save-ThornswoodArtifactZip $building $zip $sha
 
   $contents = @()
   for ($i = 0; $i -lt $names.Count; $i++) {
@@ -355,58 +467,35 @@ function New-ThornswoodArtifact {
     files     = $contents
   }
   $recordPath = [IO.Path]::ChangeExtension($zip, '.json')
-  [IO.File]::WriteAllText($recordPath, (ConvertTo-Json -InputObject $record -Depth 5), (New-Object Text.UTF8Encoding($false)))
+  Save-ThornswoodArtifactRecord $recordPath $record
 
   # Laid out like the repository, so a script that sent <repo>\site\server.js
   # sends <folder>\site\server.js. The folder name is the zip basename (commit
   # + hash), so two runs at one commit in one checkout share it (#2459). Never
   # Remove-Item that shared folder: a second call (or a concurrent first) would
-  # delete it under another run that is reading game\gamemode.js from it.
-  # Reuse when every recorded file is already there at the recorded size;
-  # otherwise unpack into a unique staging dir and Move-Item into place only
-  # when the shared name is still free. No lock and no wait/retry.
+  # delete it under another run that is reading game\gamemode.js from it. A
+  # folder only ever gets that name whole, unpacked under a name of this run's
+  # and then named (Set-ThornswoodArtifactName), so one that is there is used;
+  # when another run names its copy first, this run's goes. Either way it has
+  # to hold every recorded file at its recorded size.
   $folder = Join-Path $OutDir ([IO.Path]::GetFileNameWithoutExtension($name))
-  $ready = $false
-  if (Test-Path -LiteralPath $folder) {
-    $ready = $true
-    foreach ($f in $contents) {
-      $p = Join-Path $folder (($f.path -replace '/', [IO.Path]::DirectorySeparatorChar))
-      if (-not (Test-Path -LiteralPath $p) -or ((Get-Item -LiteralPath $p).Length -ne [long]$f.size)) {
-        $ready = $false
-        break
-      }
-    }
-  }
-  if (-not $ready) {
+  if (-not (Test-Path -LiteralPath $folder)) {
     $staging = Join-Path $OutDir ('.unpacking-' + [Guid]::NewGuid().ToString('N'))
     try {
       [IO.Compression.ZipFile]::ExtractToDirectory($zip, $staging)
-      if (-not (Test-Path -LiteralPath $folder)) {
-        try {
-          Move-Item -LiteralPath $staging -Destination $folder
-        } catch {
-          # Another run promoted first; theirs is the shared folder.
-        }
+      if (-not (Set-ThornswoodArtifactName $staging $folder)) {
+        Write-Host ('  ' + [IO.Path]::GetFileName($folder) + ' was unpacked by another run at this commit first, so that folder is used') -ForegroundColor DarkGray
       }
     } finally {
       if (Test-Path -LiteralPath $staging) {
-        Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue
+        try { Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction Stop }
+        catch { Write-Warning ("This run's spare unpacked copy " + $staging + ' could not be removed and is left there: ' + $_.Exception.Message) }
       }
     }
-    $ready = $false
-    if (Test-Path -LiteralPath $folder) {
-      $ready = $true
-      foreach ($f in $contents) {
-        $p = Join-Path $folder (($f.path -replace '/', [IO.Path]::DirectorySeparatorChar))
-        if (-not (Test-Path -LiteralPath $p) -or ((Get-Item -LiteralPath $p).Length -ne [long]$f.size)) {
-          $ready = $false
-          break
-        }
-      }
-    }
-    if (-not $ready) {
-      throw ("The $Component artifact folder could not be made ready at $folder (another run may hold an incomplete copy; clear it and retry).")
-    }
+  }
+  $short = Get-ThornswoodArtifactFolderShort $folder $contents
+  if ($short) {
+    throw ("The $Component artifact folder $folder is not what $name holds ($short). Nothing in it was changed: remove that folder and run again.")
   }
 
   return [pscustomobject]@{
