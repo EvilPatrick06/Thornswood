@@ -227,9 +227,11 @@ try {
         $hist = @(Get-ChildItem -LiteralPath (Join-Path $site 'feed-dev\history') -File -ErrorAction SilentlyContinue)
         Yes ("  the feed it replaced is kept in the store's history, and only that ({0})" -f (($hist | ForEach-Object { $_.Name }) -join ', ')) (
             $hist.Count -eq 1 -and $hist[0].Name -like '*-version.json')
-        # An old note whose own release was built with uncommitted files has
-        # nothing to prove it by, so it keeps the mark it has (6 Oct 2:10 PM:
-        # 20261006-141047-dev, uncommitted 1).
+        # An old note whose own release was built with uncommitted files, and
+        # no clean release after it, has nothing to prove it by, so it keeps
+        # the mark it has (6 Oct 2:10 PM: 20261006-141047-dev, uncommitted 1).
+        # test-2401-legacy-dev-marks.ps1 drives the one a later clean
+        # release settles.
         $dirty = Stale-DevFeed '10-6-2026 2:11 PM'
         foreach ($n in @($dirty.news)) { if (-not $n.PSObject.Properties['sourceCommit']) { $n.channel = '' } }
         $d = Set-DevFeedMarks $dirty $mainFeed $git
