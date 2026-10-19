@@ -146,9 +146,11 @@
   C:\Thornswood-Deletions\requests.jsonl, written when it is made: the
   Discord id, the profile ids, when, who ran it, the counts it removes and
   the services it asked. Nothing else about the person.
-  The folder is SYSTEM's and Administrators' only, locked when this makes it.
-  The nightly backup takes it (deletions\requests.jsonl), so it leaves the box
-  with every backup.
+  The folder is SYSTEM's and Administrators' only, locked when this makes it,
+  with read for the nightly backup's task (-BackupTask). The nightly backup
+  takes it (deletions\requests.jsonl), so it leaves the box with every
+  backup. Until #2833 the lock gave the backup no read, and the night
+  after the first deletion the backup could not read the record.
 
   -Reapply reads that record and asks for every request in it again, the same
   way: after a backup is put back and before anything starts, so each service
@@ -191,6 +193,10 @@
   The bot's folder.
 .PARAMETER RecordRoot
   Where the record of completed requests is kept.
+.PARAMETER BackupTask
+  The nightly backup's scheduled task (Install-Backup.ps1 -TaskName), whose
+  own SID is given read on the record's folder. Nothing is given when no
+  task of that name is registered; Install-Backup.ps1 gives it read then.
 .PARAMETER AllowGamingPc
   Run on a machine with the game on it. Only the tests pass it.
 #>
@@ -208,6 +214,7 @@ param(
     [string]$DevVoiceRoot = 'C:\Thornswood-Voice-Dev',
     [string]$BotRoot      = 'C:\Thornswood-Bot',
     [string]$RecordRoot   = 'C:\Thornswood-Deletions',
+    [string]$BackupTask   = 'Thornswood Backup',
     [switch]$AllowGamingPc
 )
 $ErrorActionPreference = 'Stop'
@@ -234,11 +241,33 @@ $utf8 = New-Object Text.UTF8Encoding($false)
 
 # ---------------------------------------------------------------- record ---
 # The folder: SYSTEM, Administrators and the account running this, nothing
-# inherited and no Users rule, the rule Lock-Folder.ps1 -Only applies. Only
-# the access rules are written back, never the audit part (#1120).
+# inherited and no Users rule, the rule Lock-Folder.ps1 -Only applies, and
+# read for the nightly backup's task, which takes the record off the box
+# (#2833). Only the access rules are written back, never the audit part
+# (#1120).
+# The backup task's own SID (Install-Backup.ps1 registers it with one), or
+# '' when no task of that name is registered: NT TASK names only resolve for
+# a task that exists, and Install-Backup.ps1 gives the read when it makes one.
+function Get-BackupTaskSid {
+    if (-not $BackupTask) { return '' }
+    try { return (New-Object Security.Principal.NTAccount('NT TASK', $BackupTask)).Translate([Security.Principal.SecurityIdentifier]).Value }
+    catch [Security.Principal.IdentityNotMappedException] { return '' }
+}
+function Write-RecordAcl([string]$Path, $acl) {
+    $item = Get-Item -LiteralPath $Path -Force
+    if ($PSVersionTable.PSEdition -eq 'Core') {
+        [IO.FileSystemAclExtensions]::SetAccessControl([IO.DirectoryInfo]$item, [Security.AccessControl.DirectorySecurity]$acl)
+    } else { $item.SetAccessControl($acl) }
+}
+function Add-BackupRead($acl, [string]$sid) {
+    $tree = [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
+    $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(
+        (New-Object Security.Principal.SecurityIdentifier($sid)), 'ReadAndExecute', $tree, 'None', 'Allow')))
+}
 function Lock-RecordFolder([string]$Path) {
     $tree = [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
     $keepers = @('S-1-5-18', 'S-1-5-32-544', [Security.Principal.WindowsIdentity]::GetCurrent().User.Value)
+    $backup = Get-BackupTaskSid
     $acl = Get-Acl -LiteralPath $Path
     $acl.SetAccessRuleProtection($true, $false)
     foreach ($r in @($acl.GetAccessRules($true, $false, [Security.Principal.SecurityIdentifier]))) {
@@ -248,16 +277,30 @@ function Lock-RecordFolder([string]$Path) {
         $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(
             (New-Object Security.Principal.SecurityIdentifier($s)), 'FullControl', $tree, 'None', 'Allow')))
     }
-    $item = Get-Item -LiteralPath $Path -Force
-    if ($PSVersionTable.PSEdition -eq 'Core') {
-        [IO.FileSystemAclExtensions]::SetAccessControl([IO.DirectoryInfo]$item, [Security.AccessControl.DirectorySecurity]$acl)
-    } else { $item.SetAccessControl($acl) }
+    if ($backup) { Add-BackupRead $acl $backup }
+    Write-RecordAcl $Path $acl
+    return $backup
 }
 function Ensure-RecordFolder {
-    if (Test-Path -LiteralPath $RecordRoot) { return }
+    if (Test-Path -LiteralPath $RecordRoot) {
+        # A folder locked before #2833 has no read for the backup: give it,
+        # and take nothing else away.
+        $backup = Get-BackupTaskSid
+        if (-not $backup) { return }
+        $acl = Get-Acl -LiteralPath $RecordRoot
+        $has = @($acl.GetAccessRules($true, $false, [Security.Principal.SecurityIdentifier]) | Where-Object {
+            $_.IdentityReference.Value -eq $backup -and $_.AccessControlType -eq 'Allow' -and
+            ($_.FileSystemRights -band [Security.AccessControl.FileSystemRights]::ReadAndExecute) -eq [Security.AccessControl.FileSystemRights]::ReadAndExecute })
+        if ($has.Count) { return }
+        Add-BackupRead $acl $backup
+        Write-RecordAcl $RecordRoot $acl
+        Say ('read      ' + $RecordRoot + ', given to the nightly backup (' + $BackupTask + ')')
+        return
+    }
     $null = New-Item -ItemType Directory -Path $RecordRoot -Force
-    Lock-RecordFolder $RecordRoot
-    Say ('locked    ' + $RecordRoot + ', SYSTEM and Administrators only')
+    $backup = Lock-RecordFolder $RecordRoot
+    if ($backup) { Say ('locked    ' + $RecordRoot + ', SYSTEM and Administrators only, and read for the nightly backup (' + $BackupTask + ')') }
+    else { Say ('locked    ' + $RecordRoot + ', SYSTEM and Administrators only; no ' + $BackupTask + ' task here yet, and Install-Backup.ps1 gives it read') }
 }
 # Every line of a record, each with its Discord id and profile ids. A line
 # that will not parse, or names no Discord id, refuses the run: a record that

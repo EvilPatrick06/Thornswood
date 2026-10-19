@@ -146,7 +146,17 @@ try {
   Set-Acl -LiteralPath $ownedStage -AclObject $acl
   [void](New-Item -ItemType Directory -Path $stage)
 function Grab($from, $to, [switch]$Complete) {
-  if (-not (Test-Path -LiteralPath $from)) { Note "  missing   $from"; return }
+  # A place inside a folder the task may not list makes Test-Path throw
+  # under Stop instead of saying no: the deletion record once Delete-Person.ps1
+  # has locked C:\Thornswood-Deletions, measured on the runners on 19 Oct
+  # (#2833). That is NO ACCESS like a copy refused below, counted for the
+  # failure at the end, and the rest of the night is still backed up.
+  try { $there = Test-Path -LiteralPath $from -ErrorAction Stop }
+  catch {
+    if ($_.Exception -is [UnauthorizedAccessException]) { Note "  NO ACCESS $from"; $script:denied++; return }
+    throw
+  }
+  if (-not $there) { Note "  missing   $from"; return }
   $dest = Join-Path $stage $to
   $item = Get-Item -LiteralPath $from
   if (-not $item.PSIsContainer) {
