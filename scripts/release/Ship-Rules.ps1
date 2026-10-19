@@ -1443,16 +1443,17 @@ $ShipCollectionRevision = 0
 function Get-ShipCollectionRevision([string]$Root) {
     if (-not (Get-Command Get-CollectionRevision -ErrorAction SilentlyContinue)) { return 0 }
     # No config.json, or one naming no collection, is the launcher's own
-    # collection. One that is there and does not read falls back to it too,
-    # rather than stopping Ship (tests\test-ship-revision-gate.ps1 holds that),
-    # and now says so (#2711: it was a try with an empty catch). The default's
-    # revision may not be the one config.json meant to name.
+    # collection. One that is there and does not read stops whatever asked,
+    # before anything is packed (Patrick, 19 Oct, #2711 decision 2 B): the
+    # revision decides which held files ship, and the launcher's own
+    # collection's may not be the one it meant to name. Until then it fell
+    # back to it, with an empty catch.
     $url = ''
     $cfg = Join-Path $Root 'config.json'
     if (Test-Path -LiteralPath $cfg) {
         $cfgDoc = $null
         try { $cfgDoc = Get-Content -LiteralPath $cfg -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop }
-        catch { Write-Host ("  $cfg does not read (" + ($_.Exception.Message -replace '\s+', ' ') + "), so the revision is the launcher's own collection's, which may not be the one it names") -ForegroundColor Yellow }
+        catch { throw ("$cfg does not read (" + ($_.Exception.Message -replace '\s+', ' ') + "), so the collection revision it names is not known, and nothing held for a later revision may ship. Fix config.json and run it again.") }
         if ($cfgDoc -and $cfgDoc.PSObject.Properties['CollectionUrl']) { $url = [string]$cfgDoc.CollectionUrl }
     }
     if (-not $url) { $url = 'https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf' }

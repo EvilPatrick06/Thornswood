@@ -755,8 +755,8 @@ if (Test-Path -LiteralPath $filesRecord) {
 # did not read left its list empty: the client runtime then fell under
 # Data\Platform as ours and shipped unchecked. Now each list stops whatever
 # loaded the rules, before anything is packed or sent; one that is not there
-# is still none. config.json still falls back to the launcher's collection,
-# as test-ship-revision-gate holds, and says so. A copy of the rules in a
+# is still none. A config.json that does not read stops the revision read too
+# (Patrick, 19 Oct, #2711 decision 2 B), as test-ship-revision-gate holds. A copy of the rules in a
 # scratch tree, loaded in a child.
 $scratch = Join-Path ([IO.Path]::GetTempPath()) ('ts-rules-reads-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 try {
@@ -787,7 +787,7 @@ try {
     Yes 'no config.json: the launcher''s own collection is asked' ($r.Code -eq 0 -and $r.Out -match 'REV 7')
     [IO.File]::WriteAllText((Join-Path $cfgRoot 'config.json'), '{ "CollectionUrl": ', (New-Object Text.UTF8Encoding($false)))
     $r = Load-Rules $ask
-    Yes 'a config.json that does not read still falls back to the launcher''s collection (test-ship-revision-gate), and now says so' ($r.Code -eq 0 -and $r.Out -match 'REV 7' -and $r.Out -match 'config\.json does not read' -and $r.Out -match 'which may not be the one it names')
+    Yes 'a config.json that does not read stops the revision read, and says why (test-ship-revision-gate)' ($r.Code -ne 0 -and $r.Out -notmatch 'REV 7' -and $r.Out -match 'config\.json does not read' -and $r.Out -match 'collection revision it names is not known')
 } finally {
     Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue
 }

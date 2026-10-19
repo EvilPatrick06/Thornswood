@@ -1375,28 +1375,26 @@ elseif ($Dev) {
             Say "  could not read the $ch feed from the site ($($_.Exception.Message)), so this uses the copy last received here, which may be old" 'Yellow'
         }
         $f = Join-Path (Get-FeedStoreDir $ch) 'version.json'
-        if (-not (Test-Path -LiteralPath $f)) { return '' }
+        if (-not (Test-Path -LiteralPath $f)) { throw "the site did not answer and no copy of the $ch feed was ever received here" }
         return [string]((ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $f -Raw) $f).launcherVersion)
     }
     function Read-EverPublished([string]$ch) {
         try { return @(Get-FeedStoreLaunchers $ch) }
-        catch {
-            Say "  could not read the launchers $ch has published from the VPS ($($_.Exception.Message)); the number climbs from the current feed only" 'Yellow'
-            return @()
-        }
+        catch { Die ("Could not read the launchers $ch has published from the VPS (" + $_.Exception.Message + "), so the dev number cannot be held above every one already out. Nothing was built.") }
     }
 
-    # What main and dev have published decides the number. Read-Published
-    # says when the site does not answer and takes the copy received here.
-    # When that copy does not read either, a dev Ship goes on from what it
-    # could read, as it always has (tests\test-dev-version.ps1 S6: dev fails
-    # open), and now says so (#2711: these were tries with empty catches, so a
-    # number that might be below one already out, the 1.1.76.1 case above,
-    # went out with nothing said).
+    # What main and dev have published decides the number, and a dev Ship
+    # that cannot read it stops before anything is built (Patrick, 19 Oct,
+    # #2711 decision 1 B). Until then it went on from the branch's own number
+    # (tests\test-dev-version.ps1 S6, "dev fails open"), which could land below
+    # a number already out, the 1.1.76.1 case above, and no launcher is offered
+    # a lower one. Read-Published still says when the site does not answer
+    # and takes the copy received here; with neither, it is a stop.
     $base = $current
     $mainWas = ''
     try {
         $mainWas = Read-Published 'main'
+        if (-not $mainWas) { throw "main's feed names no launcherVersion" }
         # Only the first three parts of main's number. Main never carries a
         # fourth, but reading defensively costs nothing and a 1.1.77.2 base
         # would produce a five part version nobody can read.
@@ -1408,12 +1406,12 @@ elseif ($Dev) {
                 $base = $mainWas
             }
         }
-    } catch { Say ("  could not read what main has published (" + $_.Exception.Message + "), so the number climbs from $base, which may be below main's") 'Yellow' }
+    } catch { Die ("Could not read what main has published (" + $_.Exception.Message + "), so the dev number could land below main's. Nothing was built.") }
 
     # Read-EverPublished says itself when the list cannot be read.
     $seen = @(Read-EverPublished 'dev')
     try { $was = Read-Published 'dev'; if ($was) { $seen += $was } }
-    catch { Say ("  could not read what dev has out now (" + $_.Exception.Message + "), so the number climbs past dev's published list only") 'Yellow' }
+    catch { Die ("Could not read what dev has out now (" + $_.Exception.Message + "), so the dev number could land below it. Nothing was built.") }
     $n = 1
     foreach ($v in $seen) {
         if ($v.StartsWith("$base.")) {
