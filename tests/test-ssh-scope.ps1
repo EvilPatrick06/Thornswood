@@ -62,7 +62,7 @@ function Test-IsServer { return $true }
 function Get-AllowRules {
     foreach ($r in $global:Fake.rules) {
         if ($r.Enabled -and $r.Action -eq 'Allow') {
-            [pscustomobject]@{ Name = $r.Name; DisplayName = $r.DisplayName; Protocol = $r.Protocol; Ports = @($r.Ports); Program = $r.Program; Remote = @($r.Remote) }
+            [pscustomobject]@{ Name = $r.Name; DisplayName = $r.DisplayName; Protocol = $r.Protocol; Ports = @($r.Ports); Program = $r.Program; Package = [string]$r.Package; Service = [string]$r.Service; Remote = @($r.Remote) }
         }
     }
 }
@@ -200,6 +200,24 @@ try {
     $global:Fake.rules += @{ Name = 'sshd-any'; DisplayName = 'sshd, every port'; Action = 'Allow'; Protocol = 'Any'; Ports = @('Any'); Program = 'C:\Windows\System32\OpenSSH\sshd.exe'; Remote = @('Any'); Enabled = $true }
     $r = Invoke-BoxHere '203.0.113.7'
     Yes 'a rule for sshd.exe on every port: STOP as well' ($r.Code -eq 1 -and (Has $r.Lines "'sshd, every port'") -and (Untouched))
+
+    # The per-user app container rules Windows makes (Start, Windows Search,
+    # Windows Security, "Your account"): every port from anywhere, but only for
+    # that app, so they never let sshd in (#2182, measured on the box 19 Oct).
+    New-Fake
+    $global:Fake.rules += @{ Name = 'app-start'; DisplayName = 'Start'; Action = 'Allow'; Protocol = 'Any'; Ports = @('Any'); Program = 'Any'; Package = 'S-1-15-2-515815643-2845804217-1874292103-218650560-777617685-4287762684-137415000'; Remote = @('Any'); Enabled = $true }
+    $r = Invoke-BoxHere '203.0.113.7'
+    Yes 'an app container rule for every port does not stop it' ($r.Code -eq 0 -and -not (Has $r.Lines "'Start'") -and (RemoteOf 'OpenSSH-Server-In-TCP') -eq '203.0.113.7')
+
+    New-Fake
+    $global:Fake.rules += @{ Name = 'svc-other'; DisplayName = 'one service, every port'; Action = 'Allow'; Protocol = 'TCP'; Ports = @('Any'); Program = 'Any'; Service = 'Spooler'; Remote = @('Any'); Enabled = $true }
+    $r = Invoke-BoxHere '203.0.113.7'
+    Yes 'a rule bound to another service does not stop it' ($r.Code -eq 0 -and (RemoteOf 'OpenSSH-Server-In-TCP') -eq '203.0.113.7')
+
+    New-Fake
+    $global:Fake.rules += @{ Name = 'svc-sshd'; DisplayName = 'the sshd service, every port'; Action = 'Allow'; Protocol = 'TCP'; Ports = @('Any'); Program = 'Any'; Service = 'sshd'; Remote = @('Any'); Enabled = $true }
+    $r = Invoke-BoxHere '203.0.113.7'
+    Yes 'a rule bound to the sshd service on every port: STOP' ($r.Code -eq 1 -and (Has $r.Lines "'the sshd service, every port'") -and (Untouched))
 
     New-Fake
     $global:Fake.rules += @{ Name = 'all-tcp-scoped'; DisplayName = 'every port, one address'; Action = 'Allow'; Protocol = 'TCP'; Ports = @('Any'); Program = 'Any'; Remote = @('192.0.2.1'); Enabled = $true }
