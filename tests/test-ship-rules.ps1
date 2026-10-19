@@ -749,4 +749,47 @@ if (Test-Path -LiteralPath $filesRecord) {
     Write-Host "SKIP  no $filesRecord on this machine"
 }
 
+# ---- what the rules read that does not read (#2711) -----------------------------------
+# The client record, the required-data list and the 1259 list were each read
+# in a try with an empty catch, and the collection's config.json too. One that
+# did not read left its list empty: the client runtime then fell under
+# Data\Platform as ours and shipped unchecked. Now each list stops whatever
+# loaded the rules, before anything is packed or sent; one that is not there
+# is still none. A config.json that does not read stops the revision read too
+# (Patrick, 19 Oct, #2711 decision 2 B), as test-ship-revision-gate holds. A copy of the rules in a
+# scratch tree, loaded in a child.
+$scratch = Join-Path ([IO.Path]::GetTempPath()) ('ts-rules-reads-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+try {
+    $relDir = Join-Path $scratch 'scripts\release'
+    New-Item -ItemType Directory -Force -Path $relDir, (Join-Path $scratch 'records') | Out-Null
+    foreach ($f in @(Get-ChildItem -LiteralPath (Split-Path -Parent $RulesPath) -File)) { Copy-Item -LiteralPath $f.FullName -Destination $relDir }
+    # The one other record the rules refuse to load without.
+    Copy-Item -LiteralPath (Join-Path $Here 'records\ui-gone.json') -Destination (Join-Path $scratch 'records')
+    $me = (Get-Process -Id $PID).Path
+    function Load-Rules([string]$then) {
+        $driver = Join-Path $scratch 'load.ps1'
+        [IO.File]::WriteAllText($driver, ("`$ErrorActionPreference = 'Stop'`r`n. '" + (Join-Path $relDir 'Ship-Rules.ps1').Replace("'", "''") + "'`r`n'LOADED'`r`n" + $then), (New-Object Text.UTF8Encoding($true)))
+        $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+        try { $o = @(& $me -NoProfile -ExecutionPolicy Bypass -File $driver 2>&1 | ForEach-Object { "$_" }); $c = $LASTEXITCODE }
+        finally { $ErrorActionPreference = $old }
+        return @{ Out = ($o -join ' '); Code = $c }
+    }
+    $r = Load-Rules ''
+    Yes 'the rules load with no client record beside them, as before' ($r.Code -eq 0 -and $r.Out -match 'LOADED')
+    [IO.File]::WriteAllText((Join-Path $scratch 'records\client-build.json'), '{ "files": { "Data\\Platform', (New-Object Text.UTF8Encoding($false)))
+    $r = Load-Rules ''
+    Yes 'a client record that does not read stops them loading, saying so' ($r.Code -ne 0 -and $r.Out -notmatch 'LOADED' -and $r.Out -match 'client-build\.json does not read' -and $r.Out -match 'Nothing was packed or sent')
+    Remove-Item -LiteralPath (Join-Path $scratch 'records\client-build.json')
+    $cfgRoot = Join-Path $scratch 'root'
+    New-Item -ItemType Directory -Force -Path $cfgRoot | Out-Null
+    $ask = "function Get-CollectionRevision([string]`$s) { return 7 }`r`nfunction Get-CollectionSlug([string]`$u) { return `$u }`r`n'REV ' + (Get-ShipCollectionRevision '" + $cfgRoot.Replace("'", "''") + "')`r`n"
+    $r = Load-Rules $ask
+    Yes 'no config.json: the launcher''s own collection is asked' ($r.Code -eq 0 -and $r.Out -match 'REV 7')
+    [IO.File]::WriteAllText((Join-Path $cfgRoot 'config.json'), '{ "CollectionUrl": ', (New-Object Text.UTF8Encoding($false)))
+    $r = Load-Rules $ask
+    Yes 'a config.json that does not read stops the revision read, and says why (test-ship-revision-gate)' ($r.Code -ne 0 -and $r.Out -notmatch 'REV 7' -and $r.Out -match 'config\.json does not read' -and $r.Out -match 'collection revision it names is not known')
+} finally {
+    Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 Done

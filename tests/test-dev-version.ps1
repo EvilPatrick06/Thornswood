@@ -190,11 +190,29 @@ try {
     $t = Run '1.1.80' '1.1.77' '1.1.77.1' @('1.1.77.1')
     Yes "S5 a branch ahead of main keeps its own number: $t" ($t -eq '1.1.80.1')
 
-    # S6: an unreadable main feed does not stop a dev release. Dev is where
-    #     things get tried, so it fails open on the branch's own number, and
-    #     still climbs past what dev has out.
-    $t = Run '1.1.76' '' '1.1.77.1' @('1.1.77.1')
-    Yes "S6 an unreadable main feed still produces a version above what dev has out: $t" ($t -eq '1.1.77.2')
+    # S6: a main feed that cannot be read stops a dev release before anything
+    #     is built (Patrick, 19 Oct, #2711 decision 1 B). It used to fail open
+    #     on the branch's own number, which could land below main's.
+    $refused = $false
+    try { $null = Run '1.1.76' '' '1.1.77.1' @('1.1.77.1') } catch { $refused = $true }
+    Yes 'S6 a main feed that cannot be read stops the dev Ship' $refused
+    # S6b (#2711): the copy received here is there and does not read, and the
+    # site has no answer. It stops, as S6, and says why (this was a try with
+    # an empty catch, then a yellow line that went on).
+    $site = Join-Path $tmp 'site-s6b'; $local = Join-Path $tmp 'local-s6b'
+    New-Item -ItemType Directory -Force -Path (Join-Path $site 'feed'), (Join-Path $site 'feed-dev'), (Join-Path $local 'Thornswood\feed\main') | Out-Null
+    Put-Feed (Join-Path $site 'feed-dev') '1.1.77.1'
+    Set-Content -LiteralPath (Join-Path $site 'feed-dev\launchers.txt') -Value @('1.1.77.1') -Encoding ASCII
+    Set-Content -LiteralPath (Join-Path $local 'Thornswood\feed\main\version.json') -Value '{ "launcherVersion": '
+    $env:THORNSWOOD_TEST_SITE_DIR = $site; $env:LOCALAPPDATA = $local
+    $script:s6said = @()
+    $s6stop = ''
+    try {
+        $sb = [scriptblock]::Create('$current = $args[0]; $MainSourceAligned = $false; $MainEquivalent = $false; function Say($t, $c) { $script:s6said += $t }; function Die($t) { throw $t };' + $body + '; return $target')
+        $null = & $sb '1.1.76'
+    } catch { $s6stop = $_.Exception.Message } finally { $env:THORNSWOOD_TEST_SITE_DIR = $oldSite; $env:LOCALAPPDATA = $oldLocal }
+    Yes 'S6b a main copy here that does not read stops the dev Ship' ([bool]$s6stop)
+    Yes '  and says it could not read what main has published, and that nothing was built' ($s6stop -match '(?s)Could not read what main has published \(.+\), so the dev number could land below main''s\. Nothing was built\.')
 
     # S7: 25 SEPTEMBER. Djinn's releases clone was days old and said 1.1.92,
     #     so his dev Ship went out as 1.1.92.3 while dev launchers were on

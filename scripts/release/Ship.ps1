@@ -353,10 +353,17 @@ function Get-LauncherExe([string]$dir) {
 # Which repository the release.yml draft is on: the source clone's origin, where
 # the workflow runs and creates it, not the releases clone the packs go to.
 function Get-SourceRepo([string]$repoDir) {
-    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    # No git on the path was the one thing the empty catch here took (#2711);
+    # it is asked for directly. Under Continue a git that cannot answer (no
+    # origin) gives nothing, and the fallback below is its answer.
     $remote = ''
-    try { $remote = (& git -C $repoDir remote get-url origin 2>$null | Select-Object -First 1) } catch { }
-    $ErrorActionPreference = $old
+    if (Get-Command git -ErrorAction SilentlyContinue) {
+        $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+        try { $remote = (@(& git -C $repoDir remote get-url origin 2>$null) | Select-Object -First 1) }
+        finally { $ErrorActionPreference = $old }
+    } else {
+        Write-Host '  git is not on the path, so the launcher''s draft is looked for on EvilPatrick06/Thornswood' -ForegroundColor Yellow
+    }
     if ($remote -and $remote -match 'github\.com[:/](.+?)(?:\.git)?\s*$') { return $Matches[1] }
     return 'EvilPatrick06/Thornswood'
 }
@@ -822,9 +829,9 @@ function Get-FeedLauncher($pub, [string]$into, [string]$expectedSigner) {
     $exe = Join-Path $into 'Thornswood.exe'
     $part = $exe + '.part'
     foreach ($p in $exe, $part) { if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Force } }
-    try {
-        [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
-    } catch { }
+    # Not in a try (#2711): this cannot fail on the .NET Ship runs on, and if
+    # it ever did, Ship's Stop ends here, before anything is published.
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
     $wc = New-Object Net.WebClient
     try { $wc.DownloadFile([string]$pub.Url, $part) }
     catch {
@@ -1368,20 +1375,26 @@ elseif ($Dev) {
             Say "  could not read the $ch feed from the site ($($_.Exception.Message)), so this uses the copy last received here, which may be old" 'Yellow'
         }
         $f = Join-Path (Get-FeedStoreDir $ch) 'version.json'
-        if (-not (Test-Path -LiteralPath $f)) { return '' }
+        if (-not (Test-Path -LiteralPath $f)) { throw "the site did not answer and no copy of the $ch feed was ever received here" }
         return [string]((ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $f -Raw) $f).launcherVersion)
     }
     function Read-EverPublished([string]$ch) {
         try { return @(Get-FeedStoreLaunchers $ch) }
-        catch {
-            Say "  could not read the launchers $ch has published from the VPS ($($_.Exception.Message)); the number climbs from the current feed only" 'Yellow'
-            return @()
-        }
+        catch { Die ("Could not read the launchers $ch has published from the VPS (" + $_.Exception.Message + "), so the dev number cannot be held above every one already out. Nothing was built.") }
     }
 
+    # What main and dev have published decides the number, and a dev Ship
+    # that cannot read it stops before anything is built (Patrick, 19 Oct,
+    # #2711 decision 1 B). Until then it went on from the branch's own number
+    # (tests\test-dev-version.ps1 S6, "dev fails open"), which could land below
+    # a number already out, the 1.1.76.1 case above, and no launcher is offered
+    # a lower one. Read-Published still says when the site does not answer
+    # and takes the copy received here; with neither, it is a stop.
     $base = $current
+    $mainWas = ''
     try {
         $mainWas = Read-Published 'main'
+        if (-not $mainWas) { throw "main's feed names no launcherVersion" }
         # Only the first three parts of main's number. Main never carries a
         # fourth, but reading defensively costs nothing and a 1.1.77.2 base
         # would produce a five part version nobody can read.
@@ -1393,11 +1406,12 @@ elseif ($Dev) {
                 $base = $mainWas
             }
         }
-    } catch { }
+    } catch { Die ("Could not read what main has published (" + $_.Exception.Message + "), so the dev number could land below main's. Nothing was built.") }
 
-    $seen = @()
-    try { $seen = @(Read-EverPublished 'dev') } catch { }
-    try { $was = Read-Published 'dev'; if ($was) { $seen += $was } } catch { }
+    # Read-EverPublished says itself when the list cannot be read.
+    $seen = @(Read-EverPublished 'dev')
+    try { $was = Read-Published 'dev'; if ($was) { $seen += $was } }
+    catch { Die ("Could not read what dev has out now (" + $_.Exception.Message + "), so the dev number could land below it. Nothing was built.") }
     $n = 1
     foreach ($v in $seen) {
         if ($v.StartsWith("$base.")) {
@@ -2158,15 +2172,23 @@ if ($DryRun) {
 # check used to stand in front of it for any Ship with a launcher, so that
 # block never ran for one. Anything else is a publisher that stopped, below too.
 if (-not $DryRun -and $published -eq 0) {
+    # A version.json here that does not read is said as that, not as one that
+    # names nothing (#2711: this was a try with an empty catch). Either way
+    # nothing here can say the launcher went out, so nobody is told.
     $landed = ''
-    try {
-        $vf = Join-Path $ReleaseDir 'version.json'
-        if (Test-Path $vf) {
-            $landed = [string]((Get-Content $vf -Raw | ConvertFrom-Json).launcherVersion)
-        }
-    } catch { }
+    $landedWhy = ''
+    $vf = Join-Path $ReleaseDir 'version.json'
+    if (Test-Path -LiteralPath $vf) {
+        try {
+            $vfDoc = Get-Content -LiteralPath $vf -Raw | ConvertFrom-Json
+            if ($vfDoc -and $vfDoc.PSObject.Properties['launcherVersion']) { $landed = [string]$vfDoc.launcherVersion }
+        } catch { $landedWhy = $_.Exception.Message }
+    }
     $notOut = ''
     if (-not $global:ThornswoodPublishedRelease) { $notOut = 'The publisher named no release it sent to the VPS.' }
+    elseif (-not $ModsOnly -and $landedWhy) {
+        $notOut = "$vf does not read ($landedWhy), so nothing says $target went out."
+    }
     elseif (-not $ModsOnly -and $landed -ne $target) {
         $notOut = "version.json still says $(if ($landed) { $landed } else { 'nothing at all' }), not $target."
     }
