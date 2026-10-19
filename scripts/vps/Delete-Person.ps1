@@ -2,8 +2,10 @@
   Delete-Person.ps1
 
   Carries out a deletion request (issue #2351). Finds one person's records in
-  every store on the box by their Discord id, shows how many there are, deletes
-  them only when told to, and writes the request down so that a restore
+  every store on the box by their Discord id, shows how many there are, and
+  when told to, removes them from every copy nothing runs from and asks each
+  service that holds some to take the rest out of its own files as it next
+  starts, stopping nothing (#2758). Writes the request down so that a restore
   reapplies it. Runs ON the VPS, as Administrator, sent there by Remote.ps1:
 
       .\scripts\vps\Remote.ps1 -File .\scripts\vps\Delete-Person.ps1 -Arguments '-DiscordId 123456789012345678'
@@ -21,10 +23,12 @@
   records each request so a restore reapplies it. "Deletion requests" in
   docs\WEBSITE-OPERATIONS.md is the procedure around it.
 
-  A DRY RUN IS THE DEFAULT. Without -Delete nothing is changed, stopped or
-  written. It prints, for every store, how many of the person's records are
-  there and whether a real run removes them or leaves them. Counts only,
-  never what a record says and never an address.
+  A DRY RUN IS THE DEFAULT. Without -Delete nothing is changed or written.
+  It prints, for every store, how many of the person's records are there and
+  whether a real run removes them or leaves them, and which services still
+  have a request for them that they take at their next start ("waiting"), so
+  it is also how staff see when a request is done. Counts only, never what a
+  record says and never an address.
 
   WHO. Their Discord id, and their characters: the profile ids linked.json
   holds for them, which the site checked were theirs when they played, and on
@@ -33,7 +37,8 @@
 
   WHAT A REAL RUN REMOVES, the person's own records, in every copy on the box
   (the live folder and the copies a restore, a wipe, an install or a character
-  reset sets aside beside it):
+  reset sets aside beside it). The copies go at once. The live folders are
+  each service's own, and it takes them at its next start (below):
     site            their Discord link (linked.json), their answer to the
                     rules (rules-accepted.json), their sign-in rows
                     (signins.json, which hold an address), their session rows
@@ -53,10 +58,10 @@
     voice           every chat line their characters wrote, out of each day's
                     file, live and dev, except the lines said inside a
                     session staff marked kept (#2166), which stay with it.
-                    The voice service never edits a day
-                    (voice\voice-server.js); these are the only edits, and the
-                    record keeps each file's line count before and after, so
-                    an edited day says so
+                    The voice service itself never edits a day
+                    (voice\voice-server.js); server-log.js does, before
+                    voice starts, and the record keeps each day's line count
+                    when the request was made
     the bot         their join number (joins.json; the last number given out
                     stays, so nobody is handed theirs again) and their open
                     ticket (open-tickets.json)
@@ -103,38 +108,54 @@
   faction or business book they own is disbanded then, so the procedure says
   to have staff hand it on in the game first when the group wants to keep it.
 
-  A REAL RUN STOPS WHAT WRITES THOSE STORES, and only those. The site, a game
-  server, a voice service and the bot each write their files while they run,
-  so a file changed underneath one is written straight back over (the same
-  reason docs\RESTORING.md stops the game server to put one character back).
-  So for each one whose files hold something to remove: the watchdog is
-  disabled first so it starts nothing again, the service is stopped and any
-  process still running from its folder is ended, the files are changed, and
-  the service is started again, then the watchdog. A game server with anybody
-  online is refused unless -Now: they would be dropped. A game server with an
-  unfinished save (.pending-batch in changeForms) once it is stopped is
-  refused: the engine replays it at its next start and could write a deleted
-  character back. While a server runs, a .pending-batch is its own save in
-  flight, there for a moment at every save, so the look before anything is
-  stopped does not refuse on a running server's batch; the look after the
-  stop does (#2351, refused on 18 Oct by a running dev server's save).
-  Every file is read and checked before any is written, and each JSON file is
-  written to a file beside it and swapped in, the way the site writes its own.
+  A REAL RUN STOPS NOTHING (#2758). Patrick, 18 Oct 2026, after the first
+  real run, on his own account: "it should not restart everytime we want to
+  delete a person it should just fully apply the rest upon a server restart".
+  The site, a game server, a voice service and the bot each write their files
+  while they run, so a file changed underneath one would be written straight
+  back over. So this never changes a live service's files. It writes the
+  request into the folder of each service that holds something of theirs,
+  merged into one still waiting there, and the service takes it out of its own
+  files as it next starts, before anything of theirs is open:
+    site           data\deletion-requests.json, taken by site\server.js
+                   before it listens
+    a game server  private\deleted-characters.json: server-log.js, which its
+                   task starts it under, deletes their change forms and takes
+                   them out of the card, mod menu, take count and last-left
+                   files before the engine starts (scripts\vps\Server-Log.js);
+                   then the gamemode lets go of the registers (above)
+    voice          deletion-requests.json in its folder, with the windows of
+                   the sessions staff kept: server-log.js, before voice starts
+    the bot        deletion-requests.json in its data folder, taken by
+                   bot\bot.py before it connects
+  Each says it in its own log with counts, and deletes the request once every
+  part took; a part that did not take waits for the next start. Nothing
+  restarts on a schedule: a service starts again at a deploy or an install of
+  its own, after a crash and after a reboot, which in October 2026 was about
+  a day for the game servers and the site and up to a week for voice and the
+  bot (#2758 has the count). Until it does, its copy still holds the records;
+  the procedure (docs\WEBSITE-OPERATIONS.md) says when the person is told.
+  A copy set aside with an unfinished save (.pending-batch in changeForms)
+  is refused: the engine would replay it if that copy were put back, and
+  could write a deleted character back. Every file is read and checked
+  before any is written, and each JSON file is written to a file beside it
+  and swapped in, the way the site writes its own.
 
-  THE RECORD. Each completed request is one line in
-  C:\Thornswood-Deletions\requests.jsonl: the Discord id, the profile ids,
-  when, who ran it, and the counts it removed. Nothing else about the person.
+  THE RECORD. Each request is one line in
+  C:\Thornswood-Deletions\requests.jsonl, written when it is made: the
+  Discord id, the profile ids, when, who ran it, the counts it removes and
+  the services it asked. Nothing else about the person.
   The folder is SYSTEM's and Administrators' only, locked when this makes it.
   The nightly backup takes it (deletions\requests.jsonl), so it leaves the box
   with every backup.
 
-  -Reapply reads that record and removes every request in it again: after a
-  backup is put back and before anything starts (Restore-Box.ps1 runs it, and
-  docs\RESTORING.md says when by hand). -Merge names other copies of the
-  record (the one in the backup being put back, or one from a newer backup);
-  lines the box's record does not have are added to it first. -Reapply never
-  stops anything: it refuses while a service it would write under is running,
-  and never adds a line of its own.
+  -Reapply reads that record and asks for every request in it again, the same
+  way: after a backup is put back and before anything starts, so each service
+  takes them at the start that puts it back in service (Restore-Box.ps1 runs
+  it, and docs\RESTORING.md says when by hand). -Merge names other copies of
+  the record (the one in the backup being put back, or one from a newer
+  backup); lines the box's record does not have are added to it first.
+  -Reapply never adds a line of its own.
 
   WHAT IT REFUSES, with nothing changed:
     - anywhere with C:\Thornswood\Game\SkyrimSE.exe, which is a gaming PC
@@ -155,8 +176,6 @@
   Remove every request in the record again, after a restore.
 .PARAMETER Merge
   With -Reapply: other copies of the record to add to the box's first.
-.PARAMETER Now
-  Stop a game server even with people online.
 .PARAMETER SiteRoot
   The site's folder.
 .PARAMETER GameRoot
@@ -171,9 +190,6 @@
   The bot's folder.
 .PARAMETER RecordRoot
   Where the record of completed requests is kept.
-.PARAMETER NoServices
-  Neither stop nor check any service: for stand-in folders nothing runs from.
-  Only the tests pass it.
 .PARAMETER AllowGamingPc
   Run on a machine with the game on it. Only the tests pass it.
 #>
@@ -184,7 +200,6 @@ param(
     [string]$By = '',
     [switch]$Reapply,
     [string[]]$Merge = @(),
-    [switch]$Now,
     [string]$SiteRoot     = 'C:\Thornswood-Docs',
     [string]$GameRoot     = 'C:\Thornswood-Server',
     [string]$DevGameRoot  = 'C:\Thornswood-Server-Dev',
@@ -192,7 +207,6 @@ param(
     [string]$DevVoiceRoot = 'C:\Thornswood-Voice-Dev',
     [string]$BotRoot      = 'C:\Thornswood-Bot',
     [string]$RecordRoot   = 'C:\Thornswood-Deletions',
-    [switch]$NoServices,
     [switch]$AllowGamingPc
 )
 $ErrorActionPreference = 'Stop'
@@ -337,8 +351,55 @@ function want(f, kind) {
   if (!ok) stop(f.p + ' is not the shape it should be (' + kind + '), so nothing was changed');
   return true;
 }
+// A game server's list of deleted characters (the release block in
+// game\gamemode.js reads it), with these profiles and form ids merged in and
+// what was done cleared, so every part runs for the new ids too.
+function mergeList(lf, P, A) {
+  if (!lf.missing && !(isObj(lf.value) && Array.isArray(lf.value.profiles))) {
+    stop(lf.p + ' is not a list of deleted characters, so nothing was changed');
+  }
+  const was = lf.missing ? {} : lf.value;
+  const ids = (xs) => (Array.isArray(xs) ? xs : []).map(Number).filter((x) => Number.isSafeInteger(x) && x > 0);
+  const profiles = Array.from(new Set(ids(was.profiles).concat(Array.from(P)))).sort((x, y) => x - y);
+  const actors = Array.from(new Set(ids(was.actors).concat(Array.from(A)))).sort((x, y) => x - y);
+  lf.value = { profiles, actors };
+}
+/*
+  Where each service finds the requests it takes at its next start (#2758):
+    site           data\deletion-requests.json        site\server.js, before it listens
+    a game server  private\deleted-characters.json     server-log.js (their saves), then the gamemode (the registers)
+    voice          deletion-requests.json, its folder  server-log.js, before voice starts
+    the bot        deletion-requests.json, its data    bot\bot.py, before it connects
+*/
+const botData = isDir(path.join(a.bot, 'data')) ? path.join(a.bot, 'data') : a.bot;
+function requestFile(w) {
+  if (w === 'site') return path.join(a.site, 'data', 'deletion-requests.json');
+  if (w === 'bot') return path.join(botData, 'deletion-requests.json');
+  const tag = w.split(':')[1];
+  if (w.indexOf('server:') === 0) return path.join(a.servers.find((s) => s.tag === tag).root, 'private', 'deleted-characters.json');
+  return path.join(a.voices.find((v) => v.tag === tag).root, 'deletion-requests.json');
+}
+function requestFiles() {
+  const ws = ['site'].concat(a.servers.map((s) => 'server:' + s.tag), a.voices.map((v) => 'voice:' + v.tag), ['bot']);
+  return ws.map((w) => [w, requestFile(w)]);
+}
+// A request already there, to say it still waits; one that will not parse
+// is said by the run that would merge into it.
+function peek(p) {
+  try { return JSON.parse(fs.readFileSync(p, 'utf8').replace(/^\uFEFF/, '')); } catch (e) { return null; }
+}
 const texts = new Map();    // path -> { lines, writer, dirty }
 const unlinks = new Map();  // path -> writer
+/*
+  A change is made now only where nothing runs (writer null: a copy set
+  aside). One to a service's live files (writer set) is never written here:
+  that service takes the request out of its own files as it next starts
+  (#2758), so each change names its writer, and touched collects the writers
+  the person being read has something in.
+*/
+let touched = new Set();
+function dirty(f) { f.dirty = true; if (f.writer) touched.add(f.writer); }
+function unlink(p, writer) { unlinks.set(p, writer); if (writer) touched.add(writer); }
 function text(p, writer) {
   if (texts.has(p)) return texts.get(p);
   let raw = '';
@@ -426,10 +487,18 @@ const people = a.people.map((x) => ({ discordId: String(x.discordId), profiles: 
 const linked = json(path.join(a.site, 'data', 'linked.json'), 'site');
 want(linked, 'object');
 const results = [];
+// What each service is asked to take out of its own files at its next start:
+// writer -> { people: Map(Discord id -> Set(profile)), actors: Set, kept: [] }.
+const asks = new Map();
+function ask(w) {
+  if (!asks.has(w)) asks.set(w, { people: new Map(), actors: new Set(), kept: [] });
+  return asks.get(w);
+}
 
 for (const person of people) {
   const id = person.discordId;
-  const r = { discordId: id, profiles: [], skipped: [], removed: {}, held: {}, left: {}, release: {}, chat: [], notes: [] };
+  touched = new Set();
+  const r = { discordId: id, profiles: [], skipped: [], removed: {}, held: {}, left: {}, release: {}, chat: [], notes: [], waiting: [] };
   const removed = (k, n) => { if (n) r.removed[k] = (r.removed[k] || 0) + n; };
   const releases = (k, n) => { if (n) r.release[k] = (r.release[k] || 0) + n; };
   const held = (k, n) => { if (n) r.held[k] = (r.held[k] || 0) + n; };
@@ -455,13 +524,13 @@ for (const person of people) {
   for (const s of siteSets(a.site)) {
     const D = s.data, FB = path.join(D, 'for-bot'), T = s.tag;
     const lk = json(path.join(D, 'linked.json'), s.writer);
-    if (want(lk, 'object') && has(lk.value, id)) { delete lk.value[id]; lk.dirty = true; removed(T + ': Discord link', 1); }
+    if (want(lk, 'object') && has(lk.value, id)) { delete lk.value[id]; dirty(lk); removed(T + ': Discord link', 1); }
     const rules = json(path.join(D, 'rules-accepted.json'), s.writer);
-    if (want(rules, 'object') && has(rules.value, id)) { delete rules.value[id]; rules.dirty = true; removed(T + ': answer to the rules', 1); }
+    if (want(rules, 'object') && has(rules.value, id)) { delete rules.value[id]; dirty(rules); removed(T + ': answer to the rules', 1); }
     const signins = json(path.join(D, 'signins.json'), s.writer);
     if (want(signins, 'array')) {
       const keep = signins.value.filter((x) => !(isObj(x) && String(x.id) === id));
-      if (keep.length !== signins.value.length) { removed(T + ': sign-in rows', signins.value.length - keep.length); signins.value = keep; signins.dirty = true; }
+      if (keep.length !== signins.value.length) { removed(T + ': sign-in rows', signins.value.length - keep.length); signins.value = keep; dirty(signins); }
     }
     const kept = new Set(), gone = new Set();
     const sessions = json(path.join(D, 'sessions.json'), s.writer);
@@ -481,7 +550,7 @@ for (const person of people) {
           else { gone.add(String(x.session)); removed(T + ': session rows', 1); }
         } else keep.push(x);
       }
-      if (keep.length !== sessions.value.length) { sessions.value = keep; sessions.dirty = true; }
+      if (keep.length !== sessions.value.length) { sessions.value = keep; dirty(sessions); }
     }
     const slogs = path.join(D, 'session-logs');
     for (const f of names(slogs).sort()) {
@@ -495,7 +564,7 @@ for (const person of people) {
       if (!isObj(set)) continue;
       if (String(set.who) !== id && !gone.has(String(set.session))) continue;
       if (kept.has(String(set.session))) held(T + ': launcher logs of kept sessions', 1);
-      else { unlinks.set(p, s.writer); removed(T + ': launcher logs', 1); }
+      else { unlink(p, s.writer); removed(T + ': launcher logs', 1); }
     }
     const trouble = json(path.join(FB, 'trouble.json'), s.writer);
     if (want(trouble, 'array')) {
@@ -506,12 +575,12 @@ for (const person of people) {
         if (theirs) held(T + ': failed-session alerts of kept sessions', 1);
         keep.push(x);
       }
-      if (keep.length !== trouble.value.length) { trouble.value = keep; trouble.dirty = true; }
+      if (keep.length !== trouble.value.length) { trouble.value = keep; dirty(trouble); }
     }
     const roster = json(path.join(D, 'roster.json'), s.writer);
     if (want(roster, 'object')) {
       if (isObj(roster.value.who)) {
-        for (const k of Object.keys(roster.value.who)) if (hasP(k)) { delete roster.value.who[k]; roster.dirty = true; removed(T + ': roster rows', 1); }
+        for (const k of Object.keys(roster.value.who)) if (hasP(k)) { delete roster.value.who[k]; dirty(roster); removed(T + ': roster rows', 1); }
       }
       if (isObj(roster.value.servers)) {
         for (const sv of Object.values(roster.value.servers)) {
@@ -519,7 +588,7 @@ for (const person of people) {
           for (const k of ['checked', 'held']) {
             if (!Array.isArray(sv[k])) continue;
             const keep = sv[k].filter((n) => !hasP(n));
-            if (keep.length !== sv[k].length) { sv[k] = keep; roster.dirty = true; }
+            if (keep.length !== sv[k].length) { sv[k] = keep; dirty(roster); }
           }
         }
       }
@@ -536,7 +605,7 @@ for (const person of people) {
         if (sent) held(T + ': reports they made', 1);
         else if (hasP(x.aboutProfileId)) held(T + ': reports about them', 1);
       }
-      if (keep.length !== inbox.value.length) { inbox.value = keep; inbox.dirty = true; }
+      if (keep.length !== inbox.value.length) { inbox.value = keep; dirty(inbox); }
     }
     const pending = json(path.join(D, 'gallery-pending.json'), s.writer);
     if (want(pending, 'array')) {
@@ -549,11 +618,11 @@ for (const person of people) {
         const name = String(x.name || '');
         if (s.uploads && /^[A-Za-z0-9._ -]+$/.test(name) && name !== 'uploads.json') {
           const fp = path.join(s.uploads, name);
-          if (fs.existsSync(fp)) unlinks.set(fp, s.writer);
-          if (meta && !meta.missing && has(meta.value, name)) { delete meta.value[name]; meta.dirty = true; }
+          if (fs.existsSync(fp)) unlink(fp, s.writer);
+          if (meta && !meta.missing && has(meta.value, name)) { delete meta.value[name]; dirty(meta); }
         }
       }
-      if (keep.length !== pending.value.length) { pending.value = keep; pending.dirty = true; }
+      if (keep.length !== pending.value.length) { pending.value = keep; dirty(pending); }
     }
     const greports = json(path.join(D, 'gallery-reports.json'), s.writer);
     const hasReports = want(greports, 'array');
@@ -577,13 +646,13 @@ for (const person of people) {
         if (reported.has(name) || (m.removed && Number(m.heldUntil) > a.now)) { held(T + ': gallery pictures held while a report about them is looked into', 1); continue; }
         if (onGallery) {
           gallery.value = gallery.value.filter((g) => !(isObj(g) && String(g.name) === name));
-          gallery.dirty = true;
+          dirty(gallery);
           removed(T + ': approved gallery pictures', 1);
         } else removed(T + ': other gallery files they sent', 1);
         const fp = path.join(s.uploads, name);
-        if (fs.existsSync(fp)) unlinks.set(fp, s.writer);
+        if (fs.existsSync(fp)) unlink(fp, s.writer);
         delete umeta.value[name];
-        umeta.dirty = true;
+        dirty(umeta);
       }
     }
     const bans = json(path.join(D, 'bans.json'), s.writer);
@@ -611,12 +680,22 @@ for (const person of people) {
         const dirs = [forms].concat(names(forms).filter((n) => /^_discarded-/.test(n)).map((n) => path.join(forms, n)));
         for (const dir of dirs) {
           const fl = names(dir);
-          // A running server's own save in flight is not left over: the look
-          // after it is stopped (apply) is the one that counts for it.
-          const inFlight = a.mode !== 'apply' && g.writer && (a.running || []).indexOf(g.writer) >= 0;
-          if (P.size && fl.indexOf('.pending-batch') >= 0 && !inFlight) {
-            stop(path.join(dir, '.pending-batch') + ' is an unfinished save, which the server replays at its next start and which could write a character back. ' +
-                 'Start that server once and stop it, then run this again. Nothing was changed');
+          /*
+            The engine's own folder, world\changeForms of a live server, is
+            the server's to change, at its next start (server-log.js, before
+            the engine loads it). Everything else here nothing runs from: a
+            world-before-* a wipe left, a _discarded-* a reset left (the
+            engine reads only the files at the top of changeForms), and every
+            folder set aside. Those change now.
+          */
+          const live = g.writer && w === 'world' && dir === forms;
+          // An unfinished save at a live server's start is server-log.js's to
+          // look at (it waits for the next start when the batch holds one of
+          // theirs). One in a copy nothing runs from would be replayed only
+          // if that copy were put back, and could write a character back.
+          if (P.size && fl.indexOf('.pending-batch') >= 0 && !live) {
+            stop(path.join(dir, '.pending-batch') + ' is an unfinished save in a copy nothing runs from, which the server would replay if that copy were put back, ' +
+                 'and which could write a character back. Delete that copy, or put it back and start it once, then run this again. Nothing was changed');
           }
           for (const f of fl) {
             if (!/\.json$/i.test(f) || f[0] === '.') continue;
@@ -625,7 +704,7 @@ for (const person of people) {
             let o = null;
             try { o = JSON.parse(fs.readFileSync(p, 'utf8').replace(/^\uFEFF/, '')); } catch (e) { left(T + ': change forms that would not parse, so were not read', 1); continue; }
             if (isObj(o) && Number(o.profileId) > 0 && hasP(o.profileId) && !unlinks.has(p)) {
-              unlinks.set(p, g.writer);
+              unlink(p, live ? g.writer : null);
               removed(T + ': characters' + (w === 'world' && dir === forms ? '' : ' in ' + path.relative(R, dir)), 1);
               // A character made in the world has a form id of its own, no plugin (FormDesc::ToString).
               if (/^[0-9a-f]{1,8}$/i.test(String(o.formDesc || ''))) A.add(parseInt(o.formDesc, 16));
@@ -635,26 +714,30 @@ for (const person of people) {
       }
       const priv = path.join(R, 'private'), data = path.join(R, 'data');
       const handled = new Set();
+      // The gamemode writes characters.json, mod-settings.json, take-limit.json
+      // and private\last-left.json while it runs; a characters-before-* a wipe
+      // left and the data\last-left.json from before #2582 (which the gamemode
+      // deletes at its start) nothing writes, so those change now.
       for (const f of names(priv)) {
         if (!/^characters(-before-.+)?\.json$/i.test(f) && f.toLowerCase() !== 'mod-settings.json') continue;
-        const b = json(path.join(priv, f), g.writer);
+        const b = json(path.join(priv, f), /^characters-before-/i.test(f) ? null : g.writer);
         handled.add(path.join(priv, f).toLowerCase());
         if (!want(b, 'object') || !isObj(b.value.who)) continue;
         const label = f.toLowerCase() === 'mod-settings.json' ? 'mod menu choices' : 'character cards' + (f.toLowerCase() === 'characters.json' ? '' : ' in ' + f);
-        for (const k of Object.keys(b.value.who)) if (hasP(k)) { delete b.value.who[k]; b.dirty = true; removed(T + ': ' + label, 1); }
+        for (const k of Object.keys(b.value.who)) if (hasP(k)) { delete b.value.who[k]; dirty(b); removed(T + ': ' + label, 1); }
       }
       const take = json(path.join(priv, 'take-limit.json'), g.writer);
       handled.add(path.join(priv, 'take-limit.json').toLowerCase());
       if (want(take, 'object') && isObj(take.value.counts)) {
-        for (const k of Object.keys(take.value.counts)) if (hasP(k.split('|')[0])) { delete take.value.counts[k]; take.dirty = true; removed(T + ': take counts', 1); }
+        for (const k of Object.keys(take.value.counts)) if (hasP(k.split('|')[0])) { delete take.value.counts[k]; dirty(take); removed(T + ': take counts', 1); }
       }
       // The gamemode keeps it in private since #2582; a server folder set aside
       // before that still has it in data, and is the person's record all the same.
       for (const dir of [priv, data]) {
-        const lastLeft = json(path.join(dir, 'last-left.json'), g.writer);
+        const lastLeft = json(path.join(dir, 'last-left.json'), dir === priv ? g.writer : null);
         handled.add(path.join(dir, 'last-left.json').toLowerCase());
         if (want(lastLeft, 'object')) {
-          for (const k of Object.keys(lastLeft.value)) if (hasP(k)) { delete lastLeft.value[k]; lastLeft.dirty = true; removed(T + ': when they last left', 1); }
+          for (const k of Object.keys(lastLeft.value)) if (hasP(k)) { delete lastLeft.value[k]; dirty(lastLeft); removed(T + ': when they last left', 1); }
         }
       }
       /*
@@ -666,12 +749,14 @@ for (const person of people) {
         A server that holds something of theirs gets the list: their profile
         ids and the form ids of their characters found here, merged into a
         list still waiting there, with what was already done cleared so every
-        part runs for the new ids too. It is written like any other file of
-        that server's, so a real run stops the server, writes it and starts
-        it again, and the start lets go of it then. A copy set aside gets one
-        too, which nothing runs from until it is put back. Every other file
-        is counted and left: the old copies in data, and the merchant ledger,
-        whose release is the merchant code's to write (#2351).
+        part runs for the new ids too. Nothing is stopped for it (#2758): the
+        list is the request, and at the server's next start server-log.js
+        takes out their saves (the part "saves") and the gamemode lets go of
+        the registers. A copy set aside gets one too when it holds a register
+        of theirs, which nothing runs from until it is put back; its saves go
+        now. Every other file is counted and left: the old copies in data,
+        and the merchant ledger, whose release is the merchant code's to
+        write (#2351).
       */
       const LIST = 'deleted-characters.json';
       const RELEASED = /^(property|law|beds|farm-claims|embassy|books|dungeon-rewards-ledger)\.json$/i;
@@ -699,21 +784,24 @@ for (const person of people) {
           }
         }
       }
-      // The registers live in private; a folder with none (an old copy set
-      // aside before the gamemode kept them there) has nothing to let go, so
-      // no list is written into a folder that is not there (18 Oct: a real
-      // run stopped on ENOENT writing one into Thornswood-Server.prev-20261003).
-      if (P.size && (theirs || A.size) && isDir(priv)) {
-        const lf = json(path.join(priv, LIST), g.writer);
-        if (!lf.missing && !(isObj(lf.value) && Array.isArray(lf.value.profiles))) {
-          stop(lf.p + ' is not a list of deleted characters, so nothing was changed');
+      if (g.writer) {
+        // A live server: asked when it holds anything of theirs (a save, a
+        // card or a register); the list is written after every person is read.
+        if (P.size && (theirs || touched.has(g.writer))) {
+          const q = ask(g.writer);
+          if (!q.people.has(id)) q.people.set(id, new Set());
+          for (const n of P) q.people.get(id).add(n);
+          for (const n of A) q.actors.add(n);
+          releases(T + ': ' + path.relative(R, path.join(priv, LIST)) + ', the request it takes at its next start (their saves, then the registers)', 1);
         }
-        const was = lf.missing ? {} : lf.value;
-        const ids = (xs) => (Array.isArray(xs) ? xs : []).map(Number).filter((x) => Number.isSafeInteger(x) && x > 0);
-        const profiles = Array.from(new Set(ids(was.profiles).concat(Array.from(P)))).sort((x, y) => x - y);
-        const actors = Array.from(new Set(ids(was.actors).concat(Array.from(A)))).sort((x, y) => x - y);
-        lf.value = { profiles, actors };
-        lf.dirty = true;
+      } else if (P.size && (theirs || A.size) && isDir(priv)) {
+        // The registers live in private; an old copy with none (set aside
+        // before the gamemode kept them there) has nothing to let go, so no
+        // list is written into a folder that is not there (18 Oct: a real
+        // run stopped on ENOENT writing one into Thornswood-Server.prev-20261003).
+        const lf = json(path.join(priv, LIST), null);
+        mergeList(lf, P, A);
+        dirty(lf);
         releases(T + ': ' + path.relative(R, lf.p) + ', the list the game server lets go of at its next start', 1);
       }
       for (const lg of [path.join(priv, 'moderation.log'), path.join(R, 'for-bot', 'moderation.log'), path.join(priv, 'door.log')]) {
@@ -745,7 +833,7 @@ for (const person of people) {
         r.chat.push({ voice: v.tag, file: f, before: t.lines.length, after: keep.length });
         removed(v.tag + ' voice: chat lines', t.lines.length - keep.length);
         t.lines = keep;
-        t.dirty = true;
+        dirty(t);
       }
     }
   }
@@ -755,21 +843,70 @@ for (const person of people) {
   const joins = json(path.join(bd, 'joins.json'), 'bot');
   if (want(joins, 'object')) {
     for (const gv of Object.values(joins.value)) {
-      if (isObj(gv) && isObj(gv.members) && has(gv.members, id)) { delete gv.members[id]; joins.dirty = true; removed('bot: join number', 1); }
+      if (isObj(gv) && isObj(gv.members) && has(gv.members, id)) { delete gv.members[id]; dirty(joins); removed('bot: join number', 1); }
     }
   }
   const tickets = json(path.join(bd, 'open-tickets.json'), 'bot');
   if (want(tickets, 'object')) {
-    for (const k of Object.keys(tickets.value)) if (k.split(':').pop() === id) { delete tickets.value[k]; tickets.dirty = true; removed('bot: open ticket', 1); }
+    for (const k of Object.keys(tickets.value)) if (k.split(':').pop() === id) { delete tickets.value[k]; dirty(tickets); removed('bot: open ticket', 1); }
+  }
+
+  // The site, voice and the bot are asked for whatever of theirs is in their
+  // files; voice with the windows of the sessions staff kept on it.
+  for (const w of touched) {
+    if (/^server:/.test(w)) continue;
+    const q = ask(w);
+    if (!q.people.has(id)) q.people.set(id, new Set());
+    for (const n of P) q.people.get(id).add(n);
+    if (/^voice:/.test(w)) {
+      const tag = w.slice(6);
+      for (const kw of keptWindows) if (kw.voice === tag) q.kept.push({ profile: kw.profile, from: kw.from, to: kw.to });
+    }
+  }
+  // Asked before and not taken yet: each request still waiting that names them.
+  for (const [w, p] of requestFiles()) {
+    const v = peek(p);
+    if (!isObj(v)) continue;
+    const named = w.indexOf('server:') === 0
+      ? (Array.isArray(v.profiles) && r.profiles.length && r.profiles.every((n) => v.profiles.indexOf(n) >= 0))
+      : (Array.isArray(v.people) && v.people.some((x) => isObj(x) && String(x.discordId) === id));
+    if (named) r.waiting.push(w);
   }
   results.push(r);
 }
 
-const writers = new Set();
-for (const f of files.values()) if (f.dirty && f.writer) writers.add(f.writer);
-for (const w of unlinks.values()) if (w) writers.add(w);
-for (const t of texts.values()) if (t.dirty && t.writer) writers.add(t.writer);
-for (const w of writers) say('WRITER|' + w);
+// Each request, merged into one still waiting there.
+for (const [w, q] of asks) {
+  const p = requestFile(w);
+  const lf = json(p, null);
+  if (w.indexOf('server:') === 0) {
+    const P = new Set(), A = q.actors;
+    for (const s of q.people.values()) for (const n of s) P.add(n);
+    if (!isDir(path.dirname(p))) stop(path.dirname(p) + ' is not there, so the game server cannot be asked; nothing was changed');
+    mergeList(lf, P, A);
+  } else {
+    if (!lf.missing && !(isObj(lf.value) && Array.isArray(lf.value.people))) stop(p + ' is not a list of deletion requests, so nothing was changed');
+    const people = new Map();
+    for (const x of (lf.missing ? [] : lf.value.people)) {
+      if (!isObj(x) || !/^\d{17,20}$/.test(String(x.discordId))) continue;
+      people.set(String(x.discordId), new Set((Array.isArray(x.profiles) ? x.profiles : []).map(Number).filter((n) => Number.isSafeInteger(n) && n > 0)));
+    }
+    for (const [id, s] of q.people) {
+      if (!people.has(id)) people.set(id, new Set());
+      for (const n of s) people.get(id).add(n);
+    }
+    const value = { people: Array.from(people, ([discordId, s]) => ({ discordId, profiles: Array.from(s).sort((x, y) => x - y) })) };
+    if (w.indexOf('voice:') === 0) {
+      const kept = (!lf.missing && Array.isArray(lf.value.kept) ? lf.value.kept : []).concat(q.kept);
+      const seen = new Set();
+      value.kept = kept.filter((k) => { const key = k.profile + ':' + k.from + ':' + k.to; if (seen.has(key)) return false; seen.add(key); return true; });
+    }
+    lf.value = value;
+  }
+  lf.dirty = true;
+}
+
+for (const w of asks.keys()) say('WRITER|' + w);
 for (const r of results) say('PERSON|' + JSON.stringify(r));
 
 if (a.mode !== 'apply') { say('DONE|plan'); process.exit(0); }
@@ -787,15 +924,18 @@ function swap(p, body) {
     }
   }
 }
+// Only what nothing runs from, and the requests; a service's live files are
+// its own to change at its next start.
 for (const f of files.values()) {
-  if (!f.dirty) continue;
+  if (!f.dirty || f.writer) continue;
   swap(f.p, JSON.stringify(f.value, null, f.indent || undefined) + (f.eol ? '\n' : ''));
 }
 for (const [p, t] of texts) {
-  if (!t.dirty) continue;
+  if (!t.dirty || t.writer) continue;
   swap(p, t.lines.length ? t.lines.join('\n') + '\n' : '');
 }
-for (const p of unlinks.keys()) {
+for (const [p, w] of unlinks) {
+  if (w) continue;
   try { fs.unlinkSync(p); }
   catch (e) { if (e.code !== 'ENOENT') failed.push(p + ' (' + e.code + ')'); }
 }
@@ -814,9 +954,6 @@ function Run-Core([string]$mode) {
         servers = @(@{ tag = 'live'; root = $GameRoot }, @{ tag = 'dev'; root = $DevGameRoot })
         voices  = @(@{ tag = 'live'; root = $VoiceRoot }, @{ tag = 'dev'; root = $DevVoiceRoot })
         bot     = $BotRoot
-        # The writers running now, for the plan's look at unfinished saves.
-        # With -NoServices nothing is stopped, so nothing is taken as running.
-        running = @(if ($mode -ne 'apply' -and -not $NoServices) { $svc.Keys | Where-Object { Running $svc[$_] } })
     }
     $af = Join-Path $work ($mode + '.json')
     [IO.File]::WriteAllText($af, (ConvertTo-Json -InputObject $plan -Depth 6), $utf8)
@@ -826,6 +963,12 @@ function Run-Core([string]$mode) {
     try { $lines = @(& $node $cf $af 2>&1 | ForEach-Object { "$_" }) } finally { $ErrorActionPreference = $eap }
     return ,$lines
 }
+# What each service is called, by the name the plan uses for it.
+$names = [ordered]@{
+    'site' = 'the site'; 'server:live' = 'the live game server'; 'server:dev' = 'the dev game server'
+    'voice:live' = 'live voice'; 'voice:dev' = 'dev voice'; 'bot' = 'the bot'
+}
+function Named([string[]]$ws) { return ((@($names.Keys | Where-Object { $ws -contains $_ }) | ForEach-Object { $names[$_] }) -join ', ') }
 function Show([string[]]$lines, [string]$verb) {
     foreach ($l in $lines) {
         if ($l -notlike 'PERSON|*') { continue }
@@ -840,6 +983,8 @@ function Show([string[]]$lines, [string]$verb) {
         foreach ($p in $r.held.PSObject.Properties) { $any = $true; Say ('  {0,-10} {1,6}  {2}' -f 'kept', $p.Value, $p.Name) }
         foreach ($p in $r.left.PSObject.Properties) { $any = $true; Say ('  {0,-10} {1,6}  {2}' -f 'left', $p.Value, $p.Name) }
         foreach ($c in @($r.chat)) { if ($c) { Say ('  chat       {0} {1}: {2} lines before, {3} after' -f $c.voice, $c.file, $c.before, $c.after) } }
+        # Asked earlier and not taken yet: the service has not started since (#2758).
+        foreach ($w in @($r.waiting)) { if ($w) { $any = $true; Say ('  waiting    ' + $names[$w] + ' has a request for them it takes at its next start') } }
         if (-not $any) { Say '  nothing of theirs on this box' }
     }
     Say ''
@@ -847,20 +992,13 @@ function Show([string[]]$lines, [string]$verb) {
     Say '  gallery pictures approved before the site kept the sending account (remove theirs in the hub by name),'
     Say '  and the encrypted backups (they expire on their schedule; the record reapplies this after a restore).'
 }
-# Where a game server was given the list of characters to let go (#2351):
-# it does that as it starts, so what to read afterwards, and where.
-function Say-Release([string[]]$lines) {
-    $at = @()
-    foreach ($l in $lines) {
-        if ($l -notlike 'PERSON|*') { continue }
-        foreach ($p in ($l.Substring(7) | ConvertFrom-Json).release.PSObject.Properties) {
-            # A copy set aside starts nowhere until it is put back, and then a restore reapplies the record.
-            if ($p.Name -like '*deleted-characters.json*' -and $p.Name -notlike '*set aside*') { $at += ($p.Name -split ':')[0] }
-        }
-    }
-    $at = @($at | Sort-Object -Unique)
-    if (-not $at.Count) { return }
-    Say ('The game''s registers are let go as each of these starts: ' + ($at -join ', ') + '. Its thornswood.log says release: with the counts, and private\deleted-characters.json is gone once every part is done.')
+# Which services were asked, and where each says it took the request (#2758).
+function Say-Asked([string[]]$ws) {
+    if (-not $ws.Count) { return }
+    Say ('Nothing was stopped. Each of these takes the rest out of its own files as it next starts: ' + (Named $ws) + '.')
+    Say '  Each says so in its own log, with counts: the site in site.log, each game server and voice in server.log and voice.log'
+    Say '  ("deletions:"), a game server''s registers in thornswood.log ("release:"), and the bot in bot.log ("deletion requests:").'
+    Say '  Run this again without -Delete to see what still waits; tell them it is done when nothing does.'
 }
 function Stopped([string[]]$lines) {
     $s = @($lines | Where-Object { $_ -like 'STOP|*' } | Select-Object -First 1)
@@ -869,165 +1007,56 @@ function Stopped([string[]]$lines) {
     return ''
 }
 
-# ------------------------------------------------------------- services ---
-# What writes each store, by the name the plan uses for it.
-$svc = [ordered]@{
-    'site'        = @{ Task = 'Thornswood Docs';       Root = $SiteRoot;     Say = 'the site' }
-    'server:live' = @{ Task = 'Thornswood Server';     Root = $GameRoot;     Say = 'the live game server'; Online = 3000 }
-    'server:dev'  = @{ Task = 'Thornswood Dev Server'; Root = $DevGameRoot;  Say = 'the dev game server';  Online = 7788 }
-    'voice:live'  = @{ Task = 'Thornswood Voice';      Root = $VoiceRoot;    Say = 'live voice' }
-    'voice:dev'   = @{ Task = 'Thornswood Dev Voice';  Root = $DevVoiceRoot; Say = 'dev voice' }
-    'bot'         = @{ Svc  = 'ThornswoodBot';         Root = $BotRoot;      Say = 'the bot' }
-}
-# The processes running from a folder: node, cmd or python whose command line
-# names it, and the node or python each of those started. The trailing
-# backslash matters: C:\Thornswood-Server is a prefix of C:\Thornswood-Server-Dev.
-function Holders($it) {
-    $mark = $it.Root.TrimEnd('\') + '\'
-    $all = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine })
-    $ids = @()
-    foreach ($p in $all) {
-        if ($p.Name -match '^(node|cmd|python|pythonw)(\d|\.)*\.exe$' -and $p.CommandLine.IndexOf($mark, [StringComparison]::OrdinalIgnoreCase) -ge 0) { $ids += [int]$p.ProcessId }
-    }
-    foreach ($p in $all) {
-        if ($p.Name -match '^(node|python|pythonw)(\d|\.)*\.exe$' -and $ids -contains [int]$p.ParentProcessId) { $ids += [int]$p.ProcessId }
-    }
-    return @($ids | Where-Object { $_ -gt 0 -and $_ -ne $PID } | Sort-Object -Unique)
-}
-# Whether the task or service of that name is the one that runs from this
-# root: its action, or the service's path, names the folder. Pointed at other
-# roots (a restore rehearsal, a harness on a box that also runs the real
-# servers), the real task of the same name is not theirs, so it is never read
-# as running, stopped, asked for its online count or started (#2351, 18 Oct: a
-# harness on a VPS runner took the real dev server's task for its stand-in's).
-function Owned($it) {
-    $mark = [regex]::Escape($it.Root.TrimEnd('\')) + '(\\|"|''|\s|$)'
-    if ($it.Svc) {
-        $s = Get-CimInstance Win32_Service -Filter ("Name='" + $it.Svc + "'") -ErrorAction SilentlyContinue
-        return [bool]($s -and $s.PathName -and $s.PathName -match $mark)
-    }
-    $t = Get-ScheduledTask -TaskName $it.Task -ErrorAction SilentlyContinue
-    if (-not $t) { return $false }
-    return ((@($t.Actions) | ForEach-Object { "$($_.Execute) $($_.Arguments) $($_.WorkingDirectory)" }) -join ' ') -match $mark
-}
-function Running($it) {
-    if (Owned $it) {
-        if ($it.Svc) { $s = Get-Service -Name $it.Svc -ErrorAction SilentlyContinue; if ($s -and $s.Status -ne 'Stopped') { return $true } }
-        else { $t = Get-ScheduledTask -TaskName $it.Task -ErrorAction SilentlyContinue; if ($t -and $t.State -eq 'Running') { return $true } }
-    }
-    return [bool](@(Holders $it).Count)
-}
-
 $exit = 0
 try {
     $plan = Run-Core 'plan'
     $why = Stopped $plan
     if ($why) { Refuse $why }
-    $writers = @($plan | Where-Object { $_ -like 'WRITER|*' } | ForEach-Object { $_.Substring(7) })
-    $need = @($svc.Keys | Where-Object { $writers -contains $_ })
+    $asked = @($plan | Where-Object { $_ -like 'WRITER|*' } | ForEach-Object { $_.Substring(7) })
 
     if (-not $Delete) {
         Show $plan 'remove'
         Say ''
-        if ($need.Count) { Say ('A real run stops these while it changes their files, then starts them again: ' + (($need | ForEach-Object { $svc[$_].Say }) -join ', ') + '.') }
+        if ($asked.Count) { Say ('A real run stops nothing. These take the rest out of their own files as each next starts: ' + (Named $asked) + '.') }
         Say ('DRY RUN: nothing was changed. Add -Delete' + $(if (-not $Reapply) { ' -By <your name>' } else { '' }) + ' to do it.')
         exit 0
     }
 
-    $stoppedHere = @()
-    $watch = 'Thornswood Watch'
-    $watchOff = $false
-    try {
-        if (-not $NoServices -and $need.Count) {
-            $busy = @($need | Where-Object { Running $svc[$_] })
-            if ($Reapply -and $busy.Count) {
-                Refuse ('running: ' + (($busy | ForEach-Object { $svc[$_].Say }) -join ', ') + '. -Reapply is for a restore, before anything starts, and stops nothing. Nothing was changed.')
-            }
-            foreach ($w in $busy) {
-                $it = $svc[$w]
-                if (-not $it.Online -or $Now -or -not (Owned $it)) { continue }
-                $n = -1
-                try { $n = [int]((Invoke-WebRequest -Uri ('http://127.0.0.1:' + $it.Online + '/online.json') -TimeoutSec 15 -UseBasicParsing).Content | ConvertFrom-Json).now } catch { $n = -1 }
-                if ($n -ne 0) {
-                    Refuse ($it.Say + ' has ' + $(if ($n -lt 0) { 'an online count that could not be read' } else { "$n online" }) + ', who would be dropped. Run it when nobody is on, or pass -Now. Nothing was changed.')
-                }
-            }
-            # The watchdog watches the real roots: off only while one of them is stopped here.
-            if (@($busy | Where-Object { Owned $svc[$_] }).Count -and (Get-ScheduledTask -TaskName $watch -ErrorAction SilentlyContinue)) {
-                Disable-ScheduledTask -TaskName $watch | Out-Null
-                $watchOff = $true
-                Say ('disabled  ' + $watch + ', so it starts nothing again while this runs')
-            }
-            foreach ($w in $busy) {
-                $it = $svc[$w]
-                $it.Ran = Owned $it
-                if ($it.Ran) {
-                    if ($it.Svc) { Stop-Service -Name $it.Svc -Force -ErrorAction SilentlyContinue }
-                    else { Stop-ScheduledTask -TaskName $it.Task -ErrorAction SilentlyContinue }
-                }
-                # A stopped task does not always take its child with it
-                # (vps-freeze.ps1), so whatever still runs from its folder goes too.
-                foreach ($id in @(Holders $it)) { Stop-Process -Id $id -Force -ErrorAction SilentlyContinue }
-                $stoppedHere += $w
-                Say ('stopped   ' + $it.Say)
-            }
-            # Waiting for processes that were ended to be gone, ten seconds at
-            # most, then refusing rather than writing under one.
-            for ($i = 0; $i -lt 20 -and @($busy | Where-Object { Running $svc[$_] }).Count; $i++) { Start-Sleep -Milliseconds 500 }
-            $still = @($busy | Where-Object { Running $svc[$_] })
-            if ($still.Count) { Refuse ('still running after being stopped: ' + (($still | ForEach-Object { $svc[$_].Say }) -join ', ') + '. Nothing was changed.') }
-        }
-
-        $done = Run-Core 'apply'
-        $why = Stopped $done
-        if ($why) { Refuse $why }
-        Show $done 'removed'
-        $failed = @($done | Where-Object { $_ -like 'FAILED|*' } | ForEach-Object { $_.Substring(7) })
-        if ($failed.Count) {
-            Say ''
-            foreach ($f in $failed) { Say ('COULD NOT CHANGE ' + $f) }
-            Say 'NOT FINISHED: the files above were not changed and the request is not in the record. Run it again; what is already gone stays gone.'
-            $exit = 1
-        } elseif ($Reapply) {
-            if ($adds.Count) {
-                Ensure-RecordFolder
-                foreach ($r in $adds) { [IO.File]::AppendAllText($record, $r.line + "`n", $utf8) }
-                Say ('merged    ' + $adds.Count + ' request(s) into ' + $record)
-            }
-            Say ''
-            Say ('REAPPLIED: every request in ' + $record + ' is removed again.')
-            Say-Release $done
-        } else {
-            $r = ((@($done | Where-Object { $_ -like 'PERSON|*' }))[0]).Substring(7) | ConvertFrom-Json
-            $row = [ordered]@{
-                at        = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
-                discordId = $DiscordId
-                profiles  = @($r.profiles)
-                by        = $By.Trim()
-                removed   = $r.removed
-                chat      = @($r.chat)
-            }
+    $done = Run-Core 'apply'
+    $why = Stopped $done
+    if ($why) { Refuse $why }
+    Show $done 'removes'
+    $failed = @($done | Where-Object { $_ -like 'FAILED|*' } | ForEach-Object { $_.Substring(7) })
+    if ($failed.Count) {
+        Say ''
+        foreach ($f in $failed) { Say ('COULD NOT CHANGE ' + $f) }
+        Say 'NOT FINISHED: the files above were not changed and the request is not in the record. Run it again; what is already gone stays gone.'
+        $exit = 1
+    } elseif ($Reapply) {
+        if ($adds.Count) {
             Ensure-RecordFolder
-            [IO.File]::AppendAllText($record, (ConvertTo-Json -InputObject $row -Depth 6 -Compress) + "`n", $utf8)
-            Say ''
-            Say ('DELETED, and written down in ' + $record + ' so a restore reapplies it. The nightly backup takes the record from tonight.')
-            Say-Release $done
+            foreach ($r in $adds) { [IO.File]::AppendAllText($record, $r.line + "`n", $utf8) }
+            Say ('merged    ' + $adds.Count + ' request(s) into ' + $record)
         }
-    } finally {
-        foreach ($w in $stoppedHere) {
-            $it = $svc[$w]
-            # Only what ran from its own task or service is started again; a
-            # process from that folder with neither is said, never guessed at.
-            if (-not $it.Ran) { Say ('not started again: ' + $it.Say + ' ran from ' + $it.Root + ' with no task or service of its own'); continue }
-            try {
-                if ($it.Svc) { Start-Service -Name $it.Svc } else { Start-ScheduledTask -TaskName $it.Task }
-                Say ('started   ' + $it.Say)
-            } catch { Say ('COULD NOT START ' + $it.Say + ': ' + $_.Exception.Message); $exit = 1 }
+        Say ''
+        Say ('REAPPLIED: every request in ' + $record + ' is removed again from every copy nothing runs from, and asked of every service.')
+        Say-Asked $asked
+    } else {
+        $r = ((@($done | Where-Object { $_ -like 'PERSON|*' }))[0]).Substring(7) | ConvertFrom-Json
+        $row = [ordered]@{
+            at        = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+            discordId = $DiscordId
+            profiles  = @($r.profiles)
+            by        = $By.Trim()
+            removes   = $r.removed
+            chat      = @($r.chat)
+            asked     = @($names.Keys | Where-Object { $asked -contains $_ })
         }
-        if ($watchOff) {
-            try { Enable-ScheduledTask -TaskName $watch | Out-Null; Say ('enabled   ' + $watch) }
-            catch { Say ('COULD NOT ENABLE ' + $watch + ': ' + $_.Exception.Message); $exit = 1 }
-        }
+        Ensure-RecordFolder
+        [IO.File]::AppendAllText($record, (ConvertTo-Json -InputObject $row -Depth 6 -Compress) + "`n", $utf8)
+        Say ''
+        Say ('RECORDED, and written down in ' + $record + ' so a restore reapplies it. The nightly backup takes the record from tonight.')
+        Say-Asked $asked
     }
 } finally {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue

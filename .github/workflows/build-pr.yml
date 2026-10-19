@@ -333,6 +333,10 @@ jobs:
           # second. tests\test-2351-wipe-registers.ps1 runs the survey, the
           # stop and the move Wipe-Saves.ps1 sends to the box, under Windows
           # PowerShell 5.1 on a stand-in server folder. A few seconds.
+          # Issue #2758: tests\test-2758-start-deletions.js runs the real
+          # server-log.js on a stand-in game server and voice folder, and the
+          # site's start block on a stand-in data folder, each taking a
+          # deletion request out of its own files as it starts. A few seconds.
           # Issue #2166: tests\test-2166-retention-fixes.js holds three
           # retention fixes to what the privacy page already says: trouble.json
           # ages by 365 days in the hourly sweep on a scratch site (a kept
@@ -611,6 +615,7 @@ jobs:
                  'test-2351-delete-person.ps1',
                  'test-2351-release-registers.js',
                  'test-2351-wipe-registers.ps1',
+                 'test-2758-start-deletions.js',
                  'test-2166-retention-fixes.js',
                  'test-2166-kept-chat-and-logs.js',
                  'test-missing-files-stop.ps1',
