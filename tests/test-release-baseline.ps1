@@ -412,7 +412,9 @@ try {
         $gone = [regex]::Match($r.Out, '(?m)^\s*(\d+) removed')
         return ($r.Out -match '(?m)^\s*0 added or changed' -and $gone.Success -and [int]$gone.Groups[1].Value -eq 0)
     }
-    function Feed6([string]$json) { Put (Join-Path $site6 'feed\version.json') $json; Put (Join-Path $rel6 'version.json') $json }
+    # The site's feed is the newest of its generations; a feed put there is the
+    # next one, the way the store sends it (Feed-Store.ps1, #2727).
+    function Feed6([string]$json) { Put (Join-Path (Join-Path $site6 'feed\version') (Get-FeedVersionNext (Join-Path $site6 'feed'))) $json; Put (Join-Path $rel6 'version.json') $json }
 
     # This machine records the build: a feed that names no record, no store
     # copy yet, -Baseline.

@@ -170,7 +170,7 @@ try {
     Put (Join-Path $site 'uploads\fixture-log.txt') 'Fixture diagnostic log'
     [IO.File]::WriteAllBytes((Join-Path $site 'uploads\fixture-shot.png'), [byte[]](0..255))
     foreach ($channel in 'feed', 'feed-dev') {
-        Put (Join-Path $site "$channel\version.json") ('{"version":"fixture-' + $channel + '"}')
+        Put (Join-Path $site "$channel\version\00000001.json") ('{"version":"fixture-' + $channel + '"}')
         Put (Join-Path $site "$channel\history\fixture.json") ('{"channel":"' + $channel + '"}')
     }
     $sitePrefix = [IO.Path]::GetFullPath($site).TrimEnd('\') + '\'

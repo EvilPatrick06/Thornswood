@@ -263,7 +263,9 @@ try {
     # already has that client runtime, as a real feed does, so this run does
     # not stage the six runtime files the stand-in game folder never had.
     $pFork = [string](((Get-Content -LiteralPath (Join-Path $fake 'records\client-build.json') -Raw) -replace '^\uFEFF', '') | ConvertFrom-Json).forkCommit
-    Put (Join-Path $site 'feed\version.json') ('{"launcherVersion":"1.1.102","packs":[],"news":[],"clientRuntime":{"forkCommit":"' + $pFork + '","url":"https://example.invalid/client-runtime-' + $pFork + '.zip","sha256":"' + ('c' * 64) + '","notice":1}}')
+    # The site's feed is the newest of its generations (Feed-Store.ps1, #2727).
+    function SiteFeed { return (Get-FeedVersionFile (Join-Path $site 'feed')) }
+    Put (Join-Path $site 'feed\version\00000001.json') ('{"launcherVersion":"1.1.102","packs":[],"news":[],"clientRuntime":{"forkCommit":"' + $pFork + '","url":"https://example.invalid/client-runtime-' + $pFork + '.zip","sha256":"' + ('c' * 64) + '","bytes":4096,"notice":1}}')
     Put (Join-Path $site 'feed\published.json') '{"Data\\Platform\\UI\\thornswood-ours.esp":"5:0000000000000000000000000000000000000000000000000000000000000000"}'
     $Shell = (Get-Process -Id $PID).Path
     function Publish([string[]]$extra) {
@@ -293,7 +295,7 @@ try {
     $r = Publish @('-Notes', "'Test release`n- one line'")
     YesR ("a release goes out (exit {0}) and the publisher says which one ({1})" -f $r.Code, $r.Published) ($r.Code -eq 0 -and $r.Published -match '^\d{8}-\d{6}$') $r
     $id = $r.Published
-    $feed = Read-Json (Join-Path $site 'feed\version.json')
+    $feed = Read-Json (SiteFeed)
     $rec = Get-ReleaseRecord $feed
     Yes 'the feed the site serves names that release' ($null -ne $rec -and [string]$rec.id -eq $id)
     if ($null -ne $rec) {
@@ -345,10 +347,10 @@ try {
     #    and says so with exit code 2, the code Ship reads as nothing
     #    released. It was 0 without -Launcher until 6 Oct, which Ship read as
     #    a release and announced.
-    $packsBefore = @((Read-Json (Join-Path $site 'feed\version.json')).packs).Count
+    $packsBefore = @((Read-Json (SiteFeed)).packs).Count
     $r = Publish @('-Notes', "'Test release`n- the same again'")
     YesR ("the same build again says Nothing to do (exit {0})" -f $r.Code) ($r.Code -eq 2 -and $r.Out -match 'Nothing to do' -and $r.Published -eq '') $r
-    Yes '  and the feed gained no pack' (@((Read-Json (Join-Path $site 'feed\version.json')).packs).Count -eq $packsBefore)
+    Yes '  and the feed gained no pack' (@((Read-Json (SiteFeed)).packs).Count -eq $packsBefore)
 
     # d. A second real release straight after the first (#1057): its own id,
     #    never the first's, so a launcher that took the first still takes it.
@@ -356,7 +358,7 @@ try {
     $r = Publish @('-Notes', "'Test release`n- a second one'")
     YesR ("a second release goes out under an id of its own ({0} after {1}, exit {2})" -f $r.Published, $id, $r.Code) (
         $r.Code -eq 0 -and $r.Published -match '^\d{8}-\d{6}$' -and $r.Published -ne $id) $r
-    $ids = @((Read-Json (Join-Path $site 'feed\version.json')).packs | ForEach-Object { [string]$_.id })
+    $ids = @((Read-Json (SiteFeed)).packs | ForEach-Object { [string]$_.id })
     Yes ("  the feed lists both, no id twice ({0})" -f ($ids -join ', ')) ($ids -contains $id -and $ids -contains $r.Published -and
         @($ids | Select-Object -Unique).Count -eq $ids.Count)
     $applied = @($id)
@@ -368,7 +370,7 @@ try {
     # b. What Ship -DryRun passes: -NoUpload -NoPush. Nothing is sent, so
     #    nothing may be named as sent.
     Put (Join-Path $inst 'Game\Data\Platform\UI\thornswood-ours.esp') 'the plugin, changed again'
-    $siteBefore = [IO.File]::ReadAllText((Join-Path $site 'feed\version.json'))
+    $siteBefore = [IO.File]::ReadAllText((SiteFeed))
     # A fixed id, so the checks below can name it.
     $r = Publish @('-Notes', "'Test release`n- two lines'", '-Id', '20990101-0001', '-NoUpload', '-NoPush', '-NoClose', '-KeepPacks', '0')
     YesR ("-NoUpload -NoPush: the publisher says no release was sent (exit {0})" -f $r.Code) ($r.Published -eq '') $r
@@ -376,22 +378,22 @@ try {
     # with advice about the ssh key, and it asks nothing of the keyboard.
     YesR ("  and finishes with exit 0, the packs' empty urls expected (exit {0})" -f $r.Code) (
         $r.Code -eq 0 -and $r.Out -notmatch 'uploaded no asset' -and $r.Out -match 'nothing was uploaded') $r
-    Yes '  and the site''s feed is what it was' ([IO.File]::ReadAllText((Join-Path $site 'feed\version.json')) -eq $siteBefore)
+    Yes '  and the site''s feed is what it was' ([IO.File]::ReadAllText((SiteFeed)) -eq $siteBefore)
     $local = Read-Json (Join-Path $rel 'version.json')
     $lrec = Get-ReleaseRecord $local
     Yes '  the feed it wrote here still names its release, with no baseline, as it sent none' ($null -ne $lrec -and $lrec.id -eq '20990101-0001' -and $lrec.baseline -eq '')
 
-    # c. A feed send that fails: the store's version.json cannot be replaced.
+    # c. A feed send that fails: the new feed cannot go up to the store.
     Put (Join-Path $inst 'Game\Data\Platform\UI\thornswood-ours.esp') 'the plugin, changed a third time'
     [void](Receive-FeedStore 'main' $rel -SiteDir $site)
     New-Item -ItemType Directory -Force -Path (Join-Path $site 'feed\version.json.part\in-the-way') | Out-Null
-    $siteBefore = [IO.File]::ReadAllText((Join-Path $site 'feed\version.json'))
+    $siteBefore = [IO.File]::ReadAllText((SiteFeed))
     $r = Publish @('-Notes', "'Test release`n- three lines'", '-Id', '20990101-0002')
     YesR ("a feed send that fails: the publisher says no release was sent (exit {0})" -f $r.Code) ($r.Published -eq '' -and $r.Out -match 'NOT SHIPPED') $r
     # #1055: and says it with its exit code, which is all a Ship that keeps its
     # launcher reads; anything but 0 or 2 stops Ship before it tells anybody.
     Yes ("  with an exit code that is not 0 or 2 ({0})" -f $r.Code) ($r.Code -ne 0 -and $r.Code -ne 2)
-    Yes '  and the site''s feed is what it was' ([IO.File]::ReadAllText((Join-Path $site 'feed\version.json')) -eq $siteBefore)
+    Yes '  and the site''s feed is what it was' ([IO.File]::ReadAllText((SiteFeed)) -eq $siteBefore)
     Remove-Item -LiteralPath (Join-Path $site 'feed\version.json.part') -Recurse -Force
 
     # ---- 4. the tag --------------------------------------------------------------------

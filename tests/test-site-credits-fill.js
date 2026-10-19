@@ -7,7 +7,8 @@
   (720a5f7c, caught by tests\test-source-offer.ps1). site/server.js now fills
   them at serve time from data/deployed-build.json (written by
   scripts/deploy/DeployedBuild.ps1 after a server deploy) and from the
-  feed/feed-dev version.json it serves, and keeps the hand text when either
+  feed and feed-dev it serves (the newest of <channel>\version\<8 digits>.json
+  since #2727), and keeps the hand text when either
   is missing or unreadable. A record with only one server in it fills that
   one (#2303), and the hand text names no commit for either server.
 
@@ -141,8 +142,8 @@ function wait(ms) { return new Promise(function (ok) { setTimeout(ok, ms); }); }
     yes('after the file changes, with no hand edit and no restart, /credits names the new commit',
       r.status === 200 && r.body.indexOf('aaaaaaaa') >= 0 && r.body.indexOf('tree/' + A) >= 0 && r.body.indexOf('Both servers run') >= 0);
 
-    fs.mkdirSync(path.join(dir, 'feed'));
-    fs.writeFileSync(path.join(dir, 'feed', 'version.json'), JSON.stringify({ clientRuntime: { forkCommit: B } }));
+    fs.mkdirSync(path.join(dir, 'feed', 'version'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'feed', 'version', '00000001.json'), JSON.stringify({ clientRuntime: { forkCommit: B } }));
     r = await get(port, '/credits');
     yes('the public feed it serves fills the Public row', r.body.indexOf('tree/' + B) >= 0);
 

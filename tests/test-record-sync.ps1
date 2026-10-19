@@ -94,6 +94,20 @@ function Put([string]$path, [string]$text) {
     [IO.File]::WriteAllText($path, $text, $utf8)
 }
 function Read-Json([string]$path) { return (([IO.File]::ReadAllText($path)) -replace '^﻿', '') | ConvertFrom-Json }
+# The stand-in site's feed is the newest of the channel's write-once
+# generations, version\<8 digits>.json (#2727). Reading it reads the newest; a
+# write here, a hand edit or saved bytes put back, is the next one, as the
+# store sends it, and never replaces one.
+function Site-Feed([string]$channelDir) {
+    $f = Get-FeedVersionFile $channelDir
+    if (-not $f) { throw "the stand-in site has no feed in $channelDir\version" }
+    return $f
+}
+function Next-SiteFeed([string]$channelDir) {
+    $v = Join-Path $channelDir 'version'
+    New-Item -ItemType Directory -Force -Path $v | Out-Null
+    return (Join-Path $v (Get-FeedVersionNext $channelDir))
+}
 function Free-Port { $l = New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback, 0); $l.Start(); $p = $l.LocalEndpoint.Port; $l.Stop(); return $p }
 # The port came from the system and was let go, so another run beside this one
 # can take it before the child binds it, the fault #1727 fixed in the .js
@@ -281,7 +295,7 @@ New-Zip $ancientZip @{ 'Data\Platform\UI\thornswood-filler.txt' = 'a file an old
 $ancientSha = Get-BaselineFileSha $ancientZip
 Copy-Item -LiteralPath $ancientZip -Destination (Join-Path $feedDir "assets\$ancientSha")
 Set-Build 'Data\Platform\UI\thornswood-filler.txt' 'a file an old pack wrote'
-Put (Join-Path $feedDir 'version.json') ((@{
+Put (Join-Path $feedDir 'version\00000001.json') ((@{
     launcherVersion = '1.1.102'; launcherUrl = ''; launcherSha256 = ''; minLauncher = '1.1.102'; message = ''; news = @()
     packs = @(@{ id = '20260101-0000'; url = "https://thornswood.net/feed/assets/$ancientSha"; sha256 = $ancientSha; notes = 'An old update' })
 }) | ConvertTo-Json -Depth 5)
@@ -302,7 +316,7 @@ function Publish([string[]]$extra) {
     return [pscustomobject]@{ Code = $code; Out = $out }
 }
 function Show($r) { if ($r.Code -ne 0) { Write-Host (($r.Out -split "`r?`n" | Where-Object { $_.Trim() } | Select-Object -Last 14) -join "`n") -ForegroundColor DarkGray } }
-function Feed { return Read-Json (Join-Path $feedDir 'version.json') }
+function Feed { return Read-Json (Site-Feed $feedDir) }
 function Record-Of($doc) { return Read-BaselineFile (Join-Path $feedDir ("assets\" + [string]$doc.baseline.sha256)) }
 $records = @{}
 function Release([string]$Id, [string]$note) {
@@ -380,7 +394,7 @@ Yes ("  the feed still lists the packs ({0}) beside the record" -f @($d3.packs).
 # ---- the launcher reads it ----------------------------------------------------
 Write-Host ''; Write-Host 'the launcher reads the feed'
 function Raw($x) { if ($x -is [Management.Automation.PSObject]) { return $x.PSObject.BaseObject }; return $x }
-function Parse-Feed { return (Raw ($mParse.Invoke($null, @(, [IO.File]::ReadAllBytes((Join-Path $feedDir 'version.json')))))) }
+function Parse-Feed { return (Raw ($mParse.Invoke($null, @(, [IO.File]::ReadAllBytes((Site-Feed $feedDir)))))) }
 function Pending-Of($v) { $a = New-Object 'object[]' 1; $a[0] = (Raw $v); return @($mPending.Invoke($null, $a) | ForEach-Object { Raw $_ }) }
 $v = Parse-Feed
 Yes 'VersionDoc.Parse reads the record the feed names' ($null -ne $v.record -and $v.record.id -eq $R3 -and $v.record.sha256 -eq [string]$d3.baseline.sha256)
@@ -520,7 +534,7 @@ Yes 'a fresh install with no applied.txt at all reaches the third release too' (
 
 # One behind: an install on the second release.
 $one = New-Install 'one-behind' @{} $ids
-$saveFeed = [IO.File]::ReadAllBytes((Join-Path $feedDir 'version.json'))
+$saveFeed = [IO.File]::ReadAllBytes((Site-Feed $feedDir))
 Use-Install $one
 # The list of releases is the store's releases.json since #1050, beside the
 # feed and not in it.
@@ -600,10 +614,10 @@ $hashGone[':gone:Data\Interface\racesex_menu.swf'] = $shippedSha
 $hashFile = Join-Path $T 'hash-gone.json'
 $hashSha = Write-BaselineFile $hashGone $hashFile
 Copy-Item -LiteralPath $hashFile -Destination (Join-Path $feedDir ("assets\" + $hashSha))
-$saveFeed2 = [IO.File]::ReadAllBytes((Join-Path $feedDir 'version.json'))
+$saveFeed2 = [IO.File]::ReadAllBytes((Site-Feed $feedDir))
 $doc = Feed
 $doc.baseline = [pscustomobject]@{ id = 'hash-gone'; sha256 = $hashSha; url = ("https://thornswood.net/feed/assets/" + $hashSha); entries = $hashGone.Count }
-[IO.File]::WriteAllText((Join-Path $feedDir 'version.json'), ($doc | ConvertTo-Json -Depth 6), $utf8)
+[IO.File]::WriteAllText((Next-SiteFeed $feedDir), ($doc | ConvertTo-Json -Depth 6), $utf8)
 $matchFiles = @{} + $installerFiles
 $matchFiles['Data\Interface\racesex_menu.swf'] = $shipped
 $hm = New-Install 'hash-match' $matchFiles $ids
@@ -618,7 +632,7 @@ Yes 'a person''s own copy of the same path is left alone' (
     (Test-Path -LiteralPath (Join-Path $ho 'Game\Data\Interface\racesex_menu.swf')) -and
     ((Get-Content -LiteralPath (Join-Path $ho 'Game\Data\Interface\racesex_menu.swf') -Raw) -eq $own) -and
     -not (Said '^removed Data\\Interface\\racesex_menu\.swf'))
-[IO.File]::WriteAllBytes((Join-Path $feedDir 'version.json'), $saveFeed2)
+[IO.File]::WriteAllBytes((Next-SiteFeed $feedDir), $saveFeed2)
 
 # ---- the old launcher beside it -----------------------------------------------
 Write-Host ''; Write-Host 'an old launcher on the same feed'
@@ -677,13 +691,13 @@ $plainSha = Write-BaselineFile $plain $plainFile
 Copy-Item -LiteralPath $plainFile -Destination (Join-Path $feedDir "assets\$plainSha")
 $doc = Feed
 $doc.baseline = [pscustomobject]@{ id = 'plain'; sha256 = $plainSha; url = "https://thornswood.net/feed/assets/$plainSha"; entries = $plain.Count }
-[IO.File]::WriteAllText((Join-Path $feedDir 'version.json'), ($doc | ConvertTo-Json -Depth 6), $utf8)
+[IO.File]::WriteAllText((Next-SiteFeed $feedDir), ($doc | ConvertTo-Json -Depth 6), $utf8)
 $pl = New-Install 'plain' $installerFiles $ids
 [void](Update-New $pl)
 Yes 'a record without :record:files is taken as packs, pack by pack' ((Test-Lands $pl $records[$R3]) -and (Said 'pack by pack'))
 Use-Install $pl
 Yes '  and is not offered again' ((Pending-Of (Parse-Feed)).Count -eq 0 -and (Synced $pl) -match "packs $plainSha")
-[IO.File]::WriteAllBytes((Join-Path $feedDir 'version.json'), $saveFeed)
+[IO.File]::WriteAllBytes((Next-SiteFeed $feedDir), $saveFeed)
 
 # ---- a rollback, for both ---------------------------------------------------------
 Write-Host ''; Write-Host 'Rollback-Feed.ps1, for both kinds of launcher'
@@ -724,19 +738,19 @@ Yes '  both kinds of launcher follow it' ((Test-Lands $fresh $records[$R3]) -and
 Write-Host ''; Write-Host 'the packs come off the feed'
 $fd = Feed
 $fd.launcherVersion = '1.2.3'; $fd.minLauncher = '1.2.3'
-Put (Join-Path $feedDir 'version.json') ($fd | ConvertTo-Json -Depth 8)
+Put (Next-SiteFeed $feedDir) ($fd | ConvertTo-Json -Depth 8)
 $R5 = '20260930-0600'
 Set-Build 'Data\Platform\UI\thornswood-new3.esp' 'changed by the fifth release'
 $note5 = 'Keys open their own doors'
 Yes 'a release goes out with every launcher let in syncing to the record' (Release $R5 $note5)
 $d5 = Feed; $m5 = $records[$R5]
 Yes '  the feed carries packs as an empty list, the shape every launcher reads' ($d5.PSObject.Properties['packs'] -and @($d5.packs).Count -eq 0 -and
-    ([IO.File]::ReadAllText((Join-Path $feedDir 'version.json')) -match '"packs":\s*\[\s*\]'))
+    ([IO.File]::ReadAllText((Site-Feed $feedDir)) -match '"packs":\s*\[\s*\]'))
 Yes '  and minLauncher is 1.2.3' ([string]$d5.minLauncher -eq '1.2.3')
 # The launchers in this harness sync from feeds the publisher wrote, so their
 # passes are also the proof that a launcher reads one written this way.
 Yes '  the publisher writes version.json compact, one line, and its release carries no uiAssets (#1050)' (
-    ([IO.File]::ReadAllText((Join-Path $feedDir 'version.json')) -notmatch '[\r\n]') -and -not $d5.release.PSObject.Properties['uiAssets'])
+    ([IO.File]::ReadAllText((Site-Feed $feedDir)) -notmatch '[\r\n]') -and -not $d5.release.PSObject.Properties['uiAssets'])
 Yes '  the release names no pack, and its record says every file is up' (@($d5.release.packs).Count -eq 0 -and [string]$m5[':record:files'] -eq '1' -and
     @((Get-RecordFileShas $m5).Keys | Where-Object { -not (Test-Path -LiteralPath (Join-Path $feedDir "assets\$_")) }).Count -eq 0)
 $zip5 = @(Get-ChildItem -LiteralPath (Join-Path $pub 'dist') -Recurse -File -Filter "pack-$R5.zip")
@@ -746,7 +760,7 @@ $list5 = @(Get-StoreReleases $feedDir (Feed))
 Yes '  the store''s list starts with it, ending on no pack' ([string]$list5[0].id -eq $R5 -and [string]$list5[0].lastPack -eq '' -and -not $d5.PSObject.Properties['releases'])
 $bad5 = @(Get-ReleaseDisagreements $d5 $list5)
 Yes ('  every name for it agrees' + $(if ($bad5.Count) { ': ' + ($bad5 -join '; ') } else { '' })) ($bad5.Count -eq 0)
-$sz = (Get-Item -LiteralPath (Join-Path $feedDir 'version.json')).Length
+$sz = (Get-Item -LiteralPath (Site-Feed $feedDir)).Length
 Yes ("  version.json is {0:n0} bytes" -f $sz) ($sz -gt 0)
 
 Use-Install $fresh
@@ -789,19 +803,19 @@ Write-Host ''; Write-Host 'the notes leave the feed'
 Yes 'on 1.2.3 the notes stayed in version.json and the feed named no news file' (@($d5.news).Count -ge 1 -and -not $d5.PSObject.Properties['newsFile'])
 $fd = Feed
 $fd.launcherVersion = '1.2.4'; $fd.minLauncher = '1.2.4'
-Put (Join-Path $feedDir 'version.json') ($fd | ConvertTo-Json -Depth 8)
+Put (Next-SiteFeed $feedDir) ($fd | ConvertTo-Json -Depth 8)
 $R6 = '20260930-0900'
 Set-Build 'Data\Platform\UI\thornswood-new3.esp' 'changed by the sixth release'
 Yes 'a release goes out with every launcher let in reading the news file' (Release $R6 'Notes in a file of their own')
 $d6 = Feed
 $nf = if ($d6.PSObject.Properties['newsFile'] -and $d6.newsFile) { Join-Path $feedDir ("assets\" + [string]$d6.newsFile.sha256) } else { '' }
 Yes '  version.json carries "news" as [] and names the file, on this channel''s folder' (@($d6.news).Count -eq 0 -and $nf -and
-    ([IO.File]::ReadAllText((Join-Path $feedDir 'version.json')) -match '"news":\s*\[\s*\]') -and [string]$d6.newsFile.url -eq ('https://thornswood.net/feed/assets/' + [string]$d6.newsFile.sha256))
+    ([IO.File]::ReadAllText((Site-Feed $feedDir)) -match '"news":\s*\[\s*\]') -and [string]$d6.newsFile.url -eq ('https://thornswood.net/feed/assets/' + [string]$d6.newsFile.sha256))
 $six = @(Get-FeedNewsList $d6 $site)
 Yes ("  the file is on the site, its bytes its name, this release's note first and the {0} before it after" -f ($six.Count - 1)) (
     (Test-Path -LiteralPath $nf) -and (Get-BaselineFileSha $nf) -eq [string]$d6.newsFile.sha256 -and [string]$six[0].title -eq 'Notes in a file of their own' -and
     $six.Count -eq [int]$d6.newsFile.count -and @($six | Where-Object { [string]$_.title -eq $note5 }).Count -eq 1)
-$sz6 = (Get-Item -LiteralPath (Join-Path $feedDir 'version.json')).Length
+$sz6 = (Get-Item -LiteralPath (Site-Feed $feedDir)).Length
 Yes ("  version.json is {0:n0} bytes, from {1:n0} with the notes in it" -f $sz6, $sz) ($sz6 -lt $sz)
 $R7 = '20260930-1000'
 Set-Build 'Data\Platform\UI\thornswood-new3.esp' 'changed by the seventh release'

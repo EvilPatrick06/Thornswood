@@ -10,8 +10,9 @@
 // The route and its helpers are lifted out of site\server.js by text and run
 // with stand-ins for Discord, linked.json and the reply, the way
 // test-play-join.js runs /api/play/join, because server.js opens a port when it
-// is required. The feed is a real version.json in a temp folder, read by the
-// real feedLaunchers.
+// is required. The feed is real write-once generations in a temp folder,
+// <channel>\version\<8 digits>.json (#2727), found by the real feedFile and
+// read by the real feedLaunchers.
 //
 // THE SHARED PASS. One pass is written out below in full. makePass must produce
 // exactly it, and tests\test-join-pass-game.js checks the gamemode accepts
@@ -54,6 +55,9 @@ const HELPERS = [
   grab('function versionCompare('),
   // The pass's own key, for the login's challenge (#1320).
   grab('function passLoginKey('),
+  // The feed's generations, from const feedNewest through feedFile (#2727).
+  src.indexOf('const feedNewest = {};') < 0 || src.indexOf('function feedFile(') < 0 ? '' :
+    src.slice(src.indexOf('const feedNewest = {};'), braceEnd(src.indexOf('function feedFile('))),
   src.slice(src.indexOf('const feedLaunchersSeen'), src.indexOf('\n', src.indexOf('const feedLaunchersSeen'))),
   grab('function feedLaunchers('),
   grab('async function hasLeft('), grab('async function departed('),
@@ -89,7 +93,7 @@ const VECTOR = {
 };
 const VECTOR_PASS = 'jp1.eyJwIjo3MDAsInMiOiJkZXYiLCJ2IjoiMS4xLjEwMi4zIiwiZCI6IjExMSIsImkiOjE3OTAwMDAwMDAwMDAsIngiOjE3OTAwMDA2MDAwMDB9.OfS3TF2v5kDiiBwbLyy-VZHHSTv3YE4Zd0bOnAGove8';
 
-const lib = new Function('crypto', 'fs', 'path', 'ROOT', HELPERS.slice(0, 8).join('\n') +
+const lib = new Function('crypto', 'fs', 'path', 'ROOT', HELPERS.slice(0, 9).join('\n') +
   '\nreturn { PASS_MS: PASS_MS, makePass: makePass, versionParts: versionParts, versionCompare: versionCompare, feedLaunchers: feedLaunchers, passLoginKey: passLoginKey };');
 const FEEDROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-pass-'));
 const L = lib(crypto, fs, path, FEEDROOT);
@@ -107,9 +111,12 @@ yes('1.1.102.0 is 1.1.102', L.versionCompare(L.versionParts('1.1.102.0'), L.vers
 yes('"latest" is not a version', L.versionParts('latest') === null);
 yes('a part too long for the launcher is not a version', L.versionParts('1.1.9999999999') === null);
 
+// Each write is the next generation, as the store does it (#2727).
 function feed(dir, doc) {
-  fs.mkdirSync(path.join(FEEDROOT, dir), { recursive: true });
-  const f = path.join(FEEDROOT, dir, 'version.json');
+  const gens = path.join(FEEDROOT, dir, 'version');
+  fs.mkdirSync(gens, { recursive: true });
+  const n = fs.readdirSync(gens).filter(function (x) { return /^\d{8}\.json$/.test(x); }).length + 1;
+  const f = path.join(gens, String(n).padStart(8, '0') + '.json');
   fs.writeFileSync(f, typeof doc === 'string' ? doc : JSON.stringify(doc));
   // A new mtime and size every write, so the cache in feedLaunchers reads it again.
   const t = new Date(Date.now() + Math.floor(Math.random() * 1e6));
@@ -221,7 +228,7 @@ async function main() {
   feed('feed', '{ not json');
   r = await ask({ body: { ticket: '111', profileId: 700, version: '1.1.103' }, linked: MINE });
   yes('a feed the site cannot read refuses the pass (503), never issues one', r.code === 503 && r.obj.why === 'feed' && !r.obj.pass);
-  fs.unlinkSync(path.join(FEEDROOT, 'feed', 'version.json'));
+  fs.rmSync(path.join(FEEDROOT, 'feed', 'version'), { recursive: true, force: true });
   r = await ask({ body: { ticket: '111', profileId: 700, version: '1.1.103' }, linked: MINE });
   yes('no feed at all refuses too', r.code === 503 && r.obj.why === 'feed');
   feed('feed', { launcherVersion: '1.1.102', minLauncher: '1.1.102' });
