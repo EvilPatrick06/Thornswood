@@ -10,6 +10,11 @@
   C. say for each state what the bot's join panel says for that state, so
      Patreon cannot claim the world is open while Discord asks for an
      application, or the other way round.
+
+  #2828: Bethesda's terms for mods forbid money for making mods, so
+  D. the blurb, the terms page and the classes page all say the Patreon pays
+     for the server, the domain and other expenses, and none of them says it
+     pays for the time that goes into building Thornswood.
 */
 const fs = require('fs');
 const path = require('path');
@@ -36,6 +41,16 @@ yes('B and says which line goes in for which state', /open switch/i.test(text));
 const bot = read('bot/bot.py').replace(/'\s*\n\s*'/g, '');
 yes('C the bot says the same while the alpha is open by application', /PANEL_ALPHA[\s\S]{0,200}in alpha, and the world is open by application/.test(bot));
 yes('C the bot says the same once it is open', /PANEL_OPEN[\s\S]{0,200}Thornswood is open: anyone in the Discord can play/.test(bot));
+
+const terms = read('site/data/site/terms.md').replace(/\s+/g, ' ');
+const classes = read('site/data/site/classes.md').replace(/\s+/g, ' ');
+const PAYS = /Patreon pays for the server, the domain,? and (the )?other expenses/;
+yes('D the blurb says what the Patreon pays for', PAYS.test(text));
+yes('D the terms page says the same', PAYS.test(terms));
+yes('D the classes page says the same', PAYS.test(classes));
+[['the blurb', text], ['the terms page', terms], ['the classes page', classes]].forEach(function (p) {
+  yes('D ' + p[0] + ' never says it pays for the time building it', !/time that goes into building|server bill/i.test(p[1]));
+});
 
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');

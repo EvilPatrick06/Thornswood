@@ -1,0 +1,28 @@
+# Files Thornswood never hands on, because their makers' terms or Patrick's
+# ruling say they are used only as the collection installs them.
+#
+# Read by scripts\release\Ship-Rules.ps1 ($ShipPermissionHeld). A path here
+# never ships in a pack, a release record or the installer, whichever list
+# calls it ours (built-until-1259.txt, the generated outfit files). A release
+# that drops one which an earlier release shipped lists it as gone with the
+# sha256 we shipped (Publish-Update, #1261), so the launcher deletes our copy
+# where its bytes still match and leaves any other copy, such as the one the
+# collection deploys, alone.
+#
+# One hold a line: the path under the game folder (a folder ends in \), two or
+# more spaces, then why, naming the issue that carries it.
+#
+# TO RELEASE A HOLD: only on a new ruling with the permission recorded in
+# records\asset-provenance.json, take its line out of this file in a pull
+# request (tests\test-ship-permission-held.ps1 says what changes). Keep the
+# file itself: tests\test-ship-permission-held.ps1 fails the gate without it,
+# so a lost file can never release every hold at once.
+#
+# Patrick, 17 Oct 2026, relayed by Smeagle (#2454): Immersive Armors is used
+# as-is through the Nexus collection, and nothing built from it is
+# redistributed. Its terms (Nexus SE 3479) need Hothtrooper44's permission for
+# any use of its assets, and the CBBE conversion (22382) allows BodySlide
+# output only in mods that stay free to download on Nexus. So the 18 .tri
+# morphs built on another machine leave the next pack and every install, and
+# no .nif is built from its BodySlide sets.
+Data\meshes\armor\bosmerarmormaty743\  #2454 Immersive Armors' Bosmer armour (Maty743, Hothtrooper44): used as-is through the collection, nothing built from it is redistributed (Patrick, 17 Oct)

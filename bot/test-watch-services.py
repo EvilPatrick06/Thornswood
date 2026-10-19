@@ -23,7 +23,7 @@ files in a temporary folder. Only Discord and the sleep are replaced.
 
 Read only. Never connects to anything.
 """
-import _pyguard  # noqa: F401  (first: Python 3.10 or newer, #2276)
+import _pyguard  # noqa: F401  (first: Python 3.11 or newer, #2276)
 import asyncio
 import json
 import os

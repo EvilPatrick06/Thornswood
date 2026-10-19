@@ -31,8 +31,9 @@
 # opens an issue on the board. Upstream skyrim-multiplayer/skymp reaches us
 # only through that branch, so a submodule entry here would not see it.
 #
-# The launcher is C# built with the .NET Framework csc and has no package
-# manager at all, by design, so there is nothing here for it.
+# The launcher is C# built by MSBuild from launcher/app/Thornswood.csproj with
+# no package manager at all, by design: WebView2 is vendored in launcher/lib
+# and referenced by path (#498), so there is nothing here for it.
 #
 # Weekly rather than daily: this is a two person project, and a pull request a
 # day from a robot is a pull request nobody reads.

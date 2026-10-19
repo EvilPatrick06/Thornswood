@@ -27,7 +27,8 @@
      is built or installed. tests\test-ship-dry-run.ps1 runs Ship on both
      (G, H and I).
   4. Check-ShipReady.ps1 run whole: -Root is the folder it checks, and a
-     folder Vortex deploys into is a gap.
+     folder Vortex deploys into is a gap; since #2662 the recorded folder,
+     or one named by -Root, passes with no Launcher folder in it.
   5. Build-Generated.ps1 -Channel dev, run whole, builds in the recorded
      folder.
 
@@ -160,13 +161,22 @@ try {
         return ($o -join "`n")
     }
     $out = Ready @('-Root', $vx)
-    Yes '-Root is the folder it checks' ($out -match ('yes\s+a launcher is installed\s+\(' + [regex]::Escape($vx) + '\)'))
+    Yes '-Root is the folder it checks' ($out -match ('yes\s+it has the Launcher folder a dev Ship asks for\s+\(' + [regex]::Escape((Join-Path $vx 'Launcher')) + '\)'))
     Yes '  and a folder Vortex deploys into is a gap' ($out -match 'NO\s+it is not a folder Vortex deploys into')
     Save-ShipRoot $file 'dev' $relDev
     $out = Ready @()
     Yes 'with no -Root, the folder this machine recorded for dev' (
         $out -match ('yes\s+which folder the release is built from is known\s+\(' + [regex]::Escape($relDev) + '\)') -and
         $out -match 'yes\s+it is not a folder Vortex deploys into')
+    # #2662: a recorded folder is a ship root Update-ShipRoot.ps1 makes, with
+    # no Launcher folder, and a dev Ship makes one there itself.
+    Remove-Item -LiteralPath (Join-Path $relDev 'Launcher') -Recurse -Force
+    $out = Ready @()
+    Yes 'the recorded folder with no Launcher folder passes, as a dev Ship makes it (#2662)' (
+        $out -match 'yes\s+its Launcher folder, which a dev Ship makes itself for a folder it was named' -and $out -notmatch 'No dev build at')
+    $out = Ready @('-Root', $relDev)
+    Yes '  and so does the same folder named by -Root' ($out -match 'yes\s+its Launcher folder, which a dev Ship makes itself for a folder it was named')
+    Put (Join-Path $relDev 'Launcher\Thornswood.exe') 'the launcher'
 
     # ---- 5. Build-Generated, run whole -------------------------------------------------
     Write-Host ''

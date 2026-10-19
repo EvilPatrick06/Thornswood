@@ -34,7 +34,9 @@
   once which of them it has, and exactly those are read, so a pull never
   asks for a file that is not there. The rollers keep five, so that is .1
   through .5 at most, except server.log, which server-log.js rolls by its
-  time since #2349 (server.log.<when>, up to 30 days of them, newest first).
+  time since #2349 (server.log.<when>, up to 30 days of them, newest first),
+  and voice.log and thornswood.log, which it rolls the same way since #2166
+  (up to 90 days of them).
   door.log does not roll, so only the current file is fetched.
 
   Nothing on the VPS is changed. Everything here is a read.

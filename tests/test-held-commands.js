@@ -56,7 +56,7 @@ yes('the list of words the server answers is in the gamemode', Array.isArray(WOR
 */
 function rig(world, clock, G, throwOn) {
   const a = src.indexOf('  if (!globalThis.__thornswoodLastActor)');
-  const b = a < 0 ? -1 : src.indexOf('  /** key -> the arrival point', a);
+  const b = a < 0 ? -1 : src.indexOf('  /** key -> where /tp sends staff', a);
   if (a < 0 || b < 0) { return null; }
   const block = src.slice(a, b);
   if (block.indexOf('function dispatch(') < 0 || block.indexOf('function drainHeld(') < 0) {

@@ -6,7 +6,8 @@
   notice board ... only wiithin their own hold".
 
   The real property block runs over a pretend engine with the ten boards it
-  seeds, a law register with a guard of Whiterun and a guard of Riften in it,
+  seeds, a guard of Whiterun and a guard of Riften (each by their Discord role
+  since #2551, which the door hands the block as __thornswoodOffices),
   and a Whiterun board already carrying a notice, a taken job, two letters
   and a haul. It checks:
     - the board panel says guard only to a guard of that board's hold, and the
@@ -62,9 +63,13 @@ const PEOPLE = [GUARD_W, GUARD_R, ALICE, BOB, CAROL];
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-502-board-'));
 fs.writeFileSync(path.join(dir, 'server-settings.json'), JSON.stringify({ dataDir: 'data', privDir: 'private' }));
 fs.mkdirSync(path.join(dir, 'private'));
+// An office is one character's (#2551, Patrick, 16 Oct): the law register
+// names the character that holds each office for its account. A profile the
+// door ties to no account is an account of its own, 'p:<profile>'.
+fs.writeFileSync(path.join(dir, 'private', 'law.json'), JSON.stringify({ cells: {}, held: { 'guard:whiterun': { 'p:101': { pid: 101, name: 'Hrongar' } }, 'guard:riften': { 'p:202': { pid: 202, name: 'Maul' } } } }));
 const T = clock.t - 3600000;
 fs.writeFileSync(path.join(dir, 'private', 'property.json'), JSON.stringify({
-  claims: {}, stewards: [], boxes: {},
+  claims: {}, boxes: {},
   // Two boards a steward placed, so the seeding leaves them where they are.
   boards: {
     whiterun: { cell: '3c:Skyrim.esm', pos: [0, 0, 0], where: 'Whiterun', placed: true },
@@ -85,9 +90,6 @@ fs.writeFileSync(path.join(dir, 'private', 'property.json'), JSON.stringify({
       { by: ALICE.pid, name: 'Alice', title: 'Selling a horse', text: 'A good one.', at: T, job: false, taken: 0 }
     ]
   }
-}));
-fs.writeFileSync(path.join(dir, 'private', 'law.json'), JSON.stringify({
-  guards: { '101': 'whiterun', '202': 'riften' }, cells: {}
 }));
 function inDir(f) {
   const was = process.cwd();
@@ -129,7 +131,12 @@ const box = {
   guard: function (n, f) { return f; },
   setInterval: function (f) { if (!tick) { tick = f; } return 1; }, clearInterval: function () { },
   log: function () { },
-  __thornswoodCharacter: { stateOf: function () { return { prof: 'cook' }; }, writeState: function () { } }
+  __thornswoodCharacter: { stateOf: function () { return { prof: 'cook' }; }, writeState: function () { } },
+  // The Guard of Whiterun and Guard of Riften roles (#2551).
+  __thornswoodOffices: function (pid) {
+    return { jarl: [], court: [], steward: [],
+             guard: pid === GUARD_W.pid ? ['whiterun'] : (pid === GUARD_R.pid ? ['riften'] : []) };
+  }
 };
 box.globalThis = box;
 inDir(function () { vm.runInNewContext(propBlock, box, { filename: 'gamemode.js property' }); });

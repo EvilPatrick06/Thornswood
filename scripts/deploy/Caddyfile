@@ -33,6 +33,7 @@
 
 {
 	email datdude365d@gmail.com
+	storage file_system C:/Thornswood-Caddy/data
 }
 
 thornswood.net, www.thornswood.net {

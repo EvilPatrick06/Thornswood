@@ -282,6 +282,39 @@ if ($git -and (Test-Path -LiteralPath (Join-Path $repo '.git'))) {
 $ignore = [IO.File]::ReadAllText((Join-Path $repo '.gitignore'))
 Yes '.gitignore keeps out both webhook files' ($ignore -match '(?m)^bot/news-webhook\.txt\s*$' -and $ignore -match '(?m)^bot/dev-webhook\.txt\s*$')
 
+# #2711: the head of what Set-DiscordLogin.ps1 runs on the box, from what
+# arrived on standard input to the read of the site's config.json. Both sat
+# in a try with an empty catch, so a config.json that did not read became an
+# empty table and was written over: the bot token, botKey and the cookie
+# secret with it, the #2317 shape.
+$ll = @(Get-Content -LiteralPath $login)
+$hs = [Array]::IndexOf($ll, '`$patch = `$null')
+$he = [Array]::IndexOf($ll, '`$d = @{}')
+Yes 'found the head of what Set-DiscordLogin.ps1 runs on the box' ($hs -ge 0 -and $he -gt $hs)
+if ($hs -ge 0 -and $he -gt $hs) {
+    $headDir = Join-Path $Scratch ('login-head-' + [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $headDir | Out-Null
+    try {
+        $rootWin = $headDir
+        $head = $ExecutionContext.InvokeCommand.ExpandString(($ll[$hs..($he - 1)] -join "`r`n") + "`r`n'READ ON'")
+        $cfgFile = Join-Path $headDir 'config.json'
+        $held = '{"botKey":"not-a-real-key","cookieSecret":"x"'
+        [IO.File]::WriteAllText($cfgFile, $held)
+        $ThornswoodSecret = '{"discord":{"clientId":"1"},"token":"","patreon":"","admins":[]}'
+        $said = @(& ([scriptblock]::Create($head)) | ForEach-Object { "$_" })
+        Yes 'a config.json that does not read stops it, naming the file, and it is left as it was' (
+            (($said -join ' ') -match '^NOT WRITTEN: .*config\.json does not parse as JSON') -and ($said -notcontains 'READ ON') -and [IO.File]::ReadAllText($cfgFile) -ceq $held)
+        $ThornswoodSecret = '{"discord": not json'
+        $said = @(& ([scriptblock]::Create($head)) | ForEach-Object { "$_" })
+        Yes 'what arrived that is not the JSON sent stops it, without repeating it' ((($said -join ' ') -match '^NOT WRITTEN: what arrived on standard input') -and -not (($said -join ' ') -match 'not json') -and ($said -notcontains 'READ ON'))
+        [IO.File]::WriteAllText($cfgFile, '{"botKey":"not-a-real-key"}')
+        $ThornswoodSecret = '{"discord":{"clientId":"1"},"token":"","patreon":"","admins":[]}'
+        $said = @(& ([scriptblock]::Create($head)) | ForEach-Object { "$_" })
+        Yes 'a config.json that reads goes on' ($said -contains 'READ ON')
+    } finally { Remove-Item -LiteralPath $headDir -Recurse -Force -ErrorAction SilentlyContinue }
+}
+$lt = [IO.File]::ReadAllText($login)
+Yes '  and Set-DiscordLogin.ps1 exits 1 on those lines, before its closing advice' ($lt.IndexOf("-like 'NOT WRITTEN:*'") -gt $lt.IndexOf('$wrote | ForEach-Object') -and $lt.IndexOf('The redirect in the Discord application') -gt $lt.IndexOf("-like 'NOT WRITTEN:*'"))
 Write-Host ''
 Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
 if ($script:fail) { exit 1 }

@@ -33,8 +33,9 @@
 //   C. the site keeps that per server and answers each launcher with its own
 //      characters the server does not hold ("gone"), and takes the dev server's
 //      push at /dev/api/roster, which answered 404 until now.
-//   D. the launcher reads "gone" (its C# compiled with the .NET Framework csc)
-//      and marks the character in the menu's list; the page says so.
+//   D. the launcher reads "gone" (its C# compiled with the build's compiler,
+//      tests/launcher-csc.js) and marks the character in the menu's list;
+//      the page says so.
 //
 // Read only. Temp files go under os.tmpdir().
 const fs = require('fs');
@@ -409,7 +410,7 @@ function partD() {
     yes('an empty answer marks nothing', has(/none 0/));
     if (/ERROR/.test(out)) { console.log(out); }
   } else if (parts.every(Boolean)) {
-    yes('the .NET Framework csc is on this machine (' + csc + ')', false);
+    yes('the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)', false);
   }
 
   yes('Roster.Refresh sends the channel, so the site answers for this build\'s server',
