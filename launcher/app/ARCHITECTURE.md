@@ -293,6 +293,22 @@ Voice downloads (issue #1330): the same Windows check, then the chain must end
 at Microsoft Root Certificate Authority 2011 and the certificate must be
 Microsoft Corporation's, for signing programs.
 
+**ReleaseManifest** (ReleaseManifest.cs, FeedManifest.cs). Whether the
+release's signed manifest vouches for every asset the feed names (#2163,
+phase C of docs\SIGNED-RELEASES.md). The feed's "signedManifest" is read
+apart (`ManifestRef.FromFeed` in Config.cs). On an update check that brings
+a different manifest or different assets, `Updater.ManifestLine` fetches
+release.json and its catalog like any asset (a listed host, stored under
+their sha256, bytes that hash to it). `ReleaseManifest.Refusal` then checks
+the catalog with Signature.Refusal, finds release.json's sha256 among the
+catalog's digests (wintrust's CryptCATEnumerateMember), and checks that
+release.json lists every asset. The launcher, the client runtime, each pack
+and the release record are those assets. Phase C only writes the answer to
+launcher.log, from CheckUpdatesBackground in ShellUpdate.cs; nothing is
+refused on it yet. `tests\test-2163-manifest-check.ps1` compiles the two
+files on their own and checks them against a catalog ThornswoodRelease
+signed.
+
 **FeedNotice** (FeedNotice.cs). What the feed says to everybody. Three
 optional fields in version.json, set by hand in the releases repository:
 `message` (a bar above Play, never a hold on its own), `maintenance` (holds
@@ -587,7 +603,7 @@ pages), Secrets.cs (DPAPI and locking a file to this account), Junction.cs
 (making and reading junctions without cmd), Steam.cs (finding Steam and its
 Skyrim), Online.cs (the headcount the server publishes), Slots.cs (the one
 rule for moving a character's slot), Art.cs (the art inside the exe),
-Themes.cs, Help.cs (the Help page's text), Links.cs (the Nexus page behind
+Themes.cs (every colour; the setup program is drawn in its Forge too, #2851), Help.cs (the Help page's text), Links.cs (the Nexus page behind
 each mod name), Gallery.cs (the pictures the site shows from the world, read
 from `/api/public` for Play's rotating spotlight and the Gallery page; the
 Gallery page uploads via `/api/gallery/submit`, reports via

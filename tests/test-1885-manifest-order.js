@@ -180,6 +180,8 @@ function start(opts) {
   d.timers = [];
   const box = opts.box || {};
   box.require = function (name) { return name === "fs" ? d.fs : name === "path" ? path.posix : null; };
+  // The engine's whole-file write (#2740), onto the fake disk.
+  box.mp = { writeFileWhole: function (p, text) { d.fs.writeFileSync(p, text); } };
   box.console = { log: function () { d.out.push([].join.call(arguments, " ")); },
                   error: function () { d.err.push([].join.call(arguments, " ")); } };
   ["setInterval", "setTimeout", "setImmediate"].forEach(function (t) {

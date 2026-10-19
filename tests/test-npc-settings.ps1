@@ -166,7 +166,7 @@ if ($dStart -ge 0 -and $dOpen -gt $dStart -and $dClose -gt $dOpen) {
         $rootWin = $box; $farOrder = ''; $remotePlugins = 'C:/nowhere'; $VoicePort = 7789
         $fullIndexDef = $script:fullIndexDef
         $lightTable = ''
-        $boxRecord = Join-Path $box 'server-build.json'
+        $devRecordLight = $false
         $maxOnline = 0; $LoadOrderRefuse = ''; $RequirePass = ''; $Npcs = ''
         $file = Join-Path $tmp 'dev-block.ps1'
         [IO.File]::WriteAllText($file, $ExecutionContext.InvokeCommand.ExpandString($devBody), (New-Object Text.UTF8Encoding $true))

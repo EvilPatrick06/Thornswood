@@ -1,6 +1,7 @@
-# Silent catches in the launcher, per file. Read by scripts\dev\Check-Swallow.ps1,
-# which fails when any file in launcher\app has more than its line here allows.
-# A file that is not listed is allowed none.
+# Silent catches in the launcher and the scripts, per file. Read by
+# scripts\dev\Check-Swallow.ps1, which fails when any file in launcher\app, or
+# any .ps1 under scripts\ or installer\ (since #2711, the section at the end),
+# has more than its line here allows. A file that is not listed is allowed none.
 #
 # THE RULE. A catch counts when the body between its braces is empty or holds
 # nothing but whitespace, whether the braces sit on one line or on lines of
@@ -135,3 +136,116 @@
 # Swap.Restore / Hold.Release / Keep.Unpark is still log-only; stop-
 # swallowing remains later work. No silent-catch file lines remain in this
 # baseline.
+#
+# THE SCRIPTS, since #2711 (18 Oct). Check-Swallow.ps1 counts the PowerShell
+# under scripts\ and installer\ as well, keyed by the path from the
+# repository root. Nothing counted a .ps1 before, so two empty catches in
+# scripts\release\New-ClientBuildRecord.ps1 wrote the client record over a
+# base, dirty and stale check that had not run. The same rule: a catch whose
+# braces hold nothing but whitespace counts, with its type in square brackets
+# or none; one whose braces hold a # comment does not. The text is read, so
+# a catch spelled out inside a here-string counts too: that is a script
+# another machine runs (Feed-Store.ps1's, for one).
+#
+# Measured on 18 Oct, on main at e35ab7ae with #2711's fixes: 183 in 67
+# files, below. #2711 took out the five in the record scripts
+# (New-ClientBuildRecord.ps1 two, New-ServerBuildRecord.ps1 two,
+# Check-Records.ps1 one), which is why none of them is listed. tests\ is not
+# read. Each line below is somebody's catch that hides a failure; converting
+# one lowers its line.
+#
+# 18 Oct, the deploy scripts (#2711, the second part): every one of the 58
+# in scripts\deploy now stops the deploy before anything is swapped, tests
+# for what may rightly be missing, or says in words what it could not read or
+# clean. Two of the 58 were comments that quoted an empty catch
+# (SiteConfigSet.ps1, Rotate-ServerPassword.ps1), reworded. 125 are left.
+#
+# 18 Oct, the release scripts (#2711, the third part): all 43 in 17 files of
+# scripts\release. A failure that means a release cannot be trusted now stops
+# it before anything is sent, published or deleted (the client record and
+# lists Ship-Rules.ps1 loads, the collection config.json, the server record,
+# the site's files.json, a baseline Scrub-Feed cannot read); an absence that
+# may rightly happen is tested for (a registry key, no git, no node); what
+# fails after the work is done, or where a dev Ship fails open on purpose, is
+# said (releases.txt, the pending note, the icon cache, Explorer, what main
+# and dev have published). 82 are left.
+installer\Setup-Thornswood.ps1 7
+scripts\dev\Check-Outside.ps1 6
+scripts\dev\Close-Launcher.ps1 8
+scripts\dev\Start-Thornswood.ps1 3
+scripts\dev\Watch-Foreground.ps1 1
+scripts\mods\Align-LoadOrder.ps1 1
+scripts\mods\Check-CollectionRules.ps1 1
+scripts\mods\Check-Manifest.ps1 1
+scripts\mods\Fix-Icons.ps1 1
+scripts\mods\LoadOrder.ps1 3
+scripts\oneoff\Undo-DiscordBuild.ps1 3
+scripts\ops\Publish-News.ps1 1
+scripts\ops\Reset-Character.ps1 1
+scripts\ops\Set-Door.ps1 6
+scripts\ops\Set-Server.ps1 1
+scripts\ops\Wipe-Saves.ps1 1
+scripts\vps\Bootstrap-VPS.ps1 1
+scripts\vps\Check-Load.ps1 1
+scripts\vps\Check-ServerPriority.ps1 1
+scripts\vps\Check-Site.ps1 2
+scripts\vps\Fetch-Backups.ps1 1
+scripts\vps\Get-Logs.ps1 1
+scripts\vps\Get-ProdFacts.ps1 1
+scripts\vps\Lock-VpsFolders.ps1 3
+scripts\vps\Prove-SecretOffCommandLines.ps1 2
+scripts\vps\Send-Secret.ps1 1
+scripts\vps\vps-freeze.ps1 1
+scripts\vps\vps-load.ps1 2
+scripts\vps\vps-nightly-backup.ps1 2
+scripts\vps\vps-restore-services.ps1 1
+scripts\vps\Vps.ps1 1
+scripts\vps\Watch-Outside.ps1 6
+scripts\vps\Watch-Services.ps1 9
+scripts\vps\Write-BotToken.ps1 1
+#
+# THE SITE, VOICE AND THE BOT, since #2736 (18 Oct). Check-Swallow.ps1 reads
+# the JavaScript under site\ and voice\ and the Python under bot\ as well,
+# keyed by the path from the repository root. Nothing counted a .js or a .py
+# before, so the /api/play/logs handler in site\server.js stored a session's
+# logs, answered ok, and lost the trouble colour and the bot's crash note in
+# a try whose catch was empty, with nothing said. The same rule, in each
+# language's shapes: a JavaScript catch, or a promise's .catch handed a
+# function, whose braces hold nothing but whitespace; a Python except whose
+# whole body is pass. A comment in the body, or on the except line, says why
+# and does not count. Not read: node_modules, a .min.js (the vendored
+# marked-12.0.2.min.js), __pycache__, a venv, and the harnesses kept beside
+# the code (test-*.js in voice\, test-*.py in bot\).
+#
+# Measured on 18 Oct on main at a49b90e2: 84 in 10 files, 32 of them in
+# site\server.js. #2736 took out all 32 there: each one now says what failed
+# in site.log (codes and file names, never what a person wrote, a Discord id
+# or an address), tests for the absence it expected, or was a try around a
+# call that does not throw. So site\server.js has no line below. The 52 left
+# are later work, each a catch that hides a failure; converting one lowers
+# its line.
+#
+# site\public went to none in the next #2736 pull request (19 Oct). The hub's
+# refresh after a staff action and the staff gallery read now say when they
+# fail, and Accept shows the site's refusal; home.js's localStorage catches
+# say in their braces why nothing more is done (the age cookie holds the
+# answer), and the rest were tries around calls that do not throw.
+#
+# voice\ went to none in the third (19 Oct). In voice-server.js every one was
+# a try around a call that does not throw (Sock.send and ping close the
+# socket themselves when a write fails, and a socket's write and destroy
+# report on its error event). load-voice.js counts a feed post the service
+# refused, an unreadable probe line and an unread /health in its result.
+# gamemode-voice.js was a copy of the gamemode's position feed that nothing
+# ran, so it went with the script that wrote it in; the feed's catches are
+# in game\gamemode.js, which #2784 is about.
+#
+# bot\ went to none in the fourth (19 Oct), so this section has no lines
+# left. Build-Discord.py names a role it could not move, a topic, old posts it
+# could not remove and a pin under "did not manage", and -Check no longer
+# moves roles. Build-Onboarding.py passes a refused read of the bot's own
+# member to its caller instead of reading it as no permissions. bot.py needs
+# certifi as it needs discord.py. card.py's font probes say in a comment on
+# the except line what they expect, and a glyph or avatar that will not draw
+# fails the card, which on_member_join logs. The rest were tries around code
+# that does not throw.

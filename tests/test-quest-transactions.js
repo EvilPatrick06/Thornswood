@@ -125,7 +125,45 @@ f.transfer.shutdown();assert.equal(f.transfer.commit(10,f.record(),next,[]).ok,f
   mp.getNpcAIState=()=>{throw Error('actor unloaded');};
   assert.equal(actorIdentity(mp,10),null);
 }
-console.log('PASS quest atomic inventory/state, metadata, save admission, publication errors, refusal and revocation');
+// A proposed budget is committed through the actual transaction adapter. The
+// fixture supplies the native expected-record comparison; it is not a server.
+{
+  const budget=require('../game/scene-reward-budget'),now=2000000000000;
+  for(const reverse of [false,true]) {
+    const f=fixture(),old=f.record(),initial=f.inventory();
+    for(const method of ['compareAndSetActorProperty','compareAndSetInventoryAndProperty']) {
+      const native=f.mp[method];
+      f.mp[method]=function(...args) {
+        const change=args[args.length-1];
+        if(JSON.stringify(change.expected)!==JSON.stringify(f.record()))return false;
+        return native(...args);
+      };
+    }
+    const a=budget.reserve(undefined,'q-first',100,now),b=budget.reserve(undefined,'q-second',100,now);
+    assert.equal(a.ok,true);assert.equal(b.ok,true);
+    const proposals=reverse?[b,a]:[a,b],keys=reverse?['q-second','q-first']:['q-first','q-second'];
+    const nextA={...old,expanded:proposals[0].next},nextB={...old,expanded:proposals[1].next};
+    assert.equal(f.transfer.commit(10,old,nextA,[]).ok,true);
+    assert.equal(f.transfer.commit(10,old,nextB,[]).ok,false,'one expected record cannot admit both reservations');
+    assert.deepEqual(f.inventory(),initial);
+    const accepted=f.record(),finish=budget.complete(accepted.expanded,keys[0],proposals[0].token,now+1);
+    assert.equal(finish.ok,true);assert.equal(finish.gold,100);
+    const paid={...accepted,expanded:finish.next};
+    f.mode('refuse');
+    assert.equal(f.transfer.commit(10,accepted,paid,[{item:'f:Skyrim.esm',count:finish.gold}]).ok,false);
+    assert.deepEqual(f.record(),accepted);assert.deepEqual(f.inventory(),initial);
+    f.mode('');
+    assert.equal(f.transfer.commit(10,accepted,paid,[{item:'f:Skyrim.esm',count:finish.gold}]).ok,true);
+    assert.deepEqual(f.record().open,old.open,'legacy work stays intact');
+    assert.equal(f.inventory().entries.find(row=>row.baseId===15).count,140);
+    assert.equal(f.record().expanded.paid[0][1],100);
+    f.save();
+    assert.equal(f.transfer.commit(10,accepted,paid,[{item:'f:Skyrim.esm',count:finish.gold}]).ok,false,
+      'a stale completed projection cannot pay twice after the save fence clears');
+    assert.equal(f.inventory().entries.find(row=>row.baseId===15).count,140);
+  }
+}
+console.log('PASS quest atomic inventory/state, metadata, save admission, publication errors, refusal, revocation and source-only budget CAS composition');
 {
   let body='100',dead=false;
   const ai={isHuman:false,profileId:-1,lifeGeneration:0};

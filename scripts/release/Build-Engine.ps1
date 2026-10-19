@@ -143,7 +143,13 @@ function Get-EngineSubstDir([string]$Letter) {
 }
 function Enter-EngineSubstLock {
     $mx = New-Object Threading.Mutex($false, 'Local\ThornswoodEngineSubst')
-    try { $null = $mx.WaitOne() } catch [Threading.AbandonedMutexException] { }
+    # An abandoned mutex is still handed to this run: WaitOne throws to say the
+    # run that held it ended without letting go, and this run holds it now.
+    # Written with Write-Host, not Say, because tests\test-engine-drive-letter.ps1
+    # lifts these functions on their own.
+    try { $null = $mx.WaitOne() } catch [Threading.AbandonedMutexException] {
+        Write-Host '  note: the last run to hold the drive letter lock ended without letting it go; this run holds it now' -ForegroundColor DarkGray
+    }
     return $mx
 }
 # A file under the letter's folder, held open for as long as this run uses it.
