@@ -75,6 +75,7 @@ namespace Thornswood
             {
                 try { BuildFiles(l); } catch (Exception ex) { Swallow.Note("Upkeep.Look, this build's files", ex); }
             }
+            try { Made(l); } catch (Exception ex) { Swallow.Note("Upkeep.Look, the files made from the game", ex); }
             try { WindowsFolders(l); } catch (Exception ex) { Swallow.Note("Upkeep.Look, Windows' Skyrim folders", ex); }
             if (pressed)
             {
@@ -238,6 +239,30 @@ namespace Thornswood
                 "Fix puts them back.", CloseAndRetry, false));
         }
 
+        /// <summary>
+        /// The main menu and the notice board's meshes, which Thornswood makes
+        /// from the person's own game (MadeFromGame, #2827): missing or not the
+        /// bytes it makes. Made here without writing, so the line says whether
+        /// Fix can make them or which of the game's files stops it.
+        /// </summary>
+        static void Made(List<Issue> l)
+        {
+            List<string> off = MadeFromGame.OutOfDate();
+            if (off.Count == 0) return;
+            var names = new List<string>();
+            foreach (string rel in off) names.Add(Path.GetFileName(rel));
+            string why = null;
+            foreach (FromGameFile f in MadeFromGame.Make())
+                if (off.Contains(f.Rel) && f.Problem != null) { why = f.Problem.TrimEnd('.'); break; }
+            string what = Count(names.Count, "of the files Thornswood makes from your game") + " missing or changed: " + Some(names) +
+                          ". Until " + (names.Count == 1 ? "it is" : "they are") + " made, the game shows its own main menu, and the notice boards have no mesh.";
+            if (why == null)
+                l.Add(Issue.Of(IssueKind.MadeFromGame, what, "Fix makes them again from your game's own files.", CloseAndRetry, false));
+            else
+                l.Add(Issue.Of(IssueKind.MadeFromGame, what + " They cannot be made from this game: " + why + ".", null,
+                    "Put the game back on the Skyrim build Thornswood pins (the Downgrade on the Play page does that), then press Scan.", false));
+        }
+
         /// <summary>Windows' Skyrim folders still pointed at Thornswood while Skyrim is not running.</summary>
         static void WindowsFolders(List<Issue> l)
         {
@@ -319,6 +344,11 @@ namespace Thornswood
                     catch (Exception ex) { Swallow.Note("Upkeep.FixOnDisk, putting back Vortex's files", ex); say("Vortex's files could not be put back (" + ex.Message.TrimEnd('.') + ")."); }
                 }
                 if (kinds.Contains(IssueKind.BuildFiles)) PutBackBuildFiles(say);
+                if (kinds.Contains(IssueKind.MadeFromGame))
+                {
+                    try { string made = MadeFromGame.Ensure(); if (!string.IsNullOrEmpty(made)) say(made); }
+                    catch (Exception ex) { Swallow.Note("Upkeep.FixOnDisk, the files made from the game", ex); say("The main menu and the notice board's meshes could not be written (" + ex.Message.TrimEnd('.') + ")."); }
+                }
                 if (kinds.Contains(IssueKind.Client))
                 {
                     try { ClientRuntime.Heal(cfg, say); }

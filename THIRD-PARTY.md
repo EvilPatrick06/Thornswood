@@ -485,20 +485,29 @@ no licence this file can name.
   (Test-ShipBethesdaLeftAlone) without deleting anybody's copy, so builds made
   after that change no longer carry it.
 
-## Bethesda's own file, edited
+## Bethesda's own files, made on each machine
 
-`game\ours\Data\Interface\startmenu.swf`, which every pack and the installer
-carry as `Data\Interface\startmenu.swf`, is Skyrim's own
-`interface\startmenu.swf` from `Skyrim - Interface.bsa`, edited so the main
-menu shows no Bethesda logo and no button list. Compared on 15 October: the
-same 871 SWF tags in the same order, only DefineShape tags differing, by a
-byte or two each, and no strings added or removed. It is Bethesda's work,
-edited, and recorded as that (Patrick, 15 Oct 2026, #2177); who edited it is
-not recorded. It is the one file of the game Thornswood hands on, and the
-terms page says so (Patrick, 19 Oct 2026, #2792). The notice board and drop
-box meshes, `game\ours\Data\meshes\thornswood\noticeboard01.nif` and
-`dropbox01.nif`, are not the game's files but are built from pieces of them
-(`scripts\mods\Build-NoticeBoard.py`, #2502).
+`Data\Interface\startmenu.swf` is Skyrim's own `interface\startmenu.swf` from
+`Skyrim - Interface.bsa`, edited so the main menu shows no Bethesda logo and
+no button list. Compared on 15 October: the same 871 SWF tags in the same
+order, only DefineShape tags differing, by a byte or two each, and no strings
+added or removed. It is Bethesda's work, edited, and recorded as that
+(Patrick, 15 Oct 2026, #2177); who edited it is not recorded. The notice
+board and drop box meshes, `Data\meshes\thornswood\noticeboard01.nif` and
+`dropbox01.nif`, are not the game's files but are put together from pieces of
+them (`scripts\mods\Build-NoticeBoard.py`, #2502).
+
+Until #2827 every pack and the installer carried all three, from
+`game\ours`. Since #2827 none of them ships (Patrick, 19 Oct 2026, option 2):
+the launcher makes them before every Play from the person's own game
+archives, byte for byte the files that shipped (`launcher\app\FromGame.cs` and
+`MadeFromGame.cs`), and `scripts\release\Go.ps1` does the same for a hand-run
+install. What the repository holds is the recipe, not the files: for the menu
+the bytes the edit changes (`FromGameMenu.cs`), for the meshes which game
+meshes they are put together from and where each piece goes, with
+Thornswood's own collision (`FromGameBoard.cs`). `Ship-Rules.ps1`
+`$ShipMadeFromGame` keeps the three out of every pack, release record and
+installer, and the terms page says Thornswood ships no game files.
 
 Bethesda's terms for Skyrim Special Edition mods are the Creation Kit End User
 License Agreement (https://store.steampowered.com/eula/1946180_eula_0, Steam
@@ -520,8 +529,8 @@ these three files:
 No clause grants a right to hand on ZeniMax's own files, edited or not, or
 meshes put together from them. Free mods hand on edited game files all the
 time and ZeniMax does not act against them, but that is tolerance, not a
-written grant, so `records\asset-provenance.json` records the three as no
-licence found, and #2827 carries the decision. The same section 1.D.a forbids
+written grant, so Thornswood stopped handing the three on (#2827), and
+`records\asset-provenance.json` records them as made from the game. The same section 1.D.a forbids
 crowd funding for making mods, which is #2828.
 
 The other main menu files beside it are Thornswood's own:
@@ -761,9 +770,10 @@ branch any more.
   pictures in `Images` and the ChainLink, NoticeIcon and VoiceIcon sprite
   fonts (#2177).
 - `Data\Interface\startmenu.swf` is Bethesda's file, edited, and the notice
-  board and drop box meshes are built from Bethesda's ("Bethesda's own file,
-  edited"). Bethesda's terms for mods were read on 19 October and grant no
-  right to hand any of the three on (#2827).
+  board and drop box meshes are built from Bethesda's ("Bethesda's own files,
+  made on each machine"). Bethesda's terms for mods were read on 19 October
+  and grant no right to hand any of the three on, so since #2827 none ships:
+  the launcher makes them from each person's own game.
 
 ## Microsoft WebView2 SDK licence
 
