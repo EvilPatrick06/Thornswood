@@ -46,8 +46,11 @@ function Read-JsonFile([string]$Path) {
     return [pscustomobject]@{ Text = $text; Doc = ($text | ConvertFrom-Json) }
 }
 
-# The client-build.json Build-Launcher.ps1 embedded. $null when the exe is
-# missing, is not an assembly, or was built without the resource.
+# The client-build.json Build-Launcher.ps1 embedded. $null when there is no
+# exe, or it was built without the resource. An exe that will not load, or a
+# record in it that does not read, stops it (#2711): the catch below used to
+# hand back $null for those too, and Resolve-PackageClientRecord then took the
+# feed's client or the checkout's for the launcher it packs.
 function Read-LauncherClientRecord([string]$Exe) {
     if (-not $Exe -or -not (Test-Path -LiteralPath $Exe)) { return $null }
     try {
@@ -68,7 +71,7 @@ function Read-LauncherClientRecord([string]$Exe) {
         if ($null -eq $files -or @($files.PSObject.Properties).Count -lt 1) { return $null }
         return [pscustomobject]@{ Doc = $doc; Text = $text }
     }
-    catch { return $null }
+    catch { throw ("the launcher at $Exe cannot be read for the client-build.json it was built with, so the client it puts back is not known: " + $_.Exception.Message) }
 }
 
 function Read-FeedClientRuntime([string]$VersionJson) {

@@ -126,8 +126,9 @@ function New-ThornswoodServerBuildArtifact {
   $short = $commit.Substring(0, 12)
   $name = 'server-' + $short + '-' + $sha.Substring(0, 16) + '.zip'
   $zip = Join-Path $OutDir $name
-  if (Test-Path -LiteralPath $zip) { Remove-Item -LiteralPath $building -Force }
-  else { Move-Item -LiteralPath $building -Destination $zip }
+  # Named the way Artifact.ps1 names every artifact (#2742): a zip already
+  # there has to be these bytes, and nothing there is replaced.
+  Save-ThornswoodArtifactZip $building $zip $sha
 
   $contents = @()
   for ($i = 0; $i -lt $names.Count; $i++) {
@@ -144,7 +145,7 @@ function New-ThornswoodServerBuildArtifact {
     files        = $contents
   }
   $recordPath = [IO.Path]::ChangeExtension($zip, '.json')
-  [IO.File]::WriteAllText($recordPath, (ConvertTo-Json -InputObject $meta -Depth 5), (New-Object Text.UTF8Encoding($false)))
+  Save-ThornswoodArtifactRecord $recordPath $meta
 
   return [pscustomobject]@{
     Component  = 'server'

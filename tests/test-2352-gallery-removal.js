@@ -303,7 +303,7 @@ function blockDelete(name) {
     yes('  and says the file is deleted, and kept out of sight for 30 days when somebody reported it',
         /Its file is deleted from the site\. If somebody reported it, the site keeps the file out of sight for 30 days for staff, then deletes it\./.test(hub));
     yes('and shows the site\'s error when the file could not be deleted',
-        /if \(a && a\.ok === false\) alert\(a\.error/.test(hub));
+        /if \(!a \|\| !a\.ok\) alert\(\(a && a\.error\)/.test(hub));
   } catch (err) {
     fail++;
     console.log('FAIL  the harness itself threw: ' + (err && err.stack ? err.stack : err));

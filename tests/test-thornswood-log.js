@@ -52,6 +52,11 @@ process.on('exit', function () {
 fs.writeFileSync('server-settings.json', JSON.stringify({ dataDir: 'data' }));
 fs.mkdirSync('data');
 
+// The engine's whole-file write (#2740), as far as the log can tell; the
+// block below is evaluated in this scope and writes its state through it.
+// eslint-disable-next-line no-unused-vars
+const mp = { writeFileWhole: function (p, text) { fs.writeFileSync(p, text); } };
+
 // A fresh evaluation of the block, which is what a start or a hot reload is.
 // cap, when given, is put in place of the 4 MB so rolling within one load can
 // be seen after a few lines instead of four megabytes of them.

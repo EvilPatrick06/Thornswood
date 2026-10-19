@@ -294,7 +294,8 @@ async function checkIn(table, discordId, profileId, standingOver, world) {
     cfg: SITE_CFG,
     LINKED: 'linked.json',
     jsonFile: function (f, fallback) { return f === 'linked.json' ? clone(state.table) : fallback; },
-    putJson: function (f, obj) { state.writes++; state.table = clone(obj); },
+    // The real putJson answers whether the write landed (#2180).
+    putJson: function (f, obj) { state.writes++; state.table = clone(obj); return true; },
     sendJson: function (r, code, obj) { state.sent = { code: code, obj: obj }; return state.sent; },
     slotsFor: function () { return 2; },
     // The world is never full here (#481); test-seats.js runs that refusal.

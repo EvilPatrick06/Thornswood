@@ -11,7 +11,8 @@ built to be played together, and SkyMP is the reason it can be at all.
 
 **Bethesda Game Studios**, for the game. Thornswood is not affiliated with or
 endorsed by Bethesda Softworks. The Elder Scrolls and Skyrim are their
-trademarks, and you need your own copy to play.
+trademarks, and you need your own copy to play. THIS MOD IS NOT MADE,
+GUARANTEED OR SUPPORTED BY ZENIMAX OR ITS AFFILIATES.
 
 ## The mod list
 
@@ -35,10 +36,10 @@ with no account.
 
 The server's engine recorded for the next release, `scam_native.node`, is
 built from one commit,
-[`3bdf3d3c`](https://github.com/EvilPatrick06/skymp/tree/3bdf3d3c9926a4dd241b1d1c09dadde808a788d5).
+[`9d3139ca`](https://github.com/EvilPatrick06/skymp/tree/9d3139cadbd857a6159eb96507ee6b5f6a4d1a87).
 That commit starts from
 [SkyMP](https://github.com/skyrim-multiplayer/skymp) at `2849e676`, and
-[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/2849e676...3bdf3d3c)
+[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/2849e676...9d3139ca)
 is the difference between the two.
 
 The server's engine goes to our test server first, then to the main server.
@@ -103,6 +104,17 @@ Embedded Framework and Chromium 108, ANGLE and ICU's data (BSD and Unicode
 licences), Node.js 23.2.0 (MIT), Microsoft's Direct3D shader compiler, and the
 one SkyMP script above. The licence texts come with it, in
 `Data\Docs\Thornswood Client Runtime`.
+
+**The main menu's interface file**, `Data\Interface\startmenu.swf`, is
+Skyrim's own, edited so the menu shows no logo and no button list. It is the
+one file of the game Thornswood hands on. The notice board and drop box meshes
+are Thornswood's, put together from pieces of Skyrim's own meshes with the
+game's own textures.
+
+**SkyHUD's settings**, `Data\Interface\skyhud\skyhud.txt`, are Thornswood's
+preset for SkyHUD 0.90B, by the SkyHUD Team, the version the collection
+installs. SkyHUD's author lets anybody share a preset that says which version
+it is for, and nothing else of SkyHUD's comes with it.
 
 **Tavern**, the font Skyrim Platform draws its text in, is Typey McTypeface by
 Paul J. Miller and Dieter Steffmann, under the SIL Open Font License. It comes

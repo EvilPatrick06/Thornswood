@@ -531,11 +531,11 @@ try {
     [void](New-Item -ItemType Directory -Path (Join-Path $site 'uploads\rec') -Force)
     $fs = [IO.File]::Create((Join-Path $site 'uploads\rec\recording.mp4')); $fs.SetLength(11MB); $fs.Dispose()
     foreach ($feed in 'feed', 'feed-dev') {
-        Put (Join-Path $site "$feed\version.json") ('{"launcherVersion":"1.1.1","which":"' + $feed + '"}')
+        Put (Join-Path $site "$feed\version\00000001.json") ('{"launcherVersion":"1.1.1","which":"' + $feed + '"}')
         Put (Join-Path $site "$feed\published.json") '{"packs":[]}'
         Put (Join-Path $site "$feed\launchers.txt") '1.1.1'
         Put (Join-Path $site "$feed\releases.txt") 'r1'
-        Put (Join-Path $site "$feed\history\20260928T000000Z-version.json") '{"old":true}'
+        Put (Join-Path $site "$feed\history\20260928T000000Z-published.json") '{"old":true}'
         Put (Join-Path $site "$feed\assets\$('a' * 64)") 'a download, not for the backup'
     }
     Put (Join-Path $bot 'bot.env.json') '{"DISCORD_TOKEN":"stand-in"}'
@@ -551,7 +551,7 @@ try {
     $plain = Join-Path $work 'backups'
     $code = Run $ps51 (Join-Path $scriptsDir 'vps\vps-nightly-backup.ps1') @(
         '-GameRoot', $game, '-DevGameRoot', $gameDev, '-SiteRoot', $site, '-BotRoot', $bot,
-        '-CaddyRoot', $caddy, '-VoiceRoot', $voice, '-Out', $plain, '-KeyFile', (Join-Path $work 'no-key.txt'), '-Plain')
+        '-CaddyRoot', $caddy, '-VoiceRoot', $voice, '-DeletionRoot', (Join-Path $work 'no-del'), '-Out', $plain, '-KeyFile', (Join-Path $work 'no-key.txt'), '-Plain')
     $zip = @(Get-ChildItem -LiteralPath $plain -Filter 'thornswood-*.zip' -File -EA SilentlyContinue)
     Yes "the nightly backup runs against a scratch site (exit $code)" ($code -eq 0 -and $zip.Count -eq 1)
     if (-not $zip.Count) { Show; throw 'no backup' }
@@ -560,7 +560,7 @@ try {
     $names = @($z.Entries | ForEach-Object { $_.FullName -replace '\\', '/' })
     $z.Dispose()
     Yes '  and takes the site''s uploads' ($names -contains 'site/uploads/shot-1.png' -and $names -contains 'site/uploads/uploads.json')
-    $store = foreach ($feed in 'feed', 'feed-dev') { foreach ($n in 'version.json', 'published.json', 'launchers.txt', 'releases.txt', 'history/20260928T000000Z-version.json') { "site/$feed/$n" } }
+    $store = foreach ($feed in 'feed', 'feed-dev') { foreach ($n in 'version/00000001.json', 'published.json', 'launchers.txt', 'releases.txt', 'history/20260928T000000Z-published.json') { "site/$feed/$n" } }
     Yes '  and both feeds'' store with its history' (@($store | Where-Object { $names -notcontains $_ }).Count -eq 0)
     Yes '  and not the feeds'' downloads' (@($names | Where-Object { $_ -like 'site/feed*/assets/*' }).Count -eq 0)
     Yes '  and a recording in uploads while the folder is under its budget' ($names -contains 'site/uploads/rec/recording.mp4')
@@ -569,7 +569,7 @@ try {
     $tight = Join-Path $work 'backups-tight'
     $code = Run $ps51 (Join-Path $scriptsDir 'vps\vps-nightly-backup.ps1') @(
         '-GameRoot', $game, '-DevGameRoot', $gameDev, '-SiteRoot', $site, '-BotRoot', $bot,
-        '-CaddyRoot', $caddy, '-VoiceRoot', $voice, '-Out', $tight, '-KeyFile', (Join-Path $work 'no-key.txt'), '-Plain', '-MaxUploadsMB', '5')
+        '-CaddyRoot', $caddy, '-VoiceRoot', $voice, '-DeletionRoot', (Join-Path $work 'no-del'), '-Out', $tight, '-KeyFile', (Join-Path $work 'no-key.txt'), '-Plain', '-MaxUploadsMB', '5')
     $tz = @(Get-ChildItem -LiteralPath $tight -Filter 'thornswood-*.zip' -File -EA SilentlyContinue)
     $tnames = @()
     if ($tz.Count) { $z = [IO.Compression.ZipFile]::OpenRead($tz[0].FullName); $tnames = @($z.Entries | ForEach-Object { $_.FullName -replace '\\', '/' }); $z.Dispose() }
@@ -612,9 +612,9 @@ try {
         @(Get-ChildItem -LiteralPath $nSite -Filter 'config.json-before-restore-*').Count -eq 1)
     Yes '  its uploads' (Test-Path -LiteralPath (Join-Path $nSite 'uploads\shot-1.png'))
     Yes '  both feeds'' store and history, beside the downloads already there' (
-        [IO.File]::ReadAllText((Join-Path $nSite 'feed-dev\version.json')) -match 'feed-dev' -and
+        [IO.File]::ReadAllText((Join-Path $nSite 'feed-dev\version\00000001.json')) -match 'feed-dev' -and
         (Test-Path -LiteralPath (Join-Path $nSite 'feed\releases.txt')) -and
-        (Test-Path -LiteralPath (Join-Path $nSite 'feed\history\20260928T000000Z-version.json')) -and
+        (Test-Path -LiteralPath (Join-Path $nSite 'feed\history\20260928T000000Z-published.json')) -and
         [IO.File]::ReadAllText((Join-Path $nSite "feed\assets\$('a' * 64)")) -eq 'mirrored already')
     $envFile = Join-Path $nBot 'bot.env.json'
     Yes '  the bot''s settings and join record' ((Test-Path -LiteralPath $envFile) -and (Test-Path -LiteralPath (Join-Path $nBot 'data\joins.json')))

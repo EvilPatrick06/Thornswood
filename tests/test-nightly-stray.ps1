@@ -17,7 +17,8 @@
     1. 150 branches and 130 open pull requests. Branch 140 is on the second
        page with no pull request: it is named. Branch 120's pull request is
        on the second page of pulls: it is not named. main never is.
-    2. A pull request three days old is named; one a day old is not.
+    2. A pull request three days old is named; one a day old is not; one
+       labelled held is listed as held and not named (#1273).
     3. A run that names nothing exits 0 and one that names something exits 1,
        with the lines the step used to print.
     4. nightly.yml runs the script and the inline step is gone.
@@ -119,6 +120,18 @@ $found = Find-Stray -Now $now
 Yes 'a pull request open three days is named' (@($found.OldPulls | ForEach-Object { $_.number }) -contains 7)
 Yes 'one open a day is not' (@($found.OldPulls | ForEach-Object { $_.number }) -notcontains 8)
 Yes 'and neither branch is stray, each has its pull request' ($found.Stray.Count -eq 0)
+
+# A pull request held back on purpose carries the held label (#1273): listed,
+# not counted. Any other label, or held only in its title, is not held.
+$h = Pull 9 'c' 5; $h | Add-Member labels @([pscustomobject]@{ name = 'area: Gamemode' }, [pscustomobject]@{ name = 'held' })
+$t = Pull 10 'd' 5; $t.title = 'HELD 1.2.4: work on d'; $t | Add-Member labels @([pscustomobject]@{ name = 'area: Gamemode' })
+$script:Branches = @(Branch 'main'), (Branch 'c'), (Branch 'd')
+$script:Pulls = @($h, $t)
+$found = Find-Stray -Now $now
+Yes 'a pull request labelled held is listed as held' (@($found.HeldPulls | ForEach-Object { $_.number }) -contains 9)
+Yes '  and is not an old one' (@($found.OldPulls | ForEach-Object { $_.number }) -notcontains 9)
+Yes 'one held only in its title is still old' (@($found.OldPulls | ForEach-Object { $_.number }) -contains 10 -and
+    @($found.HeldPulls | ForEach-Object { $_.number }) -notcontains 10)
 
 # ---- 3. the run ----------------------------------------------------------------
 # The script run as the nightly runs it, in a process of its own, over a

@@ -241,6 +241,16 @@ try {
     $b = @(Main-Rows 'main' | Where-Object { $_.What -like '*server build*' })[0]
     Yes '5. no matching server build anywhere fails, pointing at Build-Engine' (-not $b.Ok -and $b.Fix -match 'Build-Engine')
 
+    # A record that does not read (#2711): it was read in a try with an empty
+    # catch, and then every build "did not match" and the fix named a build.
+    $srvRecordWas = [IO.File]::ReadAllText($srvRecord)
+    [IO.File]::WriteAllText($srvRecord, '{ "binary": "scam_native.node", ')
+    $m = @(Main-Rows 'main')
+    $b = @($m | Where-Object { $_.What -like '*record reads*' })[0]
+    Yes '5. a server record that does not read is its own row, saying why' ($m.Count -eq 1 -and $b -and -not $b.Ok -and $b.Detail -match 'does not read: ' -and $b.Level -eq 'warn')
+    Yes '5. and its fix is the record, not a build' ($b.Fix -match 'records\\server-build\.json' -and $b.Fix -notmatch 'Build-Engine')
+    [IO.File]::WriteAllText($srvRecord, $srvRecordWas)
+
     # ------------------------------------------------- 6. the script's text --
     $text = Get-Content -LiteralPath $Ready -Raw
     Yes '6. no row asks whether the skymp fork is cloned' ($text -notmatch "Ready\s+'the skymp fork")

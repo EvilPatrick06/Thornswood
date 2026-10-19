@@ -2,7 +2,7 @@
 
 What Thornswood keeps about you, why, and how to have it deleted.
 
-Last changed: 17 October 2026.
+Last changed: 19 October 2026.
 
 Thornswood is a free fan project run by two people. It is not a company. This
 page is written plainly rather than legally, and it is meant to be the whole
@@ -38,7 +38,9 @@ them.
 
 **When you played.** Each session records who, when it started and when it
 ended, so an alpha has a record of what was tested and by whom instead of
-somebody's memory.
+somebody's memory. The game server's door also writes down each time a
+character connects, by its profile and character numbers, and whether it
+was let in, so staff can see why somebody could not get in.
 
 **Your character.** Name, appearance, what you carry, where you are standing,
 what you have built and claimed, and the ranks you have earned. That is the
@@ -67,6 +69,11 @@ the Discord account or the character, with who did it, when and why, and the
 staff channel is told. A character killed for good is kept, not deleted. Only
 staff read these: somebody who is not staff never sees a note, even one
 about them.
+
+**Your join number.** When you join the Discord, the bot writes down which
+arrival you were against your Discord id, so the number on the welcome card
+is never handed to two people, and is yours again if you leave and come
+back.
 
 **The launcher's own log.** Sent to the site when a session ends. It is about
 the game: which mods are installed, what failed to start, which version you
@@ -132,6 +139,39 @@ both are served from here now.
 - **A gallery submission that is removed** has its file deleted then. One
   taken down after somebody reported it is kept out of sight for 30 days, so
   staff can look into the report, then deleted. The site checks every hour.
+- **A gallery submission waiting for staff** waits for 90 days at most. One
+  staff have neither accepted nor deleted by then is taken off the queue and
+  its file deleted. An accepted one stays up until it is removed.
+
+- **Your application** on the site is kept for 365 days, like a report, then
+  dropped. The ticket itself is a private thread in the Discord. Staff close
+  it rather than delete it, because it is the record of what you were told,
+  and it stays in the Discord, closed, for 365 days, then the bot deletes it.
+  A ticket nobody closes is closed by Discord after a week with nothing said
+  in it, and goes 365 days after that. Opening a ticket again starts its 365
+  days over when it next closes. The bot checks every hour.
+- **Your answer to the rules** is kept for as long as your account is here,
+  because it is the record that you agreed to them, and goes with the rest
+  of your account when you ask for that to be deleted.
+- **Reports and calls for help** (/helpme, /report, the report page and a
+  report about a gallery picture) are kept for 365 days, like the chat they
+  are about, then dropped. The site checks every hour.
+- **/stuck and the staff logs.** Each use of /stuck, each thing staff did in
+  the world or on the site, and each move out of the world for being idle is
+  one line in a staff log, and each line is kept for 365 days, then dropped.
+  The site and each game server check every hour.
+- **Staff records.** A ban is kept for as long as it holds. Lifting one
+  deletes it, and one that ran out is kept for 365 days after it ended, then
+  deleted. A character killed for good stays dead, so that record is kept;
+  one an admin undid is kept for 365 days after it was undone, then deleted.
+  A staff note is kept for 365 days from when it was written. The site
+  checks every hour.
+- **The game server's door log** keeps each line, a character connecting
+  and whether it was let in, for 90 days, the same as the gamemode's own
+  log. The game server checks every hour.
+- **Your join number** is kept while you are in the Discord, and for 365
+  days after you leave, so coming back within a year keeps it. Then it is
+  dropped. The bot checks every hour.
 
 **Backups.** Encrypted recovery copies include site records and uploads. The
 server keeps seven daily and four weekly copies. Copies fetched to the
@@ -146,18 +186,23 @@ into service.
 
 Ask in the Discord, or open a ticket there with **I need help**. Say which
 account and what you want removed. It is done by a person, and you will be told
-when it is.
+when it is. Each part of Thornswood (the site, the game servers, voice chat and
+the Discord bot) removes it from its own records the next time that part
+restarts, which happens with its updates: usually within a day, and for voice
+and the bot sometimes up to a week. You are told once every part has done it.
 
 You can also ask what is kept about your account, request a copy, or ask to
 correct it. Use a private ticket for account details rather than a public
 Discord message. Do not send a government identity document.
 
-What deletion means here: your Discord link, your session records, your chat
-and your character. What cannot be undone is something you said that somebody
+What deletion means here: your Discord link, your session records, your chat,
+your character, your answer to the rules, the applications and calls for
+help you sent, your gallery pictures and your join number. What cannot be undone is something you said that somebody
 else has already quoted in a report, because that now belongs to the report.
 Staff's own records stay for the same reason: a ban, a note, a character
-killed for good, a report you made or one made about you, and a session staff
-marked kept because a report rests on it. A completed request is written down
+killed for good, a report you made or one made about you, a line in a staff
+log, and a session staff marked kept because a report rests on it. A request
+does not delete them, and they still go when their time above is up. A completed request is written down
 with your Discord id and character numbers and nothing else, so that an older
 backup put back into service has you removed again first.
 
@@ -194,5 +239,7 @@ There is no advertising cookie and no analytics cookie on this site. A longer li
 
 ## Asking about any of this
 
-The Discord, which is linked on every page. For a security problem rather than
-a privacy one, see `SECURITY.md` in the repository.
+The Discord, which is linked on every page. A security problem, a way to get
+at what this page says is kept, goes to the owner as a Discord direct message,
+never in a channel, where everybody would read it. You will hear back within
+72 hours.

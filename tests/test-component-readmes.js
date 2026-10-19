@@ -257,18 +257,18 @@ SIX.forEach(function (d) {
       /\[string\]\$Root\b/.test(iv) && /\[int\]\$Port\b/.test(iv) && /\[string\]\$TaskName\b/.test(iv));
   yes('voice: /health reports the BUILD string, as the README says',
       /const BUILD = '/.test(vs) && /build: BUILD/.test(vs) && t.indexOf('`BUILD`') >= 0);
-  // The README says the gamemode's copy of the feed has moved on from
-  // gamemode-voice.js. If the two are ever brought back together, this fails
-  // and the paragraph in voice\README.md is what to change.
+  // The README says the feed lives only in the gamemode, between its markers,
+  // and reads its port. The older copy beside the service went in #2736.
   const gm = read('game/gamemode.js') || '';
   const a = gm.indexOf('// ==== thornswood voice feed, added by Add-VoiceFeed.ps1 ====');
   const b = gm.indexOf('// ==== end thornswood voice feed ====');
   const block = (a >= 0 && b > a) ? gm.slice(a, b) : '';
-  const file = read('voice/gamemode-voice.js') || '';
   yes('voice: the gamemode carries the voice feed block between its markers', block.length > 0);
-  yes('voice: as the README says, that block reads its port and gamemode-voice.js has 7778 written in',
-      /VOICE_PORT = voicePort\(\)/.test(block) && /VOICE_PORT = 7778;/.test(file) &&
-      t.indexOf('server-settings.json') >= 0);
+  yes('voice: as the README says, that block reads its port from server-settings.json',
+      /VOICE_PORT = voicePort\(\)/.test(block) && t.indexOf('server-settings.json') >= 0);
+  yes('voice: and it is the only copy, as the README says',
+      read('voice/gamemode-voice.js') === null && read('scripts/deploy/Add-VoiceFeed.ps1') === null &&
+      t.indexOf('went in #2736') >= 0);
 }
 
 // ----------------------------------------------------------------- plugins --
