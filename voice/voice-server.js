@@ -149,7 +149,7 @@ function owns(ticket, profileId, then) {
         if (size > OWNS_REPLY_MAX) {
           console.log('[voice] the site\'s answer to the ownership check passed ' + OWNS_REPLY_MAX +
                       ' bytes, so the rest was not read');
-          try { req2.destroy(); } catch (e) { }
+          req2.destroy();
           finish('unchecked');
           return;
         }
@@ -164,7 +164,7 @@ function owns(ticket, profileId, then) {
     });
   } catch (e) { finish('unchecked'); return; }
 
-  late = setTimeout(() => { try { req2.destroy(); } catch (e) { } finish('unchecked'); }, OWNS_WAIT_MS);
+  late = setTimeout(() => { req2.destroy(); finish('unchecked'); }, OWNS_WAIT_MS);
   req2.on('error', () => finish('unchecked'));
   req2.write(payload);
   req2.end();
@@ -311,13 +311,14 @@ function silencedLeft(profileId, now) {
 
 /* Staff silence is a moderation tool, so every connection is told, including
    people who are not in earshot: a connection opened earlier still carries
-   sound until the microphone is closed and the listener's level is nothing. */
+   sound until the microphone is closed and the listener's level is nothing.
+   Sock.send does not throw: a write that fails closes that connection, and
+   whoever reconnects is told their own hush at join (onJoin), so nobody is
+   left unhushed by a failed send. */
 function tellHush(profileId, on) {
   const msg = { t: 'hush', profileId: Number(profileId) || 0, on: !!on };
   if (!msg.profileId) return;
-  for (const [, p] of peers) {
-    try { p.ws.send(msg); } catch (e) { }
-  }
+  for (const [, p] of peers) p.ws.send(msg);
 }
 
 function sweepSilenced(now) {
@@ -957,7 +958,7 @@ setInterval(() => {
       s.close();
       continue;
     }
-    try { s.ping(); } catch (e) { }
+    s.ping();   // does not throw: a ping that cannot be written closes s
   }
 }, PING_EVERY);
 
@@ -1134,7 +1135,7 @@ class Sock {
     live.delete(this);
     if (this.closed) return;
     this.closed = true;
-    try { this.socket.destroy(); } catch (e) { }
+    this.socket.destroy();
     if (this.onclose) this.onclose();
   }
 
@@ -1168,7 +1169,7 @@ class Sock {
         nothing that talks to this service sends one.
       */
       if (!masked) {
-        try { this.socket.write(Buffer.from([0x88, 2, 0x03, 0xea])); } catch (e) { }   // FIN+close, len 2, 1002
+        this.socket.write(Buffer.from([0x88, 2, 0x03, 0xea]));   // FIN+close, len 2, 1002
         this.close();
         return;
       }
@@ -1203,14 +1204,12 @@ class Sock {
         the reply until its own timeout.
 
         The body of a close frame is a two byte status code, big endian, and
-        1000 is a normal closure. Written before the teardown so a write that
-        throws cannot leave the socket open.
+        1000 is a normal closure. A socket's write does not throw: one the
+        other end has already dropped reports it on the socket's error event,
+        which closes this as well.
       */
       if (op === 0x8) {
-        try {
-          const bye = Buffer.from([0x88, 2, 0x03, 0xe8]);   // FIN+close, len 2, 1000
-          this.socket.write(bye);
-        } catch (e) { }
+        this.socket.write(Buffer.from([0x88, 2, 0x03, 0xe8]));   // FIN+close, len 2, 1000
         this.close();
         return;
       }
@@ -1424,7 +1423,7 @@ function onJoin(ws, msg, profileId) {
 
   ws.send({ t: 'welcome', peer: id, profileId: profileId });
   if (profileId && silencedLeft(profileId, Date.now())) {
-    try { ws.send({ t: 'hush', profileId: profileId, on: true }); } catch (e) { }
+    ws.send({ t: 'hush', profileId: profileId, on: true });
   }
   announce();
   return id;
@@ -1821,7 +1820,9 @@ function readBody(req, res, limit, then) {
     body += d;
     if (body.length > limit) {
       tooBig = true;
-      try { res.writeHead(413, { 'content-type': 'text/plain' }).end('too big'); } catch (e) { }
+      // The only answer this request gets: nothing is written before its end,
+      // which a destroyed request never reaches, so writeHead cannot throw.
+      res.writeHead(413, { 'content-type': 'text/plain' }).end('too big');
       req.destroy();
     }
   });
@@ -2134,7 +2135,7 @@ const server = http.createServer((req, res) => {
       body += d;
       if (body.length > 200000) {
         tooBig = true;
-        try { res.writeHead(413, { 'content-type': 'text/plain' }).end('too big'); } catch (e) { }
+        res.writeHead(413, { 'content-type': 'text/plain' }).end('too big');   // see readBody
         req.destroy();
       }
     });
@@ -2292,9 +2293,7 @@ const server = http.createServer((req, res) => {
       for (const pid of silenced.keys()) {
         const clear = { t: 'headclear', profileId: pid };
         const hush = { t: 'hush', profileId: Number(pid), on: true };
-        for (const [, p] of peers) {
-          try { p.ws.send(clear); p.ws.send(hush); } catch (e) { }
-        }
+        for (const [, p] of peers) { p.ws.send(clear); p.ws.send(hush); }   // see tellHush
       }
       for (const pid of before) {
         if (!silenced.has(pid)) tellHush(pid, false);
@@ -2521,15 +2520,15 @@ function plainFromOutside(req) {
 */
 const PROTOCOL = 'thornswood';
 
+/* The error listener is there for a client that hung up before the refusal
+   is written: the write's failure is reported as an error event, and that
+   client was being turned away anyway, so there is nobody to tell and the
+   socket is already gone. end() itself does not throw. */
 function refuseUpgrade(socket, why) {
   const body = 'no: ' + why + '\n';
-  try {
-    socket.on('error', () => { });
-    socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Type: text/plain\r\n' +
-               'Content-Length: ' + Buffer.byteLength(body) + '\r\n\r\n' + body);
-  } catch (e) {
-    try { socket.destroy(); } catch (x) { }
-  }
+  socket.on('error', () => { /* the client hung up first; see above */ });
+  socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Type: text/plain\r\n' +
+             'Content-Length: ' + Buffer.byteLength(body) + '\r\n\r\n' + body);
 }
 
 server.on('upgrade', (req, socket, head) => {
@@ -2600,14 +2599,10 @@ server.on('upgrade', (req, socket, head) => {
                   '(THORNSWOOD_VOICE_MOST), so profile ' + proven + ' was told and closed (' +
                   refusedFull + ' turned away so far)');
     }
-    socket.on('error', () => { });
+    socket.on('error', () => { /* the client hung up first; see refuseUpgrade */ });
     const why = Buffer.from('full', 'utf8');
-    try {
-      socket.write(frame(JSON.stringify({ t: 'chat', from: 0, profileId: 0, name: 'Thornswood', text: FULL_LINE, at: Date.now() })));
-      socket.end(Buffer.concat([Buffer.from([0x88, 2 + why.length, 0x03, 0xf5]), why]));   // FIN+close, 1013 try again later
-    } catch (e) {
-      try { socket.destroy(); } catch (x) { }
-    }
+    socket.write(frame(JSON.stringify({ t: 'chat', from: 0, profileId: 0, name: 'Thornswood', text: FULL_LINE, at: Date.now() })));
+    socket.end(Buffer.concat([Buffer.from([0x88, 2 + why.length, 0x03, 0xf5]), why]));   // FIN+close, 1013 try again later
     return;
   }
 
