@@ -9792,14 +9792,16 @@
     nothing however far the fall, for this character and nobody else.
 
     TIRELESS. Running costs nothing in this game and neither does a plain
-    swing. A sprint and a power attack do, and both are the game's own sums
-    from game settings (Skyrim.esm, overridden by nothing in the load order;
-    skymp5-server's attack costs are SweetPie's only, and this server does
-    not load SweetPie): fSprintStaminaDrainMult for a sprint, and
-    fStaminaAttackWeaponBase plus fStaminaAttackWeaponMult times the
-    weapon's weight for a power attack. Each is held at half while Tireless
-    is held. These have no second set for everybody else, so an NPC this
-    machine runs pays half as well; #1385 says so for Patrick.
+    swing. A sprint, a power attack and a shield bash do, and each is the
+    game's own sum from game settings (Skyrim.esm, overridden by nothing in
+    the load order; skymp5-server's attack costs are SweetPie's only, and
+    this server does not load SweetPie): fSprintStaminaDrainMult for a
+    sprint, fStaminaAttackWeaponBase plus fStaminaAttackWeaponMult times the
+    weapon's weight for a power attack, and fStaminaBashBase and
+    fStaminaPowerBashBase for a bash and a power bash. A bash counts as a
+    swing (Patrick, 12 Oct: one rule for every attack). Each is held at half
+    while Tireless is held. These have no second set for everybody else, so
+    an NPC this machine runs pays half as well, which Patrick kept (12 Oct).
 
     PACK MULE IS NOT HERE. Being overloaded makes the game walk you, and no
     game setting changes that; #1385 has it for Patrick.
@@ -9818,7 +9820,10 @@
   /* perk -> { game setting: the share of the game's own value it is held at }. */
   const PERK_SETTINGS = {
     windwalker: { fJumpFallHeightMult: 0 },
-    tireless: { fSprintStaminaDrainMult: 0.5, fStaminaAttackWeaponBase: 0.5, fStaminaAttackWeaponMult: 0.5 }
+    tireless: {
+      fSprintStaminaDrainMult: 0.5, fStaminaAttackWeaponBase: 0.5, fStaminaAttackWeaponMult: 0.5,
+      fStaminaBashBase: 0.5, fStaminaPowerBashBase: 0.5
+    }
   };
 
   let perksHeld = {};               // perk -> true, the view's list
