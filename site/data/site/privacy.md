@@ -146,7 +146,10 @@ both are served from here now.
 - **Your application** on the site is kept for 365 days, like a report, then
   dropped. The ticket itself is a private thread in the Discord. Staff close
   it rather than delete it, because it is the record of what you were told,
-  so it stays in the Discord, closed, until staff delete it.
+  and it stays in the Discord, closed, for 365 days, then the bot deletes it.
+  A ticket nobody closes is closed by Discord after a week with nothing said
+  in it, and goes 365 days after that. Opening a ticket again starts its 365
+  days over when it next closes. The bot checks every hour.
 - **Your answer to the rules** is kept for as long as your account is here,
   because it is the record that you agreed to them, and goes with the rest
   of your account when you ask for that to be deleted.
