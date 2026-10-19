@@ -48,7 +48,7 @@
        update writes runs after it, and work under Alone may itself refresh.
 
   HOW. As test-own-folder-alone.ps1: the shipped OwnGame.cs and the files it
-  needs, compiled with the .NET Framework csc the launcher builds with (C# 5),
+  needs, compiled with the compiler the build runs (tests\Launcher-Csc.ps1),
   stand-ins for Checks, Keep, Updater and Junction, and a driver that builds a
   pretend Steam, Steam copy and Vortex in a scratch folder.
 
@@ -91,27 +91,23 @@ for ($n = 14; $n -le [int]$rulesNum.Groups[1].Value; $n++) {
 }
 Yes ("every rule from 14 to " + $rulesNum.Groups[1].Value + " has a line in RuleTouches (null walks everything)" + $(if ($missing) { '; missing: ' + ($missing -join ', ') } else { '' })) ($missing.Count -eq 0)
 
-$csc = @(
-    (Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'),
-    (Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe')
-) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-Yes 'the .NET Framework csc the launcher builds with is on this machine' ([bool]$csc)
-if (-not $csc) { Done }
-$fw = Split-Path -Parent $csc
-$refs = @('System.dll', 'System.Core.dll', 'System.Runtime.Serialization.dll', 'System.Xml.dll', 'System.Security.dll') |
-    ForEach-Object { Join-Path $fw $_ }
-# Downgrade.cs puts a line on the clipboard through WPF, found the way
-# Build-Launcher.ps1 and test-own-folder-alone.ps1 find it.
-$refDirs = @(Get-ChildItem -Path "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework" -Directory -Filter 'v4.*' -ErrorAction SilentlyContinue |
-    Sort-Object Name -Descending | ForEach-Object { $_.FullName }) + @((Join-Path $fw 'WPF'), $fw)
-foreach ($n in 'PresentationCore.dll', 'WindowsBase.dll', 'PresentationFramework.dll', 'System.Xaml.dll') {
-    $hit = $refDirs | ForEach-Object { Join-Path $_ $n } | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-    if (-not $hit) {
-        $hit = Get-ChildItem (Join-Path $env:WINDIR 'Microsoft.NET\assembly') -Filter $n -Recurse -File -ErrorAction SilentlyContinue |
-            Sort-Object FullName -Descending | Select-Object -First 1 | ForEach-Object { $_.FullName }
-    }
-    $refs += $(if ($hit) { $hit } else { Join-Path $fw $n })
-}
+# Vortex's plugin list is copied even when nothing was deployed (17 Oct):
+# a refresh that returns "already matches" used to skip the copy, so a list
+# changed in Vortex alone (a plugin enabled, a reinstall) never reached a
+# release folder, and a Ship built from the stale list refused.
+$early = [regex]::Match($og, '(?s)static string RefreshNow\(.*?if \(!string\.IsNullOrEmpty\(src\)(.*?)return "Thornswood''s own Skyrim folder already matches what Vortex has deployed\.";')
+Yes 'the refresh that finds nothing to bring in still copies Vortex''s plugin list first' ($early.Success -and $early.Groups[1].Value -match 'BakeVortexList\(\);')
+$settle = [regex]::Match($og, '(?s)static void SettleSettings\(bool first\)\s*\{(.*?)\n        \}')
+Yes 'a refresh that brings files in copies it too (SettleSettings)' ($settle.Success -and $settle.Groups[1].Value -match 'BakeVortexList\(\);')
+
+Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
+# What the launcher compiles against, from the reference assemblies the
+# build uses (Launcher-Csc.ps1). Downgrade.cs puts a line on the clipboard
+# through WPF, so the WPF ones are here too.
+$refs = @('System.dll', 'System.Core.dll', 'System.Runtime.Serialization.dll', 'System.Xml.dll', 'System.Security.dll',
+          'PresentationCore.dll', 'WindowsBase.dll', 'PresentationFramework.dll', 'System.Xaml.dll') |
+    ForEach-Object { Join-Path $LauncherRefDir $_ }
 
 $real = @('OwnGame.cs', 'OwnGameShare.cs', 'OwnGameKinds.cs', 'Downgrade.cs', 'Steam.cs', 'Paths.cs', 'Config.cs', 'Secrets.cs', 'LoadOrder.cs', 'Swallow.cs', 'Progress.cs') |
     ForEach-Object { Join-Path $AppPath $_ }
@@ -731,7 +727,7 @@ try {
     $compiled = & $LauncherCsc @cscArgs 2>&1
     $ErrorActionPreference = $old
     $built = ($LASTEXITCODE -eq 0) -and (Test-Path -LiteralPath $exe)
-    Yes 'the real OwnGame.cs compiles with the driver under the C# 5 compiler' $built
+    Yes 'the real OwnGame.cs compiles with the driver under the build''s compiler' $built
     if (-not $built) { foreach ($l in @($compiled)) { Write-Host "      $l" }; Done }
 
     $scene = Join-Path $work 'machine'

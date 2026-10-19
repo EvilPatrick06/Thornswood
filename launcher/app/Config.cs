@@ -206,6 +206,14 @@ namespace Thornswood
 
         [DataMember] public bool KeepLauncherOpen = false;
 
+        // A full crash snapshot (#2626). Off unless the person turns it on in
+        // Settings: one can be 9 GB or more, and Djinn, 17 October, found one
+        // on his PC that nobody had told him was being written. Absent means
+        // off, which is what false means. The folder is where they go; blank
+        // leaves them beside the crash log, where Crash Logger writes them.
+        [DataMember] public bool CrashSnapshots = false;
+        [DataMember] public string CrashSnapshotFolder = "";
+
         // Said No to setting Steam's Updates setting for Skyrim (ShellSteamUpdates.cs,
         // #493), so the start does not ask again. The question after a downgrade still does.
         [DataMember] public bool SteamUpdatesDeclined = false;
@@ -663,6 +671,12 @@ namespace Thornswood
         /// </summary>
         public NewsRef newsRef;
 
+        /// <summary>
+        /// The signed release manifest, "signedManifest" (#2163, FeedManifest.cs).
+        /// Read apart like the record. Null when there is none.
+        /// </summary>
+        public ManifestRef manifestRef;
+
         public static VersionDoc Parse(byte[] raw)
         {
             // A UTF-8 byte order mark is not JSON. The serializer stops on it and
@@ -677,8 +691,53 @@ namespace Thornswood
             {
                 doc.record = RecordRef.FromFeed(raw, at);
                 doc.newsRef = NewsRef.FromFeed(raw, at);
+                doc.manifestRef = ManifestRef.FromFeed(raw, at);
             }
             return doc;
+        }
+    }
+
+    /// <summary>
+    /// The feed's "signedManifest" (#2163): { url, sha256, catalogUrl,
+    /// catalogSha256 }, release.json and the catalog ThornswoodRelease signed
+    /// over it, each stored under its own sha256 beside every other asset.
+    /// Read apart from the serializer, so a signedManifest of any other shape
+    /// costs the manifest check and never the feed.
+    /// </summary>
+    public class ManifestRef
+    {
+        public string url = "";
+        public string sha256 = "";
+        public string catalogUrl = "";
+        public string catalogSha256 = "";
+
+        /// <summary>The feed's "signedManifest", or null when it names none
+        /// this launcher can use. Never throws.</summary>
+        public static ManifestRef FromFeed(byte[] raw, int at)
+        {
+            try
+            {
+                var root = Json.Parse(Encoding.UTF8.GetString(raw, at, raw.Length - at)) as Dictionary<string, object>;
+                if (root == null) return null;
+                object b;
+                if (!root.TryGetValue("signedManifest", out b)) return null;
+                var o = b as Dictionary<string, object>;
+                if (o == null) return null;
+                var r = new ManifestRef();
+                r.sha256 = Json.Str(o, "sha256").ToLowerInvariant();
+                r.url = Json.Str(o, "url").Trim();
+                r.catalogSha256 = Json.Str(o, "catalogSha256").ToLowerInvariant();
+                r.catalogUrl = Json.Str(o, "catalogUrl").Trim();
+                if (!RecordRef.IsSha(r.sha256) || r.url.Length == 0) return null;
+                if (!RecordRef.IsSha(r.catalogSha256) || r.catalogUrl.Length == 0) return null;
+                return r;
+            }
+            catch (Exception)
+            {
+                // A feed whose "signedManifest" cannot be read has none: the
+                // check says so in the log, and the rest of the feed stands.
+                return null;
+            }
         }
     }
 

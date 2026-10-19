@@ -110,6 +110,19 @@ namespace Thornswood
             Keep.Restore();
             Check("ordinary UI restoration remains intact", Read(Path.Combine(Paths.Game, ui)) == "our page");
 
+            // #2627: Scan asks Changed, which writes nothing, and Fix runs
+            // PutBack, which is Restore without the parking.
+            Fresh(null, null, false);
+            Put(Path.Combine(Keep.Dir, ui), "our page"); Put(Path.Combine(Paths.Game, ui), "foreign page");
+            string other = Path.Combine(Paths.Game, "Data\\Platform\\Plugins\\other-server.js");
+            Put(other, "theirs");
+            var changed = Keep.Changed();
+            Check("Changed names the kept page another server changed", changed.Count == 1 && changed[0] == ui);
+            Check("and writes nothing", Read(Path.Combine(Paths.Game, ui)) == "foreign page" && File.Exists(other));
+            Check("PutBack puts it back and says so", Keep.PutBack() != null && Read(Path.Combine(Paths.Game, ui)) == "our page");
+            Check("and parks nothing: parking is for a session", File.Exists(other) && !Directory.Exists(Keep.ParkDir));
+            Check("then nothing is changed any more", Keep.Changed().Count == 0 && Keep.PutBack() == null);
+
             // Simulate a missing or unreadable resource after parser coverage.
             var record = typeof(ClientRuntime).GetField("recorded", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
             record.SetValue(null, new System.Collections.Generic.List<ClientRuntime.Entry>());

@@ -68,6 +68,7 @@ const ctx = {
 };
 ctx.globalThis = ctx;
 vm.createContext(ctx);
+const eligibility = require('./quest-eligibility-fixture')(ctx, gm);
 vm.runInContext(block, ctx);
 const create = ctx.__thornswoodCustomQuestsCreate;
 assert.equal(typeof create, 'function');
@@ -77,6 +78,7 @@ const docNames = doc.scarce.map(function (row) { return row[0]; })
 assert.ok(docNames.indexOf('Supply') < 0 && docNames.indexOf('A dragon') < 0);
 
 function world(ranks) {
+  const chosen = new Map();
   const population = require('../game/data/npc-population.json');
   const compact = {keep:population.npcs.filter(r=>r.keep).map(r=>[r.ref,r.base,r.world||r.cell,r.pos,r.leash,
     r.returnMinutes,r.role,r.habitat,r.tier,r.cap,r.populationBucket,0,r.species])};
@@ -98,6 +100,13 @@ function world(ranks) {
   // Each person's quests are kept on the character (#1621).
   const kept = new Map();
   const svc = create({
+    eligibility,
+    readCharacter(actor) {
+      const saved = {};
+      Object.keys(ranks || {}).forEach(key => {if(key.startsWith(actor + ':')) saved[key.slice(String(actor).length + 1)] = ranks[key];});
+      const cls = chosen.get(actor) || Object.keys(saved).find(key => Object.hasOwn(ctx.__thornswoodProgression.TABLE.classes, key)) || null;
+      return {v:1,cls,prof:saved.bladebinder || saved.wardweaver ? 'enchanter' : null,ranks:saved};
+    },
     now: function () { return clock; },
     goldDesc: 'f:Skyrim.esm',
     load: function (actor) { return kept.has(actor) ? JSON.parse(kept.get(actor)) : undefined; },
@@ -129,7 +138,6 @@ function world(ranks) {
       inv.set(key, inv.get(key) - count);
       return true;
     },
-    rankOf: function (actor, key) { return (ranks && ranks[actor + ':' + key]) || ''; },
     creatureName: function (id) { return names[id] || ''; },
     cellOf: function (id) { return cells[id] || ''; },
     traderHold: function (id) { return holds[id] || ''; },
@@ -147,7 +155,7 @@ function world(ranks) {
     creditWork: function () { return null; },
     wearTool: function () { return null; }
   });
-  return { svc: svc, inv: inv, adds: adds, purse: purse, bodies, ids, touches: function () { return purseTouches; } };
+  return { svc: svc, inv: inv, adds: adds, purse: purse, bodies, ids, chooseClass:(actor,cls)=>chosen.set(actor,cls), touches: function () { return purseTouches; } };
 }
 let clock = 1000;
 const names = {};
@@ -278,6 +286,7 @@ assert.equal(svc.turnIn(1, 'camp', 'trader-1').ok, true);
 assert.equal(box.adds.filter(function (row) { return row.count === camp.gold; }).length, 1);
 
 assert.equal(svc.offer(4, 'geode').ok, true, 'either Enchanter half may take the geode');
+box.chooseClass(1,'fisher');
 assert.equal(svc.offer(1, 'longfin').ok, true, 'a fisher of any rank may take the longfin');
 assert.equal(svc.offer(3, 'longfin').ok, false, 'a miner is not a fisher');
 
@@ -285,4 +294,64 @@ const mineBody = gm.slice(gm.indexOf('function mineOre'), gm.indexOf('function c
 assert.ok(mineBody.indexOf('isRareSeam') >= 0, 'mineOre sends a rare seam to the scarce place');
 assert.ok(gm.indexOf('noteKill(killerId, actorId)') >= 0, 'a death can count for a scene kill');
 assert.equal(box.touches(), 0);
+
+// The production quest rank adapter must not invoke the character reader
+// that migrates on a missing or failed read. Compile those actual functions;
+// only their native storage and presentation dependencies are controlled.
+const characterBlock = gm.slice(gm.indexOf('// ==== thornswood character ===='), gm.indexOf('// ==== end thornswood character ===='));
+assert.ok(characterBlock.length > 0, 'production character block envelope');
+function productionFunction(name, parameter) {
+  const signature = '  function ' + name + '(' + parameter + ') {';
+  assert.equal(characterBlock.split(signature).length, 2, 'unique production ' + name);
+  const begin = characterBlock.indexOf(signature), end = characterBlock.indexOf('\n  }', begin);
+  assert.ok(end > begin);
+  return characterBlock.slice(begin, end + '\n  }'.length);
+}
+const rankBegin = '        readCharacter: function (actor) {';
+assert.equal(gm.split(rankBegin).length, 2, 'unique production quest rank adapter');
+const rankStart = gm.indexOf(rankBegin);
+const rankEnd = gm.indexOf('        creatureName:', rankStart);
+assert.ok(rankEnd > rankStart);
+const rankAdapter = gm.slice(rankStart + '        readCharacter: '.length, rankEnd).trim().replace(/,$/, '');
+const characterRank = /rankOf: (function \(actorId, key\) \{ return P\.rankOf\(stateOf\(actorId\), key\); \})/.exec(gm);
+assert.ok(characterRank, 'production character rank adapter envelope');
+for (const sample of ['throw', undefined, null, [], {}, {v: 2, ranks: {miner: 'master'}},
+  {v: 1, ranks: []}, {v: 1, ranks: {miner: 'invalid'}}, {v: 1, ranks: {miner: true}},
+  {v: 1, cls:'miner', ranks: {miner: 'master'}}, {v: 1, cls:'miner', ranks: {miner: 'novice'}}]) {
+  const writes = [];
+  const rankContext = {
+    CHAR_PROPERTY: 'thornswoodCharacter', RANK: ['novice', 'advanced', 'expert', 'master'],
+    mp: {
+      get(actor, property) {
+        if (property !== 'thornswoodCharacter') return null;
+        if (sample === 'throw') throw Error('transient character read failure');
+        return sample;
+      },
+      set(...args) { writes.push(args); }
+    },
+    P: {
+      fresh: () => ({v: 1, ranks: {}}),
+      rankOf: (state, key) => state && state.ranks && Object.hasOwn(state.ranks, key) ? state.ranks[key] : null
+    },
+    writeState(actor, state) { rankContext.mp.set(actor, 'thornswoodCharacter', state); return state; },
+    mapHalf: () => null,
+    clog: () => {}
+  };
+  rankContext.globalThis = rankContext;
+  vm.createContext(rankContext);
+  vm.runInContext(productionFunction('readState', 'actorId') + '\n' +
+    productionFunction('migrate', 'actorId') + '\n' + productionFunction('stateOf', 'actorId'), rankContext);
+  rankContext.__thornswoodCharacter = {
+    PROPERTY: 'thornswoodCharacter',
+    rankOf: vm.runInContext('(' + characterRank[1] + ')', rankContext)
+  };
+  rankContext.questCharacterSource = rankContext.__thornswoodCharacter;
+  const rules = require('./quest-eligibility-fixture')(rankContext, gm);
+  const readRank = vm.runInContext('(' + rankAdapter + ')', rankContext);
+  const gate = vm.runInContext('({classKey:"miner",rank:"novice"})', rankContext);
+  const qualified = rules.allows(gate, readRank(91));
+  assert.equal(writes.length, 0, 'quest eligibility never migrates or writes progression on a read');
+  const expected = !!(sample && sample.v === 1 && sample.cls==='miner' && sample.ranks && ['master', 'novice'].includes(sample.ranks.miner));
+  assert.equal(qualified, expected, 'only canonical saved rank entries and chosen class qualify');
+}
 console.log('PASS scarce and scene quests match docs/systems/quests.md');

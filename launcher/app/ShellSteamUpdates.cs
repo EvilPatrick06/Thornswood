@@ -105,16 +105,8 @@ namespace Thornswood
         /// </summary>
         static void StartSteamAgain()
         {
-            string root = "";
-            try { root = Steam.Path_() ?? ""; } catch (Exception ex) { Swallow.Note("Shell.StartSteamAgain, finding Steam", ex); }
-            string exe = root.Length > 0 ? Path.Combine(root, "steam.exe") : "";
-            if (exe.Length > 0 && File.Exists(exe))
-            {
-                try { Process.Start(new ProcessStartInfo(exe, "-silent") { UseShellExecute = false }); return; }
-                catch (Exception ex) { LogOnly("steam.exe would not start again (" + ex.Message + "), so Steam's link is asked instead."); }
-            }
-            if (!Downgrade.AskSteam("steam://open/main", LogOnly))
-                LogOnly("Steam could not be started again. Start it yourself.");
+            // The same start Fix makes when Scan finds Steam not running (#2627).
+            Upkeep.StartSteam(LogOnly);
         }
     }
 }

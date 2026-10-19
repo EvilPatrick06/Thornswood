@@ -2,7 +2,8 @@
   Nightly-Stray.ps1
 
   Names every pull request open more than two days and every branch other than
-  main with no open pull request, reading every page GitHub has. Run by
+  main with no open pull request, reading every page GitHub has. A pull
+  request labelled held is listed as held and does not count (#1273). Run by
   .github/workflows/nightly.yml in its step "Stray pull requests and
   branches", with GH_TOKEN and REPO set:
 
@@ -60,24 +61,34 @@ function Get-StrayPages {
     return $all
 }
 
-# The pull requests open more than $Days days, and the branches other than
-# main that no open pull request is made from.
+# The label a pull request held back on purpose carries (#1273): one marker
+# read exactly, where held work had four spellings in titles and none at all
+# in others. A held pull request is listed every night and does not turn it
+# red; the label comes off when it is let go.
+$HeldLabel = 'held'
+
+# The pull requests open more than $Days days, apart from the held ones, and
+# the branches other than main that no open pull request is made from.
 function Find-Stray {
     param([int]$Days = 2, [DateTime]$Now = [DateTime]::UtcNow)
     $old = $Now.AddDays(-$Days)
     $pulls = @(Get-StrayPages 'pulls?state=open')
-    $prs = @($pulls | Where-Object { ([DateTime]$_.created_at).ToUniversalTime() -lt $old })
+    $aged = @($pulls | Where-Object { ([DateTime]$_.created_at).ToUniversalTime() -lt $old })
+    $isHeld = { param($p) @($p.labels | ForEach-Object { [string]$_.name }) -contains $HeldLabel }
+    $held = @($aged | Where-Object { & $isHeld $_ })
+    $prs = @($aged | Where-Object { -not (& $isHeld $_) })
     $open = @($pulls | ForEach-Object { [string]$_.head.ref })
     $branches = @(Get-StrayPages 'branches' | ForEach-Object { [string]$_.name } | Where-Object { $_ -ne 'main' })
     $stray = @($branches | Where-Object { $open -notcontains $_ })
-    return [pscustomobject]@{ OldPulls = $prs; Stray = $stray; Branches = $branches.Count; Pulls = $pulls.Count }
+    return [pscustomobject]@{ OldPulls = $prs; HeldPulls = $held; Stray = $stray; Branches = $branches.Count; Pulls = $pulls.Count }
 }
 
 if ($Run) {
     $found = Find-Stray
+    foreach ($p in $found.HeldPulls) { Write-Host ("::notice::pull request #{0} is held ({1}), open since {2}: {3}" -f $p.number, $HeldLabel, $p.created_at, $p.title) }
     foreach ($p in $found.OldPulls) { Write-Host ("::error::pull request #{0} has been open since {1}: {2}" -f $p.number, $p.created_at, $p.title) }
     foreach ($b in $found.Stray) { Write-Host ("::error::branch {0} has no open pull request" -f $b) }
-    Write-Host ("read {0} branch(es) other than main and {1} open pull request(s)" -f $found.Branches, $found.Pulls)
+    Write-Host ("read {0} branch(es) other than main and {1} open pull request(s), {2} of them old and held" -f $found.Branches, $found.Pulls, $found.HeldPulls.Count)
     if ($found.OldPulls.Count -or $found.Stray.Count) {
         Write-Host ("{0} old pull request(s), {1} stray branch(es)" -f $found.OldPulls.Count, $found.Stray.Count)
         exit 1

@@ -74,7 +74,7 @@ function Run-Block([string]$value, $settings) {
     $remotePlugins = 'C:/nowhere'
     $fullIndexDef = $script:fullIndexDef
     $lightTable = ''
-    $boxRecord = Join-Path $tmp 'server-build.json'
+    $devRecordLight = $false
     $VoicePort = 7789
     $maxOnline = 0
     $seats = 0

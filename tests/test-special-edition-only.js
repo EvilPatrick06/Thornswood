@@ -300,8 +300,12 @@ for (const s of ['scripts/dev/Build-HarvestTable.ps1', 'scripts/dev/Build-HuntTa
 
 {
   const verify = read('launcher/app/Verify.cs');
+  // Since #2627 a plugin the server hands out, which is ours, is passed
+  // over too, and each issue carries what Fix does about it.
   const loop = 'foreach (string p in LoadOrder.NotInBuild(have, want, LightOrMissing))\n' +
-               '                issues.Add(new Issue(p + " is enabled but is not part of this build.", true));';
+               '            {\n' +
+               '                if (ServedByServer(cfg, p)) continue;\n' +
+               '                issues.Add(Issue.Of(IssueKind.Plugins, p + " is enabled but is not part of this build.",';
   yes('Verify.cs asks LoadOrder.NotInBuild what is "not part of this build", so switched on Creation Club plugins that take no place do not stop Play',
       verify.indexOf(loop) >= 0);
   yes('...and nothing else in it says so', (verify.match(/is enabled but is not part of this build/g) || []).length === 1);

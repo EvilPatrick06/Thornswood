@@ -48,9 +48,11 @@ character on the account is ordinary.
 - **The Court** of a hold is everybody holding its "<Hold> Court" role.
   They are officers at that hold's drop box.
 - **The Steward** of a hold holds its "Steward of <Hold>" role. A steward
-  is the only one who evicts, sets rent and names a hold's box, and moves
+  is the only one in the world who evicts and sets rent (staff evict and
+  set rent too, below), and moves
   their own hold's notice board, and the Jarl of a hold keeps it as its
-  steward too.
+  steward too. All of it in their own hold only: a building's hold is the
+  hold its doors open onto ([Property](property.md), Where this is).
 - **The Guards** of a hold hold its "Guard of <Hold>" role (below).
 
 The Jarl of a hold gives and takes its Court, Steward and Guard roles, for
@@ -60,7 +62,11 @@ game, with Name and Remove on the Office page of the K panel. In the game
 the server asks the site, and the bot's account sets the role in Discord.
 Every change is said in the staff channel with who changed what, and
 Discord's audit log keeps it with the reason. Staff hold no office by
-being staff. All of it is buttons, and nothing is typed. See
+being staff. They do end claims and set rent at any building, in any
+hold or none, with the same buttons on the Office page of K, which says
+they act as staff there, and every press is in the staff log (Patrick,
+17 October, #2551; [Property](property.md)). All of it is buttons, and
+nothing is typed. See
 [Property](property.md) and [Notice boards](noticeboards.md).
 
 The roles are made for the nine holds of Skyrim and for Raven Rock
@@ -190,9 +196,9 @@ the role in Discord with the bot's token; the game reads the roles back
 at once and writes the page again. In Discord the same Jarl has the office
 panel in #choose-your-hold (`bot\bot.py`). A steward sees the door they
 opened in the last minute, who holds it and the rent owed there, with
-Evict, Set rent and No rent; the container they opened in the last
-minute, with the ten holds to make it that hold's box; and their own
-hold's board, moved to where the steward stands. Evict and moving a
+Evict, Set rent and No rent; and their own hold's board, moved to where
+the steward stands. A steward no longer marks a container as a hold's
+box: the drop box on the board is the only one (Patrick, 15 Oct, #2298). Evict and moving a
 board ask for a second press. The Court, a Steward and a guard each see
 which hold they serve and what it lets them do, and a guard which jail
 they keep. A Jarl whose role another account holds too sees that they

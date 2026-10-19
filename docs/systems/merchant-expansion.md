@@ -6,6 +6,22 @@ it does not describe a completed release.
 
 ## Roster and tables
 
+Patrick clarified during alpha testing that current merchant purses, stock
+and pending trades are disposable. Preserving that test economy is not a
+prerequisite for the sixty-merchant cut. Any one-time reset belongs to
+Claude's stopped-server rollout, never to recurring startup or a timed repair.
+
+Deliver usable sections before the whole quest catalogue is complete. The
+first runtime section assigns the selected sixty merchants their role names,
+item tables and matching legacy quest offers. The next section applies the
+sixty-only roster to the population generator and the matching last plugin.
+It requires Claude's coordinated content/client/server release. Empty alpha
+merchant records initialize through ordinary first use, once per retained
+merchant; no pre-funding or reset is required. If old pending test work blocks
+admission, the explicit reset-data tool is available to Claude. Neither
+section adds expanded quests. New offers
+still need their own objective, eligibility and transaction checks.
+
 Each of the ten existing book holds, including Raven Rock, has exactly six
 guild NPCs: Smith, Woodworker, Tailor, Enchanter, Cook and Alchemist. There
 is one of each, for 60 total. Reuse suitable authored identities. Exact
@@ -25,9 +41,9 @@ later configuration edits cannot change an open controller's authority.
 Both the panel and submitted actions check the actual resolved item ID;
 stock must also match that ID, rather than its name alone. Supply permission
 is separate from ordinary buying. Saved transfers recover their original
-terms even if their goods are outside a later role's table. The current
-249-trader catalogue has no role assignments: this support does not activate
-the six-trade roster, its display titles or the final item-table data.
+terms even if their goods are outside a later role's table. Startup binds the
+sixty retained references to their verified role tables and display titles
+before constructing a private writer or admitting interactions.
 
 The panel has separate selling and buying sections. Selling shows only
 carried items this merchant can buy at its submitted price, within its
@@ -37,11 +53,12 @@ cannot buy anything. Quantity controls use the same authenticated settlement
 and receipt checks as the existing transfer. A displayed quote never
 authorizes a stale or forged request.
 
-## Inactive item catalogue
+## Item catalogue and runtime admission
 
 `game/data/merchant-role-tables.json` records the six distinct static item
-tables and the source evidence behind each identity. It is marked inactive
-and is not imported into merchant startup. The active roster remains 249.
+tables and the source evidence behind each identity. Its authoring metadata
+remains inactive; explicit startup admission validates the roster and winning
+native records before compiling these permissions for the sixty merchants.
 These are permissions, not starting stock or new gold, and a submitted hold
 price is still required before an item can be traded.
 
@@ -49,8 +66,8 @@ price is still required before an item can be traded.
 | --- | ---: | ---: | ---: |
 | Smith | 265 | 265 | 40 |
 | Woodworker | 54 | 54 | 16 |
-| Tailor | 271 | 271 | 23 |
-| Enchanter | 408 | 408 | 16 |
+| Tailor | 269 | 269 | 23 |
+| Enchanter | 406 | 406 | 16 |
 | Cook | 116 | 116 | 53 |
 | Alchemist | 70 | 70 | 68 |
 
@@ -134,6 +151,42 @@ the character. Existing actor identities and inventory receipts remain fenced
 by the native transaction. The current roleless roster keeps its earlier offers
 until the six-trade roster and its item tables are explicitly activated together.
 
+Quest rank checks read the saved character record without initializing or
+migrating it. A missing, unreadable or malformed record refuses eligibility;
+opening an offer cannot replace progression after a failed read. Only a valid
+saved rank qualifies. Existing character initialization owns migration. This
+does not enable the expanded profession, half and school quest catalogue.
+
+`game/quest-eligibility.js` supplies the shared eligibility contract.
+`createQuestEligibility({table, spellIds})` captures the canonical progression
+`TABLE` and `SPELL_IDS`; it does not read or write a character. `validate(gate)`
+returns a copied, frozen definition or throws. Gates are exactly `{open:true}`,
+`{classKey,rank}`, or `{profession,rank,half?,school?}`. Unknown, mixed or
+inherited fields cannot grant work. Master profession work names its owning
+half, or a school for Mage. Master class work has no half.
+
+`allows(gate,state)` returns a boolean from a saved version1 character snapshot.
+The chosen class/profession and canonical standing must match. An earned sister
+half counts, while a taught outside trade is not a chosen profession. Mage
+Master work additionally requires an exactly named, mapped rulebook Master
+spell in the learned book for the named selected school. Staff permissions,
+tomes, lower spells and unknown metadata do not count. No migration, repair,
+spell grant or input mutation occurs. The source bundler embeds the module;
+the custom quest controller validates each definition before it starts. The
+existing scarce work has explicit gates, and legacy scenes are explicitly
+open. Both scarce and kill offers and acceptance use the same evaluator over
+non-migrating character reads fenced by the original owner and controller.
+
+Acceptance revalidates at the transaction's final admission boundary. Caller
+callbacks run first, then the character snapshot is the last native read.
+Only callback-free service flags, pure evaluation and the captured session
+check follow it. The native CAS owns the final body/record fence. This prevents
+an identity callback from invalidating standing after it was checked, or a
+panel closed during a read from authorizing work. Scarce harvesting also keeps
+its existing class-rank gate at the final inventory write.
+Turn-in, cancellation and kill credit preserve accepted work without rechecking
+eligibility. No new quest, unbound objective, roster cut or reward is enabled.
+
 ## Build order and checks
 
 | Part | Responsibility | Requires |
@@ -189,12 +242,14 @@ genuine pre-summary legacy work. Dropping terms cannot downgrade a new record.
 Legacy array cooldown keys still require a nonempty item label; original
 item-only legacy keys keep their compatible saved meaning.
 Without an explicit history manifest, the current active roster remains the
-manifest. This support alone does not cut the current 249 traders. Before
-activating retirement, validate writer ownership, pending-intent uniqueness,
-existing saved purse state and reachable legacy quest turn-ins. Activation
-of an already initialized world must refuse null or missing retained purses
-before any initial grant. A genuinely new world requires separate explicit
-initialization; neither existing Main nor Dev is a new world.
+manifest. The sixty-merchant roster keeps all249 historical identities while
+retiring189 extras. Writer ownership and pending-intent checks remain.
+Existing-world admission refuses null or missing retained purses before any
+initial grant. The explicit alpha roster permits empty retained entries to
+follow ordinary one-time first-use initialization; it neither resets a saved
+purse nor grants anything to retired identities. Missing ledger entries or
+initialization evidence still refuse. A genuinely new world still requires
+explicit initialization; an alpha population cut is not a new world.
 Merchant runtime startup requires its existing private ledger and initialization
 marker. Missing evidence stops service without creating a fresh manifest or
 resetting purses. It checks again before durable writer dispatch, after privacy
@@ -209,7 +264,9 @@ in suspended mode. Property registration and initial timer registration
 finish before the native exclusion commit is attempted. The trading service
 cannot interact or recover while suspended, and a required retirement gate
 cannot be bypassed by omitting the suspension option. Genuine legacy work
-still recovers normally under the compatible 249-trader startup.
+still recovers under its compatible source before a retirement that it blocks.
+The alpha reset-data generator is available for Claude to discard such test
+work during a stopped-server maintenance step, as Patrick authorized.
 
 A failed constructor cancels its owned timers and reaches startup cleanup.
 Each startup owns its local controllers; an older callback cannot stop or
@@ -230,13 +287,13 @@ including native lookups, returns and the durable initialization boundary.
 Cancelling that caller alone leaves the shared services available to others;
 an uncertain durable write retains the existing writer revocation rule.
 
-`game/data/merchant-roster.json` records the proposed 60 role bindings and
-all 249 historical identities. Its source validator checks every binding
-before changing any population row. This prerequisite does not import that
-roster into the production generator, change the current 249 traders, or
-change the generated game plugin. Reliable client suppression and gated
-plugin retirement remain required before the actual cut; server exclusions
-alone do not suppress native client copies deterministically.
+`game/data/merchant-roster.json` records the60 role bindings and all249
+historical identities. The production generator checks every binding before
+changing any source row, then emits exactly60 traders, descriptive titles,
+history, counts and location tables. The matching last plugin disables the189
+extra traders at the record. Claude must deliver matching client/server
+content together with strict client admission; a gamemode-only change and
+server exclusions cannot suppress native client copies deterministically.
 Implement quests in complete, source-bound slices with coverage checks for
 all trades, holds, tiers, classes, professions, halves and schools. Legacy
 open quests must remain recoverable during catalogue changes.
@@ -258,8 +315,9 @@ This component performs no file or server operation and cannot authorize a cut.
 A future caller still needs private-file and alias checks, a stopped world and
 completed saves, native build and load-order binding, a fresh hash check,
 coordinated plugin delivery and strict client admission. The component is not
-imported into startup and does not change the 249-trader roster or initialize
-new ledger state. `node tests/test-merchant-ledger-inspection.js` checks it.
+imported into startup and does not itself change the roster or initialize
+new ledger state. It remains an optional existing-world evidence inspector,
+not a prerequisite to preserving disposable alpha merchant records. `node tests/test-merchant-ledger-inspection.js` checks it.
 
 `game/merchant-ledger-native.js` binds an already isolated native reader to
 that inspection interface. It checks each winning actor placement and its

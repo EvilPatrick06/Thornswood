@@ -56,7 +56,9 @@ foreach ($f in $rules, $mirror, $copy, $repair, $publish, $serverJs) {
     if (-not (Test-Path -LiteralPath $f)) { Yes "$f is there" $false; Done }
 }
 . $rules
-$ps = (Get-Process -Id $PID).Path
+# Get-FeedVersionFile, for the site's feed (its newest generation, #2727).
+. (Join-Path $repo 'scripts\release\Feed-Store.ps1')
+$ps =(Get-Process -Id $PID).Path
 $node = Get-Command node -ErrorAction SilentlyContinue
 
 function ShaOf([byte[]]$b) {
@@ -293,12 +295,18 @@ http.createServer((req, res) => {
             [pscustomobject]@{ id = 'D-dev'; url = "$ghBase/dl/pack-D.zip"; sha256 = $shaD; notes = 'n' })
         updateRepo = 'EvilPatrick06/Thornswood-Releases'
     }
-    $mainJson = Join-Path $siteDir 'feed\version.json'
-    $devJson  = Join-Path $siteDir 'feed-dev\version.json'
+    # The site keeps each feed as write-once generations, version\<8 digits>.json
+    # in its channel's folder, the newest being the feed (#2727). Each starts
+    # with one; a feed untouched is still that one, with the same bytes.
+    $mainDir  = Join-Path $siteDir 'feed'
+    $devDir   = Join-Path $siteDir 'feed-dev'
+    $mainJson = Join-Path $mainDir 'version\00000001.json'
+    $devJson  = Join-Path $devDir 'version\00000001.json'
     Write-Feed $mainJson $mainFeed
     Write-Feed $devJson $devFeed
     $mainWas = ShaFile $mainJson
     $devWas  = ShaFile $devJson
+    function Feed-Is([string]$dir, [string]$file, [string]$sha) { return ((Get-FeedVersionFile $dir) -eq $file -and (ShaFile $file) -eq $sha) }
 
     Yes 'Test-SiteAsset: the site answers for a pack it holds' (Test-SiteAsset $site 'feed' $shaOld 0)
     Yes '  and not with the wrong size' (-not (Test-SiteAsset $site 'feed' $shaOld 999))
@@ -330,7 +338,7 @@ http.createServer((req, res) => {
     Yes '  the api address was asked for the bytes, not the metadata' ((Get-Content -LiteralPath $ghLog -Raw) -match 'GET /api/Thornswood\.exe application/octet-stream')
     Yes '  the launcher was fetched from GitHub once, for both channels' (@((Get-Content -LiteralPath $ghLog) | Where-Object { $_ -match '^GET /cdn/Thornswood\.exe' }).Count -eq 1)
     Yes '  the old pack came from the site''s /feed/, never from its dead GitHub address' (-not ((Get-Content -LiteralPath $ghLog -Raw) -match 'gone-old'))
-    Yes '  neither version.json was touched' ((ShaFile $mainJson) -eq $mainWas -and (ShaFile $devJson) -eq $devWas)
+    Yes '  neither version.json was touched' ((Feed-Is $mainDir $mainJson $mainWas) -and (Feed-Is $devDir $devJson $devWas))
     $served = Get-Bytes "$site/feed-dev/assets/$shaD"
     Yes '  the site serves what was sent, and it hashes to its name' ((ShaOf $served) -eq $shaD)
 
@@ -370,22 +378,23 @@ http.createServer((req, res) => {
     Yes '  it counts the one still named off the site' ($r.Out -match '3 asset\(s\) named on the site, 1 still named somewhere else')
     $servedFeed = [Text.Encoding]::UTF8.GetString((Get-Bytes "$site/feed-dev/version.json"))
     Yes '  and the site now serves the moved feed' ($servedFeed -eq [IO.File]::ReadAllText((Join-Path $feedCopy 'version.json')))
-    Yes '  the live feed folder was not touched' ((ShaFile $mainJson) -eq $mainWas)
+    Yes '  the live feed folder was not touched' (Feed-Is $mainDir $mainJson $mainWas)
 
     # A feed naming a site asset nobody holds is refused, and version.json stays.
     $holey = Join-Path $work 'holey'
     $gone = 'e' * 64
     Write-Feed (Join-Path $holey 'version.json') ([pscustomobject]@{ launcherVersion = '9'; packs = @([pscustomobject]@{ id = 'x'; url = "https://thornswood.net/feed-dev/assets/$gone"; sha256 = $gone }) })
-    $servedWas = ShaFile $devJson
+    $servedFile = Get-FeedVersionFile $devDir
+    $servedWas = ShaFile $servedFile
     $r = Run-Child $mirror @('-Dev', '-FeedDir', $holey, '-SiteDir', $siteDir, '-AssetDir', (Join-Path $work 'nothing-here'))
     Yes ("a feed naming bytes nobody has is refused (exit {0})" -f $r.Code) ($r.Code -eq 1)
-    Yes '  and the site keeps the feed it had' ((ShaFile $devJson) -eq $servedWas)
+    Yes '  and the site keeps the feed it had' (Feed-Is $devDir $servedFile $servedWas)
 
     $one = Join-Path $work 'one.zip'
     $shaOne = Put $one 'sent on its own'
     $r = Run-Child $mirror @('-Send', $one, '-SiteDir', $siteDir)
     Yes ("-Send puts one file up under its sha256 (exit {0})" -f $r.Code) ($r.Code -eq 0 -and (Test-Path (Join-Path $mainAssets $shaOne)))
-    Yes '  and says version.json was not touched' ($r.Out -match 'version\.json was not touched' -and (ShaFile $mainJson) -eq $mainWas)
+    Yes '  and says version.json was not touched' ($r.Out -match 'version\.json was not touched' -and (Feed-Is $mainDir $mainJson $mainWas))
     $r = Run-Child $mirror @('-Send', $one, '-SiteDir', $siteDir)
     Yes '  sent twice, the second time it is already there' ($r.Code -eq 0 -and $r.Out -match 'already there')
     $r = Run-Child $mirror @('-Send', (Join-Path $work 'no-such.zip'), '-SiteDir', $siteDir)

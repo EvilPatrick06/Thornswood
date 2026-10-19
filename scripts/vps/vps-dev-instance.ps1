@@ -69,13 +69,15 @@ function Get-ThornswoodTaskSid {
     } catch { return '' }
 }
 function Get-ThornswoodServiceNeverReach {
-    param([string]$Own = '')
+    param([string]$Own = '', [string]$Box = 'C:\')
     $own = $Own.TrimEnd('\')
-    $list = @('C:\Thornswood-Backup', 'C:\Thornswood-Deploys', 'C:\Thornswood-Watch', 'C:\Thornswood-Maint')
-    foreach ($r in 'C:\Thornswood-Server', 'C:\Thornswood-Server-Dev') {
+    $list = @(foreach ($n in 'Thornswood-Backup', 'Thornswood-Deploys', 'Thornswood-Watch', 'Thornswood-Maint') { Join-Path $Box $n })
+    foreach ($r in 'Thornswood-Server', 'Thornswood-Server-Dev') {
+        $r = Join-Path $Box $r
         if ($r -ine $own) { $list += (Join-Path $r 'private') }
     }
-    foreach ($r in 'C:\Thornswood-Voice', 'C:\Thornswood-Voice-Dev') {
+    foreach ($r in 'Thornswood-Voice', 'Thornswood-Voice-Dev') {
+        $r = Join-Path $Box $r
         if ($r -ine $own) { $list += (Join-Path $r 'token-key.txt') }
     }
     return $list
@@ -87,7 +89,11 @@ function Test-ThornswoodServiceCannotReach {
     $read = [long]0x90000001
     $problems = @()
     foreach ($p in @($Paths)) {
-        if (-not $p -or -not (Test-Path -LiteralPath $p)) { continue }
+        if (-not $p) { continue }
+        # A denied look is an error, not a no: without Stop, Test-Path says
+        # False and the path would be passed over as if it were not there.
+        try { if (-not (Test-Path -LiteralPath $p -ErrorAction Stop)) { continue } }
+        catch { $problems += ($p + ': whether it is there could not be checked (' + $_.Exception.Message + ')'); continue }
         try { $acl = Get-Acl -LiteralPath $p }
         catch { $problems += ($p + ': its rules could not be read (' + $_.Exception.Message + ')'); continue }
         foreach ($r in @($acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]))) {
@@ -181,7 +187,7 @@ $node = 'C:\Program Files\nodejs\node.exe'
 # The fail-safe, before any task is registered: dev goes onto LOCAL SERVICE
 # only where LOCAL SERVICE can read none of what no service may.
 if (-not $FilesOnly -and -not $AsSystem) {
-    $cannot = @(Test-ThornswoodServiceCannotReach (Get-ThornswoodServiceNeverReach -Own $dev))
+    $cannot = @(Test-ThornswoodServiceCannotReach (Get-ThornswoodServiceNeverReach -Own $dev -Box (Split-Path -Parent $dev)))
     if ($cannot.Count) {
         $cannot | ForEach-Object { Say "  $_" }
         throw 'LOCAL SERVICE could read what no service may, so dev is not moved onto it. Lock those (scripts\vps\Lock-VpsFolders.ps1), or pass -AsSystem. Nothing was changed.'
@@ -271,24 +277,25 @@ if (Test-Path $liveVoice) {
     if (-not (Test-Path $devVoice)) { New-Item -ItemType Directory -Path $devVoice | Out-Null }
     Lock-Dir $devVoice
     Say "  $devVoice is SYSTEM's and Administrators' only"
-    # By name: the program, every file it requires, and the roller.
+    # By name: the program, every file it requires, and the log writer it runs
+    # under (#2166).
     # voice-server.js requires headlines.js at its first lines since #1406,
     # and stops there without it (#1870); tests\test-dev-instance.ps1 reads
     # the requires out of voice\voice-server.js and holds this list to them.
     # Nothing else in live's folder is dev's to have, the page live may still
     # keep in public included: the service serves none since #1822.
-    & robocopy $liveVoice $devVoice voice-server.js headlines.js roll-log.ps1 /XF *.log *.log.* /NFL /NDL /NJH /NJS /NP | Out-Null
+    & robocopy $liveVoice $devVoice voice-server.js headlines.js server-log.js /XF *.log *.log.* /NFL /NDL /NJH /NJS /NP | Out-Null
     Say ("  voice program copied (robocopy code {0})" -f $LASTEXITCODE)
     # The settings come from the environment. A run file sets them, so the
     # task command stays free of cmd's quoting rules. Auth on and loopback,
     # as live runs; Install-Voice.ps1 -Root C:\Thornswood-Voice-Dev keeps both.
-    # roll-log.ps1 came across with the rest and runs before node opens
-    # voice.log, the one moment nothing holds it. See Roll-Log.ps1.
+    # server-log.js came across with the rest and runs voice, writing
+    # voice.log itself: rolled at midnight and at 4 MB, each line stamped, and
+    # nothing kept past 90 days (#2166), the way Install-Voice.ps1 runs live.
     # node goes through start /high, so dev voice runs High the way
     # Install-Voice.ps1 starts it (#2491); the task's own priority, copied
     # from live voice's, makes only this cmd.exe High.
     $run = Join-Path $devVoice 'run-dev-voice.cmd'
-    $psExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
     $lines = @(
         '@echo off',
         ('set THORNSWOOD_VOICE_PORT={0}' -f $devVoicePort),
@@ -296,8 +303,7 @@ if (Test-Path $liveVoice) {
         'set THORNSWOOD_VOICE_BIND=127.0.0.1',
         'set THORNSWOOD_SITE=https://thornswood.net',
         ('cd /d "{0}"' -f $devVoice),
-        ('"{0}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{1}\roll-log.ps1" -Path "{1}\voice.log"' -f $psExe, $devVoice),
-        ('start "" /b /wait /high "{0}" voice-server.js >> "{1}\voice.log" 2>&1' -f $node, $devVoice)
+        ('start "" /b /wait /high "{0}" "{1}\server-log.js" --log "{1}\voice.log" --days 90 --stamp voice-server.js' -f $node, $devVoice)
     )
     [IO.File]::WriteAllLines($run, [string[]]$lines, (New-Object Text.ASCIIEncoding))
     Say '  dev voice runs with auth on, on 127.0.0.1 only'

@@ -64,8 +64,8 @@ def _find(name, size):
             continue
         try:
             return ImageFont.truetype(p, size)
-        except Exception:
-            pass
+        except OSError:  # a bare name not found, or a file Pillow cannot open as a font
+            continue
     return None
 
 
@@ -82,13 +82,13 @@ def _emoji_font(size):
                 continue
             try:
                 return ImageFont.truetype(p, size), 1.0
-            except Exception:
+            except OSError:  # not scalable: it opens only at its built-in size, tried below
                 pass
             for fixed in (109, 128, 136, 160, 96, 72, 64, 48, 32):
                 try:
                     return ImageFont.truetype(p, fixed), float(size) / fixed
-                except Exception:
-                    pass
+                except OSError:  # not this size; the next built-in size is tried
+                    continue
     return None, 1.0
 
 
@@ -208,21 +208,21 @@ def _draw_runs(base, draw, x, baseline, runs, fill):
                 draw.text((round(x), baseline), t, font=f, fill=fill, anchor='ls')
             x += w
             continue
+        # Not in a try any more (#2736): a glyph that could not be drawn was
+        # left out of the name with nothing said. A failure here now fails the
+        # card, which on_member_join logs with its trace and greets without.
+        asc, desc = f.getmetrics()
+        pw, ph = int(w) + 4, asc + desc + 4
+        patch = Image.new('RGBA', (max(pw, 1), max(ph, 1)), (0, 0, 0, 0))
+        pd = ImageDraw.Draw(patch)
         try:
-            asc, desc = f.getmetrics()
-            pw, ph = int(w) + 4, asc + desc + 4
-            patch = Image.new('RGBA', (max(pw, 1), max(ph, 1)), (0, 0, 0, 0))
-            pd = ImageDraw.Draw(patch)
-            try:
-                pd.text((2, asc + 2), t, font=f, anchor='ls', embedded_color=True)
-            except Exception:
-                pd.text((2, asc + 2), t, font=f, fill=fill, anchor='ls')
-            small = patch.resize((max(int(pw * s), 1), max(int(ph * s), 1)),
-                                 Image.LANCZOS)
-            base.alpha_composite(small, (int(round(x)),
-                                         int(round(baseline - (asc + 2) * s))))
+            pd.text((2, asc + 2), t, font=f, anchor='ls', embedded_color=True)
         except Exception:
-            pass
+            pd.text((2, asc + 2), t, font=f, fill=fill, anchor='ls')
+        small = patch.resize((max(int(pw * s), 1), max(int(ph * s), 1)),
+                             Image.LANCZOS)
+        base.alpha_composite(small, (int(round(x)),
+                                     int(round(baseline - (asc + 2) * s))))
         x += w * s
 
 
@@ -275,12 +275,12 @@ def render(name, avatar_bytes, number=None, line=None, alt=None):
     wash = wash.filter(ImageFilter.GaussianBlur(40))
     base.alpha_composite(wash)
 
+    # Discord hands the avatar over as a PNG (on_member_join asks for one), so
+    # one that will not open is a fault worth its trace: it fails the card,
+    # which on_member_join logs and greets without (#2736).
     if avatar_bytes:
-        try:
-            av = _circle(avatar_bytes, 196)
-            base.alpha_composite(av, (74, (H - 196) // 2))
-        except Exception:
-            pass
+        av = _circle(avatar_bytes, 196)
+        base.alpha_composite(av, (74, (H - 196) // 2))
 
     d = ImageDraw.Draw(base)
     x = 316

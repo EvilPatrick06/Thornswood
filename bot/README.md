@@ -325,6 +325,17 @@ channel, where the panel opens them. In any other thread, a `#test-tasks`
 post or a `#tales` post, they answer that they only work inside a ticket
 and archive and write down nothing (#1776, `test-1776-close-tickets-only.py`).
 
+A closed ticket is kept for 365 days and then the bot deletes the thread
+(#2353, `TICKET_KEEP_DAYS`, `tests/test-2353-ticket-keeping.py`). When it
+closed is Discord's own archive time, so opening a ticket again and closing it
+starts the year over, and a ticket nobody closed ages from when Discord
+archived it after a week with nothing said. Every hour the bot asks Discord
+for the closed private threads in each `TICKET_CHANNEL` channel and deletes
+those it opened that closed more than a year ago, one `closed tickets:` line
+in bot.log each. Threads a Gamemaster opened there by hand are never touched.
+The `#tickets` line for a deleted ticket keeps its name, and its link stops
+working.
+
 Staff roles are job titles on purpose. Thane, Steward, Warden and Housecarl are
 all things somebody should be able to play, and a moderator wearing one makes
 every in-world use of the word ambiguous.
@@ -351,6 +362,9 @@ said in the staff channel with who changed what (`office_change`). A Jarl's
 change from the game's Office page is made by the site with the bot's token
 and comes to the same channel through the site's `moderation.log`, and so do
 two accounts holding one Jarl role and the end of that (`office_text`).
+Staff ending a claim or setting or taking off the rent at a building's door
+(#2551) comes from the game's own `moderation.log` as `evict`, `rent` and
+`norent`, said like the other staff actions with the building and its hold.
 `test-2551-hold-offices.py` holds the roles and the panel.
 
 Eighteen hold roles sounds like a lot for a small server. Discord only shows a
@@ -387,7 +401,8 @@ time rather than adding a second copy, so the rules never end up posted twice.
 
 ## Running the bot's tests
 
-The bot and its tests need Python 3.10 or newer, and the bot runs on 3.12.
+The bot and its tests need Python 3.11 or newer (Pillow 13 needs it, #1401),
+and the bot runs on 3.12.
 On a Windows PC with more than one Python installed, plain `python` is
 whichever comes first on PATH (on One that is 3.9), so run them with the
 launcher:
