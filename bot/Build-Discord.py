@@ -74,8 +74,9 @@ import sys
 #   Manage Roles              the hold and ping buttons give and take roles,
 #                             and the two ping roles are made when missing
 #   Manage Threads            a ticket thread is private and not invitable, so
-#                             only a moderator can add people to it, and Close
-#                             locks it
+#                             only a moderator can add people to it, Close
+#                             locks it, and a ticket is deleted 365 days
+#                             after it closes (#2353)
 #   Create Public Threads     threads the bot opens (the Live smoke session
 #                             thread until 11 Oct; forum posts need only Send)
 #   Create Private Threads    one per ticket
