@@ -49772,11 +49772,10 @@ log('gamemode loaded:',
     A person's block only, which is what was decided ("when a hit lands
     blocked on a person"). A spell is not one: the engine's spell damage
     (OnSpellHit) has no block in it. blocked is the flag the OnHit event
-    carries. The engine pinned now sends the event before it decides a block,
-    so the flag is the client's alone, and a block only the server saw, which
-    is every block against a server NPC, costs nothing; fork PR 84
-    decides the block first, and the pin move that takes it in changes this
-    line and the list of the fork's events at the end of this file.
+    carries. The engine decides the block before it sends the event (fork PR
+    84, in the pin since #1386), so the flag is the server's own decision,
+    and a block only the server saw, which is every block against a server
+    NPC, costs stamina like any other.
   */
   var BLOCK = { base: 0, perStopped: 0.25, through: 0.1, set: 0.5 };
 
@@ -55818,8 +55817,8 @@ mp.onPutItem = guard('onPutItem', function () {
                   that the weapon or spell is one it has equipped, or a bare
                   fist. It fires before the attack speed and splash checks and
                   before the damage, so a hit those checks then throw away was
-                  still raised. The blocked flag is the one the client sent,
-                  because the engine works out a block after the event.
+                  still raised. The blocked flag is the engine's own decision,
+                  made before the event (fork PR 84).
     OnSpellCast   A cast of a spell the caster has equipped, by the sender or
                   an actor it hosts: (caster, spell). Raised after the cast has
                   already gone out to everybody nearby, and not for the second
