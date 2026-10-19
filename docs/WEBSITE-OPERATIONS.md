@@ -181,7 +181,8 @@ clone, in PowerShell 7.
 for each request, written when it is made: the Discord id, the profile ids,
 when, who ran it, how many records each store held and which services it
 asked. Nothing else about the person. The
-folder is SYSTEM's and Administrators' only. The nightly backup takes it as
+folder is SYSTEM's and Administrators' only, with read for the nightly
+backup's own task (#2833). The nightly backup takes it as
 `deletions\requests.jsonl`, so it leaves the box with every backup and comes
 back with any of them. A request made after the last backup is only on the
 box until the next nightly run.
