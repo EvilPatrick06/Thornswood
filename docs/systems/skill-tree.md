@@ -91,13 +91,14 @@ A perk is ticked here when it fires. Each time the server fires one, it
 writes `perks: <name> fired` to its log, so a tester can see it happen. Troll's Blood and Leyline Attunement write one line a fight
 and one a cast, not one a second.
 
-Three happen on your own machine, because the game works them out there
-and the server cannot reach them: Unshakeable, Tireless and Windwalker's
-fall. The front plugin does them, from the list of perks the K panel's view
-carries, and writes them in `thornswood-front.log`:
+Four happen on your own machine, because the game works them out there
+and the server cannot reach them: Unshakeable, Tireless, Windwalker's fall
+and Pack Mule. The front plugin does them, from the list of perks the K
+panel's view carries, and writes them in `thornswood-front.log`:
 `unshakeable: refused a stagger while blocking` for each stagger refused,
 `unshakeable: a stagger played with the block down` for each one let
-through, and a `perks:` line naming each game setting it changes. Tireless
+through, a `perks:` line naming each game setting it changes, and
+`perks: Pack Mule held` or `not held` when Pack Mule comes or goes. Tireless
 and the fall are the game's own sums, from game settings read out of
 Skyrim.esm that nothing in the load order changes:
 
@@ -145,5 +146,5 @@ not left on you (issue #1642).
 | Tireless | Yes, on your own machine: a sprint, a power attack and a shield bash cost half | |
 | Second Wind | Yes | |
 | Windwalker | Yes. The speed from the server, the fall on your own machine | |
-| Pack Mule | No | All of it. Being overloaded makes the game walk you, on your own machine, and no game setting changes that. What it should be waits on Patrick (issue #1385) |
+| Pack Mule | Yes, on your own machine. Being overloaded makes the game walk you there, and no game setting changes that, so the engine fork's client keeps a list of characters the game does not hold to their carry weight, and the front plugin puts yours on it while Pack Mule is held. You run and sprint whatever you carry, and everybody else sees you run. The inventory still shows your real carry weight | |
 | Lethal Aim | Yes. An arrow or a bolt is worked out again against half the armour, by the same sum the server uses for every blow | |
