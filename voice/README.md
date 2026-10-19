@@ -15,14 +15,12 @@ never passes through it. The `test-*.js` files beside it are its harnesses.
 It serves no page of its own: its two clients are the launcher's voice page
 and the game's overlay, both loaded off disk. The plain browser page it used
 to serve at `/` went in #1822, because it had no way to get a join token and
-so could never get in. `gamemode-voice.js` is the gamemode's half of the
-position feed as `Add-VoiceFeed.ps1` first added it.
-The copy between the voice feed markers in `game\gamemode.js` has moved on
-since: it reads its port from `server-settings.json`, so the dev server feeds
-the dev service, where this file still has 7778 written in.
-`Add-VoiceFeed.ps1` would write this file over that block and redeploy the
-live gamemode, undoing that, so it stops when the two differ; `-Force` is the
-only way past.
+so could never get in. The game server's half of the position feed is the
+block between the voice feed markers in `game\gamemode.js`. It reads its port
+from `server-settings.json`, so the dev server feeds the dev service. The
+older copy of that block that sat here went in #2736, with the deploy script
+that wrote it into the gamemode: nothing ran the copy, and the script could
+only put the older block back.
 
 A socket opened by a browser has to come from a page loaded off disk, which
 says `null` or `file://`: the game's pages and the launcher's voice page. A
