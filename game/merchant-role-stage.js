@@ -11,11 +11,16 @@ function prepareMerchantRoleStage(population,catalog,stage,native) {
   const identity=value=>typeof value==='string' && /^([1-9a-f][0-9a-f]{0,5}):[^:/\\\x00-\x1f\x7f]+\.(esm|esp|esl)$/i.test(value);
   // No supplied native callback can replace the source being admitted.
   [population,catalog,stage]=JSON.parse(JSON.stringify([population,catalog,stage]));
+  if(!object(population) || !object(stage))fail();
+  const retirement=population.merchantRoster!==undefined,count=retirement?60:249;
+  if(retirement && (!object(population.merchantRoster) || population.merchantRoster.version!==1 ||
+      population.merchantRoster.worldMode!=='existing' || Object.keys(population.merchantRoster).length!==2 ||
+      JSON.stringify(population.merchantHistory)!==JSON.stringify(stage.history)))fail();
   if(!object(stage) || stage.version!==1 || !Array.isArray(stage.history) || stage.history.length!==249 ||
       !Array.isArray(stage.merchants) || stage.merchants.length!==60 || !object(stage.tables) ||
-      !object(stage.types) || !object(catalog) || catalog.count!==249 || !object(catalog.byRef) ||
-      Object.keys(catalog.byRef).length!==249 || !object(population) || !Array.isArray(population.keep) ||
-      population.merchantRoster!==undefined || !native || typeof native.resolveMerchant!=='function' ||
+      !object(stage.types) || !object(catalog) || catalog.count!==count || !object(catalog.byRef) ||
+      Object.keys(catalog.byRef).length!==count || !object(population) || !Array.isArray(population.keep) ||
+      !native || typeof native.resolveMerchant!=='function' ||
       typeof native.resolveItem!=='function') fail();
   const rows=new Map(),history=new Map(),selected=new Map(),coverage=new Set();
   for(const row of population.keep) {
@@ -25,14 +30,15 @@ function prepareMerchantRoleStage(population,catalog,stage,native) {
   for(const pair of stage.history) {
     if(!Array.isArray(pair) || pair.length!==2 || !pair.every(identity) || history.has(pair[0]))fail();
     const row=rows.get(pair[0]);
-    if(!row || row[6]!=='trader' || row[1]!==pair[1] || !own(catalog.byRef,pair[0]))fail();
+    if(!retirement && !row || row && (row[6]!=='trader' || row[1]!==pair[1] || !own(catalog.byRef,pair[0])))fail();
     history.set(pair[0],pair[1]);
   }
-  if(population.keep.filter(row=>row[6]==='trader').length!==249 ||
+  if(population.keep.filter(row=>row[6]==='trader').length!==count ||
       Object.keys(catalog.byRef).some(ref=>!history.has(ref)))fail();
   for(const merchant of stage.merchants) {
     if(!object(merchant) || Object.keys(merchant).sort().join(',')!=='base,bookHold,hold,reference,role' ||
-        history.get(merchant.reference)!==merchant.base || selected.has(merchant.reference) ||
+        history.get(merchant.reference)!==merchant.base || !rows.has(merchant.reference) ||
+        !own(catalog.byRef,merchant.reference) || selected.has(merchant.reference) ||
         !roles.includes(merchant.role) || !own(holds,merchant.bookHold) || holds[merchant.bookHold]!==merchant.hold ||
         catalog.byRef[merchant.reference].hold!==merchant.hold ||
         catalog.byRef[merchant.reference].bookHold!==merchant.bookHold || coverage.has(merchant.bookHold+':'+merchant.role))fail();
