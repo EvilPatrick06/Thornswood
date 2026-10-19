@@ -882,6 +882,21 @@ function Answer {
   if ($open.Count -and [Environment]::GetEnvironmentVariable('THORNSWOOD_DOCS_EXPOSE','Machine') -ne '1') {
     'EXPOSED: the site listens on ' + ($open -join ', ') + ' port ' + $Port + ', not loopback only. Plain HTTP past the certificate (#2185).'
   } elseif ($l.Count) { 'listening on ' + ((@($l | ForEach-Object { $_.LocalAddress } | Sort-Object -Unique)) -join ', ') }
+  # Whether the files play and identity rest on read (#2180). Said, not
+  # fatal: the swap carries the app, not those files, so putting the old app
+  # back would mend nothing. A broken one is repaired from the backup.
+  try {
+    $null = Invoke-WebRequest -Uri ('http://127.0.0.1:' + $Port + '/api/ready') -UseBasicParsing -TimeoutSec 5
+    'state ready'
+  } catch {
+    $code = 0
+    if ($_.Exception.Response) { $code = [int]$_.Exception.Response.StatusCode }
+    $said = $null
+    if ($code -eq 503 -and $_.ErrorDetails -and $_.ErrorDetails.Message) { $said = $_.ErrorDetails.Message | ConvertFrom-Json }
+    if ($said) {
+      'STATE BROKEN: ' + ((@($said.broken) | ForEach-Object { $_.file + ' ' + $_.why + $(if ($_.play) { ', nobody can play' } else { '' }) }) -join '; ') + '. Repair it from the backup.'
+    } else { 'could not ask the site whether its state reads (' + $code + '): ' + $_.Exception.Message }
+  }
 }
 # Run by hand, to see why: a task swallows what node prints.
 function Why {

@@ -1203,6 +1203,10 @@ const putFile = (p, text) => {
   // (#2736): it holds a whole copy of the file, and a folder full of them is
   // otherwise found by somebody wondering where the disk went. One that was
   // never made is not there to go, and is tested for.
+  // A held file that is there and will not read is never written over
+  // (#2180, heldNow says it on the log): the write it would be is the empty
+  // fallback plus one row, which is every other row gone.
+  if (heldShape(p) && heldNow(p).broken) return false;
   const tmp = path.join(path.dirname(p), '.' + path.basename(p) + '.' + process.pid + '.tmp');
   const dropTmp = () => {
     if (!fs.existsSync(tmp)) return;
@@ -2718,35 +2722,74 @@ const LINKED = path.join(DATA, 'linked.json');
   /banaccount the account; the hub offers both.
 */
 const BANS = path.join(DATA, 'bans.json');
-/* THE BAN LIST FAILS CLOSED (#2186). jsonFile() hands back its fallback for a
-   file that is there but will not parse, so a bans.json cut short by a crash
-   read as no bans at all and let every banned account in. Every read that
-   decides who may play goes through readBans(): a missing file is the normal
-   empty list, and a file that is there but will not read as an object is
-   BROKEN. While it is broken nobody is let in to play (standing says banned,
-   /api/allowed lists nobody), no ban or unban is written over it, and the
-   site says so on its log once each time it breaks. The pages stay up. */
-let bansBrokenSaid = '';
-function readBans() {
+/* THE BAN LIST FAILS CLOSED (#2186), AND SO DOES EVERY FILE PLAY AND
+   IDENTITY REST ON (#2180). jsonFile() hands back its fallback for a file
+   that is there but will not parse. So a bans.json cut short by a crash read
+   as no bans at all and let every banned account in; a pk.json read as
+   nobody dead for good; and a pk.json, linked.json, sessions.json or
+   signins.json read as empty was written straight back as empty plus one
+   row at the next PK, Play, session or sign-in, and every row it held was
+   gone. These five are read through readHeld(): a missing file is the
+   normal empty one, and a file that is there but will not read in its shape
+   is BROKEN. While one is broken:
+     - putFile writes nothing over it, so it is still there to repair;
+     - bans.json, pk.json or linked.json broken lets nobody in to play
+       (standing says banned for bans.json, characterBar bars every
+       character, /api/allowed lists nobody), because who is banned, who is
+       dead for good and who holds which character are not known;
+     - the site says so on its log once each time it breaks and mends, and
+       /api/ready answers 503 naming it, asked once at start too.
+   The pages stay up. A broken file is repaired by hand on the box, from the
+   backup, and the next request reads it again. */
+function heldShape(p) {
+  if (p === BANS || p === PK || p === LINKED) return 'table';
+  if (p === SESSIONS || p === ATTEMPTS) return 'list';
+  return '';
+}
+function heldGatesPlay(p) { return p === BANS || p === PK || p === LINKED; }
+function readHeld(p) {
+  const shape = heldShape(p);
+  const empty = shape === 'list' ? [] : {};
   let text;
-  try { text = fs.readFileSync(BANS, 'utf8'); }
-  catch (e) { return (e && e.code === 'ENOENT') ? { table: {}, broken: '' } : { table: {}, broken: 'cannot be read (' + ((e && e.code) || 'unknown') + ')' }; }
+  try { text = fs.readFileSync(p, 'utf8'); }
+  catch (e) { return (e && e.code === 'ENOENT') ? { doc: empty, broken: '' } : { doc: empty, broken: 'cannot be read (' + ((e && e.code) || 'unknown') + ')' }; }
   let doc;
-  try { doc = JSON.parse(text.replace(/^\uFEFF/, '')); } catch (e) { return { table: {}, broken: 'will not parse' }; }
-  if (!doc || typeof doc !== 'object' || Array.isArray(doc)) return { table: {}, broken: 'is not a table of bans' };
-  return { table: doc, broken: '' };
+  try { doc = JSON.parse(text.replace(/^\uFEFF/, '')); } catch (e) { return { doc: empty, broken: 'will not parse' }; }
+  if (shape === 'list' ? !Array.isArray(doc) : (!doc || typeof doc !== 'object' || Array.isArray(doc))) {
+    return { doc: empty, broken: shape === 'list' ? 'is not a list' : 'is not a table' };
+  }
+  return { doc, broken: '' };
+}
+const heldSaid = new Map();
+function heldNow(p) {
+  const r = readHeld(p);
+  const was = heldSaid.get(p) || '';
+  if (r.broken && was !== r.broken) {
+    if (p === BANS) console.error('[thornswood-docs] BANS BROKEN: ' + BANS + ' ' + r.broken + '. Nobody is let in to play until it is repaired (#2186).');
+    else console.error('[thornswood-docs] STATE BROKEN: ' + p + ' ' + r.broken + '. ' +
+                       (heldGatesPlay(p) ? 'Nobody is let in to play, and nothing is written over it,' : 'Nothing is written over it') +
+                       ' until it is repaired (#2180).');
+  } else if (!r.broken && was) {
+    console.log('[thornswood-docs] ' + path.basename(p) + ' reads again' + (p === BANS ? '; play is open to those not banned.' : '.'));
+  }
+  heldSaid.set(p, r.broken);
+  return r;
+}
+/* Every held file that is broken now, by name and why, for /api/ready. */
+function heldBroken() {
+  const out = [];
+  for (const p of [BANS, PK, LINKED, SESSIONS, ATTEMPTS]) {
+    const r = heldNow(p);
+    if (r.broken) out.push({ file: path.basename(p), why: r.broken, play: heldGatesPlay(p) });
+  }
+  return out;
 }
 function bansNow() {
-  const b = readBans();
-  if (b.broken && bansBrokenSaid !== b.broken) {
-    console.error('[thornswood-docs] BANS BROKEN: ' + BANS + ' ' + b.broken + '. Nobody is let in to play until it is repaired (#2186).');
-  } else if (!b.broken && bansBrokenSaid) {
-    console.log('[thornswood-docs] bans.json reads again; play is open to those not banned.');
-  }
-  bansBrokenSaid = b.broken;
-  return b;
+  const r = heldNow(BANS);
+  return { table: r.doc, broken: r.broken };
 }
 const BANS_BROKEN_WHY = 'the ban list cannot be read, so nobody can be let in until staff repair it';
+const STATE_BROKEN_WHY = 'the site cannot read who holds which character or who is dead for good, so nobody can be let in until staff repair it';
 /*
   Characters staff have killed for good (#1010, PK). Keyed by profile id:
   {"<profile>": {"at", "by", "byId", "why", "name", "account", "from"}}.
@@ -2800,8 +2843,12 @@ function banActive(b, now) {
 function characterBar(pid, now) {
   const n = Number(pid) || 0;
   if (!(n > 0)) return null;
-  const pk = jsonFile(PK, {});
-  if (pk && pkActive(pk[String(n)])) {
+  // Who is dead for good and who holds which character, unknown while
+  // pk.json or linked.json will not read (#2180): no character is let in.
+  const readP = heldNow(PK), readL = heldNow(LINKED);
+  if (readP.broken || readL.broken) return { pk: false, shut: true, why: STATE_BROKEN_WHY, until: 0 };
+  const pk = readP.doc;
+  if (pkActive(pk[String(n)])) {
     return { pk: true, at: Number((pk[String(n)] || {}).at) || 0 };
   }
   const readB = bansNow();
@@ -2815,10 +2862,14 @@ function characterBar(pid, now) {
 function pkActive(row) {
   return !!row && typeof row === 'object' && !row.undone;
 }
-/* Every profile staff have killed for good, as numbers. */
+/* Every profile staff have killed for good, as numbers. A pk.json that will
+   not read carries broken on the list, and the door lets nobody in (#2180). */
 function pkProfiles() {
-  const table = jsonFile(PK, {}) || {};
-  return Object.keys(table).filter((k) => pkActive(table[k])).map(Number).filter((n) => n > 0);
+  const readP = heldNow(PK);
+  const table = readP.doc;
+  const out = Object.keys(table).filter((k) => pkActive(table[k])).map(Number).filter((n) => n > 0);
+  if (readP.broken) Object.defineProperty(out, 'broken', { value: 'pk.json ' + readP.broken });
+  return out;
 }
 /* A ban's end in words, for the people told about it. */
 function banUntilText(until) {
@@ -2836,7 +2887,10 @@ function accountBanned(st) {
 function activeBans(now) {
   const readB = bansNow();
   const table = readB.table;
-  const linked = jsonFile(LINKED, {});
+  // An account's ban covers the characters linked.json gives it, so with
+  // linked.json unreadable no account ban can be applied (#2180).
+  const readL = heldNow(LINKED);
+  const linked = readL.doc;
   const out = [];
   for (const k of Object.keys(table || {})) {
     const b = table[k];
@@ -2851,7 +2905,8 @@ function activeBans(now) {
                              scope: k.indexOf('p:') === 0 ? 'character' : 'account' });
   }
   // Carried on the list, not sent: the door reads it to let nobody in (#2186).
-  if (readB.broken) Object.defineProperty(out, 'broken', { value: readB.broken });
+  const broken = readB.broken ? 'bans.json ' + readB.broken : (readL.broken ? 'linked.json ' + readL.broken : '');
+  if (broken) Object.defineProperty(out, 'broken', { value: broken });
   return out;
 }
 /* A ban, made or replaced. The account's standing is asked again at once. */
@@ -6835,7 +6890,13 @@ async function handle(req, res) {
       played: Date.now(), roles: st.roles,
       profiles: profiles.slice(-8)
     });
-    putJson(LINKED, linked);
+    /* Not recorded is not let in: the door lists only what linked.json holds.
+       It used to answer yes whatever the write did, and a linked.json that
+       will not read is never written over (#2180), so the launcher went on
+       to a door that would turn the character away with no reason given. */
+    if (!putJson(LINKED, linked)) return sendJson(res, 503, { ok: false, why: 'not recorded', message:
+      'The site could not record this character against your account, so the game would not let it in. ' +
+      'Staff can see why in the site log. Try again later.' });
 
     return sendJson(res, 200, {
       ok: true,
@@ -7169,6 +7230,14 @@ async function handle(req, res) {
     tell a tester apart from anybody else without a second question to Discord
     for every command somebody types.
   */
+  /* Whether the files play and identity rest on read (#2180): 200, or 503
+     naming each one that is there and will not read, and whether it shuts
+     play. Deploy-Docs asks it after every swap. Names and reasons only,
+     never what a file holds. */
+  if (route === '/api/ready' && req.method === 'GET') {
+    const broken = heldBroken();
+    return sendJson(res, broken.length ? 503 : 200, { ok: !broken.length, broken });
+  }
   // The dev server's door.json names the site as https://thornswood.net/dev,
   // so its question lands here and gets only the people the dev build is
   // for. Same key, same shape, shorter list.
@@ -7276,20 +7345,23 @@ async function handle(req, res) {
        and the bans go to the door with why and until, so the game server can
        end the session of anybody banned who is online and tell them both. */
     out.bans = activeBans(Date.now());
-    // A broken ban list lets nobody through the door (#2186): every list is
+    /* And every character staff have killed for good (#1010), left out the
+       same way and sent as pk, so the game server ends it quietly if it is
+       in the world. */
+    out.pk = pkProfiles();
+    // A broken ban list lets nobody through the door (#2186), and so does a
+    // pk.json or linked.json that will not read (#2180): every list is
     // emptied and the door is told why.
-    if (out.bans.broken) {
-      out.bansBroken = true;
+    const shut = out.bans.broken || out.pk.broken;
+    if (shut) {
+      out.bansBroken = !!out.bans.broken;
+      out.stateBroken = shut;
       for (const k of ['profiles', 'devProfiles', 'adminProfiles', 'staffRoleProfiles', 'failedProfiles']) {
         if (Array.isArray(out[k])) out[k] = [];
       }
       if (Array.isArray(out.people)) out.people = [];
       out.offices = {};
     }
-    /* And every character staff have killed for good (#1010), left out the
-       same way and sent as pk, so the game server ends it quietly if it is
-       in the world. */
-    out.pk = pkProfiles();
     const barred = new Set(out.pk);
     for (const b of out.bans) for (const n of b.profiles) barred.add(Number(n));
     if (barred.size) {
@@ -7490,6 +7562,8 @@ async function handle(req, res) {
     /* This one character (#1010): killed for good by staff, or banned by
        itself. The account is fine, so the answer says to pick another. */
     const bar = characterBar(pid, now);
+    if (bar && bar.shut) return sendJson(res, 503, { ok: false, why: 'state broken', message:
+      'The site cannot read its list of characters right now, so nobody can join until staff repair it. Try again later.' });
     if (bar && bar.pk) return sendJson(res, 403, { ok: false, why: 'pk', message:
       'That character has died for good and cannot be played again. ' +
       'Pick another character at the menu, or make a new one.' });
@@ -8058,6 +8132,12 @@ http.createServer((req, res) => {
   rereadTrouble();
   // The first retention pass, then every hour (#2350).
   retentionSweep();
+  // The files play and identity rest on, read once on the way up (#2180).
+  // Each broken one has said STATE BROKEN or BANS BROKEN above this line.
+  const notReady = heldBroken();
+  console.log('[thornswood-docs] ' + (notReady.length
+    ? 'NOT READY: ' + notReady.map((b) => b.file).join(', ') + ' will not read, /api/ready answers 503'
+    : 'ready: bans, pk, linked, sessions and signins read'));
   console.log('[thornswood-docs] downloads in ' + FILES);
   console.log('[thornswood-docs] uploads in ' + UP);
   console.log('[thornswood-docs] watching the game on 127.0.0.1:' +

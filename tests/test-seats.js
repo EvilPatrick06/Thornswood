@@ -622,7 +622,7 @@ async function join(standing, status, channel) {
     within: new Function(grabFn('within') + '\nreturn within;')(),
     standingLate: function () { throw new Error('Discord answered here'); },
     jsonFile: function (f, fallback) { return f === 'linked.json' ? {} : fallback; },
-    putJson: function () { },
+    putJson: function () { return true; },
     LINKED: 'linked.json',
     slotsFor: function () { return 2; },
     sendJson: function (r, c, obj) { sent = { code: c, obj: obj }; return sent; },
