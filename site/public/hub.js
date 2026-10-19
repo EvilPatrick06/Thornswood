@@ -184,8 +184,15 @@ function start() {
   }).catch(function () { el('gate').style.display = 'grid'; });
 }
 
+/* Fetches /api/all again after a staff action. A failure is the caller's to
+   say: an answer that is not ok (signed out, the site down) or a body that is
+   not JSON rejects, and nothing in S changes, so the page never shows stale
+   lists as if they were fresh (#2736). */
 function refresh() {
-  return api('/api/all').then(function (r) { return r.json(); }).then(function (d) {
+  return api('/api/all').then(function (r) {
+    if (!r.ok) throw new Error('the site answered ' + r.status);
+    return r.json();
+  }).then(function (d) {
     // A board with a save waiting or on its way keeps its own copy and
     // number, or the refresh would undo the edit and the save would clash.
     var boards = d.boards || {}, revs = d.boardRevs || {};
@@ -197,7 +204,7 @@ function refresh() {
     S.uploads = d.uploads || []; S.inbox = d.inbox || [];
     S.linked = d.linked || []; S.sessions = d.sessions || [];
     S.records = d.records || { bans: {}, notes: {} };
-  }).catch(function () { });
+  });
 }
 
 function chrome() {
@@ -505,18 +512,29 @@ function wireLinked() {
       }
       if (act === 'note' && !bodyOf.text.trim()) return;
       // The site's own sentence when it has one: Undo PK says why it did not.
-      var said = '';
+      // taken is set once the site has done it, so a refresh that fails after
+      // that says the lists are old rather than that nothing happened.
+      var said = '', taken = false;
       api('/api/staff/' + act, { method: 'POST', headers: { 'Content-Type': 'application/json' },
                                   body: JSON.stringify(bodyOf) })
         .then(function (r) {
           return r.json().catch(function () { return {}; }).then(function (j) {
             said = (j && j.message) || '';
             if (!r.ok) throw 0;
+            taken = true;
             return refresh();
           });
         })
         .then(function () { drawLinked(); })
-        .catch(function () { alert(said || 'The site did not take that.'); });
+        .catch(function (e) {
+          if (taken) {
+            alert('That was done, but the lists could not be fetched again (' +
+                  ((e && e.message) || 'no answer from the site') +
+                  '), so this page still shows them as they were. Reload the page to see it.');
+            return;
+          }
+          alert(said || 'The site did not take that.');
+        });
     };
   }
 }
@@ -619,9 +637,8 @@ function downloadBlob(name, blob) {
     a.download = name;
     document.body.appendChild(a);
     a.click();
-    setTimeout(function () {
-      try { URL.revokeObjectURL(a.href); document.body.removeChild(a); } catch (e) { }
-    }, 0);
+    // Neither throws: the link was made and put in the page just above.
+    setTimeout(function () { URL.revokeObjectURL(a.href); document.body.removeChild(a); }, 0);
   } catch (e) { saidNow('could not download'); }
 }
 
@@ -1437,7 +1454,8 @@ function drawSessions() {
       set(box.value);
       drawSessions();
       var again = el(id);
-      if (again) { again.focus(); try { again.setSelectionRange(at, at); } catch (e) { } }
+      // A type="search" box takes a selection, so this does not throw.
+      if (again) { again.focus(); again.setSelectionRange(at, at); }
     };
   };
   refind('sfind', function (v) { SFIND.q = v; });
@@ -1461,7 +1479,7 @@ function drawSessions() {
       each(el('page'), 'input.findmine', function (b2) {
         if (b2.dataset.w !== who) return;
         b2.focus();
-        try { b2.setSelectionRange(at, at); } catch (e) { }
+        b2.setSelectionRange(at, at);
       });
     };
   });
@@ -2174,10 +2192,16 @@ function drawUploads() {
 function loadGalleryStaff() {
   var box = el('galgrid');
   if (!box) return;
-  Promise.all([
-    api('/api/gallery/pending').then(function (r) { return r.ok ? r.json() : null; }),
-    api('/api/public').then(function (r) { return r.ok ? r.json() : null; })
-  ]).then(function (pair) {
+  // Either read failing is said in the grid. It used to read a refused answer
+  // as an empty list ("Nothing in the gallery yet") and to leave the old list
+  // up when the site did not answer at all (#2736).
+  var read = function (path) {
+    return api(path).then(function (r) {
+      if (!r.ok) throw new Error('the site answered ' + r.status + ' to ' + path);
+      return r.json();
+    });
+  };
+  Promise.all([read('/api/gallery/pending'), read('/api/public')]).then(function (pair) {
     if (!el('galgrid')) return;
     box = el('galgrid');
     var pending = (pair[0] && pair[0].pending) || [];
@@ -2219,7 +2243,14 @@ function loadGalleryStaff() {
         b.disabled = true; b.textContent = 'accepting';
         api('/api/gallery/approve', { method:'POST', headers:{ 'content-type':'application/json' },
             body: JSON.stringify({ name: b.dataset.galok }) })
-          .then(function () { loadGalleryStaff(); });
+          .then(function (r) { return r.json().catch(function () { return { ok: r.ok }; }); })
+          .then(function (a) {
+            if (!a || !a.ok) alert((a && a.error) || 'The site could not accept that picture.');
+            loadGalleryStaff();
+          }, function () {
+            alert('The site did not answer, so that picture was not accepted.');
+            loadGalleryStaff();
+          });
       };
     });
     each(box, '[data-galdel]', function (b) {
@@ -2238,12 +2269,21 @@ function loadGalleryStaff() {
             body: JSON.stringify({ name: b.dataset.galdel }) })
           .then(function (r) { return r.json().catch(function () { return { ok: r.ok }; }); })
           .then(function (a) {
-            if (a && a.ok === false) alert(a.error || 'The site could not finish removing that picture.');
+            if (!a || !a.ok) alert((a && a.error) || 'The site could not finish removing that picture.');
+            loadGalleryStaff();
+          }, function () {
+            alert('The site did not answer, so that picture was not removed.');
             loadGalleryStaff();
           });
       };
     });
-  }).catch(function () { });
+  }).catch(function (e) {
+    box = el('galgrid');
+    if (!box) return;
+    box.innerHTML = '<div class="section-label">Gallery</div>' +
+      '<div class="empty">The gallery could not be read (' +
+      esc((e && e.message) || 'no answer from the site') + '). Reload the page to see it.</div>';
+  });
 }
 
 /* -------------------------------------------------------------- report -- */

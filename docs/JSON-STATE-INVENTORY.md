@@ -25,18 +25,19 @@ The JSON files Thornswood's release, deploy, game, site, bot and voice trust, wh
 
 | File | Written by | Read by | Risk | Check today |
 | --- | --- | --- | --- | --- |
-| `server-settings.json` (built, and on each server) | Deploy-Gamemode, Export-ServerPayload; ServerSettings.ps1 carries settings on the box | the engine, Deploy-Server, Deploy-DevGamemode, Swap (on the box), site | High: port, load order, seats | named on a local bad read (#2154); box-side reads unchecked |
+| `server-settings.json` (built, and on each server) | Deploy-Gamemode, Export-ServerPayload; ServerSettings.ps1 carries settings on the box | the engine, Deploy-Server, Deploy-DevGamemode, Swap (on the box), site | High: port, load order, seats | named on a local bad read (#2154); **held** on the box (`server-settings`, Swap and Install-ThornswoodServer, #2404) |
 | `thornswood-build.json` (build stamp) | BuildStamp.ps1 | Deploy-Server, Deploy-DevGamemode, Publish-Server (held to the payload's gamemode, #459) | Medium | named on a bad read (#2154) |
 | `deployed-build.json` | DeployedBuild.ps1 (on the box), from Deploy-Server and Publish-Server | site | Low | none |
-| `version.json`, `published.json` (feed store) | Publish-Update, Publish-Server, Rollback-Feed, Scrub-Feed | every launcher, site | High: what every launcher installs | named on a bad read (#2119) |
+| `version.json`, `published.json`, `releases.json` (feed store) | Publish-Update, Publish-Server, Rollback-Feed, Scrub-Feed, Dev-News, Set-Server, Set-Collection, Repair-Manifest, Remirror-Site-Feed | every launcher, site, the next Ship and rollback | High: what every launcher installs | **held** (`feed-version`, `feed-published`, `feed-releases`): Send-FeedStore, the one way they reach the VPS, refuses a file out of shape before anything goes up (#2180); `Check-Records -Feed` reads a store folder (#2420) |
 | launcher `config.json` | launcher, Set-Server, Set-Collection | launcher, Deploy-Gamemode, Ship-Rules | Medium | named on a bad read; Deploy-Gamemode falls back |
 
 ## Site, bot and voice state (on the box)
 
 | File | Written by | Read by | Risk | Check today |
 | --- | --- | --- | --- | --- |
-| `bans.json`, `pk.json` | site | site (and what it hands the game server at join) | **Critical**: authorization. Malformed fails open today (#2186) | none: #2186 |
-| `linked.json`, `sessions.json`, `signins.json`, `rules-accepted.json` | site | site, bot | High: identity and sign-in | none |
+| `bans.json`, `pk.json` | site | site (and what it hands the game server at join) | **Critical**: authorization | **held**: a file that is there and will not read, or is not a table, shuts the door and the join pass (bans #2186, pk #2180), is never written over, and `/api/ready` answers 503 naming it |
+| `linked.json`, `sessions.json`, `signins.json` | site | site, bot | High: identity and sign-in | **held** (#2180): never written over while it will not read; a broken `linked.json` also shuts the door and the join pass, since the site cannot tell who holds which character. The site logs NOT READY at start, `/api/ready` answers 503 naming each file, and Deploy-Docs asks it after every site deploy |
+| `rules-accepted.json` | site | site, bot | Medium: sign-in | none |
 | `board.json`, `notes.json`, `inbox.json`, `open-tickets.json`, `trouble.json` | site | site | Medium: concurrent edits (#2188) | none |
 | `gallery.json`, `gallery-pending.json`, `gallery-reports.json`, `uploads.json`, `files.json` | site | site | Medium | none |
 | `news.json`, `page-versions.json` | Publish-News, Set-DevNews, site | site | Low | named on a bad read (#2119) |
@@ -52,7 +53,7 @@ How each kind of JSON state takes a format change today, and how it is put back.
 
 - **Held records** (the eight in `scripts\release\RecordShape.ps1`): each kind lists the versions this checkout understands, and every one is `@(1)` today. Only `collection-plugins.json` must say its version (`MustSay`); the other seven predate a version field and are read as version 1 when it is missing. A record that says a version the checkout does not list is refused with "update the checkout, or the record came from somewhere else". So a version 2 is a two-step change: first a checkout that lists both 1 and 2 goes out, then a writer starts writing 2. Going back is the same steps in reverse.
 - **Committed records with no check** (`steam-build.json`, `update-creation-club.json`, `upstream-not-taken.json`): no version field and no check. A format change is whatever the writer and reader agree on in the same commit.
-- **Built and deployed state, site, bot and voice state**: no version field anywhere. Readers take what is there; a file that will not parse is named on a bad read where the table above says so, and on the site falls back to its empty default (`jsonFile` in `site/server.js` logs it).
+- **Built and deployed state, site, bot and voice state**: no version field anywhere. Readers take what is there; a file that will not parse is named on a bad read where the table above says so, and on the site falls back to its empty default (`jsonFile` in `site/server.js` logs it), except the five held site files above, which are never taken as empty.
 
 ### How each is put back
 
@@ -77,13 +78,12 @@ How each kind of JSON state takes a format change today, and how it is put back.
 
 ### Options for the next change, and the do-nothing case
 
-- **Do nothing.** Held records already refuse a version they do not know, the feed and the VPS already have a tested way back, and the site's main write path is already temp then rename. What stays open is that unchecked site files still read a malformed file as empty (#2186 for `bans.json` and `pk.json`).
+- **Do nothing.** Held records already refuse a version they do not know, the feed and the VPS already have a tested way back, and the site's main write path is already temp then rename. What stays open is that the site files not held yet still read a malformed file as empty.
 - **Version field on the site's critical files.** The same rule as RecordShape: missing means 1, unknown means refuse at startup. Rollback is the reverse two-step above. It needs a readiness signal so a refused start is seen (slice 4).
 - **Atomic writes for the record writers.** Temp then move, as DeployedBuild.ps1 already does. Low risk; it only matters for a crash mid-write, which git already covers for committed records.
 - **More clash checks.** Extend the board's revision idea to the other files #2188 names (`notes.json`, `inbox.json`, `open-tickets.json`, `trouble.json`). A file lock is not needed while one Node process writes them.
 ## Next slices, in order
 
-1. **Authorization state:** `bans.json` and `pk.json` fail closed on a malformed file (#2186; site lane).
-2. **Box-side reads:** `server-settings.json` and `server-build.json`, inside the text Swap.ps1 and Install-ThornswoodServer run on the box. The helper has to travel with the payload first.
-3. **Feed:** `version.json` gets a contract in RecordShape.ps1. (`skyrim-pin.json`, `skyrim-files.json`, `ui-gone.json` and `generated.json` were held in slice 3.)
-4. **Site identity state:** `linked.json`, `sessions.json` and `signins.json` get a startup check with a readiness signal.
+Done: the box-side reads (#2404), the feed store's contracts (#2420) and holding every feed send to them (#2180), `bans.json` failing closed (#2186), and `pk.json`, `linked.json`, `sessions.json` and `signins.json` held with a readiness signal, `/api/ready` (#2180).
+
+No slice of #2180 is left. What the options above name (a version field on the site's files, atomic writes for the record writers, more clash checks) is a change of its own, taken only when a format change needs it.

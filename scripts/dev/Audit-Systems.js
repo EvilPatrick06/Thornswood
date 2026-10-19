@@ -367,7 +367,7 @@ head('The property system');
  ['function isJarlOf', 'the jarl, by the Discord role'],
  ['function isStewardOf', 'the steward, by the Discord role'],
  ['function officeCmd', 'a Jarl giving an office'],
- ['function putIn', 'the drop box'],
+ ['function dropboxCmd', 'the drop box'],
  ['function rentCmd', 'rent'],
  ['function post(', 'posting to a board'],
  ['function take(', "the taker's list"],

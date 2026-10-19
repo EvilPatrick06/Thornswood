@@ -38,8 +38,8 @@
     7. No Steam copy at all: refused in one sentence, nothing built.
 
   HOW. It compiles the shipped launcher\app\Steam.cs, OwnGame.cs and Verify.cs,
-  with Paths.cs, Config.cs, Secrets.cs and LoadOrder.cs, using the same .NET
-  Framework csc Build-Launcher.ps1 uses (C# 5), with small stand-ins for the
+  with Paths.cs, Config.cs, Secrets.cs and LoadOrder.cs, using the compiler
+  the build runs (tests\Launcher-Csc.ps1), with small stand-ins for the
   classes they call that touch the machine (Checks, Keep, Junction, Downgrade,
   SkyMp, Updater). A driver builds a pretend Steam, a pretend Other Server Online
   and a pretend Vortex staging folder in a scratch folder, points Steam.cs at
@@ -76,15 +76,10 @@ function Done {
 }
 
 # ---- the compiler the launcher is built with --------------------------------
-$csc = @(
-    (Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'),
-    (Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe')
-) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-Yes 'the .NET Framework csc the launcher builds with is on this machine' ([bool]$csc)
-if (-not $csc) { Done }
-$fw = Split-Path -Parent $csc
+Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
 $refs = @('System.dll', 'System.Core.dll', 'System.Runtime.Serialization.dll', 'System.Xml.dll', 'System.Security.dll') |
-    ForEach-Object { Join-Path $fw $_ }
+    ForEach-Object { Join-Path $LauncherRefDir $_ }
 foreach ($r in $refs) {
     Yes "$([IO.Path]::GetFileName($r)) is there to compile against" (Test-Path -LiteralPath $r)
 }
@@ -1003,9 +998,8 @@ try {
     [IO.File]::WriteAllText($driverFile, $driver, $utf8)
     $exe = Join-Path $work 'vortex-folder-test.exe'
 
-    # /noconfig for the same reason Build-Launcher.ps1 gives: csc.rsp adds its
-    # own copies of the framework and a machine with the reference assemblies
-    # installed stops on CS1703.
+    # /noconfig, as the build does: csc.rsp adds its own copies of the
+    # framework, and beside the reference assemblies that stops on CS1703.
     $cscArgs = @('/noconfig', '/nologo', '/target:exe', '/warn:0', "/out:$exe")
     if (Test-Path -LiteralPath $ownKinds) {
         $skyrimList = Join-Path $work 'skyrim-files.json'
@@ -1025,7 +1019,7 @@ try {
     $compiled = & $LauncherCsc @cscArgs 2>&1
     $ErrorActionPreference = $old
     $built = ($LASTEXITCODE -eq 0) -and (Test-Path -LiteralPath $exe)
-    Yes 'the real Steam.cs, OwnGame.cs and Verify.cs compile with the driver under the C# 5 compiler' $built
+    Yes 'the real Steam.cs, OwnGame.cs and Verify.cs compile with the driver under the build''s compiler' $built
     if (-not $built) { foreach ($l in @($compiled)) { Write-Host "      $l" }; Done }
 
     $scene = Join-Path $work 'machine'

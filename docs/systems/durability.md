@@ -128,8 +128,12 @@ first time it is opened. Each day that turns takes 5% off everything
 in it with a condition, and the loss is written when it is next
 opened. Opening it does not move its day.
 
-A temper at the grindstone or the armour table is refused, and it is
-not counted as work.
+The grindstone and the armour table do not open, for anybody. Pressing
+either says that tempering is not done there and that a piece is
+mended with a repair kit, and the crafting menu never comes up, so it
+never lists a piece to temper (#1384). The server shuts both before
+the menu, because nothing can be made at either. A temper that
+reaches it anyway is still refused, and it is not counted as work.
 
 Release 1.2.3 (11 October) carries all of it, on the main server and
 in the launcher's files. The kits are in its plugin. The recipe table
@@ -150,5 +154,6 @@ Not yet:
   engine works damage out on its own.
 - A piece that is not at 100% cannot be enchanted, because the engine
   takes a plain piece for an enchantment.
-- The grindstone and the armour table still appear in the crafting
-  menu.
+- The shut grindstone and armour table are on main and not in a
+  release yet. Until a release carries them, both still open the
+  crafting menu and only the temper is refused.

@@ -1191,7 +1191,7 @@
   */
   function lineHand(id) {
     const from = lineId;
-    T.js('try{window.thornswoodNet&&window.thornswoodNet.say(' + JSON.stringify('/line hand ' + id) + ',true);}catch(e){}');
+    T.js('try{window.thornswoodNet&&window.thornswoodNet.say(' + JSON.stringify('/line hand ' + id) + ',{quiet:true});}catch(e){}');
     log('menu: profile', from, 'hands its place in line to profile', id);
     lineStart(id, null);
   }
@@ -1256,15 +1256,15 @@
     if (passOk && (early || pass !== linePassSent || now - linePassAt >= LINE_PASS_EVERY_MS)) {
       linePassSent = pass;
       linePassAt = now;
-      T.js('try{window.thornswoodNet&&window.thornswoodNet.say(' + JSON.stringify('/joinpass ' + pass) + ',true);}catch(e){}');
+      T.js('try{window.thornswoodNet&&window.thornswoodNet.say(' + JSON.stringify('/joinpass ' + pass) + ',{quiet:true});}catch(e){}');
     }
-    T.js('try{window.thornswoodNet&&window.thornswoodNet.say("/line",true);}catch(e){}');
+    T.js('try{window.thornswoodNet&&window.thornswoodNet.say("/line",{quiet:true});}catch(e){}');
   }
 
   /* Close the game from the page: give the place up now, before the connection closes. */
   function lineLeave() {
     if (!lineId) { return; }
-    T.js('try{window.thornswoodNet&&window.thornswoodNet.say("/line leave",true);}catch(e){}');
+    T.js('try{window.thornswoodNet&&window.thornswoodNet.say("/line leave",{quiet:true});}catch(e){}');
     log('menu: profile', lineId, 'gave up their place in line');
     lineId = 0;
   }
@@ -2797,11 +2797,11 @@
   const toServer = [];
 
   /*
-    The true after the line marks it as the plugin's own, so the chat page
-    queues it without saying "Not connected yet" over it. Patrick, 24
-    September, over a tester in the creation hall who had typed nothing: "it
-    says mulitple trimes he wasnt connected yet". A page from before the
-    marker ignores it and says what it always said.
+    say marks every line as pressed rather than typed (#2251, #2732), and
+    quiet asks the chat page to queue it without saying "Not connected yet"
+    over it. Patrick, 24 September, over a tester in the creation hall who
+    had typed nothing: "it says mulitple trimes he wasnt connected yet". The
+    two are separate answers in thornswood-chat.js (TWO ANSWERS, over send).
   */
   function tellServer(line) {
     if (line) { toServer.push(line); }
@@ -2809,7 +2809,7 @@
     if (!T.ready) { return; }
     while (toServer.length) {
       const sent = T.js('try{window.thornswoodNet&&window.thornswoodNet.say(' +
-                        JSON.stringify(toServer[0]) + ',true);}catch(e){}');
+                        JSON.stringify(toServer[0]) + ',{quiet:true});}catch(e){}');
       if (!sent) { return; }
       toServer.shift();
     }
@@ -5174,7 +5174,8 @@
     if (!lookingAt) { return false; }
     const line = '/' + cmd + ' ' + lookingAt;
     if (!T.ready) { note('The social connection is loading. Try again in a moment.'); return true; }
-    // These are deliberate actions; chat reports an offline queued request.
+    // These are deliberate actions: say marks the line as a key press, and
+    // with no quiet the chat says when it is queued offline (#2732).
     const sent = T.js('(function(){try{if(window.thornswoodNet&&window.thornswoodNet.say){' +
       'window.thornswoodNet.say(' + JSON.stringify(line) + ');return;}}catch(e){}' +
       'try{window.skyrimPlatform.sendMessage("thornswood-front","social:unavailable");}catch(e){}})();');
@@ -9791,17 +9792,26 @@
     nothing however far the fall, for this character and nobody else.
 
     TIRELESS. Running costs nothing in this game and neither does a plain
-    swing. A sprint and a power attack do, and both are the game's own sums
-    from game settings (Skyrim.esm, overridden by nothing in the load order;
-    skymp5-server's attack costs are SweetPie's only, and this server does
-    not load SweetPie): fSprintStaminaDrainMult for a sprint, and
-    fStaminaAttackWeaponBase plus fStaminaAttackWeaponMult times the
-    weapon's weight for a power attack. Each is held at half while Tireless
-    is held. These have no second set for everybody else, so an NPC this
-    machine runs pays half as well; #1385 says so for Patrick.
+    swing. A sprint, a power attack and a shield bash do, and each is the
+    game's own sum from game settings (Skyrim.esm, overridden by nothing in
+    the load order; skymp5-server's attack costs are SweetPie's only, and
+    this server does not load SweetPie): fSprintStaminaDrainMult for a
+    sprint, fStaminaAttackWeaponBase plus fStaminaAttackWeaponMult times the
+    weapon's weight for a power attack, and fStaminaBashBase and
+    fStaminaPowerBashBase for a bash and a power bash. A bash counts as a
+    swing (Patrick, 12 Oct: one rule for every attack). Each is held at half
+    while Tireless is held. These have no second set for everybody else, so
+    an NPC this machine runs pays half as well, which Patrick kept (12 Oct).
 
-    PACK MULE IS NOT HERE. Being overloaded makes the game walk you, and no
-    game setting changes that; #1385 has it for Patrick.
+    PACK MULE, "being overloaded does not slow you". Being overloaded has
+    one effect here: the game makes you walk, on your own machine, and no
+    game setting changes that. The engine fork's client keeps a list of
+    characters the game does not hold to their carry weight (Patrick chose
+    the engine change on 12 Oct, #1385): for one on it, the game's own
+    Actor::IsOverEncumbered answers no, so it never makes you walk, and the
+    fork's movement sends your run to everybody else as it plays. While Pack
+    Mule is held, your own character is on that list. The inventory still
+    shows your real carry weight.
 
     SET FROM THE GAME'S OWN VALUE, NOT FROM A NUMBER WRITTEN HERE. What a
     setting read before this file first touched it is kept in sp.storage,
@@ -9817,7 +9827,10 @@
   /* perk -> { game setting: the share of the game's own value it is held at }. */
   const PERK_SETTINGS = {
     windwalker: { fJumpFallHeightMult: 0 },
-    tireless: { fSprintStaminaDrainMult: 0.5, fStaminaAttackWeaponBase: 0.5, fStaminaAttackWeaponMult: 0.5 }
+    tireless: {
+      fSprintStaminaDrainMult: 0.5, fStaminaAttackWeaponBase: 0.5, fStaminaAttackWeaponMult: 0.5,
+      fStaminaBashBase: 0.5, fStaminaPowerBashBase: 0.5
+    }
   };
 
   let perksHeld = {};               // perk -> true, the view's list
@@ -9828,6 +9841,7 @@
   let unshakeableOpen = 0;          // staggers that played with the block down, for the log
   let unshakeableSaid = 0;
   let unshakeableOpenSaid = 0;
+  let packMuleKept = null;          // what the client's list was last told, null until a view has said
 
   /* The whole panel view, as treeFromView takes it. Only its perks are read. */
   function perksFromView(json) {
@@ -9891,6 +9905,24 @@
     if (said.length) { log('perks: ' + said.join('; ')); }
   }
 
+  /* Your own character on the client's list while Pack Mule is held, and off
+     it while not. Told only when it changes; null at load, so a reloaded
+     plugin sets the list whatever an earlier copy left in it. */
+  function packMuleNow() {
+    const on = !!perksHeld.packmule;
+    if (packMuleKept === on) { return; }
+    packMuleKept = on;
+    try {
+      sp.setOverEncumberedIgnored(0x14, on);
+      log('perks: Pack Mule ' + (on ? 'held, so carrying past your carry weight does not make you walk'
+                                    : 'not held, so carrying past your carry weight makes you walk, as the game does'));
+    } catch (e) {
+      /* Said once and not retried: the next view that changes what is
+         held comes through here again. */
+      log('perks: could not set Pack Mule:', e);
+    }
+  }
+
   try {
     sp.hooks.sendAnimationEvent.add({
       enter: function (ctx) {
@@ -9909,6 +9941,7 @@
     if (perksDirty) {
       perksDirty = false;
       perkSettingsNow();
+      packMuleNow();
     }
     if (perksHeld.unshakeable) {
       let pc = null;

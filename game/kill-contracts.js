@@ -26,6 +26,8 @@ var SPECIES={wolf:'wolf',sabre:'sabre-cat',bear:'bear',barrow:'draugr',giant:'gi
 var BANDITS={'50533':'imperial','50549':'imperial','5054a':'breton','5054e':'imperial'};
 function createKillContracts(deps) {
   var mp=deps.mp, sources={},byId={},rows=[];
+  var expanded=deps.expandedRows===undefined ? [] : copy(deps.expandedRows);
+  if(!Array.isArray(expanded) || expanded.length>4)throw new Error('Invalid expanded kill source catalogue');
   if(!deps.population || !Array.isArray(deps.population.keep))throw new Error('Kill source catalogue is unavailable.');
   SPEC.forEach(function(spec){
     var row={id:spec.id,hold:spec.hold,place:spec.place,count:spec.count,world:spec.world+':Skyrim.esm',
@@ -40,6 +42,29 @@ function createKillContracts(deps) {
           spec.id==='camp' && kept[6]!=='enemy')throw new Error('Kill source disagrees with the kept cast: '+ref);
       sources[ref]={row:row,base:base,species:species,role:spec.id==='camp'?'bandit':species,
         pos:kept[3].slice(),leash:kept[4]};row.refs.push(ref);
+    });
+    byId[row.id]=row;rows.push(row);
+  });
+  expanded.forEach(function(spec){
+    if(!object(spec) || typeof spec.id!=='string' || !/^q-[a-z0-9-]{1,46}$/.test(spec.id) || own(byId,spec.id) ||
+        spec.kind!=='kill' || !object(spec.merchant) || typeof spec.merchant.hold!=='string' ||
+        !Array.isArray(spec.targets) || spec.targets.length<1 || spec.targets.length>8 || !spec.targets.every(object) ||
+        !Number.isInteger(spec.count) || spec.count<1 || spec.count>spec.targets.length)
+      throw new Error('Invalid expanded kill source');
+    var first=spec.targets[0],row={id:spec.id,hold:spec.merchant.hold,place:first.locationName,count:spec.count,
+      world:first.world||first.cell,refs:[]};
+    spec.targets.forEach(function(target){
+      var matches=deps.population.keep.filter(function(kept){return kept[0]===target.ref;}),kept=matches[0];
+      if(typeof target.ref!=='string' || typeof target.species!=='string' || !target.species ||
+          own(sources,target.ref) || matches.length!==1 || kept[1]!==target.base || kept[2]!==row.world ||
+          (target.world||target.cell)!==row.world || !point(target.pos) ||
+          JSON.stringify(kept[3])!==JSON.stringify(target.pos) || kept[4]!==target.leash || !(target.leash>0) ||
+          kept[5]!==target.returnMinutes || kept[6]!==target.role || !['enemy','animal'].includes(target.role) ||
+          kept[7]!==target.habitat || kept[8]!==target.tier || kept[12]!==target.species ||
+          (target.cap!==undefined && kept[9]!==target.cap) || !!(kept[11]&2)!==!!target.ambush)
+        throw new Error('Expanded kill source disagrees with the kept cast: '+target.ref);
+      sources[target.ref]={row:row,base:target.base,species:target.species,role:target.role,
+        pos:target.pos.slice(),leash:target.leash};row.refs.push(target.ref);
     });
     byId[row.id]=row;rows.push(row);
   });

@@ -425,12 +425,12 @@
       "published": "Every pack and the installer (Data\\Interface)",
       "source": "Skyrim's own interface\\startmenu.swf (Skyrim - Interface.bsa, 83,404 bytes), edited: its logo shapes taken out. Measured 15 Oct: the same 871 SWF tags in the same order, only DefineShape tags differ, by a byte or two each, and no strings were added or removed",
       "creator": "Bethesda Game Studios; edited for Thornswood, by whom is not recorded",
-      "licence": "not recorded: Bethesda's terms for mods that hand on a game file they edited were not read",
-      "attribution": "not recorded",
-      "approved": "Patrick, 15 Oct 2026 (#2177, option B): recorded as Bethesda's file, edited",
-      "evidence": "The comparison on #2177, 15 Oct 2026; scripts\\release\\Ship-Rules.ps1 $ShipOursFiles; scripts\\release\\Go.ps1.",
-      "status": "unconfirmed",
-      "ask": "Whoever next works #2177: record Bethesda's terms for mods that hand on a game file they edited, which this file shares with the meshes built from Skyrim's own."
+      "licence": "Bethesda's terms for Skyrim Special Edition mods, the Creation Kit End User License Agreement (https://store.steampowered.com/eula/1946180_eula_0, Steam app 1946180), read 19 Oct 2026 (#2792): mods go out free and only to people who own the game (1.D.a), carry ZeniMax's notice line (2.B), and are represented as 'originally created by You' (3); 'Any rights not granted to You in this Agreement are reserved by ZeniMax', and no clause grants a right to hand on ZeniMax's own files, edited or not, or meshes put together from them",
+      "attribution": "Named as the game's own file, edited, on the site's terms and credits pages, which carry the notice line the terms ask for (#2792)",
+      "approved": "Patrick, 15 Oct 2026 (#2177, option B): recorded as Bethesda's file, edited; Patrick, 19 Oct 2026 (#2792, option 1): the terms page names it as the one game file Thornswood hands on",
+      "evidence": "The comparison on #2177, 15 Oct 2026; THIRD-PARTY.md, Bethesda's own file, edited; site\\data\\site\\terms.md and credits.md; scripts\\release\\Ship-Rules.ps1 $ShipOursFiles; scripts\\release\\Go.ps1.",
+      "status": "no-licence-found",
+      "issue": 2827
     },
     {
       "path": "game/ours/Data/Interface/loadwaitspinner.swf",
@@ -461,16 +461,15 @@
     {
       "path": "game/ours/Data/Interface/skyhud/skyhud.txt",
       "sha256": "1d735b7475cf258ae0b5bff08c769e3be2aa5f81f583da1c1de341a3ada176e1",
-      "what": "SkyHUD's settings file (its own header, BETA 0.90B) with the values Thornswood set on 16 Sep. Hash as git stores it, with LF line endings.",
+      "what": "Thornswood's preset for SkyHUD 0.90B: SkyHUD's own settings file (its own header, BETA 0.90B, and comments) with the values Thornswood set on 16 Sep. Hash as git stores it, with LF line endings.",
       "published": "Every pack and the installer (Data\\Interface\\skyhud)",
-      "source": "SkyHUD's own settings file, changed here",
-      "creator": "SkyHUD's author, with Thornswood's values",
-      "licence": "not recorded: SkyHUD's permissions were not read",
-      "attribution": "not recorded",
-      "approved": "In $ShipOursFiles since 16 Sep",
-      "evidence": "scripts\\release\\Ship-Rules.ps1 $ShipOursFiles.",
-      "status": "unconfirmed",
-      "ask": "Whoever next works #2177: read SkyHUD's Nexus permissions for its settings file, or ship only the lines Thornswood changed."
+      "source": "SkyHUD's settings file, Data\\Interface\\skyhud\\skyhud.txt, from SkyHUD 0.90B (Nexus Mods, Skyrim Special Edition mod 463, file 61422 'SkyHUD v090B v4', the file collection 7essxf revision 2 installs), with Thornswood's values",
+      "creator": "The SkyHUD Team (uploaded by Fhaarkas): the file's layout, header and comments; the values are Thornswood's, set on 16 Sep, by whom is not recorded",
+      "licence": "SkyHUD's own permission, in its Nexus description under PERMISSION: 'You're free to share your preset (skyhud.txt) anywhere. The rest of the mod must not be included and you must state clearly what version of the mod your preset is for.' Only skyhud.txt ships, and the version is stated",
+      "attribution": "The credits page names it as Thornswood's preset for SkyHUD 0.90B, by the SkyHUD Team (#2792)",
+      "approved": "In $ShipOursFiles since 16 Sep; its permission read 19 Oct 2026 (#2792)",
+      "evidence": "SkyHUD's description and the collection's revision 2 file list, read 19 Oct 2026 through the Nexus Mods API (api.nexusmods.com/v2/graphql: legacyMods gameId 1704 modId 463, and collection 7essxf); site\\data\\site\\credits.md; scripts\\release\\Ship-Rules.ps1 $ShipOursFiles.",
+      "status": "cleared"
     },
     {
       "path": "game/content/Thornswood-Content.esp",
@@ -501,8 +500,8 @@
     },
     {
       "path": "game/content/Thornswood-Last.esp",
-      "sha256": "ebcfbe2562a1a999d06cfe90fd740ce46265201687ff834c0bc9d96558b9c77f",
-      "what": "The light plugin that loads last (#2468): 6,757 cut placed actors overridden initially disabled, with their cells and worldspaces copied exactly from the plugin that wins each, 2,226 vanilla quests and 16 of the collection's mod quests with gate, door or arrival talk stopped. 5,984,128 bytes on 17 Oct, rebuilt against the content plugin with Thornswood's own station placements (#2553).",
+      "sha256": "66f5833bfe3b02a629feba127ef0adcc15736b2e9735ed42dd297e4af71f48b8",
+      "what": "The light plugin that loads last (#2468): 6,946 cut placed actors overridden initially disabled, with their cells and worldspaces copied exactly from the plugin that wins each, 2,226 vanilla quests and 16 of the collection's mod quests with gate, door or arrival talk stopped, and 8 location records and 3 rooms copied from the plugins that win them with a hold given (#2551). 6,024,259 bytes on 19 Oct; the six-trade alpha roster removes189 extra guild traders (#1373).",
       "published": "Every pack and the installer on both channels, and handed out by both game servers, since #2486 (Patrick, 12 Oct: it ships from the repository like the content plugin)",
       "source": "Built by scripts\\mods\\Build-LastPlugin.py from the load order's own plugins (Skyrim's and the collection's), as overrides of their records",
       "creator": "Built here; the records it overrides and copies are those plugins' authors'",
@@ -520,12 +519,12 @@
       "published": "Every pack and the installer once released (Ship-Rules.ps1 $ShipOursFiles, Go.ps1)",
       "source": "Built by scripts\\mods\\Build-NoticeBoard.py from pieces of Skyrim's own meshes, read from the game's archives, with vanilla textures only (#2502)",
       "creator": "Built here from Bethesda's Skyrim meshes",
-      "licence": "not recorded: the terms under which meshes made from Skyrim's own files may be handed on were not read",
-      "attribution": "not recorded",
+      "licence": "Bethesda's terms for Skyrim Special Edition mods, the Creation Kit End User License Agreement (https://store.steampowered.com/eula/1946180_eula_0, Steam app 1946180), read 19 Oct 2026 (#2792): mods go out free and only to people who own the game (1.D.a), carry ZeniMax's notice line (2.B), and are represented as 'originally created by You' (3); 'Any rights not granted to You in this Agreement are reserved by ZeniMax', and no clause grants a right to hand on ZeniMax's own files, edited or not, or meshes put together from them",
+      "attribution": "Named on the site's terms and credits pages as built from pieces of Skyrim's own meshes (#2792)",
       "approved": "Patrick approved the board concept on 12 Oct (#2298, #2502)",
-      "evidence": "Commit b9923901 (#2502); tests\\test-2298-board-meshes.js.",
-      "status": "unconfirmed",
-      "ask": "Whoever next works #2177: record Bethesda's terms for mods that hand on meshes built from Skyrim's files, which the menu meshes and these two share."
+      "evidence": "Commit b9923901 (#2502); tests\\test-2298-board-meshes.js; THIRD-PARTY.md, Bethesda's own file, edited.",
+      "status": "no-licence-found",
+      "issue": 2827
     },
     {
       "path": "game/ours/Data/meshes/thornswood/dropbox01.nif",
@@ -534,12 +533,12 @@
       "published": "Every pack and the installer once released (Ship-Rules.ps1 $ShipOursFiles, Go.ps1)",
       "source": "Built by scripts\\mods\\Build-NoticeBoard.py from pieces of Skyrim's own meshes, read from the game's archives, with vanilla textures only (#2502)",
       "creator": "Built here from Bethesda's Skyrim meshes",
-      "licence": "not recorded: the terms under which meshes made from Skyrim's own files may be handed on were not read",
-      "attribution": "not recorded",
+      "licence": "Bethesda's terms for Skyrim Special Edition mods, the Creation Kit End User License Agreement (https://store.steampowered.com/eula/1946180_eula_0, Steam app 1946180), read 19 Oct 2026 (#2792): mods go out free and only to people who own the game (1.D.a), carry ZeniMax's notice line (2.B), and are represented as 'originally created by You' (3); 'Any rights not granted to You in this Agreement are reserved by ZeniMax', and no clause grants a right to hand on ZeniMax's own files, edited or not, or meshes put together from them",
+      "attribution": "Named on the site's terms and credits pages as built from pieces of Skyrim's own meshes (#2792)",
       "approved": "Patrick approved the board concept on 12 Oct (#2298, #2502)",
-      "evidence": "Commit b9923901 (#2502); tests\\test-2298-board-meshes.js.",
-      "status": "unconfirmed",
-      "ask": "Whoever next works #2177: record Bethesda's terms for mods that hand on meshes built from Skyrim's files, which the menu meshes and these two share."
+      "evidence": "Commit b9923901 (#2502); tests\\test-2298-board-meshes.js; THIRD-PARTY.md, Bethesda's own file, edited.",
+      "status": "no-licence-found",
+      "issue": 2827
     },
     {
       "path": "bot/thornswood-bot-1024.png",
