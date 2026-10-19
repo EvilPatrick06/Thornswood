@@ -99,8 +99,9 @@ function IsNewer([string]$remote, [string]$local) {
   Read-SiteFeed and Get-FeedStoreLaunchers, not the version.json files in a
   releases clone, and Feed-Store.ps1 takes THORNSWOOD_TEST_SITE_DIR as the
   VPS's feed folders on disk, so this runs exactly what Ship runs:
-    <site>\feed\version.json            what main has published
-    <site>\feed-dev\version.json        what dev has out now
+    <site>\feed\version\00000001.json   what main has published (the feed's
+                                        newest generation, #2727)
+    <site>\feed-dev\version\00000001.json what dev has out now
     <site>\feed-dev\launchers.txt       every dev number ever published
   and the copy last received on this machine, which Read-Published falls back
   to when the site has no answer, is LOCALAPPDATA\Thornswood\feed\<channel>,
@@ -120,13 +121,18 @@ function Put-Feed([string]$dir, [string]$v) {
     New-Item -ItemType Directory -Force -Path $dir | Out-Null
     Set-Content -LiteralPath (Join-Path $dir 'version.json') -Value (@{ launcherVersion = $v } | ConvertTo-Json)
 }
+# The site's feed is the newest of its generations (Feed-Store.ps1, #2727).
+function Put-SiteFeed([string]$dir, [string]$v) {
+    New-Item -ItemType Directory -Force -Path (Join-Path $dir 'version') | Out-Null
+    Set-Content -LiteralPath (Join-Path $dir 'version\00000001.json') -Value (@{ launcherVersion = $v } | ConvertTo-Json)
+}
 function Run([string]$branchVersion, [string]$mainFeed, [string]$devFeed, [string[]]$devEver = @(), [string]$mainCopy = '', [bool]$aligned = $false, [string]$devCopy = '') {
     $script:runN++
     $site = Join-Path $tmp ('site' + $script:runN)
     $local = Join-Path $tmp ('local' + $script:runN)
     New-Item -ItemType Directory -Force -Path (Join-Path $site 'feed'), (Join-Path $site 'feed-dev'), $local | Out-Null
-    if ($mainFeed) { Put-Feed (Join-Path $site 'feed') $mainFeed }
-    if ($devFeed) { Put-Feed (Join-Path $site 'feed-dev') $devFeed }
+    if ($mainFeed) { Put-SiteFeed (Join-Path $site 'feed') $mainFeed }
+    if ($devFeed) { Put-SiteFeed (Join-Path $site 'feed-dev') $devFeed }
     if ($devEver.Count) { Set-Content -LiteralPath (Join-Path $site 'feed-dev\launchers.txt') -Value $devEver -Encoding ASCII }
     if ($mainCopy) { Put-Feed (Join-Path $local 'Thornswood\feed\main') $mainCopy }
     if ($devCopy) { Put-Feed (Join-Path $local 'Thornswood\feed\dev') $devCopy }

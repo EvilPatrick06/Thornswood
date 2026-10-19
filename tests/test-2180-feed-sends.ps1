@@ -39,19 +39,22 @@ try {
     $site = Join-Path $T 'site'
     $up = Join-Path $site 'feed-dev'
     $dir = Join-Path $T 'work'
-    $null = New-Item -ItemType Directory -Path $up, $dir -Force
-    Put (Join-Path $up 'version.json') $goodVersion
+    $null = New-Item -ItemType Directory -Path (Join-Path $up 'version'), $dir -Force
+    # The store's feed is the newest of its generations (#2727).
+    function UpFile([string]$n) { if ($n -eq 'version.json') { return (Get-FeedVersionFile $up) } return (Join-Path $up $n) }
+    Put (Join-Path $up 'version\00000001.json') $goodVersion
     Put (Join-Path $up 'published.json') $goodPublished
     Put (Join-Path $up 'releases.json') $goodReleases
     $expect = @{}
     foreach ($n in 'version.json', 'published.json', 'releases.json') {
-        Copy-Item -LiteralPath (Join-Path $up $n) -Destination (Join-Path $dir $n)
-        $expect[$n] = Get-FeedStoreSha (Join-Path $up $n)
+        Copy-Item -LiteralPath (UpFile $n) -Destination (Join-Path $dir $n)
+        $expect[$n] = Get-FeedStoreSha (UpFile $n)
     }
     $shaBefore = @{}; foreach ($n in $expect.Keys) { $shaBefore[$n] = $expect[$n] }
 
     function StoreUntouched {
-        foreach ($n in @($shaBefore.Keys)) { if ((Get-FeedStoreSha (Join-Path $up $n)) -ne $shaBefore[$n]) { return $false } }
+        foreach ($n in @($shaBefore.Keys)) { if ((Get-FeedStoreSha (UpFile $n)) -ne $shaBefore[$n]) { return $false } }
+        if (@(Get-ChildItem -LiteralPath (Join-Path $up 'version') -File).Count -ne 1) { return $false }
         if (@(Get-ChildItem -LiteralPath $up -Filter '*.part' -File).Count) { return $false }
         if (Test-Path -LiteralPath (Join-Path $up 'history')) { return $false }
         return $true
@@ -76,7 +79,7 @@ try {
         $why = Threw { Send-FeedStore 'dev' $dir $files -SiteDir $site -Expect $expect }
         Yes ("{0} is refused, naming the file and the field" -f $c.What) ($why.Contains($c.File) -and $why.Contains($c.Says) -and $why.Contains('Nothing was sent'))
         Yes '  and the store up there is as it was, with no .part and nothing in history' (StoreUntouched)
-        Copy-Item -LiteralPath (Join-Path $up $c.File) -Destination (Join-Path $dir $c.File) -Force
+        Copy-Item -LiteralPath (UpFile $c.File) -Destination (Join-Path $dir $c.File) -Force
     }
 
     # A file sent unchanged is held too: a store already out of shape is
@@ -110,7 +113,7 @@ try {
         Put (Join-Path $dir 'version.json') $next
         $r = Send-FeedStore 'dev' $dir @('version.json', 'releases.json') -SiteDir $site -Expect $expect
         Yes 'a version.json in shape is sent, and the store has it' (@($r.Sent) -contains 'version.json' -and
-            (Get-FeedStoreSha (Join-Path $up 'version.json')) -eq (Get-FeedStoreSha (Join-Path $dir 'version.json')))
+            (Get-FeedStoreSha (UpFile 'version.json')) -eq (Get-FeedStoreSha (Join-Path $dir 'version.json')))
         Yes '  and releases.json, unchanged, is not sent again' (@($r.Same) -contains 'releases.json')
     } else {
         Write-Host 'SKIP  a send in shape ends in the store''s Windows rename; the build check runs this half on Windows'

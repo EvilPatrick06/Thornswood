@@ -61,9 +61,10 @@ function scratch() {
     botKey: KEY, admins: [STAFF_D], secret: SECRET, passKey: PASSKEY,
     gameCheckPort: 1, onlineFile: path.join(dir, 'online.json')
   }, null, 2));
-  // The launcher feed the join pass holds a launcher's version to.
-  fs.mkdirSync(path.join(dir, 'feed'), { recursive: true });
-  fs.writeFileSync(path.join(dir, 'feed', 'version.json'), JSON.stringify({ launcherVersion: '1.1.200', minLauncher: '1.1.200' }));
+  // The launcher feed the join pass holds a launcher's version to, as the
+  // feed's first generation (#2727).
+  fs.mkdirSync(path.join(dir, 'feed', 'version'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'feed', 'version', '00000001.json'), JSON.stringify({ launcherVersion: '1.1.200', minLauncher: '1.1.200' }));
   fs.writeFileSync(path.join(dir, 'data', 'linked.json'), LINKED_OK);
   return dir;
 }

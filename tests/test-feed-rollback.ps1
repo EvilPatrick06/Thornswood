@@ -109,12 +109,17 @@ function Put-Asset([string]$file) {
     return $sha
 }
 function Url([string]$sha) { return "https://thornswood.net/feed-dev/assets/$sha" }
-function Read-Feed { return (([IO.File]::ReadAllText((Join-Path $feedDir 'version.json'))) -replace '^﻿', '') | ConvertFrom-Json }
+# The feed the site serves is the newest of its generations, and a feed put
+# there is the next one, the way the store sends it (Feed-Store.ps1, #2727).
+function Feed-File { return (Get-FeedVersionFile $feedDir) }
+function Read-Feed { return (([IO.File]::ReadAllText((Feed-File))) -replace '^﻿', '') | ConvertFrom-Json }
 # The list a rollback reads, the store's releases.json beside the feed since
 # #1050 (Release-Baseline.ps1), merged with any the feed still carries.
 function Read-Releases { return @(Get-StoreReleases $feedDir (Read-Feed)) }
-function Write-Feed($doc) { [IO.File]::WriteAllText((Join-Path $feedDir 'version.json'), ($doc | ConvertTo-Json -Depth 6), $utf8) }
-function Feed-Sha { return (Get-BaselineFileSha (Join-Path $feedDir 'version.json')) }
+function Write-Feed($doc) {
+    New-Item -ItemType Directory -Force -Path (Join-Path $feedDir 'version') | Out-Null
+    [IO.File]::WriteAllText((Join-Path (Join-Path $feedDir 'version') (Get-FeedVersionNext $feedDir)), ($doc | ConvertTo-Json -Depth 6), $utf8) }
+function Feed-Sha { return (Get-BaselineFileSha (Feed-File)) }
 # A pack the way Publish-Update builds one: delete.txt, game/<path>, and the
 # plugin list under profile/.
 function New-Pack([string]$path, [hashtable]$files, [string[]]$deletes, [string]$plugins) {
@@ -294,7 +299,7 @@ function Use-Install([string]$root) {
 # bytes the feed names, checked against its sha256, through Updater.Install.
 function Update-Install([string]$root, [int]$only = -1) {
     Use-Install $root
-    $v = $mParse.Invoke($null, @(, [IO.File]::ReadAllBytes((Join-Path $feedDir 'version.json'))))
+    $v = $mParse.Invoke($null, @(, [IO.File]::ReadAllBytes((Feed-File))))
     $pending = @($mPending.Invoke($null, @($v)))
     # A launcher from #1050 on offers the record the feed names as one update.
     # These records do not say their files are on the site (':record:files'),
@@ -346,7 +351,7 @@ Yes 'a launcher applies the three releases as they come' ((Update-Install $A) -e
 $B = New-Install 'offline' $installer @()
 Yes '  and another took only the first before going quiet' ((Update-Install $B 1) -eq 1 -and (Test-Lands $B $records[$R1]))
 # The feed with the list in it still reads in the launcher, and offers no launcher.
-$vNow = $mParse.Invoke($null, @(, [IO.File]::ReadAllBytes((Join-Path $feedDir 'version.json'))))
+$vNow = $mParse.Invoke($null, @(, [IO.File]::ReadAllBytes((Feed-File))))
 Yes 'the launcher reads a feed carrying "releases" and "baseline"' ($null -ne $vNow -and @($vNow.packs).Count -eq 3)
 
 # ---- Rollback-Feed.ps1 ----------------------------------------------------------
@@ -414,7 +419,7 @@ Yes 'the one offline since the first takes the rest and the rollback, and lands 
 $C = New-Install 'fresh' @{} @($R1, $R2, $R3)
 foreach ($k in $state.Keys) { $f = Join-Path $C "Game\$k"; New-Item -ItemType Directory -Force -Path (Split-Path -Parent $f) | Out-Null; [IO.File]::WriteAllText($f, [string]$state[$k], $ascii) }
 Yes 'a fresh install built at the third release takes only the rollback and lands there too' ((Update-Install $C) -eq 1 -and (Test-Lands $C $wantB))
-$vB = $mParse.Invoke($null, @(, [IO.File]::ReadAllBytes((Join-Path $feedDir 'version.json'))))
+$vB = $mParse.Invoke($null, @(, [IO.File]::ReadAllBytes((Feed-File))))
 Yes 'no launcher is offered: the version did not move' (-not [bool]$mNewer.Invoke($null, @([string]$vB.launcherVersion, '1.1.102.5')))
 
 # All the way back to the first: the installer's own files are in no pack, but

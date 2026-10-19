@@ -80,6 +80,12 @@ function Sha([string]$path) {
     $h = [Security.Cryptography.SHA256]::Create()
     try { return (-join ($h.ComputeHash([IO.File]::ReadAllBytes($path)) | ForEach-Object { $_.ToString('x2') })) } finally { $h.Dispose() }
 }
+# The stand-in site keeps each channel's feed as write-once generations,
+# <channel>\version\<8 digits>.json, the newest being the feed (#2727,
+# Feed-Store.ps1). SiteFeed is the newest; Put-SiteFeed writes the next one,
+# as another publisher would.
+function SiteFeed([string]$channelDir) { return (Get-FeedVersionFile $channelDir) }
+function Put-SiteFeed([string]$channelDir, [string]$text) { Put (Join-Path (Join-Path $channelDir 'version') (Get-FeedVersionNext $channelDir)) $text }
 function RunGit([string]$dir) {
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     try { $out = @(& git -C $dir @args 2>&1 | ForEach-Object { [string]$_ }); $code = $LASTEXITCODE }
@@ -196,13 +202,16 @@ try {
         Write-Host ''; Write-Host 'the refresh, against a stand-in store'
         $site = Join-Path $Scratch 'site'
         $work = Join-Path $Scratch 'work-dev'
-        Put (Join-Path $site 'feed\version.json') ($mainFeed | ConvertTo-Json -Depth 6)
-        Put (Join-Path $site 'feed-dev\version.json') ((Stale-DevFeed) | ConvertTo-Json -Depth 6)
+        Put (Join-Path $site 'feed\version\00000001.json') ($mainFeed | ConvertTo-Json -Depth 6)
+        Put (Join-Path $site 'feed-dev\version\00000001.json') ((Stale-DevFeed) | ConvertTo-Json -Depth 6)
         Put (Join-Path $site 'feed-dev\published.json') '{"Data\\x.esp":"5:0000000000000000000000000000000000000000000000000000000000000000"}'
-        $devJson = Join-Path $site 'feed-dev\version.json'
-        $mainShaBefore = Sha (Join-Path $site 'feed\version.json')
+        $devDir = Join-Path $site 'feed-dev'
+        $mainDir = Join-Path $site 'feed'
+        $mainFileBefore = SiteFeed $mainDir
+        $mainShaBefore = Sha $mainFileBefore
+        $devShaBefore = Sha (SiteFeed $devDir)
         $pubShaBefore = Sha (Join-Path $site 'feed-dev\published.json')
-        $was = Read-Json $devJson
+        $was = Read-Json (SiteFeed $devDir)
         Yes ("the stale dev feed has 27 of its 40 notes marked DEV and mainVersion 1.1.106 ({0} marked)" -f @($was.news | Where-Object { $_.channel -eq 'dev' }).Count) (
             @($was.news).Count -eq 40 -and @($was.news | Where-Object { $_.channel -eq 'dev' }).Count -eq 27 -and $was.mainVersion -eq '1.1.106')
 
@@ -215,7 +224,7 @@ try {
         Yes ("  mainVersion follows main ({0} -> {1}), and the result names main's release" -f $r.WasMainVersion, $r.MainVersion) (
             $r.WasMainVersion -eq '1.1.106' -and $r.MainVersion -eq '1.2.0' -and $r.MainRelease -eq '20261005-235125')
         Yes '  and it says it sent the feed' ($r.Changed -and $r.Sent)
-        $now = Read-Json $devJson
+        $now = Read-Json (SiteFeed $devDir)
         Yes 'the store''s dev feed now marks only the one note DEV' (@($now.news | Where-Object { $_.channel -eq 'dev' }).Count -eq 1 -and $now.news[0].channel -eq 'dev')
         Yes '  and says main is on 1.2.0' ($now.mainVersion -eq '1.2.0')
         Yes '  with the same 40 notes in the same order: no entry added, none dropped' (
@@ -224,10 +233,15 @@ try {
             $now.launcherVersion -eq $was.launcherVersion -and $now.launcherUrl -eq $was.launcherUrl -and
             (($now.packs | ConvertTo-Json -Depth 4 -Compress) -eq ($was.packs | ConvertTo-Json -Depth 4 -Compress)) -and
             (($now.release | ConvertTo-Json -Depth 4 -Compress) -eq ($was.release | ConvertTo-Json -Depth 4 -Compress)))
-        Yes '  the baseline and main''s feed are untouched' ((Sha (Join-Path $site 'feed-dev\published.json')) -eq $pubShaBefore -and (Sha (Join-Path $site 'feed\version.json')) -eq $mainShaBefore)
-        $hist = @(Get-ChildItem -LiteralPath (Join-Path $site 'feed-dev\history') -File -ErrorAction SilentlyContinue)
-        Yes ("  the feed it replaced is kept in the store's history, and only that ({0})" -f (($hist | ForEach-Object { $_.Name }) -join ', ')) (
-            $hist.Count -eq 1 -and $hist[0].Name -like '*-version.json')
+        Yes '  the baseline and main''s feed are untouched' ((Sha (Join-Path $site 'feed-dev\published.json')) -eq $pubShaBefore -and
+            (SiteFeed $mainDir) -eq $mainFileBefore -and (Sha (SiteFeed $mainDir)) -eq $mainShaBefore)
+        # The generations are the feed's history: the one it replaced stays
+        # beside the new one, unchanged, and nothing else was replaced.
+        $gens = @(Get-ChildItem -LiteralPath (Join-Path $devDir 'version') -File | Sort-Object Name)
+        $hist = @(Get-ChildItem -LiteralPath (Join-Path $devDir 'history') -File -ErrorAction SilentlyContinue)
+        Yes ("  the feed it replaced is still there, unchanged, beside the new one, and nothing else went to history ({0}; history: {1})" -f (($gens | ForEach-Object { $_.Name }) -join ', '), (($hist | ForEach-Object { $_.Name }) -join ', ')) (
+            $gens.Count -eq 2 -and $gens[0].Name -eq '00000001.json' -and (Sha $gens[0].FullName) -eq $devShaBefore -and
+            $gens[1].Name -eq '00000002.json' -and (SiteFeed $devDir) -eq $gens[1].FullName -and $hist.Count -eq 0)
         # An old note whose own release was built with uncommitted files, and
         # no clean release after it, has nothing to prove it by, so it keeps
         # the mark it has (6 Oct 2:10 PM: 20261006-141047-dev, uncommitted 1).
@@ -253,55 +267,56 @@ try {
             Yes ("  an old note no tagged release holds ({0}) keeps its mark" -f $when) (
                 @($lost.news | Where-Object { -not $_.PSObject.Properties['sourceCommit'] -and $_.channel -eq 'dev' }).Count -eq 24)
         }
-        $raw = [IO.File]::ReadAllBytes($devJson)
+        $raw = [IO.File]::ReadAllBytes((SiteFeed $devDir))
         Yes '  written with no byte order mark' (-not ($raw.Length -ge 3 -and $raw[0] -eq 0xEF -and $raw[1] -eq 0xBB -and $raw[2] -eq 0xBF))
         Yes '  and no release line was added to the store''s releases.txt' (-not (Test-Path -LiteralPath (Join-Path $site 'feed-dev\releases.txt')) -or
             @(Get-Content -LiteralPath (Join-Path $site 'feed-dev\releases.txt') | Where-Object { $_ }).Count -le 1)
 
-        $shaAfter = Sha $devJson
+        $shaAfter = Sha (SiteFeed $devDir)
         $r2 = Update-DevFeedMarks -SourceRepo $git -Dir $work -SiteDir $site
-        Yes 'a second run finds nothing to move and sends nothing' (-not $r2.Changed -and -not $r2.Sent -and (Sha $devJson) -eq $shaAfter -and
-            @(Get-ChildItem -LiteralPath (Join-Path $site 'feed-dev\history') -File).Count -eq 1)
+        Yes 'a second run finds nothing to move and sends nothing' (-not $r2.Changed -and -not $r2.Sent -and (Sha (SiteFeed $devDir)) -eq $shaAfter -and
+            @(Get-ChildItem -LiteralPath (Join-Path $devDir 'version') -File).Count -eq 2)
         Yes ('  and says so: ' + ((Get-DevFeedMarksLines $r2) -join ' / ')) ((Get-DevFeedMarksLines $r2) -contains 'the dev feed already matched main, so nothing was sent')
 
-        Put $devJson ((Stale-DevFeed) | ConvertTo-Json -Depth 6)
-        $staleSha = Sha $devJson
+        Put-SiteFeed $devDir ((Stale-DevFeed) | ConvertTo-Json -Depth 6)
+        $staleSha = Sha (SiteFeed $devDir)
         $r3 = Update-DevFeedMarks -SourceRepo $git -Dir $work -SiteDir $site -NoSend
-        Yes '-NoSend works it out and sends nothing' ($r3.Changed -and -not $r3.Sent -and @($r3.Cleared).Count -eq 26 -and (Sha $devJson) -eq $staleSha)
+        Yes '-NoSend works it out and sends nothing' ($r3.Changed -and -not $r3.Sent -and @($r3.Cleared).Count -eq 26 -and (Sha (SiteFeed $devDir)) -eq $staleSha)
         Yes '  and writes nothing into the working folder either' (@((Read-Json (Join-Path $work 'version.json')).news | Where-Object { $_.channel -eq 'dev' }).Count -eq 27)
 
-        $mainJson = Join-Path $site 'feed\version.json'
-        Move-Item -LiteralPath $mainJson -Destination ($mainJson + '.away')
+        # No main feed: its generations folder is moved aside, so the site has none.
+        $mainGens = Join-Path $mainDir 'version'
+        Move-Item -LiteralPath $mainGens -Destination ($mainGens + '.away')
         $threw = ''
         try { [void](Update-DevFeedMarks -SourceRepo $git -Dir $work -SiteDir $site) } catch { $threw = $_.Exception.Message }
-        Yes ("no main feed: it refuses and sends nothing ({0})" -f $threw) ($threw -match 'no main feed' -and (Sha $devJson) -eq $staleSha)
-        Move-Item -LiteralPath ($mainJson + '.away') -Destination $mainJson
+        Yes ("no main feed: it refuses and sends nothing ({0})" -f $threw) ($threw -match 'no main feed' -and (Sha (SiteFeed $devDir)) -eq $staleSha)
+        Move-Item -LiteralPath ($mainGens + '.away') -Destination $mainGens
 
         [void](Receive-FeedStore 'dev' $work -SiteDir $site)
-        $other = Read-Json $devJson; $other.launcherVersion = '1.2.0.1'
-        Put $devJson ($other | ConvertTo-Json -Depth 6)
-        $otherSha = Sha $devJson
+        $other = Read-Json (SiteFeed $devDir); $other.launcherVersion = '1.2.0.1'
+        Put-SiteFeed $devDir ($other | ConvertTo-Json -Depth 6)
+        $otherSha = Sha (SiteFeed $devDir)
         $threw = ''
         try { [void](Update-DevFeedMarks -SourceRepo $git -Dir $work -Received -SiteDir $site) } catch { $threw = $_.Exception.Message }
-        Yes ("a dev feed that changed on the VPS after it was read is not written over ({0})" -f $threw) ($threw -match 'changed on the VPS' -and (Sha $devJson) -eq $otherSha)
+        Yes ("a dev feed that changed on the VPS after it was read is not written over ({0})" -f $threw) ($threw -match 'changed on the VPS' -and (Sha (SiteFeed $devDir)) -eq $otherSha)
 
         # ---- 2. Refresh-DevNews.ps1 --------------------------------------------------
         Write-Host ''; Write-Host 'Refresh-DevNews.ps1'
         $refresh = Join-Path $repo 'scripts\release\Refresh-DevNews.ps1'
         Yes 'scripts\release\Refresh-DevNews.ps1 is there' (Test-Path -LiteralPath $refresh)
-        Put $devJson ((Stale-DevFeed) | ConvertTo-Json -Depth 6)
-        $staleSha = Sha $devJson
+        Put-SiteFeed $devDir ((Stale-DevFeed) | ConvertTo-Json -Depth 6)
+        $staleSha = Sha (SiteFeed $devDir)
         $c = Child ("& " + (Q $refresh) + " -Check -RepoDir " + (Q $git) + " -Dir " + (Q $work) + " -SiteDir " + (Q $site) + " -NoPause; exit `$LASTEXITCODE")
         YesR ("-Check says what would move and sends nothing (exit {0})" -f $c.Code) ($c.Code -eq 0 -and $c.Out -match '1 of 40 notes marked DEV' -and
-            $c.Out -match '26 lost the mark' -and $c.Out -match 'this run sends nothing' -and (Sha $devJson) -eq $staleSha) $c
+            $c.Out -match '26 lost the mark' -and $c.Out -match 'this run sends nothing' -and (Sha (SiteFeed $devDir)) -eq $staleSha) $c
         $c = Child ("& " + (Q $refresh) + " -RepoDir " + (Q $git) + " -Dir " + (Q $work) + " -SiteDir " + (Q $site) + " -NoPause; exit `$LASTEXITCODE")
         YesR ("without it, the store's dev feed is marked against main (exit {0})" -f $c.Code) ($c.Code -eq 0 -and $c.Out -match 'version.json was sent' -and
-            @((Read-Json $devJson).news | Where-Object { $_.channel -eq 'dev' }).Count -eq 1 -and (Read-Json $devJson).mainVersion -eq '1.2.0') $c
+            @((Read-Json (SiteFeed $devDir)).news | Where-Object { $_.channel -eq 'dev' }).Count -eq 1 -and (Read-Json (SiteFeed $devDir)).mainVersion -eq '1.2.0') $c
         Yes '  and it names the note that keeps the mark' ($c.Out -match 'still DEV, main does not have them: Work main never took')
-        Move-Item -LiteralPath $mainJson -Destination ($mainJson + '.away')
+        Move-Item -LiteralPath $mainGens -Destination ($mainGens + '.away')
         $c = Child ("& " + (Q $refresh) + " -RepoDir " + (Q $git) + " -Dir " + (Q $work) + " -SiteDir " + (Q $site) + " -NoPause; exit `$LASTEXITCODE")
         YesR ("with no main feed it exits 1 and says nothing was sent (exit {0})" -f $c.Code) ($c.Code -eq 1 -and $c.Out -match 'NOT refreshed' -and $c.Out -match 'Nothing was sent') $c
-        Move-Item -LiteralPath ($mainJson + '.away') -Destination $mainJson
+        Move-Item -LiteralPath ($mainGens + '.away') -Destination $mainGens
     }
 
     # ---- 3. the real Publish-Update.ps1, dev, nothing new --------------------------
@@ -383,13 +398,13 @@ try {
     # plugin as it was, and its notes go stale below.
     $pMain = [pscustomobject][ordered]@{ launcherVersion = '1.2.0'; packs = @(); news = @()
                                          release = [pscustomobject][ordered]@{ id = '20261005-235125'; channel = 'main'; commit = $head; uncommitted = 0 } }
-    Put (Join-Path $pSite 'feed\version.json') ($pMain | ConvertTo-Json -Depth 6)
+    Put (Join-Path $pSite 'feed\version\00000001.json') ($pMain | ConvertTo-Json -Depth 6)
     # The stand-in UI front carries a SkyMP file (build.js), so the pack's source
     # notice reads records\client-build.json (#1318), copied above. The dev feed
     # already has that client runtime, as a real dev feed does, so this run does
     # not stage the six runtime files the stand-in game folder never had.
     $pFork = [string](((Get-Content -LiteralPath (Join-Path $fake 'records\client-build.json') -Raw) -replace '^\uFEFF', '') | ConvertFrom-Json).forkCommit
-    Put (Join-Path $pSite 'feed-dev\version.json') ('{"launcherVersion":"1.2.0","packs":[],"news":[],"mainVersion":"1.1.106","clientRuntime":{"forkCommit":"' + $pFork + '","url":"https://example.invalid/client-runtime-' + $pFork + '.zip","sha256":"' + ('c' * 64) + '","notice":1}}')
+    Put (Join-Path $pSite 'feed-dev\version\00000001.json') ('{"launcherVersion":"1.2.0","packs":[],"news":[],"mainVersion":"1.1.106","clientRuntime":{"forkCommit":"' + $pFork + '","url":"https://example.invalid/client-runtime-' + $pFork + '.zip","sha256":"' + ('c' * 64) + '","bytes":4096,"notice":1}}')
     Put (Join-Path $pSite 'feed-dev\published.json') '{"Data\\Platform\\UI\\thornswood-ours.esp":"5:0000000000000000000000000000000000000000000000000000000000000000"}'
     function Publish([string[]]$extra) {
         $pu = Join-Path $fake 'scripts\release\Publish-Update.ps1'
@@ -401,25 +416,25 @@ try {
         $p = [regex]::Match($c.Out, 'PUBLISHED=\[([^\]]*)\]'); $mk = [regex]::Match($c.Out, 'MARKS=\[([^\]]*)\]')
         return [pscustomobject]@{ Code = $c.Code; Out = $c.Out; Published = $(if ($p.Success) { $p.Groups[1].Value } else { '?' }); Marks = $(if ($mk.Success) { $mk.Groups[1].Value } else { '?' }) }
     }
-    $pDev = Join-Path $pSite 'feed-dev\version.json'
+    $pDevDir = Join-Path $pSite 'feed-dev'
     $r = Publish @('-Notes', "'Dev test release`n- one line'")
     YesR ("a dev release goes out first (exit {0}, {1})" -f $r.Code, $r.Published) ($r.Code -eq 0 -and $r.Published -match '-dev$') $r
-    $afterRelease = Read-Json $pDev
+    $afterRelease = Read-Json (SiteFeed $pDevDir)
     Yes '  and on the way it marks its notes against main, as it always did' ($afterRelease.mainVersion -eq '1.2.0' -and @($afterRelease.news).Count -eq 1 -and $afterRelease.news[0].channel -eq '')
 
     # Stale marks, the shape of 6 Oct: what main has marked DEV, mainVersion behind.
     function Make-Stale {
-        $d = Read-Json $pDev
+        $d = Read-Json (SiteFeed $pDevDir)
         $notes = @($d.news) + @(
             [pscustomobject]@{ date = '10-5-2026 3:25 PM'; title = 'Work main never took'; body = ''; details = @('x'); channel = 'dev'; sourceCommit = $sideCommit },
             [pscustomobject]@{ date = '10-5-2026 1:08 PM'; title = 'Work main has'; body = ''; details = @('x'); channel = 'dev'; sourceCommit = $head },
             [pscustomobject]@{ date = '10-1-2026 9:56 PM'; title = 'Note from before sourceCommit'; body = ''; details = @('x'); channel = 'dev' })
         foreach ($n in $notes) { $n.channel = 'dev' }
         $d.news = $notes; $d.mainVersion = '1.1.106'
-        Put $pDev ($d | ConvertTo-Json -Depth 6)
+        Put-SiteFeed $pDevDir ($d | ConvertTo-Json -Depth 6)
     }
     Make-Stale
-    $before = Read-Json $pDev
+    $before = Read-Json (SiteFeed $pDevDir)
     $packsBefore = @($before.packs).Count
     $relLines = { @(if (Test-Path -LiteralPath (Join-Path $pSite 'feed-dev\releases.txt')) { Get-Content -LiteralPath (Join-Path $pSite 'feed-dev\releases.txt') | Where-Object { $_ } }).Count }
     $relBefore = & $relLines
@@ -428,7 +443,7 @@ try {
     YesR ("the same build again is Nothing to do, exit 2, and no release is named (exit {0}, [{1}])" -f $r.Code, $r.Published) (
         $r.Code -eq 2 -and $r.Out -match 'Nothing to do' -and $r.Published -eq '') $r
     Yes '  it says nothing was released and nothing was added to the news' ($r.Out -match 'Nothing was released, so nothing was added to the news')
-    $after = Read-Json $pDev
+    $after = Read-Json (SiteFeed $pDevDir)
     Yes ("  the store's dev feed marks DEV only the work main never took ({0} marked)" -f @($after.news | Where-Object { $_.channel -eq 'dev' }).Count) (
         @($after.news | Where-Object { $_.channel -eq 'dev' }).Count -eq 1 -and @($after.news | Where-Object { $_.channel -eq 'dev' })[0].title -eq 'Work main never took')
     Yes '  and says main is on 1.2.0' ($after.mainVersion -eq '1.2.0')
@@ -439,25 +454,25 @@ try {
     Yes ("  and the publisher tells Ship the marks were refreshed ({0})" -f $r.Marks) ($r.Marks -eq 'True')
 
     Make-Stale
-    $staleSha = Sha $pDev
+    $staleSha = Sha (SiteFeed $pDevDir)
     # -NoPush reads the copy last received rather than the VPS, so receive the
     # stale one the way the run before a dry run would have.
     [void](Receive-FeedStore 'dev' $rel -SiteDir $pSite)
     $r = Publish @('-Notes', "'Dev and main match again`n- a dry run'", '-NoUpload', '-NoPush', '-NoClose', '-KeepPacks', '0')
-    YesR ("with -NoPush (what Ship -DryRun passes) it exits 2 and sends nothing (exit {0})" -f $r.Code) ($r.Code -eq 2 -and (Sha $pDev) -eq $staleSha -and
+    YesR ("with -NoPush (what Ship -DryRun passes) it exits 2 and sends nothing (exit {0})" -f $r.Code) ($r.Code -eq 2 -and (Sha (SiteFeed $pDevDir)) -eq $staleSha -and
         $r.Out -match 'this run sends nothing') $r
 
     # Main sees exit 2 as well when its build matches, and touches no dev feed.
     Put (Join-Path $pSite 'feed\published.json') ([IO.File]::ReadAllText((Join-Path $pSite 'feed-dev\published.json')))
-    $pMain2 = Read-Json (Join-Path $pSite 'feed\version.json')
+    $pMain2 = Read-Json (SiteFeed (Join-Path $pSite 'feed'))
     $pMain2 | Add-Member -NotePropertyName baseline -NotePropertyValue $afterRelease.baseline -Force
-    Put (Join-Path $pSite 'feed\version.json') ($pMain2 | ConvertTo-Json -Depth 6)
+    Put-SiteFeed (Join-Path $pSite 'feed') ($pMain2 | ConvertTo-Json -Depth 6)
     $relMain = Join-Path $Scratch 'rel-main'
     $pu = Join-Path $fake 'scripts\release\Publish-Update.ps1'
     $c = Child ("`$global:ThornswoodDevMarks = `$null; & " + (Q $pu) + " -Root " + (Q $inst) + " -ReleaseDir " + (Q $relMain) + " -DistRoot " + (Q (Join-Path $inst 'dist')) +
                 " -SiteDir " + (Q $pSite) + " -SiteUrl 'http://127.0.0.1:9' -NoPause -Notes 'Main again`n- nothing new'; `$rc = `$LASTEXITCODE; 'MARKS=[' + [string](`$null -ne `$global:ThornswoodDevMarks) + ']'; exit `$rc")
     YesR ("a main publish with nothing new exits 2 too, and leaves the dev feed alone (exit {0})" -f $c.Code) ($c.Code -eq 2 -and $c.Out -match 'MARKS=\[False\]' -and
-        (Sha $pDev) -eq $staleSha) $c
+        (Sha (SiteFeed $pDevDir)) -eq $staleSha) $c
 
     # ---- 4. Ship.ps1 from the publisher on -----------------------------------------
     Write-Host ''; Write-Host 'Ship.ps1 after the publisher'
