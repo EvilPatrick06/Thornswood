@@ -106,10 +106,10 @@ one SkyMP script above. The licence texts come with it, in
 `Data\Docs\Thornswood Client Runtime`.
 
 **The main menu's interface file**, `Data\Interface\startmenu.swf`, is
-Skyrim's own, edited so the menu shows no logo and no button list. It is the
-one file of the game Thornswood hands on. The notice board and drop box meshes
-are Thornswood's, put together from pieces of Skyrim's own meshes with the
-game's own textures.
+Skyrim's own, edited so the menu shows no logo and no button list. The notice
+board and drop box meshes are put together from pieces of Skyrim's own meshes
+with the game's own textures. Thornswood ships none of the three: the launcher
+makes them on your computer from your own copy of the game.
 
 **SkyHUD's settings**, `Data\Interface\skyhud\skyhud.txt`, are Thornswood's
 preset for SkyHUD 0.90B, by the SkyHUD Team, the version the collection
